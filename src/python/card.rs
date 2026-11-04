@@ -41,7 +41,7 @@ pub(super) fn dc_sweeps(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Analysis>
     Ok(Analysis::Dc { sweeps })
 }
 
-/// Where a Python sweep name becomes a [`super::analysis::Sweep`]: anything
+/// Where a Python sweep name becomes a [`super::keywords::Sweep`]: anything
 /// but dec, oct, lin or log (any case) is a `ValueError` here.
 pub(super) fn sweep(variation: &str, points: u32, start: f64, stop: f64) -> PyResult<FreqSweep> {
     Ok(FreqSweep {

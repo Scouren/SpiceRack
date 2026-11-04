@@ -1,29 +1,30 @@
 //! The analyses Python queues: each as its ngspice card (the deck's own
 //! text, which the parser reads), or, for the Spectre-only ones and the
 //! RF analyses ngspice has no card for, as its Spectre statement, in the
-//! deck's `simulator lang=spectre` region (a `.pss` is ngspice's card, which
-//! the reader keeps as ngspice text, so a Spectre target refuses it); and
-//! each's [`Kind`], which picks the backend, matches its plot and types its
+//! deck's `simulator lang=spectre` region; a `pss` is the Spectre statement
+//! on a Spectre target and the `.pss` card on any other (the reader keeps
+//! a `.pss` as ngspice text, which Spectre cannot run); and each's
+//! [`Kind`], which picks the backend, matches its plot and types its
 //! result.
 //!
 //! Cites: ngspice manual ch.11 (analysis cards; §11.3.6 `.pz`, §11.3.12
-//! `.pss`); Spectre Reference 19.1 `[REF]` p.90-91 (`hb`), p.272 (`pss`,
-//! the PSS base of the periodic analyses), p.174
+//! `.pss`); Spectre Reference 19.1 `[REF]` p.90-91 (`hb`), p.272-274
+//! (`pss`, also the PSS base of the periodic analyses), p.174
 //! (`montecarlo`), p.245-246 (`pac`), p.253-256 (`pnoise`), p.298-299
 //! (`pstb`), p.303-304 (`pxf`), p.393-394 (`stb`), p.406-410 (`sweep`).
 //!
 //! Contents:
 //! - `pub(super) enum Analysis`, `Analysis::kind(&self) -> Kind`,
-//!   `Analysis::card(&self) -> Option<String>`,
+//!   `Analysis::card(&self) -> Option<String>`, `Analysis::in_spectre_region(&self, d: Dialect) -> bool`,
 //!   `Analysis::spectre(&self) -> Result<String, String>`
 //! - `pub(super) struct DcSweep`, `pub(super) struct FreqSweep`, `pub(super) struct PssBase`
-//! - keyword enums `Sweep`, `PzTransfer`, `PzKind`, `SpectreAnalysis`, `RandomKind`, each with
-//!   `::ALL: &[Self]`, `::name(self) -> &'static str`, `FromStr`
 
 use std::fmt::Write as _;
 
+use super::keywords::{PzKind, PzTransfer, SpectreAnalysis, Sweep};
 use super::model::{dec, num};
 use crate::backend::Kind;
+use crate::syntax::Dialect;
 
 /// One analysis, as the Python call gave it.
 #[derive(Debug, Clone, PartialEq)]
@@ -156,98 +157,6 @@ pub(super) struct PssBase {
     pub(super) fundamental: f64,
     pub(super) stabilization: f64,
     pub(super) harmonics: u32,
-}
-
-/// A closed set of deck keywords: `name()` is the keyword, `FromStr` reads
-/// it in any case (anything else fails, naming the choices), so the text is
-/// parsed once, where it enters.
-macro_rules! keywords {
-    ($(#[$m:meta])* $name:ident, $what:literal { $($(#[$vm:meta])* $v:ident = $s:literal),+ $(,)? }) => {
-        $(#[$m])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        pub(super) enum $name { $($(#[$vm])* $v),+ }
-
-        impl $name {
-            /// Every keyword, in declaration order.
-            pub(super) const ALL: &'static [$name] = &[$($name::$v),+];
-
-            /// The keyword as a deck spells it.
-            pub(super) fn name(self) -> &'static str {
-                match self { $($name::$v => $s),+ }
-            }
-        }
-
-        impl std::str::FromStr for $name {
-            type Err = String;
-
-            /// Reads a [`Self::name`] in any case.
-            fn from_str(s: &str) -> Result<Self, String> {
-                Self::ALL.iter().copied().find(|k| k.name().eq_ignore_ascii_case(s)).ok_or_else(|| {
-                    let names: Vec<&str> = Self::ALL.iter().map(|k| k.name()).collect();
-                    let (last, rest) = names.split_last().expect("a keyword set is never empty");
-                    format!("unknown {} '{s}' (expected {} or {last})", $what, rest.join(", "))
-                })
-            }
-        }
-    };
-}
-
-keywords! {
-    /// How a sweep spaces its points: a frequency sweep, or a `.step`.
-    Sweep, "sweep" {
-        Dec = "dec",
-        Oct = "oct",
-        Lin = "lin",
-        /// Spectre's `log=N`: N points in total, log-spaced.
-        Log = "log",
-    }
-}
-
-keywords! {
-    /// What a `.pz` transfer function relates (ngspice manual §11.3.6).
-    PzTransfer, "transfer type" {
-        Vol = "vol",
-        Cur = "cur",
-    }
-}
-
-keywords! {
-    /// What a `.pz` finds: poles, zeros, or both.
-    PzKind, "pole-zero type" {
-        Pol = "pol",
-        Zer = "zer",
-        Pz = "pz",
-    }
-}
-
-keywords! {
-    /// The analysis a Spectre `sweep` or `montecarlo` runs inside it, as
-    /// its statement keyword.
-    SpectreAnalysis, "Spectre analysis" {
-        Dc = "dc",
-        Ac = "ac",
-        Tran = "tran",
-        Noise = "noise",
-        Xf = "xf",
-        Sp = "sp",
-        Stb = "stb",
-        Pss = "pss",
-        Pac = "pac",
-        Pnoise = "pnoise",
-        Pxf = "pxf",
-        Pstb = "pstb",
-        Hb = "hb",
-    }
-}
-
-keywords! {
-    /// TRRANDOM's distribution; its `TYPE` number is its place, from 1.
-    RandomKind, "random type" {
-        Uniform = "uniform",
-        Gaussian = "gaussian",
-        Exponential = "exponential",
-        Poisson = "poisson",
-    }
 }
 
 impl Analysis {
@@ -402,12 +311,19 @@ impl Analysis {
         })
     }
 
-    /// The Spectre statement of an analysis with no ngspice [`Self::card`]
-    /// (the deck holds it in a `simulator lang=spectre` region); `Err`
-    /// naming what Spectre cannot run.
+    /// Whether the deck for `d` holds the analysis as its Spectre
+    /// statement ([`Self::spectre`]) in its `simulator lang=spectre` region
+    /// rather than as its ngspice [`Self::card`]: one with no card, and
+    /// `pss` on Spectre, which runs no ngspice `.pss`.
+    pub(super) fn in_spectre_region(&self, d: Dialect) -> bool {
+        self.card().is_none() || (d == Dialect::Spectre && matches!(self, Analysis::Pss { .. }))
+    }
+
+    /// The Spectre statement of an analysis [`Self::in_spectre_region`]
+    /// holds in the region; `Err` naming what Spectre cannot run.
     ///
     /// # Panics
-    /// When `self` has an ngspice card.
+    /// When `self` has an ngspice card and is no `pss`.
     pub(super) fn spectre(&self) -> Result<String, String> {
         let pss = |p: &PssBase| {
             let (f, t) = (snum(p.fundamental), snum(p.stabilization));
@@ -424,6 +340,32 @@ impl Analysis {
             }
         };
         Ok(match self {
+            // `[REF]` p.272-274: `fund` (#2), `harms` (#4), `tstab` (#6), and
+            // for an autonomous circuit the observed node as the terminals;
+            // there is no `ppv` and no `probe`. ngspice's shooting controls
+            // have no Spectre parameter.
+            Analysis::Pss {
+                sc_iter,
+                steady_coeff,
+                uic,
+                ..
+            } if sc_iter.is_some() || steady_coeff.is_some() || *uic => {
+                return Err("pss sciter/steadycoeff/uic (ngspice shooting controls)".into());
+            }
+            Analysis::Pss {
+                fundamental,
+                stabilization,
+                observe_node,
+                harmonics,
+                ..
+            } => {
+                let terms = match observe_node.as_str() {
+                    "" => String::new(),
+                    n => format!("({} 0) ", bare(n)),
+                };
+                let (f, t) = (snum(*fundamental), snum(*stabilization));
+                format!("pss1 {terms}pss fund={f} tstab={t} harms={harmonics}")
+            }
             // `[REF]` p.90-91: `fundfreqs=[...]`, `maxharms=[...]`.
             Analysis::HarmonicBalance {
                 frequencies,
@@ -525,7 +467,7 @@ impl Analysis {
                 range(sweep)?,
                 probe.to_lowercase()
             ),
-            a => unreachable!("{a:?} has an ngspice card"),
+            a => unreachable!("{a:?} has an ngspice card and is no pss"),
         })
     }
 }
@@ -562,16 +504,6 @@ fn bare(s: &str) -> &str {
 mod tests {
     use super::*;
 
-    #[test]
-    fn keywords_read_in_any_case_and_name_the_choices() {
-        assert_eq!("DEC".parse::<Sweep>(), Ok(Sweep::Dec));
-        assert_eq!(
-            "decade".parse::<Sweep>(),
-            Err("unknown sweep 'decade' (expected dec, oct, lin or log)".into())
-        );
-        assert_eq!(RandomKind::ALL.len(), 4);
-    }
-
     fn pss_base() -> PssBase {
         PssBase {
             fundamental: 1e9,
@@ -589,11 +521,28 @@ mod tests {
         }
     }
 
-    /// `[REF]` p.90-91 hb (`fundfreqs`, `maxharms`, not
+    /// `[REF]` p.272-274 pss, p.90-91 hb (`fundfreqs`, `maxharms`, not
     /// `toneN`), p.393 stb (`probe`, the instance lowercased as every
     /// instance is written).
     #[test]
     fn spectre_rf_large_signal_analyses_match_documented_parameters() {
+        let pss = |sc_iter| Analysis::Pss {
+            fundamental: 1e9,
+            stabilization: 1e-7,
+            observe_node: "out".into(),
+            points_per_period: 128,
+            harmonics: 10,
+            sc_iter,
+            steady_coeff: None,
+            uic: false,
+        };
+        assert_eq!(
+            pss(None).spectre().unwrap(),
+            "pss1 (out 0) pss fund=1G tstab=100n harms=10"
+        );
+        assert!(pss(Some(50)).spectre().is_err(), "a shooting control");
+        assert!(pss(None).in_spectre_region(Dialect::Spectre));
+        assert!(!pss(None).in_spectre_region(Dialect::Ngspice));
         let hb = Analysis::HarmonicBalance {
             frequencies: vec![1e9, 1.01e9],
             harmonics: vec![5, 3],

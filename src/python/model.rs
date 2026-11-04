@@ -97,7 +97,7 @@ pub(super) struct Step {
     pub(super) start: f64,
     pub(super) stop: f64,
     pub(super) step: f64,
-    pub(super) sweep: Option<super::analysis::Sweep>,
+    pub(super) sweep: Option<super::keywords::Sweep>,
 }
 
 /// A PDK model file and corner, with a path per backend family.

@@ -5,9 +5,10 @@
 //! them.
 //!
 //! Each statement is spelled in a dialect that has it: ngspice's card, or,
-//! for what only Spectre says (the analyses with no ngspice card,
-//! `Analysis::spectre`), its Spectre statement in a `simulator
-//! lang=spectre` region of the source (`lexicon::NGSPICE_GIVEN`). A line
+//! for what only Spectre says (the analyses with no ngspice card, and
+//! `pss` on a Spectre target: `Analysis::in_spectre_region`), its Spectre
+//! statement in a `simulator lang=spectre` region of the source
+//! (`lexicon::NGSPICE_GIVEN`). A line
 //! given as one dialect's text (`extra_line`) sits in that dialect's
 //! region. The renderer writes a region's text for its own dialect family
 //! and refuses it (`W0001`) for any other; nothing is added to the text it
@@ -248,8 +249,9 @@ impl Deck {
     }
 
     /// The deck as ngspice text, for target `d`: a model library's path
-    /// is the one for `d`'s family, the only part that depends on `d`.
-    /// `Err` names an analysis no dialect here has a statement for.
+    /// is the one for `d`'s family, and a `pss` is Spectre's statement on
+    /// Spectre (`Analysis::in_spectre_region`), the only parts that depend
+    /// on `d`. `Err` names an analysis no dialect here has a statement for.
     fn source(&self, d: Dialect) -> Result<String, String> {
         let mut out = String::with_capacity(4096);
         let line = |out: &mut String, l: &str| {
@@ -306,7 +308,7 @@ impl Deck {
         }
         body(&mut out, &self.top);
         if let Some(tb) = &self.bench {
-            bench(&mut out, tb)?;
+            bench(&mut out, tb, d)?;
         }
         line(&mut out, ".end");
         Ok(out)
@@ -335,7 +337,7 @@ fn body(out: &mut String, b: &Body) {
 
 /// The testbench's cards: stimulus, options, initial conditions, outputs,
 /// measures, steps, the analyses, and the regions of other dialects' text.
-fn bench(out: &mut String, tb: &Bench) -> Result<(), String> {
+fn bench(out: &mut String, tb: &Bench, d: Dialect) -> Result<(), String> {
     for c in &tb.stimulus {
         let _ = writeln!(out, "{}", c.text);
     }
@@ -386,7 +388,7 @@ fn bench(out: &mut String, tb: &Bench) -> Result<(), String> {
     }
     let mut spectre = Vec::new();
     for a in &tb.analyses {
-        match a.card() {
+        match a.card().filter(|_| !a.in_spectre_region(d)) {
             Some(card) => {
                 let _ = writeln!(out, "{card}");
             }
@@ -416,4 +418,64 @@ fn region(out: &mut String, lang: &str, lines: &[String]) {
 /// The refusal of an analysis no dialect here has a statement for.
 fn unsupported(what: &str) -> String {
     format!("Unsupported analysis: {what}")
+}
+
+#[cfg(test)]
+mod tests {
+    // No test here reaches a `PyErr`: the extension module links no
+    // libpython, so a test binary that does fails to link.
+    use super::*;
+    use crate::python::model::Card;
+
+    /// A one-resistor deck with `analyses` queued.
+    fn deck(analyses: Vec<Analysis>) -> Deck {
+        Deck {
+            top: Body {
+                name: "t".into(),
+                elements: vec![Card::element("1", "R1 out 0 1k".into())],
+                ..Body::default()
+            },
+            bench: Some(Bench {
+                analyses,
+                ..Bench::default()
+            }),
+            ..Deck::default()
+        }
+    }
+
+    #[test]
+    fn a_pss_is_spectres_statement_on_spectre_and_the_card_elsewhere() {
+        // Spectre Reference 19.1 p.272-274 (`pss fund= tstab= harms=`, the
+        // observed node as its terminals); ngspice manual §11.3.12 (`.pss
+        // gfreq tstab oname psspoints harms`). Checks: 3.
+        let pss = Analysis::Pss {
+            fundamental: 1e6,
+            stabilization: 1e-5,
+            observe_node: "out".into(),
+            points_per_period: 128,
+            harmonics: 10,
+            sc_iter: None,
+            steady_coeff: None,
+            uic: false,
+        };
+        let d = deck(vec![pss]);
+        let spectre = d.write(Dialect::Spectre).expect("written");
+        assert!(
+            spectre
+                .lines()
+                .any(|l| l == "pss1 (out 0) pss fund=1M tstab=10u harms=10"),
+            "{spectre}"
+        );
+        let ngspice = d.write(Dialect::Ngspice).expect("written");
+        assert!(
+            ngspice.contains(".pss 1000000 0.00001 out 128 10"),
+            "{ngspice}"
+        );
+        // The store keeps ngspice's (`to_source`).
+        assert!(
+            d.source(Dialect::Ngspice)
+                .expect("source")
+                .contains(".pss ")
+        );
+    }
 }

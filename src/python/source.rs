@@ -128,7 +128,7 @@ macro_rules! pymethods_with_waves {
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
                 random_type: &str, duration: Num, time_delay: Num, parameter1: Num, parameter2: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
             ) -> PyResult<()> {
-                let kind: super::analysis::RandomKind = random_type.parse().map_err(PyValueError::new_err)?;
+                let kind: super::keywords::RandomKind = random_type.parse().map_err(PyValueError::new_err)?;
                 let ty = Num::of((kind as u8 + 1).into());
                 let wf = Wave::new("TRRANDOM", &[&ty, &duration, &time_delay, &parameter1, &parameter2], Value::Num(0.0));
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);

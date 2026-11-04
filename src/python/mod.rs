@@ -44,6 +44,7 @@ mod args;
 mod card;
 mod circuit;
 mod deck;
+mod keywords;
 mod model;
 mod results;
 mod simulator;
