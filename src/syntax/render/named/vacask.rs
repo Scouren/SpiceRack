@@ -471,7 +471,7 @@ impl W<'_, '_> {
                         "model {} sp_{}{}",
                         q(&view.name),
                         k.vacask,
-                        self.vacask_list(&rows)
+                        self.vacask_list(None, &rows)
                     ));
                 }
                 continue;
@@ -531,30 +531,26 @@ impl W<'_, '_> {
         ))
     }
 
-    /// ` (k=v …)`, or nothing.
-    fn vacask_list(&self, rows: &[(String, String)]) -> String {
-        let items: Vec<String> = rows
+    /// ` (type=1 k=v …)`, or nothing: `m`'s parameters but its `level`.
+    fn vacask_params(&self, m: &Model, sign: Option<i8>) -> String {
+        let rows = m
+            .params
             .iter()
-            .map(|(k, v)| format!("{k}={}", self.expr(v)))
+            .filter(|(k, _)| !k.eq_ignore_ascii_case("level"));
+        let rows: Vec<(String, String)> = rows
+            .map(|(k, v)| (k.to_ascii_lowercase(), v.clone()))
             .collect();
-        match items.is_empty() {
-            true => String::new(),
-            false => format!(" ({})", items.join(" ")),
-        }
+        self.vacask_list(sign, &rows)
     }
 
     /// ` (type=1 k=v …)`, or nothing.
-    fn vacask_params(&self, m: &Model, sign: Option<i8>) -> String {
+    fn vacask_list(&self, sign: Option<i8>, rows: &[(String, String)]) -> String {
         let mut s = String::new();
         if let Some(t) = sign {
             s.push_str(&format!(" type={t}"));
         }
-        for (k, v) in m
-            .params
-            .iter()
-            .filter(|(k, _)| !k.eq_ignore_ascii_case("level"))
-        {
-            s.push_str(&format!(" {}={}", k.to_ascii_lowercase(), self.expr(v)));
+        for (k, v) in rows {
+            s.push_str(&format!(" {k}={}", self.expr(v)));
         }
         if !s.is_empty() {
             s.replace_range(..1, " (");
