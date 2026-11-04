@@ -29,6 +29,7 @@
 //! - `pub(super) struct Lifted`, `pub(super) struct Var`
 //! - `pub(super) fn lift(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) -> Lifted`
 //! - `pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>)`
+//! - `pub(super) fn draw_scopes(rd: &Rd, deck: &Deck) -> (bool, bool)`
 //! - `Lifted::writes(&self, f: Func) -> bool`,
 //!   `Lifted::vars_at(&self, at: Option<usize>) -> impl Iterator<Item = &Var>`,
 //!   `Lifted::block_at(&self, at: Option<usize>) -> Option<Stats>`,
@@ -260,12 +261,7 @@ pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) {
         .flat_map(|s| &s.roots)
         .flat_map(|&r| rd.calls_in(r))
         .collect();
-    let stat = |rd: &Rd, call: u32| {
-        let (f, n) = rd.call_of(call);
-        let f = f.to_ascii_lowercase();
-        STATISTICAL.contains(&f.as_str()) && !(f == "limit" && n == 3)
-    };
-    if !calls.iter().any(|&c| stat(rd, c)) {
+    if !calls.iter().any(|&c| draws(rd, c)) {
         return;
     }
     let mut fixes = Vec::new();
@@ -290,6 +286,24 @@ pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) {
     for (tok, l) in fixes {
         rd.lift_call(tok, l);
     }
+}
+
+/// Whether the deck draws at its or a section's top (Spectre's `process`
+/// scope) and inside a subcircuit (`mismatch`): the scopes a Spectre
+/// `montecarlo variations=` picks from (Spectre Reference 19.1 p.166),
+/// which VACASK's `mc` varies alike (`docs/cmd-analysis-mc.md` lines
+/// 31-61).
+pub(super) fn draw_scopes(rd: &Rd, deck: &Deck) -> (bool, bool) {
+    let (mut process, mut mismatch) = (false, false);
+    for s in sites(rd, deck) {
+        let roots = s.sites.iter().flat_map(|site| &site.roots);
+        let drawn = roots.flat_map(|&r| rd.calls_in(r)).any(|c| draws(rd, c));
+        match s.subckt {
+            Some(_) => mismatch |= drawn,
+            None => process |= drawn,
+        }
+    }
+    (process, mismatch)
 }
 
 impl Lifted {
@@ -336,6 +350,14 @@ impl Lifted {
 }
 
 // ---- private ----
+
+/// Whether `call` draws: a statistical function, but no three-argument
+/// `limit` (Xyce's clamp, XY-RG Table 2-33).
+fn draws(rd: &Rd, call: u32) -> bool {
+    let (f, n) = rd.call_of(call);
+    let f = f.to_ascii_lowercase();
+    STATISTICAL.contains(&f.as_str()) && !(f == "limit" && n == 3)
+}
 
 /// `rack_<subckt>_<owner>_<field>_<k>`, identifier bytes only, a counter
 /// suffix on a collision (the subcircuit names a mismatch

@@ -1,7 +1,8 @@
 //! The renderer over block nesting, kit answers and a given deck's `.step`:
 //! a deck nested 10⁴ deep in `.subckt`s and `.if`s is written in Debug,
 //! what `syntax::resolve` answers for a kit file reaches the deck written
-//! from it, and a `.step log` is Spectre's sweep or refused. Each test
+//! from it, a `.step log` is Spectre's sweep or refused, and a region's
+//! Spectre `montecarlo` is Spectre's and VACASK's `mc` or refused. Each test
 //! names its clause, the text derived by hand, and how many checks it
 //! makes.
 //!
@@ -118,11 +119,81 @@ fn a_log_step_is_spectres_sweep_and_refused_where_no_step_has_one() {
     // its braces; Xyce RG p.155 (`.step` lin, dec, oct, list), LTspice help
     // (`.step` lin, oct, dec, list) and VACASK `docs/cmd-sweep.md` (lin,
     // dec, oct, values) have no total-count log sweep: `W0016`. Checks: 4.
+    let text = "t\nR1 a 0 1k\n.param g=1\n.step log g 1 100 5\n.op\n.end\n";
+    let head = "sweep1_g sweep param=g start=1 stop=100 log=5 {";
+    let w = given(text, Dialect::Spectre).expect("written");
+    assert!(w.lines().any(|l| l == head), "{w}");
+    for d in [Dialect::Xyce, Dialect::Ltspice, Dialect::Vacask] {
+        let refused = given(text, d).expect_err("refused");
+        assert!(refused.contains("W0016"), "{d:?}: {refused}");
+    }
+}
+
+#[test]
+fn a_region_montecarlo_is_spectres_and_vacasks_mc_or_refused() {
+    // Spectre Reference 19.1 p.174 (`montecarlo numruns= seed= { … }`),
+    // p.166 (`variations`, default `process`: the top's draws); VACASK
+    // `docs/cmd-analysis-mc.md` at codeberg `d7b4db4` (`mc … endmc` around
+    // the analyses, every call site drawn; `lh=0` is plain sampling; the
+    // VACASK `flake.nix` pins, `bcd48e2`, has no `mc`, so no run checks
+    // it); ngspice has no such statement (`W0015`); a draw inside a
+    // subcircuit is `mismatch`, which the default leaves out and VACASK
+    // would vary (`W0115`). Checks: 7.
+    let deck = |sub: &str, vary: &str| {
+        format!(
+            "t\n.subckt s a\nR1 a 0 {sub}\n.ends\nX1 n s\nR2 n 0 {{agauss(1k, 100, 1)}}\n\
+             .tran 1u 1m\nsimulator lang=spectre\n\
+             mc1 montecarlo numruns=20 seed=42{vary} {{\n  tran1 tran\n}}\nsimulator lang=spice\n.end\n"
+        )
+    };
+    let top = deck("1k", "");
+    let spectre = given(&top, Dialect::Spectre).expect("written");
+    let mc: Vec<&str> = spectre
+        .lines()
+        .skip_while(|l| !l.contains("montecarlo"))
+        .take(3)
+        .collect();
+    assert_eq!(
+        mc,
+        ["mc1 montecarlo numruns=20 seed=42 {", "  tran1 tran", "}"],
+        "{spectre}"
+    );
+    let vacask = given(&top, Dialect::Vacask).expect("written");
+    let mc: Vec<&str> = vacask
+        .lines()
+        .skip_while(|l| !l.contains("mc mc1"))
+        .take(3)
+        .collect();
+    assert_eq!(mc[0], "  mc mc1 samples=20 seed=42 lh=0", "{vacask}");
+    assert!(mc[1].starts_with("    analysis tran2 tran "), "{vacask}");
+    assert_eq!(mc[2], "  endmc", "{vacask}");
+    assert!(
+        given(&top, Dialect::Ngspice)
+            .expect_err("refused")
+            .contains("W0015")
+    );
+    let mismatch = deck("{agauss(1k, 100, 1)}", "");
+    assert!(
+        given(&mismatch, Dialect::Vacask)
+            .expect_err("refused")
+            .contains("W0115")
+    );
+    assert!(
+        given(
+            &deck("{agauss(1k, 100, 1)}", " variations=all"),
+            Dialect::Vacask
+        )
+        .is_ok()
+    );
+}
+
+/// `text` read as the given deck (`lexicon::NGSPICE_GIVEN`, the Python
+/// API's: ngspice has no `.step`, and its regions hold other dialects)
+/// and written for `target`: the text, or the refusal's messages.
+fn given(text: &str, target: Dialect) -> Result<String, String> {
     use crate::syntax::lexicon::NGSPICE_GIVEN;
     use crate::syntax::render::{Numbers, Source, render};
     use crate::syntax::{parse, tokenize};
-    // The given deck's lexicon (the Python API's): ngspice has no `.step`.
-    let text = "t\nR1 a 0 1k\n.param g=1\n.step log g 1 100 5\n.op\n.end\n";
     let tokens = tokenize(text, &NGSPICE_GIVEN);
     let ast = parse(&tokens, &NGSPICE_GIVEN);
     let src = Source {
@@ -134,15 +205,5 @@ fn a_log_step_is_spectres_sweep_and_refused_where_no_step_has_one() {
         loads: &[],
         numbers: Numbers::Given,
     };
-    let w = render(&src, Dialect::Spectre).expect("written");
-    let head = "sweep1_g sweep param=g start=1 stop=100 log=5 {";
-    assert!(w.text.lines().any(|l| l == head), "{}", w.text);
-    for d in [Dialect::Xyce, Dialect::Ltspice, Dialect::Vacask] {
-        let refused = render(&src, d).expect_err("refused");
-        assert!(
-            refused.messages.contains("W0016"),
-            "{d:?}: {}",
-            refused.messages
-        );
-    }
+    render(&src, target).map(|w| w.text).map_err(|d| d.messages)
 }

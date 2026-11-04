@@ -383,6 +383,24 @@ impl W<'_, '_> {
                 self.ask(Construct::PoleZero, tok);
                 return None;
             }
+            // `[REF]` p.174: every parameter precedes the brace; the names
+            // as written.
+            Ana::MonteCarlo {
+                name,
+                runs,
+                seed,
+                variations,
+                inner: (inner, kind),
+            } => {
+                let mut s = format!("{name} montecarlo numruns={runs}");
+                if let Some(seed) = seed {
+                    s.push_str(&format!(" seed={seed}"));
+                }
+                if let Some(v) = variations {
+                    s.push_str(&format!(" variations={v}"));
+                }
+                format!("{s} {{\n  {inner} {kind}\n}}")
+            }
         })
     }
 

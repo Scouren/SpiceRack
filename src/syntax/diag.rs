@@ -491,6 +491,12 @@ catalogue! {
         cite: "`render::models` (each row's ngspice-45 and Spectre Reference 5.0 clause)",
         explain: "The parameter at this position has no parameter in the target with ngspice's equation (a tunnelling current, an exponential temperature coefficient, a knee current Spectre reads only with `hcomp=1`), or ngspice and the target rank it against another one in opposite orders. Set it to its off value, or model the effect another way.",
     }
+    /// A Spectre `montecarlo` whose `variations` leaves out a scope the deck draws in, on a target that varies every call (VACASK's `mc`).
+    W0115 Refusal {
+        title: "a Monte Carlo the target varies wider",
+        cite: "Spectre Reference 19.1 p.166 (`variations`, default `process`); VACASK docs/cmd-analysis-mc.md (`mc` draws at every call site)",
+        explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Write `variations=all`, or keep the deck's draws to the scope the montecarlo names.",
+    }
 }
 
 /// Sorts `diags` by source position (token), then code: the order their

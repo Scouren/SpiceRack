@@ -75,6 +75,17 @@ pub(in crate::syntax::render) enum Ana {
     /// Four nodes, the transfer and pole-zero keywords.
     Pz([String; 4], &'static str, &'static str),
     Four(f64, Vec<String>),
+    /// Spectre's `montecarlo` over one analysis (`[REF]` p.174), from a
+    /// given deck's `spectre` region: its name, `numruns`, `seed`,
+    /// `variations` (`None`: Spectre's default, `process`, p.166), and the
+    /// inner statement's name and analysis keyword.
+    MonteCarlo {
+        name: String,
+        runs: u32,
+        seed: Option<u64>,
+        variations: Option<String>,
+        inner: (String, String),
+    },
 }
 
 /// A frequency sweep: its variation keyword (lowercase), points, start,

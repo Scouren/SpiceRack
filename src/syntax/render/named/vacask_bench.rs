@@ -1,16 +1,18 @@
 //! The testbench → VACASK's `control` block: one `options` line, the
 //! stepped parameters as control variables swept ahead of each analysis,
-//! and the analyses, initial conditions on each `analysis` line.
+//! and the analyses, initial conditions on each `analysis` line; a Spectre
+//! `montecarlo` as an `mc` loop around its inner analysis.
 //!
 //! Cites: VACASK `share/doc/vacask/demo` (`analysis`, `sweep`, `options`,
-//! `var`), `docs/cmd-analysis-mc.md` (as the old VACASK
-//! writer probed them).
+//! `var`), `docs/cmd-analysis-mc.md` (`mc`; as the old VACASK writer
+//! probed them); Spectre Reference 19.1 pp.165-174 (`montecarlo`).
 //!
 //! Contents:
 //! - `W::control(&mut self, tb: &Tb)`
 
 use super::W;
 use super::bench::{Step, Tb, bare_node};
+use super::lift::draw_scopes;
 use super::vacask::{num, respell};
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
@@ -104,7 +106,11 @@ impl W<'_, '_> {
             for s in &sweeps {
                 self.line(&format!("  {s}"));
             }
-            for l in self.vacask_analysis(idx, a, *tok) {
+            let lines = match a {
+                Ana::MonteCarlo { .. } => self.vacask_mc(idx, a, *tok, tb),
+                a => self.vacask_analysis(idx, a, *tok),
+            };
+            for l in lines {
                 let ic = match l.trim_start().starts_with("analysis") {
                     true => ic.as_str(),
                     false => "",
@@ -129,6 +135,7 @@ impl W<'_, '_> {
                 self.refuse(Code::W0015, tok);
                 return vec![];
             }
+            Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
         };
         let name = format!("{kind}{}", idx + 1);
         let mut out = Vec::new();
@@ -213,10 +220,61 @@ impl W<'_, '_> {
                 "analysis {name} dcxf out=\"{}\"",
                 bare_node(output).to_ascii_lowercase()
             )),
-            Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) => {
+            Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) | Ana::MonteCarlo { .. } => {
                 unreachable!("refused above")
             }
         }
+        out
+    }
+
+    /// A Spectre `montecarlo` (`idx`, `a`) as VACASK's `mc` loop around
+    /// the deck's analysis of its inner kind, named as the loop's own
+    /// (`docs/cmd-analysis-mc.md` lines 7-23), `lh=0`: Spectre's default
+    /// `sampling=standard` draws plainly (Reference 19.1 pp.165-174), and
+    /// `seed` carries the seed, not Spectre's draws. Refused (`W0015`) with
+    /// no analysis of that kind, and (`W0115`) where `variations` (default
+    /// `process`, p.166) leaves out a scope the deck draws in, as `mc`
+    /// varies every call.
+    fn vacask_mc(&mut self, idx: usize, a: &Ana, tok: u32, tb: &Tb) -> Vec<String> {
+        let Ana::MonteCarlo {
+            name,
+            runs,
+            seed,
+            variations,
+            inner: (_, kind),
+        } = a
+        else {
+            unreachable!("vacask_mc takes a montecarlo");
+        };
+        let (process, mismatch) = draw_scopes(self.rd, self.deck);
+        let left_out = match variations.as_deref() {
+            None | Some("process") => mismatch,
+            Some("mismatch") => process,
+            _ => false,
+        };
+        if left_out {
+            self.refuse(Code::W0115, tok);
+            return vec![];
+        }
+        let inner = tb
+            .analyses
+            .iter()
+            .find(|(x, _)| spectre_kind(x) == Some(kind.to_ascii_lowercase().as_str()));
+        let Some((inner, _)) = inner else {
+            self.refuse(Code::W0015, tok);
+            return vec![];
+        };
+        let body = self.vacask_analysis(idx, inner, tok);
+        if body.is_empty() {
+            return body;
+        }
+        let seed = seed.map(|s| format!(" seed={s}")).unwrap_or_default();
+        let mut out = vec![format!(
+            "mc {} samples={runs}{seed} lh=0",
+            name.to_ascii_lowercase()
+        )];
+        out.extend(body.into_iter().map(|l| format!("  {l}")));
+        out.push("endmc".into());
         out
     }
 
@@ -247,6 +305,23 @@ impl W<'_, '_> {
 }
 
 // ---- private ----
+
+/// The Spectre analysis keyword of `a` (`[REF]`: an operating point is a
+/// `dc` with no sweep, a transfer function `xf`); `None` for a Monte Carlo.
+fn spectre_kind(a: &Ana) -> Option<&'static str> {
+    Some(match a {
+        Ana::Op | Ana::Dc(_) => "dc",
+        Ana::Ac(_) => "ac",
+        Ana::Sp(_) => "sp",
+        Ana::Tran { .. } => "tran",
+        Ana::Noise { .. } => "noise",
+        Ana::Tf(..) => "xf",
+        Ana::Sens(..) => "sens",
+        Ana::Pz(..) => "pz",
+        Ana::Four(..) => "fourier",
+        Ana::MonteCarlo { .. } => return None,
+    })
+}
 
 /// ` ic=["n"; v; …]`.
 fn node_list(key: &str, items: &[(String, f64)]) -> String {

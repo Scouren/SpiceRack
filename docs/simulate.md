@@ -114,7 +114,10 @@ returns (`None` for `add_fourier`, whose table goes to stdout). ngspice runs a
 deck's analyses in its own order, so results are matched to analyses by plot
 name, never by position. `pss`, `hb`, `stb`, transient noise and the Spectre
 analyses run alone; queued beside others, `run()` raises rather than guess
-which plot is theirs.
+which plot is theirs. A Spectre `montecarlo` (`add_spectre_monte_carlo`) is also
+written for VACASK, as an `mc` loop around the deck's analysis of its inner
+type, unless its `variations` (Spectre's default, `process`) leaves out draws
+the deck makes inside a subcircuit (`W0115`).
 
 ```python
 both = ps.Testbench(rc)

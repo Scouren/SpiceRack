@@ -473,6 +473,13 @@ impl W<'_, '_> {
                 ),
                 _ => String::new(),
             },
+            // No SPICE statement is Spectre's `montecarlo`: ngspice's Monte
+            // Carlo is a `.control` loop, Xyce's `.sampling`, HSPICE's an
+            // analysis's `sweep monte=`.
+            Ana::MonteCarlo { .. } => {
+                self.refuse(Code::W0015, tok);
+                String::new()
+            }
         }
     }
 }

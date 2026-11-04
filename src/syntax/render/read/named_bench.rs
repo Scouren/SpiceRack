@@ -94,6 +94,7 @@ impl<'a> Rd<'a> {
                 max_step: num("maxstep"),
                 uic: s("skipdc").as_deref() == Some("yes"),
             },
+            ("montecarlo", []) => self.montecarlo(n)?,
             ("noise", [out, reference]) => Ana::Noise {
                 output: out.clone(),
                 reference: reference.clone(),
@@ -121,6 +122,49 @@ impl<'a> Rd<'a> {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// `name montecarlo numruns=N [seed=S] [variations=v] { inner kind }`
+    /// (`[REF]` p.174, `variations` p.166) over one analysis statement with
+    /// no nodes and no parameters (the Python API's `inner_analysis` and
+    /// `inner_type`); `None` for any other form, which stays text.
+    fn montecarlo(&self, n: u32) -> Option<Ana> {
+        let p = self.pairs(n);
+        let known = ["numruns", "seed", "variations"];
+        if p.iter().any(|(k, _)| !known.contains(&k.as_str())) {
+            return None;
+        }
+        let whole = |k: &str| {
+            let x = self.number(self.get(&p, k)?)?;
+            (x >= 0.0 && x.fract() == 0.0 && x <= u32::MAX as f64).then_some(x as u64)
+        };
+        let runs = u32::try_from(whole("numruns")?).ok()?;
+        let seed = match self.get(&p, "seed") {
+            Some(_) => Some(whole("seed")?),
+            None => None,
+        };
+        let variations = match self.get(&p, "variations").map(|v| self.text(v)) {
+            Some(v) if ["process", "mismatch", "all"].contains(&v.as_str()) => Some(v),
+            Some(_) => return None,
+            None => None,
+        };
+        let &[inner] = self.body(n) else {
+            return None;
+        };
+        if self.tag(inner) != Tag::Analysis {
+            return None;
+        }
+        let (h, ih) = (self.ast.header(Node(n)), self.ast.header(Node(inner)));
+        if !ih.nodes.is_empty() || !self.fields(inner).is_empty() {
+            return None;
+        }
+        Some(Ana::MonteCarlo {
+            name: self.text(h.name),
+            runs,
+            seed,
+            variations,
+            inner: (self.text(ih.name), self.text(ih.master)),
+        })
+    }
+
     /// `name options k=v` (the old lowering's `spectre_options`).
     fn spectre_options(&self, n: u32) -> Vec<Opt> {
         let mut out = Vec::new();

@@ -1,6 +1,7 @@
 //! VACASK: run `vacask` on a native deck, read back every per-analysis `.raw`.
 //!
-//! Cites: none (VACASK's CLI).
+//! Cites: VACASK's CLI; `docs/cmd-analysis-mc.md` ("Output": an `mc` loop's
+//! raw file names).
 //!
 //! Contents:
 //! - `pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError>`
@@ -47,20 +48,37 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
 
 // ---- private ----
 
-/// Analysis names declared by a deck, in order: `analysis <name> <kind> ...`.
-fn analysis_names(netlist: &str) -> impl Iterator<Item = &str> {
-    netlist.lines().filter_map(|l| {
+/// The raw file stems a deck's analyses write, in order: `analysis <name>
+/// <kind> ...` writes `<name>`; inside `mc <loop> samples=<n>` … `endmc`,
+/// `<loop>.<i>.<name>` for each sample `i` from 1 to `n`.
+fn analysis_names(netlist: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut mc: Option<(&str, u32)> = None;
+    for l in netlist.lines() {
         let mut w = l.split_whitespace();
-        (w.next()? == "analysis").then(|| w.next())?
-    })
+        match (w.next(), w.next()) {
+            (Some("mc"), Some(name)) => {
+                let samples = w.find_map(|kv| kv.strip_prefix("samples="));
+                mc = Some((name, samples.and_then(|n| n.parse().ok()).unwrap_or(0)));
+            }
+            (Some("endmc"), _) => mc = None,
+            (Some("analysis"), Some(name)) => match mc {
+                Some((lp, n)) => out.extend((1..=n).map(|i| format!("{lp}.{i}.{name}"))),
+                None => out.push(name.to_string()),
+            },
+            _ => {}
+        }
+    }
+    out
 }
 
-/// VACASK writes one raw file per analysis, named after it: each declared
-/// analysis's, in deck order; for a deck that declares none this can see,
-/// every `.raw` in name order. `Err` names the first declared analysis's
+/// VACASK writes one raw file per analysis run, named after it: each
+/// declared analysis's ([`analysis_names`]), in deck order; for a deck that
+/// declares none this can see, every `.raw` in name order. `Err` names the first declared analysis's
 /// file that is missing, or `.raw` when nothing was written.
 fn raw_files_for(dir: &Path, netlist: &str) -> Result<Vec<PathBuf>, String> {
     let declared: Vec<PathBuf> = analysis_names(netlist)
+        .iter()
         .map(|n| dir.join(format!("{n}.raw")))
         .collect();
     if let Some(missing) = declared.iter().find(|p| !p.is_file()) {
@@ -113,7 +131,10 @@ mod tests {
     #[test]
     fn analysis_names_are_read_off_the_deck_in_order() {
         let deck = "x\ncontrol\n  analysis op1 op\n  sweep s instance=\"v1\" parameter=\"dc\"\n    analysis dc1 op\nendc\n";
-        assert_eq!(analysis_names(deck).collect::<Vec<_>>(), vec!["op1", "dc1"]);
+        assert_eq!(analysis_names(deck), ["op1", "dc1"]);
+        // `docs/cmd-analysis-mc.md` "Output": `mc1.<i>.op1.raw` per sample.
+        let mc = "control\n  mc mc1 samples=2 seed=1 lh=0\n    analysis op2 op\n  endmc\nendc\n";
+        assert_eq!(analysis_names(mc), ["mc1.1.op2", "mc1.2.op2"]);
     }
 
     #[test]

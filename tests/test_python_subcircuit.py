@@ -644,7 +644,9 @@ class TestDialectText:
         return tb
 
     def test_a_spectre_analysis_is_spectre_text_in_a_region(self):
-        # Spectre Reference 19.1 p.174: `montecarlo numruns= seed= { … }`.
+        # Spectre Reference 19.1 p.174: `montecarlo numruns= seed= { … }`;
+        # VACASK docs/cmd-analysis-mc.md: `mc … endmc` around the deck's
+        # analysis of the inner kind; no SPICE statement is one (W0015).
         ps = import_spicerack()
         tb = self._tb(ps)
         tb.add_spectre_monte_carlo(20, "tran1", "tran", seed=42)
@@ -653,9 +655,18 @@ class TestDialectText:
         assert lines[i + 1] == "mc1 montecarlo numruns=20 seed=42 {"
         assert "simulator lang=spice" in lines[i:]
         assert "mc1 montecarlo numruns=20 seed=42 {" in tb.netlist("spectre").splitlines()
-        for other in ("ngspice", "hspice", "vacask"):
-            with pytest.raises(RuntimeError, match="W0001"):
+        vacask = [line.strip() for line in tb.netlist("vacask").splitlines()]
+        i = vacask.index("mc mc1 samples=20 seed=42 lh=0")
+        assert vacask[i + 1].startswith("analysis tran2 tran ")
+        assert vacask[i + 2] == "endmc"
+        for other in ("ngspice", "hspice"):
+            with pytest.raises(RuntimeError, match="W0015"):
                 tb.netlist(other)
+        # Any other Spectre-only analysis stays the region's text.
+        swept = self._tb(ps)
+        swept.add_spectre_sweep("r", 1.0, 2.0, 1.0, "tran1", "tran")
+        with pytest.raises(RuntimeError, match="W0001"):
+            swept.netlist("vacask")
 
     def test_an_extra_line_is_copied_on_its_own_family_only(self):
         ps = import_spicerack()

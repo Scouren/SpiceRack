@@ -492,10 +492,19 @@ impl<'a> Rd<'a> {
             Tag::Title | Tag::End => {}
             Tag::Verbatim | Tag::Line => self.unparsed(n, here),
             // A region of another dialect's text (`lexicon::NGSPICE_GIVEN`):
-            // kept as that dialect's text, which only it writes.
+            // kept as that dialect's text, which only it writes; but a
+            // Spectre `montecarlo` over one analysis at the top is an
+            // analysis (`Ana::MonteCarlo`), which VACASK spells as its `mc`.
             Tag::Region => {
                 for &k in self.body(n) {
-                    here.raw.push(Raw::Lines(k));
+                    let mc = scope == Scope::Top
+                        && self.text_dialect(self.main(k)) == Dialect::Spectre
+                        && self.tag(k) == Tag::Analysis
+                        && matches!(self.spectre_analysis(k), Some(Ana::MonteCarlo { .. }));
+                    match mc {
+                        true => acc.bench.push(Bench::Analysis(k)),
+                        false => here.raw.push(Raw::Lines(k)),
+                    }
                 }
             }
             Tag::Subckt => match self.subckt_head(n) {
