@@ -18,6 +18,7 @@
 //! - `fn bare_node(s: &str) -> &str`
 
 use super::W;
+use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Sweep};
@@ -194,7 +195,25 @@ impl W<'_, '_> {
                     BenchCard::Options(opts) => {
                         for o in opts {
                             match o {
-                                Opt::Portable(k, v) => tb.options.push((k, v, tok)),
+                                // A bare `parser` read as ngspice is Xyce's
+                                // option package (sky130's combined kit:
+                                // `.options parser scale=1.0u`); ngspice-45
+                                // takes it as an unused flag.
+                                Opt::Portable(k, v)
+                                    if self.rd.d == Dialect::Ngspice
+                                        && v.is_empty()
+                                        && k.eq_ignore_ascii_case("parser") =>
+                                {
+                                    if !tb.xyce.contains(&tok) {
+                                        tb.xyce.push(tok);
+                                    }
+                                }
+                                // The last value wins, as in ngspice: neither
+                                // target takes a name twice.
+                                Opt::Portable(k, v) => {
+                                    tb.options.retain(|o| !o.0.eq_ignore_ascii_case(&k));
+                                    tb.options.push((k, v, tok));
+                                }
                                 Opt::Temp(t) => tb.temp = Some(t),
                                 Opt::Tnom(t) => tb.tnom = Some(t),
                                 Opt::Vacask(k, v) => tb.vacask.push((k, v, tok)),

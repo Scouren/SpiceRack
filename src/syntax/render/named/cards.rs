@@ -64,8 +64,10 @@ impl W<'_, '_> {
                     && letter == 'R'
                     && let Some((r, kept)) = self.dependent(&value, model.is_some(), &params, n)?
                 {
+                    // ngspice's `B` line is noiseless; Spectre's resistor
+                    // is, with `isnoisy=no` (`[CMP]` p.629).
                     return Some(format!(
-                        "r{name} ({n1} {n2}) resistor r={r}{}",
+                        "r{name} ({n1} {n2}) resistor r={r}{} isnoisy=no",
                         self.params(&kept)
                     ));
                 }

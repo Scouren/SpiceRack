@@ -40,8 +40,20 @@ impl W<'_, '_> {
                     self.ask(Construct::RclModel, tok);
                     return None;
                 }
-                if ngspice && letter == 'R' {
-                    self.dependent(&value, model.is_some(), &params, n)?;
+                if ngspice
+                    && letter == 'R'
+                    && let Some((r, kept)) = self.dependent(&value, model.is_some(), &params, n)?
+                {
+                    // ngspice's `B` line is noiseless (`sp_resistor`'s
+                    // `noisy`, `devices/spice/resistor.va`).
+                    return Some(format!(
+                        "r{} ({} {}) resistor r={}{} noisy=0",
+                        q(own),
+                        q(&n1),
+                        q(&n2),
+                        self.expr(&r),
+                        self.inst_params(&kept)
+                    ));
                 }
                 let (l, m) = match letter {
                     'R' => ('r', "resistor"),

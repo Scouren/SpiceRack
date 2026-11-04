@@ -8,7 +8,8 @@
 //! `frontend/inpcom.c` L5751-L5770 (`b_transformation_wanted`: `v(`, `i(`,
 //! `temper`, `hertz`, `time`), L6621-L6680 (the `B` line keeps `tc1`, `tc2`
 //! and `m`); Spectre Reference 5.0 p.859 (`resistor r=100*(1+v(n1,n2)/2)`),
-//! p.884 (`temp` in an expression).
+//! p.884 (`temp` in an expression); VACASK `docs/cmd-options-temp.md`
+//! (`$temp`).
 //!
 //! Contents:
 //! - `W::table_kind(&self, m: &Model) -> Option<&'static Kind>`, `W::model_rows(&mut self, m: &Model, node: u32, k: &'static Kind) -> Option<Vec<(String, String)>>`
@@ -128,9 +129,11 @@ impl W<'_, '_> {
     /// current, its expression and the `tc1`, `tc2`, `m` the `B` line keeps;
     /// `Some(None)` when it reads none of `v(`, `i(`, `temper`, `hertz`,
     /// `time`. `None` when the target cannot write it (VACASK has no
-    /// behavioural element; `temper`, `hertz`, `time` have no Spectre
-    /// spelling here), refused at `node`. What is left out (the `model`,
-    /// any other parameter) is noted.
+    /// behavioural element, so writes only a `temper` one with no model;
+    /// `hertz`, `time` have no Spectre spelling here), refused at `node`.
+    /// What is left out (the `model`, any other parameter) is noted. The
+    /// `B` line has no thermal noise: the caller writes the resistor
+    /// noiseless.
     pub(super) fn dependent(
         &mut self,
         value: &Val,
@@ -157,10 +160,12 @@ impl W<'_, '_> {
         if !branch && !temper && !texts.iter().any(|e| word(e, &["hertz", "time"])) {
             return Some(None);
         }
-        // `hertz` and `time` have no Spectre spelling here; VACASK has no
-        // behavioural element and no temperature in an expression.
+        // `hertz` and `time` have no Spectre spelling here. VACASK has no
+        // behavioural element, so it takes a resistance reading only
+        // `temper` (its `$temp`), on no model: the `resistor` it names is
+        // declared only for a card naming none.
         let clean = !texts.iter().any(|e| word(e, &["hertz", "time"]));
-        if !clean || self.d == Dialect::Vacask {
+        if !clean || self.d == Dialect::Vacask && (branch || model) {
             self.refuse(Code::W0102, tok);
             return None;
         }
@@ -196,9 +201,14 @@ impl W<'_, '_> {
             self.note(Code::W0113, tok);
         }
         // `[CMP]` p.884 ("Temperature as a parameter"): Spectre's `temp` is
-        // ngspice's `temper`, re-evaluated as the temperature changes.
+        // ngspice's `temper`, re-evaluated as the temperature changes; so is
+        // VACASK's `$temp` (`docs/cmd-options-temp.md`). All are Celsius.
+        let temp = match self.d {
+            Dialect::Vacask => "$temp",
+            _ => "temp",
+        };
         let expr = words(&expr, |w| match w.eq_ignore_ascii_case("temper") {
-            true => "temp".to_string(),
+            true => temp.to_string(),
             false => w.to_string(),
         });
         Some(Some((expr.replace("V(", "v(").replace("I(", "i("), kept)))

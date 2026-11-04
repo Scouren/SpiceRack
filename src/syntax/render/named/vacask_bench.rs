@@ -36,9 +36,12 @@ const COSMETIC_OPTIONS: &[&str] = &[
 ];
 
 /// `.options KEY=VALUE` whose VACASK spelling is the same word and the same
-/// quantity (`itl1`, `maxord` are rejected there).
+/// quantity (`itl1`, `maxord` are rejected there). `scale` is the
+/// `$simparam("scale")` VACASK's `sp_*` modules read where ngspice's code
+/// reads `CKTscale` (`devices/spice/*.va` headers; `lib/osdidevice.cpp`
+/// `simParamNames`).
 const NUMERIC_OPTIONS: &[&str] = &[
-    "reltol", "abstol", "vntol", "chgtol", "gmin", "temp", "tnom",
+    "reltol", "abstol", "vntol", "chgtol", "gmin", "temp", "tnom", "scale",
 ];
 
 impl W<'_, '_> {

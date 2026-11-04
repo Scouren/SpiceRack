@@ -11,7 +11,7 @@
 use std::path::Path;
 
 use spicerack::syntax::Dialect;
-use spicerack::syntax::diag::Code;
+use spicerack::syntax::diag::{self, Code};
 use spicerack::syntax::render::{Written, render_text};
 use spicerack::syntax::resolve::{Form, Role};
 
@@ -100,16 +100,19 @@ fn gf180mcu_model_file_round_trips_through_sections() {
 /// time: each section either crosses with the same meaning ([`meaning`]: a
 /// definition's locals are Spectre `parameters`, which an instance could
 /// set; numbers respelled, SPICE quotes dropped) or is refused for its one
-/// named reason, a `.model` kind with no Spectre master mapped (`W0104`: an
-/// `r`, a `c`, a level-3 `d`, which a line scan finds in exactly those
-/// sections; `W0006` on each R or C card naming one). The mismatch and statistical corners cross, their `agauss`
+/// named reason, a level-3 diode parameter no Spectre parameter computes
+/// (`W0114`: a tunnelling current `jtun`/`jtunsw` or a reverse knee `ikr`
+/// set, which a line scan finds in exactly those sections). A section
+/// holding an `r` or `c` model crosses to Spectre only: its instances of a
+/// Spectre `resistor` or `capacitor` model are read back as Spectre text
+/// (`W0001`). The mismatch and statistical corners cross, their `agauss`
 /// calls lifted and read back (tests/test_monte_carlo.rs).
 #[test]
 fn gf180mcu_sections_cross_to_spectre() {
     let root = std::env::var("PDK_ROOT")
         .expect("PDK_ROOT not set: run the tests in `nix develop .#testing`");
     let pdk = Path::new(&root).join("gf180mcuD/libs.tech/ngspice");
-    let (mut crossed, mut refused) = (Vec::new(), Vec::new());
+    let (mut crossed, mut refused, mut one_way) = (Vec::new(), Vec::new(), Vec::new());
     for f in [
         "sm141064.ngspice",
         "sm141064_mim.ngspice",
@@ -121,19 +124,30 @@ fn gf180mcu_sections_cross_to_spectre() {
             let scs = match render_text(&one, Dialect::Ngspice, "gf180", Dialect::Spectre) {
                 Ok(w) => w.text,
                 Err(e) => {
-                    let got: Vec<Code> = e.diags.iter().map(|d| d.code).collect();
-                    // The model, and each R or C card naming it (`W0006`).
-                    assert!(
-                        got.contains(&Code::W0104)
-                            && got.iter().all(|&c| c == Code::W0104 || c == Code::W0006),
-                        "{f} {name}: {}",
-                        e.messages
-                    );
+                    let mut got: Vec<Code> = e
+                        .diags
+                        .iter()
+                        .map(|d| d.code)
+                        .filter(|&c| diag::info(c).kind == diag::Kind::Refusal)
+                        .collect();
+                    got.dedup();
+                    assert_eq!(got, [Code::W0114], "{f} {name}: {}", e.messages);
                     refused.push(format!("{f}:{name}"));
                     continue;
                 }
             };
-            let back = written(&scs, Dialect::Spectre, "gf180", Dialect::Ngspice);
+            let back = match render_text(&scs, Dialect::Spectre, "gf180", Dialect::Ngspice) {
+                Ok(w) => w,
+                // An instance of a Spectre `resistor` or `capacitor` model
+                // is kept as Spectre text: no row reads it back yet.
+                Err(e) => {
+                    let mut got: Vec<Code> = e.diags.iter().map(|d| d.code).collect();
+                    got.dedup();
+                    assert_eq!(got, [Code::W0001], "{f} {name}: {}", e.messages);
+                    one_way.push(format!("{f}:{name}"));
+                    continue;
+                }
+            };
             assert_eq!(codes(&back), [] as [Code; 0], "{f} {name}:\n{scs}");
             let spice = written(&one, Dialect::Ngspice, "gf180", Dialect::Ngspice);
             assert_eq!(
@@ -144,9 +158,10 @@ fn gf180mcu_sections_cross_to_spectre() {
             crossed.push(format!("{f}:{name}"));
         }
     }
-    // The refused sections are those holding a `.model` of kind r, c, or d
-    // at level 3 (a line scan of each section).
-    let mut unmapped = Vec::new();
+    // The refused sections are those holding a level-3 `.model … d` that
+    // sets `jtun`, `jtunsw` or `ikr` to anything but 0 (a line scan of each
+    // section).
+    let (mut unmapped, mut rc_models) = (Vec::new(), Vec::new());
     for f in [
         "sm141064.ngspice",
         "sm141064_mim.ngspice",
@@ -164,18 +179,32 @@ fn gf180mcu_sections_cross_to_spectre() {
             }
             let none = cards.iter().any(|c| {
                 let w: Vec<&str> = c.split_whitespace().collect();
+                let set = |p: &str| {
+                    w.iter()
+                        .any(|t| t.strip_prefix(p).is_some_and(|v| v != "0"))
+                };
                 w.first() == Some(&".model")
-                    && w.get(2).is_some_and(|&k| {
-                        k == "r" || k == "c" || k == "d" && c.replace(' ', "").contains("level=3")
-                    })
+                    && w.get(2) == Some(&"d")
+                    && c.replace(' ', "").contains("level=3")
+                    && (set("jtun=") || set("jtunsw=") || set("ikr="))
             });
             if none {
                 unmapped.push(format!("{f}:{name}"));
+            }
+            let rc = cards.iter().any(|c| {
+                let w: Vec<&str> = c.split_whitespace().collect();
+                w.first() == Some(&".model") && w.get(2).is_some_and(|&k| k == "r" || k == "c")
+            });
+            if rc {
+                rc_models.push(format!("{f}:{name}"));
             }
         }
     }
     assert!(!refused.is_empty());
     assert_eq!(refused, unmapped);
+    // The sections with an `r` or `c` model cross one way only.
+    assert!(!one_way.is_empty());
+    assert_eq!(one_way, rc_models);
     for name in [
         "sm141064.ngspice:statistical",
         "sm141064.ngspice:fets_mm",
