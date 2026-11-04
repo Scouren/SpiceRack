@@ -11,10 +11,10 @@
 //! a `.func` call inlined, [`Rd::inline_call`]), one table keyed by token,
 //! recorded before the writer writes; and every number token in the
 //! target's suffixes where the target would read its spelling as another
-//! value (Spectre `2*1M`, 2 mega, is ngspice's `2*2meg`; [`Rd::write_for`]).
+//! value (Spectre `2*1M`, 2 mega, is ngspice's `2*1meg`; [`Rd::write_for`]).
 //!
 //! Cites: the `rack_*` functions of `render::named::lift`; the old writer's `statistics::unlift`, which did this over the IR's text;
-//! ngspice manual §2.1.3 and Spectre UG p.39 (scale factors: `M` is milli in one and mega in the other).
+//! ngspice manual §2.1.3 and the Spectre lexicon's §2.4 (scale factors: `M` is milli in one and mega in the other).
 //!
 //! Contents:
 //! - `pub(super) struct Unlift`, `pub(in crate::syntax::render) enum Fix`, `enum Lift`, `enum Step`

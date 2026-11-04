@@ -119,9 +119,10 @@ fn kit_answers_reach_the_written_deck() {
 
 #[test]
 fn numbers_in_expressions_read_back_in_every_target() {
-    // ngspice manual §2.1.3 (`M` milli, `meg` mega), Spectre UG p.39 (`M`
-    // mega, `m` milli), HSPICE (`x` mega), LTspice (`µ` micro), VACASK
-    // (`meg` and `M` mega): one reader's suffix is another's other scale,
+    // ngspice manual §2.1.3 (`M` milli, `meg` mega), Spectre (`M` mega,
+    // `m` milli: `lexicon::spectre`'s §2.4), HSPICE (`x` mega), LTspice
+    // (`µ` micro), VACASK (`meg` and `M` mega; each lexicon's table cites
+    // its manual): one reader's suffix is another's other scale,
     // so Spectre `2*1M` written as ngspice `2*1M` is 2 milli. Each source
     // reader's every suffix `s`, in `p<k> = 2*1<s>`, is written for every
     // target, and the target's own reader reads the two numbers after
