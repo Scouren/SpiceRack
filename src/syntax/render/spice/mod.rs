@@ -33,7 +33,7 @@ use super::capability::{Action, Alt, Construct, Rule, action};
 use super::draws::{self, Layers};
 use super::names;
 use super::out::{Out, Space};
-use super::read::{Block, Comp, Deck, Elem, Func, Raw, Rd, Section};
+use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
 use super::spelling::{FuncForm, Spelling, spelling};
 use crate::syntax::Dialect;
@@ -438,54 +438,62 @@ impl W<'_, '_> {
         self.o.token(&format!(".endl {name}"), Space::Line);
     }
 
-    /// Elements, instances and conditionals in place, then the text kept.
-    /// With `rser` (an LTspice deck's top or definition), an inductor
-    /// carries LTspice's implicit `Rser=1m` unless a `K` couples it.
+    /// Elements, instances and conditionals in place, then the text kept;
+    /// each branch of `.if` … `.endif` as its models, then its elements
+    /// (the walk is a heap stack: `read::Walk`). With `rser` (an LTspice
+    /// deck's top or definition), an inductor of `b` itself carries
+    /// LTspice's implicit `Rser=1m` unless a `K` couples it.
     fn body(&mut self, b: &Block, rser: bool) {
         let coupled = match rser && self.rd.d == Dialect::Ltspice {
             true => Some(self.coupled(b)),
             false => None,
         };
-        for e in b.elements() {
-            match e {
-                Elem::Comp(Comp::Card(n)) => self.card(n, coupled.as_deref()),
-                Elem::Comp(Comp::Raw(n)) => {
+        let mut walk = b.walk();
+        while let Some(v) = walk.next() {
+            match v {
+                Visit::Comp(at, Comp::Card(n)) => {
+                    let own = std::ptr::eq(at, b);
+                    self.card(n, coupled.as_deref().filter(|_| own));
+                }
+                Visit::Comp(_, Comp::Raw(n)) => {
                     let line = self.rd.line(n);
                     self.o.token(&line, Space::None);
                 }
-                Elem::Inst(n) => self.card(n, None),
-                Elem::Cond(k) => {
-                    self.conditional(&b.conds[k].1);
+                Visit::Inst(_, n) => self.card(n, None),
+                Visit::Cond(_, c) => {
+                    let first = c.branches[0].0;
+                    if self.ask(Construct::Conditional, self.rd.main(first)) != Action::Native {
+                        walk.prune();
+                    }
+                    continue;
+                }
+                Visit::Branch(c, i) => {
+                    let (head, body) = (c.branches[i].0, &c.branches[i].1);
+                    if !body.params.is_empty() || !body.locals.is_empty() {
+                        self.ask(Construct::BranchParam, self.rd.main(head));
+                    }
+                    let line = match (self.rd.condition(head), i) {
+                        (Some(c), 0) => format!(".if ({c})"),
+                        (Some(c), _) => format!(".elseif ({c})"),
+                        (None, _) => ".else".to_string(),
+                    };
+                    self.o.token(&line, Space::Line);
+                    self.file_cards(body);
+                    self.models(body);
+                    continue;
+                }
+                Visit::EndCond => {
+                    self.o.token(".endif", Space::Line);
+                    continue;
+                }
+                Visit::EndBlock(at) => {
+                    let lines = self.raw_lines(&at.raw);
+                    self.write_raw(&lines);
                     continue;
                 }
             }
             self.o.token("", Space::Line);
         }
-        let lines = self.raw_lines(&b.raw);
-        self.write_raw(&lines);
-    }
-
-    /// Each branch of `.if` … `.endif`: its models, then its elements.
-    fn conditional(&mut self, c: &super::read::Cond) {
-        let first = c.branches[0].0;
-        if self.ask(Construct::Conditional, self.rd.main(first)) != Action::Native {
-            return;
-        }
-        for (i, (b, body)) in c.branches.iter().enumerate() {
-            if !body.params.is_empty() || !body.locals.is_empty() {
-                self.ask(Construct::BranchParam, self.rd.main(*b));
-            }
-            let head = match (self.rd.condition(*b), i) {
-                (Some(c), 0) => format!(".if ({c})"),
-                (Some(c), _) => format!(".elseif ({c})"),
-                (None, _) => ".else".to_string(),
-            };
-            self.o.token(&head, Space::Line);
-            self.file_cards(body);
-            self.models(body);
-            self.body(body, false);
-        }
-        self.o.token(".endif", Space::Line);
     }
 
     /// The inductors a `K` card of `b` couples, by name after the letter.

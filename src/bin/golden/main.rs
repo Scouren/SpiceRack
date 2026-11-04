@@ -149,11 +149,7 @@ fn record(out: &Path) -> std::io::Result<()> {
     let failed = Mutex::new(None);
     std::thread::scope(|s| {
         for _ in 0..jobs {
-            // A deck nested deep in `.if`s is a plan nested as deep, whose
-            // writers and drop recurse; the stack is address space, not
-            // resident memory.
-            let worker = std::thread::Builder::new().stack_size(256 << 20);
-            let spawned = worker.spawn_scoped(s, || {
+            let spawned = std::thread::Builder::new().spawn_scoped(s, || {
                 while let Some(input) = all.get(next.fetch_add(1, Ordering::Relaxed)) {
                     match record_one(out, input) {
                         Ok(v) => lines.lock().expect("no worker panics").extend(v),

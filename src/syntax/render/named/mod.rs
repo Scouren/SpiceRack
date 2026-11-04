@@ -37,7 +37,7 @@ use super::capability::{Action, Alt, Construct, Rule, action};
 use super::draws::{self, Draws, Layers};
 use super::names::Names;
 use super::out::{Out, Space};
-use super::read::{Block, Comp, Deck, Elem, Func, Raw, Rd, Section};
+use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
 use super::spelling::{Spelling, spelling};
 use crate::syntax::Dialect;
@@ -385,6 +385,12 @@ impl W<'_, '_> {
     /// elements, the text kept. `lifted` is the top or section whose lifted
     /// variables it declares.
     fn body(&mut self, b: &Block, lifted: Option<Option<usize>>) {
+        self.preamble(b, lifted);
+        self.elements(b);
+    }
+
+    /// [`Self::body`]'s statements before the elements.
+    fn preamble(&mut self, b: &Block, lifted: Option<Option<usize>>) {
         let params = self.param_defs(b, lifted);
         if !params.is_empty() {
             self.line(&format!("parameters{params}"));
@@ -406,27 +412,45 @@ impl W<'_, '_> {
             self.line(&s);
         }
         self.models(b);
-        self.elements(b);
     }
 
-    /// Elements, instances and conditionals in place, then the text kept.
+    /// Elements, instances and conditionals in place, then the text kept;
+    /// each conditional as `if (c) {` … `} else if (c) {` … `} else {` …
+    /// `}` (`[REF]` p.491), each branch's statements as a body's (the
+    /// walk is a heap stack: `read::Walk`).
     fn elements(&mut self, b: &Block) {
-        for e in b.elements() {
-            match e {
-                Elem::Comp(Comp::Card(n)) | Elem::Inst(n) => {
+        for v in b.walk() {
+            match v {
+                Visit::Comp(_, Comp::Card(n)) | Visit::Inst(_, n) => {
                     if let Some(line) = self.card(n) {
                         self.line(&line);
                     }
                 }
-                Elem::Comp(Comp::Raw(n)) => {
+                Visit::Comp(_, Comp::Raw(n)) => {
                     // A SPICE element line has no Spectre spelling (`checks`
                     // refuses it).
                     self.ask(Construct::ForeignText, self.rd.main(n));
                 }
-                Elem::Cond(k) => self.conditional(&b.conds[k].1),
+                Visit::Cond(..) => {}
+                Visit::Branch(c, i) => {
+                    let (head, body) = (c.branches[i].0, &c.branches[i].1);
+                    let line = match (self.rd.condition(head), i) {
+                        (Some(c), 0) => format!("if ({}) {{", self.value_text(&c)),
+                        (Some(c), _) => format!("}} else if ({}) {{", self.value_text(&c)),
+                        (None, _) => "} else {".to_string(),
+                    };
+                    self.line(&line);
+                    self.preamble(body, None);
+                }
+                Visit::EndCond => self.line("}"),
+                Visit::EndBlock(at) => self.kept(&at.raw),
             }
         }
-        for &r in &b.raw {
+    }
+
+    /// The text a block keeps, a line each.
+    fn kept(&mut self, raw: &[Raw]) {
+        for &r in raw {
             match r {
                 Raw::Line(n) => {
                     let l = self.rd.line(n);
@@ -443,21 +467,6 @@ impl W<'_, '_> {
                 }
             }
         }
-    }
-
-    /// `if (c) {` … `} else if (c) {` … `} else {` … `}` (`[REF]` p.491),
-    /// each branch a body.
-    fn conditional(&mut self, c: &super::read::Cond) {
-        for (i, (b, body)) in c.branches.iter().enumerate() {
-            let head = match (self.rd.condition(*b), i) {
-                (Some(c), 0) => format!("if ({}) {{", self.value_text(&c)),
-                (Some(c), _) => format!("}} else if ({}) {{", self.value_text(&c)),
-                (None, _) => "} else {".to_string(),
-            };
-            self.line(&head);
-            self.body(body, None);
-        }
-        self.line("}");
     }
 
     /// `library <lib>` / `section <name>` … `endsection <name>` /

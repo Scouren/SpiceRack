@@ -17,7 +17,8 @@
 //! `blocks` walks the blocks on a heap stack, `text` joins tokens as the old
 //! line stage did, `refused` sorts what the old grammar refused, `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
-//! `cards`, `testbench`, `outputs` and `options` dot cards.
+//! `cards`, `testbench`, `outputs` and `options` dot cards; `walk` steps a
+//! block's branches for the writers, and drops them, on a heap stack.
 //!
 //! Cites: the old lowering
 //! and its SPICE grammar's `card`, `Raw`, `Unparsed`.
@@ -57,6 +58,7 @@ mod testbench;
 mod text;
 mod unlift;
 mod values;
+mod walk;
 
 pub(in crate::syntax::render) use cards::Model;
 pub(in crate::syntax::render) use elements::Card;
@@ -66,6 +68,7 @@ pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
 pub(in crate::syntax::render) use testbench::{Ana, BenchCard, Sweep};
 pub(in crate::syntax::render) use unlift::{Lift, Step};
 pub(in crate::syntax::render) use values::Val;
+pub(in crate::syntax::render) use walk::Visit;
 
 /// The reader: the file, its kit, and the deck-wide facts every statement's
 /// view reads (the old lowering's `Cx`, less what it built).

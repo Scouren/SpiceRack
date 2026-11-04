@@ -35,20 +35,10 @@ fn nested_subckts_ten_thousand_deep_are_written() {
 fn nested_ifs_ten_thousand_deep_are_written() {
     // ngspice manual §2.15: `.if` blocks nest; Spectre Reference 19.1 p.491:
     // `if` blocks nest; a `.subckt` may sit in a branch and a branch in a
-    // `.subckt`. The reader walks every block on a heap stack (rule 7 of
-    // the compiler-construction skill), but the writers recurse over a
-    // branch's body (and a plan's `Cond` drops recursively), so these run on
-    // a 256 MiB thread, as `golden` does, until the writers walk branches on
-    // a heap stack (tests/fixtures/transpiler/PHASE6-STATUS.md, "Left").
-    // Checks: 3.
-    let big = std::thread::Builder::new().stack_size(256 << 20);
-    big.spawn(nested_ifs)
-        .expect("spawn")
-        .join()
-        .expect("written");
-}
-
-fn nested_ifs() {
+    // `.subckt`. The reader walks every block on a heap stack, and the
+    // writers and the plan's drop walk the branches on one (`read::Walk`;
+    // rule 7 of the compiler-construction skill), so this runs in Debug on
+    // a test thread's 2 MiB stack, on ngspice, Spectre and VACASK. Checks: 4.
     let n = 10_000;
     let mut spice = String::from("t\n");
     let mut spectre = String::from("t\n");
@@ -75,6 +65,15 @@ fn nested_ifs() {
     }
     let w = render_text(&mixed, Dialect::Ngspice, "deep", Dialect::Ngspice).expect("written");
     assert_eq!(w.text.matches(".subckt ").count(), n);
+    // P462-P509: VACASK's `@if` … `@end`.
+    let w = render_text(&spice, Dialect::Ngspice, "deep", Dialect::Vacask).expect("written");
+    assert_eq!(
+        w.text
+            .lines()
+            .filter(|l| l.trim_start().starts_with("@if "))
+            .count(),
+        n
+    );
 }
 
 #[test]

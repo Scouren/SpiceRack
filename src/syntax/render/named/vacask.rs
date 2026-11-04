@@ -30,7 +30,7 @@ use crate::syntax::ast::NONE;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::Func;
-use crate::syntax::render::read::{Block, Card, Comp, Elem, Model, Num, Raw, Val};
+use crate::syntax::render::read::{Block, Card, Comp, Model, Num, Raw, Val, Visit};
 
 /// A device module the deck needs: VACASK's build of the SPICE device set
 /// (`load "spice/<m>.osdi"` and `model <m> sp_<m>`) or a built-in (a
@@ -347,6 +347,12 @@ impl W<'_, '_> {
     /// `.param`s: one reading another cannot be overridden, P848-855),
     /// elements and text kept: a `subckt`'s or a `section`'s body.
     fn vacask_body(&mut self, b: &Block, models: &[String]) {
+        self.vacask_preamble(b, models);
+        self.vacask_elements(b, "  ");
+    }
+
+    /// [`Self::vacask_body`]'s statements before the elements.
+    fn vacask_preamble(&mut self, b: &Block, models: &[String]) {
         for m in models {
             self.line(&format!("  {m}"));
         }
@@ -377,7 +383,6 @@ impl W<'_, '_> {
         if !locals.is_empty() {
             self.line(&format!("parameters{locals}"));
         }
-        self.vacask_elements(b, "  ");
     }
 
     /// ` name=value …` for `params` (the names in `skip` left out), each
@@ -401,51 +406,56 @@ impl W<'_, '_> {
     }
 
     /// Elements, instances and conditionals in place, then the text kept,
-    /// each after `pad` (a conditional's first line only).
+    /// each after `pad` (a branch's after two blanks; a conditional's first
+    /// line only): `@if c` … `@elseif c` … `@else` … `@end` (P462-P509), a
+    /// branch holding instances and models only, its models' loads collected
+    /// with every other model's (the walk is a heap stack: `read::Walk`).
     fn vacask_elements(&mut self, b: &Block, pad: &str) {
-        for e in b.elements() {
-            match e {
-                Elem::Comp(Comp::Card(n)) | Elem::Inst(n) => {
+        let pad_of = |at: &Block| if std::ptr::eq(at, b) { pad } else { "  " };
+        // The pad of the block the open chain sits in.
+        let mut chain_pad = pad;
+        for v in b.walk() {
+            match v {
+                Visit::Comp(at, Comp::Card(n)) | Visit::Inst(at, n) => {
                     if let Some(line) = self.vacask_card(n) {
-                        self.line(&format!("{pad}{line}"));
+                        self.line(&format!("{}{line}", pad_of(at)));
                     }
                 }
-                Elem::Comp(Comp::Raw(n)) => {
+                Visit::Comp(_, Comp::Raw(n)) => {
                     self.ask(Construct::ForeignText, self.rd.main(n));
                 }
-                Elem::Cond(k) => self.vacask_conditional(&b.conds[k].1, pad),
+                Visit::Cond(at, _) => chain_pad = pad_of(at),
+                Visit::Branch(c, i) => {
+                    let (head, body) = (c.branches[i].0, &c.branches[i].1);
+                    if !body.params.is_empty() || !body.locals.is_empty() {
+                        self.ask(Construct::BranchParam, self.rd.main(head));
+                    }
+                    let line = match (self.rd.condition(head), i) {
+                        (Some(c), 0) => format!("{chain_pad}@if {}", self.expr(&c)),
+                        (Some(c), _) => format!("@elseif {}", self.expr(&c)),
+                        (None, _) => "@else".to_string(),
+                    };
+                    self.line(&line);
+                    let models = self.model_lines(body, &mut BTreeSet::new());
+                    self.vacask_preamble(body, &models);
+                }
+                Visit::EndCond => self.line("@end"),
+                Visit::EndBlock(at) => {
+                    let lines: Vec<String> = at
+                        .raw
+                        .iter()
+                        .flat_map(|&r| match r {
+                            Raw::Line(n) => vec![self.rd.line(n)],
+                            Raw::Lines(n) => self.rd.lines(n),
+                            Raw::Joined(n) => vec![self.rd.lines(n).join("\n")],
+                        })
+                        .collect();
+                    for l in lines {
+                        self.line(&format!("{}{l}", pad_of(at)));
+                    }
+                }
             }
         }
-        for &r in &b.raw {
-            let lines = match r {
-                Raw::Line(n) => vec![self.rd.line(n)],
-                Raw::Lines(n) => self.rd.lines(n),
-                Raw::Joined(n) => vec![self.rd.lines(n).join("\n")],
-            };
-            for l in lines {
-                self.line(&format!("{pad}{l}"));
-            }
-        }
-    }
-
-    /// `@if c` … `@elseif c` … `@else` … `@end` (P462-P509): a branch holds
-    /// instances and models only; its models' loads were collected with
-    /// every other model's.
-    fn vacask_conditional(&mut self, c: &crate::syntax::render::read::Cond, pad: &str) {
-        for (i, (b, body)) in c.branches.iter().enumerate() {
-            if !body.params.is_empty() || !body.locals.is_empty() {
-                self.ask(Construct::BranchParam, self.rd.main(*b));
-            }
-            let head = match (self.rd.condition(*b), i) {
-                (Some(c), 0) => format!("{pad}@if {}", self.expr(&c)),
-                (Some(c), _) => format!("@elseif {}", self.expr(&c)),
-                (None, _) => "@else".to_string(),
-            };
-            self.line(&head);
-            let models = self.model_lines(body, &mut BTreeSet::new());
-            self.vacask_body(body, &models);
-        }
-        self.line("@end");
     }
 
     /// Block `b`'s `model` lines, the OSDI files their modules need added
