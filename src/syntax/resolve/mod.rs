@@ -8,7 +8,7 @@
 //! Two passes, as Zig 0.17's AstGen does names (`scanContainer`,
 //! `localVarRef`): `declare` pre-scans every file's declarations (subcircuits,
 //! models and their bins, parameters, functions, sections) and its
-//! references, then `lookup` re-reads each file and binds each instance's
+//! references, and `verilog_a` each Verilog-A source's modules, then `lookup` re-reads each file and binds each instance's
 //! master, records each statement's scope, corrects the parser's node and
 //! model split where the kit's models say otherwise (a range terminal count,
 //! a model among an R/C/L card's arguments), and points each include at the
@@ -24,7 +24,8 @@
 //! Cites: Zig 0.17 `lib/std/zig/AstGen.zig` (resolves, never rewrites);
 //! ngspice manual §2.4.3 (`X`), §2.5 (`.subckt`), §2.6
 //! (`.include`), §2.7 (`.lib`), §2.15 (`.if`); Spectre UG p.66 (instances),
-//! p.94 (`subckt`), p.98 (`include`), p.108 (model groups), Spectre
+//! p.94 (`subckt`), p.98 (`include`), p.108 (model groups), p.118
+//! (`ahdl_include`), Spectre
 //! Reference 19.1 p.498 (`library`, `section`).
 //!
 //! Contents:
@@ -58,6 +59,7 @@ use crate::syntax::{lexicon, parse, tokenize};
 
 mod declare;
 mod lookup;
+mod verilog_a;
 
 /// The deepest include chain a kit follows (an entry is depth 0); a deeper
 /// include is an `R0008` and not read. Interop's `spice::MAX_INCLUDE_DEPTH`.
@@ -184,6 +186,16 @@ pub enum DefKind {
     Func,
     /// A `.lib name` … `.endl` or Spectre/VACASK `section`.
     Section,
+    /// A Verilog-A module of a source an `ahdl_include` or VACASK `load`
+    /// names: its ports in header order and its `parameter` names (never a
+    /// `localparam`), never the defaults. Its [`Def::file`], `node` and
+    /// `scope` are the loading statement's, so it is seen where a
+    /// subcircuit declared there would be; a source loaded twice declares
+    /// its modules at each load.
+    VerilogA {
+        ports: Vec<String>,
+        params: Vec<String>,
+    },
 }
 
 /// A device's polarity.
@@ -258,7 +270,19 @@ struct Pending {
     /// entry).
     from: Option<(FileId, u32)>,
     depth: u8,
-    verilog_a: bool,
+    /// For a Verilog-A source, the statement that loads it: where its
+    /// modules are declared.
+    load: Option<Load>,
+}
+
+/// A Verilog-A load statement: its file, node, scope and nearest subcircuit
+/// ([`Def::within`]).
+#[derive(Clone, Copy)]
+struct Load {
+    file: FileId,
+    node: Node,
+    scope: Scope,
+    within: u32,
 }
 
 /// An open block of [`walk`].
@@ -322,13 +346,17 @@ impl Kit {
                 path: normalize(e),
                 from: None,
                 depth: 0,
-                verilog_a: false,
+                load: None,
             })
             .collect();
 
         // Pass 1: read breadth first, each file's declarations and references.
         while let Some(p) = todo.pop_front() {
-            if seen.contains_key(&p.path) {
+            if let Some(&id) = seen.get(&p.path) {
+                let f = &kit.files[id.0 as usize];
+                if let (Some(at), Role::VerilogA) = (p.load, f.role) {
+                    declare_modules(&mut kit.defs, &f.text, at);
+                }
                 continue;
             }
             if kit.files.len() == FILES_MAX {
@@ -354,7 +382,9 @@ impl Kit {
                         });
                     }
                 }
-                Ok(text) if p.verilog_a => {
+                Ok(text) if p.load.is_some() => {
+                    let at = p.load.expect("a Verilog-A source's load");
+                    declare_modules(&mut kit.defs, &text, at);
                     file.role = Role::VerilogA;
                     file.text = text;
                 }
@@ -387,7 +417,12 @@ impl Kit {
                     path: normalize(&dir.join(&r.path)),
                     from: Some((id, r.token)),
                     depth: p.depth + 1,
-                    verilog_a: r.verilog_a,
+                    load: r.verilog_a.then_some(Load {
+                        file: id,
+                        node: Node(r.node),
+                        scope: r.scope,
+                        within: r.within,
+                    }),
                 });
             }
             refs.push(found);
@@ -453,7 +488,9 @@ impl Kit {
         &self.files[id.0 as usize]
     }
 
-    /// Every declaration, in read order: by file, then in source order.
+    /// Every declaration, in read order: by file, then in source order; a
+    /// Verilog-A module where its source is read (after its loading file's
+    /// declarations, under that file's [`FileId`]).
     pub fn definitions(&self) -> &[Def] {
         &self.defs
     }
@@ -657,6 +694,23 @@ impl Kit {
             self.files[f.0 as usize].diags.push(Diag { code, token });
         }
     }
+}
+
+/// Declares each module of Verilog-A source `text` at load statement `at`.
+fn declare_modules(defs: &mut Vec<Def>, text: &str, at: Load) {
+    let before = defs.len();
+    defs.extend(verilog_a::modules(text).into_iter().map(|m| Def {
+        name: m.name,
+        kind: DefKind::VerilogA {
+            ports: m.ports,
+            params: m.params,
+        },
+        file: at.file,
+        node: at.node,
+        scope: at.scope,
+        within: at.within,
+    }));
+    assert!(defs[before..].iter().all(|d| d.file == at.file));
 }
 
 fn unread_code(e: LoadError) -> Code {

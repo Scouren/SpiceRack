@@ -16,7 +16,7 @@
 //! (`MXXXXXXX nd ng ns nb mname`; HSPICE's optional bulk, BSIMSOI's up to
 //! 7 nodes), §2.4 (binned models `name.N`); Spectre UG p.66 (`name (nodes)
 //! master`, master a model, a subcircuit or a primitive), p.108 (model
-//! groups).
+//! groups), p.118 (`ahdl_include`: a Verilog-A module is a master).
 //!
 //! Contents:
 //! - `pub(super) struct Table<'k>`, `Table::new(defs: &'k [Def], fold: bool) -> Table<'k>`,
@@ -66,7 +66,8 @@ const DEVICE: &[Want] = &[Want::Model, Want::Subckt];
 /// Which declarations a lookup wants.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Want {
-    /// A subcircuit or a model: what an instance names.
+    /// A subcircuit, a model or a Verilog-A module: what a named
+    /// dialect's instance names.
     Master,
     /// A model: what an element's model word names.
     Model,
@@ -284,8 +285,13 @@ impl Site<'_, '_> {
         };
         let code = match &self.table.defs[id.0 as usize].kind {
             _ if ambiguous => Some(Code::R0003),
-            DefKind::Subckt { ports, .. } if ports.len() != nodes => Some(Code::R0004),
-            // else: a model, or a subckt whose ports the nodes match.
+            DefKind::Subckt { ports, .. } | DefKind::VerilogA { ports, .. }
+                if ports.len() != nodes =>
+            {
+                Some(Code::R0004)
+            }
+            // else: a model, or a subckt or module whose ports the nodes
+            // match.
             _ => None,
         };
         (Binding::Def(id), code.map(|code| Diag { code, token }))
@@ -324,6 +330,7 @@ impl Site<'_, '_> {
             let d = &defs[id.0 as usize];
             let accepts = match (&d.kind, want) {
                 (DefKind::Subckt { .. }, Want::Master | Want::Subckt)
+                | (DefKind::VerilogA { .. }, Want::Master)
                 | (DefKind::Model { .. }, Want::Master | Want::Model)
                 | (DefKind::Param | DefKind::Func, Want::Value) => true,
                 // else: the kind is not one `want` takes.
@@ -374,6 +381,7 @@ fn class(k: &DefKind) -> u8 {
         DefKind::Subckt { .. } => 0,
         DefKind::Model { .. } => 1,
         DefKind::Param | DefKind::Func | DefKind::Section => 2,
+        DefKind::VerilogA { .. } => 3,
     }
 }
 

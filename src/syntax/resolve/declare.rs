@@ -43,6 +43,10 @@ pub(super) struct Ref {
     /// The section a `.lib file section` or `include … section=` selects.
     pub(super) section: Option<String>,
     pub(super) verilog_a: bool,
+    /// The statement's scope and nearest subcircuit ([`super::Def`]'s
+    /// `within`): where a Verilog-A source's modules are declared.
+    pub(super) scope: Scope,
+    pub(super) within: u32,
 }
 
 /// SPICE `.model` type words → the primitive and polarity (ngspice manual
@@ -162,7 +166,7 @@ pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declar
                 None
             }
             Tag::Include | Tag::LibCall => {
-                if let Some(r) = reference(t, ast, node) {
+                if let Some(r) = reference(t, ast, node, scope, within) {
                     out.refs.push(r);
                 }
                 None
@@ -179,6 +183,8 @@ pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declar
                         path,
                         section: None,
                         verilog_a: true,
+                        scope,
+                        within,
                     });
                 }
                 None
@@ -355,7 +361,7 @@ fn func_name<'a>(ast: &'a Ast, f: u32) -> Option<&'a str> {
 }
 
 /// The file an `Include` or `LibCall` names, and the section it selects.
-fn reference(t: &Tokens, ast: &Ast, node: Node) -> Option<Ref> {
+fn reference(t: &Tokens, ast: &Ast, node: Node, scope: Scope, within: u32) -> Option<Ref> {
     let fields = ast.fields(node);
     let path = path_text(t, ast, *fields.first()?)?;
     let section = match ast.tag(node) {
@@ -376,6 +382,8 @@ fn reference(t: &Tokens, ast: &Ast, node: Node) -> Option<Ref> {
         path,
         section,
         verilog_a: false,
+        scope,
+        within,
     })
 }
 
