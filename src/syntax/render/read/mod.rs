@@ -36,6 +36,7 @@ use std::collections::{HashMap, HashSet};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::diag::Diag;
+use crate::syntax::render::spelling::Spelling;
 use crate::syntax::resolve::{FileId, Kit, Role, Split};
 use crate::syntax::token::{Tag as T, Tokens};
 use blocks::Opened;
@@ -87,6 +88,12 @@ pub(in crate::syntax::render) struct Rd<'a> {
     unlifted: unlift::Unlift,
     /// A writer's `Lift` fixups, by token (`unlift::Fix`).
     fixes: HashMap<u32, unlift::Fix>,
+    /// The target's spelling, once a writer names it ([`Rd::write_for`]):
+    /// an expression's numbers are spelled in its suffixes.
+    target: Option<&'static Spelling>,
+    /// The `Num` nodes' tokens, sorted, once a writer names its target: the
+    /// numbers it respells (a probe's `v(1a)` holds a name).
+    nums: Vec<u32>,
 }
 
 /// What the reader made of a file: every block and the deck-wide lists, in
@@ -295,6 +302,8 @@ pub(in crate::syntax::render) fn read<'a>(
         masters: HashMap::new(),
         unlifted: unlift::Unlift::default(),
         fixes: HashMap::new(),
+        target: None,
+        nums: Vec::new(),
     };
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
