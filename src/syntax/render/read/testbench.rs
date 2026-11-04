@@ -31,7 +31,7 @@ pub(in crate::syntax::render) enum BenchCard {
     Options(Vec<Opt>),
     /// Outputs to save.
     Saves(Vec<String>),
-    /// `.step [lin|dec|oct] name start stop step`.
+    /// `.step [lin|dec|oct|log] name start stop step`.
     Step {
         sweep: Option<&'static str>,
         param: String,
@@ -401,10 +401,19 @@ impl<'a> Rd<'a> {
     }
 
     fn step(&self, n: u32, items: &[u32]) -> Option<Card> {
+        // ngspice has no `.step`, so one in a deck read as ngspice is the
+        // given deck's (`lexicon::NGSPICE_GIVEN`): Xyce's form (RG p.155),
+        // whose `lin|dec|oct` LTspice shares, and Spectre's total-count
+        // `log` (Reference 19.1 p.406-410 `sweep`), which Python's
+        // `step_sweep` names.
+        let kinds: &[&str] = match self.d {
+            Dialect::Ngspice => &["lin", "dec", "oct", "log"],
+            _ => &["lin", "dec", "oct"],
+        };
         let mut it = items;
         let kind = match it.first() {
             Some(&k)
-                if ["lin", "dec", "oct"]
+                if kinds
                     .iter()
                     .any(|w| self.wordw(k) && self.text(k).eq_ignore_ascii_case(w)) =>
             {

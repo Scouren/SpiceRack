@@ -195,6 +195,12 @@ impl W<'_, '_> {
             if self.ask(Construct::Step, *tok) != Action::Native {
                 continue;
             }
+            // Spectre's total-count `log`: Xyce's `.step` sweeps lin, dec,
+            // oct or a list (RG p.155), LTspice's lin, oct, dec or a list.
+            if *sweep == Some("log") {
+                self.refuse(Code::W0016, *tok);
+                continue;
+            }
             let line = match (self.d, sweep) {
                 (Dialect::Xyce, Some(s)) => format!(".step {s} {param} {a} {b} {c}"),
                 (Dialect::Xyce, None) => format!(".step {param} {a} {b} {c}"),

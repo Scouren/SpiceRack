@@ -1,8 +1,9 @@
-//! The renderer over block nesting and kit answers: a deck nested 10⁴ deep
-//! in `.subckt`s and `.if`s is written in Debug, and what
-//! `syntax::resolve` answers for a kit file reaches the deck written from
-//! it. Each test names its clause, the text derived by hand, and how many
-//! checks it makes.
+//! The renderer over block nesting, kit answers and a given deck's `.step`:
+//! a deck nested 10⁴ deep in `.subckt`s and `.if`s is written in Debug,
+//! what `syntax::resolve` answers for a kit file reaches the deck written
+//! from it, and a `.step log` is Spectre's sweep or refused. Each test
+//! names its clause, the text derived by hand, and how many checks it
+//! makes.
 //!
 //! Contents: none (tests only).
 
@@ -109,4 +110,39 @@ fn kit_answers_reach_the_written_deck() {
     let lines: Vec<&str> = text.lines().collect();
     assert!(lines.contains(&"R1 a b 1k rmod"), "{text}");
     assert!(lines.contains(&"Q1 c b e mod 1.5"), "{text}");
+}
+
+#[test]
+fn a_log_step_is_spectres_sweep_and_refused_where_no_step_has_one() {
+    // Spectre Reference 19.1 p.406-410: `sweep … log=N`, the analyses in
+    // its braces; Xyce RG p.155 (`.step` lin, dec, oct, list), LTspice help
+    // (`.step` lin, oct, dec, list) and VACASK `docs/cmd-sweep.md` (lin,
+    // dec, oct, values) have no total-count log sweep: `W0016`. Checks: 4.
+    use crate::syntax::lexicon::NGSPICE_GIVEN;
+    use crate::syntax::render::{Numbers, Source, render};
+    use crate::syntax::{parse, tokenize};
+    // The given deck's lexicon (the Python API's): ngspice has no `.step`.
+    let text = "t\nR1 a 0 1k\n.param g=1\n.step log g 1 100 5\n.op\n.end\n";
+    let tokens = tokenize(text, &NGSPICE_GIVEN);
+    let ast = parse(&tokens, &NGSPICE_GIVEN);
+    let src = Source {
+        ast: &ast,
+        tokens: &tokens,
+        dialect: Dialect::Ngspice,
+        name: "t",
+        kit: None,
+        loads: &[],
+        numbers: Numbers::Given,
+    };
+    let w = render(&src, Dialect::Spectre).expect("written");
+    let head = "sweep1_g sweep param=g start=1 stop=100 log=5 {";
+    assert!(w.text.lines().any(|l| l == head), "{}", w.text);
+    for d in [Dialect::Xyce, Dialect::Ltspice, Dialect::Vacask] {
+        let refused = render(&src, d).expect_err("refused");
+        assert!(
+            refused.messages.contains("W0016"),
+            "{d:?}: {}",
+            refused.messages
+        );
+    }
 }
