@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::*;
-use crate::syntax::ast::Header;
+use crate::syntax::ast::{Header, Tag};
 
 const TOP_SCS: &str = "// top\nsimulator lang=spectre\ninclude \"lib.scs\"\nsubckt top (a b)\nx1 (a b) leaf w=1u\nx2 a b leaf w=2u\nm1 (a b 0 0) nch_mod w=1u\nf1 (a b) cccs probe=v1 gain=2\nends top\n";
 const LIB_SCS: &str = "// lib\nsimulator lang=spectre\nsubckt leaf (p n)\nr0 (p n) resistor r=1k\nends leaf\nmodel nch_mod bsim4 type=n\n";
