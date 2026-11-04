@@ -8,7 +8,9 @@
 //! for what only Spectre says (the analyses with no ngspice card, and
 //! `pss` on a Spectre target: `Analysis::in_spectre_region`), its Spectre
 //! statement in a `simulator lang=spectre` region of the source
-//! (`lexicon::NGSPICE_GIVEN`). A line
+//! (`lexicon::NGSPICE_GIVEN`); a Fourier analysis's harmonic count is
+//! ngspice's `.options nfreqs=` card, or the analysis in LTspice's or
+//! Spectre's words in its region (`Analysis::fourier_count`). A line
 //! given as one dialect's text (`extra_line`) sits in that dialect's
 //! region. The renderer writes a region's text for its own dialect family
 //! and refuses it (`W0001`) for any other; nothing is added to the text it
@@ -35,7 +37,7 @@ use std::fmt::Write as _;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
-use super::analysis::Analysis;
+use super::analysis::{Analysis, nfreqs};
 use super::model::{Bench, Body, Func, ModelLibrary, dec, params};
 use super::verilog::lower_verilog;
 use crate::backend::{Dialect, Kind, feature};
@@ -249,9 +251,11 @@ impl Deck {
     }
 
     /// The deck as ngspice text, for target `d`: a model library's path
-    /// is the one for `d`'s family, and a `pss` is Spectre's statement on
-    /// Spectre (`Analysis::in_spectre_region`), the only parts that depend
-    /// on `d`. `Err` names an analysis no dialect here has a statement for.
+    /// is the one for `d`'s family, a `pss` is Spectre's statement on
+    /// Spectre (`Analysis::in_spectre_region`), and a Fourier analysis's
+    /// harmonic count is in `d`'s words (`Analysis::fourier_count`), the
+    /// only parts that depend on `d`. `Err` names an analysis no dialect
+    /// here has a statement for.
     fn source(&self, d: Dialect) -> Result<String, String> {
         let mut out = String::with_capacity(4096);
         let line = |out: &mut String, l: &str| {
@@ -387,7 +391,23 @@ fn bench(out: &mut String, tb: &Bench, d: Dialect) -> Result<(), String> {
         let _ = writeln!(out, ".step {sweep}{} {a} {b} {c}", s.param);
     }
     let mut spectre = Vec::new();
+    let mut ltspice = Vec::new();
+    if d.family() == Dialect::Ngspice
+        && let Some(card) = nfreqs(&tb.analyses).map_err(|why| unsupported(&why))?
+    {
+        let _ = writeln!(out, "{card}");
+    }
     for a in &tb.analyses {
+        if let Analysis::Fourier { .. } = a
+            && let Some(lines) = a.fourier_count(d).map_err(|why| unsupported(&why))?
+        {
+            match d {
+                Dialect::Spectre => spectre.extend(lines),
+                Dialect::Ltspice => ltspice.extend(lines),
+                other => unreachable!("{other:?} holds no counted Fourier line"),
+            }
+            continue;
+        }
         match a.card().filter(|_| !a.in_spectre_region(d)) {
             Some(card) => {
                 let _ = writeln!(out, "{card}");
@@ -396,6 +416,7 @@ fn bench(out: &mut String, tb: &Bench, d: Dialect) -> Result<(), String> {
         }
     }
     region(out, "spectre", &spectre);
+    region(out, "ltspice", &ltspice);
     for (l, d) in &tb.extra_lines {
         region(out, d.name(), std::slice::from_ref(l));
     }
@@ -477,5 +498,37 @@ mod tests {
                 .expect("source")
                 .contains(".pss ")
         );
+    }
+
+    #[test]
+    fn a_fourier_harmonic_count_is_written_in_each_targets_words() {
+        // ngspice-45 `src/frontend/fourier.c`: `nfreqs` frequencies, DC the
+        // first, so five harmonics are `nfreqs=6`; LTspice help `.FOUR`:
+        // `.four <freq> <Nharmonics> <traces>`; Spectre Components p.323-325:
+        // `fourier` with `harms`. Xyce's and HSPICE's `.four` have no count.
+        // Checks: 6.
+        let four = |harmonics| Analysis::Fourier {
+            fundamental: 1e3,
+            outputs: vec!["V(out)".into()],
+            harmonics,
+        };
+        let d = deck(vec![four(Some(5))]);
+        let ngspice = d.write(Dialect::Ngspice).expect("written");
+        assert!(ngspice.contains("nfreqs=6"), "{ngspice}");
+        let ltspice = d.write(Dialect::Ltspice).expect("written");
+        assert!(
+            ltspice.lines().any(|l| l == ".four 1k 5 V(out)"),
+            "{ltspice}"
+        );
+        let spectre = d.write(Dialect::Spectre).expect("written");
+        let want = "fourh1 (out 0) fourier fund=1k harms=5";
+        assert!(spectre.lines().any(|l| l == want), "{spectre}");
+        for refused in [Dialect::Xyce, Dialect::Hspice] {
+            assert!(d.write(refused).is_err(), "{refused:?}");
+        }
+        // ngspice's count is the deck's: a second analysis counting nine
+        // (none given) cannot share it.
+        let two = deck(vec![four(Some(5)), four(None)]);
+        assert!(two.write(Dialect::Ngspice).is_err());
     }
 }

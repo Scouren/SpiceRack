@@ -111,7 +111,10 @@ Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...
 
 `add_fourier` emits ngspice's `.four`, whose output table is not parsed — the
 harmonics are unreachable. For THD, compute a Goertzel over the transient
-waveform.
+waveform. `num_harmonics=n` (harmonics past DC; the simulators' default is 9)
+is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
+`.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it (their
+`.four` takes no count).
 
 Backend-specific, `CircuitSimulator` only: `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` warns, deprecated),
 `spectre_pac`, `spectre_pnoise`, `spectre_pstb`, `spectre_pxf`, `network_params`.

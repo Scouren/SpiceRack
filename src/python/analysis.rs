@@ -8,7 +8,10 @@
 //! result.
 //!
 //! Cites: ngspice manual ch.11 (analysis cards; §11.3.6 `.pz`, §11.3.12
-//! `.pss`); Spectre Reference 19.1 `[REF]` p.90-91 (`hb`), p.272-274
+//! `.pss`), §15.4.2 (`.four`, the `fourier` command, the `nfreqs`
+//! variable); ngspice-45 `src/frontend/fourier.c`, `src/frontend/inp.c`;
+//! LTspice help (`.FOUR`); Spectre Components `[CMP]` p.323-325 (`fourier`);
+//! Spectre Reference 19.1 `[REF]` p.90-91 (`hb`), p.272-274
 //! (`pss`, also the PSS base of the periodic analyses), p.174
 //! (`montecarlo`), p.245-246 (`pac`), p.253-256 (`pnoise`), p.298-299
 //! (`pstb`), p.303-304 (`pxf`), p.393-394 (`stb`), p.406-410 (`sweep`).
@@ -16,7 +19,9 @@
 //! Contents:
 //! - `pub(super) enum Analysis`, `Analysis::kind(&self) -> Kind`,
 //!   `Analysis::card(&self) -> Option<String>`, `Analysis::in_spectre_region(&self, d: Dialect) -> bool`,
+//!   `Analysis::fourier_count(&self, d: Dialect) -> Result<Option<Vec<String>>, String>`,
 //!   `Analysis::spectre(&self) -> Result<String, String>`
+//! - `pub(super) fn nfreqs(analyses: &[Analysis]) -> Result<Option<String>, String>`
 //! - `pub(super) struct DcSweep`, `pub(super) struct FreqSweep`, `pub(super) struct PssBase`
 
 use std::fmt::Write as _;
@@ -91,9 +96,11 @@ pub(super) enum Analysis {
         sweep: FreqSweep,
     },
     TransientNoise,
+    /// `harmonics`: how many past DC (`None`: the simulator's nine).
     Fourier {
         fundamental: f64,
         outputs: Vec<String>,
+        harmonics: Option<u32>,
     },
     SpectreSweep {
         param: String,
@@ -295,9 +302,12 @@ impl Analysis {
                 let v = f.variation.name();
                 format!(".sp {v} {} {} {}", f.points, dec(f.start), dec(f.stop))
             }
+            // A harmonic count is no field of the card (manual §15.4.2:
+            // the `nfreqs` variable; [`Self::fourier_count`]).
             Analysis::Fourier {
                 fundamental,
                 outputs,
+                ..
             } => format!(".four {} {}", num(*fundamental), outputs.join(" ")),
             Analysis::HarmonicBalance { .. }
             | Analysis::Stability { .. }
@@ -317,6 +327,58 @@ impl Analysis {
     /// `pss` on Spectre, which runs no ngspice `.pss`.
     pub(super) fn in_spectre_region(&self, d: Dialect) -> bool {
         self.card().is_none() || (d == Dialect::Spectre && matches!(self, Analysis::Pss { .. }))
+    }
+
+    /// A Fourier analysis's harmonic count in the deck for `d`, as lines
+    /// for that dialect's region in place of the `.four` card: LTspice's
+    /// `.four <freq> <Nharmonics> <traces>` (LTspice help, `.FOUR`),
+    /// Spectre's `fourier` component's `harms` (`[CMP]` p.323-325, one per
+    /// output). `None` for no count, and on ngspice, whose count is the
+    /// deck's ([`nfreqs`]). `Err` for a target whose `.four` has none
+    /// (HSPICE; Xyce, which counts only `.measure … four … numfreq=`) and
+    /// for VACASK, which has no Fourier analysis.
+    ///
+    /// # Panics
+    /// When `self` is no Fourier analysis.
+    pub(super) fn fourier_count(&self, d: Dialect) -> Result<Option<Vec<String>>, String> {
+        let Analysis::Fourier {
+            fundamental,
+            outputs,
+            harmonics,
+        } = self
+        else {
+            panic!("{self:?} is no Fourier analysis");
+        };
+        let Some(n) = *harmonics else {
+            return Ok(None);
+        };
+        Ok(match d.family() {
+            Dialect::Ngspice => None,
+            Dialect::Ltspice => {
+                let f = num(*fundamental);
+                Some(vec![format!(".four {f} {n} {}", outputs.join(" "))])
+            }
+            // Named apart from the `four<k>` an uncounted `.four` is written
+            // as on Spectre.
+            Dialect::Spectre => Some(
+                outputs
+                    .iter()
+                    .enumerate()
+                    .map(|(i, o)| {
+                        let f = snum(*fundamental);
+                        format!("fourh{} ({} 0) fourier fund={f} harms={n}", i + 1, bare(o))
+                    })
+                    .collect(),
+            ),
+            Dialect::Hspice | Dialect::Xyce | Dialect::Vacask => {
+                return Err(format!(
+                    "fourier num_harmonics={n} ({} writes no harmonic count)",
+                    d.name()
+                ));
+            }
+            Dialect::Espice => unreachable!("ESPice's family is ngspice"),
+            Dialect::Cdl | Dialect::Verilog => unreachable!("no deck is run as {d:?}"),
+        })
     }
 
     /// The Spectre statement of an analysis [`Self::in_spectre_region`]
@@ -469,6 +531,30 @@ impl Analysis {
             ),
             a => unreachable!("{a:?} has an ngspice card and is no pss"),
         })
+    }
+}
+
+/// The `.options nfreqs=` card of an ngspice deck whose Fourier analyses
+/// count their harmonics: the count of frequencies, DC the first
+/// (ngspice-45 `src/frontend/fourier.c`: `nfreqs`, default 10, read from
+/// the deck's options, which `src/frontend/inp.c` sets as the circuit's
+/// variables). `None` when no analysis counts; `Err` when two count apart,
+/// as the count is the deck's (one uncounted counts nine).
+pub(super) fn nfreqs(analyses: &[Analysis]) -> Result<Option<String>, String> {
+    let mut counted = false;
+    let mut counts = std::collections::BTreeSet::new();
+    for a in analyses {
+        if let Analysis::Fourier { harmonics, .. } = a {
+            counted |= harmonics.is_some();
+            counts.insert(harmonics.unwrap_or(9));
+        }
+    }
+    match (counted, counts.first()) {
+        (true, Some(n)) if counts.len() == 1 => Ok(Some(format!(".options nfreqs={}", n + 1))),
+        (true, _) => Err(format!(
+            "fourier num_harmonics {counts:?} on ngspice (its nfreqs is the deck's)"
+        )),
+        (false, _) => Ok(None),
     }
 }
 

@@ -679,6 +679,19 @@ class TestDialectText:
         with pytest.raises(ValueError, match="no cdl text"):
             tb.extra_line("x", dialect="cdl")
 
+    def test_a_fourier_harmonic_count_is_each_targets_words(self):
+        # ngspice-45 src/frontend/fourier.c: `nfreqs` frequencies, DC the
+        # first; LTspice help `.FOUR`; Spectre Components p.323-325
+        # (`fourier`, `harms`); Xyce's `.four` takes no count.
+        ps = import_spicerack()
+        tb = self._tb(ps)
+        tb.add_fourier(1e3, ["V(out)"], num_harmonics=5)
+        assert any("nfreqs=6" in line for line in tb.netlist("ngspice").splitlines())
+        assert ".four 1k 5 V(out)" in tb.netlist("ltspice").splitlines()
+        assert "fourh1 (out 0) fourier fund=1k harms=5" in tb.netlist("spectre").splitlines()
+        with pytest.raises(RuntimeError, match="num_harmonics"):
+            tb.netlist("xyce")
+
 
 class TestSubcircuitWaveforms:
     def test_every_source_on_both_builders(self):

@@ -186,10 +186,8 @@ impl PyTestbench {
 
     #[pyo3(signature = (fundamental_frequency, outputs, num_harmonics=None))]
     fn add_fourier(mut slf: PyRefMut<'_, Self>, fundamental_frequency: f64, outputs: Vec<String>, num_harmonics: Option<u32>) {
-        // ngspice's `.four` has no harmonic count (LTspice's does), and the
-        // deck is ngspice text.
-        let _ = num_harmonics;
-        slf.as_super().tb().analyses.push(Analysis::Fourier { fundamental: fundamental_frequency, outputs });
+        let a = Analysis::Fourier { fundamental: fundamental_frequency, outputs, harmonics: num_harmonics };
+        slf.as_super().tb().analyses.push(a);
     }
 
     #[pyo3(signature = (param, start, stop, step, inner_analysis, inner_type))]
