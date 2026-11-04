@@ -44,5 +44,29 @@
     "std": { "o1": 2.5e-2, "o2": 2.5e-2, "o3": 2.5e-2, "o4": 2.5e-2 },
     "std_tol": 1.58e-3,
     "why": "x1.xa, x1.xb, x2.xa and x2.xb are four instances of leaf: four independent draws (hierarchical instances, R19 'per subcircuit instance')"
+  },
+  "t_m1_resistors.scs": {
+    "test": "T-M1",
+    "nominal": { "a1": 5.5330666667e-01, "a2": 5.43e-02, "a3": 1e-06, "a4": 0.5, "a5": 1e-02, "a6": 2.0749e-01 },
+    "rel_tol": 1e-6,
+    "why": "1 mA into each resistor model at 60 C (tests/test_model_kinds.rs RESISTORS): the closed forms there, which ngspice 45 meets to 1e-11; etch/etchl per side, ngspice's l=w=10u defaults, 1 mOhm with no r and no rsh, scale and m folded into m"
+  },
+  "t_m2_capacitors.scs": {
+    "test": "T-M2",
+    "final": { "b1": 2.4549498282e+00, "b2": 1.6666665269e-01, "b3": 9.6767575846e+00 },
+    "rel_tol": 1e-6,
+    "why": "1 uA into each capacitor model for 1 us at 60 C (CAPACITORS): v = 1e-12/C less the 1e12-ohm leak's t/(2RC); ngspice 45's values; cj/cjsw geometry, ngspice's w=10u default, scale folded into m"
+  },
+  "t_m3_diodes.scs": {
+    "test": "T-M3",
+    "nominal": { "2": 6.8448213332e-01, "4": -1.1887586514e+01, "6": 8.7384788390e-01, "8": -1.1827334925e+01 },
+    "rel_tol": 1e-3,
+    "why": "level-3 diodes (DIODES: a made-up one and sky130's ndiode) forward through 1k from 2 V and in breakdown from -20 V at 60 C; ngspice 45's values at its reltol=1e-3 (VACASK's ngspice-code diode lands within it). Spectre's level=3 diode with its own junction equations (no hcomp): the test of the mapping"
+  },
+  "t_m4_dependent.scs": {
+    "test": "T-M4",
+    "nominal": { "a": 1.1111111111e+00 },
+    "rel_tol": 1e-6,
+    "why": "r={1k*(1+0.1*abs(v(a)))} with 1 mA: v = 1/0.9 (DEPENDENT); ngspice runs it as a B source, its model and w, l, dtemp unread"
   }
 }

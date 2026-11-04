@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""T-S1 to T-S3 (the tests in tests/spectre/expected.json) on a real Spectre.
+"""T-S1 to T-S3 and T-M1 to T-M4 (the tests in tests/spectre/expected.json) on a real Spectre.
 
 Each deck here is what SpiceRack writes for a SPICE source (regenerated and
 checked by tests/test_monte_carlo.rs). This script runs one deck, reads its
 operating points (the nominal `op1` and, under `montecarlo`, every `dcmc`
-iteration), and checks them against expected.json: the closed forms and the
+iteration) and a transient's last values (`tran1`), and checks them against expected.json: the closed forms and the
 ngspice reference, at the tolerances recorded there.
 
     python3 run.py t_s2_agauss.scs          # run spectre, then check
@@ -45,8 +45,8 @@ def values(path):
 
 
 def collect(raw):
-    """(nominal values, per-iteration values) from a Spectre raw directory."""
-    nominal, runs = {}, {}
+    """(nominal values, per-iteration values, last transient values) from a Spectre raw directory."""
+    nominal, runs, final = {}, {}, {}
     for root, _, files in os.walk(raw):
         for name in sorted(files):
             path = os.path.join(root, name)
@@ -56,7 +56,9 @@ def collect(raw):
                     runs.setdefault(k, []).extend(xs)
             elif name.startswith("op1"):
                 nominal.update({k: xs[0] for k, xs in v.items()})
-    return nominal, runs
+            elif name.startswith("tran1"):
+                final.update({k: xs[-1] for k, xs in v.items()})
+    return nominal, runs, final
 
 
 def stats(xs):
@@ -84,8 +86,8 @@ def main():
         run_deck = os.path.splitext(raw)[0] + ".run.scs"
         open(run_deck, "w").write(text)
         subprocess.run(["spectre", "-format", "psfascii", "-raw", raw, run_deck], check=True)
-    nominal, runs = collect(raw)
-    summary = {"deck": deck, "nominal": nominal, "runs": {k: len(v) for k, v in runs.items()}}
+    nominal, runs, final = collect(raw)
+    summary = {"deck": deck, "nominal": nominal, "final": final, "runs": {k: len(v) for k, v in runs.items()}}
     ok = True
 
     def check(name, good, detail):
@@ -97,6 +99,10 @@ def main():
         for k, v in want["nominal"].items():
             got = nominal.get(k)
             check(f"nominal {k}", got is not None and abs(got - v) <= want["rel_tol"] * abs(v), f"{got} vs {v}")
+    if "final" in want:
+        for k, v in want["final"].items():
+            got = final.get(k)
+            check(f"final {k}", got is not None and abs(got - v) <= want["rel_tol"] * abs(v), f"{got} vs {v}")
     if "probe" in want:
         xs = runs.get(want["probe"], [])
         if not xs:

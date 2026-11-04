@@ -1,0 +1,23 @@
+// t
+
+simulator lang=spectre
+
+parameters sw_nsd_pw_cj=1 sw_func_nsd_pw_cj=1 rs_int=981*1e-12
+model ndiode diode level=3 tlevc=1 area=1T cjo=sw_nsd_pw_cj*1e-12 m=440m vj=729m cjsw=3.6001e-011*1e-6*sw_func_nsd_pw_cj mjsw=900u vjsw=200m cta=792u ctp=10u pta=1.2287m ptp=0 js=2.75f jsw=0.6f n=1.2928 rs=rs_int ik=1.3e-009/1e-12 bv=11.7/sw_func_nsd_pw_cj ibv=1.06m trs=0 eg=1.05 xti=2 tnom=30 tbv1=0 gap1=473u gap2=1.11k lm=0 lp=0 wm=0 wp=0 xm=0 xoi=10k xom=10k xp=0 xw=0 nz=1.2928 fcs=500m minr=0 dskip=no jmax=100000000T
+model dj diode level=3 js=10f jsw=1f n=1.05 rs=10 cjo=1m m=400m vj=800m cjsw=1n mjsw=300m vjsw=700m tlevc=1 cta=1m ctp=1m pta=1m ptp=1m bv=12 ibv=1m tnom=30 xti=3 tlev=1 tbv1=1m xom=10k xoi=10k lm=0 wm=0 eg=1.11 nz=1.05 fcs=500m minr=0 dskip=no jmax=100000000T
+
+v1 (1 0) vsource dc=2
+r1 (1 2) resistor r=1k
+d1 (2 0) dj area=500m perim=3
+v2 (3 0) vsource dc=-20
+r2 (3 4) resistor r=1k
+d2 (4 0) dj area=500m perim=3
+v3 (5 0) vsource dc=2
+r3 (5 6) resistor r=1k
+d3 (6 0) ndiode area=250m perim=2
+v4 (7 0) vsource dc=-20
+r4 (7 8) resistor r=1k
+d4 (8 0) ndiode area=250m perim=2
+mytemp options temp=60
+
+op1 dc

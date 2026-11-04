@@ -464,6 +464,18 @@ impl W<'_, '_> {
         let mut out = Vec::new();
         for &(m, bin) in &b.models {
             let view = self.rd.model_view(m, bin);
+            if let Some(k) = self.table_kind(&view) {
+                if let Some(rows) = self.model_rows(&view, m, k) {
+                    loads.insert(format!("spice/{}.osdi", k.vacask));
+                    out.push(format!(
+                        "model {} sp_{}{}",
+                        q(&view.name),
+                        k.vacask,
+                        self.vacask_list(&rows)
+                    ));
+                }
+                continue;
+            }
             match self.vacask_model(&view, loads) {
                 Some(l) => out.push(l),
                 None => self.refuse(Code::W0104, self.rd.main(m)),
@@ -519,6 +531,18 @@ impl W<'_, '_> {
         ))
     }
 
+    /// ` (k=v …)`, or nothing.
+    fn vacask_list(&self, rows: &[(String, String)]) -> String {
+        let items: Vec<String> = rows
+            .iter()
+            .map(|(k, v)| format!("{k}={}", self.expr(v)))
+            .collect();
+        match items.is_empty() {
+            true => String::new(),
+            false => format!(" ({})", items.join(" ")),
+        }
+    }
+
     /// ` (type=1 k=v …)`, or nothing.
     fn vacask_params(&self, m: &Model, sign: Option<i8>) -> String {
         let mut s = String::new();
@@ -552,6 +576,8 @@ impl Need {
 /// The module element `c` needs, if any.
 fn need(c: &Card) -> Option<Need> {
     Some(match c {
+        // An element naming its model is that model's instance.
+        Card::Rcl { model: Some(_), .. } => return None,
         Card::Rcl { letter: 'R', .. } => Need::Sp("resistor"),
         Card::Rcl { letter: 'C', .. } => Need::Sp("capacitor"),
         Card::Rcl { .. } => Need::Sp("inductor"),

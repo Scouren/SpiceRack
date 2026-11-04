@@ -1,0 +1,19 @@
+// t
+
+simulator lang=spectre
+
+model cmim capacitor cj=2m cjsw=100p tc1=100u tnom=27 w=10u
+model cfix capacitor c=3p w=10u
+
+i1 (0 b1) isource dc=0 type=pulse val0=0 val1=1u delay=0 rise=1f fall=1f width=1 period=2
+c1 (b1 0) cmim w=10u l=20u
+rb1 (b1 0) resistor r=1T
+i2 (0 b2) isource dc=0 type=pulse val0=0 val1=1u delay=0 rise=1f fall=1f width=1 period=2
+c2 (b2 0) cfix m=(1)*(2)
+rb2 (b2 0) resistor r=1T
+i3 (0 b3) isource dc=0 type=pulse val0=0 val1=1u delay=0 rise=1f fall=1f width=1 period=2
+c3 (b3 0) cmim l=5u
+rb3 (b3 0) resistor r=1T
+mytemp options temp=60
+
+tran1 tran step=10n stop=1u

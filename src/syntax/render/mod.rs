@@ -29,6 +29,7 @@
 
 pub mod capability;
 mod draws;
+mod models;
 mod named;
 mod names;
 mod out;

@@ -11,9 +11,10 @@
 
 use super::W;
 use super::vacask::{num, q};
+use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Card, Num, Wave, WaveKind};
+use crate::syntax::render::read::{Card, Num, Val, Wave, WaveKind};
 
 impl W<'_, '_> {
     /// Element `n`'s statement, with no line end; `None` when it is
@@ -32,21 +33,31 @@ impl W<'_, '_> {
                 model,
                 params,
             } => {
-                if model.is_some() {
+                // A model card read as ngspice maps through
+                // `render::models` (`sp_resistor`, `sp_capacitor`).
+                let ngspice = self.rd.d == Dialect::Ngspice;
+                if model.is_some() && !(ngspice && matches!(letter, 'R' | 'C')) {
                     self.ask(Construct::RclModel, tok);
                     return None;
+                }
+                if ngspice && letter == 'R' {
+                    self.dependent(&value, model.is_some(), &params, n)?;
                 }
                 let (l, m) = match letter {
                     'R' => ('r', "resistor"),
                     'C' => ('c', "capacitor"),
                     _ => ('l', "inductor"),
                 };
+                let value = match &value {
+                    Val::Raw(t) if t.is_empty() => String::new(),
+                    v => format!(" {l}={}", self.vval(v)),
+                };
                 format!(
-                    "{l}{} ({} {}) {m} {l}={}{}",
+                    "{l}{} ({} {}) {}{value}{}",
                     q(own),
                     q(&n1),
                     q(&n2),
-                    self.vval(&value),
+                    model.map_or(m.to_string(), |m| q(&m)),
                     self.inst_params(&params)
                 )
             }

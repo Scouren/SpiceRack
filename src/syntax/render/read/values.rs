@@ -13,7 +13,8 @@
 //! - `Rd::vtext(&self, n: u32) -> String`
 //! - `Rd::body_text(&self, n: u32) -> String`, `Rd::name_of(&self, n: u32) -> String`
 //! - `Rd::expr_ok(&self, n: u32) -> bool`, `Rd::inner(&self, n: u32) -> String`
-//! - `Rd::key(&self, n: u32) -> String`, `Rd::word_text(&self, n: u32) -> Option<String>`
+//! - `Rd::key(&self, n: u32) -> String`, `Rd::param_token(&self, n: u32, key: &str) -> u32`,
+//!   `Rd::word_text(&self, n: u32) -> Option<String>`
 //! - `Rd::mtext(&self, n: u32) -> String`, `Rd::params_of(&self, items: &[u32], model: bool) -> Vec<(String, String)>`,
 //!   `Rd::nests_delimiter(&self, e: u32) -> bool`, `Rd::respell(&self, s: &str) -> String`
 
@@ -131,6 +132,22 @@ impl Rd<'_> {
     /// An `Assign`'s key text.
     pub(in crate::syntax::render) fn key(&self, n: u32) -> String {
         self.text(self.ast.lhs(Node(n)))
+    }
+
+    /// The token of statement `n`'s last parameter named `key` (ignoring
+    /// case, a flag too), where a diagnostic about it anchors; `n`'s own
+    /// token when it has none.
+    pub(in crate::syntax::render) fn param_token(&self, n: u32, key: &str) -> u32 {
+        let named = |&k: &u32| match self.tag(k) {
+            Tag::Assign => self.key(k).eq_ignore_ascii_case(key),
+            Tag::Word => self.text(k).eq_ignore_ascii_case(key),
+            _ => false,
+        };
+        let found = self.fields(n).iter().rev().find(|k| named(k));
+        found.map_or(self.main(n), |&k| match self.tag(k) {
+            Tag::Assign => self.main(self.ast.lhs(Node(k))),
+            _ => self.main(k),
+        })
     }
 
     /// A body kept whole (`B`, `.func`): its expression without delimiters.

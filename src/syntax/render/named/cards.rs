@@ -15,6 +15,7 @@
 //! - `W::card(&mut self, n: u32) -> Option<String>`, `W::models(&mut self, b: &Block)`
 
 use super::W;
+use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Block, Card, Model, Num, Val, Wave, WaveKind};
@@ -46,7 +47,10 @@ impl W<'_, '_> {
                 model,
                 params,
             } => {
-                if model.is_some() {
+                // A model card read as ngspice maps through `render::models`;
+                // another dialect's means other equations.
+                let ngspice = self.rd.d == Dialect::Ngspice;
+                if model.is_some() && !(ngspice && matches!(letter, 'R' | 'C')) {
                     self.ask(Construct::RclModel, tok);
                     return None;
                 }
@@ -55,12 +59,27 @@ impl W<'_, '_> {
                     'C' => ('c', "capacitor"),
                     _ => ('l', "inductor"),
                 };
+                let (name, n1, n2) = (self.dev(own), self.node(&n1), self.node(&n2));
+                if ngspice
+                    && letter == 'R'
+                    && let Some((r, kept)) = self.dependent(&value, model.is_some(), &params, n)?
+                {
+                    return Some(format!(
+                        "r{name} ({n1} {n2}) resistor r={r}{}",
+                        self.params(&kept)
+                    ));
+                }
+                let params = match ngspice && letter != 'L' {
+                    true => self.element_rows(letter, &params, n)?,
+                    false => params,
+                };
+                let master = model.map_or(master.to_string(), |m| self.node(&m));
+                let value = match &value {
+                    Val::Raw(t) if t.is_empty() => String::new(),
+                    v => format!(" {l}={}", self.val(v)),
+                };
                 format!(
-                    "{l}{} ({} {}) {master} {l}={}{}",
-                    self.dev(own),
-                    self.node(&n1),
-                    self.node(&n2),
-                    self.val(&value),
+                    "{l}{name} ({n1} {n2}) {master}{value}{}",
                     self.params(&params)
                 )
             }
@@ -219,6 +238,10 @@ impl W<'_, '_> {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }
+                let params = match letter == 'D' && self.rd.d == Dialect::Ngspice {
+                    true => self.element_rows(letter, &params, n)?,
+                    false => params,
+                };
                 let ns: Vec<String> = nodes.iter().map(|x| self.node(x)).collect();
                 format!(
                     "{}{} ({}) {}{}",
@@ -308,11 +331,20 @@ impl W<'_, '_> {
                 None => 0,
             };
             let Some((base, _)) = bin(first).filter(|_| run > 0) else {
+                let params = match self.table_kind(first) {
+                    Some(k) => match self.model_rows(first, b.models[i].0, k) {
+                        Some(rows) => self.params(&rows),
+                        None => {
+                            i += 1;
+                            continue;
+                        }
+                    },
+                    None => self.model_params(first, master),
+                };
                 let line = format!(
-                    "model {} {}{}",
+                    "model {} {}{params}",
                     self.node(&first.name),
                     master.0.unwrap_or(&first.kind),
-                    self.model_params(first, master)
                 );
                 self.line(&line);
                 i += 1;
@@ -432,7 +464,10 @@ impl W<'_, '_> {
 
     /// Model `m`'s master, or its refusal at `tok`.
     fn master(&mut self, m: &Model, tok: u32) -> Option<Master> {
-        let found = spectre_master(m);
+        let found = match self.table_kind(m) {
+            Some(k) => Some((Some(k.spectre), None)),
+            None => spectre_master(m),
+        };
         if found.is_none() {
             self.refuse(Code::W0104, tok);
         }

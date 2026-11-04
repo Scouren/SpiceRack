@@ -473,6 +473,24 @@ catalogue! {
         cite: "Spectre Reference 19.1 p.498 (model masters)",
         explain: "The model's `level` is an expression, so the master is chosen as for level 1 (`mos1`, `bjt`). Write the level as a number so the master matches the model's equations.",
     }
+    /// A parameter ngspice reads without effect on the solution (or not at all), not written.
+    W0112 Note {
+        title: "a parameter ngspice ignores, not written",
+        cite: "ngspice-45 `parser/inpgmod.c` (\"unrecognized parameter - ignored\"); `render::models` (the safe-operating-area limits)",
+        explain: "ngspice does not read this parameter (no row of the device's table names it), or reads it only for a warning (a safe-operating-area limit), so the solution is the same without it; the target would reject or misread it. Remove it from the card.",
+    }
+    /// A voltage-dependent resistance written as ngspice runs it: its model and its other parameters left out.
+    W0113 Note {
+        title: "a voltage-dependent resistor's model and parameters, not written",
+        cite: "ngspice-45 `frontend/inpcom.c` L6621-L6680 (`R … r={v(…)}` → `B … i=v(…)/(…)` with `tc1`, `tc2`, `m` only); Spectre Reference 5.0 p.859 (`resistor r=` of `v(a,b)`)",
+        explain: "ngspice runs a resistance that reads a node voltage or a branch current as a behavioural source carrying only `tc1`, `tc2` and `m`: the model and every other parameter are dropped. The target's card keeps the same three.",
+    }
+    /// A model or element parameter no parameter of the target computes the same way.
+    W0114 Refusal {
+        title: "a parameter with no form in the target",
+        cite: "`render::models` (each row's ngspice-45 and Spectre Reference 5.0 clause)",
+        explain: "The parameter at this position has no parameter in the target with ngspice's equation (a tunnelling current, an exponential temperature coefficient, a knee current Spectre reads only with `hcomp=1`), or ngspice and the target rank it against another one in opposite orders. Set it to its off value, or model the effect another way.",
+    }
 }
 
 /// Sorts `diags` by source position (token), then code: the order their

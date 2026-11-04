@@ -10,6 +10,7 @@
 //! - `W::checks(&mut self)`, `fn calls(e: &str) -> impl Iterator<Item = &str>`
 
 use super::W;
+use super::params::spelled_flag;
 use crate::syntax::Dialect;
 use crate::syntax::ast::NONE;
 use crate::syntax::diag::Code;
@@ -143,13 +144,15 @@ impl<'r> W<'_, 'r> {
         }
         for &c in &b.comps {
             let Comp::Card(n) = c else { continue };
-            let params = match self.rd.card_view(n) {
-                Card::Rcl { params, .. }
-                | Card::Charge { params, .. }
-                | Card::Semi { params, .. } => params,
+            let (letter, params) = match self.rd.card_view(n) {
+                Card::Rcl { letter, params, .. } | Card::Semi { letter, params, .. } => {
+                    (letter, params)
+                }
+                Card::Charge { params, .. } => ('C', params),
                 _ => continue,
             };
-            if params.iter().any(|(_, v)| v.is_empty()) {
+            let flag = |k: &str| !spelled_flag(self.rd.d, self.d, letter, k);
+            if params.iter().any(|(k, v)| v.is_empty() && flag(k)) {
                 return Some(self.rd.main(n));
             }
         }
