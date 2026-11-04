@@ -47,7 +47,9 @@ pub enum Construct {
     NgBehavior,
     /// `.lib name` … `.endl`.
     LibSection,
-    /// An R, C or L card naming a model.
+    /// An R, C or L card naming a model no `render::models` kind maps: an
+    /// inductor's, or a model card read in a dialect other than ngspice
+    /// (its parameters mean other equations).
     RclModel,
     /// `C1 a b q=expr`.
     ChargeCapacitor,
