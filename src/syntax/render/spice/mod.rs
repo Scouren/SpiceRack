@@ -7,7 +7,8 @@
 //! parameters and models, subcircuits, sections, the body, the testbench,
 //! `.end`; the frame of title, `.end` and control blocks decided once, by
 //! the file's role) and the block-level cards; `cards` writes elements and
-//! waveforms, `bench` the testbench and analyses, `checks` the deck-wide
+//! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
+//! options), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads,
 //! `cdl` CDL's layout; the `statistics` lift (`render::draws`) and the name
@@ -27,6 +28,7 @@ mod cdl;
 mod checks;
 mod laplace;
 mod verilog;
+mod xyce_options;
 
 use super::Numbers;
 use super::capability::{Action, Alt, Construct, Rule, action};
