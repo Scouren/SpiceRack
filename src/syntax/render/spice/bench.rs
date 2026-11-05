@@ -368,6 +368,7 @@ impl W<'_, '_> {
                 start,
                 max_step,
                 uic,
+                ..
             } if hs => {
                 let mut s = String::new();
                 if let Some(ms) = max_step {
@@ -388,6 +389,7 @@ impl W<'_, '_> {
                 start,
                 max_step,
                 uic,
+                startup,
             } => {
                 let mut s = format!(".tran {} {}", num(self, *step), num(self, *stop));
                 if let Some(st) = start {
@@ -401,6 +403,10 @@ impl W<'_, '_> {
                 }
                 if *uic {
                     s.push_str(" UIC");
+                }
+                // Refused on a target without it (`W::checks`).
+                if *startup && action(self.d, Construct::TranStartup) == Action::Native {
+                    s.push_str(" startup");
                 }
                 s
             }

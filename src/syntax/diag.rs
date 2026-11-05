@@ -406,6 +406,18 @@ catalogue! {
         cite: "ngspice manual, the compatibility modes (`set ngbehavior` in `.spiceinit`, or `-D ngbehavior=`, read before the deck)",
         explain: "`.options ngbehavior=` selects how ngspice reads the deck (`hsa`, `ps`, `lt`, …); ngspice takes it on its command line, and no other target has such a mode, so it is left out. The target reads the deck in its own dialect.",
     }
+    /// An LTspice `.backanno`: an annotation request with no simulation meaning, not written.
+    W0036 Note {
+        title: "an annotation directive with no simulation meaning, not written",
+        cite: "LTspice help (`.BACKANNO`: annotate the subcircuit pin names onto the port currents)",
+        explain: "LTspice adds `.backanno` to a netlist it writes from a schematic, so that the waveform viewer names a subcircuit's port currents by its pins. It changes no number of the run, and no other simulator has it, so the reader leaves it out on every target.",
+    }
+    /// LTspice's `.tran … startup` on a target with no such ramp.
+    W0037 Refusal {
+        title: "a transient start-up ramp the target lacks",
+        cite: "LTspice help (`.TRAN` modifier `startup`: the operating point with the independent sources off, each ramped on over the first 20 µs); ngspice manual §11.1.4 (`RAMPTIME`, a ramp of given length whose shape LTspice does not state); HSPICE, Xyce RG §2.1.21, Spectre, VACASK: no start-up ramp",
+        explain: "The transient starts from an operating point with every independent source at zero and ramps them on over its first 20 µs. The target has no such start: without it the run starts from the full-source operating point, another answer for a circuit that latches or soft-starts. Ramp the sources in the deck (a PWL from zero) and drop `startup`.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

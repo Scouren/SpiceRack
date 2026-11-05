@@ -93,6 +93,7 @@ impl<'a> Rd<'a> {
                 start: num("start"),
                 max_step: num("maxstep"),
                 uic: s("skipdc").as_deref() == Some("yes"),
+                startup: false,
             },
             ("montecarlo", []) => self.montecarlo(n)?,
             ("noise", [out, reference]) => Ana::Noise {
@@ -299,6 +300,7 @@ impl<'a> Rd<'a> {
                     start: None,
                     max_step: num("maxstep"),
                     uic: s("icmode").as_deref() == Some("uic"),
+                    startup: false,
                 };
                 return Some(vec![
                     BenchCard::NodeVals(true, ic),

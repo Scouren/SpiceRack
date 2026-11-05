@@ -174,6 +174,7 @@ impl W<'_, '_> {
                 start,
                 max_step,
                 uic,
+                ..
             } => {
                 // VACASK always saves from t=0.
                 if start.unwrap_or(0.0) != 0.0 {

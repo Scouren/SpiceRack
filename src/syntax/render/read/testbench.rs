@@ -6,12 +6,14 @@
 //! Cites: the old lowering; the old SPICE grammar's `Options`, `Temp`,
 //! `Ic`, `Nodeset`, `Save`, `Out`, `Print`, `Meas`, `Op` … `Four`; the old ngspice grammar
 //! `Sp`; the old HSPICE grammar's `Tran`, `Probe`, `Out`; the old LTspice grammar's `Tran`, `Step`;
-//! the old Xyce grammar's `Options`, `Step`; Xyce Reference Guide p.96.
+//! the old Xyce grammar's `Options`, `Step`; Xyce Reference Guide p.96;
+//! LTspice help `.TRAN` (the `startup` and `uic` modifiers).
 //!
 //! Contents:
 //! - `pub(in crate::syntax::render) enum BenchCard`, `enum Ana`, `struct Sweep`
 //! - `Rd::testbench_peg(&self, n: u32) -> bool`, `Rd::testbench_ok(&self, n: u32) -> bool`
 //! - `Rd::bench_card(&self, n: u32) -> Option<BenchCard>`
+//! - `Rd::tran_startup(&self, bench: &[Bench]) -> Option<u32>`
 //! - `Rd::head_kind(&self, n: u32) -> String`
 //! - `Rd::numw(&self, k: u32) -> bool`
 //! - `Rd::wordw(&self, k: u32) -> bool`
@@ -62,6 +64,10 @@ pub(in crate::syntax::render) enum Ana {
         start: Option<f64>,
         max_step: Option<f64>,
         uic: bool,
+        /// LTspice's `startup`: the operating point with the independent
+        /// sources off, then each ramped on over the first 20 µs (LTspice
+        /// help, `.TRAN`, modifiers).
+        startup: bool,
     },
     Noise {
         output: String,
@@ -108,8 +114,8 @@ enum Card {
     Dc(Vec<[u32; 4]>),
     /// `.ac`, `.sp`: variation, points, start, stop.
     Freq(bool, [u32; 4]),
-    /// `.tran`: its numbers, a `START=` pair, `uic`.
-    Tran(Vec<u32>, Option<u32>, bool),
+    /// `.tran`: its numbers, a `START=` pair, `uic`, LTspice's `startup`.
+    Tran(Vec<u32>, Option<u32>, bool, bool),
     /// `.noise v(out[,ref]) src var pts f1 f2 [pts_per_summary]`.
     Noise(Vec<String>, u32, [u32; 4], Option<u32>),
     /// `.tf out src`.
@@ -190,6 +196,17 @@ impl<'a> Rd<'a> {
                 })
             }
             _ => return None,
+        })
+    }
+
+    /// The first token of the first `.tran … startup` among `bench`.
+    pub(in crate::syntax::render) fn tran_startup(&self, bench: &[super::Bench]) -> Option<u32> {
+        bench.iter().find_map(|&b| match b {
+            super::Bench::Card(n) => match self.bench_card(n) {
+                Some(BenchCard::Ana(Ana::Tran { startup: true, .. })) => Some(self.main(n)),
+                _ => None,
+            },
+            _ => None,
         })
     }
 
@@ -329,12 +346,20 @@ impl<'a> Rd<'a> {
     }
 
     fn tran(&self, n: u32, items: &[u32], hspice: bool, lt: bool) -> Option<Card> {
-        let (body, uic) = match items.split_last() {
-            Some((&u, rest)) if self.wordw(u) && self.text(u).eq_ignore_ascii_case("uic") => {
-                (rest, true)
+        // Trailing modifiers in any order: `uic`, and LTspice's `startup`
+        // (LTspice help, `.TRAN`).
+        let (mut body, mut uic, mut startup) = (items, false, false);
+        while let Some((&u, rest)) = body.split_last()
+            && self.wordw(u)
+        {
+            let w = self.text(u).to_ascii_lowercase();
+            match w.as_str() {
+                "uic" if !uic => uic = true,
+                "startup" if lt && !startup => startup = true,
+                _ => break,
             }
-            _ => (items, false),
-        };
+            body = rest;
+        }
         if !self.spaced(n, items) {
             return None;
         }
@@ -352,7 +377,7 @@ impl<'a> Rd<'a> {
         }) {
             return None;
         }
-        Some(Card::Tran(nums.to_vec(), start, uic))
+        Some(Card::Tran(nums.to_vec(), start, uic, startup))
     }
 
     fn noise(&self, n: u32, items: &[u32]) -> Option<Card> {
@@ -473,7 +498,7 @@ impl<'a> Rd<'a> {
             ),
             Card::Freq(false, f) => Ana::Ac(sweep(f)?),
             Card::Freq(true, f) => Ana::Sp(sweep(f)?),
-            Card::Tran(nums, pair, uic) => {
+            Card::Tran(nums, pair, uic, startup) => {
                 let p: Vec<f64> = nums.iter().map(|&k| num(k)).collect::<Option<_>>()?;
                 let start = match pair {
                     Some(pr) if self.key(*pr).eq_ignore_ascii_case("start") => {
@@ -482,7 +507,7 @@ impl<'a> Rd<'a> {
                     Some(_) => return None,
                     None => None,
                 };
-                let uic = *uic;
+                let (uic, startup) = (*uic, *startup);
                 match p.as_slice() {
                     [stop] => Ana::Tran {
                         step: 0.0,
@@ -490,6 +515,7 @@ impl<'a> Rd<'a> {
                         start: None,
                         max_step: None,
                         uic,
+                        startup,
                     },
                     [step, stop] if start.is_some() => Ana::Tran {
                         step: *step,
@@ -497,6 +523,7 @@ impl<'a> Rd<'a> {
                         start,
                         max_step: None,
                         uic,
+                        startup,
                     },
                     [step, stop, rest @ ..] if rest.len() <= 2 => Ana::Tran {
                         step: *step,
@@ -504,6 +531,7 @@ impl<'a> Rd<'a> {
                         start: rest.first().copied(),
                         max_step: rest.get(1).copied(),
                         uic,
+                        startup,
                     },
                     _ => return None,
                 }

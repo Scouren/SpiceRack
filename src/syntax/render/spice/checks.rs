@@ -1,7 +1,8 @@
 //! The deck-wide refusals the SPICE-family writer makes before it writes: a
 //! statement kept as another family's text (`ForeignText`), a `^` the
 //! target reads with the other meaning (`CaretReread`), a statistical call
-//! the target has no function for (`StatisticalCall`). Each reads every
+//! the target has no function for (`StatisticalCall`), an LTspice
+//! `.tran … startup` the target has no ramp for (`TranStartup`). Each reads every
 //! block the deck writes (definitions, sections, branches) and every
 //! expression the old reader kept as text.
 //!
@@ -33,6 +34,9 @@ impl W<'_, '_> {
             self.ask(Construct::ForeignText, tok);
         }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));
+        if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {
+            self.ask(Construct::TranStartup, tok);
+        }
         // A waveform's values past its form's count are not written.
         for b in &blocks {
             for &c in &b.comps {

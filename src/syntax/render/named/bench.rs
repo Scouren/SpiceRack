@@ -311,6 +311,7 @@ impl W<'_, '_> {
                 start,
                 max_step,
                 uic,
+                ..
             } => {
                 let mut s = format!("tran1 tran step={} stop={}", n(self, *step), n(self, *stop));
                 if let Some(st) = start {

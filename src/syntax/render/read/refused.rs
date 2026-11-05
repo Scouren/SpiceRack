@@ -161,7 +161,6 @@ impl<'a> Rd<'a> {
             "savestate",
             "loadstate",
             "softstart",
-            "backanno",
             "savebias",
             "loadbias",
             "machine",

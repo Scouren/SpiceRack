@@ -60,6 +60,16 @@ impl Rd<'_> {
         // `Raw_lt`, the old Xyce grammar's `Raw_xy`) is tried before the
         // shared dot cards.
         let word = self.head_word(n);
+        // LTspice's `.backanno` names port currents for its viewer and
+        // changes no number (LTspice help): left out, noted.
+        if self.d == Dialect::Ltspice && word == "backanno" && self.fields(n).is_empty() {
+            let token = self.main(n);
+            acc.notes.push(crate::syntax::diag::Diag {
+                code: crate::syntax::diag::Code::W0036,
+                token,
+            });
+            return;
+        }
         if self.dialect_raw(&word) {
             return self.keep(n, here, Kept::Raw);
         }

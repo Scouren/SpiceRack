@@ -1,7 +1,8 @@
 //! The deck-wide refusals the named writer makes before it writes: text
 //! kept from another dialect (`ForeignText`; a deck's own text passes), a
 //! flag (a parameter with no value: Spectre takes `name=value` only), a
-//! `^` the target reads with the other meaning (`CaretReread`).
+//! `^` the target reads with the other meaning (`CaretReread`), an LTspice
+//! `.tran … startup` (`TranStartup`).
 //!
 //! Cites: Spectre Reference 19.1 p.506 (`name=value`); ngspice manual
 //! §2.8.5; LTspice help, Xyce RG §2.1.18 (`^` XOR).
@@ -30,6 +31,9 @@ impl W<'_, '_> {
             self.ask(Construct::ForeignText, tok);
         }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));
+        if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {
+            self.ask(Construct::TranStartup, tok);
+        }
         // A waveform's values past its form's count are not written.
         for b in &blocks {
             for &c in &b.comps {

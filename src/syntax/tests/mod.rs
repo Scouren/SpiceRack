@@ -19,6 +19,7 @@ use crate::syntax::{parse, tokenize};
 
 mod heads;
 mod render;
+mod spice_read;
 
 // ---- private ----
 

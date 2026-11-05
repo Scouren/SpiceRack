@@ -73,6 +73,8 @@ pub enum Construct {
     Func,
     /// `.step`.
     Step,
+    /// LTspice's `.tran … startup` ramp.
+    TranStartup,
     /// `.tf`.
     Tf,
     /// `.sens` (DC).
@@ -297,6 +299,13 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
         },
+        Construct::TranStartup => match target {
+            D::Ltspice => Native,
+            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0037),
+            D::Spectre | D::Vacask => Refuse(Code::W0037),
+            // Neither writes an analysis.
+            D::Cdl | D::Verilog => Native,
+        },
         Construct::Tf => match target {
             D::Xyce => Refuse(Code::W0015),
             D::Ngspice | D::Espice | D::Hspice | D::Ltspice => Native,
@@ -394,7 +403,7 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 30] = [
+    const CONSTRUCTS: [Construct; 31] = [
         Construct::ForeignText,
         Construct::NgBehavior,
         Construct::CaretReread,
@@ -415,6 +424,7 @@ mod tests {
         Construct::BranchParam,
         Construct::Func,
         Construct::Step,
+        Construct::TranStartup,
         Construct::Tf,
         Construct::Sens,
         Construct::SensAc,
