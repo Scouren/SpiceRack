@@ -72,6 +72,25 @@ pub(super) enum Signal<'s> {
     Current(&'s str),
 }
 
+/// SPICE's options and Spectre's of the same effect (`[REF]` pp.187-236,
+/// by number): `reltol` #1, `vabstol` #3, `iabstol` #4, `chargeabstol` #5,
+/// `temp` #6, `tnom` #7, `dcmaxiters` #56 (ngspice's `itl1`, Xyce's `max_iterations`), `scale`
+/// #90, `gmin` #128, `pivrel` #181, `pivabs` #182 (SPICE's `pivtol`).
+const SPECTRE_OPTIONS: &[(&str, &str)] = &[
+    ("reltol", "reltol"),
+    ("vntol", "vabstol"),
+    ("abstol", "iabstol"),
+    ("chgtol", "chargeabstol"),
+    ("temp", "temp"),
+    ("tnom", "tnom"),
+    ("itl1", "dcmaxiters"),
+    ("max_iterations", "dcmaxiters"),
+    ("scale", "scale"),
+    ("gmin", "gmin"),
+    ("pivrel", "pivrel"),
+    ("pivtol", "pivabs"),
+];
+
 /// The most points an `oct` sweep's `values` list holds.
 const OCT_POINTS_MAX: usize = 100_000;
 
@@ -87,22 +106,21 @@ impl W<'_, '_> {
             self.note(Code::W0024, tok);
         }
         // `[REF]` p.236: `o1 options scale=1.2`; options take `name=value`
-        // only. A portable option is SPICE's: its name lowercased and
-        // mapped, its number respelled (SPICE `VNTOL=1M` is milli).
+        // only. A SPICE option is written where Spectre has one of the same
+        // effect ([`SPECTRE_OPTIONS`]), its number respelled (SPICE
+        // `VNTOL=1M` is milli); any other (a flag such as `ACCT`, `itl4`,
+        // `method`) is not written: noted.
         let mut opts = Vec::new();
         for (k, v, tok) in &tb.options {
-            if v.is_empty() {
-                self.refuse(Code::W0101, *tok);
-                continue;
-            }
             let k = k.to_ascii_lowercase();
-            let k = match k.as_str() {
-                "abstol" => "iabstol",
-                "vntol" => "vabstol",
-                "max_iterations" => "dcmaxiters",
-                other => other,
+            let spectre = match self.rd.d {
+                Dialect::Spectre => Some(k.as_str()),
+                _ => SPECTRE_OPTIONS.iter().find(|o| o.0 == k).map(|o| o.1),
             };
-            opts.push(format!("{k}={}", self.value_text(v)));
+            match spectre {
+                Some(name) if !v.is_empty() => opts.push(format!("{name}={}", self.value_text(v))),
+                _ => self.note(Code::W0024, *tok),
+            }
         }
         if !opts.is_empty() {
             self.line(&format!("myopts options {}", opts.join(" ")));

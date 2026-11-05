@@ -178,14 +178,23 @@ fn spectre_keeps_spice_meaning() {
     assert!(netlist(&vdmos, Dialect::Spectre).is_err());
 }
 
-/// An empty option value is a flag: bare in SPICE, refused by Spectre
-/// (`W0101`), whose `options` statement takes `name=value` only.
+/// An empty option value is a flag: bare in SPICE. Spectre's `options`
+/// takes `name=value` only and has no `acct` (Reference 19.1 pp.187-236):
+/// the flag is not written, noted W0024; `reltol` is Spectre's #1, `itl1`
+/// its `dcmaxiters` #56.
 #[test]
 fn option_flags() {
-    let deck = circuit(".options noacct reltol=1e-4\n.op\n", false);
+    let deck = circuit(".options noacct reltol=1e-4 itl1=200\n.op\n", false);
     let n = netlist(&deck, Dialect::Ngspice).unwrap_or_else(|e| panic!("{}", e.messages));
-    assert!(n.contains(".options noacct reltol=1e-4"), "{n}");
-    assert!(refusal(&deck, Dialect::Spectre).contains(&Code::W0101));
+    assert!(n.contains(".options noacct reltol=1e-4 itl1=200"), "{n}");
+    let w = render_text(&deck, Dialect::Ngspice, "dialects", Dialect::Spectre)
+        .unwrap_or_else(|e| panic!("{}", e.messages));
+    assert!(
+        w.text.contains("myopts options reltol=100u dcmaxiters=200"),
+        "{}",
+        w.text
+    );
+    assert!(w.notes.diags.iter().any(|x| x.code == Code::W0024));
 }
 
 // ── ESPice as the reader ──
