@@ -1,0 +1,414 @@
+"""The Python API's conformance matrix: every public feature, netlisted for
+every dialect the writer has, is written or refused with one exact code.
+
+Oracle: the table below, reviewed cell by cell against the target's manual
+(a refusal's cause is the target lacking the construct, class G in
+CONFORMANCE-GAPS.md; the citations are the codes' catalogue rows,
+`src/syntax/diag.rs`). It is compared as name lists, never counts: a cell
+that changes, a feature added without a row, or a refusal with no code
+fails. Where a simulator is installed (`nix develop .#testing`: ngspice,
+ESPice, VACASK), the written decks run and their numbers meet a closed form.
+"""
+import math
+import re
+from pathlib import Path
+
+import pytest
+
+TARGETS = ("ngspice", "espice", "hspice", "xyce", "ltspice", "spectre", "vacask", "cdl", "verilog")
+
+
+VA = Path(__file__).parent / "fixtures" / "verilog_a" / "va" / "varactor.va"
+INV = "module inv(input a, output y); assign y = ~a; endmodule"
+
+
+def ps():
+    import spicerack  # unsupported fails, never skips: an unbuilt extension is an error
+    return spicerack
+
+
+def dut(mod):
+    """An RC low-pass with a resistor parameter `r`: in -R- out -C- 0."""
+    d = mod.Subcircuit("rc", ["in", "out"], r="1k")
+    d.R("1", "in", "out", "{r}")
+    d.C("1", "out", d.gnd, 1e-9)
+    return d
+
+
+def bench(mod, d=None):
+    tb = mod.Testbench(d or dut(mod))
+    tb.V("in", "in", "0", 1.0, ac=1.0)
+    return tb
+
+
+# Each feature: what it adds to a bench (the DUT's elements go through
+# `elem`, which gets a fresh DUT).
+def elem(build):
+    def f(mod):
+        d = dut(mod)
+        build(d)
+        tb = bench(mod, d)
+        tb.add_operating_point()
+        return tb
+    return f
+
+
+def analysis(build):
+    def f(mod):
+        tb = bench(mod)
+        build(tb)
+        return tb
+    return f
+
+
+def setting(build):
+    def f(mod):
+        tb = bench(mod)
+        build(tb)
+        tb.add_transient(1e-6, 1e-5)
+        return tb
+    return f
+
+
+def source(build):
+    def f(mod):
+        tb = mod.Testbench(dut(mod))
+        build(tb)
+        tb.add_transient(1e-6, 1e-5)
+        return tb
+    return f
+
+
+def _child(mod):
+    c = mod.Subcircuit("buf", ["a", "b"])
+    c.R("1", "a", "b", 1e3)
+    return c
+
+
+def _with_child(mod):
+    d = dut(mod)
+    child = _child(mod)
+    d.instance(child, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(child)
+    tb.add_operating_point()
+    return tb
+
+
+FEATURES = {
+    # Analyses.
+    "op": analysis(lambda tb: tb.add_operating_point()),
+    "dc": analysis(lambda tb: tb.add_dc(Vin=slice(0, 1, 0.5))),
+    "dc_temp": analysis(lambda tb: tb.add_dc(temp=slice(0, 50, 25))),
+    "ac": analysis(lambda tb: tb.add_ac("dec", 10, 1.0, 1e6)),
+    "ac_oct": analysis(lambda tb: tb.add_ac("oct", 10, 1.0, 1e6)),
+    "ac_log": analysis(lambda tb: tb.add_ac("log", 10, 1.0, 1e6)),
+    "tran": analysis(lambda tb: tb.add_transient(1e-6, 1e-3)),
+    "tran_full": analysis(lambda tb: tb.add_transient(1e-6, 1e-3, 1e-4, 1e-6, True)),
+    "noise": analysis(lambda tb: tb.add_noise("out", "0", "Vin")),
+    "noise_summary": analysis(lambda tb: tb.add_noise("out", "0", "Vin", points_per_summary=5)),
+    "tf": analysis(lambda tb: tb.add_tf("V(out)", "Vin")),
+    "dc_sensitivity": analysis(lambda tb: tb.add_dc_sensitivity("V(out)")),
+    "ac_sensitivity": analysis(lambda tb: tb.add_ac_sensitivity("V(out)")),
+    "polezero": analysis(lambda tb: tb.add_polezero("in", "0", "out", "0", "vol", "pz")),
+    "distortion": analysis(lambda tb: tb.add_distortion()),
+    "pss": analysis(lambda tb: tb.add_pss(1e6, 1e-5, "out")),
+    "pss_controls": analysis(lambda tb: tb.add_pss(1e6, 1e-5, "out", sc_iter=20)),
+    "s_param": analysis(lambda tb: tb.add_s_param()),
+    "harmonic_balance": analysis(lambda tb: tb.add_harmonic_balance([1e6])),
+    "stability": analysis(lambda tb: tb.add_stability("Vin")),
+    "transient_noise": analysis(lambda tb: tb.add_transient_noise(1e-9, 1e-6)),
+    "fourier": analysis(lambda tb: (tb.add_transient(1e-6, 1e-3), tb.add_fourier(1e3, ["V(out)"]))),
+    "fourier_count": analysis(lambda tb: (tb.add_transient(1e-6, 1e-3), tb.add_fourier(1e3, ["V(out)"], num_harmonics=5))),
+    "network_params": analysis(lambda tb: tb.add_network_params("I(R1)", "Vin")),
+    "spectre_sweep": analysis(lambda tb: (tb.add_ac("dec", 10, 1.0, 1e6), tb.add_spectre_sweep("r", 1e3, 2e3, 1e3, "ac1", "ac"))),
+    "spectre_monte_carlo": analysis(lambda tb: (tb.add_ac("dec", 10, 1.0, 1e6), tb.add_spectre_monte_carlo(3, "ac1", "ac", seed=1))),
+    "spectre_pac": analysis(lambda tb: tb.add_spectre_pac(1e6, 1e-5)),
+    "spectre_pnoise": analysis(lambda tb: tb.add_spectre_pnoise(1e6, 1e-5, "out", "0")),
+    "spectre_pxf": analysis(lambda tb: tb.add_spectre_pxf(1e6, 1e-5, "out", "Vin")),
+    "spectre_pstb": analysis(lambda tb: tb.add_spectre_pstb(1e6, 1e-5, "Vin")),
+    # Settings.
+    "options": setting(lambda tb: tb.options(RELTOL=1e-4)),
+    "temperature": setting(lambda tb: (setattr(tb, "temperature", 85.0), setattr(tb, "nominal_temperature", 27.0))),
+    "initial_condition": setting(lambda tb: tb.initial_condition(out=0.0)),
+    "node_set": setting(lambda tb: tb.node_set(out=0.0)),
+    "save": setting(lambda tb: tb.save("V(out)")),
+    "measure": setting(lambda tb: tb.measure("tran", "vmax", "max", "v(out)")),
+    "print": setting(lambda tb: tb.add_print("tran", "v(out)")),
+    "step": setting(lambda tb: tb.step("r", 1e3, 3e3, 1e3)),
+    "step_dec": setting(lambda tb: tb.step_sweep("r", 1e3, 1e5, 2, "dec")),
+    "step_log": setting(lambda tb: tb.step_sweep("r", 1e3, 1e5, 5, "log")),
+    "ngbehavior": setting(lambda tb: setattr(tb, "ngbehavior", "hsa")),
+    "function": setting(lambda tb: tb.add_function("f", ["x"], "x*2")),
+    "global_nodes": setting(lambda tb: tb.global_nodes("vdd")),
+    "extra_line": setting(lambda tb: tb.extra_line(".options noacct")),
+    "extra_line_spectre": setting(lambda tb: tb.extra_line("parameters k=2", dialect="spectre")),
+    "use_pdk": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.lib", corner="tt", spectre="/sp/m.scs"))),
+    "use_pdk_include": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.inc"))),
+    "subcircuit": _with_child,
+    # Sources.
+    "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
+    "pulse": source(lambda tb: tb.PulseVoltageSource("in", "in", "0")),
+    "pwl": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)])),
+    "pwl_repeat": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)], repeat_time=0.0)),
+    "exp": source(lambda tb: tb.ExponentialVoltageSource("in", "in", "0", initial_value=0, pulsed_value=1, rise_time_constant=1e-6, fall_delay_time=5e-6, fall_time_constant=1e-6)),
+    "sffm": source(lambda tb: tb.SingleFrequencyFMVoltageSource("in", "in", "0", offset=0, amplitude=1, carrier_frequency=1e6, modulation_index=2, signal_frequency=1e4)),
+    "am": source(lambda tb: tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0, amplitude=1, modulating_frequency=1e4, carrier_frequency=1e6)),
+    "trnoise": source(lambda tb: tb.TransientNoiseVoltageSource("in", "in", "0", noise_rms=1e-3, time_step=1e-9)),
+    "trrandom": source(lambda tb: tb.RandomVoltageSource("in", "in", "0", random_type="uniform", duration=1e-9)),
+    "current_source": source(lambda tb: tb.I("in", "0", "in", 1e-3)),
+    "rf_port": source(lambda tb: tb.V("in", "in", "0", 0.0, portnum=1)),
+    # Elements and directives.
+    "L_K": elem(lambda d: (d.L("1", "in", "0", 1e-6), d.L("2", "out", "0", 1e-6), d.K("1", "L1", "L2", coupling=0.5))),
+    "D": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn"))),
+    "Q": elem(lambda d: (d.model("qn", "npn"), d.Q("1", "out", "in", "0", model="qn"))),
+    "M": elem(lambda d: (d.model("nm", "nmos"), d.M("1", "out", "in", "0", "0", model="nm", W=1e-6, L=1e-6))),
+    "M_three_node": elem(lambda d: (d.model("vd", "vdmos"), d.M("1", "out", "in", "0", model="vd"))),
+    "J": elem(lambda d: (d.model("jn", "njf"), d.J("1", "out", "in", "0", model="jn"))),
+    "Z": elem(lambda d: (d.model("zn", "nmf"), d.Z("1", "out", "in", "0", model="zn"))),
+    "E_G": elem(lambda d: (d.E("1", "x", "0", control_positive="out", control_negative="0", voltage_gain=2), d.G("1", "y", "0", control_positive="out", control_negative="0", transconductance=1e-3), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
+    "F_H": elem(lambda d: (d.V("s", "out", "z", 0), d.R("z", "z", "0", 1e3), d.F("1", "x", "0", vsense="Vs", current_gain=2), d.H("1", "y", "0", vsense="Vs", transresistance=10), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
+    "BV_BI": elem(lambda d: (d.BV("1", "x", "0", expression="V(out)*2"), d.BI("1", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
+    "POLY": elem(lambda d: (d.POLY("1", "E", "x", "0", ["out", "0"], [0, 1, 2]), d.R("x", "x", "0", 1e3))),
+    "S": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw"))),
+    "W": elem(lambda d: (d.V("s", "in", "z", 0), d.R("z", "z", "0", 1e3), d.model("cs", "csw"), d.W("1", "out", "0", vcontrol="Vs", model="cs"))),
+    "T": elem(lambda d: (d.T("1", "out", "0", "x", "0", Z0=50, TD=1e-9), d.R("x", "x", "0", 50))),
+    "A": elem(lambda d: (d.model("amp", "gain", gain=2.0), d.A(name="1", connections=["out", "x"], model="amp"), d.R("x", "x", "0", 1e3))),
+    "parameter": elem(lambda d: d.parameter("k", "2")),
+    "include": elem(lambda d: d.include("/m/x.inc")),
+    "lib": elem(lambda d: d.lib("/m/x.lib", "tt")),
+    "raw_spice": elem(lambda d: d.raw_spice("Rr out 0 1meg")),
+    "osdi": elem(lambda d: d.osdi("/m/x.osdi")),
+    "veriloga": elem(lambda d: d.veriloga(str(VA))),
+    "verilog": elem(lambda d: d.verilog(source=INV, instance_name="u1", connections={"a": "in", "y": "x"})),
+    "X": elem(lambda d: (d.raw_spice(".subckt buf a b\nR1 a b 1k\n.ends buf"), d.X("1", "buf", "out", "0"))),
+    "I": elem(lambda d: d.I("1", "out", "0", 1e-6)),
+}
+
+# Written ("ok") or the one code its refusal names. Reviewed cell by cell;
+# each refusal is the target lacking the construct (class G) unless a line
+# below says otherwise, with the owner and the findings file entry.
+OK = "ok"
+# A known failure, by name: a `verilog(mode="simulate")` block is compiled
+# when the deck is written, and `.#testing` has no Icarus Verilog (stream F,
+# FINDINGS-python.md). The row fails once iverilog is there, until it is
+# reviewed.
+NEEDS_IVERILOG = "needs iverilog"
+EXPECTED = {
+    'op': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'dc': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'dc_temp': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'ac': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'ac_oct': (OK, OK, OK, OK, OK, 'W0015', OK, OK, OK),
+    'ac_log': ('W0040', 'W0040', 'W0040', 'W0040', 'W0040', OK, 'W0040', OK, OK),
+    'tran': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # VACASK refuses `.tran … uic` (W0015): its `tran` has `icmode`; writer C (FINDINGS-python.md).
+    'tran_full': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
+    'noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # ngspice's points-per-summary is dropped on LTspice, Spectre, VACASK with no note (writers B/C; FINDINGS-python.md).
+    'noise_summary': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'tf': (OK, OK, OK, 'W0015', OK, OK, OK, OK, OK),
+    'dc_sensitivity': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    'ac_sensitivity': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    'polezero': (OK, OK, 'W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, OK),
+    # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
+    'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
+    # Xyce and HSPICE have `.LIN`: writer B (FINDINGS-python.md).
+    's_param': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # VACASK has `hb` (its test_hb1.sim), Xyce `.HB`: writers C and B (FINDINGS-python.md).
+    'harmonic_balance': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'stability': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'transient_noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'fourier': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
+    'fourier_count': (OK, OK, 'W0040', 'W0040', OK, OK, 'W0015', OK, OK),
+    'network_params': ('W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', 'W0001', OK, OK),
+    # LTspice and Xyce `.step` over the one analysis: stream A (Spectre analyses as Bench analyses).
+    'spectre_sweep': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'spectre_monte_carlo': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, OK, OK, OK),
+    'spectre_pac': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'spectre_pnoise': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'spectre_pxf': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'spectre_pstb': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'options': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'temperature': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'initial_condition': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'node_set': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'save': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'measure': (OK, OK, OK, OK, OK, OK, 'W0109', OK, OK),
+    'print': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'step': ('W0016', 'W0016', 'W0016', OK, OK, OK, OK, OK, OK),
+    'step_dec': ('W0016', 'W0016', 'W0016', OK, OK, OK, OK, OK, OK),
+    'step_log': ('W0016', 'W0016', 'W0016', 'W0016', 'W0016', OK, 'W0016', OK, OK),
+    'ngbehavior': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'function': (OK, OK, OK, OK, OK, OK, 'W0106', OK, OK),
+    'global_nodes': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'extra_line': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    'extra_line_spectre': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'use_pdk': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'use_pdk_include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'subcircuit': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'pulse': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'pwl': (OK, OK, OK, OK, OK, OK, 'W0108', OK, OK),
+    'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
+    'exp': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'sffm': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'am': (OK, OK, OK, OK, OK, 'W0108', OK, OK, OK),
+    'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
+    'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
+    'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # Spectre has `port`, HSPICE and Xyce a `P` port: writers C and B (FINDINGS-python.md).
+    'rf_port': (OK, OK, 'W0007', 'W0007', 'W0007', 'W0007', 'W0007', OK, OK),
+    'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'M_three_node': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0105', OK, OK),
+    'J': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
+    'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
+    'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'BV_BI': (OK, OK, OK, OK, OK, 'W0102', 'W0102', OK, OK),
+    'POLY': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
+    'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
+    'T': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    'A': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'lib': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'raw_spice': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # LTspice writes the deck without the OSDI load (S3, writer B).
+    'osdi': (OK, 'W0004', 'W0004', 'W0004', OK, OK, OK, OK, OK),
+    # LTspice writes the deck without the Verilog-A load (S3, writer B).
+    'veriloga': (OK, OK, OK, 'W0004', OK, OK, OK, OK, OK),
+    'verilog': (NEEDS_IVERILOG,) * 9,
+    'X': (OK,) * 9,
+    'I': (OK,) * 9,
+}
+
+
+def cell(mod, name, target):
+    try:
+        FEATURES[name](mod).netlist(target)
+        return OK
+    except RuntimeError as e:
+        if "iverilog not found" in str(e):
+            return NEEDS_IVERILOG
+        codes = sorted(set(re.findall(r"\b[LPRW]\d{4}\b", str(e))))
+        return "+".join(codes) if codes else "uncoded: " + str(e)[:80]
+
+
+def matrix(mod):
+    return {n: dict(zip(TARGETS, (cell(mod, n, t) for t in TARGETS))) for n in FEATURES}
+
+
+def test_every_feature_has_a_row():
+    assert sorted(FEATURES) == sorted(EXPECTED)
+
+
+def test_every_cell_is_written_or_refused_with_its_code():
+    mod = ps()
+    got = matrix(mod)
+    want = {n: dict(zip(TARGETS, row)) for n, row in EXPECTED.items()}
+    wrong = [f"{n} on {t}: {got[n][t]} (expected {want[n][t]})"
+             for n in FEATURES for t in TARGETS if got[n][t] != want[n][t]]
+    assert wrong == []
+
+
+# Every public method of the builders a deck is made with: each is a
+# feature above, or listed here as no deck feature (it reads, runs or
+# stores a deck, or it is an alias of one that is).
+NOT_A_FEATURE = {
+    "netlist", "run", "to_source", "save_source", "from_source", "load", "save",
+    "to_json", "from_json", "save_json", "load_json", "check_backend", "with_backend",
+    "available_backends", "add_subcircuit", "name", "ports", "gnd", "instance",
+}
+COVERED = {
+    "Testbench": {
+        "V", "I", "R", "C", "add_operating_point", "add_dc", "add_ac", "add_transient",
+        "add_noise", "add_tf", "add_transfer_function", "add_dc_sensitivity",
+        "add_ac_sensitivity", "add_polezero", "add_distortion", "add_pss", "add_s_param",
+        "add_harmonic_balance", "add_stability", "add_transient_noise", "add_fourier",
+        "add_network_params", "add_spectre_sweep", "add_spectre_monte_carlo",
+        "add_spectre_pac", "add_spectre_pnoise", "add_spectre_pxf", "add_spectre_pstb",
+        "options", "temperature", "nominal_temperature", "initial_condition", "node_set",
+        "measure", "add_print", "step", "step_sweep", "ngbehavior", "add_function",
+        "global_nodes", "extra_line", "use_pdk", "save_currents",
+    },
+    "Subcircuit": {
+        "R", "C", "L", "K", "D", "Q", "BJT", "M", "MOSFET", "J", "Z", "E", "G", "F", "H",
+        "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",
+        "include", "lib", "raw_spice", "osdi", "veriloga", "verilog",
+    },
+}
+
+
+@pytest.mark.parametrize("cls", sorted(COVERED))
+def test_every_public_builder_method_is_a_feature(cls):
+    mod = ps()
+    public = {n for n in dir(getattr(mod, cls)) if not n.startswith("_")}
+    sources = {n for n in public if n.endswith(("VoltageSource", "CurrentSource"))}
+    # The run twins of the queued analyses, and the deprecated alias.
+    runs = {n for n in public if "add_" + n in public} | {"spectre_montecarlo", "tf"}
+    left = public - COVERED[cls] - NOT_A_FEATURE - sources - runs
+    assert sorted(left) == []
+
+
+# ── The written decks, run where the simulator is installed ──
+
+K_BOLTZMANN = 1.380649e-23  # J/K, exact (SI 2019)
+T_NOM = 300.15  # 27 °C, every backend's default temperature
+
+
+def divider(mod):
+    """in -1k- out -3k- 0, 1 nF at out: H(0) = 0.75, R_th = 750 Ω."""
+    d = mod.Subcircuit("div", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    d.R("2", "out", d.gnd, 3e3)
+    d.C("1", "out", d.gnd, 1e-9)
+    return d
+
+
+def h(f):
+    """The divider's transfer at `f` (closed form)."""
+    return 0.75 / complex(1.0, 2 * math.pi * f * 750.0 * 1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_written_decks_meet_the_closed_form(backend):
+    import shutil
+    if shutil.which(backend) is None:
+        pytest.fail(f"{backend} not on PATH: run the tests in `nix develop .#testing`")
+    mod = ps()
+    tb = mod.Testbench(divider(mod))
+    tb.V("in", "in", "0", 1.0, ac=1.0)
+    tb.with_backend(backend)
+    tb.add_operating_point()
+    tb.add_dc(Vin=slice(0.0, 1.0, 0.5))
+    tb.add_ac("dec", 2, 1e3, 1e6)
+    tb.add_transient(1e-8, 5e-6, None, 1e-8)
+    op, dc, ac, tr = tb.run()
+    assert op["out"] == pytest.approx(0.75, rel=1e-9)
+    assert dc.sweep == pytest.approx([0.0, 0.5, 1.0])
+    assert dc["out"] == pytest.approx([0.0, 0.375, 0.75], abs=1e-12)
+    # AC is a linear solve: exact to rounding.
+    assert ac.magnitude("out") == pytest.approx([abs(h(f)) for f in ac.frequency], rel=1e-9)
+    # The source is 1 V from t = 0, so the cap settles to 0.75 V (tau 0.75 us).
+    assert tr["out"][-1] == pytest.approx(0.75, rel=1e-4)
+    # Thermal noise of R_th = 750 Ω through the RC: sqrt(4kTR)|H/H(0)|.
+    nz_tb = mod.Testbench(divider(mod))
+    nz_tb.V("in", "in", "0", 1.0, ac=1.0)
+    nz_tb.with_backend(backend)
+    nz_tb.add_noise("out", "0", "Vin", "dec", 1, 1e3, 1e5)
+    (nz,) = nz_tb.run()
+    want = [math.sqrt(4 * K_BOLTZMANN * T_NOM * 750.0) * abs(h(f)) / 0.75 for f in nz.frequency]
+    assert nz["onoise_spectrum"] == pytest.approx(want, rel=1e-4)
+    assert nz["inoise_spectrum"] == pytest.approx([w / abs(h(f)) for w, f in zip(want, nz.frequency)], rel=1e-4)
+
+
+if __name__ == "__main__":
+    for name, row in matrix(ps()).items():
+        print(f"    {name!r}: {tuple(row.values())!r},")

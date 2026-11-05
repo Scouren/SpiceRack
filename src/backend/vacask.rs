@@ -41,7 +41,10 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
         let mut read = read_results(raw, stdout.clone())?;
         // A deck that declares no analysis this can see has no sweeps either.
         let n = outer.get(k).copied().unwrap_or(0);
-        read.iter_mut().for_each(|p| sweeps_last(p, n));
+        read.iter_mut().for_each(|p| {
+            sweeps_last(p, n);
+            noise_spectra(p);
+        });
         plots.extend(read);
     }
     assert!(
@@ -127,6 +130,35 @@ fn sweeps_last(raw: &mut RawData, n: usize) {
     }
     if raw.complex_data.len() == cols {
         raw.complex_data.rotate_left(n);
+    }
+}
+
+/// Adds ngspice's `onoise_spectrum` and `inoise_spectrum` (V/√Hz, the
+/// names every other backend's noise plot has) to a VACASK noise plot,
+/// which holds `onoise` (V²/Hz) and `gain` (the power gain, |H|²): their
+/// square roots, the input one referred through the gain. A plot without
+/// both is left as it is.
+fn noise_spectra(raw: &mut RawData) {
+    let col = |n: &str| raw.variables.iter().position(|v| v.name == n);
+    let (Some(on), Some(gain)) = (col("onoise"), col("gain")) else {
+        return;
+    };
+    if raw.real_data.len() != raw.variables.len() {
+        return;
+    }
+    let out: Vec<f64> = raw.real_data[on].iter().map(|p| p.sqrt()).collect();
+    let input = raw.real_data[on].iter().zip(&raw.real_data[gain]);
+    let input: Vec<f64> = input.map(|(p, g)| (p / g).sqrt()).collect();
+    for (name, data) in [("onoise_spectrum", out), ("inoise_spectrum", input)] {
+        raw.variables.push(crate::result::VarInfo {
+            index: raw.variables.len(),
+            name: name.into(),
+            var_type: crate::result::VarType::Other,
+        });
+        raw.real_data.push(data);
+    }
+    if !raw.complex_data.is_empty() {
+        raw.complex_data.resize(raw.variables.len(), Vec::new());
     }
 }
 
