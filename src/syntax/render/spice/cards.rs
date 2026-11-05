@@ -12,14 +12,15 @@
 //!
 //! Contents:
 //! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`
+//! - `pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String>`
 
 use super::W;
 use super::laplace::{self, Laplace};
 use crate::syntax::Dialect;
-use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
+use crate::syntax::render::capability::{Action, Alt, Construct, Rule, action};
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::WaveKind;
-use crate::syntax::render::read::{Card, Num, Val, Wave};
+use crate::syntax::render::read::{Card, Num, Rd, Val, Wave};
 
 impl W<'_, '_> {
     /// Element `n`'s card, with no line end (a Laplace source is two
@@ -125,25 +126,23 @@ impl W<'_, '_> {
             }
             Card::Behavioural {
                 current,
-                name,
                 np,
                 nm,
                 expr,
                 value,
+                ..
             } => {
                 if laplace::has_laplace(self.rd, value) {
                     self.laplace(&decl, &np, &nm, value, current, tok)
                 } else {
                     let key = if current { 'I' } else { 'V' };
+                    let expr = self.names.refs(self.scope, &expr);
                     match self.ask(Construct::BehaviouralSource, tok) {
-                        // quirk: HSPICE's `E`/`G` form renames `B1` to `G1` or
-                        // `E1` here alone, not where a reference names it
-                        // (`i(B1)`), and may meet an `E1` of the deck's own;
-                        // phase 7 renames it in the map.
+                        // The map names it `G1`/`E1` (`renamed`).
                         Action::Spell(Alt::VolCur) if current => {
-                            format!("G{name} {np} {nm} cur='{expr}'")
+                            format!("{decl} {np} {nm} cur='{expr}'")
                         }
-                        Action::Spell(Alt::VolCur) => format!("E{name} {np} {nm} vol='{expr}'"),
+                        Action::Spell(Alt::VolCur) => format!("{decl} {np} {nm} vol='{expr}'"),
                         Action::Spell(Alt::BracedBehaviour) => {
                             format!("{decl} {np} {nm} {key}={{{expr}}}")
                         }
@@ -218,6 +217,38 @@ impl W<'_, '_> {
         } else {
             v.to_string()
         }
+    }
+}
+
+/// The name `target` writes behavioural source `card` under, where its
+/// spelling takes another letter: HSPICE's `E1`/`G1` for `B1` (`vol=`,
+/// `cur=`), a Laplace lift's `EB1`/`GB1`, ngspice's XSPICE `AB1`. `None`:
+/// the map's `B1`.
+pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String> {
+    let Card::Behavioural {
+        current,
+        name,
+        value,
+        ..
+    } = card
+    else {
+        return None;
+    };
+    let letter = if *current { 'G' } else { 'E' };
+    if !laplace::has_laplace(rd, *value) {
+        let vol_cur = action(target, Construct::BehaviouralSource) == Action::Spell(Alt::VolCur);
+        return vol_cur.then(|| format!("{letter}{name}"));
+    }
+    // A constant `H(s)` is a plain controlled source on every target.
+    match (
+        laplace::read(rd, *value),
+        action(target, Construct::Laplace),
+    ) {
+        (Some(Laplace::Gain { .. }), _) => Some(format!("{letter}B{name}")),
+        (Some(Laplace::Xfer { .. }), Action::Lift(Rule::LaplaceXfer)) => Some(format!("AB{name}")),
+        (Some(Laplace::Xfer { .. }), Action::Lift(_)) => Some(format!("{letter}B{name}")),
+        // A Laplace source the target refuses is not written.
+        (Some(Laplace::Xfer { .. }) | None, _) => None,
     }
 }
 
@@ -321,14 +352,15 @@ impl W<'_, '_> {
         current: bool,
         tok: u32,
     ) -> String {
-        let letter = if current { 'G' } else { 'E' };
+        // `decl` is the map's: the source's name after the lift's letter
+        // (`renamed`).
         let ((ip, im), num, den) = match laplace::read(self.rd, value) {
             Some(Laplace::Gain {
                 input: (ip, im),
                 gain,
             }) => {
                 return format!(
-                    "{letter}{decl} {np} {nm} {ip} {im} {}",
+                    "{decl} {np} {nm} {ip} {im} {}",
                     self.sp.number(gain, self.x)
                 );
             }
@@ -340,7 +372,7 @@ impl W<'_, '_> {
         };
         match self.ask(Construct::Laplace, tok) {
             Action::Lift(Rule::LaplaceAttr) => format!(
-                "{letter}{decl} {np} {nm} {ip} {im} Laplace={}/{}",
+                "{decl} {np} {nm} {ip} {im} Laplace={}/{}",
                 laplace::horner(&num),
                 laplace::horner(&den),
             ),
@@ -348,7 +380,7 @@ impl W<'_, '_> {
                 let asc =
                     |c: &[f64]| laplace::coeff_array(&c.iter().rev().copied().collect::<Vec<_>>());
                 format!(
-                    "{letter}{decl} {np} {nm} LAPLACE {ip} {im} {} / {}",
+                    "{decl} {np} {nm} LAPLACE {ip} {im} {} / {}",
                     asc(&num),
                     asc(&den)
                 )
@@ -357,9 +389,11 @@ impl W<'_, '_> {
                 let port = if current { "id" } else { "vd" };
                 // One integrator stage per denominator order.
                 let ic = vec!["0"; den.len() - 1].join(" ");
+                // The model is named after the source, its `A` left off.
+                let model = &decl[1..];
                 format!(
-                    "A{decl} %vd({ip} {im}) %{port}({np} {nm}) {decl}_xfer\n\
-                     .model {decl}_xfer s_xfer(num_coeff=[{}] den_coeff=[{}] int_ic=[{ic}])",
+                    "{decl} %vd({ip} {im}) %{port}({np} {nm}) {model}_xfer\n\
+                     .model {model}_xfer s_xfer(num_coeff=[{}] den_coeff=[{}] int_ic=[{ic}])",
                     laplace::coeff_array(&num),
                     laplace::coeff_array(&den),
                 )

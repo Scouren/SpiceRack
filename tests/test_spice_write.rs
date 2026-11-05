@@ -14,6 +14,11 @@ use spicerack::backend::Dialect;
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::render_text;
 
+/// A `B` source beside the deck's own `E1`, its current measured.
+const B_AND_E1: &str = "* t\nV1 in 0 1\nB1 out 0 V=2*v(in)\nR1 out 0 1k\n\
+    E1 x 0 in 0 3\nR2 x 0 1k\n.tran 1u 10u\n\
+    .meas tran ib find i(B1) at=5u\n.meas tran vx find v(x) at=5u\n.end\n";
+
 // ---- private ----
 
 /// The deck `text` read as `from`, written for `to`; panics on a refusal.
@@ -52,6 +57,25 @@ fn scratch(name: &str, text: &str) -> std::path::PathBuf {
     let p = dir.join(name);
     std::fs::write(&p, text).unwrap();
     p
+}
+
+/// Real ESPice reading `deck` as `tokenizer`: each `.meas` result by name.
+fn espice_measures(deck: &str, tokenizer: &str) -> impl Fn(&str) -> f64 {
+    let bin = std::env::var("ESPICE").unwrap_or_else(|_| "espice".into());
+    let path = scratch("espice.sp", deck);
+    let out = std::process::Command::new(&bin)
+        .arg(format!("--tokenizer={tokenizer}"))
+        .arg(&path)
+        .output()
+        .unwrap_or_else(|e| panic!("{bin}: {e}: run the tests in `nix develop .#testing`"));
+    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(out.status.success(), "{stdout}\n{deck}");
+    let ms = spicerack::measure_parse::parse_measures(&stdout, Some(Dialect::Espice));
+    move |name: &str| {
+        let m = ms.iter().find(|m| m.name.eq_ignore_ascii_case(name));
+        m.unwrap_or_else(|| panic!("no .meas {name} in\n{stdout}"))
+            .value
+    }
 }
 
 // ── LTspice `.lib file` (no section) ──
@@ -103,4 +127,20 @@ fn ltspice_refuses_a_verilog_a_or_osdi_load() {
     // The legal neighbour: the same deck with no load is written.
     let none = va.replace("ahdl_include \"m.va\"\n", "");
     let _ = write(&none, Dialect::Spectre, Dialect::Ltspice);
+}
+
+// ── HSPICE's `E`/`G` for a `B` source, in the name map ──
+
+/// HSPICE has no `B` element: `B1` is `E…  vol=` (HSPICE `E` element,
+/// behavioural form). The rename is the map's, so `i(B1)` follows it and
+/// the deck's own `E1` keeps its name. Real ESPice (`--tokenizer=hspice`)
+/// on the written deck against the closed form: `B1` drives 2 V into 1k,
+/// so `i(B1)` = -2 mA (SPICE's sign: into the + node); `E1` gives 3 V.
+#[test]
+fn hspice_renames_a_b_source_where_its_references_name_it() {
+    let hs = write(B_AND_E1, Dialect::Ngspice, Dialect::Hspice);
+    assert!(hs.contains("\nE1 x 0 in 0 3\n"), "{hs}");
+    let m = espice_measures(&hs, "hspice");
+    assert!((m("ib") + 2e-3).abs() < 1e-12, "{hs}");
+    assert!((m("vx") - 3.0).abs() < 1e-9, "{hs}");
 }

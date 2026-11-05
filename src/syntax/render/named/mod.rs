@@ -101,7 +101,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         keep_case: rd.d == target,
         lifted,
         draws,
-        names: Names::new(rd, deck),
+        names: Names::new(rd, deck, |_, _| None),
         o: Out::new(4096),
         diags: refused,
     };

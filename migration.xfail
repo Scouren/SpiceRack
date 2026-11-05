@@ -603,3 +603,31 @@ xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `retu
 # and wrote the instance naming an unknown model (W0022 note). The other
 # 450 loading decks were already refused on LTspice for other causes.
 vacask/demo/hierarchy/hier.sim ltspice written without its `load "*.osdi"` is refused W0004: LTspice cannot load the device
+
+# Phase 7: spice-write: HSPICE B renames in the name map (CONFORMANCE-GAPS S5,
+# P7-7). HSPICE has no B element; `B1` is `E1 … vol=`/`G1 … cur=`, and a
+# Laplace lift's `EB1`/`GB1`/`AB1`, now named by `render::names` (the map),
+# so a reference `i(B1)` in an output or an expression follows the
+# declaration, and a name the deck declares already gets `_1` (the old writer
+# wrote a second `E1`, or left `i(B1)` naming nothing). Oracle: ESPice
+# `--tokenizer=hspice` on the written deck (tests/test_spice_write.rs).
+xyce/BSIM6/bsim6_nmos_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIM6/bsim6_pmos_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIMCMG/gummel_n_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIMCMG_108/gummel_n_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIMCMG_110/gummel_n_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIMCMG_110/gummel_p_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIMCMG_111/gummel_n_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSIMCMG_111/gummel_p_outvars.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/BSRC/Bsrc_D1.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/Certification_Tests/BUG_440_SON/bug440b.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/Certification_Tests/BUG_828_SON/bug_828.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/LEAD_CURRENTS/lead_bsrc_ac.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/LEAD_CURRENTS/lead_bsrc_gear.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/LEAD_CURRENTS/lead_bsrc_trap.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/POWER/power_b_gear.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/POWER/power_b_trap.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/POWER/power_polarity_b_e_f_g_h_trap.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/POWER/power_subckt_b_e_f_g_h_trap.cir hspice a B source renamed E/G meets the deck's own name: written with _1
+xyce/SOURCES/ebh.cir hspice i(B…) of a B source written E/G names its E/G declaration
+xyce/SOURCES/ebh_sub.cir hspice i(B…) of a B source written E/G names its E/G declaration

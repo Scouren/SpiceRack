@@ -222,10 +222,6 @@ reference does not):
   no SPICE output names (`read/named_bench.rs`).
 - P7-6. Spectre `dc dev=` and `noise iprobe=` name the source as written
   (`read/named_bench.rs`).
-- P7-7. HSPICE writes a `B` source as `E1`/`G1` (`vol=`/`cur=`), and the
-  Laplace lift a `B1` as `EB1`/`GB1`/`AB1` (+ `.model B1_xfer`): renames of
-  the declaration alone, which a reference (`i(B1)`) does not follow and
-  which may meet a deck's own `E1` (`spice/cards.rs`).
 - P7-8. CDL writes an instance with the old IR's letter rule (`Xx2` is
   `x2`), not the map's `Xx2` (`spice/cdl.rs`).
 - SPICE input: a declaration's letter is uppercased (`vsense` is

@@ -135,7 +135,8 @@ impl W<'_, '_> {
 
     /// The testbench's cards.
     pub(super) fn bench(&mut self, control: Option<&[String]>) {
-        let tb = self.fold();
+        let mut tb = self.fold();
+        self.respell_refs(&mut tb);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
         }
@@ -247,6 +248,18 @@ impl W<'_, '_> {
 // ---- private ----
 
 impl W<'_, '_> {
+    /// `tb`'s outputs (saves, prints, measures, the text kept) with each
+    /// `i(name)` of a renamed element spelled as its declaration
+    /// (`names::Names::refs`); the testbench is the top's.
+    fn respell_refs(&self, tb: &mut Tb) {
+        let top = crate::syntax::ast::NONE;
+        let refs = |v: &mut Vec<String>| v.iter_mut().for_each(|s| *s = self.names.refs(top, s));
+        refs(&mut tb.saves);
+        refs(&mut tb.measures);
+        refs(&mut tb.extra);
+        tb.prints.iter_mut().for_each(|(_, outs, _)| refs(outs));
+    }
+
     /// One testbench card into `tb`.
     fn fold_one(&self, tb: &mut Tb, card: BenchCard, tok: u32) {
         match card {
