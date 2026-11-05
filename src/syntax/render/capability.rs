@@ -7,7 +7,7 @@
 //!
 //! `Spell` and `Lift` keep the meaning: a named alternative form, or a
 //! rewrite into extra statements recorded as fixups. Anything that cannot
-//! keep its meaning is `Refuse` with a `W` code. Seven cells answer as the
+//! keep its meaning is `Refuse` with a `W` code. Five cells answer as the
 //! old writers behaved, where that drops or garbles something: each is
 //! marked `// quirk:` (the golden gate holds them until phase 7 decides).
 //!
@@ -211,9 +211,9 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::LibWholeFile => match target {
             D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0005),
-            // quirk: the old Spectre and VACASK writers wrote `include
-            // "file" section=` (no section); phase 7 refuses it.
-            D::Spectre | D::Vacask => Spell(Alt::Copy(Code::W0110)),
+            // `include "file"` reads the whole file (Spectre Reference 5.0
+            // p.875; VACASK `lib/dfllexer.l`, `INCEND`).
+            D::Spectre | D::Vacask => Native,
             D::Cdl | D::Verilog => Refuse(Code::W0005),
         },
         Construct::LibSection => match target {

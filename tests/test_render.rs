@@ -303,7 +303,7 @@ fn what_a_writer_leaves_out_or_copies_is_a_note_by_code() {
     // Each deck is still written; the note names what the target does not
     // get as read (diag.rs, `Kind::Note`).
     let spectre = "// t\nsimulator lang=spectre\nahdl_include \"m.va\"\nr1 (a 0) resistor r=1k\n";
-    let cases: [(&str, Dialect, Dialect, Code); 11] = [
+    let cases: [(&str, Dialect, Dialect, Code); 10] = [
         (spectre, Dialect::Spectre, Dialect::Cdl, Code::W0021),
         (spectre, Dialect::Spectre, Dialect::Ltspice, Code::W0022),
         (
@@ -347,12 +347,6 @@ fn what_a_writer_leaves_out_or_copies_is_a_note_by_code() {
             Dialect::Ngspice,
             Dialect::Cdl,
             Code::W0028,
-        ),
-        (
-            "t\n.lib models.lib\nR1 a 0 1k\n.op\n.end\n",
-            Dialect::Ltspice,
-            Dialect::Spectre,
-            Code::W0110,
         ),
         (
             "t\n.param x=2\n.model m nmos level={x}\nM1 d g 0 0 m\n.op\n.end\n",

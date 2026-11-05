@@ -461,11 +461,12 @@ catalogue! {
         cite: "VACASK docs (no `measure`: post-process the raw file)",
         explain: "VACASK has no measurement statement. Compute the measurement from the raw file after the run.",
     }
-    /// A `.lib file` with no section written as `include "file" section=`.
+    /// Retired (phase 7): a `.lib file` with no section is `include
+    /// "file"`, no longer `include "file" section=`.
     W0110 Note {
         title: "a sectionless library call written with an empty section",
         cite: "Spectre Reference 19.1 p.493 (include ... section=)",
-        explain: "The SPICE `.lib file` names no section; the writer writes `include \"file\" section=` with an empty section, as the old writer did (phase 7 refuses it). Name the section, or use `.include`.",
+        explain: "Retired: no writer draws it. The old writers wrote a SPICE `.lib file` with no section as `include \"file\" section=` with an empty section; Spectre and VACASK now write `include \"file\"` (Spectre Reference 5.0 p.875), which reads the whole file.",
     }
     /// A `.model` level that is no number, mapped as level 1.
     W0111 Note {

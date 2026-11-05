@@ -37,6 +37,23 @@ fn spectre_deck_preamble_matches_documented_statements() {
     assert!(!netlist.contains(".end"), "{netlist}");
 }
 
+/// A `.lib file` naming no section reads the whole file (LTspice's form):
+/// `[CMP]` p.875 `include "filename"`. An empty `section=` is no section
+/// name (`[REF]` p.493 `section=name`).
+#[test]
+fn a_sectionless_library_call_includes_the_whole_file() {
+    let deck = "t\n.lib /pdk/models.lib\nR1 a 0 1k\n.op\n.end\n";
+    let netlist =
+        spicerack::syntax::render::render_text(deck, Dialect::Ltspice, "t", Dialect::Spectre)
+            .unwrap()
+            .text;
+    assert!(
+        netlist.contains("\ninclude \"/pdk/models.lib\"\n"),
+        "{netlist}"
+    );
+    assert!(!netlist.contains("section="), "{netlist}");
+}
+
 /// `[REF]` p.535 verbatim:
 /// ```text
 /// subckt coax (i1 o1 i2 o2)

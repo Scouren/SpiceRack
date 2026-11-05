@@ -75,3 +75,21 @@ fn run_all_returns_every_analysis_in_deck_order() {
     assert_eq!(run(&deck).plot_name, plots[0].plot_name);
     assert_eq!(col(&run(&deck), "out").len(), 1);
 }
+
+#[test]
+fn a_sectionless_library_call_includes_the_whole_file() {
+    // LTspice's `.lib file` reads the whole file. VACASK's `include "f"`
+    // does too; `include "f" section=` with no name is its syntax error
+    // ("expected section name": `lib/dfllexer.l`, `LIBSECTION`).
+    let dir = tempfile::tempdir().unwrap();
+    let lib = dir.path().join("half.inc");
+    std::fs::write(&lib, "r3 (b 0) resistor r=1e3\n").unwrap();
+    let deck = format!(
+        "t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.lib {}\n.op\n.end\n",
+        lib.display()
+    );
+    let netlist = emit_from(&deck, Dialect::Ltspice, &lexicon::LTSPICE).unwrap();
+    assert!(!netlist.contains("section="), "{netlist}");
+    // 1 V over 1k into 1k || 1k: 1/3 V.
+    close(col(&run_text(&netlist), "b")[0], 1.0 / 3.0, 1e-9);
+}

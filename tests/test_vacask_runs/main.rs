@@ -38,13 +38,17 @@ fn have_vacask() -> bool {
 /// (`lexicon::NGSPICE_GIVEN`, as the Python API's decks are), which also
 /// reads a `.step`.
 fn emit(deck: &str) -> Result<String, Vec<Code>> {
-    let lex = &lexicon::NGSPICE_GIVEN;
+    emit_from(deck, Dialect::Ngspice, &lexicon::NGSPICE_GIVEN)
+}
+
+/// [`emit`] for a deck in dialect `d`, read with `lex`.
+fn emit_from(deck: &str, d: Dialect, lex: &'static lexicon::Lexicon) -> Result<String, Vec<Code>> {
     let t = tokenize(deck, lex);
     let ast = parse(&t, lex);
     let src = Source {
         ast: &ast,
         tokens: &t,
-        dialect: Dialect::Ngspice,
+        dialect: d,
         name: deck.lines().next().unwrap_or_default(),
         kit: None,
         loads: &[],
@@ -57,12 +61,16 @@ fn emit(deck: &str) -> Result<String, Vec<Code>> {
 
 /// Emit the deck and run it.
 fn run(deck: &str) -> RawData {
-    let netlist = emit(deck).expect("emit vacask deck");
+    run_text(&emit(deck).expect("emit vacask deck"))
+}
+
+/// Run the VACASK deck `netlist`.
+fn run_text(netlist: &str) -> RawData {
     assert!(
         have_vacask(),
         "vacask not on PATH: run the tests in `nix develop .#testing`"
     );
-    match Dialect::Vacask.run(&netlist) {
+    match Dialect::Vacask.run(netlist) {
         Ok(raw) => raw,
         Err(e) => panic!(
             "vacask rejected the generated deck: {}\n--- deck ---\n{}",

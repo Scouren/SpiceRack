@@ -323,11 +323,8 @@ impl W<'_, '_> {
             self.line(&format!("{pad}include \"{p}\""));
         }
         for &lib in &b.libs {
-            let (p, section) = self.rd.lib_view(lib);
-            if section.is_empty() {
-                self.ask(Construct::LibWholeFile, self.rd.main(lib));
-            }
-            self.line(&format!("{pad}include \"{p}\" section={section}"));
+            let l = self.lib_include(lib);
+            self.line(&format!("{pad}{l}"));
         }
     }
 
