@@ -59,6 +59,9 @@ struct Corpus {
     dialect: Dialect,
     ext: &'static str,
     keep: fn(&str) -> bool,
+    /// A deck's own dialect where it is not the set's, from its path under
+    /// the root.
+    own: fn(&str) -> Option<Dialect>,
     note: &'static str,
 }
 
@@ -81,6 +84,7 @@ const CORPORA: [Corpus; 5] = [
         dialect: Dialect::Ngspice,
         ext: "sp",
         keep: |p| !p.rsplit('/').next().unwrap_or(p).starts_with('.'),
+        own: |_| None,
         note: "also the ngspice corpus (NGSPICE_CORPUS == SPICE_BENCH)",
     },
     Corpus {
@@ -89,6 +93,7 @@ const CORPORA: [Corpus; 5] = [
         dialect: Dialect::Hspice,
         ext: "sp",
         keep: |p| p.contains("hspice") && !p.contains("invalid"),
+        own: |_| None,
         note: "ESPice conformance tests/netlist",
     },
     Corpus {
@@ -97,6 +102,7 @@ const CORPORA: [Corpus; 5] = [
         dialect: Dialect::Xyce,
         ext: "cir",
         keep: |_| true,
+        own: |_| None,
         note: "Xyce_Regression Netlists",
     },
     Corpus {
@@ -105,6 +111,7 @@ const CORPORA: [Corpus; 5] = [
         dialect: Dialect::Vacask,
         ext: "sim",
         keep: |_| true,
+        own: vacask_benchmark,
         note: "VACASK sources",
     },
     Corpus {
@@ -113,6 +120,7 @@ const CORPORA: [Corpus; 5] = [
         dialect: Dialect::Ltspice,
         ext: "net",
         keep: |_| true,
+        own: |_| None,
         note: "spice-datasets",
     },
 ];
@@ -181,13 +189,16 @@ pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
             c.var,
             c.note
         ));
-        all.extend(found.into_iter().map(|path| Input {
-            set: c.set,
-            rel: rel(&root, &path),
-            path,
-            dialect: c.dialect,
-            form: Form::Deck,
-            kit: None,
+        all.extend(found.into_iter().map(|path| {
+            let rel = rel(&root, &path);
+            Input {
+                set: c.set,
+                dialect: (c.own)(&rel).unwrap_or(c.dialect),
+                rel,
+                path,
+                form: Form::Deck,
+                kit: None,
+            }
         }));
     }
     for k in &KITS {
@@ -276,6 +287,24 @@ fn rel(root: &Path, p: &Path) -> String {
         .unwrap_or(p)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+/// VACASK's `benchmark/<circuit>/<simulator>/` decks are each simulator's
+/// own input, under VACASK's `.sim` name: `ngspice*` (ngspice, its `-sparse`,
+/// `cg` and `va` variants) and `xyce` directories hold ngspice and Xyce
+/// decks. `gnucap`'s are gnucap's SPICE mode, which no reader reads: they
+/// stay VACASK, named in `tests/fixtures/conformance_noise.txt`.
+fn vacask_benchmark(rel: &str) -> Option<Dialect> {
+    let mut parts = rel.split('/');
+    if parts.next() != Some("benchmark") {
+        return None;
+    }
+    let sim = rel.rsplit('/').nth(1)?;
+    match sim {
+        "xyce" => Some(Dialect::Xyce),
+        s if s.starts_with("ngspice") => Some(Dialect::Ngspice),
+        _ => None,
+    }
 }
 
 /// IHP's corner libraries, the files a deck `.lib`s (`cornerMOSlv.lib mos_tt`).

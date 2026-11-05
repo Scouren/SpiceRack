@@ -596,3 +596,170 @@ xyce/PARAMS2/Params_C4.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (ca
 xyce/PARAMS2/Params_C4_hs.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (case-blind), Spectre's scales are case-sensitive and have no F
 xyce/PARAMS2/Params_C5.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
 xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
+
+# Phase 7: spice-read: inputs misread (src/bin/golden/inputs.rs). VACASK's
+# benchmark/<circuit>/<simulator>/runme*.sim decks are each simulator's own
+# input under VACASK's .sim name (the benchmark runs ngspice on the ngspice*
+# directories, Xyce on xyce/): they are now read as ngspice and Xyce, not as
+# VACASK (which floods P0001). Their MANIFEST input lines change dialect
+# (`manifest` lines below; golden diff excuses only those inputs' lines),
+# and each output is the deck's own reading. Oracle: real ngspice running
+# benchmark/rc/ngspice/runme.sim and the ngspice deck written from it, v(2)
+# over 1,006,013 points equal. The 3 gnucap decks stay VACASK, named in
+# tests/fixtures/conformance_noise.txt with Xyce's error-message decks.
+vacask/benchmark/c6288/ngspice-sparse/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/c6288/ngspice-sparse/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim spectre read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim xyce read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/c6288/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
+vacask/benchmark/c6288/xyce/runme.sim cdl read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim espice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim hspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim ltspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim ngspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim spectre read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now written
+vacask/benchmark/c6288/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/graetz/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/graetz/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/graetz/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/graetz/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/graetz/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/graetz/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0017 W0024 W0025)
+vacask/benchmark/graetz/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
+vacask/benchmark/graetz/xyce/runme.sim cdl read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim espice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim hspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim ltspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim ngspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim spectre read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now written
+vacask/benchmark/graetz/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/mul/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/mul/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/mul/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/mul/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/mul/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/mul/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0017 W0024 W0025)
+vacask/benchmark/mul/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
+vacask/benchmark/mul/xyce/runme.sim cdl read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim espice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim hspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim ltspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim ngspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim spectre read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now written
+vacask/benchmark/mul/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/rc/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/rc/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/rc/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/rc/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/rc/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/rc/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
+vacask/benchmark/rc/xyce/runme.sim cdl read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim espice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim hspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim ltspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim ngspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim spectre read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now written
+vacask/benchmark/rc/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/ring/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/ring/ngspice/runme_current.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
+vacask/benchmark/ring/xyce/runme.sim cdl read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim espice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim hspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim ltspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim ngspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim spectre read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now written
+vacask/benchmark/ring/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim cdl read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim espice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim hspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim ltspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim ngspice read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim spectre read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/c6288/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
+vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
+vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0017 W0024 W0025)
+vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
+vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0017 W0024 W0025)
