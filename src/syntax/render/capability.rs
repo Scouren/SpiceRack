@@ -133,6 +133,10 @@ pub enum Alt {
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
     Copy(Code),
+    /// `.include "file"`: LTspice's whole-file `.lib` (ngspice §2.6;
+    /// HSPICE `.INCLUDE`; Xyce RG `.INCLUDE`), where `.lib file` alone
+    /// would open a section definition.
+    Include,
     /// `c1 (a b) bsource q=expr` (Spectre Reference 19.1 p.459).
     BsourceCharge,
     /// PWL `r=0` as `pwlperiod=` where it repeats exactly, `td=` as
@@ -210,7 +214,7 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         },
         Construct::LibWholeFile => match target {
             D::Ltspice => Native,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0005),
+            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Spell(Alt::Include),
             // quirk: the old Spectre and VACASK writers wrote `include
             // "file" section=` (no section); phase 7 refuses it.
             D::Spectre | D::Vacask => Spell(Alt::Copy(Code::W0110)),

@@ -308,8 +308,12 @@ impl W<'_, '_> {
         for &lib in &b.libs {
             let (p, section) = self.rd.lib_view(lib);
             if section.is_empty() {
-                if self.ask(Construct::LibWholeFile, self.rd.main(lib)) == Action::Native {
-                    self.o.token(&format!(".lib {q}{p}{q}"), Space::Line);
+                match self.ask(Construct::LibWholeFile, self.rd.main(lib)) {
+                    Action::Native => self.o.token(&format!(".lib {q}{p}{q}"), Space::Line),
+                    Action::Spell(Alt::Include) => {
+                        self.o.token(&format!(".include {q}{p}{q}"), Space::Line)
+                    }
+                    _ => {}
                 }
                 continue;
             }
