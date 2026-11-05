@@ -182,20 +182,17 @@ The note at the top of `src/syntax/mod.rs` shows the three steps.
 
 ## Left
 
-- The writers recurse over a branch's body (`spice::W::body` ↔
-  `conditional`, `named::W::body` ↔ `conditional`), and a plan's `Cond`
-  drops recursively, so a 10⁴-deep `.if` deck needs a large stack
-  (`src/syntax/tests/render.rs` runs it on 256 MiB, as `golden` does). A
-  worklist over the branches (and a manual `Drop`) is the fix; the adapter
-  it replaced walked them on a heap stack.
-- Python decks: the Spectre-only analyses sit outside `.step` sweeps; a
-  VACASK `montecarlo` is refused (the old writer wrapped the inner analysis
-  in `mc`); a `log` `.step` is not read (Xyce's form has none). The
-  reader keeps a region's statements as text; reading a Spectre region's
-  analyses as `Bench::Analysis` (as a Spectre file's are) would let
-  `pac`, `sweep` and the rest be checked and spelled per target, and
-  reading ngspice's `.pss` as an analysis would give Spectre its `pss`
-  back.
+- Python decks: the Spectre-only analyses sit outside `.step` sweeps. The
+  reader keeps a region's statements as text (a `montecarlo` over one
+  analysis aside, now `Ana::MonteCarlo`); reading a Spectre region's other
+  analyses as `Bench::Analysis` (as a Spectre file's are) would let `pac`,
+  `sweep` and the rest be checked and spelled per target.
+- Fixed in phase 7 (`PHASE7-STATUS.md`): the 10⁴-deep `.if` deck
+  (`09ea795`: the writers and `Cond`'s drop walk branches on a heap
+  stack), a `log` `.step` (`b7e9fd4`: Spectre's `sweep log=N`, W0016
+  elsewhere), Python's `pss` on Spectre (`7fa7aa7`: Spectre's `pss` in the
+  spectre region), a VACASK `montecarlo` (`f20d84f`, development's `d6b4d72`: an `mc` loop, W0115
+  where `variations` is narrower).
 - The store keeps a `ModelLibrary`'s ngspice path: a library with
   `backend_paths` stores the deck its ngspice netlist is written from.
 - `.options itl1=` reaches Spectre as `itl1=` (only the portable name
