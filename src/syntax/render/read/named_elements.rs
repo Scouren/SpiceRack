@@ -185,10 +185,9 @@ impl<'a> Rd<'a> {
             }
             "cccs" | "ccvs" => {
                 let (np, nm) = two()?;
-                // quirk: the controlling source as written, not as the name
-                // map spells its declaration (`in1` is `Vin1`, `v1` is `V1`);
-                // phase 7 spells the reference through the map.
-                let vsense = ident(keys.probe)?;
+                // The controlling source as the name map spells its
+                // declaration (`in1` is `vin1`); none: no SPICE card.
+                let vsense = self.declared(n, &ident(keys.probe)?, &['V'])?;
                 let (letter, gain) = match master.as_str() {
                     "cccs" => ('f', num("gain")?),
                     _ => ('h', num(keys.rm)?),

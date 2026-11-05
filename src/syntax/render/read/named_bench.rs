@@ -10,6 +10,7 @@
 //! Contents:
 //! - `Rd::bench_cards(&self, b: Bench) -> Vec<BenchCard>`
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
+//! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
 //! - `Rd::node_vals(&self, n: u32) -> Option<Vec<(String, f64)>>`
 
 use super::named_elements::unquoted;
@@ -25,18 +26,8 @@ impl<'a> Rd<'a> {
             Bench::Card(n) => self.bench_card(n).into_iter().collect(),
             Bench::Meas(k) => vec![BenchCard::Meas(self.line(k))],
             Bench::Save(n) => {
-                let outs = self.fields(n).iter().map(|&o| {
-                    let s = self.name_of(o);
-                    // quirk: `dev:p` is `i(dev)` with `dev` as written, not as
-                    // the name map spells its declaration (`V1`, `Vin1`); any
-                    // other terminal (`main:d`) is kept as written, which no
-                    // SPICE output names. Phase 7: both through the map.
-                    match s.split_once(':') {
-                        Some((dev, "p")) => format!("i({dev})"),
-                        _ => s,
-                    }
-                });
-                vec![BenchCard::Saves(outs.collect())]
+                let outs = self.saves(n).expect("a save the reader placed");
+                vec![BenchCard::Saves(outs)]
             }
             Bench::Analysis(n) => self
                 .spectre_analysis(n)
@@ -76,11 +67,12 @@ impl<'a> Rd<'a> {
         Some(match (kind.as_str(), ns.as_slice()) {
             ("dc", []) if p.is_empty() => Ana::Op,
             ("dc", []) => {
-                // quirk: `dev=` and `iprobe=` (below) name a source as
-                // written, not as the name map spells its declaration
-                // (`in1` is `Vin1`); phase 7 spells them through the map.
+                // `dev=` and `iprobe=` (below) name a source as the name
+                // map spells its declaration (`in1` is `vin1`).
                 let source = match (s("dev"), s("param")) {
-                    (Some(dev), Some(param)) if param == "dc" => dev,
+                    (Some(dev), Some(param)) if param == "dc" => {
+                        self.declared(n, &dev, &['V', 'I'])?
+                    }
                     (None, Some(param)) => param,
                     _ => return None,
                 };
@@ -98,12 +90,29 @@ impl<'a> Rd<'a> {
             ("noise", [out, reference]) => Ana::Noise {
                 output: out.clone(),
                 reference: reference.clone(),
-                source: s("iprobe")?,
+                source: self.declared(n, &s("iprobe")?, &['V', 'I'])?,
                 sweep: sweep()?,
                 pps: None,
             },
             _ => return None,
         })
+    }
+
+    /// A `save` statement's outputs: a node as written, `dev:p` of a
+    /// voltage source `i(<source>)` as the name map spells it; `None` for
+    /// another terminal current, which no SPICE output list names as such.
+    pub(in crate::syntax::render) fn saves(&self, n: u32) -> Option<Vec<String>> {
+        self.fields(n)
+            .iter()
+            .map(|&o| {
+                let s = self.name_of(o);
+                match s.split_once(':') {
+                    Some((dev, "p")) => Some(format!("i({})", self.declared(n, dev, &['V'])?)),
+                    Some(_) => None,
+                    None => Some(s),
+                }
+            })
+            .collect()
     }
 
     /// A Spectre `ic`/`nodeset`'s node values; `None` when one is no
@@ -259,6 +268,7 @@ impl<'a> Rd<'a> {
                 let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
                 let (src, from, to, pts) =
                     (s("instance")?, num("from")?, num("to")?, num("points")?);
+                let src = self.declared(sw, &src, &['V', 'I'])?;
                 (s("parameter").as_deref() == Some("dc"))
                     .then(|| (src, from, to, (to - from) / pts))
             })
@@ -309,7 +319,7 @@ impl<'a> Rd<'a> {
             "noise" => Ana::Noise {
                 output: s("out")?,
                 reference: "0".into(),
-                source: s("in")?,
+                source: self.declared(st, &s("in")?, &['V', 'I'])?,
                 sweep: freq()?,
                 pps: None,
             },

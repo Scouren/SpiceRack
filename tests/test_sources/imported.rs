@@ -217,3 +217,71 @@ fn a_spectre_vector_keeps_its_signs_on_ngspice() {
         );
     }
 }
+
+#[test]
+fn a_spectre_reference_names_the_source_as_the_name_map_spells_it() {
+    // `in1 (a 0) vsource` is ngspice's `Vin1`; `probe=in1`, `dev=in1` and
+    // `save in1:p` name it ([CMP] `cccs`, `ccvs`, `dc`; p.686). Closed
+    // forms (SPICE's sign: a source's current flows from its + node
+    // through it): i(in1) = -v into 1 Ω, so the cccs drives 2v into
+    // `o` and the ccvs holds `p` at -3v.
+    let src = "// refs\nsimulator lang=spectre\n\
+        in1 (a 0) vsource dc=1\n\
+        f1 (o 0) cccs probe=in1 gain=2\n\
+        h1 (p 0) ccvs probe=in1 rm=3\n\
+        r1 (a 0) resistor r=1\nr2 (o 0) resistor r=1\nr3 (p 0) resistor r=1\n\
+        save a o p in1:p\n\
+        dc1 dc dev=in1 param=dc start=0 stop=1 step=0.25\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let raw = ngspice(&deck);
+    let (a, o, p) = (col(&raw, "a"), col(&raw, "o"), col(&raw, "p"));
+    let i = col(&raw, "i(vin1)");
+    assert_eq!(a.len(), 5, "{deck}");
+    for k in 0..5 {
+        let v = 0.25 * k as f64;
+        assert!((a[k] - v).abs() < 1e-9, "a {}: {v}\n{deck}", a[k]);
+        assert!((i[k] + v).abs() < 1e-9, "i(vin1) {}: {}\n{deck}", i[k], -v);
+        assert!(
+            (o[k] - 2.0 * v).abs() < 1e-9,
+            "o {}: {}\n{deck}",
+            o[k],
+            2.0 * v
+        );
+        assert!(
+            (p[k] + 3.0 * v).abs() < 1e-9,
+            "p {}: {}\n{deck}",
+            p[k],
+            -3.0 * v
+        );
+    }
+}
+
+#[test]
+fn a_spectre_noise_iprobe_names_a_source_ngspice_runs() {
+    // `iprobe=in1` is `Vin1` (`[CMP]` `noise`). Closed form: two 1 Ω
+    // resistors at 27 °C give `o` 4kT·0.5 V²/Hz at a gain of 0.5, so the
+    // input-referred density is √(8kT) V/√Hz at every frequency.
+    let src = "// noise\nsimulator lang=spectre\n\
+        in1 (a 0) vsource dc=0 mag=1\nr1 (a o) resistor r=1\nr2 (o 0) resistor r=1\n\
+        n1 (o 0) noise start=1k stop=10k dec=1 iprobe=in1\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let runs = Dialect::Ngspice
+        .run_all(&deck)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
+    let want = (8.0 * 1.380649e-23 * 300.15f64).sqrt();
+    let spectrum = runs
+        .iter()
+        .find_map(|r| {
+            let v = r.variables.iter().find(|v| v.name == "inoise_spectrum")?;
+            Some(r.re(v.index))
+        })
+        .unwrap_or_else(|| panic!("no inoise_spectrum\n{deck}"));
+    assert!(!spectrum.is_empty(), "{deck}");
+    for x in spectrum.iter() {
+        assert!((x / want - 1.0).abs() < 1e-3, "{x} want {want}\n{deck}");
+    }
+}

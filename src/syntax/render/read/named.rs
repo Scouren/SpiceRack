@@ -15,6 +15,7 @@
 //! - `fn vacask_kind(module: &str, ty: Option<f64>) -> Option<(String, Option<&'static str>)>`
 //! - `fn vacask_builtin(module: &str) -> Option<&'static str>`
 //! - `Rd::declarations(&self, stmts: &[u32]) -> (HashMap<String, String>, Vec<String>)`
+//! - `Rd::instances(&mut self, stmts: &[u32])`, `Rd::declared(&self, n: u32, name: &str, letters: &[char]) -> Option<String>`
 //! - `Rd::named_card(&mut self, n: u32, here: &mut Block, scope: Scope, acc: &mut Acc) -> Option<Opened>`
 //! - `Rd::pairs(&self, n: u32) -> Vec<(String, u32)>`, `Rd::get(&self, p: &[(String, u32)], k: &str) -> Option<u32>`
 //! - `Rd::unquote(&self, p: u32) -> String`
@@ -155,6 +156,67 @@ impl<'a> Rd<'a> {
             }
         }
         (kinds, subckts)
+    }
+
+    /// Every instance of `stmts` and the blocks in them, by scope and name
+    /// ([`Rd::declared`]'s table).
+    pub(super) fn instances(&mut self, stmts: &[u32]) {
+        let mut work: Vec<(u32, u32)> = stmts.iter().rev().map(|&s| (s, NONE)).collect();
+        while let Some((s, scope)) = work.pop() {
+            match self.tag(s) {
+                Tag::Instance => {
+                    let name = self.name_of(self.ast.header(Node(s)).name);
+                    self.insts.entry((scope, name)).or_insert(s);
+                    self.scope_of.insert(s, scope);
+                }
+                Tag::Analysis | Tag::Command => {
+                    self.scope_of.insert(s, scope);
+                }
+                Tag::Subckt => work.extend(self.body(s).iter().rev().map(|&b| (b, s))),
+                Tag::Section | Tag::Library | Tag::If | Tag::Else => {
+                    if let Some(nx) = self.ast.next(Node(s)) {
+                        work.push((nx.0, scope));
+                    }
+                    work.extend(self.body(s).iter().rev().map(|&b| (b, scope)));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// The SPICE name of the source `name` (a reference written in
+    /// statement `n`'s scope) declares: its type letter, lowercase, then
+    /// its name as the name map holds it (`in1 (a 0) vsource` is `vin1`,
+    /// the map's `Vin1`; SPICE folds case, and a Spectre writer spells a
+    /// declaration's letter lowercase). A name no instance of the scope
+    /// declares is kept as written (a VACASK `elaborate` reads another
+    /// scope; the target finds it or fails); `None` when the instance is
+    /// no source of one of `letters`.
+    pub(in crate::syntax::render) fn declared(
+        &self,
+        n: u32,
+        name: &str,
+        letters: &[char],
+    ) -> Option<String> {
+        let scope = self.scope_of.get(&n).copied().unwrap_or(NONE);
+        let Some(&k) = self.insts.get(&(scope, name.to_string())) else {
+            return Some(name.to_string());
+        };
+        let master = self.name_of(self.ast.header(Node(k)).master);
+        let master = match self.kinds.get(&master).and_then(|m| m.strip_prefix('=')) {
+            Some(b) => b.to_string(),
+            None => master,
+        };
+        // Only a source is read, so a probe of a probe never recurses.
+        if !matches!(master.as_str(), "vsource" | "isource" | "iprobe") {
+            return None;
+        }
+        match self.named_inst(k)? {
+            super::Card::Source { letter, name, .. } if letters.contains(&letter) => {
+                Some(format!("{}{name}", letter.to_ascii_lowercase()))
+            }
+            _ => None,
+        }
     }
 
     /// One Spectre or VACASK statement (the old lowering's `card`, named);
@@ -362,7 +424,7 @@ impl<'a> Rd<'a> {
             }
             Tag::Card => false,
             Tag::Model => self.named_model_ok(n, here),
-            Tag::Save => {
+            Tag::Save if self.saves(n).is_some() => {
                 acc.bench.push(Bench::Save(n));
                 true
             }

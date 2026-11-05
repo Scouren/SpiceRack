@@ -83,6 +83,11 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// Spectre/VACASK: model kinds by name, and subcircuit names.
     kinds: HashMap<String, String>,
     subckts: Vec<String>,
+    /// Spectre/VACASK: each instance by its scope (the `Subckt` node it
+    /// sits in, `NONE` at the top) and name, and each one's scope: what
+    /// a reference (`probe=`, `dev=`, `save dev:p`) names.
+    insts: HashMap<(u32, String), u32>,
+    scope_of: HashMap<u32, u32>,
     kit: Option<(&'a Kit, FileId)>,
     /// The name map: an `X` card's master as written, after the renames of
     /// the hoisted subcircuits it names (`parent__name`).
@@ -301,6 +306,8 @@ pub(in crate::syntax::render) fn read<'a>(
         models: HashSet::new(),
         kinds: HashMap::new(),
         subckts: Vec::new(),
+        insts: HashMap::new(),
+        scope_of: HashMap::new(),
         kit,
         masters: HashMap::new(),
         unlifted: unlift::Unlift::default(),
@@ -311,6 +318,7 @@ pub(in crate::syntax::render) fn read<'a>(
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
         (rd.kinds, rd.subckts) = rd.declarations(&top_stmts);
+        rd.instances(&top_stmts);
     } else {
         rd.models = rd.model_names(&top_stmts);
     }
