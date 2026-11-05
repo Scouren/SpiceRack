@@ -35,9 +35,14 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
             super::tail(&stdout)
         ))
     })?;
+    let outer = outer_sweeps(netlist);
     let mut plots = Vec::with_capacity(files.len());
-    for raw in &files {
-        plots.extend(read_results(raw, stdout.clone())?);
+    for (k, raw) in files.iter().enumerate() {
+        let mut read = read_results(raw, stdout.clone())?;
+        // A deck that declares no analysis this can see has no sweeps either.
+        let n = outer.get(k).copied().unwrap_or(0);
+        read.iter_mut().for_each(|p| sweeps_last(p, n));
+        plots.extend(read);
     }
     assert!(
         plots.len() >= files.len(),
@@ -70,6 +75,59 @@ fn analysis_names(netlist: &str) -> Vec<String> {
         }
     }
     out
+}
+
+/// For each analysis [`analysis_names`] lists, in the same order, how many
+/// of the leading columns of its raw file are sweeps around it that are
+/// not its own axis: VACASK writes each enclosing `sweep`'s variable first,
+/// outermost first, then the analysis's own (pinned build: `step_r`,
+/// `frequency`, … for an `ac` inside `sweep step_r`). An `op`'s innermost
+/// sweep is its axis (a `.dc`); every other kind has its own (time,
+/// frequency).
+fn outer_sweeps(netlist: &str) -> Vec<usize> {
+    let mut out = Vec::new();
+    let (mut sweeps, mut mc) = (0, 1);
+    for l in netlist.lines() {
+        let mut w = l.split_whitespace();
+        match w.next() {
+            Some("sweep") => sweeps += 1,
+            Some("mc") => {
+                let n = w.find_map(|kv| kv.strip_prefix("samples="));
+                mc = n.and_then(|n| n.parse().ok()).unwrap_or(0);
+            }
+            Some("endmc") => mc = 1,
+            Some("analysis") => {
+                let kind = w.nth(1);
+                let own = usize::from(kind == Some("op") && sweeps > 0);
+                out.extend(std::iter::repeat_n(sweeps - own, mc));
+                sweeps = 0;
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Moves `raw`'s first `n` columns after the others, so column 0 is the
+/// analysis's own axis and each step's value is a vector of its own.
+fn sweeps_last(raw: &mut RawData, n: usize) {
+    let cols = raw.variables.len();
+    assert!(
+        n < cols.max(1),
+        "an analysis's raw file holds its own columns"
+    );
+    assert!(raw.real_data.len() == cols || raw.real_data.is_empty());
+    raw.variables.rotate_left(n);
+    raw.variables
+        .iter_mut()
+        .enumerate()
+        .for_each(|(i, v)| v.index = i);
+    if raw.real_data.len() == cols {
+        raw.real_data.rotate_left(n);
+    }
+    if raw.complex_data.len() == cols {
+        raw.complex_data.rotate_left(n);
+    }
 }
 
 /// VACASK writes one raw file per analysis run, named after it: each
@@ -135,6 +193,35 @@ mod tests {
         // `docs/cmd-analysis-mc.md` "Output": `mc1.<i>.op1.raw` per sample.
         let mc = "control\n  mc mc1 samples=2 seed=1 lh=0\n    analysis op2 op\n  endmc\nendc\n";
         assert_eq!(analysis_names(mc), ["mc1.1.op2", "mc1.2.op2"]);
+    }
+
+    #[test]
+    fn a_step_sweeps_column_moves_after_the_analysis_axis() {
+        // What the pinned VACASK wrote for `.step r` around an `ac`, an
+        // `op` and a `.dc` (the `vsweep` the op's own axis):
+        // `step_r frequency …`, `step_r …`, `step_r vsweep …`.
+        let deck = "control\n  sweep step_r variable=\"r\"\n  analysis ac1 ac\n  sweep step_r variable=\"r\"\n  analysis op2 op\n  sweep step_r variable=\"r\"\n  sweep vsweep instance=\"vin\"\n    analysis dc3 op\n  analysis tr4 tran\nendc\n";
+        assert_eq!(outer_sweeps(deck), [1, 0, 1, 0]);
+        let mc = "  mc mc1 samples=2\n    analysis op2 op\n  endmc\n";
+        assert_eq!(outer_sweeps(mc), [0, 0]);
+        let var = |n: &str, i| crate::result::VarInfo {
+            index: i,
+            name: n.into(),
+            var_type: crate::result::VarType::Other,
+        };
+        let mut raw = RawData {
+            variables: vec![var("step_r", 0), var("frequency", 1), var("out", 2)],
+            real_data: vec![vec![1.0], vec![2.0], vec![3.0]],
+            ..RawData::default()
+        };
+        sweeps_last(&mut raw, 1);
+        let names: Vec<_> = raw
+            .variables
+            .iter()
+            .map(|v| (v.name.as_str(), v.index))
+            .collect();
+        assert_eq!(names, [("frequency", 0), ("out", 1), ("step_r", 2)]);
+        assert_eq!(raw.real_data, [[2.0], [3.0], [1.0]]);
     }
 
     #[test]

@@ -81,6 +81,10 @@ print(res.measures["vmax"])
 
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
 emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
+A stepped result holds every step's points one after another on the analysis's
+own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a vector beside
+them (`dc["step_r"]` on VACASK); an `OperatingPoint` holds one point, so reading
+a stepped one raises `ValueError`.
 
 ### ngspice compatibility mode
 

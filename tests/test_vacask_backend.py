@@ -142,3 +142,23 @@ class TestRun:
         out = tr["out"]
         i = min(range(len(t)), key=lambda k: abs(t[k] - 1e-3))
         assert out[i] == pytest.approx(1.0 - math.exp(-1.0), rel=5e-3)
+
+    def test_a_step_keeps_the_analysis_axis_and_each_steps_value(self):
+        # Closed form: out = vin * rbot / (r + rbot). VACASK writes each
+        # enclosing sweep's column first (`step_r frequency …`); the axis is
+        # the analysis's own, the step a vector beside it.
+        mod = ps()
+        sc = mod.Subcircuit("div", ["vdd", "out"], r="1k")
+        sc.R(name="top", positive="vdd", negative="out", value="{r}")
+        sc.R(name="bot", positive="out", negative=sc.gnd, value=1e3)
+        tb = bench(mod, sc)
+        tb.V(name="dd", positive="vdd", negative="0", value=1.0, ac=1.0)
+        tb.step("r", 1e3, 3e3, 1e3)
+        dc = tb.dc(Vdd=slice(0.0, 1.0, 0.5))
+        assert dc.sweep == [0.0, 0.5, 1.0] * 3
+        for v, r, out in zip(dc.sweep, dc["step_r"], dc["out"]):
+            assert out == pytest.approx(v * 1e3 / (r + 1e3), abs=1e-12)
+        ac = tb.ac(variation="dec", number_of_points=1, start_frequency=1.0, stop_frequency=10.0)
+        assert ac.frequency == pytest.approx([1.0, 10.0] * 3)
+        with pytest.raises(ValueError, match="3 points, one per .step point"):
+            tb.operating_point()["out"]
