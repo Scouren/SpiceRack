@@ -186,3 +186,34 @@ fn an_imported_spectre_pwl_runs_on_ngspice_as_the_manual_says() {
         }
     }
 }
+
+#[test]
+fn a_spectre_vector_keeps_its_signs_on_ngspice() {
+    // `[CMP]` `vsource` `wave` (p.686) and `pvcvs` `coeffs` (pp.590-616): each
+    // element is a number, its sign with it. The closed forms: `a` is
+    // -1 V at 1 ms between 0 at 0 and 2 ms; `o` is -2·v(a) - 0.5 (pvcvs
+    // coeffs [c0 c1] is c0 + c1·v).
+    let src = "// signs\nsimulator lang=spectre\n\
+        v1 (a 0) vsource type=pwl wave=[0 0 1m -1 2m 0]\n\
+        e1 (o 0 a 0) pvcvs coeffs=[-0.5 -2]\n\
+        r1 (a 0) resistor r=1\nr2 (o 0) resistor r=1\n\
+        tr tran step=10u stop=2m maxstep=10u\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let raw = ngspice(&deck);
+    let (time, a, o) = (col(&raw, "time"), col(&raw, "a"), col(&raw, "o"));
+    for k in 0..=200 {
+        let t = 2e-3 * k as f64 / 200.0;
+        let want = -(1.0 - (t - 1e-3).abs() / 1e-3);
+        let (va, vo) = (at(time, a, t), at(time, o, t));
+        assert!(
+            (va - want).abs() < 1e-9,
+            "a at {t}: {va}, want {want}\n{deck}"
+        );
+        assert!(
+            (vo - (-2.0 * want - 0.5)).abs() < 1e-6,
+            "o at {t}: {vo}\n{deck}"
+        );
+    }
+}

@@ -489,20 +489,13 @@ impl<'a> Rd<'a> {
         }))
     }
 
-    /// quirk: the old lowering's `velems`: a vector's element rows; the old
-    /// Spectre grammar's `s_unary2` captures no sign, so `-1` reads as `1`.
+    /// A vector's element rows, each with its sign (`-1` is a `Unary` row
+    /// whose number is -1; `[CMP]` `vsource` `wave`).
     fn velems(&self, v: u32) -> Vec<u32> {
         if self.tag(v) != Tag::Vector {
             return vec![v];
         }
-        self.ast
-            .list(self.ast.rhs(Node(v)) + 1)
-            .iter()
-            .map(|&k| match self.tag(k) {
-                Tag::Unary => self.ast.lhs(Node(k)),
-                _ => k,
-            })
-            .collect()
+        self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec()
     }
 }
 
