@@ -406,6 +406,13 @@ catalogue! {
         cite: "ngspice manual, the compatibility modes (`set ngbehavior` in `.spiceinit`, or `-D ngbehavior=`, read before the deck)",
         explain: "`.options ngbehavior=` selects how ngspice reads the deck (`hsa`, `ps`, `lt`, …); ngspice takes it on its command line, and no other target has such a mode, so it is left out. The target reads the deck in its own dialect.",
     }
+    // W0040–W0044: the Python deck builder's (`python::deck`).
+    /// An analysis argument from the Python API the target has no word for.
+    W0040 Refusal {
+        title: "an analysis argument the target has no word for",
+        cite: "HSPICE `.FOUR` (nine harmonics, no count); Xyce RG `.FOUR` (no count); ngspice-45 `src/frontend/fourier.c` (one `nfreqs` per deck); Spectre Reference 19.1 p.272-274 (`pss`: no sciter/steadycoeff/uic), `spectre -h ac` (no `oct`)",
+        explain: "The analysis was asked for with an argument (a Fourier harmonic count, ngspice's PSS shooting controls, an octave sweep) the target's statement has no field for. Leave the argument out, or netlist for a target that takes it.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

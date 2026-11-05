@@ -17,7 +17,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `K` | `K` | `(name, inductor1, inductor2, coupling)` |
 | `D` | `D` | `(name, anode, cathode, model)` |
 | `Q` / `BJT` | `Q` | `(name, collector, base, emitter, model)` |
-| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk, model, **kwargs)` — e.g. `L=`, `W=` |
+| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), refused on Spectre and VACASK (`W0105`) |
 | `J` | `J` | `(name, drain, gate, source, model)` |
 | `Z` | `Z` | `(name, drain, gate, source, model)` |
 | `E` | `E` | `(name, positive, negative, control_positive, control_negative, voltage_gain)` |
@@ -28,7 +28,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |
 | `S` | `S` | `(name, positive, negative, control_positive, control_negative, model)` |
 | `W` | `W` | `(name, positive, negative, vcontrol, model)` |
-| `A` | `A` | `(name, connections, model)` — `connections` is a `list[str]` |
+| `A` | `A` | `(name, connections, model)` — `connections` is a `list[str]`; an XSPICE code model: ngspice, ESPice (written), every other target refuses it (`W0001`) |
 | `X` | `X` | `X(name, subcircuit_name, *nodes, **params)` — name and nodes positional; `params` become `k=v` on the card |
 
 Current-controlled sources (`F`, `H`) sense through a named voltage source; add a
@@ -89,7 +89,7 @@ Queue on a `Testbench` with `add_*`; run on a `Testbench` or `CircuitSimulator` 
 `tb.run()` runs everything queued as one deck and returns a list, one result per
 analysis in queue order, typed as the run method's (`None` for `add_fourier`):
 `op, tran = tb.run()`. Results are matched to analyses by plot name (ngspice
-reorders analyses); `pss`, `hb`, `stb`, transient noise and Spectre-only analyses
+reorders analyses); `pss`, `hb`, `stb` and Spectre-only analyses
 queued beside others raise instead.
 
 | Run method | Queue method | Signature | Result |
@@ -104,7 +104,7 @@ queued beside others raise instead.
 | `transfer_function(...)` | — | — | `TransferFunctionAnalysis` |
 | `distortion(...)` | — | — | `DistortionAnalysis` |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only), any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre's `log=N`, N points in total; every other target refuses it, `W0040`), any
 case; any other name raises `ValueError` at the call, before anything runs. So
 do the `.pz` types (`vol`/`cur`, `pol`/`zer`/`pz`), a `step_sweep` type and a
 Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...).
@@ -113,13 +113,18 @@ Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...
 harmonics are unreachable. For THD, compute a Goertzel over the transient
 waveform. `num_harmonics=n` (harmonics past DC; the simulators' default is 9)
 is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
-`.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it (their
-`.four` takes no count).
+`.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it with
+`W0040` (their `.four` takes no count), VACASK refuses any `.four` (`W0015`).
 
-Backend-specific, `CircuitSimulator` only: `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` warns, deprecated),
-`spectre_pac`, `spectre_pnoise`, `spectre_pstb`, `spectre_pxf`, `network_params`.
-`Testbench` queues the sweep and Monte Carlo forms with `add_spectre_sweep` and
-`add_spectre_monte_carlo`.
+Every run method has an `add_` twin on `Testbench` with the same arguments,
+so any deck is netlisted before it runs: also `add_pss`, `add_s_param`,
+`add_harmonic_balance`, `add_stability`, `add_transient_noise`,
+`add_network_params`, `add_spectre_sweep`, `add_spectre_monte_carlo`,
+`add_spectre_pac`, `add_spectre_pnoise`, `add_spectre_pxf`, `add_spectre_pstb`.
+`spectre_montecarlo` warns, deprecated. `transient_noise(step, stop)` is
+ngspice's transient noise: a `.tran` whose noise is the bench's `TRNOISE`/
+`TRRANDOM` sources (no device noise). `pss(..., sc_iter=, steady_coeff=,
+uic=)` on Spectre is `W0040` (no such `pss` fields).
 
 ## Results
 
@@ -183,7 +188,7 @@ The `u_Ω` family is registered with U+03A9 and does work.
 
 ## Backend capabilities
 
-Declared in `src/backend/*.rs`; these gate automatic backend selection.
+Declared in `src/backend/mod.rs`; these gate automatic backend selection, and so does the writer: a run never lands on a backend whose writer refuses the deck.
 
 | | ngspice | ltspice | vacask | spectre | espice |
 |---|---|---|---|---|---|
@@ -193,7 +198,7 @@ Declared in `src/backend/*.rs`; these gate automatic backend selection.
 | `.step` params | **no** | yes | yes | yes | **no** |
 | control blocks | yes | no | no | no | no |
 | Laplace sources | yes | yes | no | no | yes |
-| Verilog co-sim | yes | no | no | yes | no |
+| Verilog co-sim | yes | no | no | no | no |
 
 `ps.lint(netlist, backend=None)` takes the **netlist text**, not a `Circuit` —
 pass `str(circuit)` or `tb.netlist(backend)`. It returns

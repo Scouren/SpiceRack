@@ -636,3 +636,22 @@ class TestNgbehavior:
         assert r.returncode == 0, r.stderr
         assert float(r.stdout) == 1.0
         assert not marker.exists(), f"ngspice read the {where} .spiceinit"
+
+
+def test_transient_noise_is_a_tran_over_trnoise_sources():
+    """ngspice manual §4.1.7: TRNOISE(NA NT 0 0) draws white samples of rms
+    NA every NT and interpolates linearly between them, so the node's rms
+    over the run lies between sqrt(2/3)*NA (every point mid-interval) and
+    NA (every point a sample); 2000 samples put the estimate within ~3%."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("n", ["out"])
+    dut.R(name="1", positive="out", negative=dut.gnd, value=1e3)
+    tb = ps.Testbench(dut)
+    tb.TransientNoiseVoltageSource("n", "out", "0", noise_rms=1e-3, time_step=1e-9)
+    tb.add_transient_noise(1e-9, 2e-6)
+    assert ".tran 1n 2u" in tb.netlist("ngspice").splitlines()
+    (res,) = tb.run()
+    v = res["out"]
+    rms = math.sqrt(sum(x * x for x in v) / len(v))
+    assert 0.75e-3 < rms < 1.06e-3, rms

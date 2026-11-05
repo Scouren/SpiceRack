@@ -33,14 +33,14 @@ nodes are positional; everything after `*` is keyword-only.
 | `POLY` | `(name, kind, positive, negative, controls, coefficients)`; `kind` is `"E"`, `"G"`, `"F"` or `"H"` |
 | `D` | `(name, anode, cathode, *, model, **params)` |
 | `Q` / `BJT` | `(name, collector, base, emitter, *, model, substrate=None, thermal=None, **params)` |
-| `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)` |
+| `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): Spectre and VACASK refuse it (`W0105`) |
 | `J`, `Z` | `(name, drain, gate, source, *, model, **params)` |
 | `S` | `(name, positive, negative, *, control_positive, control_negative, model)` |
 | `W` | `(name, positive, negative, *, vcontrol, model)` |
 | `T` | `(name, input_positive, input_negative, output_positive, output_negative, *, Z0, TD)` |
 | `X` | `(name, subcircuit_name, *nodes, **params)` |
 | `instance` | `(subckt, name, *nodes, **params)`: like `X`, from the object |
-| `A` | `(*, name, connections, model)`: XSPICE code model |
+| `A` | `(*, name, connections, model)`: XSPICE code model; ngspice and ESPice only, other targets refuse it (`W0001`) |
 
 Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 `Testbench`; all take `dc=None, ac=None, ac_phase=None`:
@@ -84,10 +84,10 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `with_backend(name)` | pins the simulator |
 | `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `RuntimeError` naming its code |
 | `to_source()`, `save_source(path)`, `Testbench.from_source(text, dialect=None)`, `Testbench.load(path)` | the store, as for `Subcircuit` (`save(*outputs)` stays the `.save` card): a deck read back writes the same netlists; its analyses are its text, and `run()` runs those queued on it |
-| `check_backend(name)` | reasons it will not run on `name` |
+| `check_backend(name)` | reasons it will not run on `name`: missing features, and the writer's refusal with its code |
 | `global_nodes(*nodes)` | `.global` |
 | `extra_line(line, dialect="ngspice")` | a line of `dialect`'s text: copied as written on a target of that dialect's family, refused (`W0001`) on any other |
-| `add_operating_point()`, `add_dc(**sweeps)`, `add_ac(...)`, `add_transient(...)`, `add_noise(...)`, `add_tf(...)`, `add_fourier(f0, outputs, num_harmonics=None)`, `add_spectre_sweep(...)`, `add_spectre_monte_carlo(...)`, ... | queue an analysis card instead of running it |
+| `add_operating_point()`, `add_dc(**sweeps)`, `add_ac(...)`, `add_transient(...)`, `add_noise(...)`, `add_tf(...)`, `add_fourier(f0, outputs, num_harmonics=None)`, `add_pss(...)`, `add_s_param(...)`, `add_harmonic_balance(...)`, `add_stability(...)`, `add_transient_noise(...)`, `add_network_params(...)`, `add_spectre_sweep(...)`, `add_spectre_monte_carlo(...)`, `add_spectre_pac(...)`, `add_spectre_pnoise(...)`, `add_spectre_pxf(...)`, `add_spectre_pstb(...)`, ... | queue an analysis instead of running it: each run method's twin, same arguments |
 | `run()` | runs every queued analysis as one deck: a list, one result per analysis in queue order (`None` for `add_fourier`) |
 
 ## Settings (`Testbench`, `CircuitSimulator`)
@@ -111,16 +111,16 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(node1, node2, node3, node4, tf_type, pz_type)` | `PoleZeroAnalysis` (`pz["pole(1)"]`) |
 | `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis` |
-| `pss(fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=False)` | `PssAnalysis`; the last three are ngspice's `sciter`, `steadycoeff`, `uic` |
+| `pss(fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=False)` | `PssAnalysis`; the last three are ngspice's `sciter`, `steadycoeff`, `uic` (Spectre's `pss` has none: `W0040`) |
 | `s_param(variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10)` | `SParamAnalysis` |
 | `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis` |
 | `stability(probe, variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e10)` | `StabilityAnalysis` |
-| `transient_noise(step_time, end_time)` | `TransientNoiseAnalysis` |
+| `transient_noise(step_time, end_time)` | `TransientNoiseAnalysis`: ngspice's transient noise, a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources |
 | `network_params(output_current, input_source, z_in=50.0, z_out=50.0, ...)` | `SParamAnalysis` (LTspice `.net`) |
 | `spectre_sweep`, `spectre_monte_carlo` | `RawData` (Spectre); `spectre_montecarlo` is a deprecated alias that warns |
 | `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | periodic small-signal (Spectre) |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only), in any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre's `log=N`, N points in total; every other target refuses it, `W0040`), in any
 case; any other name raises `ValueError` when the analysis is built.
 
 ## Results

@@ -654,6 +654,57 @@ class TestDialectText:
         with pytest.raises(ValueError, match="unknown backend"):
             tb.netlist("pspice")
 
+    def test_every_immediate_analysis_has_a_queued_twin(self):
+        # A deck holding any analysis is netlisted before it is run.
+        ps = import_spicerack()
+        tb = self._tb(ps)
+        immediate = ["operating_point", "dc", "ac", "transient", "noise", "tf",
+                     "dc_sensitivity", "ac_sensitivity", "polezero", "distortion",
+                     "pss", "s_param", "network_params", "harmonic_balance",
+                     "stability", "transient_noise", "spectre_sweep",
+                     "spectre_monte_carlo", "spectre_pac", "spectre_pnoise",
+                     "spectre_pxf", "spectre_pstb"]
+        assert [n for n in immediate if not hasattr(tb, "add_" + n)] == []
+
+    def test_an_argument_the_target_has_no_word_for_is_w0040(self):
+        # Spectre Reference 19.1 p.272-274 (`pss`: no sciter, steadycoeff,
+        # uic); HSPICE and Xyce `.FOUR` take no harmonic count; VACASK has no
+        # Fourier analysis at all (W0015, counted or not).
+        ps = import_spicerack()
+        tb = self._tb(ps)
+        tb.add_pss(1e6, 1e-5, "out", sc_iter=20)
+        assert ".pss 1000000 0.00001 out 128 10 20 0.001" in tb.netlist("ngspice").splitlines()
+        with pytest.raises(RuntimeError, match="W0040.*sciter"):
+            tb.netlist("spectre")
+        tb = self._tb(ps)
+        tb.add_fourier(1e3, ["V(out)"], num_harmonics=5)
+        for target in ("hspice", "xyce"):
+            with pytest.raises(RuntimeError, match="W0040.*num_harmonics"):
+                tb.netlist(target)
+        with pytest.raises(RuntimeError, match="W0015"):
+            tb.netlist("vacask")
+
+    def test_a_log_frequency_sweep_is_spectres_and_w0040_elsewhere(self):
+        # Spectre Reference 19.1 (`ac … log=N`: N points in total); ngspice
+        # manual §11.3.1, HSPICE, Xyce, LTspice `.ac` and VACASK `mode=`
+        # take dec, oct or lin only.
+        ps = import_spicerack()
+        tb = self._tb(ps)
+        tb.add_ac("log", 10, 1.0, 1e6)
+        assert "ac1 ac start=1 stop=1M log=10" in tb.netlist("spectre").splitlines()
+        for other in ("ngspice", "espice", "hspice", "xyce", "ltspice", "vacask"):
+            with pytest.raises(RuntimeError, match="W0040.*'log'"):
+                tb.netlist(other)
+        assert "C1 out 0 1n" in tb.netlist("cdl").splitlines()
+
+    def test_check_backend_names_the_writers_refusal(self):
+        # VACASK has no `sp` analysis (W0015): the run would be refused.
+        ps = import_spicerack()
+        tb = self._tb(ps)
+        tb.add_s_param()
+        assert any("W0015" in issue for issue in tb.check_backend("vacask"))
+        assert not any("W0015" in issue for issue in tb.check_backend("ngspice"))
+
     def test_a_spectre_analysis_is_spectre_text_in_a_region(self):
         # Spectre Reference 19.1 p.174: `montecarlo numruns= seed= { … }`;
         # VACASK docs/cmd-analysis-mc.md: `mc … endmc` around the deck's

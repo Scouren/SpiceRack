@@ -18,7 +18,7 @@
 //!
 //! Contents:
 //! - `pub(super) enum Analysis`, `Analysis::kind(&self) -> Kind`,
-//!   `Analysis::card(&self) -> Option<String>`, `Analysis::in_spectre_region(&self, d: Dialect) -> bool`,
+//!   `Analysis::card(&self) -> Option<String>`, `Analysis::log_sweep(&self) -> bool`, `Analysis::in_spectre_region(&self, d: Dialect) -> bool`,
 //!   `Analysis::fourier_count(&self, d: Dialect) -> Result<Option<Vec<String>>, String>`,
 //!   `Analysis::spectre(&self) -> Result<String, String>`
 //! - `pub(super) fn nfreqs(analyses: &[Analysis]) -> Result<Option<String>, String>`
@@ -95,7 +95,12 @@ pub(super) enum Analysis {
         probe: String,
         sweep: FreqSweep,
     },
-    TransientNoise,
+    /// ngspice's transient noise: a `.tran` whose noise is the deck's
+    /// `TRNOISE`/`TRRANDOM` sources (manual §4.1.7); no device noise.
+    TransientNoise {
+        step: f64,
+        stop: f64,
+    },
     /// `harmonics`: how many past DC (`None`: the simulator's nine).
     Fourier {
         fundamental: f64,
@@ -184,7 +189,7 @@ impl Analysis {
             Analysis::HarmonicBalance { .. } => Kind::Hb,
             Analysis::SPar { .. } => Kind::Sp,
             Analysis::Stability { .. } => Kind::Stb,
-            Analysis::TransientNoise => Kind::TranNoise,
+            Analysis::TransientNoise { .. } => Kind::TranNoise,
             Analysis::Fourier { .. } => Kind::Fourier,
             Analysis::SpectreSweep { .. } => Kind::SpectreSweep,
             Analysis::SpectreMonteCarlo { .. } => Kind::SpectreMonteCarlo,
@@ -298,6 +303,9 @@ impl Analysis {
                 }
                 s
             }
+            Analysis::TransientNoise { step, stop } => {
+                format!(".tran {} {}", num(*step), num(*stop))
+            }
             Analysis::SPar { sweep: f } => {
                 let v = f.variation.name();
                 format!(".sp {v} {} {} {}", f.points, dec(f.start), dec(f.stop))
@@ -311,7 +319,6 @@ impl Analysis {
             } => format!(".four {} {}", num(*fundamental), outputs.join(" ")),
             Analysis::HarmonicBalance { .. }
             | Analysis::Stability { .. }
-            | Analysis::TransientNoise
             | Analysis::SpectreSweep { .. }
             | Analysis::SpectreMonteCarlo { .. }
             | Analysis::SpectrePac { .. }
@@ -319,6 +326,28 @@ impl Analysis {
             | Analysis::SpectrePxf { .. }
             | Analysis::SpectrePstb { .. } => return None,
         })
+    }
+
+    /// Whether a frequency sweep of the analysis is Spectre's `log=N` (N
+    /// points in total): no SPICE target, nor VACASK, has that spacing
+    /// (ngspice manual §11.3.1, `.ac dec|oct|lin`).
+    pub(super) fn log_sweep(&self) -> bool {
+        let f = match self {
+            Analysis::Ac { sweep }
+            | Analysis::Noise { sweep, .. }
+            | Analysis::Distortion { sweep, .. }
+            | Analysis::SPar { sweep }
+            | Analysis::Stability { sweep, .. }
+            | Analysis::Sensitivity {
+                ac: Some(sweep), ..
+            }
+            | Analysis::SpectrePac { sweep, .. }
+            | Analysis::SpectrePnoise { sweep, .. }
+            | Analysis::SpectrePxf { sweep, .. }
+            | Analysis::SpectrePstb { sweep, .. } => sweep,
+            _ => return false,
+        };
+        f.variation == Sweep::Log
     }
 
     /// Whether the deck for `d` holds the analysis as its Spectre
@@ -335,8 +364,9 @@ impl Analysis {
     /// Spectre's `fourier` component's `harms` (`[CMP]` p.323-325, one per
     /// output). `None` for no count, and on ngspice, whose count is the
     /// deck's ([`nfreqs`]). `Err` for a target whose `.four` has none
-    /// (HSPICE; Xyce, which counts only `.measure … four … numfreq=`) and
-    /// for VACASK, which has no Fourier analysis.
+    /// (HSPICE; Xyce, which counts only `.measure … four … numfreq=`).
+    /// VACASK, which has no Fourier analysis, CDL and Verilog, which write
+    /// none, take the card as it is.
     ///
     /// # Panics
     /// When `self` is no Fourier analysis.
@@ -370,14 +400,18 @@ impl Analysis {
                     })
                     .collect(),
             ),
-            Dialect::Hspice | Dialect::Xyce | Dialect::Vacask => {
+            // VACASK has no Fourier analysis: the renderer refuses the
+            // `.four` card (W0015), counted or not.
+            Dialect::Vacask => None,
+            Dialect::Hspice | Dialect::Xyce => {
                 return Err(format!(
                     "fourier num_harmonics={n} ({} writes no harmonic count)",
                     d.name()
                 ));
             }
             Dialect::Espice => unreachable!("ESPice's family is ngspice"),
-            Dialect::Cdl | Dialect::Verilog => unreachable!("no deck is run as {d:?}"),
+            // Structure only: the writer keeps no analysis, counted or not.
+            Dialect::Cdl | Dialect::Verilog => None,
         })
     }
 
@@ -445,15 +479,6 @@ impl Analysis {
             // taken around.
             Analysis::Stability { probe, sweep } => {
                 format!("stb1 stb {} probe={}", range(sweep)?, probe.to_lowercase())
-            }
-            // Spectre spells transient noise `tran … noisefmax=<Hz>`; the
-            // call carries no noise bandwidth.
-            Analysis::TransientNoise => {
-                return Err(
-                    "transient noise (Spectre spells it `tran ... noisefmax=<Hz>`; \
-                            the call carries no noise bandwidth)"
-                        .into(),
-                );
             }
             // `[REF]` p.406-410.
             Analysis::SpectreSweep {
@@ -686,8 +711,8 @@ mod tests {
     }
 
     /// `[REF]` p.410 sweep (`swp sweep param=temp … { … }`), p.174
-    /// montecarlo (every parameter before the brace); p.433: transient
-    /// noise is a `tran` parameter (`noisefmax`) the call carries none of.
+    /// montecarlo (every parameter before the brace); ngspice manual
+    /// §4.1.7: transient noise is a `.tran` over `TRNOISE` sources.
     #[test]
     fn spectre_sweep_and_montecarlo_blocks_match_documented_forms() {
         let sweep = Analysis::SpectreSweep {
@@ -710,7 +735,11 @@ mod tests {
         assert_eq!(mc(Some(1234)).spectre().unwrap(), want);
         let want = "mc1 montecarlo numruns=200 {\n  tran1 tran\n}";
         assert_eq!(mc(None).spectre().unwrap(), want);
-        assert!(Analysis::TransientNoise.spectre().is_err());
+        let noise = Analysis::TransientNoise {
+            step: 1e-9,
+            stop: 1e-6,
+        };
+        assert_eq!(noise.card().unwrap(), ".tran 1n 1u");
     }
 
     /// ngspice manual §11.3.12: `.pss gfreq tstab oname psspoints harms

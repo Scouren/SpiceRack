@@ -138,7 +138,7 @@ pub(super) fn typed_result(
         Analysis::Stability { .. } | Analysis::SpectrePstb { .. } => {
             Py::new(py, PyStabilityAnalysis { inner: r() })?.into_any()
         }
-        Analysis::TransientNoise => {
+        Analysis::TransientNoise { .. } => {
             Py::new(py, PyTransientNoiseAnalysis { inner: r() })?.into_any()
         }
         Analysis::SpectreSweep { .. } | Analysis::SpectreMonteCarlo { .. } => {
