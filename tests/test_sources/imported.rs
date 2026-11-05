@@ -285,3 +285,70 @@ fn a_spectre_noise_iprobe_names_a_source_ngspice_runs() {
         assert!((x / want - 1.0).abs() < 1e-3, "{x} want {want}\n{deck}");
     }
 }
+
+// ── Spectre masters with a SPICE card: iprobe, port, tline, bsource ([CMP]) ──
+
+/// `src` (Spectre) written for ngspice and run.
+fn spectre_on_ngspice(src: &str) -> (String, RawData) {
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let raw = ngspice(&deck);
+    (deck, raw)
+}
+
+#[test]
+fn spectre_iprobe_tline_and_bsource_run_on_ngspice_as_the_manual_says() {
+    // Closed forms: `b` is 1000·t ($time, p.857); `d` takes 1m·v(b) into
+    // 1 kΩ (current from 0 through the source into d: v(d) = v(b)); the
+    // iprobe's current (p.379: in -> out) is v(b)/1k; the lossless line
+    // (p.647), driven through z0 and matched, gives o(t) = b(t - td)/2.
+    let src = "// masters\nsimulator lang=spectre\n\
+        b1 (b 0) bsource v=1k*$time\n\
+        b2 (0 d) bsource i=1m*v(b,0)\nr1 (d 0) resistor r=1k\n\
+        ip (b b2) iprobe\nr2 (b2 0) resistor r=1k\n\
+        rs (b s) resistor r=50\nt1 (s 0 o 0) tline z0=50 td=0.2m\nrl (o 0) resistor r=50\n\
+        save b d o ip:p\n\
+        tr tran step=10u stop=1m maxstep=10u\n";
+    let (deck, raw) = spectre_on_ngspice(src);
+    let time = col(&raw, "time");
+    let (b, d, o, i) = (
+        col(&raw, "b"),
+        col(&raw, "d"),
+        col(&raw, "o"),
+        col(&raw, "i(vip)"),
+    );
+    for k in 0..=100 {
+        let t = 1e-3 * k as f64 / 100.0;
+        let vb = 1e3 * t;
+        let near = |c: &[f64], want: f64, tol: f64, what: &str| {
+            let got = at(time, c, t);
+            assert!(
+                (got - want).abs() < tol,
+                "{what} at {t}: {got}, want {want}\n{deck}"
+            );
+        };
+        near(b, vb, 1e-9, "b");
+        near(d, vb, 1e-9, "d");
+        near(i, vb / 1e3, 1e-12, "i(vip)");
+        // The delayed corner lands between timepoints: half a step of
+        // the 500 V/s ramp.
+        near(o, (1e3 * (t - 0.2e-3)).max(0.0) / 2.0, 2.5e-3, "o");
+    }
+}
+
+#[test]
+fn a_spectre_port_is_ngspices_rf_port_with_the_source_behind_it() {
+    // `[CMP]` p.602: dc=1 is the voltage across the port terminated in its
+    // r = 50 Ω, so 1 V across a 50 Ω load; a 100 Ω load takes 4/3 V
+    // (2 V behind 50 Ω).
+    for (load, want) in [("50", 1.0), ("100", 4.0 / 3.0)] {
+        let src = format!(
+            "// port\nsimulator lang=spectre\n\
+             p1 (a 0) port num=1 r=50 dc=1 mag=1\nrl (a 0) resistor r={load}\nop1 dc\n"
+        );
+        let (deck, raw) = spectre_on_ngspice(&src);
+        let a = col(&raw, "a")[0];
+        assert!((a - want).abs() < 1e-9, "{a}, want {want}\n{deck}");
+    }
+}

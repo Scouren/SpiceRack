@@ -9,7 +9,7 @@
 //!
 //! Contents:
 //! - `fn unquoted(v: &str) -> Option<String>`
-//! - `Rd::named_inst(&self, n: u32) -> Option<Card>`
+//! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::strip(&self, name: &str, letter: char) -> String`
 
 use super::named::{spectre_kind, vacask_builtin, vacask_kind};
 use super::{Card, Num, Rd, Val, Wave, WaveKind};
@@ -239,6 +239,11 @@ impl<'a> Rd<'a> {
                     coeffs,
                 }
             }
+            "iprobe" | "port" | "tline" | "bsource"
+                if self.d == Dialect::Spectre && kit.is_none() && !subckts.contains(&master) =>
+            {
+                return self.named_master(&master, &name, &ns, &p);
+            }
             m if subckts.iter().any(|s| s == m) || matches!(kit, Some(Declared::Subckt)) => {
                 return Some(Card::Inst {
                     name: self.strip(&name, 'x'),
@@ -271,6 +276,22 @@ impl<'a> Rd<'a> {
                 }
             }
         })
+    }
+
+    /// `name`'s SPICE spelling: the letter a writer adds back is dropped
+    /// (the old lowering's `strip`).
+    pub(super) fn strip(&self, name: &str, letter: char) -> String {
+        let name = if self.d == Dialect::Vacask {
+            name.to_lowercase()
+        } else {
+            name.to_string()
+        };
+        match name.chars().next() {
+            Some(c) if c.eq_ignore_ascii_case(&letter) && name.len() > 1 => {
+                name[c.len_utf8()..].to_string()
+            }
+            _ => name,
+        }
     }
 }
 
@@ -314,22 +335,6 @@ impl<'a> Rd<'a> {
             &VACASK
         } else {
             &SPECTRE
-        }
-    }
-
-    /// `name`'s SPICE spelling: the letter a writer adds back is dropped
-    /// (the old lowering's `strip`).
-    fn strip(&self, name: &str, letter: char) -> String {
-        let name = if self.d == Dialect::Vacask {
-            name.to_lowercase()
-        } else {
-            name.to_string()
-        };
-        match name.chars().next() {
-            Some(c) if c.eq_ignore_ascii_case(&letter) && name.len() > 1 => {
-                name[c.len_utf8()..].to_string()
-            }
-            _ => name,
         }
     }
 

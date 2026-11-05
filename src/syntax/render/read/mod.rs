@@ -50,6 +50,7 @@ mod named;
 mod named_bench;
 mod named_blocks;
 mod named_elements;
+mod named_masters;
 mod options;
 mod outputs;
 mod refused;

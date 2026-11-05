@@ -596,3 +596,13 @@ xyce/PARAMS2/Params_C4.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (ca
 xyce/PARAMS2/Params_C4_hs.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (case-blind), Spectre's scales are case-sensitive and have no F
 xyce/PARAMS2/Params_C5.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
 xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
+
+# Phase 7: spectre-read: masters with a SPICE card (render::read::named_masters).
+# A Spectre `iprobe` is a 0 V source, `port` ngspice's RF port (the source
+# behind `r` twice `dc`/`mag`, [CMP] p.602), a lossless `tline` a T line,
+# a `bsource` with `v=`/`i=` over v(), $time and the functions both define
+# a B source ([CMP] pp.856-859); each was a statement kept as text. The
+# Spectre writer of a B source is gap-named-write's (W0102 here until it
+# merges). Per set: fixtures 2 (one input).
+fixtures/tests/fixtures/transpiler/f1.scs spectre b1, b2, b3 now B sources (W0102 until gap-named-write's bsource writer); were Spectre text copied as written (W0027)
+fixtures/tests/fixtures/transpiler/f1.scs cdl b1, b2, b3 now B cards (B1 a b V=v(a,b)*2 …) among the elements; were Spectre text copied after them
