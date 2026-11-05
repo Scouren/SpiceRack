@@ -1,9 +1,11 @@
 //! A file's role → what a target writes around it: the file role rule:
 //! a deck gets its
 //! title, its `.end`, its control blocks and its ground; a library none
-//! of them, in any target. The writers ask [`frame`] once per file; where the old writers'
-//! rules give other bytes, a writer keeps them as a `// quirk:` beside its
-//! one call, until phase 7 (`tests/fixtures/transpiler/PHASE4-STATUS.md`).
+//! of them, in any target. The named writer asks [`frame`] once per file
+//! and keeps the old rules beside it as a `// quirk:` (P7-11,
+//! `tests/fixtures/transpiler/PHASE4-STATUS.md`); the SPICE writer frames
+//! every file as a deck, which an including file reads as nothing
+//! (`spice::W::frame`).
 //!
 //! The role is `syntax::resolve`'s ([`Role`]): the kit's answer for a kit
 //! file, the same rule's for a file read alone (`resolve::role`).

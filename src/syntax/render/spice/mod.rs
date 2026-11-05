@@ -151,28 +151,19 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
 // ---- private ----
 
 impl W<'_, '_> {
-    /// What the deck is written in: what its role says ([`role::frame`]),
-    /// but for the old writer's rules where they give other bytes, which
-    /// the golden gate holds until phase 7.
+    /// What the deck is written in. Every file is framed as a deck (title,
+    /// `.end`, control blocks), a library too: the role is a guess from the
+    /// text (`resolve::role` takes a Python circuit with no analysis yet,
+    /// or a deck running only analyses kept as text, Xyce's `.hb`, for a
+    /// library), and the frame costs a library nothing where it is
+    /// included: a title line is a `*` comment, ngspice-45 and Xyce 7.10
+    /// read an included `.end` as nothing and ngspice runs an included
+    /// `.control` block (each run by hand). HSPICE's `.END` ends the run
+    /// even in an included file, so there a file that runs no analysis (a
+    /// library rendered alone, or sources alone) ends without one.
     fn frame(&self) -> Frame {
-        let role = self.rd.role();
-        let mut f = role::frame(role);
-        if role == Role::Library {
-            // quirk: the old writer titled and ended a library, and loaded
-            // its Verilog-A in a `.control` block, as any deck; phase 7
-            // writes it bare.
-            f = Frame {
-                title: true,
-                end: true,
-                control: true,
-                ground: true,
-            };
-        }
+        let mut f = role::frame(Role::Deck);
         if self.d == Dialect::Hspice {
-            // quirk: the old HSPICE writer's guess at the role: `.END` ends
-            // the run even in an included file, so a file with no analysis
-            // (a library, or a deck of sources alone) ends without one;
-            // phase 7 asks the role.
             f.end = self.runs();
         }
         f

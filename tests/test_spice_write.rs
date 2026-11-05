@@ -260,3 +260,33 @@ fn cdl_names_an_instance_as_the_map_declares_it() {
         "{w}"
     );
 }
+
+// ── the file role ──
+
+/// A library (no analysis, control block or top-level source) is framed as
+/// a deck on the SPICE targets: its title a `*` comment, its `.end` read as
+/// nothing where it is included. Real ngspice on a deck including the
+/// written library: 1 V across 1k into 3k || 3k is 0.6 V, every card read.
+/// HSPICE `.END` ends the run even in an included file, so the HSPICE
+/// library has none; a deck that runs ends with one.
+#[test]
+fn a_library_is_framed_as_a_deck_where_that_reads_as_nothing() {
+    let lib = "* lib\nR2 out 0 3k\n";
+    let ng = write(lib, Dialect::Ngspice, Dialect::Ngspice);
+    assert!(ng.trim_end().ends_with("\n.end"), "{ng}");
+    let path = scratch("framed.lib", &ng);
+    let deck = format!(
+        "* t\nV1 in 0 1\n.include \"{}\"\nR1 in out 1k\nR3 out 0 3k\n.op\n.end\n",
+        path.display()
+    );
+    let v = ngspice_op(&deck, "out");
+    assert!((v - 0.6).abs() < 1e-9, "v(out) = {v}\n{ng}");
+    let hs = write(lib, Dialect::Ngspice, Dialect::Hspice);
+    assert!(!hs.to_ascii_lowercase().contains(".end"), "{hs}");
+    let runs = write(
+        "* t\nV1 a 0 1\nR1 a 0 1k\n.op\n.end\n",
+        Dialect::Ngspice,
+        Dialect::Hspice,
+    );
+    assert!(runs.trim_end().ends_with("\n.end"), "{runs}");
+}

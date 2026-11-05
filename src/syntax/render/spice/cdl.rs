@@ -29,8 +29,8 @@ impl W<'_, '_> {
     /// The deck, in the xschem layout.
     pub(super) fn cdl(&mut self) {
         let deck = self.deck;
-        // quirk: the layout titles and ends every file, a library too, where
-        // `role::frame` writes a library bare; phase 7 asks the frame.
+        // Every file titled and ended, a library too, as the SPICE spine's
+        // frame (`W::frame`).
         self.o.token(&format!("* {}", deck.top.name), Space::Line);
         self.cdl_block(&deck.top, true);
         let extra = self.fold().extra;

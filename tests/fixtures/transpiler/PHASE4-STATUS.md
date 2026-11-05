@@ -201,16 +201,14 @@ Each is a `// quirk:` in the code, the old bytes kept in this phase.
 
 **The file role** (`role::frame` against the old rules; `spice/mod.rs`
 `W::frame`, `spice/cdl.rs`):
-- P7-1. A library (`Role::Library`) is written with a title line and a
-  closing `.end` on every SPICE target, and its Verilog-A loads in an
-  ngspice `.control` / `pre_osdi` block; the role writes it bare. Every
-  PDK kit file the gate reads is one (sky130, gf180mcu, IHP, VACASK's
-  `cmos180n.lib`), and every corpus deck with no analysis, control block or
-  top-level source.
-- P7-2. HSPICE: a deck (`Role::Deck`) with no analysis (sources alone, or
-  a control block) ends without `.END`, the old writer's guess at a
-  library; the role ends it. (A library with no analysis agrees.)
-- P7-3. CDL: the layout titles and ends (`.END`) a library too.
+- P7-1, P7-2, P7-3: decided (phase 7, spice-write): kept. A library is
+  framed as a deck on every SPICE target and CDL: `resolve::role` guesses
+  the role from the text (a Python circuit with no analysis, a deck running
+  only Xyce `.hb`, is a library to it), and the frame is harmless where a
+  library is included (a `*` title; ngspice-45 and Xyce 7.10 read an
+  included `.end` as nothing; ngspice runs an included `.control`).
+  HSPICE ends a file with `.END` only when it runs an analysis (`.END` ends
+  the run in an included file). `tests/test_spice_write.rs`.
 
 **The name map** (`render/names.rs`: a declaration gains its letter, a
 reference does not):
@@ -231,8 +229,10 @@ reference does not):
   `ground 0` and a `control` block (`named::W::frame`).
 
 **CDL** (`spice/cdl.rs`):
-- P7-10. Subcircuit models, sections, conditionals, includes and functions
-  are not written (the LVS layout's old shape), with no diagnostic.
+- P7-10: decided (phase 7, spice-write): coded, not written. Subcircuit
+  models, sections, conditionals, includes and functions are each a
+  `W0028` note (`cdl::unwritten`): Cadence CDL has no sections or
+  conditionals, and an include names a simulator's file, not CDL.
 
 ## Differences from the old pipeline the corpus does not reach
 
