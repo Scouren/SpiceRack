@@ -11,6 +11,8 @@ ESPice, VACASK), the written decks run and their numbers meet a closed form.
 """
 import math
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,7 +20,9 @@ import pytest
 TARGETS = ("ngspice", "espice", "hspice", "xyce", "ltspice", "spectre", "vacask", "cdl", "verilog")
 
 
-VA = Path(__file__).parent / "fixtures" / "verilog_a" / "va" / "varactor.va"
+# A copy: `veriloga()` compiles next to the source, which stays clean.
+VA = Path(tempfile.mkdtemp()) / "varactor.va"
+shutil.copy(Path(__file__).parent / "fixtures" / "verilog_a" / "va" / "varactor.va", VA)
 INV = "module inv(input a, output y); assign y = ~a; endmodule"
 
 
@@ -379,7 +383,6 @@ def h(f):
 
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
 def test_written_decks_meet_the_closed_form(backend):
-    import shutil
     if shutil.which(backend) is None:
         pytest.fail(f"{backend} not on PATH: run the tests in `nix develop .#testing`")
     mod = ps()
