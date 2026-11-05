@@ -221,8 +221,6 @@ reference does not):
   no SPICE output names (`read/named_bench.rs`).
 - P7-6. Spectre `dc dev=` and `noise iprobe=` name the source as written
   (`read/named_bench.rs`).
-- P7-8. CDL writes an instance with the old IR's letter rule (`Xx2` is
-  `x2`), not the map's `Xx2` (`spice/cdl.rs`).
 - SPICE input: a declaration's letter is uppercased (`vsense` is
   `Vsense`), a reference keeps its case: harmless (SPICE folds case), no
   fix needed. `v1` → `vv1` cannot arise in the SPICE writer: the map adds a

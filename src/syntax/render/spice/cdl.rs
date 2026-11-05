@@ -152,26 +152,19 @@ impl W<'_, '_> {
         format!("* error: {}", codes.join("; "))
     }
 
-    /// An `X` card as the old layout spelled an instance: `X` and the name
-    /// after its letter, unless that already starts with an `X`.
+    /// An `X` card, named as the map declares it (`names`: its letter, then
+    /// its name).
     fn cdl_instance(&self, n: u32) -> String {
         let Card::Inst {
-            name,
             ports,
             master,
             params,
+            ..
         } = self.rd.card_view(n)
         else {
             unreachable!("an instance the reader placed");
         };
-        // quirk: the old layout's letter rule (`Xx2` is `x2`), not the name
-        // map's; phase 7 writes the map's name.
-        let x = if name.starts_with(['x', 'X']) {
-            ""
-        } else {
-            "X"
-        };
-        let mut s = format!("{x}{name}");
+        let mut s = self.names.decl(n).to_string();
         for p in &ports {
             s.push(' ');
             s.push_str(p);

@@ -79,7 +79,6 @@ impl W<'_, '_> {
             .filter(|d| drops.contains(&d.code))
             .map(|d| (d.token, self.rd.line_last(d.token)))
             .collect();
-        eprintln!("DBG {dropped:?} {:?}", self.rd.ast.diags());
         let unread = [Code::P0002, Code::P0003, Code::P0008];
         let bad = self.rd.ast.diags().iter().find(|d| {
             unread.contains(&d.code) && !dropped.iter().any(|&(a, b)| (a..=b).contains(&d.token))

@@ -246,3 +246,17 @@ fn cdl_leaves_out_text_no_rule_read() {
         "{codes:?}"
     );
 }
+
+/// ngspice §2.4.3: an instance's name is the whole word, its letter
+/// included (`XX1` is `XX1`), as the name map declares every card. The old
+/// layout dropped a leading `X` of the name after the letter (`XX1` was
+/// `X1`, another instance's name here).
+#[test]
+fn cdl_names_an_instance_as_the_map_declares_it() {
+    let deck = "* t\n.subckt sub a\nR1 a 0 1k\n.ends\nXX1 n 0 sub\nX1 m 0 sub\n.end\n";
+    let w = write(deck, Dialect::Ngspice, Dialect::Cdl);
+    assert!(
+        w.contains("\nXX1 n 0 sub\n") && w.contains("\nX1 m 0 sub\n"),
+        "{w}"
+    );
+}

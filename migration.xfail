@@ -7062,3 +7062,11 @@ xyce/YLIN/ylin-5port-linAnalysis.cir cdl kept text left out (W0028), a kept elem
 xyce/YLIN/ylin-5port-yparam-cw.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-5port-yparam-ts1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-5port-yparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+
+# Phase 7: spice-write: CDL instance names (P7-8). An instance is named as
+# the name map declares it (its letter, then its name: `XX1` stays `XX1`),
+# not the old layout's rule, which dropped an `X` after the letter (`XX1`
+# was `X1`, which the deck may declare too).
+spice-bench/ngspice/examples/p-to-n-examples/switch-oscillators_inc.sp cdl XX1..XX17 keep their names (were X1..X17)
+spice-bench/ngspice/paranoia/pton/switch-oscillators_inc.sp cdl XX1..XX17 keep their names (were X1..X17)
+xyce/XDM/SPECTRE/MULTIPLICITY/rlc.cir cdl XX1 keeps its name (was X1)
