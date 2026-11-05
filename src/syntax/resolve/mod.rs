@@ -8,7 +8,7 @@
 //! Two passes, as Zig 0.17's AstGen does names (`scanContainer`,
 //! `localVarRef`): `declare` pre-scans every file's declarations (subcircuits,
 //! models and their bins, parameters, functions, sections) and its
-//! references, then `lookup` re-reads each file and binds each instance's
+//! references, and `verilog_a` each Verilog-A source's modules, then `lookup` re-reads each file and binds each instance's
 //! master, records each statement's scope, corrects the parser's node and
 //! model split where the kit's models say otherwise (a range terminal count,
 //! a model among an R/C/L card's arguments), and points each include at the
@@ -24,7 +24,8 @@
 //! Cites: Zig 0.17 `lib/std/zig/AstGen.zig` (resolves, never rewrites);
 //! ngspice manual §2.4.3 (`X`), §2.5 (`.subckt`), §2.6
 //! (`.include`), §2.7 (`.lib`), §2.15 (`.if`); Spectre UG p.66 (instances),
-//! p.94 (`subckt`), p.98 (`include`), p.108 (model groups), Spectre
+//! p.94 (`subckt`), p.98 (`include`), p.108 (model groups), p.118
+//! (`ahdl_include`), Spectre
 //! Reference 19.1 p.498 (`library`, `section`).
 //!
 //! Contents:
@@ -43,14 +44,13 @@
 //!   `Kit::node_count(&self, file: FileId) -> usize`
 //! - `Def::base(&self) -> &str`
 //! - `pub fn role(t: &Tokens, ast: &Ast) -> Role`
-//! - `pub(super) fn walk(ast: &Ast, visit: impl FnMut(u32, Scope, &[u32]))`,
-//!   `pub(super) fn key(name: &str, fold: bool) -> String`
+//! - `pub(super) fn key(name: &str, fold: bool) -> String`
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Component, Path, PathBuf};
 
 use crate::syntax::Dialect;
-use crate::syntax::ast::{Ast, NONE, Node, Tag};
+use crate::syntax::ast::{Ast, Node};
 use crate::syntax::device::Primitive;
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::token::Tokens;
@@ -58,6 +58,10 @@ use crate::syntax::{lexicon, parse, tokenize};
 
 mod declare;
 mod lookup;
+mod verilog_a;
+mod walk;
+
+use walk::walk;
 
 /// The deepest include chain a kit follows (an entry is depth 0); a deeper
 /// include is an `R0008` and not read. Interop's `spice::MAX_INCLUDE_DEPTH`.
@@ -184,6 +188,16 @@ pub enum DefKind {
     Func,
     /// A `.lib name` … `.endl` or Spectre/VACASK `section`.
     Section,
+    /// A Verilog-A module of a source an `ahdl_include` or VACASK `load`
+    /// names: its ports in header order and its `parameter` names (never a
+    /// `localparam`), never the defaults. Its [`Def::file`], `node` and
+    /// `scope` are the loading statement's, so it is seen where a
+    /// subcircuit declared there would be; a source loaded twice declares
+    /// its modules at each load.
+    VerilogA {
+        ports: Vec<String>,
+        params: Vec<String>,
+    },
 }
 
 /// A device's polarity.
@@ -258,21 +272,19 @@ struct Pending {
     /// entry).
     from: Option<(FileId, u32)>,
     depth: u8,
-    verilog_a: bool,
+    /// For a Verilog-A source, the statement that loads it: where its
+    /// modules are declared.
+    load: Option<Load>,
 }
 
-/// An open block of [`walk`].
-struct Open<'a> {
-    items: &'a [u32],
-    at: usize,
+/// A Verilog-A load statement: its file, node, scope and nearest subcircuit
+/// ([`Def::within`]).
+#[derive(Clone, Copy)]
+struct Load {
+    file: FileId,
+    node: Node,
     scope: Scope,
-    /// The scope around the block.
-    outer: Scope,
-    /// Whether the block is an `if` branch, whose chain's next follows it.
-    branch: bool,
-    /// Whether the block is a subcircuit.
-    subckt: bool,
-    node: u32,
+    within: u32,
 }
 
 /// What file `ast` (the parse of `t`) is when read alone: the rule
@@ -322,13 +334,17 @@ impl Kit {
                 path: normalize(e),
                 from: None,
                 depth: 0,
-                verilog_a: false,
+                load: None,
             })
             .collect();
 
         // Pass 1: read breadth first, each file's declarations and references.
         while let Some(p) = todo.pop_front() {
-            if seen.contains_key(&p.path) {
+            if let Some(&id) = seen.get(&p.path) {
+                let f = &kit.files[id.0 as usize];
+                if let (Some(at), Role::VerilogA) = (p.load, f.role) {
+                    declare_modules(&mut kit.defs, &f.text, at);
+                }
                 continue;
             }
             if kit.files.len() == FILES_MAX {
@@ -354,7 +370,9 @@ impl Kit {
                         });
                     }
                 }
-                Ok(text) if p.verilog_a => {
+                Ok(text) if p.load.is_some() => {
+                    let at = p.load.expect("a Verilog-A source's load");
+                    declare_modules(&mut kit.defs, &text, at);
                     file.role = Role::VerilogA;
                     file.text = text;
                 }
@@ -387,7 +405,12 @@ impl Kit {
                     path: normalize(&dir.join(&r.path)),
                     from: Some((id, r.token)),
                     depth: p.depth + 1,
-                    verilog_a: r.verilog_a,
+                    load: r.verilog_a.then_some(Load {
+                        file: id,
+                        node: Node(r.node),
+                        scope: r.scope,
+                        within: r.within,
+                    }),
                 });
             }
             refs.push(found);
@@ -453,7 +476,9 @@ impl Kit {
         &self.files[id.0 as usize]
     }
 
-    /// Every declaration, in read order: by file, then in source order.
+    /// Every declaration, in read order: by file, then in source order; a
+    /// Verilog-A module where its source is read (after its loading file's
+    /// declarations, under that file's [`FileId`]).
     pub fn definitions(&self) -> &[Def] {
         &self.defs
     }
@@ -511,52 +536,6 @@ impl Def {
     }
 }
 
-/// Visits every statement of `ast` in source order (a block's head, then
-/// its body, then a chain's next branch), with its [`Scope`] and the
-/// subcircuits around it, outermost first. A heap stack, so a file nested
-/// 10⁴ deep needs no deeper native stack than a flat one.
-pub(super) fn walk(ast: &Ast, mut visit: impl FnMut(u32, Scope, &[u32])) {
-    let mut stack = vec![Open {
-        items: ast.fields(ast.root()),
-        at: 0,
-        scope: Scope::Top,
-        outer: Scope::Top,
-        branch: false,
-        subckt: false,
-        node: 0,
-    }];
-    let mut chain: Vec<u32> = Vec::new();
-    while let Some(top) = stack.last_mut() {
-        if let Some(&n) = top.items.get(top.at) {
-            top.at += 1;
-            let scope = top.scope;
-            visit(n, scope, &chain);
-            if let Some(open) = opened(ast, n, scope) {
-                if open.subckt {
-                    chain.push(n);
-                }
-                stack.push(open);
-            }
-            continue;
-        }
-        let done = stack.pop().expect("the top frame");
-        if done.subckt {
-            assert_eq!(
-                chain.pop(),
-                Some(done.node),
-                "the chain ends in this subckt"
-            );
-        }
-        if done.branch
-            && let Some(next) = ast.next(Node(done.node))
-        {
-            visit(next.0, done.outer, &chain);
-            stack.extend(opened(ast, next.0, done.outer));
-        }
-    }
-    assert!(chain.is_empty(), "every subckt frame popped");
-}
-
 /// `name`'s lookup key: lowercased where the dialect folds case.
 pub(super) fn key(name: &str, fold: bool) -> String {
     if fold {
@@ -568,88 +547,6 @@ pub(super) fn key(name: &str, fold: bool) -> String {
 
 // ---- private ----
 
-/// The body statement `n` opens, if any, and the scope inside it.
-fn opened<'a>(ast: &'a Ast, n: u32, scope: Scope) -> Option<Open<'a>> {
-    let node = Node(n);
-    let tag = ast.tag(node);
-    if !has_body(tag) || ast.rhs(node) == NONE {
-        return None;
-    }
-    let inner = match tag {
-        Tag::Subckt => Scope::Subckt(node),
-        Tag::Section => Scope::Section(node),
-        Tag::If | Tag::Else => Scope::Branch(node),
-        // else: the other bodies are no scope of their own.
-        _ => scope,
-    };
-    Some(Open {
-        items: ast.body(node),
-        at: 0,
-        scope: inner,
-        outer: scope,
-        branch: matches!(tag, Tag::If | Tag::Else),
-        subckt: tag == Tag::Subckt,
-        node: n,
-    })
-}
-
-/// Whether a `tag` statement's `rhs` is a body when it is not `NONE`.
-fn has_body(tag: Tag) -> bool {
-    match tag {
-        Tag::Subckt
-        | Tag::Section
-        | Tag::Library
-        | Tag::If
-        | Tag::Else
-        | Tag::Control
-        | Tag::Region
-        | Tag::Data
-        | Tag::Func
-        | Tag::Model
-        | Tag::Analysis
-        | Tag::Command
-        | Tag::Statistics
-        | Tag::Process
-        | Tag::Card
-        | Tag::Instance => true,
-        Tag::Root
-        | Tag::Title
-        | Tag::End
-        | Tag::Verbatim
-        | Tag::Include
-        | Tag::LibCall
-        | Tag::Line
-        | Tag::Param
-        | Tag::Options
-        | Tag::Save
-        | Tag::Print
-        | Tag::Measure
-        | Tag::Ic
-        | Tag::Nodeset
-        | Tag::Temp
-        | Tag::Global
-        | Tag::Step
-        | Tag::Word
-        | Tag::Assign
-        | Tag::Group
-        | Tag::Seq
-        | Tag::Delimited
-        | Tag::Num
-        | Tag::Ident
-        | Tag::Str
-        | Tag::Unary
-        | Tag::Binary
-        | Tag::Ternary
-        | Tag::Call
-        | Tag::Probe
-        | Tag::Index
-        | Tag::Paren
-        | Tag::Vector
-        | Tag::List
-        | Tag::Bad => false,
-    }
-}
-
 impl Kit {
     /// Appends `code` at the statement `from` names; nothing for an entry.
     fn diag_from(&mut self, from: Option<(FileId, u32)>, code: Code) {
@@ -657,6 +554,23 @@ impl Kit {
             self.files[f.0 as usize].diags.push(Diag { code, token });
         }
     }
+}
+
+/// Declares each module of Verilog-A source `text` at load statement `at`.
+fn declare_modules(defs: &mut Vec<Def>, text: &str, at: Load) {
+    let before = defs.len();
+    defs.extend(verilog_a::modules(text).into_iter().map(|m| Def {
+        name: m.name,
+        kind: DefKind::VerilogA {
+            ports: m.ports,
+            params: m.params,
+        },
+        file: at.file,
+        node: at.node,
+        scope: at.scope,
+        within: at.within,
+    }));
+    assert!(defs[before..].iter().all(|d| d.file == at.file));
 }
 
 fn unread_code(e: LoadError) -> Code {

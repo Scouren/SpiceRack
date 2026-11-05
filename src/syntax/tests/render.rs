@@ -1,15 +1,20 @@
-//! The renderer over block nesting, kit answers and a given deck's `.step`:
-//! a deck nested 10⁴ deep in `.subckt`s and `.if`s is written in Debug,
-//! what `syntax::resolve` answers for a kit file reaches the deck written
-//! from it, a `.step log` is Spectre's sweep or refused, and a region's
-//! Spectre `montecarlo` is Spectre's and VACASK's `mc` or refused. Each test
-//! names its clause, the text derived by hand, and how many checks it
-//! makes.
+//! The renderer over block nesting, kit answers, numbers and a given
+//! deck's `.step`: a deck nested 10⁴ deep in `.subckt`s and `.if`s is
+//! written in Debug, what `syntax::resolve` answers for a kit file reaches
+//! the deck written from it, a number with each suffix of each reader,
+//! inside an expression, reads back as the same value in every target, a
+//! `.step log` is Spectre's sweep or refused, and a region's Spectre
+//! `montecarlo` is Spectre's and VACASK's `mc` or refused. Each test names
+//! its clause, the text derived by hand, and how many checks it makes.
 //!
 //! Contents: none (tests only).
 
 use crate::syntax::Dialect;
+use crate::syntax::lexicon::{self, Scale};
+use crate::syntax::render::spelling::spelling;
 use crate::syntax::render::{render_kit, render_text};
+use crate::syntax::token::Tag as T;
+use crate::syntax::tokenize;
 
 // ---- private ----
 
@@ -185,6 +190,77 @@ fn a_region_montecarlo_is_spectres_and_vacasks_mc_or_refused() {
         )
         .is_ok()
     );
+}
+
+#[test]
+fn numbers_in_expressions_read_back_in_every_target() {
+    // ngspice manual §2.1.3 (`M` milli, `meg` mega), Spectre (`M` mega,
+    // `m` milli: `lexicon::spectre`'s §2.4), HSPICE (`x` mega), LTspice
+    // (`µ` micro), VACASK (`meg` and `M` mega; each lexicon's table cites
+    // its manual): one reader's suffix is another's other scale,
+    // so Spectre `2*1M` written as ngspice `2*1M` is 2 milli. Each source
+    // reader's every suffix `s`, in `p<k> = 2*1<s>`, is written for every
+    // target, and the target's own reader reads the two numbers after
+    // `p<k>=` as 2 and the suffix's factor (its table row, by hand:
+    // `10^n`, `mil` 25.4e-6). Structural Verilog writes no parameters.
+    // Checks: one per source, suffix and target (75 suffixes, 8 targets:
+    // 600).
+    let mut checks = 0;
+    for d in [
+        Dialect::Ngspice,
+        Dialect::Hspice,
+        Dialect::Xyce,
+        Dialect::Ltspice,
+        Dialect::Spectre,
+        Dialect::Vacask,
+    ] {
+        let scales = lexicon::of(d).expect("a reader").numbers.scales;
+        let mut deck = String::from(match d {
+            Dialect::Spectre => "// t\nsimulator lang=spectre\n",
+            _ => "t\n",
+        });
+        for (k, (s, _)) in scales.iter().enumerate() {
+            let e = format!("2*1{s}");
+            deck.push_str(&match d {
+                Dialect::Spectre | Dialect::Vacask => format!("parameters p{k}={e}\n"),
+                Dialect::Hspice => format!(".param p{k}='{e}'\n"),
+                _ => format!(".param p{k}={{{e}}}\n"),
+            });
+        }
+        for target in Dialect::ALL.into_iter().filter(|&t| t != Dialect::Verilog) {
+            let w = render_text(&deck, d, "n", target).expect("written");
+            let lex = spelling(target).lexicon;
+            let t = tokenize(&w.text, lex);
+            let tags = t.tags();
+            for (k, &(s, scale)) in scales.iter().enumerate() {
+                let want = match scale {
+                    Scale::Exp(n) => format!("1e{n}").parse::<f64>().expect("a power of ten"),
+                    Scale::Mil => 25.4e-6,
+                };
+                let name = format!("p{k}");
+                let at = (0..tags.len() - 1)
+                    .find(|&i| {
+                        tags[i] == T::Ident
+                            && tags[i + 1] == T::Equal
+                            && t.text(i as u32).eq_ignore_ascii_case(&name)
+                    })
+                    .unwrap_or_else(|| panic!("{d:?} -> {target:?}: {name} in\n{}", w.text));
+                let got: Vec<f64> = (at + 2..tags.len())
+                    .filter(|&i| tags[i] == T::Number)
+                    .take(2)
+                    .map(|i| t.value(i as u32))
+                    .collect();
+                let close = |a: f64, b: f64| (a - b).abs() <= 1e-12 * b.abs();
+                assert!(
+                    got.len() == 2 && close(got[0], 2.0) && close(got[1], want),
+                    "{d:?} `2*1{s}` -> {target:?}: {got:?}, want [2, {want:e}]\n{}",
+                    w.text
+                );
+                checks += 1;
+            }
+        }
+    }
+    assert_eq!(checks, 600);
 }
 
 /// `text` read as the given deck (`lexicon::NGSPICE_GIVEN`, the Python

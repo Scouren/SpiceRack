@@ -215,6 +215,7 @@ fn kits_resolve() {
                         DefKind::Subckt { .. } => "subckt".into(),
                         DefKind::Model { kind, .. } => format!("model {kind:?}"),
                         DefKind::Param | DefKind::Func | DefKind::Section => "param/func".into(),
+                        DefKind::VerilogA { .. } => "verilog-a module".into(),
                     },
                     Some(Binding::Unknown) => {
                         unknown += 1;

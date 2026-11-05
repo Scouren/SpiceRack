@@ -296,7 +296,8 @@ impl<'a> Rd<'a> {
                 let ty = p.then_some(if word == "bjt" { "pnp" } else { "p" });
                 Some(Declared::Model(spectre_kind(word, ty).0))
             }
-            DefKind::Param | DefKind::Func | DefKind::Section => None,
+            // A Verilog-A module is written as an unknown master is.
+            DefKind::Param | DefKind::Func | DefKind::Section | DefKind::VerilogA { .. } => None,
         }
     }
 

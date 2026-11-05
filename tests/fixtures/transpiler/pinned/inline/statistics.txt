@@ -438,7 +438,7 @@ endc
 .param l__mm=l__mm_r
 .param w__mm_r={agauss(w, 10m, 1)}
 .param w__mm=w__mm_r
-R1 a b {w__mm*1meg+l__mm*1meg}
+R1 a b {w__mm*1m+l__mm*1m}
 .ends s1
 
 .subckt s2 a b
@@ -463,7 +463,7 @@ X2 a 0 s2
 .param l__mm=l__mm_r
 .param w__mm_r={agauss(w, 10m, 1)}
 .param w__mm=w__mm_r
-R1 a b {w__mm*1meg+l__mm*1meg}
+R1 a b {w__mm*1m+l__mm*1m}
 .ends s1
 
 .subckt s2 a b
@@ -488,7 +488,7 @@ X2 a 0 s2
 .param l__mm=l__mm_r
 .param w__mm_r='agauss(w, 10m, 1)'
 .param w__mm=w__mm_r
-R1 a b 'w__mm*1meg+l__mm*1meg'
+R1 a b 'w__mm*1m+l__mm*1m'
 .ends s1
 
 .subckt s2 a b
@@ -512,7 +512,7 @@ X2 a 0 s2
 .param l__mm=l__mm_r
 .param w__mm_r={agauss(w, 10m, 1)}
 .param w__mm=w__mm_r
-R1 a b {w__mm*1meg+l__mm*1meg}
+R1 a b {w__mm*1m+l__mm*1m}
 .ends s1
 
 .subckt s2 a b
@@ -572,7 +572,7 @@ parameters w=1u l=2u
 subckt s1 (a b)
 parameters m=w__mm*2
 parameters l__mm=aunif(l, 20m) w__mm=agauss(w, 10m, 1)
-  r1 (a b) resistor r=w__mm*1meg+l__mm*1meg
+  r1 (a b) resistor r=w__mm*1m+l__mm*1m
 ends
 
 subckt s2 (a b)

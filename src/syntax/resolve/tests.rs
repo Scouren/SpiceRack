@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::*;
-use crate::syntax::ast::Header;
+use crate::syntax::ast::{Header, Tag};
 
 const TOP_SCS: &str = "// top\nsimulator lang=spectre\ninclude \"lib.scs\"\nsubckt top (a b)\nx1 (a b) leaf w=1u\nx2 a b leaf w=2u\nm1 (a b 0 0) nch_mod w=1u\nf1 (a b) cccs probe=v1 gain=2\nends top\n";
 const LIB_SCS: &str = "// lib\nsimulator lang=spectre\nsubckt leaf (p n)\nr0 (p n) resistor r=1k\nends leaf\nmodel nch_mod bsim4 type=n\n";
@@ -437,5 +437,63 @@ fn nesting_ten_thousand_deep_resolves_without_recursion() {
         Dialect::Ngspice,
     );
     assert_eq!(def_name(&k, bound(&k, 0, "M1")).0, "m");
+    assert!(codes(&k, 0).is_empty());
+}
+
+#[test]
+fn verilog_a_modules_are_masters_in_the_loading_scope() {
+    // Spectre UG p.118: `ahdl_include` loads a Verilog-A source; p.66: an
+    // instance's master may be one of its modules. IEEE 1364-2005 §12.1:
+    // the module's ports in header order. The module `vdev` is declared at
+    // the load, so `x1` binds; `inner` is loaded inside subckt `w`, so
+    // `x3` inside it binds and `x4` outside does not (R0001); `x2` gives
+    // two nodes to a three-port module (R0004). Checks: 6.
+    let deck = "t\nahdl_include \"dev.va\"\n\
+        x1 (a 0) vdev g=1\nx2 (a 0) tri\n\
+        subckt w (p n)\nahdl_include \"inner.va\"\nx3 (p n) inner\nends w\n\
+        x4 (a 0) inner\n";
+    let va = "module vdev(inout electrical a, inout electrical b);\n\
+        parameter real g = 1 from (0:inf);\nlocalparam real h = 2;\nendmodule\n\
+        module tri(a, b, c); inout a, b, c;\nendmodule\n";
+    let k = kit(
+        &[
+            ("/d.scs", deck),
+            ("/dev.va", va),
+            ("/inner.va", "module inner(p, n);\nendmodule\n"),
+        ],
+        "/d.scs",
+        Form::Deck,
+        Dialect::Spectre,
+    );
+    let (name, kind) = def_name(&k, bound(&k, 0, "x1"));
+    assert_eq!(name, "vdev");
+    assert_eq!(
+        kind,
+        &DefKind::VerilogA {
+            ports: vec!["a".into(), "b".into()],
+            params: vec!["g".into()],
+        }
+    );
+    assert_eq!(def_name(&k, bound(&k, 0, "x2")).0, "tri");
+    assert_eq!(def_name(&k, bound(&k, 0, "x3")).0, "inner");
+    assert_eq!(bound(&k, 0, "x4"), Binding::Unknown);
+    assert_eq!(codes(&k, 0), [Code::R0004, Code::R0001]);
+}
+
+#[test]
+fn a_verilog_a_source_loaded_twice_declares_at_each_load() {
+    // A kit reads each file once (by path); a second `ahdl_include` of the
+    // same source still declares its modules where it stands, here inside
+    // a second subcircuit. Checks: 3.
+    let deck = "t\nsubckt a1 (p n)\nahdl_include \"m.va\"\nx1 (p n) m\nends a1\n\
+        subckt a2 (p n)\nahdl_include \"m.va\"\nx2 (p n) m\nends a2\n";
+    let k = kit(
+        &[("/d.scs", deck), ("/m.va", "module m(p, n);\nendmodule\n")],
+        "/d.scs",
+        Form::Deck,
+        Dialect::Spectre,
+    );
+    assert_eq!(def_name(&k, bound(&k, 0, "x1")).0, "m");
+    assert_eq!(def_name(&k, bound(&k, 0, "x2")).0, "m");
     assert!(codes(&k, 0).is_empty());
 }

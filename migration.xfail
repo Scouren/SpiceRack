@@ -575,3 +575,24 @@ pdk-sky130A/libs.tech/combined/corners/all.spice spectre now written: `.options 
 pdk-sky130A/libs.tech/combined/corners/all.spice vacask now written: `scale` is VACASK's `options scale` (the `$simparam("scale")` its sp_* modules read), `.options parser` Xyce's option package (W0024), the repeated `scale` its last value; was refused (an option VACASK lacks)
 pdk-sky130A/libs.tech/combined/parameters/montecarlo.spice spectre now written: `.options parser` is Xyce's option package, which ngspice-45 takes as an unused flag (W0024), and the repeated `scale` keeps its last value; was refused (a flag Spectre cannot spell)
 pdk-sky130A/libs.tech/combined/parameters/montecarlo.spice vacask now written: `scale` is VACASK's `options scale` (the `$simparam("scale")` its sp_* modules read), `.options parser` Xyce's option package (W0024), the repeated `scale` its last value; was refused (an option VACASK lacks)
+
+# Phase 7: suffixes in expressions (render::read::unlift, `Rd::write_for`):
+# a number inside an expression is respelled in the target's suffixes
+# where the target's reader would read its spelling as another value or
+# as no number, as a standalone value already is (Spectre `2*1M`, 2 mega,
+# was written for ngspice as `2*1M`, 2 milli). Every line below keeps its
+# value; none of the corpora holds a Spectre `M` or a SPICE `meg` inside
+# an expression crossing dialects. Per set: ltspice 9, xyce 4.
+ltspice/ltspice_demos/LT3724.net cdl {.001µ/5} is {1n/5}: ngspice's reader has no µ (was {.001u/5}, µ replaced as text)
+ltspice/ltspice_demos/LTC3125_DC1267A.net cdl {2200µ/20} is {2.2m/20}: ngspice's reader has no µ (was {2200u/20})
+ltspice/ltspice_demos/LTC3452.net cdl {.1µ/5} is {100n/5}: ngspice's reader has no µ (was {.1u/5})
+ltspice/ltspice_demos/LTC3606B.net cdl {2200µ/10} is {2.2m/10}: ngspice's reader has no µ (was {2200u/10})
+ltspice/ltspice_demos/LTC3619B_DC1489A.net cdl {2200µ/10} is {2.2m/10}: ngspice's reader has no µ (was {2200u/10})
+ltspice/ltspice_demos/LTC3835-1_LT3580.net cdl {0.01µ/10} is {10n/10} (twice): ngspice's reader has no µ (was {0.01u/10})
+ltspice/ltspice_examples/3705.net cdl {.047µ/5} and {.018µ/2.5} are {47n/5} and {18n/2.5}: ngspice's reader has no µ
+ltspice/ltspice_examples/3724.net cdl {.0015µ/10} is {1.5n/10}: ngspice's reader has no µ (was {.0015u/10})
+ltspice/ltspice_examples/3800.net cdl {.0015µ/10} is {1.5n/10}: ngspice's reader has no µ (was {.0015u/10})
+xyce/PARAMS2/Params_C4.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (case-blind), Spectre's scales are case-sensitive and have no F
+xyce/PARAMS2/Params_C4_hs.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (case-blind), Spectre's scales are case-sensitive and have no F
+xyce/PARAMS2/Params_C5.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
+xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale

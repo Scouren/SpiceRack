@@ -118,6 +118,7 @@ pub enum Reference {
 pub fn render(src: &Source, target: Dialect) -> Result<Written, Diags> {
     assert!(writes(target), "render: a target with a writer");
     let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.dialect, src.name, src.kit);
+    rd.write_for(target);
     deck.given_loads = src.loads.to_vec();
     deck.numbers = src.numbers;
     let (text, written) = match target {

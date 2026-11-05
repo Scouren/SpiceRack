@@ -9,25 +9,34 @@
 //! with a writer's `Lift` fixups ([`Fix`]: a token respelled,
 //! [`Rd::respell_token`]; a statistical call rewritten, [`Rd::lift_call`];
 //! a `.func` call inlined, [`Rd::inline_call`]), one table keyed by token,
-//! recorded before the writer writes.
+//! recorded before the writer writes; and every number token in the
+//! target's suffixes where the target would read its spelling as another
+//! value (Spectre `2*1M`, 2 mega, is ngspice's `2*1meg`; [`Rd::write_for`]).
 //!
-//! Cites: the `rack_*` functions of `render::named::lift`; the old writer's `statistics::unlift`, which did this over the IR's text.
+//! Cites: the `rack_*` functions of `render::named::lift`; the old writer's `statistics::unlift`, which did this over the IR's text;
+//! ngspice manual §2.1.3 and the Spectre lexicon's §2.4 (scale factors: `M` is milli in one and mega in the other).
 //!
 //! Contents:
 //! - `pub(super) struct Unlift`, `pub(in crate::syntax::render) enum Fix`, `enum Lift`, `enum Step`
 //! - `Rd::unlift(&mut self, deck: &mut Deck)`
 //! - `Rd::etext(&self, n: u32) -> String`, `Rd::espan(&self, a: u32, b: u32) -> String`,
 //!   `Rd::unlifted_var(&self, p: &str) -> bool`
-//! - `Rd::respell_token(&mut self, k: u32, text: String)`, `Rd::lift_call(&mut self, name: u32, l: Lift)`,
+//! - `Rd::write_for(&mut self, target: Dialect)`,
+//!   `Rd::respell_token(&mut self, k: u32, text: String)`, `Rd::lift_call(&mut self, name: u32, l: Lift)`,
 //!   `Rd::inline_call(&mut self, name: u32, steps: Vec<(u32, Step)>)`,
 //!   `Rd::unlifted_call(&self, name: u32) -> Option<(&'static str, u32)>`,
 //!   `Rd::value_roots(&self, b: &Block, out: &mut Vec<u32>)`
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use super::{Block, Comp, Deck, Func, Rd};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::lexicon::Lexicon;
+use crate::syntax::number;
+use crate::syntax::render::spelling::spelling;
+use crate::syntax::token::Tag as T;
 
 /// The fixups of the read-back rule.
 #[derive(Default)]
@@ -229,15 +238,35 @@ impl<'a> Rd<'a> {
     /// the statistical call (`rack_agauss(1k, 100, 3, v)` is
     /// `agauss(1k, 100, 3)`).
     pub(in crate::syntax::render) fn etext(&self, n: u32) -> String {
-        if self.unlifted.calls.is_empty() && self.fixes.is_empty() {
+        let (a, b) = (self.first(n), self.last(n));
+        let fixed = !(self.unlifted.calls.is_empty() && self.fixes.is_empty());
+        if !fixed && (self.target.is_none() || self.one_number(a, b)) {
             return self.text(n);
         }
-        self.espan(self.first(n), self.last(n))
+        self.espan(a, b)
     }
 
     /// Whether the read-back rule dropped `vary` rows of variable `p`.
     pub(super) fn unlifted_var(&self, p: &str) -> bool {
         self.unlifted.used.contains(p)
+    }
+
+    /// Every number token [`Rd::etext`] and [`Rd::espan`] spell from here on
+    /// (each `Num` node's) is spelled as `target` reads it: as written where
+    /// `target` reads the same value from it, or none and the number has a
+    /// unit tail (the target's reader then says so; Xyce's `2.0J` is
+    /// imaginary), else in `target`'s suffixes
+    /// ([`Spelling::format`](crate::syntax::render::spelling::Spelling::format)),
+    /// or as `2e12` where no suffix survives the VACASK writer's lowercasing.
+    /// A value that is one number, signed or delimited (`{1meg}`, `-2M`),
+    /// is kept as written: the writers read it whole and respell it as a
+    /// standalone value. A writer calls this before it writes.
+    pub(in crate::syntax::render) fn write_for(&mut self, target: Dialect) {
+        assert!(self.target.is_none(), "one target a read");
+        self.target = Some(spelling(target));
+        let nums = (0..self.ast.len() as u32).filter(|&n| self.ast.tag(Node(n)) == Tag::Num);
+        self.nums = nums.map(|n| self.main(n)).collect();
+        self.nums.sort_unstable();
     }
 
     /// Token `k` of a value is spelled `text` wherever [`Rd::etext`] spells
@@ -289,6 +318,9 @@ impl<'a> Rd<'a> {
     /// Tokens `a..=b` as [`Rd::span`] joins them, the read-back's calls
     /// spelled as their statistical call and a writer's fixups applied.
     pub(in crate::syntax::render) fn espan(&self, a: u32, b: u32) -> String {
+        if self.one_number(a, b) {
+            return self.span(a, b);
+        }
         self.spell(a, b, None)
     }
 
@@ -320,6 +352,58 @@ impl<'a> Rd<'a> {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// Whether tokens `a..=b` are one number, signed or in expression
+    /// delimiters, and nothing else.
+    fn one_number(&self, a: u32, b: u32) -> bool {
+        let mut numbers = 0;
+        for k in a..=b {
+            match self.ttag(k) {
+                T::Number => numbers += 1,
+                T::LBrace | T::RBrace | T::Quote | T::DoubleQuote | T::Plus | T::Minus => {}
+                // else: any other token makes an expression.
+                _ => return false,
+            }
+        }
+        numbers == 1
+    }
+
+    /// Token `k`'s text, a number as [`Rd::write_for`] spells it.
+    fn number_token(&self, k: u32) -> Cow<'a, str> {
+        let text = self.t.text(k);
+        let lex = self.t.lexicon_at(k);
+        let Some(sp) = self.target else {
+            return text.into();
+        };
+        let num = self.ttag(k) == T::Number && self.nums.binary_search(&k).is_ok();
+        if !num || lex.dialect == sp.lexicon.dialect {
+            return text.into();
+        }
+        let v = self.t.value(k);
+        // VACASK's writer lowercases another dialect's expressions (its
+        // names are case-sensitive, SPICE's not: `named::vacask`'s
+        // `W::expr`), so a spelling must read the same lowercased.
+        let folds = sp.target == Dialect::Vacask;
+        // An ulp between two dialects' arithmetic is no misreading; a
+        // suffix read another way is a factor of 10 or more.
+        let reads = |s: &str| {
+            let close = |s: &str| {
+                let r = number::value(s, sp.lexicon);
+                (r - v).abs() <= 1e-12 * v.abs()
+            };
+            close(s) && (!folds || close(&s.to_ascii_lowercase()))
+        };
+        let unread = number::value(text, sp.lexicon).is_nan();
+        if v.is_nan() || reads(text) || (unread && !tail_free(text, lex)) {
+            return text.into();
+        }
+        // VACASK's giga and tera are capitals only: their exponent form.
+        let spelled = [sp.format(v), format!("{v:e}")]
+            .into_iter()
+            .find(|s| reads(s))
+            .expect("an exponent form reads back in every target");
+        spelled.into()
+    }
+
     /// The `)` closing the call whose name is token `name`.
     fn call_close(&self, name: u32) -> u32 {
         let mut depth = 0i32;
@@ -405,7 +489,7 @@ impl<'a> Rd<'a> {
                     k += 1;
                 }
                 (None, None, _) => {
-                    out.push_str(self.t.text(k));
+                    out.push_str(&self.number_token(k));
                     k += 1;
                 }
             }
@@ -487,4 +571,28 @@ fn all_blocks(deck: &Deck) -> Vec<&Block> {
         );
     }
     out
+}
+
+/// Whether number `text` is a mantissa, an exponent and at most one scale
+/// suffix of `lex`, with no unit tail (`1t`, `2.5e3`; not `2.0J`, `5V`).
+fn tail_free(text: &str, lex: &Lexicon) -> bool {
+    let b = text.as_bytes();
+    let digits = |q: usize| b[q..].iter().take_while(|c| c.is_ascii_digit()).count();
+    let mut q = b
+        .iter()
+        .take_while(|c| c.is_ascii_digit() || **c == b'.')
+        .count();
+    if b.get(q).is_some_and(|c| lex.numbers.exponent.contains(c)) {
+        let sign = usize::from(matches!(b.get(q + 1), Some(b'+' | b'-')));
+        let e = digits(q + 1 + sign);
+        if e > 0 {
+            q += 1 + sign + e;
+        }
+    }
+    let rest = &text[q..];
+    let scale = |s: &str| match lex.fold_case {
+        true => s.eq_ignore_ascii_case(rest),
+        false => s == rest,
+    };
+    rest.is_empty() || lex.numbers.scales.iter().any(|(s, _)| scale(s))
 }
