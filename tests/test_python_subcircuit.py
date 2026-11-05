@@ -1099,6 +1099,23 @@ class TestTestbenchCheckBackend:
         issues = tb.check_backend("ngspice")
         assert len(issues) == 0
 
+def test_a_stored_testbench_keeps_each_targets_library_path():
+    # Round trip: the bench read back from its store writes the netlists the
+    # bench that wrote it gave, for every target with its own path.
+    ps = import_spicerack()
+    dut = ps.Subcircuit("d", ["a"])
+    dut.R("1", "a", dut.gnd, 1e3)
+    tb = ps.Testbench(dut)
+    tb.use_pdk(ps.ModelLibrary("/ng/models.lib", corner="tt", setup_includes=["/ng/setup.inc"], spectre="/sp/models.scs"))
+    tb.add_operating_point()
+    text = tb.to_source()
+    back = ps.Testbench.from_source(text)
+    for target in ("ngspice", "spectre", "vacask", "hspice"):
+        assert back.netlist(target) == tb.netlist(target), target
+    assert "/sp/models.scs" in back.netlist("spectre")
+    assert back.to_source() == text
+
+
 # ── ModelLibrary Tests ──
 
 

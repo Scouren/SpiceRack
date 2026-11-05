@@ -308,7 +308,8 @@ impl PyTestbench {
     fn from_source(py: Python<'_>, text: &str, dialect: Option<&str>) -> PyResult<Py<Self>> {
         let d = dialect.map(str::parse).transpose().map_err(PyValueError::new_err)?;
         let top = super::store::read_deck(text, d).map_err(PyValueError::new_err)?;
-        let deck = Deck { top, bench: Some(Default::default()), ..Default::default() };
+        let libraries = super::store::libraries(text);
+        let deck = Deck { top, libraries, bench: Some(Default::default()), ..Default::default() };
         let sim = PySimulator { deck, backend: None, save_currents: false };
         Py::new(py, PyClassInitializer::from(sim).add_subclass(Self {}))
     }
@@ -416,6 +417,7 @@ impl PyModelLibrary {
                 corner: corner.map(str::to_string),
                 backend_paths: bp,
                 setup_includes: setup_includes.unwrap_or_default(),
+                placed: false,
             },
         })
     }

@@ -32,6 +32,7 @@
 //! - `pub(super) fn region_dialect(name: &str) -> Result<Dialect, String>`
 //! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`
 
+use std::borrow::Cow;
 use std::fmt::Write as _;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -83,13 +84,23 @@ impl Deck {
     }
 
     /// The deck's stored source (`store::with_loads`): its ngspice text,
-    /// a model library at its ngspice path.
+    /// a model library at its ngspice path behind the store's line of its
+    /// every path (`store::library_marker`).
     pub(super) fn to_source(&self) -> PyResult<String> {
         let deck = self.lowered()?;
         let text = deck
             .source(Dialect::Ngspice)
             .map_err(PyRuntimeError::new_err)?;
-        Ok(super::store::with_loads(&text, &deck.top.osdi))
+        let mut out = String::with_capacity(text.len() + 256);
+        let mut fresh: Vec<&ModelLibrary> = deck.libraries.iter().filter(|l| !l.placed).collect();
+        for l in text.lines() {
+            if let Some(i) = fresh.iter().position(|lib| lib.line(&lib.path) == l) {
+                out.push_str(&super::store::library_marker(fresh.remove(i)));
+            }
+            out.push_str(l);
+            out.push('\n');
+        }
+        Ok(super::store::with_loads(&out, &deck.top.osdi))
     }
 
     /// `backend::check` as `"Severity: message"` lines, then the writer's
@@ -286,18 +297,11 @@ impl Deck {
             );
         }
         file_cards(&mut out, &self.top);
-        for lib in &self.libraries {
+        for lib in self.libraries.iter().filter(|l| !l.placed) {
             for s in &lib.setup_includes {
                 line(&mut out, &format!(".include {s}"));
             }
-            let path = lib
-                .backend_paths
-                .get(d.family().name())
-                .unwrap_or(&lib.path);
-            match &lib.corner {
-                Some(corner) => line(&mut out, &format!(".lib {path} {corner}")),
-                None => line(&mut out, &format!(".include {path}")),
-            }
+            line(&mut out, &lib.line(lib.path_for(d)));
         }
         for (k, v) in &self.top.params {
             line(&mut out, &format!(".param {k}={v}"));
@@ -322,7 +326,23 @@ impl Deck {
             body(&mut out, sc);
             line(&mut out, &format!(".ends {}", sc.name));
         }
-        body(&mut out, &self.top);
+        let mut top = Cow::Borrowed(&self.top);
+        for lib in self.libraries.iter().filter(|l| l.placed) {
+            let (given, wanted) = (lib.line(&lib.path), lib.line(lib.path_for(d)));
+            for l in top
+                .to_mut()
+                .raw
+                .iter_mut()
+                .filter(|l| l.lines().any(|x| x == given))
+            {
+                *l = l
+                    .lines()
+                    .map(|x| if x == given { wanted.as_str() } else { x })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+            }
+        }
+        body(&mut out, &top);
         if let Some(tb) = &self.bench {
             bench(&mut out, tb, d)?;
         }
