@@ -8,6 +8,7 @@
 //! (`analysis`, `sweep`, `options`).
 //!
 //! Contents:
+//! - `fn spectre_refusal(target: Dialect, kind: &str) -> Code`
 //! - `Rd::bench_cards(&self, b: Bench) -> Vec<BenchCard>`
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
 //! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
@@ -15,8 +16,33 @@
 
 use super::named_elements::unquoted;
 use super::{Ana, Bench, BenchCard, Opt, Rd, Sweep};
+use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::diag::Code;
 use crate::syntax::token::Tag as T;
+
+/// What `target` refuses a Spectre analysis of keyword `kind`
+/// ([`Ana::Spectre`]) with: `W0015` when it has no analysis of the kind,
+/// `W0001` (the statement kept as Spectre text) when it has one this
+/// reader does not translate. ngspice: `.pz`, `.sp`, `.sens` (manual
+/// ch.15; ngspice-45 runs no `.pss`); HSPICE: `.pz`, `.sens`, `.lin`,
+/// `.hb`, an analysis's `sweep` and `monte=`; Xyce: `.hb`, `.lin`, `.sens`,
+/// `.step`, `.sampling` (RG Table 6-1); LTspice: `.step`; VACASK: `hb`,
+/// `sweep`, `acxf`, `mc` (`docs/analysis_types.md`).
+pub(in crate::syntax::render) fn spectre_refusal(target: Dialect, kind: &str) -> Code {
+    let has: &[&str] = match target {
+        Dialect::Ngspice | Dialect::Espice => &["pz", "sp", "sens"],
+        Dialect::Hspice => &["pz", "sens", "sp", "hb", "sweep", "montecarlo"],
+        Dialect::Xyce => &["hb", "sp", "sens", "sweep", "montecarlo"],
+        Dialect::Ltspice => &["sweep"],
+        Dialect::Vacask => &["hb", "sweep", "xf", "montecarlo"],
+        Dialect::Spectre | Dialect::Cdl | Dialect::Verilog => &[],
+    };
+    match has.contains(&kind) {
+        true => Code::W0001,
+        false => Code::W0015,
+    }
+}
 
 impl<'a> Rd<'a> {
     /// What testbench item `b` adds, in order; empty when the IR held
@@ -86,7 +112,7 @@ impl<'a> Rd<'a> {
                 max_step: num("maxstep"),
                 uic: s("skipdc").as_deref() == Some("yes"),
             },
-            ("montecarlo", []) => self.montecarlo(n)?,
+            ("montecarlo", []) if self.montecarlo(n).is_some() => self.montecarlo(n)?,
             ("noise", [out, reference]) => Ana::Noise {
                 output: out.clone(),
                 reference: reference.clone(),
@@ -94,6 +120,34 @@ impl<'a> Rd<'a> {
                 sweep: sweep()?,
                 pps: None,
             },
+            // `[CMP]` p.790: poles and zeros from the `iprobe` source to
+            // the output terminals; ngspice's `.pz` takes the source's
+            // nodes as its input, `vol` for a voltage source, `cur` for a
+            // current one (manual §15.3.6).
+            ("pz", [o1, o2]) if p.len() == 1 => {
+                let src = s("iprobe")?;
+                let scope = self.scope_of.get(&n).copied().unwrap_or(NONE);
+                let &k = self.insts.get(&(scope, src))?;
+                let super::Card::Source { letter, np, nm, .. } = self.named_inst(k)? else {
+                    return None;
+                };
+                let tf = if letter == 'V' { "vol" } else { "cur" };
+                Ana::Pz([np, nm, o1.clone(), o2.clone()], tf, "pz")
+            }
+            // `[CMP]` p.826: with no `ports`, every port is active, as
+            // ngspice's `.sp` takes every `portnum` source.
+            ("sp", [])
+                if p.iter()
+                    .all(|(k, _)| ["start", "stop", "dec", "lin", "log"].contains(&k.as_str())) =>
+            {
+                Ana::Sp(sweep()?)
+            }
+            // A form of the analyses above the IR does not read stays text;
+            // any other analysis is the Spectre family's own.
+            ("dc" | "ac" | "tran" | "noise" | "sp" | "pz", _) => return None,
+            _ if self.text_dialect(self.main(n)) == Dialect::Spectre => {
+                Ana::Spectre { kind, node: n }
+            }
             _ => return None,
         })
     }

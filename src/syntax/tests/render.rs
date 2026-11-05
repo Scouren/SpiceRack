@@ -193,6 +193,57 @@ fn a_region_montecarlo_is_spectres_and_vacasks_mc_or_refused() {
 }
 
 #[test]
+fn a_region_spectre_analysis_is_written_by_spectre_and_refused_by_cause() {
+    // The Python API's Spectre-only analyses (`src/python/analysis.rs`)
+    // in a given deck's spectre region: Spectre writes each as read (a
+    // `pss` before its `pac`, Spectre Reference 5.0 p.771, p.748); a target
+    // with no such analysis refuses it `W0015` (ngspice ch.15 has no
+    // stability, harmonic balance or periodic small-signal analysis;
+    // ngspice-45 runs no `.pss`), one with it untranslated `W0001` (Xyce
+    // RG `.HB`); VACASK has no `stb` (`docs/analysis_types.md`). A
+    // region `sp` over every port is ngspice's `.sp` ([CMP] p.826).
+    let deck = |a: &str| {
+        format!(
+            "t\nV1 a 0 dc 0 ac 1\nR1 a 0 1k\nsimulator lang=spectre\n{a}\nsimulator lang=spice\n.end\n"
+        )
+    };
+    let stb = deck("stb1 stb start=1 stop=1M dec=10 probe=v1");
+    let spectre = given(&stb, Dialect::Spectre).expect("written");
+    assert!(
+        spectre
+            .lines()
+            .any(|l| l == "stb1 stb start=1 stop=1M dec=10 probe=v1"),
+        "{spectre}"
+    );
+    for t in [Dialect::Ngspice, Dialect::Vacask, Dialect::Ltspice] {
+        assert!(
+            given(&stb, t).expect_err("refused").contains("W0015"),
+            "{t:?}"
+        );
+    }
+    let pac = deck(
+        "pss1 pss fund=1M tstab=0 harms=5\npac1 pac start=1 stop=1M dec=10 sweeptype=relative",
+    );
+    let spectre = given(&pac, Dialect::Spectre).expect("written");
+    let at = |w: &str| spectre.find(w).unwrap_or_else(|| panic!("{w}\n{spectre}"));
+    assert!(at("pss1 pss fund=1M") < at("pac1 pac start=1"), "{spectre}");
+    let hb = deck("hb1 hb fundfreqs=[1M] maxharms=[5]");
+    assert!(
+        given(&hb, Dialect::Ngspice)
+            .expect_err("refused")
+            .contains("W0015")
+    );
+    assert!(
+        given(&hb, Dialect::Xyce)
+            .expect_err("refused")
+            .contains("W0001")
+    );
+    let sp = deck("sp1 sp start=1k stop=10k dec=2");
+    let ng = given(&sp, Dialect::Ngspice).expect("written");
+    assert!(ng.lines().any(|l| l == ".sp dec 2 1000 10000"), "{ng}");
+}
+
+#[test]
 fn numbers_in_expressions_read_back_in_every_target() {
     // ngspice manual §2.1.3 (`M` milli, `meg` mega), Spectre (`M` mega,
     // `m` milli: `lexicon::spectre`'s §2.4), HSPICE (`x` mega), LTspice

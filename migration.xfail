@@ -606,3 +606,26 @@ xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `retu
 # merges). Per set: fixtures 2 (one input).
 fixtures/tests/fixtures/transpiler/f1.scs spectre b1, b2, b3 now B sources (W0102 until gap-named-write's bsource writer); were Spectre text copied as written (W0027)
 fixtures/tests/fixtures/transpiler/f1.scs cdl b1, b2, b3 now B cards (B1 a b V=v(a,b)*2 …) among the elements; were Spectre text copied after them
+
+# Phase 7: spectre-read: analyses (render::read::named_bench, `Ana::Spectre`).
+# A Spectre `name master … {` analysis is read, not kept as a block: a
+# `montecarlo` over one analysis is `Ana::MonteCarlo` (Spectre writes it
+# after the deck's other analyses, its body indented as read; VACASK its
+# `mc` loop, or W0115), any other Spectre-only analysis `Ana::Spectre`
+# (Spectre writes it as read; elsewhere W0015 where the target has no such
+# analysis, W0001 where it has one not translated). CDL no longer copies
+# the analysis as text. Per set: fixtures 18 (five inputs, the T-S decks).
+fixtures/tests/spectre/t_s2_agauss.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s2_agauss.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s2_agauss.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s2_aunif.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s2_aunif.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s2_aunif.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s2_limit.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s2_limit.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s2_limit.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s3_nested.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s3_nested.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s3_nested.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s3_mismatch.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s3_mismatch.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text

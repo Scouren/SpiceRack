@@ -64,6 +64,7 @@ mod walk;
 
 pub(in crate::syntax::render) use cards::Model;
 pub(in crate::syntax::render) use elements::Card;
+pub(in crate::syntax::render) use named_bench::spectre_refusal;
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
@@ -511,15 +512,16 @@ impl<'a> Rd<'a> {
             Tag::Verbatim | Tag::Line => self.unparsed(n, here),
             // A region of another dialect's text (`lexicon::NGSPICE_GIVEN`):
             // kept as that dialect's text, which only it writes; but a
-            // Spectre `montecarlo` over one analysis at the top is an
-            // analysis (`Ana::MonteCarlo`), which VACASK spells as its `mc`.
+            // Spectre analysis at the top is an analysis (`Ana`), which
+            // each target spells or refuses (VACASK's `mc` for a
+            // `montecarlo`).
             Tag::Region => {
                 for &k in self.body(n) {
-                    let mc = scope == Scope::Top
+                    let ana = scope == Scope::Top
                         && self.text_dialect(self.main(k)) == Dialect::Spectre
                         && self.tag(k) == Tag::Analysis
-                        && matches!(self.spectre_analysis(k), Some(Ana::MonteCarlo { .. }));
-                    match mc {
+                        && self.spectre_analysis(k).is_some();
+                    match ana {
                         true => acc.bench.push(Bench::Analysis(k)),
                         false => here.raw.push(Raw::Lines(k)),
                     }

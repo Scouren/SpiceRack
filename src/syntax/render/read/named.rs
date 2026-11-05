@@ -229,7 +229,8 @@ impl<'a> Rd<'a> {
         acc: &mut Acc,
     ) -> Option<Opened> {
         let tag = self.tag(n);
-        if tag.has_header() && self.ast.rhs(Node(n)) != NONE {
+        let block = tag.has_header() && self.ast.rhs(Node(n)) != NONE;
+        if block && tag != Tag::Analysis {
             // quirk: the old Spectre grammar's `Block`: a `name master … {`
             // statement is kept whole, its body unread.
             self.raw(n, here, true);
@@ -267,8 +268,8 @@ impl<'a> Rd<'a> {
             | Tag::Options => {
                 let ok = self.named_statement(n, here, scope == Scope::Top, acc);
                 if !ok {
-                    let block =
-                        matches!(tag, Tag::Card | Tag::Model) && self.ast.rhs(Node(n)) != NONE;
+                    let block = matches!(tag, Tag::Card | Tag::Model | Tag::Analysis)
+                        && self.ast.rhs(Node(n)) != NONE;
                     self.raw(n, here, block || matches!(tag, Tag::Region | Tag::Control));
                 }
             }

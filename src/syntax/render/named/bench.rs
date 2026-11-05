@@ -401,6 +401,8 @@ impl W<'_, '_> {
                 }
                 format!("{s} {{\n  {inner} {kind}\n}}")
             }
+            // Spectre's own analysis, as read.
+            Ana::Spectre { node, .. } => self.rd.lines(*node).join("\n"),
         })
     }
 

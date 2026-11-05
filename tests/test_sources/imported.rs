@@ -352,3 +352,85 @@ fn a_spectre_port_is_ngspices_rf_port_with_the_source_behind_it() {
         assert!((a - want).abs() < 1e-9, "{a}, want {want}\n{deck}");
     }
 }
+
+#[test]
+fn a_spectre_sp_over_its_ports_is_ngspices_sp() {
+    // `[CMP]` p.826: no `ports`, so every port is active, numbered by
+    // `num`. Closed form: the matched 50 Ω T pad of loss K = 2 (R1 = R2 =
+    // Z0(K-1)/(K+1), R3 = 2·Z0·K/(K²-1)) has S11 = 0, S21 = 1/K.
+    let src = "// sp\nsimulator lang=spectre\n\
+        p1 (in 0) port num=1 r=50\np2 (out 0) port num=2 r=50\n\
+        r1 (in mid) resistor r=16.666666666666668\nr2 (mid out) resistor r=16.666666666666668\n\
+        r3 (mid 0) resistor r=66.66666666666667\n\
+        sp1 sp start=1k stop=10k dec=2\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let runs = Dialect::Ngspice
+        .run_all(&deck)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
+    let sp = runs
+        .iter()
+        .find(|r| {
+            r.variables
+                .iter()
+                .any(|v| v.name.eq_ignore_ascii_case("v(s_2_1)"))
+        })
+        .unwrap_or_else(|| panic!("no S_2_1\n{deck}"));
+    let s = |name: &str| {
+        let v = sp
+            .variables
+            .iter()
+            .find(|v| v.name.eq_ignore_ascii_case(name));
+        sp.complex(v.expect("a vector").index).expect("complex")
+    };
+    let (s11, s21) = (s("v(s_1_1)"), s("v(s_2_1)"));
+    assert_eq!(s21.len(), 3, "{deck}");
+    for (a, b) in s11.iter().zip(s21.iter()) {
+        assert!(
+            a.norm() < 1e-9 && (b.re - 0.5).abs() < 1e-9 && b.im.abs() < 1e-9,
+            "{a} {b}\n{deck}"
+        );
+    }
+}
+
+#[test]
+fn a_spectre_pz_is_ngspices_pz_from_its_source() {
+    // `[CMP]` p.790: poles and zeros of the transfer from `iprobe` to the
+    // output terminals. Closed form: the RC low pass has one pole at
+    // -1/RC = -1e6 rad/s and no zero.
+    let src = "// pz\nsimulator lang=spectre\n\
+        v1 (a 0) vsource dc=0 mag=1\nr1 (a b) resistor r=1k\nc1 (b 0) capacitor c=1n\n\
+        pz1 (b 0) pz iprobe=v1\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let runs = Dialect::Ngspice
+        .run_all(&deck)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
+    let names: Vec<Vec<String>> = runs
+        .iter()
+        .map(|r| r.variables.iter().map(|v| v.name.clone()).collect())
+        .collect();
+    let pz = runs
+        .iter()
+        .find(|r| r.variables.iter().any(|v| v.name.contains("pole(")))
+        .unwrap_or_else(|| panic!("no poles in {names:?}\n{deck}"));
+    let poles: Vec<_> = pz
+        .variables
+        .iter()
+        .filter(|v| v.name.contains("pole("))
+        .flat_map(|v| pz.complex(v.index).expect("complex").to_vec())
+        .collect();
+    let zeros = pz
+        .variables
+        .iter()
+        .filter(|v| v.name.contains("zero("))
+        .count();
+    assert_eq!(poles.len(), 1, "{poles:?} {names:?}\n{deck}");
+    assert!(
+        (poles[0].re + 1e6).abs() < 1e-3 && poles[0].im.abs() < 1e-3,
+        "{poles:?}"
+    );
+    assert_eq!(zeros, 0, "{names:?}\n{deck}");
+}

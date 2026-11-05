@@ -86,6 +86,13 @@ pub(in crate::syntax::render) enum Ana {
         variations: Option<String>,
         inner: (String, String),
     },
+    /// Any other Spectre analysis (`[REF]` analysis statements: `stb`,
+    /// `pss`, `hb`, `xf`, `sweep`, …): its keyword and its statement,
+    /// which a Spectre deck writes as read.
+    Spectre {
+        kind: String,
+        node: u32,
+    },
 }
 
 /// A frequency sweep: its variation keyword (lowercase), points, start,
