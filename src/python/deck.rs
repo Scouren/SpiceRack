@@ -58,11 +58,12 @@ pub(super) struct Deck {
 }
 
 impl Deck {
-    /// The deck `backend` runs: every runnable dialect, and HSPICE, which
-    /// is written but never run here.
+    /// The deck written in `backend`'s dialect: every dialect the renderer
+    /// writes (`render::writes`), runnable here or not (HSPICE, Xyce, CDL,
+    /// Verilog are written, never run).
     pub(super) fn netlist(&self, backend: &str) -> PyResult<String> {
         let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
-            .filter(|d| *d == Dialect::Hspice || crate::backend::RUNNABLE.contains(d))
+            .filter(|d| render::writes(*d))
             .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
         self.lowered()?.write(d).map_err(PyRuntimeError::new_err)
     }

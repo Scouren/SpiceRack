@@ -100,13 +100,15 @@ fails the run.
 ## Netlists without simulating
 
 ```python
-print(tb.netlist("ngspice"))      # also "ltspice", "vacask", "spectre", "espice", "hspice"
+print(tb.netlist("ngspice"))      # any dialect: "ltspice", "vacask", "spectre", "espice",
+                                  # "hspice", "xyce", "cdl", "verilog"
 ```
 
 To write a deck with several analyses, queue them with the `add_*` twins
 (`add_operating_point`, `add_ac`, `add_transient`, `add_noise`, `add_tf`,
-`add_fourier`, ...) and print `tb.netlist(...)`. HSPICE is netlist-only: there
-is no HSPICE runner.
+`add_fourier`, ...) and print `tb.netlist(...)`. HSPICE, Xyce, CDL and Verilog
+are netlist-only: `netlist()` writes them, `run()` needs one of ngspice,
+LTspice, VACASK, Spectre or ESPice.
 
 `tb.run()` runs the queued analyses as that one deck and returns one result per
 analysis, in the order they were queued, each the type its immediate twin

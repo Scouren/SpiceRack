@@ -82,7 +82,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `add_subcircuit(subckt)` | registers a child definition |
 | `use_pdk(lib)` | attaches a `ModelLibrary` |
 | `with_backend(name)` | pins the simulator |
-| `netlist(backend="ngspice")` | the deck |
+| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `RuntimeError` naming its code |
 | `to_source()`, `save_source(path)`, `Testbench.from_source(text, dialect=None)`, `Testbench.load(path)` | the store, as for `Subcircuit` (`save(*outputs)` stays the `.save` card): a deck read back writes the same netlists; its analyses are its text, and `run()` runs those queued on it |
 | `check_backend(name)` | reasons it will not run on `name` |
 | `global_nodes(*nodes)` | `.global` |

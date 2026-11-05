@@ -643,6 +643,17 @@ class TestDialectText:
         tb.add_transient(step_time=1e-6, end_time=1e-3)
         return tb
 
+    def test_netlist_writes_every_dialect_the_writer_has(self):
+        # Xyce RG p.29 (`.tran`), CDL (the top as `.SUBCKT`), Verilog
+        # (`module rc`): written though no backend here runs them.
+        ps = import_spicerack()
+        tb = self._tb(ps)
+        assert ".tran" in tb.netlist("xyce").lower()
+        assert ".SUBCKT rc" in tb.netlist("cdl").splitlines()
+        assert "module rc" in tb.netlist("verilog")
+        with pytest.raises(ValueError, match="unknown backend"):
+            tb.netlist("pspice")
+
     def test_a_spectre_analysis_is_spectre_text_in_a_region(self):
         # Spectre Reference 19.1 p.174: `montecarlo numruns= seed= { … }`;
         # VACASK docs/cmd-analysis-mc.md: `mc … endmc` around the deck's
