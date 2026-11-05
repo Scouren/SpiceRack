@@ -394,11 +394,11 @@ catalogue! {
         cite: "Cadence CDL (no analyses); the xschem layout (`render::spice::cdl`)",
         explain: "CDL is a netlist for LVS: analyses, library sections, conditionals, includes, functions, a subcircuit's models and text kept as the source's (no rule read it) are not written. Netlist the deck for a simulator to keep them.",
     }
-    /// What structural Verilog has no form for, left out: a primitive element or kept text (a comment in its place), an instance's parameters, anything but subcircuits and their instances.
+    /// What structural Verilog has no form for, left out: a primitive element or kept text (a comment in its place), a parameter that is no number, anything but subcircuits and their instances.
     W0029 Note {
         title: "a statement structural Verilog does not write",
         cite: "IEEE 1364-2005 §12.1 (modules), §12.2.2 (port connections); the xschem layout (`render::spice::verilog`)",
-        explain: "Structural Verilog holds modules and their instances: a primitive element (R, C, a source) is a comment naming this code, and parameters, models and analyses are not written. Netlist the deck for a simulator to keep them.",
+        explain: "Structural Verilog holds modules and their instances: a primitive element (R, C, a source) is a comment naming this code, and a parameter that is an expression, models and analyses are not written. Netlist the deck for a simulator to keep them.",
     }
     /// ngspice's compatibility mode on a target that has none.
     W0030 Note {
