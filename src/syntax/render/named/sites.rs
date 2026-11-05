@@ -187,8 +187,9 @@ fn card_sites(rd: &Rd, n: u32, sites: &mut Vec<Site>) {
                 sites.push(site(&format!("{l}{name}"), "e", vec![v]));
             }
         }
-        // A behavioural source has no Spectre form (refused); the rest
-        // carry no expression.
+        // ponytail: a behavioural source's expression is no lift site; a
+        // statistical call in it is no function `bsource_expr` writes, so
+        // the source is refused (W0102). The rest carry no expression.
         Card::Behavioural { .. }
         | Card::Coupling { .. }
         | Card::Linear { .. }

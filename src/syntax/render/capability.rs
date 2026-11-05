@@ -135,6 +135,9 @@ pub enum Alt {
     Copy(Code),
     /// `c1 (a b) bsource q=expr` (Spectre Reference 19.1 p.459).
     BsourceCharge,
+    /// `b1 (a b) bsource v=expr` / `i=expr` (Spectre Reference 5.0
+    /// pp.856-860).
+    Bsource,
     /// PWL `r=0` as `pwlperiod=` where it repeats exactly, `td=` as
     /// `delay=` (Spectre Reference 5.0 `vsource` #4, #17, #18, p.686).
     PwlPeriod,
@@ -239,7 +242,12 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Hspice => Spell(Alt::VolCur),
             D::Xyce => Spell(Alt::BracedBehaviour),
             D::Ngspice | D::Espice | D::Ltspice => Native,
-            D::Spectre | D::Vacask => Refuse(Code::W0102),
+            // `bsource v=`/`i=` (Spectre Reference 5.0 pp.856-860); an
+            // expression it cannot spell is refused by the writer.
+            D::Spectre => Spell(Alt::Bsource),
+            // VACASK's devices are its builtins (`lib/devbuiltins.cpp`:
+            // sources, controlled sources, `mutual`) and OSDI models.
+            D::Vacask => Refuse(Code::W0102),
             D::Cdl | D::Verilog => Native,
         },
         Construct::Laplace => match target {

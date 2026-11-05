@@ -25,6 +25,7 @@
 //! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> Result<String, Vec<Diag>>`
 
 mod bench;
+mod bsource;
 mod cards;
 mod checks;
 mod lift;

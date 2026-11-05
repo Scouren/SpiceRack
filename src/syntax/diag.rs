@@ -416,8 +416,8 @@ catalogue! {
     /// A behavioural source whose SPICE expression the target's grammar cannot be trusted to read.
     W0102 Refusal {
         title: "a behavioural source the target cannot spell",
-        cite: "Spectre Reference 5.0 p.856 (bsource: `v(a,b)`, `i(\"inst:idx\")`, `$time`)",
-        explain: "The behavioural source's expression uses forms (a current probe of an element, `time`, a function) the target's bsource spells otherwise. Rewrite the expression in the target's form.",
+        cite: "Spectre Reference 5.0 pp.856-860 (bsource), pp.867-870 (operators, functions); VACASK lib/devbuiltins.cpp (no behavioural device)",
+        explain: "The expression holds a form Spectre's bsource has no spelling for with the same meaning (`hertz`, a function such as `u()` or a statistical call, another dialect's `**`/`pow` whose negative-base rule is not checked), or the target is VACASK, which has no behavioural element (its devices are its builtin sources and OSDI models). Rewrite the expression with the functions both define, or model the element as Verilog-A.",
     }
     /// A charge expression reading a branch current, a braced value, `time`, `temper` or `hertz`.
     W0103 Refusal {
