@@ -392,7 +392,7 @@ catalogue! {
     W0028 Note {
         title: "a statement the CDL layout does not write",
         cite: "Cadence CDL (no analyses); the xschem layout (`render::spice::cdl`)",
-        explain: "CDL is a netlist for LVS: analyses, library sections, conditionals, includes, functions and a subcircuit's models are not written. Netlist the deck for a simulator to keep them.",
+        explain: "CDL is a netlist for LVS: analyses, library sections, conditionals, includes, functions, a subcircuit's models and text kept as the source's (no rule read it) are not written. Netlist the deck for a simulator to keep them.",
     }
     /// What structural Verilog has no form for, left out: a primitive element or kept text (a comment in its place), an instance's parameters, anything but subcircuits and their instances.
     W0029 Note {

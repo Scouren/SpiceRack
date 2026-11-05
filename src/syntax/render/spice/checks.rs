@@ -30,7 +30,10 @@ impl W<'_, '_> {
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
         let foreign = |tok: &u32| self.rd.text_dialect(*tok).family() != self.d.family();
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
-        if let Some(&tok) = other.first() {
+        // CDL leaves each out, noted where it does (`cdl::unwritten`).
+        if let Some(&tok) = other.first()
+            && self.d != Dialect::Cdl
+        {
             self.ask(Construct::ForeignText, tok);
         }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));

@@ -172,9 +172,8 @@ others are recorded through `codegen::netlist`, so the whole tree diffs.
    text, as the old writer did (`calls`, `contains('^')`, a `ponytail:`);
    over `Call` nodes and the operator tokens they would be a walk of the
    value trees, with the same verdict on the corpus to be checked.
-4. **Five capability cells reproduce a silent drop** (`// quirk:` in
-   `capability.rs`): CDL copies another family's text (`ForeignText`: `Native`);
-   Spectre and VACASK write a sectionless `.lib` as `include "f"
+4. **Four capability cells reproduce a silent drop** (`// quirk:` in
+   `capability.rs`): Spectre and VACASK write a sectionless `.lib` as `include "f"
    section=` and drop a `.print` (two cells each). Phase 7 decides.
 5. The reader duplicates `syntax::adapter`'s rules (copied, then typed to
    views). Phase 6 deletes the adapter; the rules live here after it.
@@ -234,8 +233,6 @@ reference does not):
   `ground 0` and a `control` block (`named::W::frame`).
 
 **CDL** (`spice/cdl.rs`):
-- P7-9. Another family's text is copied as written (`ForeignText`:
-  `Native`, a capability quirk).
 - P7-10. Subcircuit models, sections, conditionals, includes and functions
   are not written (the LVS layout's old shape), with no diagnostic.
 

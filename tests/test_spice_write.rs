@@ -222,3 +222,27 @@ fn text_that_did_not_parse_reaches_its_own_dialect_only() {
     let codes = refusal(meas, Dialect::Ngspice, Dialect::Hspice);
     assert!(codes.contains(&Code::W0032), "{codes:?}");
 }
+
+// ── CDL ──
+
+/// Cadence CDL (an LVS netlist: `.SUBCKT`, `.ENDS`, `*.PININFO`, `.END`,
+/// element cards) has no `.backanno` and no ngspice element `Y`; no reader
+/// reads CDL, so text the reader kept as the source's is another
+/// dialect's there. The old layout copied it inside the `.SUBCKT`; it is
+/// left out (W0028) and a kept element is a comment (W0021).
+#[test]
+fn cdl_leaves_out_text_no_rule_read() {
+    let deck = "* t\nR1 a 0 1k\nyfoo a 0 bar\n.backanno\n.end\n";
+    let w = render_text(deck, Dialect::Ltspice, "t", Dialect::Cdl).expect("written");
+    assert!(
+        !w.text.contains(".backanno") && !w.text.contains("yfoo"),
+        "{}",
+        w.text
+    );
+    assert!(w.text.contains("* error: W0001 "), "{}", w.text);
+    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&Code::W0028) && codes.contains(&Code::W0021),
+        "{codes:?}"
+    );
+}

@@ -7,7 +7,7 @@
 //!
 //! `Spell` and `Lift` keep the meaning: a named alternative form, or a
 //! rewrite into extra statements recorded as fixups. Anything that cannot
-//! keep its meaning is `Refuse` with a `W` code. Five cells answer as the
+//! keep its meaning is `Refuse` with a `W` code. Four cells answer as the
 //! old writers behaved, where that drops or garbles something: each is
 //! marked `// quirk:` (the golden gate holds them until phase 7 decides).
 //!
@@ -177,9 +177,9 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
     use Dialect as D;
     match c {
         Construct::ForeignText => match target {
-            // quirk: the xschem layout (CDL) copies another family's text
-            // as written, as the old writer did; phase 7 refuses it.
-            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            // An LVS netlist leaves out what it cannot check: no reader
+            // reads CDL, so every kept text is another family's.
+            D::Cdl => Spell(Alt::Omit(Code::W0028)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0001),
             D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0001),
         },
