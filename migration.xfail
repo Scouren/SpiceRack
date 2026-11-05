@@ -629,3 +629,16 @@ fixtures/tests/spectre/t_s3_nested.scs cdl the montecarlo block is an analysis, 
 fixtures/tests/spectre/t_s3_nested.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
 fixtures/tests/spectre/t_s3_mismatch.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
 fixtures/tests/spectre/t_s3_mismatch.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+
+# Phase 7: spectre-read: a Spectre file's SPICE region (render::read::named
+# `Rd::region`). A `simulator lang=spice` region's `.param` (HSPICE
+# lexicon, Spectre UG p.53) whose values are expressions is read as
+# `parameters`, its numbers in the region's suffixes; in a section the
+# region is kept whole unless every statement is one. Per set: fixtures 6
+# (one input).
+fixtures/tests/fixtures/pdk_sections/bare.scs ngspice now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs espice now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs hspice now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs xyce now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs vacask now written: tt's region .param is parameters rsh_spice=100 rvc=10m; was refused (the region kept as text)
+fixtures/tests/fixtures/pdk_sections/bare.scs spectre tt's region .param is parameters rsh_spice=100 rvc=10m (one statement with vth0n, u0n, after); was the region copied as written

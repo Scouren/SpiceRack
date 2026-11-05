@@ -231,16 +231,17 @@ fn spectre_sections_hold_their_cards() {
 
 /// Bare Spectre sections (no `library`, as a commercial PDK's corner files
 /// hold them) are sections like any other and are written back bare; a
-/// `simulator lang=spice` region in one stays in it, kept as the SPICE text
-/// it is (by hand from `bare.scs`).
+/// `simulator lang=spice` region of `.param`s in one is the section's
+/// `parameters`, each number in the region's suffixes (Spectre UG p.53:
+/// the region reads as SPICE; `0.01` is `10m`), by hand from `bare.scs`.
 #[test]
 fn bare_spectre_sections_with_a_spice_region() {
     let text = fixpoint(BARE, Dialect::Spectre, "bare");
     let w = written(BARE, Dialect::Spectre, "bare", Dialect::Spectre);
-    assert_eq!(codes(&w), [Code::W0027], "{}", w.notes.messages);
+    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
     assert_eq!(
         text,
-        "// bare\n\nsimulator lang=spectre\n\nsection tt\ninclude \"shared.scs\"\nparameters vth0n=450m u0n=30m after=1\nsimulator lang=spice\n.param rsh_spice=100 rvc=0.01\nsimulator lang=spectre\nendsection tt\nsection ff\ninclude \"shared.scs\"\nparameters vth0n=400m u0n=35m\nendsection ff\n\n"
+        "// bare\n\nsimulator lang=spectre\n\nsection tt\ninclude \"shared.scs\"\nparameters vth0n=450m u0n=30m rsh_spice=100 rvc=10m after=1\nendsection tt\nsection ff\ninclude \"shared.scs\"\nparameters vth0n=400m u0n=35m\nendsection ff\n\n"
     );
     assert!(!text.contains("library") && text.contains("\nsection tt\n"));
 }

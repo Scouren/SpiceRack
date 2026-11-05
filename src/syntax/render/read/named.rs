@@ -236,6 +236,10 @@ impl<'a> Rd<'a> {
             self.raw(n, here, true);
             return None;
         }
+        if scope == Scope::Section && tag == Tag::Region {
+            self.region(n, here, false, acc);
+            return None;
+        }
         if scope == Scope::Section && self.named_leaks(n) {
             self.raw(n, here, matches!(tag, Tag::Region | Tag::Control));
             return None;
@@ -430,13 +434,7 @@ impl<'a> Rd<'a> {
                 true
             }
             Tag::Region => {
-                for &k in self.body(n) {
-                    if self.line(k).starts_with(".meas") {
-                        acc.bench.push(Bench::Meas(k));
-                    } else {
-                        here.raw.push(super::Raw::Line(k));
-                    }
-                }
+                self.region(n, here, top, acc);
                 true
             }
             Tag::Control => {
@@ -467,6 +465,46 @@ impl<'a> Rd<'a> {
                 }
                 None => false,
             },
+            _ => false,
+        }
+    }
+
+    /// A `simulator lang=spice` region's statements (read by the HSPICE
+    /// lexicon, `lexicon::spectre`): a `.param` whose values are
+    /// expressions read as `parameters` (each number in its own suffixes:
+    /// `2M` is milli), a `.meas` at the top a measurement, the rest kept
+    /// as SPICE text; in a section the region is kept whole unless every
+    /// statement is such a `.param`.
+    fn region(&mut self, n: u32, here: &mut Block, top: bool, acc: &mut Acc) {
+        let param = |k: u32| {
+            self.tag(k) == Tag::Param
+                && self.fields(k).iter().all(|&f| {
+                    let v = self.ast.rhs(Node(f));
+                    self.tag(f) == Tag::Assign && v != NONE && self.expression(v)
+                })
+        };
+        if !top && !self.body(n).iter().all(|&k| param(k)) {
+            here.raw.push(super::Raw::Lines(n));
+            return;
+        }
+        for &k in self.body(n) {
+            if param(k) {
+                here.params.extend(self.fields(k));
+            } else if top && self.line(k).starts_with(".meas") {
+                acc.bench.push(Bench::Meas(k));
+            } else {
+                here.raw.push(super::Raw::Line(k));
+            }
+        }
+    }
+
+    /// Whether value `v` is an expression tree (a `{…}` the HSPICE
+    /// lexicon keeps as one word is not).
+    fn expression(&self, v: u32) -> bool {
+        match self.tag(v) {
+            Tag::Num | Tag::Ident | Tag::Binary | Tag::Unary | Tag::Paren | Tag::Call => true,
+            Tag::Ternary | Tag::Probe => true,
+            Tag::Delimited => self.ast.lhs(Node(v)) != NONE,
             _ => false,
         }
     }

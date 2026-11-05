@@ -434,3 +434,30 @@ fn a_spectre_pz_is_ngspices_pz_from_its_source() {
     );
     assert_eq!(zeros, 0, "{names:?}\n{deck}");
 }
+
+#[test]
+fn a_spectre_files_spice_region_params_keep_their_suffixes_on_ngspice() {
+    // Spectre UG p.53: a `simulator lang=spice` region reads as SPICE, so
+    // its `2M` is milli; the Spectre statements' `1M` is mega (`[KUN]`).
+    // Closed form: rs = 2e-3, q = rs·1e-3 = 2e-6, so 1 A into rs·1e6 and
+    // into q·1e9 is 2 kV each.
+    let src = "// region\nsimulator lang=spectre\n\
+        section tt\nsimulator lang=spice\n.param rs=2M q='rs*1M'\nsimulator lang=spectre\nendsection tt\n";
+    let top = "// top\nsimulator lang=spectre\ninclude \"lib.scs\" section=tt\n\
+        i1 (0 a) isource dc=1\nr1 (a 0) resistor r=rs*1M\n\
+        i2 (0 b) isource dc=1\nr2 (b 0) resistor r=q*1G\nop1 dc\n";
+    let lib = render_text(src, Dialect::Spectre, "lib", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let dir = tempfile::tempdir().expect("a temp dir");
+    std::fs::write(dir.path().join("lib.sp"), &lib).expect("written");
+    let deck = render_text(top, Dialect::Spectre, "top", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text
+        .replace("lib.scs", &dir.path().join("lib.sp").display().to_string());
+    let raw = ngspice(&deck);
+    for node in ["a", "b"] {
+        let v = col(&raw, node)[0];
+        assert!((v - 2e3).abs() < 1e-6, "{node}: {v}\n{lib}\n{deck}");
+    }
+}
