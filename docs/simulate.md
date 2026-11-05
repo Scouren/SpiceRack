@@ -36,7 +36,7 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | `pss`, `s_param`, `harmonic_balance`, `stability`, `transient_noise`, `network_params` | RF and periodic analyses; each runs only where a backend supports it (see below) |
 | `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` is a deprecated alias), `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | Spectre only |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only), in any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only: the SPICE targets refuse it, W0031), in any
 case; any other name raises `ValueError` when the analysis is built. The same
 holds for the other keywords: `polezero`/`add_polezero` `tf_type` (`vol`, `cur`)
 and `pz_type` (`pol`, `zer`, `pz`), `step_sweep` (`lin`, `dec`, `oct`, `log`),

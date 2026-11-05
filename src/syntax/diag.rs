@@ -406,6 +406,12 @@ catalogue! {
         cite: "ngspice manual, the compatibility modes (`set ngbehavior` in `.spiceinit`, or `-D ngbehavior=`, read before the deck)",
         explain: "`.options ngbehavior=` selects how ngspice reads the deck (`hsa`, `ps`, `lt`, …); ngspice takes it on its command line, and no other target has such a mode, so it is left out. The target reads the deck in its own dialect.",
     }
+    /// A sweep by total point count (Spectre's `log=N`) on a SPICE target, which sweeps by points per decade or octave, or linearly.
+    W0031 Refusal {
+        title: "a `log` sweep the target lacks",
+        cite: "ngspice manual §11.3 (`.ac`, `.noise`, `.sp`, `.sens`: `dec|oct|lin`); HSPICE `.AC` (DEC, OCT, LIN, POI); Xyce RG `.AC` (DEC, OCT, LIN); LTspice help (`.ac oct|dec|lin`)",
+        explain: "`log` is Spectre's sweep of a total number of points spaced logarithmically; the SPICE targets' `.ac`, `.noise`, `.sp` and `.sens … ac` take `dec` or `oct` (points per decade or octave) or `lin`, and ngspice stops on `log`. Spell the sweep as `dec` points per decade.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

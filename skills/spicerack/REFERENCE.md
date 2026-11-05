@@ -104,7 +104,7 @@ queued beside others raise instead.
 | `transfer_function(...)` | — | — | `TransferFunctionAnalysis` |
 | `distortion(...)` | — | — | `DistortionAnalysis` |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only), any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only: the SPICE targets refuse it, W0031), any
 case; any other name raises `ValueError` at the call, before anything runs. So
 do the `.pz` types (`vol`/`cur`, `pol`/`zer`/`pz`), a `step_sweep` type and a
 Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...).

@@ -144,3 +144,44 @@ fn hspice_renames_a_b_source_where_its_references_name_it() {
     assert!((m("ib") + 2e-3).abs() < 1e-12, "{hs}");
     assert!((m("vx") - 3.0).abs() < 1e-9, "{hs}");
 }
+
+// ── `log` sweeps ──
+
+/// Spectre's `log=N` (N points, logarithmic) has no SPICE spelling: the
+/// ngspice manual §11.3 `.ac`/`.noise`/`.sp`/`.sens` take `dec|oct|lin`,
+/// HSPICE `.AC` DEC/OCT/LIN/POI, Xyce RG `.AC` DEC/OCT/LIN, LTspice `.ac`
+/// oct/dec/lin. Real ngspice-45 runs nothing from `.ac log` (the old writer
+/// copied it). Refused W0031 on every SPICE target; the `dec` neighbour is
+/// written and runs.
+#[test]
+fn a_log_sweep_is_refused_on_the_spice_targets() {
+    let deck = "* t\nV1 in 0 0 AC 1\nR1 in out 1k\nC1 out 0 1u\n.ac log 31 1 1k\n.end\n";
+    let spectre = "// t\nsimulator lang=spectre\nv1 (in 0) vsource dc=0 mag=1\n\
+                   r1 (in out) resistor r=1k\nc1 (out 0) capacitor c=1u\n\
+                   a1 ac start=1 stop=1k log=31\n";
+    let spice = [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Hspice,
+        Dialect::Xyce,
+        Dialect::Ltspice,
+    ];
+    for to in spice {
+        assert_eq!(refusal(deck, Dialect::Ngspice, to), [Code::W0031], "{to:?}");
+        assert_eq!(
+            refusal(spectre, Dialect::Spectre, to),
+            [Code::W0031],
+            "{to:?}"
+        );
+    }
+    assert!(Dialect::Ngspice.run(deck).is_err(), "ngspice ran `.ac log`");
+    let dec = write(
+        &deck.replace("log 31", "dec 10"),
+        Dialect::Ngspice,
+        Dialect::Ngspice,
+    );
+    let raw = Dialect::Ngspice
+        .run(&dec)
+        .expect("ngspice runs the dec sweep");
+    assert_eq!(raw.complex_data[0].len(), 31, "{dec}");
+}

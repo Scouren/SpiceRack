@@ -120,7 +120,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `spectre_sweep`, `spectre_monte_carlo` | `RawData` (Spectre); `spectre_montecarlo` is a deprecated alias that warns |
 | `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | periodic small-signal (Spectre) |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only), in any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only: the SPICE targets refuse it, W0031), in any
 case; any other name raises `ValueError` when the analysis is built.
 
 ## Results

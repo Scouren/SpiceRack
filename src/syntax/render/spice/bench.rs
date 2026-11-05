@@ -358,6 +358,18 @@ impl W<'_, '_> {
                 num(w, s.stop)
             )
         };
+        // Spectre's total-count `log` sweep: the SPICE targets have only
+        // `dec`, `oct` and `lin` (W0031).
+        let log = match a {
+            Ana::Ac(sw) | Ana::Sp(sw) | Ana::Noise { sweep: sw, .. } | Ana::Sens(_, Some(sw)) => {
+                sw.variation.eq_ignore_ascii_case("log")
+            }
+            _ => false,
+        };
+        if log {
+            self.refuse(Code::W0031, tok);
+            return String::new();
+        }
         match a {
             Ana::Op => ".op".into(),
             Ana::Dc(sweeps) => {
