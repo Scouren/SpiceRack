@@ -109,6 +109,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
     w.checks();
     if target == Dialect::Cdl {
         w.cdl();
+        w.unparsed();
         return (w.o.finish(), w.diags);
     }
     let frame = w.frame();
@@ -143,6 +144,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         // The deck ends on its last card's line end.
         false => w.o.pop(),
     }
+    w.unparsed();
     (w.o.finish(), w.diags)
 }
 

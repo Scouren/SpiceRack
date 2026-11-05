@@ -412,6 +412,12 @@ catalogue! {
         cite: "ngspice manual §11.3 (`.ac`, `.noise`, `.sp`, `.sens`: `dec|oct|lin`); HSPICE `.AC` (DEC, OCT, LIN, POI); Xyce RG `.AC` (DEC, OCT, LIN); LTspice help (`.ac oct|dec|lin`)",
         explain: "`log` is Spectre's sweep of a total number of points spaced logarithmically; the SPICE targets' `.ac`, `.noise`, `.sp` and `.sens … ac` take `dec` or `oct` (points per decade or octave) or `lin`, and ngspice stops on `log`. Spell the sweep as `dec` points per decade.",
     }
+    /// Text the parser could not read (P0002, P0003, P0008), kept as written, on a target of another dialect.
+    W0032 Refusal {
+        title: "text that did not parse, for another dialect",
+        cite: "the source dialect's grammar, at the parse note beside this code (P0002, P0003, P0008)",
+        explain: "The parser kept this text as written: an expression that is no expression, an unclosed delimiter, a block the file ends inside. A target of the source's own dialect gets it back as written; another target would read text no rule checked. Fix the source at the parse note.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

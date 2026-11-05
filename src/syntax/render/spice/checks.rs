@@ -1,5 +1,6 @@
 //! The deck-wide refusals the SPICE-family writer makes before it writes: a
-//! statement kept as another family's text (`ForeignText`), a `^` the
+//! statement kept as another family's text (`ForeignText`), text that did
+//! not parse for another dialect (W0032), a `^` the
 //! target reads with the other meaning (`CaretReread`), a statistical call
 //! the target has no function for (`StatisticalCall`). Each reads every
 //! block the deck writes (definitions, sections, branches) and every
@@ -9,7 +10,7 @@
 //! `gauss(x)`); Xyce RG §2.1.18.
 //!
 //! Contents:
-//! - `W::checks(&mut self)`
+//! - `W::checks(&mut self)`, `W::unparsed(&mut self)`
 
 use super::W;
 use crate::syntax::Dialect;
@@ -57,6 +58,31 @@ impl W<'_, '_> {
         let is_stat = |f: &str| STATISTICAL.iter().any(|s| s.eq_ignore_ascii_case(f));
         if stat && let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(is_stat)) {
             self.ask(Construct::StatisticalCall, *tok);
+        }
+    }
+
+    /// Text that did not parse is the source's own: its dialect gets it
+    /// back as written, another target refuses it (W0032) unless the
+    /// statement holding it was left out (a drop note at its first token).
+    /// Asked once the deck is written, when its drops are noted.
+    pub(super) fn unparsed(&mut self) {
+        if self.rd.d.family() == self.d.family() {
+            return;
+        }
+        let drops = [Code::W0021, Code::W0023, Code::W0024, Code::W0028];
+        let dropped: Vec<(u32, u32)> = self
+            .diags
+            .iter()
+            .filter(|d| drops.contains(&d.code))
+            .map(|d| (d.token, self.rd.line_last(d.token)))
+            .collect();
+        eprintln!("DBG {dropped:?} {:?}", self.rd.ast.diags());
+        let unread = [Code::P0002, Code::P0003, Code::P0008];
+        let bad = self.rd.ast.diags().iter().find(|d| {
+            unread.contains(&d.code) && !dropped.iter().any(|&(a, b)| (a..=b).contains(&d.token))
+        });
+        if let Some(d) = bad {
+            self.refuse(Code::W0032, d.token);
         }
     }
 }

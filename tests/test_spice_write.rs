@@ -185,3 +185,40 @@ fn a_log_sweep_is_refused_on_the_spice_targets() {
         .expect("ngspice runs the dec sweep");
     assert_eq!(raw.complex_data[0].len(), 31, "{dec}");
 }
+
+// ── text that did not parse ──
+
+/// Xyce RG: `POLY` is no function of an expression (the Xyce corpus's
+/// `MPDE/sandler24.cir`, `BGND 99 0 V={POLY(2) V(3) V(4) 0 0.5 0.5}`): the
+/// parser keeps the text (P0002). Its own dialect gets it back as written;
+/// every other target refuses it (W0032), where the old writer copied it
+/// into an ngspice deck unchecked. The neighbour with a parsed expression is
+/// written everywhere.
+#[test]
+fn text_that_did_not_parse_reaches_its_own_dialect_only() {
+    let deck =
+        "* t\nV3 3 0 1\nV4 4 0 1\nB1 99 0 V={POLY(2) V(3) V(4) 0 0.5 0.5}\nR1 99 0 1k\n.op\n.end\n";
+    let own = write(deck, Dialect::Xyce, Dialect::Xyce);
+    assert!(own.contains("POLY(2) V(3) V(4) 0 0.5 0.5"), "{own}");
+    let others = [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Hspice,
+        Dialect::Ltspice,
+        Dialect::Cdl,
+    ];
+    for to in others {
+        let codes = refusal(deck, Dialect::Xyce, to);
+        assert!(codes.contains(&Code::W0032), "{to:?}: {codes:?}");
+    }
+    let good = deck.replace("{POLY(2) V(3) V(4) 0 0.5 0.5}", "{0.5*V(3)+0.5*V(4)}");
+    for to in others {
+        let _ = write(&good, Dialect::Xyce, to);
+    }
+    // Unparsed text in a statement the target leaves out (CDL writes no
+    // `.meas`, W0028) is not copied, so the deck is written there.
+    let meas = "* t\nV1 1 0 1\nR1 1 0 1k\n.tran 1n 10n\n.meas tran x find v(1 at=5n\n.end\n";
+    let _ = write(meas, Dialect::Ngspice, Dialect::Cdl);
+    let codes = refusal(meas, Dialect::Ngspice, Dialect::Hspice);
+    assert!(codes.contains(&Code::W0032), "{codes:?}");
+}
