@@ -7,7 +7,7 @@
 //!
 //! `Spell` and `Lift` keep the meaning: a named alternative form, or a
 //! rewrite into extra statements recorded as fixups. Anything that cannot
-//! keep its meaning is `Refuse` with a `W` code. Five cells answer as the
+//! keep its meaning is `Refuse` with a `W` code. Three cells answer as the
 //! old writers behaved, where that drops or garbles something: each is
 //! marked `// quirk:` (the golden gate holds them until phase 7 decides).
 //!
@@ -322,9 +322,10 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             // An LTspice run saves every vector and has no stdout print.
             D::Ltspice => Spell(Alt::Omit(Code::W0023)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce => Native,
-            // quirk: the old Spectre and VACASK writers drop a `.print`
-            // (never mapped); phase 7 decides.
-            D::Spectre | D::Vacask => Spell(Alt::Omit(Code::W0023)),
+            // Spectre: a `save` of the same signals (Spectre Reference 5.0
+            // p.886). VACASK saves every node and source flow. An output
+            // with no signal form is noted W0023 by the writer.
+            D::Spectre | D::Vacask => Native,
             D::Cdl | D::Verilog => Native,
         },
         Construct::Save => match target {

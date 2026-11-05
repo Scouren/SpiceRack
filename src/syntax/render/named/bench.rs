@@ -1,8 +1,8 @@
 //! The testbench → Spectre statements: the deck's testbench items folded in
 //! read order (options merged, the last temperature winning), then
-//! `options`, `ic`, `nodeset`, `save`, the measures in a `simulator
-//! lang=spice` region, and the analyses, each `.step` a `sweep` block
-//! around them.
+//! `options`, `ic`, `nodeset`, `save` (a `.save`'s and a `.print`'s
+//! signals), the measures in a `simulator lang=spice` region, and the
+//! analyses, each `.step` a `sweep` block around them.
 //!
 //! Cites: Spectre Reference 19.1 `[REF]` pp.187-236 (`options`: `reltol`
 //! #1, `vabstol` #3, `iabstol` #4, `temp` #6, `tnom` #7, `dcmaxiters` #56),
@@ -10,11 +10,13 @@
 //! (`.measure`), p.64 (`dc`: `dev=`/`param=`), p.43 (`ac`), pp.416-417
 //! (`tran`), pp.181-182 (`noise`), pp.438-439 (`xf`), p.524 (`sens`),
 //! pp.387-389 (`sp`), pp.406-410 (`sweep`); `[CMP]` pp.323-325
-//! (`fourier`); `[KUN]` B.2 (`simulator lang=`).
+//! (`fourier`), p.886 (`save`: nodes, `inst:index` terminal currents);
+//! `[KUN]` B.2 (`simulator lang=`).
 //!
 //! Contents:
 //! - `pub(super) struct Tb`, `pub(super) type Step`
 //! - `W::bench(&mut self)`, `W::fold(&self) -> Tb`, `W::unwritten_outputs(&mut self, tb: &Tb)`
+//! - `pub(super) enum Signal`, `fn signal_of(out: &str) -> Option<Signal<'_>>`
 //! - `fn bare_node(s: &str) -> &str`
 
 use super::W;
@@ -40,8 +42,8 @@ pub(super) struct Tb {
     pub(super) saves: Vec<String>,
     /// The first save card's first token.
     pub(super) save_tok: Option<u32>,
-    /// Each `.print`'s first token (neither target writes one).
-    pub(super) prints: Vec<u32>,
+    /// Each `.print`'s outputs and first token.
+    pub(super) prints: Vec<(Vec<String>, u32)>,
     /// The first token of each options card holding Xyce's own options,
     /// which neither target writes.
     pub(super) xyce: Vec<u32>,
@@ -59,6 +61,16 @@ pub(super) struct Tb {
 /// A `.step`: its sweep keyword, parameter, start, stop and step, and its
 /// statement's first token.
 pub(super) type Step = (Option<&'static str>, String, [f64; 3], u32);
+
+/// A SPICE output as a signal Spectre saves (`[CMP]` p.886: a node, or a
+/// component's terminal current).
+pub(super) enum Signal<'s> {
+    /// A voltage's nodes, ground left out (`v(a,b)`, `vdb(a)`: the vector
+    /// saved, its view the post-processor's).
+    Nodes(Vec<&'s str>),
+    /// A device's current (`i(r1)`, `im(r1)`).
+    Current(&'s str),
+}
 
 impl W<'_, '_> {
     /// The testbench's statements.
@@ -105,19 +117,26 @@ impl W<'_, '_> {
             }
         }
         for s in &tb.saves {
-            // `i(V1)` is the source's current: its terminal, under the
-            // name the instance is written with.
-            let save = self.signal(s);
-            let t = save.trim();
-            let current = t
-                .strip_prefix("i(")
-                .or_else(|| t.strip_prefix("I("))
-                .and_then(|r| r.strip_suffix(')'));
-            let line = match current {
-                Some(dev) => format!("save {}:p", self.inst_ref(dev.trim())),
-                None => format!("save {}", bare_node(&save)),
+            let words = match signal_of(s) {
+                Some(sig) => self.save_words(&sig),
+                None => bare_node(&self.signal(s)).to_string(),
             };
-            self.line(&line);
+            if !words.is_empty() {
+                self.line(&format!("save {words}"));
+            }
+        }
+        // A `.print`'s signals are saved; its view of them (`vdb`, a
+        // difference) is the post-processor's.
+        for (outs, _) in &tb.prints {
+            let words: Vec<String> = outs
+                .iter()
+                .filter_map(|o| signal_of(o))
+                .map(|sig| self.save_words(&sig))
+                .filter(|w| !w.is_empty())
+                .collect();
+            if !words.is_empty() {
+                self.line(&format!("save {}", words.join(" ")));
+            }
         }
         // `.measure` is SPICE syntax: fenced by language switches.
         for (m, tok) in &tb.measures {
@@ -162,8 +181,17 @@ impl W<'_, '_> {
     /// `.print`, Xyce's own options, ngspice's mode, the save list where the target saves
     /// every node.
     pub(super) fn unwritten_outputs(&mut self, tb: &Tb) {
-        for &tok in &tb.prints {
-            self.ask(Construct::Print, tok);
+        for (outs, tok) in &tb.prints {
+            self.ask(Construct::Print, *tok);
+            // VACASK's raw file holds every node voltage and source current.
+            let unwritten = outs.iter().any(|o| match (signal_of(o), self.d) {
+                (None, _) => true,
+                (Some(Signal::Current(dev)), Dialect::Vacask) => !dev.starts_with(['v', 'V']),
+                (Some(_), _) => false,
+            });
+            if unwritten {
+                self.note(Code::W0023, *tok);
+            }
         }
         for &tok in &tb.xyce {
             self.note(Code::W0024, tok);
@@ -236,9 +264,7 @@ impl W<'_, '_> {
                     BenchCard::Temp(t) => tb.temp = Some(t),
                     BenchCard::NodeVals(true, v) => tb.ics.extend(v),
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
-                    // `Construct::Print` is `Spell(Omit)` here (a quirk):
-                    // asked, and noted, by [`W::unwritten_outputs`].
-                    BenchCard::Print(..) => tb.prints.push(tok),
+                    BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
                     BenchCard::Extra(l) => tb.extra.push(l),
                 }
@@ -259,9 +285,43 @@ pub(super) fn bare_node(s: &str) -> &str {
     inner.map_or(t, str::trim)
 }
 
+/// `out` as a [`Signal`]; `None` for an output with no signal form (an
+/// expression, an option such as `format=`, a device parameter).
+pub(super) fn signal_of(out: &str) -> Option<Signal<'_>> {
+    let (w, r) = out.trim().split_once('(')?;
+    let args = r.strip_suffix(')')?;
+    let parts: Vec<&str> = args.split(',').map(str::trim).collect();
+    if parts.iter().any(|p| p.is_empty() || p.contains(['(', ')'])) {
+        return None;
+    }
+    match w.to_ascii_lowercase().as_str() {
+        "v" | "vm" | "vr" | "vi" | "vp" | "vph" | "vdb" if parts.len() <= 2 => Some(Signal::Nodes(
+            parts.into_iter().filter(|&p| p != "0").collect(),
+        )),
+        "i" | "im" | "ir" | "ii" | "ip" | "iph" | "idb" if parts.len() == 1 => {
+            Some(Signal::Current(parts[0]))
+        }
+        _ => None,
+    }
+}
+
 // ---- private ----
 
 impl W<'_, '_> {
+    /// `sig`'s words in a Spectre `save`: its nodes, or the current into
+    /// its device's first terminal (`r1:1`, `[CMP]` p.886: a terminal by
+    /// index; SPICE's `i(r1)` flows into the first node).
+    fn save_words(&self, sig: &Signal) -> String {
+        match sig {
+            Signal::Nodes(nodes) => nodes
+                .iter()
+                .map(|n| self.path(n))
+                .collect::<Vec<_>>()
+                .join(" "),
+            Signal::Current(dev) => format!("{}:1", self.inst_ref(dev)),
+        }
+    }
+
     /// A signal (`v(x)`, `i(x)`, bare `x`), the name inside its wrapper in
     /// Spectre's spelling.
     fn signal(&self, s: &str) -> String {
@@ -270,9 +330,27 @@ impl W<'_, '_> {
             .split_once('(')
             .filter(|(w, r)| matches!(*w, "v" | "V" | "i" | "I") && r.ends_with(')'));
         match wrapped {
-            Some((w, r)) => format!("{w}({})", self.node(&r[..r.len() - 1])),
-            None => self.node(t),
+            Some((w, r)) => format!("{w}({})", self.path(&r[..r.len() - 1])),
+            None => self.path(t),
         }
+    }
+
+    /// A node in a signal position (`save`, `ic`, `nodeset`), its
+    /// hierarchy kept: each instance on the path and the node escaped,
+    /// joined by `.` (`[CMP]` p.886: `OpAmp1.comp`); Xyce's separator
+    /// `:` (`v(X1:n)`, the corpus's Xyce decks) is Spectre's `.`.
+    fn path(&self, s: &str) -> String {
+        let sep = match self.rd.d {
+            Dialect::Xyce => ':',
+            _ => '.',
+        };
+        let mut segs: Vec<&str> = s.trim().split(sep).collect();
+        let node = segs.pop().map_or(String::new(), |n| self.node(n));
+        segs.iter()
+            .map(|i| self.dev(i))
+            .chain([node])
+            .collect::<Vec<_>>()
+            .join(".")
     }
 
     /// `a`'s statement (several lines `\n`-joined where Spectre needs a

@@ -161,7 +161,8 @@ fn spectre_keeps_spice_meaning() {
     // SPICE 30M is milli; Spectre's M is mega, its m milli.
     assert!(n.contains("model qn bjt type=npn ikf=30m"), "{n}");
     assert!(n.contains("skipdc=yes"), "uic: {n}");
-    assert!(n.contains("save v1:p"), "current save: {n}");
+    // A current is its first terminal by index (Spectre Reference 5.0 p.886).
+    assert!(n.contains("save v1:1"), "current save: {n}");
     // A nested `.dc` must not lose a sweep, and a VDMOS has no Spectre
     // master: both refused.
     let nested = circuit(&format!("{model}.dc V1 0 1 0.1 temp 0 1 0.1\n"), false);
