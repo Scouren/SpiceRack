@@ -163,10 +163,17 @@ fn spectre_keeps_spice_meaning() {
     assert!(n.contains("skipdc=yes"), "uic: {n}");
     // A current is its first terminal by index (Spectre Reference 5.0 p.886).
     assert!(n.contains("save v1:1"), "current save: {n}");
-    // A nested `.dc` must not lose a sweep, and a VDMOS has no Spectre
-    // master: both refused.
+    // A nested `.dc` keeps both sweeps: the second a `sweep` around the
+    // first (Spectre Reference 19.1 pp.406-409). A VDMOS has no Spectre
+    // master: refused.
     let nested = circuit(&format!("{model}.dc V1 0 1 0.1 temp 0 1 0.1\n"), false);
-    assert!(netlist(&nested, Dialect::Spectre).is_err());
+    let n = netlist(&nested, Dialect::Spectre).unwrap_or_else(|e| panic!("{}", e.messages));
+    assert!(
+        n.contains(
+            "dcsweep1 sweep param=temp start=0 stop=1 step=100m {\n  dc1 dc dev=v1 param=dc"
+        ),
+        "{n}"
+    );
     let vdmos = circuit(".model qn VDMOS(IKF=30M)\n.op\n", false);
     assert!(netlist(&vdmos, Dialect::Spectre).is_err());
 }

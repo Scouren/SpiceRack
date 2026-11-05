@@ -341,7 +341,9 @@ fn sweep_line(scale: &str, src: &str, start: f64, stop: f64, step: f64) -> Optio
     }
     let span = ((stop - start) / step).abs();
     let n = (span + 1e-9 * span.max(1.0)).floor();
-    if n < 1.0 || n.is_nan() || n > 1e7 {
+    // `points=0` is one point, `from` (`lib/answeep.cpp`
+    // `setupLinearSweep`: `end = points+1`): SPICE's `.dc v1 5 5 1`.
+    if n.is_nan() || n > 1e7 {
         return None;
     }
     let last = start + (stop - start).signum() * n * step.abs();
@@ -359,14 +361,16 @@ fn sweep_line(scale: &str, src: &str, start: f64, stop: f64, step: f64) -> Optio
 }
 
 /// `from= to= mode="dec" points=n` (a `lin` sweep counts intervals, not
-/// points); `None` for `log` or no interval.
+/// points; one point is `points=0`, `lib/answeep.cpp` `setupLinearSweep`);
+/// `None` for `log` or no point.
 fn freq_sweep(sw: &Sweep) -> Option<String> {
     let n = match sw.variation {
         "dec" | "oct" => sw.points,
         "lin" => sw.points.saturating_sub(1),
         _ => return None,
     };
-    (n != 0).then(|| {
+    let one = sw.variation == "lin" && sw.points == 1;
+    (n != 0 || one).then(|| {
         format!(
             "from={} to={} mode=\"{}\" points={n}",
             num(sw.start),

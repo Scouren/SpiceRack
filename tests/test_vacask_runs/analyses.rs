@@ -163,3 +163,19 @@ fn dc_transfer_function_runs() {
     close(col(&raw, "tf(vdd)")[0], 0.5, 1e-9);
     close(col(&raw, "zin(vdd)")[0], 2000.0, 1e-9);
 }
+
+#[test]
+fn a_one_point_sweep_is_points_zero() {
+    // VACASK's `points=0` is one point (`lib/answeep.cpp`
+    // `setupLinearSweep`: `end = points+1`). Oracle: the divider's closed
+    // form, 3 V * 1k/2k = 1.5 V; `.ac lin 1 f f` at 1 V AC: 0.5 V.
+    let raw = run(&rc(".dc Vdd 3 3 1"));
+    let out = col(&raw, "out");
+    assert_eq!(out.len(), 1, "{out:?}");
+    close(out[0], 1.5, 1e-9);
+    let deck = "one\nR1 vdd out 1k\nR2 out 0 1k\nVdd vdd 0 0 AC 1\n.ac lin 1 1k 1k\n.end\n";
+    let raw = run(deck);
+    let out = cplx(&raw, "out");
+    assert_eq!(out.len(), 1, "{out:?}");
+    close(out[0].re, 0.5, 1e-9);
+}

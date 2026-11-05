@@ -72,6 +72,9 @@ pub(super) enum Signal<'s> {
     Current(&'s str),
 }
 
+/// The most points an `oct` sweep's `values` list holds.
+const OCT_POINTS_MAX: usize = 100_000;
+
 impl W<'_, '_> {
     /// The testbench's statements.
     pub(super) fn bench(&mut self) {
@@ -361,27 +364,30 @@ impl W<'_, '_> {
         Some(match a {
             // `[REF]`: `dc1 dc`, a `dc` with no sweep is the operating point.
             Ana::Op => "op1 dc".into(),
-            // A second sweep needs a `sweep` block around the first.
-            Ana::Dc(sweeps) if sweeps.len() > 1 => {
-                self.refuse(Code::W0015, tok);
-                return None;
+            // SPICE's first sweep is the inner one; each further one a
+            // `sweep` around it (`[REF]` pp.406-409: `dev`/`param`,
+            // `start`/`stop`/`step`, analyses in braces).
+            Ana::Dc(sweeps) => {
+                let range = |w: &Self, (src, a, b, c): &(String, f64, f64, f64)| {
+                    format!(
+                        "{} start={} stop={} step={}",
+                        dc_selector(src),
+                        n(w, *a),
+                        n(w, *b),
+                        n(w, *c)
+                    )
+                };
+                let Some(first) = sweeps.first() else {
+                    return Some("dc1 dc".into());
+                };
+                let mut s = format!("dc1 dc {}", range(self, first));
+                for (k, sw) in sweeps.iter().enumerate().skip(1) {
+                    let inner = s.replace('\n', "\n  ");
+                    s = format!("dcsweep{k} sweep {} {{\n  {inner}\n}}", range(self, sw));
+                }
+                s
             }
-            Ana::Dc(sweeps) => match sweeps.first() {
-                Some((src, a, b, c)) => format!(
-                    "dc1 dc {} start={} stop={} step={}",
-                    dc_selector(src),
-                    n(self, *a),
-                    n(self, *b),
-                    n(self, *c)
-                ),
-                None => "dc1 dc".into(),
-            },
-            Ana::Ac(sw) => format!(
-                "ac1 ac start={} stop={} {}",
-                n(self, sw.start),
-                n(self, sw.stop),
-                self.points(sw, tok)?
-            ),
+            Ana::Ac(sw) => format!("ac1 ac {}", self.points(sw, tok)?),
             // `step` (#9) is the closest analogue of SPICE's tstep.
             Ana::Tran {
                 step,
@@ -416,33 +422,41 @@ impl W<'_, '_> {
                     false => bare_node(reference),
                 };
                 format!(
-                    "noise1 ({} {neg}) noise start={} stop={} {} iprobe={}",
+                    "noise1 ({} {neg}) noise {} iprobe={}",
                     bare_node(output),
-                    n(self, sweep.start),
-                    n(self, sweep.stop),
                     self.points(sweep, tok)?,
                     self.inst_ref(source)
                 )
             }
-            // INFERRED (the old writer's choice): SPICE `.tf` is a DC
-            // transfer function, Spectre's xf a small-signal one at `freq=0`.
-            Ana::Tf(out, _) => format!("xf1 ({} 0) xf freq=0", bare_node(out)),
+            // `[REF]` p.438: xf is the small-signal transfer function from
+            // every source to the output (`V(out)/V(src)`), here at the one
+            // frequency 0, SPICE's `.tf` at the operating point (p.439
+            // `values`). It has no input or output resistance: noted.
+            Ana::Tf(out, _) => {
+                self.note(Code::W0125, tok);
+                match signal_of(out) {
+                    Some(Signal::Current(dev)) => {
+                        format!("xf1 xf probe={} values=[0]", self.inst_ref(dev))
+                    }
+                    Some(Signal::Nodes(ns)) if ns.len() == 2 => {
+                        format!(
+                            "xf1 ({} {}) xf values=[0]",
+                            self.path(ns[0]),
+                            self.path(ns[1])
+                        )
+                    }
+                    _ => format!("xf1 ({} 0) xf values=[0]", self.path(bare_node(out))),
+                }
+            }
             // `sens` is a control statement over a named analysis, which is
             // written too.
             Ana::Sens(out, Some(sw)) => format!(
-                "sensac1 ac start={} stop={} {}\nsens ({}) for (sensac1)",
-                n(self, sw.start),
-                n(self, sw.stop),
+                "sensac1 ac {}\nsens ({}) for (sensac1)",
                 self.points(sw, tok)?,
                 bare_node(out)
             ),
             Ana::Sens(out, None) => format!("sensdc1 dc\nsens ({}) for (sensdc1)", bare_node(out)),
-            Ana::Sp(sw) => format!(
-                "sp1 sp start={} stop={} {}",
-                n(self, sw.start),
-                n(self, sw.stop),
-                self.points(sw, tok)?
-            ),
+            Ana::Sp(sw) => format!("sp1 sp {}", self.points(sw, tok)?),
             // `fourier` is a component, one per output.
             Ana::Four(f, outs) => outs
                 .iter()
@@ -482,15 +496,30 @@ impl W<'_, '_> {
         })
     }
 
-    /// `dec=10`: a sweep's points (Spectre has no `oct`).
+    /// `start=1 stop=1M dec=10`: a sweep's interval. Spectre has no `oct`
+    /// (`[REF]` p.43):
+    /// its points are `values=[…]`, ngspice's grid (`acan.c`: `f *=
+    /// 2^(1/n)` from `start` while `f <= stop + 2^(1/n)*stop*reltol`).
+    // ponytail: reltol is ngspice's default 1e-3, not the deck's; it moves
+    // only whether a point a hair past `stop` is kept.
     fn points(&mut self, sw: &Sweep, tok: u32) -> Option<String> {
-        match sw.variation {
-            "oct" => {
-                self.refuse(Code::W0015, tok);
-                None
-            }
-            v => Some(format!("{v}={}", sw.points)),
+        if sw.variation != "oct" {
+            let (a, b) = (self.num(sw.start), self.num(sw.stop));
+            return Some(format!("start={a} stop={b} {}={}", sw.variation, sw.points));
         }
+        let delta = 2f64.powf(1.0 / f64::from(sw.points));
+        let end = sw.stop + delta * sw.stop * 1e-3;
+        let mut grid = Vec::new();
+        let mut f = sw.start;
+        while f <= end && grid.len() <= OCT_POINTS_MAX && sw.start > 0.0 {
+            grid.push(self.num(f));
+            f *= delta;
+        }
+        if grid.is_empty() || grid.len() > OCT_POINTS_MAX {
+            self.refuse(Code::W0015, tok);
+            return None;
+        }
+        Some(format!("values=[{}]", grid.join(" ")))
     }
 
     /// `sweep<k>_<name> sweep param=p start= stop= step= {` for `.step`

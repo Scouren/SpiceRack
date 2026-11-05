@@ -49,12 +49,46 @@ fn spectre_ac_and_tran_match_documented_parameters() {
 }
 
 /// `[REF]` "Sweep interval parameters" (p.44, p.182, p.389, p.394, p.439, ...)
-/// list `step lin dec log values valuesfile` only — Spectre has no octave
-/// sweep, so SPICE's `oct` must be refused rather than emitted.
+/// list `step lin dec log values valuesfile` only: Spectre has no octave
+/// sweep, so SPICE's `oct` is its grid as `values=[…]`. The grid is
+/// ngspice-45's, recorded by running it: `.ac oct 3 1 10` gives 10
+/// points, 1 to 8 (2^(10/3) = 10.08 is past `stop` plus its 1.26e-2
+/// tolerance); `.ac oct 250 100 1meg` gives 3323, the last 1.000199e6.
 #[test]
-fn spectre_rejects_octave_frequency_sweeps() {
-    let r = try_analysis(".ac oct 10 1 1meg");
-    assert!(r.is_err(), "{r:?}");
+fn spectre_octave_sweeps_are_ngspices_grid_as_values() {
+    let s = analysis(".ac oct 3 1 10");
+    let v: Vec<f64> = s
+        .strip_prefix("ac1 ac values=[")
+        .and_then(|r| r.strip_suffix(']'))
+        .unwrap_or_else(|| panic!("{s}"))
+        .split(' ')
+        .map(|x| x.parse().unwrap())
+        .collect();
+    let want = [
+        1.0, 1.259921, 1.587401, 2.0, 2.519842, 3.174802, 4.0, 5.039684, 6.349604, 8.0,
+    ];
+    assert_eq!(v.len(), want.len(), "{s}");
+    for (g, w) in v.iter().zip(want) {
+        assert!((g - w).abs() < 1e-6 * w, "{s}");
+    }
+    let s = analysis(".ac oct 250 100 1meg");
+    let v = s.split_once("values=[").unwrap().1.trim_end_matches(']');
+    let v: Vec<&str> = v.split(' ').collect();
+    assert_eq!(v.len(), 3323, "{s}");
+    let last: f64 = v[v.len() - 1].parse().unwrap();
+    assert!((last / 1.000199e6 - 1.0).abs() < 1e-6, "{s}");
+}
+
+/// `[REF]` pp.406-409 `sweep`: "Within a sweep statement, you can specify
+/// analyses statements ... bound within braces"; `dev`/`param` select the
+/// swept value. SPICE's `.dc` sweeps its first source innermost.
+#[test]
+fn a_nested_dc_is_a_spectre_sweep_around_the_inner_dc() {
+    assert_eq!(
+        analysis(".dc Vgs 0 1 0.5 Vbs 0 -3 -1.5"),
+        "dcsweep1 sweep dev=vbs param=dc start=0 stop=-3 step=-1.5 {\n  \
+         dc1 dc dev=vgs param=dc start=0 stop=1 step=500m\n}"
+    );
 }
 
 /// `[REF]` p.181-182 noise: `Name [p] [n] noise parameter=value ...`,
@@ -71,15 +105,25 @@ fn spectre_noise_puts_the_output_in_the_terminal_list() {
 
 /// `[REF]` p.438-439 xf: "you can simply specify a voltage to be the output by
 /// giving a pair of nodes on the xf analysis statement". xf computes the
-/// transfer function from *every* independent source, so there is no
-/// `source=` parameter.
-///
-/// INFERRED, NOT VERIFIED: `freq=0` as the stand-in for SPICE's DC `.tf`.
+/// transfer function from *every* independent source (`V(out)/V(src)`), so
+/// there is no `source=`; `values=[0]` (p.439) is the one frequency 0,
+/// SPICE's DC `.tf`. A current output is a probe (#16). The `.tf`'s input
+/// and output resistances have no xf output: W0125.
 #[test]
 fn spectre_xf_has_no_source_parameter() {
     let s = analysis(".tf V(out) Vin");
-    assert_eq!(s, "xf1 (out 0) xf freq=0");
-    assert!(!s.contains("source="), "{s}");
+    assert_eq!(s, "xf1 (out 0) xf values=[0]");
+    assert_eq!(analysis(".tf i(Vout) Vin"), "xf1 xf probe=vout values=[0]");
+    let w = spicerack::syntax::render::render_text(
+        "t\n.tf v(a,b) vin\n.end\n",
+        Dialect::Ngspice,
+        "t",
+        Dialect::Spectre,
+    )
+    .unwrap();
+    assert!(w.text.contains("xf1 (a b) xf values=[0]"), "{}", w.text);
+    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    assert_eq!(codes, [Code::W0125]);
 }
 
 /// `[REF]` p.524 verbatim: `sens (1 n2 7) for (analAC)` — `sens` is a control

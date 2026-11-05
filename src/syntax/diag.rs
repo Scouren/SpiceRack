@@ -498,6 +498,13 @@ catalogue! {
         cite: "Spectre Reference 19.1 p.166 (`variations`, default `process`); VACASK docs/cmd-analysis-mc.md (`mc` draws at every call site)",
         explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Write `variations=all`, or keep the deck's draws to the scope the montecarlo names.",
     }
+    /// A `.tf` written as Spectre's `xf` at frequency 0: its input and
+    /// output resistances are not computed.
+    W0125 Note {
+        title: "a transfer function's input and output resistance not computed",
+        cite: "Spectre Reference 19.1 pp.438-439 (xf: transfer functions from every source)",
+        explain: "SPICE's `.tf` gives the gain and the input and output resistances at the operating point; Spectre's `xf` at `values=[0]` gives the transfer function from every source to the output, no resistance. Add a test source and compute the resistance from its transfer function.",
+    }
 }
 
 /// Sorts `diags` by source position (token), then code: the order their
