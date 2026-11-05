@@ -172,9 +172,8 @@ others are recorded through `codegen::netlist`, so the whole tree diffs.
    text, as the old writer did (`calls`, `contains('^')`, a `ponytail:`);
    over `Call` nodes and the operator tokens they would be a walk of the
    value trees, with the same verdict on the corpus to be checked.
-4. **Seven capability cells reproduce a silent drop** (`// quirk:` in
-   `capability.rs`): LTspice drops a Verilog-A/OSDI load (`Spell(Omit)`,
-   two cells); CDL copies another family's text (`ForeignText`: `Native`);
+4. **Five capability cells reproduce a silent drop** (`// quirk:` in
+   `capability.rs`): CDL copies another family's text (`ForeignText`: `Native`);
    Spectre and VACASK write a sectionless `.lib` as `include "f"
    section=` and drop a `.print` (two cells each). Phase 7 decides.
 5. The reader duplicates `syntax::adapter`'s rules (copied, then typed to

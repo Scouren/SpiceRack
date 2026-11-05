@@ -243,8 +243,8 @@ catalogue! {
     /// A Verilog-A load the target loads another way (an OSDI binary where it compiles the source, or a command-line plugin).
     W0004 Refusal {
         title: "a Verilog-A load the target cannot spell",
-        cite: "ngspice manual §13 (`pre_osdi`); HSPICE `.hdl`; Xyce RG (`-plugin`)",
-        explain: "The target loads compiled models in a way a deck line cannot name (Xyce takes a `-plugin` on its command line). Load the model through the simulator's own mechanism.",
+        cite: "ngspice manual §13 (`pre_osdi`); HSPICE `.hdl`; Xyce RG (`-plugin`); LTspice help (no Verilog-A or OSDI loader)",
+        explain: "The target loads compiled models in a way a deck line cannot name (Xyce takes a `-plugin` on its command line), or cannot load one at all (LTspice). Load the model through the simulator's own mechanism.",
     }
     /// A `.lib file` with no section: LTspice reads the whole file; another target reads the card as a section definition.
     W0005 Refusal {
@@ -353,8 +353,8 @@ catalogue! {
     /// or inside a subcircuit (the writers load the top's alone).
     W0022 Note {
         title: "a Verilog-A load not written",
-        cite: "LTspice help (no OSDI or Verilog-A loader)",
-        explain: "The writer leaves the load out, as the old writer did: LTspice has no way to load a compiled model (phase 7 refuses it), and a load inside a subcircuit is not written on any target but ESPice. An instance of the model then names nothing the simulator knows; load it at the top.",
+        cite: "ngspice manual §13 (`pre_osdi`, a deck-level command)",
+        explain: "A load inside a subcircuit is not written on any target but ESPice. An instance of the model then names nothing the simulator knows; load it at the top.",
     }
     /// An output request (`.print`, `.save`, `.probe`) not written.
     W0023 Note {

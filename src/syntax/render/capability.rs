@@ -7,7 +7,7 @@
 //!
 //! `Spell` and `Lift` keep the meaning: a named alternative form, or a
 //! rewrite into extra statements recorded as fixups. Anything that cannot
-//! keep its meaning is `Refuse` with a `W` code. Seven cells answer as the
+//! keep its meaning is `Refuse` with a `W` code. Five cells answer as the
 //! old writers behaved, where that drops or garbles something: each is
 //! marked `// quirk:` (the golden gate holds them until phase 7 decides).
 //!
@@ -199,17 +199,13 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::VerilogALoad => match target {
             D::Ngspice => Spell(Alt::PreOsdi),
             D::Espice | D::Hspice => Spell(Alt::Hdl),
-            D::Xyce => Refuse(Code::W0004),
-            // quirk: the old LTspice writer drops a load (LTspice has no
-            // OSDI loader); phase 7 refuses it.
-            D::Ltspice => Spell(Alt::Omit(Code::W0022)),
+            // LTspice has no Verilog-A or OSDI loader (LTspice help).
+            D::Xyce | D::Ltspice => Refuse(Code::W0004),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
         },
         Construct::OsdiLoad => match target {
             D::Ngspice => Spell(Alt::PreOsdi),
-            D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0004),
-            // quirk: as `VerilogALoad`.
-            D::Ltspice => Spell(Alt::Omit(Code::W0022)),
+            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0004),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
         },
         Construct::LibWholeFile => match target {

@@ -596,3 +596,10 @@ xyce/PARAMS2/Params_C4.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (ca
 xyce/PARAMS2/Params_C4_hs.cir spectre ISmant*1F is ISmant*1f: Xyce's F is femto (case-blind), Spectre's scales are case-sensitive and have no F
 xyce/PARAMS2/Params_C5.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
 xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `return 1f*X`: Spectre has no F scale
+
+# Phase 7: spice-write: LTspice Verilog-A/OSDI loads (CONFORMANCE-GAPS S3).
+# LTspice has no Verilog-A compiler or OSDI loader (LTspice help), so a deck
+# loading a model is refused (W0004) where the old writer left the load out
+# and wrote the instance naming an unknown model (W0022 note). The other
+# 450 loading decks were already refused on LTspice for other causes.
+vacask/demo/hierarchy/hier.sim ltspice written without its `load "*.osdi"` is refused W0004: LTspice cannot load the device

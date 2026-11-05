@@ -11,6 +11,7 @@
 #![cfg(feature = "backend")]
 
 use spicerack::backend::Dialect;
+use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::render_text;
 
 // ---- private ----
@@ -20,6 +21,14 @@ fn write(text: &str, from: Dialect, to: Dialect) -> String {
     render_text(text, from, "t", to)
         .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
         .text
+}
+
+/// The codes the refusal of `text` (read as `from`, written for `to`) has.
+fn refusal(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
+    match render_text(text, from, "t", to) {
+        Ok(w) => panic!("written, not refused:\n{}", w.text),
+        Err(e) => e.diags.iter().map(|d| d.code).collect(),
+    }
 }
 
 /// `deck` run on real ngspice: the operating point's `v(name)`.
@@ -74,3 +83,24 @@ fn an_ltspice_whole_file_lib_is_an_include_on_the_spice_targets() {
     assert!(ng.contains("half.lib tt\n"), "{ng}");
 }
 
+// ── Verilog-A and OSDI loads on LTspice ──
+
+/// LTspice help: no Verilog-A compiler and no OSDI loader, so a deck that
+/// loads one cannot run its device there; the old writer left the load out
+/// and wrote the instance anyway. Refused (W0004), each form.
+#[test]
+fn ltspice_refuses_a_verilog_a_or_osdi_load() {
+    let va = "// t\nsimulator lang=spectre\nahdl_include \"m.va\"\nr1 (a 0) resistor r=1k\n";
+    assert_eq!(
+        refusal(va, Dialect::Spectre, Dialect::Ltspice),
+        [Code::W0004]
+    );
+    let osdi = "t\nload \"m.osdi\"\nr1 (a 0) resistor r=1k\n";
+    assert_eq!(
+        refusal(osdi, Dialect::Vacask, Dialect::Ltspice),
+        [Code::W0004]
+    );
+    // The legal neighbour: the same deck with no load is written.
+    let none = va.replace("ahdl_include \"m.va\"\n", "");
+    let _ = write(&none, Dialect::Spectre, Dialect::Ltspice);
+}
