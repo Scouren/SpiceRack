@@ -237,8 +237,9 @@ impl W<'_, '_> {
                 WaveKind::Exp => "exp",
                 WaveKind::Sffm => "fm",
                 WaveKind::Am => "am",
-                // Refused (W0108) or not a VACASK waveform (NoiseWave).
-                WaveKind::Pwl | WaveKind::Trnoise | WaveKind::Trrandom => continue,
+                WaveKind::Pwl => "pwl",
+                // Not a VACASK waveform (NoiseWave).
+                WaveKind::Trnoise | WaveKind::Trrandom => continue,
             };
             let name = format!(
                 "{}{}",
@@ -308,10 +309,29 @@ impl W<'_, '_> {
                 "type=\"am\" sinedc={} ampl={} freq={} modfreq={} delay={}",
                 a[1], a[0], a[3], a[2], a[4]
             ),
-            // PWL comes back identically zero in VACASK's transient.
+            // `type="pwl"` holds the first value before the first point
+            // and the last after, as ngspice does; `delay` is `td=`
+            // (`docs/dev-builtin-src.md`, `lib/devvisrc.cpp` L910 at
+            // 36be560). Its `period` repeats from time 0 and wants the
+            // last value equal to the first: only that `r=0` has a form.
             WaveKind::Pwl => {
-                self.refuse(Code::W0108, tok);
-                return None;
+                let n = w.args.len();
+                let whole = n >= 4
+                    && w.args[0] == Num::Num(0.0)
+                    && w.args[1] == w.args[n - 1]
+                    && w.repeat == Some(Num::Num(0.0));
+                if w.repeat.is_some() && !whole {
+                    self.refuse(Code::W0108, tok);
+                    return None;
+                }
+                let mut s = format!("type=\"pwl\" wave=[{}]", a.join(", "));
+                if whole {
+                    s.push_str(&format!(" period={}", a[n - 2]));
+                }
+                if let Some(d) = &w.delay {
+                    s.push_str(&format!(" delay={}", self.vacask_num(d)));
+                }
+                s
             }
             WaveKind::Trnoise | WaveKind::Trrandom => {
                 self.ask(Construct::NoiseWave, tok);

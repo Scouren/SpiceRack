@@ -522,11 +522,11 @@ catalogue! {
         cite: "HSPICE UG B-2008.09 App. A (`multiplier`); ngspice manual §2.11.5; Xyce RG Table 2-33",
         explain: "The call's arguments have no meaning in the target's statistical form (HSPICE's four-argument multiplier, a count no dialect reads). Write the call with ngspice's arguments.",
     }
-    /// A source waveform the target cannot run as SPICE does (Spectre's AM; VACASK's PWL, a SIN phase, an EXP delay that is no number).
+    /// A source waveform the target cannot run as SPICE does (Spectre's AM; VACASK's PWL repeat, a SIN phase, an EXP delay that is no number).
     W0108 Refusal {
         title: "a source waveform the target cannot run",
-        cite: "Spectre Reference 5.0 p.685 (no AM equation); VACASK vsource (`sine` ignores a phase; PWL)",
-        explain: "The target's source runs this waveform otherwise (Spectre has no AM; VACASK ignores a SIN phase). Write the waveform as a behavioural source or a PWL.",
+        cite: "Spectre Reference 5.0 p.685 (no AM equation); VACASK vsource (`sine` ignores a phase; a PWL `period` repeats from time 0 with the last value the first: `docs/dev-builtin-src.md`)",
+        explain: "The target's source runs this waveform otherwise (Spectre has no AM; VACASK ignores a SIN phase and repeats a PWL only whole). Write the waveform as a behavioural source or a PWL without the repeat.",
     }
     /// A `.measure` the target has no statement for (VACASK).
     W0109 Refusal {

@@ -59,7 +59,7 @@ fn a_pwl_without_repeat_holds_its_last_value() {
 }
 
 #[test]
-fn pwl_repeat_and_delay_are_refused_where_no_dialect_form_exists() {
+fn pwl_repeat_and_delay_are_written_or_refused_per_dialect() {
     let tri = || triangle(Some("0"), Some("0.5m"));
     let v = bench(&source(false, &tri()), 1e-5, 1e-3, "");
     let i = bench(&source(true, &tri()), 1e-5, 1e-3, "");
@@ -72,8 +72,10 @@ fn pwl_repeat_and_delay_are_refused_where_no_dialect_form_exists() {
     for d in [Dialect::Ltspice, Dialect::Hspice, Dialect::Xyce] {
         assert!(refuses(netlist(&v, d), Code::W0008), "{d:?}");
     }
-    // VACASK has no PWL at all (`W0108`, it runs as zero there).
-    assert!(refuses(netlist(&v, Dialect::Vacask), Code::W0108));
+    // VACASK: `delay` and `period`, for the same whole-waveform r=0
+    // (`docs/dev-builtin-src.md`, PWL; run in test_vacask_runs).
+    let vacask = netlist(&v, Dialect::Vacask).unwrap();
+    assert!(vacask.contains("period=2e-3 delay=5e-4"), "{vacask}");
     // Spectre: `delay` and `pwlperiod`, but only for an r= that is exactly a
     // period (test_spectre_golden/); r=1m repeats from mid-waveform.
     let spectre = netlist(&v, Dialect::Spectre).unwrap();

@@ -384,13 +384,16 @@ impl W<'_, '_> {
 // ---- private ----
 
 impl W<'_, '_> {
-    /// `ic=["n"; v; …]`: each node and its value ([`W::vval`]).
+    /// ` ic={"n", v, …}`: each node and its value ([`W::vval`]), upstream
+    /// VACASK's mixed list (36be560; a run of `ic={"out", 0.5}` starts out
+    /// at 0.5 V). The fork's `["n"; v]` is its "unexpected ;", `["n", v]`
+    /// its "Vector component type incompatibility".
     fn node_list(&self, key: &str, items: &[(String, Val)]) -> String {
         let body: Vec<String> = items
             .iter()
-            .map(|(n, v)| format!("\"{}\"; {}", n.to_ascii_lowercase(), self.vval(v)))
+            .map(|(n, v)| format!("\"{}\", {}", n.to_ascii_lowercase(), self.vval(v)))
             .collect();
-        format!(" {key}=[{}]", body.join("; "))
+        format!(" {key}={{{}}}", body.join(", "))
     }
 }
 
