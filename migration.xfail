@@ -32350,3 +32350,34 @@ xyce/SENS/sensCapGearAdjOrder1.cir xyce written differently: Xyce .print kind re
 xyce/SENS/sensCapTrapAdj.cir xyce written differently: Xyce .print kind read as the kind
 xyce/SENS/sensCapTrapAdjNewFD.cir xyce written differently: Xyce .print kind read as the kind
 xyce/SENS/sensCapTrapAdjOrder1.cir xyce written differently: Xyce .print kind read as the kind
+
+# Phase 7: spice-read: Xyce's B source with POLY (render::read devices.rs
+# b_poly; spice/checks.rs exempts it from W0032 like TABLE). `B … V={POLY(n)
+# V(a[,b])…}` / `I={POLY(n) I(src)…}` is the E/G/F/H POLY card it spells
+# (named `E` + `B…`): ngspice's B has no poly() (stream F's Y7), Xyce
+# writes the POLY card back. Oracle: Xyce 7.10 B POLY vs E/F POLY, and Xyce
+# vs ngspice (in the commit).
+xyce/AMPMOD/amp_mod.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/AMPMOD/amp_mod.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/CONNECTIVITY/connect.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/CONNECTIVITY/connect.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_141_SON/poly.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_141_SON/poly.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318_noscope.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318_noscope.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_67/bug_67.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/MPDE/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/MPDE/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/MPDE/sandler24_MPDE.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/POLY/poly.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/POLY/poly.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER24/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER24/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER28/sandler28.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER28/sandler28.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24_WAMPDE.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24_WAMPDE.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY

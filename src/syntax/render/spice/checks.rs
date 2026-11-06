@@ -101,12 +101,15 @@ impl W<'_, '_> {
             .filter(|d| drops.contains(&d.code))
             .map(|d| (d.token, self.rd.line_last(d.token)))
             .collect();
-        // A `TABLE` source is read from its text (`Rd::table_source`), so
-        // a parse note inside it is no unread text.
+        // A `TABLE` source and Xyce's B POLY are read from their text
+        // (`Rd::table_source`, `Rd::b_poly`), so a parse note inside either
+        // is no unread text.
         let blocks = self.blocks();
         let comps = blocks.iter().flat_map(|b| &b.comps);
         dropped.extend(comps.filter_map(|c| match *c {
-            Comp::Card(n) if matches!(self.rd.card_view(n), Card::Table { .. }) => {
+            Comp::Card(n)
+                if matches!(self.rd.card_view(n), Card::Table { .. } | Card::Poly { .. }) =>
+            {
                 let t = self.rd.main(n);
                 Some((t, self.rd.line_last(t)))
             }
