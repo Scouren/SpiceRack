@@ -349,3 +349,36 @@ fn an_initial_condition_by_expression_is_written_in_the_targets_delimiters() {
         .text;
     assert!(hs.lines().any(|l| l == ".ic V(1)='V1'"), "{hs}");
 }
+
+#[test]
+fn a_subcircuit_func_is_the_subcircuits_or_the_tops() {
+    // ngspice-45 and Xyce 7.10 ran both subcircuits' `f` (2 V, 3 V: the
+    // first reads its subcircuit's `r0`); Spectre Reference p.871:
+    // functions "at the top level only" (W0106). One reading only its
+    // arguments, under its own name, moves to the top. Checks: 2 + 1 + 1.
+    let text = "t\n.subckt s1 a b r0=2\n.func f(x) {x*r0}\nR1 a b {f(1k)}\n.ends\n.subckt s2 a b\n.func f(x) {x*3}\nR1 a b {f(1k)}\n.ends\nX1 1 0 s1\nX2 2 0 s2\nI1 0 1 1m\nI2 0 2 1m\n.op\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    let lines: Vec<&str> = ng.lines().collect();
+    let at = |l: &str| lines.iter().position(|x| *x == l).expect(l);
+    assert!(
+        at(".subckt s1 a b PARAMS: r0=2") < at(".func f(x) {x*r0}"),
+        "{ng}"
+    );
+    assert!(at(".subckt s2 a b") < at(".func f(x) {x*3}"), "{ng}");
+    let sp = render_text(text, Dialect::Xyce, "t", Dialect::Spectre).expect_err("refused");
+    assert!(
+        sp.diags.iter().any(|g| g.code == Code::W0106),
+        "{}",
+        sp.messages
+    );
+    let pure = "t\n.subckt s1 a b\n.func g(x) {x*2}\nR1 a b {g(1k)}\n.ends\nX1 1 0 s1\nI1 0 1 1m\n.op\n.end\n";
+    let sp = render_text(pure, Dialect::Xyce, "t", Dialect::Spectre)
+        .expect("written")
+        .text;
+    assert!(
+        sp.lines().next().is_some_and(|_| sp.contains("real g(")),
+        "{sp}"
+    );
+}

@@ -37,6 +37,11 @@ impl W<'_, '_> {
                 self.ask(c, tok);
             }
         }
+        if let Some(&(Func::Param(n) | Func::Card(n) | Func::Real(n))) =
+            blocks.iter().flat_map(|b| &b.funcs).next()
+        {
+            self.ask(Construct::LocalFunc, self.rd.main(n));
+        }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));
         if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {
             self.ask(Construct::TranStartup, tok);

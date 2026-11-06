@@ -342,7 +342,7 @@ fn what_a_writer_leaves_out_or_copies_is_a_note_by_code() {
             Code::W0026,
         ),
         (
-            "t\n.subckt s a\n.func f(x) {x}\nR1 a 0 1k\n.ends\n.end\n",
+            "t\n.subckt s a\n.param f(x)={x}\nR1 a 0 1k\n.ends\n.end\n",
             Dialect::Ngspice,
             Dialect::Espice,
             Code::W0027,

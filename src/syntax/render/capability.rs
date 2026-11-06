@@ -75,6 +75,9 @@ pub enum Construct {
     BranchParam,
     /// `.func f(x) body`.
     Func,
+    /// A `.func` local to a subcircuit (it reads the subcircuit's
+    /// parameters, or another `.func` shares its name).
+    LocalFunc,
     /// `.step`.
     Step,
     /// `.step <name> list <values>`.
@@ -334,6 +337,17 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Vacask => Refuse(Code::W0106),
             D::Spectre | D::Cdl | D::Verilog => Native,
         },
+        // ngspice-45 and Xyce 7.10 run a `.func` reading its subcircuit's
+        // parameter inside the subcircuit (run: 2 V and 3 V from two
+        // subcircuits' `f`); HSPICE's function `.param` is local to its
+        // subcircuit like any `.param` (HSPICE `.PARAM`); Spectre defines
+        // functions "at the top level only" (Reference p.871); VACASK has
+        // none; LTspice's help states no scope for `.func`.
+        Construct::LocalFunc => match target {
+            D::Ngspice | D::Espice | D::Xyce | D::Hspice => Native,
+            D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0106),
+            D::Cdl | D::Verilog => Native,
+        },
         Construct::Step => match target {
             D::Xyce | D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
@@ -468,7 +482,7 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 35] = [
+    const CONSTRUCTS: [Construct; 36] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -490,6 +504,7 @@ mod tests {
         Construct::Conditional,
         Construct::BranchParam,
         Construct::Func,
+        Construct::LocalFunc,
         Construct::Step,
         Construct::StepList,
         Construct::TranStartup,

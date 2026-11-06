@@ -513,7 +513,7 @@ catalogue! {
     /// A function the target cannot define (a body over `v()`/`i()`; VACASK has none).
     W0106 Refusal {
         title: "a function the target cannot define",
-        cite: "Spectre Reference R5 pp.870-871 (`real f(real x)`); VACASK has no user functions",
+        cite: "Spectre Reference R5 pp.870-871 (`real f(real x)`; \"declared at the top level only, and must not be declared within subcircuits\"); VACASK has no user functions; LTspice help `.FUNC` (no scope stated for one in a subcircuit)",
         explain: "The target's functions cannot read node voltages or currents (Spectre), or it has no user functions (VACASK). Inline the function where it is called.",
     }
     /// A statistical call with no form in the target (HSPICE's multiplier, a wrong argument count).
