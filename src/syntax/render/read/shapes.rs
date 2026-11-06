@@ -21,8 +21,8 @@
 //! - `Rd::group_items(&self, g: u32) -> &[u32]`
 
 use super::Rd;
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::token::Tag as T;
 
 impl<'a> Rd<'a> {
@@ -141,7 +141,9 @@ impl<'a> Rd<'a> {
         match self.tag(v) {
             Tag::Word | Tag::Str => true,
             Tag::Delimited => {
-                self.expr_ok(v) || (self.d == Dialect::Xyce && self.ttag(self.main(v)) == T::LBrace)
+                self.expr_ok(v)
+                    || (self.b.card_rules == CardRules::Xyce
+                        && self.ttag(self.main(v)) == T::LBrace)
             }
             Tag::Seq | Tag::Bad | Tag::Group | Tag::Assign => false,
             _ => !self.nests_delimiter(v),

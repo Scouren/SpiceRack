@@ -19,7 +19,8 @@
 use super::W;
 use super::laplace::{self, Laplace};
 use super::ternary::{Read, parenthesize};
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
+use crate::syntax::behaviour::{Coupling, ParamForm, ValueQuoting};
 use crate::syntax::lang::Cells;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::out::Space;
@@ -103,7 +104,7 @@ impl W<'_, '_> {
                 // Xyce and LTspice couple every pair on one card (RG `K`,
                 // LTspice help `K`); the others one card per pair, the
                 // first keeping the name.
-                if matches!(self.d, Dialect::Xyce | Dialect::Ltspice) {
+                if self.b.coupling == Coupling::OneCard {
                     format!("{decl} {} {k}", l.join(" "))
                 } else {
                     pairs(&l)
@@ -241,7 +242,7 @@ impl W<'_, '_> {
     /// spelled for the target ([`W::ternaries`]).
     pub(super) fn spelled(&self, v: &str) -> String {
         let v = self.ternaries(v);
-        if self.d == Dialect::Hspice {
+        if self.b.value_quoting == ValueQuoting::Hspice {
             hspice_value(&v)
         } else {
             v
@@ -252,19 +253,19 @@ impl W<'_, '_> {
     /// (`ternary`): grouped as the source groups a then-branch's (C's, or
     /// ngspice's `{}` evaluator's), a blank before each `:` on Xyce.
     pub(super) fn ternaries(&self, e: &str) -> String {
-        let read = match self.rd.d.family() {
-            Dialect::Ngspice => Read::Ngspice,
-            _ => Read::C,
+        let read = match self.rd.b.text_family == Lang::NGSPICE {
+            true => Read::Ngspice,
+            false => Read::C,
         };
         self.ternaries_as(e, read)
     }
 
     /// `e`'s ternaries for another family, grouped as `read` groups them.
     fn ternaries_as(&self, e: &str, read: Read) -> String {
-        if self.rd.d.family() == self.d.family() {
+        if self.rd.b.text_family == self.b.text_family {
             return e.to_string();
         }
-        parenthesize(e, read, self.d == Dialect::Xyce)
+        parenthesize(e, read, self.b.param_form == ParamForm::Xyce)
     }
 }
 

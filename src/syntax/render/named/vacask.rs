@@ -25,8 +25,8 @@
 use std::collections::BTreeSet;
 
 use super::W;
-use crate::syntax::Dialect;
 use crate::syntax::ast::NONE;
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::Func;
@@ -102,7 +102,7 @@ impl W<'_, '_> {
         let read = read.map(|&n| self.rd.unquote(self.rd.fields(n)[0]));
         let paths: Vec<String> = read.chain(deck.given_loads.iter().cloned()).collect();
         self.unwritten_loads();
-        match self.rd.d == Dialect::Vacask {
+        match self.rd.b.named_rules == NamedRules::Vacask {
             true => loads.extend(paths),
             false => match crate::veriloga::osdi_loads(&paths) {
                 Ok(l) => loads.extend(l),

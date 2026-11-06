@@ -44,11 +44,12 @@ use super::out::{Out, Space};
 use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
 use super::spelling::Spelling;
+use crate::syntax::Lang;
 use crate::syntax::ast::NONE;
+use crate::syntax::behaviour::{Behaviours, Writer};
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::Cells;
 use crate::syntax::resolve::Role;
-use crate::syntax::{Dialect, Lang};
 use lift::Lifted;
 
 /// The writer's state for one deck.
@@ -58,8 +59,10 @@ struct W<'a, 'r> {
     sp: &'static Spelling,
     /// What the target does with each construct.
     cells: &'static Cells,
+    /// The target's behaviours.
+    b: &'static Behaviours,
     /// The target.
-    d: Dialect,
+    lang: Lang,
     /// The deck was read in the target's dialect: its names keep their
     /// case (`[KUN]` B.2: Spectre is case-sensitive, SPICE is not).
     keep_case: bool,
@@ -81,7 +84,6 @@ struct W<'a, 'r> {
 /// # Panics
 /// For a target outside the named family (Spectre, VACASK).
 pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
-    let target = lang.dialect();
     let mut refused = Vec::new();
     let lifted = match lang.action(Construct::StatisticalCall) {
         Action::Lift(Rule::RackVars) => lift::lift(rd, deck, &mut refused),
@@ -105,8 +107,9 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         deck,
         sp: lang.spelling(),
         cells: lang.cells(),
-        d: target,
-        keep_case: rd.d == target,
+        b: lang.behaviours(),
+        lang,
+        keep_case: Lang::from(rd.d) == lang,
         lifted,
         draws,
         names: Names::new(rd, deck, |_, _| None),
@@ -114,10 +117,10 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         diags: refused,
     };
     w.checks();
-    match target {
-        Dialect::Spectre => w.spectre(),
-        Dialect::Vacask => w.vacask(),
-        _ => panic!("write: a named target"),
+    match w.b.writer {
+        Writer::Spectre => w.spectre(),
+        Writer::Vacask => w.vacask(),
+        Writer::Cards | Writer::Cdl | Writer::Verilog => panic!("write: a named target"),
     }
     (w.o.finish(), w.diags)
 }

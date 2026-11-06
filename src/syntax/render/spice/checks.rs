@@ -16,7 +16,8 @@
 
 use super::W;
 use super::ternary::{Nest, ngspice_nest};
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
+use crate::syntax::behaviour::Writer;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Block, Card, Comp, Func, Num, Val};
@@ -31,13 +32,13 @@ impl W<'_, '_> {
         // Text kept from another family reaches only its own; its own
         // family copies it unchecked.
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
-        let foreign = |tok: &u32| self.rd.text_dialect(*tok).family() != self.d.family();
+        let foreign = |tok: &u32| self.rd.text_behaviours(*tok).text_family != self.b.text_family;
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
         // A statement whose target lacks it is that statement's refusal,
         // the rest foreign text's (one note each kind); CDL leaves each
         // out, noted where it does (`cdl::unwritten`).
         let mut asked = Vec::new();
-        let cdl = self.d == Dialect::Cdl;
+        let cdl = self.b.writer == Writer::Cdl;
         for &tok in other.iter().filter(|_| !cdl) {
             let c = self.rd.kept_construct(tok);
             if !asked.contains(&c) {
@@ -61,7 +62,7 @@ impl W<'_, '_> {
             }
         }
         self.ternary_checks(&blocks);
-        let caret = caret_means_power(self.rd.d) != caret_means_power(self.d);
+        let caret = self.rd.b.caret_power != self.b.caret_power;
         let stat = self.cells[Construct::StatisticalCall as usize] != Action::Native;
         if !caret && !stat {
             return;
@@ -81,7 +82,7 @@ impl W<'_, '_> {
     /// statement holding it was left out (a drop note at its first token).
     /// Asked once the deck is written, when its drops are noted.
     pub(super) fn unparsed(&mut self) {
-        if self.rd.d.family() == self.d.family() {
+        if self.rd.b.text_family == self.b.text_family {
             return;
         }
         let drops = [Code::W0021, Code::W0023, Code::W0024, Code::W0028];
@@ -110,7 +111,7 @@ impl<'r> W<'_, 'r> {
     /// refused, as ngspice reads its body by C's grammar in a B source
     /// and its own way in a `{}` value. A B source's is C's (no code).
     fn ternary_checks(&mut self, blocks: &[&Block]) {
-        if self.rd.d.family() != Dialect::Ngspice || self.d.family() == Dialect::Ngspice {
+        if self.rd.b.text_family != Lang::NGSPICE || self.b.text_family == Lang::NGSPICE {
             return;
         }
         let deck = self.deck;
@@ -277,12 +278,6 @@ fn card_exprs(c: Card, tok: u32, out: &mut Vec<(String, u32)>) {
         | Card::Line { .. }
         | Card::Inst { .. } => {}
     }
-}
-
-/// `^` means power in ngspice, HSPICE, ESPice and Spectre, but XOR in
-/// LTspice, Xyce and VACASK.
-fn caret_means_power(d: Dialect) -> bool {
-    !matches!(d, Dialect::Ltspice | Dialect::Xyce | Dialect::Vacask)
 }
 
 /// The names `e` calls: each identifier followed by `(`.

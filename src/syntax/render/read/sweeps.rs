@@ -18,7 +18,7 @@
 
 use super::Rd;
 use super::testbench::{Card, Sweep};
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::CardRules;
 
 /// One `.dc` axis: its source (or parameter) and how it sweeps.
 #[derive(Clone, Debug)]
@@ -72,7 +72,7 @@ impl Rd<'_> {
     /// octave or over a list; `None` when every axis is linear (the plain
     /// `.dc` reads those) or the card does not read.
     pub(in crate::syntax::render) fn dc_axes(&self, items: &[u32]) -> Option<Vec<DcAxis>> {
-        if self.d == Dialect::Hspice {
+        if self.b.card_rules == CardRules::Hspice {
             return self.dc_axes_hspice(items);
         }
         let word = |k: u32| self.wordw(k).then(|| self.text(k).to_ascii_lowercase());
@@ -140,7 +140,7 @@ impl Rd<'_> {
         let is = |k: u32, w: &str| self.wordw(k) && self.text(k).eq_ignore_ascii_case(w);
         let mut it = items;
         // LTspice names a parameter after `param`, and `temp` bare.
-        if self.d == Dialect::Ltspice {
+        if self.b.card_rules == CardRules::Ltspice {
             match it.first() {
                 Some(&p) if is(p, "param") => it = &it[1..],
                 Some(&t) if is(t, "temp") => {}
@@ -217,7 +217,7 @@ impl Rd<'_> {
 
     /// A `.step` card's parts (Xyce RG `.STEP`, LTspice help `.step`).
     pub(super) fn step(&self, n: u32, items: &[u32]) -> Option<Card> {
-        if matches!(self.d, Dialect::Xyce | Dialect::Ltspice)
+        if matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice)
             && self.spaced(n, items)
             && let Some((name, values)) = self.step_list(items)
         {
@@ -228,8 +228,8 @@ impl Rd<'_> {
         // whose `lin|dec|oct` LTspice shares, and Spectre's total-count
         // `log` (Reference 19.1 p.406-410 `sweep`), which Python's
         // `step_sweep` names.
-        let kinds: &[&str] = match self.d {
-            Dialect::Ngspice => &["lin", "dec", "oct", "log"],
+        let kinds: &[&str] = match self.b.card_rules {
+            CardRules::Ngspice => &["lin", "dec", "oct", "log"],
             _ => &["lin", "dec", "oct"],
         };
         let mut it = items;
@@ -244,7 +244,7 @@ impl Rd<'_> {
             }
             _ => None,
         };
-        if self.d == Dialect::Ltspice {
+        if self.b.card_rules == CardRules::Ltspice {
             let (&p, rest) = it.split_first()?;
             if !(self.wordw(p) && self.text(p).eq_ignore_ascii_case("param")) {
                 return None;

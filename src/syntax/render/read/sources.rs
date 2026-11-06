@@ -13,8 +13,8 @@
 //! - `Rd::source(&self, n: u32, e: Element, name: String) -> Option<Card>`
 
 use super::{Card, Rd, Val};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::SourceRules;
 use crate::syntax::device::Primitive as Element;
 
 /// A waveform value: a number or an expression (without delimiters).
@@ -199,7 +199,7 @@ impl<'a> Rd<'a> {
     fn spec(&self, items: &[u32], j: usize) -> Option<(Spec, usize)> {
         let it = items[j];
         let next = items.get(j + 1).copied();
-        let ngspice = self.d == Dialect::Ngspice;
+        let ngspice = self.b.source_rules == SourceRules::Ngspice;
         let numword = |k: u32| self.number(k).is_some();
         if self.word_is(it, "dc") {
             let v = next.filter(|&v| {
@@ -284,7 +284,7 @@ impl<'a> Rd<'a> {
 
     /// The waveform a word names.
     fn wave(&self, w: u32) -> Option<WaveKind> {
-        let ngspice = self.d == Dialect::Ngspice;
+        let ngspice = self.b.source_rules == SourceRules::Ngspice;
         let t = self.word_text(w)?.to_ascii_lowercase();
         Some(match t.as_str() {
             "pulse" => WaveKind::Pulse,

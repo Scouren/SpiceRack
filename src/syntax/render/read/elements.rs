@@ -16,8 +16,8 @@
 //! - `Rd::card_view(&self, n: u32) -> Card`, `Rd::letter(&self, n: u32) -> char`
 
 use super::{Block, Comp, Rd, Val, Wave};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::device::Primitive as Element;
 
 /// An element card as the writer spells it: what the old reader kept of
@@ -230,7 +230,7 @@ impl<'a> Rd<'a> {
                 let (k, ls) = items.split_last()?;
                 // ngspice's `K` couples two inductors (manual, coupled
                 // inductors); Xyce's and LTspice's any number.
-                let many = matches!(self.d, Dialect::Xyce | Dialect::Ltspice);
+                let many = matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice);
                 if ls.len() < 2 || (ls.len() > 2 && !many) {
                     return None;
                 }
@@ -433,7 +433,7 @@ impl<'a> Rd<'a> {
         let mut swapped = None;
         let (val, inst) = match (val, inst.split_first()) {
             (Some(m), Some((&v, tail)))
-                if self.d == Dialect::Xyce
+                if self.b.card_rules == CardRules::Xyce
                     && self.tag(v) != Tag::Assign
                     && self.number(v).is_some()
                     && self.same_rcl_model(m)

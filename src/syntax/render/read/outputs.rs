@@ -15,7 +15,7 @@
 //! - `Rd::probe_outs(&self, n: u32) -> Option<Vec<String>>`
 
 use super::Rd;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::CardRules;
 
 /// the old SPICE grammar's `(s PrintKind)?`: the analysis word after `.print`, and the
 /// text after it.
@@ -139,7 +139,7 @@ impl<'a> Rd<'a> {
 impl<'a> Rd<'a> {
     /// The end of the `Out` at `i`, if one starts there.
     fn out_end(&self, b: &[u8], i: usize) -> Option<usize> {
-        if self.d == Dialect::Hspice {
+        if self.b.card_rules == CardRules::Hspice {
             let e = i + b[i..]
                 .iter()
                 .take_while(|c| !matches!(c, b' ' | b'\t' | b'\n'))

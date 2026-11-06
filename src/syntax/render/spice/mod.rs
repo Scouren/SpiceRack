@@ -43,10 +43,13 @@ use super::out::{Out, Space};
 use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
 use super::spelling::{FuncForm, Spelling};
+use crate::syntax::Lang;
+use crate::syntax::behaviour::{
+    Behaviours, CardRules, EndRule, LoadForm, NumberReading, ParamForm, Writer,
+};
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::Cells;
 use crate::syntax::resolve::Role;
-use crate::syntax::{Dialect, Lang};
 
 /// The writer's state for one deck.
 struct W<'a, 'r> {
@@ -55,8 +58,8 @@ struct W<'a, 'r> {
     sp: &'static Spelling,
     /// What the target does with each construct.
     cells: &'static Cells,
-    /// The target.
-    d: Dialect,
+    /// The target's behaviours.
+    b: &'static Behaviours,
     /// The deck's numbers were read with ngspice's arithmetic.
     x: bool,
     o: Out,
@@ -81,7 +84,7 @@ struct W<'a, 'r> {
 /// is then not the deck), the notes of what is kept or left out. The `Lift`
 /// rules record their fixups in `rd` before anything is written.
 pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
-    let (sp, cells, target) = (lang.spelling(), lang.cells(), lang.dialect());
+    let (sp, cells, b) = (lang.spelling(), lang.cells(), lang.behaviours());
     let mut diags = Vec::new();
     let draws = match lang.action(Construct::Statistics) {
         Action::Lift(Rule::StatisticsDraws) => {
@@ -98,10 +101,12 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         deck,
         sp,
         cells,
-        d: target,
+        b,
         // CDL's cards are the old layout's ngspice cards,
         // which spells numbers without ngspice's arithmetic.
-        x: rd.d == Dialect::Ngspice && target != Dialect::Cdl && deck.numbers == Numbers::Read,
+        x: rd.b.numbers == NumberReading::Ngspice
+            && b.writer != Writer::Cdl
+            && deck.numbers == Numbers::Read,
         o: Out::new(4096),
         diags,
         draws,
@@ -111,12 +116,12 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         in_section: false,
     };
     // Verilog evaluates nothing, so no deck-wide check refuses it.
-    if target == Dialect::Verilog {
+    if b.writer == Writer::Verilog {
         w.verilog();
         return (w.o.finish(), w.diags);
     }
     w.checks();
-    if target == Dialect::Cdl {
+    if b.writer == Writer::Cdl {
         w.cdl();
         w.unparsed();
         return (w.o.finish(), w.diags);
@@ -172,7 +177,7 @@ impl W<'_, '_> {
     /// library rendered alone, or sources alone) ends without one.
     fn frame(&self) -> Frame {
         let mut f = role::frame(Role::Deck);
-        if self.d == Dialect::Hspice {
+        if self.b.end_rule == EndRule::WhenRuns {
             f.end = self.runs();
         }
         f
@@ -215,8 +220,8 @@ impl W<'_, '_> {
         let paths: Vec<String> = top.iter().map(|(p, _)| p.clone()).collect();
         let tok = top.first().map_or(0, |l| l.1);
         let source = crate::veriloga::is_source;
-        match self.d {
-            Dialect::Ngspice if control && !top.is_empty() => {
+        match self.b.load_form {
+            LoadForm::Ngspice if control && !top.is_empty() => {
                 match crate::veriloga::osdi_loads(&paths) {
                     Ok(loads) => {
                         self.o.token(".control", Space::Line);
@@ -228,7 +233,7 @@ impl W<'_, '_> {
                     Err(_) => self.refuse(Code::W0004, tok),
                 }
             }
-            Dialect::Espice => {
+            LoadForm::Espice => {
                 let defs = deck.defs.iter().flat_map(|s| &s.loads);
                 let defs = defs.map(|&n| (path(n), self.rd.main(n)));
                 let mut seen: Vec<String> = Vec::new();
@@ -241,10 +246,10 @@ impl W<'_, '_> {
                     }
                 }
             }
-            Dialect::Xyce if !top.is_empty() => {
+            LoadForm::Xyce if !top.is_empty() => {
                 self.ask(Construct::VerilogALoad, tok);
             }
-            Dialect::Hspice => {
+            LoadForm::Hspice => {
                 for (l, _) in &top {
                     if !source(l) {
                         self.ask(Construct::OsdiLoad, tok);
@@ -253,7 +258,7 @@ impl W<'_, '_> {
                     }
                 }
             }
-            Dialect::Ltspice => {
+            LoadForm::Ltspice => {
                 for (l, tok) in &top {
                     let c = match source(l) {
                         true => Construct::VerilogALoad,
@@ -265,7 +270,7 @@ impl W<'_, '_> {
             _ => {}
         }
         // ESPice loads a subcircuit's too (above); the others the top's.
-        if self.d != Dialect::Espice {
+        if self.b.load_form != LoadForm::Espice {
             for &n in deck.defs.iter().flat_map(|s| &s.loads) {
                 self.note(Code::W0022, self.rd.main(n));
             }
@@ -350,7 +355,7 @@ impl W<'_, '_> {
                 v = d.to_string();
             }
             let v = self.spelled(&v);
-            let kw = match self.d == Dialect::Xyce && self.rd.global_param(a) {
+            let kw = match self.b.param_form == ParamForm::Xyce && self.rd.global_param(a) {
                 true => ".global_param",
                 false => ".param",
             };
@@ -382,7 +387,7 @@ impl W<'_, '_> {
         let mos = m.kind.eq_ignore_ascii_case("nmos") || m.kind.eq_ignore_ascii_case("pmos");
         let mut line = format!(".model {} {}", m.name, m.kind);
         for (i, (k, v)) in m.params.iter().enumerate() {
-            let v = if self.d == Dialect::Xyce
+            let v = if self.b.param_form == ParamForm::Xyce
                 && mos
                 && k.eq_ignore_ascii_case("level")
                 && v.trim() == "8"
@@ -434,7 +439,10 @@ impl W<'_, '_> {
         self.param_lines(&draws);
         self.param_cards(&sc.locals);
         self.models(sc);
-        self.body(sc, self.rd.d == Dialect::Ltspice && !self.in_section);
+        self.body(
+            sc,
+            self.rd.b.card_rules == CardRules::Ltspice && !self.in_section,
+        );
         self.o.token(&format!(".ends {}", sc.name), Space::Line);
         self.scope = crate::syntax::ast::NONE;
     }
@@ -464,7 +472,7 @@ impl W<'_, '_> {
     /// deck's top or definition), an inductor of `b` itself carries
     /// LTspice's implicit `Rser=1m` unless a `K` couples it.
     fn body(&mut self, b: &Block, rser: bool) {
-        let coupled = match rser && self.rd.d == Dialect::Ltspice {
+        let coupled = match rser && self.rd.b.card_rules == CardRules::Ltspice {
             true => Some(self.coupled(b)),
             false => None,
         };

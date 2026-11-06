@@ -16,8 +16,8 @@
 use super::cards::Model;
 use super::named::{spectre_kind, vacask_builtin, vacask_kind};
 use super::{Block, Rd};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Tag};
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::token::Tag as T;
 
 /// A Spectre `statistics` block as the old reader kept it.
@@ -145,7 +145,9 @@ impl<'a> Rd<'a> {
     /// `one_model`): `false` when the IR had no kind for it; a VACASK
     /// built-in is declared by the writer, not placed.
     fn one_model(&mut self, n: u32, bin: u32, here: &mut Block) -> bool {
-        if self.d == Dialect::Vacask && vacask_builtin(&self.name_of(self.fields(n)[1])).is_some() {
+        if self.b.named_rules == NamedRules::Vacask
+            && vacask_builtin(&self.name_of(self.fields(n)[1])).is_some()
+        {
             return true;
         }
         match self.model_of(n, bin) {
@@ -170,13 +172,14 @@ impl<'a> Rd<'a> {
                 format!("{name}.{}", self.t.text(self.main(b)))
             }
         };
-        let (kind, level) = if self.d == Dialect::Vacask {
+        let (kind, level) = if self.b.named_rules == NamedRules::Vacask {
             vacask_kind(&master, self.get(&p, "type").and_then(|t| self.number(t)))?
         } else {
             let ty = self.get(&p, "type").map(|t| self.text(t));
             spectre_kind(&master, ty.as_deref())
         };
-        let drop_type = self.d == Dialect::Vacask || level.is_some() || kind != master;
+        let drop_type =
+            self.b.named_rules == NamedRules::Vacask || level.is_some() || kind != master;
         let mut params: Vec<(String, String)> = p
             .iter()
             .filter(|(k, _)| !(drop_type && k == "type"))

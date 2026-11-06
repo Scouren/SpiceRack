@@ -20,7 +20,7 @@
 //! - `fn bare_node(s: &str) -> &str`
 
 use super::W;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::{ModelSemantics, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt};
@@ -121,8 +121,8 @@ impl W<'_, '_> {
         let mut opts = Vec::new();
         for (k, v, tok) in &tb.options {
             let k = k.to_ascii_lowercase();
-            let spectre = match self.rd.d {
-                Dialect::Spectre => Some(k.as_str()),
+            let spectre = match self.rd.b.options_form {
+                OptionsForm::Spectre => Some(k.as_str()),
                 _ => SPECTRE_OPTIONS.iter().find(|o| o.0 == k).map(|o| o.1),
             };
             match spectre {
@@ -235,10 +235,7 @@ impl W<'_, '_> {
     /// joined by `.` (`[CMP]` p.886: `OpAmp1.comp`); Xyce's separator
     /// `:` (`v(X1:n)`, the corpus's Xyce decks) is Spectre's `.`.
     pub(super) fn path(&self, s: &str) -> String {
-        let sep = match self.rd.d {
-            Dialect::Xyce => ':',
-            _ => '.',
-        };
+        let sep = self.rd.b.hier_sep;
         let mut segs: Vec<&str> = s.trim().split(sep).collect();
         let node = segs.pop().map_or(String::new(), |n| self.node(n));
         segs.iter()
@@ -253,9 +250,9 @@ impl W<'_, '_> {
         for (outs, tok) in &tb.prints {
             self.ask(Construct::Print, *tok);
             // VACASK's raw file holds every node voltage and source current.
-            let unwritten = outs.iter().any(|o| match (signal_of(o), self.d) {
+            let unwritten = outs.iter().any(|o| match (signal_of(o), self.b.writer) {
                 (None, _) => true,
-                (Some(Signal::Current(dev)), Dialect::Vacask) => !dev.starts_with(['v', 'V']),
+                (Some(Signal::Current(dev)), Writer::Vacask) => !dev.starts_with(['v', 'V']),
                 (Some(_), _) => false,
             });
             if unwritten {
@@ -300,7 +297,7 @@ impl W<'_, '_> {
                                 // `.options parser scale=1.0u`); ngspice-45
                                 // takes it as an unused flag.
                                 Opt::Portable(k, v)
-                                    if self.rd.d == Dialect::Ngspice
+                                    if self.rd.b.model_semantics == ModelSemantics::Ngspice
                                         && v.is_empty()
                                         && k.eq_ignore_ascii_case("parser") =>
                                 {

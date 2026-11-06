@@ -8,7 +8,7 @@
 //! (`analysis`, `sweep`, `options`).
 //!
 //! Contents:
-//! - `fn spectre_refusal(target: Dialect, kind: &str) -> Code`
+//! - `fn spectre_refusal(target: &Behaviours, kind: &str) -> Code`
 //! - `Rd::bench_cards(&self, b: Bench) -> Vec<BenchCard>`
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
 //! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
@@ -16,8 +16,8 @@
 
 use super::named_elements::unquoted;
 use super::{Ana, Bench, BenchCard, Opt, Rd, Sweep};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::{Behaviours, NamedRules};
 use crate::syntax::diag::Code;
 use crate::syntax::token::Tag as T;
 
@@ -29,15 +29,8 @@ use crate::syntax::token::Tag as T;
 /// `.hb`, an analysis's `sweep` and `monte=`; Xyce: `.hb`, `.lin`, `.sens`,
 /// `.step`, `.sampling` (RG Table 6-1); LTspice: `.step`; VACASK: `hb`,
 /// `sweep`, `acxf`, `mc` (`docs/analysis_types.md`).
-pub(in crate::syntax::render) fn spectre_refusal(target: Dialect, kind: &str) -> Code {
-    let has: &[&str] = match target {
-        Dialect::Ngspice | Dialect::Espice => &["pz", "sp", "sens"],
-        Dialect::Hspice => &["pz", "sens", "sp", "hb", "sweep", "montecarlo"],
-        Dialect::Xyce => &["hb", "sp", "sens", "sweep", "montecarlo"],
-        Dialect::Ltspice => &["sweep"],
-        Dialect::Vacask => &["hb", "sweep", "xf", "montecarlo"],
-        Dialect::Spectre | Dialect::Cdl | Dialect::Verilog => &[],
-    };
+pub(in crate::syntax::render) fn spectre_refusal(target: &Behaviours, kind: &str) -> Code {
+    let has = target.spectre_analyses;
     match has.contains(&kind) {
         true => Code::W0001,
         false => Code::W0015,
@@ -146,7 +139,7 @@ impl<'a> Rd<'a> {
             // A form of the analyses above the IR does not read stays text;
             // any other analysis is the Spectre family's own.
             ("dc" | "ac" | "tran" | "noise" | "sp" | "pz", _) => return None,
-            _ if self.text_dialect(self.main(n)) == Dialect::Spectre => {
+            _ if self.text_behaviours(self.main(n)).named_rules == NamedRules::Spectre => {
                 Ana::Spectre { kind, node: n }
             }
             _ => return None,

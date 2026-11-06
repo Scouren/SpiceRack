@@ -1,7 +1,7 @@
 //! Languages as handles into one table of rows: a [`Lang`] → its row,
 //! which holds every table its reader and writers read (the lexicon, the
 //! spelling, the capability column) and the code path that reads them
-//! (its [`Dialect`]). The readers and writers reach a language's tables
+//! (its [`Dialect`]), and its [`Behaviours`]. The readers and writers reach a language's tables
 //! only through its row, so a row is what a dialect definition fills
 //! (`tests/fixtures/transpiler/DIALECT-PLUGIN.md`).
 //!
@@ -16,10 +16,11 @@
 //! - `pub type Cells`, `pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT]`, `pub const CONSTRUCT_COUNT: usize`
 //! - `Lang::dialect(self) -> Dialect`, `Lang::lexicon(self) -> Option<&'static Lexicon>`,
 //!   `Lang::spelling(self) -> &'static Spelling`, `Lang::cells(self) -> &'static Cells`,
-//!   `Lang::action(self, c: Construct) -> Action`
+//!   `Lang::action(self, c: Construct) -> Action`, `Lang::behaviours(self) -> &'static Behaviours`
 //! - `impl From<Dialect> for Lang`
 
 use crate::syntax::Dialect;
+use crate::syntax::behaviour::{self, Behaviours};
 use crate::syntax::lexicon::{self, Lexicon};
 use crate::syntax::render::capability::{Action, Construct, action};
 use crate::syntax::render::spelling::{Spelling, spelling};
@@ -83,6 +84,7 @@ struct Row {
     lexicon: Option<&'static Lexicon>,
     spelling: &'static Spelling,
     cells: Cells,
+    behaviours: Behaviours,
 }
 
 /// The rows, the built-ins at their [`Dialect::ALL`] positions.
@@ -153,6 +155,11 @@ impl Lang {
     pub fn action(self, c: Construct) -> Action {
         self.cells()[c as usize]
     }
+
+    /// What its reader and writer do that its tables do not say.
+    pub fn behaviours(self) -> &'static Behaviours {
+        &self.row().behaviours
+    }
 }
 
 impl From<Dialect> for Lang {
@@ -195,6 +202,7 @@ const fn builtin(d: Dialect) -> Row {
         lexicon,
         spelling: spelling(d),
         cells,
+        behaviours: behaviour::builtin(d),
     }
 }
 

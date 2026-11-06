@@ -11,7 +11,7 @@
 
 use super::W;
 use super::vacask::{num, q};
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::ModelSemantics;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Card, Num, Val, Wave, WaveKind};
@@ -35,7 +35,7 @@ impl W<'_, '_> {
             } => {
                 // A model card read as ngspice maps through
                 // `render::models` (`sp_resistor`, `sp_capacitor`).
-                let ngspice = self.rd.d == Dialect::Ngspice;
+                let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
                 if model.is_some() && !(ngspice && matches!(letter, 'R' | 'C')) {
                     self.ask(Construct::RclModel, tok);
                     return None;

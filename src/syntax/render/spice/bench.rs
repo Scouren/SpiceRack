@@ -19,6 +19,7 @@
 
 use super::W;
 use crate::syntax::Dialect;
+use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
@@ -84,7 +85,7 @@ impl W<'_, '_> {
     /// `.ac`/`.tran`/`.dc` for a `.measure` to read, or a raw control block
     /// already runs the deck.
     pub(super) fn control_run(&self) -> Option<Vec<String>> {
-        if self.d != Dialect::Ngspice {
+        if self.b.control_block != ControlBlock::Ngspice {
             return None;
         }
         let tb = self.fold();
@@ -144,7 +145,7 @@ impl W<'_, '_> {
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
         }
-        if self.d == Dialect::Xyce {
+        if self.b.options_form == OptionsForm::XycePackages {
             for l in self.xyce_options(&tb) {
                 self.o.token(&l, Space::Line);
             }
@@ -206,9 +207,9 @@ impl W<'_, '_> {
                 self.refuse(Code::W0016, *tok);
                 continue;
             }
-            let line = match (self.d, sweep) {
-                (Dialect::Xyce, Some(s)) => format!(".step {s} {param} {a} {b} {c}"),
-                (Dialect::Xyce, None) => format!(".step {param} {a} {b} {c}"),
+            let line = match (self.b.analysis_form, sweep) {
+                (AnalysisForm::Xyce, Some(s)) => format!(".step {s} {param} {a} {b} {c}"),
+                (AnalysisForm::Xyce, None) => format!(".step {param} {a} {b} {c}"),
                 (_, Some(s)) => format!(".step {s} param {param} {a} {b} {c}"),
                 (_, None) => format!(".step param {param} {a} {b} {c}"),
             };
@@ -221,8 +222,8 @@ impl W<'_, '_> {
             // Xyce RG `.STEP <name> LIST`; LTspice help `.step
             // param <name> list`, `temp` bare.
             let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
-            let name = match (self.d, param.eq_ignore_ascii_case("temp")) {
-                (Dialect::Ltspice, false) => format!("param {param}"),
+            let name = match (self.b.analysis_form, param.eq_ignore_ascii_case("temp")) {
+                (AnalysisForm::Ltspice, false) => format!("param {param}"),
                 _ => param.clone(),
             };
             self.o.token(
@@ -306,7 +307,9 @@ impl W<'_, '_> {
                     match o {
                         Opt::Portable(k, v) => tb.portable.push((k, v, tok)),
                         Opt::Xyce(k, v) => {
-                            if self.d != Dialect::Xyce && !tb.dropped.contains(&tok) {
+                            if self.b.options_form != OptionsForm::XycePackages
+                                && !tb.dropped.contains(&tok)
+                            {
                                 tb.dropped.push(tok);
                             }
                             tb.xyce.push((k, v));
@@ -347,7 +350,10 @@ impl W<'_, '_> {
             .analyses
             .iter()
             .any(|(a, _)| matches!(a, Ana::Noise { .. }));
-        let ngspice = matches!(self.d, Dialect::Ngspice | Dialect::Espice);
+        let ngspice = matches!(
+            self.b.analysis_form,
+            AnalysisForm::Ngspice | AnalysisForm::Espice
+        );
         // Asked here, not through `ask`: a deck with no save card has no
         // token to note an omission at.
         let written = match self.cells[Construct::Save as usize] {

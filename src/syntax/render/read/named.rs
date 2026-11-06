@@ -24,8 +24,8 @@ use std::collections::HashMap;
 
 use super::blocks::Opened;
 use super::{Acc, Bench, Block, Func, Rd, Scope};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{Header, NONE, Node, Tag};
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::statement::Statement;
 use crate::syntax::token::Tag as T;
 
@@ -124,7 +124,7 @@ impl<'a> Rd<'a> {
                         p.extend(self.pairs(bin));
                     }
                     let ty = self.get(&p, "type");
-                    if self.d == Dialect::Vacask {
+                    if self.b.named_rules == NamedRules::Vacask {
                         match vacask_kind(&master, ty.and_then(|t| self.number(t))) {
                             Some((kind, _)) => {
                                 kinds.insert(name, kind);
@@ -250,14 +250,14 @@ impl<'a> Rd<'a> {
             Tag::Card if self.ttag(self.main(n)) == T::KwSimulator => {}
             Tag::Instance if !self.inst_peg_ok(n) => self.unparsed(n, here),
             Tag::Analysis | Tag::Command | Tag::Options
-                if self.d == Dialect::Spectre && !self.inst_peg_ok(n) =>
+                if self.b.named_rules == NamedRules::Spectre && !self.inst_peg_ok(n) =>
             {
                 self.unparsed(n, here)
             }
             // quirk: the old VACASK grammar's `stmt`: `save`, `analysis`,
             // `sweep`, `options` are statements only inside `control`.
             Tag::Save | Tag::Card | Tag::Analysis | Tag::Options
-                if self.d == Dialect::Vacask && !self.vacask_top_ok(n) =>
+                if self.b.named_rules == NamedRules::Vacask && !self.vacask_top_ok(n) =>
             {
                 self.unparsed(n, here)
             }
@@ -292,7 +292,7 @@ impl<'a> Rd<'a> {
             },
             Tag::Global => {
                 for &k in self.fields(n) {
-                    if self.d == Dialect::Spectre && self.text(k) == "0" {
+                    if self.b.named_rules == NamedRules::Spectre && self.text(k) == "0" {
                         continue;
                     }
                     let g = self.name_of(k);
@@ -379,10 +379,10 @@ impl<'a> Rd<'a> {
         let Header { name, master, .. } = self.ast.header(Node(n));
         let parens = self.last(name) < self.line_last(self.main(n))
             && self.ttag(self.last(name) + 1) == T::LParen;
-        if self.d == Dialect::Vacask && !parens {
+        if self.b.named_rules == NamedRules::Vacask && !parens {
             return false;
         }
-        if self.d == Dialect::Spectre && master == NONE {
+        if self.b.named_rules == NamedRules::Spectre && master == NONE {
             return false;
         }
         self.fields(n).iter().all(|&k| {
@@ -405,7 +405,9 @@ impl<'a> Rd<'a> {
     fn named_leaks(&self, n: u32) -> bool {
         match self.tag(n) {
             Tag::Global | Tag::Save | Tag::Region | Tag::Control => true,
-            Tag::Analysis | Tag::Command | Tag::Options => self.d == Dialect::Spectre,
+            Tag::Analysis | Tag::Command | Tag::Options => {
+                self.b.named_rules == NamedRules::Spectre
+            }
             Tag::Instance => self.analysis_kind(n),
             _ => false,
         }
@@ -418,7 +420,7 @@ impl<'a> Rd<'a> {
         match self.tag(n) {
             Tag::Card if matches!(head, T::KwLoad | T::KwAhdlInclude) => {
                 let path = self.unquote(self.fields(n)[0]);
-                if !(self.d == Dialect::Vacask && path.starts_with("spice/")) {
+                if !(self.b.named_rules == NamedRules::Vacask && path.starts_with("spice/")) {
                     here.loads.push(n);
                 }
                 true

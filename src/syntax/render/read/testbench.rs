@@ -22,8 +22,8 @@ use super::Rd;
 use super::options::Opt;
 use super::outputs::print_kind;
 use super::sweeps::DcSweep;
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::token::Tag as T;
 
 /// What one testbench card adds to the deck's testbench (the old
@@ -269,8 +269,8 @@ impl<'a> Rd<'a> {
     fn read_card(&self, n: u32) -> Option<Card> {
         let items = self.fields(n);
         let kind = self.head_kind(n);
-        let hspice = self.d == Dialect::Hspice;
-        let lt = self.d == Dialect::Ltspice;
+        let hspice = self.b.card_rules == CardRules::Hspice;
+        let lt = self.b.card_rules == CardRules::Ltspice;
         match self.tag(n) {
             Tag::Options => self.options_ok(n).then_some(Card::Options),
             Tag::Temp => match items {
@@ -280,7 +280,7 @@ impl<'a> Rd<'a> {
             // Bare `node value` pairs: Xyce 7.10 runs `.ic 1 1.0` as `.ic
             // v(1)=1.0` (checked by running both); HSPICE `.DCVOLT 11 5`.
             Tag::Ic | Tag::Nodeset
-                if matches!(self.d, Dialect::Xyce | Dialect::Hspice)
+                if matches!(self.b.card_rules, CardRules::Xyce | CardRules::Hspice)
                     && !items.is_empty()
                     && items.iter().all(|&k| self.tag(k) != Tag::Assign) =>
             {
@@ -324,8 +324,10 @@ impl<'a> Rd<'a> {
             Tag::Step => self.step(n, items),
             Tag::Analysis => match kind.as_str() {
                 "op" => Some(Card::Op),
-                "dc" if matches!(self.d, Dialect::Xyce | Dialect::Ltspice | Dialect::Hspice)
-                    && self.spaced(n, items)
+                "dc" if matches!(
+                    self.b.card_rules,
+                    CardRules::Xyce | CardRules::Ltspice | CardRules::Hspice
+                ) && self.spaced(n, items)
                     && let Some(axes) = self.dc_axes(items) =>
                 {
                     Some(Card::DcAxes(axes))
@@ -398,7 +400,9 @@ impl<'a> Rd<'a> {
             let w = self.text(u).to_ascii_lowercase();
             match w.as_str() {
                 // Xyce 7.10 runs `NOOP` and `UIC` alike (checked by running both).
-                "uic" | "noop" if !uic && (w == "uic" || self.d == Dialect::Xyce) => uic = true,
+                "uic" | "noop" if !uic && (w == "uic" || self.b.card_rules == CardRules::Xyce) => {
+                    uic = true
+                }
                 "startup" if lt && !startup => startup = true,
                 _ => break,
             }

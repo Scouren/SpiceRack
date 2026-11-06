@@ -13,8 +13,8 @@
 
 use super::named::{spectre_kind, vacask_builtin, vacask_kind};
 use super::{Card, Num, Rd, Val, Wave, WaveKind};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::resolve::{Binding, Def, DefKind, Polarity};
 
 /// The keys one dialect's built-in masters use (the old lowering).
@@ -199,7 +199,9 @@ impl<'a> Rd<'a> {
                     gain,
                 }
             }
-            m if m == keys.mutual && (self.d == Dialect::Spectre || ns.is_empty()) => {
+            m if m == keys.mutual
+                && (self.b.named_rules == NamedRules::Spectre || ns.is_empty()) =>
+            {
                 let refs = vec![ident("ind1")?, ident("ind2")?];
                 Card::Coupling {
                     name: self.strip(&name, 'k'),
@@ -208,7 +210,7 @@ impl<'a> Rd<'a> {
                     k: num(keys.coupling)?,
                 }
             }
-            "pvcvs" | "pvccs" | "pcccs" | "pccvs" if self.d == Dialect::Spectre => {
+            "pvcvs" | "pvccs" | "pcccs" | "pccvs" if self.b.named_rules == NamedRules::Spectre => {
                 let letter = match master.as_str() {
                     "pvcvs" => 'E',
                     "pvccs" => 'G',
@@ -239,7 +241,9 @@ impl<'a> Rd<'a> {
                 }
             }
             "iprobe" | "port" | "tline" | "bsource"
-                if self.d == Dialect::Spectre && kit.is_none() && !subckts.contains(&master) =>
+                if self.b.named_rules == NamedRules::Spectre
+                    && kit.is_none()
+                    && !subckts.contains(&master) =>
             {
                 return self.named_master(&master, &name, &ns, &p);
             }
@@ -262,8 +266,8 @@ impl<'a> Rd<'a> {
                     ("d", 2) => 'd',
                     ("npn" | "pnp", 3..=5) => 'q',
                     ("nmos" | "pmos", 4) => 'm',
-                    ("njf" | "pjf", 3) if self.d == Dialect::Vacask => 'j',
-                    ("nmf" | "pmf", 3) if self.d == Dialect::Vacask => 'z',
+                    ("njf" | "pjf", 3) if self.b.named_rules == NamedRules::Vacask => 'j',
+                    ("nmf" | "pmf", 3) if self.b.named_rules == NamedRules::Vacask => 'z',
                     _ => return None,
                 };
                 Card::Semi {
@@ -280,7 +284,7 @@ impl<'a> Rd<'a> {
     /// `name`'s SPICE spelling: the letter a writer adds back is dropped
     /// (the old lowering's `strip`).
     pub(super) fn strip(&self, name: &str, letter: char) -> String {
-        let name = if self.d == Dialect::Vacask {
+        let name = if self.b.named_rules == NamedRules::Vacask {
             name.to_lowercase()
         } else {
             name.to_string()
@@ -305,7 +309,7 @@ impl<'a> Rd<'a> {
             DefKind::Subckt { .. } => Some(Declared::Subckt),
             DefKind::Model { word, polarity, .. } => {
                 let p = *polarity == Some(Polarity::P);
-                if self.d == Dialect::Vacask {
+                if self.b.named_rules == NamedRules::Vacask {
                     let ty = polarity.map(|_| if p { -1.0 } else { 1.0 });
                     return match vacask_kind(word, ty) {
                         Some((kind, _)) => Some(Declared::Model(kind)),
@@ -330,7 +334,7 @@ impl<'a> Rd<'a> {
     }
 
     fn keys(&self) -> &'static Keys {
-        if self.d == Dialect::Vacask {
+        if self.b.named_rules == NamedRules::Vacask {
             &VACASK
         } else {
             &SPECTRE
@@ -349,7 +353,7 @@ impl<'a> Rd<'a> {
             .map(|t| self.text(t).trim_matches('"').to_string());
         let fm = ty.as_deref() == Some("fm")
             || (ty.as_deref() == Some("sine") && self.get(p, "fmmodindex").is_some());
-        let spectre_exp = self.d == Dialect::Spectre && ty.as_deref() == Some("exp");
+        let spectre_exp = self.b.named_rules == NamedRules::Spectre && ty.as_deref() == Some("exp");
         if (fm || spectre_exp)
             && self
                 .get(p, "delay")
@@ -404,7 +408,7 @@ impl<'a> Rd<'a> {
                 delay: None,
                 cut: false,
             },
-            Some("exp") if self.d == Dialect::Vacask => {
+            Some("exp") if self.b.named_rules == NamedRules::Vacask => {
                 let n = |k: &str| self.get(p, k).map_or(Some(0.0), |v| self.number(v));
                 Wave {
                     kind: WaveKind::Exp,
@@ -461,7 +465,7 @@ impl<'a> Rd<'a> {
                 delay: None,
                 cut: false,
             },
-            Some("pwl") if self.d == Dialect::Spectre => {
+            Some("pwl") if self.b.named_rules == NamedRules::Spectre => {
                 let w = self.get(p, "wave")?;
                 let xs: Vec<Num> = self
                     .velems(w)

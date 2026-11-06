@@ -31,9 +31,9 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use super::{Block, Comp, Deck, Func, Rd};
-use crate::syntax::Dialect;
 use crate::syntax::Lang;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::{NamedRules, Writer};
 use crate::syntax::lexicon::Lexicon;
 use crate::syntax::number;
 use crate::syntax::token::Tag as T;
@@ -123,7 +123,7 @@ impl<'a> Rd<'a> {
     /// `vary` rows (an emptied `statistics` block with them), and the
     /// `rack_*` functions no value calls.
     pub(super) fn unlift(&mut self, deck: &mut Deck) {
-        if self.d != Dialect::Spectre {
+        if self.b.named_rules != NamedRules::Spectre {
             return;
         }
         let mut kinds: HashMap<String, bool> = HashMap::new(); // var -> unif
@@ -382,7 +382,7 @@ impl<'a> Rd<'a> {
         // VACASK's writer lowercases another dialect's expressions (its
         // names are case-sensitive, SPICE's not: `named::vacask`'s
         // `W::expr`), so a spelling must read the same lowercased.
-        let folds = sp.target == Dialect::Vacask;
+        let folds = Lang::from(sp.target).behaviours().writer == Writer::Vacask;
         // An ulp between two dialects' arithmetic is no misreading; a
         // suffix read another way is a factor of 10 or more.
         let reads = |s: &str| {

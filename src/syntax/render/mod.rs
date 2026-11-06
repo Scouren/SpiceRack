@@ -39,6 +39,7 @@ pub mod spelling;
 mod spice;
 
 use crate::syntax::ast::Ast;
+use crate::syntax::behaviour::Writer;
 use crate::syntax::diag::{self, Diag, Kind};
 use crate::syntax::resolve::{FileId, Kit, Role};
 use crate::syntax::token::Tokens;
@@ -224,9 +225,9 @@ fn render_lang(src: &Source, target: Lang) -> Result<Written, Diags> {
     rd.write_for(target);
     deck.given_loads.extend(src.loads.iter().cloned());
     deck.numbers = src.numbers;
-    let (text, written) = match target.dialect() {
-        Dialect::Spectre | Dialect::Vacask => named::write(&mut rd, &deck, target),
-        _ => spice::write(&mut rd, &deck, target),
+    let (text, written) = match target.behaviours().writer {
+        Writer::Spectre | Writer::Vacask => named::write(&mut rd, &deck, target),
+        Writer::Cards | Writer::Cdl | Writer::Verilog => spice::write(&mut rd, &deck, target),
     };
     // The earlier stages' notes: the kit's for its file (the parser's
     // copied, then its own), else the parser's; then the reader's and the
