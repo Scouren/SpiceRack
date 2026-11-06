@@ -92,8 +92,6 @@ r1 (a 0) resistor r=p
 x1 (a 0) s
 
 == deck 0 vacask
-t
-
 ground 0
 
 load "spice/resistor.osdi"
@@ -103,16 +101,13 @@ model resistor sp_resistor
 parameters p=agauss(1k, (1k)*(10)/100, 1) q=exp(agauss(log(2), 100m, 1)) r=aunif(3, 200m)
 
 subckt s (a b)
+  model resistor sp_resistor
 parameters q__mm=agauss(q, 50m, 1)
   r1 (a b) resistor r=q__mm*1k
 ends
 
 r1 (a 0) resistor r=p
 x1 (a 0) s
-
-control
-  options rawfile="binary"
-endc
 
 == deck 1 ngspice
 * t
@@ -172,8 +167,6 @@ statistics {
 r1 (x 0) resistor r=a+b
 
 == deck 1 vacask
-t
-
 ground 0
 
 load "spice/resistor.osdi"
@@ -183,10 +176,6 @@ model resistor sp_resistor
 parameters a__z=agauss(0, 1, 1) a=(1) + (100m)*((1e0)*a__z) b__z=agauss(0, 1, 1) b=(2) + (200m)*((6e-1)*a__z + (8e-1)*b__z)
 
 r1 (x 0) resistor r=a+b
-
-control
-  options rawfile="binary"
-endc
 
 == deck 2 ngspice
 * t
@@ -250,8 +239,6 @@ statistics {
 r1 (x 0) resistor r=a+b
 
 == deck 2 vacask
-t
-
 ground 0
 
 load "spice/resistor.osdi"
@@ -261,10 +248,6 @@ model resistor sp_resistor
 parameters a__z=agauss(0, 1, 1) a=(1) + (100m)*((1)*a__z) b__z=agauss(0, 1, 1) b=(2) + (200m)*(((k))*a__z + (sqrt(1-(k)*(k)))*b__z) k=500m
 
 r1 (x 0) resistor r=a+b
-
-control
-  options rawfile="binary"
-endc
 
 == deck 3 ngspice
 * t
@@ -325,8 +308,6 @@ statistics {
 r1 (x 0) resistor r=a+b
 
 == deck 3 vacask
-t
-
 ground 0
 
 load "spice/resistor.osdi"
@@ -336,10 +317,6 @@ model resistor sp_resistor
 parameters a__z=agauss(0, 1, 1) a=(1) + (100m)*((1e0)*a__z) b__z=agauss(0, 1, 1) b=(2) + (200m)*((6e-1)*a__z + (8e-1)*b__z)
 
 r1 (x 0) resistor r=a+b
-
-control
-  options rawfile="binary"
-endc
 
 == deck 4 ngspice
 * t
@@ -412,8 +389,6 @@ statistics {
 r1 (x 0) resistor r=a+b+c
 
 == deck 4 vacask
-t
-
 ground 0
 
 load "spice/resistor.osdi"
@@ -423,10 +398,6 @@ model resistor sp_resistor
 parameters a__z=agauss(0, 1, 1) a=(1) + (100m)*((1e0)*a__z) b__z=agauss(0, 1, 1) b=(2) + (200m)*((5e-1)*a__z + (8.660254037844386e-1)*b__z) c__z=agauss(0, 1, 1) c=(3) + ((3)*(300m)/100)*((5e-1)*a__z + (2.886751345948129e-1)*b__z + (8.16496580927726e-1)*c__z)
 
 r1 (x 0) resistor r=a+b+c
-
-control
-  options rawfile="binary"
-endc
 
 == deck 5 ngspice
 * t
@@ -559,23 +530,22 @@ x1 (a 0) s1
 x2 (a 0) s2
 
 == deck 5 vacask
-t
-
 ground 0
 
 load "spice/resistor.osdi"
 
-model resistor sp_resistor
 
 parameters w=1u l=2u
 
 subckt s1 (a b)
+  model resistor sp_resistor
 parameters m=w__mm*2
 parameters l__mm=aunif(l, 20m) w__mm=agauss(w, 10m, 1)
   r1 (a b) resistor r=w__mm*1m+l__mm*1m
 ends
 
 subckt s2 (a b)
+  model resistor sp_resistor
   r1 (a b) resistor r=1e3
 ends
 
@@ -586,10 +556,6 @@ ends
 
 x1 (a 0) s1
 x2 (a 0) s2
-
-control
-  options rawfile="binary"
-endc
 
 == deck 6 ngspice
 new: P0003 P0003 W0032 P0004 W0001 P0001 P0009 P0004 P0004

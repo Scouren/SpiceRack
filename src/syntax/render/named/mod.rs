@@ -151,13 +151,17 @@ impl W<'_, '_> {
     fn frame(&self) -> Frame {
         let role = self.rd.role();
         match role {
-            // quirk: the old Spectre and VACASK writers titled a library,
-            // and VACASK gave it `ground 0` and a `control` block, as any
-            // deck; phase 7 writes it bare.
+            // A library keeps `ground 0`: `resolve::role` calls a deck with
+            // no analysis one too, VACASK's node 0 is ground only by it,
+            // and an included file repeats it harmlessly. Its title is
+            // Spectre's `//` comment, but on VACASK a statement ("unexpected
+            // newline, expecting (" where the file is included), and its
+            // `control` a second block ("Only one control block is
+            // allowed"; with no analysis it runs nothing).
             Role::Library => Frame {
-                title: true,
+                title: self.b.named_rules == NamedRules::Spectre,
                 end: true,
-                control: true,
+                control: self.b.named_rules == NamedRules::Spectre,
                 ground: true,
             },
             _ => role::frame(role),

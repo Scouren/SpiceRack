@@ -31,6 +31,7 @@ use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::Func;
 use crate::syntax::render::read::{Block, Card, Comp, Num, Raw, Val, Visit};
+use crate::syntax::resolve::Role;
 
 /// A device module the deck needs: VACASK's build of the SPICE device set
 /// (`load "spice/<m>.osdi"` and `model <m> sp_<m>`) or a built-in (a
@@ -54,18 +55,11 @@ impl W<'_, '_> {
         if let Some(&(Func::Param(n) | Func::Card(n) | Func::Real(n))) = funcs.next() {
             self.ask(Construct::Func, self.rd.main(n));
         }
-        let mut needs: BTreeSet<Need> = BTreeSet::new();
-        for b in &blocks {
-            for &c in &b.comps {
-                if let Comp::Card(n) = c {
-                    let card = self.rd.card_view(n);
-                    needs.extend(need(&card));
-                    if self.rd.b.card_rules == CardRules::Ltspice {
-                        needs.extend(parasitic_needs(&card));
-                    }
-                }
-            }
-        }
+        let needs: BTreeSet<Need> = blocks.iter().flat_map(|b| self.comp_needs(b)).collect();
+        // A library declares each block's synthesised models in it: the
+        // deck including it declares its own, and VACASK refuses a second
+        // `model resistor` ("already exists") but scopes one in a subckt.
+        let library = self.rd.role() == Role::Library;
         // Models first: they add loads too. A subcircuit's and a section's
         // models stay in it, where VACASK scopes them.
         let mut loads: BTreeSet<String> = BTreeSet::new();
@@ -98,6 +92,27 @@ impl W<'_, '_> {
                 loads.insert(format!("spice/{m}.osdi"));
             }
         }
+        let (def_models, section_models) = match library {
+            false => (def_models, section_models),
+            true => {
+                let own = |w: &Self, b: &Block, m: &[String]| {
+                    let mut l = need_lines(&w.block_needs(b));
+                    l.extend_from_slice(m);
+                    l
+                };
+                let defs = deck.defs.iter().zip(&def_models);
+                let defs = defs.map(|(b, m)| own(self, b, m)).collect();
+                let secs = deck.sections.iter().zip(&section_models).map(|(s, ms)| {
+                    let bs = std::iter::once(&s.body).chain(&s.defs);
+                    bs.zip(ms).map(|(b, m)| own(self, b, m)).collect()
+                });
+                (defs, secs.collect())
+            }
+        };
+        let top_needs = match library {
+            true => self.block_needs(&deck.top),
+            false => needs.clone(),
+        };
         // A VACASK deck's own `load`s are VACASK's (it compiles a `.va`
         // itself); a SPICE-origin Verilog-A load goes through OpenVAF.
         let read = deck.top.loads.iter().chain(&deck.top.own_loads);
@@ -138,7 +153,7 @@ impl W<'_, '_> {
         }
         self.vacask_files(&deck.top, "");
         self.line("");
-        for n in &needs {
+        for n in &top_needs {
             // A user model wearing a synthesised name would be a second
             // definition; VACASK takes the first and runs the wrong device.
             let auto = n.auto();
@@ -151,11 +166,7 @@ impl W<'_, '_> {
             if let Some(tok) = clash {
                 self.refuse(Code::W0104, tok);
             }
-            let line = match n {
-                Need::Sp(m) => format!("model {auto} sp_{m}"),
-                Need::Builtin(m) => format!("model {auto} {m}"),
-            };
-            self.line(&line);
+            self.line(&n.line());
         }
         for l in &top_models {
             self.line(l);
@@ -295,6 +306,38 @@ pub(super) fn q(name: &str) -> String {
 // ---- private ----
 
 impl<'r> W<'_, 'r> {
+    /// The modules block `b`'s own elements need (its branches' not).
+    fn comp_needs(&self, b: &Block) -> BTreeSet<Need> {
+        let mut out = BTreeSet::new();
+        for &c in &b.comps {
+            if let Comp::Card(n) = c {
+                let card = self.rd.card_view(n);
+                out.extend(need(&card));
+                if self.rd.b.card_rules == CardRules::Ltspice {
+                    out.extend(parasitic_needs(&card));
+                }
+            }
+        }
+        out
+    }
+
+    /// [`Self::comp_needs`] of `b` and of every branch inside it (a heap
+    /// stack, as `read::Walk`).
+    fn block_needs(&self, b: &Block) -> BTreeSet<Need> {
+        let mut out = BTreeSet::new();
+        let mut work = vec![b];
+        while let Some(b) = work.pop() {
+            out.extend(self.comp_needs(b));
+            work.extend(
+                b.conds
+                    .iter()
+                    .flat_map(|(_, c)| &c.branches)
+                    .map(|(_, body)| body),
+            );
+        }
+        out
+    }
+
     /// Every block a body is written from, branches included.
     fn vacask_blocks(&self) -> Vec<&'r Block> {
         let deck = self.deck;
@@ -472,6 +515,19 @@ impl Need {
             Need::Sp(m) | Need::Builtin(m) => m,
         }
     }
+
+    /// Its `model` line.
+    fn line(&self) -> String {
+        match self {
+            Need::Sp(m) => format!("model {m} sp_{m}"),
+            Need::Builtin(m) => format!("model {m} {m}"),
+        }
+    }
+}
+
+/// The `model` lines of `needs`.
+fn need_lines(needs: &BTreeSet<Need>) -> Vec<String> {
+    needs.iter().map(Need::line).collect()
 }
 
 /// The modules an LTspice card's parasitics need (`W::parasitics`):

@@ -156,3 +156,22 @@ fn a_device_ic_without_uic_is_left_out() {
     close(b[0], 1.0, 1e-9);
     close(*b.last().unwrap(), 1.0, 1e-9);
 }
+
+#[test]
+fn an_included_library_has_no_title_line() {
+    // VACASK reads a file's every line as a statement (its decks' first
+    // line only is the title): an included library's `t` title was
+    // "unexpected newline, expecting (" (iscas85, adder_mos.sp). Written
+    // with no title, a deck including it runs: 1 V over 1k into 1k.
+    let dir = tempfile::tempdir().unwrap();
+    let lib = "lib\n.subckt half a b\nR1 a b 1k\n.ends\n";
+    let written = emit(lib).expect("library written");
+    assert!(!written.starts_with("lib\n"), "{written}");
+    let path = dir.path().join("half.inc");
+    std::fs::write(&path, &written).unwrap();
+    let deck = format!(
+        "t\nV1 a 0 1\nR1 a b 1k\nX1 b 0 half\n.include {}\n.op\n.end\n",
+        path.display()
+    );
+    close(col(&run(&deck), "b")[0], 0.5, 1e-9);
+}
