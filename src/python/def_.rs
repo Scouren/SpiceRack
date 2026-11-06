@@ -231,6 +231,10 @@ calls! {
     parasitics(v: PyParasitics);
     text_family(lang: PyLang);
     spectre_analysis(kind: &str);
+    temp_name(word: &str);
+    builtin_constant(name: &str, value: &str);
+    builtin_device(name: &str);
+    vacask_analysis(kind: &str);
     code(id: &str, kind: PyKind, message: &str);
     refuse_code(c: PyConstruct, id: &str);
     omit_code(c: PyConstruct, id: &str);

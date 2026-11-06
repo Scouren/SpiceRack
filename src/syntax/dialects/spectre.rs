@@ -223,12 +223,21 @@ pub(super) fn spectre() -> DialectDef {
         .options_form(OptionsForm::Spectre)
         .named_params(NamedParams::Spectre)
         .analysis_masters(Lang::SPECTRE)
+        // The circuit temperature in an expression ([CMP] 5.0 p.884).
+        .temp_name("temp")
+        // The VACASK analyses it has (Spectre Reference 5.0, Analysis Statements: xf, stb, pss p.771, pac p.748, pnoise p.759; no hb, dcinc or trannoise).
+        .vacask_analysis("acxf")
+        .vacask_analysis("acstb")
+        .vacask_analysis("pss")
+        .vacask_analysis("pac")
+        .vacask_analysis("pnoise")
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0015)
         .refuse(Construct::HspiceAnalysis, Code::W0015)
         .omit(Construct::VacaskScript, Code::W0120)
+        .refuse(Construct::VacaskElaborate, Code::W0122)
         .refuse(Construct::CaretReread, Code::W0002)
         .lift(Construct::StatisticalCall, Rule::RackVars)
         .native(Construct::VerilogALoad)

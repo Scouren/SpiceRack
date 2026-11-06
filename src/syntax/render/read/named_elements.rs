@@ -10,7 +10,7 @@
 //! Contents:
 //! - `fn unquoted(v: &str) -> Option<String>`
 //! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::velems(&self, v: u32) -> Vec<u32>`,
-//!   `Rd::strip(&self, name: &str, letter: char) -> String`
+//!   `Rd::va_module(&self, n: u32) -> Option<String>`, `Rd::strip(&self, name: &str, letter: char) -> String`
 
 use super::named::{OSDI, spectre_kind, vacask_model_kind};
 use super::{Card, Rd, Val};
@@ -282,6 +282,16 @@ impl<'a> Rd<'a> {
             {
                 return self.named_master(&master, &name, &ns, &p);
             }
+            // A Verilog-A module the kit loads, instantiated by name with
+            // its parameters (Spectre `ahdl_include`): ngspice's `N` card,
+            // the writer giving it a model of its own (`Rd::va_module`).
+            m if self.va_module(n).is_some() => Card::Semi {
+                letter: 'N',
+                name: name.clone(),
+                nodes: ns,
+                model: m.to_string(),
+                params: kept(&[]),
+            },
             m if subckts.iter().any(|s| s == m) || matches!(kit, Some(Declared::Subckt)) => {
                 return Some(Card::Inst {
                     name: self.strip(&name, 'x'),
@@ -339,6 +349,16 @@ impl<'a> Rd<'a> {
             return vec![v];
         }
         self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec()
+    }
+
+    /// The Verilog-A module instance `n` names directly, when the kit
+    /// binds its master to one (`DefKind::VerilogA`): no model names it.
+    pub(in crate::syntax::render) fn va_module(&self, n: u32) -> Option<String> {
+        if self.tag(n) != Tag::Instance {
+            return None;
+        }
+        let d = self.kit_def(n)?;
+        matches!(d.kind, DefKind::VerilogA { .. }).then(|| d.name.clone())
     }
 
     /// `name`'s SPICE spelling: the letter a writer adds back is dropped

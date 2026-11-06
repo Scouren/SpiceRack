@@ -74,9 +74,15 @@ fn a_spectre_kit_binds_its_verilog_a_instances() {
     // Declared at the `ahdl_include` of kit.inc, not in the source.
     assert_eq!(module.file, FileId(0));
     assert_eq!(file.diags, []);
-    // The writer gets no `R` row (it still copies the instances of a
-    // module as written, W0027: render has no card for one yet).
+    // The writer gets no `R` row, and writes each module instance as a
+    // card (the OSDI `N` card's view), its name and parameters as read.
     let w = render_kit(&kit, FileId(0), "kit", Dialect::Spectre).expect("written");
     let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
-    assert_eq!(codes, [Code::W0027, Code::W0027], "{}", w.notes.messages);
+    assert_eq!(codes, [], "{}", w.notes.messages);
+    for line in [
+        "xv (p n) varactor_va area=area c0=2f",
+        "xtop (a 0) varactor_va area=4p",
+    ] {
+        assert!(w.text.contains(line), "{line}\n{}", w.text);
+    }
 }

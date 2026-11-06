@@ -75,6 +75,19 @@ pub struct Behaviours {
     pub parasitics: Parasitics,
     /// Write: the Spectre analysis kinds the target has an analysis for.
     pub spectre_analyses: &'static [&'static str],
+    /// Read and write: the expression word for the circuit temperature
+    /// (ngspice `temper`, Spectre `temp`, VACASK `$temp`); empty: none.
+    pub temp_name: &'static str,
+    /// Read: the source's builtin constants (VACASK `M_PI`, `P_K`, …) and
+    /// each one's value as a number's text, written as that off the source.
+    pub builtin_constants: &'static [(&'static str, &'static str)],
+    /// Write: the target's built-in device names, which a model type names
+    /// before any OSDI module the deck loads (ngspice `devhelp`).
+    pub builtin_devices: &'static [&'static str],
+    /// Write: the VACASK analysis kinds no SPICE card reads (`dcinc`,
+    /// `hb`, …) that the target has an analysis for, untranslated (W0001);
+    /// any other is one it lacks (W0015).
+    pub vacask_analyses: &'static [&'static str],
 }
 
 /// The writer layout.
@@ -276,5 +289,9 @@ impl Behaviours {
         expr_eval: ExprEval::C,
         parasitics: Parasitics::Elements,
         spectre_analyses: &[],
+        temp_name: "",
+        builtin_constants: &[],
+        builtin_devices: &[],
+        vacask_analyses: &[],
     };
 }

@@ -593,6 +593,12 @@ catalogue! {
         cite: "ngspice-45 run: `.model dmod diode` with VACASK's `diode.osdi` loaded reads `diode` as its built-in `Diode` (\"unrecognized parameter (diode)\") and the `N` instance fails (\"incorrect model type! Expected OSDI device\"); `devhelp` lists the built-in names",
         explain: "The target looks a model's type up among its built-in devices before the OSDI modules it loaded, so a module named as one of them (`diode`, `resistor`, `bjt`, …) cannot be instantiated. Rename the module in its Verilog-A source and load that build.",
     }
+    /// A VACASK run that elaborates more than one circuit.
+    W0122 Refusal {
+        title: "a VACASK run of more than one circuit",
+        cite: "VACASK docs cmd-elaboration.md (`elaborate circuit(\"a\")` builds the circuit the analyses after it run); ngspice manual §2.1 (one circuit, the title line to `.end`); Spectre Reference 5.0 (one netlist a run)",
+        explain: "The control block elaborates a circuit after an analysis has run, or more than once (`elaborate circuit(\"ntest\")` … `elaborate circuit(\"ptest\")`), so its analyses run on different circuits; the target's deck holds one (a promoted subcircuit with terminals is not read either). Split the deck, one per circuit, each promoting its subcircuit once before its first analysis.",
+    }
     /// A `.tf` written as Spectre's `xf` at frequency 0: its input and
     /// output resistances are not computed.
     W0125 Note {

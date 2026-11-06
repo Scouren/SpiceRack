@@ -278,9 +278,12 @@ impl W<'_, '_> {
             let tok = self.rd.main(n);
             match self.b.writer {
                 Writer::Cdl => self.note(Code::W0028, tok),
-                _ => {
-                    self.ask(self.rd.kept_construct(tok), tok);
-                }
+                _ => match crate::syntax::render::read::vacask_refusal(self.rd, self.b, tok) {
+                    Some(c) => self.refuse(c, tok),
+                    None => {
+                        self.ask(self.rd.kept_construct(tok), tok);
+                    }
+                },
             }
         }
     }

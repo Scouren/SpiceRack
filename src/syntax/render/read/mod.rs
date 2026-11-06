@@ -70,7 +70,7 @@ mod walk;
 
 pub(in crate::syntax::render) use cards::Model;
 pub(in crate::syntax::render) use elements::Card;
-pub(in crate::syntax::render) use named_bench::spectre_refusal;
+pub(in crate::syntax::render) use named_bench::{spectre_refusal, vacask_refusal};
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
@@ -119,6 +119,9 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// The top's Xyce `.global_param` assignments, read as `.param`s
     /// ([`Rd::global_param`]).
     global_params: HashSet<u32>,
+    /// VACASK: the subcircuits the control block's one `elaborate` makes
+    /// toplevel circuits, read as the top (`Rd::vacask_promoted`).
+    promoted: HashSet<String>,
 }
 
 /// What the reader made of a file: every block and the deck-wide lists, in
@@ -346,9 +349,11 @@ pub(in crate::syntax::render) fn read<'a>(
         target: None,
         nums: Vec::new(),
         global_params: HashSet::new(),
+        promoted: HashSet::new(),
     };
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
+        rd.promoted = rd.vacask_promoted(&top_stmts);
         (rd.kinds, rd.subckts) = rd.declarations(&top_stmts);
         rd.instances(&top_stmts);
     } else {

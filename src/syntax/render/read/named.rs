@@ -183,7 +183,16 @@ impl<'a> Rd<'a> {
                 Tag::Analysis | Tag::Command => {
                     self.scope_of.insert(s, scope);
                 }
-                Tag::Subckt => work.extend(self.body(s).iter().rev().map(|&b| (b, s))),
+                // A promoted subcircuit's instances are the top's.
+                Tag::Subckt => {
+                    let promoted = scope == NONE
+                        && self
+                            .fields(s)
+                            .first()
+                            .is_some_and(|&f| self.promoted.contains(&self.name_of(f)));
+                    let at = if promoted { NONE } else { s };
+                    work.extend(self.body(s).iter().rev().map(|&b| (b, at)));
+                }
                 Tag::Section | Tag::Library | Tag::If | Tag::Else => {
                     if let Some(nx) = self.ast.next(Node(s)) {
                         work.push((nx.0, scope));
@@ -295,6 +304,12 @@ impl<'a> Rd<'a> {
             Tag::Section => {
                 let s = self.section(n, None, acc);
                 acc.sections.push(s);
+            }
+            Tag::Subckt
+                if scope == Scope::Top
+                    && self.promoted.contains(&self.name_of(self.fields(n)[0])) =>
+            {
+                return Some(Opened::Promoted(n));
             }
             Tag::Subckt => return Some(Opened::Subckt(n)),
             Tag::Include => match self.get(&self.pairs(n), "section") {

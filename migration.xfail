@@ -31695,7 +31695,7 @@ xyce/VCCS/vccs_tran_m.cir vacask now written: its PWL as type="pwl" wave=[…] (
 xyce/VCCS/vccs_tran_m_baseline.cir vacask now written: its PWL as type="pwl" wave=[…] (delay=; a whole-waveform r=0 as period=); was refused W0108
 xyce/VCVS/vcvs_trans.cir vacask now written: its PWL as type="pwl" wave=[…] (delay=; a whole-waveform r=0 as period=); was refused W0108
 xyce/XDM/HSPICE/PWL_SOURCES/pwl_sources.cir vacask now written: its PWL as type="pwl" wave=[…] (delay=; a whole-waveform r=0 as period=); was refused W0108
-vacask/demo/spice/vdmossh.sim vacask ic=/nodeset= as upstream VACASK's mixed list {"n", v, …} (the fork's ["n"; v] is its "unexpected ;")
+vacask/demo/spice/vdmossh.sim vacask ic=/nodeset= as upstream VACASK's mixed list {"n", v, …} (the fork's ["n"; v] is its "unexpected ;"); its elaborated testbench read as the top (spectre-read-r2 round 3)
 xyce/Certification_Tests/BUG_1007_SON/ic_cap0.cir vacask ic=/nodeset= as upstream VACASK's mixed list {"n", v, …} (the fork's ["n"; v] is its "unexpected ;")
 xyce/Certification_Tests/BUG_1007_SON/ic_cap1.cir vacask ic=/nodeset= as upstream VACASK's mixed list {"n", v, …} (the fork's ["n"; v] is its "unexpected ;")
 xyce/Certification_Tests/BUG_1007_SON/ic_cap2.cir vacask ic=/nodeset= as upstream VACASK's mixed list {"n", v, …} (the fork's ["n"; v] is its "unexpected ;")
@@ -32140,3 +32140,42 @@ vacask/test/test_opnl.sim spectre now written: a model of the loaded Verilog-A m
 vacask/test/test_opsweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_sweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_sweepvar.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+
+# Phase 7: spectre-read-r2: a VACASK elaborate of one testbench
+# (render::read::named_control vacask_promoted; W0122 new). A control
+# block's only `elaborate circuit("tb", …)`, before its first analysis, of
+# top-level subcircuits with no terminals makes each a toplevel circuit
+# (VACASK docs cmd-elaboration.md): the reader reads its body as the top,
+# and every target writes that one circuit (VACASK too, without the
+# `elaborate`). Any other `elaborate` (a second circuit of one run) is
+# refused W0122 off VACASK, was W0001.
+vacask/demo/bsim3-ptm/diffpair.sim vacask its elaborated testbench read as the top (body at the top, no elaborate line)
+
+# Phase 7: spectre-read-r2: a named dialect's instance parameter expression
+# on SPICE (render::spice::cards params, a minimal arm; unit::spice_bare).
+# A Spectre or VACASK instance parameter that is no number and no single
+# name (`pd=2*(w+ld)`) is written in the target's expression delimiters:
+# ngspice reads it bare as "unknown parameter (*)" (VACASK c6288 benchmark
+# on the cross-sim harness). No golden output changes.
+
+# Phase 7: spectre-read-r2: VACASK noise, ac and resistor sweeps
+# (render::read::named_control; refused kept_construct, capability
+# VacaskAnalysis). A noise `out=["n"]` (one or two nodes, VACASK docs
+# cmd-analysis-noise.md), an ac `values=[f]` (one frequency: `.ac lin 1 f
+# f`, cmd-analysis-ac.md) and a sweep of a resistor's `r` (ngspice `.dc
+# R1`, manual §15.3.2) are read; a VACASK analysis no SPICE simulator has
+# (dcinc, acxf, acstb, hb, hbac, hbnoise, pss, pac, pnoise, trannoise) is
+# refused W0015 on ngspice, ESPice, LTspice (was W0001). VACASK writes them
+# among its analyses (its writer puts every read analysis after the kept
+# control lines, FINDINGS-A).
+vacask/demo/bsim3-ptm-amp/toplevel.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/bjtamp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/jfet1amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/mes1amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/mos1amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/mos2amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/mos3amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/mos6amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/mos9amp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/demo/spice/vdmosamp.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling
+vacask/test/test_visrc.sim vacask its noise (out=[…]) or one-frequency ac read as analyses, written among the analyses in VACASK's spelling

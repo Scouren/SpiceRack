@@ -267,6 +267,26 @@ impl<'a> Rd<'a> {
         let nums = (0..self.ast.len() as u32).filter(|&n| self.ast.tag(Node(n)) == Tag::Num);
         self.nums = nums.map(|n| self.main(n)).collect();
         self.nums.sort_unstable();
+        // A named source's temperature word (VACASK `$temp`,
+        // `docs/expr-special.md`; Spectre `temp`, `[CMP]` p.884) is the
+        // target's (ngspice `temper`, manual §2.8.5); its builtin
+        // constants (VACASK `docs/expr-constants.md`) are their values,
+        // which no other language names so.
+        let (from, to) = (self.b, target.behaviours());
+        if from.named_rules == NamedRules::None || from.temp_name == to.temp_name {
+            return;
+        }
+        for k in 0..self.t.len() as u32 {
+            if self.ttag(k) != T::Ident {
+                continue;
+            }
+            let w = self.t.text(k);
+            if w == from.temp_name && !to.temp_name.is_empty() {
+                self.respell_token(k, to.temp_name.to_string());
+            } else if let Some(&(_, v)) = from.builtin_constants.iter().find(|(c, _)| *c == w) {
+                self.respell_token(k, v.to_string());
+            }
+        }
     }
 
     /// Token `k` of a value is spelled `text` wherever [`Rd::etext`] spells

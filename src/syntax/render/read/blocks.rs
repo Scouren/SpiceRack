@@ -31,6 +31,10 @@ pub(super) enum Opened {
     /// A Spectre `library`: its sections, and its other statements as at
     /// the top.
     Library(u32),
+    /// A VACASK subcircuit the control block's `elaborate` makes a
+    /// toplevel circuit (`Rd::vacask_promoted`): its body read where it
+    /// sits, its `ends` with it.
+    Promoted(u32),
 }
 
 /// An open block and the body it builds.
@@ -177,6 +181,11 @@ impl<'a> Rd<'a> {
                 let body = self.body(n);
                 top.pending
                     .extend(body.iter().rev().map(|&s| Work::Loose(s)));
+            }
+            Opened::Promoted(n) => {
+                let body = self.body(n);
+                top.pending
+                    .extend(body.iter().rev().map(|&s| Work::Stmt(s)));
             }
             Opened::Library(n) => {
                 let lib = self.name_of(self.fields(n)[0]);

@@ -289,7 +289,21 @@ impl W<'_, '_> {
                 if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
                     self.ask(c, tok);
                 }
-                format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
+                // An OSDI module's instance (ngspice manual §13); a module
+                // named directly takes a model of its own, its parameters.
+                let ps = self.params(&params);
+                match self.rd.va_module(n) {
+                    Some(m) if ps.is_empty() => format!(
+                        ".model {decl}__va {m}\n{decl} {} {decl}__va",
+                        nodes.join(" ")
+                    ),
+                    Some(m) => format!(
+                        ".model {decl}__va {m} ({})\n{decl} {} {decl}__va",
+                        ps.trim_start(),
+                        nodes.join(" ")
+                    ),
+                    None => format!("{decl} {} {model}{ps}", nodes.join(" ")),
+                }
             }
             Card::Switch { nodes, model, .. } => format!("{decl} {} {model}", nodes.join(" ")),
             Card::Line { nodes, z0, td, .. } => format!(
@@ -417,7 +431,11 @@ impl W<'_, '_> {
             if v.is_empty() {
                 s.push_str(&format!(" {k}"));
             } else {
-                s.push_str(&format!(" {k}={}", self.spelled(v)));
+                // A Spectre or VACASK expression is bare; a SPICE instance
+                // line reads one only in its delimiters (ngspice §2.8.5).
+                let bare = self.rd.named() && !v.starts_with('"') && !crate::unit::spice_bare(v);
+                let (open, close) = if bare { self.sp.expr } else { ("", "") };
+                s.push_str(&format!(" {k}={open}{}{close}", self.spelled(v)));
             }
         }
         s
@@ -492,69 +510,6 @@ impl W<'_, '_> {
             s.push_str(&format!(" td={}", self.wave_num(td)));
         }
         s
-    }
-
-    /// A `Laplace(...)` behavioural source, rewritten into a card the
-    /// target parses (`Lift`): ngspice's XSPICE `s_xfer` (instance and
-    /// `.model`), HSPICE's and ESPice's `LAPLACE` table, LTspice's
-    /// `Laplace=`; a constant `H(s)` is a plain controlled source anywhere.
-    fn laplace(
-        &mut self,
-        decl: &str,
-        np: &str,
-        nm: &str,
-        value: u32,
-        current: bool,
-        tok: u32,
-    ) -> String {
-        // `decl` is the map's: the source's name after the lift's letter
-        // (`renamed`).
-        let ((ip, im), num, den) = match laplace::read(self.rd, value) {
-            Some(Laplace::Gain {
-                input: (ip, im),
-                gain,
-            }) => {
-                return format!(
-                    "{decl} {np} {nm} {ip} {im} {}",
-                    self.sp.number(gain, self.x)
-                );
-            }
-            Some(Laplace::Xfer { input, num, den }) => (input, num, den),
-            None => {
-                self.refuse(crate::syntax::diag::Code::W0010, tok);
-                return String::new();
-            }
-        };
-        match self.ask(Construct::Laplace, tok) {
-            Action::Lift(Rule::LaplaceAttr) => format!(
-                "{decl} {np} {nm} {ip} {im} Laplace={}/{}",
-                laplace::horner(&num),
-                laplace::horner(&den),
-            ),
-            Action::Lift(Rule::LaplaceTable) => {
-                let asc =
-                    |c: &[f64]| laplace::coeff_array(&c.iter().rev().copied().collect::<Vec<_>>());
-                format!(
-                    "{decl} {np} {nm} LAPLACE {ip} {im} {} / {}",
-                    asc(&num),
-                    asc(&den)
-                )
-            }
-            Action::Lift(Rule::LaplaceXfer) => {
-                let port = if current { "id" } else { "vd" };
-                // One integrator stage per denominator order.
-                let ic = vec!["0"; den.len() - 1].join(" ");
-                // The model is named after the source, its `A` left off.
-                let model = &decl[1..];
-                format!(
-                    "{decl} %vd({ip} {im}) %{port}({np} {nm}) {model}_xfer\n\
-                     .model {model}_xfer s_xfer(num_coeff=[{}] den_coeff=[{}] int_ic=[{ic}])",
-                    laplace::coeff_array(&num),
-                    laplace::coeff_array(&den),
-                )
-            }
-            _ => String::new(),
-        }
     }
 }
 

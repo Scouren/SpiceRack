@@ -285,9 +285,10 @@ impl Rd<'_> {
             "powergridtransformer",
         ];
         if self.text_behaviours(tok).named_rules == NamedRules::Vacask {
-            return match self.vacask_script(tok) {
-                true => Construct::VacaskScript,
-                false => Construct::ForeignText,
+            return match (self.vacask_script(tok), self.t.text(tok)) {
+                (true, _) => Construct::VacaskScript,
+                (false, "elaborate") => Construct::VacaskElaborate,
+                (false, _) => Construct::ForeignText,
             };
         }
         let w = self.t.text(tok).to_ascii_lowercase();

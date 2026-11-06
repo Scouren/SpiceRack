@@ -143,12 +143,19 @@ pub(super) fn hspice() -> DialectDef {
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("montecarlo")
+        // The circuit temperature in an expression (HSPICE UG, temper).
+        .temp_name("temper")
+        // The VACASK analyses it has (HSPICE RF .HB, .HBAC, .HBNOISE).
+        .vacask_analysis("hb")
+        .vacask_analysis("hbac")
+        .vacask_analysis("hbnoise")
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0015)
         .native(Construct::HspiceAnalysis)
         .omit(Construct::VacaskScript, Code::W0120)
+        .refuse(Construct::VacaskElaborate, Code::W0122)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)
         .spell(Construct::VerilogALoad, Alt::Hdl)

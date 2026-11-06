@@ -32,6 +32,7 @@ pub(super) fn verilog() -> DialectDef {
         .refuse(Construct::XyceSens, Code::W0001)
         .refuse(Construct::HspiceAnalysis, Code::W0001)
         .omit(Construct::VacaskScript, Code::W0120)
+        .refuse(Construct::VacaskElaborate, Code::W0122)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)
         .native(Construct::VerilogALoad)

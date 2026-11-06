@@ -46,6 +46,29 @@ print(\"done\")
 >>>FILE
 ";
 
+/// A testbench subcircuit VACASK's `elaborate` promotes (a divider: v(2) =
+/// 9 V), the default top holding only the source's model.
+const PROMOTED: &str = "Promoted divider
+
+ground 0
+
+load \"resistor.osdi\"
+
+model resistor resistor
+model vsource vsource
+
+subckt tb()
+  v1 (1 0) vsource dc=10
+  r1 (1 2) resistor r=1k
+  r2 (2 0) resistor r=9k
+ends
+
+control
+  elaborate circuit(\"tb\")
+  analysis op1 op
+endc
+";
+
 // ---- private ----
 
 /// `deck` (VACASK text) written for `target`, or its refusal's codes.
@@ -128,17 +151,21 @@ fn a_vacask_script_line_is_left_out_with_a_note_and_the_numbers_stay() {
 
 #[test]
 fn a_vacask_control_command_that_changes_the_circuit_is_refused() {
-    // `elaborate circuit("sub")` makes `sub` the top (cmd-elaboration.md);
-    // `alter` changes a parameter between analyses (cmd-alter.md). No
-    // SPICE or Spectre deck line says either: refused, not copied.
-    for cmd in ["elaborate circuit(\"sub\")", "alter instance(\"r2\") r=1k"] {
+    // `elaborate circuit("sub")` of a subcircuit the deck lacks
+    // (cmd-elaboration.md) is not read as the top (W0122); `alter`
+    // changes a parameter between analyses (cmd-alter.md), kept as text
+    // (W0001). Neither is copied.
+    for (cmd, code) in [
+        ("elaborate circuit(\"sub\")", Code::W0122),
+        ("alter instance(\"r2\") r=1k", Code::W0001),
+    ] {
         // The deck without its `embed`, so the command is all it refuses.
         let bare = SCRIPTED.split("embed").next().expect("a deck");
         let deck = bare.replace("  analysis op1 op", &format!("  {cmd}\n  analysis op1 op"));
         for target in [Dialect::Ngspice, Dialect::Spectre] {
             assert_eq!(
                 refusals(written(&deck, target)),
-                vec![Code::W0001],
+                vec![code],
                 "{cmd} on {target:?}"
             );
         }
@@ -344,7 +371,7 @@ fn a_vacask_model_of_a_loaded_module_is_an_ngspice_osdi_instance() {
     let osdi = vacask_mod().join("psp103v4.osdi");
     let deck = format!(
         "PSP nmos\n\nground 0\n\nload \"{}\"\n\nmodel vsource vsource\nmodel nch psp103va type=1\n\n\
-         vd (d 0) vsource dc=1\nvg (g 0) vsource dc=1\nm1 (d g 0 0) nch w=1u l=1u $mfactor=2\n\n\
+         vd (d 0) vsource dc=1\nvg (g 0) vsource dc=1\nm1 (d g 0 0) nch w=2*(0.5u+0) l=1u $mfactor=2\n\n\
          control\n  analysis op1 op\nendc\n",
         osdi.display()
     );
@@ -432,4 +459,187 @@ fn a_vacask_model_number_in_parentheses_or_quotes_is_a_bare_spice_number() {
     for word in ["version=4.8 ", "binunit=1 ", "k2=-10m", " trnqsmod=0"] {
         assert!(ng.contains(word), "{word}:\n{ng}");
     }
+}
+
+#[test]
+fn a_vacask_temp_in_an_expression_is_the_targets_temperature() {
+    // expr-special.md: `$temp` is the circuit temperature (degrees C),
+    // re-evaluated as it sweeps; ngspice's is `temper` (manual §2.8.5),
+    // Spectre's `temp` ([CMP] p.884). r1 = 1k (1 + (T - 30)/1000) under
+    // 10 V: at T = 0, 50, 100 the source current is -10/r1.
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare
+        .replace(
+            "r1 (1 2) resistor r=1k",
+            "r1 (1 0) resistor r=1k*(1+($temp-30)*0.001)",
+        )
+        .replace("r2 (2 0) resistor r=9k\n", "")
+        .replace(
+            "  analysis op1 op",
+            "  sweep t option=\"temp\" from=0 to=100 step=50\n  analysis op1 op",
+        );
+    let ng = written(&deck, Dialect::Ngspice).expect("written").text;
+    assert!(ng.contains("temper") && !ng.contains("$temp"), "{ng}");
+    let sp = written(&deck, Dialect::Spectre).expect("written").text;
+    assert!(sp.contains(" temp-30)") && !sp.contains("$temp"), "{sp}");
+    let n = run(Dialect::Ngspice, &ng);
+    let at = n
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("i(v1)"));
+    let i = &n.real_data[at.unwrap_or_else(|| panic!("{:?}", n.variables))];
+    for (k, t) in [0.0, 50.0, 100.0].into_iter().enumerate() {
+        let exact = -10.0 / (1e3 * (1.0 + (t - 30.0) * 1e-3));
+        assert!(
+            (i[k] - exact).abs() < 1e-9 * exact.abs(),
+            "T={t}: {} vs {exact}\n{ng}",
+            i[k]
+        );
+    }
+}
+
+#[test]
+fn a_vacask_elaborate_of_one_testbench_is_the_top() {
+    // cmd-elaboration.md: `elaborate circuit("tb")` makes tb a toplevel
+    // circuit beside the default one, its instances and models global;
+    // once, before any analysis, the deck is that one circuit: tb's body
+    // at the top.
+    let ng = written(PROMOTED, Dialect::Ngspice).expect("written").text;
+    assert!(!ng.contains(".subckt") && !ng.contains("elaborate"), "{ng}");
+    let (v, n) = (run(Dialect::Vacask, PROMOTED), run(Dialect::Ngspice, &ng));
+    assert!((node(&v, "2") - 9.0).abs() < 1e-9, "VACASK v(2)");
+    assert!((node(&n, "2") - 9.0).abs() < 1e-9, "ngspice v(2)\n{ng}");
+    let own = written(PROMOTED, Dialect::Vacask).expect("written").text;
+    assert!(
+        (node(&run(Dialect::Vacask, &own), "2") - 9.0).abs() < 1e-9,
+        "{own}"
+    );
+}
+
+#[test]
+fn a_vacask_run_of_two_circuits_is_refused() {
+    // Two `elaborate`s: two circuits, one analysis each (cmd-elaboration.md);
+    // a SPICE or Spectre deck is one (W0122).
+    let two = PROMOTED.replace(
+        "  analysis op1 op",
+        "  analysis op1 op\n  elaborate circuit(\"tb\")\n  analysis op2 op",
+    );
+    for target in [Dialect::Ngspice, Dialect::Spectre] {
+        let codes = refusals(written(&two, target));
+        assert!(
+            !codes.is_empty() && codes.iter().all(|&c| c == Code::W0122),
+            "{target:?}: {codes:?}"
+        );
+    }
+}
+
+#[test]
+fn a_vacask_instance_parameter_expression_is_delimited_on_spice() {
+    // VACASK writes an instance parameter's expression bare (`pd=2*(w+ld)`,
+    // benchmark/vadistiller/c6288/vacask/models.inc); an ngspice instance
+    // line reads an expression only in `{}` (manual §2.8.5; bare it is
+    // "unknown parameter (*)").
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare
+        .replace(
+            "model vsource vsource",
+            "model vsource vsource\nparameters a=0",
+        )
+        .replace(
+            "r1 (1 2) resistor r=1k",
+            "r1 (1 2) resistor r=1k tc1=2*(a+0)",
+        );
+    let ng = written(&deck, Dialect::Ngspice).expect("written").text;
+    assert!(
+        ng.contains("tc1={2*( a+0)}") || ng.contains("tc1={2*(a+0)}"),
+        "{ng}"
+    );
+    assert!(
+        (node(&run(Dialect::Ngspice, &ng), "2") - 9.0).abs() < 1e-9,
+        "{ng}"
+    );
+}
+
+#[test]
+fn a_vacask_noise_ac_and_resistor_sweep_are_the_targets_analyses() {
+    // cmd-analysis-noise.md: `out=["n"]` a one-node output (a vector);
+    // cmd-analysis-ac.md: `values=[f]` the frequencies, one a one-point
+    // `.ac lin 1 f f`; cmd-sweep.md: an instance's parameter, a resistor's
+    // `r` ngspice's `.dc R1` (manual §15.3.2: a resistor is a `.dc`
+    // source). The divider: v(2) = 10 * r2 / (r1 + r2).
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let ac = bare
+        .replace("dc=10", "dc=10 mag=1")
+        .replace("  analysis op1 op", "  analysis ac1 ac values=[1k]\n  analysis nz1 noise out=[\"2\"] in=\"v1\" from=1 to=1k mode=\"dec\" points=2");
+    let ng = written(&ac, Dialect::Ngspice).expect("written").text;
+    let low = ng.to_ascii_lowercase();
+    assert!(
+        low.contains(".ac lin 1 1k 1k") && low.contains(".noise v(2) v1 dec 2 1 1k"),
+        "{ng}"
+    );
+    run(Dialect::Ngspice, &ng);
+    let dc = bare.replace(
+        "  analysis op1 op",
+        "  sweep s1 instance=\"r2\" parameter=\"r\" from=1k to=9k step=8k\n  analysis op1 op",
+    );
+    let ng = written(&dc, Dialect::Ngspice).expect("written").text;
+    let (v, n) = (run(Dialect::Vacask, &dc), run(Dialect::Ngspice, &ng));
+    for (k, r2) in [1e3, 9e3].into_iter().enumerate() {
+        let exact = 10.0 * r2 / (1e3 + r2);
+        assert!((column(&v, "2")[k] - exact).abs() < 1e-9, "VACASK {k}");
+        assert!(
+            (column(&n, "2")[k] - exact).abs() < 1e-9,
+            "ngspice {k}\n{ng}"
+        );
+    }
+}
+
+#[test]
+fn a_vacask_analysis_spice_lacks_is_refused_as_lacking() {
+    // cmd-analysis-dcinc.md, -acxf.md, -hb.md: DC incremental, AC transfer
+    // functions, harmonic balance; ngspice has none (manual ch.15), so
+    // W0015 (the target lacks it), not W0001.
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    for a in ["dcinc1 dcinc", "hb1 hb freq=[1k] nharm=3"] {
+        let deck = bare.replace("  analysis op1 op", &format!("  analysis {a}"));
+        assert_eq!(
+            refusals(written(&deck, Dialect::Ngspice)),
+            vec![Code::W0015],
+            "{a}"
+        );
+    }
+    // Spectre Reference 5.0's analyses: no harmonic balance (W0015), an
+    // `xf` for VACASK's `acxf` (W0001: not translated); Xyce RG `.HB`.
+    for (a, target, code) in [
+        ("hb1 hb freq=[1k] nharm=3", Dialect::Spectre, Code::W0015),
+        (
+            "xf1 acxf out=[\"2\"] from=1 to=1k mode=\"dec\" points=2",
+            Dialect::Spectre,
+            Code::W0001,
+        ),
+        ("hb1 hb freq=[1k] nharm=3", Dialect::Xyce, Code::W0001),
+    ] {
+        let deck = bare.replace("  analysis op1 op", &format!("  analysis {a}"));
+        assert_eq!(
+            refusals(written(&deck, target)),
+            vec![code],
+            "{a} on {target:?}"
+        );
+    }
+}
+
+#[test]
+fn a_vacask_builtin_constant_is_its_value_off_vacask() {
+    // expr-constants.md: `M_PI` and the other `constants.vams` names are
+    // VACASK's builtins; ngspice reads `m_pi` as an undefined parameter
+    // (demo/sc/lpfilter.sim), so each is written as its value. r1 = pi k:
+    // v(2) = 10 * 9k / (9k + pi k).
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare.replace("r1 (1 2) resistor r=1k", "r1 (1 2) resistor r=M_PI*1k");
+    let ng = written(&deck, Dialect::Ngspice).expect("written").text;
+    assert!(!ng.to_ascii_lowercase().contains("m_pi"), "{ng}");
+    let exact = 10.0 * 9.0 / (9.0 + std::f64::consts::PI);
+    let (v, n) = (run(Dialect::Vacask, &deck), run(Dialect::Ngspice, &ng));
+    assert!((node(&v, "2") - exact).abs() < 1e-9, "VACASK");
+    assert!((node(&n, "2") - exact).abs() < 1e-9, "ngspice\n{ng}");
 }
