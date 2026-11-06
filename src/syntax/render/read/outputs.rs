@@ -20,8 +20,33 @@ use crate::syntax::behaviour::CardRules;
 /// the old SPICE grammar's `(s PrintKind)?`: the analysis word after `.print`, and the
 /// text after it.
 pub(in crate::syntax::render) fn print_kind(rest: &str) -> (&str, &str) {
+    // ngspice's, then Xyce's own (RG `.PRINT`: `hb`, `hb_fd`, `hb_td`,
+    // `hb_ic`, `hb_startup`, `homotopy`, `es`, `pce`, `mpde`, `mpde_ic`,
+    // `mpde_startup`, `ac_ic`, `tranadjoint`).
     const KINDS: &[&str] = &[
-        "noise", "disto", "tran", "sens", "four", "op", "dc", "ac", "tf", "pz",
+        "noise",
+        "disto",
+        "tran",
+        "sens",
+        "four",
+        "op",
+        "dc",
+        "ac",
+        "tf",
+        "pz",
+        "hb",
+        "hb_fd",
+        "hb_td",
+        "hb_ic",
+        "hb_startup",
+        "homotopy",
+        "es",
+        "pce",
+        "mpde",
+        "mpde_ic",
+        "mpde_startup",
+        "ac_ic",
+        "tranadjoint",
     ];
     let blanks = rest.len() - rest.trim_start_matches([' ', '\t']).len();
     if blanks == 0 {

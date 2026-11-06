@@ -627,3 +627,23 @@ fn a_pwl_repeat_inside_the_parentheses_is_the_repeat() {
         lt.messages
     );
 }
+
+#[test]
+fn a_xyce_print_kind_is_the_kind_not_an_output() {
+    // Xyce RG `.PRINT` kinds (`homotopy`, `hb_fd`, …): read as the kind,
+    // not as a first output `homotopy`; ngspice has no such analysis, so
+    // the card is not written (W0023). Checks: 2 + 1.
+    let text =
+        "t\nV1 1 0 1\nR1 1 0 1k\n.dc V1 0 1 0.5\n.print homotopy v(1)\n.print dc v(1)\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice).expect("written");
+    assert!(!ng.text.contains("homotopy"), "{}", ng.text);
+    assert!(
+        ng.notes.diags.iter().any(|g| g.code == Code::W0023),
+        "{:?}",
+        ng.notes.diags
+    );
+    let xy = render_text(text, Dialect::Xyce, "t", Dialect::Xyce)
+        .expect("written")
+        .text;
+    assert!(xy.lines().any(|l| l == ".print homotopy v(1)"), "{xy}");
+}
