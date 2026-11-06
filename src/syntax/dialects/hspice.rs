@@ -148,6 +148,7 @@ pub(super) fn hspice() -> DialectDef {
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0015)
         .native(Construct::HspiceAnalysis)
+        .native(Construct::HspiceWLine)
         .omit(Construct::VacaskScript, Code::W0120)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)

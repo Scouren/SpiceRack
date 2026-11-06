@@ -182,6 +182,7 @@ pub(super) fn vacask() -> DialectDef {
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0015)
         .refuse(Construct::HspiceAnalysis, Code::W0015)
+        .refuse(Construct::HspiceWLine, Code::W0105)
         .native(Construct::VacaskScript)
         .refuse(Construct::CaretReread, Code::W0002)
         .lift(Construct::StatisticalCall, Rule::VacaskCalls)

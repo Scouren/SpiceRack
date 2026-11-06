@@ -119,6 +119,9 @@ pub enum Construct {
     Statistics,
     /// `.measure`.
     Measure,
+    /// HSPICE's W element (a multi-conductor lossy line on an RLGC,
+    /// tabular, U, FS or S model), kept as text.
+    HspiceWLine,
 }
 
 /// What a writer does with a construct.
@@ -329,7 +332,7 @@ mod tests {
         );
     }
 
-    const CONSTRUCTS: [Construct; 42] = [
+    const CONSTRUCTS: [Construct; 43] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -372,5 +375,6 @@ mod tests {
         Construct::UnmappedOption,
         Construct::Statistics,
         Construct::Measure,
+        Construct::HspiceWLine,
     ];
 }
