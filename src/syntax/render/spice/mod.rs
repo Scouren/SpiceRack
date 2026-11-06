@@ -8,7 +8,7 @@
 //! `.end`; the frame of title, `.end` and control blocks decided once, by
 //! the file's role) and the block-level cards; `cards` writes elements and
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
-//! options), `checks` the deck-wide
+//! options, `prints` the `.print` cards), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
 //! target reads it,
@@ -28,6 +28,7 @@ mod cards;
 mod cdl;
 mod checks;
 mod laplace;
+mod prints;
 mod ternary;
 mod verilog;
 mod xyce_options;

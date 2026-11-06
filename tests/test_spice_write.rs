@@ -465,3 +465,35 @@ fn an_ngspice_nested_ternary_is_written_as_ngspice_reads_it() {
     let deep = deck.replace("1?0?4:8:16", "0?0?4:1?8:16:32");
     assert!(refusal(&deep, Dialect::Ngspice, Dialect::Xyce).contains(&Code::W0035));
 }
+
+// ── Xyce prints on ngspice ──
+
+/// ngspice-45's `.print` (manual §15.4.1) takes a kind it runs and bare
+/// vectors or expressions: `.print homotopy` and `.print dc` with no `.dc`
+/// are "no … analysis found", `{v(1)*2}` is "no such function as {v",
+/// and Xyce's `p(R1)` (RG `.PRINT`, device power) leaves the transient
+/// "not run" (each run by hand). So a print of a kind the deck does not
+/// run and a power accessor are left out (W0023), a braced expression is
+/// written bare, and real ngspice runs the deck: v(2) = 0.5 V.
+#[test]
+fn xyce_prints_are_spelled_or_left_out_on_ngspice() {
+    let deck = "* t\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 1k\n.tran 1u 10u\n\
+        .print tran v(2) {v(1) * 2} p(R1)\n.print homotopy v(2)\n.print dc v(2)\n.end\n";
+    let w = render_text(deck, Dialect::Xyce, "t", Dialect::Ngspice).expect("written");
+    assert!(w.text.contains(".print tran v(2) v(1)*2\n"), "{}", w.text);
+    assert!(
+        !w.text.contains("homotopy") && !w.text.contains(".print dc"),
+        "{}",
+        w.text
+    );
+    assert!(w.notes.diags.iter().any(|d| d.code == Code::W0023));
+    let raw = Dialect::Ngspice
+        .run(&w.text)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{}", w.text));
+    let i = raw
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("v(2)"));
+    let v = *raw.real_data[i.expect("v(2)")].last().unwrap();
+    assert!((v - 0.5).abs() < 1e-9, "{v}\n{}", w.text);
+}
