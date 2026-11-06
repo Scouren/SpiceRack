@@ -137,6 +137,7 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
+                mut parasitics,
                 ..
             } => {
                 if let Some(w) = &wave {
@@ -145,6 +146,12 @@ impl W<'_, '_> {
                 if port.is_some() {
                     self.ask(Construct::RfPort, tok);
                 }
+                // LTspice writes its own; the others as elements.
+                let extra = match self.d {
+                    Dialect::Ltspice => None,
+                    _ => parasitics::expand(&decl, &np, &nm, &mut parasitics),
+                };
+                let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let mut s = format!("{decl} {np} {nm} {}", self.value(&value));
                 if let Some(mag) = ac_mag {
                     s.push_str(&format!(" AC {}", self.sp.decimal(mag, self.x)));
@@ -161,6 +168,11 @@ impl W<'_, '_> {
                 if let Some(w) = &wave {
                     s.push(' ');
                     s.push_str(&self.wave(w));
+                }
+                s.push_str(&self.params(&parasitics));
+                for l in extra.map(|e| e.1).unwrap_or_default() {
+                    s.push('\n');
+                    s.push_str(&l);
                 }
                 s
             }

@@ -134,6 +134,7 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
+                parasitics: _,
             } => {
                 if let Some(port) = port {
                     let ac = (ac_mag, ac_phase);

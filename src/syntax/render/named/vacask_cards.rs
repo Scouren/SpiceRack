@@ -98,6 +98,7 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
+                parasitics: _,
             } => {
                 if port.is_some() {
                     self.ask(Construct::RfPort, tok);

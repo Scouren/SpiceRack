@@ -26838,3 +26838,13 @@ xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir xyce written differently: Xyce 
 # implicit Rser=1m of an uncoupled L likewise. No golden line: every
 # LTspice deck holding one is still refused on those targets (W0005,
 # W0037), compared by status only.
+
+# Phase 7: spice-read: an LTspice V source's Rser=/Cpar= (render::read
+# sources; Card::Source parasitics; spice/cards.rs, named cards). Read (as
+# text before, W0001): LTspice writes them back, ngspice, ESPice, HSPICE and
+# Xyce as a series R on `{decl}_s1` and a C across, Spectre and VACASK
+# refuse W0114. Oracle: closed form on ngspice-45 (in the commit).
+ltspice/ltspice_examples/TransmissionLineInverter.net espice now written: LTspice V Rser read
+ltspice/ltspice_examples/TransmissionLineInverter.net hspice now written: LTspice V Rser read
+ltspice/ltspice_examples/TransmissionLineInverter.net ngspice now written: LTspice V Rser read
+ltspice/ltspice_examples/TransmissionLineInverter.net xyce now written: LTspice V Rser read

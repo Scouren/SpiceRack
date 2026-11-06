@@ -46,14 +46,22 @@ impl W<'_, '_> {
         if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {
             self.ask(Construct::TranStartup, tok);
         }
-        // A waveform's values past its form's count are not written.
+        // A waveform's values past its form's count are not written; no
+        // source parasitic is (spice/parasitics.rs writes them).
         for b in &blocks {
             for &c in &b.comps {
-                if let Comp::Card(n) = c
-                    && let Card::Source { wave: Some(w), .. } = self.rd.card_view(n)
-                    && w.cut
-                {
+                let Comp::Card(n) = c else { continue };
+                let Card::Source {
+                    wave, parasitics, ..
+                } = self.rd.card_view(n)
+                else {
+                    continue;
+                };
+                if wave.is_some_and(|w| w.cut) {
                     self.note(Code::W0026, self.rd.main(n));
+                }
+                if !parasitics.is_empty() {
+                    self.refuse(Code::W0114, self.rd.main(n));
                 }
             }
         }

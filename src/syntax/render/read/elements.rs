@@ -75,6 +75,9 @@ pub(in crate::syntax::render) enum Card {
         wave: Option<Wave>,
         /// ngspice `portnum n z0 Z`.
         port: Option<(u32, f64)>,
+        /// LTspice's `Rser=` and `Cpar=` (the source's series resistance,
+        /// its parallel capacitance), each key and value text as written.
+        parasitics: Vec<(String, String)>,
     },
     /// `B … V=` / `I=`, `E … value=`, `G … cur=`: the expression's text,
     /// and its tree (the value node).

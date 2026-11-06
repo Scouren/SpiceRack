@@ -100,11 +100,22 @@ impl<'a> Rd<'a> {
         let (mut value, mut dc_given, mut ac_magnitude, mut ac_phase, mut wf) =
             (Val::Num(0.0), false, None, None, None);
         let (mut repeat, mut delay, mut portnum, mut z0) = (None, None, None, None);
+        let mut parasitics = Vec::new();
         if let Some(v) = lead {
             (value, dc_given) = (self.value(v), true);
         }
         for s in specs {
             match s {
+                // LTspice help, Voltage Source: `Rser=`, `Cpar=`.
+                Spec::Pair(key, val)
+                    if self.d == Dialect::Ltspice
+                        && e == Element::VoltageSource
+                        && matches!(key.as_str(), "rser" | "cpar") =>
+                {
+                    self.irnum(val)?;
+                    let key = if key == "rser" { "Rser" } else { "Cpar" };
+                    parasitics.push((key.to_string(), self.vtext(val)));
+                }
                 Spec::Pair(key, val) => {
                     let v = self.irnum(val)?;
                     match key.as_str() {
@@ -161,6 +172,7 @@ impl<'a> Rd<'a> {
             ac_phase,
             wave: wf,
             port,
+            parasitics,
         })
     }
 }
@@ -260,6 +272,17 @@ impl<'a> Rd<'a> {
                 k += 1;
             }
             return Some((Spec::Wave(w, vals), k));
+        }
+        // LTspice help, Voltage Source: `Rser=`, `Cpar=`.
+        if self.d == Dialect::Ltspice
+            && self.tag(it) == Tag::Assign
+            && ["rser", "cpar"]
+                .iter()
+                .any(|w| self.key(it).eq_ignore_ascii_case(w))
+        {
+            let v = self.ast.rhs(Node(it));
+            let key = self.key(it).to_ascii_lowercase();
+            return self.val_ok(v).then_some((Spec::Pair(key, v), j + 1));
         }
         if ngspice {
             let keys = ["portnum", "z0", "td", "r"];

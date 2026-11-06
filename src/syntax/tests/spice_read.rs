@@ -437,3 +437,25 @@ fn an_ltspice_parasitic_is_an_element_where_c_and_l_take_none() {
         assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
     }
 }
+
+#[test]
+fn an_ltspice_sources_rser_and_cpar_are_elements_elsewhere() {
+    // LTspice help, Voltage Source (`Rser=`, `Cpar=`); read as text
+    // before (W0001). The written deck ran on ngspice-45 to the closed form
+    // v(a) = 0.5 V (1 - e^(-t/0.5 ms)) (1k into 1 µF || 1k) to 9.7e-7.
+    // Spectre and VACASK write no such element (W0114). Checks: 3 + 1.
+    let text = "* t\nV1 a 0 PULSE(0 1 0 1n 1n 1 2) Rser=1k Cpar=1u\nR1 a 0 1k\n.tran 5m\n.end\n";
+    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in ["RV1_ser a V1_s1 1k", "CV1_par a 0 1u"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    assert!(ng.lines().any(|l| l.starts_with("V1 V1_s1 0 ")), "{ng}");
+    let sp = render_text(text, Dialect::Ltspice, "t", Dialect::Spectre).expect_err("refused");
+    assert!(
+        sp.diags.iter().any(|g| g.code == Code::W0114),
+        "{}",
+        sp.messages
+    );
+}
