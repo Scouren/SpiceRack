@@ -1,0 +1,8 @@
+* t
+.func dbl(x) {2*x}
+.param rb=1k
+V1 in 0 2
+R1 in out {dbl(500)}
+R2 out 0 {rb}
+.op
+.end

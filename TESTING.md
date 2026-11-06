@@ -11,7 +11,7 @@ trusts. The rules behind it are in `AGENTS.md` (Testing).
 | merge | both suites in the testing shell | `nix develop .#testing -c cargo test`, then `maturin develop && python3 -m pytest` in a `--system-site-packages` venv | `.github/workflows/test.yaml`, every PR and every push to `main` |
 | docs | the site builds strictly; every Python example in it runs | `nix develop .#docs -c mkdocs build --strict`; `tests/test_docs.py` | `.github/workflows/docs.yaml`; pytest |
 | release | tag matches `Cargo.toml` and `pyproject.toml`, wheels for every target, sdist | `.github/scripts/bump_version.py`, then the release workflow | `.github/workflows/tags.yaml`, `publish.yaml` |
-| nightly | the spice-bench and corpus import suite (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
+| nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
 | golden | the transpiler rewrite's byte-identical gate against `9d1d6bb` ("Golden gate" below) | `golden record`, then `golden diff <baseline> <new> --xfail migration.xfail`; `golden check-determinism`; `cargo test --features corpus --test test_syntax` | local, before each rewrite phase lands |
 
 `.github/scripts/check_style.py` is vendored from the `code-style` skill
@@ -32,9 +32,12 @@ provenance, never by re-deriving it the way the writer does.
 | `test_espice_analyses.rs` | real ESPice; the same closed forms as the ngspice suite |
 | `test_laplace_ngspice.rs` | real ngspice 44.2; closed-form Laplace responses |
 | `test_sources/` | real ngspice (and ESPice) against the waveform closed forms: PWL `r=`/`td=`; TRNOISE/TRRANDOM against their distribution, five standard errors at N = 4000; each dialect without a form refuses. Imported ngspice PWL `r=`/`td=`, `portnum`/`z0` and `.sp`: the original deck and the deck written from it on real ngspice, every vector of every plot equal to 1e-12. Imported Spectre PWL `delay`/`pwlperiod`: the Spectre Reference 5.0 semantics (`vsource` #4, #17, #18, p.686) as the closed form, on real ngspice running the deck written from it, to 1e-9 V |
-| `test_vacask_runs/` | real VACASK: the emitted deck parses and writes a raw file with the expected numbers |
+| `test_vacask_runs/` | real VACASK (upstream `36be560`, codeberg.org/arpadbuermen/VACASK; its device models built by OpenVAF `mb-experimental` `96b3322`): the emitted deck parses and writes a raw file with the expected numbers |
 | `test_dialects.rs` | one circuit in every dialect, read back by ESPice (`--tokenizer=<d>`), same numbers; the dialects it cannot do yet are named in `ESPICE_REFUSES` |
 | `test_import_suite/` | spice-bench decks (`SPICE_BENCH`, a pinned nix fetch): parse, re-written as ngspice, every plot and `.meas` reproduced by real ngspice; decks ngspice itself cannot run are named in `tests/fixtures/spice_bench_known_failures.txt`, decks past the CPU budget in `spice_bench_slow.txt`. Read/write text fixpoint over the ngspice, HSPICE, Xyce, VACASK and LTspice corpora (`*_CORPUS`, pinned in `flake.nix`) |
+| `test_cross_sim/` | two real simulators on one circuit: a corpus deck on its own simulator against the deck SpiceRack writes from it (and from each file it includes) on the target's, every shared vector of every plot within the sum of the two runs' RELTOL/VNTOL (op, dc, ac) or 1% of the swing in a 1%-of-stop time tube (tran) (`cmp.rs`). Cells: Xyce corpus -> ngspice; spice-bench -> Xyce, ESPice, VACASK, HSPICE (on ESPice `--tokenizer=hspice` and ngspice `hsa`); VACASK corpus -> ngspice; HSPICE corpus (run on ESPice `--tokenizer=hspice`) -> ngspice. An ESPice mismatch ESPice also gives on the original is `simulator-differs`, not the writer's. Every deck that does not pass is a named line in `tests/fixtures/cross_sim/<cell>.txt` (strict both ways). Merge: 48 decks per corpus; nightly (`--features corpus`): every deck |
+| `test_pending_real_run.rs` | closed forms by hand (the diode, BJT and level-1 MOSFET solved from their model equations), met by real ngspice on each SPICE source; the Spectre and LTspice decks written from them pinned in `tests/spectre/p_*.scs`, `tests/ltspice/p_*.cir` with the numbers a real run must give (`pending.json`, `"status": "pending-real-run"`), checked by `tests/spectre/run.py`, `tests/ltspice/run.py` on a machine with the licence |
+| `test_structural.rs` | netgen 1.5 LVS: the CDL written from a hierarchical deck against the deck itself, every cell matching; Icarus Verilog 13 (`-g2012 -Wall`) elaborating the Verilog written from it. Decks Icarus rejects today are named in `VERILOG_FAILS` (strict both ways) |
 | `test_conditionals.rs` | conditional blocks and functions: the hand-written fixtures (`tests/fixtures/conditionals/`: a Spectre kit section with `real` functions and a structural `if`/`else if`/`else` chain, multi-line conditions, nesting, an unbraced branch; ngspice's `.if`/`.elseif`/`.else` forms) counted by hand; fixpoints in ngspice, Spectre, VACASK; real ngspice running the ngspice deck written back (and its HSPICE text in `hsa` mode) bit-identical to the original, and the Spectre kit written as ngspice to each branch's closed-form resistance |
 | `test_monte_carlo.rs` | SPICE statistical calls and Spectre `statistics`: T-G1 to T-G10 against hand-worked Spectre text (each call `rack_f(args, v)`, `v` varied `dist=gauss std=1` or `dist=unif N=1`, `process` at the top and `mismatch` in a subcircuit; Spectre Reference 19.1 pp.175-179); T-R1 SPICE -> Spectre -> SPICE gives every call back (sky130, gf180mcu slices); T-R2 the Spectre table read back equal; T-R3, T-R4 the table's SPICE lowering; T-R5 `vary` lines equal the call sites counted in the source; the one-layer lint. `test_monte_carlo_ngspice.rs` T-N0, T-N1: real ngspice, N=2000, a deck written for Spectre and back and the original, and a Spectre `statistics` table written for ngspice, against the closed forms (mean within 4σ/√N, std within 4σ/√(2N), inter-instance ρ). T-S1 to T-S3: `tests/spectre/run.py` on a real Spectre (not installed here), expectations in `tests/spectre/expected.json` |
 | `test_sections.rs` | library sections: the hand-written PDK-like fixtures (`tests/fixtures/pdk_sections/`: SPICE `.lib` corners, a Spectre `library`, bare Spectre sections with a `simulator lang=spice` region) counted by hand; read -> write -> read fixpoints in ngspice, HSPICE, Xyce, ESPice, Spectre and VACASK; SPICE <-> Spectre trips compared by meaning, the dialect differences listed in the test; real ngspice and ESPice running each corner from the written sections, bit-identical to the fixture's run |
@@ -59,6 +62,27 @@ provenance, never by re-deriving it the way the writer does.
 | `test_python_simulator.py::TestNgbehavior` | ngspice's own "Compatibility modes selected" note (Rust: `test_ngspice_analyses.rs`); a `.spiceinit` whose `shell touch` marks it read, in the working and home directories |
 | `test_python_*.py`, `test_design_testbenches.py` | API contract: spec examples per method |
 | `test_bump_version.py` | a copy of the manifests, each bump kind and each refusal |
+
+### Oracle matrix (source dialect -> target)
+
+What says a written deck is wrong, per cell. `sim`: both simulators run
+(`test_cross_sim/`, the cell's list in `tests/fixtures/cross_sim/`); `fixpoint`:
+read -> write -> read in one dialect (`test_import_suite/`); `pins`: bytes
+fixed by a test; `pending`: a deck and its closed-form numbers waiting for a
+licensed run (`tests/spectre/`, `tests/ltspice/`); `G`: byte-identical to the
+old writer only (the golden gate), no oracle of correctness yet.
+
+| src \ tgt | ngspice | ESPice | HSPICE | Xyce | LTspice | Spectre | VACASK | CDL | Verilog |
+|---|---|---|---|---|---|---|---|---|---|
+| ngspice | sim (import suite) | sim | sim (ESPice `--tokenizer=hspice`, ngspice `hsa`) | sim | pending | pending, T-S/T-M decks | sim | netgen LVS | iverilog |
+| HSPICE | sim (original on ESPice) | G | fixpoint | G | G | G | G | G | G |
+| Xyce | sim | G | G | fixpoint | G | G | G | G | G |
+| LTspice | G | G | G | G | fixpoint | G | G | G | G |
+| Spectre | closed form (`test_monte_carlo_ngspice.rs`, `test_sources/`) | G | G | G | G | fixpoint | G | G | G |
+| VACASK | sim (145 of 151 refused by the reader today) | G | G | G | G | G | fixpoint | G | G |
+
+Licence-bound simulators (HSPICE, Spectre, LTspice) have no binary here; a
+Spectre or LTspice cell is checked at most by its pending decks.
 
 ## Golden gate
 
@@ -184,7 +208,12 @@ never skip.
   ngspice number is checked against the golden only.
 
 - LTspice and Spectre are not installed anywhere SpiceRack is tested, so their
-  decks are checked against the manuals only.
+  decks are checked against the manuals and the pending decks only.
+- `test_cross_sim/` runs the merge tier on 48 decks per corpus (about 90 s)
+  and every deck nightly (31 min on 12 workers, 5.1 CPU-hours). A deck near
+  the CPU budget (60 s for an original, 120 s for a written deck) can flap
+  between `slow` and another class; each such deck is listed `slow` and not
+  simulated.
 - The spice-bench round trip runs only in the nightly tier: 2,586 CPU seconds
   (5 min 25 s wall on a 20-thread machine, 20 min on a 4-vCPU CI runner), past
   the merge budget. A change to `src/import` should run it locally before merging.

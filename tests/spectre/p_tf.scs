@@ -1,0 +1,10 @@
+// t
+
+simulator lang=spectre
+
+
+v1 (in 0) vsource dc=2
+r1 (in out) resistor r=2k
+r2 (out 0) resistor r=1k
+
+xf1 (out 0) xf freq=0

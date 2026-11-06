@@ -1,0 +1,8 @@
+* t
+V1 a 0 0 SIN(0 1 1000 0 0 0)
+R1 a 0 1k
+.options reltol=1e-4
+.save v(a)
+.measure tran vmax max v(a)
+.tran 1u 1m
+.end

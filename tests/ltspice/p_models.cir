@@ -1,0 +1,16 @@
+* t
+.model dmod d (is=1e-14 n=1.0)
+.model qn npn (is=1e-15 bf=100)
+.model nm nmos (level=1 vto=1.0 kp=2e-5 lambda=0.05)
+V1 vin 0 1
+R1 vin a 1k
+D1 a 0 dmod
+Vcc vcc 0 5
+Rb vcc base 470k
+Rc vcc coll 1k
+Q1 coll base 0 qn
+Vg gate 0 3
+Rd vcc drain 1k
+M1 drain gate 0 0 nm w=10u l=1u
+.op
+.end

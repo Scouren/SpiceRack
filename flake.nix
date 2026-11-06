@@ -39,15 +39,14 @@
           numpy
           pytest
         ]);
-        openvaf = pkgs.rustPlatform.buildRustPackage rec {
+        mkOpenvaf = { rev, hash }: pkgs.rustPlatform.buildRustPackage rec {
           pname = "openvaf-r";
           version = "unstable-2026";
 
           src = pkgs.fetchFromGitHub {
             owner = "arpadbuermen";
             repo = "OpenVAF";
-            rev = "2e066436d985b05cf8e6563e936daf9ab875775a";
-            hash = "sha256-AXtp8qaDq/MRYz2TYXRwT3kS+8EnKyakD3lQwdv3K34=";
+            inherit rev hash;
           };
 
           cargoLock = {
@@ -110,15 +109,41 @@
           };
         };
 
+        # ngspice's OSDI 0.4 modules (src/veriloga.rs, the `openvaf` alias).
+        openvaf = mkOpenvaf {
+          rev = "2e066436d985b05cf8e6563e936daf9ab875775a";
+          hash = "sha256-AXtp8qaDq/MRYz2TYXRwT3kS+8EnKyakD3lQwdv3K34=";
+        };
+        # VACASK's: upstream VACASK builds its device models with the
+        # mb-experimental branch (its ci/build-openvaf.sh) and opens no module
+        # the older compiler wrote.
+        openvafVacask = mkOpenvaf {
+          rev = "96b3322cedd9c8b56de4ca009cdeccda6f1ae571";
+          hash = "sha256-pFgK7H6EX0dFd8NALIdQ/4lo/iiBECUFl3QjsG0EyXE=";
+        };
+
+        # The VACASK deck corpus (golden gate, import suite, cross-simulator
+        # cell): the fork's tree the golden baseline recorded, kept apart from
+        # the simulator so a VACASK bump leaves the gate's inputs alone.
+        vacaskCorpus = pkgs.fetchFromGitHub {
+          owner = "robtaylor";
+          repo = "VACASK";
+          rev = "bcd48e2dd25182f5aaa3392c4e27b4e198372744";
+          hash = "sha256-/x6yJ+fklipvYbtI5rHx4d5YIpC9IJ5uhHCtWC5eJJg=";
+        };
+
         vacask = pkgs.stdenv.mkDerivation rec {
           pname = "vacask";
           version = "unstable-2026";
 
-          src = pkgs.fetchFromGitHub {
-            owner = "robtaylor";
-            repo = "VACASK";
-            rev = "bcd48e2dd25182f5aaa3392c4e27b4e198372744";
-            hash = "sha256-/x6yJ+fklipvYbtI5rHx4d5YIpC9IJ5uhHCtWC5eJJg=";
+          # Upstream (Arpad Buermen's), not the robtaylor fork pinned before:
+          # the fork's vsource validates a `type="pwl"` wave but its
+          # sourceCompute has no Pwl case, so every PWL source gave 0 V
+          # (lib/devvisrc.cpp); upstream evaluates it.
+          src = pkgs.fetchgit {
+            url = "https://codeberg.org/arpadbuermen/VACASK";
+            rev = "36be560b51c157dbb58ebc0a597deb1c1ba951f7";
+            hash = "sha256-dzC795Gf08WLJyBtLQq76DtI52golKPsla3q6XabYTI=";
           };
 
           nativeBuildInputs = with pkgs; [
@@ -132,46 +157,33 @@
 
           buildInputs = with pkgs; [
             suitesparse
-            openblas
+            # LP64: upstream calls the Fortran BLAS (dcopy_, ...) with 32-bit
+            # ints; nixpkgs' `openblas` is ILP64 on 64-bit hosts and the first
+            # Newton step segfaulted in dcopy_k.
+            openblasCompat
             boost
             tomlplusplus
+            fftw
           ];
 
           postPatch = ''
-            # --- Bypass all Darwin/Homebrew blocks ---
-            # The CMakeLists.txt "Darwin" blocks (lines 47, 130, 280) assume Homebrew:
-            # they call brew --prefix, set SuiteSparse_DIR/TOMLPP_DIR/Boost_ROOT to
-            # Homebrew paths, etc. None of this works in Nix's sandbox.
-            # By renaming "Darwin" the platform falls through to the Linux/generic
-            # else blocks, where all our Nix patches already apply.
+            # --- Bypass the Darwin/Homebrew blocks ---
+            # They call brew --prefix and set SuiteSparse_DIR/TOMLPP_DIR/Boost_ROOT
+            # to Homebrew paths; renamed, the platform falls through to Linux's.
             sed -i 's/STREQUAL "Darwin"/STREQUAL "DarwinBrew"/g' CMakeLists.txt
 
-            # --- Linux/generic block Boost fixes ---
+            # --- Boost: nixpkgs ships shared libraries only ---
+            sed -i 's/set(Boost_USE_STATIC_LIBS ON)/set(Boost_USE_STATIC_LIBS OFF)/' CMakeLists.txt
             sed -i 's/set(Boost_NO_SYSTEM_PATHS TRUE)//' CMakeLists.txt
-            sed -i 's/find_package(Boost 1.88 REQUIRED COMPONENTS filesystem process system)/find_package(Boost REQUIRED COMPONENTS filesystem process)/' CMakeLists.txt
-            sed -i 's|set(Boost_EXTRA_LINK_DIR "''${Boost_INCLUDE_DIRS}/stage/lib")|set(Boost_EXTRA_LINK_DIR "''${Boost_LIBRARY_DIRS}")|' CMakeLists.txt
-            sed -i 's/boost_system boost_filesystem boost_process/boost_filesystem boost_process/' CMakeLists.txt
 
-            # --- Compiler fixes ---
-            # Remove -fcoroutines (GCC-only flag, clang rejects it; C++20 coroutines
-            # are enabled by default in both compilers anyway).
-            sed -i 's/ "-fcoroutines"//' CMakeLists.txt
-
-            # --- KLU type fix (macOS ARM64) ---
-            # On macOS ARM64: int64_t = long long, SuiteSparse_long = long.
-            # Both 64-bit but C++ treats them as different types.
-            # Replace int64_t with SuiteSparse_long in KLU template instantiations.
-            sed -i 's/int64_t/SuiteSparse_long/g' lib/klumatrix.cpp
-            sed -i 's/int64_t/SuiteSparse_long/g' lib/klubsmatrix.cpp
-
-            # --- Header fixes ---
-            sed -i 's|suitesparse/klu.h|klu.h|g' include/klumatrix.h
+            # --- Header: nixpkgs' SuiteSparse puts klu.h at the include root ---
+            sed -i 's|suitesparse/klu.h|klu.h|g' include/solklu.h
 
             # --- Portable device models ---
             # OpenVAF compiles for the build machine's CPU by default ('native'). A
             # store path built on one CI runner and fetched from the cache onto a
             # runner with an older CPU then dies with SIGILL in every device model.
-            sed -i 's|ARGS "''${options_list}" "--allow"|ARGS "''${options_list}" "--target_cpu" "generic" "--allow"|' devices/CMakeLists.txt
+            sed -i 's|"''${options_list}" "--allow"|"''${options_list}" "--target_cpu" "generic" "--allow"|' devices/CMakeLists.txt
             grep -q -- '"--target_cpu" "generic"' devices/CMakeLists.txt
           '';
 
@@ -180,7 +192,7 @@
 
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=Release"
-            "-DOPENVAF_DIR=${openvaf}/bin"
+            "-DOPENVAF_DIR=${openvafVacask}/bin"
             "-DTOMLPP_DIR=${pkgs.tomlplusplus}"
             "-DSuiteSparse_DIR=${pkgs.suitesparse}"
           ];
@@ -192,7 +204,7 @@
 
           meta = {
             description = "VACASK – Verilog-A Circuit Analysis Kernel";
-            homepage = "https://github.com/robtaylor/VACASK";
+            homepage = "https://codeberg.org/arpadbuermen/VACASK";
             license = pkgs.lib.licenses.gpl2Plus;
             platforms = pkgs.lib.platforms.linux ++ pkgs.lib.platforms.darwin;
           };
@@ -352,14 +364,24 @@
             openvafAlias
             vacask
             espice.packages.${system}.espice
+            # tests/test_cross_sim/: the Xyce corpus on its own simulator and
+            # the decks written for Xyce (nixpkgs' xyce, pinned by flake.lock).
+            pkgs.xyce
+            # tests/test_structural.rs: netgen's LVS on the CDL written from a
+            # deck, Icarus Verilog on the Verilog.
+            pkgs.netgen-vlsi
+            pkgs.iverilog
           ];
           # tests/test_import_suite/: the spice-bench round trip and the
           # per-dialect fixpoint corpora.
+          # VACASK compiles a loaded Verilog-A source with this compiler, the one
+          # its own device models were built with (PATH's openvaf-r is ngspice's).
+          SIM_OPENVAF = "${openvafVacask}/bin/openvaf-r";
           SPICE_BENCH = spiceBench;
           NGSPICE_CORPUS = spiceBench;
           HSPICE_CORPUS = "${conformance}/tests/netlist";
           XYCE_CORPUS = "${xyceRegression}/Netlists";
-          VACASK_CORPUS = vacask.src;
+          VACASK_CORPUS = vacaskCorpus;
           LTSPICE_CORPUS = spiceDatasets;
 
           # examples 20 and 21: sky130 and gf180mcu, a ciel-layout PDK_ROOT.

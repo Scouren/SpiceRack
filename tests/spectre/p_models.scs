@@ -1,0 +1,20 @@
+// t
+
+simulator lang=spectre
+
+model dmod diode is=10f n=1
+model qn bjt type=npn is=1f bf=100
+model nm mos1 type=n vto=1 kp=20u lambda=50m
+
+v1 (vin 0) vsource dc=1
+r1 (vin a) resistor r=1k
+d1 (a 0) dmod
+vcc (vcc 0) vsource dc=5
+rb (vcc base) resistor r=470k
+rc (vcc coll) resistor r=1k
+q1 (coll base 0) qn
+vg (gate 0) vsource dc=3
+rd (vcc drain) resistor r=1k
+m1 (drain gate 0 0) nm w=10u l=1u
+
+op1 dc
