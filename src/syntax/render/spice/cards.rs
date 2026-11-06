@@ -18,6 +18,7 @@
 
 use super::W;
 use super::laplace::{self, Laplace};
+use super::parasitics;
 use super::ternary::{Read, parenthesize, spell_if};
 use crate::syntax::Dialect;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule, action};
@@ -54,6 +55,16 @@ impl W<'_, '_> {
                 if model.is_some() {
                     self.ask(Construct::RclModel, tok);
                 }
+                // An LTspice C's or L's parasitics as elements where the
+                // target's C and L take none (`parasitics`).
+                let extra = match (self.rd.d, self.d) {
+                    (
+                        Dialect::Ltspice,
+                        Dialect::Ngspice | Dialect::Espice | Dialect::Hspice | Dialect::Xyce,
+                    ) if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
+                    _ => None,
+                };
+                let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let mut s = format!("{decl} {n1} {n2}");
                 // ngspice-45 reads a C or L model only before the value
                 // (`C1 1 0 1u CM`: "unknown parameter (cm)"; run), as
@@ -70,7 +81,12 @@ impl W<'_, '_> {
                 if let Some(m) = model.as_ref().filter(|_| early.is_none()) {
                     s.push_str(&format!(" {m}"));
                 }
-                s + &self.params(&params)
+                s.push_str(&self.params(&params));
+                for l in extra.map(|e| e.1).unwrap_or_default() {
+                    s.push('\n');
+                    s.push_str(&l);
+                }
+                s
             }
             Card::Charge {
                 n1,

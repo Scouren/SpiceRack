@@ -26829,3 +26829,12 @@ xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir cdl written differently: Xyce E
 xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir xyce written differently: Xyce E/G TABLE read
 xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir cdl written differently: Xyce E/G TABLE read
 xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir xyce written differently: Xyce E/G TABLE read
+
+# Phase 7: spice-read: LTspice C/L parasitics as elements (spice/parasitics.rs,
+# spice/cards.rs Rcl arm). On ngspice, ESPice, HSPICE and Xyce an LTspice
+# C's or L's Rser/Lser (series, on internal nodes `{decl}_s1`, `_s2`) and
+# Rpar/Cpar (across the card's nodes) are written as R, L, C elements, the
+# part's ratings (V, Irms, Ipk, mfg, pn, type, pppkg, mtbf) left out; the
+# implicit Rser=1m of an uncoupled L likewise. No golden line: every
+# LTspice deck holding one is still refused on those targets (W0005,
+# W0037), compared by status only.

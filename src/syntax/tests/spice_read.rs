@@ -415,3 +415,25 @@ fn a_xyce_table_source_is_ngspices_pwl_value_with_flat_ends() {
         es.messages
     );
 }
+
+#[test]
+fn an_ltspice_parasitic_is_an_element_where_c_and_l_take_none() {
+    // LTspice help, Capacitor and Inductor (Rser, Lser in series; Rpar,
+    // Cpar across); ngspice-45 stops at `rser` on a C. The written deck ran
+    // on ngspice-45 to the closed forms: i = 1 mA e^(-t/1 ms) (C 1 µF,
+    // Rser 1k) to 5e-7, 0.1 A (1 - e^(-t/0.1 ms)) (L 1 mH, Rser 10) to
+    // 4e-6, 1 mA + 1 A e^(-t/1 µs) (Rser 1, Rpar 1k) to 1.2e-6. Checks: 4.
+    let text =
+        "* t\nV1 a 0 1\nC1 a 0 1u Rser=1k V=50 Irms=1\nL1 a 0 1m Rser=10 Rpar=1k\n.tran 5m\n.end\n";
+    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [
+        "C1 C1_s1 0 1u",
+        "RC1_ser a C1_s1 1k",
+        "RL1_ser a L1_s1 10",
+        "RL1_par a 0 1k",
+    ] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+}
