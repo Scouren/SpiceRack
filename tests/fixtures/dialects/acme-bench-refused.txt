@@ -1,0 +1,2 @@
+ngspice/examples/soa/diode-soa-simple.sp: W0001
+ngspice/paranoia/TransmissionLines/ltra7_4_line.sp: W0001

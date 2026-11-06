@@ -15,21 +15,19 @@
 //!
 //! Contents: none (tests only).
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+#[path = "common/acme.rs"]
+mod acme;
 
-use spicerack::syntax::behaviour::NumberReading;
-use spicerack::syntax::def::{Answer, Card, DialectDef, RegisterError, register};
+use std::sync::atomic::Ordering;
+
+use acme::{NOISE_CALLS, NOISE_CARDS, acme_as};
+use spicerack::syntax::def::{Answer, DialectDef, RegisterError, register};
 use spicerack::syntax::diag::{Code, Kind};
-use spicerack::syntax::lexicon::{Arithmetic, Scale};
-use spicerack::syntax::render::capability::{Alt, Construct};
-use spicerack::syntax::render::spelling::FuncForm;
+use spicerack::syntax::lexicon::Scale;
+use spicerack::syntax::render::capability::Construct;
 use spicerack::syntax::render::{Diags, Numbers, Source, render_pending, render_text, splice};
 use spicerack::syntax::token::Tag;
 use spicerack::syntax::{Dialect, Lang, parse, tokenize};
-
-/// How often [`write_noise`] was called, and with how many cards.
-static NOISE_CALLS: AtomicUsize = AtomicUsize::new(0);
-static NOISE_CARDS: AtomicUsize = AtomicUsize::new(0);
 
 /// A deck exercising every acme row but the hook.
 const DECK: &str = "\
@@ -60,50 +58,8 @@ const FIXTURES: &[&str] = &[
 
 // ---- private ----
 
-/// Acme (§2) under `name`: ngspice with `#` comment lines and `;` tails,
-/// `.subcircuit`/`.endsub`, `x` for mega, decimal arithmetic, functions as
-/// `.param f(x)='body'`, no Laplace sources (its own code), charge
-/// capacitors braced, `reltol` spelled `rtol`, and a `.noise` hook.
-fn acme_as(name: &str) -> DialectDef {
-    DialectDef::new(name)
-        .extends(Lang::NGSPICE)
-        .comment_line("#")
-        .comment_tail(";")
-        .keyword(".subcircuit", Tag::KwSubckt)
-        .keyword(".endsub", Tag::KwEnds)
-        .write_head(Tag::KwSubckt, ".subcircuit")
-        .write_head(Tag::KwEnds, ".endsub")
-        .scale("x", Scale::Exp(6))
-        .arithmetic(Arithmetic::Decimal)
-        .number_reading(NumberReading::Decimal)
-        .ngspice_numbers(false)
-        .func(FuncForm::Param)
-        .spell(Construct::Func, Alt::FuncParam)
-        .option("reltol", "rtol")
-        .code("ACME001", Kind::Refusal, "acme has no Laplace sources")
-        .code("ACME002", Kind::Refusal, "acme's .noise takes one source")
-        .refuse_code(Construct::Laplace, "ACME001")
-        .spell(Construct::ChargeCapacitor, Alt::ChargeBraced)
-        .hook(".noise", write_noise)
-}
-
 fn acme() -> DialectDef {
     acme_as("acme")
-}
-
-/// Acme's `.noise`: `.noise_acme out=<o> src=<s> <sweep>`; a card with
-/// fewer than two words refused `ACME002`.
-fn write_noise(cards: &[Card<'_>], out: &mut Vec<Answer>) {
-    NOISE_CALLS.fetch_add(1, Ordering::SeqCst);
-    NOISE_CARDS.fetch_add(cards.len(), Ordering::SeqCst);
-    for c in cards {
-        out.push(match c.words {
-            [o, s, rest @ ..] => {
-                Answer::Text(format!(".noise_acme out={o} src={s} {}", rest.join(" ")))
-            }
-            _ => Answer::Refuse("ACME002"),
-        });
-    }
 }
 
 fn acme_lang() -> Lang {
@@ -491,6 +447,19 @@ fn a_plugin_region_in_a_given_deck() {
         "{}",
         e.messages
     );
+}
+
+/// Oracle: §6.5: a region's name is a whole word: `simulator
+/// lang=ngspice-x` opens the plugin `ngspice-x`'s region, not the built-in
+/// `ngspice` region its name begins with.
+#[test]
+fn a_region_name_is_matched_whole() {
+    let x = register(acme_as("ngspice-x")).expect("registers");
+    let deck =
+        "* t\nV1 in 0 1\nsimulator lang=ngspice-x\nR1 in 0 2x\nsimulator lang=spice\n.op\n.end\n";
+    let t = tokenize(deck, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
+    let langs: Vec<Lang> = (0..t.len() as u32).map(|k| t.lexicon_at(k).lang).collect();
+    assert!(langs.contains(&x), "a token read by ngspice-x's lexicon");
 }
 
 /// Oracle: the pinned dumps (`tests/fixtures/dialects/*.dump`, the Python

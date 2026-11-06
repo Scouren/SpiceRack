@@ -351,8 +351,9 @@ impl Lexer<'_> {
                 s == to.as_bytes()
             }
         });
+        // A whole word: `ngspice-x` (a plugin's name) is not `ngspice`.
         let after = self.src.get(p + to.len()).copied().unwrap_or(b' ');
-        let wchar = after.is_ascii_alphanumeric() || after == b'_' || after == b'!';
+        let wchar = after.is_ascii_alphanumeric() || matches!(after, b'_' | b'!' | b'-');
         hit && !wchar
     }
 

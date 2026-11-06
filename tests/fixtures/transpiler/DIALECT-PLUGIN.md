@@ -858,14 +858,14 @@ Taken from the user's defaults and this doc's recommendations (team lead,
     heads, not functions: an equal re-registration with another function
     keeps the held hook.
   - Plugin regions look up plugins only (a built-in's region is a row of
-    the lexicon's own table). A `simulator lang=` name a built-in's row
-    prefixes before a `-` (`ngspice-x`) still opens the built-in's region.
+    the lexicon's own table). (A `simulator lang=` name a built-in's row
+    prefixed before a `-`, `ngspice-x`, opened the built-in's region; fixed
+    in the oracles round below.)
   - A statement an ngspice deck keeps as ngspice text is refused `W0001`
     by acme (its text family is itself, §6.5).
-  - Oracle 4 runs on five inline decks, not the 200-deck spice-bench
-    sample; oracle 5 (acme on ngspice) and oracle 2 (`tests/dialect_defs.rs`)
-    are not written. `Kit` keeps its `Dialect`: a plugin kit is out of
-    scope.
+  - Oracle 4 ran on five inline decks; oracles 2 and 5 were not written
+    (all three are now: the oracles round below). `Kit` keeps its
+    `Dialect`: a plugin kit is out of scope.
 - **P10**: the Python binding. `src/python/def_.rs`: `spicerack.def_`
   (a submodule, in `sys.modules`) with `DialectDef`, one method per Rust
   call, same name and arguments, each returning the definition (generated
@@ -898,12 +898,57 @@ Taken from the user's defaults and this doc's recommendations (team lead,
     `Keyword.Subckt`. A variant named `None` is `None_` in Python (a
     keyword there). `Family` is `writer(Writer)`; the class-attribute sugar
     covers every one-argument call.
-  - The only per-oracle-3 parity is acme and `MyHspice` (the pinned dumps);
-    the built-ins are not re-declared from Python.
+  - The only per-oracle-3 parity was acme and `MyHspice` (the pinned
+    dumps); the built-ins are re-declared from Python since the oracles
+    round below.
   - A hook's wrong answer count is a `RuntimeError` naming the hook (the
     deck's errors are `RuntimeError`), not a `ValueError`.
   - A plugin run skips `backend::select`'s feature checks: the deck goes
     to `runs_on`'s simulator as written.
+- **Oracles round** (after f407dd3):
+  - Oracle 2: `tests/dialect_defs.rs` compiles each
+    `src/syntax/dialects/<d>.rs` unchanged in another crate (a crate-root
+    `mod syntax { pub use spicerack::syntax::*; }`), so a definition using a
+    private item does not compile: none does. Each is registered again
+    under a new name (`DialectDef::renamed`, in Python too); its dump equals
+    the built-in's but the rows naming the language itself (`name`,
+    `lex.lang`, `sp.lexicon`, `text_family`); it writes the 53 golden
+    fixtures (each read through its kit, as `golden` does), the pinned
+    200-deck spice-bench sample (`tests/fixtures/dialects/spice-bench-200.txt`)
+    and two expression probes to the same text or refusal codes as its
+    built-in, and reads them (as the clone, written to ngspice; ngspice's
+    clone written to Xyce) the same. A clone whose text family is itself
+    is read and written as itself where the built-in's deck is. The probes
+    found the back doors left in f407dd3, ngspice's `{}` evaluator asked by
+    name (`sdt` refused, a then-branch ternary's grouping, `if()` as `?:`):
+    now `behaviour::ExprEval` (acme, extending ngspice, gets ngspice's).
+    `xyce_options` spells numbers with the target's spelling.
+  - Oracle 3: `tests/builtin_dialects.py` declares all ten built-ins with
+    the Python calls of their Rust files (translated once, written out);
+    each dumps its Rust row, names aside (`test_dialect_def.py`).
+  - Oracle 4 on the 200-deck sample (`tests/test_acme_oracles.rs`): 191
+    decks are fixpoints, 2 are refused `W0001` (the pinned list
+    `acme-bench-refused.txt`: a region kept as ngspice text), 7 holding a
+    `.noise` card are excluded by name (the hook writes `.noise_acme`, text
+    acme does not read; the test checks each still holds one).
+  - Oracle 5: one circuit (a parametrised subcircuit, a B source, a charge
+    capacitor, an RC) with `.op`, `.dc`, `.ac`, `.tran`: `D` and
+    `write(read(write(D, acme), acme), ngspice)` run on ngspice give every
+    vector within 1e-9 (op, dc, ac) and 1e-3 (tran, ngspice's RELTOL)
+    relative; a missing ngspice fails.
+  - Open items closed: pytest registers each test's plugins under names of
+    its own (`uniq`); a Python hook is held from the registration that makes
+    a new row (one per hooked registration, at most `LANGS_MAX`), none for
+    an unregistered or equal re-registered definition (a refcount test);
+    a region name is matched whole (`simulator lang=ngspice-x` opens the
+    plugin, not ngspice's region).
+  - Still open: `tokenize`'s plugin regions look up plugins only (index
+    past the built-ins); `render::spice::bench` spells a `.control`
+    block's `fourier` numbers with ngspice's spelling by name, and
+    `read::named` reads VACASK analysis words with Spectre's lexicon by
+    name (a quirk kept from the old reader): neither changes a built-in or
+    a clone's bytes, each a named-built-in reference a later definition
+    call could replace.
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).
