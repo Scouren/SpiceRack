@@ -57,17 +57,20 @@ class Acme(ps.Dialect):
 
     # What acme can write, per construct (others: the base's answer).
     capabilities = {
-        "laplace": ps.Refuse("ACME001", "acme has no Laplace sources"),
+        "laplace": ps.Refuse("ACME001"),
         "charge_capacitor": ps.Spell("charge_braced"),
     }
-    codes = {"ACME002": "acme's .noise takes one source"}
+    codes = {                     # every code the plugin raises, and its message
+        "ACME001": "acme has no Laplace sources",
+        "ACME002": "acme's .noise takes one source",
+    }
 
     # A hook: called once per deck with every .noise card the base wrote.
     def write_noise(self, cards):
         out = []
         for c in cards:           # ps.Card: head, words, params, text
             if len(c.words) != 3:
-                out.append(ps.Refuse("ACME002", c.text))
+                out.append(ps.Refuse("ACME002"))
             else:
                 out.append(".noise_acme out=%s src=%s %s" % tuple(c.words))
         return out
@@ -117,9 +120,9 @@ class AcmeRF(ps.Dialect):
     masters = {"transient": "tran"}                    # analysis/control words
     options = {"reltol": "rel_tol", "gmin": "g_min"}   # over the base's map
     capabilities = {
-        "statistics": ps.Refuse("ARF001", "acmerf has no statistics block"),
+        "statistics": ps.Refuse("ARF001"),
     }
-    codes = {}
+    codes = {"ARF001": "acmerf has no statistics block"}
 
 ps.register_dialect(AcmeRF())
 ```
@@ -146,8 +149,8 @@ Every field is optional; a missing one inherits the base's row.
 | `masters` | `Lexicon.masters` (named family) | yes | respelled after writing (§3.5) | the base word is a base master |
 | `expr`, `path_quote`, `func`, `subckt_params` | `Spelling` | (the lexicon's quote rules are the base's) | yes | `func`: `func`, `param`, `real`, `none`; `expr` must be one the base lexicon reads |
 | `options` | the option map | acme → SPICE option | SPICE → acme option | names only |
-| `capabilities` | the capability column | | yes | construct names (stable list, §4); `ps.Native()`, `ps.Refuse(code, msg)`, `ps.Spell(alt)`, `ps.Omit(code, msg)` where `alt` is one the base **family's** writer implements |
-| `codes` | the plugin's message table | | yes | `[A-Z]+[0-9]{3}`, unique per plugin |
+| `capabilities` | the capability column | | yes | construct names (stable list, §4); `ps.Native()`, `ps.Refuse(code)`, `ps.Spell(alt)`, `ps.Omit(code)` where `alt` is one the base **family's** writer implements |
+| `codes` | the plugin's message table | | yes | `[A-Z]+[0-9]{3}` → message; every `Refuse`/`Omit` code is one of these |
 | `hooks` | the hook table | | yes | base head words (`.noise`, `.four`, a SPICE element letter); methods of the instance |
 
 What a plugin cannot do, by design: add a statement shape, a construct, an
@@ -334,7 +337,7 @@ catalogue rows in a new range:
 - `W0201 Refusal` "refused by a dialect plugin": `detail` is the index of
   the plugin's code in its row; the message is
   `<deck>:<line>:<col>: W0201 acme:ACME001 <the plugin's message>`.
-- `W0202 Note`: `ps.Omit(code, msg)`, written without the construct.
+- `W0202 Note`: `ps.Omit(code)`, written without the construct.
 - A hook's refusal anchors to the cell's token where the writer asked,
   else to the first token of the source statement the span came from (the
   writer records it with the span).
@@ -370,8 +373,7 @@ types, `Lang` numbers. The plugin sees only:
   the base wrote it, continuations joined). Built in Rust by reading the
   span with the plugin's lexicon: the plugin gets the base's text form, so
   its shape does not follow the AST.
-- **`ps.Refuse(code, message)`, `ps.Spell(alt)`, `ps.Native()`,
-  `ps.Omit(code, message)`**: plain value classes.
+- **`ps.Refuse(code)`, `ps.Spell(alt)`, `ps.Native()`, `ps.Omit(code)`**: plain value classes.
 - **`api = 1`**: registration refuses a plugin written for another surface
   version.
 
