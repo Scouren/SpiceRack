@@ -11,7 +11,7 @@
 //! `vol=`/`cur=`; LTspice help (`Q=`).
 //!
 //! Contents:
-//! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`, `W::ternaries(&self, e: &str) -> String`
+//! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`, `W::value(&self, v: &Val) -> String`, `W::ternaries(&self, e: &str) -> String`
 //! - `pub(super) fn renamed(rd: &Rd, cells: &Cells, card: &Card) -> Option<String>`
 //! - `pub(in crate::syntax::render) fn pairs<T>(items: &[T]) -> impl Iterator<Item = (&T, &T)>`,
 //!   `pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String`
@@ -26,8 +26,7 @@ use crate::syntax::behaviour::{
 use crate::syntax::lang::Cells;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::out::Space;
-use crate::syntax::render::read::WaveKind;
-use crate::syntax::render::read::{Card, Num, Rd, Val, Wave};
+use crate::syntax::render::read::{Card, Rd, Val};
 
 impl W<'_, '_> {
     /// Element `n`'s card, with no line end (a Laplace source is two
@@ -330,6 +329,16 @@ impl W<'_, '_> {
         }
     }
 
+    /// A value field: a number in the target's format, an expression in its
+    /// delimiters, raw text as written.
+    pub(super) fn value(&self, v: &Val) -> String {
+        match v {
+            Val::Num(x) => self.sp.number(*x, self.x),
+            Val::Expr(e) => format!("{}{}{}", self.sp.expr.0, self.ternaries(e), self.sp.expr.1),
+            Val::Raw(t) => t.clone(),
+        }
+    }
+
     /// `e`'s ternaries, in a `{}` value, as another family reads them
     /// (`ternary`): grouped as the source groups a then-branch's (C's, or
     /// ngspice's `{}` evaluator's), a blank before each `:` on Xyce.
@@ -419,77 +428,6 @@ impl W<'_, '_> {
             } else {
                 s.push_str(&format!(" {k}={}", self.spelled(v)));
             }
-        }
-        s
-    }
-
-    /// A value field: a number in the target's format, an expression in its
-    /// delimiters, raw text as written.
-    fn value(&self, v: &Val) -> String {
-        match v {
-            Val::Num(x) => self.sp.number(*x, self.x),
-            Val::Expr(e) => format!("{}{}{}", self.sp.expr.0, self.ternaries(e), self.sp.expr.1),
-            Val::Raw(t) => t.clone(),
-        }
-    }
-
-    /// A waveform value: a number as plain decimal, an expression
-    /// delimited.
-    fn wave_num(&self, n: &Num) -> String {
-        match n {
-            Num::Num(v) => self.sp.decimal(*v, self.x),
-            Num::Expr(e) => self.value(&Val::Expr(e.clone())),
-        }
-    }
-
-    /// Records a refusal for a waveform the target lacks.
-    fn wave_ok(&mut self, letter: char, w: &Wave, tok: u32) {
-        match w.kind {
-            WaveKind::Pwl if w.repeat.is_some() || w.delay.is_some() => {
-                let c = match letter {
-                    'V' => Construct::PwlRepeatV,
-                    _ => Construct::PwlRepeatI,
-                };
-                self.ask(c, tok);
-            }
-            WaveKind::Trnoise | WaveKind::Trrandom => {
-                self.ask(Construct::NoiseWave, tok);
-            }
-            _ => {}
-        }
-    }
-
-    /// `w`'s spelling: `KIND(v …)`, PWL's `r=`/`td=` after it.
-    fn wave(&self, w: &Wave) -> String {
-        let word = match w.kind {
-            WaveKind::Sin => "SIN",
-            WaveKind::Pulse => "PULSE",
-            WaveKind::Pwl => "PWL",
-            WaveKind::Exp => "EXP",
-            WaveKind::Sffm => "SFFM",
-            WaveKind::Am => "AM",
-            WaveKind::Trnoise => "TRNOISE",
-            WaveKind::Trrandom => "TRRANDOM",
-        };
-        let mut args: Vec<String> = w.args.iter().map(|a| self.wave_num(a)).collect();
-        match w.kind {
-            // The RTS fields are left off when all zero, as the manual's
-            // white and 1/f examples write the card.
-            WaveKind::Trnoise if w.args[4..].iter().all(|a| a.num() == Some(0.0)) => {
-                args.truncate(4)
-            }
-            WaveKind::Trrandom => {
-                let kind = w.args[0].num().expect("a TRRANDOM type");
-                args[0] = format!("{}", kind as u8);
-            }
-            _ => {}
-        }
-        let mut s = format!("{word}({})", args.join(" "));
-        if let Some(r) = &w.repeat {
-            s.push_str(&format!(" r={}", self.wave_num(r)));
-        }
-        if let Some(td) = &w.delay {
-            s.push_str(&format!(" td={}", self.wave_num(td)));
         }
         s
     }

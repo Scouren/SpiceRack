@@ -161,6 +161,7 @@ pub(super) fn ngspice() -> DialectDef {
         .native(Construct::LocalFunc)
         .spell(Construct::TableSource, Alt::PwlValue)
         .native(Construct::LossyLine)
+        .native(Construct::AmWave)
         .refuse(Construct::Step, Code::W0016)
         .refuse(Construct::StepList, Code::W0016)
         .refuse(Construct::TranStartup, Code::W0037)

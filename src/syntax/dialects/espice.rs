@@ -39,4 +39,7 @@ pub(super) fn espice() -> DialectDef {
         .native(Construct::PwlRepeatI)
         .refuse(Construct::NoiseWave, Code::W0009)
         .refuse(Construct::TableSource, Code::W0102)
+        // ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
+        // offset" (run).
+        .spell(Construct::AmWave, Alt::AmNoOffset)
 }

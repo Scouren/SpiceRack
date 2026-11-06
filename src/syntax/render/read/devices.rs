@@ -15,6 +15,7 @@
 
 use super::{Card, Rd};
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::device::Primitive as Element;
 use crate::syntax::token::Tag as T;
 
@@ -95,6 +96,11 @@ impl<'a> Rd<'a> {
             "i" => true,
             _ => return None,
         };
+        if self.b.card_rules == CardRules::Xyce
+            && let Some(p) = self.b_poly(&expression, current, &name, &np, &nm)
+        {
+            return Some(p);
+        }
         Some(Card::Behavioural {
             current,
             name,
@@ -102,6 +108,61 @@ impl<'a> Rd<'a> {
             nm,
             expr: expression,
             value: self.ast.rhs(Node(*kv)),
+        })
+    }
+
+    /// Xyce's `B … V={POLY(n) ctrl… coeff…}` (Xyce RG, B source: a POLY
+    /// in the expression) as the E, F, G or H POLY card it is (ngspice
+    /// manual §5.2-§5.5: `E`/`G` by `V(a[,b])` controls, `F`/`H` by
+    /// `I(src)` ones; ngspice's B has no `poly()`: "no such function
+    /// 'poly'"); `None` for another expression or mixed controls.
+    fn b_poly(&self, e: &str, current: bool, name: &str, np: &str, nm: &str) -> Option<Card> {
+        let e = e.trim();
+        if !e.get(..4)?.eq_ignore_ascii_case("poly") {
+            return None;
+        }
+        let rest = e[4..].trim_start().strip_prefix('(')?;
+        let (dims, mut rest) = rest.split_once(')')?;
+        let dims: usize = dims.trim().parse().ok()?;
+        let (mut volts, mut controls) = (0, Vec::new());
+        // Each pass reads one control, so it ends after `dims` of them.
+        for _ in 0..dims {
+            let r = rest.trim_start();
+            let kind = r.chars().next()?.to_ascii_lowercase();
+            let (args, after) = r[1..].trim_start().strip_prefix('(')?.split_once(')')?;
+            let args: Vec<&str> = args.split(',').map(str::trim).collect();
+            match (kind, args.as_slice()) {
+                ('v', [a]) => controls.extend([a.to_string(), "0".into()]),
+                ('v', [a, b]) => controls.extend([a.to_string(), b.to_string()]),
+                ('i', [s]) => controls.push(s.to_string()),
+                _ => return None,
+            }
+            volts += usize::from(kind == 'v');
+            rest = after;
+        }
+        if volts != 0 && volts != dims {
+            return None;
+        }
+        let lex = self.t.lexicon_at(0);
+        let coeffs: Vec<f64> = rest
+            .split_whitespace()
+            .map(|w| self.number_text(w, lex))
+            .collect::<Option<_>>()?;
+        let letter = match (current, volts == dims) {
+            (false, true) => 'E',
+            (true, true) => 'G',
+            (true, false) => 'F',
+            (false, false) => 'H',
+        };
+        // The source's name keeps its `B` (`BGND` is `EBGND`): the B card
+        // shares no name with the deck's own E cards.
+        Some(Card::Poly {
+            letter,
+            name: format!("B{name}"),
+            np: np.to_string(),
+            nm: nm.to_string(),
+            controls,
+            coeffs,
         })
     }
 

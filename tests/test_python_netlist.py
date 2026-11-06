@@ -501,7 +501,7 @@ class TestWaveformSources:
         assert "Vp a 0 500m AC 1 PULSE(" in n
         assert "Vs b 0 200m SIN(0.2 1 1000 0.001 10 90)" in n  # DC defaults to the offset
         assert "Ie d 0 0 EXP(0 0.001 0 0.000001 0.000005 0.000001)" in n
-        assert "SFFM(0 1 1000000 0.5 1000)" in n and "AM(0.5 1 1000 1000000 0)" in n
+        assert "SFFM(0 1 1000000 0.5 1000)" in n and "AM(0 0.5 0.5 1000 1000000)" in n
         assert "Iw w 0 0 PWL(" in n
         with pytest.raises(TypeError):
             c.PulseVoltageSource("x", "x", c.gnd, dc=1.0, dc_offset=1.0)

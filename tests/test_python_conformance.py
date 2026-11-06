@@ -212,7 +212,8 @@ EXPECTED = {
     'tf': (OK, OK, OK, 'W0015', OK, OK, OK, OK, OK),
     'dc_sensitivity': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     'ac_sensitivity': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    'polezero': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # HSPICE `.PZ v(out) src` where a source stands across the input (D's 8b52303).
+    'polezero': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
@@ -258,7 +259,9 @@ EXPECTED = {
     'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
     'exp': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sffm': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'am': (OK, OK, OK, OK, OK, 'W0108', OK, OK, OK),
+    # Xyce and LTspice have no AM source; VACASK's `type="am"` cannot hold a
+    # zero carrier (`offset=0`: modindex VMA/VMO); stream D's AM order.
+    'am': (OK, OK, OK, 'W0108', 'W0108', 'W0108', 'W0108', OK, OK),
     'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

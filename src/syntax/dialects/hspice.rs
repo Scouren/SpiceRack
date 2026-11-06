@@ -171,6 +171,7 @@ pub(super) fn hspice() -> DialectDef {
         .native(Construct::LocalFunc)
         .refuse(Construct::TableSource, Code::W0102)
         .refuse(Construct::LossyLine, Code::W0105)
+        .spell(Construct::AmWave, Alt::HspiceAm)
         .refuse(Construct::Step, Code::W0016)
         .refuse(Construct::StepList, Code::W0016)
         .refuse(Construct::TranStartup, Code::W0037)
@@ -178,7 +179,8 @@ pub(super) fn hspice() -> DialectDef {
         .native(Construct::Tf)
         .native(Construct::Sens)
         .refuse(Construct::SensAc, Code::W0015)
-        .refuse(Construct::PoleZero, Code::W0015)
+        // HSPICE UG `.PZ out src`: where a source stands across the input.
+        .spell(Construct::PoleZero, Alt::HspicePz)
         .refuse(Construct::SParameter, Code::W0015)
         .native(Construct::Print)
         .spell(Construct::Save, Alt::Probe)

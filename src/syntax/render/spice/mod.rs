@@ -35,6 +35,7 @@ mod prints;
 mod sweeps;
 mod ternary;
 mod verilog;
+mod waves;
 mod xyce_options;
 
 use super::Numbers;

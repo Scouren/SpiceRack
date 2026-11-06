@@ -143,6 +143,9 @@ pub(super) enum Card {
     Sens(String, Option<[u32; 4]>),
     /// `.pz` six words.
     Pz([u32; 6]),
+    /// HSPICE's `.pz out src`: the source's and the output's nodes, `vol`
+    /// or `cur` (`Rd::hspice_pz`).
+    PzNodes([String; 4], &'static str),
     /// `.four f outs`.
     Four(u32, Vec<String>),
     Options,
@@ -389,6 +392,7 @@ impl<'a> Rd<'a> {
                         .then(|| Card::Tf(out, src.to_string()))
                 }
                 "sens" => self.sens(n),
+                "pz" if hspice => self.hspice_pz(n),
                 "pz" => match items {
                     [a, b, c, d, e, f]
                         if self.spaced(n, items) && items.iter().all(|&k| self.wordw(k)) =>
@@ -436,6 +440,25 @@ impl<'a> Rd<'a> {
         let (nums, start) = match body.split_last() {
             Some((&p, rest)) if hspice && self.tag(p) == Tag::Assign => (rest, Some(p)),
             _ => (body, None),
+        };
+        // HSPICE `.TRAN s1 t1 s2 t2 …` runs to the last stop, each segment
+        // printed at its own step (HSPICE UG `.TRAN`): one run to the last
+        // stop at the finest step prints every one of those points.
+        let segs: Vec<u32>;
+        let nums = match nums {
+            n if hspice && n.len() >= 4 && n.len().is_multiple_of(2) => {
+                let v: Vec<f64> = n.iter().map(|&k| self.number(k)).collect::<Option<_>>()?;
+                let stops: Vec<f64> = v.iter().skip(1).step_by(2).copied().collect();
+                if stops.windows(2).any(|w| w[0] >= w[1]) {
+                    return None;
+                }
+                let finest = (0..n.len())
+                    .step_by(2)
+                    .min_by(|&a, &b| v[a].total_cmp(&v[b]))?;
+                segs = vec![n[finest], n[n.len() - 1]];
+                &segs[..]
+            }
+            n => n,
         };
         let lo = if lt { 1 } else { 2 };
         let hi = if hspice { 2 } else { 4 };
@@ -568,6 +591,7 @@ impl<'a> Rd<'a> {
                 keyword(&self.text(w[4]), &["vol", "cur"])?,
                 keyword(&self.text(w[5]), &["pol", "zer", "pz"])?,
             ),
+            Card::PzNodes(nodes, tf) => Ana::Pz(nodes.clone(), tf, "pz"),
             Card::Four(f, outs) => Ana::Four(num(*f)?, outs.clone()),
             _ => return None,
         })

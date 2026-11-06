@@ -65,7 +65,8 @@ const SPECTRE: Keys = Keys {
 const VACASK: Keys = Keys {
     source: &[
         "dc", "mag", "phase", "type", "val0", "val1", "delay", "rise", "fall", "width", "period",
-        "sinedc", "ampl", "freq", "theta", "modindex", "modfreq", "tau1", "td2", "tau2", "wave",
+        "sinedc", "ampl", "freq", "theta", "modindex", "modfreq", "modphase", "tau1", "td2",
+        "tau2", "wave",
     ],
     gm: "gain",
     rm: "gain",

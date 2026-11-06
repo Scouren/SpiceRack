@@ -27315,7 +27315,7 @@ vacask/demo/spice/bsim3v3nqs.sim vacask a waveform source's DC value for the DC 
 vacask/demo/spice/bsim4v8nqs.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 vacask/test/test_capacitor.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 vacask/test/test_hb1.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
-vacask/test/test_hb2.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb2.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
 vacask/test/test_hb3.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_inductor.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 xyce/ACSENS/bsim3/gain-stage_fd.cir vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc)
@@ -32132,11 +32132,279 @@ vacask/test/test_acxf.sim vacask a model of a loaded module and its instances wr
 vacask/test/test_dcinc.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_dcxf.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_diode.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
-vacask/test/test_hb4.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
-vacask/test/test_hb5.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
-vacask/test/test_hb6.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb4.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
+vacask/test/test_hb5.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
+vacask/test/test_hb6.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
 vacask/test/test_noise.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_opnl.sim spectre now written: a model of the loaded Verilog-A module (simdio.va, ahdl_include) and its instance; was refused W0001
 vacask/test/test_opsweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_sweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_sweepvar.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+
+# Phase 7: spice-read: AM in each dialect's order (render::read sources,
+# named_elements; Wave args AM = ngspice-45's VO VMO VMA FM FC TD PHASEM
+# PHASEC; spice/cards.rs am_args, named/vacask_cards.rs; capability
+# AmWave). ngspice's 8-value AM read (it was raw past 5 values: v-i-
+# sources-am-ffm.sp, now written for ngspice, refused W0108 on ESPice for
+# its offset); VACASK's type="am" written with modindex (its default 0.5
+# was taken before) and modphase; Xyce, LTspice refuse W0108.
+spice-bench/ngspice/examples/various/v-i-sources-am-ffm.sp espice now refused: AM read in ngspice-45 / VACASK order
+spice-bench/ngspice/examples/various/v-i-sources-am-ffm.sp ngspice written differently: AM read in ngspice-45 / VACASK order
+
+# Phase 7: spice-read: tests/ltspice/*.cir read as LTspice (src/bin/golden/
+# inputs.rs): stream F's pending-run LTspice decks, read as Xyce by their
+# `.cir` extension before. Their outputs are new in fx14 (listed above).
+fixtures/tests/ltspice/p_behavioural.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_branch_param.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_charge_capacitor.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_conditional.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_dc_sweep.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_elements.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_func.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_measure_save.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_models.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_pwl_repeat.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_tf.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+
+# Phase 7: spice-read: Xyce's .print kinds (render::read outputs.rs
+# print_kind: hb, hb_fd, hb_td, hb_ic, hb_startup, homotopy, es, pce, mpde,
+# mpde_ic, mpde_startup, ac_ic, tranadjoint; Xyce RG .PRINT) read as the
+# kind, not as a first output: the kind is now written lowercased
+# (`.print hb`, was `.print HB` copied as an output word).
+xyce/COMPLEX_NUM/test5.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_1238_SON/bug1238-hb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_3.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_3.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_3.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_3_baseline.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_3_baseline.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_3_baseline.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_573_SON/common_emitter_hb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/ac_files.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/ac_files.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/ac_files.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/ac_files_csv.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/ac_files_csv.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/ac_files_csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/hb_files_csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_701_SON/hb_files_fallback_csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-multiple-lines.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-multiple-lines.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-multiple-lines.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-tran-order1.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-tran-order1.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-tran-order1.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-tran-order2.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-tran-order2.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_920_SON/homotopy-tran-order2.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-error.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-error.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-error.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-multifile.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-multifile.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-multifile.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-nooverwrite.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-nooverwrite.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy-nooverwrite.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy.cir espice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Certification_Tests/BUG_966_SON/tran-homotopy.cir xyce written differently: Xyce .print kind read as the kind
+xyce/EMBEDDED/mutIndNormal.cir xyce written differently: Xyce .print kind read as the kind
+xyce/EMBEDDED/simpleNormal.cir xyce written differently: Xyce .print kind read as the kind
+xyce/EMBEDDED2/simpleNormal.cir xyce written differently: Xyce .print kind read as the kind
+xyce/GenCoupAPI/rc_hb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/GenCoupAPI/rc_hb_nogenext.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/common_emitter_hb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/common_emitter_hb_basker.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/common_emitter_hb_blockbasker.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hb1.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hbTdsamples.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hbt.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hbt1.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hbt_tahb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hbtbox.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_hbtdia.cir xyce written differently: Xyce .print kind read as the kind
+xyce/HB/gilbert_cell_mpde.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/ES_setAnalysisParams1.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/ES_setAnalysisParams2.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/ES_setAnalysisParams3.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/ES_stokhos_setEmbeddedSamplingOptions.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/SAMPLING_setAnalysisParams1.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/SAMPLING_setAnalysisParams2.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Message/Input/SAMPLING_setAnalysisParams3.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/AC/ac-csv.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/ac-csv.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/ac-csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/AC/ac-touchstone-defaults-to-prn.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/ac-touchstone-defaults-to-prn.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/ac-touchstone-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/AC/op-print-line-order.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/op-print-line-order.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/op-print-line-order.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/AC/op-td-prn.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/op-td-prn.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/AC/op-td-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/ac.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/ac.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/ac.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/es.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/hb-fallbacks.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/hb.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/printLine_for_hb_ic.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/printLine_for_hb_startup.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Dasho/printLine_for_hb_td.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/dashRNotSupported.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-formats-default-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-no-headerfooter.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-proj-pce-dc-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-proj-pce-dc-step-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-proj-pce-dc-tecplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-proj-pce-tran-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-regr-pce-tran-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/ES/es-specific-print-params-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/dashRNotSupported.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-fd-td-diff-formats.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-fd-td-step-gnuplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-files-fd-td.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-files-fd.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-files-td.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-files.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-gnuplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-prn-saveic-startup.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-probe-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-probe-fallback-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-raw-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-raw-fallback-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-step-csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-step-gnuplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-step-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-step-tecplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-td-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/hb-tecplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/op-hb-ordering.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/op-hb_fd-ordering.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/op-hb_ic-ordering.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/op-hb_startup-ordering.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HB/op-hb_td-ordering.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-csv.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-csv.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-prn-noindex.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-prn-noindex.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-prn-noindex.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-prn.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-prn.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-probe-defaults-to-prn.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-probe-defaults-to-prn.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-probe-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-raw-defaults-to-prn.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-raw-defaults-to-prn.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-raw-defaults-to-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-tecplot.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-tecplot.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/HOMOTOPY/homotopy-tecplot.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Other/file-extension.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Other/printExpression.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/Other/printFilename.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/SENS/sens-tranadjoint-csv.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/SENS/sens-tranadjoint-noindex.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/SENS/sens-tranadjoint-overrideRaw.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/SENS/sens-tranadjoint-unsupportedProbeFormat.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/SENS/sens-tranadjoint-unsupportedRawFormat.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/TRAN/tran-homotopy-prn-file.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/TRAN/tran-homotopy-prn-file.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/TRAN/tran-homotopy-prn-file.cir xyce written differently: Xyce .print kind read as the kind
+xyce/Output/TRAN/tran-homotopy-prn.cir espice written differently: Xyce .print kind read as the kind
+xyce/Output/TRAN/tran-homotopy-prn.cir hspice written differently: Xyce .print kind read as the kind
+xyce/Output/TRAN/tran-homotopy-prn.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/NISP/cmosInverter_nisp.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/NISP2/cmosInverter_nisp.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/NISP2/issue84_devParam2.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/NI_REGRESSION/cmosInverter_regr.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/NI_REGRESSION2/cmosInverter_regr.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/PCE/cmosInverter_pce.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/PCE/mutInd_pce.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PCE/PCE2/cmosInverter_pce.cir xyce written differently: Xyce .print kind read as the kind
+xyce/PDE_1D_BJT/ramp_test1_pde_homotopy.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bsim6invAdjoint.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bsim6invAdjointForceAnalytic.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bsim6invAdjointNewFD.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bsim6invAdjointTrap.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bsim6invAdjointTrapNewFD.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bug797Adjoint.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/bugs799_and_842A.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/diodeTranAdjoint.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/diodeTranAdjointScaled.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/diodeTranAdjointTrap.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/fullWaveDummy.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/fullWaveRectDiodeAdjoint.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/inverter_event.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/rc1000TranAdjGear.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/sensCapGearAdj.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/sensCapGearAdjNewFD.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/sensCapGearAdjOrder1.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/sensCapTrapAdj.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/sensCapTrapAdjNewFD.cir xyce written differently: Xyce .print kind read as the kind
+xyce/SENS/sensCapTrapAdjOrder1.cir xyce written differently: Xyce .print kind read as the kind
+
+# Phase 7: spice-read: Xyce's B source with POLY (render::read devices.rs
+# b_poly; spice/checks.rs exempts it from W0032 like TABLE). `B … V={POLY(n)
+# V(a[,b])…}` / `I={POLY(n) I(src)…}` is the E/G/F/H POLY card it spells
+# (named `E` + `B…`): ngspice's B has no poly() (stream F's Y7), Xyce
+# writes the POLY card back. Oracle: Xyce 7.10 B POLY vs E/F POLY, and Xyce
+# vs ngspice (in the commit).
+xyce/AMPMOD/amp_mod.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/AMPMOD/amp_mod.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/CONNECTIVITY/connect.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/CONNECTIVITY/connect.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_141_SON/poly.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_141_SON/poly.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318_noscope.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_318/bug_318_noscope.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/Certification_Tests/BUG_67/bug_67.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/MPDE/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/MPDE/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/MPDE/sandler24_MPDE.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/POLY/poly.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/POLY/poly.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER24/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER24/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER28/sandler28.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/SANDLER28/sandler28.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24_WAMPDE.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
+xyce/WAMPDE/sandler24_WAMPDE.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+
+# Phase 7: spice-read: HSPICE `.pz v(out) src` (render::read sweeps.rs
+# hspice_pz) read as ngspice's `.pz in+ in- out+ out- vol|cur pz` over the
+# source's nodes; HSPICE writes `.pz v(out) src` back where a source of
+# the transfer's kind stands across the input pair (spice/analyses.rs
+# across; capability PoleZero HSPICE cell), so an ngspice `.pz … pz` deck
+# with such a source is now written for HSPICE. HSPICE `.snac`, `.sample`,
+# `.ptdnoise` refuse W0015, `.vec`, `.check`, `.power` W0039 (status only).
+hspice/hspice/pz_source.sp espice now written: HSPICE .pz read / written
+hspice/hspice/pz_source.sp hspice written differently: HSPICE .pz read / written
+hspice/hspice/pz_source.sp ngspice now written: HSPICE .pz read / written
+hspice/hspice/pz_source.sp spectre now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/polezero/filt_bridge_t.sp hspice now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/polezero/filt_multistage.sp hspice now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/polezero/filt_rc.sp hspice now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/regression/pz/ac-resistance.sp hspice now written: HSPICE .pz read / written
+
+# Phase 7: spice-read: HSPICE `.tran s1 t1 s2 t2 …` (render::read
+# testbench tran) read as one run to the last stop at the finest step
+# (HSPICE UG .TRAN; as text before, W0001); HSPICE writes it back so.
+hspice/hspice/tran_segments.sp espice now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp hspice written differently: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp ltspice now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp ngspice now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp spectre now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp vacask now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp xyce now written: HSPICE .tran segments read as one run to the last stop

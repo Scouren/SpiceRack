@@ -316,10 +316,32 @@ impl W<'_, '_> {
                 "type=\"fm\" sinedc={} ampl={} freq={} modindex={} modfreq={}",
                 a[0], a[1], a[2], a[3], a[4]
             ),
-            WaveKind::Am => format!(
-                "type=\"am\" sinedc={} ampl={} freq={} modfreq={} delay={}",
-                a[1], a[0], a[3], a[2], a[4]
-            ),
+            // ngspice-45's order (`Wave::args`) as VACASK's `type="am"`
+            // (`lib/devvisrc.cpp`): modindex VMA/VMO; VACASK holds the
+            // value at `delay` before it, ngspice 0, so a delayed AM is
+            // written only with no offset; no carrier phase (the pinned
+            // VACASK runs `phase=60` as 0: run, 1.3 V off).
+            WaveKind::Am => {
+                let x: Vec<Option<f64>> = w.args.iter().map(Num::num).collect();
+                let [Some(vo), Some(vmo), Some(vma), _, _, Some(td), _, Some(pc)] = x[..] else {
+                    self.refuse(Code::W0108, tok);
+                    return None;
+                };
+                if vmo == 0.0 || pc != 0.0 || td != 0.0 && vo != 0.0 {
+                    self.refuse(Code::W0108, tok);
+                    return None;
+                }
+                format!(
+                    "type=\"am\" sinedc={} ampl={} modindex={} modfreq={} freq={} delay={} modphase={}",
+                    a[0],
+                    a[1],
+                    num(vma / vmo),
+                    a[3],
+                    a[4],
+                    a[5],
+                    a[6]
+                )
+            }
             // `type="pwl"` holds the first value before the first point
             // and the last after, as ngspice does; `delay` is `td=`
             // (`docs/dev-builtin-src.md`, `lib/devvisrc.cpp` L910 at

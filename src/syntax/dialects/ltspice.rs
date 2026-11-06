@@ -167,6 +167,7 @@ pub(super) fn ltspice() -> DialectDef {
         .refuse(Construct::LocalFunc, Code::W0106)
         .refuse(Construct::TableSource, Code::W0102)
         .native(Construct::LossyLine)
+        .refuse(Construct::AmWave, Code::W0108)
         .native(Construct::Step)
         .native(Construct::StepList)
         .native(Construct::TranStartup)

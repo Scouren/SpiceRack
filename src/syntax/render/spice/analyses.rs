@@ -13,7 +13,7 @@ use super::sweeps::{dc_axis, has_ac, xyce_lin};
 use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
-use crate::syntax::render::read::Ana;
+use crate::syntax::render::read::{Ana, Card, Comp};
 
 impl W<'_, '_> {
     /// `a`'s card (HSPICE's `.tran` with a step cap and `.noise` take two
@@ -191,6 +191,21 @@ impl W<'_, '_> {
             }
             Ana::Pz(nodes, tf, pz) => match self.ask(Construct::PoleZero, tok) {
                 Action::Native => format!(".pz {} {tf} {pz}", nodes.join(" ")),
+                // HSPICE's `.PZ` finds poles and zeros both, from a source
+                // standing across the input pair.
+                Action::Spell(Alt::HspicePz) => match self.across(&nodes[0], &nodes[1], tf) {
+                    Some(src) if *pz == "pz" => {
+                        let out = match nodes[3].as_str() {
+                            "0" => format!("v({})", nodes[2]),
+                            r => format!("v({},{r})", nodes[2]),
+                        };
+                        format!(".pz {out} {src}")
+                    }
+                    _ => {
+                        self.refuse(Code::W0015, tok);
+                        String::new()
+                    }
+                },
                 _ => String::new(),
             },
             Ana::Sp(sw) => match self.ask(Construct::SParameter, tok) {
@@ -218,5 +233,23 @@ impl W<'_, '_> {
                 String::new()
             }
         }
+    }
+}
+
+// ---- private ----
+
+impl W<'_, '_> {
+    /// The name of the top's V (`vol`) or I (`cur`) source from `a` to
+    /// `b`, as written.
+    fn across(&self, a: &str, b: &str, tf: &str) -> Option<String> {
+        let want = if tf == "vol" { 'V' } else { 'I' };
+        self.deck.top.comps.iter().find_map(|c| {
+            let Comp::Card(n) = *c else { return None };
+            let Card::Source { letter, np, nm, .. } = self.rd.card_view(n) else {
+                return None;
+            };
+            let across = np.eq_ignore_ascii_case(a) && nm.eq_ignore_ascii_case(b);
+            (letter == want && across).then(|| self.names.decl(n).to_string())
+        })
     }
 }

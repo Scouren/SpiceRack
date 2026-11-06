@@ -211,8 +211,14 @@ pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
     let before = all.len();
     all.extend(found.into_iter().filter_map(|path| {
         let ext = path.extension()?.to_str()?;
-        let &(_, dialect) = FIXTURES.iter().find(|f| f.0 == ext)?;
+        let &(_, by_ext) = FIXTURES.iter().find(|f| f.0 == ext)?;
         let tests = repo.join("tests");
+        // `tests/ltspice/` holds LTspice decks under `.cir` (stream F's
+        // pending-run decks), which the extension would read as Xyce.
+        let dialect = match path.starts_with(tests.join("ltspice")) {
+            true => Dialect::Ltspice,
+            false => by_ext,
+        };
         let kit = spicerack::import::kit(
             std::slice::from_ref(&path),
             resolve::Form::Deck,

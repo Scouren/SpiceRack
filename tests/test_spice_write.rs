@@ -190,18 +190,18 @@ fn a_log_sweep_is_refused_on_the_spice_targets() {
 
 // ── text that did not parse ──
 
-/// Xyce RG: `POLY` is no function of an expression (the Xyce corpus's
-/// `MPDE/sandler24.cir`, `BGND 99 0 V={POLY(2) V(3) V(4) 0 0.5 0.5}`): the
-/// parser keeps the text (P0002). Its own dialect gets it back as written;
+/// An expression of two terms with no operator between them (`V={V(3)
+/// V(4)}`) is no expression of any dialect: the parser keeps the text
+/// (P0002). (Xyce's `V={POLY(2) V(3) V(4) 0 0.5 0.5}`, this test's first
+/// case, is read as the E POLY card it spells since stream D's b_poly.) Its own dialect gets it back as written;
 /// every other target refuses it (W0032), where the old writer copied it
 /// into an ngspice deck unchecked. The neighbour with a parsed expression is
 /// written everywhere.
 #[test]
 fn text_that_did_not_parse_reaches_its_own_dialect_only() {
-    let deck =
-        "* t\nV3 3 0 1\nV4 4 0 1\nB1 99 0 V={POLY(2) V(3) V(4) 0 0.5 0.5}\nR1 99 0 1k\n.op\n.end\n";
+    let deck = "* t\nV3 3 0 1\nV4 4 0 1\nB1 99 0 V={V(3) V(4)}\nR1 99 0 1k\n.op\n.end\n";
     let own = write(deck, Dialect::Xyce, Dialect::Xyce);
-    assert!(own.contains("POLY(2) V(3) V(4) 0 0.5 0.5"), "{own}");
+    assert!(own.contains("V(3) V(4)"), "{own}");
     let others = [
         Dialect::Ngspice,
         Dialect::Espice,
@@ -213,7 +213,7 @@ fn text_that_did_not_parse_reaches_its_own_dialect_only() {
         let codes = refusal(deck, Dialect::Xyce, to);
         assert!(codes.contains(&Code::W0032), "{to:?}: {codes:?}");
     }
-    let good = deck.replace("{POLY(2) V(3) V(4) 0 0.5 0.5}", "{0.5*V(3)+0.5*V(4)}");
+    let good = deck.replace("{V(3) V(4)}", "{0.5*V(3)+0.5*V(4)}");
     for to in others {
         let _ = write(&good, Dialect::Xyce, to);
     }

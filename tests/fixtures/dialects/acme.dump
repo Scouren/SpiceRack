@@ -81,6 +81,7 @@ cell.Func Spell(FuncParam)
 cell.LocalFunc Native
 cell.TableSource Spell(PwlValue)
 cell.LossyLine Native
+cell.AmWave Native
 cell.Step Refuse(W0016)
 cell.StepList Refuse(W0016)
 cell.TranStartup Refuse(W0037)

@@ -81,6 +81,7 @@ cell.Func Spell(FuncParam)
 cell.LocalFunc Native
 cell.TableSource Refuse(W0102)
 cell.LossyLine Refuse(W0105)
+cell.AmWave Spell(HspiceAm)
 cell.Step Refuse(W0201) MY001
 cell.StepList Refuse(W0016)
 cell.TranStartup Refuse(W0037)
@@ -88,7 +89,7 @@ cell.DcLogList Spell(DcType)
 cell.Tf Native
 cell.Sens Native
 cell.SensAc Refuse(W0015)
-cell.PoleZero Refuse(W0015)
+cell.PoleZero Spell(HspicePz)
 cell.SParameter Refuse(W0015)
 cell.Print Native
 cell.Save Spell(Probe)

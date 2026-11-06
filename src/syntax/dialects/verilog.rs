@@ -54,6 +54,7 @@ pub(super) fn verilog() -> DialectDef {
         .native(Construct::LocalFunc)
         .native(Construct::TableSource)
         .native(Construct::LossyLine)
+        .native(Construct::AmWave)
         .native(Construct::Step)
         .native(Construct::StepList)
         .native(Construct::TranStartup)
