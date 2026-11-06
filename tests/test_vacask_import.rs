@@ -415,3 +415,21 @@ fn a_spice_module_with_no_spice_kind_keeps_its_load() {
         "{ng}"
     );
 }
+
+#[test]
+fn a_vacask_model_number_in_parentheses_or_quotes_is_a_bare_spice_number() {
+    // VACASK reads `(1)` as an expression and `"4.8"` as a string the
+    // module takes (input-numbers.md, input-strings.md); ngspice's
+    // `.model` reads neither ("Syntax error: letter [)]" on
+    // demo/spice/bsim4v82.inc), and BSIM4's `version` is the number.
+    // VACASK's build of a SPICE device names a clashing instance parameter
+    // `instance_<p>` (devices/spice/bsim4v8.va header): SPICE's `<p>`.
+    let deck = "M\nground 0\nload \"spice/bsim4v8.osdi\"\nmodel vsource vsource\n\
+                model n1 sp_bsim4v8 type=1 version=\"4.8\" binunit=( 1) k2=( -0.01)\n\
+                v1 (d 0) vsource dc=1\nm1 (d d 0 0) n1 w=1u l=1u instance_trnqsmod=0\n\
+                control\n  analysis op1 op\nendc\n";
+    let ng = written(deck, Dialect::Ngspice).expect("written").text;
+    for word in ["version=4.8 ", "binunit=1 ", "k2=-10m", " trnqsmod=0"] {
+        assert!(ng.contains(word), "{word}:\n{ng}");
+    }
+}

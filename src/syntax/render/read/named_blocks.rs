@@ -18,7 +18,7 @@ use super::cards::Model;
 use super::named::{OSDI, spectre_kind, vacask_builtin, vacask_kind, vacask_model_kind};
 use super::{Block, Rd};
 use crate::syntax::Dialect;
-use crate::syntax::ast::{NONE, Tag};
+use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::token::Tag as T;
 
 /// A Spectre `statistics` block as the old reader kept it.
@@ -187,7 +187,7 @@ impl<'a> Rd<'a> {
                 // A loaded module's model: ngspice's OSDI `.model name
                 // <module>` takes its parameters as written, `type` too.
                 None => {
-                    let params = p.iter().map(|(k, v)| (k.clone(), self.vtext(*v)));
+                    let params = p.iter().map(|(k, v)| (k.clone(), self.model_value(*v)));
                     let params = params.collect();
                     return Some(Model {
                         name,
@@ -204,12 +204,36 @@ impl<'a> Rd<'a> {
         let mut params: Vec<(String, String)> = p
             .iter()
             .filter(|(k, _)| !(drop_type && k == "type"))
-            .map(|(k, v)| (k.clone(), self.vtext(*v)))
+            .map(|(k, v)| (k.clone(), self.model_value(*v)))
             .collect();
         if let Some(l) = level {
             params.insert(0, ("level".into(), l.into()));
         }
         Some(Model { name, kind, params })
+    }
+
+    /// A model parameter's value as written, but a VACASK number in
+    /// parentheses (`binunit=(1)`) or in quotes (`version="4.8"`) bare:
+    /// VACASK reads an expression in parentheses and a string where the
+    /// module takes one (`docs/input-numbers.md`, `input-strings.md`),
+    /// SPICE's `.model` neither ("Syntax error: letter [)]", ngspice-45
+    /// on `demo/spice/bsim4v82.inc`).
+    fn model_value(&self, v: u32) -> String {
+        if self.d != Dialect::Vacask {
+            return self.vtext(v);
+        }
+        let mut inner = v;
+        while self.tag(inner) == Tag::Paren && self.ast.lhs(Node(inner)) != NONE {
+            inner = self.ast.lhs(Node(inner));
+        }
+        if self.number(inner).is_some() {
+            return self.vtext(inner);
+        }
+        let t = self.vtext(v);
+        match super::named_elements::unquoted(t.trim()) {
+            Some(u) if u.parse::<f64>().is_ok() => u,
+            _ => t,
+        }
     }
 
     /// `vary <param> dist=<d> std=<s> | N=<n> [percent=yes]`.

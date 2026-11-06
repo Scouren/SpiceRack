@@ -1,6 +1,6 @@
 //! Spectre and VACASK instance statements → [`Card`] views (by built-in
 //! master or model kind, or a subcircuit instance), with their source
-//! waveforms, as the old lowering typed them; a master another file of the
+//! waveforms (`named_waves`), as the old lowering typed them; a master another file of the
 //! kit declares is read as `syntax::resolve` binds it.
 //!
 //! Cites: the old lowering's named elements;
@@ -13,7 +13,7 @@
 //!   `Rd::strip(&self, name: &str, letter: char) -> String`
 
 use super::named::{OSDI, spectre_kind, vacask_model_kind};
-use super::{Card, Num, Rd, Val, Wave, WaveKind};
+use super::{Card, Rd, Val};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::resolve::{Binding, Def, DefKind, Polarity};
@@ -21,7 +21,6 @@ use crate::syntax::resolve::{Binding, Def, DefKind, Polarity};
 /// The keys one dialect's built-in masters use (the old lowering).
 struct Keys {
     source: &'static [&'static str],
-    damp: &'static str,
     gm: &'static str,
     rm: &'static str,
     probe: &'static str,
@@ -56,7 +55,6 @@ const SPECTRE: Keys = Keys {
         "wave",
         "pwlperiod",
     ],
-    damp: "damp",
     gm: "gm",
     rm: "rm",
     probe: "probe",
@@ -69,7 +67,6 @@ const VACASK: Keys = Keys {
         "dc", "mag", "phase", "type", "val0", "val1", "delay", "rise", "fall", "width", "period",
         "sinedc", "ampl", "freq", "theta", "modindex", "modfreq", "tau1", "td2", "tau2", "wave",
     ],
-    damp: "theta",
     gm: "gain",
     rm: "gain",
     probe: "ctlinst",
@@ -122,12 +119,20 @@ impl<'a> Rd<'a> {
         };
         // A device's parameters: VACASK's `$mfactor` (N in parallel,
         // `docs/cir-mfactor.md`) is SPICE's multiplier `m` (ngspice manual
-        // §3.3.1, §7.1, §11.1).
+        // §3.3.1, §7.1, §11.1); VACASK's build of a SPICE device names an
+        // instance parameter that shares a model parameter's name
+        // `instance_<p>` (`devices/spice/bsim3v3.va`, `bsim4v8.va`
+        // headers), SPICE's `<p>`.
         let device = |used: &[&str]| -> Vec<(String, String)> {
             let mut v = kept(used);
             for (k, _) in &mut v {
-                if self.d == Dialect::Vacask && k == "$mfactor" {
+                if self.d != Dialect::Vacask {
+                    continue;
+                }
+                if k == "$mfactor" {
                     *k = "m".into();
+                } else if let Some(p) = k.strip_prefix("instance_") {
+                    *k = p.to_string();
                 }
             }
             v
@@ -294,7 +299,14 @@ impl<'a> Rd<'a> {
                 name: name.to_lowercase(),
                 nodes: ns,
                 model: m.to_string(),
-                params: device(&[]),
+                // A loaded module's own parameter names, `$mfactor` its `m`.
+                params: kept(&[])
+                    .into_iter()
+                    .map(|(k, v)| match k.as_str() {
+                        "$mfactor" => ("m".into(), v),
+                        _ => (k, v),
+                    })
+                    .collect(),
             },
             m => {
                 let kind = kind_of.as_deref()?;
@@ -383,174 +395,4 @@ impl<'a> Rd<'a> {
             &SPECTRE
         }
     }
-
-    /// the old lowering's `named_waveform`.
-    fn named_waveform(&self, p: &[(String, u32)]) -> Option<Option<Wave>> {
-        let keys = self.keys();
-        let f = |k: &str| {
-            self.get(p, k)
-                .map_or(Some(Num::Num(0.0)), |v| self.irnum(v))
-        };
-        let ty = self
-            .get(p, "type")
-            .map(|t| self.text(t).trim_matches('"').to_string());
-        let fm = ty.as_deref() == Some("fm")
-            || (ty.as_deref() == Some("sine") && self.get(p, "fmmodindex").is_some());
-        let spectre_exp = self.d == Dialect::Spectre && ty.as_deref() == Some("exp");
-        if (fm || spectre_exp)
-            && self
-                .get(p, "delay")
-                .is_some_and(|v| self.number(v) != Some(0.0))
-        {
-            return None;
-        }
-        if ty.as_deref() != Some("pwl") && self.get(p, "pwlperiod").is_some() {
-            return None;
-        }
-        Some(Some(match ty.as_deref() {
-            None | Some("dc") => return Some(None),
-            Some("pulse") => Wave {
-                kind: WaveKind::Pulse,
-                args: vec![
-                    f("val0")?,
-                    f("val1")?,
-                    f("delay")?,
-                    f("rise")?,
-                    f("fall")?,
-                    f("width")?,
-                    f("period")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("sine") if self.get(p, "fmmodindex").is_some() => Wave {
-                kind: WaveKind::Sffm,
-                args: vec![
-                    f("sinedc")?,
-                    f("ampl")?,
-                    f("freq")?,
-                    f("fmmodindex")?,
-                    f("fmmodfreq")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("sine") => Wave {
-                kind: WaveKind::Sin,
-                args: vec![
-                    f("sinedc")?,
-                    f("ampl")?,
-                    f("freq")?,
-                    f("delay")?,
-                    f(keys.damp)?,
-                    f("sinephase")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("exp") if self.d == Dialect::Vacask => {
-                let n = |k: &str| self.get(p, k).map_or(Some(0.0), |v| self.number(v));
-                Wave {
-                    kind: WaveKind::Exp,
-                    args: vec![
-                        f("val0")?,
-                        f("val1")?,
-                        Num::Num(n("delay")?),
-                        f("tau1")?,
-                        Num::Num(n("delay")? + n("td2")?),
-                        f("tau2")?,
-                    ],
-                    repeat: None,
-                    delay: None,
-                    cut: false,
-                }
-            }
-            Some("exp") => Wave {
-                kind: WaveKind::Exp,
-                args: vec![
-                    f("val0")?,
-                    f("val1")?,
-                    f("td1")?,
-                    f("tau1")?,
-                    f("td2")?,
-                    f("tau2")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("fm") => Wave {
-                kind: WaveKind::Sffm,
-                args: vec![
-                    f("sinedc")?,
-                    f("ampl")?,
-                    f("freq")?,
-                    f("modindex")?,
-                    f("modfreq")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("am") => Wave {
-                kind: WaveKind::Am,
-                args: vec![
-                    f("ampl")?,
-                    f("sinedc")?,
-                    f("modfreq")?,
-                    f("freq")?,
-                    f("delay")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("pwl") if self.d == Dialect::Spectre => {
-                let w = self.get(p, "wave")?;
-                let xs: Vec<Num> = self
-                    .velems(w)
-                    .into_iter()
-                    .map(|x| self.irnum(x))
-                    .collect::<Option<_>>()?;
-                if !xs.len().is_multiple_of(2) {
-                    return None;
-                }
-                let repeat = match self.get(p, "pwlperiod") {
-                    Some(v) if pwl_period(&xs)? == self.number(v)? => Some(Num::Num(0.0)),
-                    Some(_) => return None,
-                    None => None,
-                };
-                let delay = match self.get(p, "delay") {
-                    Some(v) => Some(self.irnum(v)?).filter(|d| *d != Num::Num(0.0)),
-                    None => None,
-                };
-                Wave {
-                    kind: WaveKind::Pwl,
-                    args: xs,
-                    repeat,
-                    delay,
-                    cut: false,
-                }
-            }
-            Some(_) => return None,
-        }))
-    }
-}
-
-/// The Spectre `pwlperiod` that repeats PWL points `xs` (time, value flat)
-/// exactly as ngspice's `r=0` does, when one does: numeric points from
-/// t = 0 whose last value equals the first, the last segment at least the
-/// default `twidth` (period/1000) long (Spectre Reference 5.0, `vsource`
-/// #17, #18, p.686). `None` otherwise.
-fn pwl_period(xs: &[Num]) -> Option<f64> {
-    let n = xs.len();
-    if n < 4 {
-        return None;
-    }
-    let (t0, v0) = (xs[0].num()?, xs[1].num()?);
-    let (tp, tn, vn) = (xs[n - 4].num()?, xs[n - 2].num()?, xs[n - 1].num()?);
-    (t0 == 0.0 && vn == v0 && tn > 0.0 && tn - tp >= tn / 1000.0).then_some(tn)
 }

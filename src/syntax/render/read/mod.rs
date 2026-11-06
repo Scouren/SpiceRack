@@ -53,6 +53,7 @@ mod named_blocks;
 mod named_control;
 mod named_elements;
 mod named_masters;
+mod named_waves;
 mod options;
 mod outputs;
 mod refused;
