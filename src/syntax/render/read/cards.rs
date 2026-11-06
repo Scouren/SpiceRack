@@ -20,8 +20,8 @@
 //!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::is_word_item(&self, n: u32) -> bool`
 
 use super::{Acc, Block, Func, Kept, Rd, Scope};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::token::Tag as T;
 
 /// A `.subckt` head as the old grammar read it: its ports and parameter
@@ -55,16 +55,23 @@ impl Rd<'_> {
         let word = self.head_word(n);
         // LTspice's `.backanno` names port currents for its viewer and
         // changes no number (LTspice help): left out, noted.
-        if self.d == Dialect::Ltspice && word == "backanno" && self.fields(n).is_empty() {
+        if self.b.card_rules == CardRules::Ltspice
+            && word == "backanno"
+            && self.fields(n).is_empty()
+        {
             let token = self.main(n);
-            acc.notes.push(crate::syntax::diag::Diag {
-                code: crate::syntax::diag::Code::W0036,
+            acc.notes.push(crate::syntax::diag::Diag::new(
+                crate::syntax::diag::Code::W0036,
                 token,
-            });
+                0,
+            ));
             return;
         }
         // Xyce's `.LIN` (S parameters over the `.AC` sweep) is an analysis.
-        if self.d == Dialect::Xyce && word == "lin" && scope == Scope::Top && self.testbench_peg(n)
+        if self.b.card_rules == CardRules::Xyce
+            && word == "lin"
+            && scope == Scope::Top
+            && self.testbench_peg(n)
         {
             return acc.bench.push(super::Bench::Card(n));
         }
@@ -160,7 +167,7 @@ impl Rd<'_> {
         {
             return None;
         }
-        let xyce = self.d == Dialect::Xyce;
+        let xyce = self.b.card_rules == CardRules::Xyce;
         let mval = |v: u32| match self.tag(v) {
             Tag::Word | Tag::Str => true,
             Tag::Delimited => self.expr_ok(v) || (xyce && self.ttag(self.main(v)) == T::LBrace),
@@ -196,7 +203,7 @@ impl Rd<'_> {
             kind: self.text(items[1]),
             params: self.params_of(&items[2..], true),
         };
-        if self.d == Dialect::Xyce
+        if self.b.card_rules == CardRules::Xyce
             && matches!(m.kind.to_ascii_lowercase().as_str(), "nmos" | "pmos")
         {
             // Xyce's BSIM3 is level 9 (RG Table 2-36): the IR keeps 49.
@@ -216,14 +223,14 @@ impl Rd<'_> {
         }
         let items = self.fields(n);
         let first = items[0];
-        if self.d == Dialect::Xyce && self.head_word(n) == "incl" {
+        if self.b.card_rules == CardRules::Xyce && self.head_word(n) == "incl" {
             // quirk: the old Xyce grammar's `Path_xy`: a quoted path alone,
             // else all of the rest of the card.
             match items {
                 [p] if self.tag(*p) == Tag::Str => self.path_of(*p),
                 _ => self.span(self.main(first), self.line_last(self.main(n))),
             }
-        } else if self.d == Dialect::Ltspice && items.len() > 1 {
+        } else if self.b.card_rules == CardRules::Ltspice && items.len() > 1 {
             // LTspice help, `.INCLUDE <filename>`: the rest of the card.
             self.rest_path(n)
         } else {
@@ -245,7 +252,9 @@ impl Rd<'_> {
             // LTspice has no sections: the rest of the card is the file,
             // blanks and all (LTspice help, `.LIB <filename>`; the
             // corpus's `.lib C:\users\brian\My Documents\…\standard.dio`).
-            [_, ..] if self.d == Dialect::Ltspice => (self.rest_path(n), String::new()),
+            [_, ..] if self.b.card_rules == CardRules::Ltspice => {
+                (self.rest_path(n), String::new())
+            }
             [p, s, ..] => (self.path_of(*p), self.text(*s)),
             [] => unreachable!("lib_call read it"),
         }
@@ -321,8 +330,8 @@ impl Rd<'_> {
     /// `.lib path section` (LTspice: the section optional).
     fn lib_call(&mut self, n: u32, here: &mut Block) -> Result<(), Kept> {
         match self.fields(n) {
-            [_] if self.d == Dialect::Ltspice => {}
-            [_, s, ..] if self.tag(*s) == Tag::Word || self.d == Dialect::Ltspice => {}
+            [_] if self.b.card_rules == CardRules::Ltspice => {}
+            [_, s, ..] if self.tag(*s) == Tag::Word || self.b.card_rules == CardRules::Ltspice => {}
             _ => return Err(self.refused(n)),
         }
         here.libs.push(n);
@@ -378,12 +387,12 @@ impl Rd<'_> {
         inside: bool,
         acc: &mut Acc,
     ) -> Result<(), Kept> {
-        if self.d == Dialect::Xyce && self.global_swept(n) {
+        if self.b.card_rules == CardRules::Xyce && self.global_swept(n) {
             return Err(Kept::Raw);
         }
         let items = self.fields(n).to_vec();
-        let ngspice = self.d == Dialect::Ngspice;
-        let lt_params = self.d == Dialect::Ltspice && self.head_word(n) == "params";
+        let ngspice = self.b.card_rules == CardRules::Ngspice;
+        let lt_params = self.b.card_rules == CardRules::Ltspice && self.head_word(n) == "params";
         let mut assigns = Vec::new();
         for (k, &it) in items.iter().enumerate() {
             let plus = ngspice
@@ -427,7 +436,7 @@ impl Rd<'_> {
             } else if inside {
                 here.locals.push(a);
             } else {
-                if self.d == Dialect::Xyce && self.head_word(n) == "global_param" {
+                if self.b.card_rules == CardRules::Xyce && self.head_word(n) == "global_param" {
                     self.global_params.insert(a);
                 }
                 here.params.push(a);
@@ -440,7 +449,7 @@ impl Rd<'_> {
     /// expression (`{1+x} + x*AGAUSS(0,1,1)`).
     fn val_p_ok(&self, a: u32) -> bool {
         let v = self.ast.rhs(Node(a));
-        self.d == Dialect::Ngspice
+        self.b.card_rules == CardRules::Ngspice
             && v != NONE
             && self.tag(v) == Tag::Binary
             && self.ttag(self.first(v)) == T::LBrace

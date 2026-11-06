@@ -414,7 +414,7 @@ impl PySubcircuit {
     #[staticmethod]
     #[pyo3(signature = (text, dialect=None))]
     fn from_source(text: &str, dialect: Option<&str>) -> PyResult<Self> {
-        let d = dialect.map(str::parse).transpose().map_err(PyValueError::new_err)?;
+        let d = dialect.map(super::def_::parse_lang).transpose().map_err(PyValueError::new_err)?;
         let inner = super::store::from_source(text, d).map_err(PyValueError::new_err)?;
         Ok(Self { inner, ground_alias: false })
     }

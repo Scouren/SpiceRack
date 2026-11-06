@@ -15,7 +15,7 @@
 //! - `W::card(&mut self, n: u32) -> Option<String>`, `W::models(&mut self, b: &Block)`
 
 use super::W;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::ModelSemantics;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Block, Card, Model, Val};
@@ -49,7 +49,7 @@ impl W<'_, '_> {
             } => {
                 // A model card read as ngspice maps through `render::models`;
                 // another dialect's means other equations.
-                let ngspice = self.rd.d == Dialect::Ngspice;
+                let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
                 if model.is_some() && !(ngspice && matches!(letter, 'R' | 'C')) {
                     self.ask(Construct::RclModel, tok);
                     return None;
@@ -266,10 +266,11 @@ impl W<'_, '_> {
                     'N' => String::new(),
                     l => l.to_ascii_lowercase().to_string(),
                 };
-                let params = match letter == 'D' && self.rd.d == Dialect::Ngspice {
-                    true => self.element_rows(letter, &params, n)?,
-                    false => params,
-                };
+                let params =
+                    match letter == 'D' && self.rd.b.model_semantics == ModelSemantics::Ngspice {
+                        true => self.element_rows(letter, &params, n)?,
+                        false => params,
+                    };
                 let ns: Vec<String> = nodes.iter().map(|x| self.node(x)).collect();
                 format!(
                     "{}{} ({}) {}{}",

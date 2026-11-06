@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 
 use super::W;
 use super::vacask::q;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::ModelSemantics;
 use crate::syntax::diag::Code;
 use crate::syntax::render::read::{Block, Model};
 
@@ -104,7 +104,9 @@ impl W<'_, '_> {
             }
             if vacask_has(module, &k) {
                 rows.push((k, v.clone()));
-            } else if self.rd.d == Dialect::Ngspice && !ngspice_reads(module, &k) {
+            } else if self.rd.b.model_semantics == ModelSemantics::Ngspice
+                && !ngspice_reads(module, &k)
+            {
                 self.note(Code::W0112, tok);
             } else {
                 self.refuse(Code::W0129, tok);

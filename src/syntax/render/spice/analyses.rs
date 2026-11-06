@@ -10,9 +10,9 @@
 
 use super::W;
 use super::sweeps::{dc_axis, has_ac, xyce_lin};
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
-use crate::syntax::render::capability::{Action, Alt, Construct, action};
+use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::read::Ana;
 
 impl W<'_, '_> {
@@ -20,7 +20,7 @@ impl W<'_, '_> {
     /// lines); an analysis the target lacks is refused, written empty.
     pub(super) fn analysis(&mut self, a: &Ana, tok: u32) -> String {
         let num = |w: &Self, v: f64| w.sp.number(v, w.x);
-        let hs = self.d == Dialect::Hspice;
+        let hs = self.b.analysis_form == AnalysisForm::Hspice;
         let sweep = |w: &Self, s: &crate::syntax::render::read::Sweep| {
             format!(
                 "{} {} {} {}",
@@ -103,7 +103,11 @@ impl W<'_, '_> {
                 // ngspice stops on a zero step (Xyce's and LTspice's "the
                 // simulator's choice"): the span over 50, ngspice's own
                 // default step cap (manual §11.3.10).
-                let zero = *step <= 0.0 && self.d.family() == Dialect::Ngspice;
+                let zero = *step <= 0.0
+                    && matches!(
+                        self.b.analysis_form,
+                        AnalysisForm::Ngspice | AnalysisForm::Espice
+                    );
                 let step = if zero {
                     (stop - start.unwrap_or(0.0)) / 50.0
                 } else {
@@ -123,7 +127,7 @@ impl W<'_, '_> {
                     s.push_str(" UIC");
                 }
                 // Refused on a target without it (`W::checks`).
-                if *startup && action(self.d, Construct::TranStartup) == Action::Native {
+                if *startup && self.cells[Construct::TranStartup as usize] == Action::Native {
                     s.push_str(" startup");
                 }
                 s
@@ -152,8 +156,8 @@ impl W<'_, '_> {
                 let mut s = format!(".noise {out} {source} {}", sweep(self, sw));
                 // `pts_per_summary` is an ngspice/SPICE3 extension; LTspice's
                 // `.noise` card stops at the stop frequency (W0033).
-                match (pps, self.d) {
-                    (Some(_), Dialect::Ltspice) => self.note(Code::W0033, tok),
+                match (pps, self.b.analysis_form) {
+                    (Some(_), AnalysisForm::Ltspice) => self.note(Code::W0033, tok),
                     (Some(p), _) => s.push_str(&format!(" {p}")),
                     (None, _) => {}
                 }
@@ -208,7 +212,7 @@ impl W<'_, '_> {
             }
             Ana::Spectre { kind, .. } => {
                 self.refuse(
-                    crate::syntax::render::read::spectre_refusal(self.d, kind),
+                    crate::syntax::render::read::spectre_refusal(self.b, kind),
                     tok,
                 );
                 String::new()

@@ -11,7 +11,7 @@
 //! - `W::prints(&mut self, prints: &[(String, Vec<String>, u32)], analyses: &[(Ana, u32)])`
 
 use super::W;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::out::Space;
@@ -29,7 +29,7 @@ impl W<'_, '_> {
             if self.ask(Construct::Print, *tok) != Action::Native {
                 continue;
             }
-            let outs: Vec<String> = if self.d == Dialect::Ngspice {
+            let outs: Vec<String> = if self.b.analysis_form == AnalysisForm::Ngspice {
                 // The reader keeps a kind it does not know (Xyce's
                 // `homotopy`) as the first output: a bare word.
                 let word = |o: &String| o.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');

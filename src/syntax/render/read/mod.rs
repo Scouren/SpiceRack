@@ -27,15 +27,16 @@
 //! - `pub(in crate::syntax::render) struct Rd`, `enum Kept`, `struct Deck`, `struct Block`, `enum Comp`,
 //!   `enum Elem`, `enum Raw`, `struct Cond`, `struct Section`, `enum Func`
 //! - `Block::elements(&self) -> Vec<Elem>`
-//! - `fn read(ast: &Ast, t: &Tokens, d: Dialect, name: &str, kit: Option<(&Kit, FileId)>) -> (Rd, Deck)`
-//! - `Rd::text_dialect`, `Rd::role`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
+//! - `fn read(ast: &Ast, t: &Tokens, d: Lang, name: &str, kit: Option<(&Kit, FileId)>) -> (Rd, Deck)`
+//! - `Rd::text_behaviours`, `Rd::text_lang`, `Rd::role`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
 //!   `Rd::ttag`, `Rd::raw`, `Rd::unparsed`, `Rd::keep`, `Rd::card`, `Rd::section`, `Rd::if_head_ok`
 //! - `fn unwrapped(t: &str) -> String`
 
 use std::collections::{HashMap, HashSet};
 
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
+use crate::syntax::behaviour::{Behaviours, NamedRules};
 use crate::syntax::diag::Diag;
 use crate::syntax::render::spelling::Spelling;
 use crate::syntax::resolve::{FileId, Kit, Role, Split};
@@ -84,8 +85,12 @@ pub(in crate::syntax::render) use walk::Visit;
 pub(in crate::syntax::render) struct Rd<'a> {
     pub(in crate::syntax::render) ast: &'a Ast<'a>,
     pub(in crate::syntax::render) t: &'a Tokens<'a>,
-    /// The dialect the file was read in (its family: ESPice reads ngspice).
-    pub(in crate::syntax::render) d: Dialect,
+    /// The language the file was read in (its text family: ESPice reads
+    /// ngspice).
+    pub(in crate::syntax::render) d: Lang,
+    /// The file's language's behaviours (its family's: ESPice reads
+    /// ngspice's).
+    pub(in crate::syntax::render) b: &'static Behaviours,
     /// The deck's `.model` names, lowercased (the old lowering), each to
     /// its (last) card.
     models: HashMap<String, u32>,
@@ -316,11 +321,11 @@ impl Default for Block {
 pub(in crate::syntax::render) fn read<'a>(
     ast: &'a Ast<'a>,
     t: &'a Tokens<'a>,
-    d: Dialect,
+    d: Lang,
     name: &str,
     kit: Option<(&'a Kit, FileId)>,
 ) -> (Rd<'a>, Deck) {
-    let d = d.family();
+    let d = d.behaviours().text_family;
     if let Some((k, f)) = kit {
         assert_eq!(ast.len(), k.node_count(f), "read: the kit file's tree");
     }
@@ -328,6 +333,7 @@ pub(in crate::syntax::render) fn read<'a>(
         ast,
         t,
         d,
+        b: d.behaviours(),
         models: HashMap::new(),
         kinds: HashMap::new(),
         subckts: Vec::new(),
@@ -354,7 +360,7 @@ pub(in crate::syntax::render) fn read<'a>(
         ..Block::default()
     };
     rd.cards(&top_stmts, &mut top, Scope::Top, &mut acc);
-    if d == Dialect::Vacask {
+    if rd.b.named_rules == NamedRules::Vacask {
         // The old reader sorted the top's loads by path.
         top.loads.sort_by_key(|&n| rd.unquote(rd.fields(n)[0]));
     }
@@ -374,18 +380,24 @@ pub(in crate::syntax::render) fn read<'a>(
 }
 
 impl<'a> Rd<'a> {
+    /// The behaviours of the language the text at token `tok` is in
+    /// ([`Rd::text_lang`]).
+    pub(in crate::syntax::render) fn text_behaviours(&self, tok: u32) -> &'static Behaviours {
+        self.text_lang(tok).behaviours()
+    }
+
     /// The dialect the text at token `tok` is in: a SPICE file's region's
     /// (`simulator lang=`), else the file's (a Spectre file's SPICE region
     /// is the file's, as the old reader kept it).
-    pub(in crate::syntax::render) fn text_dialect(&self, tok: u32) -> Dialect {
+    pub(in crate::syntax::render) fn text_lang(&self, tok: u32) -> Lang {
         match self.named() {
             true => self.d,
-            false => self.t.lexicon_at(tok).dialect,
+            false => self.t.lexicon_at(tok).lang,
         }
     }
 
     pub(in crate::syntax::render) fn named(&self) -> bool {
-        matches!(self.d, Dialect::Spectre | Dialect::Vacask)
+        self.b.named_rules != NamedRules::None
     }
 
     pub(in crate::syntax::render) fn tag(&self, n: u32) -> Tag {
@@ -534,7 +546,7 @@ impl<'a> Rd<'a> {
         match self.tag(n) {
             Tag::Title | Tag::End => {}
             Tag::Verbatim | Tag::Line => self.unparsed(n, here),
-            // A region of another dialect's text (`lexicon::NGSPICE_GIVEN`):
+            // A region of another dialect's text (`Lang::NGSPICE_GIVEN`):
             // kept as that dialect's text, which only it writes; but a
             // Spectre analysis at the top is an analysis (`Ana`), which
             // each target spells or refuses (VACASK's `mc` for a
@@ -542,7 +554,7 @@ impl<'a> Rd<'a> {
             Tag::Region => {
                 for &k in self.body(n) {
                     let ana = scope == Scope::Top
-                        && self.text_dialect(self.main(k)) == Dialect::Spectre
+                        && self.text_behaviours(self.main(k)).named_rules == NamedRules::Spectre
                         && self.tag(k) == Tag::Analysis
                         && self.spectre_analysis(k).is_some();
                     match ana {
@@ -590,10 +602,11 @@ impl<'a> Rd<'a> {
                             .push(p.trim().trim_matches('"').to_string());
                     } else {
                         // The script's other lines are not read.
-                        acc.notes.push(Diag {
-                            code: crate::syntax::diag::Code::W0025,
-                            token: self.main(c),
-                        });
+                        acc.notes.push(Diag::new(
+                            crate::syntax::diag::Code::W0025,
+                            self.main(c),
+                            0,
+                        ));
                     }
                 }
             }

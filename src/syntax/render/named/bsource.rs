@@ -31,8 +31,8 @@
 //! - `W::bsource_expr(&self, value: u32) -> Option<String>`
 
 use super::W;
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Name, Node, Tag};
+use crate::syntax::behaviour::{CardRules, ModelSemantics};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 
@@ -55,7 +55,7 @@ impl W<'_, '_> {
     /// form in it has no Spectre spelling with its meaning.
     pub(super) fn bsource_expr(&self, value: u32) -> Option<String> {
         let a = self.rd.ast;
-        let ngspice = self.rd.d == Dialect::Ngspice;
+        let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
         let own: Vec<String> = self
             .deck
             .funcs
@@ -162,7 +162,9 @@ impl W<'_, '_> {
                             let name = match fname.as_str() {
                                 f if SAME.contains(&f) => f.to_string(),
                                 "ln" => "log".to_string(),
-                                "log" if self.rd.d != Dialect::Xyce => "log".to_string(),
+                                "log" if self.rd.b.card_rules != CardRules::Xyce => {
+                                    "log".to_string()
+                                }
                                 "pow" if ngspice && n_args == 2 => {
                                     vals.push((
                                         format!("pow(abs({}),{})", args[0], args[1]),

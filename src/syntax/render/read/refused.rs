@@ -12,8 +12,8 @@
 //! - `Rd::global_swept(&self, n: u32) -> bool`
 
 use super::{Kept, Rd};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{Node, Tag};
+use crate::syntax::behaviour::{CardRules, NamedRules};
 use crate::syntax::render::capability::Construct;
 use crate::syntax::token::Tag as T;
 
@@ -194,10 +194,10 @@ impl<'a> Rd<'a> {
             "mor",
             "rol",
         ];
-        match self.d {
-            Dialect::Ltspice => LT.contains(&w),
-            Dialect::Xyce => XY.contains(&w),
-            _ => false,
+        match self.b.card_rules {
+            CardRules::Ltspice => LT.contains(&w),
+            CardRules::Xyce => XY.contains(&w),
+            CardRules::Spice | CardRules::Ngspice | CardRules::Hspice => false,
         }
     }
 }
@@ -284,14 +284,14 @@ impl Rd<'_> {
             "powergridbusshunt",
             "powergridtransformer",
         ];
-        if self.text_dialect(tok) == Dialect::Vacask {
+        if self.text_behaviours(tok).named_rules == NamedRules::Vacask {
             return match self.vacask_script(tok) {
                 true => Construct::VacaskScript,
                 false => Construct::ForeignText,
             };
         }
         let w = self.t.text(tok).to_ascii_lowercase();
-        if self.text_dialect(tok) == Dialect::Hspice {
+        if self.text_behaviours(tok).card_rules == CardRules::Hspice {
             return match w.as_str() {
                 // HSPICE's StatEye (HSPICE UG, signal integrity): no other
                 // simulator has one.
@@ -303,7 +303,7 @@ impl Rd<'_> {
                 _ => Construct::ForeignText,
             };
         }
-        if self.text_dialect(tok) != Dialect::Xyce {
+        if self.text_behaviours(tok).card_rules != CardRules::Xyce {
             return Construct::ForeignText;
         }
         let private = match w.strip_prefix('y') {

@@ -21,8 +21,8 @@
 
 use super::Num;
 use super::Rd;
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::{CardRules, NamedRules, NumberReading};
 use crate::syntax::lexicon::Arithmetic;
 use crate::syntax::token::Tag as T;
 
@@ -213,8 +213,8 @@ impl Rd<'_> {
     /// parts are the bytes they spell (the old lowering's `name`).
     pub(in crate::syntax::render) fn name_of(&self, n: u32) -> String {
         let t = self.text(n);
-        match self.d {
-            Dialect::Spectre => {
+        match self.b.named_rules {
+            NamedRules::Spectre => {
                 let mut out = String::with_capacity(t.len());
                 let mut it = t.chars();
                 while let Some(c) = it.next() {
@@ -225,7 +225,7 @@ impl Rd<'_> {
                 }
                 out
             }
-            Dialect::Vacask => {
+            NamedRules::Vacask => {
                 let mut out = String::new();
                 let mut it = t.chars().peekable();
                 let mut quoted = false;
@@ -241,7 +241,7 @@ impl Rd<'_> {
                 }
                 out
             }
-            _ => t,
+            NamedRules::None => t,
         }
     }
 
@@ -252,7 +252,7 @@ impl Rd<'_> {
 
     /// LTspice's `µ` is `u` (XVII help) in the text a SPICE reader gets.
     pub(in crate::syntax::render) fn respell(&self, s: &str) -> String {
-        if self.d == Dialect::Ltspice {
+        if self.b.card_rules == CardRules::Ltspice {
             s.replace('µ', "u")
         } else {
             s.to_string()
@@ -276,7 +276,7 @@ impl Rd<'_> {
     fn single_vtext(&self, n: u32) -> String {
         let text = self.etext(n);
         let text = text.trim();
-        if matches!(self.d, Dialect::Ngspice) {
+        if self.b.numbers == NumberReading::Ngspice {
             return one_group(text);
         }
         if self.named()
@@ -318,11 +318,11 @@ impl Rd<'_> {
             let ok = !v.is_nan() && body.starts_with(|c: char| c.is_ascii_digit() || c == '.');
             return ok.then_some(if neg { -v } else { v });
         }
-        if matches!(lex.dialect, Dialect::Ngspice) {
+        if lex.lang.behaviours().numbers == NumberReading::Ngspice {
             if !ngspice_num(s) {
                 return None;
             }
-            // `lexicon::NGSPICE_GIVEN` reads its numbers correctly rounded.
+            // `Lang::NGSPICE_GIVEN` reads its numbers correctly rounded.
             if lex.numbers.arithmetic == Arithmetic::Decimal {
                 let (neg, body) = (s.starts_with('-'), s.trim_start_matches(['-', '+']));
                 let v = crate::syntax::number::value(body, lex);

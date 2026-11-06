@@ -12,7 +12,7 @@
 //!
 //! Contents:
 //! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`, `W::ternaries(&self, e: &str) -> String`
-//! - `pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String>`
+//! - `pub(super) fn renamed(rd: &Rd, cells: &Cells, card: &Card) -> Option<String>`
 //! - `pub(in crate::syntax::render) fn pairs<T>(items: &[T]) -> impl Iterator<Item = (&T, &T)>`,
 //!   `pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String`
 
@@ -20,8 +20,11 @@ use super::W;
 use super::laplace::{self, Laplace};
 use super::parasitics;
 use super::ternary::{Read, parenthesize, spell_if};
-use crate::syntax::Dialect;
-use crate::syntax::render::capability::{Action, Alt, Construct, Rule, action};
+use crate::syntax::behaviour::{
+    CardRules, Coupling, ExprEval, ParamForm, Parasitics, ValueQuoting,
+};
+use crate::syntax::lang::Cells;
+use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::WaveKind;
 use crate::syntax::render::read::{Card, Num, Rd, Val, Wave};
@@ -57,11 +60,9 @@ impl W<'_, '_> {
                 }
                 // An LTspice C's or L's parasitics as elements where the
                 // target's C and L take none (`parasitics`).
-                let extra = match (self.rd.d, self.d) {
-                    (
-                        Dialect::Ltspice,
-                        Dialect::Ngspice | Dialect::Espice | Dialect::Hspice | Dialect::Xyce,
-                    ) if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
+                let lt = self.rd.b.card_rules == CardRules::Ltspice;
+                let extra = match lt && self.b.parasitics == Parasitics::Elements {
+                    true if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
                     _ => None,
                 };
                 let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
@@ -118,7 +119,7 @@ impl W<'_, '_> {
                 // Xyce and LTspice couple every pair on one card (RG `K`,
                 // LTspice help `K`); the others one card per pair, the
                 // first keeping the name.
-                if matches!(self.d, Dialect::Xyce | Dialect::Ltspice) {
+                if self.b.coupling == Coupling::OneCard {
                     format!("{decl} {} {k}", l.join(" "))
                 } else {
                     pairs(&l)
@@ -158,9 +159,11 @@ impl W<'_, '_> {
                         .token(&format!("{name} {np} {nm} port={num} z0={z0}"), Space::Line);
                 }
                 // LTspice writes its own; the others as elements.
-                let extra = match self.d {
-                    Dialect::Ltspice => None,
-                    _ => parasitics::expand(&decl, &np, &nm, &mut parasitics),
+                let extra = match self.b.parasitics {
+                    Parasitics::Ltspice => None,
+                    Parasitics::Elements | Parasitics::Netlist => {
+                        parasitics::expand(&decl, &np, &nm, &mut parasitics)
+                    }
                 };
                 let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let mut s = format!("{decl} {np} {nm} {}", self.value(&value));
@@ -281,11 +284,10 @@ impl W<'_, '_> {
                 params,
                 ..
             } => {
-                if letter == 'O' {
-                    self.ask(Construct::LossyLine, tok);
-                }
-                if letter == 'N' {
-                    self.ask(Construct::OsdiInstance, tok);
+                // An `O` (LTRA) line, an `N` (OSDI) instance.
+                let asked = [('O', Construct::LossyLine), ('N', Construct::OsdiInstance)];
+                if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
+                    self.ask(c, tok);
                 }
                 format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
             }
@@ -321,7 +323,7 @@ impl W<'_, '_> {
     /// spelled for the target ([`W::ternaries`]).
     pub(super) fn spelled(&self, v: &str) -> String {
         let v = self.ternaries(v);
-        if self.d == Dialect::Hspice {
+        if self.b.value_quoting == ValueQuoting::Hspice {
             hspice_value(&v)
         } else {
             v
@@ -332,9 +334,9 @@ impl W<'_, '_> {
     /// (`ternary`): grouped as the source groups a then-branch's (C's, or
     /// ngspice's `{}` evaluator's), a blank before each `:` on Xyce.
     pub(super) fn ternaries(&self, e: &str) -> String {
-        let read = match self.rd.d.family() {
-            Dialect::Ngspice => Read::Ngspice,
-            _ => Read::C,
+        let read = match self.rd.b.expr_eval == ExprEval::Ngspice {
+            true => Read::Ngspice,
+            false => Read::C,
         };
         self.ternaries_as(e, read)
     }
@@ -342,23 +344,23 @@ impl W<'_, '_> {
     /// `e`'s ternaries for another family, grouped as `read` groups them,
     /// an `if()` one on ngspice's family.
     fn ternaries_as(&self, e: &str, read: Read) -> String {
-        if self.rd.d.family() == self.d.family() {
+        if self.rd.b.text_family == self.b.text_family {
             return e.to_string();
         }
         // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
-        let e = match self.d.family() {
-            Dialect::Ngspice => spell_if(e),
-            _ => e.to_string(),
+        let e = match self.b.expr_eval == ExprEval::Ngspice {
+            true => spell_if(e),
+            false => e.to_string(),
         };
-        parenthesize(&e, read, self.d == Dialect::Xyce)
+        parenthesize(&e, read, self.b.param_form == ParamForm::Xyce)
     }
 }
 
-/// The name `target` writes behavioural source `card` under, where its
+/// The name a target (its `cells`) writes behavioural source `card` under, where its
 /// spelling takes another letter: HSPICE's `E1`/`G1` for `B1` (`vol=`,
 /// `cur=`), a Laplace lift's `EB1`/`GB1`, ngspice's XSPICE `AB1`. `None`:
 /// the map's `B1`.
-pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String> {
+pub(super) fn renamed(rd: &Rd, cells: &Cells, card: &Card) -> Option<String> {
     let Card::Behavioural {
         current,
         name,
@@ -370,13 +372,13 @@ pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String> {
     };
     let letter = if *current { 'G' } else { 'E' };
     if !laplace::has_laplace(rd, *value) {
-        let vol_cur = action(target, Construct::BehaviouralSource) == Action::Spell(Alt::VolCur);
+        let vol_cur = cells[Construct::BehaviouralSource as usize] == Action::Spell(Alt::VolCur);
         return vol_cur.then(|| format!("{letter}{name}"));
     }
     // A constant `H(s)` is a plain controlled source on every target.
     match (
         laplace::read(rd, *value),
-        action(target, Construct::Laplace),
+        cells[Construct::Laplace as usize],
     ) {
         (Some(Laplace::Gain { .. }), _) => Some(format!("{letter}B{name}")),
         (Some(Laplace::Xfer { .. }), Action::Lift(Rule::LaplaceXfer)) => Some(format!("AB{name}")),

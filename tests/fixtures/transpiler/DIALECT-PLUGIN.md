@@ -1,0 +1,1000 @@
+# Dialects as definitions: a design
+
+Status: design only (branch `dialect-plugin`, from `p7-integrate` b0952a7).
+Nothing here is implemented. It lands after the in-flight conformance
+branches that edit `src/syntax/render/` merge (§9).
+
+Decided by the user:
+
+- A plugin is a Python class (a subclass of `spicerack.Dialect`, or of a
+  built-in such as `spicerack.dialects.HSPICE`). It both reads its
+  dialect's text into the one AST and writes any deck in its dialect, and
+  it sees a narrow, stable surface.
+- **Every** dialect (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre,
+  VACASK, CDL, Verilog) is defined through the same interface. Built-ins
+  are declared **in Rust** through a public definition API; the Python
+  class calls the **same** API through a thin 1:1 PyO3 binding (same names,
+  arguments, semantics). Every built-in is expressible with that public API
+  alone: no private back door.
+- The crate builds and runs with no Python (`--no-default-features`:
+  wasm32, `golden`, Rust users). Built-ins need no interpreter.
+
+## 1. The core choice
+
+A dialect is a `DialectDef`: a builder whose calls fill the tables the
+pipeline already reads (`Lexicon`, `Spelling`, a capability column), plus
+named **behaviours** (closed enums, each selecting one existing code path
+in a family's reader or writer, the way `Dollar::Hspice` selects the
+tokenizer's `$` rule today). `register(def)` validates the resolved
+definition once and freezes it into `&'static` rows behind a `Lang(u16)`
+handle; the reader and writers read rows and behaviours and never ask "is
+this HSPICE?". The built-ins are ten Rust functions returning a
+`DialectDef`, registered on first use; a plugin is the same calls from
+Python, usually `extends` of a built-in or of another plugin with a few
+rows overridden.
+
+The 88 places where the reader and writers ask a dialect's identity today
+are the back doors a public API must close. Each becomes a call: 13 read a
+row that already exists, 13 become new table rows (10 new calls), 62 become
+15 behaviours (§6.1). What stays code is a closed list: the two family
+spines, four writer layouts (CDL, Verilog, VACASK's, Xyce's options) and
+the lift rules. A definition selects among them and cannot add one; that
+is the narrow surface. For what no row or behaviour says, a plugin adds a
+**write hook**: a function of the cards of one head, called once per deck
+(§6.3). Built-ins need zero hooks and zero read hooks, so the design has
+no read hooks (§6.4).
+
+Decided defaults: a plugin is netlist-only unless it declares the
+simulator that reads its text (`runs_on`, §6.5); a plugin gets its own
+`simulator lang=<name>` region (§6.5); registration is explicit,
+`register_dialect()`, in the caller's flow; a plugin may extend a plugin
+(§5).
+
+## 2. Caller code first
+
+### One small dialect, twice
+
+Acme is ngspice with `#` comment lines and `;` tail comments, `.subcircuit`
+/ `.endsub` for `.subckt` / `.ends`, `x` as mega (written in preference to
+`meg`), decimal arithmetic, functions as `.param f(x)='body'`, no Laplace
+sources (its own refusal code), charge capacitors as `Q={expr}`, `reltol`
+spelled `rtol`, and a `.noise` card of its own form (a hook).
+
+Rust (a Rust user's crate, or a built-in's file):
+
+```rust
+use spicerack::syntax::def::*;
+
+pub fn acme() -> DialectDef {
+    DialectDef::new("acme")
+        .extends(Lang::NGSPICE)
+        .comment_line("#")
+        .comment_tail(";")
+        .keyword(".subcircuit", Keyword::Subckt)
+        .keyword(".endsub", Keyword::Ends)
+        .write_head(Keyword::Subckt, ".subcircuit")
+        .write_head(Keyword::Ends, ".endsub")
+        .scale("x", Scale::Exp(6))
+        .arithmetic(Arithmetic::Decimal)
+        .func(FuncForm::Param)
+        .option("reltol", "rtol")
+        .code("ACME001", Kind::Refusal, "acme has no Laplace sources")
+        .code("ACME002", Kind::Refusal, "acme's .noise takes one source")
+        .refuse(Construct::Laplace, "ACME001")
+        .spell(Construct::ChargeCapacitor, Alt::ChargeBraced)
+        .hook(".noise", write_noise)
+}
+
+fn write_noise(cards: &[Card], out: &mut Vec<Answer>) {
+    for c in cards {
+        out.push(match c.words {
+            [o, s, n] => Answer::Text(format!(".noise_acme out={o} src={s} {n}")),
+            _ => Answer::Refuse("ACME002"),
+        });
+    }
+}
+
+let acme: Lang = register(acme())?;
+```
+
+Python (the same calls in the same order; the same registered tables):
+
+```python
+import spicerack as ps
+from spicerack.def_ import (Lang, Keyword, Scale, Arithmetic, FuncForm,
+                            Construct, Alt, Kind, Answer)
+
+class Acme(ps.Dialect):
+    def define(self, d):
+        return (d.extends(Lang.NGSPICE)
+                 .comment_line("#")
+                 .comment_tail(";")
+                 .keyword(".subcircuit", Keyword.Subckt)
+                 .keyword(".endsub", Keyword.Ends)
+                 .write_head(Keyword.Subckt, ".subcircuit")
+                 .write_head(Keyword.Ends, ".endsub")
+                 .scale("x", Scale.Exp(6))
+                 .arithmetic(Arithmetic.Decimal)
+                 .func(FuncForm.Param)
+                 .option("reltol", "rtol")
+                 .code("ACME001", Kind.Refusal, "acme has no Laplace sources")
+                 .code("ACME002", Kind.Refusal, "acme's .noise takes one source")
+                 .refuse(Construct.Laplace, "ACME001")
+                 .spell(Construct.ChargeCapacitor, Alt.ChargeBraced)
+                 .hook(".noise", self.write_noise))
+
+    def write_noise(self, cards):           # ps.Card: head, words, params, text
+        return [Answer.Text(f".noise_acme out={c.words[0]} src={c.words[1]} {c.words[2]}")
+                if len(c.words) == 3 else Answer.Refuse("ACME002")
+                for c in cards]
+
+acme = ps.register_dialect(Acme("acme"))  # DialectDef("acme"), define(), register: once
+```
+
+The enums are the Rust enums exported by name (`Keyword.Subckt` is
+`Keyword::Subckt`; a data-carrying variant is a constructor,
+`Scale.Exp(6)`); the binding has no vocabulary of its own. Oracle 3 (§8)
+checks the two register byte-identical rows.
+
+Class attributes are sugar only where one attribute is exactly one call:
+`extends = Lang.NGSPICE`, `family = Family.Spice`, `fold_case = True`,
+`arithmetic = Arithmetic.Decimal` and every other one-argument scalar or
+behaviour setter, applied before `define` in declaration order. A table
+call (`keyword`, `scale`, `refuse`, ...) takes several rows, so it has no
+attribute form; it is written in `define`.
+
+The user code. Acme is netlist-only, as HSPICE is (§6.5):
+
+```python
+tb = ps.Testbench.from_source(open("amp.acme").read(), dialect="acme")
+print(tb.netlist("ngspice"))                         # acme -> ngspice
+tb2 = ps.Testbench.from_source(open("amp.cir").read(), dialect="ngspice")
+print(tb2.netlist("acme"))                           # ngspice -> acme
+bench = ps.Testbench(rc)                             # a Python deck
+bench.add_transient(step_time=1e-9, end_time=1e-6)
+print(bench.netlist("acme"))                         # Python -> acme
+try:
+    laplace_deck.netlist("acme")
+except RuntimeError as e:                            # coded, positioned
+    print(e)   # amp:12:1: W0201 acme:ACME001 acme has no Laplace sources
+```
+
+`from_source(text, dialect=)` and `netlist(name)` already carry a dialect
+name; they accept a registered one. Rust: `render_text(text, acme, "amp",
+Lang::NGSPICE)`.
+
+### Extending a built-in
+
+```python
+class MyHspice(ps.dialects.HSPICE):        # HSPICE.define is d.extends(Lang.HSPICE)
+    def define(self, d):
+        return (super().define(d)
+                .comment_tail("//")
+                .code("MY001", Kind.Refusal, "our HSPICE build has no .step")
+                .refuse(Construct.Step, "MY001"))
+
+ps.register_dialect(MyHspice("my-hspice"))
+```
+
+```rust
+let my = DialectDef::new("my-hspice")
+    .extends(Lang::HSPICE)
+    .comment_tail("//")
+    .code("MY001", Kind::Refusal, "our HSPICE build has no .step")
+    .refuse(Construct::Step, "MY001");
+```
+
+Rust built-ins are extendable from Rust exactly as from Python; ESPice is
+one (§3). A plugin extends a plugin the same way (`class Mine(MyHspice)`,
+`.extends(my_hspice)`): §5.
+
+## 3. HSPICE, declared with the API
+
+Every row of today's `lexicon/hspice.rs`, the `HSPICE` row of
+`spelling.rs` and the `D::Hspice` cells of `capability.rs`, as calls. This
+file (`src/syntax/dialects/hspice.rs`) replaces all three.
+
+```rust
+/// HSPICE (UG08 = User Guide 2008, CR10 = Command Reference 2010; the rule
+/// ids L1..X2 are the old grammar's, `git show 9d1d6bb:grammar/hspice.peg`).
+pub fn hspice() -> DialectDef {
+    let quoted = Quoting { escapes: false, protects: true, across_breaks: true }; // T2, L6
+    DialectDef::new("hspice")
+        .family(Family::Spice)
+        // Lines (L1-L9).
+        .title(true)
+        .fold_case(true)
+        .comment_line("*").comment_line("$")
+        .cont_skip("*").cont_skip("$")
+        .dollar(Dollar::Hspice)                                    // L3
+        .plus(true)                                                // L5
+        .backslash(Backslash::Hspice)                              // L6
+        .end(End { col1: false, then_blank: false, stops: true })  // L9
+        .join(Join::None)
+        // Words and quotes (T1, T2).
+        .quote(Quote::Expr(quoted))
+        .string(quoted)
+        .string_expr(true)
+        .ident_start("$").ident_continue("$.")
+        .directive('.')
+        .keywords(Keywords::Spice)                                 // the shared dot cards
+        .keyword(".probe", Keyword::Probe)
+        .lib_sections(true)
+        // Operators (X2, UG08 pp.279-283, Table 19).
+        .operator("**", Op::StarStar).operator("==", Op::EqualEqual)
+        .operator("!=", Op::BangEqual).operator("<=", Op::LessEqual)
+        .operator(">=", Op::GreaterEqual).operator("&&", Op::AmpAmp)
+        .operator("||", Op::PipePipe)
+        .infix(Op::PipePipe, 2).infix(Op::AmpAmp, 3)
+        .infix(Op::EqualEqual, 4).infix(Op::BangEqual, 4).infix(Op::LessEqual, 4)
+        .infix(Op::GreaterEqual, 4).infix(Op::Less, 4).infix(Op::Greater, 4)
+        .infix(Op::Plus, 5).infix(Op::Minus, 5)
+        .infix(Op::Star, 6).infix(Op::Slash, 6)
+        .infix(Op::Caret, 7).infix(Op::StarStar, 7)
+        .prefix(Op::Plus).prefix(Op::Minus).prefix_bp(6)
+        .caret(Caret::Pow)
+        .probe("v").probe("i")
+        // Numbers (T3: T G MEG X K MIL M U N P F A).
+        .exponent("eEdD")
+        .scale("meg", Scale::Exp(6)).scale("x", Scale::Exp(6)).scale("mil", Scale::Mil)
+        .scale("t", Scale::Exp(12)).scale("g", Scale::Exp(9)).scale("k", Scale::Exp(3))
+        .scale("m", Scale::Exp(-3)).scale("u", Scale::Exp(-6)).scale("n", Scale::Exp(-9))
+        .scale("p", Scale::Exp(-12)).scale("f", Scale::Exp(-15)).scale("a", Scale::Exp(-18))
+        .tail(Tail::Spice { dot: true })
+        .arithmetic(Arithmetic::Decimal)
+        .devices(Devices::Spice)
+        // Spelling.
+        .comment("*")
+        .path_quote("'")
+        .expr("'", "'")
+        .func(FuncForm::Param)
+        .subckt_params(None)
+        // Behaviours (§6.1): what the HSPICE identity checks did.
+        .end_rule(EndRule::WhenRuns)                 // quirk: spice/mod.rs:169
+        .value_quoting(ValueQuoting::Hspice)         // spice/cards.rs:216
+        .sweep_form(SweepForm::Hspice)               // spice/bench.rs:338
+        .card_rules(CardRules::Hspice)               // read/testbench.rs:234, read/outputs.rs:142
+        // Capability: every construct answered (registration checks).
+        .refuse(Construct::ForeignText, W0001)
+        .refuse(Construct::CaretReread, W0002)
+        .omit(Construct::NgBehavior, W0030)
+        .native(Construct::StatisticalCall)
+        .spell(Construct::VerilogALoad, Alt::Hdl)
+        .refuse(Construct::OsdiLoad, W0004)
+        .refuse(Construct::LibWholeFile, W0005)
+        .native(Construct::LibSection)
+        .native(Construct::RclModel)
+        .spell(Construct::ChargeCapacitor, Alt::ChargeQuoted)
+        .spell(Construct::BehaviouralSource, Alt::VolCur)
+        .lift(Construct::Laplace, Rule::LaplaceTable)
+        .refuse(Construct::RfPort, W0007)
+        .refuse(Construct::PwlRepeatV, W0008)
+        .refuse(Construct::PwlRepeatI, W0008)
+        .refuse(Construct::NoiseWave, W0009)
+        .native(Construct::Conditional)
+        .refuse(Construct::BranchParam, W0014)
+        .spell(Construct::Func, Alt::FuncParam)
+        .refuse(Construct::Step, W0016)
+        .native(Construct::Tf)
+        .native(Construct::Sens)
+        .refuse(Construct::SensAc, W0015)
+        .refuse(Construct::SParameter, W0015)
+        .refuse(Construct::PoleZero, W0015)
+        .native(Construct::Print)
+        .spell(Construct::Save, Alt::Probe)
+        .native(Construct::UnmappedOption)
+        .lift(Construct::Statistics, Rule::StatisticsDraws)
+        .native(Construct::Measure)
+}
+```
+
+About 100 lines, against today's 95-line lexicon const plus its spelling
+row and 30 capability arms spread over two files. ESPice, the one built-in
+that extends another:
+
+```rust
+pub fn espice() -> DialectDef {
+    DialectDef::new("espice")
+        .extends(Lang::NGSPICE)
+        .text_family(Lang::NGSPICE)                 // Dialect::family
+        .control_block(ControlBlock::None)          // spice/mod.rs:266
+        .omit(Construct::NgBehavior, W0030)
+        .spell(Construct::VerilogALoad, Alt::Hdl)
+        .refuse(Construct::OsdiLoad, W0004)
+        .lift(Construct::Laplace, Rule::LaplaceTable)
+        .native(Construct::PwlRepeatI)
+        .refuse(Construct::NoiseWave, W0009)
+}
+```
+
+(Behaviour names are read off today's code; P0 confirms each.)
+
+## 4. The API
+
+`syntax::def` (new, `pub`): `DialectDef`, `register`, `Lang`, `Card`,
+`Answer` and the vocabulary enums. The Python module `spicerack.def_`
+(PyO3, feature `python`) binds each 1:1: a method of the same name and
+arguments; each Rust enum is a Python class of the same name whose
+members are its variants.
+
+| Group | Calls | Fills |
+|---|---|---|
+| Identity | `new(name)`, `extends(Lang)`, `family(Family)` | registry row; `Family::{Spice, Named}` picks the reader and writer spine |
+| Lines | `title`, `fold_case`, `comment_line`, `comment_col1`, `blank_led_comment`, `cont_skip`, `comment_tail`, `block_comment`, `long_strings`, `dollar`, `plus`, `backslash`, `end`, `stop`, `join` | `Lexicon` |
+| Words | `quote`, `string`, `string_expr`, `name_escape`, `ident_start`, `ident_continue`, `directive`, `head_words`, `head_after`, `keywords(Keywords)`, `keyword(word, Keyword)`, `lib_sections` | `Lexicon` |
+| Expressions | `operator(text, Op)`, `infix(Op, bp)`, `right(Op)`, `prefix(Op)`, `prefix_bp`, `caret`, `probe`, `index`, `expr_braces` | `Lexicon.ops` |
+| Numbers | `exponent`, `scale(text, Scale)`, `tail`, `arithmetic` | `Lexicon.numbers`, `Spelling.ngspice_numbers` (one fact) |
+| Elements | `devices(Devices)`, `device(word, like)` (a row shaped as the base's row `like`), `master(word, Statement)`, `analysis(word, Analysis)`, `region(name, Lang)` | `Lexicon` |
+| Spelling | `comment`, `path_quote`, `expr(open, close)`, `func`, `subckt_params`, `write_head(Keyword, text)`, `write_master(word, text)`, `option(spice, own)` | `Spelling`, the head, master and option maps |
+| Capability | `native(c)`, `spell(c, Alt)`, `lift(c, Rule)`, `refuse(c, code)`, `omit(c, code)`, `copy(c, code)` | the capability column |
+| Back-door rows | `master_letter`, `function`, `sweep_kind`, `refused_word`, `hier_sep`, `temp_name`, `model_level`, `model_devices`, `text_family` (§6.1 B) | row tables |
+| Behaviours | `model_semantics`, `source_rules`, `card_rules`, `control_block`, `noise_form`, `sweep_form`, `end_rule`, `value_quoting`, `model_params`, `options_form`, `series_resistance`, `named_rules`, `mc_readback`, `named_params`, `writer` (§6.1 C) | `Behaviours` |
+| Running | `runs_on(Simulator)` (§6.5) | registry row |
+| Codes | `code(id, Kind, message)` | the definition's message table (`W0201`/`W0202`) |
+| Hooks | `hook(head, WriteHook)` | the hook table |
+| Use | `register(def) -> Result<Lang, RegisterError>`, `Lang::from_name`, `Lang::name`, `Lang::dump` | |
+
+About 85 calls. `Keywords::Spice`, `Devices::Spice` and the like name the
+shared tables (`SPICE_KEYWORDS`, `device::SPICE`, …) so six definitions
+do not repeat fifty rows; they are vocabulary values, as public as
+`Keyword::Subckt`.
+
+A cell's code is a catalogue `Code` (`W0001`, as the built-ins pass) or
+one of the definition's own `code` ids. Both are open to every caller:
+the catalogue is public and a plugin may refuse with `W0016` as HSPICE
+does. Nothing in the API is reserved for built-ins.
+
+## 5. Inheritance and registration
+
+- **`extends(base)`** copies the registered base's resolved definition
+  (every table, behaviour, cell, code, hook, `runs_on`) into this one,
+  `family` with it; later calls override. Any registered `Lang` may be a
+  base, a plugin included: `class Mine(MyHspice)` and
+  `.extends(my_hspice)` chain.
+- **Chains and cycles**: `extends` takes a `Lang`, which exists only once
+  registered, so a chain is resolved as it is built: each link was
+  validated when it registered, and the new definition is a resolved copy,
+  not a pointer up the chain. A cycle cannot be written; the one attempt
+  that can be (re-registering a name as an extension of itself, or of its
+  own descendant) is a different definition under a registered name,
+  refused `RegisterError::Redefined`. In Python a subclass chain is
+  Python's: `define` calls `super().define(d)`, so the calls run base
+  first, and the root's `define` is `d.extends(Lang.X)`.
+- **Scalars and behaviours**: the last call wins.
+- **Ordered tables** (keywords, scales, operators, devices, masters,
+  options, regions, the row tables of §6.1): a row whose key the table
+  holds replaces it in place; a new key goes **first**. An override is
+  found first by the reader ("the first table holding a word wins", as
+  today) and, where the writer reads a table backwards (letters,
+  suffixes), it is what is written: acme's `x` for mega.
+  `clear_<table>()` empties one; no per-row removal (factor at the second
+  need).
+- **Cells**: one per construct; the last call wins.
+- **Validation, once, in `register`**, over the resolved definition, one
+  validator for built-ins and plugins: the name is new, or an equal
+  redefinition (idempotent: the same `Lang`), else `Redefined`; every
+  construct has a cell; each `Alt` and `Rule` is one the family's writer
+  implements (`Alt::family`, `Rule::family`); each behaviour value belongs
+  to the family; each code is in the catalogue or the definition's table;
+  each `region` names a registered language; `runs_on` names a simulator
+  that a built-in in the chain is read by; the scales cover the writer's
+  ladder (12..-15); a keyword's text fits the `directive` rule. An error
+  names the call and its argument. All of it runs before the commit (the
+  append).
+- **Built-ins** register on first use of the registry in a fixed order
+  (ngspice, espice, hspice, xyce, ltspice, spectre, vacask, cdl, verilog,
+  then `ngspice-given`, the Python decks' reader), so their handles are
+  constants, `Lang::NGSPICE` = 0 to `Lang::NGSPICE_GIVEN` = 9.
+
+## 6. What the tables cannot say
+
+### 6.1 The back doors: today's identity checks, by the property they ask
+
+`rg` on b0952a7 finds 88 lines in `syntax/` (outside `capability.rs`,
+`spelling.rs`, `dialect.rs` and tests) that compare or match a dialect:
+reader 52, SPICE writer 18, named writer 17, `resolve` 1. Each asks a
+property of the dialect, and each becomes the call below, which the
+built-ins declare and an extension may change. The merges of
+gap-spice-read, gap-spice-write and gap-spectre-read add some (P0 recounts
+on the merged tree).
+
+**A. A row that already exists (13 sites, S).** The check is read from
+the row instead.
+
+| Property | Call | Sites |
+|---|---|---|
+| number arithmetic | `arithmetic` | `read/values.rs:268, 310`, `spice/mod.rs:95` |
+| `^` is power | `caret` | `spice/checks.rs:211`, `named/checks.rs:249` |
+| `.lib file` reads a whole file | `lib_sections` | `read/cards.rs:321, 322` |
+| `\` escapes a name byte | `name_escape` | `read/values.rs:215` |
+| LTspice's number tail | `tail` | `read/values.rs:254` |
+| SPICE or named statements | `family` | `read/mod.rs:354`, `lexicon/mod.rs:417`, `render/mod.rs:124` |
+| how a Verilog-A load is written | the `VerilogALoad` cell | `spice/mod.rs:216` |
+
+**B. A table in disguise (13 sites, 10 new row calls, S).**
+
+| Property | Call | Sites |
+|---|---|---|
+| a card head (`incl`, LTspice `.subckt … params:`) | `keyword` | `read/cards.rs:211, 396` |
+| a master's element letter by arity (`pvcvs`, `njf`, `nmf`) | `master_letter(word, arity, letter)` | `read/named_elements.rs:213, 262, 263` |
+| a function's name in the target (`log`) | `function(name, spelled)` | `named/bsource.rs:165` |
+| the sweep kinds (`log`) | `sweep_kind(word)` | `read/testbench.rs:420` |
+| words that make a card unreadable | `refused_word(word)` | `read/refused.rs:195` |
+| the hierarchy separator in a probe | `hier_sep(char)` | `named/bench.rs:364` |
+| the temperature variable | `temp_name(text)` | `named/params.rs:206` |
+| a model level the source renumbers (Xyce BSIM3 9 → 49) | `model_level(kind, from, to)` | `read/cards.rs:191` |
+| which device table a `model` names | `model_devices(Devices)` | `resolve/declare.rs:299` |
+| options copied by name when source and target agree | `option` (an empty map is the identity) | `named/bench.rs:116` |
+
+**C. A behaviour (62 sites, 15 calls, M-L).** A closed enum named for what
+it does; the variant names its origin, honestly.
+
+| Property | Call (values) | Sites | n |
+|---|---|---|---|
+| whose equations a read model, option or expression means | `model_semantics(Ngspice, Other)` | `named/params.rs:35, 222`, `named/cards.rs:52, 247`, `named/vacask_cards.rs:38`, `named/bsource.rs:58`, `named/bench.rs:252` | 7 |
+| ngspice's source-spec grammar | `source_rules(Ngspice, Spice)` | `read/sources.rs:202, 287` | 2 |
+| the old reader's per-dialect card rules | `card_rules(Spice, Ngspice, Hspice, Ltspice, Xyce)` | `read/cards.rs:155, 395, 450`, `read/shapes.rs:144`, `read/testbench.rs:234, 235, 436`, `read/outputs.rs:142` | 8 |
+| a `.control` block runs the analyses | `control_block(Ngspice, None)` | `spice/bench.rs:82`, `spice/mod.rs:266` | 2 |
+| the noise card's form | `noise_form(Ngspice, Plain)` | `spice/bench.rs:299, 431` | 2 |
+| the sweep's form | `sweep_form(Plain, Hspice)` | `spice/bench.rs:338` | 1 |
+| when `.end` is written | `end_rule(Always, WhenRuns)` | `spice/mod.rs:169` | 1 |
+| how a kept value is quoted | `value_quoting(AsWritten, Hspice)` | `spice/cards.rs:216` | 1 |
+| how model parameters are written | `model_params(Plain, Xyce)` | `spice/mod.rs:367` | 1 |
+| the options' form | `options_form(Plain, XycePackages)` | `read/options.rs:43`, `spice/bench.rs:142, 259` | 3 |
+| LTspice's `Rser=` coupling | `series_resistance(Plain, LtspiceRser)` | `spice/mod.rs:419, 449` | 2 |
+| the named reader's statement rules | `named_rules(Spectre, Vacask)` | `read/named.rs:126, 186, 193, 228, 315, 318, 341, 354`, `read/named_elements.rs:203, 289, 314, 324, 349, 404, 461`, `read/named_blocks.rs:148, 173, 179`, `read/mod.rs:323` | 19 |
+| Monte Carlo read back from a `statistics` region | `mc_readback(None, Spectre)` | `read/unlift.rs:126, 385`, `read/mod.rs:510` | 3 |
+| the named writer's parameter rows | `named_params(Spectre, Vacask)` | `named/params.rs:51, 94, 168, 223, 270` | 5 |
+| a statement read in the target's own language is written as read | none: `rd.lang == target` | `named/vacask.rs:105`, `named/vacask_bench.rs:183` | 2 |
+| the writer layout | `writer(Cards, Cdl, Verilog; Spectre, Vacask)` | `named/mod.rs:110`, `spice/mod.rs:105, 110` | 3 |
+
+By family: 23 of the C sites are the SPICE family's, 39 the named
+family's. By dialect named: VACASK 21, ngspice 17, Spectre 14, Xyce 12,
+LTspice 10, HSPICE 5, ESPice 3, CDL 2, Verilog 1 (some lines name two).
+
+Also a back door, outside `syntax/render`: `Dialect::family()` (ESPice
+reads ngspice text, and writes a `lang=ngspice` region's text as its own).
+It becomes `text_family(Lang)`: the language whose text this one copies
+as written (default itself; ESPice declares `Lang::NGSPICE`).
+
+**Size.** A and B: about 26 one-line changes and 10 calls with their
+tables (~150 lines). C: 15 enums (~120 lines with their docs), 62 sites
+of one to three lines each, and a line per built-in per behaviour. P2
+lands in three commits (A+B, the SPICE behaviours, the named
+behaviours), each gated IDENTICAL.
+
+**What stays family code**, selected by value and never extended by a
+definition: the two spines (`render/spice`, `render/named`,
+`render/read`); the layouts `writer` and `options_form` select
+(`spice/cdl.rs` 227 lines, `spice/verilog.rs` 177,
+`named/vacask*.rs` 1,274, `spice/xyce_options.rs` 85); the lift rules
+(`spice/laplace.rs`, `named/lift.rs`, `draws.rs`); the tokenizer rules
+`Dollar`, `Backslash`, `Tail` and `Arithmetic` select. Adding one is a
+change in the family's owner, as adding a `Construct` is today.
+
+**Which built-in needs the most**: VACASK: 21 identity checks (12 in the
+named reader, 9 in the named writer), its own writer layout (1,274 lines)
+and the `VacaskCalls` lift. It needs **zero hooks**: every one is a row,
+a behaviour value or family code. No built-in needs a hook.
+
+### 6.2 Heads the writer writes as literals
+
+The SPICE writer writes card heads as literals (`".subckt"`, about 75 in
+`render/spice/`), the named writer its masters and option names likewise.
+`write_head`, `write_master` and `option` act in one post-pass over a
+plugin's written deck (`render/def_pass.rs`): a statement's leading word
+(SPICE) or master (named, after `name [(nodes)]`) found in the map is
+replaced. The built-ins declare none, so they skip the pass. Rejected:
+threading a table through 75 literals, a larger diff for the same bytes.
+Risk: text a region keeps as written is respelled too (right for a plugin
+target; oracle 4 checks it).
+
+### 6.3 Hooks: one signature, two callers
+
+```rust
+/// Writes the cards of one hooked head of a deck, as the definition's writer
+/// wrote them, in output order: one answer per card, pushed onto `out`.
+pub type WriteHook = fn(cards: &[Card<'_>], out: &mut Vec<Answer>);
+
+pub struct Card<'a> {
+    pub head: &'a str,
+    pub words: &'a [&'a str],
+    pub params: &'a [(&'a str, &'a str)],
+    /// The whole card, continuations joined.
+    pub text: &'a str,
+}
+
+pub enum Answer { Text(String), Refuse(&'static str) }
+```
+
+1. The writer writes every hooked card in its own form; the post-pass
+   (§6.2) records a request row per hooked card, `{hook: u16, span:
+   Range<u32>, anchor: u32}`, in output order.
+2. A **Rust** hook is called in the post-pass, once per hooked head per
+   deck, with all its cards; one `Vec<Answer>` is reused across hooks.
+3. A **Python** hook cannot be called from `syntax` (no Python there, no
+   I/O, wasm). `render` returns the request rows with the text; the binding
+   calls each Python hook once per deck with its `ps.Card`s and hands the
+   answers to `render::splice(written, answers)`, which replaces the spans
+   back to front in one pass. A Rust caller without hooks gets no requests
+   and final text: the immediate twin.
+4. A wrong number of answers is a `ValueError` naming the hook; a refusal
+   is `W0201` at `anchor`, the source statement the card came from.
+
+A hook runs per deck per head, never per token or per statement of a hot
+loop. There are no read hooks (§6.4).
+
+### 6.4 No read hooks
+
+A read hook would exist only if a built-in needed one to be declared.
+None does: every reading difference among the seven readers is a lexicon
+row, a row of §6.1 B, a behaviour of §6.1 C (`card_rules`,
+`source_rules`, `named_rules`, `mc_readback`) or family code. Oracle 2
+(API completeness) is what would say otherwise: a built-in it cannot
+declare names the missing call. A plugin card no row reads stays what it
+is today (`P0001`, a `Verbatim`).
+
+### 6.5 Running, and regions
+
+- **Running**: netlist-only by default (`run(backend="acme")` raises
+  naming that no simulator reads acme). `runs_on(Simulator)` declares that
+  a simulator reads this dialect's text, allowed only when a built-in in the
+  `extends` chain is that simulator's (`my-ngspice` extends ngspice and
+  `runs_on(Simulator::Ngspice)`): `run` then writes the deck in the
+  plugin's dialect and hands it to that backend, whose raw reader reads the
+  result; `backend::select` lists the plugin under the simulator. The
+  claim that the simulator reads the plugin's text is the author's; oracle
+  5 checks acme's on ngspice.
+- **Regions**: registering a plugin makes `simulator lang=<name>` open a
+  region read by its lexicon in a Python deck (`extra_line(line,
+  dialect="acme")`) and in any file whose lexicon allows regions by name.
+  `Lexicon::regions` becomes `Regions::{None, Named(&[(&str, Lang)]),
+  Registered}`: Spectre's `spice` region stays `Named` (HSPICE),
+  `ngspice-given` is `Registered`, a registry lookup by name at the
+  tokenizer's `simulator lang=` switch (once per switch, not per token). A
+  region's text is written as written by a target whose `text_family` is
+  the region's language, else refused `W0001`, as today.
+
+## 7. Rust side
+
+### 7.1 `Lang`, and what happens to `Dialect`
+
+`Lang(u16)` names a registered language: built-ins `0..10`, plugins after,
+up to `LANGS_MAX = 64`. Inside `syntax`, every `Dialect` value becomes a
+`Lang` and every identity check a row or behaviour read (§6.1), so
+`syntax` no longer matches on a dialect. `Dialect` stays as the backend's
+enum of the simulators it runs (`backend/` 46 sites, `python/` 33), mapped
+to a `Lang` by name: running is the backend's owner, languages `syntax`'s.
+
+Sites (`rg` on b0952a7, `src/`):
+
+| Sites | Count | Becomes |
+|---|---|---|
+| `Dialect::` mentions, all / outside tests | 363 / 316 | the rows below; the backend's and Python's stay |
+| `capability.rs` per-construct `match target` (arms naming `D::`) | 30 (110) | each built-in's capability calls; `action()` deleted |
+| `spelling.rs` rows and `match` | 9 rows, 27 mentions | the definitions' spelling calls; `spelling()` deleted |
+| identity checks in `syntax/` (compare or match) | 88 | 13 existing-row reads, 13 new rows, 62 behaviour reads (§6.1) |
+| `lexicon::of` and its `match` | 8 calls | `Lang::lexicon` |
+| uses of the lexicon consts (`lexicon::NGSPICE`, …) outside tests | 93 | `Lang::X.lexicon()`; the consts become definitions |
+| `Lexicon::dialect` reads | 5 | `Lexicon::lang` |
+| name parsing (`parse::<Dialect>`, `from_backend_name`) | 12 | `Lang::from_name` in `python/` and `bin/` |
+| `render*` callers | 24 | none: `impl Into<Lang>` |
+
+### 7.2 Registry
+
+`[OnceLock<&'static Row>; LANGS_MAX]` and an `AtomicU16` count;
+`register` appends under a `Mutex` after building and leaking the row
+(`Box::leak`), so a reader takes no lock and sees a whole row. The
+built-ins fill slots `0..10` in a `LazyLock` on first access. A row is
+never freed; memory is bounded by `LANGS_MAX`. A plugin's handle depends
+on registration order and appears in no output (text, diagnostics and
+goldens carry names). `Lang::dump()` writes a row as canonical text
+(every table, behaviour and cell): what oracles 2 and 3 compare.
+
+### 7.3 A runtime builder, not `const` tables or spec files
+
+- **The hot path is identical.** The tokenizer and parser take `&Lexicon`
+  and get it at run time today (`lexicon::of` returns a reference chosen by
+  a `match`), so no lexicon field is constant-folded into their loops now.
+  A registered row is the same struct behind the same kind of reference,
+  plus `lang: Lang`, which no loop reads. Expected `asm_probe` verdict on
+  `tokenize::tokenize`: IDENTICAL; P1 cites the probe.
+- **`ask` becomes a table load**: `W::ask` reads `cells[c as usize]` of
+  the row resolved once per deck, where today it is a `const fn` match.
+  Per construct occurrence, not per token. Expected EQUIVALENT, probed.
+- **Behaviours** are a `Copy` struct of one-byte enums; a field load
+  replaces a compare, per statement.
+- **Registration cost**: the ten built-ins are about 1,500 calls, each a
+  push or a store, once per process. No speed claim here: P1 measures it
+  in a test that prints the time against a 1 ms budget.
+- **Why not `const`**: a 1:1 binding needs per-row calls that push onto
+  tables, which a `const fn` builder cannot do; a `const` form beside the
+  builder is two APIs. **Why not spec files**: a third language and its
+  parser for the same tables; the user chose Rust calls.
+- **Totality moves** from compile time (the exhaustive `match`) to
+  registration time: a new `Construct` compiles, and the pre-commit test
+  "every built-in registers" fails naming each built-in without its cell.
+  The price of the 1:1 API, stated.
+- `--no-default-features` builds `syntax::def` and the built-ins; only
+  `src/python/def_.rs` needs the `python` feature. wasm32 has `OnceLock` and
+  `LazyLock`.
+
+### 7.4 Diagnostics
+
+`Diag` is 8 bytes (asserted, `diag.rs:558`) and `Code` one byte, so a
+`detail: u16` fits the padding and the assertion stays. A new range:
+
+| Range | Stage |
+|---|---|
+| W0201–W0300 | render: rules a dialect definition declares |
+
+`W0201 Refusal` and `W0202 Note` carry `detail`, the index of the code in
+the definition's table; the message reads `W0201 acme:ACME001 <message>`.
+`golden diff` compares code lines, so a reworded plugin message is no
+difference. Built-ins raise catalogue codes, as today: no golden changes.
+
+## 8. Oracles
+
+1. **The migration gate (metamorphic)**. A built-in moved onto its
+   definition renders the golden corpus byte-identically: `golden record`,
+   then `golden diff` against the previous phase's record, **IDENTICAL, no
+   new `migration.xfail` line**, every input set and every target. The
+   oracle is the previous code, which consulted no definition.
+2. **API completeness (no back door)**. The built-in definition files
+   (`src/syntax/dialects/*.rs`) are also compiled by an integration test
+   (`tests/dialect_defs.rs`, an `include!` of each): an integration test is
+   another crate and sees only `pub` items, so a definition using a private
+   item fails to compile there. It registers each under a new name and
+   checks `dump()` equals the built-in's.
+3. **Python parity**. `tests/test_dialect_def.py` declares acme, and each
+   built-in again with the same calls (written out, not generated), from
+   Python; each `dump()` equals the Rust row's, byte for byte. A
+   `MyHspice` subclass's dump equals the Rust `extends(Lang::HSPICE)` one.
+4. **Round-trip fixpoint**. The fixtures and a pinned 200-deck
+   `spice-bench` sample: `A1 = write(D, acme)`,
+   `write(read(A1, acme), acme) == A1`; the refusal codes of
+   `write(D, acme)` are the expected name list.
+5. **Simulator**. `write(read(write(D, acme), acme), ngspice)` on ngspice
+   in `.#testing` gives `D`'s results within each analysis's own tolerance
+   (a sample of the `test_dialects.rs` decks). A missing ngspice fails.
+6. **Refusals and hooks coded**. A Laplace deck written to acme: `Err`,
+   code list `[W0201]`, `acme:ACME001` at the source line; a hook's refusal
+   at its card. Each test is first run with the cell set to `native` and
+   must go red there.
+7. **Registration**. Each rule of §5 has a case naming the call;
+   idempotent and conflicting redefinition; `LANGS_MAX + 1` errors; a
+   definition missing one cell names it.
+8. **Determinism**. Two plugin registration orders × 1 and 8 threads, the
+   same bytes; hooks called once per head per deck, cards in output order.
+9. **Names**. The Python enums' members equal the Rust variants (names
+   compared, never counts).
+
+## 9. Plan
+
+Every phase ends on oracle 1 IDENTICAL (no new xfail) and, where it
+touches the tokenizer or `ask`, an `asm_probe` verdict cited in the
+commit.
+
+**Collisions with the in-flight branches** (`git diff --stat` of each
+against its merge base with `p7-integrate`):
+
+| Branch | `src/` files it changes that this plan touches |
+|---|---|
+| gap-spice-write | `render/capability.rs`, `render/named/mod.rs`, `render/spice/{mod,bench,cards,cdl,checks,verilog,xyce_options}.rs`, `diag.rs` |
+| gap-spice-read | `render/capability.rs`, `lexicon/xyce.rs`, `render/read/{mod,cards,testbench,refused,elements,named_bench}.rs`, `render/spice/{mod,bench,checks}.rs`, `render/named/{bench,checks,vacask_bench}.rs`, `diag.rs`; adds `read/sweeps.rs`, `spice/sweeps.rs` |
+| gap-spectre-read | `render/read/{mod,named,named_bench,named_elements,testbench}.rs`, `render/named/{bench,vacask_bench}.rs`, `render/spice/bench.rs`; adds `read/named_masters.rs` |
+| gap-python | `src/python/*`, `backend/{mod,vacask}.rs`, `diag.rs` |
+| gap-oracles | none in `src/` (tests and fixtures only) |
+
+So P1a starts now on `p7-integrate` (new files and one field); P1b and
+everything after start once the round-1 merges are in.
+
+| Phase | Size | Files | Gate |
+|---|---|---|---|
+| P1a `def` and registry | M | new `syntax/def/{mod,build,validate,registry}.rs`; `lexicon/mod.rs` (`Lexicon::lang`) and one line in each `lexicon/*.rs` (`xyce.rs` collides with gap-spice-read: one line); `dialect.rs` (`Lang`). The built-ins registered through a **temporary** `DialectDef::from_tables` wrapping today's consts (the back door oracle 2 forbids; deleted in P9) | oracle 1 (nothing reads `Lang` yet); oracle 7 |
+| P0 inventory | S | §6.1 recounted on the merged tree, each new site classified | review |
+| P1b `Lang` threaded | M | `render/{mod,capability,spelling}.rs`, `read/mod.rs`, `spice/mod.rs`, `named/mod.rs` (`cells`, `lang`), `parse.rs` (`Verbatim`), `resolve/mod.rs` (`Kit`) | oracle 1; `asm_probe` on `tokenize::tokenize` (IDENTICAL) and `W::ask` (EQUIVALENT); registration time printed |
+| P2 back doors | L | §6.1 A+B, then the SPICE behaviours, then the named ones (three commits); `syntax/def/behaviour.rs` | oracle 1 per commit |
+| P3 ngspice | M | `syntax/dialects/ngspice.rs`; `lexicon/ngspice.rs` keeps its tests | oracles 1, 2 |
+| P4 ESPice | S | `dialects/espice.rs` (`extends(Lang::NGSPICE)`, `text_family`) | oracles 1, 2 |
+| P5 HSPICE, LTspice, Xyce | M | `dialects/{hspice,ltspice,xyce}.rs`, a commit each | oracles 1, 2 |
+| P6 Spectre, VACASK | M | `dialects/{spectre,vacask}.rs` (Spectre's region names HSPICE, so after P5) | oracles 1, 2 |
+| P7 CDL, Verilog, `ngspice-given` | S | writer-only definitions (`writer(Cdl)`, `writer(Verilog)`, no lexicon rows); `ngspice-given` extends ngspice, `Regions::Registered` | oracles 1, 2 |
+| P8 plugins | M | `render/def_pass.rs` (heads, masters, options, hook spans, Rust hooks), `W0201`/`W0202`, `runs_on`, plugin regions; acme in Rust | oracles 4-8 |
+| P9 cleanup | S | delete `from_tables`, `capability::action`, `spelling()` and its rows, `lexicon::of`, `Dialect::family`, `Dialect` in `syntax` | oracles 1, 2 |
+| P10 Python | M | `src/python/def_.rs` (the 1:1 binding, `ps.Dialect`, `ps.dialects.*`, `ps.register_dialect`, Python hooks via `splice`); `python/spicerack/`; `docs/dialects.md`, `docs/reference.md`; `skills/spicerack/` | oracles 3, 9; `test_docs.py` runs §2 |
+
+**Migration order, and why.** ngspice first: every other SPICE definition
+is compared with it, ESPice and `ngspice-given` extend it, the Python
+decks are its text, and its corpus is the largest (6,050 decks and three
+PDKs), so the strongest gate runs on the move everything else rests on.
+ESPice second: the smallest delta (3 checks) and the first `extends`,
+which proves inheritance before anything depends on it. Then HSPICE (5
+checks), LTspice (10), Xyce (12), in growing behaviour count. Spectre
+after HSPICE (its region reads HSPICE), VACASK last of the readers (the
+most behaviours, its own layout). CDL and Verilog last: writer-only, and
+the least gated (`--skip verilog`).
+
+**Expected deletions** (P9): `capability::action` and its 30 matches
+(~190 lines; `Construct`, `Action`, `Alt`, `Rule` stay as vocabulary);
+the nine `Spelling` consts and `spelling()` (~100); `lexicon::of`;
+`Dialect`'s role in `syntax` (most of `dialect.rs`, ~90 lines; `ALIASES`
+moves to `backend`); the 88 identity checks, replaced in place (net about
+zero). The seven lexicon consts become definitions (their tests stay).
+Added: `syntax/def` (~750 lines with the validator and behaviours),
+`def_pass.rs` (~150), `python/def_.rs` (~400, mostly one line per call).
+
+Risks:
+
+- **The property grouping is a reading of each site, not yet a proof**:
+  some will split or join. The golden gate catches a wrong grouping; P0
+  re-reads after the merges.
+- **Totality at registration, not compile time** (§7.3): mitigated by the
+  pre-commit test, not removed.
+- **P1b and P2 touch every render file**: they collide with any open
+  render branch, so they land in a window with none open.
+- **The enums become a public contract**: `Keyword`, `Construct`, `Alt`,
+  `Rule` and the behaviours are API; a rename is a breaking change of
+  `spicerack.def_`, kept as an alias for one release.
+- **Leaked rows**: bounded by `LANGS_MAX`; a notebook re-registering a
+  changed plugin gets `Redefined`, not a leak.
+
+## Decisions
+
+Taken from the user's defaults and this doc's recommendations (team lead,
+2026-11-06):
+
+1. Plugins are netlist-only; `runs_on(Simulator)` lets one that extends a
+   runnable built-in run on that built-in's backend, the author's claim
+   that it reads the text (§6.5), checked for acme by oracle 5.
+2. A plugin gets its `simulator lang=<name>` region (§6.5).
+3. No read hooks: no built-in needs one (§6.4); oracle 2 would say if one
+   did.
+4. Registration is explicit, `register_dialect()`.
+5. A plugin may extend a plugin; cycles cannot be written (§5).
+6. Behaviours are named for their origin (`card_rules: Ltspice`); a
+   finer, neutral split waits for a second definition that needs it.
+
+## Done
+
+- **P0** (on b0952a7): §6.1's inventory, 88 sites. Recounted after the
+  round-1 merges, before P2.
+- **P1**: `syntax/lang.rs`: `Lang(u16)` and the rows (`dialect`,
+  `lexicon`, `spelling`, the capability column `cells`), the built-ins at
+  their `Dialect::ALL` positions, filled at compile time from today's
+  tables. `lexicon::of` reads the row; `render`, `render_kit` and
+  `render_text` take `impl Into<Lang>`; both writers take the `Lang` and
+  read `spelling()` and `cells()` from it (`W::ask` is a cell load);
+  `Rd::write_for` takes the `Lang`. Narrower than the table above, by
+  need: the builder and validator land with the first definition (P3),
+  `Lexicon::lang` with the first reader of it (plugin regions, P8), the
+  registry's append path with plugins (P8); `Source`, `Rd` and `Kit` keep
+  their `Dialect` until P2 removes the checks that read it.
+  Gate: `golden record` of this commit and of its parent (b0952a7,
+  recorded the same way) are byte-identical (`diff -r`, MANIFEST
+  included); `golden diff` against `baseline-daa0ad0-fx13` with
+  `migration.xfail`: IDENTICAL except 4132 listed xfails, as the parent.
+  Probes (`asm_probe.py`, release, `codegen-units=1`, the parent's listing
+  as `hand_`): `tokenize::tokenize` EQUIVALENT (1402 instructions, 56
+  calls, both); `render::named::W::ask` reported RESIDUE on its own body
+  (45 against 42 instructions), but the 42 call the out-of-line
+  `capability::action` (128 instructions) that the new body replaces with
+  a three-instruction cell load, so with the helper counted, as
+  `zero-cost.md` says to, it is NEGATIVE (45 against 170, one call against
+  two). `render::spice::W::ask` is inlined into its callers in both
+  builds.
+- **P1b** (on 613966e): the construct table lists the constructs streams
+  B and D added; their capability reads read the target's cells.
+- **P0 recount** (613966e): 108 identity sites (88 at b0952a7).
+- **P2**: `syntax/behaviour.rs`, 15 behaviour enums and four plain rows
+  (`text_family`, `caret_power`, `hier_sep`, `spectre_analyses`); all 108
+  sites read a property of the source's (`Rd::b`) or target's (`W::b`)
+  language. Each built-in's values are what its code path did, so the
+  grouping is exact for the built-ins. Narrower than §6.1: the rows §6.1
+  A and B list (keyword, master-letter, function-name tables) are
+  behaviours for now (`card_rules`, `named_rules`); turning them into
+  tables is a later compression with no golden change to prove it.
+- **P3**: `syntax/def` (`DialectDef`, `register`, `RegisterError`), the
+  registry behind `Lang` (one `OnceLock` slot per row, an append lock,
+  the built-ins registered first at constant handles in the order
+  ngspice, espice, hspice, xyce, ltspice, spectre, vacask, cdl, verilog,
+  ngspice-given); `Lexicon::lang` and `Spelling::lang` replace their
+  `Dialect` fields; a frozen lexicon's `lang` is the definition's
+  `text_family`. Tables keep declaration order; a single-row call
+  replaces a held key in place; a shared table (`keywords`, `operators`,
+  `devices`) adds only the keys the definition does not hold, as "the
+  first table holding a word wins" did.
+- **P4-P7**: every built-in declared in `syntax/dialects/<d>.rs` with the
+  public calls only (each lexicon translated from `lexicon/<d>.rs` with its
+  rule citations; its spelling, behaviours and all 35 cells). Until P9 a
+  test checked each registered row field by field against the old tables.
+- **P9**: deleted the old tables: the seven lexicon consts and
+  `NGSPICE_GIVEN` (the `lexicon/<d>.rs` files keep their rule tests, now
+  against the registered lexicons), the nine `Spelling` rows and
+  `spelling()`, `capability::action` and its 30 matches,
+  `behaviour::builtin`, `lexicon::of`: 1,781 lines deleted, 376 added in
+  P9 (the branch so far: 4,442 added, 1,751 deleted over 80 files,
+  migration notes included). `Dialect` stays as the built-ins' names
+  (`From<Dialect> for Lang`, the backend's simulators, `Kit`); nothing in
+  `syntax` branches on it.
+- **P8**: plugins. `render::Source.lang: Lang` and `render_text(text,
+  d: impl Into<Lang>, ..)` read a plugin's text (`Rd.d` is the source's
+  `text_family`). Codes: `DialectDef::code(id, Kind, message)`,
+  `refuse_code(c, id)` / `omit_code(c, id)` (a cell `Refuse(W0201)` /
+  `Omit(W0202)` plus a per-construct detail in the row), `Diag.detail: u16`
+  (still 8 bytes) indexing one global code table the registry owns
+  (`lang::plugin_code`), rendered `W0201 <lang>:<id> <message>`; the new
+  range `W0201–W0300`. `render/def_pass.rs`: `write_head(Tag, text)`,
+  `write_master(word, text)`, `option(spice, own)` and hooks
+  (`hook(head, WriteHook)`, `Card`, `Answer`), one pass over a plugin
+  target's text only when its row has a map or a hook; the request form
+  for bindings (`external_hook(head, id)`, `render_pending` →
+  `Pending { text, requests: [Request { hook, span, anchor }] }`,
+  `splice(src, pending, answers)`). `runs_on(Dialect)` (validated against
+  the `extends` chain; `Lang::runs_on` is a built-in's own simulator, not
+  copied by `extends`, so a plugin is netlist-only until it says).
+  `Lexicon::regions_registered` (ngspice-given's): `simulator lang=<name>`
+  with no own row looks the name up once per switch. `Lang::dump()`;
+  registering an equal definition returns the held `Lang`, another one is
+  `Redefined` (`Taken` is gone); the name is checked under the append
+  lock (a test registering one name from 8 threads raced to two rows
+  before). Tests: `tests/test_dialect_plugin.rs` (acme from §2,
+  `MyHspice`, a plugin of a plugin, every `RegisterError` but `Full`, which
+  `tests/test_dialect_full.rs` fills the registry for), the pinned dumps
+  `tests/fixtures/dialects/{acme,my-hspice}.dump` (P10's parity oracle).
+  Narrower than §2-§6, by need or by what the code is:
+  - `Keyword` is `token::Tag` (`write_head(Tag::KwSubckt, ..)`); a
+    catalogue code keeps `refuse(c, Code)`, an own code is `refuse_code`.
+  - A new table row still goes last (P3's rule; first would reorder the
+    built-ins' tables), so acme reads `x` and writes `meg`.
+  - `func(FuncForm::Param)` alone leaves the `Func` cell `Native`: acme also
+    calls `spell(Construct::Func, Alt::FuncParam)`. "Decimal arithmetic" is
+    three calls (`arithmetic`, `number_reading`, `ngspice_numbers(false)`),
+    not one fact; with only the first, acme's round trip respelled numbers.
+  - A hook's text is write-only (no read hooks): a deck holding a hooked
+    card is no round-trip fixpoint unless the hook writes text the
+    definition reads. A hook's anchor is the k-th source token of the
+    card's keyword when the counts agree, else token 0. `dump` names hook
+    heads, not functions: an equal re-registration with another function
+    keeps the held hook.
+  - Plugin regions look up plugins only (a built-in's region is a row of
+    the lexicon's own table). (A `simulator lang=` name a built-in's row
+    prefixed before a `-`, `ngspice-x`, opened the built-in's region; fixed
+    in the oracles round below.)
+  - A statement an ngspice deck keeps as ngspice text is refused `W0001`
+    by acme (its text family is itself, §6.5).
+  - Oracle 4 ran on five inline decks; oracles 2 and 5 were not written
+    (all three are now: the oracles round below). `Kit` keeps its
+    `Dialect`: a plugin kit is out of scope.
+- **P10**: the Python binding. `src/python/def_.rs`: `spicerack.def_`
+  (a submodule, in `sys.modules`) with `DialectDef`, one method per Rust
+  call, same name and arguments, each returning the definition (generated
+  by one macro from the call list), `register(d)` (`ValueError` with the
+  `RegisterError` message), `Lang` (the ten constants, `from_name`, `name`,
+  `dump`, `runs_on`), `Card`, `Answer`. `src/python/def_enums.rs`: every
+  vocabulary enum as a class of the same name, its unit variants class
+  attributes named by their Rust `Debug` and an exhaustive `match` per enum
+  (a new variant fails to compile until listed); data variants are
+  constructors (`Scale.Exp(6)`, `Alt.Omit(code)`, `Tail.Spice(dot)`,
+  `Quote.Expr(Quoting(..))`, `Statement.Analysis(a)`). Python hooks are
+  `external_hook`s: `def_::render` calls each once per deck with its
+  `Card`s and hands the answers to `render::splice`.
+  `python/spicerack/dialects.py`: `Dialect`, `register_dialect` (one-argument
+  class attributes applied as calls, base classes first, then `define`),
+  the built-ins as classes. `netlist(name)`, `from_source(text,
+  dialect=name)`, `extra_line(line, dialect=name)` and `with_backend(name)`
+  accept a registered plugin; `run()` on a plugin writes it and runs it on
+  `runs_on`'s simulator, else raises naming it netlist-only. A Python deck
+  written for a plugin takes the library paths and analysis forms of the
+  built-in in its chain. Docs: `docs/dialects.md` (run by `test_docs.py`),
+  `docs/reference.md`, `docs/index.md`; `skills/spicerack/`. Tests:
+  `tests/test_dialect_def.py` (acme and `MyHspice` dump the pinned Rust
+  rows byte for byte; each enum's members equal its Rust variants' names;
+  a hook called once per deck, spliced; refusals coded; acme text read and
+  written; netlist-only `run` refused; a `runs_on(Ngspice)` plugin gives
+  ngspice's operating point on ngspice).
+  Narrower than §2/§4, by what the code is:
+  - `Keyword` is `Tag` (exported under both names), so `Tag.KwSubckt`, not
+    `Keyword.Subckt`. A variant named `None` is `None_` in Python (a
+    keyword there). `Family` is `writer(Writer)`; the class-attribute sugar
+    covers every one-argument call.
+  - The only per-oracle-3 parity was acme and `MyHspice` (the pinned
+    dumps); the built-ins are re-declared from Python since the oracles
+    round below.
+  - A hook's wrong answer count is a `RuntimeError` naming the hook (the
+    deck's errors are `RuntimeError`), not a `ValueError`.
+  - A plugin run skips `backend::select`'s feature checks: the deck goes
+    to `runs_on`'s simulator as written.
+- **Oracles round** (after f407dd3):
+  - Oracle 2: `tests/dialect_defs.rs` compiles each
+    `src/syntax/dialects/<d>.rs` unchanged in another crate (a crate-root
+    `mod syntax { pub use spicerack::syntax::*; }`), so a definition using a
+    private item does not compile: none does. Each is registered again
+    under a new name (`DialectDef::renamed`, in Python too); its dump equals
+    the built-in's but the rows naming the language itself (`name`,
+    `lex.lang`, `sp.lexicon`, `text_family`); it writes the 53 golden
+    fixtures (each read through its kit, as `golden` does), the pinned
+    200-deck spice-bench sample (`tests/fixtures/dialects/spice-bench-200.txt`)
+    and two expression probes to the same text or refusal codes as its
+    built-in, and reads them (as the clone, written to ngspice; ngspice's
+    clone written to Xyce) the same. A clone whose text family is itself
+    is read and written as itself where the built-in's deck is. The probes
+    found the back doors left in f407dd3, ngspice's `{}` evaluator asked by
+    name (`sdt` refused, a then-branch ternary's grouping, `if()` as `?:`):
+    now `behaviour::ExprEval` (acme, extending ngspice, gets ngspice's).
+    `xyce_options` spells numbers with the target's spelling.
+  - Oracle 3: `tests/builtin_dialects.py` declares all ten built-ins with
+    the Python calls of their Rust files (translated once, written out);
+    each dumps its Rust row, names aside (`test_dialect_def.py`).
+  - Oracle 4 on the 200-deck sample (`tests/test_acme_oracles.rs`): 191
+    decks are fixpoints, 2 are refused `W0001` (the pinned list
+    `acme-bench-refused.txt`: a region kept as ngspice text), 7 holding a
+    `.noise` card are excluded by name (the hook writes `.noise_acme`, text
+    acme does not read; the test checks each still holds one).
+  - Oracle 5: one circuit (a parametrised subcircuit, a B source, a charge
+    capacitor, an RC) with `.op`, `.dc`, `.ac`, `.tran`: `D` and
+    `write(read(write(D, acme), acme), ngspice)` run on ngspice give every
+    vector within 1e-9 (op, dc, ac) and 1e-3 (tran, ngspice's RELTOL)
+    relative; a missing ngspice fails.
+  - Open items closed: pytest registers each test's plugins under names of
+    its own (`uniq`); a Python hook is held from the registration that makes
+    a new row (one per hooked registration, at most `LANGS_MAX`), none for
+    an unregistered or equal re-registered definition (a refcount test);
+    a region name is matched whole (`simulator lang=ngspice-x` opens the
+    plugin, not ngspice's region).
+  - Still open: `tokenize`'s plugin regions look up plugins only (index
+    past the built-ins); `render::spice::bench` spells a `.control`
+    block's `fourier` numbers with ngspice's spelling by name, and
+    `read::named` reads VACASK analysis words with Spectre's lexicon by
+    name (a quirk kept from the old reader): neither changes a built-in or
+    a clone's bytes, each a named-built-in reference a later definition
+    call could replace.
+- **Merge of p7-integrate ac33748** (stream D round 3): its eleven new
+  identity checks are declared properties: the reader's Xyce, LTspice and
+  HSPICE rules (`.LIN`, the `P` port, `TABLE`, the `O` line, V
+  parasitics, HSPICE `.noise`/`.dc START=`/`VALUE=` modifiers, HSPICE-only
+  analyses) read `card_rules`; the writer's LTspice parasitics read a new
+  behaviour `Parasitics` (`Elements`, `Ltspice`, `Netlist`: CDL and
+  Verilog keep a C's or L's as read); its five new constructs
+  (`HspiceAnalysis`, `LocalFunc`, `TableSource`, `LossyLine`, and the
+  `XycePort`/`XyceLin`/`PwlValue` alternatives) are cells in every
+  definition file, the `O` and `P` device rows `Devices::LossyLine` and
+  `Devices::XycePort`; the Python enums, `builtin_dialects.py` and the
+  pinned dumps follow.
+- **Merge of p7-integrate 9fb1535** (streams F, C and A round 2): its
+  new identity checks are declared properties, no new behaviour enum
+  needed. The VACASK reader's checks (`== Dialect::Vacask`,
+  `!= Dialect::Spectre` in `read::named`, `named_blocks`,
+  `named_elements`, the new `named_waves` and `named_control`, the kept
+  text's `text_dialect`) read `named_rules`; a source read with ngspice's
+  model meaning (C/L `IC=` without `uic` noted W0112, the parameters a
+  VACASK module lacks, W0129) reads `model_semantics`; an LTspice
+  source's parasitics on the named targets read `card_rules`; a Spectre
+  source's own include in a subcircuit (else W0128) reads `named_rules`;
+  the writers' "is the target VACASK / CDL" read `writer`; Xyce's
+  `.options` packages read `options_form`; the W0121 refusal (a loaded
+  module named as an ngspice built-in device) is asked by a target whose
+  loads are `LoadForm::Ngspice`. Its two constructs (`VacaskScript`,
+  `OsdiInstance`) are cells in every definition file; the VACASK script
+  lines are left out where the target's `VacaskScript` cell is an `Omit`
+  (was "unless CDL" / "unless VACASK"). `capability::action` stays
+  deleted (`ngspice_device` and its table stay). `diag.rs` passed 500
+  lines and is `diag/mod.rs` (the catalogue) and `diag/messages.rs`;
+  the named writer's `statistics` block moved to `named/statistics.rs`.
+  Python enums follow from the Rust lists; `builtin_dialects.py` and the
+  pinned dumps gained the two cells.
+- Named gap, **a `Kit` holding a plugin**: `resolve::Kit` (`Kit::load(.., dialect: Dialect, ..)`, `Kit::dialect`)
+  keeps its `Dialect`, so a kit's files are read and
+  written only in a built-in dialect; a plugin kit is not supported.
+- Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
+  included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
+  the listed xfails (25,596 on 613966e).
+- **The last two by-name references** (after 2bc41e2): a `.control`
+  block's `fourier` numbers are spelled with the target's own spelling
+  (only ngspice declares `control_block(Ngspice)`, so no byte changes);
+  VACASK's quirk of reading Spectre's analysis words is a declared row,
+  `analysis_masters(Lang)` (`Behaviours::analysis_masters`; Spectre and
+  VACASK declare `Lang::SPECTRE`, bound in Python, in the pinned dumps and
+  the Python re-declarations). No code in `syntax/` names a built-in
+  outside its definition and the tests; the no-back-door oracle covers
+  both.

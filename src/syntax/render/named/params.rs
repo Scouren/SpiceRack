@@ -17,11 +17,11 @@
 //! - `W::tran_ic(&mut self, letter: char, params: Vec<(String, String)>, node: u32) -> Vec<(String, String)>`
 //! - `W::dependent(&mut self, value: &Val, model: bool, params: &[(String, String)], node: u32) -> Option<Option<Dependent>>`
 //! - `type Dependent`
-//! - `fn spelled_flag(rd_d: Dialect, d: Dialect, letter: char, name: &str) -> bool`, `fn level(m: &Model) -> u32`
+//! - `fn spelled_flag(source: &Behaviours, target: &Behaviours, letter: char, name: &str) -> bool`, `fn level(m: &Model) -> u32`
 
 use super::W;
 use super::checks::calls;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::{Behaviours, ModelSemantics, NamedParams};
 use crate::syntax::diag::Code;
 use crate::syntax::render::models::{self, Implied, Kind, Param, Row};
 use crate::syntax::render::read::{Ana, Model, Val};
@@ -33,7 +33,7 @@ impl W<'_, '_> {
     /// The rows model `m` is written through: a deck read as ngspice, a
     /// kind and level `render::models` holds.
     pub(super) fn table_kind(&self, m: &Model) -> Option<&'static Kind> {
-        if self.rd.d != Dialect::Ngspice {
+        if self.rd.b.model_semantics != ModelSemantics::Ngspice {
             return None;
         }
         models::kind(&m.kind, level(m))
@@ -49,7 +49,7 @@ impl W<'_, '_> {
         k: &'static Kind,
     ) -> Option<Vec<(String, String)>> {
         let mut out = self.rows(k.rows, &m.params, node)?;
-        if self.d != Dialect::Spectre {
+        if self.b.named_params != NamedParams::Spectre {
             return Some(out);
         }
         if let Some((a, b)) = k.exclusive
@@ -98,8 +98,9 @@ impl W<'_, '_> {
         let at = params
             .iter()
             .position(|(k, _)| k.eq_ignore_ascii_case("ic"));
-        let Some(at) = at.filter(|_| self.rd.d == Dialect::Ngspice && matches!(letter, 'C' | 'L'))
-        else {
+        let Some(at) = at.filter(|_| {
+            self.rd.b.model_semantics == ModelSemantics::Ngspice && matches!(letter, 'C' | 'L')
+        }) else {
             return params;
         };
         let tb = self.fold();
@@ -123,7 +124,7 @@ impl W<'_, '_> {
         params: &[(String, String)],
         node: u32,
     ) -> Option<Vec<(String, String)>> {
-        assert!(self.d == Dialect::Spectre);
+        assert!(self.b.named_params == NamedParams::Spectre);
         let rows = models::instance(letter);
         let mut out: Vec<(String, String)> = Vec::new();
         let mut scale = None;
@@ -197,7 +198,7 @@ impl W<'_, '_> {
         // `temper` (its `$temp`), on no model: the `resistor` it names is
         // declared only for a card naming none.
         let clean = !texts.iter().any(|e| word(e, &["hertz", "time"]));
-        if !clean || self.d == Dialect::Vacask && (branch || model) {
+        if !clean || self.b.named_params == NamedParams::Vacask && (branch || model) {
             self.refuse(Code::W0102, tok);
             return None;
         }
@@ -235,9 +236,9 @@ impl W<'_, '_> {
         // `[CMP]` p.884 ("Temperature as a parameter"): Spectre's `temp` is
         // ngspice's `temper`, re-evaluated as the temperature changes; so is
         // VACASK's `$temp` (`docs/cmd-options-temp.md`). All are Celsius.
-        let temp = match self.d {
-            Dialect::Vacask => "$temp",
-            _ => "temp",
+        let temp = match self.b.named_params {
+            NamedParams::Vacask => "$temp",
+            NamedParams::Spectre | NamedParams::None => "temp",
         };
         let expr = words(&expr, |w| match w.eq_ignore_ascii_case("temper") {
             true => temp.to_string(),
@@ -249,10 +250,15 @@ impl W<'_, '_> {
 
 /// Whether flag `name` on an element of type `letter` is written as a
 /// `name=value` in the target (Spectre's `region=off`), so is no flag.
-pub(super) fn spelled_flag(rd_d: Dialect, d: Dialect, letter: char, name: &str) -> bool {
+pub(super) fn spelled_flag(
+    source: &Behaviours,
+    target: &Behaviours,
+    letter: char,
+    name: &str,
+) -> bool {
     let row = models::row(models::instance(letter), name);
-    rd_d == Dialect::Ngspice
-        && d == Dialect::Spectre
+    source.model_semantics == ModelSemantics::Ngspice
+        && target.named_params == NamedParams::Spectre
         && row.is_some_and(|r| matches!(r.spectre, Param::Flag(..)))
 }
 
@@ -299,9 +305,9 @@ impl W<'_, '_> {
     /// is written as, `Some(None)` when it is left out (noted at `at`
     /// unless its value is the off one), `None` when refused at `at`.
     fn answer(&mut self, row: &Row, v: &str, at: u32) -> Option<Option<(String, String)>> {
-        let answer = match self.d {
-            Dialect::Spectre => row.spectre,
-            _ => row.vacask,
+        let answer = match self.b.named_params {
+            NamedParams::Spectre => row.spectre,
+            NamedParams::Vacask | NamedParams::None => row.vacask,
         };
         let named = |n: &str| Some(Some((n.to_string(), v.to_string())));
         match answer {

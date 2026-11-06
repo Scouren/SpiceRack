@@ -13,7 +13,7 @@
 
 use super::W;
 use super::vacask::q;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::{CardRules, Writer};
 use crate::syntax::render::spice::parasitics::{Part, parts};
 
 impl W<'_, '_> {
@@ -28,7 +28,7 @@ impl W<'_, '_> {
         n2: &str,
         params: &mut Vec<(String, String)>,
     ) -> Option<(String, Vec<Part>)> {
-        if self.rd.d != Dialect::Ltspice || letter == 'R' {
+        if self.rd.b.card_rules != CardRules::Ltspice || letter == 'R' {
             return None;
         }
         parts(&self.names.decl(n).to_ascii_lowercase(), n1, n2, params)
@@ -45,8 +45,8 @@ impl W<'_, '_> {
                 'L' => ('l', "inductor"),
                 _ => ('c', "capacitor"),
             };
-            let (name, a, b, v) = match self.d {
-                Dialect::Vacask => (q(&p.name), q(&p.a), q(&p.b), self.expr(&p.value)),
+            let (name, a, b, v) = match self.b.writer {
+                Writer::Vacask => (q(&p.name), q(&p.a), q(&p.b), self.expr(&p.value)),
                 _ => (
                     self.node(&p.name),
                     self.node(&p.a),

@@ -12,7 +12,6 @@
 
 use super::W;
 use super::params::spelled_flag;
-use crate::syntax::Dialect;
 use crate::syntax::ast::NONE;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
@@ -25,7 +24,7 @@ impl W<'_, '_> {
         // Text kept from another dialect reaches only its own, which
         // copies it unchecked.
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
-        let foreign = |tok: &u32| self.rd.text_dialect(*tok) != self.d;
+        let foreign = |tok: &u32| self.rd.text_lang(*tok) != self.lang;
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
         // A statement whose target lacks it is that statement's refusal,
         // the rest foreign text's (one note each kind).
@@ -61,7 +60,7 @@ impl W<'_, '_> {
         if let Some(tok) = blocks.iter().find_map(|b| self.first_flag(b)) {
             self.refuse(Code::W0101, tok);
         }
-        if caret_means_power(self.rd.d) != caret_means_power(self.d)
+        if self.rd.b.caret_power != self.b.caret_power
             && let Some((_, tok)) = self
                 .expressions(&blocks)
                 .into_iter()
@@ -168,7 +167,7 @@ impl<'r> W<'_, 'r> {
                 Card::Charge { params, .. } => ('C', params),
                 _ => continue,
             };
-            let flag = |k: &str| !spelled_flag(self.rd.d, self.d, letter, k);
+            let flag = |k: &str| !spelled_flag(self.rd.b, self.b, letter, k);
             if params.iter().any(|(k, v)| v.is_empty() && flag(k)) {
                 return Some(self.rd.main(n));
             }
@@ -258,10 +257,4 @@ fn card_exprs(c: Card, tok: u32, out: &mut Vec<(String, u32)>) {
         | Card::Line { .. }
         | Card::Inst { .. } => {}
     }
-}
-
-/// `^` means power in ngspice, HSPICE, ESPice and Spectre, but XOR in
-/// LTspice, Xyce and VACASK.
-fn caret_means_power(d: Dialect) -> bool {
-    !matches!(d, Dialect::Ltspice | Dialect::Xyce | Dialect::Vacask)
 }

@@ -21,9 +21,8 @@
 //!
 //! Contents:
 //! - `pub enum Construct`, `pub enum Action`, `pub enum Alt`, `pub enum Rule`
-//! - `pub const fn action(target: Dialect, c: Construct) -> Action`, `pub fn ngspice_device(kind: &str) -> bool`
+//! - `pub fn ngspice_device(kind: &str) -> bool`
 
-use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 
 /// A construct whose spelling, or whose existence, differs by target.
@@ -270,330 +269,9 @@ const NGSPICE_DEVICES: [&str; 57] = [
     "NUMOS",
 ];
 
-/// What `target` does with `c`.
-pub const fn action(target: Dialect, c: Construct) -> Action {
-    use Action::{Lift, Native, Refuse, Spell};
-    use Dialect as D;
-    match c {
-        Construct::ForeignText => match target {
-            // An LVS netlist leaves out what it cannot check: no reader
-            // reads CDL, so every kept text is another family's.
-            D::Cdl => Spell(Alt::Omit(Code::W0028)),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0001),
-            D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0001),
-        },
-        Construct::PrivateText => match target {
-            // As `ForeignText`: the xschem layout copies it.
-            D::Cdl => Spell(Alt::Copy(Code::W0027)),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0039),
-            D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0039),
-        },
-        // VACASK docs cmd-errorhandling.md, cmd-print.md,
-        // cmd-postprocess.md, input-embed.md: the run's own steps, no
-        // number of the circuit.
-        Construct::VacaskScript => match target {
-            D::Vacask => Native,
-            // As `ForeignText`: the xschem layout copies it.
-            D::Cdl => Spell(Alt::Copy(Code::W0027)),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => {
-                Spell(Alt::Omit(Code::W0120))
-            }
-            D::Spectre | D::Verilog => Spell(Alt::Omit(Code::W0120)),
-        },
-        // ngspice's `.sens` is one output's sensitivity to every parameter
-        // at the operating point or over an AC sweep (manual, `.SENS`);
-        // HSPICE's `.SENS` the DC operating point's; neither has it over a
-        // transient or a DC sweep, nor of an expression; LTspice and
-        // VACASK have no sensitivity analysis.
-        Construct::XyceSens => match target {
-            D::Xyce => Native,
-            D::Cdl => Spell(Alt::Copy(Code::W0027)),
-            D::Ngspice | D::Espice | D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
-            // Spectre's `sens` covers dc and ac (Reference 19.1 p.524), so
-            // Xyce's `.sens` over a `.tran` (118 corpus decks) has none
-            // (class G); over an op or a `.dc`, no clause read here maps
-            // Xyce's objective expression onto `sens`'s output list.
-            D::Spectre => Refuse(Code::W0015),
-            D::Verilog => Refuse(Code::W0001),
-        },
-        // ngspice manual ch.11, Xyce RG, LTspice help, VACASK: no
-        // shooting-Newton noise or transfer, transient noise analysis or
-        // loop-stability analysis. Spectre's pss/pnoise/pxf, `tran`
-        // noise and `stb` are the same analyses, but no HSPICE or Spectre
-        // clause read here maps their parameters: refused until one is.
-        Construct::HspiceAnalysis => match target {
-            D::Hspice => Native,
-            D::Cdl => Spell(Alt::Copy(Code::W0027)),
-            D::Ngspice | D::Espice | D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
-            D::Spectre => Refuse(Code::W0015),
-            D::Verilog => Refuse(Code::W0001),
-        },
-        Construct::CaretReread => Refuse(Code::W0002),
-        Construct::NgBehavior => match target {
-            D::Ngspice => Spell(Alt::NgBehaviorLine),
-            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Spell(Alt::Omit(Code::W0030)),
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Spell(Alt::Omit(Code::W0030)),
-        },
-        Construct::StatisticalCall => match target {
-            D::Ltspice => Refuse(Code::W0003),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Native,
-            D::Spectre => Lift(Rule::RackVars),
-            D::Vacask => Lift(Rule::VacaskCalls),
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::VerilogALoad => match target {
-            D::Ngspice => Spell(Alt::PreOsdi),
-            D::Espice | D::Hspice => Spell(Alt::Hdl),
-            // LTspice has no Verilog-A or OSDI loader (LTspice help).
-            D::Xyce | D::Ltspice => Refuse(Code::W0004),
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
-        },
-        Construct::OsdiLoad => match target {
-            D::Ngspice => Spell(Alt::PreOsdi),
-            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0004),
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
-        },
-        // ngspice manual §13 (`N` instances of an OSDI model); Spectre
-        // and VACASK instantiate a model of a module as any other; HSPICE
-        // and ESPice compile Verilog-A source (`.hdl`), Xyce loads plugins
-        // on its command line, LTspice loads none: no deck line names a
-        // compiled module there. CDL's layout copies the ngspice card.
-        Construct::OsdiInstance => match target {
-            D::Ngspice | D::Spectre | D::Vacask | D::Cdl => Native,
-            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0004),
-            D::Verilog => Spell(Alt::Omit(Code::W0029)),
-        },
-        Construct::LibWholeFile => match target {
-            D::Ltspice => Native,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Spell(Alt::Include),
-            // `include "file"` reads the whole file (Spectre Reference 5.0
-            // p.875; VACASK `lib/dfllexer.l`, `INCEND`).
-            D::Spectre | D::Vacask => Native,
-            D::Cdl | D::Verilog => Refuse(Code::W0005),
-        },
-        Construct::LibSection => match target {
-            D::Ltspice => Refuse(Code::W0012),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Native,
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
-        },
-        Construct::RclModel => match target {
-            D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0006),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Native,
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::ChargeCapacitor => match target {
-            D::Ngspice | D::Espice | D::Hspice => Spell(Alt::ChargeQuoted),
-            D::Xyce => Spell(Alt::ChargeBraced),
-            D::Ltspice => Spell(Alt::ChargeBare),
-            D::Spectre => Spell(Alt::BsourceCharge),
-            // VACASK has no charge-based element.
-            D::Vacask => Refuse(Code::W0105),
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::BehaviouralSource => match target {
-            D::Hspice => Spell(Alt::VolCur),
-            D::Xyce => Spell(Alt::BracedBehaviour),
-            D::Ngspice | D::Espice | D::Ltspice => Native,
-            // `bsource v=`/`i=` (Spectre Reference 5.0 pp.856-860); an
-            // expression it cannot spell is refused by the writer.
-            D::Spectre => Spell(Alt::Bsource),
-            // VACASK's devices are its builtins (`lib/devbuiltins.cpp`:
-            // sources, controlled sources, `mutual`) and OSDI models.
-            D::Vacask => Refuse(Code::W0102),
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::Laplace => match target {
-            // CDL writes an element as its ngspice card.
-            D::Ngspice | D::Cdl => Lift(Rule::LaplaceXfer),
-            D::Espice | D::Hspice => Lift(Rule::LaplaceTable),
-            D::Ltspice => Lift(Rule::LaplaceAttr),
-            D::Xyce => Refuse(Code::W0011),
-            D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0011),
-        },
-        Construct::RfPort => match target {
-            D::Ngspice | D::Espice => Native,
-            // Xyce RG, port device `P n+ n- port=n z0=z`.
-            D::Xyce => Spell(Alt::XycePort),
-            D::Hspice | D::Ltspice => Refuse(Code::W0007),
-            // Spectre's `port` (Spectre Reference 5.0 p.602), `dc`/`mag`
-            // half ngspice's; a wave or an expression is refused by the
-            // writer. VACASK's builtins have no port (`lib/devbuiltins.cpp`).
-            D::Spectre => Native,
-            D::Vacask => Refuse(Code::W0007),
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::PwlRepeatV => match target {
-            D::Ngspice | D::Espice | D::Cdl => Native,
-            D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0008),
-            D::Spectre => Spell(Alt::PwlPeriod),
-            D::Vacask | D::Verilog => Refuse(Code::W0008),
-        },
-        Construct::PwlRepeatI => match target {
-            D::Espice => Native,
-            D::Ngspice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0008),
-            D::Spectre => Spell(Alt::PwlPeriod),
-            D::Vacask | D::Cdl | D::Verilog => Refuse(Code::W0008),
-        },
-        Construct::NoiseWave => match target {
-            D::Ngspice | D::Cdl => Native,
-            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0009),
-            D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0009),
-        },
-        Construct::Conditional => match target {
-            D::Xyce | D::Ltspice => Refuse(Code::W0013),
-            D::Ngspice | D::Espice | D::Hspice => Native,
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
-        },
-        Construct::BranchParam => match target {
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0014),
-            // A VACASK `@if` holds instances and models only.
-            D::Vacask => Refuse(Code::W0014),
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::Func => match target {
-            D::Hspice => Spell(Alt::FuncParam),
-            D::Ngspice | D::Espice | D::Xyce | D::Ltspice => Native,
-            D::Vacask => Refuse(Code::W0106),
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        // ngspice-45 and Xyce 7.10 run a `.func` reading its subcircuit's
-        // parameter inside the subcircuit (run: 2 V and 3 V from two
-        // subcircuits' `f`); HSPICE's function `.param` is local to its
-        // subcircuit like any `.param` (HSPICE `.PARAM`); Spectre defines
-        // functions "at the top level only" (Reference p.871); VACASK has
-        // none; LTspice's help states no scope for `.func`.
-        Construct::LocalFunc => match target {
-            D::Ngspice | D::Espice | D::Xyce | D::Hspice => Native,
-            D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0106),
-            D::Cdl | D::Verilog => Native,
-        },
-        // Xyce's own form; ngspice's `pwl()` in a value (its `TABLE`
-        // smooths each corner: ngspice-45 and ESPice 0.3.0 give 1.05 at
-        // the first point of `(0,1) (1,3)`, Xyce 1); ESPice's B has no
-        // `pwl()` (0.3.0: "WrongArity"); HSPICE's `PWL(1)` reads a node
-        // pair, not an expression; LTspice, Spectre and VACASK not written.
-        Construct::TableSource => match target {
-            D::Xyce => Native,
-            D::Ngspice => Spell(Alt::PwlValue),
-            D::Espice | D::Hspice | D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0102),
-            D::Cdl | D::Verilog => Native,
-        },
-        // ngspice manual §6.3 and LTspice help `O` (LTRA); Xyce RG; ESPice
-        // 0.3.0 runs it (checked); HSPICE's lossy line is its W element
-        // (no `O`). VACASK 36be560 ships no transmission line at all
-        // (`devices/`, `devices/spice/`): class G. Spectre's `tline` has a
-        // lossy form, but no clause read here maps LTRA's R, L, G, C, LEN
-        // onto it: refused until one is (no manual in this tree).
-        Construct::LossyLine => match target {
-            D::Ngspice | D::Espice | D::Xyce | D::Ltspice => Native,
-            D::Hspice | D::Spectre | D::Vacask => Refuse(Code::W0105),
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::Step => match target {
-            D::Xyce | D::Ltspice => Native,
-            D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
-        },
-        Construct::StepList => match target {
-            D::Xyce | D::Ltspice => Native,
-            D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
-            // Spectre `sweep param=p values=[…]` (Reference 19.1
-            // pp.406-409); VACASK `sweep … values=[…]` (`lib/answeep.cpp`
-            // `setupValueSweep`).
-            D::Spectre | D::Vacask => Native,
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::TranStartup => match target {
-            D::Ltspice => Native,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0037),
-            D::Spectre | D::Vacask => Refuse(Code::W0037),
-            // Neither writes an analysis.
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::DcLogList => match target {
-            D::Xyce | D::Ltspice => Native,
-            D::Hspice => Spell(Alt::DcType),
-            D::Ngspice | D::Espice => Refuse(Code::W0038),
-            // Each axis as its values (`DcSweep::values`): Spectre `dc` and
-            // `sweep` `values=[…]` (Reference 19.1 pp.406-409), VACASK
-            // `sweep … values=[…]` (`lib/answeep.cpp` `setupValueSweep`).
-            D::Spectre | D::Vacask => Native,
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::Tf => match target {
-            D::Xyce => Refuse(Code::W0015),
-            D::Ngspice | D::Espice | D::Hspice | D::Ltspice => Native,
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
-        },
-        Construct::Sens => match target {
-            D::Ngspice | D::Espice | D::Hspice => Native,
-            D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::SensAc => match target {
-            D::Ngspice | D::Espice => Native,
-            D::Hspice | D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::SParameter => match target {
-            D::Ngspice | D::Espice => Native,
-            // Xyce RG `.LIN` over the deck's `.AC` sweep.
-            D::Xyce => Spell(Alt::XyceLin),
-            D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::PoleZero => match target {
-            D::Ngspice | D::Espice => Native,
-            D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0015),
-            // Spectre's `pz` takes its input as a source (`iprobe`,
-            // Spectre Reference 5.0 p.790), not SPICE's node pair: written
-            // where a source of the transfer's kind stands across the
-            // pair, refused by the writer otherwise.
-            D::Spectre => Native,
-            D::Vacask => Refuse(Code::W0015),
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::Print => match target {
-            // An LTspice run saves every vector and has no stdout print.
-            D::Ltspice => Spell(Alt::Omit(Code::W0023)),
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Native,
-            // Spectre: a `save` of the same signals (Spectre Reference 5.0
-            // p.886). VACASK saves every node and source flow. An output
-            // with no signal form is noted W0023 by the writer.
-            D::Spectre | D::Vacask => Native,
-            D::Cdl | D::Verilog => Native,
-        },
-        Construct::Save => match target {
-            D::Hspice => Spell(Alt::Probe),
-            // VACASK saves every node and source flow unless `strictsave`.
-            D::Xyce | D::Vacask => Spell(Alt::Omit(Code::W0023)),
-            D::Ngspice | D::Espice | D::Ltspice => Native,
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::UnmappedOption => match target {
-            D::Xyce | D::Vacask => Refuse(Code::W0017),
-            D::Ngspice | D::Espice | D::Hspice | D::Ltspice => Native,
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::Statistics => match target {
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => {
-                Lift(Rule::StatisticsDraws)
-            }
-            // One layer: a VACASK `parameters` call is one value.
-            D::Vacask => Lift(Rule::StatisticsDraws),
-            D::Spectre | D::Cdl | D::Verilog => Native,
-        },
-        Construct::Measure => match target {
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Native,
-            D::Spectre => Spell(Alt::SpiceRegion),
-            D::Vacask => Refuse(Code::W0109),
-            D::Cdl | D::Verilog => Native,
-        },
-    }
-}
-
 /// Whether `kind` names one of ngspice-45's built-in devices (a model type
-/// ngspice reads as the built-in before any OSDI module it loaded).
+/// ngspice reads as the built-in before any OSDI module it loaded): asked
+/// by a target whose loads are `LoadForm::Ngspice`.
 pub fn ngspice_device(kind: &str) -> bool {
     NGSPICE_DEVICES.iter().any(|d| d.eq_ignore_ascii_case(kind))
 }
@@ -601,6 +279,7 @@ pub fn ngspice_device(kind: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::syntax::{Dialect, Lang};
 
     #[test]
     fn refusals_are_w_refusal_codes_and_omissions_w_notes() {
@@ -610,7 +289,7 @@ mod tests {
         use crate::syntax::diag::{Kind, info};
         for d in Dialect::ALL {
             for c in CONSTRUCTS {
-                let (code, kind) = match action(d, c) {
+                let (code, kind) = match Lang::from(d).action(c) {
                     Action::Refuse(code) => (code, Kind::Refusal),
                     Action::Spell(Alt::Omit(code) | Alt::Copy(code)) => (code, Kind::Note),
                     Action::Native | Action::Spell(_) | Action::Lift(_) => continue,
@@ -624,16 +303,22 @@ mod tests {
     #[test]
     fn the_spice_family_differs_only_where_its_manuals_do() {
         use Dialect as D;
-        assert_eq!(action(D::Ngspice, Construct::Conditional), Action::Native);
         assert_eq!(
-            action(D::Xyce, Construct::Conditional),
+            Lang::from(D::Ngspice).action(Construct::Conditional),
+            Action::Native
+        );
+        assert_eq!(
+            Lang::from(D::Xyce).action(Construct::Conditional),
             Action::Refuse(Code::W0013)
         );
         assert_eq!(
-            action(D::Xyce, Construct::ChargeCapacitor),
+            Lang::from(D::Xyce).action(Construct::ChargeCapacitor),
             Action::Spell(Alt::ChargeBraced)
         );
-        assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
+        assert_eq!(
+            Lang::from(D::Ltspice).action(Construct::LibWholeFile),
+            Action::Native
+        );
     }
 
     const CONSTRUCTS: [Construct; 41] = [

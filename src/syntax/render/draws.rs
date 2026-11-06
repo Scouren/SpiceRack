@@ -196,7 +196,7 @@ impl Draws {
 }
 
 fn diag(code: Code, token: u32) -> Diag {
-    Diag { code, token }
+    Diag::new(code, token, 0)
 }
 
 fn new(name: String, value: String) -> P {

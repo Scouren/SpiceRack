@@ -16,8 +16,8 @@
 //! - `Rd::card_view(&self, n: u32) -> Card`, `Rd::letter(&self, n: u32) -> char`
 
 use super::{Block, Comp, Rd, Val, Wave};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::device::Primitive as Element;
 
 /// An element card as the writer spells it: what the old reader kept of
@@ -257,7 +257,7 @@ impl<'a> Rd<'a> {
                 let (k, ls) = items.split_last()?;
                 // ngspice's `K` couples two inductors (manual, coupled
                 // inductors); Xyce's and LTspice's any number.
-                let many = matches!(self.d, Dialect::Xyce | Dialect::Ltspice);
+                let many = matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice);
                 if ls.len() < 2 || (ls.len() > 2 && !many) {
                     return None;
                 }
@@ -346,7 +346,9 @@ impl<'a> Rd<'a> {
             }
             // Xyce's and LTspice's `O` (four nodes, an LTRA model) is
             // ngspice's (manual §6.3, Xyce RG lossy transmission line).
-            Element::LossyLine if matches!(self.d, Dialect::Xyce | Dialect::Ltspice) => {
+            Element::LossyLine
+                if matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice) =>
+            {
                 self.semiconductor(n, e, name)?
             }
             Element::VoltageSwitch | Element::CurrentSwitch => {
@@ -433,7 +435,7 @@ impl<'a> Rd<'a> {
     fn modified(&self, expr: String, mods: &[u32]) -> Option<String> {
         let mut e = expr;
         for &m in mods {
-            if self.d != Dialect::Hspice || self.tag(m) != Tag::Assign {
+            if self.b.card_rules != CardRules::Hspice || self.tag(m) != Tag::Assign {
                 return None;
             }
             let v = self.body_text(self.ast.rhs(Node(m)));
@@ -485,7 +487,7 @@ impl<'a> Rd<'a> {
         let mut swapped = None;
         let (val, inst) = match (val, inst.split_first()) {
             (Some(m), Some((&v, tail)))
-                if self.d == Dialect::Xyce
+                if self.b.card_rules == CardRules::Xyce
                     && self.tag(v) != Tag::Assign
                     && self.number(v).is_some()
                     && self.same_rcl_model(m)

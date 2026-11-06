@@ -22,7 +22,7 @@
 //! groups).
 //!
 //! Contents:
-//! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> Result<String, Vec<Diag>>`
+//! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)`
 
 mod analyses;
 mod bench;
@@ -34,21 +34,24 @@ mod params;
 mod parasitics;
 mod sites;
 mod sources;
+mod statistics;
 mod vacask;
 mod vacask_bench;
 mod vacask_cards;
 mod vacask_models;
 
-use super::capability::{Action, Alt, Construct, Rule, action};
+use super::capability::{Action, Alt, Construct, Rule};
 use super::draws::{self, Draws, Layers};
 use super::names::Names;
 use super::out::{Out, Space};
 use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
-use super::spelling::{Spelling, spelling};
-use crate::syntax::Dialect;
+use super::spelling::Spelling;
+use crate::syntax::Lang;
 use crate::syntax::ast::NONE;
+use crate::syntax::behaviour::{Behaviours, NamedRules, Writer};
 use crate::syntax::diag::{Code, Diag};
+use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
 use crate::syntax::resolve::Role;
 use lift::Lifted;
 
@@ -57,8 +60,14 @@ struct W<'a, 'r> {
     rd: &'r Rd<'a>,
     deck: &'r Deck,
     sp: &'static Spelling,
+    /// What the target does with each construct.
+    cells: &'static Cells,
+    /// Per construct: the definition's own code a cell raises.
+    details: &'static [u16; CONSTRUCT_COUNT],
+    /// The target's behaviours.
+    b: &'static Behaviours,
     /// The target.
-    d: Dialect,
+    lang: Lang,
     /// The deck was read in the target's dialect: its names keep their
     /// case (`[KUN]` B.2: Spectre is case-sensitive, SPICE is not).
     keep_case: bool,
@@ -79,9 +88,9 @@ struct W<'a, 'r> {
 ///
 /// # Panics
 /// For a target outside the named family (Spectre, VACASK).
-pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<Diag>) {
+pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
     let mut refused = Vec::new();
-    let lifted = match action(target, Construct::StatisticalCall) {
+    let lifted = match lang.action(Construct::StatisticalCall) {
         Action::Lift(Rule::RackVars) => lift::lift(rd, deck, &mut refused),
         Action::Lift(Rule::VacaskCalls) => {
             lift::vacask_calls(rd, deck, &mut refused);
@@ -89,7 +98,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         }
         _ => Lifted::default(),
     };
-    let draws = match action(target, Construct::Statistics) {
+    let draws = match lang.action(Construct::Statistics) {
         Action::Lift(Rule::StatisticsDraws) => {
             draws::lift(rd, deck, Layers::One).unwrap_or_else(|d| {
                 refused.push(d);
@@ -101,9 +110,12 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
     let mut w = W {
         rd,
         deck,
-        sp: spelling(target),
-        d: target,
-        keep_case: rd.d == target,
+        sp: lang.spelling(),
+        cells: lang.cells(),
+        details: &lang.row().details,
+        b: lang.behaviours(),
+        lang,
+        keep_case: rd.d == lang,
         lifted,
         draws,
         names: Names::new(rd, deck, |_, _| None),
@@ -111,10 +123,10 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         diags: refused,
     };
     w.checks();
-    match target {
-        Dialect::Spectre => w.spectre(),
-        Dialect::Vacask => w.vacask(),
-        _ => panic!("write: a named target"),
+    match w.b.writer {
+        Writer::Spectre => w.spectre(),
+        Writer::Vacask => w.vacask(),
+        Writer::Cards | Writer::Cdl | Writer::Verilog => panic!("write: a named target"),
     }
     (w.o.finish(), w.diags)
 }
@@ -125,11 +137,10 @@ impl W<'_, '_> {
     /// `c`'s action for the target; a refusal, or the note of a drop or a
     /// copy, is recorded at `token`.
     fn ask(&mut self, c: Construct, token: u32) -> Action {
-        let a = action(self.d, c);
-        match a {
-            Action::Refuse(code) => self.refuse(code, token),
-            Action::Spell(Alt::Omit(code) | Alt::Copy(code)) => self.note(code, token),
-            Action::Native | Action::Spell(_) | Action::Lift(_) => {}
+        let a = self.cells[c as usize];
+        if let Action::Refuse(code) | Action::Spell(Alt::Omit(code) | Alt::Copy(code)) = a {
+            self.diags
+                .push(Diag::new(code, token, self.details[c as usize]));
         }
         a
     }
@@ -154,13 +165,13 @@ impl W<'_, '_> {
     }
 
     fn refuse(&mut self, code: Code, token: u32) {
-        self.diags.push(Diag { code, token });
+        self.diags.push(Diag::new(code, token, 0));
     }
 
     /// A note at `token`: something kept or left out, the deck still
     /// written.
     fn note(&mut self, code: Code, token: u32) {
-        self.diags.push(Diag { code, token });
+        self.diags.push(Diag::new(code, token, 0));
     }
 
     fn line(&mut self, text: &str) {
@@ -314,68 +325,6 @@ impl W<'_, '_> {
         s
     }
 
-    /// `statistics { … }`: block `b`'s, then the lift's for the top or
-    /// section `at` (`[REF]` pp.175-179), one statement a line.
-    fn statistics(&mut self, b: &Block, at: Option<usize>) {
-        for &st in &b.statistics {
-            let s = self.rd.statistics(st);
-            self.stat_block(&s);
-        }
-        if let Some(s) = self.lifted.block_at(at) {
-            self.stat_block(&s);
-        }
-    }
-
-    fn stat_block(&mut self, st: &super::read::Stats) {
-        self.line("statistics {");
-        self.o.indent();
-        self.o.indent();
-        let scopes = [
-            ("process", &st.process, &st.truncate[1]),
-            ("mismatch", &st.mismatch, &st.truncate[2]),
-        ];
-        for (name, varies, t) in scopes {
-            if varies.is_empty() && t.is_none() {
-                continue;
-            }
-            self.line(&format!("{name} {{"));
-            self.o.indent();
-            self.o.indent();
-            for x in varies {
-                let key = if x.dist == "unif" { "N" } else { "std" };
-                let pct = if x.percent { " percent=yes" } else { "" };
-                let spread = self.value_text(&x.spread);
-                self.line(&format!(
-                    "vary {} dist={} {key}={spread}{pct}",
-                    x.param, x.dist
-                ));
-            }
-            if let Some(t) = t {
-                self.line(&format!("truncate tr={}", self.value_text(t)));
-            }
-            self.o.dedent();
-            self.o.dedent();
-            self.line("}");
-        }
-        for (params, devices, cc) in &st.correlations {
-            let mut s = String::from("correlate");
-            if !devices.is_empty() {
-                s.push_str(&format!(" dev=[{}]", devices.join(" ")));
-            }
-            if !params.is_empty() {
-                s.push_str(&format!(" param=[{}]", params.join(" ")));
-            }
-            s.push_str(&format!(" cc={}", self.value_text(cc)));
-            self.line(&s);
-        }
-        if let Some(t) = &st.truncate[0] {
-            self.line(&format!("truncate tr={}", self.value_text(t)));
-        }
-        self.o.dedent();
-        self.o.dedent();
-        self.line("}");
-    }
-
     /// `subckt name (ports)` … `ends name` (`[REF]` pp.533-535), an empty
     /// body one blank line.
     fn subckt(&mut self, sc: &Block) {
@@ -393,7 +342,7 @@ impl W<'_, '_> {
         // dialect's file read there has no clause here saying Spectre
         // scopes it (ngspice §2.7 does), so it is refused, not dropped.
         let first = sc.includes.first().or(sc.libs.first());
-        match (self.rd.d == Dialect::Spectre, first) {
+        match (self.rd.b.named_rules == NamedRules::Spectre, first) {
             (true, _) => self.file_cards(sc),
             (false, Some(&n)) => self.refuse(Code::W0128, self.rd.main(n)),
             (false, None) => {}
@@ -476,7 +425,11 @@ impl W<'_, '_> {
     fn kept(&mut self, raw: &[Raw]) {
         for &r in raw {
             let (Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) = r;
-            if self.d != Dialect::Vacask && self.rd.vacask_script(self.rd.main(n)) {
+            let omit = matches!(
+                self.cells[Construct::VacaskScript as usize],
+                Action::Spell(Alt::Omit(_))
+            );
+            if omit && self.rd.vacask_script(self.rd.main(n)) {
                 continue;
             }
             match r {

@@ -68,10 +68,10 @@ pub enum Tag {
     /// `.end`. No fields.
     End,
     /// A statement the parser cannot read, kept as its tokens, always with a
-    /// diagnostic. `lhs`: its last token; `rhs`: the [`Dialect`] index
-    /// (`Dialect::ALL`) of the lexicon that read it.
+    /// diagnostic. `lhs`: its last token; `rhs`: the [`Lang`] index of
+    /// the lexicon that read it.
     ///
-    /// [`Dialect`]: crate::syntax::Dialect
+    /// [`Lang`]: crate::syntax::Lang
     Verbatim,
     /// `.include`, `include`. Fields: the path.
     Include,
@@ -97,7 +97,7 @@ pub enum Tag {
     Control,
     /// Spectre `simulator lang=spice` … `simulator lang=spectre`, and in a
     /// SPICE file a `simulator lang=<dialect>` … `simulator lang=spice`
-    /// region (`lexicon::NGSPICE_GIVEN`): the region's statements, read by
+    /// region (`Lang::NGSPICE_GIVEN`): the region's statements, read by
     /// its lexicon. Fields: the head's; body.
     Region,
     /// Lines kept whole: `.data` … `.enddata`, `.variation` …
@@ -517,7 +517,7 @@ impl<'s> Ast<'s> {
 
     /// Appends a diagnostic anchored at `token`.
     pub fn diag(&mut self, code: Code, token: u32) {
-        self.diags.push(Diag { code, token });
+        self.diags.push(Diag::new(code, token, 0));
     }
 }
 

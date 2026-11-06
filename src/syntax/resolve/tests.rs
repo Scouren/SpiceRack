@@ -6,6 +6,8 @@
 //!
 //! Contents: none (tests only).
 
+use crate::syntax::Lang;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -34,7 +36,7 @@ fn kit(files: &[(&str, &str)], entry: &str, form: Form, d: Dialect) -> Kit {
 
 /// File `f`'s tree, rebuilt from its text.
 fn tree(k: &Kit, f: u32) -> (Vec<u32>, Vec<(String, Node)>) {
-    let lex = lexicon::of(k.dialect()).expect("a reader");
+    let lex = Lang::from(k.dialect()).lexicon().expect("a reader");
     let text = &k.file(FileId(f)).text;
     let t = tokenize(text, lex);
     let a = parse(&t, lex);
@@ -123,7 +125,10 @@ fn an_unknown_master_keeps_its_name_with_r0001() {
     assert_eq!(bound(&k, 0, "x1"), Binding::Unknown);
     assert_eq!(codes(&k, 0), [Code::R0001]);
     let d = k.file(FileId(0)).diags[0];
-    let t = tokenize(&k.file(FileId(0)).text, &lexicon::SPECTRE);
+    let t = tokenize(
+        &k.file(FileId(0)).text,
+        Lang::SPECTRE.lexicon().expect("a reader"),
+    );
     assert_eq!(t.text(d.token), "othercell");
 }
 

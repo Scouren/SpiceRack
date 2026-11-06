@@ -19,33 +19,18 @@
 //! - `pub enum Join`, `pub enum Dollar`, `pub enum Backslash`, `pub struct End`, `pub enum Quote`,
 //!   `pub struct Quoting`, `pub enum Caret`, `pub struct Ops`, `Ops::TERNARY: u8`
 //! - `pub struct Numbers`, `pub enum Scale`, `pub enum Tail`, `pub enum Arithmetic`
-//! - `pub const NGSPICE`, `NGSPICE_GIVEN`, `HSPICE`, `LTSPICE`, `XYCE`, `SPECTRE`, `VACASK: Lexicon`
-//! - `pub fn of(d: Dialect) -> Option<&'static Lexicon>`
+//! - `pub(crate) const SPICE_KEYWORDS`, `pub(crate) const SPICE_OPERATORS: &[(&str, Tag)]`
 
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device::{self, Device};
 use crate::syntax::statement::{Analysis, Statement};
 use crate::syntax::token::Tag;
 
-mod hspice;
-mod ltspice;
-mod ngspice;
-mod spectre;
-mod vacask;
-mod xyce;
-
-pub use hspice::HSPICE;
-pub use ltspice::LTSPICE;
-pub use ngspice::{NGSPICE, NGSPICE_GIVEN};
-pub use spectre::SPECTRE;
-pub use vacask::VACASK;
-pub use xyce::XYCE;
-
 /// One dialect's lexical rules. Line structure first, then words, then the
 /// tables the parser reads.
 pub struct Lexicon {
-    /// The dialect whose text this reads (ESPice reads [`NGSPICE`]).
-    pub dialect: Dialect,
+    /// The language whose text this reads (ESPice reads `Lang::NGSPICE`'s).
+    pub lang: Lang,
     /// Line 1 of a top-level file is the title, whatever it holds.
     pub title: bool,
     /// Words compare case-blind: keywords and suffixes match lowercased.
@@ -141,8 +126,11 @@ pub struct Lexicon {
     /// its lexicon until the statement that switches back (`simulator
     /// lang=spectre` in a Spectre file, `simulator lang=spice` in a SPICE
     /// one): Spectre's `spice` (the old Spectre grammar's hook), and in
-    /// [`NGSPICE_GIVEN`] each target dialect's own.
+    /// `Lang::NGSPICE_GIVEN` each target dialect's own.
     pub regions: &'static [(&'static str, &'static Lexicon)],
+    /// `simulator lang=<name>` with no row in `regions` opens a region of
+    /// the registered plugin language `name` (ngspice-given's).
+    pub regions_registered: bool,
 }
 
 /// Which open brackets carry a statement past its line's end.
@@ -306,7 +294,7 @@ pub enum Arithmetic {
 /// The dot cards every SPICE dialect shares, with their aliases: the
 /// spellings the old SPICE grammar reads (`.macro`/`.eom` are HSPICE's
 /// `.subckt`/`.ends`, `.dcvolt` its `.ic`).
-const SPICE_KEYWORDS: &[(&str, Tag)] = &[
+pub(crate) const SPICE_KEYWORDS: &[(&str, Tag)] = &[
     (".param", Tag::KwParam),
     (".parameter", Tag::KwParam),
     (".parameters", Tag::KwParam),
@@ -357,7 +345,7 @@ const SPICE_KEYWORDS: &[(&str, Tag)] = &[
 ];
 
 /// The SPICE comparison and logic operators.
-const SPICE_OPERATORS: &[(&str, Tag)] = &[
+pub(crate) const SPICE_OPERATORS: &[(&str, Tag)] = &[
     ("**", Tag::StarStar),
     ("==", Tag::EqualEqual),
     ("!=", Tag::BangEqual),
@@ -411,16 +399,15 @@ impl Lexicon {
     }
 }
 
-/// The lexicon dialect `d`'s text is read with; `None` for the dialects
-/// with no reader (CDL, Verilog).
-pub fn of(d: Dialect) -> Option<&'static Lexicon> {
-    match d {
-        Dialect::Ngspice | Dialect::Espice => Some(&NGSPICE),
-        Dialect::Hspice => Some(&HSPICE),
-        Dialect::Ltspice => Some(&LTSPICE),
-        Dialect::Xyce => Some(&XYCE),
-        Dialect::Spectre => Some(&SPECTRE),
-        Dialect::Vacask => Some(&VACASK),
-        Dialect::Cdl | Dialect::Verilog => None,
-    }
-}
+#[cfg(test)]
+mod hspice;
+#[cfg(test)]
+mod ltspice;
+#[cfg(test)]
+mod ngspice;
+#[cfg(test)]
+mod spectre;
+#[cfg(test)]
+mod vacask;
+#[cfg(test)]
+mod xyce;

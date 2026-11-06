@@ -10,14 +10,14 @@
 //! - `Rd::named_waveform(&self, p: &[(String, u32)]) -> Option<Option<Wave>>`
 
 use super::{Num, Rd, Wave, WaveKind};
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::NamedRules;
 
 impl<'a> Rd<'a> {
     /// the old lowering's `named_waveform`.
     pub(super) fn named_waveform(&self, p: &[(String, u32)]) -> Option<Option<Wave>> {
         // A sine's damping key (VACASK `theta`).
-        let damp = match self.d {
-            Dialect::Vacask => "theta",
+        let damp = match self.b.named_rules {
+            NamedRules::Vacask => "theta",
             _ => "damp",
         };
         let f = |k: &str| {
@@ -29,7 +29,7 @@ impl<'a> Rd<'a> {
             .map(|t| self.text(t).trim_matches('"').to_string());
         let fm = ty.as_deref() == Some("fm")
             || (ty.as_deref() == Some("sine") && self.get(p, "fmmodindex").is_some());
-        let spectre_exp = self.d == Dialect::Spectre && ty.as_deref() == Some("exp");
+        let spectre_exp = self.b.named_rules == NamedRules::Spectre && ty.as_deref() == Some("exp");
         if (fm || spectre_exp)
             && self
                 .get(p, "delay")
@@ -84,7 +84,7 @@ impl<'a> Rd<'a> {
                 delay: None,
                 cut: false,
             },
-            Some("exp") if self.d == Dialect::Vacask => {
+            Some("exp") if self.b.named_rules == NamedRules::Vacask => {
                 let n = |k: &str| self.get(p, k).map_or(Some(0.0), |v| self.number(v));
                 Wave {
                     kind: WaveKind::Exp,
@@ -141,7 +141,7 @@ impl<'a> Rd<'a> {
                 delay: None,
                 cut: false,
             },
-            Some("pwl") if self.d == Dialect::Spectre => {
+            Some("pwl") if self.b.named_rules == NamedRules::Spectre => {
                 let w = self.get(p, "wave")?;
                 let xs: Vec<Num> = self
                     .velems(w)

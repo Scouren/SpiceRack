@@ -220,7 +220,7 @@ impl PyTestbench {
         let ac = card::ac(variation, points, start_freq, stop_freq)?;
         let tb = slf.as_super().tb();
         tb.analyses.push(ac);
-        tb.extra_lines.push((card::network_params(output_current, input_source, z_in, z_out), crate::syntax::Dialect::Ltspice));
+        tb.extra_lines.push((card::network_params(output_current, input_source, z_in, z_out), crate::syntax::Dialect::Ltspice.into()));
         Ok(())
     }
 
@@ -306,7 +306,7 @@ impl PyTestbench {
     #[staticmethod]
     #[pyo3(signature = (text, dialect=None))]
     fn from_source(py: Python<'_>, text: &str, dialect: Option<&str>) -> PyResult<Py<Self>> {
-        let d = dialect.map(str::parse).transpose().map_err(PyValueError::new_err)?;
+        let d = dialect.map(super::def_::parse_lang).transpose().map_err(PyValueError::new_err)?;
         let top = super::store::read_deck(text, d).map_err(PyValueError::new_err)?;
         let libraries = super::store::libraries(text);
         let deck = Deck { top, libraries, bench: Some(Default::default()), ..Default::default() };

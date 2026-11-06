@@ -26,16 +26,20 @@
 //! gate").
 //!
 //! Contents:
-//! - `pub mod ast`, `pub mod device`, `pub mod diag`, `pub mod lexicon`, `pub mod render`,
+//! - `pub mod ast`, `pub mod behaviour`, `pub mod def`, `pub mod device`, `pub mod diag`, `pub mod lang`, `pub mod lexicon`, `pub mod render`,
 //!   `pub mod resolve`, `pub mod statement`, `pub mod token`
-//! - `pub use dialect::Dialect`, `pub use tokenize::tokenize`, `pub use parse::{parse, DEPTH_MAX}`
+//! - `pub use dialect::Dialect`, `pub use lang::Lang`, `pub use tokenize::tokenize`, `pub use parse::{parse, DEPTH_MAX}`
 
 pub mod ast;
+pub mod behaviour;
+pub mod def;
 pub mod device;
 pub mod diag;
 mod dialect;
+mod dialects;
 mod expr;
 mod fields;
+pub mod lang;
 pub mod lexicon;
 mod named;
 mod number;
@@ -49,6 +53,7 @@ pub mod token;
 mod tokenize;
 
 pub use dialect::Dialect;
+pub use lang::Lang;
 pub use parse::{DEPTH_MAX, parse};
 pub use tokenize::tokenize;
 

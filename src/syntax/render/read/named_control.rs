@@ -16,8 +16,8 @@
 
 use super::named_elements::unquoted;
 use super::{Ana, BenchCard, DcAxis, DcSweep, Opt, Rd, Sweep};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::token::Tag as T;
 
 impl<'a> Rd<'a> {
@@ -68,7 +68,7 @@ impl<'a> Rd<'a> {
     /// `include` of the deck reads (`input-embed.md`: the file is written
     /// for such a program).
     pub(in crate::syntax::render) fn vacask_script(&self, head: u32) -> bool {
-        if self.d != Dialect::Vacask {
+        if self.b.named_rules != NamedRules::Vacask {
             return false;
         }
         match self.ttag(head) {
@@ -90,7 +90,7 @@ impl<'a> Rd<'a> {
     /// parallel instance's `i`, ngspice's `@r1[i]` all of them). `None`
     /// for any other output.
     pub(in crate::syntax::render) fn vacask_saves(&self, n: u32) -> Option<(Vec<String>, bool)> {
-        if self.d != Dialect::Vacask || self.tag(n) != Tag::Save {
+        if self.b.named_rules != NamedRules::Vacask || self.tag(n) != Tag::Save {
             return None;
         }
         let head = self.main(n);

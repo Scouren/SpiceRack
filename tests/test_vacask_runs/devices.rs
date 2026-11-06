@@ -148,14 +148,28 @@ fn ltspice_parasitics_are_elements() {
     // drives node a from 1 V through 1k; the closed forms below.
     let lt = |body: &str, ana: &str| {
         let deck = format!("t\nV1 in 0 1 AC 1\nR1 in a 1k\n{body}\n{ana}\n.end\n");
-        run_text(&emit_from(&deck, Dialect::Ltspice, &lexicon::LTSPICE).expect("written"))
+        run_text(
+            &emit_from(
+                &deck,
+                Dialect::Ltspice,
+                Lang::LTSPICE.lexicon().expect("a reader"),
+            )
+            .expect("written"),
+        )
     };
     // Divider halves: a C's Rpar (1k), an L's Rser (1k to ground through
     // the inductor), a source's own Rser feeding 1k to ground.
     close(col(&lt("C1 a 0 1u Rpar=1k", ".op"), "a")[0], 0.5, 1e-9);
     close(col(&lt("L1 a 0 1m Rser=1k", ".op"), "a")[0], 0.5, 1e-9);
     let src = "t\nV1 a 0 1 Rser=1k\nR1 a 0 1k\n.op\n.end\n";
-    let raw = run_text(&emit_from(src, Dialect::Ltspice, &lexicon::LTSPICE).unwrap());
+    let raw = run_text(
+        &emit_from(
+            src,
+            Dialect::Ltspice,
+            Lang::LTSPICE.lexicon().expect("a reader"),
+        )
+        .unwrap(),
+    );
     close(col(&raw, "a")[0], 0.5, 1e-9);
     // AC at 1 kHz: C1 with Cpar=1u is 2u (a = 1/(1 + jwRC)), L1 with
     // Lser=1m is 2m (a = jwL/(R + jwL)).

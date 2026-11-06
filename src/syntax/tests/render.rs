@@ -9,9 +9,10 @@
 //!
 //! Contents: none (tests only).
 
+use crate::syntax::Lang;
+
 use crate::syntax::Dialect;
-use crate::syntax::lexicon::{self, Scale};
-use crate::syntax::render::spelling::spelling;
+use crate::syntax::lexicon::Scale;
 use crate::syntax::render::{render_kit, render_text};
 use crate::syntax::token::Tag as T;
 use crate::syntax::tokenize;
@@ -265,7 +266,7 @@ fn numbers_in_expressions_read_back_in_every_target() {
         Dialect::Spectre,
         Dialect::Vacask,
     ] {
-        let scales = lexicon::of(d).expect("a reader").numbers.scales;
+        let scales = Lang::from(d).lexicon().expect("a reader").numbers.scales;
         let mut deck = String::from(match d {
             Dialect::Spectre => "// t\nsimulator lang=spectre\n",
             _ => "t\n",
@@ -280,7 +281,7 @@ fn numbers_in_expressions_read_back_in_every_target() {
         }
         for target in Dialect::ALL.into_iter().filter(|&t| t != Dialect::Verilog) {
             let w = render_text(&deck, d, "n", target).expect("written");
-            let lex = spelling(target).lexicon;
+            let lex = Lang::from(target).spelling().lexicon;
             let t = tokenize(&w.text, lex);
             let tags = t.tags();
             for (k, &(s, scale)) in scales.iter().enumerate() {
@@ -314,19 +315,18 @@ fn numbers_in_expressions_read_back_in_every_target() {
     assert_eq!(checks, 600);
 }
 
-/// `text` read as the given deck (`lexicon::NGSPICE_GIVEN`, the Python
+/// `text` read as the given deck (`Lang::NGSPICE_GIVEN`, the Python
 /// API's: ngspice has no `.step`, and its regions hold other dialects)
 /// and written for `target`: the text, or the refusal's messages.
 fn given(text: &str, target: Dialect) -> Result<String, String> {
-    use crate::syntax::lexicon::NGSPICE_GIVEN;
     use crate::syntax::render::{Numbers, Source, render};
     use crate::syntax::{parse, tokenize};
-    let tokens = tokenize(text, &NGSPICE_GIVEN);
-    let ast = parse(&tokens, &NGSPICE_GIVEN);
+    let tokens = tokenize(text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
+    let ast = parse(&tokens, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let src = Source {
         ast: &ast,
         tokens: &tokens,
-        dialect: Dialect::Ngspice,
+        lang: Lang::NGSPICE,
         name: "t",
         kit: None,
         loads: &[],

@@ -104,7 +104,7 @@ impl W<'_, '_> {
     /// Block `b`'s elements, each its line: the cards in order, then the
     /// instances (the old IR's components, then its instances).
     fn cdl_elements(&mut self, b: &Block) -> Vec<String> {
-        let coupled = match self.rd.d == crate::syntax::Dialect::Ltspice {
+        let coupled = match self.rd.b.card_rules == crate::syntax::behaviour::CardRules::Ltspice {
             true => Some(self.coupled(b)),
             false => None,
         };

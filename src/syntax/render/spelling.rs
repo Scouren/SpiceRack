@@ -12,18 +12,19 @@
 //! lexicons' own citations for each suffix table.
 //!
 //! Contents:
-//! - `pub struct Spelling`, `pub enum FuncForm`, `pub const fn spelling(target: Dialect) -> &'static Spelling`
+//! - `pub struct Spelling`, `pub enum FuncForm`
 //! - `Spelling::letter(&self, p: Primitive) -> char`, `Spelling::number(&self, v: f64, exact: bool) -> String`,
 //!   `Spelling::decimal(&self, v: f64, exact: bool) -> String`, `Spelling::format(&self, v: f64) -> String`
 //! - `pub fn shortest(v: f64, written: String, mega: &str) -> String`
 
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device::{self, Primitive};
-use crate::syntax::lexicon::{self, Lexicon, Scale};
+use crate::syntax::lexicon::{Lexicon, Scale};
 
 /// One target's spelling.
 pub struct Spelling {
-    pub target: Dialect,
+    /// The language it spells.
+    pub lang: Lang,
     /// The lexicon the target's reader reads: its element letters and its
     /// number suffixes are the writer's too.
     pub lexicon: &'static Lexicon,
@@ -70,96 +71,6 @@ const LADDER: [(f64, i32); 10] = [
     (1e-12, -12),
     (1e-15, -15),
 ];
-
-const NGSPICE: Spelling = Spelling {
-    target: Dialect::Ngspice,
-    lexicon: &lexicon::NGSPICE,
-    comment: "*",
-    path_quote: "",
-    expr: ("{", "}"),
-    func: FuncForm::Func,
-    subckt_params: Some("PARAMS:"),
-    ngspice_numbers: true,
-};
-
-const ESPICE: Spelling = Spelling {
-    target: Dialect::Espice,
-    ..NGSPICE
-};
-
-const HSPICE: Spelling = Spelling {
-    target: Dialect::Hspice,
-    lexicon: &lexicon::HSPICE,
-    path_quote: "'",
-    expr: ("'", "'"),
-    func: FuncForm::Param,
-    subckt_params: None,
-    ngspice_numbers: false,
-    ..NGSPICE
-};
-
-const XYCE: Spelling = Spelling {
-    target: Dialect::Xyce,
-    lexicon: &lexicon::XYCE,
-    ngspice_numbers: false,
-    ..NGSPICE
-};
-
-/// CDL (the xschem layout): its elements are ngspice cards, its numbers
-/// spelled as a deck read with no ngspice arithmetic.
-const CDL: Spelling = Spelling {
-    target: Dialect::Cdl,
-    ..NGSPICE
-};
-
-/// Structural Verilog: a `//` comment; its instances' nets are names.
-const VERILOG: Spelling = Spelling {
-    target: Dialect::Verilog,
-    comment: "//",
-    ..NGSPICE
-};
-
-const LTSPICE: Spelling = Spelling {
-    target: Dialect::Ltspice,
-    lexicon: &lexicon::LTSPICE,
-    ngspice_numbers: false,
-    ..NGSPICE
-};
-
-const SPECTRE: Spelling = Spelling {
-    target: Dialect::Spectre,
-    lexicon: &lexicon::SPECTRE,
-    comment: "//",
-    path_quote: "\"",
-    expr: ("", ""),
-    func: FuncForm::Real,
-    subckt_params: None,
-    ngspice_numbers: false,
-};
-
-/// VACASK's title is its first line, bare (no comment leader).
-const VACASK: Spelling = Spelling {
-    target: Dialect::Vacask,
-    lexicon: &lexicon::VACASK,
-    comment: "",
-    func: FuncForm::None,
-    ..SPECTRE
-};
-
-/// Target `target`'s row.
-pub const fn spelling(target: Dialect) -> &'static Spelling {
-    match target {
-        Dialect::Ngspice => &NGSPICE,
-        Dialect::Espice => &ESPICE,
-        Dialect::Hspice => &HSPICE,
-        Dialect::Xyce => &XYCE,
-        Dialect::Ltspice => &LTSPICE,
-        Dialect::Cdl => &CDL,
-        Dialect::Spectre => &SPECTRE,
-        Dialect::Vacask => &VACASK,
-        Dialect::Verilog => &VERILOG,
-    }
-}
 
 impl Spelling {
     /// The element letter of `p`, uppercase: the device table read
@@ -277,6 +188,7 @@ impl Spelling {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::syntax::Dialect;
 
     const SPICE: [Dialect; 5] = [
         Dialect::Ngspice,
@@ -312,7 +224,7 @@ mod tests {
         // Writing a primitive's letter and reading it back gives the
         // primitive: the reader's table, read both ways.
         for d in SPICE {
-            let s = spelling(d);
+            let s = Lang::from(d).spelling();
             for p in Primitive::ALL {
                 let Some(row) = device::spelling(s.lexicon.devices, p) else {
                     continue;
@@ -346,7 +258,7 @@ mod tests {
             -2.2e-12,
         ];
         for d in SPICE {
-            let s = spelling(d);
+            let s = Lang::from(d).spelling();
             for v in values {
                 // An ngspice reader's arithmetic is not decimal: its exact
                 // spelling is the one that reads back.
@@ -366,7 +278,7 @@ mod tests {
         // The oracle is Spectre's own suffix table (`M` mega, `k` kilo):
         // what is written reads back as `v`, and is the old writer's
         // `format_spice_number` with SPICE's `meg`/`g`/`t` as `M`/`G`/`T`.
-        let s = spelling(Dialect::Spectre);
+        let s = Lang::from(Dialect::Spectre).spelling();
         for v in [
             0.0, 1e3, 1e6, 2.4e9, 1e12, 1e-9, 1e-15, 30e-3, -4.7e-6, 0.1, 123456.789,
         ] {
@@ -391,10 +303,16 @@ mod tests {
     fn exact_numbers_are_ngspice_spellings_only_for_ngspice_readers() {
         let v = 5e-7;
         assert_eq!(
-            spelling(Dialect::Ngspice).number(v, true),
+            Lang::from(Dialect::Ngspice).spelling().number(v, true),
             crate::unit::ngspice_spelling(v)
         );
-        assert_eq!(spelling(Dialect::Hspice).number(v, true), "500n");
-        assert_eq!(spelling(Dialect::Ngspice).decimal(0.5, true), "0.5");
+        assert_eq!(
+            Lang::from(Dialect::Hspice).spelling().number(v, true),
+            "500n"
+        );
+        assert_eq!(
+            Lang::from(Dialect::Ngspice).spelling().decimal(0.5, true),
+            "0.5"
+        );
     }
 }

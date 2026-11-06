@@ -154,10 +154,7 @@ impl Site<'_, '_> {
         let name = word_text(ast, h.name)?;
         let Some(row) = name.get(..1).and_then(|l| lex.device(l)) else {
             // A letter the dialect has no device for: nothing it can bind.
-            let d = Diag {
-                code: Code::R0001,
-                token: ast.main_token(n),
-            };
+            let d = Diag::new(Code::R0001, ast.main_token(n), 0);
             return Some((Binding::Unknown, None, Some(d)));
         };
         let items = items(ast, n);
@@ -250,20 +247,10 @@ impl Site<'_, '_> {
             Found::One(id) => self.bound(id, false, ast, m, nodes, n),
             Found::Ambiguous(id) => self.bound(id, true, ast, m, nodes, n),
             Found::None => match self.find(name, Want::Value) {
-                Found::One(id) | Found::Ambiguous(id) => (
-                    Binding::Def(id),
-                    Some(Diag {
-                        code: Code::R0005,
-                        token: anchor(m),
-                    }),
-                ),
-                Found::None => (
-                    Binding::Unknown,
-                    Some(Diag {
-                        code: Code::R0001,
-                        token: anchor(m),
-                    }),
-                ),
+                Found::One(id) | Found::Ambiguous(id) => {
+                    (Binding::Def(id), Some(Diag::new(Code::R0005, anchor(m), 0)))
+                }
+                Found::None => (Binding::Unknown, Some(Diag::new(Code::R0001, anchor(m), 0))),
             },
         }
     }
@@ -294,7 +281,7 @@ impl Site<'_, '_> {
             // match.
             _ => None,
         };
-        (Binding::Def(id), code.map(|code| Diag { code, token }))
+        (Binding::Def(id), code.map(|code| Diag::new(code, token, 0)))
     }
 
     /// The model word item `w` names, if it is a word naming one.

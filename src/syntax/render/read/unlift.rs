@@ -21,7 +21,7 @@
 //! - `Rd::unlift(&mut self, deck: &mut Deck)`
 //! - `Rd::etext(&self, n: u32) -> String`, `Rd::espan(&self, a: u32, b: u32) -> String`,
 //!   `Rd::unlifted_var(&self, p: &str) -> bool`
-//! - `Rd::write_for(&mut self, target: Dialect)`,
+//! - `Rd::write_for(&mut self, target: Lang)`,
 //!   `Rd::respell_token(&mut self, k: u32, text: String)`, `Rd::lift_call(&mut self, name: u32, l: Lift)`,
 //!   `Rd::inline_call(&mut self, name: u32, steps: Vec<(u32, Step)>)`,
 //!   `Rd::unlifted_call(&self, name: u32) -> Option<(&'static str, u32)>`,
@@ -31,11 +31,11 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use super::{Block, Comp, Deck, Func, Rd};
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::{NamedRules, Writer};
 use crate::syntax::lexicon::Lexicon;
 use crate::syntax::number;
-use crate::syntax::render::spelling::spelling;
 use crate::syntax::token::Tag as T;
 
 /// The fixups of the read-back rule.
@@ -123,7 +123,7 @@ impl<'a> Rd<'a> {
     /// `vary` rows (an emptied `statistics` block with them), and the
     /// `rack_*` functions no value calls.
     pub(super) fn unlift(&mut self, deck: &mut Deck) {
-        if self.d != Dialect::Spectre {
+        if self.b.named_rules != NamedRules::Spectre {
             return;
         }
         let mut kinds: HashMap<String, bool> = HashMap::new(); // var -> unif
@@ -261,9 +261,9 @@ impl<'a> Rd<'a> {
     /// A value that is one number, signed or delimited (`{1meg}`, `-2M`),
     /// is kept as written: the writers read it whole and respell it as a
     /// standalone value. A writer calls this before it writes.
-    pub(in crate::syntax::render) fn write_for(&mut self, target: Dialect) {
+    pub(in crate::syntax::render) fn write_for(&mut self, target: Lang) {
         assert!(self.target.is_none(), "one target a read");
-        self.target = Some(spelling(target));
+        self.target = Some(target.spelling());
         let nums = (0..self.ast.len() as u32).filter(|&n| self.ast.tag(Node(n)) == Tag::Num);
         self.nums = nums.map(|n| self.main(n)).collect();
         self.nums.sort_unstable();
@@ -375,14 +375,14 @@ impl<'a> Rd<'a> {
             return text.into();
         };
         let num = self.ttag(k) == T::Number && self.nums.binary_search(&k).is_ok();
-        if !num || lex.dialect == sp.lexicon.dialect {
+        if !num || lex.lang == sp.lexicon.lang {
             return text.into();
         }
         let v = self.t.value(k);
         // VACASK's writer lowercases another dialect's expressions (its
         // names are case-sensitive, SPICE's not: `named::vacask`'s
         // `W::expr`), so a spelling must read the same lowercased.
-        let folds = sp.target == Dialect::Vacask;
+        let folds = sp.lang.behaviours().writer == Writer::Vacask;
         // An ulp between two dialects' arithmetic is no misreading; a
         // suffix read another way is a factor of 10 or more.
         let reads = |s: &str| {

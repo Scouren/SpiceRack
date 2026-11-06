@@ -17,8 +17,8 @@
 use super::cards::Model;
 use super::named::{OSDI, spectre_kind, vacask_builtin, vacask_kind, vacask_model_kind};
 use super::{Block, Rd};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::token::Tag as T;
 
 /// A Spectre `statistics` block as the old reader kept it.
@@ -62,7 +62,7 @@ impl<'a> Rd<'a> {
     /// (no SPICE kind, no builtin: `named::vacask_model_kind`).
     pub(in crate::syntax::render) fn osdi_module(&self, n: u32) -> bool {
         let f = self.fields(n);
-        self.d == Dialect::Vacask
+        self.b.named_rules == NamedRules::Vacask
             && self.tag(n) == Tag::Model
             && f.len() >= 2
             && vacask_model_kind(&self.name_of(f[1]), None).starts_with(OSDI)
@@ -156,7 +156,9 @@ impl<'a> Rd<'a> {
     /// `one_model`): `false` when the IR had no kind for it; a VACASK
     /// built-in is declared by the writer, not placed.
     fn one_model(&mut self, n: u32, bin: u32, here: &mut Block) -> bool {
-        if self.d == Dialect::Vacask && vacask_builtin(&self.name_of(self.fields(n)[1])).is_some() {
+        if self.b.named_rules == NamedRules::Vacask
+            && vacask_builtin(&self.name_of(self.fields(n)[1])).is_some()
+        {
             return true;
         }
         match self.model_of(n, bin) {
@@ -181,7 +183,7 @@ impl<'a> Rd<'a> {
                 format!("{name}.{}", self.t.text(self.main(b)))
             }
         };
-        let (kind, level) = if self.d == Dialect::Vacask {
+        let (kind, level) = if self.b.named_rules == NamedRules::Vacask {
             match vacask_kind(&master, self.get(&p, "type").and_then(|t| self.number(t))) {
                 Some(k) => k,
                 // A loaded module's model: ngspice's OSDI `.model name
@@ -200,7 +202,8 @@ impl<'a> Rd<'a> {
             let ty = self.get(&p, "type").map(|t| self.text(t));
             spectre_kind(&master, ty.as_deref())
         };
-        let drop_type = self.d == Dialect::Vacask || level.is_some() || kind != master;
+        let drop_type =
+            self.b.named_rules == NamedRules::Vacask || level.is_some() || kind != master;
         let mut params: Vec<(String, String)> = p
             .iter()
             .filter(|(k, _)| !(drop_type && k == "type"))
@@ -219,7 +222,7 @@ impl<'a> Rd<'a> {
     /// SPICE's `.model` neither ("Syntax error: letter [)]", ngspice-45
     /// on `demo/spice/bsim4v82.inc`).
     fn model_value(&self, v: u32) -> String {
-        if self.d != Dialect::Vacask {
+        if self.b.named_rules != NamedRules::Vacask {
             return self.vtext(v);
         }
         let mut inner = v;

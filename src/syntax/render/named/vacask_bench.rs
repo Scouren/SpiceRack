@@ -14,7 +14,7 @@ use super::W;
 use super::bench::{Step, Tb, bare_node};
 use super::lift::draw_scopes;
 use super::vacask::{num, respell};
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Ana, DcSweep, Sweep, Val};
@@ -177,7 +177,7 @@ impl W<'_, '_> {
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
             Ana::Spectre { kind, .. } => {
                 self.refuse(
-                    crate::syntax::render::read::spectre_refusal(Dialect::Vacask, kind),
+                    crate::syntax::render::read::spectre_refusal(self.b, kind),
                     tok,
                 );
                 return vec![];
@@ -255,7 +255,7 @@ impl W<'_, '_> {
                     self.refuse(Code::W0015, tok);
                     return vec![];
                 }
-                let native = self.rd.d == Dialect::Vacask;
+                let native = self.rd.b.named_rules == NamedRules::Vacask;
                 let tmax = max_step.or((!native).then(|| step.min(stop / 50.0)));
                 let mut s = format!(
                     "analysis {name} tran step={} stop={}",

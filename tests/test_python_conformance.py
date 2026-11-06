@@ -4,7 +4,7 @@ every dialect the writer has, is written or refused with one exact code.
 Oracle: the table below, reviewed cell by cell against the target's manual
 (a refusal's cause is the target lacking the construct, class G in
 CONFORMANCE-GAPS.md; the citations are the codes' catalogue rows,
-`src/syntax/diag.rs`). It is compared as name lists, never counts: a cell
+`src/syntax/diag/mod.rs`). It is compared as name lists, never counts: a cell
 that changes, a feature added without a row, or a refusal with no code
 fails. Where a simulator is installed (`nix develop .#testing`: ngspice,
 ESPice, VACASK), the written decks run and their numbers meet a closed form.

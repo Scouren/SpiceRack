@@ -14,8 +14,8 @@
 
 use super::named::{OSDI, spectre_kind, vacask_model_kind};
 use super::{Card, Rd, Val};
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::resolve::{Binding, Def, DefKind, Polarity};
 
 /// The keys one dialect's built-in masters use (the old lowering).
@@ -126,7 +126,7 @@ impl<'a> Rd<'a> {
         let device = |used: &[&str]| -> Vec<(String, String)> {
             let mut v = kept(used);
             for (k, _) in &mut v {
-                if self.d != Dialect::Vacask {
+                if self.b.named_rules != NamedRules::Vacask {
                     continue;
                 }
                 if k == "$mfactor" {
@@ -178,8 +178,8 @@ impl<'a> Rd<'a> {
                 // VACASK: `dc` is `type="dc"`'s value; a waveform's DC value
                 // is its value at t = 0 (`docs/dev-builtin-src.md`; a VACASK
                 // op of `dc=5 type="pulse" val0=1` is 1).
-                let value = match (&wave, self.d) {
-                    (Some(w), Dialect::Vacask) => w.at_zero(),
+                let value = match (&wave, self.b.named_rules) {
+                    (Some(w), NamedRules::Vacask) => w.at_zero(),
                     _ => self.get(&p, "dc").map_or(Val::Num(0.0), |v| self.value(v)),
                 };
                 let letter = if master == "vsource" { 'v' } else { 'i' };
@@ -234,7 +234,7 @@ impl<'a> Rd<'a> {
                 }
             }
             m if m == keys.mutual
-                && (self.d == Dialect::Spectre || ns.is_empty())
+                && (self.b.named_rules == NamedRules::Spectre || ns.is_empty())
                 && only(&["ind1", "ind2", keys.coupling]) =>
             {
                 let refs = vec![ident("ind1")?, ident("ind2")?];
@@ -245,7 +245,7 @@ impl<'a> Rd<'a> {
                     k: num(keys.coupling)?,
                 }
             }
-            "pvcvs" | "pvccs" | "pcccs" | "pccvs" if self.d == Dialect::Spectre => {
+            "pvcvs" | "pvccs" | "pcccs" | "pccvs" if self.b.named_rules == NamedRules::Spectre => {
                 let letter = match master.as_str() {
                     "pvcvs" => 'E',
                     "pvccs" => 'G',
@@ -276,7 +276,9 @@ impl<'a> Rd<'a> {
                 }
             }
             "iprobe" | "port" | "tline" | "bsource"
-                if self.d == Dialect::Spectre && kit.is_none() && !subckts.contains(&master) =>
+                if self.b.named_rules == NamedRules::Spectre
+                    && kit.is_none()
+                    && !subckts.contains(&master) =>
             {
                 return self.named_master(&master, &name, &ns, &p);
             }
@@ -315,8 +317,8 @@ impl<'a> Rd<'a> {
                     ("d", 2) => 'd',
                     ("npn" | "pnp", 3..=5) => 'q',
                     ("nmos" | "pmos", 4) => 'm',
-                    ("njf" | "pjf", 3) if self.d == Dialect::Vacask => 'j',
-                    ("nmf" | "pmf", 3) if self.d == Dialect::Vacask => 'z',
+                    ("njf" | "pjf", 3) if self.b.named_rules == NamedRules::Vacask => 'j',
+                    ("nmf" | "pmf", 3) if self.b.named_rules == NamedRules::Vacask => 'z',
                     _ => return None,
                 };
                 Card::Semi {
@@ -342,7 +344,7 @@ impl<'a> Rd<'a> {
     /// `name`'s SPICE spelling: the letter a writer adds back is dropped
     /// (the old lowering's `strip`).
     pub(super) fn strip(&self, name: &str, letter: char) -> String {
-        let name = if self.d == Dialect::Vacask {
+        let name = if self.b.named_rules == NamedRules::Vacask {
             name.to_lowercase()
         } else {
             name.to_string()
@@ -367,7 +369,7 @@ impl<'a> Rd<'a> {
             DefKind::Subckt { .. } => Some(Declared::Subckt),
             DefKind::Model { word, polarity, .. } => {
                 let p = *polarity == Some(Polarity::P);
-                if self.d == Dialect::Vacask {
+                if self.b.named_rules == NamedRules::Vacask {
                     let ty = polarity.map(|_| if p { -1.0 } else { 1.0 });
                     return Some(Declared::Model(vacask_model_kind(word, ty)));
                 }
@@ -389,7 +391,7 @@ impl<'a> Rd<'a> {
     }
 
     fn keys(&self) -> &'static Keys {
-        if self.d == Dialect::Vacask {
+        if self.b.named_rules == NamedRules::Vacask {
             &VACASK
         } else {
             &SPECTRE

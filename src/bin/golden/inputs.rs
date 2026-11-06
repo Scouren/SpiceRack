@@ -406,7 +406,7 @@ fn references(src: &str, name: &str, d: Dialect) -> Vec<(String, bool)> {
     let file = render::Source {
         ast: &ast,
         tokens: &tokens,
-        dialect: d,
+        lang: d.into(),
         name,
         kit: None,
         loads: &[],

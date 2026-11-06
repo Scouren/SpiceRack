@@ -10,7 +10,7 @@
 //!   `pub(super) fn has_ac(w: &W, sw: &Sweep) -> bool`
 
 use super::W;
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::render::read::{Ana, Bench, BenchCard, DcAxis, DcSweep, Sweep};
 
 /// One `.dc` axis: Xyce's and LTspice's `[DEC|OCT] src start stop n` and
@@ -52,7 +52,7 @@ pub(super) fn dc_axis(w: &W<'_, '_>, ax: &DcAxis, hspice: bool) -> String {
 /// written (its output form), else `.LIN` and, when the deck has no `.ac`
 /// of the sweep, one.
 pub(super) fn xyce_lin(w: &W<'_, '_>, sw: &Sweep, tok: u32, ac: &str) -> String {
-    if w.rd.d == Dialect::Xyce {
+    if w.rd.b.card_rules == CardRules::Xyce {
         return w.rd.span(tok, w.rd.line_last(tok));
     }
     match has_ac(w, sw) {

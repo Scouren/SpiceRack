@@ -12,8 +12,8 @@
 //! - `Rd::options_view(&self, n: u32) -> Vec<Opt>`
 
 use super::Rd;
-use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::behaviour::OptionsForm;
 use crate::syntax::token::Tag as T;
 
 /// One option a `.options` card sets.
@@ -40,7 +40,7 @@ impl<'a> Rd<'a> {
     /// `.options` items (the old SPICE grammar's `oitem`, the old Xyce grammar's `Options`).
     pub(in crate::syntax::render) fn options_ok(&self, n: u32) -> bool {
         let items = self.fields(n);
-        if self.d == Dialect::Xyce && self.xyce_pkg(n).is_some() {
+        if self.b.options_form == OptionsForm::XycePackages && self.xyce_pkg(n).is_some() {
             return self.only_commas_between(n, items) && self.xyce_pairs(&items[1..]).is_some();
         }
         self.only_commas_between(n, items)
@@ -55,8 +55,8 @@ impl<'a> Rd<'a> {
     /// What `.options` card `n` sets, in order (the old lowering).
     pub(in crate::syntax::render) fn options_view(&self, n: u32) -> Vec<Opt> {
         let items = self.fields(n);
-        match (self.d, self.xyce_pkg(n)) {
-            (Dialect::Xyce, Some(pkg)) => {
+        match (self.b.options_form, self.xyce_pkg(n)) {
+            (OptionsForm::XycePackages, Some(pkg)) => {
                 let pkg = self.text(pkg).to_ascii_lowercase();
                 let pairs = self.xyce_pairs(&items[1..]).expect("options_ok read it");
                 let mut out = Vec::new();
@@ -72,7 +72,7 @@ impl<'a> Rd<'a> {
                 }
                 out
             }
-            (Dialect::Xyce, None) => self
+            (OptionsForm::XycePackages, None) => self
                 .params_of(items, false)
                 .into_iter()
                 .map(|(k, v)| Opt::Xyce(k, v))

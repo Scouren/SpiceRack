@@ -66,6 +66,7 @@ gain_db = ac.magnitude_db("vout")       # list[float], one per ac.frequency poin
 | [Models and PDKs](models.md) | Model libraries and corners, Verilog-A, digital Verilog |
 | [Testbenches](testbenches.md) | About 60 ready-made benches (amplifiers, regulators, converters, PLLs...), corners and Monte Carlo |
 | [Re-measuring](remeasure.md) | Recomputing SNDR, settling, margins, noise and yield from a `.raw` file |
+| [Dialect plugins](dialects.md) | Declaring a netlist dialect of your own, or extending a built-in, from Python |
 | [Tools](tools.md) | The `spice2rack` converter, the Rust crate |
 | [API reference](reference.md) | Every class, method and signature on one page |
 

@@ -8,6 +8,8 @@
 //!
 //! Contents: none (tests only).
 
+use spicerack::syntax::Lang;
+
 use std::path::Path;
 
 use spicerack::import;
@@ -15,7 +17,7 @@ use spicerack::syntax::ast::{Node, Tag};
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::render_kit;
 use spicerack::syntax::resolve::{Binding, DefKind, FileId, Form, Role};
-use spicerack::syntax::{Dialect, lexicon, parse, tokenize};
+use spicerack::syntax::{Dialect, parse, tokenize};
 
 // ---- private ----
 
@@ -36,8 +38,8 @@ fn a_spectre_kit_binds_its_verilog_a_instances() {
     let roles: Vec<Role> = kit.files().iter().map(|f| f.role).collect();
     assert_eq!(roles, [Role::Library, Role::VerilogA]);
     let file = kit.file(FileId(0));
-    let t = tokenize(&file.text, &lexicon::SPECTRE);
-    let ast = parse(&t, &lexicon::SPECTRE);
+    let t = tokenize(&file.text, Lang::SPECTRE.lexicon().expect("a reader"));
+    let ast = parse(&t, Lang::SPECTRE.lexicon().expect("a reader"));
     let mut masters = Vec::new();
     for n in (0..ast.len() as u32).map(Node) {
         if ast.tag(n) != Tag::Instance {

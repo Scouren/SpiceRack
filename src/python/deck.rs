@@ -8,7 +8,7 @@
 //! for what only Spectre says (the analyses with no ngspice card, and
 //! `pss` on a Spectre target: `Analysis::in_spectre_region`), its Spectre
 //! statement in a `simulator lang=spectre` region of the source
-//! (`lexicon::NGSPICE_GIVEN`); a Fourier analysis's harmonic count is
+//! (`Lang::NGSPICE_GIVEN`); a Fourier analysis's harmonic count is
 //! ngspice's `.options nfreqs=` card, or the analysis in LTspice's or
 //! Spectre's words in its region (`Analysis::fourier_count`). A line
 //! given as one dialect's text (`extra_line`) sits in that dialect's
@@ -29,8 +29,10 @@
 //!   `Deck::to_source(&self) -> PyResult<String>`, `Deck::issues(&self, backend: &str) -> Vec<String>`,
 //!   `Deck::card(body: &Body, name: &str) -> PyResult<String>`
 //! - `pub(super) fn check_backend_name(name: &str) -> PyResult<()>`
-//! - `pub(super) fn region_dialect(name: &str) -> Result<Dialect, String>`
+//! - `pub(super) fn region_dialect(name: &str) -> Result<Lang, String>`
 //! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`
+
+use crate::syntax::Lang;
 
 use std::borrow::Cow;
 use std::fmt::Write as _;
@@ -65,8 +67,10 @@ impl Deck {
     pub(super) fn netlist(&self, backend: &str) -> PyResult<String> {
         let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
             .filter(|d| render::writes(*d))
+            .map(Lang::from)
+            .or_else(|| super::def_::plugin(backend))
             .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
-        self.lowered()?.write(d).map_err(PyRuntimeError::new_err)
+        self.lowered()?.write_to(d).map_err(PyRuntimeError::new_err)
     }
 
     /// Runs the deck on `backend` (`None`: the best installed one for its
@@ -148,7 +152,7 @@ impl Deck {
 
 /// Refuse a backend name at selection time rather than at the first run.
 pub(super) fn check_backend_name(name: &str) -> PyResult<()> {
-    if crate::backend::parse(name).is_some() {
+    if crate::backend::parse(name).is_some() || super::def_::plugin(name).is_some() {
         return Ok(());
     }
     let names = crate::backend::RUNNABLE
@@ -166,11 +170,15 @@ pub(super) fn check_backend_name(name: &str) -> PyResult<()> {
 ///
 /// # Errors
 /// A name no dialect has; a dialect with no region (CDL, Verilog).
-pub(super) fn region_dialect(name: &str) -> Result<Dialect, String> {
+pub(super) fn region_dialect(name: &str) -> Result<Lang, String> {
+    // A plugin's region is read by its lexicon (`regions_registered`).
+    if let Some(p) = super::def_::plugin(name).filter(|p| p.lexicon().is_some()) {
+        return Ok(p);
+    }
     let d = name.parse::<Dialect>()?.family();
-    let regions = crate::syntax::lexicon::NGSPICE_GIVEN.regions;
+    let regions = Lang::NGSPICE_GIVEN.lexicon().expect("a reader").regions;
     match regions.iter().any(|(n, _)| *n == d.name()) {
-        true => Ok(d),
+        true => Ok(d.into()),
         false => {
             let names: Vec<&str> = regions.iter().map(|r| r.0).collect();
             Err(format!(
@@ -193,6 +201,16 @@ impl Deck {
     /// The simulator a run picks and the deck written for it.
     fn for_run(&self, backend: Option<&str>) -> PyResult<(Dialect, String)> {
         let deck = self.lowered()?;
+        if let Some(lang) = backend.and_then(super::def_::plugin) {
+            // A plugin runs where its definition says (`runs_on`), as written.
+            let sim = lang.runs_on().ok_or_else(|| {
+                runtime_err(format!(
+                    "no simulator runs '{}': it is netlist only (its definition declares no runs_on)",
+                    lang.name()
+                ))
+            })?;
+            return Ok((sim, deck.write_to(lang).map_err(runtime_err)?));
+        }
         let first = deck.analyses().first().map_or(Kind::Op, Analysis::kind);
         let writes = |d| deck.write(d).is_ok();
         let sim =
@@ -253,24 +271,43 @@ impl Deck {
 
     /// The deck written for `d`: its ngspice source rendered there.
     fn write(&self, d: Dialect) -> Result<String, String> {
+        // A built-in has no hooks: no Python reached (the unit tests link
+        // no interpreter).
+        let plain = |src: &render::Source, l: Lang| {
+            render::render(src, l)
+                .map(|w| w.text)
+                .map_err(|e| e.messages.trim_end().to_string())
+        };
+        self.write_with(d.into(), plain)
+    }
+
+    /// The deck written for `lang`, a plugin's Python hooks called.
+    fn write_to(&self, lang: Lang) -> Result<String, String> {
+        self.write_with(lang, super::def_::render)
+    }
+
+    /// The deck rendered for `lang` by `render`: its ngspice source for the
+    /// built-in in `lang`'s chain.
+    fn write_with(
+        &self,
+        lang: Lang,
+        render: impl Fn(&render::Source, Lang) -> Result<String, String>,
+    ) -> Result<String, String> {
         let name = self.top.name.as_str();
-        let source = self.source(d)?;
-        let lex = &crate::syntax::lexicon::NGSPICE_GIVEN;
+        let source = self.source(super::def_::builtin_of(lang))?;
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
         let tokens = crate::syntax::tokenize(&source, lex);
         let ast = crate::syntax::parse(&tokens, lex);
         let src = render::Source {
             ast: &ast,
             tokens: &tokens,
-            dialect: Dialect::Ngspice,
+            lang: Lang::NGSPICE,
             name,
             kit: None,
             loads: &self.top.osdi,
             numbers: render::Numbers::Given,
         };
-        match render::render(&src, d) {
-            Ok(w) => Ok(w.text),
-            Err(diags) => Err(diags.messages.trim_end().to_string()),
-        }
+        render(&src, lang)
     }
 
     /// The deck as ngspice text, for target `d`: a model library's path

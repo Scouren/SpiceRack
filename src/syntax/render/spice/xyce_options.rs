@@ -16,10 +16,8 @@
 
 use super::W;
 use super::bench::Tb;
-use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
-use crate::syntax::render::spelling::spelling;
 
 /// The options that shape only a listing, the accounting or the output
 /// files, no number (ngspice manual §11.1.1 ACCT, NOACCT, LIST, NODE,
@@ -93,7 +91,7 @@ impl W<'_, '_> {
             };
             items.push((pkg.into(), kv(key, v)));
         }
-        let xyce = spelling(Dialect::Xyce);
+        let xyce = self.sp;
         if let Some(t) = tb.temp {
             items.push(("device".into(), kv("temp", &xyce.number(t, false))));
         }

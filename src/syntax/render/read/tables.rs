@@ -10,7 +10,7 @@
 //! - `Rd::table_source(&self, n: u32, current: bool, name: String, np: String, nm: String) -> Option<Card>`
 
 use super::{Card, Rd};
-use crate::syntax::Dialect;
+use crate::syntax::behaviour::CardRules;
 
 impl Rd<'_> {
     /// The `TABLE` form of the E or G card `n` (its items from the third),
@@ -28,7 +28,7 @@ impl Rd<'_> {
     ) -> Option<Card> {
         let items = self.items(n);
         let &kw = items.get(2)?;
-        if self.d != Dialect::Xyce || !self.is_word(kw) || !self.word_is(kw, "table") {
+        if self.b.card_rules != CardRules::Xyce || !self.is_word(kw) || !self.word_is(kw, "table") {
             return None;
         }
         let last = self.line_last(self.main(n));

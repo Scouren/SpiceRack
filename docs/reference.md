@@ -16,6 +16,9 @@ nodes are positional; everything after `*` is keyword-only.
 | `compile_veriloga(source_or_path)` | compiles Verilog-A with OpenVAF, returns the `.osdi` path |
 | `read_raw(path)` | every plot of a `.raw` file, as `RawData` |
 | `unit` | unit constants, used as `10 @ u_kOhm` |
+| `Dialect(name)`, `register_dialect(obj)` | a dialect plugin's base class and its registration ([Dialect plugins](dialects.md)); returns its `def_.Lang` |
+| `dialects` | the built-ins as base classes: `NGSPICE`, `ESPICE`, `HSPICE`, `XYCE`, `LTSPICE`, `SPECTRE`, `VACASK`, `CDL`, `VERILOG` |
+| `def_` | the definition API: `DialectDef(name)` (one method per Rust call, each returning the definition), `register(d)`, `Lang`, `Card`, `Answer`, and the vocabulary enums (`Tag`/`Keyword`, `Construct`, `Alt`, `Rule`, `Code`, `Kind`, `Scale`, ...) |
 
 ## Elements (`Circuit`, `Subcircuit`)
 
