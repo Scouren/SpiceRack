@@ -197,3 +197,21 @@ fn a_device_ic_without_uic_is_left_out() {
             .contains("c1 (b 0) capacitor c=1u ic=300m")
     );
 }
+
+/// LTspice help, Capacitor: Rser and Lser in series (internal nodes), Rpar
+/// and Cpar across; the same network as the SPICE targets get
+/// (`spice/parasitics.rs`), in `[REF]` p.494's instance form.
+#[test]
+fn ltspice_parasitics_are_spectre_elements() {
+    let deck = "t\nC1 a 0 1u Rser=5m Lser=1n Rpar=1meg\n.op\n.end\n";
+    let w = spicerack::syntax::render::render_text(deck, Dialect::Ltspice, "t", Dialect::Spectre)
+        .unwrap();
+    for l in [
+        "c1 (c1_s2 0) capacitor c=1u",
+        "rc1_ser (a c1_s1) resistor r=5m",
+        "lc1_ser (c1_s1 c1_s2) inductor l=1n",
+        "rc1_par (a 0) resistor r=1M",
+    ] {
+        assert!(w.text.contains(l), "{l}\n{}", w.text);
+    }
+}

@@ -139,3 +139,34 @@ fn a_bsim_version_is_the_modules_or_refused() {
     // A parameter ngspice reads that the module lacks: refused.
     assert_eq!(emit(&card("level=1 icvds=1")).unwrap_err(), [Code::W0129]);
 }
+
+#[test]
+fn ltspice_parasitics_are_elements() {
+    // LTspice help, Capacitor/Inductor/Voltage Source: Rser and Lser in
+    // series with the device, Rpar and Cpar across it; written as explicit
+    // elements, as for the SPICE targets (`spice/parasitics.rs`). Each deck
+    // drives node a from 1 V through 1k; the closed forms below.
+    let lt = |body: &str, ana: &str| {
+        let deck = format!("t\nV1 in 0 1 AC 1\nR1 in a 1k\n{body}\n{ana}\n.end\n");
+        run_text(&emit_from(&deck, Dialect::Ltspice, &lexicon::LTSPICE).expect("written"))
+    };
+    // Divider halves: a C's Rpar (1k), an L's Rser (1k to ground through
+    // the inductor), a source's own Rser feeding 1k to ground.
+    close(col(&lt("C1 a 0 1u Rpar=1k", ".op"), "a")[0], 0.5, 1e-9);
+    close(col(&lt("L1 a 0 1m Rser=1k", ".op"), "a")[0], 0.5, 1e-9);
+    let src = "t\nV1 a 0 1 Rser=1k\nR1 a 0 1k\n.op\n.end\n";
+    let raw = run_text(&emit_from(src, Dialect::Ltspice, &lexicon::LTSPICE).unwrap());
+    close(col(&raw, "a")[0], 0.5, 1e-9);
+    // AC at 1 kHz: C1 with Cpar=1u is 2u (a = 1/(1 + jwRC)), L1 with
+    // Lser=1m is 2m (a = jwL/(R + jwL)).
+    let w = 2.0 * std::f64::consts::PI * 1e3;
+    let one = num_complex::Complex64::new(1.0, 0.0);
+    let jw = num_complex::Complex64::new(0.0, w);
+    let ac = ".ac lin 1 1k 1k";
+    let c = cplx(&lt("C1 a 0 1u Cpar=1u", ac), "a")[0];
+    let want = one / (one + jw * 1e3 * 2e-6);
+    assert!((c - want).norm() <= 1e-9 * want.norm(), "{c} vs {want}");
+    let l = cplx(&lt("L1 a 0 1m Lser=1m", ac), "a")[0];
+    let want = jw * 2e-3 / (1e3 + jw * 2e-3);
+    assert!((l - want).norm() <= 1e-9 * want.norm(), "{l} vs {want}");
+}

@@ -31,6 +31,7 @@ mod cards;
 mod checks;
 mod lift;
 mod params;
+mod parasitics;
 mod sites;
 mod sources;
 mod vacask;

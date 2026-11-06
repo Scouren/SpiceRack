@@ -56,7 +56,9 @@ impl W<'_, '_> {
                         self.inst_params(&kept)
                     ));
                 }
-                let params = self.tran_ic(letter, params, n);
+                let mut params = self.tran_ic(letter, params, n);
+                let extra = self.parasitics(letter, n, &n1, &n2, &mut params);
+                let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let (l, m) = match letter {
                     'R' => ('r', "resistor"),
                     'C' => ('c', "capacitor"),
@@ -67,12 +69,13 @@ impl W<'_, '_> {
                     v => format!(" {l}={}", self.vval(v)),
                 };
                 format!(
-                    "{l}{} ({} {}) {}{value}{}",
+                    "{l}{} ({} {}) {}{value}{}{}",
                     q(own),
                     q(&n1),
                     q(&n2),
                     model.map_or(m.to_string(), |m| q(&m)),
-                    self.inst_params(&params)
+                    self.inst_params(&params),
+                    self.part_lines(extra)
                 )
             }
             // One `mutual` per pair, the first keeping the name.
@@ -100,12 +103,14 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
-                parasitics: _,
+                mut parasitics,
             } => {
                 if port.is_some() {
                     self.ask(Construct::RfPort, tok);
                     return None;
                 }
+                let extra = self.parasitics(letter, n, &np, &nm, &mut parasitics);
+                let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let (l, m) = match letter {
                     'V' => ('v', "vsource"),
                     _ => ('i', "isource"),
@@ -131,6 +136,7 @@ impl W<'_, '_> {
                     s.push(' ');
                     s.push_str(&w);
                 }
+                s.push_str(&self.part_lines(extra));
                 s
             }
             Card::Linear {

@@ -57,10 +57,12 @@ impl W<'_, '_> {
         let mut needs: BTreeSet<Need> = BTreeSet::new();
         for b in &blocks {
             for &c in &b.comps {
-                if let Comp::Card(n) = c
-                    && let Some(need) = need(&self.rd.card_view(n))
-                {
-                    needs.insert(need);
+                if let Comp::Card(n) = c {
+                    let card = self.rd.card_view(n);
+                    needs.extend(need(&card));
+                    if self.rd.d == Dialect::Ltspice {
+                        needs.extend(parasitic_needs(&card));
+                    }
                 }
             }
         }
@@ -470,6 +472,27 @@ impl Need {
             Need::Sp(m) | Need::Builtin(m) => m,
         }
     }
+}
+
+/// The modules an LTspice card's parasitics need (`W::parasitics`):
+/// `Rser`/`Rpar` a resistor, `Lser` an inductor, `Cpar` a capacitor.
+fn parasitic_needs(c: &Card) -> Vec<Need> {
+    let params = match c {
+        Card::Rcl {
+            letter: 'C' | 'L',
+            params,
+            ..
+        } => params,
+        Card::Source { parasitics, .. } => parasitics,
+        _ => return vec![],
+    };
+    let module = |k: &str| match k.to_ascii_lowercase().as_str() {
+        "rser" | "rpar" => Some(Need::Sp("resistor")),
+        "lser" => Some(Need::Sp("inductor")),
+        "cpar" => Some(Need::Sp("capacitor")),
+        _ => None,
+    };
+    params.iter().filter_map(|(k, _)| module(k)).collect()
 }
 
 /// The module element `c` needs, if any.
