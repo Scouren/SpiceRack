@@ -467,3 +467,81 @@ fn an_ngspice_nested_ternary_is_written_as_ngspice_reads_it() {
     let deep = deck.replace("1?0?4:8:16", "0?0?4:1?8:16:32");
     assert!(refusal(&deep, Dialect::Ngspice, Dialect::Xyce).contains(&Code::W0035));
 }
+
+// ── Xyce prints on ngspice ──
+
+/// ngspice-45's `.print` (manual §15.4.1) takes a kind it runs and bare
+/// vectors or expressions: `.print homotopy` and `.print dc` with no `.dc`
+/// are "no … analysis found", `{v(1)*2}` is "no such function as {v",
+/// and Xyce's `p(R1)` (RG `.PRINT`, device power) leaves the transient
+/// "not run" (each run by hand). So a print of a kind the deck does not
+/// run and a power accessor are left out (W0023), a braced expression is
+/// written bare, and real ngspice runs the deck: v(2) = 0.5 V.
+#[test]
+fn xyce_prints_are_spelled_or_left_out_on_ngspice() {
+    let deck = "* t\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 1k\n.tran 1u 10u\n\
+        .print tran v(2) {v(1) * 2} p(R1)\n.print homotopy v(2)\n.print dc v(2)\n.end\n";
+    let w = render_text(deck, Dialect::Xyce, "t", Dialect::Ngspice).expect("written");
+    assert!(w.text.contains(".print tran v(2) v(1)*2\n"), "{}", w.text);
+    assert!(
+        !w.text.contains("homotopy") && !w.text.contains(".print dc"),
+        "{}",
+        w.text
+    );
+    assert!(w.notes.diags.iter().any(|d| d.code == Code::W0023));
+    let raw = Dialect::Ngspice
+        .run(&w.text)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{}", w.text));
+    let i = raw
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("v(2)"));
+    let v = *raw.real_data[i.expect("v(2)")].last().unwrap();
+    assert!((v - 0.5).abs() < 1e-9, "{v}\n{}", w.text);
+}
+
+/// Xyce RG §2.3 (`sdt(x)`, the time integral of x); ngspice's B-source
+/// functions (manual §5.1) have `ddt` but no integral, and ngspice-45
+/// stops on `sdt` ("no such function 'sdt'", `xyce/Certification_Tests/
+/// BUG_963_SON/nonzeroInitialValue.cir`, run by hand): refused (W0045).
+#[test]
+fn ngspice_refuses_xyces_time_integral() {
+    let deck = "* t\nV2 2 0 1\nBsrc 1 0 V=sdt(v(2))\nR1 1 0 1k\n.tran 1u 10u\n.end\n";
+    let codes = refusal(deck, Dialect::Xyce, Dialect::Ngspice);
+    assert!(codes.contains(&Code::W0045), "{codes:?}");
+}
+
+/// ngspice §2.7 scopes what a `.include` or `.lib` inside a `.subckt`
+/// defines to that subcircuit (ngspice's `lib-processing/ex1b.sp`: 1.0 V);
+/// Xyce 7.10 makes it global, so the library's `inner` replaces the
+/// deck's own and the same deck gives 0.8 V (`.include`; a `.lib` there is
+/// "Invalid device type"; each run by hand). The writer cannot rename
+/// inside a file it does not write: refused on Xyce (W0046).
+#[test]
+fn xyce_refuses_a_file_read_inside_a_subcircuit() {
+    let lib = scratch("inner.lib", ".subckt inner n1 n2\nR3 n1 n2 2k\n.ends\n");
+    let deck = format!(
+        "* t\nI1 9 0 -1mA\nX1 9 0 sub1\nR2 9 0 4k\nX3 9 0 inner\n.subckt sub1 n1 n2\n\
+         .include {}\nX1 n1 n2 inner\n.ends\n.subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n",
+        lib.display()
+    );
+    assert!((ngspice_op(&deck, "9") - 1.0).abs() < 1e-9);
+    let codes = refusal(&deck, Dialect::Ngspice, Dialect::Xyce);
+    assert!(codes.contains(&Code::W0046), "{codes:?}");
+}
+
+// ── Xyce's if() and output syntax on ngspice ──
+
+/// Xyce RG §2.3 `if(c,a,b)`; ngspice-45 has no `if` ("no such function
+/// 'if'" in a B source, "Cannot compute substitute" in `{}`, run by
+/// hand) but reads `((c)?(a):(b))` in both. Xyce 7.10 on this deck, by
+/// hand: v(b) = 4, v(c) = 2·v(1) = 3. Real ngspice on the written deck
+/// gives the same.
+#[test]
+fn xyce_if_is_a_ternary_on_ngspice() {
+    let deck = "* t\nV1 1 0 1.5\nR1 1 0 1k\nVb b 0 {if(1>2,3,4)}\nRb b 0 1k\n\
+        Bc c 0 V={IF(V(1)>0,2*V(1),0)}\nRc c 0 1k\n.op\n.end\n";
+    let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
+    assert!((ngspice_op(&w, "b") - 4.0).abs() < 1e-9, "{w}");
+    assert!((ngspice_op(&w, "c") - 3.0).abs() < 1e-9, "{w}");
+}

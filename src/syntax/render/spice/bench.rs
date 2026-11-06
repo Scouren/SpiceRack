@@ -183,13 +183,7 @@ impl W<'_, '_> {
             self.o.token(&format!(".nodeset V({n})={v}"), Space::Line);
         }
         self.saves(&tb);
-        for (kind, outs, tok) in &tb.prints {
-            if self.ask(Construct::Print, *tok) == Action::Native {
-                let sep = if kind.is_empty() { "" } else { " " };
-                let line = format!(".print{sep}{kind} {}", outs.join(" "));
-                self.o.token(&line, Space::Line);
-            }
-        }
+        self.prints(&tb.prints, &tb.analyses);
         for m in &tb.measures {
             // `.MEASURE TRAN ...` is already a card, in any case.
             let card = m.get(..5).is_some_and(|p| p.eq_ignore_ascii_case(".meas"));

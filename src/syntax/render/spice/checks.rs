@@ -4,7 +4,8 @@
 //! target reads with the other meaning (`CaretReread`), a statistical call
 //! the target has no function for (`StatisticalCall`), an LTspice
 //! `.tran … startup` the target has no ramp for (`TranStartup`), an ngspice
-//! then-branch ternary another family groups otherwise (W0034, W0035). Each reads every
+//! then-branch ternary another family groups otherwise (W0034, W0035),
+//! Xyce's `sdt` on ngspice (W0045). Each reads every
 //! block the deck writes (definitions, sections, branches) and every
 //! expression the old reader kept as text.
 //!
@@ -61,6 +62,15 @@ impl W<'_, '_> {
             }
         }
         self.ternary_checks(&blocks);
+        // Xyce's time integral: ngspice's B source has `ddt`, no integral
+        // (manual §5.1).
+        if self.d.family() == Dialect::Ngspice {
+            let exprs = self.expressions(&blocks);
+            let sdt = |f: &str| f.eq_ignore_ascii_case("sdt");
+            if let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(sdt)) {
+                self.refuse(Code::W0045, *tok);
+            }
+        }
         let caret = caret_means_power(self.rd.d) != caret_means_power(self.d);
         let stat = crate::syntax::render::capability::action(self.d, Construct::StatisticalCall)
             != Action::Native;

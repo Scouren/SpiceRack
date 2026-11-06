@@ -467,6 +467,18 @@ catalogue! {
         cite: "HSPICE `.FOUR` (nine harmonics, no count); Xyce RG `.FOUR` (no count); ngspice-45 `src/frontend/fourier.c` (one `nfreqs` per deck); Spectre Reference 19.1 p.272-274 (`pss`: no sciter/steadycoeff/uic), `spectre -h ac` (no `oct`)",
         explain: "The analysis was asked for with an argument (a Fourier harmonic count, ngspice's PSS shooting controls, an octave sweep) the target's statement has no field for. Leave the argument out, or netlist for a target that takes it.",
     }
+    /// Xyce's time integral `sdt(x)` on a target with no integral function.
+    W0045 Refusal {
+        title: "a time integral the target lacks",
+        cite: "Xyce RG §2.3 (`sdt`); ngspice manual §5.1 (B-source functions: `ddt`, no integral); ngspice-45 run by hand (\"no such function 'sdt'\")",
+        explain: "`sdt(x)` integrates x over time in Xyce; ngspice's expressions have a derivative (`ddt`) but no integral, and ngspice stops on the call. Integrate with a capacitor (a current source of x into 1 F) instead.",
+    }
+    /// A `.include` or `.lib` inside a `.subckt` on a target that does not scope what the file defines to it.
+    W0046 Refusal {
+        title: "a file read inside a subcircuit the target does not scope",
+        cite: "ngspice manual §2.7 (a `.lib` in a `.subckt` is local to it); Xyce 7.10 run by hand (a `.include` there defines globally, a `.lib` there is \"Invalid device type\")",
+        explain: "ngspice scopes the subcircuits and models a file read inside a `.subckt` defines to that subcircuit; Xyce makes them global, where they replace the deck's own of the same name. Read the file at the top level, renaming what collides.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {
