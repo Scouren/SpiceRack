@@ -8721,3 +8721,16 @@ xyce/WAMPDE/invert1.cir ngspice .print spelled for ngspice: braced outputs bare,
 xyce/WAMPDE/invert1_WAMPDE.cir ngspice .print spelled for ngspice: braced outputs bare, a kind not run or p()/w() left out (W0023)
 xyce/XDM/PSPICE/MODELS/switch_model_statements.cir ngspice .print spelled for ngspice: braced outputs bare, a kind not run or p()/w() left out (W0023)
 xyce/XDM/QUERY/queryQ.cir ngspice .print spelled for ngspice: braced outputs bare, a kind not run or p()/w() left out (W0023)
+
+# Phase 7: spice-write: if() on ngspice. Xyce's and LTspice's if(c,a,b) is
+# ((c)?(a):(b)) on ngspice and ESPice: ngspice-45 has no if ("no such
+# function 'if'" in a B source, "Cannot compute substitute" in {}). Real
+# ngspice on the written xyce/TERNARY_OP deck: its 14 ternary/if() pairs
+# agree at all 51 .dc points (that deck is listed above).
+xyce/ABM_BREAK/break.cir espice if(c,a,b) written ((c)?(a):(b))
+xyce/ABM_BREAK/break.cir ngspice if(c,a,b) written ((c)?(a):(b))
+xyce/ACtests/test1.cir espice if(c,a,b) written ((c)?(a):(b))
+xyce/ACtests/test1.cir ngspice if(c,a,b) written ((c)?(a):(b))
+xyce/PARSER/nakedIf.cir espice if(c,a,b) written ((c)?(a):(b))
+xyce/UNARYOPS/unary_funcs.cir espice if(c,a,b) written ((c)?(a):(b))
+xyce/UNARYOPS/unary_funcs.cir ngspice if(c,a,b) written ((c)?(a):(b))

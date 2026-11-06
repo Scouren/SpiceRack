@@ -527,3 +527,19 @@ fn xyce_refuses_a_file_read_inside_a_subcircuit() {
     let codes = refusal(&deck, Dialect::Ngspice, Dialect::Xyce);
     assert!(codes.contains(&Code::W0046), "{codes:?}");
 }
+
+// ── Xyce's if() and output syntax on ngspice ──
+
+/// Xyce RG §2.3 `if(c,a,b)`; ngspice-45 has no `if` ("no such function
+/// 'if'" in a B source, "Cannot compute substitute" in `{}`, run by
+/// hand) but reads `((c)?(a):(b))` in both. Xyce 7.10 on this deck, by
+/// hand: v(b) = 4, v(c) = 2·v(1) = 3. Real ngspice on the written deck
+/// gives the same.
+#[test]
+fn xyce_if_is_a_ternary_on_ngspice() {
+    let deck = "* t\nV1 1 0 1.5\nR1 1 0 1k\nVb b 0 {if(1>2,3,4)}\nRb b 0 1k\n\
+        Bc c 0 V={IF(V(1)>0,2*V(1),0)}\nRc c 0 1k\n.op\n.end\n";
+    let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
+    assert!((ngspice_op(&w, "b") - 4.0).abs() < 1e-9, "{w}");
+    assert!((ngspice_op(&w, "c") - 3.0).abs() < 1e-9, "{w}");
+}
