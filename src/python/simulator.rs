@@ -358,7 +358,7 @@ impl PySimulator {
         let mut deck = self.deck(card::ac(variation, points, start_freq, stop_freq)?);
         if let Some(tb) = &mut deck.bench {
             let net = card::network_params(output_current, input_source, z_in, z_out);
-            tb.extra_lines.push((net, crate::syntax::Dialect::Ltspice));
+            tb.extra_lines.push((net, crate::syntax::Dialect::Ltspice.into()));
         }
         Ok(PySParamAnalysis {
             inner: Results::from_raw(deck.run(self.backend.as_deref())?),

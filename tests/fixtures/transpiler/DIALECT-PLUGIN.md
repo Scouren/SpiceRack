@@ -866,6 +866,44 @@ Taken from the user's defaults and this doc's recommendations (team lead,
     sample; oracle 5 (acme on ngspice) and oracle 2 (`tests/dialect_defs.rs`)
     are not written. `Kit` keeps its `Dialect`: a plugin kit is out of
     scope.
+- **P10**: the Python binding. `src/python/def_.rs`: `spicerack.def_`
+  (a submodule, in `sys.modules`) with `DialectDef`, one method per Rust
+  call, same name and arguments, each returning the definition (generated
+  by one macro from the call list), `register(d)` (`ValueError` with the
+  `RegisterError` message), `Lang` (the ten constants, `from_name`, `name`,
+  `dump`, `runs_on`), `Card`, `Answer`. `src/python/def_enums.rs`: every
+  vocabulary enum as a class of the same name, its unit variants class
+  attributes named by their Rust `Debug` and an exhaustive `match` per enum
+  (a new variant fails to compile until listed); data variants are
+  constructors (`Scale.Exp(6)`, `Alt.Omit(code)`, `Tail.Spice(dot)`,
+  `Quote.Expr(Quoting(..))`, `Statement.Analysis(a)`). Python hooks are
+  `external_hook`s: `def_::render` calls each once per deck with its
+  `Card`s and hands the answers to `render::splice`.
+  `python/spicerack/dialects.py`: `Dialect`, `register_dialect` (one-argument
+  class attributes applied as calls, base classes first, then `define`),
+  the built-ins as classes. `netlist(name)`, `from_source(text,
+  dialect=name)`, `extra_line(line, dialect=name)` and `with_backend(name)`
+  accept a registered plugin; `run()` on a plugin writes it and runs it on
+  `runs_on`'s simulator, else raises naming it netlist-only. A Python deck
+  written for a plugin takes the library paths and analysis forms of the
+  built-in in its chain. Docs: `docs/dialects.md` (run by `test_docs.py`),
+  `docs/reference.md`, `docs/index.md`; `skills/spicerack/`. Tests:
+  `tests/test_dialect_def.py` (acme and `MyHspice` dump the pinned Rust
+  rows byte for byte; each enum's members equal its Rust variants' names;
+  a hook called once per deck, spliced; refusals coded; acme text read and
+  written; netlist-only `run` refused; a `runs_on(Ngspice)` plugin gives
+  ngspice's operating point on ngspice).
+  Narrower than §2/§4, by what the code is:
+  - `Keyword` is `Tag` (exported under both names), so `Tag.KwSubckt`, not
+    `Keyword.Subckt`. A variant named `None` is `None_` in Python (a
+    keyword there). `Family` is `writer(Writer)`; the class-attribute sugar
+    covers every one-argument call.
+  - The only per-oracle-3 parity is acme and `MyHspice` (the pinned dumps);
+    the built-ins are not re-declared from Python.
+  - A hook's wrong answer count is a `RuntimeError` naming the hook (the
+    deck's errors are `RuntimeError`), not a `ValueError`.
+  - A plugin run skips `backend::select`'s feature checks: the deck goes
+    to `runs_on`'s simulator as written.
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).

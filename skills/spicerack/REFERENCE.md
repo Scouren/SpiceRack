@@ -188,6 +188,19 @@ The `u_Ω` family is registered with U+03A9 and does work.
 
 `UnitValue` exposes `.value`, `.str_spice()`, and `float()`.
 
+## Dialect plugins (`spicerack.def_`, `spicerack.dialects`)
+
+| Name | What it is |
+|---|---|
+| `ps.Dialect(name)` | base class; override `define(self, d) -> DialectDef` |
+| `ps.register_dialect(obj)` | `DialectDef(obj.name)`, one-argument class attributes as calls, `obj.define(d)`, register; returns `Lang` |
+| `ps.dialects.NGSPICE` ... `VERILOG` | the built-ins as base classes (`define` is `d.extends(Lang.X)`) |
+| `def_.DialectDef(name)` | the Rust calls 1:1, chained: `extends`, `comment_line`, `keyword`, `scale`, `write_head`, `option`, `spell`, `refuse`, `code`, `refuse_code`, `hook`, `runs_on`, ... |
+| `def_.register(d)` | registers a `DialectDef`; `ValueError` names the rule it breaks |
+| `def_.Lang` | `Lang.NGSPICE` ... `Lang.VERILOG`, `Lang.from_name(n)`, `.name()`, `.dump()`, `.runs_on()` |
+| `def_.Card`, `def_.Answer` | a hook's card (`head`, `words`, `params`, `text`) and answer (`Answer.Text(s)`, `Answer.Refuse(id)`) |
+| enums | the Rust enums by name: `Tag` (= `Keyword`), `Construct`, `Alt` (`Alt.Omit(Code.W0030)`), `Rule`, `Code`, `Kind`, `Scale` (`Scale.Exp(6)`, `Scale.Mil`), `Simulator`, the behaviour enums; `None` variants are `None_` |
+
 ## Backend capabilities
 
 Declared in `src/backend/mod.rs`; these gate automatic backend selection, and so does the writer: a run never lands on a backend whose writer refuses the deck.

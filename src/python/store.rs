@@ -10,9 +10,9 @@
 //! Contents:
 //! - `pub(super) const HEADER: &str`
 //! - `pub(super) fn to_source(b: &Body) -> Result<String, String>`
-//! - `pub(super) fn from_source(text: &str, d: Option<Dialect>) -> Result<Body, String>`
+//! - `pub(super) fn from_source(text: &str, d: Option<Lang>) -> Result<Body, String>`
 //! - `pub(super) fn with_loads(text: &str, loads: &[String]) -> String`
-//! - `pub(super) fn read_deck(text: &str, d: Option<Dialect>) -> Result<Body, String>`
+//! - `pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String>`
 //! - `pub(super) fn library_marker(lib: &ModelLibrary) -> String`,
 //!   `pub(super) fn libraries(text: &str) -> Vec<ModelLibrary>`
 
@@ -24,7 +24,7 @@ use std::fmt::Write as _;
 use super::model::{Body, Card, ModelLibrary, params};
 use crate::syntax::ast::{Ast, Node, Tag};
 use crate::syntax::token::{Tag as T, Tokens};
-use crate::syntax::{Dialect, parse, tokenize};
+use crate::syntax::{parse, tokenize};
 
 /// A stored text's first line, the name of the dialect after it following
 /// (`* spicerack-source ngspice`): a comment in every SPICE dialect and in
@@ -79,7 +79,7 @@ pub(super) fn to_source(b: &Body) -> Result<String, String> {
 ///
 /// # Errors
 /// As [`read_deck`]; text that defines no subcircuit.
-pub(super) fn from_source(text: &str, d: Option<Dialect>) -> Result<Body, String> {
+pub(super) fn from_source(text: &str, d: Option<Lang>) -> Result<Body, String> {
     let text = ngspice_text(text, d)?;
     let t = tokenize(&text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let a = parse(&t, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
@@ -149,7 +149,7 @@ pub(super) fn with_loads(text: &str, loads: &[String]) -> String {
 /// # Errors
 /// A dialect with no reader; text the renderer refuses to write as
 /// ngspice; a [`HEADER`] naming no dialect.
-pub(super) fn read_deck(text: &str, d: Option<Dialect>) -> Result<Body, String> {
+pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String> {
     let text = ngspice_text(text, d)?;
     let t = tokenize(&text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let a = parse(&t, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
@@ -305,22 +305,22 @@ fn words(line: &str) -> Vec<String> {
 
 /// `text` as ngspice text: its [`HEADER`] line left out, read in `d` (or
 /// the header's dialect, or ngspice), another dialect's written as ngspice.
-fn ngspice_text(text: &str, d: Option<Dialect>) -> Result<Cow<'_, str>, String> {
+fn ngspice_text(text: &str, d: Option<Lang>) -> Result<Cow<'_, str>, String> {
     let (named, body) = match text.strip_prefix(HEADER) {
         Some(rest) => {
             let (name, body) = rest.split_once('\n').unwrap_or((rest, ""));
-            (Some(name.trim().parse::<Dialect>()?), body)
+            (Some(super::def_::parse_lang(name.trim())?), body)
         }
         None => (None, text),
     };
-    let d = d.or(named).unwrap_or(Dialect::Ngspice);
-    if d.family() == Dialect::Ngspice {
+    let d = d.or(named).unwrap_or(Lang::NGSPICE);
+    if d.behaviours().text_family == Lang::NGSPICE {
         return Ok(Cow::Borrowed(body));
     }
-    if crate::syntax::Lang::from(d).lexicon().is_none() {
+    if d.lexicon().is_none() {
         return Err(format!("no {} reader", d.name()));
     }
-    let w = crate::syntax::render::render_text(body, d, "source", Dialect::Ngspice);
+    let w = crate::syntax::render::render_text(body, d, "source", Lang::NGSPICE);
     Ok(Cow::Owned(w.map_err(|e| e.messages)?.text))
 }
 
@@ -396,7 +396,7 @@ mod tests {
     fn a_header_names_the_dialect_and_text_needs_a_subcircuit() {
         assert!(from_source("t\nR1 a 0 1k\n.end\n", None).is_err());
         assert!(
-            from_source("t\n", Some(Dialect::Cdl)).is_err(),
+            from_source("t\n", Some(Lang::CDL)).is_err(),
             "no CDL reader"
         );
         assert!(from_source("* spicerack-source nonesuch\nt\n", None).is_err());
@@ -405,10 +405,7 @@ mod tests {
         let spectre = "// t\nsubckt cell (a b)\nr1 (a b) resistor r=1k\nends cell\n";
         for (text, d) in [
             (format!("{HEADER}spectre\n{spectre}"), None),
-            (
-                format!("{HEADER}ngspice\n{spectre}"),
-                Some(Dialect::Spectre),
-            ),
+            (format!("{HEADER}ngspice\n{spectre}"), Some(Lang::SPECTRE)),
         ] {
             let b = from_source(&text, d).unwrap();
             assert_eq!(

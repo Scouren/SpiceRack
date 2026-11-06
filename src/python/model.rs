@@ -82,7 +82,7 @@ pub(super) struct Bench {
     pub(super) steps: Vec<Step>,
     /// Lines given as one dialect's text (`extra_line`), each with its
     /// dialect's family: written as is for that family, refused elsewhere.
-    pub(super) extra_lines: Vec<(String, Dialect)>,
+    pub(super) extra_lines: Vec<(String, crate::syntax::Lang)>,
     /// `.print` cards: the analysis (maybe empty) and its outputs.
     pub(super) prints: Vec<(String, Vec<String>)>,
     /// ngspice's compatibility mode: an `.options ngbehavior=` card, which

@@ -26,6 +26,7 @@
 //! - `store.rs`: a subcircuit's source text and stored file (`to_source`, `save`)
 //! - `simulator.rs`, `spectre.rs`: `CircuitSimulator` and its Spectre-only analyses
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
+//! - `def_.rs`, `def_enums.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
 //!
 //! Contents:
@@ -44,6 +45,8 @@ mod args;
 mod card;
 mod circuit;
 mod deck;
+mod def_;
+mod def_enums;
 mod keywords;
 mod model;
 mod results;
@@ -96,6 +99,7 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compile_veriloga, m)?)?;
 
     create_unit_module(m)?;
+    def_::create_def_module(m)?;
     Ok(())
 }
 
