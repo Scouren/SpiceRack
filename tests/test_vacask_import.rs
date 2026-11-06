@@ -165,3 +165,32 @@ fn a_load_of_vacasks_own_linear_device_is_no_load_off_vacask() {
         assert!(!w.text.contains("resistor.osdi"), "{target:?}:\n{}", w.text);
     }
 }
+
+#[test]
+fn a_vacask_mfactor_is_the_targets_multiplier() {
+    // cir-mfactor.md: `$mfactor=N` is N devices in parallel; r1 = 1k/2
+    // gives v(2) = 10 * 9k / 9.5k. ngspice's R, D, M take `m=` (manual
+    // §3.3.1, §7.1, §11.1).
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare.replace("r=1k", "r=1k $mfactor=2");
+    let ng = written(&deck, Dialect::Ngspice).expect("written").text;
+    let (v, n) = (run(Dialect::Vacask, &deck), run(Dialect::Ngspice, &ng));
+    let exact = 10.0 * 9.0 / 9.5;
+    assert!((node(&v, "2") - exact).abs() < 1e-9, "VACASK v(2)");
+    assert!((node(&n, "2") - exact).abs() < 1e-9, "ngspice v(2)\n{ng}");
+}
+
+#[test]
+fn a_controlled_source_parameter_the_reader_has_no_field_for_is_kept() {
+    // The builtin `vccs` takes `gain` and `$mfactor` (dev-builtin.md); a
+    // card holding the gain alone would drop the multiplier.
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare.replace(
+        "model vsource vsource",
+        "model vsource vsource\nmodel g vccs\ng1 (2 0 1 0) g gain=1m $mfactor=2",
+    );
+    assert_eq!(
+        refusals(written(&deck, Dialect::Ngspice)),
+        vec![Code::W0001]
+    );
+}

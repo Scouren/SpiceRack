@@ -119,6 +119,21 @@ impl<'a> Rd<'a> {
                 .map(|(k, v)| (k.clone(), self.vtext(*v)))
                 .collect()
         };
+        // A device's parameters: VACASK's `$mfactor` (N in parallel,
+        // `docs/cir-mfactor.md`) is SPICE's multiplier `m` (ngspice manual
+        // §3.3.1, §7.1, §11.1).
+        let device = |used: &[&str]| -> Vec<(String, String)> {
+            let mut v = kept(used);
+            for (k, _) in &mut v {
+                if self.d == Dialect::Vacask && k == "$mfactor" {
+                    *k = "m".into();
+                }
+            }
+            v
+        };
+        // Whether every parameter is one of `known` (a card with no field
+        // for another would drop it).
+        let only = |known: &[&str]| p.iter().all(|(k, _)| known.contains(&k.as_str()));
         let two = || match ns.as_slice() {
             [a, b] => Some((a.clone(), b.clone())),
             _ => None,
@@ -145,7 +160,7 @@ impl<'a> Rd<'a> {
                     n2,
                     value: self.value(self.get(&p, key)?),
                     model: None,
-                    params: kept(&[key]),
+                    params: device(&[key]),
                 }
             }
             "vsource" | "isource" => {
@@ -173,6 +188,9 @@ impl<'a> Rd<'a> {
                 let [np, nm, ncp, ncm] = ns.as_slice() else {
                     return None;
                 };
+                if !only(&["gain", keys.gm]) {
+                    return None;
+                }
                 let (letter, gain) = match master.as_str() {
                     "vcvs" => ('e', num("gain")?),
                     _ => ('g', num(keys.gm)?),
@@ -186,6 +204,9 @@ impl<'a> Rd<'a> {
             }
             "cccs" | "ccvs" => {
                 let (np, nm) = two()?;
+                if !only(&["gain", keys.rm, keys.probe]) {
+                    return None;
+                }
                 // The controlling source as the name map spells its
                 // declaration (`in1` is `vin1`); none: no SPICE card.
                 let vsense = self.declared(n, &ident(keys.probe)?, &['V'])?;
@@ -200,7 +221,10 @@ impl<'a> Rd<'a> {
                     gain,
                 }
             }
-            m if m == keys.mutual && (self.d == Dialect::Spectre || ns.is_empty()) => {
+            m if m == keys.mutual
+                && (self.d == Dialect::Spectre || ns.is_empty())
+                && only(&["ind1", "ind2", keys.coupling]) =>
+            {
                 let refs = vec![ident("ind1")?, ident("ind2")?];
                 Card::Coupling {
                     name: self.strip(&name, 'k'),
@@ -258,7 +282,7 @@ impl<'a> Rd<'a> {
             }
             m => {
                 let kind = kind_of.as_deref()?;
-                let (model, params) = (m.to_string(), kept(&[]));
+                let (model, params) = (m.to_string(), device(&[]));
                 let letter = match (kind, ns.len()) {
                     ("d", 2) => 'd',
                     ("npn" | "pnp", 3..=5) => 'q',
