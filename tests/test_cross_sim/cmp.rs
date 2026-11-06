@@ -139,9 +139,11 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
     let (xa, xb) = (a.re(0), b.re(0));
     if first == 1 && k != "tran" {
         let span = xa.iter().fold(0.0f64, |m, x| m.max(x.abs()));
-        let same = |ys: &[f64]| {
-            ys.len() == xa.len() && xa.iter().zip(ys).all(|(x, y)| (x - y).abs() <= 1e-9 * span)
-        };
+        // A grid point holds to 1e-9 of the span, or to 1e-6 of itself: a
+        // log sweep's points are printed to 7 digits in Xyce's noise table.
+        let close = |x: f64, y: f64| (x - y).abs() <= (1e-9 * span).max(1e-6 * x.abs());
+        let same =
+            |ys: &[f64]| ys.len() == xa.len() && xa.iter().zip(ys).all(|(&x, &y)| close(x, y));
         // A nested `.dc` is one plot over the inner source in ngspice; VACASK
         // writes each sweep's vector first, the outer one (`sweep1`) before
         // the inner (`vsweep`). The grid holds if any leading vector is `a`'s.

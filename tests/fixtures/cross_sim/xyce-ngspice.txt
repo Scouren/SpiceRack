@@ -102,7 +102,7 @@ BSIM4_rbodymod2/test6.X.cir mismatch # dc VDS#branch: -0.0002975276275886967+0i 
 BSIM4_rbodymod2/test7.X.cir mismatch # dc VDS#branch: -0.000787288180101079+0i vs -0.0007855676604010845+0i at 1.04 (tol 1.715e-6)
 BSIM4_rbodymod2/test8.X.cir mismatch # dc VDS#branch: 0.0006377548705301063+0i vs 0.0006341088345945861+0i at -0.32 (tol 3.644e-6)
 BSIM4_rbodymod2/test9.X.cir mismatch # dc VDS#branch: 0.0004570215678821272+0i vs 0.00045241179241321594+0i at -0.1 (tol 4.413e-6)
-BSIM4_v4p7/gain-stage1-bsim4p7.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "M1_GatePrime", "VDD", "VDD1#branch"] vs ["onoise.m1.rd", "onoise.m1.rs", "onoise.m1.rg", "onoise.m1.rbps",
+BSIM4_v4p7/gain-stage1-bsim4p7.cir mismatch # noise inoise_spectrum: 0.00000233673532947144+0i vs 0.00000023226998520705779+0i at 100000000 (tol 2.016e-6)
 BSIM4_v4p82/test1.cir mismatch # dc VB#branch: 0.0000000003897007659907384+0i vs 0.00000000039463253725172804+0i at 0 (tol 3.038e-12)
 BSIM4_v4p82/test10.cir mismatch # dc VD#branch: 0.000004902537151799217+0i vs 0.0000006787565130319457+0i at -0.54 (tol 4.197e-6)
 BSIM4_v4p82/test13.cir mismatch # dc VB#branch: -0.000000000000863163618384237+0i vs -0.00000000000601262815415615+0i at -0.9400000000000001 (tol 4.379e-12)
@@ -212,7 +212,6 @@ Certification_Tests/BUG_1211_SON/specialChars.cir mismatch # op 2$: 0.6666666666
 Certification_Tests/BUG_1222_SON/bug_1222_son_1.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [betty]
 Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir target-fails # no raw file .cross_sim_out.raw: Formula() error. | Undefined parameter [test1]
 Certification_Tests/BUG_1238_SON/bug1238-ac-op.cir mismatch # plots ["op"] became ["ac", "op"]
-Certification_Tests/BUG_1238_SON/bug1238-noise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
 Certification_Tests/BUG_128/bug_128.cir mismatch # tran V(1): 1 leaves the tube at t=0 (tol 1.000e-2)
 Certification_Tests/BUG_1299_SON/bug1299son.cir mismatch # tran V(1): -0.9968095107021919 leaves the tube at t=0.487283156964356 (tol 1.000e-2)
 Certification_Tests/BUG_1325_SON/inc_lib_file_relative_path.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [p4]
@@ -492,7 +491,6 @@ DIODE_ANALYTIC/forward_model.cir mismatch # tran V(2): 0 leaves the tube at t=0 
 DIODE_ANALYTIC/reverse_model.cir mismatch # tran V(1): 1 leaves the tube at t=0 (tol 1.000e-2)
 DIODE_CMC/DiodeClipper.cir mismatch # tran V(2): -0.05854424949055976 leaves the tube at t=0.0005880074733127265 (tol 7.541e-2)
 DIODE_CMC/DiodeClipper_DC.cir mismatch # dc V(2): -0.26943701771561274+0i vs -0.7007822720752727+0i at -10 (tol 2.014e-2)
-DIODE_CMC/DiodeClipper_noise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "VCC#branch", "VIN#branch"] vs ["onoise_spectrum", "inoise_spectrum"])
 EKV26/inverter_transient_ekv26.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1)
 EKV26/test_ekv26_nmos.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 EKV26/test_ekv26_pmos.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
@@ -551,12 +549,10 @@ INIT_CONDS/comparatorICnonVector.cir target-fails # no raw file .cross_sim_out.r
 INIT_CONDS/inv1xIC.cir mismatch # tran IN: 0 leaves the tube at t=0 (tol 2.001e-2)
 INIT_CONDS/ring_osc_bsim3.cir mismatch # tran V(10): 1.9999966968093406 leaves the tube at t=0 (tol 2.083e-2)
 INVALID_CHARS/valid_chars_device_node_names.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v$ | Not enough parameters
-INVALID_CHARS/valid_chars_noise_expressions.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
 INVERT1/invert1.cir mismatch # tran VDDDEV#branch: -0.001771236106629716 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
 ISFFM/isffm.cir mismatch # tran V(1): 1.985668316061229 leaves the tube at t=0.0000049999999999999996 (tol 5.000e-2)
 JUNCAP200/DiodeClipper.cir mismatch # tran V(2): -0.014465014665564614 leaves the tube at t=0.0005824469561641759 (tol 7.542e-2)
 LEAD_CURRENTS/lead_bsrc_ac.cir mismatch # plots ["op"] became ["ac", "op"]
-LEAD_CURRENTS/lead_ind_noise.cir mismatch # plots ["op"] became ["noise", "op"]
 LEAD_CURRENTS/lead_min_ac.cir mismatch # plots ["op"] became ["ac", "op"]
 LTRA/ltra1.cir mismatch # tran V(100): 0.46681337015201163 leaves the tube at t=0.000000011304608227824232 (tol 5.610e-2)
 LTRA/ltra2.cir mismatch # tran V1#branch: 0.0069574881183347495 leaves the tube at t=0.0000000021328134031570598 (tol 3.291e-4)
@@ -643,11 +639,7 @@ MEASURE_AC/FindWhenTestAC.cir target-fails # no raw file .cross_sim_out.raw: Und
 MEASURE_AC/IntegTestAC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [vp]
 MEASURE_AC/MaxMinPPTestAC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [vr] | Undefined parameter [vi] | Undefined parameter [vr] | Undefined parameter [vi]
 MEASURE_AC/RMSTestAC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [vp]
-MEASURE_CONT/DerivTestNoise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "B", "C", "D"] vs ["onoise_spectrum", "inoise_spectrum"])
-MEASURE_CONT/FindWhenTestNoise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "B", "C", "D"] vs ["onoise_spectrum", "inoise_spectrum"])
-MEASURE_CONT/TrigTargTestNoise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "B", "C", "D"] vs ["onoise_spectrum", "inoise_spectrum"])
 MEASURE_CONT/USE_CONT_FILES/DuplicateMeasureNames.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [stdout]
-MEASURE_CONT/USE_CONT_FILES/Noise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "B", "C", "D"] vs ["onoise_spectrum", "inoise_spectrum"])
 MEASURE_DC/DerivTest1DC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v] | Undefined parameter [v] | Undefined parameter [v] | Undefined parameter [v]
 MEASURE_DC/DotOpDotDC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v] | Undefined parameter [dotopdotdcrawdata.prn]
 MEASURE_DC/DotOpOnly.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v] | Undefined parameter [dotopdotdcrawdata.prn]
@@ -670,9 +662,7 @@ MEASURE_NOISE/InputNoiseOps.cir target-fails # no raw file .cross_sim_out.raw: U
 MEASURE_NOISE/IntegTestNoise.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [vr]
 MEASURE_NOISE/MaxMinPPTestNoise.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [vr] | Undefined parameter [vi] | Undefined parameter [freq] | Undefined parameter [freq]
 MEASURE_NOISE/OutputNoiseOps.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [dno] | Undefined parameter [dno] | Undefined parameter [dno] | Undefined parameter [onoise]
-MEASURE_NOISE/REMEASURE/UnsupportedRemeasureMode.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
 MEASURE_NOISE/RMSTestNoise.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [vr]
-MEASURE_NOISE/TrigTargTestNoise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "B", "C", "D"] vs ["onoise_spectrum", "inoise_spectrum"])
 MEXTRAM/RGummel_Ib.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 MEXTRAM/RGummel_Ib_noFlip_P.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 MEXTRAM/RGummel_Ie.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
@@ -712,15 +702,7 @@ Message/Topology/Supernode_Warning.cir mismatch # dc V1#branch: -0.001+0i vs -0.
 NJFET_DC/njfet-2109.cir mismatch # dc VDS#branch: -0.0001649032985970153+0i vs -0.001912651242304979+0i at 1 (tol 8.281e-7)
 NL_RESISTOR/nlrcs10.cir mismatch # tran V(1): 400 leaves the tube at t=0 (tol 4.000e0)
 NMOS_ANALYTIC/mosfet_level1.cir mismatch # tran V(2): 5 leaves the tube at t=0 (tol 5.000e-2)
-NOISE/cascodeBjtNOISE.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "V(5)", "V(6)"] vs ["onoise_spectrum", "inoise_spectrum"])
-NOISE/commonEmitterBjt.cir mismatch # noise: no vector in common (["V(1)", "OUT", "Q1_baseprime", "Q1_collectorprime", "V1#branch", "V2#branch"] vs ["onoise_q1_rc", "onoise_q1_rb", "onoise_q1_re", "
-NOISE/gain-stage1.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "VDD", "VDD1#branch", "VIN#branch"] vs ["onoise_m1_rd", "onoise_m1_rs", "onoise_m1_id", "onoise_m1_1overf",
-NOISE/gain-stage2.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "VDD", "VDD1#branch", "VIN#branch"] vs ["onoise_spectrum", "inoise_spectrum"])
-NOISE/gain-stage3.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "VDD", "VDD1#branch", "VIN#branch"] vs ["onoise_spectrum", "inoise_spectrum"])
-NOISE/gain-stage_b3.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "VDD", "VDD1#branch", "VIN#branch"] vs ["onoise_spectrum", "inoise_spectrum"])
-NOISE/noiseBjt1.cir mismatch # noise: no vector in common (["N001", "N002", "N003", "N004", "N005", "N006"] vs ["onoise_q1_rc", "onoise_q1_rb", "onoise_q1_re", "onoise_q1_ic", "onoise_q1_ib",
-NOISE/noiseBjt2.cir mismatch # noise: no vector in common (["IN", "N001", "N002", "N003", "N004", "N005"] vs ["onoise_spectrum", "inoise_spectrum"])
-NOISE/res_noise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
+NOISE/gain-stage_b3.cir mismatch # noise inoise_spectrum: 0.019582390048204026+0i vs 0.0019582604835444903+0i at 100 (tol 4.116e-5)
 Nonlinear/ConvergenceTests/NLStrategy2.cir mismatch # tran V(1): -0.3762875070434149 leaves the tube at t=0.000000010954772022827602 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/NLStrategy5.cir mismatch # tran V(1): -0.3762862707533511 leaves the tube at t=0.000000010954800834658948 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/NLStrategy6.cir mismatch # tran V(1): -0.3762850999920565 leaves the tube at t=0.000000010954828121258379 (tol 2.277e-2)
@@ -748,7 +730,6 @@ Output/AC/op-td-prn.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/DC/op-big-prn.cir mismatch # op V(1): 0.0006592935750634707+0i vs 2.0006589630416975+0i at 0 (tol 3.319e-6)
 Output/Dasho/ac.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/Dasho/dc.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
-Output/Dasho/noise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
 Output/HOMOTOPY/arclengthSimple.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
 Output/HOMOTOPY/homotopy-csv.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-gnuplot.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
@@ -758,17 +739,6 @@ Output/HOMOTOPY/homotopy-prn.cir mismatch # tran V(5): -12.467552218111747 leave
 Output/HOMOTOPY/homotopy-probe-defaults-to-prn.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-raw-defaults-to-prn.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-tecplot.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-Output/NOISE/noise-csv.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/noise-gnuplot.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/noise-prn-noindex.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/noise-prn.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/noise-probe-defaults-to-prn.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/noise-raw-defaults-to-prn.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/noise-raw-override-ascii.cir mismatch # noise: no vector in common (["V(1)", "V1#branch"] vs ["onoise_r1_thermal", "onoise_r1_1overf", "onoise_r1", "onoise_spectrum", "inoise_spectrum"])
-Output/NOISE/noise-raw-override.cir mismatch # noise: no vector in common (["V(1)", "V1#branch"] vs ["onoise_r1_thermal", "onoise_r1_1overf", "onoise_r1", "onoise_spectrum", "inoise_spectrum"])
-Output/NOISE/noise-tecplot.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "V(4)", "EAMP#branch", "V1#branch"] vs ["onoise_rlp1_thermal", "onoise_rlp1_1overf", "onoise_rlp1", "onoise
-Output/NOISE/op-raw-override-ascii.cir mismatch # plots ["op"] became ["noise", "op"]
-Output/NOISE/op-raw-override.cir mismatch # plots ["op"] became ["noise", "op"]
 Output/Other/tran-timer.cir mismatch # tran V(6): 2.2876703372015585 leaves the tube at t=0.000000018650944770796552 (tol 2.535e-2)
 PARAMS1/params_a0.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2.000e-1)
 PARAMS1/params_a1.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2.000e-1)

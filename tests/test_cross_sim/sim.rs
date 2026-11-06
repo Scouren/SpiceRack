@@ -17,7 +17,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use spicerack::result::RawData;
+use spicerack::result::{RawData, VarInfo, VarType};
 
 /// A simulator a cell runs, with the reading mode it is started in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,6 +217,12 @@ fn run_in(
                 .filter(|p| !p.plot_name.eq_ignore_ascii_case("constants")),
         );
     }
+    if sim == Sim::Xyce
+        && let Some(n) = xyce_noise(&dir.join(format!("{DECK}.{ext}_noise.dat")))
+    {
+        plots.retain(|p| !p.plot_name.to_ascii_lowercase().contains("noise"));
+        plots.push(n);
+    }
     if plots.is_empty() {
         return Ok(Ran::Failed(format!("no plot: {}", errors(&log))));
     }
@@ -257,6 +263,65 @@ fn vacask_modules() -> Option<std::path::PathBuf> {
     let bin = std::env::split_paths(&path).find(|d| d.join("vacask").is_file())?;
     let real = std::fs::canonicalize(bin.join("vacask")).ok()?;
     Some(real.parent()?.parent()?.join("lib/vacask/mod"))
+}
+
+/// Xyce's noise spectra, which its raw file leaves out (it holds the ac
+/// node voltages): `<deck>_noise.dat`, a Tecplot table of frequency,
+/// Re/Im of the output and each `*noise*` density in V^2/Hz (for a 50k
+/// divider `onoise_spectrum` is 8.3e-16 = 4kTR). As one noise plot in
+/// ngspice's units, V/sqrt(Hz) (the square root of each density), the
+/// Re/Im columns dropped.
+fn xyce_noise(path: &Path) -> Option<RawData> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let (head, body) = text.split_once("ZONE")?;
+    let names: Vec<String> = head
+        .split('"')
+        .skip(3)
+        .step_by(2)
+        .map(|n| n.trim().to_string())
+        .collect();
+    let mut cols: Vec<Vec<f64>> = vec![Vec::new(); names.len()];
+    for l in body.lines().skip(1) {
+        let row: Vec<f64> = l
+            .split_whitespace()
+            .filter_map(|w| w.parse().ok())
+            .collect();
+        if row.len() == names.len() {
+            row.iter().zip(&mut cols).for_each(|(&v, c)| c.push(v));
+        }
+    }
+    let keep: Vec<usize> = (0..names.len())
+        .filter(|&i| i == 0 || names[i].to_ascii_lowercase().contains("noise"))
+        .collect();
+    let variables = keep
+        .iter()
+        .enumerate()
+        .map(|(k, &i)| VarInfo {
+            index: k,
+            name: names[i].clone(),
+            var_type: if i == 0 {
+                VarType::Frequency
+            } else {
+                VarType::Voltage
+            },
+        })
+        .collect();
+    let real_data = keep
+        .iter()
+        .map(|&i| {
+            if i == 0 {
+                cols[0].clone()
+            } else {
+                cols[i].iter().map(|v| v.sqrt()).collect()
+            }
+        })
+        .collect();
+    Some(RawData {
+        plot_name: "Noise Spectral Density Curves".into(),
+        variables,
+        real_data,
+        ..Default::default()
+    })
 }
 
 /// `timeout` exits 124 itself; a CPU-limit kill (SIGXCPU, SIGKILL at the
