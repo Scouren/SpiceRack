@@ -119,3 +119,25 @@ fn a_print_of_nodes_and_source_currents_is_in_the_raw_file() {
     let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
     assert_eq!(codes, [Code::W0023], "{}", w.notes.messages);
 }
+
+#[test]
+fn a_library_read_inside_a_subcircuit_stays_in_its_scope() {
+    // ngspice §2.7 scopes what a `.lib` inside a `.subckt` defines to it
+    // (`lib-processing/ex1b.sp`: ngspice 1.0 V). VACASK's `include` is
+    // textual (`lib/dfllexer.l`) and a subckt may hold one, so written
+    // inside `sub1` the library's `inner` (2k) shadows the top's (4k) there
+    // only: 1 mA into 4k || 2k || 4k = 1.0 V. Dropped, it ran 1.3333 V.
+    let dir = tempfile::tempdir().unwrap();
+    let lib = dir.path().join("inner.lib");
+    std::fs::write(
+        &lib,
+        "section res\nsubckt inner (n1 n2)\n  r3 (n1 n2) resistor r=2e3\nends\nendsection\n",
+    )
+    .unwrap();
+    let deck = format!(
+        "t\nI1 9 0 -1mA\nX1 9 0 sub1\nR2 9 0 4k\nX3 9 0 inner\n.subckt sub1 n1 n2\n\
+         .lib {} res\nX1 n1 n2 inner\n.ends\n.subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n",
+        lib.display()
+    );
+    close(col(&run(&deck), "9")[0], 1.0, 1e-9);
+}

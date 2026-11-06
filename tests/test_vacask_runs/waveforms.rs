@@ -49,3 +49,26 @@ fn a_pulse_train_runs() {
     close(at(2.5e-4), 0.0, 1e-3); // after the fall
     close(at(3.5e-4), 1.0, 1e-3); // second period
 }
+
+#[test]
+fn a_waveform_sources_dc_value_drives_the_dc_analyses() {
+    // ngspice-45 (run by hand: "dc value used for op instead of transient
+    // time=0 value") gives the op and every `.dc` point the card's DC value
+    // and starts `.tran` at the waveform's time-zero value. VACASK's source
+    // computes its waveform's in every analysis (`lib/devvisrc.cpp`
+    // `sourceCompute`), so a `dc=` beside `type="pulse"` and a sweep of it
+    // did nothing (rca3040: v(1) 0, not -0.25 V).
+    let deck = "t\nV1 a 0 dc 1 pulse(2 5 1n 1n 1n 10n 20n)\nR1 a 0 1k\n\
+                Vin b 0 sin(0 0.1 50meg)\nR2 b 0 1k\n.op\n.dc vin -0.25 0.25 0.25\n\
+                .tran 1n 2n\n.end\n";
+    let netlist = emit(deck).unwrap();
+    let plots = Dialect::Vacask
+        .run_all(&netlist)
+        .unwrap_or_else(|e| panic!("{e}\n{netlist}"));
+    close(col(&plots[0], "a")[0], 1.0, 1e-9);
+    let b = col(&plots[1], "b");
+    for (v, want) in b.iter().zip([-0.25, 0.0, 0.25]) {
+        assert!((v - want).abs() <= 1e-9, "dc b {v}, want {want}\n{netlist}");
+    }
+    close(col(&plots[2], "a")[0], 2.0, 1e-9);
+}

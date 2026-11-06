@@ -8,13 +8,14 @@
 //!
 //! Contents:
 //! - `W::vacask_card(&mut self, n: u32) -> Option<String>`
+//! - `W::dc_alters(&self, swept: &[String]) -> Vec<(String, &'static str)>`
 
 use super::W;
 use super::vacask::{num, q};
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Card, Num, Val, Wave, WaveKind};
+use crate::syntax::render::read::{Card, Comp, Num, Val, Wave, WaveKind};
 
 impl W<'_, '_> {
     /// Element `n`'s statement, with no line end; `None` when it is
@@ -207,6 +208,47 @@ impl W<'_, '_> {
                 return None;
             }
         })
+    }
+
+    /// The top's waveform sources the DC analyses must see as `type="dc"`,
+    /// each instance name and its waveform's `type`: VACASK evaluates the
+    /// waveform in every analysis (`lib/devvisrc.cpp` `sourceCompute`),
+    /// ngspice gives op and `.dc` the card's DC value (run by hand: "dc
+    /// value used for op instead of transient time=0 value"). Only those
+    /// whose DC value is not the waveform's at time zero, or that a `.dc`
+    /// in `swept` sweeps.
+    pub(super) fn dc_alters(&self, swept: &[String]) -> Vec<(String, &'static str)> {
+        let mut out = Vec::new();
+        for &c in &self.deck.top.comps {
+            let Comp::Card(n) = c else { continue };
+            let Card::Source {
+                letter,
+                value,
+                wave: Some(w),
+                ..
+            } = self.rd.card_view(n)
+            else {
+                continue;
+            };
+            let kind = match w.kind {
+                WaveKind::Sin => "sine",
+                WaveKind::Pulse => "pulse",
+                WaveKind::Exp => "exp",
+                WaveKind::Sffm => "fm",
+                WaveKind::Am => "am",
+                // Refused (W0108) or not a VACASK waveform (NoiseWave).
+                WaveKind::Pwl | WaveKind::Trnoise | WaveKind::Trrandom => continue,
+            };
+            let name = format!(
+                "{}{}",
+                letter.to_ascii_lowercase(),
+                q(&self.names.decl(n)[1..])
+            );
+            if value != w.at_zero() || swept.iter().any(|s| s.eq_ignore_ascii_case(&name)) {
+                out.push((name, kind));
+            }
+        }
+        out
     }
 
     /// `w` as `type="…"` parameters; `None` when it is refused.

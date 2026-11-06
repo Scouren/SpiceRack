@@ -9,7 +9,7 @@
 //! `checks` the deck-wide refusals (both targets'), `lift` the Monte Carlo
 //! rules (Spectre's `Lift(RackVars)`, VACASK's `Lift(VacaskCalls)`: fixups
 //! over `Call` nodes) and `sites` the expressions they walk, `vacask` the
-//! VACASK spine and its blocks and models, `vacask_cards` its instances,
+//! VACASK spine and its blocks, `vacask_models` its models, `vacask_cards` its instances,
 //! `vacask_bench` its `control` block. The two share the reader's plan, the checks, the
 //! testbench fold and the lift's walk; their decks differ around them.
 //!
@@ -36,6 +36,7 @@ mod sources;
 mod vacask;
 mod vacask_bench;
 mod vacask_cards;
+mod vacask_models;
 
 use super::capability::{Action, Alt, Construct, Rule, action};
 use super::draws::{self, Draws, Layers};
@@ -386,6 +387,15 @@ impl W<'_, '_> {
         self.line(&format!("subckt {name} ({})", ports.join(" ")));
         if empty(sc) && head.params.is_empty() {
             self.line("");
+        }
+        // A Spectre deck's own include in a subckt is Spectre's; another
+        // dialect's file read there has no clause here saying Spectre
+        // scopes it (ngspice §2.7 does), so it is refused, not dropped.
+        let first = sc.includes.first().or(sc.libs.first());
+        match (self.rd.d == Dialect::Spectre, first) {
+            (true, _) => self.file_cards(sc),
+            (false, Some(&n)) => self.refuse(Code::W0128, self.rd.main(n)),
+            (false, None) => {}
         }
         self.body(sc, None);
         self.line(&format!("ends {name}"));

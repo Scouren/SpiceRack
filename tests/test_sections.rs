@@ -146,8 +146,11 @@ fn each_dialect_is_a_fixpoint() {
         assert_eq!(meaning(&back.text).len(), 2, "{d:?}");
     }
     fixpoint(SPECTRE, Dialect::Spectre, "models");
-    // VACASK has no PDK fixture of its own: the SPICE one, written as VACASK.
-    let text = written(SPICE, Dialect::Ngspice, "models", Dialect::Vacask).text;
+    // VACASK has no PDK fixture of its own: the SPICE one, written as VACASK,
+    // at BSIM4 4.8 (ngspice-45 runs `version=4.5` as BSIM4v5, a module VACASK
+    // lacks: W0104; VACASK's is `sp_bsim4v8`).
+    let spice48 = SPICE.replace("version=4.5", "version=4.8");
+    let text = written(&spice48, Dialect::Ngspice, "models", Dialect::Vacask).text;
     // Known gap: VACASK selects no bin by geometry, so the wrappers' `m0 ...
     // nch` names no VACASK model and reads back as text, one per corner.
     let again = written(&text, Dialect::Vacask, "models", Dialect::Vacask);
@@ -160,10 +163,23 @@ fn each_dialect_is_a_fixpoint() {
         .filter(|l| !l.trim_start().starts_with("m0 "))
         .map(|l| format!("{l}\n"))
         .collect();
+    // VACASK's BSIM4 `version` is a string (`bsim4v8.va` L164), SPICE's a
+    // number: the same 4.8, spelled two ways, so it is left out here.
     let unbinned = |text: &str| {
         meaning(text)
             .into_iter()
             .map(|m| Meaning {
+                models: m
+                    .models
+                    .into_iter()
+                    .map(|(n, k, ps)| {
+                        (
+                            n,
+                            k,
+                            ps.into_iter().filter(|(p, _)| p != "version").collect(),
+                        )
+                    })
+                    .collect(),
                 subckts: m
                     .subckts
                     .into_iter()
@@ -174,7 +190,7 @@ fn each_dialect_is_a_fixpoint() {
             .collect::<Vec<_>>()
     };
     let back = written(&rest, Dialect::Vacask, "models", Dialect::Ngspice);
-    let spice = written(SPICE, Dialect::Ngspice, "models", Dialect::Ngspice);
+    let spice = written(&spice48, Dialect::Ngspice, "models", Dialect::Ngspice);
     assert_eq!(unbinned(&back.text), unbinned(&spice.text), "{text}");
     fixpoint(&text, Dialect::Vacask, "models");
 }

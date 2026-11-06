@@ -95,3 +95,47 @@ fn controlled_sources_run() {
     close(col(&raw, "f")[0], 4.0, 1e-9);
     close(col(&raw, "h")[0], 4.0, 1e-9);
 }
+
+#[test]
+fn a_model_parameter_ngspice_ignores_is_left_out() {
+    // ngspice-45's mos1 has no `utra` (`mos1/mos1.c`: "unrecognized
+    // parameter - ignored"), nor has VACASK's `sp_mos1`, which stopped on
+    // it ("Parameter 'utra' not found."; circuitsim90 MOS2 g1310.sp).
+    // Saturation, lambda 0: Id = KP/2 * W/L * (Vgs-Vt)^2 = 0.4 mA, so the
+    // drain sits at 5 - 1k * 0.4m = 4.6 V.
+    let deck = "mos\n.model nm NMOS (LEVEL=1 VTO=1.0 KP=2e-5 UTRA=2)\nRd vdd drain 1k\n\
+                M1 drain gate 0 0 nm W=10u L=1u\nVdd vdd 0 5\nVg gate 0 3\n.op\n.end\n";
+    let w = spicerack::syntax::render::render_text(deck, Dialect::Ngspice, "t", Dialect::Vacask)
+        .unwrap();
+    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    assert_eq!(codes, [Code::W0112], "{}", w.notes.messages);
+    close(col(&run(deck), "drain")[0], 4.6, 1e-6);
+}
+
+#[test]
+fn a_bsim_version_is_the_modules_or_refused() {
+    // ngspice-45 `inpdomod.c` L271-L314: level 49 `version=3.3…` is BSIM3
+    // (VACASK's `sp_bsim3v3`, which has no `version`), `3.2…` BSIM3v32;
+    // level 54 `4.8…` is BSIM4, the module's own `version` string
+    // (`bsim4v8.va` L164). Written bare, `3.3.0` was VACASK's syntax error
+    // ("unexpected floating point number", nmos_out_BSIM330_*.sp).
+    let card = |m: &str| {
+        format!("m\n.model n1 nmos {m}\nM1 d g 0 0 n1 W=1u L=1u\nVd d 0 1\nVg g 0 1\n.op\n.end\n")
+    };
+    let b3 = card("level=49 version=3.3.0 tox=3.5n");
+    assert!(!emit(&b3).unwrap().contains("version"));
+    assert!(col(&run(&b3), "d")[0] == 1.0);
+    let b4 = card("level=54 version=4.8.2");
+    assert!(emit(&b4).unwrap().contains("version=\"4.8.2\""));
+    assert!(col(&run(&b4), "d")[0] == 1.0);
+    assert_eq!(
+        emit(&card("level=49 version=3.2.4")).unwrap_err(),
+        [Code::W0104]
+    );
+    assert_eq!(
+        emit(&card("level=54 version=4.7")).unwrap_err(),
+        [Code::W0104]
+    );
+    // A parameter ngspice reads that the module lacks: refused.
+    assert_eq!(emit(&card("level=1 icvds=1")).unwrap_err(), [Code::W0129]);
+}

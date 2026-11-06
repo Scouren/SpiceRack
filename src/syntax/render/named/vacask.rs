@@ -30,7 +30,7 @@ use crate::syntax::ast::NONE;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::Func;
-use crate::syntax::render::read::{Block, Card, Comp, Model, Num, Raw, Val, Visit};
+use crate::syntax::render::read::{Block, Card, Comp, Num, Raw, Val, Visit};
 
 /// A device module the deck needs: VACASK's build of the SPICE device set
 /// (`load "spice/<m>.osdi"` and `model <m> sp_<m>`) or a built-in (a
@@ -336,6 +336,10 @@ impl W<'_, '_> {
             .expect("the reader read the head");
         let ports: Vec<String> = head.ports.iter().map(|p| q(p)).collect();
         self.line(&format!("subckt {} ({})", q(&sc.name), ports.join(" ")));
+        // VACASK's `include` is textual (`lib/dfllexer.l`): inside the
+        // subckt, what the file defines is local to it, as ngspice §2.7
+        // scopes a `.lib` there.
+        self.vacask_files(sc, "  ");
         self.vacask_body(sc, models);
         self.line("ends");
     }
@@ -454,107 +458,6 @@ impl W<'_, '_> {
             }
         }
     }
-
-    /// Block `b`'s `model` lines, the OSDI files their modules need added
-    /// to `loads`; a model with no VACASK module is refused.
-    fn model_lines(&mut self, b: &Block, loads: &mut BTreeSet<String>) -> Vec<String> {
-        let mut out = Vec::new();
-        for &(m, bin) in &b.models {
-            let view = self.rd.model_view(m, bin);
-            if let Some(k) = self.table_kind(&view) {
-                if let Some(rows) = self.model_rows(&view, m, k) {
-                    loads.insert(format!("spice/{}.osdi", k.vacask));
-                    out.push(format!(
-                        "model {} sp_{}{}",
-                        q(&view.name),
-                        k.vacask,
-                        self.vacask_list(None, &rows)
-                    ));
-                }
-                continue;
-            }
-            match self.vacask_model(&view, loads) {
-                Some(l) => out.push(l),
-                None => self.refuse(Code::W0104, self.rd.main(m)),
-            }
-        }
-        out
-    }
-
-    /// Model `m`'s line: LEVEL picks the module (a type or level with none
-    /// is `None`); a kind no SPICE type names is a module the deck loads
-    /// itself, passed through ("Model not found" beats a substitute).
-    fn vacask_model(&self, m: &Model, loads: &mut BTreeSet<String>) -> Option<String> {
-        let kind = m.kind.to_ascii_lowercase();
-        let name = q(&m.name);
-        let mut level = 1u32;
-        for (k, v) in &m.params {
-            if k.eq_ignore_ascii_case("level") {
-                let t = v
-                    .trim()
-                    .trim_start_matches('{')
-                    .trim_end_matches('}')
-                    .trim();
-                level = super::spice_num(t)?.0 as u32;
-            }
-        }
-        let (module, sign) = match kind.as_str() {
-            "nmos" | "pmos" => (mos_module(level)?, if kind == "nmos" { 1 } else { -1 }),
-            // `.model x NPN (LEVEL=4)` is VBIC, `LEVEL=8` HICUM: other
-            // equations under the same keyword.
-            k if model_type(k).is_some() => {
-                if level != 1 {
-                    return None;
-                }
-                model_type(k)?
-            }
-            // `sp_resistor` renames the card's `r`/`tc1` to `model_r`…: a
-            // name-for-name card would set the instance's. No switches.
-            "r" | "c" | "l" | "res" | "cap" | "ind" | "sw" | "csw" => return None,
-            _ => {
-                return Some(format!(
-                    "model {name} {kind}{}",
-                    self.vacask_params(m, None)
-                ));
-            }
-        };
-        loads.insert(format!("spice/{module}.osdi"));
-        // `type=` is the polarity, and keeps an otherwise empty list
-        // non-empty: `model x sp_diode ( )` is a syntax error.
-        let lead = (sign != 0).then_some(sign);
-        Some(format!(
-            "model {name} sp_{module}{}",
-            self.vacask_params(m, lead)
-        ))
-    }
-
-    /// ` (type=1 k=v …)`, or nothing: `m`'s parameters but its `level`.
-    fn vacask_params(&self, m: &Model, sign: Option<i8>) -> String {
-        let rows = m
-            .params
-            .iter()
-            .filter(|(k, _)| !k.eq_ignore_ascii_case("level"));
-        let rows: Vec<(String, String)> = rows
-            .map(|(k, v)| (k.to_ascii_lowercase(), v.clone()))
-            .collect();
-        self.vacask_list(sign, &rows)
-    }
-
-    /// ` (type=1 k=v …)`, or nothing.
-    fn vacask_list(&self, sign: Option<i8>, rows: &[(String, String)]) -> String {
-        let mut s = String::new();
-        if let Some(t) = sign {
-            s.push_str(&format!(" type={t}"));
-        }
-        for (k, v) in rows {
-            s.push_str(&format!(" {k}={}", self.expr(v)));
-        }
-        if !s.is_empty() {
-            s.replace_range(..1, " (");
-            s.push(')');
-        }
-        s
-    }
 }
 
 impl Need {
@@ -581,37 +484,6 @@ fn need(c: &Card) -> Option<Need> {
         Card::Linear { letter: 'G', .. } => Need::Builtin("vccs"),
         Card::Linear { letter: 'F', .. } => Need::Builtin("cccs"),
         Card::Linear { .. } => Need::Builtin("ccvs"),
-        _ => return None,
-    })
-}
-
-/// SPICE MOSFET LEVEL → VACASK module; a level not here has none ("the
-/// nearest model" is other equations).
-fn mos_module(level: u32) -> Option<&'static str> {
-    Some(match level {
-        1 => "mos1",
-        2 => "mos2",
-        3 => "mos3",
-        6 => "mos6",
-        9 => "mos9",
-        49 | 8 => "bsim3v3",
-        54 | 14 => "bsim4v8",
-        _ => return None,
-    })
-}
-
-/// `.model` TYPE → (module, polarity), for the types whose parameters
-/// transcribe name for name at LEVEL 1.
-fn model_type(kind: &str) -> Option<(&'static str, i8)> {
-    Some(match kind {
-        "d" => ("diode", 0),
-        "npn" => ("bjt", 1),
-        "pnp" => ("bjt", -1),
-        "njf" => ("jfet1", 1),
-        "pjf" => ("jfet1", -1),
-        "nmf" => ("mes1", 1),
-        "pmf" => ("mes1", -1),
-        "vdmos" => ("vdmos", 1),
         _ => return None,
     })
 }

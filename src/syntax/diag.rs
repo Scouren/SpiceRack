@@ -578,6 +578,18 @@ catalogue! {
         cite: "Spectre Reference 19.1 pp.438-439 (xf: transfer functions from every source)",
         explain: "SPICE's `.tf` gives the gain and the input and output resistances at the operating point; Spectre's `xf` at `values=[0]` gives the transfer function from every source to the output, no resistance. Add a test source and compute the resistance from its transfer function.",
     }
+    /// A SPICE `.include` or `.lib` inside a `.subckt`, on Spectre.
+    W0128 Refusal {
+        title: "a file read inside a subcircuit, on Spectre",
+        cite: "ngspice manual §2.7 (a `.lib` in a `.subckt` is local to it); Spectre Reference 19.1 pp.533-535 (`subckt`: no clause on an `include` in its body)",
+        explain: "ngspice scopes what a file read inside a `.subckt` defines to that subcircuit; no Spectre clause here says an `include` in a `subckt` body does the same, and leaving the file out changes which subcircuits and models the body sees. Read the file at the top level, renaming what collides.",
+    }
+    /// A model parameter the VACASK module the card maps to does not declare.
+    W0129 Refusal {
+        title: "a model parameter the VACASK module lacks",
+        cite: "VACASK 36be560 `devices/spice/<module>.va` (its `parameter` and `aliasparam` names; VACASK stops on another: \"Parameter '…' not found.\"); ngspice-45 `devices/<dev>/*.c` (the names the device reads)",
+        explain: "The card sets a parameter the source simulator reads (or, from a dialect other than ngspice, may read) but the `sp_*` module VACASK builds from ngspice's device code does not declare (an initial condition, a self-heating or a version switch), so VACASK has no equation for it. Remove the parameter, or set the condition the VACASK way (`ic=` on the analysis).",
+    }
 }
 
 /// Sorts `diags` by source position (token), then code: the order their
