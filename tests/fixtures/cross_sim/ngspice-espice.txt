@@ -7,15 +7,15 @@ circuitsim90/MOS2/nand.sp simulator-fails # no raw file .cross_sim_out.raw: Erro
 circuitsim90/MOS2/pump.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS2/ring.sp simulator-differs # tran v(2): 3.035043276482301 leaves the tube at t=0.00000003142807272942943 (tol 3.055e-2)
 circuitsim90/MOS2/slowlatch.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
-circuitsim90/MOS2_LARGE/dac.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS2_LARGE/dac.sp slow # quarantined
 circuitsim90/MOS2_LARGE/fadd32.sp simulator-differs # tran v(27): 4.829967900476039 leaves the tube at t=0.00000004213614057458797 (tol 5.262e-2)
 circuitsim90/MOS2_LARGE/pchip.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
-circuitsim90/MOS2_LARGE/sqrt.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS2_LARGE/sqrt.sp slow # quarantined
 circuitsim90/MOS3/arom.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS3/gm17.sp simulator-differs # tran v(2): 2.518455731506805 leaves the tube at t=0.000000016 (tol 2.519e-2)
 circuitsim90/MOS3/gm19.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS3/jge.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
-circuitsim90/MOS3/rich3.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS3/rich3.sp slow # quarantined
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_14.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q0: unknown instance parameter 'dtemp' | Error: .cross_sim_deck.sp: UnknownParameter
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_2.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q0: unknown instance parameter 'dtemp' | Error: .cross_sim_deck.sp: UnknownParameter
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_20.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q0: unknown instance parameter 'dtemp' | Error: .cross_sim_deck.sp: UnknownParameter
@@ -1880,7 +1880,6 @@ ngspice/examples/sp/sp1.sp simulator-fails # no raw file .cross_sim_out.raw: err
 ngspice/examples/sp/sp2.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .sp dec 100 1 1e6 0: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
 ngspice/examples/sp/sp3.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .sp dec 100 1 1e6 0: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
 ngspice/examples/sp/sp4.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .sp lin 100 1e8 1e9 1: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
-ngspice/examples/transient-noise/noi-ring51-demo.sp simulator-fails # no raw file .cross_sim_out.raw: error: v.xiinv51.vn1: the trnoise source waveform is not supported | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/bjt_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @q1[gm]: q1 has no variable 'gm'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/diode_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @d1[gd]: d1 has no variable 'gd'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/roessler-attractor.sp simulator-differs # tran v(x): 6.2592552217138575 leaves the tube at t=153.61596000036945 (tol 1.143e-1)
@@ -1930,7 +1929,6 @@ ngspice/paranoia/pton/op-test-test.sp simulator-fails # no raw file .cross_sim_o
 ngspice/paranoia/pton/op-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars
 ngspice/paranoia/pton/relax_osc_st.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: e_iccsat_high icc_out_high 0 value={table( v(vccp,vccn) , 2 , {64e-6 - iee} , 3.3 , {65e-6
 ngspice/paranoia/pton/switch-oscillators.sp simulator-differs # tran v(n001): 0.03301560197605448 leaves the tube at t=0.0000000022576797174247857 (tol 3.000e-2)
-ngspice/paranoia/transient-noise/noi-ring51-demo.sp simulator-fails # no raw file .cross_sim_out.raw: error: v.xiinv51.vn1: the trnoise source waveform is not supported | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/paranoia/various/nmos_pmos_BSIM330.sp simulator-differs # dc: sweep grid changed (246 -> 186 points)
 ngspice/paranoia/various/nmos_pmos_plotting.sp simulator-differs # dc: sweep grid changed (246 -> 186 points)
 ngspice/paranoia/various/ro_17_4.sp simulator-differs # tran v(3): 1.0032345606593271 leaves the tube at t=0.000000001128 (tol 2.020e-2)

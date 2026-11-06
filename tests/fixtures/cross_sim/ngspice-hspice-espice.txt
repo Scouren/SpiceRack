@@ -8,15 +8,15 @@ circuitsim90/MOS2/pump.sp simulator-fails # no raw file .cross_sim_out.raw: Erro
 circuitsim90/MOS2/ring.sp simulator-differs # tran v(2): 3.035043276482301 leaves the tube at t=0.00000003142807272942943 (tol 3.055e-2)
 circuitsim90/MOS2/slowlatch.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS2_LARGE/add20.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
-circuitsim90/MOS2_LARGE/dac.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS2_LARGE/dac.sp slow # quarantined
 circuitsim90/MOS2_LARGE/fadd32.sp mismatch # tran v(27): 4.737524448348849 leaves the tube at t=0.00000004191803908252018 (tol 5.262e-2)
-circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined: past the 120 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/sqrt.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined
+circuitsim90/MOS2_LARGE/sqrt.sp slow # quarantined
 circuitsim90/MOS3/arom.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS3/gm17.sp simulator-differs # tran v(4): 4.813072814687794 leaves the tube at t=0.0000000000016000000000000003 (tol 5.000e-2)
 circuitsim90/MOS3/gm19.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS3/gm3.sp mismatch # op v(60): 0.021136929931199738+0i vs 0.02119159000963426+0i at 0 (tol 4.427e-5)
-circuitsim90/MOS3/rich3.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS3/rich3.sp slow # quarantined
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_14.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q0: unknown instance parameter 'dtemp' | Error: .cross_sim_deck.sp: UnknownParameter
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_2.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q0: unknown instance parameter 'dtemp' | Error: .cross_sim_deck.sp: UnknownParameter
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_20.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q0: unknown instance parameter 'dtemp' | Error: .cross_sim_deck.sp: UnknownParameter
@@ -2476,16 +2476,8 @@ ngspice/examples/mos/ro-meas.sp simulator-differs # tran v(xro.n2): 0.7617871250
 ngspice/examples/mos/ro_17_4.sp mismatch # tran v(3): 2.031786140106218 leaves the tube at t=0.0000000036638227578334806 (tol 2.032e-2)
 ngspice/examples/noise/bipolar-noise.sp mismatch # noise: sweep grid changed (84 -> 84 points)
 ngspice/examples/noise/resdiv.sp simulator-differs # total v(onoise_total): 0.00000006364900413612206+0i vs 0.000002869272520463811+0i at 0 (tol 2.000e-6)
-ngspice/examples/numparam/pintest.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
-ngspice/examples/optran/F5TurboV2thermal-optran.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .MODEL SW VSWITCH(VON=4V VOFF=1V RON={ron} ROFF=100K) | Error: .cross_sim_deck.sp: ParseEr
-ngspice/examples/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM RNVF={1.184*PWR(NVRF,2)} | Error: .cross_sim_deck.sp: ParseError
-ngspice/examples/optran/TLV9002-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM GLF={PWR(FLW,0.25)*NLF/1164} | Error: .cross_sim_deck.sp: ParseError
-ngspice/examples/p-to-n-examples/555-timer-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM LPE = {36U - LDP} | Error: .cross_sim_deck.sp: ParseError
-ngspice/examples/p-to-n-examples/OP_MCP6041.sp target-fails # no raw file .cross_sim_out.raw: error: netlist: a braced expression (HSPICE quotes expressions: '...'): GD16 16 1 TABLE {V(16,1)} ((-100,-1p)(0,0)(1m,1u)(2m,1m)
 ngspice/examples/p-to-n-examples/logic.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: E1 1 0 vol='~(~v(9)&v(8)) + 0.5' | Error: .cross_sim_deck.sp: ParseError
 ngspice/examples/p-to-n-examples/op-test-adi.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xopmap.q1: model 'qp' (ako:qp350) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
-ngspice/examples/p-to-n-examples/op-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .param GLFF={PWR(FLWF,0.25)*NLFF/1164} | Error: .cross_sim_deck.sp: ParseError
-ngspice/examples/p-to-n-examples/switch-oscillators_inc.sp target-fails # no raw file .cross_sim_out.raw: error: S element 's.xx1.sp': MNAME= is required (FQMODEL is not supported) | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/snapshot/adder_mos.sp mismatch # tran i(vcc): 0.000028800403292145605 leaves the tube at t=0.000000000010000000000000001 (tol 2.756e-6)
 ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.7): 3.3408752682771654 leaves the tube at t=0.00000000428 (tol 3.396e-2)
 ngspice/examples/soa/bjt-soa.sp simulator-differs # dc v(b): -0.000000000000000005618573551780987+0i vs 192730461.46672505+0i at 0 (tol 1.201e-3)
@@ -2499,7 +2491,6 @@ ngspice/examples/svg/nmos_out_BSIM330_ps.sp mismatch # dc i(vss2): 0.00013403422
 ngspice/examples/svg/nmos_out_BSIM330_svg-2.sp mismatch # dc i(vss2): 0.00013403422848867223+0i vs 0.00013303534247702554+0i at 0.39999999999999997 (tol 9.913e-7)
 ngspice/examples/svg/nmos_out_BSIM330_svg.sp mismatch # dc i(vss2): 0.00013403422848867223+0i vs 0.00013303534247702554+0i at 0.39999999999999997 (tol 9.913e-7)
 ngspice/examples/svg/nmos_out_BSIM330_various.sp mismatch # dc i(vss2): 0.00013403422848867223+0i vs 0.00013303534247702554+0i at 0.39999999999999997 (tol 9.913e-7)
-ngspice/examples/transient-noise/noi-ring51-demo.sp simulator-fails # no raw file .cross_sim_out.raw: error: v.xiinv51.vn1: the trnoise source waveform is not supported | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/bjt_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @q1[gm]: q1 has no variable 'gm'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/diode_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @d1[gd]: d1 has no variable 'gd'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/gain_stage.sp mismatch # ac v(3): -0.0033610614417935647+0.000000012006472859773026i vs -0.0033298182668377863+0.000000011894819414036425i at 100 (tol 8.722e-6)
@@ -2534,20 +2525,8 @@ ngspice/iscas85/c499/c499.sp mismatch # tran v(g217): 0.02512508352859677 leaves
 ngspice/iscas85/c499/c499_ann.sp mismatch # tran v(g369_1): 0.7177782171893664 leaves the tube at t=0.0000000009149999999999989 (tol 1.807e-2)
 ngspice/iscas85/c880/c880.sp mismatch # tran v(x101.n1): -0.08873676392817934 leaves the tube at t=0.0000000004550000000000004 (tol 3.710e-3)
 ngspice/iscas85/c880/c880_ann.sp mismatch # tran v(g795_1): 1.2208840783137147 leaves the tube at t=0.000000000934999999999999 (tol 1.811e-2)
-ngspice/kicad/sallen_key-bandpass-072/sallen_key_bp.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card:  | Error: .cross_sim_deck.sp: ParseError
 ngspice/paranoia/measure/func_cap.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
-ngspice/paranoia/optran/F5TurboV2thermal-ic-out.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .MODEL SW VSWITCH(VON=4V VOFF=1V RON={ron} ROFF=100K) | Error: .cross_sim_deck.sp: ParseEr
-ngspice/paranoia/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM RNVF={1.184*PWR(NVRF,2)} | Error: .cross_sim_deck.sp: ParseError
-ngspice/paranoia/optran/TLV9002-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM GLF={PWR(FLW,0.25)*NLF/1164} | Error: .cross_sim_deck.sp: ParseError
-ngspice/paranoia/pton/555-timer-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM LPE = {36U - LDP} | Error: .cross_sim_deck.sp: ParseError
-ngspice/paranoia/pton/OP_MCP6041.sp target-fails # no raw file .cross_sim_out.raw: error: netlist: a braced expression (HSPICE quotes expressions: '...'): GD16 16 1 TABLE {V(16,1)} ((-100,-1p)(0,0)(1m,1u)(2m,1m)
-ngspice/paranoia/pton/Optimos_out.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM  x0=0          x1=12.3       dx={x1-x0} | Error: .cross_sim_deck.sp: ParseError
 ngspice/paranoia/pton/op-test-adi.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xopmap.q1: model 'qp' (ako:qp350) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
-ngspice/paranoia/pton/op-test-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .param GLFF={PWR(FLWF,0.25)*NLFF/1164} | Error: .cross_sim_deck.sp: ParseError
-ngspice/paranoia/pton/op-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .param GLFF={PWR(FLWF,0.25)*NLFF/1164} | Error: .cross_sim_deck.sp: ParseError
-ngspice/paranoia/pton/relax_osc_st.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .PARAM RIN_CM_VM={2*RINCM} | Error: .cross_sim_deck.sp: ParseError
-ngspice/paranoia/pton/switch-oscillators_inc.sp target-fails # no raw file .cross_sim_out.raw: error: S element 's.xx1.sp': MNAME= is required (FQMODEL is not supported) | Error: .cross_sim_deck.sp: UnsupportedCard
-ngspice/paranoia/transient-noise/noi-ring51-demo.sp simulator-fails # no raw file .cross_sim_out.raw: error: v.xiinv51.vn1: the trnoise source waveform is not supported | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/paranoia/various/gain_stage.sp mismatch # ac v(3): -0.0033610614417935647+0.000000012006472859773026i vs -0.0033298182668377863+0.000000011894819414036425i at 100 (tol 8.722e-6)
 ngspice/paranoia/various/nmos_pmos_BSIM330.sp mismatch # dc: sweep grid changed (246 -> 186 points)
 ngspice/paranoia/various/nmos_pmos_plotting.sp mismatch # dc: sweep grid changed (246 -> 186 points)
@@ -2588,12 +2567,6 @@ ngspice/tests/bsim3soidd/ring51.sp simulator-fails # no raw file .cross_sim_out.
 ngspice/tests/bsim3soidd/t3.sp mismatch # dc i(vs): 0.0024644873528504667+0i vs 0.0024817310965769+0i at 1.280000000000001 (tol 1.593e-5)
 ngspice/tests/bsim3soidd/t4.sp mismatch # dc i(vb): -0.000000000021243858257111632+0i vs 0+0i at 0 (tol 2.042e-12)
 ngspice/tests/bsim3soidd/t5.sp mismatch # dc i(vs): 0.0000969591938176943+0i vs 0.00009747954085733858+0i at 0.8700000000000006 (tol 5.146e-7)
-ngspice/tests/bsim3soifd/RampVg2.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
-ngspice/tests/bsim3soifd/inv2.sp mismatch # dc v(out): 1.7274496281318614+0i vs 1.7354325969369138+0i at 1.2300000000000009 (tol 5.002e-3)
-ngspice/tests/bsim3soifd/ring51.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xdum.mn1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
-ngspice/tests/bsim3soifd/t3.sp mismatch # dc i(vs): 0.0020115471785840944+0i vs 0.0020263896443987787+0i at 0.6400000000000003 (tol 1.482e-5)
-ngspice/tests/bsim3soifd/t4.sp mismatch # dc i(vs): 0.0000778619361278307+0i vs 0.00007831583251599654+0i at 0.7300000000000004 (tol 4.468e-7)
-ngspice/tests/bsim3soifd/t5.sp mismatch # dc i(vs): 0.00009994929512569792+0i vs 0.00010048880484461022+0i at 1.0000000000000007 (tol 5.124e-7)
 ngspice/tests/bsim3soipd/RampVg2.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: model 'n1' (nmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/tests/bsim3soipd/inv2.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: model 'p1' (pmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/tests/bsim3soipd/ring51.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xinv1.xinv1.xinv1.mn1: model 'n1' (nmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevi
@@ -2616,11 +2589,12 @@ ngspice/tests/mesa/mesgout.sp mismatch # ac v(2): -0.0008965907949260534+0.00000
 ngspice/tests/mesa/mesinv.sp mismatch # dc v(40): 0.6021137958405641+0i vs 0.6035812134661475+0i at 0 (tol 1.206e-3)
 ngspice/tests/mesa/mesosc.sp mismatch # tran v(xinv05.2): 0.30144319703198635 leaves the tube at t=0.000000005 (tol 5.655e-3)
 ngspice/tests/regression/lib-processing/ex1b.sp simulator-differs # op v(9): 1+0i vs 1.3333333333333335+0i at 0 (tol 2.002e-3)
+ngspice/tests/regression/lib-processing/ex2a.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound
+ngspice/tests/regression/lib-processing/ex3a.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound
 ngspice/tests/regression/misc/ac-zero.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .ac lin 1 0 0: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
 ngspice/tests/regression/misc/asrc-tc-2.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
 ngspice/tests/regression/misc/bugs-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @v1[dc]: v1 has no variable 'dc'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/tests/regression/misc/empty-1.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: DeliveryFailed | Output error: DataLengthMismatch
-ngspice/tests/regression/misc/if-elseif.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .elseif (select2 = 2) | Error: .cross_sim_deck.sp: ParseError
 ngspice/tests/regression/misc/log-functions-1.sp target-fails # no raw file .cross_sim_out.raw: error: B-source 'eb2': the v= expression is not supported (UnsupportedFunction); the limits are i() of branch cards only, no unk
 ngspice/tests/regression/misc/test-noise-2.sp simulator-differs # noise onoise_spectrum: 0.002263714702364253+0i vs 0.000000004057784401557085+0i at 1000 (tol 6.527e-6)
 ngspice/tests/regression/misc/test-noise-3.sp simulator-differs # noise onoise_spectrum: 0.00038791823585810346+0i vs 0.0000000009073481759919947+0i at 1000 (tol 2.776e-6)

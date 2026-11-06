@@ -130,12 +130,14 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
     let (xa, xb) = (a.re(0), b.re(0));
     if first == 1 && k != "tran" {
         let span = xa.iter().fold(0.0f64, |m, x| m.max(x.abs()));
-        let same = xa.len() == xb.len()
-            && xa
-                .iter()
-                .zip(xb.iter())
-                .all(|(x, y)| (x - y).abs() <= 1e-9 * span);
-        if !same {
+        let same = |ys: &[f64]| {
+            ys.len() == xa.len() && xa.iter().zip(ys).all(|(x, y)| (x - y).abs() <= 1e-9 * span)
+        };
+        // A nested `.dc` is one plot over the inner source in ngspice; VACASK
+        // writes each sweep's vector first, the outer one (`sweep1`) before
+        // the inner (`vsweep`). The grid holds if any leading vector is `a`'s.
+        let lead = b.variables.len().min(4);
+        if !(0..lead).any(|j| same(&b.re(j))) {
             return Err(format!(
                 "{k}: sweep grid changed ({} -> {} points)",
                 xa.len(),

@@ -82,16 +82,15 @@ ngspice/examples/mos/ro-meas.sp target-fails # no raw file .cross_sim_out.raw:
 ngspice/examples/mos/ro_17_4.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/noise/bipolar-noise.sp target-fails # no raw file .cross_sim_out.raw: Error on line 10 or its substitute:: .noise v(2) vin 1 | no such parameter on this device or parameter is missing | Simulation i
 ngspice/examples/noise/resdiv.sp target-fails # no raw file .cross_sim_out.raw: Error on line 14 or its substitute:: .noise v(2) v1 1 | no such parameter on this device or parameter is missing | Simulation in
-ngspice/examples/p-to-n-examples/555-timer-2.sp mismatch # tran v(1): 4.815926341018673 leaves the tube at t=0.05414927176746497 (tol 4.887e-2)
-ngspice/examples/p-to-n-examples/switch-oscillators_inc.sp target-fails # no raw file .cross_sim_out.raw: Error on line 26 or its substitute:: .tran 50p 40n start=50p | Error: unknown parameter on .tran - ignored | Simulation interrup
+ngspice/examples/p-to-n-examples/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Error: Original (pnp) and new () type for AKO model disagree
+ngspice/examples/snapshot/adder_mos.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/snapshot/adder_mos_circ.sp target-fails # no raw file .cross_sim_out.raw: 
-ngspice/examples/soa/nic_soa.sp target-fails # no raw file .cross_sim_out.raw: Error on line 32 or its substitute:: .tran 1u 1m start=0 | Error: unknown parameter on .tran - ignored | Simulation interrupted 
+ngspice/examples/soa/nic_soa.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/svg/nmos_out_BSIM330_png.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/svg/nmos_out_BSIM330_ps.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/svg/nmos_out_BSIM330_svg-2.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/svg/nmos_out_BSIM330_svg.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/svg/nmos_out_BSIM330_various.sp target-fails # no raw file .cross_sim_out.raw: 
-ngspice/examples/transient-noise/noi-ring51-demo.sp mismatch # tran v(in): 2.3021276565172224 leaves the tube at t=0.000000011663679998834527 (tol 2.641e-2)
 ngspice/examples/utf-8/стекло/있어요/adder_mos.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/utf-8/стекло/있어요/adder_mos3.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/examples/various/FFT_Leakage.sp target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: .tran 1u 998.9999999999999u start=0 | Error: unknown parameter on .tran - ignored | Simulati
@@ -110,8 +109,7 @@ ngspice/iscas85/c499/c499.sp target-fails # no raw file .cross_sim_out.raw: Erro
 ngspice/iscas85/c499/c499_ann.sp target-fails # no raw file .cross_sim_out.raw: Error on line 22202 or its substitute:: .tran 1p 1n start=0 | Error: unknown parameter on .tran - ignored | Simulation interrupt
 ngspice/iscas85/c880/c880.sp target-fails # no raw file .cross_sim_out.raw: Error on line 549 or its substitute:: .tran 1p 1n start=0 | Error: unknown parameter on .tran - ignored | Simulation interrupted
 ngspice/iscas85/c880/c880_ann.sp target-fails # no raw file .cross_sim_out.raw: Error on line 16713 or its substitute:: .tran 1p 1n start=0 | Error: unknown parameter on .tran - ignored | Simulation interrupt
-ngspice/paranoia/pton/switch-oscillators_inc.sp target-fails # no raw file .cross_sim_out.raw: Error on line 26 or its substitute:: .tran 50p 4n start=50p uic | Error: unknown parameter on .tran - ignored | Simulation inter
-ngspice/paranoia/transient-noise/noi-ring51-demo.sp mismatch # tran v(in): 0.5549138409533885 leaves the tube at t=0.000000000031999999994 (tol 2.588e-2)
+ngspice/paranoia/pton/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Error: Original (pnp) and new () type for AKO model disagree
 ngspice/paranoia/various/FFT_Leakage.sp target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: .tran 1u 998.9999999999999u start=0 | Error: unknown parameter on .tran - ignored | Simulati
 ngspice/paranoia/various/adder_mos.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/paranoia/various/bjtnoise.sp target-fails # no raw file .cross_sim_out.raw: Error on line 11 or its substitute:: .noise v(3) vin 1 | no such parameter on this device or parameter is missing | Simulation i
@@ -120,7 +118,7 @@ ngspice/paranoia/various/nmos_pmos_BSIM330.sp target-fails # no raw file .cross_
 ngspice/paranoia/various/nmos_pmos_plotting.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/paranoia/various/ro_17_4.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/paranoia/vbic/vbic_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "@q1[go]", "@q1[gpi]", "@q1[cbe]", "@q1[cbc]", "@q1[qbe]"] vs ["v(1)", "v(b)", "v(q1#substrate)", "v(q1#collCI)", "v(q1#xf1
-ngspice/tests/bsim3soipd/ring51.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+ngspice/tests/bsim3soipd/ring51.sp slow # quarantined
 ngspice/tests/mesa/mesosc.sp target-fails # no raw file .cross_sim_out.raw: Error on line 28 or its substitute:: .tran 1p 5n start=1n | Error: unknown parameter on .tran - ignored | Simulation interrupted
 ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["v(1)", "i(v1)"])
 ngspice/tests/regression/misc/test-noise-2.sp target-fails # no raw file .cross_sim_out.raw: Error on line 9 or its substitute:: .noise v(1) v1 0 | no such parameter on this device or parameter is missing | Simulation int
