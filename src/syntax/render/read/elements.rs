@@ -263,6 +263,7 @@ impl<'a> Rd<'a> {
                                 value: v,
                             });
                         }
+                        let (items, m) = self.multiplier(e, items)?;
                         let [_, _, c, d, g] = items else { return None };
                         if ![c, d, g].iter().all(|&&k| self.is_word(k)) {
                             return None;
@@ -271,10 +272,11 @@ impl<'a> Rd<'a> {
                             letter,
                             name,
                             nodes: vec![np, nm, self.text(*c), self.text(*d)],
-                            gain: self.number(*g)?,
+                            gain: self.number(*g)? * m,
                         }
                     }
                     _ => {
+                        let (items, m) = self.multiplier(e, items)?;
                         let [_, _, v, g] = items else { return None };
                         if !self.is_word(*v) || !self.is_word(*g) {
                             return None;
@@ -283,7 +285,7 @@ impl<'a> Rd<'a> {
                             letter,
                             name,
                             nodes: vec![np, nm, self.text(*v)],
-                            gain: self.number(*g)?,
+                            gain: self.number(*g)? * m,
                         }
                     }
                 }
@@ -319,14 +321,26 @@ impl<'a> Rd<'a> {
                         .find(|&&p| self.key(p).eq_ignore_ascii_case(key))
                         .and_then(|&p| self.number(self.ast.rhs(Node(p))))
                 };
-                if pairs.len() != 2 {
+                let known = ["z0", "td", "f", "nl"];
+                if !pairs
+                    .iter()
+                    .all(|&p| known.iter().any(|k| self.key(p).eq_ignore_ascii_case(k)))
+                {
                     return None;
                 }
+                // The delay, or a frequency at which the line is `nl`
+                // wavelengths long (default a quarter): td = nl / f
+                // (ngspice manual and Xyce RG, lossless transmission line `T`).
+                let td = match (get("td"), get("f")) {
+                    (Some(td), None) if pairs.len() == 2 => td,
+                    (None, Some(f)) if f > 0.0 && pairs.len() <= 3 => get("nl").unwrap_or(0.25) / f,
+                    _ => return None,
+                };
                 Card::Line {
                     name,
                     nodes: items[..4].iter().map(|&k| self.text(k)).collect(),
                     z0: get("z0")?,
-                    td: get("td")?,
+                    td,
                 }
             }
             // else: the ngspice letters the old reader had no rule for.
@@ -338,6 +352,23 @@ impl<'a> Rd<'a> {
             | Element::CodeModel
             | Element::Osdi => return None,
         })
+    }
+
+    /// A linear controlled source's items less a trailing `M=` and its
+    /// value (1 without one): `M` parallel copies of a current-output source
+    /// (G, F) is the gain times `M` (Xyce RG and ngspice manual, the
+    /// controlled sources' `m=`); `None` for an `M=` on E or H, or one not a number.
+    fn multiplier<'i>(&self, e: Element, items: &'i [u32]) -> Option<(&'i [u32], f64)> {
+        match items.split_last() {
+            Some((&a, rest))
+                if self.tag(a) == Tag::Assign && self.key(a).eq_ignore_ascii_case("m") =>
+            {
+                let current = matches!(e, Element::Vccs | Element::Cccs);
+                current.then_some(())?;
+                Some((rest, self.number(self.ast.rhs(Node(a)))?))
+            }
+            _ => Some((items, 1.0)),
+        }
     }
 
     /// An R, C or L card's value, model and parameters.

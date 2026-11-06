@@ -10,13 +10,13 @@
 //! LTspice help `.TRAN` (the `startup` and `uic` modifiers).
 //!
 //! Contents:
-//! - `pub(in crate::syntax::render) enum BenchCard`, `enum Ana`, `struct Sweep`
+//! - `pub(in crate::syntax::render) enum BenchCard`, `enum Ana`, `struct Sweep`; `pub(super) enum Card`
 //! - `Rd::testbench_peg(&self, n: u32) -> bool`, `Rd::testbench_ok(&self, n: u32) -> bool`
 //! - `Rd::bench_card(&self, n: u32) -> Option<BenchCard>`
 //! - `Rd::tran_startup(&self, bench: &[Bench]) -> Option<u32>`
 //! - `Rd::head_kind(&self, n: u32) -> String`
 //! - `Rd::numw(&self, k: u32) -> bool`
-//! - `Rd::wordw(&self, k: u32) -> bool`
+//! - `Rd::wordw(&self, k: u32) -> bool`, `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
 
 use super::Rd;
 use super::options::Opt;
@@ -39,6 +39,11 @@ pub(in crate::syntax::render) enum BenchCard {
         param: String,
         nums: [f64; 3],
     },
+    /// `.step <name> list <values>` (Xyce, LTspice).
+    StepList {
+        param: String,
+        values: Vec<f64>,
+    },
     Temp(f64),
     /// `.ic` (`true`) or `.nodeset` values.
     NodeVals(bool, Vec<(String, f64)>),
@@ -56,6 +61,9 @@ pub(in crate::syntax::render) enum Ana {
     Op,
     /// Each sweep's source, start, stop, step.
     Dc(Vec<(String, f64, f64, f64)>),
+    /// A `.dc` with an axis by decade, by octave or over a list (Xyce,
+    /// LTspice), innermost first.
+    DcAxes(Vec<super::DcAxis>),
     Ac(Sweep),
     Sp(Sweep),
     Tran {
@@ -104,14 +112,13 @@ pub(in crate::syntax::render) struct Sweep {
     pub(in crate::syntax::render) stop: f64,
 }
 
-/// The sweep keywords (`Sweep` in the IR).
-const SWEEPS: &[&str] = &["dec", "oct", "lin", "log"];
-
 /// A testbench card's parts, as its grammar rule reads them.
-enum Card {
+pub(super) enum Card {
     Op,
     /// `.dc`: the sweeps' `[source, start, stop, step]` items.
     Dc(Vec<[u32; 4]>),
+    /// `.dc` with a log or list axis.
+    DcAxes(Vec<super::DcAxis>),
     /// `.ac`, `.sp`: variation, points, start, stop.
     Freq(bool, [u32; 4]),
     /// `.tran`: its numbers, a `START=` pair, `uic`, LTspice's `startup`.
@@ -136,7 +143,12 @@ enum Card {
     Meas,
     /// `.step [kind] [param] name a b c`.
     Step(Option<u32>, u32, [u32; 3]),
+    /// `.step [param] name list v…`.
+    StepList(String, Vec<f64>),
 }
+
+/// The sweep keywords (`Sweep` in the IR).
+const SWEEPS: &[&str] = &["dec", "oct", "lin", "log"];
 
 impl<'a> Rd<'a> {
     /// Whether the card's rule in the dialect's grammar reads it.
@@ -173,6 +185,7 @@ impl<'a> Rd<'a> {
                     nums,
                 }
             }
+            Card::StepList(param, values) => BenchCard::StepList { param, values },
             Card::Temp(v) => BenchCard::Temp(self.number(v)?),
             Card::NodeVals(vals) => {
                 let v: Vec<(String, f64)> = vals
@@ -224,14 +237,10 @@ impl<'a> Rd<'a> {
     pub(super) fn wordw(&self, k: u32) -> bool {
         self.tag(k) == Tag::Word
     }
-}
 
-// ---- private ----
-
-impl<'a> Rd<'a> {
     /// quirk: whether every item follows the one before it (or the head) after
     /// blanks only: the old grammars' `s` between fields.
-    fn spaced(&self, n: u32, items: &[u32]) -> bool {
+    pub(super) fn spaced(&self, n: u32, items: &[u32]) -> bool {
         let mut prev = self.main(n);
         for &k in items {
             let first = self.main(k);
@@ -242,7 +251,11 @@ impl<'a> Rd<'a> {
         }
         true
     }
+}
 
+// ---- private ----
+
+impl<'a> Rd<'a> {
     /// The card's parts by its grammar rule; `None` when the rule does not
     /// read it.
     fn read_card(&self, n: u32) -> Option<Card> {
@@ -256,6 +269,22 @@ impl<'a> Rd<'a> {
                 [v] if self.val_ok(*v) && self.tag(*v) != Tag::Seq => Some(Card::Temp(*v)),
                 _ => None,
             },
+            // Bare `node value` pairs: Xyce 7.10 runs `.ic 1 1.0` as `.ic
+            // v(1)=1.0` (checked by running both); HSPICE `.DCVOLT 11 5`.
+            Tag::Ic | Tag::Nodeset
+                if matches!(self.d, Dialect::Xyce | Dialect::Hspice)
+                    && !items.is_empty()
+                    && items.iter().all(|&k| self.tag(k) != Tag::Assign) =>
+            {
+                if !items.len().is_multiple_of(2) || !self.spaced(n, items) {
+                    return None;
+                }
+                items
+                    .chunks(2)
+                    .map(|p| (self.wordw(p[0]) && self.val_ok(p[1])).then_some((p[0], p[1])))
+                    .collect::<Option<Vec<_>>>()
+                    .map(Card::NodeVals)
+            }
             Tag::Ic | Tag::Nodeset => items
                 .iter()
                 .map(|&a| {
@@ -287,6 +316,12 @@ impl<'a> Rd<'a> {
             Tag::Step => self.step(n, items),
             Tag::Analysis => match kind.as_str() {
                 "op" => Some(Card::Op),
+                "dc" if matches!(self.d, Dialect::Xyce | Dialect::Ltspice | Dialect::Hspice)
+                    && self.spaced(n, items)
+                    && let Some(axes) = self.dc_axes(items) =>
+                {
+                    Some(Card::DcAxes(axes))
+                }
                 "dc" => {
                     if items.is_empty() || !items.len().is_multiple_of(4) || !self.spaced(n, items)
                     {
@@ -346,15 +381,16 @@ impl<'a> Rd<'a> {
     }
 
     fn tran(&self, n: u32, items: &[u32], hspice: bool, lt: bool) -> Option<Card> {
-        // Trailing modifiers in any order: `uic`, and LTspice's `startup`
-        // (LTspice help, `.TRAN`).
+        // Trailing modifiers in any order: `uic` (Xyce's `NOOP` too), and
+        // LTspice's `startup` (LTspice help, `.TRAN`).
         let (mut body, mut uic, mut startup) = (items, false, false);
         while let Some((&u, rest)) = body.split_last()
             && self.wordw(u)
         {
             let w = self.text(u).to_ascii_lowercase();
             match w.as_str() {
-                "uic" if !uic => uic = true,
+                // Xyce 7.10 runs `NOOP` and `UIC` alike (checked by running both).
+                "uic" | "noop" if !uic && (w == "uic" || self.d == Dialect::Xyce) => uic = true,
                 "startup" if lt && !startup => startup = true,
                 _ => break,
             }
@@ -436,47 +472,6 @@ impl<'a> Rd<'a> {
         }
     }
 
-    fn step(&self, n: u32, items: &[u32]) -> Option<Card> {
-        // ngspice has no `.step`, so one in a deck read as ngspice is the
-        // given deck's (`lexicon::NGSPICE_GIVEN`): Xyce's form (RG p.155),
-        // whose `lin|dec|oct` LTspice shares, and Spectre's total-count
-        // `log` (Reference 19.1 p.406-410 `sweep`), which Python's
-        // `step_sweep` names.
-        let kinds: &[&str] = match self.d {
-            Dialect::Ngspice => &["lin", "dec", "oct", "log"],
-            _ => &["lin", "dec", "oct"],
-        };
-        let mut it = items;
-        let kind = match it.first() {
-            Some(&k)
-                if kinds
-                    .iter()
-                    .any(|w| self.wordw(k) && self.text(k).eq_ignore_ascii_case(w)) =>
-            {
-                it = &it[1..];
-                Some(k)
-            }
-            _ => None,
-        };
-        if self.d == Dialect::Ltspice {
-            let (&p, rest) = it.split_first()?;
-            if !(self.wordw(p) && self.text(p).eq_ignore_ascii_case("param")) {
-                return None;
-            }
-            it = rest;
-        }
-        match it {
-            [name, a, b, c]
-                if self.spaced(n, items)
-                    && self.wordw(*name)
-                    && [a, b, c].iter().all(|&&k| self.numw(k)) =>
-            {
-                Some(Card::Step(kind, *name, [*a, *b, *c]))
-            }
-            _ => None,
-        }
-    }
-
     /// An analysis card's view (the old lowering's `analysis`).
     fn analysis(&self, card: &Card) -> Option<Ana> {
         let num = |k: u32| self.number(k);
@@ -496,6 +491,7 @@ impl<'a> Rd<'a> {
                     .map(|s| Some((self.text(s[0]), num(s[1])?, num(s[2])?, num(s[3])?)))
                     .collect::<Option<_>>()?,
             ),
+            Card::DcAxes(axes) => Ana::DcAxes(axes.clone()),
             Card::Freq(false, f) => Ana::Ac(sweep(f)?),
             Card::Freq(true, f) => Ana::Sp(sweep(f)?),
             Card::Tran(nums, pair, uic, startup) => {

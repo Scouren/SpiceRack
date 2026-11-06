@@ -17,7 +17,8 @@
 //! - `Rd::subckt_head(&self, n: u32) -> Option<Head>`, `Rd::model_head(&self, n: u32) -> Option<Node>`
 //! - `Rd::model_view(&self, n: u32) -> Model`, `Rd::include_path(&self, n: u32) -> String`,
 //!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::func_view(&self, f: Func) -> (String, Vec<String>, String)`,
-//!   `Rd::func_span(&self, f: Func) -> Option<(u32, u32)>`, `Rd::param_view(&self, a: u32) -> (String, String)`
+//!   `Rd::func_span(&self, f: Func) -> Option<(u32, u32)>`, `Rd::param_view(&self, a: u32) -> (String, String)`,
+//!   `Rd::global_param(&self, a: u32) -> bool`
 
 use super::{Acc, Block, Func, Kept, Rd, Scope};
 use crate::syntax::Dialect;
@@ -280,6 +281,15 @@ impl Rd<'_> {
         }
     }
 
+    /// Whether the `.param` assignment `a` is an Xyce `.global_param`'s:
+    /// Xyce runs a constant instance `temp={…}` from a `.param` at the
+    /// swept temperature, from a `.global_param` at its value
+    /// (Xyce_Regression BUG_1203_SON/dot_step.cir, run both ways), so
+    /// Xyce writes it back as `.global_param`.
+    pub(in crate::syntax::render) fn global_param(&self, a: u32) -> bool {
+        self.global_params.contains(&a)
+    }
+
     /// A `.param` assignment's name and value text.
     pub(in crate::syntax::render) fn param_view(&self, a: u32) -> (String, String) {
         (
@@ -401,6 +411,9 @@ impl Rd<'_> {
         inside: bool,
         acc: &mut Acc,
     ) -> Result<(), Kept> {
+        if self.d == Dialect::Xyce && self.global_swept(n) {
+            return Err(Kept::Raw);
+        }
         let items = self.fields(n).to_vec();
         let ngspice = self.d == Dialect::Ngspice;
         let lt_params = self.d == Dialect::Ltspice && self.head_word(n) == "params";
@@ -447,6 +460,9 @@ impl Rd<'_> {
             } else if inside {
                 here.locals.push(a);
             } else {
+                if self.d == Dialect::Xyce && self.head_word(n) == "global_param" {
+                    self.global_params.insert(a);
+                }
                 here.params.push(a);
             }
         }

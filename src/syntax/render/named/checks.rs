@@ -27,6 +27,11 @@ impl W<'_, '_> {
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
         let foreign = |tok: &u32| self.rd.text_dialect(*tok) != self.d;
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
+        let (private, other): (Vec<u32>, Vec<u32>) =
+            other.iter().partition(|&&t| self.rd.private(t));
+        if let Some(&tok) = private.first() {
+            self.ask(Construct::PrivateText, tok);
+        }
         if let Some(&tok) = other.first() {
             self.ask(Construct::ForeignText, tok);
         }

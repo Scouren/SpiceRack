@@ -16,6 +16,7 @@
 //! - `W::control_run(&self) -> Option<Vec<String>>`, `W::bench(&mut self, control: Option<&[String]>)`, `W::runs(&self) -> bool`
 
 use super::W;
+use super::sweeps::dc_axis;
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct, action};
@@ -46,6 +47,8 @@ pub(super) struct Tb {
     measures: Vec<String>,
     /// Each `.step`'s sweep, name, numbers and first token.
     steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
+    /// Each list `.step`'s name, values and first token.
+    step_lists: Vec<(String, Vec<f64>, u32)>,
     /// VACASK control lines kept as text.
     pub(super) extra: Vec<String>,
     /// `ngbehavior=`'s mode, with its statement's first token.
@@ -209,6 +212,22 @@ impl W<'_, '_> {
             };
             self.o.token(&line, Space::Line);
         }
+        for (param, values, tok) in &tb.step_lists {
+            if self.ask(Construct::StepList, *tok) != Action::Native {
+                continue;
+            }
+            // Xyce RG `.STEP <name> LIST`; LTspice help `.step
+            // param <name> list`, `temp` bare.
+            let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
+            let name = match (self.d, param.eq_ignore_ascii_case("temp")) {
+                (Dialect::Ltspice, false) => format!("param {param}"),
+                _ => param.clone(),
+            };
+            self.o.token(
+                &format!(".step {name} list {}", vals.join(" ")),
+                Space::Line,
+            );
+        }
         self.write_raw(&tb.extra);
         match control {
             Some(fourier) => {
@@ -277,6 +296,7 @@ impl W<'_, '_> {
                 tb.saves.extend(s);
             }
             BenchCard::Step { sweep, param, nums } => tb.steps.push((sweep, param, nums, tok)),
+            BenchCard::StepList { param, values } => tb.step_lists.push((param, values, tok)),
             BenchCard::Temp(t) => tb.temp = Some(t),
             BenchCard::NodeVals(true, v) => tb.ics.extend(v),
             BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
@@ -356,6 +376,18 @@ impl W<'_, '_> {
                         num(self, *b),
                         num(self, *c)
                     ));
+                }
+                s
+            }
+            Ana::DcAxes(axes) => {
+                let hspice = match self.ask(Construct::DcLogList, tok) {
+                    Action::Native => false,
+                    Action::Spell(Alt::DcType) => true,
+                    _ => return String::new(),
+                };
+                let mut s = String::from(".dc");
+                for ax in axes {
+                    s.push_str(&dc_axis(self, ax, hspice));
                 }
                 s
             }

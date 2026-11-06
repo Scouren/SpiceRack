@@ -11556,3 +11556,1687 @@ ltspice/ltspice_examples/wavein.net cdl the .backanno and .tran lines no longer 
 ltspice/ltspice_examples/wavein.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/waveout.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/waveout.net ltspice .backanno left out (W0036); .tran read as the analysis
+
+
+
+# Phase 7: spice-read: Xyce .global_param, bare .ic pairs, .dc DEC/OCT/LIST,
+# .step list, .tran NOOP, G/F M=, T F=/NL= (render::read testbench, sweeps,
+# refused, cards, elements; lexicon/xyce.rs; spice writer's .param head).
+# Xyce's .global_param is a top-level .param, which Xyce writes back as
+# .global_param (Xyce 7.10 runs a constant instance temp={…} from a .param
+# at the swept temperature: BUG_1203_SON/dot_step.cir), unless its value
+# reads temp, vt, freq, hertz or time, itself or through another
+# .global_param (Xyce runs it otherwise as a .param:
+# BUG_1043_SON/RC_AC_params_analytic.cir), which stays Xyce's text. `.ic 1
+# 1.0` is `.ic V(1)=1`; `.tran … NOOP` is UIC (Xyce runs both alike); a .dc
+# axis by DEC/OCT or LIST (Xyce, LTspice) is Ana::DcAxes: Xyce and LTspice
+# write `.dc DEC src a b n` / `src LIST v…`, HSPICE `src DEC n a b` / `src
+# POI n v…`, ngspice and ESPice refuse W0038 (.dc is linear only), Spectre
+# and VACASK W0015 (they have one, not written yet: FINDINGS-spice-read.md);
+# `.step <name> list v…` (Xyce, LTspice) is written by both and refused
+# W0016 where no .step is; `G … M=m` is the gain times m (Xyce, ngspice
+# agree: -0.2 V both); `T … F=f NL=nl` is TD=nl/f (ngspice runs both
+# alike). Xyce's own analyses and Y devices (.mpde .mor .pce
+# .embeddedsampling, YNEURON …) refuse W0039, not W0001 (status-only here).
+# Oracle: Xyce 7.10 ran each Xyce corpus deck holding one of these (noise
+# list out), as given and as written for Xyce, every .prn column equal to
+# 1e-6 of its scale (counts in the commit message).
+xyce/4049OSC/4049osc.cir cdl read: .tran NOOP; written in the target form
+xyce/4049OSC/4049osc.cir espice now written: .tran NOOP read (was W0001)
+xyce/4049OSC/4049osc.cir hspice now written: .tran NOOP read (was W0001)
+xyce/4049OSC/4049osc.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/4049OSC/4049osc.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/4049OSC/4049osc.cir spectre now written: .tran NOOP read (was W0001)
+xyce/4049OSC/4049osc.cir vacask now written: .tran NOOP read (was W0001)
+xyce/4049OSC/4049osc.cir xyce read: .tran NOOP; written in the target form
+xyce/ABM_FREQ/RC_data.cir cdl read: .global_param; written in the target form
+xyce/ABM_FREQ/RC_data.cir xyce read: .global_param; written in the target form
+xyce/ABM_FREQ/RC_data_hertz.cir cdl read: .global_param; written in the target form
+xyce/ABM_FREQ/RC_data_hertz.cir xyce read: .global_param; written in the target form
+xyce/ABM_FREQ/abmfreq1_data.cir cdl read: .global_param; written in the target form
+xyce/ABM_FREQ/abmfreq1_data.cir xyce read: .global_param; written in the target form
+xyce/ABM_FREQ/abmhertz1_data.cir cdl read: .global_param; written in the target form
+xyce/ABM_FREQ/abmhertz1_data.cir xyce read: .global_param; written in the target form
+xyce/ABM_SPLINES/akimaOutOfOrder.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/akimaOutOfOrder.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/akimaOutOfOrder.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/akimaOutOfOrder.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/akimaOutOfOrder_baseline.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/akimaOutOfOrder_baseline.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/akimaOutOfOrder_baseline.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/akimaOutOfOrder_baseline.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/tableOutOfOrder2.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/tableOutOfOrder2.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/tableOutOfOrder2.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/tableOutOfOrder2.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/tableOutOfOrder2_baseline.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/ABM_SPLINES/tableOutOfOrder2_baseline.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/tableOutOfOrder2_baseline.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/ABM_SPLINES/tableOutOfOrder2_baseline.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/B4SOI/shmodtest_nmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/B4SOI/shmodtest_nmos.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/B4SOI/shmodtest_nmos.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/B4SOI/shmodtest_nmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/B4SOI_450/shmodtest_nmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/B4SOI_450/shmodtest_nmos.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/B4SOI_450/shmodtest_nmos.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/B4SOI_450/shmodtest_nmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/B4SOI_461/shmodtest_nmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/B4SOI_461/shmodtest_nmos.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/B4SOI_461/shmodtest_nmos.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/B4SOI_461/shmodtest_nmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_expr.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_expr.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_expr4_baseline.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_expr4_baseline.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_exprAlone.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_exprAlone.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/transLineDataGlobal_AC.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1035_SON/transLineDataGlobal_AC.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1042_SON/noise_data.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1042_SON/noise_data.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1042_SON/noise_data_noTNI.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1042_SON/noise_data_noTNI.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1043_SON/RC_AC_params.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1043_SON/RC_AC_params.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1145_SON/lotka_volterra.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1145_SON/lotka_volterra.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1162_SON/defective_dec.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1162_SON/defective_dec.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1162_SON/defective_dec.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1162_SON/defective_dec.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1162_SON/defective_oct.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1162_SON/defective_oct.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1162_SON/defective_oct.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1162_SON/defective_oct.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/bsim3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/bsim3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/bsim3.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/bsim3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/bsim4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/bsim4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/bsim4.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/bsim4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/diode.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/diode.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/diode.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/diode.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/diode.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd1.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd1.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/mutInd1.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd1_baseline.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd1_baseline.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_1190_SON/mutInd1_baseline.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd2.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd2.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd2_baseline.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1190_SON/mutInd2_baseline.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1203_SON/default_temp.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1203_SON/device_options.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1203_SON/device_options.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1203_SON/dot_step.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1203_SON/dot_step.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1353/150nm_nmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1353/150nm_nmos.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1353/150nm_nmos.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1353/150nm_nmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1353/150nm_pmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1353/150nm_pmos.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1353/150nm_pmos.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/BUG_1353/150nm_pmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/BUG_1774/HBT_IV_step.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1774/HBT_IV_step.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1775/HBT_IV.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1775/HBT_IV.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1776/HBT_IV_10X50_20100217.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_1776/HBT_IV_10X50_20100217.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_A0.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_A0.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_A0.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_A0.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_A1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_A1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_A1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_A1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B0.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B0.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B0.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B0.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1801/bug_1801_B3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1801/bug_1801_B3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_1826/linear_simple_global.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir cdl read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir espice now written: .tran NOOP read (was W0001)
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir hspice now written: .tran NOOP read (was W0001)
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir spectre now written: .tran NOOP read (was W0001)
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir vacask now written: .tran NOOP read (was W0001)
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir xyce read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_2039/bug_2039.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_2039/bug_2039.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_2039/bug_2039.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_2039/bug_2039.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_2039/bug_2039.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_2039/bug_2039.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_260_SON/bug_260_son.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_260_SON/bug_260_son.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/BUG_260_SON/bug_260_son.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_264_SON/bug_264.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_267/bug267.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_267/bug267.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_267/bug267.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_267/bug267.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_267/bug267.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_267/bug267.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_267/bug267.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_267/bug267.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son3_globalp.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4_3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son5.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_28_SON/bug_28_son5.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_381/comparator3.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_381/comparator3.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/BUG_381/comparator3.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_389_SON/global_param.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_389_SON/global_param.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_457_SON/bug457.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_457_SON/bug457.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_457_SON/bug457.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_460/bug_460.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_460/bug_460.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_465_SON/bug465.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_465_SON/bug465.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_466_SON/bug_466.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_466_SON/bug_466.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_477_SON/bug_477.cir cdl read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_477_SON/bug_477.cir xyce read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_496_SON/bug_496_son.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_496_SON/bug_496_son.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_496_SON/bug_496_son.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_496_SON/bug_496_son.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_573_SON/common_emitter_hb_contin.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_573_SON/common_emitter_hb_contin.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_612_SON/bug_612.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_612_SON/bug_612.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_645_SON/bug645son_Global.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_645_SON/bug645son_Global.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_645_SON/bug645son_GlobalStep.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_645_SON/bug645son_GlobalStep.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/Synapse_lv3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/Synapse_lv3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/Synapse_lv3_modpar.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/Synapse_lv3_modpar.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/baselineLumpedLine.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/baselineLumpedLine.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_647_SON/baselineLumpedLine.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_647_SON/baselineLumpedLine.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_647_SON/baselineLumpedLine.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_647_SON/neuron_lv4.cir cdl read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_647_SON/neuron_lv4.cir xyce read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_647_SON/neuron_lv4_modpar.cir cdl read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_647_SON/neuron_lv4_modpar.cir xyce read: .tran NOOP; written in the target form
+xyce/Certification_Tests/BUG_681_SON/bsim3_681.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_681_SON/bsim3_681.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/BUG_681_SON/bsim3_681.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_681_SON/bsim4_681.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_681_SON/bsim4_681.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/BUG_681_SON/bsim4_681.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/dcsweep_globalpar.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/newton_and_swept.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/newton_and_swept.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/newton_and_swept.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_and_swept.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_and_swept.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_and_swept.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_and_swept.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/source_stepped_and_swept.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/source_stepped_and_swept.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/dc_globalparam_data.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/dc_globalparam_data.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline_forglobal.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline_forglobal.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline_forglobal.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/BUG_806_SON/mos2_data_step_globalparam.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/mos2_data_step_globalparam.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/transLineDataGlobal.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/transLineDataGlobal.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/transLine_baseline.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_806_SON/transLine_baseline.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_806_SON/transLine_baseline.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_806_SON/transLine_baseline.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_806_SON/transLine_baseline.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_239/bsim3_test1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/bsim3_test1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/bsim3_test1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/bsim3_test1Ref.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/bsim3_test1Ref.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/bsim3_test1Ref.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/bsim4_test2.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/bsim4_test2.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos1_test1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos1_test1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos1_test1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos1_test1Ref.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos1_test1Ref.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos1_test1Ref.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos2_test1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos2_test1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos2_test1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos2_test1Ref.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos2_test1Ref.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos2_test1Ref.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos3_test1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos3_test1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos3_test1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos3_test1Ref.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos3_test1Ref.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos3_test1Ref.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos6_test1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos6_test1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos6_test1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos6_test1Ref.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/mos6_test1Ref.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/mos6_test1Ref.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/vdmos_test1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/vdmos_test1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/vdmos_test1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/vdmos_test1Ref.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_239/vdmos_test1Ref.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_239/vdmos_test1Ref.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_267/test_bjt_ampSens1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_267/test_bjt_ampSens1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_267/test_bjt_ampSens2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_267/test_bjt_ampSens2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_405/test2.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_405/test2.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_405/test2.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a0.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a0.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a0.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a0.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a1.cir cdl read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a1.cir hspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a1.cir ltspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a1.cir xyce read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a2.cir cdl read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a2.cir hspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a2.cir ltspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a2.cir xyce read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a3.cir cdl read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a3.cir hspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a3.cir ltspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a3.cir xyce read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a4.cir cdl read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_a4.cir hspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a4.cir ltspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_a4.cir xyce read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b0.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b0.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b0.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b2.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b2.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b2.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv0.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv0.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv0.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv1.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv1.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv1.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv2.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv2.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv2.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv3.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv3.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv3.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv4.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv4.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv4.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv5.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv5.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b3soi_inv5.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b4.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_b4.cir ltspice now written: .step list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_b4.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_bjt_ampSens1.cir cdl read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_bjt_ampSens1.cir xyce read: .global_param, .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_bjt_ampSens2.cir cdl read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_bjt_ampSens2.cir xyce read: .step list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c0.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c0.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c0.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c0.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c1.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c1.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c1.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c1.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c2.cir cdl read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c2.cir hspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c2.cir ltspice now written: .global_param, .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c2.cir xyce read: .global_param, .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c3.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c3.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c3.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c3.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c4.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c4.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c4.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c4.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c5.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c5.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c5.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c5.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c6.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_492/test_c6.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c6.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_492/test_c6.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_a4.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a4.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a4.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a4.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_a4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b1.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b2.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv4.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv4.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv4.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv5.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv5.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv5.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv5.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv5.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b3soi_inv5.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_b4.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b4.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b4.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b4.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b4.cir vacask now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_b4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_bjt_ampSens1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_bjt_ampSens1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_bjt_ampSens2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_bjt_ampSens2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c1.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c1.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c1.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c1.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c1.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c1.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c1.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c2.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c2.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c2.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c2.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c2.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c2.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c2.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c3.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c3.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c3.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c3.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c3.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c3.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c3.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c4.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c4.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c4.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c4.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c4.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c4.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c4.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c5.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c5.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c5.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c5.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c5.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c5.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c5.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c6.cir cdl read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_494/test_c6.cir espice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c6.cir hspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c6.cir ltspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c6.cir ngspice now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c6.cir spectre now written: .global_param read (was W0001)
+xyce/Certification_Tests/ISSUE_494/test_c6.cir xyce read: .global_param; written in the target form
+xyce/Certification_Tests/ISSUE_536/dcDecBaseline.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_536/dcDecBaseline.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_536/dcDecBaseline.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_536/dcDecBaseline.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_536/dcListBaseline.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_536/dcListBaseline.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_536/dcListBaseline.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_536/dcListBaseline.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_536/dcOctBaseline.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_536/dcOctBaseline.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_536/dcOctBaseline.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Certification_Tests/ISSUE_536/dcOctBaseline.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/Certification_Tests/ISSUE_575/issue575.cir cdl read: .step list, .tran NOOP; written in the target form
+xyce/Certification_Tests/ISSUE_575/issue575.cir ltspice now written: .step list, .tran NOOP read (was W0001)
+xyce/Certification_Tests/ISSUE_575/issue575.cir xyce read: .step list, .tran NOOP; written in the target form
+xyce/Certification_Tests/ISSUE_575/issue575_small.cir cdl read: .step list, .tran NOOP; written in the target form
+xyce/Certification_Tests/ISSUE_575/issue575_small.cir ltspice now written: .step list, .tran NOOP read (was W0001)
+xyce/Certification_Tests/ISSUE_575/issue575_small.cir xyce read: .step list, .tran NOOP; written in the target form
+xyce/DC_UPGRADE/dcDec.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/DC_UPGRADE/dcDec.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/DC_UPGRADE/dcDec.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/DC_UPGRADE/dcDec.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/DC_UPGRADE/dcList.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/DC_UPGRADE/dcList.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/DC_UPGRADE/dcList.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/DC_UPGRADE/dcList.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/DC_UPGRADE/dcOct.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/DC_UPGRADE/dcOct.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/DC_UPGRADE/dcOct.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/DC_UPGRADE/dcOct.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/DIAGNOSTIC/CurrentCheck1.cir cdl read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/CurrentCheck1.cir espice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/CurrentCheck1.cir hspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/CurrentCheck1.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/CurrentCheck1.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/CurrentCheck1.cir spectre now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/CurrentCheck1.cir vacask now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/CurrentCheck1.cir xyce read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/ExVCheck1.cir cdl read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/ExVCheck1.cir espice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVCheck1.cir hspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVCheck1.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVCheck1.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVCheck1.cir spectre now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVCheck1.cir vacask now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVCheck1.cir xyce read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/ExVICheck1.cir cdl read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/ExVICheck1.cir espice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVICheck1.cir hspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVICheck1.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVICheck1.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVICheck1.cir spectre now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVICheck1.cir vacask now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExVICheck1.cir xyce read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/ExtremaCheck1.cir cdl read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/ExtremaCheck1.cir espice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExtremaCheck1.cir hspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExtremaCheck1.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExtremaCheck1.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExtremaCheck1.cir spectre now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExtremaCheck1.cir vacask now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/ExtremaCheck1.cir xyce read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/VICheck1.cir cdl read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/VICheck1.cir espice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VICheck1.cir hspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VICheck1.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VICheck1.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VICheck1.cir spectre now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VICheck1.cir vacask now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VICheck1.cir xyce read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/VoltageCheck1.cir cdl read: .tran NOOP; written in the target form
+xyce/DIAGNOSTIC/VoltageCheck1.cir espice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VoltageCheck1.cir hspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VoltageCheck1.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VoltageCheck1.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VoltageCheck1.cir spectre now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VoltageCheck1.cir vacask now written: .tran NOOP read (was W0001)
+xyce/DIAGNOSTIC/VoltageCheck1.cir xyce read: .tran NOOP; written in the target form
+xyce/DIODE/Level2_Temp_Dep_Breakdown.cir cdl read: .step list; written in the target form
+xyce/DIODE/Level2_Temp_Dep_Breakdown.cir ltspice now written: .step list read (was W0001)
+xyce/DIODE/Level2_Temp_Dep_Breakdown.cir xyce read: .step list; written in the target form
+xyce/DTEMP/Level2_Diode_DTEMP.cir cdl read: .step list; written in the target form
+xyce/DTEMP/Level2_Diode_DTEMP.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/Level2_Diode_DTEMP.cir xyce read: .step list; written in the target form
+xyce/DTEMP/Level2_Diode_Ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/Level2_Diode_Ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/Level2_Diode_Ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/b3soi_nmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/b3soi_nmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/b3soi_nmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/b3soi_nmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/b3soi_nmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/b3soi_nmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/b3soi_pmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/b3soi_pmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/b3soi_pmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/b3soi_pmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/b3soi_pmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/b3soi_pmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_nmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_nmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.61_nmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_nmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_nmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.61_nmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_pmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_pmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.61_pmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_pmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.61_pmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.61_pmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_nmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_nmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.7_nmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_nmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_nmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.7_nmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_pmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_pmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.7_pmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_pmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.7_pmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.7_pmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_nmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_nmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.82_nmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_nmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_nmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.82_nmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_pmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_pmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.82_pmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_pmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/bsim4.82_pmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/bsim4.82_pmos_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/cap_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/cap_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/cap_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/cap_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/njfet_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/njfet_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/njfet_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/njfet_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/njfet_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/njfet_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmesfet_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmesfet_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmesfet_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmesfet_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmesfet_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmesfet_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos1_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos1_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos1_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos1_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos1_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos1_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos2_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos2_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos2_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos2_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos2_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos2_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos3_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos3_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos3_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos3_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos3_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos3_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos6_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos6_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos6_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/nmos6_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/nmos6_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/nmos6_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/npn_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/npn_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/npn_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/npn_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/npn_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/npn_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pjfet_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pjfet_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pjfet_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pjfet_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pjfet_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pjfet_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmesfet_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmesfet_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmesfet_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmesfet_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmesfet_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmesfet_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos1_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos1_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos1_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos1_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos1_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos1_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos2_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos2_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos2_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos2_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos2_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos2_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos3_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos3_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos3_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos3_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos3_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos3_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos6_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos6_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos6_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pmos6_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pmos6_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pmos6_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pnp_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pnp_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pnp_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/pnp_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/pnp_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/pnp_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/res_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/res_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/res_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/res_ref.cir xyce read: .step list; written in the target form
+xyce/DTEMP/vdmos_dtemp.cir cdl read: .step list; written in the target form
+xyce/DTEMP/vdmos_dtemp.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/vdmos_dtemp.cir xyce read: .step list; written in the target form
+xyce/DTEMP/vdmos_ref.cir cdl read: .step list; written in the target form
+xyce/DTEMP/vdmos_ref.cir ltspice now written: .step list read (was W0001)
+xyce/DTEMP/vdmos_ref.cir xyce read: .step list; written in the target form
+xyce/EMBEDDED/globalParamNormalLHS.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamNormalLHS.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamNormalMC.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamNormalMC.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamNormal_OP_MC.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamNormal_OP_MC.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamUniformLHS.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamUniformLHS.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamUniformMC.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/globalParamUniformMC.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/tran-sampling-measure.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/tran-sampling-measure.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/tran-sampling-measureLHS.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/tran-sampling-measureLHS.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED/transLineStepDataGlobalPar.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED/transLineStepDataGlobalPar.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamNormalLHS.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamNormalLHS.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamNormalMC.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamNormalMC.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamNormal_OP_MC.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamNormal_OP_MC.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamUniformLHS.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamUniformLHS.cir xyce read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamUniformMC.cir cdl read: .global_param; written in the target form
+xyce/EMBEDDED2/globalParamUniformMC.cir xyce read: .global_param; written in the target form
+xyce/GLOBALPAR/gp2.cir cdl read: .global_param; written in the target form
+xyce/GLOBALPAR/gp2.cir ltspice now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp2.cir vacask now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp2.cir xyce read: .global_param; written in the target form
+xyce/GLOBALPAR/gp_func.cir cdl read: .global_param; written in the target form
+xyce/GLOBALPAR/gp_func.cir ltspice now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_func.cir spectre now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_func.cir xyce read: .global_param; written in the target form
+xyce/GLOBALPAR/gp_loca.cir cdl read: .global_param; written in the target form
+xyce/GLOBALPAR/gp_loca.cir espice now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_loca.cir hspice now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_loca.cir ltspice now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_loca.cir ngspice now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_loca.cir spectre now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_loca.cir vacask now written: .global_param read (was W0001)
+xyce/GLOBALPAR/gp_loca.cir xyce read: .global_param; written in the target form
+xyce/HB/mixers/top.cir cdl read: .global_param; written in the target form
+xyce/HB/mixers/top.cir xyce read: .global_param; written in the target form
+xyce/HICUM/HICUM_L0/fgum_TRANS_npn_full_sh.cir cdl read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_TRANS_npn_full_sh.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/HICUM_L0/fgum_TRANS_npn_full_sh.cir xyce read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_ac_npn_full_sh_ac.cir cdl read: .global_param, .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_ac_npn_full_sh_ac.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/HICUM/HICUM_L0/fgum_ac_npn_full_sh_ac.cir xyce read: .global_param, .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_ac_npn_full_sh_dc.cir cdl read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_ac_npn_full_sh_dc.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/HICUM_L0/fgum_ac_npn_full_sh_dc.cir xyce read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_dc_npn_full_sh.cir cdl read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fgum_dc_npn_full_sh.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/HICUM_L0/fgum_dc_npn_full_sh.cir xyce read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fout_npn_full_sh.cir cdl read: .step list; written in the target form
+xyce/HICUM/HICUM_L0/fout_npn_full_sh.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/HICUM_L0/fout_npn_full_sh.cir xyce read: .step list; written in the target form
+xyce/HICUM/fgum_TRANS_npn_full_sh.cir cdl read: .step list; written in the target form
+xyce/HICUM/fgum_TRANS_npn_full_sh.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/fgum_TRANS_npn_full_sh.cir xyce read: .step list; written in the target form
+xyce/HICUM/fgum_ac_npn_full_sh_ac.cir cdl read: .global_param, .step list; written in the target form
+xyce/HICUM/fgum_ac_npn_full_sh_ac.cir ltspice now written: .global_param, .step list read (was W0001)
+xyce/HICUM/fgum_ac_npn_full_sh_ac.cir xyce read: .global_param, .step list; written in the target form
+xyce/HICUM/fgum_ac_npn_full_sh_dc.cir cdl read: .step list; written in the target form
+xyce/HICUM/fgum_ac_npn_full_sh_dc.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/fgum_ac_npn_full_sh_dc.cir xyce read: .step list; written in the target form
+xyce/HICUM/fgum_dc_npn_full_sh.cir cdl read: .step list; written in the target form
+xyce/HICUM/fgum_dc_npn_full_sh.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/fgum_dc_npn_full_sh.cir xyce read: .step list; written in the target form
+xyce/HICUM/fout_npn_full_sh.cir cdl read: .step list; written in the target form
+xyce/HICUM/fout_npn_full_sh.cir ltspice now written: .step list read (was W0001)
+xyce/HICUM/fout_npn_full_sh.cir xyce read: .step list; written in the target form
+xyce/IC_AND_NODESET/dcvolt_cap2.cir cdl read: bare .ic pairs; written in the target form
+xyce/IC_AND_NODESET/dcvolt_cap2.cir espice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/dcvolt_cap2.cir hspice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/dcvolt_cap2.cir ltspice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/dcvolt_cap2.cir ngspice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/dcvolt_cap2.cir spectre now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/dcvolt_cap2.cir vacask now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/dcvolt_cap2.cir xyce read: bare .ic pairs; written in the target form
+xyce/IC_AND_NODESET/ic_cap2.cir cdl read: bare .ic pairs; written in the target form
+xyce/IC_AND_NODESET/ic_cap2.cir espice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/ic_cap2.cir hspice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/ic_cap2.cir ltspice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/ic_cap2.cir ngspice now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/ic_cap2.cir spectre now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/ic_cap2.cir vacask now written: bare .ic pairs read (was W0001)
+xyce/IC_AND_NODESET/ic_cap2.cir xyce read: bare .ic pairs; written in the target form
+xyce/IC_AND_NODESET/pierce_noop.cir cdl read: .tran NOOP; written in the target form
+xyce/IC_AND_NODESET/pierce_noop.cir espice now written: .tran NOOP read (was W0001)
+xyce/IC_AND_NODESET/pierce_noop.cir hspice now written: .tran NOOP read (was W0001)
+xyce/IC_AND_NODESET/pierce_noop.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/IC_AND_NODESET/pierce_noop.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/IC_AND_NODESET/pierce_noop.cir spectre now written: .tran NOOP read (was W0001)
+xyce/IC_AND_NODESET/pierce_noop.cir vacask now written: .tran NOOP read (was W0001)
+xyce/IC_AND_NODESET/pierce_noop.cir xyce read: .tran NOOP; written in the target form
+xyce/LTRA/ltra-rc.cir cdl read: .tran NOOP; written in the target form
+xyce/LTRA/ltra-rc.cir xyce read: .tran NOOP; written in the target form
+xyce/L_UTSOI/asym_nmos_idvg0_allsw0_T27.cir cdl read: .step list; written in the target form
+xyce/L_UTSOI/asym_nmos_idvg0_allsw0_T27.cir ltspice now written: .step list read (was W0001)
+xyce/L_UTSOI/asym_nmos_idvg0_allsw0_T27.cir xyce read: .step list; written in the target form
+xyce/L_UTSOI/asym_pmos_idvg0_allsw0_T27.cir cdl read: .step list; written in the target form
+xyce/L_UTSOI/asym_pmos_idvg0_allsw0_T27.cir ltspice now written: .step list read (was W0001)
+xyce/L_UTSOI/asym_pmos_idvg0_allsw0_T27.cir xyce read: .step list; written in the target form
+xyce/L_UTSOI/sym_nmos_idvg0_allsw0_T27.cir cdl read: .step list; written in the target form
+xyce/L_UTSOI/sym_nmos_idvg0_allsw0_T27.cir ltspice now written: .step list read (was W0001)
+xyce/L_UTSOI/sym_nmos_idvg0_allsw0_T27.cir xyce read: .step list; written in the target form
+xyce/L_UTSOI/sym_pmos_idvg0_allsw0_T27.cir cdl read: .step list; written in the target form
+xyce/L_UTSOI/sym_pmos_idvg0_allsw0_T27.cir ltspice now written: .step list read (was W0001)
+xyce/L_UTSOI/sym_pmos_idvg0_allsw0_T27.cir xyce read: .step list; written in the target form
+xyce/MEASURE_AC/ErrorFuncTestAC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_AC/ErrorFuncTestAC.cir espice now written: .global_param read (was W0001)
+xyce/MEASURE_AC/ErrorFuncTestAC.cir hspice now written: .global_param read (was W0001)
+xyce/MEASURE_AC/ErrorFuncTestAC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_AC/ErrorFuncTestAC.cir ngspice now written: .global_param read (was W0001)
+xyce/MEASURE_AC/ErrorFuncTestAC.cir spectre now written: .global_param read (was W0001)
+xyce/MEASURE_AC/ErrorFuncTestAC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_AC/STEP/ErrorFuncTestAC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_AC/STEP/ErrorFuncTestAC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_AC/STEP/ErrorFuncTestAC.cir spectre now written: .global_param read (was W0001)
+xyce/MEASURE_AC/STEP/ErrorFuncTestAC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_CONT/STEP/DerivTest1DC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_CONT/STEP/DerivTest1DC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_CONT/STEP/DerivTest1DC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_CONT/STEP/FindWhenTest1DC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_CONT/STEP/FindWhenTest1DC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_CONT/STEP/FindWhenTest1DC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_CONT/STEP/TrigTargTest1DC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_CONT/STEP/TrigTargTest1DC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_CONT/STEP/TrigTargTest1DC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir espice now written: .global_param read (was W0001)
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir hspice now written: .global_param read (was W0001)
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir ngspice now written: .global_param read (was W0001)
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir spectre now written: .global_param read (was W0001)
+xyce/MEASURE_DC/ErrorFuncTest1DC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_DC/REMEASURE/RemeasureDecadeDCStep.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/MEASURE_DC/REMEASURE/RemeasureDecadeDCStep.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/MEASURE_DC/REMEASURE/RemeasureDecadeDCStep.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/MEASURE_DC/REMEASURE/RemeasureDecadeDCStep.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/MEASURE_DC/REMEASURE/RemeasureListDCStep.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/MEASURE_DC/REMEASURE/RemeasureListDCStep.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/MEASURE_DC/REMEASURE/RemeasureListDCStep.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/MEASURE_DC/REMEASURE/RemeasureListDCStep.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/MEASURE_DC/REMEASURE/RemeasureOctaveDCStep.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/MEASURE_DC/REMEASURE/RemeasureOctaveDCStep.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/MEASURE_DC/REMEASURE/RemeasureOctaveDCStep.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/MEASURE_DC/REMEASURE/RemeasureOctaveDCStep.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/MEASURE_DC/STEP/ErrorFuncTest1DC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_DC/STEP/ErrorFuncTest1DC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_DC/STEP/ErrorFuncTest1DC.cir spectre now written: .global_param read (was W0001)
+xyce/MEASURE_DC/STEP/ErrorFuncTest1DC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_DC/STEP/TrigTargTest1DC.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_DC/STEP/TrigTargTest1DC.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_DC/STEP/TrigTargTest1DC.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir espice now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir hspice now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir ngspice now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir spectre now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/ErrorFuncTestNoise.cir xyce read: .global_param; written in the target form
+xyce/MEASURE_NOISE/STEP/ErrorFuncTestNoise.cir cdl read: .global_param; written in the target form
+xyce/MEASURE_NOISE/STEP/ErrorFuncTestNoise.cir ltspice now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/STEP/ErrorFuncTestNoise.cir spectre now written: .global_param read (was W0001)
+xyce/MEASURE_NOISE/STEP/ErrorFuncTestNoise.cir xyce read: .global_param; written in the target form
+xyce/MEXTRAM/FGummel_Ib.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_Ib.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib_TRANS.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib_TRANS.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_Ib_TRANS.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_Ib_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib_noFlip_P_TRANS.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ib_noFlip_P_TRANS.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ic.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ic.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_Ic.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ic_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_Ic_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_Ic_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ib.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ib.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_Ib.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ib_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ib_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_Ib_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ic.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ic.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_Ic.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ic_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_Ic_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_Ic_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ib.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ib.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_MLF_Ib.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ib_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ib_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_MLF_Ib_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ic.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ic.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_MLF_Ic.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ic_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/FGummel_low_MLF_Ic_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/FGummel_low_MLF_Ic_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gbb.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gbb.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/acBias_Gbb.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gbb_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gbb_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/acBias_Gbb_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gcc.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gcc.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/acBias_Gcc.cir xyce read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gcc_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/MEXTRAM/acBias_Gcc_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/MEXTRAM/acBias_Gcc_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/MINDUCTORS/mutIndStep.cir cdl read: .step list; written in the target form
+xyce/MINDUCTORS/mutIndStep.cir ltspice now written: .step list read (was W0001)
+xyce/MINDUCTORS/mutIndStep.cir xyce read: .step list; written in the target form
+xyce/MINDUCTORS/nlMutIndStep.cir cdl read: .step list; written in the target form
+xyce/MINDUCTORS/nlMutIndStep.cir xyce read: .step list; written in the target form
+xyce/MINDUCTORS/nlMutIndStep_lvl2.cir cdl read: .step list; written in the target form
+xyce/MINDUCTORS/nlMutIndStep_lvl2.cir xyce read: .step list; written in the target form
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir cdl read: .global_param; written in the target form
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir espice now written: .global_param read (was W0001)
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir hspice now written: .global_param read (was W0001)
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir ltspice now written: .global_param read (was W0001)
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir ngspice now written: .global_param read (was W0001)
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir spectre now written: .global_param read (was W0001)
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir vacask now written: .global_param read (was W0001)
+xyce/MODEL_BINNING/globalPar_comparatorBinning.cir xyce read: .global_param; written in the target form
+xyce/Message/Device/DeviceBlock_extractModelName_3.cir cdl read: .global_param; written in the target form
+xyce/Message/Device/DeviceBlock_extractModelName_3.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/AC_doInit1.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/AC_doInit1.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/NOISE_doInit.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/NOISE_doInit.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/PCE_setAnalysisParams1.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/PCE_setAnalysisParams1.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/PCE_setAnalysisParams2.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/PCE_setAnalysisParams2.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/PCE_setAnalysisParams3.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/PCE_setAnalysisParams3.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/PCE_setPCEOptions.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/PCE_setPCEOptions.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/SweepParams_convertData.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/SweepParams_convertData.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/SweepParams_convertData1.cir cdl read: .global_param; written in the target form
+xyce/Message/Input/SweepParams_convertData1.cir xyce read: .global_param; written in the target form
+xyce/Message/Input/SweepParams_parseSweepParams2.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/Message/Input/SweepParams_parseSweepParams2.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/Message/Input/SweepParams_parseSweepParams2.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/NEURON/CG_Syn_TEST_1Pre_1Post_01.cir cdl read: .global_param; written in the target form
+xyce/NEURON/CG_Syn_TEST_1Pre_1Post_01.cir xyce read: .global_param; written in the target form
+xyce/NEURON/CS_Cable.cir cdl read: .tran NOOP; written in the target form
+xyce/NEURON/CS_Cable.cir xyce read: .tran NOOP; written in the target form
+xyce/Output/Dasho/dc.cir cdl read: .global_param; written in the target form
+xyce/Output/Dasho/dc.cir espice now written: .global_param read (was W0001)
+xyce/Output/Dasho/dc.cir hspice now written: .global_param read (was W0001)
+xyce/Output/Dasho/dc.cir ltspice now written: .global_param read (was W0001)
+xyce/Output/Dasho/dc.cir ngspice now written: .global_param read (was W0001)
+xyce/Output/Dasho/dc.cir xyce read: .global_param; written in the target form
+xyce/Output/Dasho/pce.cir cdl read: .global_param; written in the target form
+xyce/Output/Dasho/pce.cir xyce read: .global_param; written in the target form
+xyce/Output/ES/es-no-pce-coeffs.cir cdl read: .global_param; written in the target form
+xyce/Output/ES/es-no-pce-coeffs.cir xyce read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-gnuplot.cir cdl read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-gnuplot.cir espice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-gnuplot.cir hspice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-gnuplot.cir ltspice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-gnuplot.cir ngspice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-gnuplot.cir xyce read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-step-gnuplot.cir cdl read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-step-gnuplot.cir ltspice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-step-gnuplot.cir xyce read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-step-tecplot.cir cdl read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-step-tecplot.cir ltspice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-step-tecplot.cir xyce read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-stepnum-col.cir cdl read: .global_param; written in the target form
+xyce/Output/HOMOTOPY/homotopy-stepnum-col.cir ltspice now written: .global_param read (was W0001)
+xyce/Output/HOMOTOPY/homotopy-stepnum-col.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/dashRNotSupported.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/dashRNotSupported.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/pce-dc-prn.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/pce-dc-prn.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/pce-dc-step-prn.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/pce-dc-step-prn.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/pce-dc-tecplot.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/pce-dc-tecplot.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/pce-formats-default-to-prn.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/pce-formats-default-to-prn.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/pce-no-headerfooter.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/pce-no-headerfooter.cir xyce read: .global_param; written in the target form
+xyce/Output/PCE/pce-no-output.cir cdl read: .global_param; written in the target form
+xyce/Output/PCE/pce-no-output.cir xyce read: .global_param; written in the target form
+xyce/PARAM_REFACTOR/paramDep2.cir cdl read: .global_param, .step list; written in the target form
+xyce/PARAM_REFACTOR/paramDep2.cir xyce read: .global_param, .step list; written in the target form
+xyce/PARAM_REFACTOR/paramDep3.cir cdl read: .step list; written in the target form
+xyce/PARAM_REFACTOR/paramDep3.cir ltspice now written: .step list read (was W0001)
+xyce/PARAM_REFACTOR/paramDep3.cir xyce read: .step list; written in the target form
+xyce/PARAM_REFACTOR/paramDep4.cir cdl read: .step list; written in the target form
+xyce/PARAM_REFACTOR/paramDep4.cir ltspice now written: .step list read (was W0001)
+xyce/PARAM_REFACTOR/paramDep4.cir xyce read: .step list; written in the target form
+xyce/PARSER/nakedAlgebraGlobal.cir cdl read: .global_param; written in the target form
+xyce/PARSER/nakedAlgebraGlobal.cir espice now written: .global_param read (was W0001)
+xyce/PARSER/nakedAlgebraGlobal.cir hspice now written: .global_param read (was W0001)
+xyce/PARSER/nakedAlgebraGlobal.cir ltspice now written: .global_param read (was W0001)
+xyce/PARSER/nakedAlgebraGlobal.cir ngspice now written: .global_param read (was W0001)
+xyce/PARSER/nakedAlgebraGlobal.cir xyce read: .global_param; written in the target form
+xyce/PARSER/nakedRandomGlobal.cir cdl read: .global_param; written in the target form
+xyce/PARSER/nakedRandomGlobal.cir espice now written: .global_param read (was W0001)
+xyce/PARSER/nakedRandomGlobal.cir hspice now written: .global_param read (was W0001)
+xyce/PARSER/nakedRandomGlobal.cir ngspice now written: .global_param read (was W0001)
+xyce/PARSER/nakedRandomGlobal.cir spectre now written: .global_param read (was W0001)
+xyce/PARSER/nakedRandomGlobal.cir xyce read: .global_param; written in the target form
+xyce/PCE/NISP/simpleUniformPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NISP/simpleUniformPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NISP/transLineStepDataGlobalPar.cir cdl read: .global_param; written in the target form
+xyce/PCE/NISP/transLineStepDataGlobalPar.cir xyce read: .global_param; written in the target form
+xyce/PCE/NISP2/issue84_devParam1.cir cdl read: .global_param; written in the target form
+xyce/PCE/NISP2/issue84_devParam1.cir xyce read: .global_param; written in the target form
+xyce/PCE/NISP2/simpleUniformPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NISP2/simpleUniformPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION/embeddedNormalPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION/embeddedNormalPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION/simpleNormalPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION/simpleNormalPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION/simpleUniformPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION/simpleUniformPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION2/embeddedNormalPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION2/embeddedNormalPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION2/simpleNormalPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION2/simpleNormalPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION2/simpleUniformPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/NI_REGRESSION2/simpleUniformPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/PCE/simpleUniformPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/PCE/simpleUniformPCE.cir xyce read: .global_param; written in the target form
+xyce/PCE/PCE2/simpleUniformPCE.cir cdl read: .global_param; written in the target form
+xyce/PCE/PCE2/simpleUniformPCE.cir xyce read: .global_param; written in the target form
+xyce/PDE_2D_BJT/invertbjt.cir cdl read: .global_param; written in the target form
+xyce/PDE_2D_BJT/invertbjt.cir xyce read: .global_param; written in the target form
+xyce/PSP103/asym_nmos_idvdh_dt.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/asym_nmos_idvdh_dt.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/asym_nmos_idvdh_dt.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/asym_pmos_idvdh_dt.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/asym_pmos_idvdh_dt.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/asym_pmos_idvdh_dt.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_asym_nmos_idvg0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_asym_nmos_idvg0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_asym_nmos_idvg0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_asym_pmos_idvg0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_asym_pmos_idvg0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_asym_pmos_idvg0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvg0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0_allsw0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0_allsw0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvg0_allsw0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0_swigate1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0_swigate1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvg0_swigate1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0_swimpact1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvg0_swimpact1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvg0_swimpact1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvgh.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_allsw0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_allsw0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvgh_allsw0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_outvars.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_outvars.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvgh_outvars.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_swigate1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_swigate1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvgh_swigate1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_swimpact1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_nmos_idvgh_swimpact1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_nmos_idvgh_swimpact1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvg0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0_allsw0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0_allsw0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvg0_allsw0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0_swigate1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0_swigate1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvg0_swigate1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0_swimpact1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvg0_swimpact1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvg0_swimpact1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvgh.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh_allsw0.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh_allsw0.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvgh_allsw0.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh_swigate1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh_swigate1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvgh_swigate1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh_swimpact1.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/psp_symm_pmos_idvgh_swimpact1.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/psp_symm_pmos_idvgh_swimpact1.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/sym_nmos_idvdh_dt.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/sym_nmos_idvdh_dt.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/sym_nmos_idvdh_dt.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/sym_pmos_idvdh_dt.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/PSP103/sym_pmos_idvdh_dt.cir ltspice now written: .step list, .dc dec/oct/list read (was W0001)
+xyce/PSP103/sym_pmos_idvdh_dt.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/SAMPLING/globalParamNormalLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/globalParamNormalLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/globalParamNormalMC.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/globalParamNormalMC.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/globalParamNormal_OP_MC.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/globalParamNormal_OP_MC.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/globalParamUniformLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/globalParamUniformLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/globalParamUniformMC.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/globalParamUniformMC.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/tran-sampling-measure.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/tran-sampling-measure.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/tran-sampling-measureLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/tran-sampling-measureLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING/transLineStepDataGlobalPar.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING/transLineStepDataGlobalPar.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamLimitLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamLimitLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamNormalLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamNormalLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamNormalMC.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamNormalMC.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamNormal_OP_MC.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamNormal_OP_MC.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamUniformLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamUniformLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamUniformMC.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/globalParamUniformMC.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/referenceMultipleAgauss.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/referenceMultipleAgauss.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/tran-sampling-measure.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/tran-sampling-measure.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/tran-sampling-measureLHS.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/tran-sampling-measureLHS.cir xyce read: .global_param; written in the target form
+xyce/SAMPLING2/transLineStepDataGlobalPar.cir cdl read: .global_param; written in the target form
+xyce/SAMPLING2/transLineStepDataGlobalPar.cir xyce read: .global_param; written in the target form
+xyce/SENS/150nm_nmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmosFD.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmosFD.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmos_deviceFD.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmos_deviceFD.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmos_oldFD.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_nmos_oldFD.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_pmos.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_pmos.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_pmosFD.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/SENS/150nm_pmosFD.cir xyce read: .dc dec/oct/list; written in the target form
+xyce/SENS/ampSens.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensAdj.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensAdj.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensAdj_aztec.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensAdj_aztec.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensAdj_belos.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensAdj_belos.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensFD.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensFD.cir espice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFD.cir hspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFD.cir ltspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFD.cir ngspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFD.cir spectre now written: .global_param read (was W0001)
+xyce/SENS/ampSensFD.cir vacask now written: .global_param read (was W0001)
+xyce/SENS/ampSensFD.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensFDa.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensFDa.cir espice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDa.cir hspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDa.cir ltspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDa.cir ngspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDa.cir spectre now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDa.cir vacask now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDa.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensFDb.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensFDb.cir espice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDb.cir hspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDb.cir ltspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDb.cir ngspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDb.cir spectre now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDb.cir vacask now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDb.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSensFDc.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSensFDc.cir espice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDc.cir hspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDc.cir ltspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDc.cir ngspice now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDc.cir spectre now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDc.cir vacask now written: .global_param read (was W0001)
+xyce/SENS/ampSensFDc.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_10v.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_10v.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_hicum.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_hicum.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_hicumFD.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_hicumFD.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_hicumL0.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_hicumL0.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_hicumL0FD.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_hicumL0FD.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_op.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_op.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_vbic.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_vbic.cir xyce read: .global_param; written in the target form
+xyce/SENS/ampSens_vbicFD.cir cdl read: .global_param; written in the target form
+xyce/SENS/ampSens_vbicFD.cir xyce read: .global_param; written in the target form
+xyce/SENS/improperObjFormat.cir cdl read: .global_param; written in the target form
+xyce/SENS/improperObjFormat.cir xyce read: .global_param; written in the target form
+xyce/SENS/psp_asym_nmos_idvg0_FD_SENS.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_nmos_idvg0_FD_SENS.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_nmos_idvg0_SENS.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_nmos_idvg0_SENS.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_pmos_idvg0_FD_SENS.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_pmos_idvg0_FD_SENS.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_pmos_idvg0_SENS.cir cdl read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/psp_asym_pmos_idvg0_SENS.cir xyce read: .step list, .dc dec/oct/list; written in the target form
+xyce/SENS/sensCapGear_forceDeviceFD.cir cdl read: .global_param; written in the target form
+xyce/SENS/sensCapGear_forceDeviceFD.cir xyce read: .global_param; written in the target form
+xyce/SENS/sensCapGear_global.cir cdl read: .global_param; written in the target form
+xyce/SENS/sensCapGear_global.cir xyce read: .global_param; written in the target form
+xyce/SENS/sensCapGear_global2.cir cdl read: .global_param; written in the target form
+xyce/SENS/sensCapGear_global2.cir xyce read: .global_param; written in the target form
+xyce/SENS/sensCapGear_global_curlybrace.cir cdl read: .global_param; written in the target form
+xyce/SENS/sensCapGear_global_curlybrace.cir xyce read: .global_param; written in the target form
+xyce/SENS/sensCapGear_oldFD.cir cdl read: .global_param; written in the target form
+xyce/SENS/sensCapGear_oldFD.cir xyce read: .global_param; written in the target form
+xyce/SENS/transLineStepDataGlobalPar.cir cdl read: .global_param; written in the target form
+xyce/SENS/transLineStepDataGlobalPar.cir xyce read: .global_param; written in the target form
+xyce/SENS/twoObj.cir cdl read: .global_param; written in the target form
+xyce/SENS/twoObj.cir xyce read: .global_param; written in the target form
+xyce/SENS/twoObjFD.cir cdl read: .global_param; written in the target form
+xyce/SENS/twoObjFD.cir espice now written: .global_param read (was W0001)
+xyce/SENS/twoObjFD.cir hspice now written: .global_param read (was W0001)
+xyce/SENS/twoObjFD.cir ltspice now written: .global_param read (was W0001)
+xyce/SENS/twoObjFD.cir ngspice now written: .global_param read (was W0001)
+xyce/SENS/twoObjFD.cir spectre now written: .global_param read (was W0001)
+xyce/SENS/twoObjFD.cir vacask now written: .global_param read (was W0001)
+xyce/SENS/twoObjFD.cir xyce read: .global_param; written in the target form
+xyce/SENS/vsrcSensTest.cir cdl read: .global_param; written in the target form
+xyce/SENS/vsrcSensTest.cir xyce read: .global_param; written in the target form
+xyce/SENS/vsrcSensTest2.cir cdl read: .global_param; written in the target form
+xyce/SENS/vsrcSensTest2.cir xyce read: .global_param; written in the target form
+xyce/SOLN_DEP_CAP/voltDepCap_baseline.cir cdl read: .global_param; written in the target form
+xyce/SOLN_DEP_CAP/voltDepCap_baseline.cir ltspice now written: .global_param read (was W0001)
+xyce/SOLN_DEP_CAP/voltDepCap_baseline.cir xyce read: .global_param; written in the target form
+xyce/SOLN_DEP_CAP/voltDepCap_test.cir cdl read: .global_param; written in the target form
+xyce/SOLN_DEP_CAP/voltDepCap_test.cir ltspice now written: .global_param read (was W0001)
+xyce/SOLN_DEP_CAP/voltDepCap_test.cir spectre now written: .global_param read (was W0001)
+xyce/SOLN_DEP_CAP/voltDepCap_test.cir vacask now written: .global_param read (was W0001)
+xyce/SOLN_DEP_CAP/voltDepCap_test.cir xyce read: .global_param; written in the target form
+xyce/SOLN_DEP_CAP/voltDepCharge_test.cir cdl read: .global_param; written in the target form
+xyce/SOLN_DEP_CAP/voltDepCharge_test.cir ltspice now written: .global_param read (was W0001)
+xyce/SOLN_DEP_CAP/voltDepCharge_test.cir spectre now written: .global_param read (was W0001)
+xyce/SOLN_DEP_CAP/voltDepCharge_test.cir xyce read: .global_param; written in the target form
+xyce/SOLN_DEP_RES/exp_temp_dep.cir cdl read: .global_param; written in the target form
+xyce/SOLN_DEP_RES/exp_temp_dep.cir xyce read: .global_param; written in the target form
+xyce/TIA/TRAP/4049OSC/4049osc.cir cdl read: .tran NOOP; written in the target form
+xyce/TIA/TRAP/4049OSC/4049osc.cir espice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/4049OSC/4049osc.cir hspice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/4049OSC/4049osc.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/4049OSC/4049osc.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/4049OSC/4049osc.cir spectre now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/4049OSC/4049osc.cir vacask now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/4049OSC/4049osc.cir xyce read: .tran NOOP; written in the target form
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir cdl read: bare .ic pairs; written in the target form
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir espice now written: bare .ic pairs read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir hspice now written: bare .ic pairs read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir ltspice now written: bare .ic pairs read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir ngspice now written: bare .ic pairs read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir spectre now written: bare .ic pairs read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir vacask now written: bare .ic pairs read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/ic_cap2.cir xyce read: bare .ic pairs; written in the target form
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir cdl read: .tran NOOP; written in the target form
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir espice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir hspice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir spectre now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir vacask now written: .tran NOOP read (was W0001)
+xyce/TIA/TRAP/IC_AND_NODESET/pierce_noop.cir xyce read: .tran NOOP; written in the target form
+xyce/TL431/TL431.cir cdl read: .tran NOOP; written in the target form
+xyce/TL431/TL431.cir espice now written: .tran NOOP read (was W0001)
+xyce/TL431/TL431.cir hspice now written: .tran NOOP read (was W0001)
+xyce/TL431/TL431.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/TL431/TL431.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/TL431/TL431.cir spectre now written: .tran NOOP read (was W0001)
+xyce/TL431/TL431.cir xyce read: .tran NOOP; written in the target form
+xyce/TRANSLINE/invalid_instance_parameters.cir cdl read: T F=/NL=; written in the target form
+xyce/TRANSLINE/invalid_instance_parameters.cir xyce read: T F=/NL=; written in the target form
+xyce/TRANSLINE/transline.cir cdl read: T F=/NL=; written in the target form
+xyce/TRANSLINE/transline.cir espice now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline.cir hspice now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline.cir ltspice now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline.cir ngspice now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline.cir spectre now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline.cir xyce read: T F=/NL=; written in the target form
+xyce/TRANSLINE/transline_step.cir cdl read: T F=/NL=; written in the target form
+xyce/TRANSLINE/transline_step.cir ltspice now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline_step.cir spectre now written: T F=/NL= read (was W0001)
+xyce/TRANSLINE/transline_step.cir xyce read: T F=/NL=; written in the target form
+xyce/VBIC13/HBT_IV.cir cdl read: .global_param; written in the target form
+xyce/VBIC13/HBT_IV.cir xyce read: .global_param; written in the target form
+xyce/VBIC13/dcFo.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFo.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFo.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFoEt.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFoEt.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFoEt.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_3T.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_3T.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFoEt_3T.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_3T_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_3T_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFoEt_3T_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_3T_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_3T_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFoEt_3T_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFoEt_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFoEt_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFoEt_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFo_3T.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFo_3T.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFo_3T.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFo_3T_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFo_3T_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFo_3T_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFo_3T_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFo_3T_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFo_3T_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFo_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFo_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFo_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcFo_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcFo_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcFo_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcRo.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcRo.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcRo.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcRo_3T.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcRo_3T.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcRo_3T.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcRo_3T_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcRo_3T_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcRo_3T_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcRo_3T_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcRo_3T_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcRo_3T_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcRo_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcRo_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcRo_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcRo_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcRo_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcRo_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcTemp.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcTemp.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcTemp.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcTemp_3T.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcTemp_3T.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcTemp_3T.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcTemp_3T_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcTemp_3T_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcTemp_3T_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcTemp_3T_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcTemp_3T_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcTemp_3T_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcTemp_m.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcTemp_m.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcTemp_m.cir xyce read: .step list; written in the target form
+xyce/VBIC13/dcTemp_noFlip_P.cir cdl read: .step list; written in the target form
+xyce/VBIC13/dcTemp_noFlip_P.cir ltspice now written: .step list read (was W0001)
+xyce/VBIC13/dcTemp_noFlip_P.cir xyce read: .step list; written in the target form
+xyce/VCCS/vccs_m.cir cdl read: G/F M=; written in the target form
+xyce/VCCS/vccs_m.cir espice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_m.cir hspice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_m.cir ltspice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_m.cir ngspice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_m.cir spectre now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_m.cir vacask now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_m.cir xyce read: G/F M=; written in the target form
+xyce/VCCS/vccs_tran_m.cir cdl read: G/F M=; written in the target form
+xyce/VCCS/vccs_tran_m.cir espice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_tran_m.cir hspice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_tran_m.cir ltspice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_tran_m.cir ngspice now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_tran_m.cir spectre now written: G/F M= read (was W0001)
+xyce/VCCS/vccs_tran_m.cir xyce read: G/F M=; written in the target form
+xyce/WAMPDE/BLOCKING/block.cir cdl read: .tran NOOP; written in the target form
+xyce/WAMPDE/BLOCKING/block.cir espice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/BLOCKING/block.cir hspice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/BLOCKING/block.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/BLOCKING/block.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/BLOCKING/block.cir spectre now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/BLOCKING/block.cir vacask now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/BLOCKING/block.cir xyce read: .tran NOOP; written in the target form
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir cdl read: .tran NOOP; written in the target form
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir espice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir hspice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir ltspice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir ngspice now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir spectre now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir vacask now written: .tran NOOP read (was W0001)
+xyce/WAMPDE/PIERCE/pierce_withbjt.cir xyce read: .tran NOOP; written in the target form
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir cdl read: T F=/NL=; written in the target form
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir espice now written: T F=/NL= read (was W0001)
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir hspice now written: T F=/NL= read (was W0001)
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir ltspice now written: T F=/NL= read (was W0001)
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir ngspice now written: T F=/NL= read (was W0001)
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir spectre now written: T F=/NL= read (was W0001)
+xyce/XDM/HSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir xyce read: T F=/NL=; written in the target form
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir cdl read: T F=/NL=; written in the target form
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir espice now written: T F=/NL= read (was W0001)
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir hspice now written: T F=/NL= read (was W0001)
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir ltspice now written: T F=/NL= read (was W0001)
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir ngspice now written: T F=/NL= read (was W0001)
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir spectre now written: T F=/NL= read (was W0001)
+xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir xyce read: T F=/NL=; written in the target form
+xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir cdl read: .dc dec/oct/list; written in the target form
+xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir hspice now written: .dc dec/oct/list read (was W0001)
+xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir ltspice now written: .dc dec/oct/list read (was W0001)
+xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir xyce read: .dc dec/oct/list; written in the target form
+ltspice/ltspice_examples/LM78XX.net xyce now written: .step list read (was W0001)
+ltspice/ltspice_examples/SoftDiodeRecovery.net xyce now written: .step list read (was W0001)
+ltspice/ltspice_examples/dimmer.net xyce now written: .step list read (was W0001)
+
+# Phase 7: spice-read: HSPICE `.dc var DEC|OCT|LIN|POI np …` and bare
+# `.dcvolt node val` (render::read sweeps, testbench; HSPICE .DC, .DCVOLT):
+# read as Ana::DcAxes and node voltages, written as above.
+hspice/hspice/dc_dec_grid.sp cdl read: .dc dec/oct/list; written in the target form
+hspice/hspice/dc_dec_grid.sp hspice read: .dc dec/oct/list; written in the target form
+hspice/hspice/dc_dec_grid.sp ltspice now written: .dc dec/oct/list read (was W0001)
+hspice/hspice/dc_dec_grid.sp xyce now written: .dc dec/oct/list read (was W0001)
+hspice/hspice/dc_poi_grid.sp cdl read: .dc dec/oct/list; written in the target form
+hspice/hspice/dc_poi_grid.sp hspice read: .dc dec/oct/list; written in the target form
+hspice/hspice/dc_poi_grid.sp ltspice now written: .dc dec/oct/list read (was W0001)
+hspice/hspice/dc_poi_grid.sp xyce now written: .dc dec/oct/list read (was W0001)
+hspice/hspice/dcvolt_uic.sp cdl read: bare .ic pairs; written in the target form
+hspice/hspice/dcvolt_uic.sp espice now written: bare .ic pairs read (was W0001)
+hspice/hspice/dcvolt_uic.sp hspice read: bare .ic pairs; written in the target form
+hspice/hspice/dcvolt_uic.sp ltspice now written: bare .ic pairs read (was W0001)
+hspice/hspice/dcvolt_uic.sp ngspice now written: bare .ic pairs read (was W0001)
+hspice/hspice/dcvolt_uic.sp spectre now written: bare .ic pairs read (was W0001)
+hspice/hspice/dcvolt_uic.sp vacask now written: bare .ic pairs read (was W0001)
+hspice/hspice/dcvolt_uic.sp xyce now written: bare .ic pairs read (was W0001)

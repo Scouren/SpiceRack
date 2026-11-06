@@ -32,6 +32,8 @@ use crate::syntax::diag::Code;
 pub enum Construct {
     /// A statement kept as text from another dialect family.
     ForeignText,
+    /// Such a statement only its own simulator has (`Rd::private`).
+    PrivateText,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -73,8 +75,12 @@ pub enum Construct {
     Func,
     /// `.step`.
     Step,
+    /// `.step <name> list <values>`.
+    StepList,
     /// LTspice's `.tran … startup` ramp.
     TranStartup,
+    /// A `.dc` axis by decade, octave or list.
+    DcLogList,
     /// `.tf`.
     Tf,
     /// `.sens` (DC).
@@ -131,6 +137,9 @@ pub enum Alt {
     PreOsdi,
     /// `.probe` per output, `.option post` for all (HSPICE).
     Probe,
+    /// `.dc src DEC|OCT np start stop`, `.dc src POI n v…` (HSPICE `.DC`,
+    /// the `type np` form).
+    DcType,
     /// Not written, the code the note the writer records for it.
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
@@ -180,6 +189,12 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0001),
             D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0001),
+        },
+        Construct::PrivateText => match target {
+            // As `ForeignText`: the xschem layout copies it.
+            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0039),
+            D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0039),
         },
         Construct::CaretReread => Refuse(Code::W0002),
         Construct::NgBehavior => match target {
@@ -299,11 +314,28 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
         },
+        Construct::StepList => match target {
+            D::Xyce | D::Ltspice => Native,
+            D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
+            // Spectre's `sweep … values=[…]` and VACASK's `sweep` over
+            // values have one; not written yet.
+            D::Spectre | D::Vacask => Refuse(Code::W0015),
+            D::Cdl | D::Verilog => Native,
+        },
         Construct::TranStartup => match target {
             D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0037),
             D::Spectre | D::Vacask => Refuse(Code::W0037),
             // Neither writes an analysis.
+            D::Cdl | D::Verilog => Native,
+        },
+        Construct::DcLogList => match target {
+            D::Xyce | D::Ltspice => Native,
+            D::Hspice => Spell(Alt::DcType),
+            D::Ngspice | D::Espice => Refuse(Code::W0038),
+            // Spectre's `dc` (`dec=`, `values=`) and VACASK's `sweep`
+            // (`mode="dec"`, `values=`) have one; not written yet.
+            D::Spectre | D::Vacask => Refuse(Code::W0015),
             D::Cdl | D::Verilog => Native,
         },
         Construct::Tf => match target {
@@ -403,8 +435,9 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 31] = [
+    const CONSTRUCTS: [Construct; 34] = [
         Construct::ForeignText,
+        Construct::PrivateText,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,
@@ -424,7 +457,9 @@ mod tests {
         Construct::BranchParam,
         Construct::Func,
         Construct::Step,
+        Construct::StepList,
         Construct::TranStartup,
+        Construct::DcLogList,
         Construct::Tf,
         Construct::Sens,
         Construct::SensAc,

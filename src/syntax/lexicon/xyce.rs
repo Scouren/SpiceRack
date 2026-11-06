@@ -122,7 +122,17 @@ const SCALES: &[(&str, Scale)] = &[
 ];
 
 /// RG p.49: `.incl` is `.include`.
-const OWN_KEYWORDS: &[(&str, Tag)] = &[(".incl", Tag::KwInclude), (".step", Tag::KwStep)];
+/// `.global_param` (Xyce RG `.GLOBAL_PARAM`) is a `.param` Xyce
+/// re-evaluates as the run goes; Xyce 7.10 runs a constant, a swept and a
+/// stepped `.param` the same as the `.global_param` (checked by running
+/// both); one reading a swept variable is kept as text by the reader
+/// (`Rd::global_swept`), and Xyce writes the rest back as `.global_param`
+/// (`Rd::global_param`).
+const OWN_KEYWORDS: &[(&str, Tag)] = &[
+    (".incl", Tag::KwInclude),
+    (".step", Tag::KwStep),
+    (".global_param", Tag::KwParam),
+];
 
 #[cfg(test)]
 mod tests {

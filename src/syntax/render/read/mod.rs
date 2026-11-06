@@ -55,6 +55,7 @@ mod outputs;
 mod refused;
 mod shapes;
 mod sources;
+mod sweeps;
 mod testbench;
 mod text;
 mod unlift;
@@ -66,6 +67,7 @@ pub(in crate::syntax::render) use elements::Card;
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
+pub(in crate::syntax::render) use sweeps::{DcAxis, DcSweep};
 pub(in crate::syntax::render) use testbench::{Ana, BenchCard, Sweep};
 pub(in crate::syntax::render) use unlift::{Lift, Step};
 pub(in crate::syntax::render) use values::Val;
@@ -97,6 +99,9 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// The `Num` nodes' tokens, sorted, once a writer names its target: the
     /// numbers it respells (a probe's `v(1a)` holds a name).
     nums: Vec<u32>,
+    /// The top's Xyce `.global_param` assignments, read as `.param`s
+    /// ([`Rd::global_param`]).
+    global_params: HashSet<u32>,
 }
 
 /// What the reader made of a file: every block and the deck-wide lists, in
@@ -307,6 +312,7 @@ pub(in crate::syntax::render) fn read<'a>(
         fixes: HashMap::new(),
         target: None,
         nums: Vec::new(),
+        global_params: HashSet::new(),
     };
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
