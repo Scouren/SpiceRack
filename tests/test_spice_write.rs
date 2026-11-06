@@ -497,3 +497,14 @@ fn xyce_prints_are_spelled_or_left_out_on_ngspice() {
     let v = *raw.real_data[i.expect("v(2)")].last().unwrap();
     assert!((v - 0.5).abs() < 1e-9, "{v}\n{}", w.text);
 }
+
+/// Xyce RG §2.3 (`sdt(x)`, the time integral of x); ngspice's B-source
+/// functions (manual §5.1) have `ddt` but no integral, and ngspice-45
+/// stops on `sdt` ("no such function 'sdt'", `xyce/Certification_Tests/
+/// BUG_963_SON/nonzeroInitialValue.cir`, run by hand): refused (W0045).
+#[test]
+fn ngspice_refuses_xyces_time_integral() {
+    let deck = "* t\nV2 2 0 1\nBsrc 1 0 V=sdt(v(2))\nR1 1 0 1k\n.tran 1u 10u\n.end\n";
+    let codes = refusal(deck, Dialect::Xyce, Dialect::Ngspice);
+    assert!(codes.contains(&Code::W0045), "{codes:?}");
+}

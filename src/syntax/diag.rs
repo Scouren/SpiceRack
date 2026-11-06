@@ -436,6 +436,12 @@ catalogue! {
         cite: "ngspice-45 src/frontend/numparam/xpressn.c (`{}` values) and its B-source parser (C's grammar), run by hand",
         explain: "ngspice reads a function body's `a?b?c:d:e` by C's grammar in a B source and as `a?c:e` in a `{}` value, and a deeper nest in a then-branch by neither rule, so the source has no single meaning to write. Parenthesize the then-branch in the source.",
     }
+    /// Xyce's time integral `sdt(x)` on a target with no integral function.
+    W0045 Refusal {
+        title: "a time integral the target lacks",
+        cite: "Xyce RG §2.3 (`sdt`); ngspice manual §5.1 (B-source functions: `ddt`, no integral); ngspice-45 run by hand (\"no such function 'sdt'\")",
+        explain: "`sdt(x)` integrates x over time in Xyce; ngspice's expressions have a derivative (`ddt`) but no integral, and ngspice stops on the call. Integrate with a capacitor (a current source of x into 1 F) instead.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {
