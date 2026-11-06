@@ -252,6 +252,12 @@ impl W<'_, '_> {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }
+                // A loaded module's instance keeps its name as read (no
+                // letter: Spectre names by statement, not by letter).
+                let prefix = match letter {
+                    'N' => String::new(),
+                    l => l.to_ascii_lowercase().to_string(),
+                };
                 let params = match letter == 'D' && self.rd.d == Dialect::Ngspice {
                     true => self.element_rows(letter, &params, n)?,
                     false => params,
@@ -259,7 +265,7 @@ impl W<'_, '_> {
                 let ns: Vec<String> = nodes.iter().map(|x| self.node(x)).collect();
                 format!(
                     "{}{} ({}) {}{}",
-                    letter.to_ascii_lowercase(),
+                    prefix,
                     self.dev(own),
                     ns.join(" "),
                     self.node(&model),

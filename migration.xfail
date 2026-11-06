@@ -27682,3 +27682,46 @@ vacask/test/test_optpar.sim ltspice now written: its VACASK temp sweep as .dc te
 vacask/test/test_optpar.sim ngspice now written: its VACASK temp sweep as .dc temp; was refused W0001
 vacask/test/test_optpar.sim spectre now written: its VACASK temp sweep as .dc temp; was refused W0001
 vacask/test/test_optpar.sim xyce now written: its VACASK temp sweep as .dc temp; was refused W0001
+
+# Phase 7: spectre-read-r2: VACASK models of loaded modules (render::read
+# named, named_blocks, named_elements; capability OsdiInstance; W0121 new).
+# A VACASK `model NAME <module>` whose module is no builtin and no mapped
+# SPICE kind is a loaded (Verilog-A / OSDI) module's model (VACASK docs
+# cir-masters.md): `.model NAME <module> (params)` and its instances
+# ngspice's OSDI `N` cards (manual §13; a PSP 103.4 drain current equal on
+# VACASK and ngspice, tests/test_vacask_import.rs); HSPICE, ESPice, Xyce,
+# LTspice refuse W0004; a module named as an ngspice built-in device
+# (`diode`) W0121 (ngspice-45 run). Was kept as text (W0001 off VACASK). A
+# `spice/<m>.osdi` load of a module with no mapped kind (sp_jfet2) is kept.
+# VACASK and Spectre write the model and instance in their own spelling,
+# the instance named as read; CDL writes the N card.
+pdk-vacask/demo/cmos180n.lib vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/limiting/builtin.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/limiting/custom.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/natures/ddt.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/natures/ibrictl.sim cdl a loaded module's instance written as its ngspice N card and .model (were copied as VACASK text)
+vacask/demo/natures/ibrictl.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/natures/idt.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/natures/switchbr.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/natures/vbr.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/demo/spice/jfet2amp.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_ac.sim spectre now written: a model of the loaded Verilog-A module (simdio.va, ahdl_include) and its instance; was refused W0001
+vacask/test/test_ac.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_acxf.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_dcinc.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_dcxf.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_diode.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb1.sim cdl a loaded module's instance written as its ngspice N card and .model (were copied as VACASK text)
+vacask/test/test_hb1.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb2.sim cdl a loaded module's instance written as its ngspice N card and .model (were copied as VACASK text)
+vacask/test/test_hb2.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb3.sim cdl a loaded module's instance written as its ngspice N card and .model (were copied as VACASK text)
+vacask/test/test_hb3.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb4.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb5.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_hb6.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_noise.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_opnl.sim spectre now written: a model of the loaded Verilog-A module (simdio.va, ahdl_include) and its instance; was refused W0001
+vacask/test/test_opsweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_sweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+vacask/test/test_sweepvar.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)

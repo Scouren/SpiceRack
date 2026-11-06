@@ -319,3 +319,99 @@ fn a_temperature_sweep_is_the_temp_options_sweep_on_vacask() {
         assert_eq!(column(&run(Dialect::Vacask, &deck), "2").len(), 3, "{deck}");
     }
 }
+
+/// VACASK's module directory (`<prefix>/lib/vacask/mod`, beside the binary
+/// on PATH), where its precompiled OSDI files are.
+fn vacask_mod() -> std::path::PathBuf {
+    let path = std::env::var_os("PATH").expect("PATH");
+    let bin = std::env::split_paths(&path)
+        .map(|d| d.join("vacask"))
+        .find(|b| b.is_file())
+        .expect("vacask on PATH: run in nix develop .#testing");
+    let bin = bin.canonicalize().expect("vacask's path");
+    bin.parent()
+        .and_then(|d| d.parent())
+        .expect("a prefix")
+        .join("lib/vacask/mod")
+}
+
+#[test]
+fn a_vacask_model_of_a_loaded_module_is_an_ngspice_osdi_instance() {
+    // cir-masters.md: a model's master is a builtin or a loaded module;
+    // ngspice manual §13: an OSDI module is a `.model` type, its instance
+    // an `N` card, the module loaded by `pre_osdi`. Both run the same
+    // PSP 103.4 binary: the drain current is the same number.
+    let osdi = vacask_mod().join("psp103v4.osdi");
+    let deck = format!(
+        "PSP nmos\n\nground 0\n\nload \"{}\"\n\nmodel vsource vsource\nmodel nch psp103va type=1\n\n\
+         vd (d 0) vsource dc=1\nvg (g 0) vsource dc=1\nm1 (d g 0 0) nch w=1u l=1u $mfactor=2\n\n\
+         control\n  analysis op1 op\nendc\n",
+        osdi.display()
+    );
+    let ng = written(&deck, Dialect::Ngspice).expect("written").text;
+    assert!(
+        ng.contains(".model nch psp103va (type=1)") && ng.contains("Nm1 d g 0 0 nch"),
+        "{ng}"
+    );
+    let current = |raw: &RawData, names: &[&str]| {
+        let at = raw
+            .variables
+            .iter()
+            .position(|v| names.iter().any(|n| v.name.eq_ignore_ascii_case(n)));
+        raw.real_data[at.unwrap_or_else(|| panic!("{:?}", raw.variables))][0]
+    };
+    let v = current(&run(Dialect::Vacask, &deck), &["vd:flow(br)"]);
+    let n = current(&run(Dialect::Ngspice, &ng), &["i(vd)"]);
+    assert!(
+        v < -1e-5 && ((n - v) / v).abs() < 1e-6,
+        "VACASK {v}, ngspice {n}\n{ng}"
+    );
+    // VACASK and Spectre keep the instance's name.
+    let own = written(&deck, Dialect::Vacask).expect("written").text;
+    assert!(own.contains("m1 (d g 0 0) nch"), "{own}");
+    // No other SPICE target names a compiled module in a deck line.
+    for target in [
+        Dialect::Hspice,
+        Dialect::Xyce,
+        Dialect::Ltspice,
+        Dialect::Espice,
+    ] {
+        assert!(
+            refusals(written(&deck, target)).contains(&Code::W0004),
+            "{target:?}"
+        );
+    }
+}
+
+#[test]
+fn a_module_named_as_an_ngspice_builtin_device_is_refused() {
+    // W0121's run: VACASK's `diode.osdi` (module `diode`) as `.model d
+    // diode` is ngspice's built-in Diode, and its `N` instance fails.
+    let osdi = vacask_mod().join("diode.osdi");
+    let deck = format!(
+        "D\nground 0\nload \"{}\"\nmodel vsource vsource\nmodel d diode is=1e-12\n\
+         v1 (1 0) vsource dc=1\nd1 (1 0) d\ncontrol\n  analysis op1 op\nendc\n",
+        osdi.display()
+    );
+    assert_eq!(
+        refusals(written(&deck, Dialect::Ngspice)),
+        vec![Code::W0121]
+    );
+}
+
+#[test]
+fn a_spice_module_with_no_spice_kind_keeps_its_load() {
+    // A `spice/<m>.osdi` whose module SpiceRack maps to a SPICE card is
+    // VACASK's build of ngspice's device (written as that card); any other
+    // (`sp_jfet2`, ngspice's JFET level 2 has no mapped kind here) is a
+    // loaded module's model, so its `N` instance needs the load
+    // (cir-loading.md).
+    let deck = "J\nground 0\nload \"spice/jfet2.osdi\"\nmodel vsource vsource\n\
+                model nf sp_jfet2 type=1\nv1 (d 0) vsource dc=1\nj1 (d 0 0) nf\n\
+                control\n  analysis op1 op\nendc\n";
+    let ng = written(deck, Dialect::Ngspice).expect("written").text;
+    assert!(
+        ng.contains("pre_osdi spice/jfet2.osdi") && ng.contains("Nj1 d 0 0 nf"),
+        "{ng}"
+    );
+}

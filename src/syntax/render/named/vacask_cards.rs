@@ -165,9 +165,14 @@ impl W<'_, '_> {
                     return None;
                 }
                 let ns: Vec<String> = nodes.iter().map(|x| q(x)).collect();
+                // A loaded module's instance keeps its name as read.
+                let letter = match letter {
+                    'N' => String::new(),
+                    l => l.to_ascii_lowercase().to_string(),
+                };
                 format!(
                     "{}{} ({}) {}{}",
-                    letter.to_ascii_lowercase(),
+                    letter,
                     q(own),
                     ns.join(" "),
                     q(&model),

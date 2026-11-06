@@ -12,7 +12,7 @@
 //! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::velems(&self, v: u32) -> Vec<u32>`,
 //!   `Rd::strip(&self, name: &str, letter: char) -> String`
 
-use super::named::{spectre_kind, vacask_builtin, vacask_kind};
+use super::named::{OSDI, spectre_kind, vacask_model_kind};
 use super::{Card, Num, Rd, Val, Wave, WaveKind};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
@@ -287,6 +287,15 @@ impl<'a> Rd<'a> {
                     params: kept(&[]),
                 });
             }
+            // A loaded module's instance: ngspice's OSDI `N` card (manual
+            // §13: an instance of a `.model` of the module), named as read.
+            m if kind_of.as_deref().is_some_and(|k| k.starts_with(OSDI)) => Card::Semi {
+                letter: 'N',
+                name: name.to_lowercase(),
+                nodes: ns,
+                model: m.to_string(),
+                params: device(&[]),
+            },
             m => {
                 let kind = kind_of.as_deref()?;
                 let (model, params) = (m.to_string(), device(&[]));
@@ -348,10 +357,7 @@ impl<'a> Rd<'a> {
                 let p = *polarity == Some(Polarity::P);
                 if self.d == Dialect::Vacask {
                     let ty = polarity.map(|_| if p { -1.0 } else { 1.0 });
-                    return match vacask_kind(word, ty) {
-                        Some((kind, _)) => Some(Declared::Model(kind)),
-                        None => vacask_builtin(word).map(|b| Declared::Model(format!("={b}"))),
-                    };
+                    return Some(Declared::Model(vacask_model_kind(word, ty)));
                 }
                 let ty = p.then_some(if word == "bjt" { "pnp" } else { "p" });
                 Some(Declared::Model(spectre_kind(word, ty).0))

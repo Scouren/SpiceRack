@@ -579,6 +579,12 @@ catalogue! {
         cite: "VACASK docs cmd-errorhandling.md (`abort`), cmd-print.md, cmd-postprocess.md, input-embed.md (a file written for a script)",
         explain: "`abort` sets VACASK's error policy, `print` writes to its console, `postprocess` runs a program after the run, and an `embed` that no `load` or `include` of the deck reads writes a file for such a program: none changes a number of the circuit, and the target has no such step, so it is left out. Run the script on the target's own results.",
     }
+    /// A loaded module named as one of the target's built-in devices.
+    W0121 Refusal {
+        title: "a Verilog-A module named as a built-in device of the target",
+        cite: "ngspice-45 run: `.model dmod diode` with VACASK's `diode.osdi` loaded reads `diode` as its built-in `Diode` (\"unrecognized parameter (diode)\") and the `N` instance fails (\"incorrect model type! Expected OSDI device\"); `devhelp` lists the built-in names",
+        explain: "The target looks a model's type up among its built-in devices before the OSDI modules it loaded, so a module named as one of them (`diode`, `resistor`, `bjt`, …) cannot be instantiated. Rename the module in its Verilog-A source and load that build.",
+    }
     /// A `.tf` written as Spectre's `xf` at frequency 0: its input and
     /// output resistances are not computed.
     W0125 Note {

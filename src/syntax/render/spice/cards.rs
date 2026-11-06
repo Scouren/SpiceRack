@@ -284,6 +284,9 @@ impl W<'_, '_> {
                 if letter == 'O' {
                     self.ask(Construct::LossyLine, tok);
                 }
+                if letter == 'N' {
+                    self.ask(Construct::OsdiInstance, tok);
+                }
                 format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
             }
             Card::Switch { nodes, model, .. } => format!("{decl} {} {model}", nodes.join(" ")),

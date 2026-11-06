@@ -38,7 +38,7 @@ mod verilog;
 mod xyce_options;
 
 use super::Numbers;
-use super::capability::{Action, Alt, Construct, Rule, action};
+use super::capability::{Action, Alt, Construct, Rule, action, ngspice_device};
 use super::draws::{self, Layers};
 use super::names;
 use super::out::{Out, Space};
@@ -387,6 +387,11 @@ impl W<'_, '_> {
     /// `vres(r=3k)`.
     fn model(&mut self, n: u32, bin: u32) {
         let m = self.rd.model_view(n, bin);
+        // A loaded module named as a built-in device: ngspice reads the
+        // built-in (W0121's run).
+        if self.d == Dialect::Ngspice && self.rd.osdi_module(n) && ngspice_device(&m.kind) {
+            self.refuse(Code::W0121, self.rd.main(n));
+        }
         let mos = m.kind.eq_ignore_ascii_case("nmos") || m.kind.eq_ignore_ascii_case("pmos");
         let mut line = format!(".model {} {}", m.name, m.kind);
         for (i, (k, v)) in m.params.iter().enumerate() {

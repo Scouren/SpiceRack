@@ -9,12 +9,13 @@
 //! Contents:
 //! - `pub(in crate::syntax::render) struct Stats`, `struct Vary`
 //! - `Rd::named_model_ok(&mut self, n: u32, here: &mut Block) -> bool`
+//! - `Rd::osdi_module(&self, n: u32) -> bool`
 //! - `Rd::named_model_view(&self, n: u32, bin: u32) -> Model`
 //! - `Rd::real_func(&self, n: u32) -> (String, Vec<String>, String)`, `Rd::real_return(&self, n: u32) -> Option<u32>`
 //! - `Rd::statistics(&self, n: u32) -> Stats`
 
 use super::cards::Model;
-use super::named::{spectre_kind, vacask_builtin, vacask_kind};
+use super::named::{OSDI, spectre_kind, vacask_builtin, vacask_kind, vacask_model_kind};
 use super::{Block, Rd};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Tag};
@@ -55,6 +56,16 @@ impl<'a> Rd<'a> {
             return self.one_model(n, NONE, here);
         }
         bins.iter().all(|&b| self.one_model(n, b, here))
+    }
+
+    /// Whether model statement `n` is a VACASK model of a loaded module
+    /// (no SPICE kind, no builtin: `named::vacask_model_kind`).
+    pub(in crate::syntax::render) fn osdi_module(&self, n: u32) -> bool {
+        let f = self.fields(n);
+        self.d == Dialect::Vacask
+            && self.tag(n) == Tag::Model
+            && f.len() >= 2
+            && vacask_model_kind(&self.name_of(f[1]), None).starts_with(OSDI)
     }
 
     /// Model statement `n`'s view, or its bin `bin`'s (`NONE`: no bin).
@@ -157,8 +168,8 @@ impl<'a> Rd<'a> {
         }
     }
 
-    /// Model `n` (bin `bin`) as SPICE reads it; `None` for a VACASK module
-    /// with no SPICE kind.
+    /// Model `n` (bin `bin`) as SPICE reads it: a VACASK module with no
+    /// SPICE kind is its own (an OSDI model).
     fn model_of(&self, n: u32, bin: u32) -> Option<Model> {
         let f = self.fields(n);
         let (name, master) = (self.name_of(f[0]), self.name_of(f[1]));
@@ -171,7 +182,20 @@ impl<'a> Rd<'a> {
             }
         };
         let (kind, level) = if self.d == Dialect::Vacask {
-            vacask_kind(&master, self.get(&p, "type").and_then(|t| self.number(t)))?
+            match vacask_kind(&master, self.get(&p, "type").and_then(|t| self.number(t))) {
+                Some(k) => k,
+                // A loaded module's model: ngspice's OSDI `.model name
+                // <module>` takes its parameters as written, `type` too.
+                None => {
+                    let params = p.iter().map(|(k, v)| (k.clone(), self.vtext(*v)));
+                    let params = params.collect();
+                    return Some(Model {
+                        name,
+                        kind: master,
+                        params,
+                    });
+                }
+            }
         } else {
             let ty = self.get(&p, "type").map(|t| self.text(t));
             spectre_kind(&master, ty.as_deref())
