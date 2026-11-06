@@ -433,7 +433,16 @@ impl W<'_, '_> {
                 max_step,
                 uic,
             } => {
-                let mut s = format!(".tran {} {}", num(self, *step), num(self, *stop));
+                // ngspice stops on a zero step (Xyce's and LTspice's "the
+                // simulator's choice"): the span over 50, ngspice's own
+                // default step cap (manual §11.3.10).
+                let zero = *step <= 0.0 && self.d.family() == Dialect::Ngspice;
+                let step = if zero {
+                    (stop - start.unwrap_or(0.0)) / 50.0
+                } else {
+                    *step
+                };
+                let mut s = format!(".tran {} {}", num(self, step), num(self, *stop));
                 if let Some(st) = start {
                     s.push_str(&format!(" {}", num(self, *st)));
                 }

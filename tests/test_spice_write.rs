@@ -393,3 +393,31 @@ fn a_nested_ternary_keeps_its_meaning_across_dialects() {
     assert!(w.contains("{x<p?p :x>n?n :x}"), "{w}");
     assert!((ngspice_op(ng, "a") - 5.0).abs() < 1e-12);
 }
+
+// ── transient step ──
+
+/// Xyce and LTspice take `.tran 0 <stop>` (Xyce RG `.TRAN`: a zero
+/// initial step is chosen by the simulator); ngspice-45 stops on it
+/// ("TSTEP is invalid, must be greater than zero", `xyce/TEMPCAP/
+/// tempcap.cir`). The written step is the span over 50, ngspice's own
+/// default step cap (manual §11.3.10, TMAX), and real ngspice charges the
+/// RC (1 ms) to 1 - e^-5 of 1 V at 5 ms.
+#[test]
+fn a_zero_transient_step_is_a_positive_one_on_ngspice() {
+    let deck = "* t\nV1 in 0 1\nR1 in out 1k\nC1 out 0 1u IC=0\n.tran 0 5m UIC\n.end\n";
+    let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
+    assert!(
+        w.contains(".tran 1e-4 5m") || w.contains(".tran 100u 5m"),
+        "{w}"
+    );
+    let raw = Dialect::Ngspice
+        .run(&w)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{w}"));
+    let i = raw
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("v(out)"));
+    let v = *raw.real_data[i.expect("v(out)")].last().unwrap();
+    let want = 1.0 - (-5.0f64).exp();
+    assert!((v - want).abs() < 1e-3, "{v} vs {want}\n{w}");
+}
