@@ -195,9 +195,11 @@ The note at the top of `src/syntax/mod.rs` shows the three steps.
   where `variations` is narrower).
 - The store keeps a `ModelLibrary`'s ngspice path: a library with
   `backend_paths` stores the deck its ngspice netlist is written from.
-- `.options itl1=` reaches Spectre as `itl1=` (only the portable name
-  `max_iterations` maps to `dcmaxiters`): a quirk older than this phase.
-- A VACASK charge-defined capacitor is refused `W0105`; `W0103` (a charge
-  expression the target cannot spell) may be the better code.
+- (Phase 7, named-write) `.options itl1=` is Spectre's `dcmaxiters`; a
+  SPICE option with no Spectre equivalent is noted W0024, not written.
+- (Phase 7, named-write) A VACASK charge-defined capacitor stays `W0105`:
+  VACASK has no charge-defined device at all (its builtins and OSDI
+  models), which is W0105's cause; W0103 is an expression Spectre's `q=`
+  cannot spell.
 - Verilog: a simple name that is a Verilog keyword is not escaped; an
   instance's parameters are noted, not written.

@@ -129,11 +129,11 @@ fn spectre_refuses_constructs_without_a_documented_spelling() {
     let cases = [
         // XSPICE A-devices are ngspice-only.
         "A1 a d_and\n.model d_and d_and",
-        // `[CMP]` p.856: Spectre bsource expressions are `v(a,b)`,
-        // `i("inst:idx")`, `$time` — not SPICE's `V()`/`I()`/`time`, and
-        // Spectre is case sensitive.
-        "B1 o 0 V=V(a)*2",
-        "B1 o 0 I=I(V1)*2",
+        // `[CMP]` pp.857-870: no bsource frequency (`hertz`), no `u()`
+        // step, no Laplace.
+        "B1 o 0 V=hertz*2",
+        "B1 o 0 V=u(v(a))",
+        "B1 o 0 V={laplace(v(a), 1/(1+s))}",
         // `[CMP]` p.625 `relay` is voltage controlled; p.643 `switch` changes
         // position only between analyses. Neither is SPICE's W element.
         "W1 a b V1 csw",
@@ -144,5 +144,33 @@ fn spectre_refuses_constructs_without_a_documented_spelling() {
     for card in cases {
         let r = try_component(card);
         assert!(r.is_err(), "{card}: expected a refusal, got {r:?}");
+    }
+}
+
+/// `[CMP]` pp.856-860: `name (n1 n2) bsource v=expr` / `i=expr`, node
+/// voltages `v(a,b)`, a branch current `i("inst:0")` (the `cccs1` example),
+/// `$time`; p.884 `temp`; p.864 `M_PI`; p.869 `log` natural. ngspice-45
+/// computes `x**y` as `|x|^y` (`(-2)**3` is 8, measured), hence
+/// `pow(abs(x),y)`; every compound operand is parenthesised, so Spectre's
+/// right-associative `**` and its unary minus above it regroup nothing.
+#[test]
+fn a_behavioural_source_is_a_spectre_bsource() {
+    for (card, want) in [
+        ("B1 o 0 V=V(a)*2", "b1 (o 0) bsource v=v(a)*2"),
+        ("B1 o 0 I=-I(V1)*2", "b1 (o 0) bsource i=(-i(\"v1:0\"))*2"),
+        ("B2 o 0 V=time*1k+pi", "b2 (o 0) bsource v=($time*1k)+M_PI"),
+        ("B3 o 0 V=ln(v(a,b))", "b3 (o 0) bsource v=log(v(a,b))"),
+        (
+            "B4 o 0 V=-v(a)**2",
+            "b4 (o 0) bsource v=-(pow(abs(v(a)),2))",
+        ),
+        (
+            "B5 o 0 V=v(a)>1 ? 1 : !v(b)",
+            "b5 (o 0) bsource v=(v(a)>1) ? 1 : (v(b)==0)",
+        ),
+        ("E1 o 0 value={2*v(a)}", "e1 (o 0) bsource v=2*v(a)"),
+        ("G1 o 0 cur={temper}", "g1 (o 0) bsource i=temp"),
+    ] {
+        assert_eq!(component(card), want, "{card}");
     }
 }

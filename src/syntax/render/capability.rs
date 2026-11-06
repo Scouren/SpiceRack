@@ -7,7 +7,7 @@
 //!
 //! `Spell` and `Lift` keep the meaning: a named alternative form, or a
 //! rewrite into extra statements recorded as fixups. Anything that cannot
-//! keep its meaning is `Refuse` with a `W` code. Seven cells answer as the
+//! keep its meaning is `Refuse` with a `W` code. Three cells answer as the
 //! old writers behaved, where that drops or garbles something: each is
 //! marked `// quirk:` (the golden gate holds them until phase 7 decides).
 //!
@@ -135,6 +135,9 @@ pub enum Alt {
     Copy(Code),
     /// `c1 (a b) bsource q=expr` (Spectre Reference 19.1 p.459).
     BsourceCharge,
+    /// `b1 (a b) bsource v=expr` / `i=expr` (Spectre Reference 5.0
+    /// pp.856-860).
+    Bsource,
     /// PWL `r=0` as `pwlperiod=` where it repeats exactly, `td=` as
     /// `delay=` (Spectre Reference 5.0 `vsource` #4, #17, #18, p.686).
     PwlPeriod,
@@ -211,9 +214,9 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::LibWholeFile => match target {
             D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0005),
-            // quirk: the old Spectre and VACASK writers wrote `include
-            // "file" section=` (no section); phase 7 refuses it.
-            D::Spectre | D::Vacask => Spell(Alt::Copy(Code::W0110)),
+            // `include "file"` reads the whole file (Spectre Reference 5.0
+            // p.875; VACASK `lib/dfllexer.l`, `INCEND`).
+            D::Spectre | D::Vacask => Native,
             D::Cdl | D::Verilog => Refuse(Code::W0005),
         },
         Construct::LibSection => match target {
@@ -239,7 +242,12 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Hspice => Spell(Alt::VolCur),
             D::Xyce => Spell(Alt::BracedBehaviour),
             D::Ngspice | D::Espice | D::Ltspice => Native,
-            D::Spectre | D::Vacask => Refuse(Code::W0102),
+            // `bsource v=`/`i=` (Spectre Reference 5.0 pp.856-860); an
+            // expression it cannot spell is refused by the writer.
+            D::Spectre => Spell(Alt::Bsource),
+            // VACASK's devices are its builtins (`lib/devbuiltins.cpp`:
+            // sources, controlled sources, `mutual`) and OSDI models.
+            D::Vacask => Refuse(Code::W0102),
             D::Cdl | D::Verilog => Native,
         },
         Construct::Laplace => match target {
@@ -322,9 +330,10 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             // An LTspice run saves every vector and has no stdout print.
             D::Ltspice => Spell(Alt::Omit(Code::W0023)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce => Native,
-            // quirk: the old Spectre and VACASK writers drop a `.print`
-            // (never mapped); phase 7 decides.
-            D::Spectre | D::Vacask => Spell(Alt::Omit(Code::W0023)),
+            // Spectre: a `save` of the same signals (Spectre Reference 5.0
+            // p.886). VACASK saves every node and source flow. An output
+            // with no signal form is noted W0023 by the writer.
+            D::Spectre | D::Vacask => Native,
             D::Cdl | D::Verilog => Native,
         },
         Construct::Save => match target {

@@ -75,3 +75,41 @@ fn run_all_returns_every_analysis_in_deck_order() {
     assert_eq!(run(&deck).plot_name, plots[0].plot_name);
     assert_eq!(col(&run(&deck), "out").len(), 1);
 }
+
+#[test]
+fn a_sectionless_library_call_includes_the_whole_file() {
+    // LTspice's `.lib file` reads the whole file. VACASK's `include "f"`
+    // does too; `include "f" section=` with no name is its syntax error
+    // ("expected section name": `lib/dfllexer.l`, `LIBSECTION`).
+    let dir = tempfile::tempdir().unwrap();
+    let lib = dir.path().join("half.inc");
+    std::fs::write(&lib, "r3 (b 0) resistor r=1e3\n").unwrap();
+    let deck = format!(
+        "t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.lib {}\n.op\n.end\n",
+        lib.display()
+    );
+    let netlist = emit_from(&deck, Dialect::Ltspice, &lexicon::LTSPICE).unwrap();
+    assert!(!netlist.contains("section="), "{netlist}");
+    // 1 V over 1k into 1k || 1k: 1/3 V.
+    close(col(&run_text(&netlist), "b")[0], 1.0 / 3.0, 1e-9);
+}
+
+#[test]
+fn a_print_of_nodes_and_source_currents_is_in_the_raw_file() {
+    // VACASK saves every node and source flow: a `.print` of them loses
+    // nothing, so it is not noted; a resistor's current is not saved.
+    let deck = "t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.print dc v(b) i(V1)\n.op\n.end\n";
+    let netlist = emit(deck).unwrap();
+    let w = spicerack::syntax::render::render_text(deck, Dialect::Ngspice, "t", Dialect::Vacask)
+        .unwrap();
+    assert!(w.notes.diags.is_empty(), "{}", w.notes.messages);
+    let raw = run_text(&netlist);
+    close(col(&raw, "b")[0], 0.5, 1e-9);
+    close(col(&raw, "v1:flow(br)")[0], -0.5e-3, 1e-9);
+    let resistor = deck.replace("i(V1)", "i(R1)");
+    let w =
+        spicerack::syntax::render::render_text(&resistor, Dialect::Ngspice, "t", Dialect::Vacask)
+            .unwrap();
+    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    assert_eq!(codes, [Code::W0023], "{}", w.notes.messages);
+}

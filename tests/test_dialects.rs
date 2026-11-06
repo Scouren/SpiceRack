@@ -161,23 +161,40 @@ fn spectre_keeps_spice_meaning() {
     // SPICE 30M is milli; Spectre's M is mega, its m milli.
     assert!(n.contains("model qn bjt type=npn ikf=30m"), "{n}");
     assert!(n.contains("skipdc=yes"), "uic: {n}");
-    assert!(n.contains("save v1:p"), "current save: {n}");
-    // A nested `.dc` must not lose a sweep, and a VDMOS has no Spectre
-    // master: both refused.
+    // A current is its first terminal by index (Spectre Reference 5.0 p.886).
+    assert!(n.contains("save v1:1"), "current save: {n}");
+    // A nested `.dc` keeps both sweeps: the second a `sweep` around the
+    // first (Spectre Reference 19.1 pp.406-409). A VDMOS has no Spectre
+    // master: refused.
     let nested = circuit(&format!("{model}.dc V1 0 1 0.1 temp 0 1 0.1\n"), false);
-    assert!(netlist(&nested, Dialect::Spectre).is_err());
+    let n = netlist(&nested, Dialect::Spectre).unwrap_or_else(|e| panic!("{}", e.messages));
+    assert!(
+        n.contains(
+            "dcsweep1 sweep param=temp start=0 stop=1 step=100m {\n  dc1 dc dev=v1 param=dc"
+        ),
+        "{n}"
+    );
     let vdmos = circuit(".model qn VDMOS(IKF=30M)\n.op\n", false);
     assert!(netlist(&vdmos, Dialect::Spectre).is_err());
 }
 
-/// An empty option value is a flag: bare in SPICE, refused by Spectre
-/// (`W0101`), whose `options` statement takes `name=value` only.
+/// An empty option value is a flag: bare in SPICE. Spectre's `options`
+/// takes `name=value` only and has no `acct` (Reference 19.1 pp.187-236):
+/// the flag is not written, noted W0024; `reltol` is Spectre's #1, `itl1`
+/// its `dcmaxiters` #56.
 #[test]
 fn option_flags() {
-    let deck = circuit(".options noacct reltol=1e-4\n.op\n", false);
+    let deck = circuit(".options noacct reltol=1e-4 itl1=200\n.op\n", false);
     let n = netlist(&deck, Dialect::Ngspice).unwrap_or_else(|e| panic!("{}", e.messages));
-    assert!(n.contains(".options noacct reltol=1e-4"), "{n}");
-    assert!(refusal(&deck, Dialect::Spectre).contains(&Code::W0101));
+    assert!(n.contains(".options noacct reltol=1e-4 itl1=200"), "{n}");
+    let w = render_text(&deck, Dialect::Ngspice, "dialects", Dialect::Spectre)
+        .unwrap_or_else(|e| panic!("{}", e.messages));
+    assert!(
+        w.text.contains("myopts options reltol=100u dcmaxiters=200"),
+        "{}",
+        w.text
+    );
+    assert!(w.notes.diags.iter().any(|x| x.code == Code::W0024));
 }
 
 // ── ESPice as the reader ──

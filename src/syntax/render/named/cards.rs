@@ -163,10 +163,14 @@ impl W<'_, '_> {
                 }
                 s
             }
-            Card::Behavioural { .. } => {
-                self.ask(Construct::BehaviouralSource, tok);
-                return None;
-            }
+            Card::Behavioural {
+                current,
+                np,
+                nm,
+                expr,
+                value,
+                ..
+            } => self.bsource_card(tok, own, current, [&np, &nm], &expr, value)?,
             Card::Linear {
                 letter,
                 name: _,

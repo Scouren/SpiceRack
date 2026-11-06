@@ -1,8 +1,8 @@
 //! The testbench → Spectre statements: the deck's testbench items folded in
 //! read order (options merged, the last temperature winning), then
-//! `options`, `ic`, `nodeset`, `save`, the measures in a `simulator
-//! lang=spice` region, and the analyses, each `.step` a `sweep` block
-//! around them.
+//! `options`, `ic`, `nodeset`, `save` (a `.save`'s and a `.print`'s
+//! signals), the measures in a `simulator lang=spice` region, and the
+//! analyses, each `.step` a `sweep` block around them.
 //!
 //! Cites: Spectre Reference 19.1 `[REF]` pp.187-236 (`options`: `reltol`
 //! #1, `vabstol` #3, `iabstol` #4, `temp` #6, `tnom` #7, `dcmaxiters` #56),
@@ -10,11 +10,13 @@
 //! (`.measure`), p.64 (`dc`: `dev=`/`param=`), p.43 (`ac`), pp.416-417
 //! (`tran`), pp.181-182 (`noise`), pp.438-439 (`xf`), p.524 (`sens`),
 //! pp.387-389 (`sp`), pp.406-410 (`sweep`); `[CMP]` pp.323-325
-//! (`fourier`); `[KUN]` B.2 (`simulator lang=`).
+//! (`fourier`), p.886 (`save`: nodes, `inst:index` terminal currents);
+//! `[KUN]` B.2 (`simulator lang=`).
 //!
 //! Contents:
 //! - `pub(super) struct Tb`, `pub(super) type Step`
 //! - `W::bench(&mut self)`, `W::fold(&self) -> Tb`, `W::unwritten_outputs(&mut self, tb: &Tb)`
+//! - `pub(super) enum Signal`, `fn signal_of(out: &str) -> Option<Signal<'_>>`
 //! - `fn bare_node(s: &str) -> &str`
 
 use super::W;
@@ -40,8 +42,8 @@ pub(super) struct Tb {
     pub(super) saves: Vec<String>,
     /// The first save card's first token.
     pub(super) save_tok: Option<u32>,
-    /// Each `.print`'s first token (neither target writes one).
-    pub(super) prints: Vec<u32>,
+    /// Each `.print`'s outputs and first token.
+    pub(super) prints: Vec<(Vec<String>, u32)>,
     /// The first token of each options card holding Xyce's own options,
     /// which neither target writes.
     pub(super) xyce: Vec<u32>,
@@ -60,6 +62,38 @@ pub(super) struct Tb {
 /// statement's first token.
 pub(super) type Step = (Option<&'static str>, String, [f64; 3], u32);
 
+/// A SPICE output as a signal Spectre saves (`[CMP]` p.886: a node, or a
+/// component's terminal current).
+pub(super) enum Signal<'s> {
+    /// A voltage's nodes, ground left out (`v(a,b)`, `vdb(a)`: the vector
+    /// saved, its view the post-processor's).
+    Nodes(Vec<&'s str>),
+    /// A device's current (`i(r1)`, `im(r1)`).
+    Current(&'s str),
+}
+
+/// SPICE's options and Spectre's of the same effect (`[REF]` pp.187-236,
+/// by number): `reltol` #1, `vabstol` #3, `iabstol` #4, `chargeabstol` #5,
+/// `temp` #6, `tnom` #7, `dcmaxiters` #56 (ngspice's `itl1`, Xyce's `max_iterations`), `scale`
+/// #90, `gmin` #128, `pivrel` #181, `pivabs` #182 (SPICE's `pivtol`).
+const SPECTRE_OPTIONS: &[(&str, &str)] = &[
+    ("reltol", "reltol"),
+    ("vntol", "vabstol"),
+    ("abstol", "iabstol"),
+    ("chgtol", "chargeabstol"),
+    ("temp", "temp"),
+    ("tnom", "tnom"),
+    ("itl1", "dcmaxiters"),
+    ("max_iterations", "dcmaxiters"),
+    ("scale", "scale"),
+    ("gmin", "gmin"),
+    ("pivrel", "pivrel"),
+    ("pivtol", "pivabs"),
+];
+
+/// The most points an `oct` sweep's `values` list holds.
+const OCT_POINTS_MAX: usize = 100_000;
+
 impl W<'_, '_> {
     /// The testbench's statements.
     pub(super) fn bench(&mut self) {
@@ -72,22 +106,21 @@ impl W<'_, '_> {
             self.note(Code::W0024, tok);
         }
         // `[REF]` p.236: `o1 options scale=1.2`; options take `name=value`
-        // only. A portable option is SPICE's: its name lowercased and
-        // mapped, its number respelled (SPICE `VNTOL=1M` is milli).
+        // only. A SPICE option is written where Spectre has one of the same
+        // effect ([`SPECTRE_OPTIONS`]), its number respelled (SPICE
+        // `VNTOL=1M` is milli); any other (a flag such as `ACCT`, `itl4`,
+        // `method`) is not written: noted.
         let mut opts = Vec::new();
         for (k, v, tok) in &tb.options {
-            if v.is_empty() {
-                self.refuse(Code::W0101, *tok);
-                continue;
-            }
             let k = k.to_ascii_lowercase();
-            let k = match k.as_str() {
-                "abstol" => "iabstol",
-                "vntol" => "vabstol",
-                "max_iterations" => "dcmaxiters",
-                other => other,
+            let spectre = match self.rd.d {
+                Dialect::Spectre => Some(k.as_str()),
+                _ => SPECTRE_OPTIONS.iter().find(|o| o.0 == k).map(|o| o.1),
             };
-            opts.push(format!("{k}={}", self.value_text(v)));
+            match spectre {
+                Some(name) if !v.is_empty() => opts.push(format!("{name}={}", self.value_text(v))),
+                _ => self.note(Code::W0024, *tok),
+            }
         }
         if !opts.is_empty() {
             self.line(&format!("myopts options {}", opts.join(" ")));
@@ -105,19 +138,26 @@ impl W<'_, '_> {
             }
         }
         for s in &tb.saves {
-            // `i(V1)` is the source's current: its terminal, under the
-            // name the instance is written with.
-            let save = self.signal(s);
-            let t = save.trim();
-            let current = t
-                .strip_prefix("i(")
-                .or_else(|| t.strip_prefix("I("))
-                .and_then(|r| r.strip_suffix(')'));
-            let line = match current {
-                Some(dev) => format!("save {}:p", self.inst_ref(dev.trim())),
-                None => format!("save {}", bare_node(&save)),
+            let words = match signal_of(s) {
+                Some(sig) => self.save_words(&sig),
+                None => bare_node(&self.signal(s)).to_string(),
             };
-            self.line(&line);
+            if !words.is_empty() {
+                self.line(&format!("save {words}"));
+            }
+        }
+        // A `.print`'s signals are saved; its view of them (`vdb`, a
+        // difference) is the post-processor's.
+        for (outs, _) in &tb.prints {
+            let words: Vec<String> = outs
+                .iter()
+                .filter_map(|o| signal_of(o))
+                .map(|sig| self.save_words(&sig))
+                .filter(|w| !w.is_empty())
+                .collect();
+            if !words.is_empty() {
+                self.line(&format!("save {}", words.join(" ")));
+            }
         }
         // `.measure` is SPICE syntax: fenced by language switches.
         for (m, tok) in &tb.measures {
@@ -162,8 +202,17 @@ impl W<'_, '_> {
     /// `.print`, Xyce's own options, ngspice's mode, the save list where the target saves
     /// every node.
     pub(super) fn unwritten_outputs(&mut self, tb: &Tb) {
-        for &tok in &tb.prints {
-            self.ask(Construct::Print, tok);
+        for (outs, tok) in &tb.prints {
+            self.ask(Construct::Print, *tok);
+            // VACASK's raw file holds every node voltage and source current.
+            let unwritten = outs.iter().any(|o| match (signal_of(o), self.d) {
+                (None, _) => true,
+                (Some(Signal::Current(dev)), Dialect::Vacask) => !dev.starts_with(['v', 'V']),
+                (Some(_), _) => false,
+            });
+            if unwritten {
+                self.note(Code::W0023, *tok);
+            }
         }
         for &tok in &tb.xyce {
             self.note(Code::W0024, tok);
@@ -236,9 +285,7 @@ impl W<'_, '_> {
                     BenchCard::Temp(t) => tb.temp = Some(t),
                     BenchCard::NodeVals(true, v) => tb.ics.extend(v),
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
-                    // `Construct::Print` is `Spell(Omit)` here (a quirk):
-                    // asked, and noted, by [`W::unwritten_outputs`].
-                    BenchCard::Print(..) => tb.prints.push(tok),
+                    BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
                     BenchCard::Extra(l) => tb.extra.push(l),
                 }
@@ -259,9 +306,43 @@ pub(super) fn bare_node(s: &str) -> &str {
     inner.map_or(t, str::trim)
 }
 
+/// `out` as a [`Signal`]; `None` for an output with no signal form (an
+/// expression, an option such as `format=`, a device parameter).
+pub(super) fn signal_of(out: &str) -> Option<Signal<'_>> {
+    let (w, r) = out.trim().split_once('(')?;
+    let args = r.strip_suffix(')')?;
+    let parts: Vec<&str> = args.split(',').map(str::trim).collect();
+    if parts.iter().any(|p| p.is_empty() || p.contains(['(', ')'])) {
+        return None;
+    }
+    match w.to_ascii_lowercase().as_str() {
+        "v" | "vm" | "vr" | "vi" | "vp" | "vph" | "vdb" if parts.len() <= 2 => Some(Signal::Nodes(
+            parts.into_iter().filter(|&p| p != "0").collect(),
+        )),
+        "i" | "im" | "ir" | "ii" | "ip" | "iph" | "idb" if parts.len() == 1 => {
+            Some(Signal::Current(parts[0]))
+        }
+        _ => None,
+    }
+}
+
 // ---- private ----
 
 impl W<'_, '_> {
+    /// `sig`'s words in a Spectre `save`: its nodes, or the current into
+    /// its device's first terminal (`r1:1`, `[CMP]` p.886: a terminal by
+    /// index; SPICE's `i(r1)` flows into the first node).
+    fn save_words(&self, sig: &Signal) -> String {
+        match sig {
+            Signal::Nodes(nodes) => nodes
+                .iter()
+                .map(|n| self.path(n))
+                .collect::<Vec<_>>()
+                .join(" "),
+            Signal::Current(dev) => format!("{}:1", self.inst_ref(dev)),
+        }
+    }
+
     /// A signal (`v(x)`, `i(x)`, bare `x`), the name inside its wrapper in
     /// Spectre's spelling.
     fn signal(&self, s: &str) -> String {
@@ -270,9 +351,27 @@ impl W<'_, '_> {
             .split_once('(')
             .filter(|(w, r)| matches!(*w, "v" | "V" | "i" | "I") && r.ends_with(')'));
         match wrapped {
-            Some((w, r)) => format!("{w}({})", self.node(&r[..r.len() - 1])),
-            None => self.node(t),
+            Some((w, r)) => format!("{w}({})", self.path(&r[..r.len() - 1])),
+            None => self.path(t),
         }
+    }
+
+    /// A node in a signal position (`save`, `ic`, `nodeset`), its
+    /// hierarchy kept: each instance on the path and the node escaped,
+    /// joined by `.` (`[CMP]` p.886: `OpAmp1.comp`); Xyce's separator
+    /// `:` (`v(X1:n)`, the corpus's Xyce decks) is Spectre's `.`.
+    fn path(&self, s: &str) -> String {
+        let sep = match self.rd.d {
+            Dialect::Xyce => ':',
+            _ => '.',
+        };
+        let mut segs: Vec<&str> = s.trim().split(sep).collect();
+        let node = segs.pop().map_or(String::new(), |n| self.node(n));
+        segs.iter()
+            .map(|i| self.dev(i))
+            .chain([node])
+            .collect::<Vec<_>>()
+            .join(".")
     }
 
     /// `a`'s statement (several lines `\n`-joined where Spectre needs a
@@ -283,27 +382,30 @@ impl W<'_, '_> {
         Some(match a {
             // `[REF]`: `dc1 dc`, a `dc` with no sweep is the operating point.
             Ana::Op => "op1 dc".into(),
-            // A second sweep needs a `sweep` block around the first.
-            Ana::Dc(sweeps) if sweeps.len() > 1 => {
-                self.refuse(Code::W0015, tok);
-                return None;
+            // SPICE's first sweep is the inner one; each further one a
+            // `sweep` around it (`[REF]` pp.406-409: `dev`/`param`,
+            // `start`/`stop`/`step`, analyses in braces).
+            Ana::Dc(sweeps) => {
+                let range = |w: &Self, (src, a, b, c): &(String, f64, f64, f64)| {
+                    format!(
+                        "{} start={} stop={} step={}",
+                        dc_selector(src),
+                        n(w, *a),
+                        n(w, *b),
+                        n(w, *c)
+                    )
+                };
+                let Some(first) = sweeps.first() else {
+                    return Some("dc1 dc".into());
+                };
+                let mut s = format!("dc1 dc {}", range(self, first));
+                for (k, sw) in sweeps.iter().enumerate().skip(1) {
+                    let inner = s.replace('\n', "\n  ");
+                    s = format!("dcsweep{k} sweep {} {{\n  {inner}\n}}", range(self, sw));
+                }
+                s
             }
-            Ana::Dc(sweeps) => match sweeps.first() {
-                Some((src, a, b, c)) => format!(
-                    "dc1 dc {} start={} stop={} step={}",
-                    dc_selector(src),
-                    n(self, *a),
-                    n(self, *b),
-                    n(self, *c)
-                ),
-                None => "dc1 dc".into(),
-            },
-            Ana::Ac(sw) => format!(
-                "ac1 ac start={} stop={} {}",
-                n(self, sw.start),
-                n(self, sw.stop),
-                self.points(sw, tok)?
-            ),
+            Ana::Ac(sw) => format!("ac1 ac {}", self.points(sw, tok)?),
             // `step` (#9) is the closest analogue of SPICE's tstep.
             Ana::Tran {
                 step,
@@ -338,33 +440,41 @@ impl W<'_, '_> {
                     false => bare_node(reference),
                 };
                 format!(
-                    "noise1 ({} {neg}) noise start={} stop={} {} iprobe={}",
+                    "noise1 ({} {neg}) noise {} iprobe={}",
                     bare_node(output),
-                    n(self, sweep.start),
-                    n(self, sweep.stop),
                     self.points(sweep, tok)?,
                     self.inst_ref(source)
                 )
             }
-            // INFERRED (the old writer's choice): SPICE `.tf` is a DC
-            // transfer function, Spectre's xf a small-signal one at `freq=0`.
-            Ana::Tf(out, _) => format!("xf1 ({} 0) xf freq=0", bare_node(out)),
+            // `[REF]` p.438: xf is the small-signal transfer function from
+            // every source to the output (`V(out)/V(src)`), here at the one
+            // frequency 0, SPICE's `.tf` at the operating point (p.439
+            // `values`). It has no input or output resistance: noted.
+            Ana::Tf(out, _) => {
+                self.note(Code::W0125, tok);
+                match signal_of(out) {
+                    Some(Signal::Current(dev)) => {
+                        format!("xf1 xf probe={} values=[0]", self.inst_ref(dev))
+                    }
+                    Some(Signal::Nodes(ns)) if ns.len() == 2 => {
+                        format!(
+                            "xf1 ({} {}) xf values=[0]",
+                            self.path(ns[0]),
+                            self.path(ns[1])
+                        )
+                    }
+                    _ => format!("xf1 ({} 0) xf values=[0]", self.path(bare_node(out))),
+                }
+            }
             // `sens` is a control statement over a named analysis, which is
             // written too.
             Ana::Sens(out, Some(sw)) => format!(
-                "sensac1 ac start={} stop={} {}\nsens ({}) for (sensac1)",
-                n(self, sw.start),
-                n(self, sw.stop),
+                "sensac1 ac {}\nsens ({}) for (sensac1)",
                 self.points(sw, tok)?,
                 bare_node(out)
             ),
             Ana::Sens(out, None) => format!("sensdc1 dc\nsens ({}) for (sensdc1)", bare_node(out)),
-            Ana::Sp(sw) => format!(
-                "sp1 sp start={} stop={} {}",
-                n(self, sw.start),
-                n(self, sw.stop),
-                self.points(sw, tok)?
-            ),
+            Ana::Sp(sw) => format!("sp1 sp {}", self.points(sw, tok)?),
             // `fourier` is a component, one per output.
             Ana::Four(f, outs) => outs
                 .iter()
@@ -404,15 +514,30 @@ impl W<'_, '_> {
         })
     }
 
-    /// `dec=10`: a sweep's points (Spectre has no `oct`).
+    /// `start=1 stop=1M dec=10`: a sweep's interval. Spectre has no `oct`
+    /// (`[REF]` p.43):
+    /// its points are `values=[…]`, ngspice's grid (`acan.c`: `f *=
+    /// 2^(1/n)` from `start` while `f <= stop + 2^(1/n)*stop*reltol`).
+    // ponytail: reltol is ngspice's default 1e-3, not the deck's; it moves
+    // only whether a point a hair past `stop` is kept.
     fn points(&mut self, sw: &Sweep, tok: u32) -> Option<String> {
-        match sw.variation {
-            "oct" => {
-                self.refuse(Code::W0015, tok);
-                None
-            }
-            v => Some(format!("{v}={}", sw.points)),
+        if sw.variation != "oct" {
+            let (a, b) = (self.num(sw.start), self.num(sw.stop));
+            return Some(format!("start={a} stop={b} {}={}", sw.variation, sw.points));
         }
+        let delta = 2f64.powf(1.0 / f64::from(sw.points));
+        let end = sw.stop + delta * sw.stop * 1e-3;
+        let mut grid = Vec::new();
+        let mut f = sw.start;
+        while f <= end && grid.len() <= OCT_POINTS_MAX && sw.start > 0.0 {
+            grid.push(self.num(f));
+            f *= delta;
+        }
+        if grid.is_empty() || grid.len() > OCT_POINTS_MAX {
+            self.refuse(Code::W0015, tok);
+            return None;
+        }
+        Some(format!("values=[{}]", grid.join(" ")))
     }
 
     /// `sweep<k>_<name> sweep param=p start= stop= step= {` for `.step`

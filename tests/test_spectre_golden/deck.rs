@@ -37,6 +37,23 @@ fn spectre_deck_preamble_matches_documented_statements() {
     assert!(!netlist.contains(".end"), "{netlist}");
 }
 
+/// A `.lib file` naming no section reads the whole file (LTspice's form):
+/// `[CMP]` p.875 `include "filename"`. An empty `section=` is no section
+/// name (`[REF]` p.493 `section=name`).
+#[test]
+fn a_sectionless_library_call_includes_the_whole_file() {
+    let deck = "t\n.lib /pdk/models.lib\nR1 a 0 1k\n.op\n.end\n";
+    let netlist =
+        spicerack::syntax::render::render_text(deck, Dialect::Ltspice, "t", Dialect::Spectre)
+            .unwrap()
+            .text;
+    assert!(
+        netlist.contains("\ninclude \"/pdk/models.lib\"\n"),
+        "{netlist}"
+    );
+    assert!(!netlist.contains("section="), "{netlist}");
+}
+
 /// `[REF]` p.535 verbatim:
 /// ```text
 /// subckt coax (i1 o1 i2 o2)
@@ -85,6 +102,37 @@ fn spectre_ic_nodeset_save_use_bare_signal_names() {
     assert!(netlist.contains("\nsave out\n"), "{netlist}");
 }
 
+/// `[CMP]` p.886: `save` takes nodes and `inst:terminal` currents, the
+/// terminal "by name or index" (`L1:1`, "the current through the first
+/// terminal"; a resistor's terminals are `1 2`, p.629, a vsource's `p n`,
+/// p.683). SPICE's `i(R1)` flows into its first node, so it is `r1:1`;
+/// a `.print`'s voltages are their nodes (`vdb`, a difference: views of
+/// the saved vectors), ground left out.
+#[test]
+fn a_print_and_a_save_are_spectre_saves_of_the_same_signals() {
+    let deck = "t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.save i(R1)\n\
+                .print tran v(b) v(a,b) vdb(a,0) i(V1)\n.tran 1u 1m\n.end\n";
+    let netlist = spectre(deck).unwrap();
+    assert!(netlist.contains("\nsave r1:1\n"), "{netlist}");
+    assert!(netlist.contains("\nsave b a b a v1:1\n"), "{netlist}");
+    // Every output had a signal: nothing noted.
+    let w = spicerack::syntax::render::render_text(deck, Dialect::Ngspice, "t", Dialect::Spectre)
+        .unwrap();
+    assert!(w.notes.diags.is_empty(), "{}", w.notes.messages);
+}
+
+/// An output with no signal form (Xyce's `format=`, an expression) is
+/// noted W0023; the deck's signals are still saved.
+#[test]
+fn a_print_output_with_no_signal_form_is_noted() {
+    let deck = "t\nV1 a 0 1\nR1 a 0 1k\n.print tran format=csv v(a) {v(a)*2}\n.tran 1u 1m\n.end\n";
+    let w =
+        spicerack::syntax::render::render_text(deck, Dialect::Xyce, "t", Dialect::Spectre).unwrap();
+    assert!(w.text.contains("\nsave a\n"), "{}", w.text);
+    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    assert_eq!(codes, [Code::W0023], "{}", w.notes.messages);
+}
+
 /// `[REF]` p.17: Spectre supports "standard SPICE measurement functions
 /// (.measure)". `.measure` is SPICE syntax, so it must sit inside a
 /// `simulator lang=spice` region (`[REF]` p.493, `[KUN]` B.2).
@@ -117,4 +165,17 @@ fn spectre_options_use_documented_parameter_names() {
         !s.contains(" maxiters="),
         "maxiters is a dc parameter, not an option: {s}"
     );
+}
+
+/// `[CMP]` p.886: a node in a subcircuit is `OpAmp1.comp`, the hierarchy
+/// unescaped (an escaped `\.` is one name). SPICE's `x1.n`, Xyce's `X1:n`.
+#[test]
+fn a_saved_subcircuit_node_keeps_its_hierarchy() {
+    let netlist = spectre("t\n.save v(x1.n)\n.ic v(x1.n)=0\n.op\n.end\n").unwrap();
+    assert!(netlist.contains("\nsave x1.n\n"), "{netlist}");
+    assert!(netlist.contains("\nic x1.n=0\n"), "{netlist}");
+    let deck = "t\n.print tran v(X1:n)\n.tran 1u 1m\n.end\n";
+    let w =
+        spicerack::syntax::render::render_text(deck, Dialect::Xyce, "t", Dialect::Spectre).unwrap();
+    assert!(w.text.contains("\nsave x1.n\n"), "{}", w.text);
 }

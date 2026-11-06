@@ -359,8 +359,8 @@ catalogue! {
     /// An output request (`.print`, `.save`, `.probe`) not written.
     W0023 Note {
         title: "an output request not written",
-        cite: "LTspice help, Xyce RG §2.1.21, VACASK docs (every vector saved); Spectre Reference 19.1 (no `.print` mapped)",
-        explain: "The target saves every vector anyway (LTspice, Xyce, VACASK), or the writer has no form for the request (Spectre's and VACASK's `.print`, HSPICE's `.probe` under a noise run). Select the outputs in the target's post-processing.",
+        cite: "LTspice help, Xyce RG §2.1.21, VACASK docs (every vector saved); Spectre Reference 5.0 p.886 (`save` takes nodes and terminal currents only)",
+        explain: "The target saves every vector anyway (LTspice, Xyce, VACASK), or has no form for the request: a `.print` output that is no node voltage or device current on Spectre (an expression, `format=`, a device parameter), or no node voltage or source current on VACASK; HSPICE's `.probe` under a noise run. Select the outputs in the target's post-processing.",
     }
     /// An option not written: another simulator's own, or one with no effect
     /// on the numbers.
@@ -416,8 +416,8 @@ catalogue! {
     /// A behavioural source whose SPICE expression the target's grammar cannot be trusted to read.
     W0102 Refusal {
         title: "a behavioural source the target cannot spell",
-        cite: "Spectre Reference 5.0 p.856 (bsource: `v(a,b)`, `i(\"inst:idx\")`, `$time`)",
-        explain: "The behavioural source's expression uses forms (a current probe of an element, `time`, a function) the target's bsource spells otherwise. Rewrite the expression in the target's form.",
+        cite: "Spectre Reference 5.0 pp.856-860 (bsource), pp.867-870 (operators, functions); VACASK lib/devbuiltins.cpp (no behavioural device)",
+        explain: "The expression holds a form Spectre's bsource has no spelling for with the same meaning (`hertz`, a function such as `u()` or a statistical call, another dialect's `**`/`pow` whose negative-base rule is not checked), or the target is VACASK, which has no behavioural element (its devices are its builtin sources and OSDI models). Rewrite the expression with the functions both define, or model the element as Verilog-A.",
     }
     /// A charge expression reading a branch current, a braced value, `time`, `temper` or `hertz`.
     W0103 Refusal {
@@ -461,11 +461,12 @@ catalogue! {
         cite: "VACASK docs (no `measure`: post-process the raw file)",
         explain: "VACASK has no measurement statement. Compute the measurement from the raw file after the run.",
     }
-    /// A `.lib file` with no section written as `include "file" section=`.
+    /// Retired (phase 7): a `.lib file` with no section is `include
+    /// "file"`, no longer `include "file" section=`.
     W0110 Note {
         title: "a sectionless library call written with an empty section",
         cite: "Spectre Reference 19.1 p.493 (include ... section=)",
-        explain: "The SPICE `.lib file` names no section; the writer writes `include \"file\" section=` with an empty section, as the old writer did (phase 7 refuses it). Name the section, or use `.include`.",
+        explain: "Retired: no writer draws it. The old writers wrote a SPICE `.lib file` with no section as `include \"file\" section=` with an empty section; Spectre and VACASK now write `include \"file\"` (Spectre Reference 5.0 p.875), which reads the whole file.",
     }
     /// A `.model` level that is no number, mapped as level 1.
     W0111 Note {
@@ -496,6 +497,13 @@ catalogue! {
         title: "a Monte Carlo the target varies wider",
         cite: "Spectre Reference 19.1 p.166 (`variations`, default `process`); VACASK docs/cmd-analysis-mc.md (`mc` draws at every call site)",
         explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Write `variations=all`, or keep the deck's draws to the scope the montecarlo names.",
+    }
+    /// A `.tf` written as Spectre's `xf` at frequency 0: its input and
+    /// output resistances are not computed.
+    W0125 Note {
+        title: "a transfer function's input and output resistance not computed",
+        cite: "Spectre Reference 19.1 pp.438-439 (xf: transfer functions from every source)",
+        explain: "SPICE's `.tf` gives the gain and the input and output resistances at the operating point; Spectre's `xf` at `values=[0]` gives the transfer function from every source to the output, no resistance. Add a test source and compute the resistance from its transfer function.",
     }
 }
 

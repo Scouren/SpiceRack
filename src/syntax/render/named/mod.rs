@@ -25,6 +25,7 @@
 //! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> Result<String, Vec<Diag>>`
 
 mod bench;
+mod bsource;
 mod cards;
 mod checks;
 mod lift;
@@ -267,12 +268,20 @@ impl W<'_, '_> {
             self.line(&format!("include \"{p}\""));
         }
         for &lib in &b.libs {
-            let (p, section) = self.rd.lib_view(lib);
-            if section.is_empty() {
-                self.ask(Construct::LibWholeFile, self.rd.main(lib));
-            }
-            self.line(&format!("include \"{p}\" section={section}"));
+            let l = self.lib_include(lib);
+            self.line(&l);
         }
+    }
+
+    /// The `.lib` call `lib` as an `include`, `section=` only where it
+    /// names one: a sectionless call reads the whole file.
+    fn lib_include(&mut self, lib: u32) -> String {
+        let (p, section) = self.rd.lib_view(lib);
+        if section.is_empty() {
+            self.ask(Construct::LibWholeFile, self.rd.main(lib));
+            return format!("include \"{p}\"");
+        }
+        format!("include \"{p}\" section={section}")
     }
 
     /// ` name=value …`: block `b`'s parameter declarations (a subcircuit
