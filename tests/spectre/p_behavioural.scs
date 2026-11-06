@@ -1,0 +1,12 @@
+// t
+
+simulator lang=spectre
+
+
+v1 (in 0) vsource dc=2
+r1 (in out) resistor r=2k
+r2 (out 0) resistor r=1k
+b1 (b 0) bsource v=(3*v(out))*v(out)
+rb (b 0) resistor r=1k
+
+op1 dc

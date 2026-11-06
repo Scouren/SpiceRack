@@ -14,7 +14,7 @@
 //! - `pub(super) fn xyce() -> DialectDef`
 
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, Coupling, LoadForm, OptionsForm, ParamForm,
+    AnalysisForm, CardRules, Coupling, IncludeScope, LoadForm, OptionsForm, ParamForm,
 };
 use crate::syntax::def::{Devices, DialectDef, Keywords, Operators};
 use crate::syntax::diag::Code;
@@ -155,6 +155,7 @@ pub(super) fn xyce() -> DialectDef {
         .analysis_form(AnalysisForm::Xyce)
         .coupling(Coupling::OneCard)
         .param_form(ParamForm::Xyce)
+        .include_scope(IncludeScope::Global)
         .spectre_analysis("hb")
         .spectre_analysis("sp")
         .spectre_analysis("sens")

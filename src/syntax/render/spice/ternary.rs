@@ -9,13 +9,17 @@
 //! Xyce 7.10 reads `p:n` as one hierarchical name ("syntax error in
 //! expression"), so on Xyce each ternary `:` has a blank before it.
 //!
-//! Cites: ngspice manual §2.8.5 (`?:`); Xyce RG §2.1.18 (`?:`), §2.3
+//! Xyce's and LTspice's `if(c,a,b)` is `((c)?(a):(b))` where the target
+//! has no `if` (ngspice-45: "no such function 'if'", run by hand).
+//!
+//! Cites: ngspice manual §2.8.5 (`?:`); Xyce RG §2.3 (`if`); Xyce RG §2.1.18 (`?:`), §2.3
 //! (`:` in hierarchical names).
 //!
 //! Contents:
 //! - `pub(super) enum Read`, `pub(super) enum Nest`
 //! - `pub(super) fn parenthesize(e: &str, read: Read, blank: bool) -> String`
 //! - `pub(super) fn ngspice_nest(e: &str) -> Nest`
+//! - `pub(super) fn spell_if(e: &str) -> String`
 
 use std::cell::Cell;
 
@@ -85,6 +89,15 @@ pub(super) fn ngspice_nest(e: &str) -> Nest {
         );
     }
     seen.get()
+}
+
+/// `e` with each `if(c, a, b)` call spelled `((c)?(a):(b))`, inner calls
+/// first; a call of another arity as written.
+pub(super) fn spell_if(e: &str) -> String {
+    if !e.to_ascii_lowercase().contains("if") {
+        return e.to_string();
+    }
+    ifs(e, 0)
 }
 
 // ---- private ----
@@ -191,6 +204,53 @@ fn top(s: &str) -> Vec<(usize, u8)> {
     out
 }
 
+/// `s` with its `if` calls spelled, at nesting `depth`.
+fn ifs(s: &str, depth: u32) -> String {
+    let b = s.as_bytes();
+    let mut out = String::with_capacity(s.len() + 8);
+    let mut i = 0;
+    while i < b.len() {
+        let word = i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_');
+        let call = word
+            && depth < DEPTH
+            && s[i..].len() > 2
+            && s[i..i + 2].eq_ignore_ascii_case("if")
+            && b[i + 2] == b'(';
+        if let Some(j) = call.then(|| close(b, i + 2)).flatten() {
+            let args = commas(&s[i + 3..j]);
+            if let [c, x, y] = args.as_slice() {
+                let [c, x, y] = [c, x, y].map(|a| ifs(a.trim(), depth + 1));
+                out.push_str(&format!("(({c})?({x}):({y}))"));
+                i = j + 1;
+                continue;
+            }
+        }
+        let next = s[i..].chars().next().map_or(1, char::len_utf8);
+        out.push_str(&s[i..i + next]);
+        i += next;
+    }
+    out
+}
+
+/// `s` split at its commas outside every delimited group.
+fn commas(s: &str) -> Vec<&str> {
+    let b = s.as_bytes();
+    let (mut out, mut from, mut i) = (Vec::new(), 0, 0);
+    while i < b.len() {
+        if let Some(j) = close(b, i) {
+            i = j + 1;
+            continue;
+        }
+        if b[i] == b',' {
+            out.push(&s[from..i]);
+            from = i + 1;
+        }
+        i += 1;
+    }
+    out.push(&s[from..]);
+    out
+}
+
 /// The index closing the group `b[i]` opens; `None` when `b[i]` opens
 /// none or the group is unclosed. Quotes nest nothing.
 fn close(b: &[u8], i: usize) -> Option<usize> {
@@ -222,7 +282,7 @@ fn close(b: &[u8], i: usize) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Nest, Read, ngspice_nest, parenthesize};
+    use super::{Nest, Read, ngspice_nest, parenthesize, spell_if};
 
     #[test]
     fn a_c_then_branch_ternary_is_parenthesized() {
@@ -246,6 +306,16 @@ mod tests {
         assert_eq!(ngspice_nest("0?42:1?41:40"), Nest::Flat);
         assert_eq!(ngspice_nest("0?0?4:1?8:16:32"), Nest::Deep);
         assert_eq!(ngspice_nest("a?(b?c:d):e"), Nest::Flat);
+    }
+
+    #[test]
+    fn an_if_call_is_a_ternary() {
+        assert_eq!(spell_if("IF(V(1)>0,2*V(1),0)"), "((V(1)>0)?(2*V(1)):(0))");
+        assert_eq!(
+            spell_if("if(a, if(b,1,2), f(c,d))"),
+            "((a)?(((b)?(1):(2))):(f(c,d)))"
+        );
+        assert_eq!(spell_if("diff(a,b)+if(a,b)"), "diff(a,b)+if(a,b)");
     }
 
     #[test]

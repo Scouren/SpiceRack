@@ -43,9 +43,9 @@ mod freeze;
 mod plugin;
 
 use crate::syntax::behaviour::{
-    AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, LoadForm, ModelSemantics,
-    NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, SourceRules, ValueQuoting,
-    Writer,
+    AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, IncludeScope, LoadForm,
+    ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, SourceRules,
+    ValueQuoting, Writer,
 };
 use crate::syntax::device::{self, Device};
 use crate::syntax::diag::{Code, Kind};
@@ -607,6 +607,7 @@ impl DialectDef {
     set!(value_quoting, b.value_quoting: ValueQuoting);
     set!(coupling, b.coupling: Coupling);
     set!(param_form, b.param_form: ParamForm);
+    set!(include_scope, b.include_scope: IncludeScope);
     set!(named_params, b.named_params: NamedParams);
 
     /// A region kept as `lang`'s text is written as written here.

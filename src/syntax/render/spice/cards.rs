@@ -18,7 +18,7 @@
 
 use super::W;
 use super::laplace::{self, Laplace};
-use super::ternary::{Read, parenthesize};
+use super::ternary::{Read, parenthesize, spell_if};
 use crate::syntax::Lang;
 use crate::syntax::behaviour::{Coupling, ParamForm, ValueQuoting};
 use crate::syntax::lang::Cells;
@@ -260,12 +260,18 @@ impl W<'_, '_> {
         self.ternaries_as(e, read)
     }
 
-    /// `e`'s ternaries for another family, grouped as `read` groups them.
+    /// `e`'s ternaries for another family, grouped as `read` groups them,
+    /// an `if()` one on ngspice's family.
     fn ternaries_as(&self, e: &str, read: Read) -> String {
         if self.rd.b.text_family == self.b.text_family {
             return e.to_string();
         }
-        parenthesize(e, read, self.b.param_form == ParamForm::Xyce)
+        // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
+        let e = match self.b.text_family == Lang::NGSPICE {
+            true => spell_if(e),
+            false => e.to_string(),
+        };
+        parenthesize(&e, read, self.b.param_form == ParamForm::Xyce)
     }
 }
 

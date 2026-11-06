@@ -17,7 +17,7 @@
 //! - `pub enum Writer`, `pub enum NumberReading`, `pub enum ModelSemantics`, `pub enum SourceRules`,
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
-//!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum NamedParams`
+//!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`
 
 use crate::syntax::Lang;
 
@@ -59,6 +59,8 @@ pub struct Behaviours {
     pub coupling: Coupling,
     /// Write: how parameters and model parameters are written.
     pub param_form: ParamForm,
+    /// Write: what a file included inside a subcircuit defines.
+    pub include_scope: IncludeScope,
     /// Write: the named writer's parameter rows.
     pub named_params: NamedParams,
     /// Write: the Spectre analysis kinds the target has an analysis for.
@@ -188,6 +190,16 @@ pub enum Coupling {
     OneCard,
 }
 
+/// What a file included inside a subcircuit defines.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum IncludeScope {
+    /// The subcircuit's own.
+    Local,
+    /// Global definitions (Xyce, run by hand): a deck read elsewhere
+    /// loses its scope there.
+    Global,
+}
+
 /// How parameters and model parameters are written.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ParamForm {
@@ -226,6 +238,7 @@ impl Behaviours {
         value_quoting: ValueQuoting::AsWritten,
         coupling: Coupling::Pairs,
         param_form: ParamForm::Plain,
+        include_scope: IncludeScope::Local,
         named_params: NamedParams::None,
         spectre_analyses: &[],
     };

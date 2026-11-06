@@ -305,6 +305,36 @@ fn every_analysis_of_a_measured_testbench_reaches_the_result() {
     assert!((vmax.value - 1.0).abs() < 5e-6, "vmax = {}", vmax.value);
 }
 
+// ── Spectre's sweep counts ──
+
+/// Spectre's `lin=N` and `log=N` are N steps, N+1 points (`[REF]` 19.1
+/// p.43 `ac` #7, #9: "Number of steps"). Oracle: ngspice's own vector
+/// length on the deck written from Spectre, and on a SPICE deck after a
+/// trip through Spectre.
+#[test]
+fn spectre_lin_counts_steps_so_one_more_point() {
+    let points = |deck: &str| {
+        let raw = common::run(Dialect::Ngspice, deck);
+        let v = &raw.complex_data[index_of(&raw, "in")];
+        assert!(v.iter().all(|z| (z.norm() - 1.0).abs() < 1e-12), "{deck}");
+        v.len()
+    };
+    let from = |text: &str, d: Dialect, to: Dialect| {
+        spicerack::syntax::render::render_text(text, d, "lin", to)
+            .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
+            .text
+    };
+    let scs = "simulator lang=spectre\nv1 (in 0) vsource dc=0 mag=1\nr1 (in 0) resistor r=1k\n\
+               ac1 ac start=1 stop=2 lin=10\n";
+    let deck = from(scs, Dialect::Spectre, Dialect::Ngspice);
+    assert_eq!(points(&deck), 11, "{deck}");
+    let spice = "* lin\nV1 in 0 0 AC 1\nR1 in 0 1k\n.ac lin 11 1 2\n.end\n";
+    assert_eq!(points(spice), 11);
+    let scs = from(spice, Dialect::Ngspice, Dialect::Spectre);
+    let deck = from(&scs, Dialect::Spectre, Dialect::Ngspice);
+    assert_eq!(points(&deck), 11, "{scs}\n{deck}");
+}
+
 // ── .sp and RF ports ──
 
 #[test]

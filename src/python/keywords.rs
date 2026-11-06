@@ -49,7 +49,7 @@ keywords! {
         Dec = "dec",
         Oct = "oct",
         Lin = "lin",
-        /// Spectre's `log=N`: N points in total, log-spaced.
+        /// N points in total, log-spaced: Spectre's `log=N-1` (`[REF]` p.43, steps).
         Log = "log",
     }
 }

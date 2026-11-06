@@ -218,6 +218,7 @@ calls! {
     value_quoting(v: PyValueQuoting);
     coupling(v: PyCoupling);
     param_form(v: PyParamForm);
+    include_scope(v: PyIncludeScope);
     named_params(v: PyNamedParams);
     text_family(lang: PyLang);
     spectre_analysis(kind: &str);

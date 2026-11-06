@@ -123,7 +123,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `spectre_sweep`, `spectre_monte_carlo` | `RawData` (Spectre); `spectre_montecarlo` is a deprecated alias that warns |
 | `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | periodic small-signal (Spectre) |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre's `log=N`, N points in total; every other target refuses it, `W0040`), in any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (N log-spaced points in total, Spectre's `log=N-1`, its steps; every other target refuses it, `W0040`), in any
 case; any other name raises `ValueError` when the analysis is built.
 `noise`'s `points_per_summary` is ngspice's, HSPICE's and Xyce's last field;
 LTspice's `.noise` has none, so it is left out there with a note (W0033).

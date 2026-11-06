@@ -1,0 +1,18 @@
+* t
+V1 in 0 2
+R1 in out 2k
+R2 out 0 1k
+C1 out 0 1n
+I1 0 n1 1m
+L1 n1 n2 1u
+R4 n2 0 1k
+E1 e 0 out 0 2
+Re e 0 1k
+G1 0 g out 0 0.001
+Rg g 0 1k
+F1 0 f v1 3
+Rf f 0 1
+H1 h 0 v1 100
+Rh h 0 1k
+.op
+.end

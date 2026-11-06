@@ -5,6 +5,10 @@
 //!
 //! Contents:
 //! - `macro_rules! pymethods_with_spectre` (scoped to `python` by `#[macro_use]`)
+//! - `pub(super) fn range(f: &FreqSweep) -> Result<String, String>`
+
+use super::analysis::{FreqSweep, snum};
+use super::keywords::Sweep;
 
 /// `#[pymethods] impl PySimulator { ... }` with the Spectre-only analyses
 /// appended: pyo3 takes one `#[pymethods]` per class without its
@@ -193,4 +197,22 @@ macro_rules! pymethods_with_spectre {
             }
         }
     };
+}
+
+/// A frequency sweep's Spectre interval: `lin=` and `log=` count steps,
+/// one fewer than the points (`[REF]` p.245 `pac`, p.253 `pnoise`, p.298
+/// `pstb`, p.303 `pxf`, p.393 `stb`), so one point is `values=[start]`, as
+/// `render::named::bench` writes `ac`; `Err` for `oct`, which Spectre lacks.
+pub(super) fn range(f: &FreqSweep) -> Result<String, String> {
+    let (a, b) = (snum(f.start), snum(f.stop));
+    let steps = f.points.saturating_sub(1);
+    match (f.variation, f.points) {
+        (Sweep::Oct, _) => Err(
+            "frequency sweep type 'oct' (Spectre accepts only dec/lin/log, see spectre -h ac)"
+                .into(),
+        ),
+        (Sweep::Dec, n) => Ok(format!("start={a} stop={b} dec={n}")),
+        (_, 1) => Ok(format!("values=[{a}]")),
+        (v, _) => Ok(format!("start={a} stop={b} {}={steps}", v.name())),
+    }
 }

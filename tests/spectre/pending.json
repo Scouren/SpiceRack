@@ -1,0 +1,14 @@
+{
+  "_provenance": "Written by tests/test_pending_real_run.rs from its SPICE sources; the values are the closed forms there, which ngspice-45 meets on the source (hand_only: ngspice cannot run it). status pending-real-run: no spectre run has checked these decks yet.",
+  "p_elements.scs": { "rows": "R C L V I E F G H; .op", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:out": 6.666666666666666e-1, "op1:n2": 1e0, "op1:e": 1.3333333333333333e0, "op1:g": 6.666666666666666e-1, "op1:f": -2e-3, "op1:h": -6.666666666666667e-2 } },
+  "p_func.scs": { "rows": "Func", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:out": 1e0 } },
+  "p_conditional.scs": { "rows": "Conditional", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:out": 1e0 } },
+  "p_behavioural.scs": { "rows": "BehaviouralSource", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:b": 1.3333333333333333e0 } },
+  "p_tf.scs": { "rows": "Tf", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "tf1:transfer_function": 3.333333333333333e-1, "tf1:output_impedance_at_v(out)": 6.666666666666666e2 } },
+  "p_branch_param.scs": { "rows": "BranchParam", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:out": 1e0 } },
+  "p_charge_capacitor.scs": { "rows": "ChargeCapacitor; .tran", "status": "pending-real-run", "rel_tol": 1e-3, "values": { "tran1:q": 1e0 } },
+  "p_pwl_repeat.scs": { "rows": "PwlRepeatV", "status": "pending-real-run", "rel_tol": 1e-6, "values": { "tran1:a": 2.5e-1 } },
+  "p_dc_sweep.scs": { "rows": ".dc", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "dc1:out": 6.666666666666666e-1 } },
+  "p_models.scs": { "rows": "D Q M (level 1) models", "status": "pending-real-run", "rel_tol": 1e-3, "values": { "op1:a": 6.29441e-1, "op1:coll": 4.087723e0, "op1:drain": 4.509803921568627e0 } },
+  "p_measure_save.scs": { "rows": "Measure; Save; UnmappedOption", "status": "pending-real-run", "rel_tol": 1e-3, "values": { "measure:vmax": 1e0 } }
+}

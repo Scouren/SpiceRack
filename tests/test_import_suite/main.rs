@@ -35,9 +35,11 @@ use spicerack::result::RawData;
 
 mod compare;
 mod fixpoint;
+mod tube;
 
 use compare::*;
 use fixpoint::*;
+use tube::*;
 /// One ngspice run: every plot, and the `.meas` results.
 struct Run {
     plots: Vec<RawData>,

@@ -684,14 +684,39 @@ class TestDialectText:
         with pytest.raises(RuntimeError, match="W0015"):
             tb.netlist("vacask")
 
+    def test_spectre_only_analyses_count_a_sweep_as_ac_does(self):
+        # Spectre Reference 19.1 `lin=`/`log=` are "Number of steps" in ac
+        # (p.43), pac (p.245), pnoise (p.253), pstb (p.298), pxf (p.303) and
+        # stb (p.393). Oracle: the same Python sweep on `ac`, whose Spectre
+        # spelling ngspice's run counts (test_ngspice_analyses
+        # spectre_lin_counts_steps_so_one_more_point).
+        ps = import_spicerack()
+        for sweep in (("lin", 11, 1.0, 2.0), ("log", 10, 1.0, 1e6), ("lin", 1, 1e3, 1e3)):
+            tb = self._tb(ps)
+            tb.add_ac(*sweep)
+            line = next(l for l in tb.netlist("spectre").splitlines() if l.startswith("ac1 ac "))
+            want = line.removeprefix("ac1 ac ")
+            tb = self._tb(ps)
+            tb.add_stability("Vin", *sweep)
+            tb.add_spectre_pac(1e6, 1e-5, 10, *sweep)
+            tb.add_spectre_pnoise(1e6, 1e-5, "out", "0", 10, *sweep)
+            tb.add_spectre_pxf(1e6, 1e-5, "out", "Vin", 10, *sweep)
+            tb.add_spectre_pstb(1e6, 1e-5, "Vin", 10, *sweep)
+            heads = ("stb1 stb ", "pac1 pac ", "pnoise1 (", "pxf1 (", "pstb1 pstb ")
+            lines = [l for l in tb.netlist("spectre").splitlines() if l.startswith(heads)]
+            assert len(lines) == 5, lines
+            for l in lines:
+                assert f" {want}" in l or l.endswith(want), (sweep, want, l)
+
     def test_a_log_frequency_sweep_is_spectres_and_w0040_elsewhere(self):
-        # Spectre Reference 19.1 (`ac … log=N`: N points in total); ngspice
+        # Spectre Reference 19.1 p.43 (`ac … log=N`: N steps, so 10 points
+        # are `log=9`); ngspice
         # manual §11.3.1, HSPICE, Xyce, LTspice `.ac` and VACASK `mode=`
         # take dec, oct or lin only.
         ps = import_spicerack()
         tb = self._tb(ps)
         tb.add_ac("log", 10, 1.0, 1e6)
-        assert "ac1 ac start=1 stop=1M log=10" in tb.netlist("spectre").splitlines()
+        assert "ac1 ac start=1 stop=1M log=9" in tb.netlist("spectre").splitlines()
         for other in ("ngspice", "espice", "hspice", "xyce", "ltspice", "vacask"):
             with pytest.raises(RuntimeError, match="W0040.*'log'"):
                 tb.netlist(other)

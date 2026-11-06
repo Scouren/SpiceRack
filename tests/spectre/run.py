@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""T-S1 to T-S3 and T-M1 to T-M4 (the tests in tests/spectre/expected.json) on a real Spectre.
+"""T-S1 to T-S3 and T-M1 to T-M4 (the tests in tests/spectre/expected.json), and the
+pending-real-run decks `p_*.scs` (tests/spectre/pending.json, written by
+tests/test_pending_real_run.rs: one deck per construct row the Spectre writer
+spells, no Spectre run yet), on a real Spectre.
 
 Each deck here is what SpiceRack writes for a SPICE source (regenerated and
 checked by tests/test_monte_carlo.rs). This script runs one deck, reads its
@@ -74,8 +77,36 @@ def rho(a, b):
     return sum((a[i] - ma) * (b[i] - mb) for i in range(n)) / (n - 1) / (sa * sb)
 
 
+def pending(deck, want, raw):
+    """A pending.json deck: each `"<analysis>:<vector>"` value against the last
+    point of that analysis's psfascii file (`op1`, `tran1`, `dc1`), or a
+    `measure:<name>` against the `.measure` output Spectre writes."""
+    if want["status"] != "pending-real-run":
+        print(f"SKIP {deck}: {want['status']}")
+        return True
+    if "--raw" not in sys.argv:
+        subprocess.run(["spectre", "-format", "psfascii", "-raw", raw, os.path.join(HERE, deck)], check=True)
+    last = {}
+    for root, _, files in os.walk(raw):
+        for name in sorted(files):
+            for k, xs in values(os.path.join(root, name)).items():
+                prefix = "measure" if name.endswith((".measure", ".mt0")) else name.split(".")[0]
+                last[f"{prefix}:{k}"] = xs[-1]
+    ok = True
+    for key, value in want["values"].items():
+        got = last.get(key)
+        good = got is not None and abs(got - value) <= want["rel_tol"] * abs(value)
+        ok &= good
+        print(f"{'PASS' if good else 'FAIL'} {deck} {key}: {got} vs {value}")
+    return ok
+
+
 def main():
     deck = sys.argv[1]
+    if os.path.basename(deck).startswith("p_"):
+        want = json.load(open(os.path.join(HERE, "pending.json")))[os.path.basename(deck)]
+        raw = sys.argv[sys.argv.index("--raw") + 1] if "--raw" in sys.argv else os.path.splitext(deck)[0] + ".raw"
+        sys.exit(0 if pending(deck, want, raw) else 1)
     want = json.load(open(os.path.join(HERE, "expected.json")))[os.path.basename(deck)]
     raw = sys.argv[sys.argv.index("--raw") + 1] if "--raw" in sys.argv else os.path.splitext(deck)[0] + ".raw"
     if "--raw" not in sys.argv:

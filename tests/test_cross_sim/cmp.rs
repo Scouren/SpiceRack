@@ -1,0 +1,229 @@
+//! Two simulators' plots of one circuit -> pass or the first difference.
+//! Plots pair by kind (op, dc, ac, tran: what the scale says, since each
+//! simulator names and orders its plots its own way), vectors by a name
+//! every simulator spells alike once normalized (`v(x)`, `X`, `x` are one
+//! node; `i(v1)`, `V1#branch`, `v1:flow(br)` one branch current).
+//!
+//! The tolerance is each simulator's own accuracy, summed over the two
+//! runs: ngspice and Xyce both converge Newton to RELTOL = 1e-3 of the
+//! value plus VNTOL = 1e-6 V (ABSTOL = 1e-12 A for a current); VACASK and
+//! ESPice share those defaults. An op, dc or ac point passes within
+//! 2 * (RELTOL * swing + VNTOL), the swing being the vector's largest
+//! magnitude in the reference run. A transient also carries the local
+//! truncation error each integrator allows, TRTOL = 7 times RELTOL in
+//! ngspice and Xyce, so a point passes within 1e-2 of the swing (rounded up
+//! from 2 * 7e-3 / sqrt(2), the two errors independent) plus 2 * VNTOL,
+//! through a time tube of 1% of the stop time (`tube.rs`): the two
+//! simulators choose different steps and move an edge by a few of them.
+//!
+//! Cites: ngspice manual §11.1.1 (`.options` RELTOL, VNTOL, ABSTOL, TRTOL
+//! defaults); Xyce Reference Guide 7.10 §2.1.20 (`.options device`/`timeint`
+//! RELTOL, ABSTOL defaults).
+//!
+//! Contents:
+//! - `pub fn compare(a: &[RawData], b: &[RawData]) -> Result<(), String>`
+
+use std::collections::HashMap;
+
+use num_complex::Complex64;
+use spicerack::result::{RawData, VarType};
+
+use super::tube::leaves_tube;
+
+/// RELTOL, VNTOL and ABSTOL, the defaults both simulators share.
+const RELTOL: f64 = 1e-3;
+const VNTOL: f64 = 1e-6;
+const ABSTOL: f64 = 1e-12;
+/// A transient point's tolerance, relative to the swing (module doc).
+const TRAN: f64 = 1e-2;
+
+/// `b`'s plots against the reference `a`'s: the same count of each kind,
+/// paired in order, and every vector they share within the tolerance. An op
+/// plot `b` has where `a` has none passes: Xyce's `.op` beside another
+/// analysis only prints the operating point (Xyce Reference Guide 7.10,
+/// `.OP`), where ngspice runs it as an analysis of its own. So does an ac
+/// plot beside a noise analysis where `a` has none: HSPICE runs `.NOISE`
+/// on an `.AC` sweep, which the deck written for it holds (HSPICE Reference
+/// Manual, `.NOISE`), and ngspice's integrated noise (a one-point plot,
+/// `total`) where `a`, Xyce's, has only the spectrum.
+pub fn compare(a: &[RawData], b: &[RawData]) -> Result<(), String> {
+    let has = |k: &str| a.iter().any(|p| kind(p) == k);
+    let (op, ac, total) = (has("op"), has("ac") || !has("noise"), has("total"));
+    let kinds = |r: &[RawData]| {
+        let mut k: Vec<&str> = r
+            .iter()
+            .map(kind)
+            .filter(|&k| (op || k != "op") && (ac || k != "ac") && (total || k != "total"))
+            .collect();
+        k.sort_unstable();
+        k
+    };
+    if kinds(a) != kinds(b) {
+        return Err(format!("plots {:?} became {:?}", kinds(a), kinds(b)));
+    }
+    for k in ["op", "dc", "ac", "tran", "noise", "total"] {
+        let pa = a.iter().filter(|p| kind(p) == k);
+        let pb = b.iter().filter(|p| kind(p) == k);
+        for (x, y) in pa.zip(pb) {
+            plot(k, x, y)?;
+        }
+    }
+    Ok(())
+}
+
+// ---- private ----
+
+/// The analysis a plot holds: noise by its plot name (ngspice's noise
+/// spectrum has a frequency scale too), else read off its scale, by its type
+/// or its name where the type word is not ngspice's (VACASK types `time`
+/// `notype`).
+fn kind(p: &RawData) -> &'static str {
+    let scale = p.variables.first();
+    let named = |n: &str| scale.is_some_and(|v| v.name.eq_ignore_ascii_case(n));
+    if p.plot_name.to_ascii_lowercase().contains("noise") {
+        return if p.re(0).len() <= 1 { "total" } else { "noise" };
+    }
+    // One point is an operating point whatever its scale: Xyce writes the
+    // `.op` beside an `.ac` as a one-point plot over frequency.
+    if p.re(0).len() <= 1 {
+        return "op";
+    }
+    match scale.map(|v| v.var_type) {
+        Some(VarType::Time) => "tran",
+        Some(VarType::Frequency) => "ac",
+        _ if named("time") => "tran",
+        _ if named("frequency") => "ac",
+        _ => "dc",
+    }
+}
+
+/// A vector's name as every simulator here spells it: lower case, `v(x)`
+/// as `x`, a branch current as `<device>#branch`, hierarchy joined by `.`.
+fn normal(name: &str) -> String {
+    let n = name.trim().to_ascii_lowercase().replace(':', ".");
+    if let Some(dev) = n.strip_suffix(".flow(br)") {
+        return format!("{dev}#branch");
+    }
+    if let Some(inner) = n.strip_prefix("v(").and_then(|s| s.strip_suffix(')'))
+        && !inner.contains(',')
+    {
+        return inner.to_string();
+    }
+    if let Some(inner) = n.strip_prefix("i(").and_then(|s| s.strip_suffix(')')) {
+        return format!("{inner}#branch");
+    }
+    n
+}
+
+fn column(r: &RawData, i: usize) -> Vec<Complex64> {
+    match r.complex(i) {
+        Some(c) => c.to_vec(),
+        None => r.re(i).iter().map(|&x| Complex64::new(x, 0.0)).collect(),
+    }
+}
+
+/// One pair of plots of kind `k`.
+fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
+    // An op plot (and ngspice's one-point integrated noise) has no scale:
+    // its first vector is a value.
+    let first = usize::from(k != "op" && a.re(0).len() > 1);
+    let (xa, xb) = (a.re(0), b.re(0));
+    if first == 1 && k != "tran" {
+        let span = xa.iter().fold(0.0f64, |m, x| m.max(x.abs()));
+        let same = xa.len() == xb.len()
+            && xa
+                .iter()
+                .zip(xb.iter())
+                .all(|(x, y)| (x - y).abs() <= 1e-9 * span);
+        if !same {
+            return Err(format!(
+                "{k}: sweep grid changed ({} -> {} points)",
+                xa.len(),
+                xb.len()
+            ));
+        }
+    }
+    if k == "tran" {
+        let (ea, eb) = (xa.last().copied(), xb.last().copied());
+        if !matches!((ea, eb), (Some(x), Some(y)) if (x - y).abs() <= 1e-9 * x.abs().max(y.abs())) {
+            return Err(format!("tran: stop time {ea:?} -> {eb:?}"));
+        }
+    }
+    let mut in_b = HashMap::new();
+    for (j, w) in b.variables.iter().enumerate().skip(first) {
+        in_b.entry(normal(&w.name)).or_insert(j);
+    }
+    let mut shared = 0;
+    for (i, v) in a.variables.iter().enumerate().skip(first) {
+        let Some(&j) = in_b.get(&normal(&v.name)) else {
+            continue;
+        };
+        shared += 1;
+        let (ya, yb) = (column(a, i), column(b, j));
+        let swing = ya.iter().map(|c| c.norm()).fold(0.0, f64::max);
+        let floor = match v.var_type {
+            VarType::Current => ABSTOL,
+            _ => VNTOL,
+        };
+        if k == "tran" {
+            let tol = TRAN * swing + 2.0 * floor;
+            let (ra, rb) = (a.re(i), b.re(j));
+            let dx = 0.01 * xa.last().copied().unwrap_or(0.0);
+            if let Some(p) = leaves_tube(&xa, &ra, &xb, &rb, dx, tol) {
+                return Err(format!(
+                    "tran {}: {} leaves the tube at t={} (tol {tol:.3e})",
+                    v.name, ra[p], xa[p]
+                ));
+            }
+        } else {
+            let tol = 2.0 * (RELTOL * swing + floor);
+            if ya.len() != yb.len() {
+                return Err(format!(
+                    "{k} {}: {} -> {} points",
+                    v.name,
+                    ya.len(),
+                    yb.len()
+                ));
+            }
+            if let Some(p) = (0..ya.len()).find(|&p| (ya[p] - yb[p]).norm() > tol) {
+                let at = if first == 1 { xa[p] } else { 0.0 };
+                return Err(format!(
+                    "{k} {}: {} vs {} at {at} (tol {tol:.3e})",
+                    v.name, ya[p], yb[p]
+                ));
+            }
+        }
+    }
+    if shared == 0 && a.variables.len() > first {
+        let names = |r: &RawData| -> Vec<String> {
+            r.variables
+                .iter()
+                .skip(first)
+                .take(6)
+                .map(|v| v.name.clone())
+                .collect()
+        };
+        return Err(format!(
+            "{k}: no vector in common ({:?} vs {:?})",
+            names(a),
+            names(b)
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_simulators_spelling_of_one_vector_is_one_name() {
+        for n in ["v(out)", "OUT", "out"] {
+            assert_eq!(normal(n), "out");
+        }
+        for n in ["i(v1)", "V1#branch", "v1:flow(br)"] {
+            assert_eq!(normal(n), "v1#branch");
+        }
+        assert_eq!(normal("X1:N2"), "x1.n2");
+    }
+}
