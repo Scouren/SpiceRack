@@ -8,7 +8,9 @@
 //! `.end`; the frame of title, `.end` and control blocks decided once, by
 //! the file's role) and the block-level cards; `cards` writes elements and
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
-//! options, `prints` the `.print` cards), `checks` the deck-wide
+//! options, `xyce_cards` Xyce's spellings of another dialect's cards,
+//! `xyce_models` its model cards,
+//! `prints` the `.print` cards), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
 //! target reads it,
@@ -35,6 +37,8 @@ mod prints;
 mod sweeps;
 mod ternary;
 mod verilog;
+mod xyce_cards;
+mod xyce_models;
 mod xyce_options;
 
 use super::Numbers;
@@ -47,7 +51,8 @@ use super::role::{self, Frame};
 use super::spelling::{FuncForm, Spelling};
 use crate::syntax::Lang;
 use crate::syntax::behaviour::{
-    Behaviours, CardRules, EndRule, IncludeScope, LoadForm, NumberReading, ParamForm, Writer,
+    Behaviours, CardRules, EndRule, IncludeScope, LoadForm, ModelSemantics, NumberReading,
+    ParamForm, Writer,
 };
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
@@ -392,12 +397,20 @@ impl W<'_, '_> {
         }
     }
 
-    /// `.model name kind (k=v …)`. Xyce rejects BSIM3 as level 8 and reads
-    /// 49. The parameter list is separated from the type by a space:
-    /// ngspice-45 drops the parameters of an OSDI model written
+    /// `.model name kind (k=v …)`, on Xyce as its device reads it
+    /// (`xyce_models`). The parameter list is separated from the type by a
+    /// space: ngspice-45 drops the parameters of an OSDI model written
     /// `vres(r=3k)`.
     fn model(&mut self, n: u32, bin: u32) {
-        let m = self.rd.model_view(n, bin);
+        let mut m = self.rd.model_view(n, bin);
+        if self.b.param_form == ParamForm::Xyce {
+            let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
+            match xyce_models::xyce_model(ngspice, &m.kind, &m.params) {
+                Ok(Some(params)) => m.params = params,
+                Ok(None) => {}
+                Err(code) => self.refuse(code, self.rd.main(n)),
+            }
+        }
         // A loaded module named as a built-in device: ngspice reads the
         // built-in (W0121's run).
         if self.b.load_form == LoadForm::Ngspice
@@ -406,18 +419,8 @@ impl W<'_, '_> {
         {
             self.refuse(Code::W0121, self.rd.main(n));
         }
-        let mos = m.kind.eq_ignore_ascii_case("nmos") || m.kind.eq_ignore_ascii_case("pmos");
         let mut line = format!(".model {} {}", m.name, m.kind);
         for (i, (k, v)) in m.params.iter().enumerate() {
-            let v = if self.b.param_form == ParamForm::Xyce
-                && mos
-                && k.eq_ignore_ascii_case("level")
-                && v.trim() == "8"
-            {
-                "49"
-            } else {
-                v
-            };
             let open = if i == 0 { " (" } else { " " };
             if v.is_empty() {
                 line.push_str(&format!("{open}{k}"));
@@ -448,12 +451,12 @@ impl W<'_, '_> {
             line.push_str(word);
         }
         for (k, v) in &head.params {
-            line.push_str(&format!(" {k}={}", self.spelled(v)));
+            line.push_str(&format!(" {k}={}", self.param_value(v)));
         }
         // A Spectre or VACASK subcircuit's `parameters` are its defaults.
         for &a in &sc.params {
             let (k, v) = self.rd.param_view(a);
-            line.push_str(&format!(" {k}={}", self.spelled(&v)));
+            line.push_str(&format!(" {k}={}", self.param_value(&v)));
         }
         self.o.token(&line, Space::Line);
         self.file_cards(sc);

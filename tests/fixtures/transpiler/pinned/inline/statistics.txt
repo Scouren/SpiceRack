@@ -522,7 +522,7 @@ R1 a b 1k
 .subckt s3 a b
 .param w__mm_r={agauss(w, 10m, 1)}
 .param w__mm=w__mm_r
-X1 a b s1 m=w__mm
+X1 a b s1 m={w__mm}
 .ends s3
 X1 a 0 s1
 X2 a 0 s2

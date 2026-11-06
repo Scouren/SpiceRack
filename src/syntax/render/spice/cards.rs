@@ -342,7 +342,8 @@ impl W<'_, '_> {
     }
 
     /// `e`'s ternaries for another family, grouped as `read` groups them,
-    /// an `if()` one on ngspice's family.
+    /// an `if()` one on ngspice's family; its functions as Xyce names them
+    /// ([`W::xyce_functions`]).
     fn ternaries_as(&self, e: &str, read: Read) -> String {
         if self.rd.b.text_family == self.b.text_family {
             return e.to_string();
@@ -410,14 +411,14 @@ pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String {
 // ---- private ----
 
 impl W<'_, '_> {
-    /// ` k=v` each (a flag bare), values [`W::spelled`].
+    /// ` k=v` each (a flag bare), values [`W::param_value`].
     fn params(&self, params: &[(String, String)]) -> String {
         let mut s = String::new();
         for (k, v) in params {
             if v.is_empty() {
                 s.push_str(&format!(" {k}"));
             } else {
-                s.push_str(&format!(" {k}={}", self.spelled(v)));
+                s.push_str(&format!(" {k}={}", self.param_value(v)));
             }
         }
         s

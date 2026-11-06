@@ -487,6 +487,25 @@ catalogue! {
         cite: "ngspice manual §2.7 (a `.lib` in a `.subckt` is local to it); Xyce 7.10 run by hand (a `.include` there defines globally, a `.lib` there is \"Invalid device type\")",
         explain: "ngspice scopes the subcircuits and models a file read inside a `.subckt` defines to that subcircuit; Xyce makes them global, where they replace the deck's own of the same name. Read the file at the top level, renaming what collides.",
     }
+    // W0050–W0054: the Xyce target's (`render::spice::xyce_*`).
+    /// An ngspice model parameter Xyce's device lacks, set to change a number, or an ngspice model kind no Xyce device computes.
+    W0050 Refusal {
+        title: "a model parameter or kind Xyce's devices lack",
+        cite: "Xyce RG 7.10 `D` and `Q` model parameter tables (levels 1 and 234; Xyce 7.10 ignores another name with a warning, run), `M` (level 18 VDMOS, no `vdmos` type); ngspice-45 `devices/dio/dio.c`, `devices/bjt/bjt.c`, `devices/hicum2/hicum2.c`, `devices/vdmos`",
+        explain: "The card sets a parameter ngspice's device reads that Xyce's has no parameter for (a `tlev`/`tlevc` temperature coefficient, a tunnelling current, the BJT substrate diode, an instance default on the card) to a value other than the one that turns it off, so Xyce would run without it and give another number; or the card is ngspice's `vdmos`, which no Xyce model type computes. Set the parameter to its off value, or model the effect another way.",
+    }
+    /// An ngspice C or L model card giving the element's value, which Xyce reads as a multiplier.
+    W0051 Refusal {
+        title: "a model value Xyce reads as a multiplier",
+        cite: "ngspice-45 `devices/cap/cap.c` (`cap`), `devices/ind/ind.c` (`ind`), `parser/inpgmod.c` (an instance parameter on the card is the instance's default); Xyce RG 7.10 C, L model parameters (`C`, `L`: multipliers of the instance value)",
+        explain: "In ngspice the model's `c=` (`l=`) is the value of an element that gives none; Xyce multiplies the element's value by it. Give the value on each element and leave it off the model.",
+    }
+    /// An output Xyce writes no vector for: an `.op` beside another analysis, the integrated noise, an ngspice `@dev[param]` vector.
+    W0052 Note {
+        title: "an output Xyce writes no vector for",
+        cite: "Xyce RG 7.10 `.OP` (\"if specified with another analysis type, no additional operating point will be calculated\"), `.NOISE` (the total noise integrals are sent to stdout), `.PRINT` (node voltages, lead currents, power); ngspice manual §15.6 (`@device[param]`)",
+        explain: "Xyce runs `.op` beside another analysis as a printout of the bias point, writes a noise sweep's integrals to its standard output only, and has no name for an ngspice device vector (`@q1[gm]`), so the results lack that plot or vector. Run the operating point alone, integrate the noise spectrum, or compute the quantity from node voltages and lead currents.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

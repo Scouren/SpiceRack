@@ -11,13 +11,20 @@
 //! PARSER); ngspice manual §11.1.1; Xyce 7.10 run by hand on each mapped
 //! name (no "No options parameter" warning).
 //!
+//! The outputs Xyce writes no vector for are noted (W0052): an
+//! `.op` beside another analysis (RG `.OP`: "no additional operating point
+//! will be calculated"), the integrated noise (RG `.NOISE`: the total noise
+//! integrals go to stdout only), ngspice's `@dev[param]` vectors (no Xyce
+//! name; RG `.PRINT` device lead currents and power only).
+//!
 //! Contents:
-//! - `W::xyce_options(&mut self, tb: &Tb) -> Vec<String>`
+//! - `W::xyce_options(&mut self, tb: &Tb) -> Vec<String>`, `W::xyce_drops(&mut self, tb: &Tb)`
 
 use super::W;
 use super::bench::Tb;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
+use crate::syntax::render::read::Ana;
 
 /// The options that shape only a listing, the accounting or the output
 /// files, no number (ngspice manual §11.1.1 ACCT, NOACCT, LIST, NODE,
@@ -44,6 +51,29 @@ const LISTING: &[&str] = &[
 ];
 
 impl W<'_, '_> {
+    /// The notes of `tb`'s outputs Xyce writes no vector for: an `.op`
+    /// beside another analysis, each `.noise`'s integrated noise, a saved
+    /// or printed ngspice `@dev[param]` (W0052).
+    pub(super) fn xyce_drops(&mut self, tb: &Tb) {
+        for (a, tok) in &tb.analyses {
+            match a {
+                Ana::Op if tb.analyses.len() > 1 => self.note(Code::W0052, *tok),
+                Ana::Noise { .. } => self.note(Code::W0052, *tok),
+                _ => {}
+            }
+        }
+        if let Some(tok) = tb.save_tok
+            && tb.saves.iter().any(|s| s.contains('@'))
+        {
+            self.note(Code::W0052, tok);
+        }
+        for (_, outs, tok) in &tb.prints {
+            if outs.iter().any(|o| o.contains('@')) {
+                self.note(Code::W0052, *tok);
+            }
+        }
+    }
+
     /// Xyce's options: `.options <pkg> k=v` per package. Xyce's own keep
     /// their `pkg.key`; portable ones map through the RG tables, and one
     /// with no Xyce spelling is refused. Consecutive entries of one package
