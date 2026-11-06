@@ -34,4 +34,5 @@ pub(super) fn ngspice_given() -> DialectDef {
         .region("hspice", Lang::HSPICE)
         .region("ltspice", Lang::LTSPICE)
         .region("xyce", Lang::XYCE)
+        .regions_registered(true)
 }

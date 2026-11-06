@@ -48,7 +48,7 @@ fn spectre_with(deck: &str, loads: &[String]) -> Result<String, Vec<Code>> {
     let src = Source {
         ast: &ast,
         tokens: &t,
-        dialect: Dialect::Ngspice,
+        lang: Lang::NGSPICE,
         name: deck.lines().next().unwrap_or_default(),
         kit: None,
         loads,

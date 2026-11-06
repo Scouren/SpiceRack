@@ -368,10 +368,7 @@ impl Kit {
                 Err(e) => {
                     file.role = Role::Unread(e);
                     if p.from.is_none() {
-                        file.diags.push(Diag {
-                            code: unread_code(e),
-                            token: 0,
-                        });
+                        file.diags.push(Diag::new(unread_code(e), 0, 0));
                     }
                 }
                 Ok(text) if p.load.is_some() => {
@@ -399,10 +396,9 @@ impl Kit {
             kit.files.push(file);
             for r in &found {
                 if p.depth >= DEPTH_MAX {
-                    kit.files[id.0 as usize].diags.push(Diag {
-                        code: Code::R0008,
-                        token: r.token,
-                    });
+                    kit.files[id.0 as usize]
+                        .diags
+                        .push(Diag::new(Code::R0008, r.token, 0));
                     continue;
                 }
                 todo.push_back(Pending {
@@ -555,7 +551,9 @@ impl Kit {
     /// Appends `code` at the statement `from` names; nothing for an entry.
     fn diag_from(&mut self, from: Option<(FileId, u32)>, code: Code) {
         if let Some((f, token)) = from {
-            self.files[f.0 as usize].diags.push(Diag { code, token });
+            self.files[f.0 as usize]
+                .diags
+                .push(Diag::new(code, token, 0));
         }
     }
 }
@@ -611,10 +609,7 @@ fn targets(
             continue;
         };
         if let Some(e) = unread[file.0 as usize] {
-            diags.push(Diag {
-                code: unread_code(e),
-                token: r.token,
-            });
+            diags.push(Diag::new(unread_code(e), r.token, 0));
             continue;
         }
         let section = match &r.section {
@@ -622,10 +617,7 @@ fn targets(
             Some(s) => match table.section(file, s) {
                 Some(n) => Some(n),
                 None => {
-                    diags.push(Diag {
-                        code: Code::R0010,
-                        token: r.token,
-                    });
+                    diags.push(Diag::new(Code::R0010, r.token, 0));
                     None
                 }
             },

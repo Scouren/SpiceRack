@@ -817,6 +817,55 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   migration notes included). `Dialect` stays as the built-ins' names
   (`From<Dialect> for Lang`, the backend's simulators, `Kit`); nothing in
   `syntax` branches on it.
+- **P8**: plugins. `render::Source.lang: Lang` and `render_text(text,
+  d: impl Into<Lang>, ..)` read a plugin's text (`Rd.d` is the source's
+  `text_family`). Codes: `DialectDef::code(id, Kind, message)`,
+  `refuse_code(c, id)` / `omit_code(c, id)` (a cell `Refuse(W0201)` /
+  `Omit(W0202)` plus a per-construct detail in the row), `Diag.detail: u16`
+  (still 8 bytes) indexing one global code table the registry owns
+  (`lang::plugin_code`), rendered `W0201 <lang>:<id> <message>`; the new
+  range `W0201–W0300`. `render/def_pass.rs`: `write_head(Tag, text)`,
+  `write_master(word, text)`, `option(spice, own)` and hooks
+  (`hook(head, WriteHook)`, `Card`, `Answer`), one pass over a plugin
+  target's text only when its row has a map or a hook; the request form
+  for bindings (`external_hook(head, id)`, `render_pending` →
+  `Pending { text, requests: [Request { hook, span, anchor }] }`,
+  `splice(src, pending, answers)`). `runs_on(Dialect)` (validated against
+  the `extends` chain; `Lang::runs_on` is a built-in's own simulator, not
+  copied by `extends`, so a plugin is netlist-only until it says).
+  `Lexicon::regions_registered` (ngspice-given's): `simulator lang=<name>`
+  with no own row looks the name up once per switch. `Lang::dump()`;
+  registering an equal definition returns the held `Lang`, another one is
+  `Redefined` (`Taken` is gone); the name is checked under the append
+  lock (a test registering one name from 8 threads raced to two rows
+  before). Tests: `tests/test_dialect_plugin.rs` (acme from §2,
+  `MyHspice`, a plugin of a plugin, every `RegisterError` but `Full`, which
+  `tests/test_dialect_full.rs` fills the registry for), the pinned dumps
+  `tests/fixtures/dialects/{acme,my-hspice}.dump` (P10's parity oracle).
+  Narrower than §2-§6, by need or by what the code is:
+  - `Keyword` is `token::Tag` (`write_head(Tag::KwSubckt, ..)`); a
+    catalogue code keeps `refuse(c, Code)`, an own code is `refuse_code`.
+  - A new table row still goes last (P3's rule; first would reorder the
+    built-ins' tables), so acme reads `x` and writes `meg`.
+  - `func(FuncForm::Param)` alone leaves the `Func` cell `Native`: acme also
+    calls `spell(Construct::Func, Alt::FuncParam)`. "Decimal arithmetic" is
+    three calls (`arithmetic`, `number_reading`, `ngspice_numbers(false)`),
+    not one fact; with only the first, acme's round trip respelled numbers.
+  - A hook's text is write-only (no read hooks): a deck holding a hooked
+    card is no round-trip fixpoint unless the hook writes text the
+    definition reads. A hook's anchor is the k-th source token of the
+    card's keyword when the counts agree, else token 0. `dump` names hook
+    heads, not functions: an equal re-registration with another function
+    keeps the held hook.
+  - Plugin regions look up plugins only (a built-in's region is a row of
+    the lexicon's own table). A `simulator lang=` name a built-in's row
+    prefixes before a `-` (`ngspice-x`) still opens the built-in's region.
+  - A statement an ngspice deck keeps as ngspice text is refused `W0001`
+    by acme (its text family is itself, §6.5).
+  - Oracle 4 runs on five inline decks, not the 200-deck spice-bench
+    sample; oracle 5 (acme on ngspice) and oracle 2 (`tests/dialect_defs.rs`)
+    are not written. `Kit` keeps its `Dialect`: a plugin kit is out of
+    scope.
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).

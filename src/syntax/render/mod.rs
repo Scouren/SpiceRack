@@ -22,12 +22,16 @@
 //! - `pub mod capability`, `pub mod spelling`
 //! - `pub struct Source<'a>`, `pub enum Numbers`, `pub const NGBEHAVIOR: &str`, `pub struct Written`, `pub struct Diags`
 //! - `pub fn render(src: &Source, target: impl Into<Lang>) -> Result<Written, Diags>`
+//! - `pub struct Pending`, `pub struct Request`, `pub fn card_fields(text: &str) -> (&str, Vec<&str>, Vec<(&str, &str)>)`,
+//!   `pub fn render_pending(src: &Source, target: impl Into<Lang>) -> Result<Pending, Diags>`,
+//!   `pub fn splice(src: &Source, p: Pending, answers: &[Answer]) -> Result<Written, Diags>`
 //! - `pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
-//! - `pub fn render_text(text: &str, d: Dialect, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
+//! - `pub fn render_text(text: &str, d: impl Into<Lang>, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
 //! - `pub enum Reference`, `pub fn references(src: &Source) -> Vec<Reference>`
 //! - `pub fn writes(target: Dialect) -> bool`
 
 pub mod capability;
+mod def_pass;
 mod draws;
 mod models;
 mod named;
@@ -38,8 +42,11 @@ mod role;
 pub mod spelling;
 mod spice;
 
+pub use def_pass::{Pending, Request, card_fields};
+
 use crate::syntax::ast::Ast;
 use crate::syntax::behaviour::Writer;
+use crate::syntax::def::Answer;
 use crate::syntax::diag::{self, Diag, Kind};
 use crate::syntax::resolve::{FileId, Kit, Role};
 use crate::syntax::token::Tokens;
@@ -53,7 +60,7 @@ use crate::syntax::{parse, tokenize};
 pub struct Source<'a> {
     pub ast: &'a Ast<'a>,
     pub tokens: &'a Tokens<'a>,
-    pub dialect: Dialect,
+    pub lang: Lang,
     pub name: &'a str,
     pub kit: Option<(&'a Kit, FileId)>,
     /// Loads no statement of the file holds: an ngspice deck has no load
@@ -114,10 +121,87 @@ pub enum Reference {
 /// something the deck holds.
 ///
 /// # Panics
-/// When `target` is not one [`writes`] names; when `src.kit`'s file is not
-/// `src.ast`'s.
+/// When `src.kit`'s file is not `src.ast`'s; when `target` declares an
+/// external hook ([`render_pending`] is its form).
 pub fn render(src: &Source, target: impl Into<Lang>) -> Result<Written, Diags> {
-    render_lang(src, target.into())
+    let p = render_pending(src, target)?;
+    assert!(
+        p.requests.is_empty(),
+        "render: a target with external hooks is written by render_pending"
+    );
+    splice(src, p, &[])
+}
+
+/// [`render`] for a target whose external hooks answer cards
+/// (`syntax::def::Hook::External`, the Python binding's): the text with
+/// one [`Request`] per card such a hook answers, in output order, the
+/// caller then calling each hook once per deck and handing the answers to
+/// [`splice`]. With no external hook, no requests: [`render`]'s deck.
+///
+/// # Errors
+/// [`Diags`] when the deck is refused before any hook answers.
+pub fn render_pending(src: &Source, target: impl Into<Lang>) -> Result<Pending, Diags> {
+    let target = target.into();
+    let (text, mut diags) = write_lang(src, target);
+    let (text, requests) = match def_pass::applies(target) {
+        true => def_pass::pass(&text, target, src.tokens, &mut diags),
+        false => (text, Vec::new()),
+    };
+    let p = Pending {
+        text,
+        requests,
+        target,
+        diags,
+    };
+    match p
+        .diags
+        .iter()
+        .any(|d| diag::info(d.code).kind == Kind::Refusal)
+    {
+        true => Err(finish(src, p.diags)),
+        false => Ok(p),
+    }
+}
+
+/// `p` completed with `answers`, one per request in order: a text
+/// replaces its request's span, a refusal refuses the deck (`W0201`, the
+/// target's code, at the request's anchor).
+///
+/// # Errors
+/// [`Diags`] when the deck is refused.
+///
+/// # Panics
+/// When `answers` is not one per request, or a refusal names a code the
+/// target did not declare.
+pub fn splice(src: &Source, p: Pending, answers: &[Answer]) -> Result<Written, Diags> {
+    assert_eq!(
+        answers.len(),
+        p.requests.len(),
+        "splice: one answer per request"
+    );
+    let Pending {
+        mut text,
+        requests,
+        target,
+        mut diags,
+    } = p;
+    for (r, a) in requests.iter().zip(answers).rev() {
+        match a {
+            Answer::Text(t) => {
+                let span = r.span.start as usize..r.span.end as usize;
+                text.replace_range(span, t.trim_end_matches('\n'));
+            }
+            Answer::Refuse(id) => diags.push(def_pass::refusal(target, id, r.anchor)),
+        }
+    }
+    let refused = diags
+        .iter()
+        .any(|d| diag::info(d.code).kind == Kind::Refusal);
+    let notes = finish(src, diags);
+    match refused {
+        true => Err(notes),
+        false => Ok(Written { text, notes }),
+    }
 }
 
 /// File `file` of `kit` written for `target`, its deck named `name`.
@@ -143,7 +227,7 @@ pub fn render_kit(
     let src = Source {
         ast: &ast,
         tokens: &t,
-        dialect: kit.dialect(),
+        lang: kit.dialect().into(),
         name,
         kit: Some((kit, file)),
         loads: &[],
@@ -158,17 +242,18 @@ pub fn render_kit(
 /// As [`render`]; when `d` has no reader (CDL, Verilog).
 pub fn render_text(
     text: &str,
-    d: Dialect,
+    d: impl Into<Lang>,
     name: &str,
     target: impl Into<Lang>,
 ) -> Result<Written, Diags> {
-    let lex = Lang::from(d).lexicon().expect("a dialect with a reader");
+    let d = d.into();
+    let lex = d.lexicon().expect("a dialect with a reader");
     let t = tokenize(text, lex);
     let ast = parse(&t, lex);
     let src = Source {
         ast: &ast,
         tokens: &t,
-        dialect: d,
+        lang: d,
         name,
         kit: None,
         loads: &[],
@@ -184,7 +269,7 @@ pub fn render_text(
 /// branch's include is not listed (`resolve::Kit::load` follows those
 /// too). Paths are as written, quotes removed.
 pub fn references(src: &Source) -> Vec<Reference> {
-    let (rd, deck) = read::read(src.ast, src.tokens, src.dialect, src.name, src.kit);
+    let (rd, deck) = read::read(src.ast, src.tokens, src.lang, src.name, src.kit);
     let blocks = std::iter::once(&deck.top).chain(deck.sections.iter().map(|s| &s.body));
     let unquoted = |p: String| p.trim_matches(['"', '\'']).to_string();
     let mut out = Vec::new();
@@ -220,9 +305,10 @@ pub fn writes(target: Dialect) -> bool {
 
 // ---- private ----
 
-/// [`render`], its target resolved to a row.
-fn render_lang(src: &Source, target: Lang) -> Result<Written, Diags> {
-    let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.dialect, src.name, src.kit);
+/// `src` written for `target`, and every diagnostic on the file: the
+/// earlier stages' notes, the reader's and the writer's.
+fn write_lang(src: &Source, target: Lang) -> (String, Vec<Diag>) {
+    let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.lang, src.name, src.kit);
     rd.write_for(target);
     deck.given_loads.extend(src.loads.iter().cloned());
     deck.numbers = src.numbers;
@@ -239,15 +325,12 @@ fn render_lang(src: &Source, target: Lang) -> Result<Written, Diags> {
     };
     diags.extend(deck.notes.iter().copied());
     diags.extend(written);
-    let refused = diags
-        .iter()
-        .any(|d| diag::info(d.code).kind == Kind::Refusal);
-    let text = (!refused).then_some(text);
+    (text, diags)
+}
+
+/// `diags` sorted, with their messages.
+fn finish(src: &Source, mut diags: Vec<Diag>) -> Diags {
     diag::sort(&mut diags);
     let messages = diag::messages(&diags, src.tokens, src.name);
-    let diags = Diags { diags, messages };
-    match text {
-        Some(text) => Ok(Written { text, notes: diags }),
-        None => Err(diags),
-    }
+    Diags { diags, messages }
 }

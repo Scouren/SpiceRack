@@ -215,10 +215,8 @@ pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declar
                 Scope::Subckt(s) | Scope::Section(s) | Scope::Branch(s) => s.0,
             };
             if !names.insert((container, space, key(name, fold))) {
-                out.diags.push(Diag {
-                    code: Code::R0002,
-                    token: ast.main_token(node),
-                });
+                out.diags
+                    .push(Diag::new(Code::R0002, ast.main_token(node), 0));
             }
         }
     });

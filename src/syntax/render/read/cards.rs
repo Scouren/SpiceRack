@@ -68,10 +68,11 @@ impl Rd<'_> {
             && self.fields(n).is_empty()
         {
             let token = self.main(n);
-            acc.notes.push(crate::syntax::diag::Diag {
-                code: crate::syntax::diag::Code::W0036,
+            acc.notes.push(crate::syntax::diag::Diag::new(
+                crate::syntax::diag::Code::W0036,
                 token,
-            });
+                0,
+            ));
             return;
         }
         if self.dialect_raw(&word) {

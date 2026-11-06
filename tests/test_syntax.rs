@@ -288,7 +288,7 @@ fn timed() {
         let file = Source {
             ast: &ast,
             tokens: &t,
-            dialect: d,
+            lang: d.into(),
             name: &key,
             kit: None,
             loads: &[],

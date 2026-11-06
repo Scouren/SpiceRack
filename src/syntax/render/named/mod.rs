@@ -48,7 +48,7 @@ use crate::syntax::Lang;
 use crate::syntax::ast::NONE;
 use crate::syntax::behaviour::{Behaviours, Writer};
 use crate::syntax::diag::{Code, Diag};
-use crate::syntax::lang::Cells;
+use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
 use crate::syntax::resolve::Role;
 use lift::Lifted;
 
@@ -59,6 +59,8 @@ struct W<'a, 'r> {
     sp: &'static Spelling,
     /// What the target does with each construct.
     cells: &'static Cells,
+    /// Per construct: the definition's own code a cell raises.
+    details: &'static [u16; CONSTRUCT_COUNT],
     /// The target's behaviours.
     b: &'static Behaviours,
     /// The target.
@@ -107,9 +109,10 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         deck,
         sp: lang.spelling(),
         cells: lang.cells(),
+        details: &lang.row().details,
         b: lang.behaviours(),
         lang,
-        keep_case: Lang::from(rd.d) == lang,
+        keep_case: rd.d == lang,
         lifted,
         draws,
         names: Names::new(rd, deck, |_, _| None),
@@ -132,10 +135,9 @@ impl W<'_, '_> {
     /// copy, is recorded at `token`.
     fn ask(&mut self, c: Construct, token: u32) -> Action {
         let a = self.cells[c as usize];
-        match a {
-            Action::Refuse(code) => self.refuse(code, token),
-            Action::Spell(Alt::Omit(code) | Alt::Copy(code)) => self.note(code, token),
-            Action::Native | Action::Spell(_) | Action::Lift(_) => {}
+        if let Action::Refuse(code) | Action::Spell(Alt::Omit(code) | Alt::Copy(code)) = a {
+            self.diags
+                .push(Diag::new(code, token, self.details[c as usize]));
         }
         a
     }
@@ -160,13 +162,13 @@ impl W<'_, '_> {
     }
 
     fn refuse(&mut self, code: Code, token: u32) {
-        self.diags.push(Diag { code, token });
+        self.diags.push(Diag::new(code, token, 0));
     }
 
     /// A note at `token`: something kept or left out, the deck still
     /// written.
     fn note(&mut self, code: Code, token: u32) {
-        self.diags.push(Diag { code, token });
+        self.diags.push(Diag::new(code, token, 0));
     }
 
     fn line(&mut self, text: &str) {

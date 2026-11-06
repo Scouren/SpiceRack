@@ -137,7 +137,7 @@ fn measure_survives_alongside_an_osdi_control_block() {
     let src = Source {
         ast: &ast,
         tokens: &t,
-        dialect: Dialect::Ngspice,
+        lang: Lang::NGSPICE,
         name: "deck",
         kit: None,
         loads: &loads,

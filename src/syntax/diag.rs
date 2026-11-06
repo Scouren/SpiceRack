@@ -15,6 +15,11 @@
 //! | R0001–R0100 | resolve |
 //! | W0001–W0100 | render: the SPICE-family writer and the rules both writers share |
 //! | W0101–W0200 | render: the named writer (Spectre, VACASK) |
+//! | W0201–W0300 | render: rules a dialect definition declares |
+//!
+//! A `W0201`/`W0202` diagnostic carries a `detail`: which of the codes a
+//! definition declared (`syntax::def::DialectDef::code`) it is, its
+//! message `W0201 <lang>:<id> <message>`.
 //!
 //! The catalogue is one table (`catalogue!`): a code's variant and its
 //! row are one entry, so no code lacks a row; `tests` checks each row and
@@ -26,7 +31,7 @@
 //! Contents:
 //! - `pub enum Code`, `Code::ALL: &[Code]`, `pub enum Kind`, `pub struct Info`,
 //!   `pub const fn info(c: Code) -> Info`
-//! - `pub struct Diag { pub code: Code, pub token: u32 }`
+//! - `pub struct Diag { pub code: Code, pub token: u32, pub detail: u16 }`, `Diag::new(code: Code, token: u32, detail: u16) -> Diag`
 //! - `pub fn sort(diags: &mut [Diag])`
 //! - `pub fn messages(diags: &[Diag], t: &Tokens, file: &str) -> String`
 
@@ -63,6 +68,9 @@ pub struct Diag {
     pub code: Code,
     /// The token it anchors to.
     pub token: u32,
+    /// `W0201`, `W0202`: the declared code it is (`lang::plugin_code`);
+    /// 0 for every other code.
+    pub detail: u16,
 }
 
 /// Defines [`Code`], [`Code::ALL`] and [`info`] from one list of rows, so
@@ -566,6 +574,30 @@ catalogue! {
         cite: "Spectre Reference 19.1 pp.438-439 (xf: transfer functions from every source)",
         explain: "SPICE's `.tf` gives the gain and the input and output resistances at the operating point; Spectre's `xf` at `values=[0]` gives the transfer function from every source to the output, no resistance. Add a test source and compute the resistance from its transfer function.",
     }
+    // W0201–W0300: the rules a dialect definition declares.
+    /// A refusal a dialect definition declared (`DialectDef::code`): its id and message are the definition's.
+    W0201 Refusal {
+        title: "refused by the target dialect's definition",
+        cite: "the target's definition (`syntax::def`, `DialectDef::code`)",
+        explain: "The target is a dialect a definition declared (a plugin), and that definition refuses this construct or card with a code of its own; the message names the code and says why. Change the deck, or write it for a dialect that says the construct.",
+    }
+    /// A note a dialect definition declared: something its writer left out or kept.
+    W0202 Note {
+        title: "noted by the target dialect's definition",
+        cite: "the target's definition (`syntax::def`, `DialectDef::code`)",
+        explain: "The target is a dialect a definition declared (a plugin), and that definition leaves this construct out with a note of its own; the message names the code and says what was left out. The deck is still written.",
+    }
+}
+
+impl Diag {
+    /// `code` at `token`, with `detail` (0 but for `W0201`/`W0202`).
+    pub const fn new(code: Code, token: u32, detail: u16) -> Diag {
+        Diag {
+            code,
+            token,
+            detail,
+        }
+    }
 }
 
 /// Sorts `diags` by source position (token), then code: the order their
@@ -590,13 +622,30 @@ pub fn messages(diags: &[Diag], t: &Tokens, file: &str) -> String {
             "a diagnostic on a token of `t`"
         );
         let at = t.location(d.token);
-        let i = info(d.code);
-        writeln!(
-            out,
-            "{file}:{}:{}: {:?} {}",
-            at.line, at.column, d.code, i.title
-        )
-        .expect("a String takes writes");
+        let r = match d.code {
+            Code::W0201 | Code::W0202 => {
+                let p = crate::syntax::lang::plugin_code(d.detail);
+                writeln!(
+                    out,
+                    "{file}:{}:{}: {:?} {}:{} {}",
+                    at.line,
+                    at.column,
+                    d.code,
+                    p.lang.name(),
+                    p.id,
+                    p.message
+                )
+            }
+            _ => writeln!(
+                out,
+                "{file}:{}:{}: {:?} {}",
+                at.line,
+                at.column,
+                d.code,
+                info(d.code).title
+            ),
+        };
+        r.expect("a String takes writes");
     }
     out
 }
@@ -622,12 +671,13 @@ mod tests {
     #[test]
     fn codes_follow_their_stage_ranges() {
         // The module header's table: (letter, first, last, stage).
-        const RANGES: [(char, u32, u32, &str); 5] = [
+        const RANGES: [(char, u32, u32, &str); 6] = [
             ('L', 1, 100, "tokenize"),
             ('P', 1, 100, "parse"),
             ('R', 1, 100, "resolve"),
             ('W', 1, 100, "render: SPICE and shared"),
             ('W', 101, 200, "render: named"),
+            ('W', 201, 300, "render: a definition's rules"),
         ];
         let mut last: Option<(char, u32)> = None;
         for &c in Code::ALL {

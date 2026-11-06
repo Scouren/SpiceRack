@@ -27,14 +27,13 @@
 //! - `pub(in crate::syntax::render) struct Rd`, `enum Kept`, `struct Deck`, `struct Block`, `enum Comp`,
 //!   `enum Elem`, `enum Raw`, `struct Cond`, `struct Section`, `enum Func`
 //! - `Block::elements(&self) -> Vec<Elem>`
-//! - `fn read(ast: &Ast, t: &Tokens, d: Dialect, name: &str, kit: Option<(&Kit, FileId)>) -> (Rd, Deck)`
+//! - `fn read(ast: &Ast, t: &Tokens, d: Lang, name: &str, kit: Option<(&Kit, FileId)>) -> (Rd, Deck)`
 //! - `Rd::text_behaviours`, `Rd::text_lang`, `Rd::role`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
 //!   `Rd::ttag`, `Rd::raw`, `Rd::unparsed`, `Rd::keep`, `Rd::card`, `Rd::section`, `Rd::if_head_ok`
 //! - `fn unwrapped(t: &str) -> String`
 
 use std::collections::{HashMap, HashSet};
 
-use crate::syntax::Dialect;
 use crate::syntax::Lang;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::behaviour::{Behaviours, NamedRules};
@@ -82,8 +81,9 @@ pub(in crate::syntax::render) use walk::Visit;
 pub(in crate::syntax::render) struct Rd<'a> {
     pub(in crate::syntax::render) ast: &'a Ast<'a>,
     pub(in crate::syntax::render) t: &'a Tokens<'a>,
-    /// The dialect the file was read in (its family: ESPice reads ngspice).
-    pub(in crate::syntax::render) d: Dialect,
+    /// The language the file was read in (its text family: ESPice reads
+    /// ngspice).
+    pub(in crate::syntax::render) d: Lang,
     /// The file's language's behaviours (its family's: ESPice reads
     /// ngspice's).
     pub(in crate::syntax::render) b: &'static Behaviours,
@@ -307,11 +307,11 @@ impl Default for Block {
 pub(in crate::syntax::render) fn read<'a>(
     ast: &'a Ast<'a>,
     t: &'a Tokens<'a>,
-    d: Dialect,
+    d: Lang,
     name: &str,
     kit: Option<(&'a Kit, FileId)>,
 ) -> (Rd<'a>, Deck) {
-    let d = d.family();
+    let d = d.behaviours().text_family;
     if let Some((k, f)) = kit {
         assert_eq!(ast.len(), k.node_count(f), "read: the kit file's tree");
     }
@@ -319,7 +319,7 @@ pub(in crate::syntax::render) fn read<'a>(
         ast,
         t,
         d,
-        b: Lang::from(d).behaviours(),
+        b: d.behaviours(),
         models: HashMap::new(),
         kinds: HashMap::new(),
         subckts: Vec::new(),
@@ -377,7 +377,7 @@ impl<'a> Rd<'a> {
     /// is the file's, as the old reader kept it).
     pub(in crate::syntax::render) fn text_lang(&self, tok: u32) -> Lang {
         match self.named() {
-            true => Lang::from(self.d),
+            true => self.d,
             false => self.t.lexicon_at(tok).lang,
         }
     }
@@ -588,10 +588,11 @@ impl<'a> Rd<'a> {
                             .push(p.trim().trim_matches('"').to_string());
                     } else {
                         // The script's other lines are not read.
-                        acc.notes.push(Diag {
-                            code: crate::syntax::diag::Code::W0025,
-                            token: self.main(c),
-                        });
+                        acc.notes.push(Diag::new(
+                            crate::syntax::diag::Code::W0025,
+                            self.main(c),
+                            0,
+                        ));
                     }
                 }
             }

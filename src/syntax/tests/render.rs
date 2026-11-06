@@ -326,7 +326,7 @@ fn given(text: &str, target: Dialect) -> Result<String, String> {
     let src = Source {
         ast: &ast,
         tokens: &tokens,
-        dialect: Dialect::Ngspice,
+        lang: Lang::NGSPICE,
         name: "t",
         kit: None,
         loads: &[],

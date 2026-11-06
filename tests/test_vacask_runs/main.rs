@@ -54,7 +54,7 @@ fn emit_from(deck: &str, d: Dialect, lex: &'static lexicon::Lexicon) -> Result<S
     let src = Source {
         ast: &ast,
         tokens: &t,
-        dialect: d,
+        lang: d.into(),
         name: deck.lines().next().unwrap_or_default(),
         kit: None,
         loads: &[],

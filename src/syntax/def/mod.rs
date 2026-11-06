@@ -32,19 +32,23 @@
 //!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
 //!   `named_params`, `spectre_analysis`
+//! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
+//!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
+//!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
 //! - `pub fn register(def: DialectDef) -> Result<Lang, RegisterError>`, `pub enum RegisterError`
 
 mod copy;
+mod dump;
 mod freeze;
+mod plugin;
 
-use crate::syntax::Lang;
 use crate::syntax::behaviour::{
     AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, LoadForm, ModelSemantics,
     NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, SourceRules, ValueQuoting,
     Writer,
 };
 use crate::syntax::device::{self, Device};
-use crate::syntax::diag::Code;
+use crate::syntax::diag::{Code, Kind};
 use crate::syntax::lang::CONSTRUCT_COUNT;
 use crate::syntax::lexicon::{
     self, Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Quote, Quoting, Scale, Tail,
@@ -53,8 +57,11 @@ use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::spelling::FuncForm;
 use crate::syntax::statement::{Analysis, Statement};
 use crate::syntax::token::Tag;
+use crate::syntax::{Dialect, Lang};
 
+pub(crate) use dump::dump;
 pub use freeze::{RegisterError, register};
+pub use plugin::{Answer, Card, Hook, WriteHook};
 
 /// A language being declared.
 #[derive(Clone)]
@@ -69,6 +76,18 @@ pub struct DialectDef {
     b: Behaviours,
     /// `None`: the language itself.
     text_family: Option<Lang>,
+    /// Its own codes: id, kind, message (`code`).
+    codes: Vec<(String, Kind, String)>,
+    /// Per construct: the own code a `W0201`/`W0202` cell raises.
+    code_ids: [Option<String>; CONSTRUCT_COUNT],
+    /// The post-pass's maps and the hooks (`plugin`).
+    heads: Vec<(Tag, String)>,
+    write_masters: Vec<(String, String)>,
+    options: Vec<(String, String)>,
+    hooks: Vec<(String, Hook)>,
+    runs_on: Option<Dialect>,
+    /// The language it extends.
+    base: Option<Lang>,
 }
 
 /// A shared table of keyword rows.
@@ -145,6 +164,7 @@ struct Lex {
     masters: Vec<(String, Statement)>,
     analyses: Vec<(String, Analysis)>,
     regions: Vec<(String, Lang)>,
+    regions_registered: bool,
 }
 
 /// The spelling, owned while being declared.
@@ -192,15 +212,50 @@ impl DialectDef {
             cells: [None; CONSTRUCT_COUNT],
             b: Behaviours::DEFAULT,
             text_family: None,
+            codes: Vec::new(),
+            code_ids: std::array::from_fn(|_| None),
+            heads: Vec::new(),
+            write_masters: Vec::new(),
+            options: Vec::new(),
+            hooks: Vec::new(),
+            runs_on: None,
+            base: None,
         }
     }
 
     /// Copies registered language `base`: its lexicon (shared until a
-    /// lexicon call changes it), spelling, cells and behaviours.
+    /// lexicon call changes it), spelling, cells, behaviours, codes, maps,
+    /// hooks and `runs_on` (a built-in's own simulator is not copied: a
+    /// plugin runs only where it says, `runs_on`). A `Lang` exists only
+    /// once registered, so a chain cannot hold a cycle.
     ///
     /// # Panics
     /// When `base` is not registered.
     pub fn extends(mut self, base: Lang) -> DialectDef {
+        let r = base.row();
+        let own = |s: &&str| s.to_string();
+        self.codes = r
+            .codes
+            .iter()
+            .map(|c| (c.0.into(), c.1, c.2.into()))
+            .collect();
+        self.code_ids = std::array::from_fn(|i| match r.cells[i] {
+            Action::Refuse(Code::W0201) | Action::Spell(Alt::Omit(Code::W0202)) => {
+                let d = usize::from(r.details[i] - r.first_code);
+                Some(r.codes[d].0.to_string())
+            }
+            _ => None,
+        });
+        self.heads = r.heads.iter().map(|h| (h.0, own(&h.1))).collect();
+        self.write_masters = r
+            .write_masters
+            .iter()
+            .map(|m| (own(&m.0), own(&m.1)))
+            .collect();
+        self.options = r.options.iter().map(|m| (own(&m.0), own(&m.1))).collect();
+        self.hooks = r.hooks.iter().map(|h| (own(&h.0), h.1)).collect();
+        self.runs_on = r.runs_on;
+        self.base = Some(base);
         let sp = base.spelling();
         self.shared = base.lexicon();
         self.lex = None;
@@ -588,6 +643,7 @@ impl DialectDef {
 
     fn cell(mut self, c: Construct, a: Action) -> Self {
         self.cells[c as usize] = Some(a);
+        self.code_ids[c as usize] = None;
         self
     }
 }

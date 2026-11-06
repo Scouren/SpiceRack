@@ -128,6 +128,9 @@ pub struct Lexicon {
     /// one): Spectre's `spice` (the old Spectre grammar's hook), and in
     /// `Lang::NGSPICE_GIVEN` each target dialect's own.
     pub regions: &'static [(&'static str, &'static Lexicon)],
+    /// `simulator lang=<name>` with no row in `regions` opens a region of
+    /// the registered plugin language `name` (ngspice-given's).
+    pub regions_registered: bool,
 }
 
 /// Which open brackets carry a statement past its line's end.

@@ -263,7 +263,7 @@ impl Deck {
         let src = render::Source {
             ast: &ast,
             tokens: &tokens,
-            dialect: Dialect::Ngspice,
+            lang: Lang::NGSPICE,
             name,
             kit: None,
             loads: &self.top.osdi,

@@ -312,13 +312,53 @@ impl Lexer<'_> {
                 let fold = !self.lex.named;
                 let open = self.lex.regions.iter();
                 let mut open = open.filter(|(name, _)| self.lang_is(at, name, fold));
-                open.next().map(|&(_, lex)| (Tag::LangSpice, lex))
+                let own = open.next().map(|&(_, lex)| lex);
+                let lex = own.or_else(|| self.registered_region(at));
+                lex.map(|lex| (Tag::LangSpice, lex))
             }
         }
     }
 
+    /// [`Lexicon::regions_registered`]: the lexicon of the plugin language
+    /// the statement at `at` names, if it is `simulator lang=<name>`: one
+    /// registry lookup per switch statement, never per token. The
+    /// built-ins' regions are the lexicon's own rows.
+    fn registered_region(&self, at: usize) -> Option<&'static Lexicon> {
+        if !self.lex.regions_registered {
+            return None;
+        }
+        let from = self.lang_value(at, true)?;
+        let len = self.src[from..]
+            .iter()
+            .take_while(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
+            .count();
+        let name = std::str::from_utf8(&self.src[from..from + len]).ok()?;
+        let lang = crate::syntax::Lang::from_name(name)?;
+        (lang.index() as usize >= crate::syntax::Lang::BUILTIN_COUNT)
+            .then(|| lang.lexicon())
+            .flatten()
+    }
+
     /// Whether the statement at `at` is `simulator lang=<to>`.
     fn lang_is(&self, at: usize, to: &str, fold: bool) -> bool {
+        let Some(p) = self.lang_value(at, fold) else {
+            return false;
+        };
+        let hit = self.src.get(p..p + to.len()).is_some_and(|s| {
+            if fold {
+                s.eq_ignore_ascii_case(to.as_bytes())
+            } else {
+                s == to.as_bytes()
+            }
+        });
+        let after = self.src.get(p + to.len()).copied().unwrap_or(b' ');
+        let wchar = after.is_ascii_alphanumeric() || after == b'_' || after == b'!';
+        hit && !wchar
+    }
+
+    /// Where the name starts in the statement at `at` when it is
+    /// `simulator lang = <name>`.
+    fn lang_value(&self, at: usize, fold: bool) -> Option<usize> {
         let word = |p: &mut usize, w: &str| {
             let hit = self.src.get(*p..*p + w.len()).is_some_and(|s| {
                 if fold {
@@ -335,16 +375,13 @@ impl Lexer<'_> {
         let gap = blanks(self.src, p) > 0;
         p += blanks(self.src, p);
         if !(simulator && gap && word(&mut p, "lang")) {
-            return false;
+            return None;
         }
         p += blanks(self.src, p);
         if !word(&mut p, "=") {
-            return false;
+            return None;
         }
-        p += blanks(self.src, p);
-        let after = self.src.get(p + to.len()).copied().unwrap_or(b' ');
-        let wchar = after.is_ascii_alphanumeric() || after == b'_' || after == b'!';
-        word(&mut p, to) && !wchar
+        Some(p + blanks(self.src, p))
     }
 
     /// The `+` line continuing the statement whose line ends at `nl`: past

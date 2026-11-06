@@ -1,0 +1,93 @@
+name my-hspice
+base hspice
+runs_on None
+lex.lang my-hspice
+lex.title true
+lex.fold_case true
+lex.comment_lines ["*", "$"]
+lex.comment_col1 []
+lex.blank_led_comment false
+lex.cont_skip ["*", "$"]
+lex.comment_tails ["//"]
+lex.block_comment false
+lex.long_strings false
+lex.dollar Hspice
+lex.plus true
+lex.backslash Hspice
+lex.end Some(End { col1: false, then_blank: false, stops: true })
+lex.stop None
+lex.join None
+lex.quote Expr(Quoting { escapes: false, protects: true, across_breaks: true })
+lex.string Quoting { escapes: false, protects: true, across_breaks: true }
+lex.string_expr true
+lex.name_escape false
+lex.ident_start [36]
+lex.ident_continue [36, 46]
+lex.directive Some(46)
+lex.head_words false
+lex.heads_after []
+lex.operators [("**", StarStar), ("==", EqualEqual), ("!=", BangEqual), ("<=", LessEqual), (">=", GreaterEqual), ("&&", AmpAmp), ("||", PipePipe)]
+lex.expr_braces false
+lex.caret Pow
+lex.infix [(PipePipe, 2), (AmpAmp, 3), (EqualEqual, 4), (BangEqual, 4), (LessEqual, 4), (GreaterEqual, 4), (Less, 4), (Greater, 4), (Plus, 5), (Minus, 5), (Star, 6), (Slash, 6), (Caret, 7), (StarStar, 7)]
+lex.right []
+lex.prefix [Plus, Minus]
+lex.prefix_bp 6
+lex.probes ["v", "i"]
+lex.index false
+lex.lib_sections true
+lex.exponent [101, 69, 100, 68]
+lex.scales [("meg", Exp(6)), ("x", Exp(6)), ("mil", Mil), ("t", Exp(12)), ("g", Exp(9)), ("k", Exp(3)), ("m", Exp(-3)), ("u", Exp(-6)), ("n", Exp(-9)), ("p", Exp(-12)), ("f", Exp(-15)), ("a", Exp(-18))]
+lex.tail Spice { dot: true }
+lex.arithmetic Decimal
+lex.keywords [[(".param", KwParam), (".parameter", KwParam), (".parameters", KwParam), (".func", KwFunc), (".subckt", KwSubckt), (".macro", KwSubckt), (".ends", KwEnds), (".eom", KwEnds), (".model", KwModel), (".include", KwInclude), (".inc", KwInclude), (".lib", KwLib), (".endl", KwEndl), (".end", KwEnd), (".global", KwGlobal), (".options", KwOptions), (".option", KwOptions), (".opts", KwOptions), (".opt", KwOptions), (".temp", KwTemp), (".temperature", KwTemp), (".ic", KwIc), (".dcvolt", KwIc), (".nodeset", KwNodeset), (".save", KwSave), (".print", KwPrint), (".plot", KwPrint), (".meas", KwMeas), (".measure", KwMeas), (".op", KwOp), (".dc", KwDc), (".ac", KwAc), (".tran", KwTran), (".noise", KwNoise), (".tf", KwTf), (".sens", KwSens), (".pz", KwPz), (".four", KwFour), (".fourier", KwFour), (".data", KwData), (".enddata", KwEnddata), (".variation", KwVariation), (".end_variation", KwEndVariation), (".if", KwIf), (".elseif", KwElseif), (".else", KwElse), (".endif", KwEndif), (".probe", KwProbe)]]
+lex.named false
+lex.devices [[Device { word: "r", primitive: Resistor, terminals: Fixed(2), refs: 0, model: InArgs, value: First }, Device { word: "c", primitive: Capacitor, terminals: Fixed(2), refs: 0, model: InArgs, value: First }, Device { word: "l", primitive: Inductor, terminals: Fixed(2), refs: 0, model: InArgs, value: First }, Device { word: "k", primitive: Coupling, terminals: Fixed(0), refs: 2, model: None, value: First }, Device { word: "v", primitive: VoltageSource, terminals: Fixed(2), refs: 0, model: None, value: Specs }, Device { word: "i", primitive: CurrentSource, terminals: Fixed(2), refs: 0, model: None, value: Specs }, Device { word: "e", primitive: Vcvs, terminals: Fixed(4), refs: 0, model: None, value: First }, Device { word: "g", primitive: Vccs, terminals: Fixed(4), refs: 0, model: None, value: First }, Device { word: "f", primitive: Cccs, terminals: Fixed(2), refs: 1, model: None, value: First }, Device { word: "h", primitive: Ccvs, terminals: Fixed(2), refs: 1, model: None, value: First }, Device { word: "b", primitive: Behavioural, terminals: Fixed(2), refs: 0, model: None, value: Keys(["v", "i"]) }, Device { word: "d", primitive: Diode, terminals: Fixed(2), refs: 0, model: AfterNodes, value: None }, Device { word: "q", primitive: Bjt, terminals: Range(3, 5), refs: 0, model: AfterNodes, value: None }, Device { word: "m", primitive: Mosfet, terminals: Range(3, 7), refs: 0, model: AfterNodes, value: None }, Device { word: "j", primitive: Jfet, terminals: Fixed(3), refs: 0, model: AfterNodes, value: None }, Device { word: "z", primitive: Mesfet, terminals: Fixed(3), refs: 0, model: AfterNodes, value: None }, Device { word: "s", primitive: VoltageSwitch, terminals: Fixed(4), refs: 0, model: AfterNodes, value: None }, Device { word: "w", primitive: CurrentSwitch, terminals: Fixed(2), refs: 1, model: AfterNodes, value: None }, Device { word: "t", primitive: TransmissionLine, terminals: Fixed(4), refs: 0, model: None, value: None }, Device { word: "x", primitive: Subckt, terminals: Any, refs: 0, model: Subckt, value: None }]]
+lex.masters []
+lex.analyses []
+lex.regions []
+lex.regions_registered false
+sp.lexicon my-hspice
+sp.comment "*"
+sp.path_quote "'"
+sp.expr ("'", "'")
+sp.func Param
+sp.subckt_params None
+sp.ngspice_numbers false
+cell.ForeignText Refuse(W0001)
+cell.PrivateText Refuse(W0039)
+cell.XyceSens Refuse(W0015)
+cell.CaretReread Refuse(W0002)
+cell.StatisticalCall Native
+cell.VerilogALoad Spell(Hdl)
+cell.OsdiLoad Refuse(W0004)
+cell.LibWholeFile Spell(Include)
+cell.NgBehavior Spell(Omit(W0030))
+cell.LibSection Native
+cell.RclModel Native
+cell.ChargeCapacitor Spell(ChargeQuoted)
+cell.BehaviouralSource Spell(VolCur)
+cell.Laplace Lift(LaplaceTable)
+cell.RfPort Refuse(W0007)
+cell.PwlRepeatV Refuse(W0008)
+cell.PwlRepeatI Refuse(W0008)
+cell.NoiseWave Refuse(W0009)
+cell.Conditional Native
+cell.BranchParam Refuse(W0014)
+cell.Func Spell(FuncParam)
+cell.Step Refuse(W0201) MY001
+cell.StepList Refuse(W0016)
+cell.TranStartup Refuse(W0037)
+cell.DcLogList Spell(DcType)
+cell.Tf Native
+cell.Sens Native
+cell.SensAc Refuse(W0015)
+cell.PoleZero Refuse(W0015)
+cell.SParameter Refuse(W0015)
+cell.Print Native
+cell.Save Spell(Probe)
+cell.UnmappedOption Native
+cell.Statistics Lift(StatisticsDraws)
+cell.Measure Native
+behaviours Behaviours { writer: Cards, text_family: my-hspice, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Other, source_rules: Spice, card_rules: Hspice, named_rules: None, options_form: Spice, load_form: Hspice, control_block: None, analysis_form: Hspice, end_rule: WhenRuns, value_quoting: Hspice, coupling: Pairs, param_form: Plain, named_params: None, spectre_analyses: ["pz", "sens", "sp", "hb", "sweep", "montecarlo"] }
+code MY001 Refusal "our HSPICE build has no .step"

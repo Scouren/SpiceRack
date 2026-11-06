@@ -21,8 +21,11 @@
 //!   `Lang::lexicon(self) -> Option<&'static Lexicon>`, `Lang::spelling(self) -> &'static Spelling`,
 //!   `Lang::cells(self) -> &'static Cells`, `Lang::action(self, c: Construct) -> Action`,
 //!   `Lang::behaviours(self) -> &'static Behaviours`
+//! - `Lang::runs_on(self) -> Option<Dialect>`, `Lang::dump(self) -> String`, `Lang::base(self) -> Option<Lang>`,
+//!   `Lang::row(self) -> &'static Row`
+//! - `pub struct PluginCode`, `pub fn plugin_code(detail: u16) -> PluginCode`
 //! - `impl From<Dialect> for Lang`
-//! - `pub(crate) struct Row`, `pub(crate) fn append(build: impl FnOnce(Lang) -> Row) -> Option<Lang>`
+//! - `pub(crate) struct Row`, `pub(crate) fn append(name: &str, build: impl FnOnce(Lang, u16) -> Row) -> Result<Lang, Option<Lang>>`
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -30,9 +33,12 @@ use std::sync::{Mutex, Once, OnceLock};
 
 use crate::syntax::Dialect;
 use crate::syntax::behaviour::Behaviours;
+use crate::syntax::def::Hook;
+use crate::syntax::diag::Kind;
 use crate::syntax::lexicon::Lexicon;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::spelling::Spelling;
+use crate::syntax::token::Tag;
 
 /// A language a deck is read or written in: an index into the registry.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -89,13 +95,40 @@ pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT] = [
     Construct::Measure,
 ];
 
+/// A code a definition declared (`DialectDef::code`): what a `W0201` or
+/// `W0202` diagnostic's `detail` names.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct PluginCode {
+    /// The language that declared it.
+    pub lang: Lang,
+    pub id: &'static str,
+    pub kind: Kind,
+    pub message: &'static str,
+}
+
 /// One language's tables, as registration froze them.
 pub(crate) struct Row {
     pub(crate) name: &'static str,
     pub(crate) lexicon: Option<&'static Lexicon>,
     pub(crate) spelling: &'static Spelling,
     pub(crate) cells: Cells,
+    /// Per construct: the plugin code a `W0201`/`W0202` cell raises (an
+    /// index of the global code table, [`plugin_code`]); 0 elsewhere.
+    pub(crate) details: [u16; CONSTRUCT_COUNT],
     pub(crate) behaviours: Behaviours,
+    /// Its codes, `(id, kind, message)`: global indices `first_code..`.
+    pub(crate) codes: &'static [(&'static str, Kind, &'static str)],
+    pub(crate) first_code: u16,
+    /// The post-pass's maps (`render::def_pass`): a keyword's written head,
+    /// a master's written word, an option's written name; and the hooks.
+    pub(crate) heads: &'static [(Tag, &'static str)],
+    pub(crate) write_masters: &'static [(&'static str, &'static str)],
+    pub(crate) options: &'static [(&'static str, &'static str)],
+    pub(crate) hooks: &'static [(&'static str, Hook)],
+    /// The simulator that reads its text (`DialectDef::runs_on`).
+    pub(crate) runs_on: Option<Dialect>,
+    /// The language it extends.
+    pub(crate) base: Option<Lang>,
 }
 
 /// The registry: each slot set once, `COUNT` the slots set.
@@ -180,6 +213,49 @@ impl Lang {
     pub fn behaviours(self) -> &'static Behaviours {
         &self.row().behaviours
     }
+
+    /// The simulator that reads its text: a built-in's own, a plugin's
+    /// declared one (`DialectDef::runs_on`); `None`: netlist only.
+    pub fn runs_on(self) -> Option<Dialect> {
+        let own = Dialect::ALL.into_iter().find(|&d| Lang::from(d) == self);
+        own.or(self.row().runs_on)
+    }
+
+    /// Its row as canonical text: every table, behaviour, cell, code and
+    /// hook head, languages by name; two definitions that register equal
+    /// rows dump the same bytes.
+    pub fn dump(self) -> String {
+        crate::syntax::def::dump(self.row())
+    }
+
+    /// The language it extends, `None` for a root.
+    pub fn base(self) -> Option<Lang> {
+        self.row().base
+    }
+}
+
+/// The plugin code a `W0201`/`W0202` diagnostic's `detail` names.
+///
+/// # Panics
+/// When no registered language declared a code at `detail`.
+pub fn plugin_code(detail: u16) -> PluginCode {
+    builtins();
+    let n = COUNT.load(Ordering::Acquire);
+    let row = (0..n)
+        .map(|i| Lang(i as u16))
+        .find(|l| {
+            let r = l.row();
+            (r.first_code..r.first_code + r.codes.len() as u16).contains(&detail)
+        })
+        .expect("plugin_code: a registered code");
+    let r = row.row();
+    let (id, kind, message) = r.codes[usize::from(detail - r.first_code)];
+    PluginCode {
+        lang: row,
+        id,
+        kind,
+        message,
+    }
 }
 
 impl From<Dialect> for Lang {
@@ -198,34 +274,64 @@ impl From<Dialect> for Lang {
     }
 }
 
-/// Publishes the row `build` makes for the next handle, under the
-/// registry's lock; `None` when every slot is taken.
+/// Publishes the row `build` makes for the next handle (and its first
+/// global code index), under the registry's lock: `Err(Some(held))` when
+/// a language named `name` is registered (checked under the lock, so two
+/// threads registering one name get one row), `Err(None)` when every
+/// slot, or the code table, is full.
 ///
 /// # Panics
 /// When `build` registers (the lock is held).
-pub(crate) fn append(build: impl FnOnce(Lang) -> Row) -> Option<Lang> {
+pub(crate) fn append(
+    name: &str,
+    build: impl FnOnce(Lang, u16) -> Row,
+) -> Result<Lang, Option<Lang>> {
+    builtins();
     let _held = APPEND.lock().unwrap_or_else(|p| p.into_inner());
     let i = COUNT.load(Ordering::Acquire);
+    let taken = (0..i).find(|&k| {
+        let r = ROWS[k].get().expect("set before the count");
+        r.name.eq_ignore_ascii_case(name)
+    });
+    if let Some(k) = taken {
+        return Err(Some(Lang(k as u16)));
+    }
     if i == LANGS_MAX {
-        return None;
+        return Err(None);
     }
     let me = Lang(i as u16);
-    let row: &'static Row = Box::leak(Box::new(build(me)));
+    let first = match i {
+        0 => 0,
+        _ => {
+            let last = ROWS[i - 1].get().expect("set before the count");
+            usize::from(last.first_code) + last.codes.len()
+        }
+    };
+    let built = build(me, u16::try_from(first).map_err(|_| None)?);
+    if first + built.codes.len() > usize::from(u16::MAX) {
+        return Err(None);
+    }
+    assert!(
+        built.first_code as usize == first,
+        "append: the code index given"
+    );
+    let row: &'static Row = Box::leak(Box::new(built));
     assert!(ROWS[i].set(row).is_ok(), "append: a slot set once");
     COUNT.store(i + 1, Ordering::Release);
-    Some(me)
+    Ok(me)
 }
 
-// ---- private ----
-
 impl Lang {
-    fn row(self) -> &'static Row {
+    /// Its row.
+    pub(crate) fn row(self) -> &'static Row {
         builtins();
         let i = usize::from(self.0);
         assert!(i < LANGS_MAX);
         ROWS[i].get().expect("a registered language")
     }
 }
+
+// ---- private ----
 
 /// Registers the built-ins once, before the first read; a read from their
 /// own definitions (while registering) sees the ones before it.

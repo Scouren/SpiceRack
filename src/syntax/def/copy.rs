@@ -65,6 +65,7 @@ impl Lex {
                 .iter()
                 .map(|r| (r.0.to_string(), r.1.lang))
                 .collect(),
+            regions_registered: l.regions_registered,
         };
         for &(s, t) in l.operators {
             first(&mut lex.operators, s.to_string(), t);

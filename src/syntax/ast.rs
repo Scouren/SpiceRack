@@ -517,7 +517,7 @@ impl<'s> Ast<'s> {
 
     /// Appends a diagnostic anchored at `token`.
     pub fn diag(&mut self, code: Code, token: u32) {
-        self.diags.push(Diag { code, token });
+        self.diags.push(Diag::new(code, token, 0));
     }
 }
 

@@ -165,10 +165,7 @@ pub(super) fn lift(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) -> Lifted 
         out.inlined.insert(n);
         let Some(span) = rd.func_span(f) else {
             // A call found outside the body's tokens: nothing to inline.
-            refused.push(Diag {
-                code: Code::W0107,
-                token: rd.main(n),
-            });
+            refused.push(Diag::new(Code::W0107, rd.main(n), 0));
             continue;
         };
         let (name, params, _) = rd.func_view(f);
@@ -214,10 +211,7 @@ pub(super) fn lift(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) -> Lifted 
                         (true, 3) | (false, 2) => false,
                         // HSPICE's multiplier, or a wrong count.
                         _ => {
-                            refused.push(Diag {
-                                code: Code::W0107,
-                                token: tok,
-                            });
+                            refused.push(Diag::new(Code::W0107, tok, 0));
                             continue;
                         }
                     };
@@ -277,10 +271,7 @@ pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) {
             ("limit", 3) => fixes.push((tok, Lift::Clamp)),
             ("agauss" | "gauss", 2) => fixes.push((tok, Lift::Sigma(f))),
             ("agauss" | "gauss", 3) | ("aunif" | "unif", 2) => {}
-            _ => refused.push(Diag {
-                code: Code::W0107,
-                token: tok,
-            }),
+            _ => refused.push(Diag::new(Code::W0107, tok, 0)),
         }
     }
     for (tok, l) in fixes {
