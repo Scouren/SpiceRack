@@ -290,3 +290,32 @@ fn a_library_is_framed_as_a_deck_where_that_reads_as_nothing() {
     );
     assert!(runs.trim_end().ends_with("\n.end"), "{runs}");
 }
+
+// ── Xyce options ──
+
+/// Xyce RG `.options <pkg>`: SPICE's ABSTOL is NONLIN ABSTOL (the residual
+/// tolerance, 1e-12 A by default in both), METHOD (trap, gear), MAXORD and
+/// DELMAX are TIMEINT's, SCALE is PARSER's; Xyce 7.10 takes each name
+/// without "No options parameter … found" (run by hand). ACCT shapes only
+/// the listing (ngspice §11.1.1): left out, W0024. VNTOL, a voltage update
+/// tolerance, has no Xyce option (the old writer spelled it NONLIN ABSTOL,
+/// a current one): refused, W0017.
+#[test]
+fn xyce_takes_the_options_its_reference_guide_names() {
+    let deck = "* t\nV1 a 0 1\nR1 a 0 1k\n.options acct abstol=1n method=gear maxord=2 delmax=1n scale=1u\n.tran 1n 10n\n.end\n";
+    let w = render_text(deck, Dialect::Ngspice, "t", Dialect::Xyce).expect("written");
+    for line in [
+        ".options nonlin abstol=1n\n",
+        ".options timeint method=gear maxord=2 delmax=1n\n",
+        ".options parser scale=1u\n",
+    ] {
+        assert!(w.text.contains(line), "{line}{}", w.text);
+    }
+    assert!(!w.text.contains("acct"), "{}", w.text);
+    assert!(w.notes.diags.iter().any(|d| d.code == Code::W0024));
+    let vntol = deck.replace("acct ", "vntol=1u ");
+    assert_eq!(
+        refusal(&vntol, Dialect::Ngspice, Dialect::Xyce),
+        [Code::W0017]
+    );
+}
