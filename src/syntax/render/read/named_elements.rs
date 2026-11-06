@@ -169,7 +169,13 @@ impl<'a> Rd<'a> {
                     return None;
                 }
                 let wave = self.named_waveform(&p)?;
-                let value = self.get(&p, "dc").map_or(Val::Num(0.0), |v| self.value(v));
+                // VACASK: `dc` is `type="dc"`'s value; a waveform's DC value
+                // is its value at t = 0 (`docs/dev-builtin-src.md`; a VACASK
+                // op of `dc=5 type="pulse" val0=1` is 1).
+                let value = match (&wave, self.d) {
+                    (Some(w), Dialect::Vacask) => w.at_zero(),
+                    _ => self.get(&p, "dc").map_or(Val::Num(0.0), |v| self.value(v)),
+                };
                 let letter = if master == "vsource" { 'v' } else { 'i' };
                 Card::Source {
                     letter: letter.to_ascii_uppercase(),

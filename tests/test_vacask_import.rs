@@ -216,3 +216,21 @@ fn a_vacask_option_spice_names_alike_is_the_targets_option() {
         assert!(!codes(&w).contains(&Code::W0024), "{opt}: {:?}", codes(&w));
     }
 }
+
+#[test]
+fn a_vacask_waveform_source_is_its_value_at_time_zero_in_dc() {
+    // dev-builtin-src.md: `dc` is the value of `type="dc"`; a waveform
+    // source's value is the waveform's in every analysis, the operating
+    // point its value at t = 0 (VACASK run: `dc=5 type="pulse" val0=1`
+    // gives v(1) = 1). ngspice takes a source with no DC value at its
+    // transient value at t = 0 (manual §4.1).
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare.replace(
+        "v1 (1 0) vsource dc=10",
+        "v1 (1 0) vsource dc=5 type=\"pulse\" val0=10 val1=2 delay=1m rise=1u",
+    );
+    let ng = written(&deck, Dialect::Ngspice).expect("written").text;
+    let (v, n) = (run(Dialect::Vacask, &deck), run(Dialect::Ngspice, &ng));
+    assert!((node(&v, "2") - 9.0).abs() < 1e-9, "VACASK v(2)");
+    assert!((node(&n, "2") - 9.0).abs() < 1e-9, "ngspice v(2)\n{ng}");
+}

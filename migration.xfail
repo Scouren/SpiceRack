@@ -27662,3 +27662,29 @@ vacask/benchmark/graetz/vacask/lte_debug2.sim ltspice its tran_method="gear2" wr
 vacask/benchmark/graetz/vacask/lte_debug2.sim ngspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
 vacask/benchmark/graetz/vacask/lte_debug2.sim xyce now refused W0017: its tran_method="gear2" is the portable method option, which the Xyce writer refuses (was dropped W0024)
 vacask/benchmark/mul/vacask/runme.sim vacask its reltol and vntol read as portable options, written after tran_method (were VACASK options, written in place)
+
+# Phase 7: spectre-read-r2: a VACASK waveform source's DC value
+# (render::read::named_elements). VACASK's `dc` is `type="dc"`'s value; a
+# waveform source's value in an operating point is the waveform's at t = 0
+# (docs/dev-builtin-src.md; a VACASK op of `dc=5 type="pulse" val0=1` is
+# 1). It was `dc` or 0: ngspice's op of test/test_capacitor.sim's source
+# was 0 V where VACASK's is 1 V. Every SPICE target (already listed above
+# where it changed) writes the time-zero value; VACASK writes it as `dc=`.
+vacask/benchmark/c6288/vacask-ieb/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask-ieb/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask-nocb/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask-nocb/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask-nortc/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask-nortc/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/debug_run.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/debug_run.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/hmax_test.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/hmax_test.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/test_ivdd.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/c6288/vacask/test_ivdd.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/vadistiller/c6288/vacaskcg/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+vacask/benchmark/vadistiller/c6288/vacaskcg/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
