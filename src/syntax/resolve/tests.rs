@@ -6,7 +6,7 @@
 //!
 //! Contents: none (tests only).
 
-use crate::syntax::Lang;
+use crate::syntax::{Dialect, Lang};
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -36,7 +36,7 @@ fn kit(files: &[(&str, &str)], entry: &str, form: Form, d: Dialect) -> Kit {
 
 /// File `f`'s tree, rebuilt from its text.
 fn tree(k: &Kit, f: u32) -> (Vec<u32>, Vec<(String, Node)>) {
-    let lex = Lang::from(k.dialect()).lexicon().expect("a reader");
+    let lex = k.lang().lexicon().expect("a reader");
     let text = &k.file(FileId(f)).text;
     let t = tokenize(text, lex);
     let a = parse(&t, lex);

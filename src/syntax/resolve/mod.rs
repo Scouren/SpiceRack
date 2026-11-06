@@ -34,8 +34,8 @@
 //! - `pub struct Def`, `pub enum DefKind`, `pub enum Polarity`, `pub enum Scope`
 //! - `pub enum Binding`, `pub struct Split`, `pub struct Target`
 //! - `pub const DEPTH_MAX: u8`, `pub const FILES_MAX: usize`
-//! - `Kit::load(entries: &[PathBuf], form: Form, dialect: Dialect, load: &mut dyn FnMut(&Path) -> Result<String, LoadError>) -> Kit`
-//! - `Kit::dialect(&self) -> Dialect`, `Kit::files(&self) -> &[File]`, `Kit::file(&self, id: FileId) -> &File`,
+//! - `Kit::load(entries: &[PathBuf], form: Form, lang: impl Into<Lang>, load: &mut dyn FnMut(&Path) -> Result<String, LoadError>) -> Kit`
+//! - `Kit::lang(&self) -> Lang`, `Kit::files(&self) -> &[File]`, `Kit::file(&self, id: FileId) -> &File`,
 //!   `Kit::definitions(&self) -> &[Def]`, `Kit::definition(&self, id: DefId) -> &Def`,
 //!   `Kit::binding(&self, file: FileId, n: Node) -> Option<Binding>`,
 //!   `Kit::scope(&self, file: FileId, n: Node) -> Option<Scope>`,
@@ -51,7 +51,6 @@ use crate::syntax::Lang;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Component, Path, PathBuf};
 
-use crate::syntax::Dialect;
 use crate::syntax::ast::{Ast, Node};
 use crate::syntax::device::Primitive;
 use crate::syntax::diag::{Code, Diag};
@@ -80,7 +79,7 @@ pub const FILES_MAX: usize = 1 << 12;
 /// every [`DefId`], [`FileId`] and node id an answer holds is in range; each
 /// fact table is sorted by node.
 pub struct Kit {
-    dialect: Dialect,
+    lang: Lang,
     files: Vec<File>,
     defs: Vec<Def>,
     facts: Vec<Facts>,
@@ -104,7 +103,7 @@ pub struct File {
     /// The text the kit parsed: the loaded text, behind one empty title
     /// line for a file read in [`Form::Library`] (so token and line numbers
     /// count that line); a Verilog-A source's text as loaded; empty for an
-    /// unread file. `tokenize(&text, Lang::from(kit.dialect()).lexicon())` and
+    /// unread file. `tokenize(&text, kit.lang().lexicon())` and
     /// `parse` rebuild the tree every answer's node ids name.
     pub text: String,
     /// The parse's `P` rows and resolve's `R` rows, sorted by token. An `R`
@@ -304,7 +303,7 @@ pub fn role(t: &Tokens, ast: &Ast) -> Role {
 }
 
 impl Kit {
-    /// Reads `entries` (in `form`) and every file they reach, in `dialect`,
+    /// Reads `entries` (in `form`) and every file they reach, in `lang`,
     /// and resolves them. `load` returns a path's text (decoded); a path it
     /// refuses or lacks is a [`Role::Unread`] row with an `R0006` or
     /// `R0007`. Files are read breadth first, each once (by path), relative
@@ -314,18 +313,17 @@ impl Kit {
     /// alive at a time.
     ///
     /// # Panics
-    /// When `dialect` has no reader (CDL, Verilog).
+    /// When `lang` has no reader (CDL, Verilog).
     pub fn load(
         entries: &[PathBuf],
         form: Form,
-        dialect: Dialect,
+        lang: impl Into<Lang>,
         load: &mut dyn FnMut(&Path) -> Result<String, LoadError>,
     ) -> Kit {
-        let lex = Lang::from(dialect)
-            .lexicon()
-            .expect("Kit::load: a dialect with a reader");
+        let lang = lang.into();
+        let lex = lang.lexicon().expect("Kit::load: a language with a reader");
         let mut kit = Kit {
-            dialect,
+            lang,
             files: Vec::new(),
             defs: Vec::new(),
             facts: Vec::new(),
@@ -458,9 +456,9 @@ impl Kit {
         kit
     }
 
-    /// The dialect every file was read in.
-    pub fn dialect(&self) -> Dialect {
-        self.dialect
+    /// The language every file was read in.
+    pub fn lang(&self) -> Lang {
+        self.lang
     }
 
     /// Every file the walk reached, in read order (unread ones included).
