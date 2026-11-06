@@ -31,7 +31,7 @@
 //! - the behaviour calls: `writer`, `text_family`, `caret_power`, `hier_sep`, `number_reading`,
 //!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
-//!   `named_params`, `expr_eval`, `parasitics`, `spectre_analysis`
+//!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `spectre_analysis`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
 //!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
@@ -622,6 +622,13 @@ impl DialectDef {
     set!(param_form, b.param_form: ParamForm);
     set!(include_scope, b.include_scope: IncludeScope);
     set!(named_params, b.named_params: NamedParams);
+
+    /// A named instance whose master is one of `lang`'s analysis words is
+    /// read as that analysis.
+    pub fn analysis_masters(mut self, lang: Lang) -> Self {
+        self.b.analysis_masters = Some(lang);
+        self
+    }
     set!(expr_eval, b.expr_eval: ExprEval);
     set!(parasitics, b.parasitics: Parasitics);
 

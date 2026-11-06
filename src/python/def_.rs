@@ -226,6 +226,7 @@ calls! {
     param_form(v: PyParamForm);
     include_scope(v: PyIncludeScope);
     named_params(v: PyNamedParams);
+    analysis_masters(lang: PyLang);
     expr_eval(v: PyExprEval);
     parasitics(v: PyParasitics);
     text_family(lang: PyLang);

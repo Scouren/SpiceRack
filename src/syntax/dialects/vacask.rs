@@ -13,6 +13,7 @@
 //! Contents:
 //! - `pub(super) fn vacask() -> DialectDef`
 
+use crate::syntax::Lang;
 use crate::syntax::behaviour::{NamedParams, NamedRules, OptionsForm, Writer};
 use crate::syntax::def::DialectDef;
 use crate::syntax::diag::Code;
@@ -171,6 +172,7 @@ pub(super) fn vacask() -> DialectDef {
         .named_rules(NamedRules::Vacask)
         .options_form(OptionsForm::Vacask)
         .named_params(NamedParams::Vacask)
+        .analysis_masters(Lang::SPECTRE)
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("xf")

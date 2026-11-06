@@ -361,16 +361,19 @@ impl<'a> Rd<'a> {
 
 impl<'a> Rd<'a> {
     /// quirk: the old lowering read the old Spectre grammar's `Word_kind`
-    /// for VACASK too: a VACASK instance whose master is a Spectre analysis
-    /// word is an analysis (Spectre's are `Analysis` nodes already).
+    /// for VACASK too: an instance whose master is an analysis word of the
+    /// language's `analysis_masters` (Spectre's, for Spectre and VACASK) is
+    /// an analysis (Spectre's are `Analysis` nodes already).
     fn analysis_kind(&self, n: u32) -> bool {
         self.tag(n) == Tag::Instance
-            && self.master(n).is_some_and(|m| {
-                matches!(
-                    Lang::SPECTRE.lexicon().expect("a reader").master(&m),
-                    Some(Statement::Analysis(_))
-                )
-            })
+            && self
+                .b
+                .analysis_masters
+                .and_then(Lang::lexicon)
+                .is_some_and(|lex| {
+                    self.master(n)
+                        .is_some_and(|m| matches!(lex.master(&m), Some(Statement::Analysis(_))))
+                })
     }
 
     /// A header statement's master word's text.

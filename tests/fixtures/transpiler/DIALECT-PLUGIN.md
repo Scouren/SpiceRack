@@ -989,3 +989,12 @@ Taken from the user's defaults and this doc's recommendations (team lead,
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).
+- **The last two by-name references** (after 2bc41e2): a `.control`
+  block's `fourier` numbers are spelled with the target's own spelling
+  (only ngspice declares `control_block(Ngspice)`, so no byte changes);
+  VACASK's quirk of reading Spectre's analysis words is a declared row,
+  `analysis_masters(Lang)` (`Behaviours::analysis_masters`; Spectre and
+  VACASK declare `Lang::SPECTRE`, bound in Python, in the pinned dumps and
+  the Python re-declarations). No code in `syntax/` names a built-in
+  outside its definition and the tests; the no-back-door oracle covers
+  both.

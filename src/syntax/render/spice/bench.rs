@@ -18,7 +18,6 @@
 //! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
 
 use super::W;
-use crate::syntax::Lang;
 use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
@@ -98,7 +97,7 @@ impl W<'_, '_> {
         let mut fourier = fourier_commands(raw());
         for (a, _) in &tb.analyses {
             if let Ana::Four(f, outs) = a {
-                let mut cmd = format!("fourier {}", Lang::NGSPICE.spelling().number(*f, self.x));
+                let mut cmd = format!("fourier {}", self.sp.number(*f, self.x));
                 outs.iter().for_each(|o| cmd.push_str(&format!(" {o}")));
                 fourier.push(cmd);
             }

@@ -64,6 +64,10 @@ pub struct Behaviours {
     pub include_scope: IncludeScope,
     /// Write: the named writer's parameter rows.
     pub named_params: NamedParams,
+    /// Read: the language whose master words make a named instance an
+    /// analysis (the old lowering read Spectre's `Word_kind` for VACASK
+    /// too); `None`: only its own analysis statements are.
+    pub analysis_masters: Option<Lang>,
     /// Read and write: whose evaluator reads a `{}` expression (a
     /// then-branch ternary's grouping, `if()`, `sdt()`).
     pub expr_eval: ExprEval,
@@ -268,6 +272,7 @@ impl Behaviours {
         param_form: ParamForm::Plain,
         include_scope: IncludeScope::Local,
         named_params: NamedParams::None,
+        analysis_masters: None,
         expr_eval: ExprEval::C,
         parasitics: Parasitics::Elements,
         spectre_analyses: &[],

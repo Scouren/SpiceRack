@@ -222,6 +222,7 @@ pub(super) fn spectre() -> DialectDef {
         .named_rules(NamedRules::Spectre)
         .options_form(OptionsForm::Spectre)
         .named_params(NamedParams::Spectre)
+        .analysis_masters(Lang::SPECTRE)
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)

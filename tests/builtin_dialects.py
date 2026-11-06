@@ -811,6 +811,7 @@ def spectre(d):
         .named_rules(NamedRules.Spectre)
         .options_form(OptionsForm.Spectre)
         .named_params(NamedParams.Spectre)
+        .analysis_masters(Lang.SPECTRE)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
@@ -986,6 +987,7 @@ def vacask(d):
         .named_rules(NamedRules.Vacask)
         .options_form(OptionsForm.Vacask)
         .named_params(NamedParams.Vacask)
+        .analysis_masters(Lang.SPECTRE)
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("xf")
