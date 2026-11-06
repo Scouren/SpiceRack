@@ -7322,3 +7322,13 @@ vacask/demo/rpn/sipfx.sim ngspice its VACASK abort/print lines are left out (W00
 vacask/demo/rpn/sipfx.sim xyce its VACASK abort/print lines are left out (W0025), no longer copied as cards
 vacask/demo/hierarchy/hier.sim cdl its VACASK elaborate/print lines are left out, no longer copied
 vacask/demo/hierarchy/hier.sim ngspice refused W0001: `elaborate circuit("sub1")` changes the top (was copied as a card)
+
+# Phase 7: spice-write: ternaries (FINDINGS-spice-read). On a target of
+# another family a `?:` in a then-branch is parenthesized when the source
+# reads C's grammar (ngspice-45 reads `x>0?y>0?4:8:8` as 4 at x=1, y=-1;
+# Xyce, C, gives 8), and on Xyce each ternary `:` has a blank before it:
+# Xyce 7.10 reads `p:n` as one hierarchical name ("syntax error in
+# expression"), `p :n` as `n`. Run by hand on ngspice-45 and Xyce 7.10.
+spice-bench/ngspice/tests/regression/func/func-1.sp xyce moo/moo2 `?P :N` (Xyce refused `?P:N`)
+pdk-gf180mcuD/libs.tech/ngspice/sm141064.ngspice xyce `?1e-15 :d_sab` (Xyce refused `1e-15:d_sab`)
+pdk-gf180mcuD/libs.tech/ngspice/sm141064.spice xyce `?1e-15 :d_sab` (Xyce refused `1e-15:d_sab`)

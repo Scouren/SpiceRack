@@ -10,7 +10,8 @@
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
 //! options), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
-//! transfer function a Laplace lift reads,
+//! transfer function a Laplace lift reads, `ternary` a `?:` as the
+//! target reads it,
 //! `cdl` CDL's layout; the `statistics` lift (`render::draws`) and the name
 //! map (`render::names`) are shared with the named writer.
 //!
@@ -27,6 +28,7 @@ mod cards;
 mod cdl;
 mod checks;
 mod laplace;
+mod ternary;
 mod verilog;
 mod xyce_options;
 
@@ -274,7 +276,7 @@ impl W<'_, '_> {
     fn funcs(&mut self, funcs: &[Func]) {
         for &f in funcs {
             let (name, args, body) = self.rd.func_view(f);
-            let args = args.join(", ");
+            let (args, body) = (args.join(", "), self.ternaries(&body));
             let tok = match f {
                 Func::Param(a) | Func::Card(a) | Func::Real(a) => self.rd.main(a),
             };

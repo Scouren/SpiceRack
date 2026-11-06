@@ -371,3 +371,25 @@ fn ltspice_notes_the_noise_summary_it_leaves_out() {
     );
     assert!(write(deck, Dialect::Ngspice, Dialect::Ngspice).contains("100meg 5\n"));
 }
+
+// ── nested ternaries ──
+
+/// Xyce RG §2.1.18 reads `?:` by C's grammar: `x>0?y>0?4:8:8` at x=1,
+/// y=-1 is 8 (Xyce 7.10, run by hand, on `xyce/XDM/HSPICE/OTHER_PARSING/
+/// ternary_operator.cir`'s VAL4). ngspice-45 reads the unparenthesized
+/// text as 4, so the written deck parenthesizes the inner ternary and real
+/// ngspice gives 8. Xyce 7.10 reads `p:n` as one name ("syntax error in
+/// expression" on ngspice's `func-1.sp`, run by hand), so its `:` gets a
+/// blank before it (`p :n` runs, giving 5 here as ngspice does).
+#[test]
+fn a_nested_ternary_keeps_its_meaning_across_dialects() {
+    let deck =
+        "* t\n.func val4(x,y) {x>0?y>0?4 :8 :8}\nV1 a 0 {val4(1,-1)}\nR1 a 0 1k\n.op\n.end\n";
+    let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
+    let v = ngspice_op(&w, "a");
+    assert!((v - 8.0).abs() < 1e-12, "{v}\n{w}");
+    let ng = "* t\n.func lim(x,p,n) {x<p?p:x>n?n:x}\nV1 a 0 {lim(7,0,5)}\nR1 a 0 1k\n.op\n.end\n";
+    let w = write(ng, Dialect::Ngspice, Dialect::Xyce);
+    assert!(w.contains("{x<p?p :x>n?n :x}"), "{w}");
+    assert!((ngspice_op(ng, "a") - 5.0).abs() < 1e-12);
+}

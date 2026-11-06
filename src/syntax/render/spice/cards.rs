@@ -11,7 +11,7 @@
 //! `vol=`/`cur=`; LTspice help (`Q=`).
 //!
 //! Contents:
-//! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`
+//! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`, `W::ternaries(&self, e: &str) -> String`
 //! - `pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String>`
 
 use super::W;
@@ -210,13 +210,28 @@ impl W<'_, '_> {
     /// for HSPICE, which reads braces as name bytes and an unquoted value
     /// as one word starting with a letter, or a number: any other
     /// expression is quoted (`{a*2}` is `'a*2'`, `{a} + b` is `'(a) + b'`);
-    /// a run of numbers (a matrix) is not.
+    /// a run of numbers (a matrix) is not. A ternary is
+    /// spelled for the target ([`W::ternaries`]).
     pub(super) fn spelled(&self, v: &str) -> String {
+        let v = self.ternaries(v);
         if self.d == Dialect::Hspice {
-            hspice_value(v)
+            hspice_value(&v)
         } else {
-            v.to_string()
+            v
         }
+    }
+
+    /// `e`'s ternaries as another family reads them (`ternary`): a
+    /// then-branch's parenthesized when the source reads C's grammar, not
+    /// ngspice's (which reads one its own way), a blank before each `:`
+    /// on Xyce.
+    pub(super) fn ternaries(&self, e: &str) -> String {
+        let from = self.rd.d.family();
+        if from == self.d.family() {
+            return e.to_string();
+        }
+        let xyce = self.d == Dialect::Xyce;
+        super::ternary::parenthesize(e, from != Dialect::Ngspice, xyce)
     }
 }
 
@@ -273,7 +288,7 @@ impl W<'_, '_> {
     fn value(&self, v: &Val) -> String {
         match v {
             Val::Num(x) => self.sp.number(*x, self.x),
-            Val::Expr(e) => format!("{}{e}{}", self.sp.expr.0, self.sp.expr.1),
+            Val::Expr(e) => format!("{}{}{}", self.sp.expr.0, self.ternaries(e), self.sp.expr.1),
             Val::Raw(t) => t.clone(),
         }
     }
