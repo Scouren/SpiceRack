@@ -143,6 +143,9 @@ pub(super) enum Card {
     Sens(String, Option<[u32; 4]>),
     /// `.pz` six words.
     Pz([u32; 6]),
+    /// HSPICE's `.pz out src`: the source's and the output's nodes, `vol`
+    /// or `cur` (`Rd::hspice_pz`).
+    PzNodes([String; 4], &'static str),
     /// `.four f outs`.
     Four(u32, Vec<String>),
     Options,
@@ -389,6 +392,7 @@ impl<'a> Rd<'a> {
                         .then(|| Card::Tf(out, src.to_string()))
                 }
                 "sens" => self.sens(n),
+                "pz" if hspice => self.hspice_pz(n),
                 "pz" => match items {
                     [a, b, c, d, e, f]
                         if self.spaced(n, items) && items.iter().all(|&k| self.wordw(k)) =>
@@ -568,6 +572,7 @@ impl<'a> Rd<'a> {
                 keyword(&self.text(w[4]), &["vol", "cur"])?,
                 keyword(&self.text(w[5]), &["pol", "zer", "pz"])?,
             ),
+            Card::PzNodes(nodes, tf) => Ana::Pz(nodes.clone(), tf, "pz"),
             Card::Four(f, outs) => Ana::Four(num(*f)?, outs.clone()),
             _ => return None,
         })

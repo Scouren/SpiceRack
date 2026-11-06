@@ -293,13 +293,16 @@ impl Rd<'_> {
         let w = self.t.text(tok).to_ascii_lowercase();
         if self.text_behaviours(tok).card_rules == CardRules::Hspice {
             return match w.as_str() {
-                // HSPICE's StatEye (HSPICE UG, signal integrity): no other
-                // simulator has one.
-                ".stateye" => Construct::PrivateText,
-                // HSPICE RF shooting-Newton (`.SN`, `.SNNOISE`, `.SNXF`),
-                // transient noise, loop stability (HSPICE UG): no SPICE
-                // target has these analyses.
-                ".sn" | ".snnoise" | ".snxf" | ".trannoise" | ".lstb" => Construct::HspiceAnalysis,
+                // HSPICE's StatEye, digital vector files, timing checks and
+                // power report (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`,
+                // `.POWER`): no other simulator has them.
+                ".stateye" | ".vec" | ".check" | ".power" => Construct::PrivateText,
+                // HSPICE RF shooting-Newton (`.SN`, `.SNAC`, `.SNNOISE`,
+                // `.SNXF`), periodic time-dependent noise (`.PTDNOISE`),
+                // sampling noise (`.SAMPLE`), transient noise, loop
+                // stability (HSPICE UG): no SPICE target has these analyses.
+                ".sn" | ".snac" | ".snnoise" | ".snxf" | ".ptdnoise" | ".sample" | ".trannoise"
+                | ".lstb" => Construct::HspiceAnalysis,
                 _ => Construct::ForeignText,
             };
         }

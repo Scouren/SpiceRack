@@ -32381,3 +32381,19 @@ xyce/WAMPDE/sandler24.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
 xyce/WAMPDE/sandler24.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
 xyce/WAMPDE/sandler24_WAMPDE.cir spectre now written: Xyce B POLY read as E/F/G/H POLY
 xyce/WAMPDE/sandler24_WAMPDE.cir xyce written differently: Xyce B POLY read as E/F/G/H POLY
+
+# Phase 7: spice-read: HSPICE `.pz v(out) src` (render::read sweeps.rs
+# hspice_pz) read as ngspice's `.pz in+ in- out+ out- vol|cur pz` over the
+# source's nodes; HSPICE writes `.pz v(out) src` back where a source of
+# the transfer's kind stands across the input pair (spice/analyses.rs
+# across; capability PoleZero HSPICE cell), so an ngspice `.pz … pz` deck
+# with such a source is now written for HSPICE. HSPICE `.snac`, `.sample`,
+# `.ptdnoise` refuse W0015, `.vec`, `.check`, `.power` W0039 (status only).
+hspice/hspice/pz_source.sp espice now written: HSPICE .pz read / written
+hspice/hspice/pz_source.sp hspice written differently: HSPICE .pz read / written
+hspice/hspice/pz_source.sp ngspice now written: HSPICE .pz read / written
+hspice/hspice/pz_source.sp spectre now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/polezero/filt_bridge_t.sp hspice now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/polezero/filt_multistage.sp hspice now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/polezero/filt_rc.sp hspice now written: HSPICE .pz read / written
+spice-bench/ngspice/tests/regression/pz/ac-resistance.sp hspice now written: HSPICE .pz read / written

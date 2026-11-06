@@ -89,7 +89,7 @@ cell.DcLogList Spell(DcType)
 cell.Tf Native
 cell.Sens Native
 cell.SensAc Refuse(W0015)
-cell.PoleZero Refuse(W0015)
+cell.PoleZero Spell(HspicePz)
 cell.SParameter Refuse(W0015)
 cell.Print Native
 cell.Save Spell(Probe)

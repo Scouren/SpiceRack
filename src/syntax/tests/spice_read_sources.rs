@@ -295,3 +295,25 @@ fn a_xyce_b_poly_is_the_e_f_g_h_poly_it_spells() {
         assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
     }
 }
+
+#[test]
+fn an_hspice_pz_over_a_source_is_ngspices_over_its_nodes() {
+    // HSPICE UG `.PZ v(out) src`; ngspice manual `.pz in+ in- out+ out-
+    // vol pz`. The ESPice corpus's pz_source.expected.json (its twin
+    // `.pz in 0 out 0 vol pz`, ngspice-44.2) poles -1.893e6, -4.402e5 and
+    // zeros -7.5e5 ± 2.107e6j, which ngspice-45 gave on the written deck.
+    // HSPICE `.SNAC`/`.SAMPLE` (W0015) and `.VEC` (W0039). Checks: 1 + 2.
+    let text = "t\nvin in 0 dc 0 ac 1\nr1 in out 1k\nc1 out 0 1n\n.pz v(out) vin\n.end\n";
+    let ng = render_text(text, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == ".pz in 0 out 0 vol pz"), "{ng}");
+    for (line, code) in [
+        (".sample fs=1meg maxfld=10", Code::W0015),
+        (".vec 'stim.vec'", Code::W0039),
+    ] {
+        let t = format!("t\nr1 a 0 1k\nv1 a 0 1\n{line}\n.op\n.end\n");
+        let e = render_text(&t, Dialect::Hspice, "t", Dialect::Ngspice).expect_err("refused");
+        assert!(e.diags.iter().any(|g| g.code == code), "{}", e.messages);
+    }
+}

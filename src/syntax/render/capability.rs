@@ -166,6 +166,8 @@ pub enum Alt {
     HspiceAm,
     /// ngspice's `AM(…)` with no VO offset (ESPice).
     AmNoOffset,
+    /// `.pz v(out) src` (HSPICE).
+    HspicePz,
     /// `.LIN` beside an `.AC` of the sweep (Xyce).
     XyceLin,
     /// Not written, the code the note the writer records for it.

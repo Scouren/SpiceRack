@@ -212,7 +212,8 @@ EXPECTED = {
     'tf': (OK, OK, OK, 'W0015', OK, OK, OK, OK, OK),
     'dc_sensitivity': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     'ac_sensitivity': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    'polezero': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # HSPICE `.PZ v(out) src` where a source stands across the input (D's 8b52303).
+    'polezero': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),

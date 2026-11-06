@@ -324,7 +324,8 @@ def hspice(d):
         .native(Construct.Tf)
         .native(Construct.Sens)
         .refuse(Construct.SensAc, Code.W0015)
-        .refuse(Construct.PoleZero, Code.W0015)
+        # HSPICE UG `.PZ out src`: where a source stands across the input.
+        .spell(Construct.PoleZero, Alt.HspicePz)
         .refuse(Construct.SParameter, Code.W0015)
         .native(Construct.Print)
         .spell(Construct.Save, Alt.Probe)

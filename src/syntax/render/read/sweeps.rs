@@ -16,7 +16,7 @@
 //! - `Rd::step_list(&self, items: &[u32]) -> Option<(String, Vec<f64>)>`
 //! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`, `Rd::xyce_lin(&self, n: u32) -> Option<Card>`,
 //!   `Rd::top_ac(&self) -> Option<[u32; 4]>`,
-//!   `Rd::noise(&self, n: u32, items: &[u32]) -> Option<Card>`
+//!   `Rd::noise(&self, n: u32, items: &[u32]) -> Option<Card>`, `Rd::hspice_pz(&self, n: u32) -> Option<Card>`
 
 use super::Rd;
 use super::testbench::{Card, Sweep};
@@ -242,6 +242,47 @@ impl Rd<'_> {
             [*var, *a, *b, *c],
             rest.first().copied(),
         ))
+    }
+
+    /// HSPICE's `.PZ v(out[,ref]) src` (HSPICE UG `.PZ`: the poles and
+    /// zeros from source `src` to the output) as ngspice's `.pz in+ in-
+    /// out+ out- vol|cur pz` over `src`'s nodes (`vol` for a V source,
+    /// `cur` for an I; the ESPice corpus's pz_source.expected.json takes
+    /// `.pz in 0 out 0 vol pz` as its twin); `None` for another form.
+    pub(super) fn hspice_pz(&self, n: u32) -> Option<Card> {
+        let rest = self.rest_text(n);
+        let (out, after) = self.one_out(&rest)?;
+        let src = after.trim();
+        let inner = out
+            .strip_prefix(['v', 'V'])?
+            .strip_prefix('(')?
+            .strip_suffix(')')?;
+        let (op, om) = match inner.split_once(',') {
+            Some((a, b)) => (a.trim().to_string(), b.trim().to_string()),
+            None => (inner.trim().to_string(), "0".to_string()),
+        };
+        if src.is_empty() || src.contains(char::is_whitespace) {
+            return None;
+        }
+        let card = self
+            .ast
+            .fields(self.ast.root())
+            .iter()
+            .copied()
+            .find(|&s| {
+                self.tag(s) == Tag::Instance
+                    && self
+                        .text(self.ast.header(Node(s)).name)
+                        .eq_ignore_ascii_case(src)
+            })?;
+        let tf = match src.chars().next()?.to_ascii_lowercase() {
+            'v' => "vol",
+            'i' => "cur",
+            _ => return None,
+        };
+        let items = self.items(card);
+        let (ip, im) = (self.text(*items.first()?), self.text(*items.get(1)?));
+        Some(Card::PzNodes([ip, im, op, om], tf))
     }
 
     /// HSPICE's `.DC src DEC|OCT np start stop`, `src POI n v…` and `src
