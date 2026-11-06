@@ -27315,7 +27315,7 @@ vacask/demo/spice/bsim3v3nqs.sim vacask a waveform source's DC value for the DC 
 vacask/demo/spice/bsim4v8nqs.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 vacask/test/test_capacitor.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 vacask/test/test_hb1.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
-vacask/test/test_hb2.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order
+vacask/test/test_hb2.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
 vacask/test/test_hb3.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_inductor.sim vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc); and (spectre-read r2) the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 xyce/ACSENS/bsim3/gain-stage_fd.cir vacask a waveform source's DC value for the DC analyses: alter instance(…) type="dc" before them, its waveform type back before a tran (VACASK evaluates the waveform in op and dc)
@@ -32132,9 +32132,9 @@ vacask/test/test_acxf.sim vacask a model of a loaded module and its instances wr
 vacask/test/test_dcinc.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_dcxf.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_diode.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
-vacask/test/test_hb4.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order
-vacask/test/test_hb5.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order
-vacask/test/test_hb6.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order
+vacask/test/test_hb4.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
+vacask/test/test_hb5.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
+vacask/test/test_hb6.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (spice-read): written differently: AM read in ngspice-45 / VACASK order; and (spice-read): written differently: AM read in ngspice-45 / VACASK order
 vacask/test/test_noise.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_opnl.sim spectre now written: a model of the loaded Verilog-A module (simdio.va, ahdl_include) and its instance; was refused W0001
 vacask/test/test_opsweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
@@ -32150,3 +32150,18 @@ vacask/test/test_sweepvar.sim vacask a model of a loaded module and its instance
 # was taken before) and modphase; Xyce, LTspice refuse W0108.
 spice-bench/ngspice/examples/various/v-i-sources-am-ffm.sp espice now refused: AM read in ngspice-45 / VACASK order
 spice-bench/ngspice/examples/various/v-i-sources-am-ffm.sp ngspice written differently: AM read in ngspice-45 / VACASK order
+
+# Phase 7: spice-read: tests/ltspice/*.cir read as LTspice (src/bin/golden/
+# inputs.rs): stream F's pending-run LTspice decks, read as Xyce by their
+# `.cir` extension before. Their outputs are new in fx14 (listed above).
+fixtures/tests/ltspice/p_behavioural.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_branch_param.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_charge_capacitor.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_conditional.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_dc_sweep.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_elements.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_func.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_measure_save.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_models.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_pwl_repeat.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
+fixtures/tests/ltspice/p_tf.cir manifest read as LTspice (tests/ltspice/), not Xyce by extension
