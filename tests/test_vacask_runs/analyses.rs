@@ -179,3 +179,17 @@ fn a_one_point_sweep_is_points_zero() {
     assert_eq!(out.len(), 1, "{out:?}");
     close(out[0].re, 0.5, 1e-9);
 }
+
+#[test]
+fn spectre_lin_is_steps_on_vacask_too() {
+    // Spectre's `lin=10` is 10 steps, 11 points (`[REF]` 19.1 p.43);
+    // VACASK's `points=` counts intervals too (`lib/answeep.cpp`
+    // `setupLinearSweep`: `end = points+1`). Oracle: ngspice's `.ac lin 11
+    // 1 2` is 11 points (manual §11.3.1), so VACASK's run must be too.
+    let scs = "simulator lang=spectre\nv1 (in 0) vsource dc=0 mag=1\nr1 (in 0) resistor r=1k\n\
+               ac1 ac start=1 stop=2 lin=10\n";
+    let deck = emit_from(scs, Dialect::Spectre, &lexicon::SPECTRE).expect("emit vacask deck");
+    let f = col(&run_text(&deck), "frequency");
+    assert_eq!(f.len(), 11, "{f:?}\n{deck}");
+    close(f[10], 2.0, 1e-12);
+}

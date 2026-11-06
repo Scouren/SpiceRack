@@ -37,7 +37,7 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | `transient_noise(step_time, end_time)` | ngspice's transient noise: a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources (no device noise) |
 | `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` is a deprecated alias), `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | Spectre only |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre's `log=N`, N points in total; every other target refuses it, `W0040`), in any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (N log-spaced points in total, Spectre's `log=N-1`, its steps; every other target refuses it, `W0040`), in any
 case; any other name raises `ValueError` when the analysis is built. The same
 holds for the other keywords: `polezero`/`add_polezero` `tf_type` (`vol`, `cur`)
 and `pz_type` (`pol`, `zer`, `pz`), `step_sweep` (`lin`, `dec`, `oct`, `log`),

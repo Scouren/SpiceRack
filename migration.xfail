@@ -4279,3 +4279,21 @@ spice-bench/ngspice/paranoia/various/Tschebyschef-LP.sp spectre now written: V1,
 spice-bench/ngspice/tests/polezero/filt_rc.sp spectre now written: .pz 1 0 2 0 vol pz is pz1 (2 0) pz iprobe=v1 (v1 across 1 0); was refused
 spice-bench/ngspice/tests/polezero/filt_bridge_t.sp spectre now written: .PZ 1 0 3 0 VOL PZ is pz1 (3 0) pz iprobe=v1 (V1 across 1 0); was refused
 spice-bench/ngspice/tests/polezero/filt_multistage.sp spectre now written: .pz 1 0 6 0 vol pz is pz1 (6 0) pz iprobe=v1 (v1 across 1 0); was refused
+
+# Phase 7: spectre-lin: Spectre's lin=N/log=N is N steps, N+1 points
+# (Spectre Reference 19.1 p.43 ac #7 #9, "Number of steps"), so a SPICE
+# `.ac/.noise/.sp lin N` is lin=N-1 and one point is values=[start]
+# (render::named::bench::points; the reader adds the point back,
+# render::read::named_bench). Oracle: ngspice's and VACASK's vector length
+# (test_ngspice_analyses spectre_lin_counts_steps_so_one_more_point,
+# test_vacask_runs spectre_lin_is_steps_on_vacask_too). Also changed, under
+# earlier sections' lines: both Tschebyschef-LP (sp lin=99), diffpair_spiceManLIN
+# (lin=99), diffpair_spiceManOld and lowpass_fd (values=[…]), the three
+# ErrorTestAC/UnsupportedRemeasureTypes (lin=26/26/12).
+spice-bench/ngspice/examples/inductive-systems/positive-definite-4.sp spectre .ac lin 5000 is lin=4999 steps; was lin=5000
+spice-bench/ngspice/tests/regression/misc/ac-zero.sp spectre .ac lin 1 0 0 is values=[0]; was lin=1 (2 points)
+spice-bench/ngspice/tests/regression/misc/empty-1.sp spectre .ac lin 3 is lin=2 steps; was lin=3
+spice-bench/ngspice/tests/regression/sens/sens-ac-1.sp spectre .ac lin 1 is values=[1M]; was lin=1 (2 points)
+spice-bench/ngspice/tests/regression/sens/sens-ac-2.sp spectre .ac lin 1 is values=[1M]; was lin=1 (2 points)
+xyce/MEASURE_NOISE/InputNoiseOps.cir spectre .noise lin 10 is lin=9 steps; was lin=10
+xyce/MEASURE_NOISE/OutputNoiseOps.cir spectre .noise lin 10 is lin=9 steps; was lin=10

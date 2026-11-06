@@ -685,13 +685,14 @@ class TestDialectText:
             tb.netlist("vacask")
 
     def test_a_log_frequency_sweep_is_spectres_and_w0040_elsewhere(self):
-        # Spectre Reference 19.1 (`ac … log=N`: N points in total); ngspice
+        # Spectre Reference 19.1 p.43 (`ac … log=N`: N steps, so 10 points
+        # are `log=9`); ngspice
         # manual §11.3.1, HSPICE, Xyce, LTspice `.ac` and VACASK `mode=`
         # take dec, oct or lin only.
         ps = import_spicerack()
         tb = self._tb(ps)
         tb.add_ac("log", 10, 1.0, 1e6)
-        assert "ac1 ac start=1 stop=1M log=10" in tb.netlist("spectre").splitlines()
+        assert "ac1 ac start=1 stop=1M log=9" in tb.netlist("spectre").splitlines()
         for other in ("ngspice", "espice", "hspice", "xyce", "ltspice", "vacask"):
             with pytest.raises(RuntimeError, match="W0040.*'log'"):
                 tb.netlist(other)

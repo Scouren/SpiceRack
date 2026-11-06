@@ -328,8 +328,8 @@ impl Analysis {
         })
     }
 
-    /// Whether a frequency sweep of the analysis is Spectre's `log=N` (N
-    /// points in total): no SPICE target, nor VACASK, has that spacing
+    /// Whether a frequency sweep of the analysis is log-spaced over N points
+    /// in total (Spectre's `log=`): no SPICE target, nor VACASK, has that spacing
     /// (ngspice manual §11.3.1, `.ac dec|oct|lin`).
     pub(super) fn log_sweep(&self) -> bool {
         let f = match self {
