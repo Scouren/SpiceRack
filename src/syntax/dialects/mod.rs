@@ -12,7 +12,11 @@
 //! Contents:
 //! - `pub(crate) fn register_builtins()`
 
+mod espice;
+mod hspice;
+mod ltspice;
 mod ngspice;
+mod xyce;
 
 use crate::syntax::behaviour;
 use crate::syntax::def::register;
@@ -42,6 +46,10 @@ pub(crate) fn register_builtins() {
     for d in order {
         let got = match d {
             Dialect::Ngspice => register(ngspice::ngspice()).expect("ngspice registers"),
+            Dialect::Espice => register(espice::espice()).expect("espice registers"),
+            Dialect::Hspice => register(hspice::hspice()).expect("hspice registers"),
+            Dialect::Xyce => register(xyce::xyce()).expect("xyce registers"),
+            Dialect::Ltspice => register(ltspice::ltspice()).expect("ltspice registers"),
             _ => lang::append(|_| from_tables(d)).expect("a slot for a built-in"),
         };
         assert_eq!(got, Lang::from(d), "{d:?} at its handle");
@@ -122,13 +130,16 @@ mod tests {
             out
         };
         let kw = |l: &Lexicon| {
-            first(
+            // A lookup by word: the rows' order does not matter.
+            let mut v = first(
                 l.keywords
                     .iter()
                     .flat_map(|t| t.iter())
                     .map(|r| (r.0, format!("{:?}", r.1)))
                     .collect(),
-            )
+            );
+            v.sort();
+            v
         };
         let dev = |l: &Lexicon| {
             l.devices

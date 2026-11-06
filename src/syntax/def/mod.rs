@@ -10,6 +10,8 @@
 //! field or adds a row. A row whose key a table holds replaces it in
 //! place; a new one is added last, so a table keeps its declaration order
 //! (the first holding a word wins, the first suffix of a scale is written).
+//! A shared table (`keywords`, `operators`, `devices`) adds only the rows
+//! whose keys the definition does not hold.
 //!
 //! Cites: none (the tables' own files cite their manuals).
 //!
@@ -317,13 +319,13 @@ impl DialectDef {
         self
     }
 
-    /// Adds a shared operator table's rows.
+    /// Adds a shared operator table's rows the definition does not hold.
     pub fn operators(mut self, table: Operators) -> Self {
         let rows = match table {
             Operators::Spice => lexicon::SPICE_OPERATORS,
         };
         for &(s, t) in rows {
-            self = self.operator(s, t);
+            add(&mut self.lex().operators, s.to_string(), t);
         }
         self
     }
@@ -394,13 +396,13 @@ impl DialectDef {
         self
     }
 
-    /// Adds a shared keyword table's rows.
+    /// Adds a shared keyword table's rows the definition does not hold.
     pub fn keywords(mut self, table: Keywords) -> Self {
         let rows = match table {
             Keywords::Spice => lexicon::SPICE_KEYWORDS,
         };
         for &(s, t) in rows {
-            self = self.keyword(s, t);
+            add(&mut self.lex().keywords, s.to_string(), t);
         }
         self
     }
@@ -411,7 +413,7 @@ impl DialectDef {
         self
     }
 
-    /// Adds a shared device table's rows.
+    /// Adds a shared device table's rows the definition does not hold.
     pub fn devices(mut self, table: Devices) -> Self {
         let rows = match table {
             Devices::Spice => device::SPICE,
@@ -420,7 +422,7 @@ impl DialectDef {
             Devices::Vacask => device::VACASK,
         };
         for d in rows {
-            put(&mut self.lex().devices, d.word.to_string(), *d);
+            add(&mut self.lex().devices, d.word.to_string(), *d);
         }
         self
     }
@@ -594,6 +596,14 @@ impl DialectDef {
 fn push_new(v: &mut Vec<String>, s: &str) {
     if !v.iter().any(|x| x == s) {
         v.push(s.to_string());
+    }
+}
+
+/// Adds `key`'s row to `v` unless `v` holds the key (a shared table's
+/// row yields to the definition's own).
+fn add<K: PartialEq, V>(v: &mut Vec<(K, V)>, key: K, val: V) {
+    if !v.iter().any(|r| r.0 == key) {
+        v.push((key, val));
     }
 }
 
