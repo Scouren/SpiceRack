@@ -9,7 +9,8 @@
 //!
 //! Contents:
 //! - `fn unquoted(v: &str) -> Option<String>`
-//! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::strip(&self, name: &str, letter: char) -> String`
+//! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::velems(&self, v: u32) -> Vec<u32>`,
+//!   `Rd::strip(&self, name: &str, letter: char) -> String`
 
 use super::named::{spectre_kind, vacask_builtin, vacask_kind};
 use super::{Card, Num, Rd, Val, Wave, WaveKind};
@@ -308,6 +309,15 @@ impl<'a> Rd<'a> {
         })
     }
 
+    /// A vector's element rows, each with its sign (`-1` is a `Unary` row
+    /// whose number is -1; `[CMP]` `vsource` `wave`).
+    pub(super) fn velems(&self, v: u32) -> Vec<u32> {
+        if self.tag(v) != Tag::Vector {
+            return vec![v];
+        }
+        self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec()
+    }
+
     /// `name`'s SPICE spelling: the letter a writer adds back is dropped
     /// (the old lowering's `strip`).
     pub(super) fn strip(&self, name: &str, letter: char) -> String {
@@ -521,15 +531,6 @@ impl<'a> Rd<'a> {
             }
             Some(_) => return None,
         }))
-    }
-
-    /// A vector's element rows, each with its sign (`-1` is a `Unary` row
-    /// whose number is -1; `[CMP]` `vsource` `wave`).
-    fn velems(&self, v: u32) -> Vec<u32> {
-        if self.tag(v) != Tag::Vector {
-            return vec![v];
-        }
-        self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec()
     }
 }
 

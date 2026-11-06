@@ -73,16 +73,22 @@ fn run(d: Dialect, deck: &str) -> RawData {
         .unwrap_or_else(|e| panic!("{d:?} failed: {e}\n{deck}"))
 }
 
-/// Node `name`'s first value in `raw` (VACASK names a node bare, ngspice
+/// Node `name`'s values in `raw` (VACASK names a node bare, ngspice
 /// `v(name)`).
-fn node(raw: &RawData, name: &str) -> f64 {
+fn column<'r>(raw: &'r RawData, name: &str) -> &'r [f64] {
     let wrapped = format!("v({name})");
     let at = raw
         .variables
         .iter()
         .position(|v| v.name.eq_ignore_ascii_case(name) || v.name.eq_ignore_ascii_case(&wrapped));
     let at = at.unwrap_or_else(|| panic!("no node {name} in {:?}", raw.variables));
-    raw.real_data[at][0]
+    &raw.real_data[at]
+}
+
+/// Node `name`'s first value in `raw` (VACASK names a node bare, ngspice
+/// `v(name)`).
+fn node(raw: &RawData, name: &str) -> f64 {
+    column(raw, name)[0]
 }
 
 #[test]
@@ -257,4 +263,59 @@ fn a_vacask_save_is_the_targets_save_list() {
     let own = written(&deck, Dialect::Vacask).expect("written").text;
     let squeezed: String = own.split_whitespace().collect();
     assert!(squeezed.contains("savedefaultv(2)i(v1)p(r1,i)"), "{own}");
+}
+
+#[test]
+fn a_vacask_sweep_over_an_operating_point_is_the_targets_dc_sweep() {
+    // cmd-sweep.md: `step=` a uniform step, `mode="lin" points=N` N
+    // intervals, `mode="dec" points=N` N per decade; ngspice's `.dc` is
+    // linear only (manual §15.3.2), so a decade sweep is refused W0038.
+    // The divider's v(2) is 0.9 v1.
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let sweep = |s: &str| {
+        bare.replace(
+            "  analysis op1 op",
+            &format!("  sweep s1 instance=\"v1\" parameter=\"dc\" {s}\n  analysis op1 op"),
+        )
+    };
+    for range in ["from=0 to=10 step=5", "from=0 to=10 mode=\"lin\" points=2"] {
+        let deck = sweep(range);
+        let ng = written(&deck, Dialect::Ngspice)
+            .unwrap_or_else(|c| panic!("{range}: {c:?}"))
+            .text;
+        let (v, n) = (run(Dialect::Vacask, &deck), run(Dialect::Ngspice, &ng));
+        let (vv, nn) = (column(&v, "2"), column(&n, "2"));
+        assert_eq!(vv.len(), 3, "{range}: VACASK points");
+        assert_eq!(nn.len(), 3, "{range}: ngspice points\n{ng}");
+        for (k, (a, b)) in vv.iter().zip(nn).enumerate() {
+            assert!(
+                (a - 4.5 * k as f64).abs() < 1e-9 && (b - a).abs() < 1e-9,
+                "{range}: {a} {b}"
+            );
+        }
+    }
+    let dec = sweep("from=1 to=100 mode=\"dec\" points=2");
+    assert_eq!(refusals(written(&dec, Dialect::Ngspice)), vec![Code::W0038]);
+}
+
+#[test]
+fn a_temperature_sweep_is_the_temp_options_sweep_on_vacask() {
+    // cmd-sweep.md: `option="name"` sweeps a simulator option (`temp`,
+    // cmd-options-temp.md); `instance="temp"` names no instance, so the
+    // run fails. ngspice `.dc temp` (manual §15.3.2) and VACASK's own
+    // sweep both reach VACASK so.
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let own = bare.replace(
+        "  analysis op1 op",
+        "  sweep t option=\"temp\" from=0 to=100 step=50\n  analysis op1 op",
+    );
+    let ng = "temp sweep\nV1 1 0 10\nR1 1 2 1k\nR2 2 0 9k\n.dc temp 0 100 50\n.end\n";
+    let from_ng = render_text(ng, Dialect::Ngspice, "deck", Dialect::Vacask).expect("written");
+    for deck in [
+        written(&own, Dialect::Vacask).expect("written").text,
+        from_ng.text,
+    ] {
+        assert!(deck.contains("option=\"temp\""), "{deck}");
+        assert_eq!(column(&run(Dialect::Vacask, &deck), "2").len(), 3, "{deck}");
+    }
 }

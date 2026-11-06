@@ -15,7 +15,7 @@
 //! - `Rd::vacask_saves(&self, n: u32) -> Option<(Vec<String>, bool)>`
 
 use super::named_elements::unquoted;
-use super::{Ana, BenchCard, Opt, Rd, Sweep};
+use super::{Ana, BenchCard, DcAxis, DcSweep, Opt, Rd, Sweep};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::token::Tag as T;
@@ -191,19 +191,11 @@ impl<'a> Rd<'a> {
         let p = self.pairs(st);
         let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
         let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
-        let sweeps: Vec<(String, f64, f64, f64)> = sweeps
+        // The last sweep is the inner one, as `.dc`'s first source.
+        let axes: Vec<DcAxis> = sweeps
             .iter()
             .rev()
-            .map(|&sw| {
-                let p = self.pairs(sw);
-                let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
-                let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
-                let (src, from, to, pts) =
-                    (s("instance")?, num("from")?, num("to")?, num("points")?);
-                let src = self.declared(sw, &src, &['V', 'I'])?;
-                (s("parameter").as_deref() == Some("dc"))
-                    .then(|| (src, from, to, (to - from) / pts))
-            })
+            .map(|&sw| self.vacask_sweep(sw))
             .collect::<Option<_>>()?;
         let kind = match self.ast.header(Node(st)).master {
             NONE => String::new(),
@@ -222,8 +214,17 @@ impl<'a> Rd<'a> {
             })
         };
         let a = match kind.as_str() {
-            "op" if !sweeps.is_empty() => Ana::Dc(sweeps),
-            _ if !sweeps.is_empty() => return None,
+            "op" if !axes.is_empty() => {
+                let lin = axes.iter().map(|a| match a.sweep {
+                    DcSweep::Lin(from, to, step) => Some((a.src.clone(), from, to, step)),
+                    DcSweep::Log(_) | DcSweep::List(_) => None,
+                });
+                match lin.collect::<Option<Vec<_>>>() {
+                    Some(dc) => Ana::Dc(dc),
+                    None => Ana::DcAxes(axes),
+                }
+            }
+            _ if !axes.is_empty() => return None,
             "op" => Ana::Op,
             "ac" => Ana::Ac(freq()?),
             "tran" => {
@@ -260,6 +261,57 @@ impl<'a> Rd<'a> {
             _ => return None,
         };
         Some(vec![BenchCard::Ana(a)])
+    }
+
+    /// `sweep name instance="src" parameter="dc"` (or `option="temp"`)
+    /// over `from to step`, `from to mode="lin" points=N` (N intervals),
+    /// `mode="dec"|"oct" points=N` (per decade or octave) or `values=[…]`
+    /// (`docs/cmd-sweep.md`); `None` for any other sweep.
+    fn vacask_sweep(&self, sw: u32) -> Option<DcAxis> {
+        let p = self.pairs(sw);
+        let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
+        let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
+        let src = match (s("instance"), s("parameter"), s("option")) {
+            (Some(i), Some(dc), None) if dc == "dc" => self.declared(sw, &i, &['V', 'I'])?,
+            (None, None, Some(t)) if t == "temp" => "temp".into(),
+            _ => return None,
+        };
+        let known = [
+            "instance",
+            "parameter",
+            "option",
+            "from",
+            "to",
+            "step",
+            "mode",
+            "points",
+        ];
+        if p.iter()
+            .any(|(k, _)| !known.contains(&k.as_str()) && k != "values")
+        {
+            return None;
+        }
+        let sweep = match (s("mode").as_deref(), self.get(&p, "values")) {
+            (_, Some(v)) => DcSweep::List(
+                self.velems(v)
+                    .into_iter()
+                    .map(|x| self.number(x))
+                    .collect::<Option<_>>()?,
+            ),
+            (None, None) => DcSweep::Lin(num("from")?, num("to")?, num("step")?),
+            (Some("lin"), None) => {
+                let (from, to) = (num("from")?, num("to")?);
+                DcSweep::Lin(from, to, (to - from) / num("points")?)
+            }
+            (Some(m @ ("dec" | "oct")), None) => DcSweep::Log(Sweep {
+                variation: if m == "dec" { "dec" } else { "oct" },
+                points: num("points")? as u32,
+                start: num("from")?,
+                stop: num("to")?,
+            }),
+            (Some(_), None) => return None,
+        };
+        Some(DcAxis { src, sweep })
     }
 
     /// `ic=["n"; v; ...]` (or `{"n", v, ...}`) → node values (the old
