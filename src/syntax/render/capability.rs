@@ -21,7 +21,7 @@
 //!
 //! Contents:
 //! - `pub enum Construct`, `pub enum Action`, `pub enum Alt`, `pub enum Rule`
-//! - `pub const fn action(target: Dialect, c: Construct) -> Action`
+//! - `pub const fn action(target: Dialect, c: Construct) -> Action`, `pub fn ngspice_device(kind: &str) -> bool`
 
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
@@ -39,6 +39,9 @@ pub enum Construct {
     /// HSPICE's `.sn`, `.snnoise`, `.snxf`, `.trannoise`, `.lstb`, kept as
     /// text.
     HspiceAnalysis,
+    /// A VACASK script line with no circuit meaning (`abort`, `print`,
+    /// `postprocess`, an `embed` nothing loads: `Rd::vacask_script`).
+    VacaskScript,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -47,6 +50,8 @@ pub enum Construct {
     VerilogALoad,
     /// A compiled OSDI binary load.
     OsdiLoad,
+    /// An instance of a loaded module (ngspice's OSDI `N` card).
+    OsdiInstance,
     /// `.lib file` with no section (LTspice's whole-file form).
     LibWholeFile,
     /// `.options ngbehavior=<mode>`: ngspice's compatibility mode, read
@@ -203,6 +208,68 @@ pub enum Rule {
     VacaskCalls,
 }
 
+/// ngspice-45's built-in analog devices (`devhelp`): a model type of one
+/// of these names is the built-in, never a loaded OSDI module.
+const NGSPICE_DEVICES: [&str; 57] = [
+    "URC",
+    "ASRC",
+    "BJT",
+    "BSIM1",
+    "BSIM2",
+    "BSIM3",
+    "BSIM3v0",
+    "BSIM3v1",
+    "BSIM3v32",
+    "B4SOI",
+    "BSIM4",
+    "BSIM4v5",
+    "BSIM4v6",
+    "BSIM4v7",
+    "B3SOIPD",
+    "B3SOIFD",
+    "B3SOIDD",
+    "Capacitor",
+    "CCCS",
+    "CCVS",
+    "CplLines",
+    "CSwitch",
+    "Diode",
+    "HFET1",
+    "HFET2",
+    "hicum2",
+    "HiSIM2",
+    "HiSIMHV1",
+    "HiSIMHV2",
+    "Inductor",
+    "mutual",
+    "Isource",
+    "JFET",
+    "JFET2",
+    "LTRA",
+    "MES",
+    "MESA",
+    "Mos1",
+    "Mos2",
+    "Mos3",
+    "Mos6",
+    "Mos9",
+    "Resistor",
+    "SOI3",
+    "Switch",
+    "Tranline",
+    "TransLine",
+    "VBIC",
+    "VCCS",
+    "VCVS",
+    "Vsource",
+    "VDMOS",
+    "NBJT",
+    "NBJT2",
+    "NUMD",
+    "NUMD2",
+    "NUMOS",
+];
+
 /// What `target` does with `c`.
 pub const fn action(target: Dialect, c: Construct) -> Action {
     use Action::{Lift, Native, Refuse, Spell};
@@ -220,6 +287,18 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0039),
             D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0039),
+        },
+        // VACASK docs cmd-errorhandling.md, cmd-print.md,
+        // cmd-postprocess.md, input-embed.md: the run's own steps, no
+        // number of the circuit.
+        Construct::VacaskScript => match target {
+            D::Vacask => Native,
+            // As `ForeignText`: the xschem layout copies it.
+            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => {
+                Spell(Alt::Omit(Code::W0120))
+            }
+            D::Spectre | D::Verilog => Spell(Alt::Omit(Code::W0120)),
         },
         // ngspice's `.sens` is one output's sensitivity to every parameter
         // at the operating point or over an AC sweep (manual, `.SENS`);
@@ -273,6 +352,16 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Ngspice => Spell(Alt::PreOsdi),
             D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0004),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
+        },
+        // ngspice manual §13 (`N` instances of an OSDI model); Spectre
+        // and VACASK instantiate a model of a module as any other; HSPICE
+        // and ESPice compile Verilog-A source (`.hdl`), Xyce loads plugins
+        // on its command line, LTspice loads none: no deck line names a
+        // compiled module there. CDL's layout copies the ngspice card.
+        Construct::OsdiInstance => match target {
+            D::Ngspice | D::Spectre | D::Vacask | D::Cdl => Native,
+            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0004),
+            D::Verilog => Spell(Alt::Omit(Code::W0029)),
         },
         Construct::LibWholeFile => match target {
             D::Ltspice => Native,
@@ -503,6 +592,12 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
     }
 }
 
+/// Whether `kind` names one of ngspice-45's built-in devices (a model type
+/// ngspice reads as the built-in before any OSDI module it loaded).
+pub fn ngspice_device(kind: &str) -> bool {
+    NGSPICE_DEVICES.iter().any(|d| d.eq_ignore_ascii_case(kind))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541,16 +636,18 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 39] = [
+    const CONSTRUCTS: [Construct; 41] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
         Construct::HspiceAnalysis,
+        Construct::VacaskScript,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,
         Construct::VerilogALoad,
         Construct::OsdiLoad,
+        Construct::OsdiInstance,
         Construct::LibWholeFile,
         Construct::LibSection,
         Construct::RclModel,

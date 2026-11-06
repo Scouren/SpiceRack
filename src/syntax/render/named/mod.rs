@@ -471,9 +471,14 @@ impl W<'_, '_> {
         }
     }
 
-    /// The text a block keeps, a line each.
+    /// The text a block keeps, a line each; off VACASK, a VACASK script
+    /// line (`Rd::vacask_script`, noted by `checks`) is left out.
     fn kept(&mut self, raw: &[Raw]) {
         for &r in raw {
+            let (Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) = r;
+            if self.d != Dialect::Vacask && self.rd.vacask_script(self.rd.main(n)) {
+                continue;
+            }
             match r {
                 Raw::Line(n) => {
                     let l = self.rd.line(n);

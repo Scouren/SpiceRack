@@ -1,5 +1,5 @@
-//! Spectre analysis, `options`, `save`, `ic`/`nodeset` statements and
-//! VACASK `control` blocks → [`BenchCard`] views, what each adds to the
+//! Spectre analysis, `options`, `save`, `ic`/`nodeset` statements →
+//! [`BenchCard`] views (VACASK `control` blocks in `named_control`), what each adds to the
 //! testbench as the old lowering applied them; `None` when the IR could not
 //! hold one; and [`Rd::bench_cards`], every testbench item's views.
 //!
@@ -14,12 +14,10 @@
 //! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
 //! - `Rd::node_vals(&self, n: u32) -> Option<Vec<(String, f64)>>`
 
-use super::named_elements::unquoted;
 use super::{Ana, Bench, BenchCard, Opt, Rd, Sweep};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::diag::Code;
-use crate::syntax::token::Tag as T;
 
 /// What `target` refuses a Spectre analysis of keyword `kind`
 /// ([`Ana::Spectre`]) with: `W0015` when it has no analysis of the kind,
@@ -257,153 +255,5 @@ impl<'a> Rd<'a> {
             });
         }
         out
-    }
-
-    /// A VACASK `control` block: its options and analyses, the rest kept as
-    /// lines (the old lowering's `ControlBlock`).
-    fn vacask_control(&self, n: u32) -> Vec<BenchCard> {
-        let mut out = Vec::new();
-        let mut sweeps: Vec<u32> = Vec::new();
-        let extra = |out: &mut Vec<BenchCard>, s: u32| out.push(BenchCard::Extra(self.line(s)));
-        for &st in self.body(n) {
-            let head = self.ttag(self.main(st));
-            if head == T::KwSweep {
-                sweeps.push(st);
-                continue;
-            }
-            if head == T::KwAnalysis {
-                match self.vacask_analysis(&sweeps, st) {
-                    Some(cards) => out.extend(cards),
-                    None => {
-                        for &s in sweeps.iter().chain([&st]) {
-                            extra(&mut out, s);
-                        }
-                    }
-                }
-                sweeps.clear();
-                continue;
-            }
-            for &s in &sweeps {
-                extra(&mut out, s);
-            }
-            sweeps.clear();
-            match self.vacask_options(st) {
-                Some(o) => out.push(BenchCard::Options(o)),
-                None => extra(&mut out, st),
-            }
-        }
-        for &s in &sweeps {
-            extra(&mut out, s);
-        }
-        out
-    }
-
-    /// A VACASK `options` statement in a `control` block (the old
-    /// lowering's `vacask_control`, `Ctl`).
-    fn vacask_options(&self, st: u32) -> Option<Vec<Opt>> {
-        if self.tag(st) != Tag::Options {
-            return None;
-        }
-        let mut out = Vec::new();
-        for (k, v) in self.pairs(st) {
-            match (k.as_str(), self.number(v)) {
-                ("rawfile", _) => {}
-                ("temp", Some(x)) => out.push(Opt::Temp(x)),
-                ("tnom", Some(x)) => out.push(Opt::Tnom(x)),
-                _ => out.push(Opt::Vacask(k, self.text(v))),
-            }
-        }
-        Some(out)
-    }
-
-    /// `sweep …` lines and the `analysis NAME KIND k=v` they belong to
-    /// (the old lowering's `vacask_control`, `Ana`): the analysis and the
-    /// initial conditions it sets; `None` when the IR had no such analysis.
-    fn vacask_analysis(&self, sweeps: &[u32], st: u32) -> Option<Vec<BenchCard>> {
-        let p = self.pairs(st);
-        let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
-        let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
-        let sweeps: Vec<(String, f64, f64, f64)> = sweeps
-            .iter()
-            .rev()
-            .map(|&sw| {
-                let p = self.pairs(sw);
-                let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
-                let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
-                let (src, from, to, pts) =
-                    (s("instance")?, num("from")?, num("to")?, num("points")?);
-                let src = self.declared(sw, &src, &['V', 'I'])?;
-                (s("parameter").as_deref() == Some("dc"))
-                    .then(|| (src, from, to, (to - from) / pts))
-            })
-            .collect::<Option<_>>()?;
-        let kind = match self.ast.header(Node(st)).master {
-            NONE => String::new(),
-            w => self.text(w),
-        };
-        let freq = || -> Option<Sweep> {
-            let mode = ["dec", "oct", "lin", "log"]
-                .into_iter()
-                .find(|m| s("mode").is_some_and(|x| x.eq_ignore_ascii_case(m)))?;
-            let points = num("points")? as u32 + u32::from(mode == "lin");
-            Some(Sweep {
-                variation: mode,
-                points,
-                start: num("from")?,
-                stop: num("to")?,
-            })
-        };
-        let a = match kind.as_str() {
-            "op" if !sweeps.is_empty() => Ana::Dc(sweeps),
-            _ if !sweeps.is_empty() => return None,
-            "op" => Ana::Op,
-            "ac" => Ana::Ac(freq()?),
-            "tran" => {
-                let ic = match self.get(&p, "ic") {
-                    Some(v) => self.node_list(v)?,
-                    None => vec![],
-                };
-                let ns = match self.get(&p, "nodeset") {
-                    Some(v) => self.node_list(v)?,
-                    None => vec![],
-                };
-                let a = Ana::Tran {
-                    step: num("step")?,
-                    stop: num("stop")?,
-                    start: None,
-                    max_step: num("maxstep"),
-                    uic: s("icmode").as_deref() == Some("uic"),
-                    startup: false,
-                };
-                return Some(vec![
-                    BenchCard::NodeVals(true, nums(ic)),
-                    BenchCard::NodeVals(false, nums(ns)),
-                    BenchCard::Ana(a),
-                ]);
-            }
-            "noise" => Ana::Noise {
-                output: s("out")?,
-                reference: "0".into(),
-                source: self.declared(st, &s("in")?, &['V', 'I'])?,
-                sweep: freq()?,
-                pps: None,
-            },
-            "dcxf" => Ana::Tf(s("out")?, String::new()),
-            _ => return None,
-        };
-        Some(vec![BenchCard::Ana(a)])
-    }
-
-    /// `ic=["n"; v; ...]` (or `{"n", v, ...}`) → node values (the old
-    /// lowering's `node_list`).
-    fn node_list(&self, v: u32) -> Option<Vec<(String, f64)>> {
-        let items: Vec<u32> = match self.tag(v) {
-            Tag::Vector | Tag::List => self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec(),
-            _ => vec![v],
-        };
-        items
-            .chunks(2)
-            .map(|c| Some((unquoted(&self.text(*c.first()?))?, self.number(*c.get(1)?)?)))
-            .collect()
     }
 }

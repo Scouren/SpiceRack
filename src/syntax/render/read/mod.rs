@@ -50,8 +50,10 @@ mod funcs;
 mod named;
 mod named_bench;
 mod named_blocks;
+mod named_control;
 mod named_elements;
 mod named_masters;
+mod named_waves;
 mod options;
 mod outputs;
 mod refused;
@@ -189,6 +191,10 @@ pub(in crate::syntax::render) struct Block {
     pub(in crate::syntax::render) raw: Vec<Raw>,
     /// Its Verilog-A loads (Spectre `ahdl_include`, VACASK `load`).
     pub(in crate::syntax::render) loads: Vec<u32>,
+    /// Its VACASK loads of VACASK's own linear R, C, L (`resistor.osdi`,
+    /// `docs/dev-vacask.md`), whose instances are R, C, L cards: no load
+    /// on another target, so VACASK's writer alone reads them.
+    pub(in crate::syntax::render) own_loads: Vec<u32>,
     /// Its Spectre `statistics` blocks.
     pub(in crate::syntax::render) statistics: Vec<u32>,
 }
@@ -295,6 +301,7 @@ impl Default for Block {
             libs: vec![],
             raw: vec![],
             loads: vec![],
+            own_loads: vec![],
             statistics: vec![],
         }
     }

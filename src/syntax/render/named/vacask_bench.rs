@@ -114,7 +114,8 @@ impl W<'_, '_> {
             ic.push_str(&self.node_list("nodeset", &tb.nodesets));
         }
         // `Construct::Save` is `Spell(Omit)`: VACASK saves every node.
-        for l in &tb.extra {
+        for &n in &tb.extra {
+            let l = self.rd.line(n);
             self.line(&format!("  {l}"));
         }
         let swept: Vec<String> = tb
@@ -446,9 +447,13 @@ fn sweep_line(scale: &str, src: &str, start: f64, stop: f64, step: f64) -> Optio
         true => stop,
         false => last,
     };
+    // SPICE's `.dc temp` is the `temp` option's sweep (`docs/cmd-sweep.md`).
+    let what = match src.eq_ignore_ascii_case("temp") {
+        true => "option=\"temp\"".to_string(),
+        false => format!("instance=\"{}\" parameter=\"dc\"", src.to_ascii_lowercase()),
+    };
     Some(format!(
-        "sweep {scale} instance=\"{}\" parameter=\"dc\" from={} to={} mode=\"lin\" points={}",
-        src.to_ascii_lowercase(),
+        "sweep {scale} {what} from={} to={} mode=\"lin\" points={}",
         num(start),
         num(last),
         n as u64

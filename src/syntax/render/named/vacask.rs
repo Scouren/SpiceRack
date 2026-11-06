@@ -100,7 +100,7 @@ impl W<'_, '_> {
         }
         // A VACASK deck's own `load`s are VACASK's (it compiles a `.va`
         // itself); a SPICE-origin Verilog-A load goes through OpenVAF.
-        let read = deck.top.loads.iter();
+        let read = deck.top.loads.iter().chain(&deck.top.own_loads);
         let read = read.map(|&n| self.rd.unquote(self.rd.fields(n)[0]));
         let paths: Vec<String> = read.chain(deck.given_loads.iter().cloned()).collect();
         self.unwritten_loads();
