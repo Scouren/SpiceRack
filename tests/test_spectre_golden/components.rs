@@ -174,3 +174,26 @@ fn a_behavioural_source_is_a_spectre_bsource() {
         assert_eq!(component(card), want, "{card}");
     }
 }
+
+/// ngspice applies a capacitor's or an inductor's `IC=` only with `.tran …
+/// uic` (manual, C and L: "the initial conditions (if any) apply only if
+/// the uic option is specified"); Spectre's `tran` applies a device `ic`
+/// unless told otherwise, so without `uic` it is left out (W0112), with
+/// `uic` kept beside `skipdc=yes`.
+#[test]
+fn a_device_ic_without_uic_is_left_out() {
+    let deck =
+        |uic: &str| format!("t\nV1 a 0 1\nR1 a b 1k\nC1 b 0 1u IC=0.3\n.tran 10u 1m{uic}\n.end\n");
+    let w = |d: &str| {
+        spicerack::syntax::render::render_text(d, Dialect::Ngspice, "t", Dialect::Spectre).unwrap()
+    };
+    let no = w(&deck(""));
+    assert!(no.text.contains("c1 (b 0) capacitor c=1u\n"), "{}", no.text);
+    let codes: Vec<Code> = no.notes.diags.iter().map(|d| d.code).collect();
+    assert_eq!(codes, [Code::W0112], "{}", no.notes.messages);
+    assert!(
+        w(&deck(" uic"))
+            .text
+            .contains("c1 (b 0) capacitor c=1u ic=300m")
+    );
+}

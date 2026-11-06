@@ -14,6 +14,7 @@
 //! Contents:
 //! - `W::table_kind(&self, m: &Model) -> Option<&'static Kind>`, `W::model_rows(&mut self, m: &Model, node: u32, k: &'static Kind) -> Option<Vec<(String, String)>>`
 //! - `W::element_rows(&mut self, letter: char, params: &[(String, String)], node: u32) -> Option<Vec<(String, String)>>`
+//! - `W::tran_ic(&mut self, letter: char, params: Vec<(String, String)>, node: u32) -> Vec<(String, String)>`
 //! - `W::dependent(&mut self, value: &Val, model: bool, params: &[(String, String)], node: u32) -> Option<Option<Dependent>>`
 //! - `type Dependent`
 //! - `fn spelled_flag(rd_d: Dialect, d: Dialect, letter: char, name: &str) -> bool`, `fn level(m: &Model) -> u32`
@@ -23,7 +24,7 @@ use super::checks::calls;
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::models::{self, Implied, Kind, Param, Row};
-use crate::syntax::render::read::{Model, Val};
+use crate::syntax::render::read::{Ana, Model, Val};
 
 /// A voltage-dependent resistance's expression and the parameters kept.
 pub(super) type Dependent = (String, Vec<(String, String)>);
@@ -80,6 +81,37 @@ impl W<'_, '_> {
             out.push((name.to_string(), value));
         }
         Some(out)
+    }
+
+    /// `params` but a C's or an L's `ic` on an ngspice card when no
+    /// `.tran` of the deck has `uic`: ngspice applies it only then (manual,
+    /// C and L: "the initial conditions (if any) apply only if the uic
+    /// option is specified on the .tran control line"), where Spectre's
+    /// `tran` applies a device `ic` and VACASK's `sp_capacitor` has none.
+    /// Left out, noted W0112.
+    pub(super) fn tran_ic(
+        &mut self,
+        letter: char,
+        mut params: Vec<(String, String)>,
+        node: u32,
+    ) -> Vec<(String, String)> {
+        let at = params
+            .iter()
+            .position(|(k, _)| k.eq_ignore_ascii_case("ic"));
+        let Some(at) = at.filter(|_| self.rd.d == Dialect::Ngspice && matches!(letter, 'C' | 'L'))
+        else {
+            return params;
+        };
+        let tb = self.fold();
+        let uic = tb
+            .analyses
+            .iter()
+            .any(|(a, _)| matches!(a, Ana::Tran { uic: true, .. }));
+        if !uic {
+            params.remove(at);
+            self.note(Code::W0112, self.rd.main(node));
+        }
+        params
     }
 
     /// Element `node`'s parameters (an R, C or D card's) as Spectre's,

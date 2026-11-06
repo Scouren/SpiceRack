@@ -56,6 +56,7 @@ impl W<'_, '_> {
                         self.inst_params(&kept)
                     ));
                 }
+                let params = self.tran_ic(letter, params, n);
                 let (l, m) = match letter {
                     'R' => ('r', "resistor"),
                     'C' => ('c', "capacitor"),

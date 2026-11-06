@@ -141,3 +141,14 @@ fn a_library_read_inside_a_subcircuit_stays_in_its_scope() {
     );
     close(col(&run(&deck), "9")[0], 1.0, 1e-9);
 }
+
+#[test]
+fn a_device_ic_without_uic_is_left_out() {
+    // ngspice applies `IC=` only with `.tran … uic` (manual, C and L), so
+    // the op sets the capacitor: b = 1 V from t=0. VACASK's `sp_capacitor`
+    // has no `ic` ("Parameter 'ic' not found."; `capacitor.va` notes).
+    let deck = "t\nV1 a 0 1\nR1 a b 1k\nC1 b 0 1u IC=0.3\n.tran 10u 1m\n.end\n";
+    let b = col(&run(deck), "b");
+    close(b[0], 1.0, 1e-9);
+    close(*b.last().unwrap(), 1.0, 1e-9);
+}

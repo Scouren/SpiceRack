@@ -71,6 +71,7 @@ impl W<'_, '_> {
                         self.params(&kept)
                     ));
                 }
+                let params = self.tran_ic(letter, params, n);
                 let params = match ngspice && letter != 'L' {
                     true => self.element_rows(letter, &params, n)?,
                     false => params,
