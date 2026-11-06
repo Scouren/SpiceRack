@@ -4,17 +4,19 @@ circuitsim90/MOS2/ab_opamp.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS2/gm6.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS2/hussamp.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS2/nand.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+circuitsim90/MOS2/pump.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS2/ring.sp mismatch # tran v(2): 0.51398545047556 leaves the tube at t=0.00000009053104541064522 (tol 3.055e-2)
 circuitsim90/MOS2/toronto.sp mismatch # tran v(24): 1.2256894594351704 leaves the tube at t=0.0000005018600306872237 (tol 5.026e-2)
 circuitsim90/MOS2_LARGE/add20.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 2479
 circuitsim90/MOS2_LARGE/dac.sp mismatch # tran v(1085): 0.00004040824660718652 leaves the tube at t=0.00000011686888058021189 (tol 2.579e-6)
 circuitsim90/MOS2_LARGE/fadd32.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined: past the 120 s CPU budget in one of two runs
-circuitsim90/MOS3/arom.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined
+circuitsim90/MOS3/arom.sp slow # quarantined
 circuitsim90/MOS3/gm17.sp mismatch # tran v(4): 4.813072814687794 leaves the tube at t=0.0000000000016000000000000003 (tol 5.000e-2)
 circuitsim90/MOS3/gm19.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS3/gm3.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS3/jge.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+circuitsim90/MOS3/mike2.sp mismatch # tran i(vpulse): -0.0020232967180685846 leaves the tube at t=0.000000001011106874948874 (tol 2.311e-5)
 circuitsim90/MOS3/rich3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS3/todd3.sp mismatch # tran i(vamp): 0.0022356814081991774 leaves the tube at t=0.00000000593 (tol 3.070e-5)
 cmcqa/gf180/gf180_beta_vnpn_0p54x16_14.sp mismatch # dc i(vbp): -0.000005350157383245645+0i vs -0.00000000020883599853537978+0i at 0.6400000000000003 (tol 4.950e-6)
@@ -3222,7 +3224,6 @@ ngspice/examples/hicum2/hic2_gum.sp target-fails # no raw file .cross_sim_out.ra
 ngspice/examples/hicum2/hic2_gum_inv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Q1 and no valid model card found. | Simulation aborted
 ngspice/examples/hicum2/hic2_noise.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unrecognized parameter NOISY for device RLOAD | Netlist error in file .cross_sim_de
 ngspice/examples/hicum2/hic2_tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Q1 and no valid model card found. | Simulation aborted
-ngspice/examples/measure/buggy-meas-tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unknown mode in .MEASURE line.  Should be TRAN/TR, DC, AC, FFT, NOISE, | Unknown mo
 ngspice/examples/measure/func_cap.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {{max(icap_calc(1,2,3,4))}} | Netlist error: syntax error in expression {{max(icap_cal
 ngspice/examples/measure/mos-meas-dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: VD_DIFF1 has invalid MEASURE line | Netlist error: VD_DIFF2 has invalid MEASURE line | Simulation aborted due to 
 ngspice/examples/measure/rc-meas-ac-control.sp mismatch # ac: sweep grid changed (41 -> 34 points)
@@ -3231,22 +3232,19 @@ ngspice/examples/measure/simple-meas-tran.sp target-fails # no raw file .cross_s
 ngspice/examples/mos/nmos_out_BSIM330_plainwrite.sp mismatch # plots ["dc", "dc"] became ["dc"]
 ngspice/examples/mos/nmos_pmos_BSIM330.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 16
 ngspice/examples/mos/nmos_pmos_BSIM482.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 16
-ngspice/examples/mos/nmos_pmos_drainresistor.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+ngspice/examples/mos/nmos_pmos_drainresistor.sp slow # quarantined
 ngspice/examples/mos/nmos_pmos_plotting.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 18
+ngspice/examples/mos/ro-meas.sp mismatch # tran v(xro.n2): 0.7617871250767438 leaves the tube at t=0.0000000008145599999999978 (tol 1.576e-2)
 ngspice/examples/mos/ro_17_4.sp mismatch # tran i(vdd): -0.3335242810047126 leaves the tube at t=0.0000000000010000000000000002 (tol 3.335e-3)
 ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/noise/resdiv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unrecognized parameter NOISY for device R12 | Netlist error in file .cross_sim_deck
-ngspice/examples/optran/F5TurboV2thermal-optran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/optran/script
-ngspice/examples/optran/TLV6001-test.sp mismatch # ac: sweep grid changed (54 -> 54 points)
-ngspice/examples/optran/TLV9002-test.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 135 | Netlist error: Solving for DC operating point failed! Cannot continue AC
-ngspice/examples/p-to-n-examples/555-timer-2.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 143
 ngspice/examples/p-to-n-examples/MOS1_out.sp mismatch # dc i(vb): 0.000000000005430000000000002+0i vs 0.000000000007487829062052148+0i at 1.8000000000000005 (tol 2.030e-12)
-ngspice/examples/p-to-n-examples/OP_MCP6041.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/p-to-n-exampl
 ngspice/examples/p-to-n-examples/logic.sp mismatch # tran v(1): 1.5 leaves the tube at t=0 (tol 1.500e-2)
 ngspice/examples/p-to-n-examples/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/p-to-n-exampl
-ngspice/examples/p-to-n-examples/switch-oscillators_inc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/p-to-n-exampl
 ngspice/examples/snapshot/adder_mos.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/snapshot/adde
 ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.x1.net.1): 1.6918072410561842 leaves the tube at t=0.0000006064999999999999 (tol 1.918e-2)
+ngspice/examples/soa/bjt-soa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Parameter .00 not formatted correctly in .model MPSA92 | Simulation aborted due to 
+ngspice/examples/soa/nic_soa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M16 and no valid model card found. | Netlist error in 
 ngspice/examples/soi/Inv_chain.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
 ngspice/examples/soi/inv_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
 ngspice/examples/soi/inv_tr.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
@@ -3270,29 +3268,28 @@ ngspice/examples/vdmos/crss_coss_ciss.sp target-fails # no raw file .cross_sim_o
 ngspice/examples/vdmos/inv_vdmos.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device MP1 and no valid model card found. | Netlist error in 
 ngspice/examples/vdmos/ro_11_vdmos.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Parameter pchan not formatted correctly in .model P1 | Simulation aborted due to er
 ngspice/examples/vdmos/self-heating.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
+ngspice/examples/vdmos/soa_chk.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Netlist error in f
 ngspice/examples/vdmos/vdmos-out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
 ngspice/examples/vdmos/vdmos-out_ir_mtr.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Netlist error in f
 ngspice/examples/vdmos/vdmosp-out-mtr.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Netlist error in f
 ngspice/examples/vdmos/vdmosp-out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
-ngspice/kicad/sallen_key-bandpass-072/sallen_key_bp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/kicad-test-circuits/sallen_key
+ngspice/iscas85/c1355/c1355.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+ngspice/iscas85/c1355/c1355_ann.sp slow # quarantined
+ngspice/iscas85/c1908/c1908.sp slow # quarantined
+ngspice/iscas85/c432/c432.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+ngspice/iscas85/c499/c499.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+ngspice/iscas85/c499/c499_ann.sp slow # quarantined
+ngspice/iscas85/c880/c880.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+ngspice/iscas85/c880/c880_ann.sp slow # quarantined
 ngspice/paranoia/measure/func_cap.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {{max(icap_calc(1,2,3,4))}} | Netlist error: syntax error in expression {{max(icap_cal
 ngspice/paranoia/measure/mos-meas-dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: VD_DIFF1 has invalid MEASURE line | Netlist error: VD_DIFF2 has invalid MEASURE line | Simulation aborted due to 
 ngspice/paranoia/measure/rc-meas-ac.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: VOUT_DIFF has invalid MEASURE line | Netlist error: FIXED_DIFF has invalid MEASURE line | Simulation aborted due 
 ngspice/paranoia/measure/simple-meas-tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Illegal type in .MEASURE line for TRAN mode.  Must be one of: AVG, | DERIV/DERIVATI
-ngspice/paranoia/optran/F5TurboV2thermal-ic-out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/optran/scrip
-ngspice/paranoia/optran/TLV6001-test.sp mismatch # ac: sweep grid changed (17 -> 17 points)
-ngspice/paranoia/optran/TLV9002-test.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 135 | Netlist error: Solving for DC operating point failed! Cannot continue AC
-ngspice/paranoia/pton/555-timer-2.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 143
 ngspice/paranoia/pton/MOS1_out.sp mismatch # dc i(vb): 0.000000000005430000000000002+0i vs 0.000000000007487829062052148+0i at 1.8000000000000005 (tol 2.030e-12)
-ngspice/paranoia/pton/OP_MCP6041.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/pton/MCP6041
-ngspice/paranoia/pton/Optimos_out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/pton/OptiMOS
 ngspice/paranoia/pton/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/pton/ad22057
-ngspice/paranoia/pton/op-test-test.sp mismatch # tran v(xopmap.n044): 1.4780067547546372 leaves the tube at t=0.0000000001 (tol 1.478e-2)
-ngspice/paranoia/pton/op-test.sp mismatch # tran v(xopmap.n044): 0.8868884880595973 leaves the tube at t=0.0000000001 (tol 8.871e-3)
-ngspice/paranoia/pton/switch-oscillators_inc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/pton/switch-
 ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/paranoia/various/nmos_pmos_BSIM330.sp slow # quarantined: past the 120 s CPU budget in one of two runs
-ngspice/paranoia/various/nmos_pmos_plotting.sp slow # quarantined: past the 120 s CPU budget in one of two runs
+ngspice/paranoia/various/nmos_pmos_BSIM330.sp slow # quarantined
+ngspice/paranoia/various/nmos_pmos_plotting.sp slow # quarantined
 ngspice/paranoia/various/ro_17_4.sp mismatch # tran v(3): 1.0032345606593271 leaves the tube at t=0.000000001128 (tol 2.020e-2)
 ngspice/paranoia/vbic/DFF_Y_ECL.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device QVLGNPN16 and no valid model card found. | Netlist err
 ngspice/paranoia/vbic/npn_gum.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/vbic/qnva.mo
@@ -3313,6 +3310,7 @@ ngspice/paranoia/vdmos/inv_vdmos.sp.sp target-fails # no raw file .cross_sim_out
 ngspice/paranoia/vdmos/inv_vdmos_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device MP1 and no valid model card found. | Netlist error in 
 ngspice/paranoia/vdmos/ro_11_vdmos.sp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Parameter pchan not formatted correctly in .model P1 | Simulation aborted due to er
 ngspice/paranoia/vdmos/self-heating.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
+ngspice/paranoia/vdmos/soa_chk.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Netlist error in f
 ngspice/paranoia/vdmos/vdmos-out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
 ngspice/paranoia/vdmos/vdmos-out.sp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
 ngspice/paranoia/vdmos/vdmos-out_ir.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
@@ -3322,8 +3320,34 @@ ngspice/paranoia/vdmos/vdmosp-out-mtr.sp target-fails # no raw file .cross_sim_o
 ngspice/paranoia/vdmos/vdmosp-out-mtr.sp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Netlist error in f
 ngspice/paranoia/vdmos/vdmosp-out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
 ngspice/paranoia/vdmos/vdmosp-out.sp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
-ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {X<P?P:N} | Netlist error: syntax error in expression {X<P?P:X>N?N:X} | Netlist error:
-ngspice/tests/regression/lib-processing/ex1b.sp mismatch # op v(9): 1+0i vs 0.8+0i at 0 (tol 2.002e-3)
+ngspice/tests/bsim1/test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device MN1 and no valid model card found. | Netlist error in 
+ngspice/tests/bsim2/test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device MN1 and no valid model card found. | Netlist error in 
+ngspice/tests/bsim3soidd/inv2.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Netlist error in f
+ngspice/tests/bsim3soidd/ring51.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/tests/bsim3soidd/lib.h
+ngspice/tests/bsim3soidd/t3.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
+ngspice/tests/bsim3soidd/t4.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
+ngspice/tests/bsim3soidd/t5.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device M1 and no valid model card found. | Simulation aborted
+ngspice/tests/bsim3soipd/ring51.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type TRAN are inconsistent. | Simulation aborted due to error.  There are 0 MSG_FATAL 
+ngspice/tests/bsim3soipd/t4.sp mismatch # dc i(vb): 0+0i vs -0.000000000006278979391451045+0i at 0 (tol 2.000e-12)
+ngspice/tests/general/fourbitadder.sp mismatch # tran v(x1.x1.x1.x5.8): -0.0006232238726266992 leaves the tube at t=0.0000000036177435765459917 (tol 2.519e-5)
+ngspice/tests/general/rc.sp mismatch # tran v(1): 0.011117920800000002 leaves the tube at t=0.0011117920800000002 (tol 1.000e-2)
+ngspice/tests/general/rca3040.sp mismatch # plots ["ac", "dc", "tran"] became ["tran"]
+ngspice/tests/hfet/id_vgs.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Simulation aborted
+ngspice/tests/hfet/inverter.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Netlist error in f
+ngspice/tests/jfet/jfet_vds-vgs.sp mismatch # plots ["dc", "op"] became ["dc"]
+ngspice/tests/mes/subth.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: VIDS#BRANCH | Simulation aborted due to error.  There are 0 MSG_F
+ngspice/tests/mesa/mesa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Netlist error in f
+ngspice/tests/mesa/mesa11.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Simulation aborted
+ngspice/tests/mesa/mesa13.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type VIG#BRANCH are inconsistent. | Simulation aborted due to error.  There are 0 MSG_
+ngspice/tests/mesa/mesa14.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Netlist error in f
+ngspice/tests/mesa/mesa15.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Simulation aborted
+ngspice/tests/mesa/mesa21.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type VIDS#BRANCH are inconsistent. | Simulation aborted due to error.  There are 0 MSG
+ngspice/tests/mesa/mesgout.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Z1 and no valid model card found. | Simulation aborted
+ngspice/tests/mesa/mesinv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device ZD1 and no valid model card found. | Netlist error in 
+ngspice/tests/mesa/mesosc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device ZD and no valid model card found. | Netlist error in f
+ngspice/tests/mos6/mos6inv.sp mismatch # tran i(vin): -0.00006723369385653813 leaves the tube at t=0.00000000046 (tol 6.811e-7)
+ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): -0.0000008905818325687239 leaves the tube at t=0.000000038139999999999996 (tol 9.868e-8)
+ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {100*foo0()} | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MS
 ngspice/tests/regression/misc/asrc-tc-2.sp mismatch # plots ["op", "op"] became ["op"]
 ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["V(1)", "V1#branch"])
 ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file .cross_sim_out.raw: 
@@ -3335,3 +3359,8 @@ ngspice/tests/regression/parser/xpressn-3.sp mismatch # op v(n1085_n): 2+0i vs 3
 ngspice/tests/regression/subckt-processing/model-scope-5.sp mismatch # op v(n1001_t): 2000+0i vs 2000000+0i at 0 (tol 4.000e0)
 ngspice/tests/regression/temper/temper-3.sp mismatch # dc i(v1): -0.0049504950495049506+0i vs -0.000004950495049504951+0i at 10 (tol 9.901e-6)
 ngspice/tests/regression/temper/temper-res-1.sp mismatch # dc i(v2): -0.005628521797951112+0i vs -0.000005628521797951113+0i at 10 (tol 1.126e-5)
+ngspice/tests/resistance/res_array.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type TRAN and print type AC are inconsistent. | Simulation aborted due to error.  There are 0 MSG_FATAL 
+ngspice/tests/resistance/res_partition.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unrecognized parameter AC for device R2 | Netlist error in file .cross_sim_deck.sp 
+ngspice/tests/vbic/FO.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unrecognized parenthetical specification in .print near .print dc -i ( vc ) | Netli
+ngspice/tests/vbic/noise_scale_test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Q1 and no valid model card found. | Simulation aborted
+ngspice/tests/vbic/temp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Model is required for device Q1 and no valid model card found. | Simulation aborted

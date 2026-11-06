@@ -118,6 +118,9 @@ fn run_in(
     }
     for (name, body) in files {
         let at = dir.join(name);
+        if let Some(parent) = at.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
         let _ = std::fs::remove_file(&at);
         std::fs::write(&at, body).map_err(|e| e.to_string())?;
     }

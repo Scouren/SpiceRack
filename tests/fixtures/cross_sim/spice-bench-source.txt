@@ -1,12 +1,12 @@
-circuitsim90/MOS2_LARGE/add32.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/chip2.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/mem_plus.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/pc_frame.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/ram2k.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/smult20.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/sram.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/voter.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-circuitsim90/MOS2_LARGE/voter25.sp slow # quarantined: past the 60 s CPU budget in one of two runs
+circuitsim90/MOS2_LARGE/add32.sp slow # quarantined
+circuitsim90/MOS2_LARGE/chip2.sp slow # quarantined
+circuitsim90/MOS2_LARGE/mem_plus.sp slow # quarantined
+circuitsim90/MOS2_LARGE/pc_frame.sp slow # quarantined
+circuitsim90/MOS2_LARGE/ram2k.sp slow # quarantined
+circuitsim90/MOS2_LARGE/smult20.sp slow # quarantined
+circuitsim90/MOS2_LARGE/sram.sp slow # quarantined
+circuitsim90/MOS2_LARGE/voter.sp slow # quarantined
+circuitsim90/MOS2_LARGE/voter25.sp slow # quarantined
 cmcqa/gf180/gf180_cv_cgc_nmos_3p3_0.sp source-fails # no raw file .cross_sim_out.raw: Error on line 39 or its substitute:: mn d_tn g_tn s_tn s_tn nmos_3p3 w=200u l=0.28u nf=20 ad=24u pd=200.48u as=24u ps=200.48u | 
 cmcqa/gf180/gf180_cv_cgc_pmos_3p3_0.sp source-fails # no raw file .cross_sim_out.raw: Error on line 39 or its substitute:: mn d_tn g_tn s_tn s_tn pmos_3p3 w=200u l=0.28u nf=20 ad=24u pd=200.48u as=24u ps=200.48u | 
 cmcqa/gf180/gf180_cv_cgd_nmos_3p3_0.sp source-fails # no raw file .cross_sim_out.raw: Error on line 39 or its substitute:: mn d_tn g_tn s_tn s_tn nmos_3p3 w=200u l=0.28u nf=20 ad=24u pd=200.48u as=24u ps=200.48u | 
@@ -1964,30 +1964,30 @@ ngspice/examples/pss/hartley_osc_pss.sp source-fails # no raw file .cross_sim_ou
 ngspice/examples/pss/ring_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 30 or its substitute:: .pss 624e6 500n 1 1024 10 5 5e-3 uic | Simulation interrupted due to error! | Error: circui
 ngspice/examples/pss/vackar_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 22 or its substitute:: .pss 1e6 10e-6 4 1024 10 50 5e-3 uic | Simulation interrupted due to error! | Error: circui
 ngspice/examples/pss/vdp_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 18 or its substitute:: .pss 0.8e6 130e-6 1 50 10 50 5e-3 uic | Simulation interrupted due to error! | Error: circu
-ngspice/examples/vdmos/dcdc.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c1908/c1908_ann.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c2670/c2670.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c2670/c2670_ann.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c3540/c3540.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c3540/c3540_ann.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c5315/c5315.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c5315/c5315_ann.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c6288/c6288.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c6288/c6288_ann.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c7552/c7552.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/iscas85/c7552/c7552_ann.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/kicad/Dual-NMOS-Amp/Dual-NMOS-amp.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/kicad/GaN_Test/GaN_boost.sp slow # quarantined: past the 60 s CPU budget in one of two runs
+ngspice/examples/vdmos/dcdc.sp slow # quarantined
+ngspice/iscas85/c1908/c1908_ann.sp slow # quarantined
+ngspice/iscas85/c2670/c2670.sp slow # quarantined
+ngspice/iscas85/c2670/c2670_ann.sp slow # quarantined
+ngspice/iscas85/c3540/c3540.sp slow # quarantined
+ngspice/iscas85/c3540/c3540_ann.sp slow # quarantined
+ngspice/iscas85/c5315/c5315.sp slow # quarantined
+ngspice/iscas85/c5315/c5315_ann.sp slow # quarantined
+ngspice/iscas85/c6288/c6288.sp slow # quarantined
+ngspice/iscas85/c6288/c6288_ann.sp slow # quarantined
+ngspice/iscas85/c7552/c7552.sp slow # quarantined
+ngspice/iscas85/c7552/c7552_ann.sp slow # quarantined
+ngspice/kicad/Dual-NMOS-Amp/Dual-NMOS-amp.sp slow # quarantined
+ngspice/kicad/GaN_Test/GaN_boost.sp slow # quarantined
 ngspice/paranoia/TransmissionLines/ltra5_1_line.sp source-fails # no raw file .cross_sim_out.raw: Error on line 164 or its substitute:: d.xrcv.d1 xrcv.1 3 diod1 | Simulation interrupted due to error! | Error: circuit not parse
 ngspice/paranoia/TransmissionLines/txl4_1_line.sp source-fails # no raw file .cross_sim_out.raw: Error on line 162 or its substitute:: d.xrcv.d1 xrcv.1 3 diod1 | Simulation interrupted due to error! | Error: circuit not parse
 ngspice/paranoia/vdmos/ro_11_vdmos.sp source-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m.xinv1.mp1 3 2 1 1 p1 l=2u w=20u | unknown parameter (l) | Simulation interrupted due to er
-ngspice/tests/mesa/mesa-12.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/tests/mesa/mesa12.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-ngspice/tests/vbic/FG.sp slow # quarantined: past the 60 s CPU budget in one of two runs
+ngspice/tests/mesa/mesa-12.sp slow # quarantined
+ngspice/tests/mesa/mesa12.sp slow # quarantined
+ngspice/tests/vbic/FG.sp slow # quarantined
 ngspice/tests/vbic/diffamp.sp source-fails # Parse error: Bad variable index: invalid digit found in string
 postlayout/c7552_ihp.sp source-fails # no raw file .cross_sim_out.raw: Unknown model type psp103va - ignored | Unknown model type pspnqs103va - ignored | Unknown model type psp103va - ignored | Unkno
-postlayout/c7552_sky130.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-postlayout/tdc_sky130.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-powergrid/ibmpg1t.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-powergrid/ibmpg3.sp slow # quarantined: past the 60 s CPU budget in one of two runs
-powergrid/ssram_trans.sp slow # quarantined: past the 60 s CPU budget in one of two runs
+postlayout/c7552_sky130.sp slow # quarantined
+postlayout/tdc_sky130.sp slow # quarantined
+powergrid/ibmpg1t.sp slow # quarantined
+powergrid/ibmpg3.sp slow # quarantined
+powergrid/ssram_trans.sp slow # quarantined
