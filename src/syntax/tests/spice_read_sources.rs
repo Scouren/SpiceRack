@@ -317,3 +317,16 @@ fn an_hspice_pz_over_a_source_is_ngspices_over_its_nodes() {
         assert!(e.diags.iter().any(|g| g.code == code), "{}", e.messages);
     }
 }
+
+#[test]
+fn an_hspice_tran_in_segments_runs_to_the_last_stop_at_the_finest_step() {
+    // HSPICE UG `.TRAN tstep1 tstop1 tstep2 tstop2`: one run to the last
+    // stop; the ESPice corpus's tran_segments.expected.json analytic
+    // oracle (1 - e^(-t/5 ns) over 0..40 ns), which ngspice-45 gave on the
+    // written deck to 9.7e-5. Read as text before (W0001). Checks: 1.
+    let text = "t\nv1 in 0 pulse(0 1 0 1p 1p 1 2)\nr1 in out 1k\nc1 out 0 5p\n.tran 0.1n 10n 1n 40n\n.end\n";
+    let ng = render_text(text, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == ".tran 100p 40n"), "{ng}");
+}

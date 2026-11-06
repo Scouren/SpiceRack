@@ -441,6 +441,25 @@ impl<'a> Rd<'a> {
             Some((&p, rest)) if hspice && self.tag(p) == Tag::Assign => (rest, Some(p)),
             _ => (body, None),
         };
+        // HSPICE `.TRAN s1 t1 s2 t2 …` runs to the last stop, each segment
+        // printed at its own step (HSPICE UG `.TRAN`): one run to the last
+        // stop at the finest step prints every one of those points.
+        let segs: Vec<u32>;
+        let nums = match nums {
+            n if hspice && n.len() >= 4 && n.len().is_multiple_of(2) => {
+                let v: Vec<f64> = n.iter().map(|&k| self.number(k)).collect::<Option<_>>()?;
+                let stops: Vec<f64> = v.iter().skip(1).step_by(2).copied().collect();
+                if stops.windows(2).any(|w| w[0] >= w[1]) {
+                    return None;
+                }
+                let finest = (0..n.len())
+                    .step_by(2)
+                    .min_by(|&a, &b| v[a].total_cmp(&v[b]))?;
+                segs = vec![n[finest], n[n.len() - 1]];
+                &segs[..]
+            }
+            n => n,
+        };
         let lo = if lt { 1 } else { 2 };
         let hi = if hspice { 2 } else { 4 };
         if nums.len() < lo || nums.len() > hi || !nums.iter().all(|&k| self.numw(k)) {

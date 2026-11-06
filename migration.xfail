@@ -32397,3 +32397,14 @@ spice-bench/ngspice/tests/polezero/filt_bridge_t.sp hspice now written: HSPICE .
 spice-bench/ngspice/tests/polezero/filt_multistage.sp hspice now written: HSPICE .pz read / written
 spice-bench/ngspice/tests/polezero/filt_rc.sp hspice now written: HSPICE .pz read / written
 spice-bench/ngspice/tests/regression/pz/ac-resistance.sp hspice now written: HSPICE .pz read / written
+
+# Phase 7: spice-read: HSPICE `.tran s1 t1 s2 t2 …` (render::read
+# testbench tran) read as one run to the last stop at the finest step
+# (HSPICE UG .TRAN; as text before, W0001); HSPICE writes it back so.
+hspice/hspice/tran_segments.sp espice now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp hspice written differently: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp ltspice now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp ngspice now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp spectre now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp vacask now written: HSPICE .tran segments read as one run to the last stop
+hspice/hspice/tran_segments.sp xyce now written: HSPICE .tran segments read as one run to the last stop
