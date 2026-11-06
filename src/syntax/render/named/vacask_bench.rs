@@ -113,11 +113,11 @@ impl W<'_, '_> {
         if !tb.nodesets.is_empty() {
             ic.push_str(&self.node_list("nodeset", &tb.nodesets));
         }
-        // `Construct::Save` is `Spell(Omit)`: VACASK saves every node.
-        for &n in &tb.extra {
-            let l = self.rd.line(n);
-            self.line(&format!("  {l}"));
-        }
+        // `Construct::Save` is `Spell(Omit)`: VACASK saves every node. A
+        // kept control line runs where it stood among the analyses (an
+        // `elaborate` picks the circuit the next ones run on): each is
+        // written before the analysis that followed it in the source.
+        let mut extra = tb.extra.iter().copied().peekable();
         let swept: Vec<String> = tb
             .analyses
             .iter()
@@ -130,6 +130,10 @@ impl W<'_, '_> {
         let alters = self.dc_alters(&swept);
         let mut dc_types = false;
         for (idx, (a, tok)) in tb.analyses.iter().enumerate() {
+            while let Some((n, _)) = extra.next_if(|&(_, before)| before <= idx) {
+                let l = self.rd.line(n);
+                self.line(&format!("  {l}"));
+            }
             // The DC analyses see a waveform source's DC value
             // (`W::dc_alters`), a transient its waveform.
             let tran = spectre_kind(a) == Some("tran")
@@ -156,6 +160,10 @@ impl W<'_, '_> {
                 };
                 self.line(&format!("  {l}{ic}"));
             }
+        }
+        for (n, _) in extra {
+            let l = self.rd.line(n);
+            self.line(&format!("  {l}"));
         }
         self.line("endc");
     }

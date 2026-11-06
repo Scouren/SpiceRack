@@ -175,3 +175,23 @@ fn an_included_library_has_no_title_line() {
     );
     close(col(&run(&deck), "b")[0], 0.5, 1e-9);
 }
+
+#[test]
+fn control_lines_keep_their_place_among_the_analyses() {
+    // A VACASK control block runs in order (`docs/cmd-overview.md`):
+    // `elaborate circuit("x")` makes x the circuit the next analyses run
+    // on. Written back with every control line first, both analyses ran on
+    // `two` (demo/spice/mos1amp.sim). op1 must see 1 V, op2 2 V.
+    let deck = "t\n\nground 0\nload \"spice/resistor.osdi\"\nmodel resistor sp_resistor\n\
+                model vsource vsource\n\nsubckt one ()\n  v1 (a 0) vsource dc=1\n  \
+                r1 (a 0) resistor r=1k\nends\n\nsubckt two ()\n  v1 (a 0) vsource dc=2\n  \
+                r1 (a 0) resistor r=1k\nends\n\ncontrol\n  elaborate circuit(\"one\")\n  \
+                analysis op1 op\n  elaborate circuit(\"two\")\n  analysis op2 op\nendc\n";
+    let lex = Lang::VACASK.lexicon().expect("a reader");
+    let netlist = emit_from(deck, Dialect::Vacask, lex).expect("written");
+    let plots = Dialect::Vacask
+        .run_all(&netlist)
+        .unwrap_or_else(|e| panic!("{e}\n{netlist}"));
+    close(col(&plots[0], "a")[0], 1.0, 1e-9);
+    close(col(&plots[1], "a")[0], 2.0, 1e-9);
+}

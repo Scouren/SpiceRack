@@ -56,8 +56,9 @@ pub(super) struct Tb {
     pub(super) steps: Vec<Step>,
     /// Each list `.step`'s name, values and first token.
     pub(super) step_lists: Vec<(String, Vec<f64>, u32)>,
-    /// VACASK control statements kept as text.
-    pub(super) extra: Vec<u32>,
+    /// VACASK control statements kept as text, each with the count of
+    /// analyses read before it (its place among them).
+    pub(super) extra: Vec<(u32, usize)>,
     /// Each VACASK `save` naming a module's output variable (not written).
     pub(super) unsaved: Vec<u32>,
 }
@@ -188,7 +189,7 @@ impl W<'_, '_> {
         }
         // A VACASK control statement: a script line left out, any other
         // refused (no Spectre statement says it).
-        for &n in &tb.extra {
+        for &(n, _) in &tb.extra {
             let tok = self.rd.main(n);
             self.ask(self.rd.kept_construct(tok), tok);
         }
@@ -359,7 +360,7 @@ impl W<'_, '_> {
                             tb.saves.extend(s);
                             tb.unsaved.extend(dropped.then(|| self.rd.main(n)));
                         }
-                        _ => tb.extra.push(n),
+                        _ => tb.extra.push((n, tb.analyses.len())),
                     },
                 }
             }
