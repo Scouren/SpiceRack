@@ -27688,3 +27688,25 @@ vacask/benchmark/vadistiller/c6288/vacask/runme.sim cdl its waveform source's DC
 vacask/benchmark/vadistiller/c6288/vacask/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
 vacask/benchmark/vadistiller/c6288/vacaskcg/runme.sim cdl its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
 vacask/benchmark/vadistiller/c6288/vacaskcg/runme.sim vacask its waveform source's DC value is the waveform at t = 0 (dc=v0*vdd), was 0
+
+# Phase 7: spectre-read-r2: a VACASK save (render::read::named_control
+# vacask_saves; the control block's reading moves to named_control.rs). A
+# control `save` of `v(n)`, `v(a,b)`, `i(source)`, `default`/`full`
+# (VACASK docs cmd-analysis-tran.md "Save directives") is the target's save
+# list (`all` for default); a `p(inst,var)` (a module's own output
+# variable: VACASK's resistor gives one parallel instance's current,
+# ngspice's @r1[i] all of them) is left out with a W0023 note. Was refused
+# W0001 off VACASK; VACASK copies the line as before, CDL no longer copies it.
+vacask/demo/spice/rcl.sim cdl the VACASK save is a save list, which the layout does not write (was copied as a line)
+vacask/demo/spice/rcl.sim espice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/demo/spice/rcl.sim hspice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/demo/spice/rcl.sim ltspice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/demo/spice/rcl.sim ngspice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/demo/spice/rcl.sim spectre now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/demo/spice/rcl.sim xyce now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/test/test_resistor.sim espice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/test/test_resistor.sim hspice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/test/test_resistor.sim ltspice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/test/test_resistor.sim ngspice now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/test/test_resistor.sim spectre now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001
+vacask/test/test_resistor.sim xyce now written: its VACASK save as the save list, a p(inst,var) left out W0023; was refused W0001

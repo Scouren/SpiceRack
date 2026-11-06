@@ -58,6 +58,8 @@ pub(super) struct Tb {
     pub(super) step_lists: Vec<(String, Vec<f64>, u32)>,
     /// VACASK control statements kept as text.
     pub(super) extra: Vec<u32>,
+    /// Each VACASK `save` naming a module's output variable (not written).
+    pub(super) unsaved: Vec<u32>,
 }
 
 /// A `.step`: its sweep keyword, parameter, start, stop and step, and its
@@ -273,6 +275,9 @@ impl W<'_, '_> {
         for &tok in &tb.xyce {
             self.note(Code::W0024, tok);
         }
+        for &tok in &tb.unsaved {
+            self.note(Code::W0023, tok);
+        }
         for &tok in &tb.ngbehavior {
             self.ask(Construct::NgBehavior, tok);
         }
@@ -349,7 +354,16 @@ impl W<'_, '_> {
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
                     BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
-                    BenchCard::Extra(n) => tb.extra.push(n),
+                    // A VACASK `save` is a save list (VACASK's own writer
+                    // copies the statement).
+                    BenchCard::Extra(n) => match self.rd.vacask_saves(n) {
+                        Some((s, dropped)) if self.d != Dialect::Vacask => {
+                            tb.save_tok.get_or_insert(self.rd.main(n));
+                            tb.saves.extend(s);
+                            tb.unsaved.extend(dropped.then(|| self.rd.main(n)));
+                        }
+                        _ => tb.extra.push(n),
+                    },
                 }
             }
         }

@@ -328,8 +328,9 @@ fn xyce_takes_the_options_its_reference_guide_names() {
 /// VACASK `simulator/cmd.cpp` (the `control` commands): `abort` sets when
 /// a failed command stops the script, `print` writes to the console,
 /// `postprocess` runs a program over the results; none changes a number,
-/// so each is left out (W0120) and the written deck runs on real ngspice
-/// to the divider's 0.5 V. `alter`
+/// so each is left out (W0120); `save v(b)` is the save list (`.save
+/// v(b)`), and the written deck runs on real ngspice to the divider's
+/// 0.5 V. `alter`
 /// changes a value between analyses: no SPICE card has it, so it is
 /// refused (W0001). The old writer copied each as a card (`abort always`
 /// an A element to ngspice).
@@ -337,7 +338,7 @@ fn xyce_takes_the_options_its_reference_guide_names() {
 fn a_vacask_control_line_is_left_out_or_refused_off_vacask() {
     let deck = "t\nground 0\nload \"spice/resistor.osdi\"\nmodel r resistor\n\
         model v vsource\nv1 (a 0) v dc=1\nr1 (a b) r r=1k\nr2 (b 0) r r=1k\n\
-        control\n  abort always\n  print stats\n  analysis op1 op\n\
+        control\n  abort always\n  save v(b)\n  print stats\n  analysis op1 op\n\
         postprocess(PYTHON, \"runme.py\")\nendc\n";
     let w = render_text(deck, Dialect::Vacask, "t", Dialect::Ngspice).expect("written");
     for word in ["abort", "print", "postprocess"] {
@@ -345,6 +346,7 @@ fn a_vacask_control_line_is_left_out_or_refused_off_vacask() {
     }
     let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
     assert!(codes.contains(&Code::W0120), "{codes:?}");
+    assert!(w.text.contains(".save v(b)"), "{}", w.text);
     let v = ngspice_op(&w.text, "b");
     assert!((v - 0.5).abs() < 1e-9, "{v}\n{}", w.text);
     let alter = deck.replace("print stats", "alter r1 r=2k");

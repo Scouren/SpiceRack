@@ -53,6 +53,8 @@ pub(super) struct Tb {
     /// VACASK control statements kept as text: none is written
     /// (`W::vacask_lines`).
     pub(super) extra: Vec<u32>,
+    /// Each VACASK `save` naming a module's output variable (not written).
+    unsaved: Vec<u32>,
     /// `ngbehavior=`'s mode, with its statement's first token.
     pub(super) ngbehavior: Option<(String, u32)>,
 }
@@ -143,6 +145,9 @@ impl W<'_, '_> {
         self.respell_refs(&mut tb);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
+        }
+        for &tok in &tb.unsaved {
+            self.note(Code::W0023, tok);
         }
         if self.d == Dialect::Xyce {
             for l in self.xyce_options(&tb) {
@@ -332,7 +337,16 @@ impl W<'_, '_> {
             BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
             BenchCard::Print(k, outs) => tb.prints.push((k, outs, tok)),
             BenchCard::Meas(m) => tb.measures.push(m),
-            BenchCard::Extra(n) => tb.extra.push(n),
+            // A VACASK `save` is a save list; any other kept control
+            // statement is asked about where the testbench is written.
+            BenchCard::Extra(n) => match self.rd.vacask_saves(n) {
+                Some((s, dropped)) => {
+                    tb.save_tok.get_or_insert(self.rd.main(n));
+                    tb.saves.extend(s);
+                    tb.unsaved.extend(dropped.then(|| self.rd.main(n)));
+                }
+                None => tb.extra.push(n),
+            },
         }
     }
 

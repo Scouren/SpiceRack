@@ -234,3 +234,27 @@ fn a_vacask_waveform_source_is_its_value_at_time_zero_in_dc() {
     assert!((node(&v, "2") - 9.0).abs() < 1e-9, "VACASK v(2)");
     assert!((node(&n, "2") - 9.0).abs() < 1e-9, "ngspice v(2)\n{ng}");
 }
+
+#[test]
+fn a_vacask_save_is_the_targets_save_list() {
+    // cmd-analysis-tran.md "Save directives": `v(node)`, `i(instance)`,
+    // `default` (every node and branch flow); ngspice `.save` (manual
+    // §15.6.1) with `all`. A `p(instance,outvar)` is the module's own
+    // output: VACASK's resistor gives one parallel instance's current,
+    // ngspice's `@r1[i]` all of them (1.5 mA against 0.5 mA at
+    // `$mfactor=3`), so it is left out with a note.
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    let deck = bare.replace(
+        "  analysis op1 op",
+        "  save default v(2) i(v1) p(r1,i)\n  analysis op1 op",
+    );
+    let w = written(&deck, Dialect::Ngspice).expect("written");
+    assert!(w.text.contains(".save all v(2) i(v1)\n"), "{}", w.text);
+    assert!(codes(&w).contains(&Code::W0023), "{:?}", codes(&w));
+    let n = run(Dialect::Ngspice, &w.text);
+    assert!((node(&n, "2") - 9.0).abs() < 1e-9);
+    // Only VACASK reads `p(...)`, `default`: its own writer keeps the line.
+    let own = written(&deck, Dialect::Vacask).expect("written").text;
+    let squeezed: String = own.split_whitespace().collect();
+    assert!(squeezed.contains("savedefaultv(2)i(v1)p(r1,i)"), "{own}");
+}
