@@ -12,7 +12,6 @@
 
 use super::W;
 use super::params::spelled_flag;
-use crate::syntax::Lang;
 use crate::syntax::ast::NONE;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
@@ -25,7 +24,7 @@ impl W<'_, '_> {
         // Text kept from another dialect reaches only its own, which
         // copies it unchecked.
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
-        let foreign = |tok: &u32| Lang::from(self.rd.text_dialect(*tok)) != self.lang;
+        let foreign = |tok: &u32| self.rd.text_lang(*tok) != self.lang;
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
         // A statement whose target lacks it is that statement's refusal,
         // the rest foreign text's (one note each kind).

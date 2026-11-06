@@ -68,10 +68,10 @@ pub enum Tag {
     /// `.end`. No fields.
     End,
     /// A statement the parser cannot read, kept as its tokens, always with a
-    /// diagnostic. `lhs`: its last token; `rhs`: the [`Dialect`] index
-    /// (`Dialect::ALL`) of the lexicon that read it.
+    /// diagnostic. `lhs`: its last token; `rhs`: the [`Lang`] index of
+    /// the lexicon that read it.
     ///
-    /// [`Dialect`]: crate::syntax::Dialect
+    /// [`Lang`]: crate::syntax::Lang
     Verbatim,
     /// `.include`, `include`. Fields: the path.
     Include,

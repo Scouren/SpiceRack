@@ -13,7 +13,7 @@
 //! Cites: none (each code path cites its manual where it is read).
 //!
 //! Contents:
-//! - `pub struct Behaviours`, `pub const fn builtin(d: Dialect) -> Behaviours`
+//! - `pub struct Behaviours`, `Behaviours::DEFAULT`, `pub const fn builtin(d: Dialect) -> Behaviours`
 //! - `pub enum Writer`, `pub enum NumberReading`, `pub enum ModelSemantics`, `pub enum SourceRules`,
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
@@ -22,7 +22,7 @@
 use crate::syntax::{Dialect, Lang};
 
 /// A language's behaviours.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Behaviours {
     /// The writer layout its decks are written in.
     pub writer: Writer,
@@ -202,6 +202,33 @@ pub enum NamedParams {
     None,
     Spectre,
     Vacask,
+}
+
+impl Behaviours {
+    /// A SPICE-card language's behaviours where none is declared: SPICE
+    /// cards, the SPICE rules, no dialect's own forms. `text_family` is
+    /// the language itself, set when it registers.
+    pub const DEFAULT: Behaviours = Behaviours {
+        writer: Writer::Cards,
+        text_family: Lang::NGSPICE,
+        caret_power: true,
+        hier_sep: '.',
+        numbers: NumberReading::Decimal,
+        model_semantics: ModelSemantics::Other,
+        source_rules: SourceRules::Spice,
+        card_rules: CardRules::Spice,
+        named_rules: NamedRules::None,
+        options_form: OptionsForm::Spice,
+        load_form: LoadForm::None,
+        control_block: ControlBlock::None,
+        analysis_form: AnalysisForm::Plain,
+        end_rule: EndRule::Always,
+        value_quoting: ValueQuoting::AsWritten,
+        coupling: Coupling::Pairs,
+        param_form: ParamForm::Plain,
+        named_params: NamedParams::None,
+        spectre_analyses: &[],
+    };
 }
 
 /// Built-in `d`'s behaviours: each field what `d`'s code path did.

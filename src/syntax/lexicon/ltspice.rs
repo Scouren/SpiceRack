@@ -14,14 +14,14 @@ use super::{
     Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Numbers, Ops, Quote, Quoting,
     SPICE_KEYWORDS, Scale, Tail,
 };
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device;
 use crate::syntax::token::Tag;
 
 /// LTspice: case-blind, `*`/`;` comments, `+` continuation, `{…}`
 /// expressions, `"…"` strings, no `$` or `//` comments.
 pub const LTSPICE: Lexicon = Lexicon {
-    dialect: Dialect::Ltspice,
+    lang: Lang::LTSPICE,
     title: true,
     fold_case: true,
     comment_lines: &["*", ";"],

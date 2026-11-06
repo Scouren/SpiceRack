@@ -15,7 +15,7 @@ use super::{
     Arithmetic, Backslash, Caret, Dollar, HSPICE, Join, Lexicon, Numbers, Ops, Quote, Quoting,
     Scale, Tail,
 };
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device;
 use crate::syntax::statement::{Analysis, Command, Statement};
 use crate::syntax::token::Tag;
@@ -24,7 +24,7 @@ use crate::syntax::token::Tag;
 /// continuation, keywords at a statement's head, `M` mega; a
 /// `simulator lang=spice` region reads as HSPICE.
 pub const SPECTRE: Lexicon = Lexicon {
-    dialect: Dialect::Spectre,
+    lang: Lang::SPECTRE,
     title: true,
     fold_case: false,
     comment_lines: &["//"],

@@ -28,7 +28,7 @@
 //!   `enum Elem`, `enum Raw`, `struct Cond`, `struct Section`, `enum Func`
 //! - `Block::elements(&self) -> Vec<Elem>`
 //! - `fn read(ast: &Ast, t: &Tokens, d: Dialect, name: &str, kit: Option<(&Kit, FileId)>) -> (Rd, Deck)`
-//! - `Rd::text_behaviours`, `Rd::text_dialect`, `Rd::role`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
+//! - `Rd::text_behaviours`, `Rd::text_lang`, `Rd::role`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
 //!   `Rd::ttag`, `Rd::raw`, `Rd::unparsed`, `Rd::keep`, `Rd::card`, `Rd::section`, `Rd::if_head_ok`
 //! - `fn unwrapped(t: &str) -> String`
 
@@ -367,18 +367,18 @@ pub(in crate::syntax::render) fn read<'a>(
 
 impl<'a> Rd<'a> {
     /// The behaviours of the language the text at token `tok` is in
-    /// ([`Rd::text_dialect`]).
+    /// ([`Rd::text_lang`]).
     pub(in crate::syntax::render) fn text_behaviours(&self, tok: u32) -> &'static Behaviours {
-        Lang::from(self.text_dialect(tok)).behaviours()
+        self.text_lang(tok).behaviours()
     }
 
     /// The dialect the text at token `tok` is in: a SPICE file's region's
     /// (`simulator lang=`), else the file's (a Spectre file's SPICE region
     /// is the file's, as the old reader kept it).
-    pub(in crate::syntax::render) fn text_dialect(&self, tok: u32) -> Dialect {
+    pub(in crate::syntax::render) fn text_lang(&self, tok: u32) -> Lang {
         match self.named() {
-            true => self.d,
-            false => self.t.lexicon_at(tok).dialect,
+            true => Lang::from(self.d),
+            false => self.t.lexicon_at(tok).lang,
         }
     }
 

@@ -306,8 +306,8 @@ fn a_given_ngspice_deck_holds_regions_of_other_dialects() {
         "the sweep, a Spectre analysis"
     );
     assert_eq!(
-        t.lexicon_at(a.main_token(Node(spectre[0]))).dialect,
-        crate::syntax::Dialect::Spectre
+        t.lexicon_at(a.main_token(Node(spectre[0]))).lang,
+        crate::syntax::Lang::SPECTRE
     );
     assert!(a.diags().is_empty(), "{:?}", a.diags());
     // The same text in plain ngspice holds no region.

@@ -14,14 +14,14 @@ use super::{
     Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Numbers, Ops, Quote, Quoting,
     SPICE_KEYWORDS, SPICE_OPERATORS, Scale, Tail,
 };
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device;
 use crate::syntax::token::Tag;
 
 /// ngspice: case-blind, `*`/`$`/`;`/`//` comments, `+` and `\\` continuation,
 /// `'…'` and `{…}` expressions, `M` milli.
 pub const NGSPICE: Lexicon = Lexicon {
-    dialect: Dialect::Ngspice,
+    lang: Lang::NGSPICE,
     title: true,
     fold_case: true,
     // §1.5: `*`, `#`, `$`, `;` are comments; the punctuation is turned into

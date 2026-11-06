@@ -16,14 +16,14 @@ use super::{
     Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Numbers, Ops, Quote, Quoting,
     SPICE_KEYWORDS, Scale, Tail,
 };
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device;
 use crate::syntax::token::Tag;
 
 /// HSPICE: case-blind, `*`/`$` comment lines, the `$` hook, `+`, `\` and
 /// `\\` continuation, `'…'` expressions, braces as name bytes (#203).
 pub const HSPICE: Lexicon = Lexicon {
-    dialect: Dialect::Hspice,
+    lang: Lang::HSPICE,
     title: true,
     fold_case: true,
     comment_lines: &["*", "$"],

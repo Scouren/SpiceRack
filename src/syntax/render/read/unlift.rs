@@ -375,14 +375,14 @@ impl<'a> Rd<'a> {
             return text.into();
         };
         let num = self.ttag(k) == T::Number && self.nums.binary_search(&k).is_ok();
-        if !num || lex.dialect == sp.lexicon.dialect {
+        if !num || lex.lang == sp.lexicon.lang {
             return text.into();
         }
         let v = self.t.value(k);
         // VACASK's writer lowercases another dialect's expressions (its
         // names are case-sensitive, SPICE's not: `named::vacask`'s
         // `W::expr`), so a spelling must read the same lowercased.
-        let folds = Lang::from(sp.target).behaviours().writer == Writer::Vacask;
+        let folds = sp.lang.behaviours().writer == Writer::Vacask;
         // An ulp between two dialects' arithmetic is no misreading; a
         // suffix read another way is a factor of 10 or more.
         let reads = |s: &str| {

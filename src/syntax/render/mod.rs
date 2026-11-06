@@ -220,7 +220,6 @@ pub fn writes(target: Dialect) -> bool {
 
 /// [`render`], its target resolved to a row.
 fn render_lang(src: &Source, target: Lang) -> Result<Written, Diags> {
-    assert!(writes(target.dialect()), "render: a target with a writer");
     let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.dialect, src.name, src.kit);
     rd.write_for(target);
     deck.given_loads.extend(src.loads.iter().cloned());

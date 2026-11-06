@@ -15,14 +15,14 @@ use super::{
     Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Numbers, Ops, Quote, Quoting,
     SPICE_KEYWORDS, SPICE_OPERATORS, Scale, Tail,
 };
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::device;
 use crate::syntax::token::Tag;
 
 /// Xyce: case-blind, `*` and blank-led comment lines, `;` comments that no
 /// quote protects, `+` continuation, `.END` in column 1.
 pub const XYCE: Lexicon = Lexicon {
-    dialect: Dialect::Xyce,
+    lang: Lang::XYCE,
     title: true,
     fold_case: true,
     comment_lines: &["*"],

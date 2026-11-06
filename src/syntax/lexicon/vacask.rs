@@ -14,14 +14,14 @@
 use super::{
     Arithmetic, Backslash, Caret, Dollar, Join, Lexicon, Numbers, Ops, Quote, Quoting, Scale, Tail,
 };
-use crate::syntax::Dialect;
+use crate::syntax::Lang;
 use crate::syntax::statement::Analysis;
 use crate::syntax::token::Tag;
 
 /// VACASK: case kept, `//` and `/* */` comments, statements across lines
 /// inside brackets, `@if` directives, keywords at a statement's head.
 pub const VACASK: Lexicon = Lexicon {
-    dialect: Dialect::Vacask,
+    lang: Lang::VACASK,
     title: true,
     fold_case: false,
     comment_lines: &[],

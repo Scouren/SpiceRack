@@ -19,7 +19,6 @@
 use std::collections::{HashMap, HashSet};
 
 use super::{Def, DefKind, FileId, Polarity, Role, Scope, key, walk};
-use crate::syntax::Lang;
 use crate::syntax::ast::{Ast, NONE, Name, Node, Tag};
 use crate::syntax::behaviour::NamedRules;
 use crate::syntax::device::{self, Primitive};
@@ -297,7 +296,7 @@ fn model(t: &Tokens, ast: &Ast, node: Node, word: &str, named: bool) -> DefKind 
         };
         // VACASK's instances name no primitive, so its lexicon has no device
         // table; its `model` statements name `device::VACASK`'s modules.
-        let row = match Lang::from(lex.dialect).behaviours().named_rules {
+        let row = match lex.lang.behaviours().named_rules {
             NamedRules::Vacask => device::find(&[device::VACASK], word, lex.fold_case),
             _ => lex.device(word),
         };

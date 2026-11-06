@@ -20,7 +20,6 @@
 
 use super::Num;
 use super::Rd;
-use crate::syntax::Lang;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::{CardRules, NamedRules, NumberReading};
 use crate::syntax::lexicon::Arithmetic;
@@ -308,7 +307,7 @@ impl Rd<'_> {
             let ok = !v.is_nan() && body.starts_with(|c: char| c.is_ascii_digit() || c == '.');
             return ok.then_some(if neg { -v } else { v });
         }
-        if Lang::from(lex.dialect).behaviours().numbers == NumberReading::Ngspice {
+        if lex.lang.behaviours().numbers == NumberReading::Ngspice {
             if !ngspice_num(s) {
                 return None;
             }

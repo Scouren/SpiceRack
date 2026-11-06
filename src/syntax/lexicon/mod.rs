@@ -20,12 +20,13 @@
 //!   `pub struct Quoting`, `pub enum Caret`, `pub struct Ops`, `Ops::TERNARY: u8`
 //! - `pub struct Numbers`, `pub enum Scale`, `pub enum Tail`, `pub enum Arithmetic`
 //! - `pub const NGSPICE`, `NGSPICE_GIVEN`, `HSPICE`, `LTSPICE`, `XYCE`, `SPECTRE`, `VACASK: Lexicon`
+//! - `pub(crate) const SPICE_KEYWORDS`, `pub(crate) const SPICE_OPERATORS: &[(&str, Tag)]`
 //! - `pub fn of(d: Dialect) -> Option<&'static Lexicon>`
 
-use crate::syntax::Dialect;
 use crate::syntax::device::{self, Device};
 use crate::syntax::statement::{Analysis, Statement};
 use crate::syntax::token::Tag;
+use crate::syntax::{Dialect, Lang};
 
 mod hspice;
 mod ltspice;
@@ -44,8 +45,8 @@ pub use xyce::XYCE;
 /// One dialect's lexical rules. Line structure first, then words, then the
 /// tables the parser reads.
 pub struct Lexicon {
-    /// The dialect whose text this reads (ESPice reads [`NGSPICE`]).
-    pub dialect: Dialect,
+    /// The language whose text this reads (ESPice reads [`NGSPICE`]).
+    pub lang: Lang,
     /// Line 1 of a top-level file is the title, whatever it holds.
     pub title: bool,
     /// Words compare case-blind: keywords and suffixes match lowercased.
@@ -306,7 +307,7 @@ pub enum Arithmetic {
 /// The dot cards every SPICE dialect shares, with their aliases: the
 /// spellings the old SPICE grammar reads (`.macro`/`.eom` are HSPICE's
 /// `.subckt`/`.ends`, `.dcvolt` its `.ic`).
-const SPICE_KEYWORDS: &[(&str, Tag)] = &[
+pub(crate) const SPICE_KEYWORDS: &[(&str, Tag)] = &[
     (".param", Tag::KwParam),
     (".parameter", Tag::KwParam),
     (".parameters", Tag::KwParam),
@@ -357,7 +358,7 @@ const SPICE_KEYWORDS: &[(&str, Tag)] = &[
 ];
 
 /// The SPICE comparison and logic operators.
-const SPICE_OPERATORS: &[(&str, Tag)] = &[
+pub(crate) const SPICE_OPERATORS: &[(&str, Tag)] = &[
     ("**", Tag::StarStar),
     ("==", Tag::EqualEqual),
     ("!=", Tag::BangEqual),

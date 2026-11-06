@@ -1,32 +1,40 @@
-//! Languages as handles into one table of rows: a [`Lang`] → its row,
+//! Languages as handles into one registry of rows: a [`Lang`] → its row,
 //! which holds every table its reader and writers read (the lexicon, the
-//! spelling, the capability column) and the code path that reads them
-//! (its [`Dialect`]), and its [`Behaviours`]. The readers and writers reach a language's tables
-//! only through its row, so a row is what a dialect definition fills
+//! spelling, the capability column, the behaviours). The readers and
+//! writers reach a language's tables only through its row, and a row is
+//! what `syntax::def::register` freezes from a definition
 //! (`tests/fixtures/transpiler/DIALECT-PLUGIN.md`).
 //!
-//! Today the rows are the built-ins, filled from the per-dialect tables
-//! (`lexicon::*`, `render::spelling`, `render::capability::action`) at
-//! compile time; registration of a definition replaces this (P3, P8 there).
+//! The built-ins are registered on the first read of the registry, in a
+//! fixed order, so their handles are constants; a registered language is
+//! never removed. A read takes no lock: rows are published once each, by
+//! [`append`] under one lock, and never change.
 //!
 //! Cites: none (a registry; each row's tables cite their manuals).
 //!
 //! Contents:
-//! - `pub struct Lang`, `Lang::{NGSPICE, LTSPICE, SPECTRE, VACASK, ESPICE, HSPICE, XYCE, CDL, VERILOG}: Lang`
-//! - `pub type Cells`, `pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT]`, `pub const CONSTRUCT_COUNT: usize`
-//! - `Lang::dialect(self) -> Dialect`, `Lang::lexicon(self) -> Option<&'static Lexicon>`,
-//!   `Lang::spelling(self) -> &'static Spelling`, `Lang::cells(self) -> &'static Cells`,
-//!   `Lang::action(self, c: Construct) -> Action`, `Lang::behaviours(self) -> &'static Behaviours`
+//! - `pub struct Lang`, `Lang::{NGSPICE, ESPICE, HSPICE, XYCE, LTSPICE, SPECTRE, VACASK, CDL, VERILOG}: Lang`,
+//!   `Lang::BUILTIN_COUNT: usize`
+//! - `pub type Cells`, `pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT]`, `pub const CONSTRUCT_COUNT: usize`,
+//!   `pub const LANGS_MAX: usize`
+//! - `Lang::name(self) -> &'static str`, `Lang::index(self) -> u32`, `Lang::from_name(name: &str) -> Option<Lang>`,
+//!   `Lang::lexicon(self) -> Option<&'static Lexicon>`, `Lang::spelling(self) -> &'static Spelling`,
+//!   `Lang::cells(self) -> &'static Cells`, `Lang::action(self, c: Construct) -> Action`,
+//!   `Lang::behaviours(self) -> &'static Behaviours`
 //! - `impl From<Dialect> for Lang`
+//! - `pub(crate) struct Row`, `pub(crate) fn append(build: impl FnOnce(Lang) -> Row) -> Option<Lang>`
+
+use std::cell::Cell;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, Once, OnceLock};
 
 use crate::syntax::Dialect;
-use crate::syntax::behaviour::{self, Behaviours};
-use crate::syntax::lexicon::{self, Lexicon};
-use crate::syntax::render::capability::{Action, Construct, action};
-use crate::syntax::render::spelling::{Spelling, spelling};
+use crate::syntax::behaviour::Behaviours;
+use crate::syntax::lexicon::Lexicon;
+use crate::syntax::render::capability::{Action, Construct};
+use crate::syntax::render::spelling::Spelling;
 
-/// A language a deck is read or written in: an index into the rows. The
-/// built-ins are their [`Dialect`]'s position in [`Dialect::ALL`].
+/// A language a deck is read or written in: an index into the registry.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Lang(u16);
 
@@ -36,6 +44,9 @@ pub type Cells = [Action; CONSTRUCT_COUNT];
 
 /// How many [`Construct`]s there are.
 pub const CONSTRUCT_COUNT: usize = 35;
+
+/// How many languages can be registered, the built-ins among them.
+pub const LANGS_MAX: usize = 64;
 
 /// Every [`Construct`], in declaration order, so `CONSTRUCTS[c as usize]`
 /// is `c` (asserted at compile time, and [`position`] fails to compile
@@ -78,29 +89,27 @@ pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT] = [
     Construct::Measure,
 ];
 
-/// One language's tables.
-struct Row {
-    dialect: Dialect,
-    lexicon: Option<&'static Lexicon>,
-    spelling: &'static Spelling,
-    cells: Cells,
-    behaviours: Behaviours,
+/// One language's tables, as registration froze them.
+pub(crate) struct Row {
+    pub(crate) name: &'static str,
+    pub(crate) lexicon: Option<&'static Lexicon>,
+    pub(crate) spelling: &'static Spelling,
+    pub(crate) cells: Cells,
+    pub(crate) behaviours: Behaviours,
 }
 
-/// The rows, the built-ins at their [`Dialect::ALL`] positions.
-// ponytail: built-ins only, filled at compile time; the registry that
-// appends a registered definition's row lands with the definitions (P3).
-static ROWS: [Row; 9] = [
-    builtin(Dialect::Ngspice),
-    builtin(Dialect::Ltspice),
-    builtin(Dialect::Spectre),
-    builtin(Dialect::Vacask),
-    builtin(Dialect::Espice),
-    builtin(Dialect::Hspice),
-    builtin(Dialect::Xyce),
-    builtin(Dialect::Cdl),
-    builtin(Dialect::Verilog),
-];
+/// The registry: each slot set once, `COUNT` the slots set.
+static ROWS: [OnceLock<&'static Row>; LANGS_MAX] = [const { OnceLock::new() }; LANGS_MAX];
+static COUNT: AtomicUsize = AtomicUsize::new(0);
+/// Taken by [`append`]: one registration at a time.
+static APPEND: Mutex<()> = Mutex::new(());
+static BUILTINS: Once = Once::new();
+
+thread_local! {
+    /// This thread is registering the built-ins (their definitions read the
+    /// rows registered before them).
+    static REGISTERING: Cell<bool> = const { Cell::new(false) };
+}
 
 const _: () = {
     let mut i = 0;
@@ -109,30 +118,38 @@ const _: () = {
         assert!(position(CONSTRUCTS[i]) == i);
         i += 1;
     }
-    let mut d = 0;
-    while d < ROWS.len() {
-        assert!(Dialect::ALL[d] as usize == d);
-        d += 1;
-    }
-    assert!(ROWS.len() == Dialect::ALL.len());
 };
 
 impl Lang {
     pub const NGSPICE: Lang = Lang(0);
-    pub const LTSPICE: Lang = Lang(1);
-    pub const SPECTRE: Lang = Lang(2);
-    pub const VACASK: Lang = Lang(3);
-    pub const ESPICE: Lang = Lang(4);
-    pub const HSPICE: Lang = Lang(5);
-    pub const XYCE: Lang = Lang(6);
+    pub const ESPICE: Lang = Lang(1);
+    pub const HSPICE: Lang = Lang(2);
+    pub const XYCE: Lang = Lang(3);
+    pub const LTSPICE: Lang = Lang(4);
+    pub const SPECTRE: Lang = Lang(5);
+    pub const VACASK: Lang = Lang(6);
     pub const CDL: Lang = Lang(7);
     pub const VERILOG: Lang = Lang(8);
+    /// How many built-ins there are: the first registered handles.
+    pub const BUILTIN_COUNT: usize = 9;
 
-    /// The code path that reads this language's rows: the reader and
-    /// writer family, and (until the dialect checks become rows) the
-    /// dialect they ask about.
-    pub fn dialect(self) -> Dialect {
-        self.row().dialect
+    /// The name it was registered under (`ngspice`, ...).
+    pub fn name(self) -> &'static str {
+        self.row().name
+    }
+
+    /// Its position in the registry (a node's word, `ast::Tag::Verbatim`).
+    pub fn index(self) -> u32 {
+        u32::from(self.0)
+    }
+
+    /// The language registered as `name`, compared case-blind.
+    pub fn from_name(name: &str) -> Option<Lang> {
+        builtins();
+        let n = COUNT.load(Ordering::Acquire);
+        (0..n)
+            .map(|i| Lang(i as u16))
+            .find(|l| l.row().name.eq_ignore_ascii_case(name))
     }
 
     /// The lexicon its text is read with; `None` for a language with no
@@ -164,46 +181,61 @@ impl Lang {
 
 impl From<Dialect> for Lang {
     fn from(d: Dialect) -> Lang {
-        let lang = Lang(d as u16);
-        assert!(lang.row().dialect == d);
-        lang
+        match d {
+            Dialect::Ngspice => Lang::NGSPICE,
+            Dialect::Espice => Lang::ESPICE,
+            Dialect::Hspice => Lang::HSPICE,
+            Dialect::Xyce => Lang::XYCE,
+            Dialect::Ltspice => Lang::LTSPICE,
+            Dialect::Spectre => Lang::SPECTRE,
+            Dialect::Vacask => Lang::VACASK,
+            Dialect::Cdl => Lang::CDL,
+            Dialect::Verilog => Lang::VERILOG,
+        }
     }
+}
+
+/// Publishes the row `build` makes for the next handle, under the
+/// registry's lock; `None` when every slot is taken.
+///
+/// # Panics
+/// When `build` registers (the lock is held).
+pub(crate) fn append(build: impl FnOnce(Lang) -> Row) -> Option<Lang> {
+    let _held = APPEND.lock().unwrap_or_else(|p| p.into_inner());
+    let i = COUNT.load(Ordering::Acquire);
+    if i == LANGS_MAX {
+        return None;
+    }
+    let me = Lang(i as u16);
+    let row: &'static Row = Box::leak(Box::new(build(me)));
+    assert!(ROWS[i].set(row).is_ok(), "append: a slot set once");
+    COUNT.store(i + 1, Ordering::Release);
+    Some(me)
 }
 
 // ---- private ----
 
 impl Lang {
     fn row(self) -> &'static Row {
-        let row = &ROWS[usize::from(self.0)];
-        assert!(row.dialect as u16 == self.0, "a built-in row at its index");
-        row
+        builtins();
+        let i = usize::from(self.0);
+        assert!(i < LANGS_MAX);
+        ROWS[i].get().expect("a registered language")
     }
 }
 
-/// Built-in `d`'s row, from its per-dialect tables.
-const fn builtin(d: Dialect) -> Row {
-    let lexicon = match d {
-        Dialect::Ngspice | Dialect::Espice => Some(&lexicon::NGSPICE),
-        Dialect::Hspice => Some(&lexicon::HSPICE),
-        Dialect::Ltspice => Some(&lexicon::LTSPICE),
-        Dialect::Xyce => Some(&lexicon::XYCE),
-        Dialect::Spectre => Some(&lexicon::SPECTRE),
-        Dialect::Vacask => Some(&lexicon::VACASK),
-        Dialect::Cdl | Dialect::Verilog => None,
-    };
-    let mut cells = [Action::Native; CONSTRUCT_COUNT];
-    let mut i = 0;
-    while i < CONSTRUCT_COUNT {
-        cells[i] = action(d, CONSTRUCTS[i]);
-        i += 1;
+/// Registers the built-ins once, before the first read; a read from their
+/// own definitions (while registering) sees the ones before it.
+fn builtins() {
+    if REGISTERING.get() {
+        return;
     }
-    Row {
-        dialect: d,
-        lexicon,
-        spelling: spelling(d),
-        cells,
-        behaviours: behaviour::builtin(d),
-    }
+    BUILTINS.call_once(|| {
+        REGISTERING.set(true);
+        crate::syntax::dialects::register_builtins();
+        REGISTERING.set(false);
+        assert!(COUNT.load(Ordering::Acquire) == Lang::BUILTIN_COUNT);
+    });
 }
 
 /// `c`'s index in [`CONSTRUCTS`]: an exhaustive match, so a construct
@@ -245,43 +277,5 @@ const fn position(c: Construct) -> usize {
         Construct::UnmappedOption => 32,
         Construct::Statistics => 33,
         Construct::Measure => 34,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn each_built_in_row_holds_its_dialects_tables() {
-        // The oracle is the per-dialect tables the writers read before the
-        // rows: the spelling row, the capability match, and the lexicon
-        // each dialect's text was read with (ESPice reads ngspice's).
-        for d in Dialect::ALL {
-            let l = Lang::from(d);
-            assert_eq!(l.dialect(), d);
-            // A `const` row's address is its use site's, so the rows
-            // compare by their fields.
-            let (got, want) = (l.spelling(), spelling(d));
-            assert_eq!(got.target, want.target);
-            assert_eq!(got.lexicon.dialect, want.lexicon.dialect, "{d:?}");
-            assert_eq!(got.comment, want.comment, "{d:?}");
-            assert_eq!(got.path_quote, want.path_quote, "{d:?}");
-            assert_eq!(got.expr, want.expr, "{d:?}");
-            assert_eq!(got.func, want.func, "{d:?}");
-            assert_eq!(got.subckt_params, want.subckt_params, "{d:?}");
-            assert_eq!(got.ngspice_numbers, want.ngspice_numbers, "{d:?}");
-            for c in CONSTRUCTS {
-                assert_eq!(l.action(c), action(d, c), "{d:?} {c:?}");
-            }
-            let read = l.lexicon().map(|x| x.dialect);
-            let want = match d {
-                Dialect::Cdl | Dialect::Verilog => None,
-                _ => Some(d.family()),
-            };
-            assert_eq!(read, want, "{d:?}");
-        }
-        assert_eq!(Lang::from(Dialect::Hspice), Lang::HSPICE);
-        assert_eq!(Lang::VERILOG.dialect(), Dialect::Verilog);
     }
 }

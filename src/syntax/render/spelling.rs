@@ -16,13 +16,14 @@
 //! - `Spelling::letter(&self, p: Primitive) -> char`, `Spelling::number(&self, v: f64, exact: bool) -> String`,
 //!   `Spelling::decimal(&self, v: f64, exact: bool) -> String`, `Spelling::format(&self, v: f64) -> String`
 
-use crate::syntax::Dialect;
 use crate::syntax::device::{self, Primitive};
 use crate::syntax::lexicon::{self, Lexicon, Scale};
+use crate::syntax::{Dialect, Lang};
 
 /// One target's spelling.
 pub struct Spelling {
-    pub target: Dialect,
+    /// The language it spells.
+    pub lang: Lang,
     /// The lexicon the target's reader reads: its element letters and its
     /// number suffixes are the writer's too.
     pub lexicon: &'static Lexicon,
@@ -71,7 +72,7 @@ const LADDER: [(f64, i32); 10] = [
 ];
 
 const NGSPICE: Spelling = Spelling {
-    target: Dialect::Ngspice,
+    lang: Lang::NGSPICE,
     lexicon: &lexicon::NGSPICE,
     comment: "*",
     path_quote: "",
@@ -82,12 +83,12 @@ const NGSPICE: Spelling = Spelling {
 };
 
 const ESPICE: Spelling = Spelling {
-    target: Dialect::Espice,
+    lang: Lang::ESPICE,
     ..NGSPICE
 };
 
 const HSPICE: Spelling = Spelling {
-    target: Dialect::Hspice,
+    lang: Lang::HSPICE,
     lexicon: &lexicon::HSPICE,
     path_quote: "'",
     expr: ("'", "'"),
@@ -98,7 +99,7 @@ const HSPICE: Spelling = Spelling {
 };
 
 const XYCE: Spelling = Spelling {
-    target: Dialect::Xyce,
+    lang: Lang::XYCE,
     lexicon: &lexicon::XYCE,
     ngspice_numbers: false,
     ..NGSPICE
@@ -107,26 +108,26 @@ const XYCE: Spelling = Spelling {
 /// CDL (the xschem layout): its elements are ngspice cards, its numbers
 /// spelled as a deck read with no ngspice arithmetic.
 const CDL: Spelling = Spelling {
-    target: Dialect::Cdl,
+    lang: Lang::CDL,
     ..NGSPICE
 };
 
 /// Structural Verilog: a `//` comment; its instances' nets are names.
 const VERILOG: Spelling = Spelling {
-    target: Dialect::Verilog,
+    lang: Lang::VERILOG,
     comment: "//",
     ..NGSPICE
 };
 
 const LTSPICE: Spelling = Spelling {
-    target: Dialect::Ltspice,
+    lang: Lang::LTSPICE,
     lexicon: &lexicon::LTSPICE,
     ngspice_numbers: false,
     ..NGSPICE
 };
 
 const SPECTRE: Spelling = Spelling {
-    target: Dialect::Spectre,
+    lang: Lang::SPECTRE,
     lexicon: &lexicon::SPECTRE,
     comment: "//",
     path_quote: "\"",
@@ -138,7 +139,7 @@ const SPECTRE: Spelling = Spelling {
 
 /// VACASK's title is its first line, bare (no comment leader).
 const VACASK: Spelling = Spelling {
-    target: Dialect::Vacask,
+    lang: Lang::VACASK,
     lexicon: &lexicon::VACASK,
     comment: "",
     func: FuncForm::None,
