@@ -31,7 +31,10 @@
 //!
 //! `CROSS_SIM_BLESS=<dir>` writes each cell's observed list to `<dir>`, for
 //! review against the tree's; `CROSS_SIM_JOBS` sets the workers (one per CPU);
-//! `CROSS_SIM_ONLY=<text>` runs only the decks whose path holds it;
+//! `CROSS_SIM_ONLY=<text>` runs only the decks whose path holds it
+//! (`@<file>`: those the file lists, one corpus-relative path a line);
+//! `CROSS_SIM_TUBE=<fraction>` widens the transient time tube (triage only:
+//! the lists hold at the default 0.01);
 //! `CROSS_SIM_KEEP=1` keeps every run's directory (the decks as run, the
 //! simulator's output) and prints where.
 //!
@@ -260,7 +263,15 @@ fn sweep(c: &Corpus, sample: Option<usize>) {
     let mut all = Vec::new();
     files(Path::new(&root), c.ext, &mut all);
     let only = std::env::var("CROSS_SIM_ONLY").unwrap_or_default();
-    all.retain(|p| (c.keep)(&p.to_string_lossy()) && p.to_string_lossy().contains(&only));
+    let wanted: Option<BTreeSet<String>> = only.strip_prefix('@').map(|f| {
+        let text = std::fs::read_to_string(f).unwrap_or_else(|e| panic!("CROSS_SIM_ONLY {f}: {e}"));
+        text.lines().map(|l| l.trim().to_string()).collect()
+    });
+    let picked = |p: &Path| match &wanted {
+        Some(set) => set.contains(&*p.strip_prefix(&root).unwrap_or(p).to_string_lossy()),
+        None => p.to_string_lossy().contains(&only),
+    };
+    all.retain(|p| (c.keep)(&p.to_string_lossy()) && picked(p));
     all.sort();
     assert!(!all.is_empty(), "no *.{} under {root}", c.ext);
     if let Some(n) = sample {

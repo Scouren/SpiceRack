@@ -97,6 +97,15 @@ fn kind(p: &RawData) -> &'static str {
     }
 }
 
+/// The time tube's half-width as a fraction of the stop time: 1%, or
+/// `CROSS_SIM_TUBE` (triage: does a wider window clear an edge?).
+fn tube() -> f64 {
+    std::env::var("CROSS_SIM_TUBE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.01)
+}
+
 /// A vector's name as every simulator here spells it: lower case, `v(x)`
 /// as `x`, a branch current as `<device>#branch`, hierarchy joined by `.`.
 fn normal(name: &str) -> String {
@@ -170,7 +179,7 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
         if k == "tran" {
             let tol = TRAN * swing + 2.0 * floor;
             let (ra, rb) = (a.re(i), b.re(j));
-            let dx = 0.01 * xa.last().copied().unwrap_or(0.0);
+            let dx = tube() * xa.last().copied().unwrap_or(0.0);
             if let Some(p) = leaves_tube(&xa, &ra, &xb, &rb, dx, tol) {
                 return Err(format!(
                     "tran {}: {} leaves the tube at t={} (tol {tol:.3e})",
