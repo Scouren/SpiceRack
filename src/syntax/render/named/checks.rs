@@ -244,7 +244,7 @@ fn card_exprs(c: Card, tok: u32, out: &mut Vec<(String, u32)>) {
             }
             out.extend(expr(value));
         }
-        Card::Behavioural { expr, .. } => out.push((expr, tok)),
+        Card::Behavioural { expr, .. } | Card::Table { expr, .. } => out.push((expr, tok)),
         Card::Charge { charge, params, .. } => {
             out.push((charge, tok));
             out.extend(params.into_iter().map(at));

@@ -78,6 +78,8 @@ pub enum Construct {
     /// A `.func` local to a subcircuit (it reads the subcircuit's
     /// parameters, or another `.func` shares its name).
     LocalFunc,
+    /// Xyce's `E`/`G` `TABLE`.
+    TableSource,
     /// `.step`.
     Step,
     /// `.step <name> list <values>`.
@@ -145,6 +147,8 @@ pub enum Alt {
     /// `.dc src DEC|OCT np start stop`, `.dc src POI n v…` (HSPICE `.DC`,
     /// the `type np` form).
     DcType,
+    /// An E/G `value={pwl(expr, x, y, …)}` (ngspice).
+    PwlValue,
     /// Not written, the code the note the writer records for it.
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
@@ -348,6 +352,17 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0106),
             D::Cdl | D::Verilog => Native,
         },
+        // Xyce's own form; ngspice's `pwl()` in a value (its `TABLE`
+        // smooths each corner: ngspice-45 and ESPice 0.3.0 give 1.05 at
+        // the first point of `(0,1) (1,3)`, Xyce 1); ESPice's B has no
+        // `pwl()` (0.3.0: "WrongArity"); HSPICE's `PWL(1)` reads a node
+        // pair, not an expression; LTspice, Spectre and VACASK not written.
+        Construct::TableSource => match target {
+            D::Xyce => Native,
+            D::Ngspice => Spell(Alt::PwlValue),
+            D::Espice | D::Hspice | D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0102),
+            D::Cdl | D::Verilog => Native,
+        },
         Construct::Step => match target {
             D::Xyce | D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
@@ -482,7 +497,7 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 36] = [
+    const CONSTRUCTS: [Construct; 37] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -505,6 +520,7 @@ mod tests {
         Construct::BranchParam,
         Construct::Func,
         Construct::LocalFunc,
+        Construct::TableSource,
         Construct::Step,
         Construct::StepList,
         Construct::TranStartup,

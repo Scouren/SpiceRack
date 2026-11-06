@@ -43,6 +43,16 @@ pub(in crate::syntax::render) enum Card {
         charge: String,
         params: Vec<(String, String)>,
     },
+    /// Xyce's `E`/`G` `TABLE {expr} = (x,y) …`: the output (a current for
+    /// G) by straight lines between the points, constant past either end.
+    Table {
+        current: bool,
+        name: String,
+        np: String,
+        nm: String,
+        expr: String,
+        points: Vec<(f64, f64)>,
+    },
     /// `K1 L1 L2 … k`: the inductor names after their letter, and as the
     /// card wrote them (the references the name map looks up); every pair
     /// coupled by `k` (Xyce RG and LTspice help, `K` with more than two
@@ -198,6 +208,20 @@ impl<'a> Rd<'a> {
                 | Element::VoltageSource
                 | Element::CurrentSource
         );
+        if matches!(e, Element::Vcvs | Element::Vccs)
+            && let [a, b, ..] = items
+            && self.is_word(*a)
+            && self.is_word(*b)
+            && let Some(t) = self.table_source(
+                n,
+                e == Element::Vccs,
+                name.clone(),
+                self.text(*a),
+                self.text(*b),
+            )
+        {
+            return Some(t);
+        }
         let head = items.len().min(2);
         // A `B` card's body after `key =` is text to the card's end.
         let spaced = match e {

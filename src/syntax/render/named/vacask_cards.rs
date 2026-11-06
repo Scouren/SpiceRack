@@ -196,6 +196,10 @@ impl W<'_, '_> {
                 self.ask(Construct::BehaviouralSource, tok);
                 return None;
             }
+            Card::Table { .. } => {
+                self.ask(Construct::TableSource, tok);
+                return None;
+            }
             // No polynomial builtin, no switch, no lossless line.
             Card::Poly { .. } | Card::Switch { .. } | Card::Line { .. } => {
                 self.refuse(Code::W0105, tok);

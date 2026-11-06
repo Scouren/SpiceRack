@@ -174,6 +174,10 @@ impl W<'_, '_> {
                 value,
                 ..
             } => self.bsource_card(tok, own, current, [&np, &nm], &expr, value)?,
+            Card::Table { .. } => {
+                self.ask(Construct::TableSource, tok);
+                return None;
+            }
             Card::Linear {
                 letter,
                 name: _,

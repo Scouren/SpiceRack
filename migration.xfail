@@ -26780,3 +26780,52 @@ xyce/SUBCKT/subckt_j1_hs.cir espice now written: .func inside a .subckt read
 xyce/SUBCKT/subckt_j1_hs.cir hspice now written: .func inside a .subckt read
 xyce/SUBCKT/subckt_j1_hs.cir ngspice now written: .func inside a .subckt read
 xyce/SUBCKT/subckt_j1_hs.cir xyce written differently: .func inside a .subckt read
+
+# Phase 7: spice-read: Xyce's E/G TABLE (render::read tables.rs; Card::Table;
+# capability TableSource). `TABLE {expr} = (x,y) …` (braces, `=` and an
+# outer parenthesis optional) over node voltages and branch currents: Xyce
+# writes `TABLE {expr} = (x,y) …`, ngspice `value={pwl(expr, x0-1, y0, …,
+# xn+1, yn)}` (flat past the ends, as Xyce: ngspice's own TABLE smooths
+# each corner), ESPice, HSPICE, LTspice, Spectre and VACASK refuse W0102.
+# Oracle: Xyce 7.10 vs ngspice-45 (counts in the commit).
+xyce/Certification_Tests/BUG_1012/negtable.cir cdl written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_1012/negtable.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_1012/negtable.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_133/bug_133.cir cdl written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_133/bug_133.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_133/bug_133.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir cdl written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir cdl written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir cdl written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_794_SON/test1.cir cdl written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_794_SON/test1.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_794_SON/test1.cir xyce written differently: Xyce E/G TABLE read
+xyce/Message/Device/DeviceBlock_extractBehavioralDeviceData.cir cdl written differently: Xyce E/G TABLE read
+xyce/Message/Device/DeviceBlock_extractBehavioralDeviceData.cir xyce written differently: Xyce E/G TABLE read
+xyce/Message/Topology/Bad_Voltage_Node_Error.cir cdl written differently: Xyce E/G TABLE read
+xyce/Message/Topology/Bad_Voltage_Node_Error.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_gear.cir cdl written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_gear.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_e_gear.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_trap.cir cdl written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_trap.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_e_trap.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_gear.cir cdl written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_gear.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_g_gear.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_trap.cir cdl written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_trap.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_g_trap.cir xyce written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir cdl written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir ngspice now written: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir xyce written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir cdl written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir cdl written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir xyce written differently: Xyce E/G TABLE read

@@ -58,6 +58,7 @@ mod refused;
 mod shapes;
 mod sources;
 mod sweeps;
+mod tables;
 mod testbench;
 mod text;
 mod unlift;

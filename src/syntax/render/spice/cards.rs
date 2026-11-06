@@ -148,6 +148,39 @@ impl W<'_, '_> {
                 }
                 s
             }
+            Card::Table {
+                np,
+                nm,
+                expr,
+                points,
+                ..
+            } => {
+                let act = self.ask(Construct::TableSource, tok);
+                let n = |v: f64| self.sp.number(v, self.x);
+                match act {
+                    // ngspice manual, `pwl(x, x1, y1, …)` in an E/G value
+                    // (straight on past the ends, so a flat point is added
+                    // each side; ngspice-45 ran it equal to Xyce's TABLE).
+                    Action::Spell(Alt::PwlValue) => {
+                        let (x0, y0) = points[0];
+                        let (xn, yn) = points[points.len() - 1];
+                        let mut args = vec![format!("{}, {}", n(x0 - 1.0), n(y0))];
+                        args.extend(points.iter().map(|&(x, y)| format!("{}, {}", n(x), n(y))));
+                        args.push(format!("{}, {}", n(xn + 1.0), n(yn)));
+                        format!(
+                            "{decl} {np} {nm} value={{pwl({expr}, {})}}",
+                            args.join(", ")
+                        )
+                    }
+                    _ => {
+                        let pts: Vec<String> = points
+                            .iter()
+                            .map(|&(x, y)| format!("({},{})", n(x), n(y)))
+                            .collect();
+                        format!("{decl} {np} {nm} TABLE {{{expr}}} = {}", pts.join(" "))
+                    }
+                }
+            }
             Card::Behavioural {
                 current,
                 np,

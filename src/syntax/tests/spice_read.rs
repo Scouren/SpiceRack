@@ -382,3 +382,36 @@ fn a_subcircuit_func_is_the_subcircuits_or_the_tops() {
         "{sp}"
     );
 }
+
+#[test]
+fn a_xyce_table_source_is_ngspices_pwl_value_with_flat_ends() {
+    // Xyce RG E/G `TABLE`; ngspice manual `pwl()` in a value. Xyce 7.10
+    // ran the TABLE deck, ngspice-45 the written one to the same v(2),
+    // v(3) at every point of -2..3 V (1 below 0, 3 above 1); ngspice's own
+    // TABLE gives 1.05 at 0 (smoothed), so it is not the spelling; ESPice
+    // has no `pwl()` (W0102). Checks: 2 + 1 + 1.
+    let text = "t\nV1 1 0 0\nE1 2 0 TABLE V(1,0) = (0,1) (1,3)\nR2 2 0 1k\nG1 0 3 TABLE {V(1)} = (0,1m) (1,3m)\nR3 3 0 1k\n.dc V1 -1 2 0.25\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [
+        "E1 2 0 value={pwl(V(1,0), -1, 1, 0, 1, 1, 3, 2, 3)}",
+        "G1 0 3 value={pwl(V(1), -1, 1m, 0, 1m, 1, 3m, 2, 3m)}",
+    ] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    let xy = render_text(text, Dialect::Xyce, "t", Dialect::Xyce)
+        .expect("written")
+        .text;
+    assert!(
+        xy.lines()
+            .any(|l| l == "E1 2 0 TABLE {V(1,0)} = (0,1) (1,3)"),
+        "{xy}"
+    );
+    let es = render_text(text, Dialect::Xyce, "t", Dialect::Espice).expect_err("refused");
+    assert!(
+        es.diags.iter().any(|g| g.code == Code::W0102),
+        "{}",
+        es.messages
+    );
+}
