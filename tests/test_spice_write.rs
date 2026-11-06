@@ -55,6 +55,7 @@ fn scratch(name: &str, text: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("spice-write-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.join(name);
+    std::fs::create_dir_all(p.parent().unwrap()).unwrap();
     std::fs::write(&p, text).unwrap();
     p
 }
@@ -420,4 +421,26 @@ fn a_zero_transient_step_is_a_positive_one_on_ngspice() {
     let v = *raw.real_data[i.expect("v(out)")].last().unwrap();
     let want = 1.0 - (-5.0f64).exp();
     assert!((v - want).abs() < 1e-3, "{v} vs {want}\n{w}");
+}
+
+// ── a path with a blank ──
+
+/// ngspice §2.6 and Xyce RG `.INCLUDE` read a quoted path; written bare,
+/// `my dir/half.lib` is a path and a section. Real ngspice on the written
+/// deck: the divider 1 V · 3k/(1k+3k) = 0.75 V, so the file was read.
+#[test]
+fn a_path_with_a_blank_is_quoted() {
+    let lib = scratch("my dir/half.lib", "R2 out 0 3k\n");
+    let deck = format!(
+        "* t\nV1 in 0 1\nR1 in out 1k\n.include \"{}\"\n.op\n.end\n",
+        lib.display()
+    );
+    let ng = write(&deck, Dialect::Ltspice, Dialect::Ngspice);
+    let v = ngspice_op(&ng, "out");
+    assert!((v - 0.75).abs() < 1e-9, "v(out) = {v}\n{ng}");
+    let xy = write(&deck, Dialect::Ltspice, Dialect::Xyce);
+    assert!(
+        xy.contains(&format!(".include \"{}\"", lib.display())),
+        "{xy}"
+    );
 }

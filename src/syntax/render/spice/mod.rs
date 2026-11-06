@@ -295,13 +295,21 @@ impl W<'_, '_> {
     /// `.lib` inside a `.subckt` to that subcircuit, so hoisting one
     /// changes which models it sees.
     fn file_cards(&mut self, b: &Block) {
-        let q = self.sp.path_quote;
+        // A path with a blank is quoted where the target writes paths
+        // bare (ngspice §2.6 and Xyce RG `.INCLUDE` read `"…"`), or it
+        // would be a path and a section.
+        let quote = |p: &str| match self.sp.path_quote {
+            "" if p.contains(char::is_whitespace) => "\"",
+            q => q,
+        };
         for &inc in &b.includes {
             let p = self.rd.include_path(inc);
+            let q = quote(&p);
             self.o.token(&format!(".include {q}{p}{q}"), Space::Line);
         }
         for &lib in &b.libs {
             let (p, section) = self.rd.lib_view(lib);
+            let q = quote(&p);
             if section.is_empty() {
                 match self.ask(Construct::LibWholeFile, self.rd.main(lib)) {
                     Action::Native => self.o.token(&format!(".lib {q}{p}{q}"), Space::Line),
