@@ -27406,3 +27406,239 @@ vacask/test/test_tran.sim spectre now written: its VACASK script lines (abort, p
 vacask/test/timestep.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
 vacask/test/timestep.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
 vacask/test/timestep.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+
+# Phase 7: spectre-read-r2: VACASK's own linear devices (render::read::named
+# named_statement). `load "resistor.osdi"` (capacitor, inductor) loads
+# VACASK's own linear R, C, L from its module path (docs/dev-vacask.md);
+# the reader writes their instances as R, C, L cards, so the load is no
+# load: ngspice wrote `pre_osdi resistor.osdi` ("Error opening osdi lib"),
+# Spectre `ahdl_include "resistor.osdi"`, CDL an error comment, VACASK a
+# redundant load beside the `spice/resistor.osdi` its own `sp_resistor`
+# needs. ESPice, HSPICE and Xyce refused the load W0004 and now write the
+# deck.
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/bsim3-ptm-amp/toplevel.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/bsim3-ptm-amp/toplevel.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/bsim3-ptm/amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/bsim3-ptm/amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/bsim3-ptm/diffpair.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/bsim3-ptm/diffpair.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/bsim3-ptm/mirror.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/bsim3-ptm/mirror.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/control/initfatal.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/control/initfatal.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/control/output.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/control/output.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/control/runfatal.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/control/runfatal.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/control/runfinish.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/control/runfinish.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/control/runstop.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/control/runstop.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/control/uncondfatal.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/control/uncondfatal.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/gilbert/gilbert.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/gilbert/gilbert.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/hierarchy/hier.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/hierarchy/hier.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/limiting/builtin.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/limiting/builtin.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/limiting/custom.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/limiting/custom.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/natures/ddt.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/natures/ddt.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/natures/idt.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/natures/idt.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/natures/switchbr.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/natures/switchbr.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/natures/vbr.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/natures/vbr.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/sc/lpfilter.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/sc/lpfilter.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/sc/opamp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/sc/opamp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bjt.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bjt.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bjtamp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bjtamp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bjtinv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bjtinv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bjtnqs.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bjtnqs.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim3v3.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bsim3v3.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim3v3amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bsim3v3amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim3v3nqs.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bsim3v3nqs.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/bsim3v3nqs.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/bsim3v3nqs.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim3v3nqs.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/bsim4v8.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bsim4v8.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim4v8amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bsim4v8amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim4v8nqs.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/bsim4v8nqs.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/bsim4v8nqs.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/bsim4v8nqs.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/bsim4v8nqs.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/dio.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/dio.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/jfet1.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/jfet1.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/jfet1amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/jfet1amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/jfet1inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/jfet1inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/jfet2.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/jfet2.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/jfet2amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/jfet2amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/jfet2inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/jfet2inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mes1.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mes1.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mes1amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mes1amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mes1inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mes1inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos1.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos1.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos1amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos1amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos1inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos1inv.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos1inv.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos1inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos1inv.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos2.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos2.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos2amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos2amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos2inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos2inv.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos2inv.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos2inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos2inv.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos3.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos3.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos3amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos3amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos3inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos3inv.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos3inv.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos3inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos3inv.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos6.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos6.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos6amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos6amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos6inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos6inv.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos6inv.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos6inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos6inv.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos9.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos9.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos9amp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos9amp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos9inv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mos9inv.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos9inv.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mos9inv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mos9inv.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mutual.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/mutual.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mutual.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/mutual.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/mutual.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/demo/spice/vdmos.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/vdmos.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/vdmosamp.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/vdmosamp.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/vdmosinv.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/vdmosinv.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/demo/spice/vdmossh.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/demo/spice/vdmossh.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/resonator.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/resonator.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/resonator.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/resonator.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/resonator.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_ac.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_ac.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_acxf.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_acxf.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_build.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_build.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_capacitor.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_capacitor.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_capacitor.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_capacitor.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_capacitor.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_cblock.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_cblock.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_cblocksweep.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_cblocksweep.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_ctlsrc.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_ctlsrc.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_dcinc.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_dcinc.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_dcxf.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_dcxf.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_diode.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_diode.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_hb4.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_hb4.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_hb5.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_hb5.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_hb6.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_hb6.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_inductor.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_inductor.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_mutual.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_mutual.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_mutual.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_mutual.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_mutual.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_noise.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_noise.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_op.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_op.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_opnl.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_opnl.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_opsweep.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_opsweep.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_optpar.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_optpar.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_resistor.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_resistor.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_sweep.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_sweep.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_sweeppar.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_sweeppar.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_sweepvar.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_sweepvar.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_sweepvec.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_sweepvec.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_tran.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_tran.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_tran.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_tran.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_tran.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/test_tranic.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_tranic.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_visrc.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_visrc.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/test_viwfm.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/test_viwfm.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/timestep.sim cdl no error comment for a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi), which is no load
+vacask/test/timestep.sim espice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/timestep.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+vacask/test/timestep.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
+vacask/test/timestep.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004

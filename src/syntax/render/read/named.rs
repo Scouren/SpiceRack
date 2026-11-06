@@ -417,8 +417,15 @@ impl<'a> Rd<'a> {
         let head = self.ttag(self.main(n));
         match self.tag(n) {
             Tag::Card if matches!(head, T::KwLoad | T::KwAhdlInclude) => {
+                // VACASK's build of the SPICE set and its own linear R, C
+                // and L (`docs/dev-vacask.md`): the reader writes their
+                // instances as the target's R, C, L and SPICE cards, and
+                // VACASK's writer loads what it writes.
                 let path = self.unquote(self.fields(n)[0]);
-                if !(self.d == Dialect::Vacask && path.starts_with("spice/")) {
+                let own = path.starts_with("spice/")
+                    || ["resistor.osdi", "capacitor.osdi", "inductor.osdi"]
+                        .contains(&path.as_str());
+                if !(self.d == Dialect::Vacask && own) {
                     here.loads.push(n);
                 }
                 true

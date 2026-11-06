@@ -151,3 +151,17 @@ fn an_embedded_file_the_deck_loads_is_kept_and_refused_off_vacask() {
         vec![Code::W0001]
     );
 }
+
+#[test]
+fn a_load_of_vacasks_own_linear_device_is_no_load_off_vacask() {
+    // dev-vacask.md: `resistor.osdi`, `capacitor.osdi` and `inductor.osdi`
+    // are VACASK's own linear devices, found on its own module path; their
+    // instances are written as the target's R, C and L, which need no load
+    // (ngspice: "Error opening osdi lib", Spectre: an `ahdl_include` of a
+    // binary it cannot read).
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    for target in [Dialect::Ngspice, Dialect::Spectre] {
+        let w = written(bare, target).unwrap_or_else(|c| panic!("{target:?}: {c:?}"));
+        assert!(!w.text.contains("resistor.osdi"), "{target:?}:\n{}", w.text);
+    }
+}
