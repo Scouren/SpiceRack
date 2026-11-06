@@ -192,6 +192,7 @@ fn written(c: Card) -> String {
         Card::Charge { name, .. } => ('C', name),
         Card::Coupling { name, .. } => ('K', name),
         Card::Behavioural { name, .. } => ('B', name),
+        Card::Table { current, name, .. } => (if current { 'G' } else { 'E' }, name),
         Card::Line { name, .. } => ('T', name),
         Card::Inst { name, .. } => ('X', name),
     };

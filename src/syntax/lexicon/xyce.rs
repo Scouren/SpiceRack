@@ -94,7 +94,7 @@ pub const XYCE: Lexicon = Lexicon {
     },
     keywords: &[SPICE_KEYWORDS, OWN_KEYWORDS],
     named: false,
-    devices: &[device::SPICE],
+    devices: &[device::SPICE, device::LOSSY_LINE, device::XYCE_PORT],
     masters: &[],
     analyses: &[],
     regions: &[],

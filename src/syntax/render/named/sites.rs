@@ -191,6 +191,7 @@ fn card_sites(rd: &Rd, n: u32, sites: &mut Vec<Site>) {
         // statistical call in it is no function `bsource_expr` writes, so
         // the source is refused (W0102). The rest carry no expression.
         Card::Behavioural { .. }
+        | Card::Table { .. }
         | Card::Coupling { .. }
         | Card::Linear { .. }
         | Card::Poly { .. }

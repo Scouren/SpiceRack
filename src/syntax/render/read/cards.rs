@@ -16,9 +16,8 @@
 //! - `Rd::dot_card(&mut self, n: u32, here: &mut Block, scope: Scope, inside: bool, acc: &mut Acc)`
 //! - `Rd::subckt_head(&self, n: u32) -> Option<Head>`, `Rd::model_head(&self, n: u32) -> Option<Node>`
 //! - `Rd::model_view(&self, n: u32) -> Model`, `Rd::include_path(&self, n: u32) -> String`,
-//!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::func_view(&self, f: Func) -> (String, Vec<String>, String)`,
-//!   `Rd::func_span(&self, f: Func) -> Option<(u32, u32)>`, `Rd::param_view(&self, a: u32) -> (String, String)`,
-//!   `Rd::global_param(&self, a: u32) -> bool`
+//!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::param_view(&self, a: u32) -> (String, String)`,
+//!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::is_word_item(&self, n: u32) -> bool`
 
 use super::{Acc, Block, Func, Kept, Rd, Scope};
 use crate::syntax::Dialect;
@@ -38,13 +37,6 @@ pub(in crate::syntax::render) struct Model {
     pub(in crate::syntax::render) kind: String,
     /// Each `k=v` (a flag's value empty), a matrix joined by blanks.
     pub(in crate::syntax::render) params: Vec<(String, String)>,
-}
-
-/// Where a `.func` card's body is: a delimited expression's inside, or
-/// tokens `a..=b` (empty when `a > b`).
-enum Body {
-    Expr(u32),
-    Span(u32, u32),
 }
 
 impl Rd<'_> {
@@ -71,6 +63,11 @@ impl Rd<'_> {
             });
             return;
         }
+        // Xyce's `.LIN` (S parameters over the `.AC` sweep) is an analysis.
+        if self.d == Dialect::Xyce && word == "lin" && scope == Scope::Top && self.testbench_peg(n)
+        {
+            return acc.bench.push(super::Bench::Card(n));
+        }
         if self.dialect_raw(&word) {
             return self.keep(n, here, Kept::Raw);
         }
@@ -80,7 +77,7 @@ impl Rd<'_> {
             Tag::Global => self.global(n, acc),
             Tag::Model => self.model(n, here),
             Tag::Param => self.param_card(n, here, inside, acc),
-            Tag::Func => self.func(n, inside, acc),
+            Tag::Func => self.func(n, here, inside, acc),
             Tag::Card => Err(self.refused(n)),
             _ if scope != Scope::Top => match self.testbench_peg(n) {
                 true => Err(Kept::Raw),
@@ -254,40 +251,6 @@ impl Rd<'_> {
         }
     }
 
-    /// A function's name, arguments and body text.
-    pub(in crate::syntax::render) fn func_view(&self, f: Func) -> (String, Vec<String>, String) {
-        let (g, body) = match f {
-            Func::Param(a) => (self.ast.lhs(Node(a)), self.body_text(self.ast.rhs(Node(a)))),
-            Func::Card(n) => {
-                let g = self.func_group(n).expect("func read it");
-                (g, self.func_body(n, g).expect("func read it"))
-            }
-            Func::Real(n) => return self.real_func(n),
-        };
-        (
-            self.text(self.ast.lhs(Node(g))),
-            self.group_items(g).iter().map(|&k| self.text(k)).collect(),
-            body,
-        )
-    }
-
-    /// The tokens function `f`'s body ([`Rd::func_view`]'s) is spelled
-    /// from; `None` when it is empty or a string's text.
-    pub(in crate::syntax::render) fn func_span(&self, f: Func) -> Option<(u32, u32)> {
-        let v = match f {
-            Func::Param(a) => self.ast.rhs(Node(a)),
-            Func::Card(n) => match self.func_body_at(n, self.func_group(n)?)? {
-                Body::Expr(e) => return self.inner_span(e),
-                Body::Span(a, b) => return (a <= b).then_some((a, b)),
-            },
-            Func::Real(n) => *self.fields(self.real_return(n)?).first()?,
-        };
-        match self.tag(v) {
-            Tag::Delimited => self.inner_span(v),
-            _ => Some((self.first(v), self.last(v))),
-        }
-    }
-
     /// Whether the `.param` assignment `a` is an Xyce `.global_param`'s:
     /// Xyce runs a constant instance `temp={…}` from a `.param` at the
     /// swept temperature, from a `.global_param` at its value
@@ -304,15 +267,16 @@ impl Rd<'_> {
             self.vtext(self.ast.rhs(Node(a))),
         )
     }
+
+    /// Whether `n` is one word.
+    pub(super) fn is_word_item(&self, n: u32) -> bool {
+        n != NONE && self.tag(n) == Tag::Word
+    }
 }
 
 // ---- private ----
 
 impl Rd<'_> {
-    fn is_word_item(&self, n: u32) -> bool {
-        n != NONE && self.tag(n) == Tag::Word
-    }
-
     fn is_params_colon(&self, n: u32) -> bool {
         self.tag(n) == Tag::Word && self.text(n).eq_ignore_ascii_case("params:")
     }
@@ -323,7 +287,6 @@ impl Rd<'_> {
         w.strip_prefix('.').unwrap_or(&w).to_string()
     }
 
-    /// A path item without its quotes (the old lowering's `path`).
     /// The text of card `n` from its first field to the line's end, a path
     /// with blanks in it.
     fn rest_path(&self, n: u32) -> String {
@@ -336,6 +299,7 @@ impl Rd<'_> {
         }
     }
 
+    /// A path item without its quotes (the old lowering's `path`).
     fn path_of(&self, p: u32) -> String {
         let t = self.text(p);
         let p = t.trim();
@@ -404,22 +368,6 @@ impl Rd<'_> {
         let (a, b) = (self.first(v), self.last(v));
         (a..b).all(|k| self.t.end(k) == self.t.start(k + 1))
             && (a..=b).all(|k| self.ttag(k) != T::Comma)
-    }
-
-    /// the old SPICE grammar's `Key s? '(' s? (Arg (s? ',' s? Arg)*)? s? ')'`: a key and
-    /// keys, closed.
-    fn func_head_ok(&self, g: u32) -> bool {
-        let name = self.ast.lhs(Node(g));
-        let key = |k: u32| {
-            self.is_word_item(k)
-                && self
-                    .text(k)
-                    .starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
-        };
-        name != NONE
-            && key(name)
-            && self.group_closed(g)
-            && self.group_items(g).iter().all(|&k| key(k))
     }
 
     /// `.param a=1 f(x)=…` (the old SPICE grammar's `Params`).
@@ -496,109 +444,5 @@ impl Rd<'_> {
             && v != NONE
             && self.tag(v) == Tag::Binary
             && self.ttag(self.first(v)) == T::LBrace
-    }
-
-    /// `.func name(args) [=] body` (the old SPICE grammar's `Func`).
-    fn func(&mut self, n: u32, inside: bool, acc: &mut Acc) -> Result<(), Kept> {
-        let Some(g) = self.func_group(n) else {
-            return Err(Kept::Unparsed);
-        };
-        if self.func_body(n, g).is_none() {
-            return Err(Kept::Unparsed);
-        }
-        if inside {
-            return Err(Kept::Raw);
-        }
-        acc.funcs.push(Func::Card(n));
-        Ok(())
-    }
-
-    /// A `.func` card's `name(args)` group, when its head reads.
-    fn func_group(&self, n: u32) -> Option<u32> {
-        let &first = self.fields(n).first()?;
-        let g = match self.tag(first) {
-            Tag::Group => first,
-            Tag::Assign if self.tag(self.ast.lhs(Node(first))) == Tag::Group => {
-                self.ast.lhs(Node(first))
-            }
-            _ => return None,
-        };
-        self.func_head_ok(g).then_some(g)
-    }
-
-    /// A `.func` card's body text (`g` its head group), when it reads.
-    fn func_body(&self, n: u32, g: u32) -> Option<String> {
-        Some(match self.func_body_at(n, g)? {
-            Body::Expr(e) => self.inner(e).trim().to_string(),
-            Body::Span(a, b) if a > b => String::new(),
-            Body::Span(a, b) => self.span(a, b).trim().to_string(),
-        })
-    }
-
-    /// Where a `.func` card's body is (`g` its head group), when it reads.
-    fn func_body_at(&self, n: u32, g: u32) -> Option<Body> {
-        let items = self.fields(n);
-        // The body: after `)` and an optional `=`, to the card's end or a
-        // ` key=` (the old SPICE grammar's `Body`).
-        let close = self.last(g);
-        let mut start = close + 1;
-        if start <= self.line_last(self.main(n)) && self.ttag(start) == T::Equal {
-            start += 1;
-        }
-        let last = self.line_last(self.main(n));
-        if start > last {
-            return None;
-        }
-        for k in start + 1..=last {
-            if self.t.end(k - 1) != self.t.start(k)
-                && self.ttag(k) == T::Ident
-                && k < last
-                && self.ttag(k + 1) == T::Equal
-            {
-                return None;
-            }
-        }
-        // quirk: the old SPICE grammar's `Body`: an `expr` to the end, a
-        // braced body to the end, else the text.
-        let expr = items
-            .iter()
-            .copied()
-            .chain(
-                items
-                    .iter()
-                    .filter(|&&k| self.tag(k) == Tag::Assign)
-                    .map(|&k| self.ast.rhs(Node(k))),
-            )
-            .find(|&k| k != NONE && self.first(k) == start && self.last(k) == last);
-        Some(if expr.is_some_and(|e| self.expr_ok(e)) {
-            Body::Expr(expr.expect("checked"))
-        } else if self.ttag(start) == T::LBrace && self.brace_close_at(start) == Some(last) {
-            Body::Span(start + 1, last - 1)
-        } else {
-            Body::Span(start, last)
-        })
-    }
-
-    /// The tokens a delimited expression's inside ([`Rd::inner`]) is
-    /// spelled from; `None` when it is empty or a string's text (`{"…"}`).
-    fn inner_span(&self, n: u32) -> Option<(u32, u32)> {
-        let a = self.ast;
-        let (open, close) = (a.main_token(Node(n)), a.rhs(Node(n)));
-        let e = a.lhs(Node(n));
-        let string = e != NONE && self.tag(e) == Tag::Str && self.ttag(open) == T::LBrace;
-        (!string && close > open + 1).then(|| (open + 1, close - 1))
-    }
-
-    fn brace_close_at(&self, open: u32) -> Option<u32> {
-        let last = self.line_last(open);
-        let mut depth = 0i32;
-        (open..=last).find(|&k| {
-            match self.ttag(k) {
-                T::LBrace => depth += 1,
-                T::RBrace => depth -= 1,
-                _ => {}
-            }
-            depth == 0
-        })
     }
 }

@@ -30,6 +30,7 @@ pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
 mod cdl;
 mod checks;
 mod laplace;
+mod parasitics;
 mod prints;
 mod sweeps;
 mod ternary;
@@ -440,6 +441,11 @@ impl W<'_, '_> {
         let draws = self.draws.locals(sc.node).to_vec();
         self.param_lines(&draws);
         self.param_cards(&sc.locals);
+        if let Some(&(Func::Param(n) | Func::Card(n) | Func::Real(n))) = sc.funcs.first()
+            && self.ask(Construct::LocalFunc, self.rd.main(n)) == Action::Native
+        {
+            self.funcs(&sc.funcs);
+        }
         self.models(sc);
         self.body(sc, self.rd.d == Dialect::Ltspice && !self.in_section);
         self.o.token(&format!(".ends {}", sc.name), Space::Line);

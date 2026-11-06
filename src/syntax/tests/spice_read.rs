@@ -332,3 +332,223 @@ fn a_control_pre_osdi_is_the_decks_osdi_load() {
         .text;
     assert!(va.lines().any(|l| l == "load \"psp103v4.osdi\""), "{va}");
 }
+
+#[test]
+fn an_initial_condition_by_expression_is_written_in_the_targets_delimiters() {
+    // Xyce RG `.IC`/`.NODESET` (`V(node)=value`, bare `node value`; a
+    // value may be a braced expression); ngspice manual `.ic`. Read as a
+    // number only before (W0001). Checks: 3.
+    let text = "t\n.param V1=1.0\nC1 1 0 1u\nR1 1 0 1k\n.ic v(1)={V1}\n.nodeset 1 {2*V1}\n.tran 0.1m 1m\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == ".ic V(1)={V1}"), "{ng}");
+    assert!(ng.lines().any(|l| l == ".nodeset V(1)={2*V1}"), "{ng}");
+    let hs = render_text(text, Dialect::Xyce, "t", Dialect::Hspice)
+        .expect("written")
+        .text;
+    assert!(hs.lines().any(|l| l == ".ic V(1)='V1'"), "{hs}");
+}
+
+#[test]
+fn a_subcircuit_func_is_the_subcircuits_or_the_tops() {
+    // ngspice-45 and Xyce 7.10 ran both subcircuits' `f` (2 V, 3 V: the
+    // first reads its subcircuit's `r0`); Spectre Reference p.871:
+    // functions "at the top level only" (W0106). One reading only its
+    // arguments, under its own name, moves to the top. Checks: 2 + 1 + 1.
+    let text = "t\n.subckt s1 a b r0=2\n.func f(x) {x*r0}\nR1 a b {f(1k)}\n.ends\n.subckt s2 a b\n.func f(x) {x*3}\nR1 a b {f(1k)}\n.ends\nX1 1 0 s1\nX2 2 0 s2\nI1 0 1 1m\nI2 0 2 1m\n.op\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    let lines: Vec<&str> = ng.lines().collect();
+    let at = |l: &str| lines.iter().position(|x| *x == l).expect(l);
+    assert!(
+        at(".subckt s1 a b PARAMS: r0=2") < at(".func f(x) {x*r0}"),
+        "{ng}"
+    );
+    assert!(at(".subckt s2 a b") < at(".func f(x) {x*3}"), "{ng}");
+    let sp = render_text(text, Dialect::Xyce, "t", Dialect::Spectre).expect_err("refused");
+    assert!(
+        sp.diags.iter().any(|g| g.code == Code::W0106),
+        "{}",
+        sp.messages
+    );
+    let pure = "t\n.subckt s1 a b\n.func g(x) {x*2}\nR1 a b {g(1k)}\n.ends\nX1 1 0 s1\nI1 0 1 1m\n.op\n.end\n";
+    let sp = render_text(pure, Dialect::Xyce, "t", Dialect::Spectre)
+        .expect("written")
+        .text;
+    assert!(
+        sp.lines().next().is_some_and(|_| sp.contains("real g(")),
+        "{sp}"
+    );
+}
+
+#[test]
+fn a_xyce_table_source_is_ngspices_pwl_value_with_flat_ends() {
+    // Xyce RG E/G `TABLE`; ngspice manual `pwl()` in a value. Xyce 7.10
+    // ran the TABLE deck, ngspice-45 the written one to the same v(2),
+    // v(3) at every point of -2..3 V (1 below 0, 3 above 1); ngspice's own
+    // TABLE gives 1.05 at 0 (smoothed), so it is not the spelling; ESPice
+    // has no `pwl()` (W0102). Checks: 2 + 1 + 1.
+    let text = "t\nV1 1 0 0\nE1 2 0 TABLE V(1,0) = (0,1) (1,3)\nR2 2 0 1k\nG1 0 3 TABLE {V(1)} = (0,1m) (1,3m)\nR3 3 0 1k\n.dc V1 -1 2 0.25\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [
+        "E1 2 0 value={pwl(V(1,0), -1, 1, 0, 1, 1, 3, 2, 3)}",
+        "G1 0 3 value={pwl(V(1), -1, 1m, 0, 1m, 1, 3m, 2, 3m)}",
+    ] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    let xy = render_text(text, Dialect::Xyce, "t", Dialect::Xyce)
+        .expect("written")
+        .text;
+    assert!(
+        xy.lines()
+            .any(|l| l == "E1 2 0 TABLE {V(1,0)} = (0,1) (1,3)"),
+        "{xy}"
+    );
+    let es = render_text(text, Dialect::Xyce, "t", Dialect::Espice).expect_err("refused");
+    assert!(
+        es.diags.iter().any(|g| g.code == Code::W0102),
+        "{}",
+        es.messages
+    );
+}
+
+#[test]
+fn an_ltspice_parasitic_is_an_element_where_c_and_l_take_none() {
+    // LTspice help, Capacitor and Inductor (Rser, Lser in series; Rpar,
+    // Cpar across); ngspice-45 stops at `rser` on a C. The written deck ran
+    // on ngspice-45 to the closed forms: i = 1 mA e^(-t/1 ms) (C 1 µF,
+    // Rser 1k) to 5e-7, 0.1 A (1 - e^(-t/0.1 ms)) (L 1 mH, Rser 10) to
+    // 4e-6, 1 mA + 1 A e^(-t/1 µs) (Rser 1, Rpar 1k) to 1.2e-6. Checks: 4.
+    let text =
+        "* t\nV1 a 0 1\nC1 a 0 1u Rser=1k V=50 Irms=1\nL1 a 0 1m Rser=10 Rpar=1k\n.tran 5m\n.end\n";
+    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [
+        "C1 C1_s1 0 1u",
+        "RC1_ser a C1_s1 1k",
+        "RL1_ser a L1_s1 10",
+        "RL1_par a 0 1k",
+    ] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+}
+
+#[test]
+fn an_ltspice_sources_rser_and_cpar_are_elements_elsewhere() {
+    // LTspice help, Voltage Source (`Rser=`, `Cpar=`); read as text
+    // before (W0001). The written deck ran on ngspice-45 to the closed form
+    // v(a) = 0.5 V (1 - e^(-t/0.5 ms)) (1k into 1 µF || 1k) to 9.7e-7.
+    // Spectre and VACASK write no such element (W0114). Checks: 3 + 1.
+    let text = "* t\nV1 a 0 PULSE(0 1 0 1n 1n 1 2) Rser=1k Cpar=1u\nR1 a 0 1k\n.tran 5m\n.end\n";
+    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in ["RV1_ser a V1_s1 1k", "CV1_par a 0 1u"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    assert!(ng.lines().any(|l| l.starts_with("V1 V1_s1 0 ")), "{ng}");
+    let sp = render_text(text, Dialect::Ltspice, "t", Dialect::Spectre).expect_err("refused");
+    assert!(
+        sp.diags.iter().any(|g| g.code == Code::W0114),
+        "{}",
+        sp.messages
+    );
+}
+
+#[test]
+fn a_xyce_lossy_line_is_ngspices_o_and_refused_where_none_is() {
+    // Xyce RG and ngspice manual §6.3: `O n1 n2 n3 n4 model` on an LTRA
+    // model (Xyce 7.10 and ngspice-45 ran LTRA/zero_length_* alike to
+    // 5e-8); HSPICE has no `O`, Spectre and VACASK no LTRA (W0105).
+    // Checks: 1 + 3.
+    let text = "t\nV1 1 0 1\nO1 1 0 2 0 cab\n.model cab ltra r=0.05 c=20pF len=100\nR1 2 0 10\n.op\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == "O1 1 0 2 0 cab"), "{ng}");
+    for t in [Dialect::Hspice, Dialect::Spectre, Dialect::Vacask] {
+        let e = render_text(text, Dialect::Xyce, "t", t).expect_err("refused");
+        assert!(
+            e.diags.iter().any(|g| g.code == Code::W0105),
+            "{t:?} {}",
+            e.messages
+        );
+    }
+}
+
+#[test]
+fn a_xyce_lin_over_ports_is_ngspices_sp() {
+    // Xyce RG port device and `.LIN` (S over the `.AC` sweep); ngspice
+    // manual `.sp` and `portnum`/`z0`. Xyce 7.10's Touchstone and ngspice-45's
+    // S_i_j agreed to 1e-15 on 14 Output/SPARAMS, XDM and YLIN decks (2 to 5
+    // ports). Checks: 3 + 2.
+    let text = "t\nP1 1 0 port=1 z0=50\nR1 1 2 30\nC1 2 0 1n\nP2 2 0 port=2\n.AC dec 2 1e6 1e8\n.LIN FORMAT=TOUCHSTONE2\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [
+        "VP1 1 0 0 portnum 1 z0 50",
+        "VP2 2 0 0 portnum 2 z0 50",
+        ".sp dec 2 1000000 100000000",
+    ] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    let xy = render_text(text, Dialect::Xyce, "t", Dialect::Xyce)
+        .expect("written")
+        .text;
+    for want in ["P1 1 0 port=1 z0=50", ".LIN FORMAT=TOUCHSTONE2"] {
+        assert!(xy.lines().any(|l| l == want), "{want}\n{xy}");
+    }
+}
+
+#[test]
+fn an_hspice_noise_takes_the_ac_sweep_and_a_keyword_dc_reads() {
+    // HSPICE `.NOISE out src [interval]` over the `.AC` sweep; the ESPice
+    // corpus's noise_ac_sweep.expected.json (oracle: ngspice on `.noise
+    // v(out) vin dec 2 1k 100k 1`) matched ngspice-45 on the written deck
+    // exactly, every column. HSPICE `.DC v1 START= STOP= STEP=`: ngspice-45
+    // gave the divider's 1/4 at 0..1 V. Checks: 2.
+    let text = "t\nvin in 0 dc 1 ac 1\nr1 in out 1k\nc1 out 0 1n\n.ac dec 2 1k 100k\n.noise v(out) vin 1\n.dc vin start=0 stop=1 step=0.25\n.end\n";
+    let ng = render_text(text, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [".noise V(out) vin dec 2 1k 100k 1", ".dc vin 0 1 250m"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+}
+
+#[test]
+fn an_hspice_only_analysis_is_refused_as_the_targets_lack() {
+    // HSPICE UG `.SN`, `.TRANNOISE`, `.LSTB` (no ngspice, Xyce, LTspice
+    // or VACASK analysis of the kind: W0015), `.STATEYE` (HSPICE's own:
+    // W0039), not W0001. Checks: 2 per deck, 2 decks.
+    for (line, code) in [
+        (".lstb mode=single vsource=vlstb", Code::W0015),
+        (".stateye T=1n trf=10p", Code::W0039),
+    ] {
+        let text = format!("t\nr1 a 0 1k\nv1 a 0 1\n{line}\n.op\n.end\n");
+        let ng = render_text(&text, Dialect::Hspice, "t", Dialect::Ngspice).expect_err("refused");
+        let codes: Vec<Code> = ng.diags.iter().map(|g| g.code).collect();
+        assert_eq!(codes, [code], "{}", ng.messages);
+        assert!(render_text(&text, Dialect::Hspice, "t", Dialect::Hspice).is_ok());
+    }
+}
+
+#[test]
+fn an_hspice_value_modifier_scales_or_clamps_the_value() {
+    // HSPICE UG, E/G `VALUE=` with `SCALE=`, `MAX=`, `MIN=`; the ESPice
+    // corpus's value_modifier.sp analytic oracle (v(a) = 0.5: 3 and 0.4),
+    // which ngspice-45 gave on the written deck. Checks: 2.
+    let text = "t\nva a 0 0.5\ne1 o1 0 value='2*v(a)' scale=3\nr1 o1 0 1k\ne2 o2 0 value='2*v(a)' max=0.4\nr2 o2 0 1k\n.op\n.end\n";
+    let ng = render_text(text, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in ["B1 o1 0 V=(2*v(a))*(3)", "B2 o2 0 V=min(2*v(a), 0.4)"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+}

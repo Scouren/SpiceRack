@@ -202,6 +202,11 @@ impl W<'_, '_> {
             .chain(deck.sections.iter().flat_map(|s| &s.funcs));
         at.extend(funcs.map(|&(Func::Param(n) | Func::Card(n) | Func::Real(n))| n));
         for b in std::iter::once(&deck.top).chain(&deck.defs) {
+            at.extend(
+                b.funcs
+                    .iter()
+                    .map(|&(Func::Param(n) | Func::Card(n) | Func::Real(n))| n),
+            );
             at.extend(b.conds.iter().map(|&(n, _)| n));
             at.extend(b.includes.iter().chain(&b.libs).copied());
         }

@@ -7,7 +7,8 @@
 //! old PEG grammar; ngspice manual §2.1.3; ADI LTspice help (`µ`).
 //!
 //! Contents:
-//! - `Rd::number(&self, n: u32) -> Option<f64>`, `Rd::count(&self, n: u32) -> Option<u32>`
+//! - `Rd::number(&self, n: u32) -> Option<f64>`, `Rd::count(&self, n: u32) -> Option<u32>`,
+//!   `Rd::number_text(&self, s: &str, lex: &Lexicon) -> Option<f64>`
 //! - `enum Val`
 //! - `Rd::value(&self, n: u32) -> Val`, `Rd::irnum(&self, n: u32) -> Option<Num>`
 //! - `Rd::vtext(&self, n: u32) -> String`
@@ -256,6 +257,16 @@ impl Rd<'_> {
         } else {
             s.to_string()
         }
+    }
+
+    /// The number text `s` is in lexicon `lex` (sign included), as a
+    /// value field's.
+    pub(in crate::syntax::render) fn number_text(
+        &self,
+        s: &str,
+        lex: &crate::syntax::lexicon::Lexicon,
+    ) -> Option<f64> {
+        self.num_text(s, lex)
     }
 }
 

@@ -457,7 +457,7 @@ catalogue! {
     /// A statement only its own simulator has (Xyce's own analyses and `Y` devices).
     W0039 Refusal {
         title: "a statement only its source simulator has",
-        cite: "Xyce RG, analysis commands (`.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`) and devices (`Y` devices: neuron, synapse, ROM, reaction network, general external, accelerometer, power grid); none in the ngspice manual, HSPICE, LTspice help, Spectre Reference, VACASK docs",
+        cite: "Xyce RG, analysis commands (`.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`) and devices (`Y` devices: neuron, synapse, ROM, reaction network, general external, accelerometer, power grid); none in the ngspice manual, HSPICE, LTspice help, Spectre Reference, VACASK docs; HSPICE UG, `.STATEYE` (StatEye), in no other simulator",
         explain: "The statement is an analysis or a device that only the simulator the deck was written for has, so no other target can run it. Run the deck on that simulator, or replace the device with a model the target has.",
     }
     // W0040–W0044: the Python deck builder's (`python::deck`).
@@ -513,7 +513,7 @@ catalogue! {
     /// A function the target cannot define (a body over `v()`/`i()`; VACASK has none).
     W0106 Refusal {
         title: "a function the target cannot define",
-        cite: "Spectre Reference R5 pp.870-871 (`real f(real x)`); VACASK has no user functions",
+        cite: "Spectre Reference R5 pp.870-871 (`real f(real x)`; \"declared at the top level only, and must not be declared within subcircuits\"); VACASK has no user functions; LTspice help `.FUNC` (no scope stated for one in a subcircuit)",
         explain: "The target's functions cannot read node voltages or currents (Spectre), or it has no user functions (VACASK). Inline the function where it is called.",
     }
     /// A statistical call with no form in the target (HSPICE's multiplier, a wrong argument count).

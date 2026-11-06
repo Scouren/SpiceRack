@@ -18,6 +18,7 @@
 
 use super::W;
 use super::laplace::{self, Laplace};
+use super::parasitics;
 use super::ternary::{Read, parenthesize, spell_if};
 use crate::syntax::Dialect;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule, action};
@@ -54,6 +55,16 @@ impl W<'_, '_> {
                 if model.is_some() {
                     self.ask(Construct::RclModel, tok);
                 }
+                // An LTspice C's or L's parasitics as elements where the
+                // target's C and L take none (`parasitics`).
+                let extra = match (self.rd.d, self.d) {
+                    (
+                        Dialect::Ltspice,
+                        Dialect::Ngspice | Dialect::Espice | Dialect::Hspice | Dialect::Xyce,
+                    ) if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
+                    _ => None,
+                };
+                let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let mut s = format!("{decl} {n1} {n2}");
                 // ngspice-45 reads a C or L model only before the value
                 // (`C1 1 0 1u CM`: "unknown parameter (cm)"; run), as
@@ -70,7 +81,12 @@ impl W<'_, '_> {
                 if let Some(m) = model.as_ref().filter(|_| early.is_none()) {
                     s.push_str(&format!(" {m}"));
                 }
-                s + &self.params(&params)
+                s.push_str(&self.params(&params));
+                for l in extra.map(|e| e.1).unwrap_or_default() {
+                    s.push('\n');
+                    s.push_str(&l);
+                }
+                s
             }
             Card::Charge {
                 n1,
@@ -121,14 +137,32 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
+                mut parasitics,
                 ..
             } => {
                 if let Some(w) = &wave {
                     self.wave_ok(letter, w, tok);
                 }
-                if port.is_some() {
-                    self.ask(Construct::RfPort, tok);
+                if let Some((num, z0)) = port
+                    && self.ask(Construct::RfPort, tok) == Action::Spell(Alt::XycePort)
+                {
+                    // Xyce's port carries no source value here.
+                    if value != Val::Num(0.0) || ac_mag.is_some() || wave.is_some() {
+                        self.refuse(crate::syntax::diag::Code::W0007, tok);
+                    }
+                    let name = decl.strip_prefix('V').filter(|r| r.starts_with(['P', 'p']));
+                    let name = name.map_or_else(|| format!("P{decl}"), str::to_string);
+                    let z0 = self.sp.decimal(z0, self.x);
+                    return self
+                        .o
+                        .token(&format!("{name} {np} {nm} port={num} z0={z0}"), Space::Line);
                 }
+                // LTspice writes its own; the others as elements.
+                let extra = match self.d {
+                    Dialect::Ltspice => None,
+                    _ => parasitics::expand(&decl, &np, &nm, &mut parasitics),
+                };
+                let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let mut s = format!("{decl} {np} {nm} {}", self.value(&value));
                 if let Some(mag) = ac_mag {
                     s.push_str(&format!(" AC {}", self.sp.decimal(mag, self.x)));
@@ -146,7 +180,45 @@ impl W<'_, '_> {
                     s.push(' ');
                     s.push_str(&self.wave(w));
                 }
+                s.push_str(&self.params(&parasitics));
+                for l in extra.map(|e| e.1).unwrap_or_default() {
+                    s.push('\n');
+                    s.push_str(&l);
+                }
                 s
+            }
+            Card::Table {
+                np,
+                nm,
+                expr,
+                points,
+                ..
+            } => {
+                let act = self.ask(Construct::TableSource, tok);
+                let n = |v: f64| self.sp.number(v, self.x);
+                match act {
+                    // ngspice manual, `pwl(x, x1, y1, …)` in an E/G value
+                    // (straight on past the ends, so a flat point is added
+                    // each side; ngspice-45 ran it equal to Xyce's TABLE).
+                    Action::Spell(Alt::PwlValue) => {
+                        let (x0, y0) = points[0];
+                        let (xn, yn) = points[points.len() - 1];
+                        let mut args = vec![format!("{}, {}", n(x0 - 1.0), n(y0))];
+                        args.extend(points.iter().map(|&(x, y)| format!("{}, {}", n(x), n(y))));
+                        args.push(format!("{}, {}", n(xn + 1.0), n(yn)));
+                        format!(
+                            "{decl} {np} {nm} value={{pwl({expr}, {})}}",
+                            args.join(", ")
+                        )
+                    }
+                    _ => {
+                        let pts: Vec<String> = points
+                            .iter()
+                            .map(|&(x, y)| format!("({},{})", n(x), n(y)))
+                            .collect();
+                        format!("{decl} {np} {nm} TABLE {{{expr}}} = {}", pts.join(" "))
+                    }
+                }
             }
             Card::Behavioural {
                 current,
@@ -203,11 +275,17 @@ impl W<'_, '_> {
                 )
             }
             Card::Semi {
+                letter,
                 nodes,
                 model,
                 params,
                 ..
-            } => format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params)),
+            } => {
+                if letter == 'O' {
+                    self.ask(Construct::LossyLine, tok);
+                }
+                format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
+            }
             Card::Switch { nodes, model, .. } => format!("{decl} {} {model}", nodes.join(" ")),
             Card::Line { nodes, z0, td, .. } => format!(
                 "{decl} {} Z0={} TD={}",

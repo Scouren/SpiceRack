@@ -53,6 +53,7 @@ impl<'a> Rd<'a> {
                 ac_phase: None,
                 wave: None,
                 port: None,
+                parasitics: vec![],
             }),
             // `[CMP]` p.602: `dc` and `mag` are across the port terminated
             // in `r`, so the source behind `r` is twice each; ngspice's
@@ -75,6 +76,7 @@ impl<'a> Rd<'a> {
                     ac_phase: mag.and(num("phase")?),
                     wave: None,
                     port: Some((k, r)),
+                    parasitics: vec![],
                 })
             }
             // `[CMP]` p.645: the lossless line is `z0` (default 50 Ω) and

@@ -98,6 +98,7 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
+                parasitics: _,
             } => {
                 if port.is_some() {
                     self.ask(Construct::RfPort, tok);
@@ -159,7 +160,7 @@ impl W<'_, '_> {
                 model,
                 params,
             } => {
-                if letter == 'M' && nodes.len() != 4 {
+                if letter == 'M' && nodes.len() != 4 || letter == 'O' {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }
@@ -194,6 +195,10 @@ impl W<'_, '_> {
             }
             Card::Behavioural { .. } => {
                 self.ask(Construct::BehaviouralSource, tok);
+                return None;
+            }
+            Card::Table { .. } => {
+                self.ask(Construct::TableSource, tok);
                 return None;
             }
             // No polynomial builtin, no switch, no lossless line.

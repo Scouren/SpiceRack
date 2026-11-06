@@ -6,7 +6,7 @@
 //! a test checks that the two directions invert.
 //!
 //! The SPICE dialects share [`SPICE`], the twenty letters every one of them
-//! reads; ngspice adds [`NGSPICE_OWN`]. A letter no table holds is an
+//! reads; ngspice adds [`NGSPICE_OWN`], Xyce and LTspice [`LOSSY_LINE`]. A letter no table holds is an
 //! element with no primitive. Spectre's table holds the masters an instance
 //! may name directly; VACASK's holds the device modules a `model` statement
 //! names (an instance's master is always a model or a subcircuit there).
@@ -33,7 +33,7 @@
 //!
 //! Contents:
 //! - `pub enum Primitive`, `pub struct Device`, `pub enum Terminals`, `pub enum Model`, `pub enum Value`
-//! - `pub const SPICE`, `NGSPICE_OWN`, `SPECTRE`, `VACASK: &[Device]`, `pub const FLAGS: &[&str]`
+//! - `pub const SPICE`, `NGSPICE_OWN`, `LOSSY_LINE`, `XYCE_PORT`, `SPECTRE`, `VACASK: &[Device]`, `pub const FLAGS: &[&str]`
 //! - `pub fn find(tables: &[&'static [Device]], word: &str, fold: bool) -> Option<&'static Device>`
 //! - `pub fn spelling(tables: &[&'static [Device]], p: Primitive) -> Option<&'static Device>`
 //! - `Primitive::ALL: [Primitive; 26]`, `Primitive::from_u32(code: u32) -> Option<Primitive>`
@@ -206,6 +206,28 @@ pub const NGSPICE_OWN: &[Device] = &[
     row("a", P::CodeModel, N::ByModel, 0, M::AfterNodes, V::None),
     row("n", P::Osdi, N::ByModel, 0, M::AfterNodes, V::None),
 ];
+
+/// The lossy transmission line `O` Xyce and LTspice share with ngspice
+/// (Xyce RG, LTspice help: four nodes, an LTRA model).
+pub const LOSSY_LINE: &[Device] = &[row(
+    "o",
+    P::LossyLine,
+    N::Fixed(4),
+    0,
+    M::AfterNodes,
+    V::None,
+)];
+
+/// Xyce's port `P n+ n- port=n z0=z` (Xyce RG, port device), read as
+/// ngspice's port source (`V … portnum n z0 z`).
+pub const XYCE_PORT: &[Device] = &[row(
+    "p",
+    P::VoltageSource,
+    N::Fixed(2),
+    0,
+    M::None,
+    V::Specs,
+)];
 
 /// The Spectre masters an instance names directly (`r1 (a b) resistor
 /// r=1k`). The polynomial sources read as their linear primitive, so the

@@ -36,6 +36,9 @@ pub enum Construct {
     /// Xyce's `.sens` (objective, parameters, over the deck's analysis),
     /// kept as text.
     XyceSens,
+    /// HSPICE's `.sn`, `.snnoise`, `.snxf`, `.trannoise`, `.lstb`, kept as
+    /// text.
+    HspiceAnalysis,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -75,6 +78,13 @@ pub enum Construct {
     BranchParam,
     /// `.func f(x) body`.
     Func,
+    /// A `.func` local to a subcircuit (it reads the subcircuit's
+    /// parameters, or another `.func` shares its name).
+    LocalFunc,
+    /// Xyce's `E`/`G` `TABLE`.
+    TableSource,
+    /// An `O` lossy line on an LTRA model.
+    LossyLine,
     /// `.step`.
     Step,
     /// `.step <name> list <values>`.
@@ -142,6 +152,12 @@ pub enum Alt {
     /// `.dc src DEC|OCT np start stop`, `.dc src POI n v…` (HSPICE `.DC`,
     /// the `type np` form).
     DcType,
+    /// An E/G `value={pwl(expr, x, y, …)}` (ngspice).
+    PwlValue,
+    /// `P n+ n- port=n z0=z` (Xyce).
+    XycePort,
+    /// `.LIN` beside an `.AC` of the sweep (Xyce).
+    XyceLin,
     /// Not written, the code the note the writer records for it.
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
@@ -215,6 +231,17 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             // Spectre's `sens` covers dc and ac; not written yet.
+            D::Spectre => Refuse(Code::W0015),
+            D::Verilog => Refuse(Code::W0001),
+        },
+        // ngspice manual ch.11, Xyce RG, LTspice help, VACASK: no
+        // shooting-Newton noise or transfer, transient noise analysis or
+        // loop-stability analysis. Spectre's pss/pnoise/pxf, `tran`
+        // noise and `stb` have them; not written yet.
+        Construct::HspiceAnalysis => match target {
+            D::Hspice => Native,
+            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            D::Ngspice | D::Espice | D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             D::Spectre => Refuse(Code::W0015),
             D::Verilog => Refuse(Code::W0001),
         },
@@ -292,7 +319,9 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         },
         Construct::RfPort => match target {
             D::Ngspice | D::Espice => Native,
-            D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0007),
+            // Xyce RG, port device `P n+ n- port=n z0=z`.
+            D::Xyce => Spell(Alt::XycePort),
+            D::Hspice | D::Ltspice => Refuse(Code::W0007),
             // Spectre's `port` (Spectre Reference 5.0 p.602), `dc`/`mag`
             // half ngspice's; a wave or an expression is refused by the
             // writer. VACASK's builtins have no port (`lib/devbuiltins.cpp`).
@@ -333,6 +362,36 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Ngspice | D::Espice | D::Xyce | D::Ltspice => Native,
             D::Vacask => Refuse(Code::W0106),
             D::Spectre | D::Cdl | D::Verilog => Native,
+        },
+        // ngspice-45 and Xyce 7.10 run a `.func` reading its subcircuit's
+        // parameter inside the subcircuit (run: 2 V and 3 V from two
+        // subcircuits' `f`); HSPICE's function `.param` is local to its
+        // subcircuit like any `.param` (HSPICE `.PARAM`); Spectre defines
+        // functions "at the top level only" (Reference p.871); VACASK has
+        // none; LTspice's help states no scope for `.func`.
+        Construct::LocalFunc => match target {
+            D::Ngspice | D::Espice | D::Xyce | D::Hspice => Native,
+            D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0106),
+            D::Cdl | D::Verilog => Native,
+        },
+        // Xyce's own form; ngspice's `pwl()` in a value (its `TABLE`
+        // smooths each corner: ngspice-45 and ESPice 0.3.0 give 1.05 at
+        // the first point of `(0,1) (1,3)`, Xyce 1); ESPice's B has no
+        // `pwl()` (0.3.0: "WrongArity"); HSPICE's `PWL(1)` reads a node
+        // pair, not an expression; LTspice, Spectre and VACASK not written.
+        Construct::TableSource => match target {
+            D::Xyce => Native,
+            D::Ngspice => Spell(Alt::PwlValue),
+            D::Espice | D::Hspice | D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0102),
+            D::Cdl | D::Verilog => Native,
+        },
+        // ngspice manual §6.3 and LTspice help `O` (LTRA); Xyce RG; ESPice
+        // 0.3.0 runs it (checked); HSPICE's lossy line is its W element
+        // (no `O`), Spectre's `tline` and VACASK no LTRA model.
+        Construct::LossyLine => match target {
+            D::Ngspice | D::Espice | D::Xyce | D::Ltspice => Native,
+            D::Hspice | D::Spectre | D::Vacask => Refuse(Code::W0105),
+            D::Cdl | D::Verilog => Native,
         },
         Construct::Step => match target {
             D::Xyce | D::Ltspice => Native,
@@ -375,9 +434,16 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             D::Spectre | D::Cdl | D::Verilog => Native,
         },
-        Construct::SensAc | Construct::SParameter => match target {
+        Construct::SensAc => match target {
             D::Ngspice | D::Espice => Native,
             D::Hspice | D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
+            D::Spectre | D::Cdl | D::Verilog => Native,
+        },
+        Construct::SParameter => match target {
+            D::Ngspice | D::Espice => Native,
+            // Xyce RG `.LIN` over the deck's `.AC` sweep.
+            D::Xyce => Spell(Alt::XyceLin),
+            D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             D::Spectre | D::Cdl | D::Verilog => Native,
         },
         Construct::PoleZero => match target {
@@ -468,10 +534,11 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 35] = [
+    const CONSTRUCTS: [Construct; 39] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
+        Construct::HspiceAnalysis,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,
@@ -490,6 +557,9 @@ mod tests {
         Construct::Conditional,
         Construct::BranchParam,
         Construct::Func,
+        Construct::LocalFunc,
+        Construct::TableSource,
+        Construct::LossyLine,
         Construct::Step,
         Construct::StepList,
         Construct::TranStartup,

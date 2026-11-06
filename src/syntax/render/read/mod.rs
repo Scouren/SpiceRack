@@ -46,6 +46,7 @@ mod blocks;
 mod cards;
 mod devices;
 mod elements;
+mod funcs;
 mod named;
 mod named_bench;
 mod named_blocks;
@@ -57,6 +58,7 @@ mod refused;
 mod shapes;
 mod sources;
 mod sweeps;
+mod tables;
 mod testbench;
 mod text;
 mod unlift;
@@ -175,6 +177,10 @@ pub(in crate::syntax::render) struct Block {
     pub(in crate::syntax::render) params: Vec<u32>,
     /// Its `.param` assignments inside a subcircuit.
     pub(in crate::syntax::render) locals: Vec<u32>,
+    /// Its `.func` cards inside a subcircuit that read more than their
+    /// arguments (a subcircuit parameter), or whose name another `.func`
+    /// shares; any other moves to the deck's top ([`Rd::func`]).
+    pub(in crate::syntax::render) funcs: Vec<Func>,
     /// Its `.include` cards.
     pub(in crate::syntax::render) includes: Vec<u32>,
     /// Its `.lib file section` cards.
@@ -284,6 +290,7 @@ impl Default for Block {
             models: vec![],
             params: vec![],
             locals: vec![],
+            funcs: vec![],
             includes: vec![],
             libs: vec![],
             raw: vec![],
