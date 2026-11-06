@@ -27075,3 +27075,31 @@ xyce/YLIN/ylin-5port-linAnalysis.cir cdl written differently: Xyce P port and .L
 xyce/YLIN/ylin-5port-linAnalysis.cir espice now written: Xyce P port and .LIN read
 xyce/YLIN/ylin-5port-linAnalysis.cir ngspice now written: Xyce P port and .LIN read
 xyce/YLIN/ylin-5port-linAnalysis.cir xyce written differently: Xyce P port and .LIN read
+
+# Phase 7: spice-read: HSPICE `.noise out src [interval]` over the .ac
+# sweep and `.dc var START= STOP= STEP=` (render::read testbench, sweeps
+# top_ac; spice/bench.rs, spice/sweeps.rs has_ac). Read (as text before);
+# HSPICE writes no second `.ac` when the deck has one of the sweep (an
+# ngspice deck's `.noise` for HSPICE likewise, tmp-noise.sp). Oracle: the
+# ESPice corpus's noise_ac_sweep.expected.json (ngspice twin), exact.
+hspice/hspice/dc_start_stop.sp cdl written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp espice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp ltspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp ngspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp spectre now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp vacask now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp xyce now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp cdl written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp espice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp ltspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp ngspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp spectre now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp vacask now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp xyce now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc.sp cdl written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc_beta.sp cdl written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc_beta.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+spice-bench/ngspice/examples/various/tmp-noise.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read

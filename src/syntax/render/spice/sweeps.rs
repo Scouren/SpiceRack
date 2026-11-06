@@ -6,7 +6,8 @@
 //!
 //! Contents:
 //! - `pub(super) fn dc_axis(w: &W, ax: &DcAxis, hspice: bool) -> String`
-//! - `pub(super) fn xyce_lin(w: &W, sw: &Sweep, tok: u32, ac: &str) -> String`
+//! - `pub(super) fn xyce_lin(w: &W, sw: &Sweep, tok: u32, ac: &str) -> String`,
+//!   `pub(super) fn has_ac(w: &W, sw: &Sweep) -> bool`
 
 use super::W;
 use crate::syntax::Dialect;
@@ -54,18 +55,23 @@ pub(super) fn xyce_lin(w: &W<'_, '_>, sw: &Sweep, tok: u32, ac: &str) -> String 
     if w.rd.d == Dialect::Xyce {
         return w.rd.span(tok, w.rd.line_last(tok));
     }
+    match has_ac(w, sw) {
+        true => ".LIN".to_string(),
+        false => format!(".ac {ac}\n.LIN"),
+    }
+}
+
+/// Whether the deck has an `.ac` of sweep `sw` (for an analysis that
+/// takes its frequencies from one: HSPICE `.noise`, Xyce `.LIN`).
+pub(super) fn has_ac(w: &W<'_, '_>, sw: &Sweep) -> bool {
     let same = |s: &Sweep| {
         (s.variation, s.points, s.start, s.stop) == (sw.variation, sw.points, sw.start, sw.stop)
     };
-    let has_ac = w.deck.bench.iter().any(|b| match b {
+    w.deck.bench.iter().any(|b| match b {
         Bench::Card(n) => matches!(
             w.rd.bench_card(*n),
             Some(BenchCard::Ana(Ana::Ac(s))) if same(&s)
         ),
         _ => false,
-    });
-    match has_ac {
-        true => ".LIN".to_string(),
-        false => format!(".ac {ac}\n.LIN"),
-    }
+    })
 }

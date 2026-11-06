@@ -14,12 +14,14 @@
 //! - `DcSweep::values(&self) -> Option<Vec<f64>>`
 //! - `Rd::dc_axes(&self, items: &[u32]) -> Option<Vec<DcAxis>>` (HSPICE's `type np` form too)
 //! - `Rd::step_list(&self, items: &[u32]) -> Option<(String, Vec<f64>)>`
-//! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`, `Rd::xyce_lin(&self, n: u32) -> Option<Card>`
+//! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`, `Rd::xyce_lin(&self, n: u32) -> Option<Card>`,
+//!   `Rd::top_ac(&self) -> Option<[u32; 4]>`,
+//!   `Rd::noise(&self, n: u32, items: &[u32]) -> Option<Card>`
 
 use super::Rd;
 use super::testbench::{Card, Sweep};
 use crate::syntax::Dialect;
-use crate::syntax::ast::{Node, Tag};
+use crate::syntax::ast::{NONE, Node, Tag};
 
 /// One `.dc` axis: its source (or parameter) and how it sweeps.
 #[derive(Clone, Debug)]
@@ -176,19 +178,70 @@ impl Rd<'_> {
         if off || !pairs.iter().all(|&a| self.tag(a) == Tag::Assign) {
             return None;
         }
+        Some(Card::Freq(true, self.top_ac()?))
+    }
+
+    /// The deck's first top `.ac` card's `variation points start stop`
+    /// items, by that card's own rule (testbench `read_card`).
+    pub(super) fn top_ac(&self) -> Option<[u32; 4]> {
         let ac = self
             .ast
             .fields(self.ast.root())
             .iter()
             .copied()
             .find(|&s| self.tag(s) == Tag::Analysis && self.head_kind(s) == "ac")?;
-        // The `.AC` card's own rule (testbench `read_card`).
         match self.fields(ac) {
             &[v, a, b, c] if self.wordw(v) && [a, b, c].iter().all(|&k| self.numw(k)) => {
-                Some(Card::Freq(true, [v, a, b, c]))
+                Some([v, a, b, c])
             }
             _ => None,
         }
+    }
+
+    /// A `.noise` card's parts: `v(out[,ref]) src variation points start
+    /// stop [pts_per_summary]`, or HSPICE's `out src [interval]` over the
+    /// deck's `.ac`.
+    pub(super) fn noise(&self, n: u32, items: &[u32]) -> Option<Card> {
+        // HSPICE `.NOISE out src [interval]` sweeps the deck's `.AC`.
+        let (items, spaced) = match items {
+            [g, src, rest @ ..] if self.d == Dialect::Hspice && rest.len() <= 1 => {
+                let ac = self.top_ac()?;
+                let v: Vec<u32> = [*g, *src]
+                    .into_iter()
+                    .chain(ac)
+                    .chain(rest.iter().copied())
+                    .collect();
+                (v, self.spaced(n, items))
+            }
+            _ => (items.to_vec(), self.spaced(n, items)),
+        };
+        let [g, src, var, a, b, c, rest @ ..] = &items[..] else {
+            return None;
+        };
+        if rest.len() > 1 || self.tag(*g) != Tag::Group || !self.group_closed(*g) || !spaced {
+            return None;
+        }
+        let gn = self.ast.lhs(Node(*g));
+        if gn == NONE || !self.text(gn).eq_ignore_ascii_case("v") {
+            return None;
+        }
+        let nodes = self.group_items(*g);
+        if nodes.is_empty() || nodes.len() > 2 || !nodes.iter().all(|&k| self.wordw(k)) {
+            return None;
+        }
+        if !self.wordw(*src)
+            || !self.wordw(*var)
+            || ![a, b, c].iter().all(|&&k| self.numw(k))
+            || rest.iter().any(|&k| !self.numw(k))
+        {
+            return None;
+        }
+        Some(Card::Noise(
+            nodes.iter().map(|&k| self.text(k)).collect(),
+            *src,
+            [*var, *a, *b, *c],
+            rest.first().copied(),
+        ))
     }
 
     /// HSPICE's `.DC src DEC|OCT np start stop`, `src POI n v…` and `src

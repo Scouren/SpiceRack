@@ -505,3 +505,19 @@ fn a_xyce_lin_over_ports_is_ngspices_sp() {
         assert!(xy.lines().any(|l| l == want), "{want}\n{xy}");
     }
 }
+
+#[test]
+fn an_hspice_noise_takes_the_ac_sweep_and_a_keyword_dc_reads() {
+    // HSPICE `.NOISE out src [interval]` over the `.AC` sweep; the ESPice
+    // corpus's noise_ac_sweep.expected.json (oracle: ngspice on `.noise
+    // v(out) vin dec 2 1k 100k 1`) matched ngspice-45 on the written deck
+    // exactly, every column. HSPICE `.DC v1 START= STOP= STEP=`: ngspice-45
+    // gave the divider's 1/4 at 0..1 V. Checks: 2.
+    let text = "t\nvin in 0 dc 1 ac 1\nr1 in out 1k\nc1 out 0 1n\n.ac dec 2 1k 100k\n.noise v(out) vin 1\n.dc vin start=0 stop=1 step=0.25\n.end\n";
+    let ng = render_text(text, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [".noise V(out) vin dec 2 1k 100k 1", ".dc vin 0 1 250m"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+}

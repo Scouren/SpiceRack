@@ -335,6 +335,20 @@ impl<'a> Rd<'a> {
                 {
                     Some(Card::DcAxes(axes))
                 }
+                // HSPICE `.DC var START=a STOP=b STEP=c`.
+                "dc" if hspice
+                    && let [v, a, b, c] = items
+                    && [(a, "start"), (b, "stop"), (c, "step")]
+                        .iter()
+                        .all(|&(&k, w)| {
+                            self.tag(k) == Tag::Assign && self.key(k).eq_ignore_ascii_case(w)
+                        }) =>
+                {
+                    let r = |k: u32| self.ast.rhs(Node(k));
+                    let s = [*v, r(*a), r(*b), r(*c)];
+                    (self.wordw(s[0]) && s[1..].iter().all(|&k| self.number(k).is_some()))
+                        .then(|| Card::Dc(vec![s]))
+                }
                 "dc" => {
                     if items.is_empty() || !items.len().is_multiple_of(4) || !self.spaced(n, items)
                     {
@@ -427,40 +441,6 @@ impl<'a> Rd<'a> {
             return None;
         }
         Some(Card::Tran(nums.to_vec(), start, uic, startup))
-    }
-
-    fn noise(&self, n: u32, items: &[u32]) -> Option<Card> {
-        let [g, src, var, a, b, c, rest @ ..] = items else {
-            return None;
-        };
-        if rest.len() > 1
-            || self.tag(*g) != Tag::Group
-            || !self.group_closed(*g)
-            || !self.spaced(n, items)
-        {
-            return None;
-        }
-        let gn = self.ast.lhs(Node(*g));
-        if gn == NONE || !self.text(gn).eq_ignore_ascii_case("v") {
-            return None;
-        }
-        let nodes = self.group_items(*g);
-        if nodes.is_empty() || nodes.len() > 2 || !nodes.iter().all(|&k| self.wordw(k)) {
-            return None;
-        }
-        if !self.wordw(*src)
-            || !self.wordw(*var)
-            || ![a, b, c].iter().all(|&&k| self.numw(k))
-            || rest.iter().any(|&k| !self.numw(k))
-        {
-            return None;
-        }
-        Some(Card::Noise(
-            nodes.iter().map(|&k| self.text(k)).collect(),
-            *src,
-            [*var, *a, *b, *c],
-            rest.first().copied(),
-        ))
     }
 
     fn sens(&self, n: u32) -> Option<Card> {
