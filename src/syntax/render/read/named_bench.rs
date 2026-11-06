@@ -345,17 +345,38 @@ impl<'a> Rd<'a> {
     }
 
     /// A VACASK `options` statement in a `control` block (the old
-    /// lowering's `vacask_control`, `Ctl`).
+    /// lowering's `vacask_control`, `Ctl`): an option SPICE names alike
+    /// with the same quantity (`docs/cmd-options-tol.md`,
+    /// `cmd-options-temp.md`, `cmd-options-special.md`: `scale`) and a
+    /// `tran_method` SPICE has (`cmd-options-tran.md`: "trap", "am2" the
+    /// trapezoidal rule; "gear2", "bdf2" second-order Gear, ngspice's
+    /// `method=gear` at its default MAXORD 2) are portable, the rest
+    /// VACASK's own.
     fn vacask_options(&self, st: u32) -> Option<Vec<Opt>> {
+        const SPICE_ALIKE: [&str; 6] = ["reltol", "abstol", "vntol", "chgtol", "gmin", "scale"];
         if self.tag(st) != Tag::Options {
             return None;
         }
         let mut out = Vec::new();
         for (k, v) in self.pairs(st) {
-            match (k.as_str(), self.number(v)) {
-                ("rawfile", _) => {}
-                ("temp", Some(x)) => out.push(Opt::Temp(x)),
-                ("tnom", Some(x)) => out.push(Opt::Tnom(x)),
+            let method = match k.as_str() {
+                "tran_method" => unquoted(&self.text(v)),
+                _ => None,
+            };
+            match (k.as_str(), self.number(v), method.as_deref()) {
+                ("rawfile", ..) => {}
+                ("temp", Some(x), _) => out.push(Opt::Temp(x)),
+                ("tnom", Some(x), _) => out.push(Opt::Tnom(x)),
+                // As a number: VACASK's `M` is mega, SPICE's milli.
+                (k, Some(x), _) if SPICE_ALIKE.contains(&k) => {
+                    out.push(Opt::Portable(k.into(), format!("{x:e}")))
+                }
+                (_, _, Some("trap" | "am2")) => {
+                    out.push(Opt::Portable("method".into(), "trap".into()))
+                }
+                (_, _, Some("gear2" | "bdf2")) => {
+                    out.push(Opt::Portable("method".into(), "gear".into()))
+                }
                 _ => out.push(Opt::Vacask(k, self.text(v))),
             }
         }

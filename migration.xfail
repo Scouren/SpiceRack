@@ -27642,3 +27642,23 @@ vacask/test/timestep.sim espice now written: a load of VACASK's own linear devic
 vacask/test/timestep.sim hspice now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
 vacask/test/timestep.sim vacask the redundant load of its own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) left out: its R, C, L are written as sp_resistor
 vacask/test/timestep.sim xyce now written: a load of VACASK's own linear device (resistor.osdi, capacitor.osdi, inductor.osdi) is no load, was refused W0004
+
+# Phase 7: spectre-read-r2: VACASK options SPICE names alike
+# (render::read::named_bench vacask_options). reltol, abstol, vntol, chgtol,
+# gmin, scale (VACASK docs cmd-options-tol.md, cmd-options-temp.md,
+# cmd-options-special.md: SPICE's quantities) and tran_method "trap"/"am2"
+# (trapezoidal), "gear2"/"bdf2" (second-order Gear; cmd-options-tran.md)
+# are portable options, were VACASK's own (dropped W0024 off VACASK):
+# ngspice now writes `.options method=gear`, Xyce refuses the method W0017
+# (its writer's cell), VACASK writes the same options in another order.
+vacask/benchmark/graetz/vacask/lte_debug.sim espice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug.sim hspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug.sim ltspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug.sim ngspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug.sim xyce now refused W0017: its tran_method="gear2" is the portable method option, which the Xyce writer refuses (was dropped W0024)
+vacask/benchmark/graetz/vacask/lte_debug2.sim espice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug2.sim hspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug2.sim ltspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug2.sim ngspice its tran_method="gear2" written as .options method=gear (cmd-options-tran.md), was dropped W0024
+vacask/benchmark/graetz/vacask/lte_debug2.sim xyce now refused W0017: its tran_method="gear2" is the portable method option, which the Xyce writer refuses (was dropped W0024)
+vacask/benchmark/mul/vacask/runme.sim vacask its reltol and vntol read as portable options, written after tran_method (were VACASK options, written in place)

@@ -194,3 +194,25 @@ fn a_controlled_source_parameter_the_reader_has_no_field_for_is_kept() {
         vec![Code::W0001]
     );
 }
+
+#[test]
+fn a_vacask_option_spice_names_alike_is_the_targets_option() {
+    // cmd-options-tol.md: `reltol`, `abstol`, `vntol`, `chgtol`, `gmin`
+    // mean SPICE's; cmd-options-tran.md: `tran_method` "trap" (and "am2")
+    // is the trapezoidal rule, "gear2"/"bdf2" second-order Gear (ngspice
+    // manual §11.1.2: `method=trap|gear`, MAXORD default 2).
+    let bare = SCRIPTED.split("embed").next().expect("a deck");
+    for (opt, card) in [
+        ("reltol=1e-6 gmin=1e-15", ".options reltol=1e-6 gmin=1e-15"),
+        ("tran_method=\"gear2\"", ".options method=gear"),
+        ("tran_method=\"trap\"", ".options method=trap"),
+    ] {
+        let deck = bare.replace(
+            "  analysis op1 op",
+            &format!("  options {opt}\n  analysis op1 op"),
+        );
+        let w = written(&deck, Dialect::Ngspice).expect("written");
+        assert!(w.text.contains(card), "{opt}:\n{}", w.text);
+        assert!(!codes(&w).contains(&Code::W0024), "{opt}: {:?}", codes(&w));
+    }
+}
