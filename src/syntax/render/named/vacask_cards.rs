@@ -160,7 +160,7 @@ impl W<'_, '_> {
                 model,
                 params,
             } => {
-                if letter == 'M' && nodes.len() != 4 {
+                if letter == 'M' && nodes.len() != 4 || letter == 'O' {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }

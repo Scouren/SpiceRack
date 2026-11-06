@@ -248,7 +248,7 @@ impl W<'_, '_> {
             } => {
                 // `[CMP]` mos models: `d g s b model`; no mapped terminal
                 // list for a MOSFET without its bulk or with extra nodes.
-                if letter == 'M' && nodes.len() != 4 {
+                if letter == 'M' && nodes.len() != 4 || letter == 'O' {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }

@@ -459,3 +459,24 @@ fn an_ltspice_sources_rser_and_cpar_are_elements_elsewhere() {
         sp.messages
     );
 }
+
+#[test]
+fn a_xyce_lossy_line_is_ngspices_o_and_refused_where_none_is() {
+    // Xyce RG and ngspice manual §6.3: `O n1 n2 n3 n4 model` on an LTRA
+    // model (Xyce 7.10 and ngspice-45 ran LTRA/zero_length_* alike to
+    // 5e-8); HSPICE has no `O`, Spectre and VACASK no LTRA (W0105).
+    // Checks: 1 + 3.
+    let text = "t\nV1 1 0 1\nO1 1 0 2 0 cab\n.model cab ltra r=0.05 c=20pF len=100\nR1 2 0 10\n.op\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == "O1 1 0 2 0 cab"), "{ng}");
+    for t in [Dialect::Hspice, Dialect::Spectre, Dialect::Vacask] {
+        let e = render_text(text, Dialect::Xyce, "t", t).expect_err("refused");
+        assert!(
+            e.diags.iter().any(|g| g.code == Code::W0105),
+            "{t:?} {}",
+            e.messages
+        );
+    }
+}

@@ -344,6 +344,11 @@ impl<'a> Rd<'a> {
             Element::Diode | Element::Bjt | Element::Mosfet | Element::Jfet | Element::Mesfet => {
                 self.semiconductor(n, e, name)?
             }
+            // Xyce's and LTspice's `O` (four nodes, an LTRA model) is
+            // ngspice's (manual §6.3, Xyce RG lossy transmission line).
+            Element::LossyLine if matches!(self.d, Dialect::Xyce | Dialect::Ltspice) => {
+                self.semiconductor(n, e, name)?
+            }
             Element::VoltageSwitch | Element::CurrentSwitch => {
                 let want = if e == Element::VoltageSwitch { 5 } else { 4 };
                 if items.len() != want || !items.iter().all(|&k| self.is_word(k)) {

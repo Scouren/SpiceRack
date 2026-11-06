@@ -264,11 +264,17 @@ impl W<'_, '_> {
                 )
             }
             Card::Semi {
+                letter,
                 nodes,
                 model,
                 params,
                 ..
-            } => format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params)),
+            } => {
+                if letter == 'O' {
+                    self.ask(Construct::LossyLine, tok);
+                }
+                format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
+            }
             Card::Switch { nodes, model, .. } => format!("{decl} {} {model}", nodes.join(" ")),
             Card::Line { nodes, z0, td, .. } => format!(
                 "{decl} {} Z0={} TD={}",

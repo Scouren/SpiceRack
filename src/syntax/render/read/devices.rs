@@ -179,6 +179,7 @@ impl<'a> Rd<'a> {
             Element::Bjt => (3..=5).contains(&nodes.len()),
             Element::Mosfet => (3..=7).contains(&nodes.len()),
             Element::Jfet | Element::Mesfet => nodes.len() == 3,
+            Element::LossyLine => nodes.len() == 4,
             _ => false,
         };
         fits.then(|| Card::Semi {

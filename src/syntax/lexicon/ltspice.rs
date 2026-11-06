@@ -94,7 +94,7 @@ pub const LTSPICE: Lexicon = Lexicon {
     // `.fourier` is LTspice's own card, not `.four`.
     keywords: &[OWN_KEYWORDS, SPICE_KEYWORDS],
     named: false,
-    devices: &[device::SPICE],
+    devices: &[device::SPICE, device::LOSSY_LINE],
     masters: &[],
     analyses: &[],
     regions: &[],

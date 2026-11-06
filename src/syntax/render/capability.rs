@@ -80,6 +80,8 @@ pub enum Construct {
     LocalFunc,
     /// Xyce's `E`/`G` `TABLE`.
     TableSource,
+    /// An `O` lossy line on an LTRA model.
+    LossyLine,
     /// `.step`.
     Step,
     /// `.step <name> list <values>`.
@@ -363,6 +365,14 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Espice | D::Hspice | D::Ltspice | D::Spectre | D::Vacask => Refuse(Code::W0102),
             D::Cdl | D::Verilog => Native,
         },
+        // ngspice manual §6.3 and LTspice help `O` (LTRA); Xyce RG; ESPice
+        // 0.3.0 runs it (checked); HSPICE's lossy line is its W element
+        // (no `O`), Spectre's `tline` and VACASK no LTRA model.
+        Construct::LossyLine => match target {
+            D::Ngspice | D::Espice | D::Xyce | D::Ltspice => Native,
+            D::Hspice | D::Spectre | D::Vacask => Refuse(Code::W0105),
+            D::Cdl | D::Verilog => Native,
+        },
         Construct::Step => match target {
             D::Xyce | D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
@@ -497,7 +507,7 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 37] = [
+    const CONSTRUCTS: [Construct; 38] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -521,6 +531,7 @@ mod tests {
         Construct::Func,
         Construct::LocalFunc,
         Construct::TableSource,
+        Construct::LossyLine,
         Construct::Step,
         Construct::StepList,
         Construct::TranStartup,
