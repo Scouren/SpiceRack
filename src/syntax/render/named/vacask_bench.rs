@@ -136,6 +136,13 @@ impl W<'_, '_> {
                 return vec![];
             }
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
+            Ana::Spectre { kind, .. } => {
+                self.refuse(
+                    crate::syntax::render::read::spectre_refusal(Dialect::Vacask, kind),
+                    tok,
+                );
+                return vec![];
+            }
         };
         let name = format!("{kind}{}", idx + 1);
         let mut out = Vec::new();
@@ -220,9 +227,12 @@ impl W<'_, '_> {
                 "analysis {name} dcxf out=\"{}\"",
                 bare_node(output).to_ascii_lowercase()
             )),
-            Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) | Ana::MonteCarlo { .. } => {
-                unreachable!("refused above")
-            }
+            Ana::Sens(..)
+            | Ana::Pz(..)
+            | Ana::Sp(..)
+            | Ana::Four(..)
+            | Ana::MonteCarlo { .. }
+            | Ana::Spectre { .. } => unreachable!("refused above"),
         }
         out
     }
@@ -319,7 +329,7 @@ fn spectre_kind(a: &Ana) -> Option<&'static str> {
         Ana::Sens(..) => "sens",
         Ana::Pz(..) => "pz",
         Ana::Four(..) => "fourier",
-        Ana::MonteCarlo { .. } => return None,
+        Ana::MonteCarlo { .. } | Ana::Spectre { .. } => return None,
     })
 }
 

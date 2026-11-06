@@ -261,9 +261,11 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::RfPort => match target {
             D::Ngspice | D::Espice => Native,
             D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0007),
-            // Spectre's `port` instance; the mapping from `portnum`/`z0`
-            // is unverified.
-            D::Spectre | D::Vacask => Refuse(Code::W0007),
+            // Spectre's `port` (Spectre Reference 5.0 p.602), `dc`/`mag`
+            // half ngspice's; a wave or an expression is refused by the
+            // writer. VACASK's builtins have no port (`lib/devbuiltins.cpp`).
+            D::Spectre => Native,
+            D::Vacask => Refuse(Code::W0007),
             D::Cdl | D::Verilog => Native,
         },
         Construct::PwlRepeatV => match target {
@@ -323,7 +325,12 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::PoleZero => match target {
             D::Ngspice | D::Espice => Native,
             D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0015),
-            D::Spectre | D::Vacask => Refuse(Code::W0015),
+            // Spectre's `pz` takes its input as a source (`iprobe`,
+            // Spectre Reference 5.0 p.790), not SPICE's node pair: written
+            // where a source of the transfer's kind stands across the
+            // pair, refused by the writer otherwise.
+            D::Spectre => Native,
+            D::Vacask => Refuse(Code::W0015),
             D::Cdl | D::Verilog => Native,
         },
         Construct::Print => match target {

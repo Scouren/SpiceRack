@@ -132,8 +132,9 @@ others are recorded through `codegen::netlist`, so the whole tree diffs.
   one `control` block), so VACASK is a spine of its own, not a row. Its
   declarations are the name map's, spelled as the old writers did (a
   lowercase letter, then the name escaped: Spectre `\`, VACASK `'…'`);
-  its references (`probe=`, `ind1=`, `iprobe=`) are as written, as the
-  old writers spelled them (P7-4..P7-6).
+  its references (`ind1=`) are as written, as the old writers spelled
+  them; a Spectre or VACASK source's references (`probe=`, `dev=`,
+  `iprobe=`, `save dev:p`) are read as the map spells it (phase 7).
 - `render/role.rs`: the file role rule (`frame(Role) -> Frame`: title,
   `.end`, control blocks, ground); `Rd::role` is the kit's answer, or
   `resolve::role` for a file read alone. A writer asks it once and keeps
@@ -215,13 +216,6 @@ Each is a `// quirk:` in the code, the old bytes kept in this phase.
 
 **The name map** (`render/names.rs`: a declaration gains its letter, a
 reference does not):
-- P7-4. Spectre `cccs`/`ccvs` `probe=`: the controlling source as written
-  (`in1`), its declaration `Vin1` (`read/named_elements.rs`).
-- P7-5. Spectre `save dev:p` is `i(dev)` as written (`i(in1)`, not
-  `i(Vin1)`); `save main:d` (any other terminal) is kept as written, which
-  no SPICE output names (`read/named_bench.rs`).
-- P7-6. Spectre `dc dev=` and `noise iprobe=` name the source as written
-  (`read/named_bench.rs`).
 - P7-7. HSPICE writes a `B` source as `E1`/`G1` (`vol=`/`cur=`), and the
   Laplace lift a `B1` as `EB1`/`GB1`/`AB1` (+ `.model B1_xfer`): renames of
   the declaration alone, which a reference (`i(B1)`) does not follow and

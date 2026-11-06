@@ -22,8 +22,8 @@
 use super::W;
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
-use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Sweep};
+use crate::syntax::render::capability::{Action, Construct};
+use crate::syntax::render::read::{Ana, Bench, BenchCard, Card, Comp, Opt, Sweep};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
@@ -489,9 +489,24 @@ impl W<'_, '_> {
                 })
                 .collect::<Vec<_>>()
                 .join("\n"),
-            Ana::Pz(..) => {
-                self.ask(Construct::PoleZero, tok);
-                return None;
+            // Spectre Reference 5.0 p.790: poles and zeros from the
+            // `iprobe` source to the output pair; SPICE's input node pair
+            // is that source where one of the transfer's kind (`vol` a V,
+            // `cur` an I) stands across it.
+            Ana::Pz([i1, i2, o1, o2], tf, kind) => {
+                let src = (*kind == "pz").then(|| self.pz_source(i1, i2, tf));
+                let Some(Some(src)) = src else {
+                    self.refuse(Code::W0015, tok);
+                    return None;
+                };
+                if !matches!(self.ask(Construct::PoleZero, tok), Action::Native) {
+                    return None;
+                }
+                format!(
+                    "pz1 ({} {}) pz iprobe={src}",
+                    self.path(bare_node(o1)),
+                    self.path(bare_node(o2))
+                )
             }
             // `[REF]` p.174: every parameter precedes the brace; the names
             // as written.
@@ -511,6 +526,29 @@ impl W<'_, '_> {
                 }
                 format!("{s} {{\n  {inner} {kind}\n}}")
             }
+            // Spectre's own analysis, as read.
+            Ana::Spectre { node, .. } => self.rd.lines(*node).join("\n"),
+        })
+    }
+
+    /// The top's source across `a b` of `tf`'s kind (`vol` a V, `cur`
+    /// an I), as its declaration is written.
+    fn pz_source(&self, a: &str, b: &str, tf: &str) -> Option<String> {
+        let want = if tf == "vol" { 'V' } else { 'I' };
+        let same = |x: &str, y: &str| match self.keep_case {
+            true => x == y,
+            false => x.eq_ignore_ascii_case(y),
+        };
+        self.deck.top.comps.iter().find_map(|c| {
+            let Comp::Card(n) = *c else { return None };
+            let Card::Source { letter, np, nm, .. } = self.rd.card_view(n) else {
+                return None;
+            };
+            let across = same(&np, a) && same(&nm, b);
+            (letter == want && across).then(|| {
+                let l = letter.to_ascii_lowercase();
+                format!("{l}{}", self.dev(&self.names.decl(n)[1..]))
+            })
         })
     }
 

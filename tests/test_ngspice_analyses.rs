@@ -339,18 +339,23 @@ fn sp_of_a_matched_t_attenuator_reflects_nothing_and_passes_half() {
 
 /// An RF port puts Z0 in series with the source in every analysis (manual
 /// §4.1.11), so a dialect that cannot write one refuses (`W0007`) rather
-/// than drop it.
+/// than drop it. Spectre's `port` is the voltage across the terminated
+/// port (Spectre Reference 5.0 p.602), half the source behind Z0.
 #[test]
 fn rf_ports_are_refused_where_no_dialect_form_exists() {
     use spicerack::syntax::diag::Code;
     use spicerack::syntax::render::render_text;
     let deck = format!("* p\n{PORTS}.end\n");
     assert!(common::written(Dialect::Espice, &deck).contains("V1 in 0 0 AC 1 portnum 1 z0 50"));
+    let spectre = common::written(Dialect::Spectre, &deck);
+    assert!(
+        spectre.contains("v1 (in 0) port num=1 r=50 dc=0 mag=500m"),
+        "{spectre}"
+    );
     for d in [
         Dialect::Ltspice,
         Dialect::Hspice,
         Dialect::Xyce,
-        Dialect::Spectre,
         Dialect::Vacask,
     ] {
         let e = render_text(&deck, Dialect::Ngspice, "p", d).expect_err("refused");

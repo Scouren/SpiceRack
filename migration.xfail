@@ -4220,3 +4220,62 @@ spice-bench/ngspice/tests/sensitivity/diffpair.sp spectre an option written only
 spice-bench/postlayout/c7552_ihp.sp spectre an option written only where Spectre has its equivalent
 spice-bench/postlayout/c7552_sky130.sp spectre an option written only where Spectre has its equivalent
 spice-bench/powergrid/ibmpg1t.sp spectre an option written only where Spectre has its equivalent
+
+# Phase 7: spectre-read: masters with a SPICE card (render::read::named_masters).
+# A Spectre `iprobe` is a 0 V source, `port` ngspice's RF port (the source
+# behind `r` twice `dc`/`mag`, [CMP] p.602), a lossless `tline` a T line,
+# a `bsource` with `v=`/`i=` over v(), $time and the functions both define
+# a B source ([CMP] pp.856-859); each was a statement kept as text. The
+# Spectre writer of a B source is gap-named-write's (W0102 here until it
+# merges). Per set: fixtures 2 (one input).
+fixtures/tests/fixtures/transpiler/f1.scs spectre b1, b2, b3 now B sources written back as bsource v=/i= (gap-named-write's writer); were Spectre text copied as written (W0027)
+fixtures/tests/fixtures/transpiler/f1.scs cdl b1, b2, b3 now B cards (B1 a b V=v(a,b)*2 …) among the elements; were Spectre text copied after them
+
+# Phase 7: spectre-read: analyses (render::read::named_bench, `Ana::Spectre`).
+# A Spectre `name master … {` analysis is read, not kept as a block: a
+# `montecarlo` over one analysis is `Ana::MonteCarlo` (Spectre writes it
+# after the deck's other analyses, its body indented as read; VACASK its
+# `mc` loop, or W0115), any other Spectre-only analysis `Ana::Spectre`
+# (Spectre writes it as read; elsewhere W0015 where the target has no such
+# analysis, W0001 where it has one not translated). CDL no longer copies
+# the analysis as text. Per set: fixtures 18 (five inputs, the T-S decks).
+fixtures/tests/spectre/t_s2_agauss.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s2_agauss.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s2_agauss.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s2_aunif.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s2_aunif.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s2_aunif.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s2_limit.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s2_limit.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s2_limit.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s3_nested.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s3_nested.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+fixtures/tests/spectre/t_s3_nested.scs vacask now written: the montecarlo is VACASK's mc loop around op (Ana::MonteCarlo, as a given deck's region one); was refused (a block kept as text)
+fixtures/tests/spectre/t_s3_mismatch.scs spectre the montecarlo block written after op1 dc (the bench's order), its body indented as read; was a block kept in place
+fixtures/tests/spectre/t_s3_mismatch.scs cdl the montecarlo block is an analysis, which CDL does not write; was copied as Spectre text
+
+# Phase 7: spectre-read: a Spectre file's SPICE region (render::read::named
+# `Rd::region`). A `simulator lang=spice` region's `.param` (HSPICE
+# lexicon, Spectre UG p.53) whose values are expressions is read as
+# `parameters`, its numbers in the region's suffixes; in a section the
+# region is kept whole unless every statement is one. Per set: fixtures 6
+# (one input).
+fixtures/tests/fixtures/pdk_sections/bare.scs ngspice now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs espice now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs hspice now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs xyce now written: tt's region .param rsh_spice=100 rvc=0.01 is .param rsh_spice=100 / .param rvc=10m; was refused (the region kept as Spectre-file text, W0001)
+fixtures/tests/fixtures/pdk_sections/bare.scs vacask now written: tt's region .param is parameters rsh_spice=100 rvc=10m; was refused (the region kept as text)
+fixtures/tests/fixtures/pdk_sections/bare.scs spectre tt's region .param is parameters rsh_spice=100 rvc=10m (one statement with vth0n, u0n, after); was the region copied as written
+
+# Phase 7: integrate: Spectre port and pz written (render::named, capability
+# RfPort/PoleZero). A port source is Spectre's `port` (Spectre Reference 5.0
+# p.602: `dc`/`mag` across the terminated port, half ngspice's source behind
+# `z0`); a `.pz` whose input pair has a source of its kind across it (`vol`
+# a V, `cur` an I) is `pz (out) pz iprobe=<source>` (p.790), so a Spectre
+# deck's own port and pz trip (test_sources/imported.rs). Per set:
+# spice-bench 5 (five inputs).
+spice-bench/ngspice/examples/sp/Tschebyschef-LP.sp spectre now written: V1, V2 (portnum, z0 50) are port num= r=50 dc=0 mag=500m / mag=0; was refused W0007
+spice-bench/ngspice/paranoia/various/Tschebyschef-LP.sp spectre now written: V1, V2 (portnum, z0 50) are port num= r=50 dc=0 mag=500m / mag=0; was refused W0007
+spice-bench/ngspice/tests/polezero/filt_rc.sp spectre now written: .pz 1 0 2 0 vol pz is pz1 (2 0) pz iprobe=v1 (v1 across 1 0); was refused
+spice-bench/ngspice/tests/polezero/filt_bridge_t.sp spectre now written: .PZ 1 0 3 0 VOL PZ is pz1 (3 0) pz iprobe=v1 (V1 across 1 0); was refused
+spice-bench/ngspice/tests/polezero/filt_multistage.sp spectre now written: .pz 1 0 6 0 vol pz is pz1 (6 0) pz iprobe=v1 (v1 across 1 0); was refused

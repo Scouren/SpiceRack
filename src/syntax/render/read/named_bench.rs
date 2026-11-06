@@ -8,14 +8,41 @@
 //! (`analysis`, `sweep`, `options`).
 //!
 //! Contents:
+//! - `fn spectre_refusal(target: Dialect, kind: &str) -> Code`
 //! - `Rd::bench_cards(&self, b: Bench) -> Vec<BenchCard>`
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
+//! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
 //! - `Rd::node_vals(&self, n: u32) -> Option<Vec<(String, f64)>>`
 
 use super::named_elements::unquoted;
 use super::{Ana, Bench, BenchCard, Opt, Rd, Sweep};
+use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::diag::Code;
 use crate::syntax::token::Tag as T;
+
+/// What `target` refuses a Spectre analysis of keyword `kind`
+/// ([`Ana::Spectre`]) with: `W0015` when it has no analysis of the kind,
+/// `W0001` (the statement kept as Spectre text) when it has one this
+/// reader does not translate. ngspice: `.pz`, `.sp`, `.sens` (manual
+/// ch.15; ngspice-45 runs no `.pss`); HSPICE: `.pz`, `.sens`, `.lin`,
+/// `.hb`, an analysis's `sweep` and `monte=`; Xyce: `.hb`, `.lin`, `.sens`,
+/// `.step`, `.sampling` (RG Table 6-1); LTspice: `.step`; VACASK: `hb`,
+/// `sweep`, `acxf`, `mc` (`docs/analysis_types.md`).
+pub(in crate::syntax::render) fn spectre_refusal(target: Dialect, kind: &str) -> Code {
+    let has: &[&str] = match target {
+        Dialect::Ngspice | Dialect::Espice => &["pz", "sp", "sens"],
+        Dialect::Hspice => &["pz", "sens", "sp", "hb", "sweep", "montecarlo"],
+        Dialect::Xyce => &["hb", "sp", "sens", "sweep", "montecarlo"],
+        Dialect::Ltspice => &["sweep"],
+        Dialect::Vacask => &["hb", "sweep", "xf", "montecarlo"],
+        Dialect::Spectre | Dialect::Cdl | Dialect::Verilog => &[],
+    };
+    match has.contains(&kind) {
+        true => Code::W0001,
+        false => Code::W0015,
+    }
+}
 
 impl<'a> Rd<'a> {
     /// What testbench item `b` adds, in order; empty when the IR held
@@ -25,18 +52,8 @@ impl<'a> Rd<'a> {
             Bench::Card(n) => self.bench_card(n).into_iter().collect(),
             Bench::Meas(k) => vec![BenchCard::Meas(self.line(k))],
             Bench::Save(n) => {
-                let outs = self.fields(n).iter().map(|&o| {
-                    let s = self.name_of(o);
-                    // quirk: `dev:p` is `i(dev)` with `dev` as written, not as
-                    // the name map spells its declaration (`V1`, `Vin1`); any
-                    // other terminal (`main:d`) is kept as written, which no
-                    // SPICE output names. Phase 7: both through the map.
-                    match s.split_once(':') {
-                        Some((dev, "p")) => format!("i({dev})"),
-                        _ => s,
-                    }
-                });
-                vec![BenchCard::Saves(outs.collect())]
+                let outs = self.saves(n).expect("a save the reader placed");
+                vec![BenchCard::Saves(outs)]
             }
             Bench::Analysis(n) => self
                 .spectre_analysis(n)
@@ -76,11 +93,12 @@ impl<'a> Rd<'a> {
         Some(match (kind.as_str(), ns.as_slice()) {
             ("dc", []) if p.is_empty() => Ana::Op,
             ("dc", []) => {
-                // quirk: `dev=` and `iprobe=` (below) name a source as
-                // written, not as the name map spells its declaration
-                // (`in1` is `Vin1`); phase 7 spells them through the map.
+                // `dev=` and `iprobe=` (below) name a source as the name
+                // map spells its declaration (`in1` is `vin1`).
                 let source = match (s("dev"), s("param")) {
-                    (Some(dev), Some(param)) if param == "dc" => dev,
+                    (Some(dev), Some(param)) if param == "dc" => {
+                        self.declared(n, &dev, &['V', 'I'])?
+                    }
                     (None, Some(param)) => param,
                     _ => return None,
                 };
@@ -94,16 +112,61 @@ impl<'a> Rd<'a> {
                 max_step: num("maxstep"),
                 uic: s("skipdc").as_deref() == Some("yes"),
             },
-            ("montecarlo", []) => self.montecarlo(n)?,
+            ("montecarlo", []) if self.montecarlo(n).is_some() => self.montecarlo(n)?,
             ("noise", [out, reference]) => Ana::Noise {
                 output: out.clone(),
                 reference: reference.clone(),
-                source: s("iprobe")?,
+                source: self.declared(n, &s("iprobe")?, &['V', 'I'])?,
                 sweep: sweep()?,
                 pps: None,
             },
+            // `[CMP]` p.790: poles and zeros from the `iprobe` source to
+            // the output terminals; ngspice's `.pz` takes the source's
+            // nodes as its input, `vol` for a voltage source, `cur` for a
+            // current one (manual §15.3.6).
+            ("pz", [o1, o2]) if p.len() == 1 => {
+                let src = s("iprobe")?;
+                let scope = self.scope_of.get(&n).copied().unwrap_or(NONE);
+                let &k = self.insts.get(&(scope, src))?;
+                let super::Card::Source { letter, np, nm, .. } = self.named_inst(k)? else {
+                    return None;
+                };
+                let tf = if letter == 'V' { "vol" } else { "cur" };
+                Ana::Pz([np, nm, o1.clone(), o2.clone()], tf, "pz")
+            }
+            // `[CMP]` p.826: with no `ports`, every port is active, as
+            // ngspice's `.sp` takes every `portnum` source.
+            ("sp", [])
+                if p.iter()
+                    .all(|(k, _)| ["start", "stop", "dec", "lin", "log"].contains(&k.as_str())) =>
+            {
+                Ana::Sp(sweep()?)
+            }
+            // A form of the analyses above the IR does not read stays text;
+            // any other analysis is the Spectre family's own.
+            ("dc" | "ac" | "tran" | "noise" | "sp" | "pz", _) => return None,
+            _ if self.text_dialect(self.main(n)) == Dialect::Spectre => {
+                Ana::Spectre { kind, node: n }
+            }
             _ => return None,
         })
+    }
+
+    /// A `save` statement's outputs: a node as written, `dev:p` of a
+    /// voltage source `i(<source>)` as the name map spells it; `None` for
+    /// another terminal current, which no SPICE output list names as such.
+    pub(in crate::syntax::render) fn saves(&self, n: u32) -> Option<Vec<String>> {
+        self.fields(n)
+            .iter()
+            .map(|&o| {
+                let s = self.name_of(o);
+                match s.split_once(':') {
+                    Some((dev, "p")) => Some(format!("i({})", self.declared(n, dev, &['V'])?)),
+                    Some(_) => None,
+                    None => Some(s),
+                }
+            })
+            .collect()
     }
 
     /// A Spectre `ic`/`nodeset`'s node values; `None` when one is no
@@ -259,6 +322,7 @@ impl<'a> Rd<'a> {
                 let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
                 let (src, from, to, pts) =
                     (s("instance")?, num("from")?, num("to")?, num("points")?);
+                let src = self.declared(sw, &src, &['V', 'I'])?;
                 (s("parameter").as_deref() == Some("dc"))
                     .then(|| (src, from, to, (to - from) / pts))
             })
@@ -309,7 +373,7 @@ impl<'a> Rd<'a> {
             "noise" => Ana::Noise {
                 output: s("out")?,
                 reference: "0".into(),
-                source: s("in")?,
+                source: self.declared(st, &s("in")?, &['V', 'I'])?,
                 sweep: freq()?,
                 pps: None,
             },

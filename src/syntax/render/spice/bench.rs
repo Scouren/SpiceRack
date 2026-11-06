@@ -480,6 +480,13 @@ impl W<'_, '_> {
                 self.refuse(Code::W0015, tok);
                 String::new()
             }
+            Ana::Spectre { kind, .. } => {
+                self.refuse(
+                    crate::syntax::render::read::spectre_refusal(self.d, kind),
+                    tok,
+                );
+                String::new()
+            }
         }
     }
 }

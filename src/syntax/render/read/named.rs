@@ -15,6 +15,7 @@
 //! - `fn vacask_kind(module: &str, ty: Option<f64>) -> Option<(String, Option<&'static str>)>`
 //! - `fn vacask_builtin(module: &str) -> Option<&'static str>`
 //! - `Rd::declarations(&self, stmts: &[u32]) -> (HashMap<String, String>, Vec<String>)`
+//! - `Rd::instances(&mut self, stmts: &[u32])`, `Rd::declared(&self, n: u32, name: &str, letters: &[char]) -> Option<String>`
 //! - `Rd::named_card(&mut self, n: u32, here: &mut Block, scope: Scope, acc: &mut Acc) -> Option<Opened>`
 //! - `Rd::pairs(&self, n: u32) -> Vec<(String, u32)>`, `Rd::get(&self, p: &[(String, u32)], k: &str) -> Option<u32>`
 //! - `Rd::unquote(&self, p: u32) -> String`
@@ -157,6 +158,67 @@ impl<'a> Rd<'a> {
         (kinds, subckts)
     }
 
+    /// Every instance of `stmts` and the blocks in them, by scope and name
+    /// ([`Rd::declared`]'s table).
+    pub(super) fn instances(&mut self, stmts: &[u32]) {
+        let mut work: Vec<(u32, u32)> = stmts.iter().rev().map(|&s| (s, NONE)).collect();
+        while let Some((s, scope)) = work.pop() {
+            match self.tag(s) {
+                Tag::Instance => {
+                    let name = self.name_of(self.ast.header(Node(s)).name);
+                    self.insts.entry((scope, name)).or_insert(s);
+                    self.scope_of.insert(s, scope);
+                }
+                Tag::Analysis | Tag::Command => {
+                    self.scope_of.insert(s, scope);
+                }
+                Tag::Subckt => work.extend(self.body(s).iter().rev().map(|&b| (b, s))),
+                Tag::Section | Tag::Library | Tag::If | Tag::Else => {
+                    if let Some(nx) = self.ast.next(Node(s)) {
+                        work.push((nx.0, scope));
+                    }
+                    work.extend(self.body(s).iter().rev().map(|&b| (b, scope)));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// The SPICE name of the source `name` (a reference written in
+    /// statement `n`'s scope) declares: its type letter, lowercase, then
+    /// its name as the name map holds it (`in1 (a 0) vsource` is `vin1`,
+    /// the map's `Vin1`; SPICE folds case, and a Spectre writer spells a
+    /// declaration's letter lowercase). A name no instance of the scope
+    /// declares is kept as written (a VACASK `elaborate` reads another
+    /// scope; the target finds it or fails); `None` when the instance is
+    /// no source of one of `letters`.
+    pub(in crate::syntax::render) fn declared(
+        &self,
+        n: u32,
+        name: &str,
+        letters: &[char],
+    ) -> Option<String> {
+        let scope = self.scope_of.get(&n).copied().unwrap_or(NONE);
+        let Some(&k) = self.insts.get(&(scope, name.to_string())) else {
+            return Some(name.to_string());
+        };
+        let master = self.name_of(self.ast.header(Node(k)).master);
+        let master = match self.kinds.get(&master).and_then(|m| m.strip_prefix('=')) {
+            Some(b) => b.to_string(),
+            None => master,
+        };
+        // Only a source is read, so a probe of a probe never recurses.
+        if !matches!(master.as_str(), "vsource" | "isource" | "iprobe") {
+            return None;
+        }
+        match self.named_inst(k)? {
+            super::Card::Source { letter, name, .. } if letters.contains(&letter) => {
+                Some(format!("{}{name}", letter.to_ascii_lowercase()))
+            }
+            _ => None,
+        }
+    }
+
     /// One Spectre or VACASK statement (the old lowering's `card`, named);
     /// a block of statements is handed back, as [`Rd::card`] does.
     pub(super) fn named_card(
@@ -167,10 +229,15 @@ impl<'a> Rd<'a> {
         acc: &mut Acc,
     ) -> Option<Opened> {
         let tag = self.tag(n);
-        if tag.has_header() && self.ast.rhs(Node(n)) != NONE {
+        let block = tag.has_header() && self.ast.rhs(Node(n)) != NONE;
+        if block && tag != Tag::Analysis {
             // quirk: the old Spectre grammar's `Block`: a `name master … {`
             // statement is kept whole, its body unread.
             self.raw(n, here, true);
+            return None;
+        }
+        if scope == Scope::Section && tag == Tag::Region {
+            self.region(n, here, false, acc);
             return None;
         }
         if scope == Scope::Section && self.named_leaks(n) {
@@ -205,8 +272,8 @@ impl<'a> Rd<'a> {
             | Tag::Options => {
                 let ok = self.named_statement(n, here, scope == Scope::Top, acc);
                 if !ok {
-                    let block =
-                        matches!(tag, Tag::Card | Tag::Model) && self.ast.rhs(Node(n)) != NONE;
+                    let block = matches!(tag, Tag::Card | Tag::Model | Tag::Analysis)
+                        && self.ast.rhs(Node(n)) != NONE;
                     self.raw(n, here, block || matches!(tag, Tag::Region | Tag::Control));
                 }
             }
@@ -362,18 +429,12 @@ impl<'a> Rd<'a> {
             }
             Tag::Card => false,
             Tag::Model => self.named_model_ok(n, here),
-            Tag::Save => {
+            Tag::Save if self.saves(n).is_some() => {
                 acc.bench.push(Bench::Save(n));
                 true
             }
             Tag::Region => {
-                for &k in self.body(n) {
-                    if self.line(k).starts_with(".meas") {
-                        acc.bench.push(Bench::Meas(k));
-                    } else {
-                        here.raw.push(super::Raw::Line(k));
-                    }
-                }
+                self.region(n, here, top, acc);
                 true
             }
             Tag::Control => {
@@ -404,6 +465,46 @@ impl<'a> Rd<'a> {
                 }
                 None => false,
             },
+            _ => false,
+        }
+    }
+
+    /// A `simulator lang=spice` region's statements (read by the HSPICE
+    /// lexicon, `lexicon::spectre`): a `.param` whose values are
+    /// expressions read as `parameters` (each number in its own suffixes:
+    /// `2M` is milli), a `.meas` at the top a measurement, the rest kept
+    /// as SPICE text; in a section the region is kept whole unless every
+    /// statement is such a `.param`.
+    fn region(&mut self, n: u32, here: &mut Block, top: bool, acc: &mut Acc) {
+        let param = |k: u32| {
+            self.tag(k) == Tag::Param
+                && self.fields(k).iter().all(|&f| {
+                    let v = self.ast.rhs(Node(f));
+                    self.tag(f) == Tag::Assign && v != NONE && self.expression(v)
+                })
+        };
+        if !top && !self.body(n).iter().all(|&k| param(k)) {
+            here.raw.push(super::Raw::Lines(n));
+            return;
+        }
+        for &k in self.body(n) {
+            if param(k) {
+                here.params.extend(self.fields(k));
+            } else if top && self.line(k).starts_with(".meas") {
+                acc.bench.push(Bench::Meas(k));
+            } else {
+                here.raw.push(super::Raw::Line(k));
+            }
+        }
+    }
+
+    /// Whether value `v` is an expression tree (a `{…}` the HSPICE
+    /// lexicon keeps as one word is not).
+    fn expression(&self, v: u32) -> bool {
+        match self.tag(v) {
+            Tag::Num | Tag::Ident | Tag::Binary | Tag::Unary | Tag::Paren | Tag::Call => true,
+            Tag::Ternary | Tag::Probe => true,
+            Tag::Delimited => self.ast.lhs(Node(v)) != NONE,
             _ => false,
         }
     }

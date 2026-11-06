@@ -186,3 +186,300 @@ fn an_imported_spectre_pwl_runs_on_ngspice_as_the_manual_says() {
         }
     }
 }
+
+#[test]
+fn a_spectre_vector_keeps_its_signs_on_ngspice() {
+    // `[CMP]` `vsource` `wave` (p.686) and `pvcvs` `coeffs` (pp.590-616): each
+    // element is a number, its sign with it. The closed forms: `a` is
+    // -1 V at 1 ms between 0 at 0 and 2 ms; `o` is -2·v(a) - 0.5 (pvcvs
+    // coeffs [c0 c1] is c0 + c1·v).
+    let src = "// signs\nsimulator lang=spectre\n\
+        v1 (a 0) vsource type=pwl wave=[0 0 1m -1 2m 0]\n\
+        e1 (o 0 a 0) pvcvs coeffs=[-0.5 -2]\n\
+        r1 (a 0) resistor r=1\nr2 (o 0) resistor r=1\n\
+        tr tran step=10u stop=2m maxstep=10u\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let raw = ngspice(&deck);
+    let (time, a, o) = (col(&raw, "time"), col(&raw, "a"), col(&raw, "o"));
+    for k in 0..=200 {
+        let t = 2e-3 * k as f64 / 200.0;
+        let want = -(1.0 - (t - 1e-3).abs() / 1e-3);
+        let (va, vo) = (at(time, a, t), at(time, o, t));
+        assert!(
+            (va - want).abs() < 1e-9,
+            "a at {t}: {va}, want {want}\n{deck}"
+        );
+        assert!(
+            (vo - (-2.0 * want - 0.5)).abs() < 1e-6,
+            "o at {t}: {vo}\n{deck}"
+        );
+    }
+}
+
+#[test]
+fn a_spectre_reference_names_the_source_as_the_name_map_spells_it() {
+    // `in1 (a 0) vsource` is ngspice's `Vin1`; `probe=in1`, `dev=in1` and
+    // `save in1:p` name it ([CMP] `cccs`, `ccvs`, `dc`; p.686). Closed
+    // forms (SPICE's sign: a source's current flows from its + node
+    // through it): i(in1) = -v into 1 Ω, so the cccs drives 2v into
+    // `o` and the ccvs holds `p` at -3v.
+    let src = "// refs\nsimulator lang=spectre\n\
+        in1 (a 0) vsource dc=1\n\
+        f1 (o 0) cccs probe=in1 gain=2\n\
+        h1 (p 0) ccvs probe=in1 rm=3\n\
+        r1 (a 0) resistor r=1\nr2 (o 0) resistor r=1\nr3 (p 0) resistor r=1\n\
+        save a o p in1:p\n\
+        dc1 dc dev=in1 param=dc start=0 stop=1 step=0.25\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let raw = ngspice(&deck);
+    let (a, o, p) = (col(&raw, "a"), col(&raw, "o"), col(&raw, "p"));
+    let i = col(&raw, "i(vin1)");
+    assert_eq!(a.len(), 5, "{deck}");
+    for k in 0..5 {
+        let v = 0.25 * k as f64;
+        assert!((a[k] - v).abs() < 1e-9, "a {}: {v}\n{deck}", a[k]);
+        assert!((i[k] + v).abs() < 1e-9, "i(vin1) {}: {}\n{deck}", i[k], -v);
+        assert!(
+            (o[k] - 2.0 * v).abs() < 1e-9,
+            "o {}: {}\n{deck}",
+            o[k],
+            2.0 * v
+        );
+        assert!(
+            (p[k] + 3.0 * v).abs() < 1e-9,
+            "p {}: {}\n{deck}",
+            p[k],
+            -3.0 * v
+        );
+    }
+}
+
+#[test]
+fn a_spectre_noise_iprobe_names_a_source_ngspice_runs() {
+    // `iprobe=in1` is `Vin1` (`[CMP]` `noise`). Closed form: two 1 Ω
+    // resistors at 27 °C give `o` 4kT·0.5 V²/Hz at a gain of 0.5, so the
+    // input-referred density is √(8kT) V/√Hz at every frequency.
+    let src = "// noise\nsimulator lang=spectre\n\
+        in1 (a 0) vsource dc=0 mag=1\nr1 (a o) resistor r=1\nr2 (o 0) resistor r=1\n\
+        n1 (o 0) noise start=1k stop=10k dec=1 iprobe=in1\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let runs = Dialect::Ngspice
+        .run_all(&deck)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
+    let want = (8.0 * 1.380649e-23 * 300.15f64).sqrt();
+    let spectrum = runs
+        .iter()
+        .find_map(|r| {
+            let v = r.variables.iter().find(|v| v.name == "inoise_spectrum")?;
+            Some(r.re(v.index))
+        })
+        .unwrap_or_else(|| panic!("no inoise_spectrum\n{deck}"));
+    assert!(!spectrum.is_empty(), "{deck}");
+    for x in spectrum.iter() {
+        assert!((x / want - 1.0).abs() < 1e-3, "{x} want {want}\n{deck}");
+    }
+}
+
+// ── Spectre masters with a SPICE card: iprobe, port, tline, bsource ([CMP]) ──
+
+/// `src` (Spectre) written for ngspice and run.
+fn spectre_on_ngspice(src: &str) -> (String, RawData) {
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let raw = ngspice(&deck);
+    (deck, raw)
+}
+
+#[test]
+fn spectre_iprobe_tline_and_bsource_run_on_ngspice_as_the_manual_says() {
+    // Closed forms: `b` is 1000·t ($time, p.857); `d` takes 1m·v(b) into
+    // 1 kΩ (current from 0 through the source into d: v(d) = v(b)); the
+    // iprobe's current (p.379: in -> out) is v(b)/1k; the lossless line
+    // (p.647), driven through z0 and matched, gives o(t) = b(t - td)/2.
+    let src = "// masters\nsimulator lang=spectre\n\
+        b1 (b 0) bsource v=1k*$time\n\
+        b2 (0 d) bsource i=1m*v(b,0)\nr1 (d 0) resistor r=1k\n\
+        ip (b b2) iprobe\nr2 (b2 0) resistor r=1k\n\
+        rs (b s) resistor r=50\nt1 (s 0 o 0) tline z0=50 td=0.2m\nrl (o 0) resistor r=50\n\
+        save b d o ip:p\n\
+        tr tran step=10u stop=1m maxstep=10u\n";
+    let (deck, raw) = spectre_on_ngspice(src);
+    let time = col(&raw, "time");
+    let (b, d, o, i) = (
+        col(&raw, "b"),
+        col(&raw, "d"),
+        col(&raw, "o"),
+        col(&raw, "i(vip)"),
+    );
+    for k in 0..=100 {
+        let t = 1e-3 * k as f64 / 100.0;
+        let vb = 1e3 * t;
+        let near = |c: &[f64], want: f64, tol: f64, what: &str| {
+            let got = at(time, c, t);
+            assert!(
+                (got - want).abs() < tol,
+                "{what} at {t}: {got}, want {want}\n{deck}"
+            );
+        };
+        near(b, vb, 1e-9, "b");
+        near(d, vb, 1e-9, "d");
+        near(i, vb / 1e3, 1e-12, "i(vip)");
+        // The delayed corner lands between timepoints: half a step of
+        // the 500 V/s ramp.
+        near(o, (1e3 * (t - 0.2e-3)).max(0.0) / 2.0, 2.5e-3, "o");
+    }
+}
+
+/// `src` (Spectre) written for Spectre, its text checked for `line`; the
+/// deck it is, to run as `src` would.
+fn spectre_trip(src: &str, line: &str) -> String {
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Spectre)
+        .unwrap_or_else(|e| panic!("Spectre -> Spectre: {}", e.messages))
+        .text;
+    assert!(deck.lines().any(|l| l == line), "no {line:?} in\n{deck}");
+    deck
+}
+
+#[test]
+fn a_spectre_port_is_ngspices_rf_port_with_the_source_behind_it() {
+    // `[CMP]` p.602: dc=1 is the voltage across the port terminated in its
+    // r = 50 Ω, so 1 V across a 50 Ω load; a 100 Ω load takes 4/3 V
+    // (2 V behind 50 Ω).
+    for (load, want) in [("50", 1.0), ("100", 4.0 / 3.0)] {
+        let src = format!(
+            "// port\nsimulator lang=spectre\n\
+             p1 (a 0) port num=1 r=50 dc=1 mag=1\nrl (a 0) resistor r={load}\nop1 dc\n"
+        );
+        // Written back for Spectre, the port is the same port.
+        let back = spectre_trip(&src, "vp1 (a 0) port num=1 r=50 dc=1 mag=1");
+        for s in [src.as_str(), back.as_str()] {
+            let (deck, raw) = spectre_on_ngspice(s);
+            let a = col(&raw, "a")[0];
+            assert!((a - want).abs() < 1e-9, "{a}, want {want}\n{deck}");
+        }
+    }
+}
+
+#[test]
+fn a_spectre_sp_over_its_ports_is_ngspices_sp() {
+    // `[CMP]` p.826: no `ports`, so every port is active, numbered by
+    // `num`. Closed form: the matched 50 Ω T pad of loss K = 2 (R1 = R2 =
+    // Z0(K-1)/(K+1), R3 = 2·Z0·K/(K²-1)) has S11 = 0, S21 = 1/K.
+    let src = "// sp\nsimulator lang=spectre\n\
+        p1 (in 0) port num=1 r=50\np2 (out 0) port num=2 r=50\n\
+        r1 (in mid) resistor r=16.666666666666668\nr2 (mid out) resistor r=16.666666666666668\n\
+        r3 (mid 0) resistor r=66.66666666666667\n\
+        sp1 sp start=1k stop=10k dec=2\n";
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let runs = Dialect::Ngspice
+        .run_all(&deck)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
+    let sp = runs
+        .iter()
+        .find(|r| {
+            r.variables
+                .iter()
+                .any(|v| v.name.eq_ignore_ascii_case("v(s_2_1)"))
+        })
+        .unwrap_or_else(|| panic!("no S_2_1\n{deck}"));
+    let s = |name: &str| {
+        let v = sp
+            .variables
+            .iter()
+            .find(|v| v.name.eq_ignore_ascii_case(name));
+        sp.complex(v.expect("a vector").index).expect("complex")
+    };
+    let (s11, s21) = (s("v(s_1_1)"), s("v(s_2_1)"));
+    assert_eq!(s21.len(), 3, "{deck}");
+    for (a, b) in s11.iter().zip(s21.iter()) {
+        assert!(
+            a.norm() < 1e-9 && (b.re - 0.5).abs() < 1e-9 && b.im.abs() < 1e-9,
+            "{a} {b}\n{deck}"
+        );
+    }
+}
+
+#[test]
+fn a_spectre_pz_is_ngspices_pz_from_its_source() {
+    // `[CMP]` p.790: poles and zeros of the transfer from `iprobe` to the
+    // output terminals. Closed form: the RC low pass has one pole at
+    // -1/RC = -1e6 rad/s and no zero.
+    let src = "// pz\nsimulator lang=spectre\n\
+        v1 (a 0) vsource dc=0 mag=1\nr1 (a b) resistor r=1k\nc1 (b 0) capacitor c=1n\n\
+        pz1 (b 0) pz iprobe=v1\n";
+    // Written back for Spectre, the pz is the same pz.
+    let back = spectre_trip(src, "pz1 (b 0) pz iprobe=v1");
+    for s in [src, back.as_str()] {
+        spectre_pz_has_one_pole_at_minus_one_over_rc(s);
+    }
+}
+
+fn spectre_pz_has_one_pole_at_minus_one_over_rc(src: &str) {
+    let deck = render_text(src, Dialect::Spectre, "t", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let runs = Dialect::Ngspice
+        .run_all(&deck)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
+    let names: Vec<Vec<String>> = runs
+        .iter()
+        .map(|r| r.variables.iter().map(|v| v.name.clone()).collect())
+        .collect();
+    let pz = runs
+        .iter()
+        .find(|r| r.variables.iter().any(|v| v.name.contains("pole(")))
+        .unwrap_or_else(|| panic!("no poles in {names:?}\n{deck}"));
+    let poles: Vec<_> = pz
+        .variables
+        .iter()
+        .filter(|v| v.name.contains("pole("))
+        .flat_map(|v| pz.complex(v.index).expect("complex").to_vec())
+        .collect();
+    let zeros = pz
+        .variables
+        .iter()
+        .filter(|v| v.name.contains("zero("))
+        .count();
+    assert_eq!(poles.len(), 1, "{poles:?} {names:?}\n{deck}");
+    assert!(
+        (poles[0].re + 1e6).abs() < 1e-3 && poles[0].im.abs() < 1e-3,
+        "{poles:?}"
+    );
+    assert_eq!(zeros, 0, "{names:?}\n{deck}");
+}
+
+#[test]
+fn a_spectre_files_spice_region_params_keep_their_suffixes_on_ngspice() {
+    // Spectre UG p.53: a `simulator lang=spice` region reads as SPICE, so
+    // its `2M` is milli; the Spectre statements' `1M` is mega (`[KUN]`).
+    // Closed form: rs = 2e-3, q = rs·1e-3 = 2e-6, so 1 A into rs·1e6 and
+    // into q·1e9 is 2 kV each.
+    let src = "// region\nsimulator lang=spectre\n\
+        section tt\nsimulator lang=spice\n.param rs=2M q='rs*1M'\nsimulator lang=spectre\nendsection tt\n";
+    let top = "// top\nsimulator lang=spectre\ninclude \"lib.scs\" section=tt\n\
+        i1 (0 a) isource dc=1\nr1 (a 0) resistor r=rs*1M\n\
+        i2 (0 b) isource dc=1\nr2 (b 0) resistor r=q*1G\nop1 dc\n";
+    let lib = render_text(src, Dialect::Spectre, "lib", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let dir = tempfile::tempdir().expect("a temp dir");
+    std::fs::write(dir.path().join("lib.sp"), &lib).expect("written");
+    let deck = render_text(top, Dialect::Spectre, "top", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text
+        .replace("lib.scs", &dir.path().join("lib.sp").display().to_string());
+    let raw = ngspice(&deck);
+    for node in ["a", "b"] {
+        let v = col(&raw, node)[0];
+        assert!((v - 2e3).abs() < 1e-6, "{node}: {v}\n{lib}\n{deck}");
+    }
+}

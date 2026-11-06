@@ -50,6 +50,7 @@ mod named;
 mod named_bench;
 mod named_blocks;
 mod named_elements;
+mod named_masters;
 mod options;
 mod outputs;
 mod refused;
@@ -63,6 +64,7 @@ mod walk;
 
 pub(in crate::syntax::render) use cards::Model;
 pub(in crate::syntax::render) use elements::Card;
+pub(in crate::syntax::render) use named_bench::spectre_refusal;
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
@@ -83,6 +85,11 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// Spectre/VACASK: model kinds by name, and subcircuit names.
     kinds: HashMap<String, String>,
     subckts: Vec<String>,
+    /// Spectre/VACASK: each instance by its scope (the `Subckt` node it
+    /// sits in, `NONE` at the top) and name, and each one's scope: what
+    /// a reference (`probe=`, `dev=`, `save dev:p`) names.
+    insts: HashMap<(u32, String), u32>,
+    scope_of: HashMap<u32, u32>,
     kit: Option<(&'a Kit, FileId)>,
     /// The name map: an `X` card's master as written, after the renames of
     /// the hoisted subcircuits it names (`parent__name`).
@@ -301,6 +308,8 @@ pub(in crate::syntax::render) fn read<'a>(
         models: HashSet::new(),
         kinds: HashMap::new(),
         subckts: Vec::new(),
+        insts: HashMap::new(),
+        scope_of: HashMap::new(),
         kit,
         masters: HashMap::new(),
         unlifted: unlift::Unlift::default(),
@@ -311,6 +320,7 @@ pub(in crate::syntax::render) fn read<'a>(
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
         (rd.kinds, rd.subckts) = rd.declarations(&top_stmts);
+        rd.instances(&top_stmts);
     } else {
         rd.models = rd.model_names(&top_stmts);
     }
@@ -502,15 +512,16 @@ impl<'a> Rd<'a> {
             Tag::Verbatim | Tag::Line => self.unparsed(n, here),
             // A region of another dialect's text (`lexicon::NGSPICE_GIVEN`):
             // kept as that dialect's text, which only it writes; but a
-            // Spectre `montecarlo` over one analysis at the top is an
-            // analysis (`Ana::MonteCarlo`), which VACASK spells as its `mc`.
+            // Spectre analysis at the top is an analysis (`Ana`), which
+            // each target spells or refuses (VACASK's `mc` for a
+            // `montecarlo`).
             Tag::Region => {
                 for &k in self.body(n) {
-                    let mc = scope == Scope::Top
+                    let ana = scope == Scope::Top
                         && self.text_dialect(self.main(k)) == Dialect::Spectre
                         && self.tag(k) == Tag::Analysis
-                        && matches!(self.spectre_analysis(k), Some(Ana::MonteCarlo { .. }));
-                    match mc {
+                        && self.spectre_analysis(k).is_some();
+                    match ana {
                         true => acc.bench.push(Bench::Analysis(k)),
                         false => here.raw.push(Raw::Lines(k)),
                     }

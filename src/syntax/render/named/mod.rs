@@ -31,6 +31,7 @@ mod checks;
 mod lift;
 mod params;
 mod sites;
+mod sources;
 mod vacask;
 mod vacask_bench;
 mod vacask_cards;
