@@ -605,3 +605,25 @@ fn an_am_source_is_read_in_its_dialects_order() {
         );
     }
 }
+
+#[test]
+fn a_pwl_repeat_inside_the_parentheses_is_the_repeat() {
+    // ngspice-45 reads `pwl(0 0 1m 1 r=0 td=0.5m)` as `pwl(0 0 1m 1) r=0
+    // td=0.5m` (both decks ran to the same v(a), 0.75 V at 2.25 ms); read
+    // before as four more points `r 0 td 0.5m`. Checks: 1 + 1.
+    let text = "t\nv1 a 0 pwl(0 0 1m 1 r=0 td=0.5m)\nr1 a 0 1k\n.tran 10u 3m\n.end\n";
+    let ng = render_text(text, Dialect::Ngspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(
+        ng.lines()
+            .any(|l| l == "V1 a 0 0 PWL(0 0 0.001 1) r=0 td=0.0005"),
+        "{ng}"
+    );
+    let lt = render_text(text, Dialect::Ngspice, "t", Dialect::Ltspice).expect_err("refused");
+    assert!(
+        lt.diags.iter().any(|g| g.code == Code::W0008),
+        "{}",
+        lt.messages
+    );
+}

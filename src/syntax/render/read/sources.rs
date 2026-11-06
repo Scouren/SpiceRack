@@ -143,7 +143,37 @@ impl<'a> Rd<'a> {
                         ac_phase = Some(self.number(p)?);
                     }
                 }
-                Spec::Wave(w, vals) => wf = Some(self.waveform(w, &vals)?),
+                Spec::Wave(w, vals) => {
+                    // ngspice-45 also reads PWL's `r=`/`td=` inside the
+                    // parentheses (`pwl(0 0 1m 1 r=0 td=0.5m)`: run, v(2.25
+                    // ms) = 0.75 V, as `pwl(0 0 1m 1) r=0 td=0.5m`); their
+                    // `=` is no item, so `r 0 td 0.5m` follow the points.
+                    let key =
+                        |k: u32, w: &str| self.is_word(k) && self.text(k).eq_ignore_ascii_case(w);
+                    let at = vals.iter().position(|&k| key(k, "r") || key(k, "td"));
+                    let vals = match at {
+                        Some(i)
+                            if self.b.source_rules == SourceRules::Ngspice
+                                && w == WaveKind::Pwl =>
+                        {
+                            let tail = &vals[i..];
+                            if !tail.len().is_multiple_of(2) {
+                                return None;
+                            }
+                            for kv in tail.chunks(2) {
+                                let v = self.irnum(kv[1])?;
+                                match () {
+                                    _ if key(kv[0], "r") && repeat.is_none() => repeat = Some(v),
+                                    _ if key(kv[0], "td") && delay.is_none() => delay = Some(v),
+                                    _ => return None,
+                                }
+                            }
+                            vals[..i].to_vec()
+                        }
+                        _ => vals,
+                    };
+                    wf = Some(self.waveform(w, &vals)?)
+                }
             }
         }
         if !dc_given && let Some(w) = &wf {
