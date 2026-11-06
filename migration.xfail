@@ -8256,6 +8256,7 @@ xyce/TERNARY_OP/ternary_op.cir ngspice B1n's then-branch ternary parenthesized
 # no integral): refused W0045. A .include/.lib inside a .subckt of another
 # dialect's deck is refused on Xyce (W0046): Xyce 7.10 defines its content
 # globally (ex1b: 0.8 V on Xyce, 1.0 V on ngspice).
+spice-bench/ngspice/tests/regression/lib-processing/ex1b.sp xyce refused W0046: .lib inside .subckt sub1 (Xyce makes sub_in_lib global; 0.8 V vs ngspice 1.0 V)
 xyce/ABM/sdt.cir ngspice refused W0045: sdt() (ngspice has no time integral)
 xyce/ABM/sdt.cir espice refused W0045: sdt() (ngspice's family)
 spice-bench/ngspice/tests/general/mosmem.sp ngspice .print spelled for ngspice: braced outputs bare, a kind not run or p()/w() left out (W0023)

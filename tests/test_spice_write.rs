@@ -508,3 +508,22 @@ fn ngspice_refuses_xyces_time_integral() {
     let codes = refusal(deck, Dialect::Xyce, Dialect::Ngspice);
     assert!(codes.contains(&Code::W0045), "{codes:?}");
 }
+
+/// ngspice §2.7 scopes what a `.include` or `.lib` inside a `.subckt`
+/// defines to that subcircuit (ngspice's `lib-processing/ex1b.sp`: 1.0 V);
+/// Xyce 7.10 makes it global, so the library's `inner` replaces the
+/// deck's own and the same deck gives 0.8 V (`.include`; a `.lib` there is
+/// "Invalid device type"; each run by hand). The writer cannot rename
+/// inside a file it does not write: refused on Xyce (W0046).
+#[test]
+fn xyce_refuses_a_file_read_inside_a_subcircuit() {
+    let lib = scratch("inner.lib", ".subckt inner n1 n2\nR3 n1 n2 2k\n.ends\n");
+    let deck = format!(
+        "* t\nI1 9 0 -1mA\nX1 9 0 sub1\nR2 9 0 4k\nX3 9 0 inner\n.subckt sub1 n1 n2\n\
+         .include {}\nX1 n1 n2 inner\n.ends\n.subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n",
+        lib.display()
+    );
+    assert!((ngspice_op(&deck, "9") - 1.0).abs() < 1e-9);
+    let codes = refusal(&deck, Dialect::Ngspice, Dialect::Xyce);
+    assert!(codes.contains(&Code::W0046), "{codes:?}");
+}

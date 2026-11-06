@@ -296,6 +296,16 @@ impl W<'_, '_> {
     /// `.lib` inside a `.subckt` to that subcircuit, so hoisting one
     /// changes which models it sees.
     fn file_cards(&mut self, b: &Block) {
+        // Xyce makes what a file inside a `.subckt` defines global (run
+        // by hand), so another dialect's deck would lose its scope.
+        let first = b.includes.first().or(b.libs.first());
+        if self.d == Dialect::Xyce
+            && self.rd.d != Dialect::Xyce
+            && b.node != crate::syntax::ast::NONE
+            && let Some(&n) = first
+        {
+            self.refuse(Code::W0046, self.rd.main(n));
+        }
         // A path with a blank is quoted where the target writes paths
         // bare (ngspice §2.6 and Xyce RG `.INCLUDE` read `"…"`), or it
         // would be a path and a section.
