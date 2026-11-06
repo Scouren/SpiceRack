@@ -480,3 +480,28 @@ fn a_xyce_lossy_line_is_ngspices_o_and_refused_where_none_is() {
         );
     }
 }
+
+#[test]
+fn a_xyce_lin_over_ports_is_ngspices_sp() {
+    // Xyce RG port device and `.LIN` (S over the `.AC` sweep); ngspice
+    // manual `.sp` and `portnum`/`z0`. Xyce 7.10's Touchstone and ngspice-45's
+    // S_i_j agreed to 1e-15 on 14 Output/SPARAMS, XDM and YLIN decks (2 to 5
+    // ports). Checks: 3 + 2.
+    let text = "t\nP1 1 0 port=1 z0=50\nR1 1 2 30\nC1 2 0 1n\nP2 2 0 port=2\n.AC dec 2 1e6 1e8\n.LIN FORMAT=TOUCHSTONE2\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [
+        "VP1 1 0 0 portnum 1 z0 50",
+        "VP2 2 0 0 portnum 2 z0 50",
+        ".sp dec 2 1000000 100000000",
+    ] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    let xy = render_text(text, Dialect::Xyce, "t", Dialect::Xyce)
+        .expect("written")
+        .text;
+    for want in ["P1 1 0 port=1 z0=50", ".LIN FORMAT=TOUCHSTONE2"] {
+        assert!(xy.lines().any(|l| l == want), "{want}\n{xy}");
+    }
+}

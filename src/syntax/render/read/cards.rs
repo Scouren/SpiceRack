@@ -63,6 +63,11 @@ impl Rd<'_> {
             });
             return;
         }
+        // Xyce's `.LIN` (S parameters over the `.AC` sweep) is an analysis.
+        if self.d == Dialect::Xyce && word == "lin" && scope == Scope::Top && self.testbench_peg(n)
+        {
+            return acc.bench.push(super::Bench::Card(n));
+        }
         if self.dialect_raw(&word) {
             return self.keep(n, here, Kept::Raw);
         }

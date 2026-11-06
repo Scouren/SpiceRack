@@ -14,11 +14,12 @@
 //! - `DcSweep::values(&self) -> Option<Vec<f64>>`
 //! - `Rd::dc_axes(&self, items: &[u32]) -> Option<Vec<DcAxis>>` (HSPICE's `type np` form too)
 //! - `Rd::step_list(&self, items: &[u32]) -> Option<(String, Vec<f64>)>`
-//! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`
+//! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`, `Rd::xyce_lin(&self, n: u32) -> Option<Card>`
 
 use super::Rd;
 use super::testbench::{Card, Sweep};
 use crate::syntax::Dialect;
+use crate::syntax::ast::{Node, Tag};
 
 /// One `.dc` axis: its source (or parameter) and how it sweeps.
 #[derive(Clone, Debug)]
@@ -158,6 +159,36 @@ impl Rd<'_> {
             .map(|&k| self.number(k))
             .collect::<Option<_>>()?;
         Some((self.text(*name), v))
+    }
+
+    /// Xyce's `.LIN [k=v]…` (Xyce RG `.LIN`): the S (and Y, Z) parameters
+    /// over the deck's `.AC` sweep, ngspice's `.sp` of that sweep (ngspice
+    /// manual `.sp`; Xyce 7.10 and ngspice-45 gave the same S11, S21, S22,
+    /// run); `None` with `SPARCALC=0` (no S computed) or no `.AC`. Its
+    /// other keys choose the output file's form only.
+    pub(super) fn xyce_lin(&self, n: u32) -> Option<Card> {
+        let pairs = self.fields(n);
+        let off = pairs.iter().any(|&a| {
+            self.tag(a) == Tag::Assign
+                && self.key(a).eq_ignore_ascii_case("sparcalc")
+                && self.number(self.ast.rhs(Node(a))) == Some(0.0)
+        });
+        if off || !pairs.iter().all(|&a| self.tag(a) == Tag::Assign) {
+            return None;
+        }
+        let ac = self
+            .ast
+            .fields(self.ast.root())
+            .iter()
+            .copied()
+            .find(|&s| self.tag(s) == Tag::Analysis && self.head_kind(s) == "ac")?;
+        // The `.AC` card's own rule (testbench `read_card`).
+        match self.fields(ac) {
+            &[v, a, b, c] if self.wordw(v) && [a, b, c].iter().all(|&k| self.numw(k)) => {
+                Some(Card::Freq(true, [v, a, b, c]))
+            }
+            _ => None,
+        }
     }
 
     /// HSPICE's `.DC src DEC|OCT np start stop`, `src POI n v…` and `src

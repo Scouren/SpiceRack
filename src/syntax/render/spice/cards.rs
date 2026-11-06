@@ -143,8 +143,19 @@ impl W<'_, '_> {
                 if let Some(w) = &wave {
                     self.wave_ok(letter, w, tok);
                 }
-                if port.is_some() {
-                    self.ask(Construct::RfPort, tok);
+                if let Some((num, z0)) = port
+                    && self.ask(Construct::RfPort, tok) == Action::Spell(Alt::XycePort)
+                {
+                    // Xyce's port carries no source value here.
+                    if value != Val::Num(0.0) || ac_mag.is_some() || wave.is_some() {
+                        self.refuse(crate::syntax::diag::Code::W0007, tok);
+                    }
+                    let name = decl.strip_prefix('V').filter(|r| r.starts_with(['P', 'p']));
+                    let name = name.map_or_else(|| format!("P{decl}"), str::to_string);
+                    let z0 = self.sp.decimal(z0, self.x);
+                    return self
+                        .o
+                        .token(&format!("{name} {np} {nm} port={num} z0={z0}"), Space::Line);
                 }
                 // LTspice writes its own; the others as elements.
                 let extra = match self.d {

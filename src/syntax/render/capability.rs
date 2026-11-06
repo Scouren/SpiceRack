@@ -151,6 +151,10 @@ pub enum Alt {
     DcType,
     /// An E/G `value={pwl(expr, x, y, …)}` (ngspice).
     PwlValue,
+    /// `P n+ n- port=n z0=z` (Xyce).
+    XycePort,
+    /// `.LIN` beside an `.AC` of the sweep (Xyce).
+    XyceLin,
     /// Not written, the code the note the writer records for it.
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
@@ -301,7 +305,9 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         },
         Construct::RfPort => match target {
             D::Ngspice | D::Espice => Native,
-            D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0007),
+            // Xyce RG, port device `P n+ n- port=n z0=z`.
+            D::Xyce => Spell(Alt::XycePort),
+            D::Hspice | D::Ltspice => Refuse(Code::W0007),
             // Spectre's `port` (Spectre Reference 5.0 p.602), `dc`/`mag`
             // half ngspice's; a wave or an expression is refused by the
             // writer. VACASK's builtins have no port (`lib/devbuiltins.cpp`).
@@ -414,9 +420,16 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             D::Spectre | D::Cdl | D::Verilog => Native,
         },
-        Construct::SensAc | Construct::SParameter => match target {
+        Construct::SensAc => match target {
             D::Ngspice | D::Espice => Native,
             D::Hspice | D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
+            D::Spectre | D::Cdl | D::Verilog => Native,
+        },
+        Construct::SParameter => match target {
+            D::Ngspice | D::Espice => Native,
+            // Xyce RG `.LIN` over the deck's `.AC` sweep.
+            D::Xyce => Spell(Alt::XyceLin),
+            D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             D::Spectre | D::Cdl | D::Verilog => Native,
         },
         Construct::PoleZero => match target {

@@ -9,7 +9,7 @@
 //! - `W::analysis(&mut self, a: &Ana, tok: u32) -> String`
 
 use super::W;
-use super::sweeps::dc_axis;
+use super::sweeps::{dc_axis, xyce_lin};
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct, action};
@@ -190,6 +190,7 @@ impl W<'_, '_> {
                 _ => String::new(),
             },
             Ana::Sp(sw) => match self.ask(Construct::SParameter, tok) {
+                Action::Spell(Alt::XyceLin) => xyce_lin(self, sw, tok, &sweep(self, sw)),
                 // ponytail: Rust `{}` numbers, byte for byte what the old
                 // writer sent ngspice for this card.
                 Action::Native => format!(

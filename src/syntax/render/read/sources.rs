@@ -79,6 +79,9 @@ impl<'a> Rd<'a> {
             return None;
         }
         let (np, nm) = (self.text(items[0]), self.text(items[1]));
+        if self.d == Dialect::Xyce && self.letter(n) == 'P' {
+            return self.xyce_port(&items[2..], name, np, nm);
+        }
         let mut j = 2;
         let mut lead = None;
         if let Some(&v) = items.get(2)
@@ -173,6 +176,37 @@ impl<'a> Rd<'a> {
             wave: wf,
             port,
             parasitics,
+        })
+    }
+
+    /// Xyce's `P n+ n- port=n [z0=z]` (Xyce RG, port device: z0 50 when
+    /// not given) as ngspice's port source `V … portnum n z0 z` (ngspice
+    /// manual, `.sp`: Xyce 7.10's `.LIN` and ngspice-45's `.sp` gave the
+    /// same S, run); `None` for a port with a source value or a waveform.
+    fn xyce_port(&self, rest: &[u32], name: String, np: String, nm: String) -> Option<Card> {
+        let (mut num, mut z0) = (None, 50.0);
+        for &a in rest {
+            if self.tag(a) != Tag::Assign {
+                return None;
+            }
+            let v = self.ast.rhs(Node(a));
+            match self.key(a).to_ascii_lowercase().as_str() {
+                "port" => num = Some(self.count(v)?),
+                "z0" => z0 = self.number(v)?,
+                _ => return None,
+            }
+        }
+        Some(Card::Source {
+            letter: 'V',
+            name: format!("P{name}"),
+            np,
+            nm,
+            value: Val::Num(0.0),
+            ac_mag: None,
+            ac_phase: None,
+            wave: None,
+            port: Some((num?, z0)),
+            parasitics: vec![],
         })
     }
 }

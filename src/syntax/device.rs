@@ -33,7 +33,7 @@
 //!
 //! Contents:
 //! - `pub enum Primitive`, `pub struct Device`, `pub enum Terminals`, `pub enum Model`, `pub enum Value`
-//! - `pub const SPICE`, `NGSPICE_OWN`, `LOSSY_LINE`, `SPECTRE`, `VACASK: &[Device]`, `pub const FLAGS: &[&str]`
+//! - `pub const SPICE`, `NGSPICE_OWN`, `LOSSY_LINE`, `XYCE_PORT`, `SPECTRE`, `VACASK: &[Device]`, `pub const FLAGS: &[&str]`
 //! - `pub fn find(tables: &[&'static [Device]], word: &str, fold: bool) -> Option<&'static Device>`
 //! - `pub fn spelling(tables: &[&'static [Device]], p: Primitive) -> Option<&'static Device>`
 //! - `Primitive::ALL: [Primitive; 26]`, `Primitive::from_u32(code: u32) -> Option<Primitive>`
@@ -216,6 +216,17 @@ pub const LOSSY_LINE: &[Device] = &[row(
     0,
     M::AfterNodes,
     V::None,
+)];
+
+/// Xyce's port `P n+ n- port=n z0=z` (Xyce RG, port device), read as
+/// ngspice's port source (`V … portnum n z0 z`).
+pub const XYCE_PORT: &[Device] = &[row(
+    "p",
+    P::VoltageSource,
+    N::Fixed(2),
+    0,
+    M::None,
+    V::Specs,
 )];
 
 /// The Spectre masters an instance names directly (`r1 (a b) resistor

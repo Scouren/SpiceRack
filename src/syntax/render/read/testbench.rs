@@ -276,6 +276,7 @@ impl<'a> Rd<'a> {
         let hspice = self.d == Dialect::Hspice;
         let lt = self.d == Dialect::Ltspice;
         match self.tag(n) {
+            _ if self.d == Dialect::Xyce && kind == "lin" => self.xyce_lin(n),
             Tag::Options => self.options_ok(n).then_some(Card::Options),
             Tag::Temp => match items {
                 [v] if self.val_ok(*v) && self.tag(*v) != Tag::Seq => Some(Card::Temp(*v)),
