@@ -190,3 +190,25 @@ fn spectre_numbers_use_si_scale_factors() {
         );
     }
 }
+
+/// `[REF]` pp.406-409: `dc` and `sweep` take `values=[…]` for their
+/// points, and a `sweep` around analyses in braces. Xyce RG `.DC DEC`,
+/// `LIST` and `.STEP … LIST`: a decade axis is start·10^(k/n) to stop, a
+/// list its values, the first `.dc` axis the inner one.
+#[test]
+fn spectre_dc_dec_and_list_and_a_list_step_are_values() {
+    use spicerack::syntax::render::render_text;
+    let xyce = |deck: &str| {
+        render_text(deck, Dialect::Xyce, "t", Dialect::Spectre)
+            .unwrap_or_else(|e| panic!("{}", e.messages))
+            .text
+    };
+    let sp =
+        xyce("t\nV1 1 0 1\nV2 2 0 1\nR1 1 0 1k\nR2 2 0 1k\n.DC DEC V1 1 10 2 V2 LIST 0 1\n.end\n");
+    let want = "dcsweep1 sweep dev=v2 param=dc values=[0 1] {\n  \
+                dc1 dc dev=v1 param=dc values=[1 3.1622776601683795 10]\n}";
+    assert!(sp.contains(want), "{sp}");
+    let sp = xyce("t\n.param r=1k\nR1 1 0 {r}\nI1 0 1 1m\n.step r list 1k 2k\n.op\n.end\n");
+    let want = "sweep1_r sweep param=r values=[1k 2k] {\n  op1 dc\n}";
+    assert!(sp.contains(want), "{sp}");
+}

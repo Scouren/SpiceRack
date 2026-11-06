@@ -16,8 +16,8 @@ use super::lift::draw_scopes;
 use super::vacask::{num, respell};
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
-use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Ana, Sweep};
+use crate::syntax::render::capability::{Action, Construct};
+use crate::syntax::render::read::{Ana, DcSweep, Sweep};
 
 /// `.options` keys that only steer a simulator's bookkeeping or printing:
 /// dropping one changes no number in the raw file.
@@ -88,7 +88,24 @@ impl W<'_, '_> {
         for (_, p, [start, ..], _) in &tb.steps {
             self.line(&format!("  var {}={}", p.to_ascii_lowercase(), num(*start)));
         }
-        let sweeps: Vec<String> = tb.steps.iter().filter_map(|s| self.step_sweep(s)).collect();
+        let mut sweeps: Vec<String> = tb.steps.iter().filter_map(|s| self.step_sweep(s)).collect();
+        // A list `.step` is a `sweep … values=[…]` (`lib/answeep.cpp`
+        // `setupValueSweep`); `temp` is the `temp` option's.
+        for (p, v, _) in &tb.step_lists {
+            let name = p.to_ascii_lowercase();
+            let what = match name.as_str() {
+                "temp" => "option=\"temp\"".to_string(),
+                _ => {
+                    self.line(&format!("  var {name}={}", num(v[0])));
+                    format!("variable=\"{name}\"")
+                }
+            };
+            sweeps.push(format!(
+                "sweep step_{} {what} {}",
+                sanitize(&name),
+                values(v)
+            ));
+        }
         let mut ic = String::new();
         if !tb.ics.is_empty() {
             ic.push_str(&node_list("ic", &tb.ics));
@@ -126,17 +143,13 @@ impl W<'_, '_> {
     fn vacask_analysis(&mut self, idx: usize, a: &Ana, tok: u32) -> Vec<String> {
         let kind = match a {
             Ana::Op => "op",
-            Ana::Dc(_) => "dc",
+            Ana::Dc(_) | Ana::DcAxes(_) => "dc",
             Ana::Ac(_) => "ac",
             Ana::Tran { .. } => "tran",
             Ana::Noise { .. } => "noise",
             Ana::Tf(..) => "tf",
             Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) => {
                 self.refuse(Code::W0015, tok);
-                return vec![];
-            }
-            Ana::DcAxes(_) => {
-                self.ask(Construct::DcLogList, tok);
                 return vec![];
             }
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
@@ -169,6 +182,34 @@ impl W<'_, '_> {
                             return vec![];
                         }
                     }
+                }
+                out.push(format!("  analysis {name} op"));
+            }
+            // A log or list axis is its values (`DcSweep::values`), the
+            // first axis innermost as for `Ana::Dc`.
+            Ana::DcAxes(axes) => {
+                if !matches!(self.ask(Construct::DcLogList, tok), Action::Native) {
+                    return vec![];
+                }
+                for (i, ax) in axes.iter().enumerate().rev() {
+                    let scale = match i {
+                        0 => "vsweep".to_string(),
+                        i => format!("sweep{i}"),
+                    };
+                    let line = match (&ax.sweep, ax.sweep.values()) {
+                        (DcSweep::Lin(a, b, c), _) => sweep_line(&scale, &ax.src, *a, *b, *c),
+                        (_, Some(v)) => Some(format!(
+                            "sweep {scale} instance=\"{}\" parameter=\"dc\" {}",
+                            ax.src.to_ascii_lowercase(),
+                            values(&v)
+                        )),
+                        (_, None) => None,
+                    };
+                    let Some(line) = line else {
+                        self.refuse(Code::W0015, tok);
+                        return vec![];
+                    };
+                    out.push(line);
                 }
                 out.push(format!("  analysis {name} op"));
             }
@@ -236,7 +277,6 @@ impl W<'_, '_> {
             | Ana::Pz(..)
             | Ana::Sp(..)
             | Ana::Four(..)
-            | Ana::DcAxes(_)
             | Ana::MonteCarlo { .. }
             | Ana::Spectre { .. } => unreachable!("refused above"),
         }
@@ -394,6 +434,12 @@ fn freq_sweep(sw: &Sweep) -> Option<String> {
             sw.variation
         )
     })
+}
+
+/// `values=[v1, v2, …]` in VACASK's numbers.
+fn values(v: &[f64]) -> String {
+    let v: Vec<String> = v.iter().map(|&x| num(x)).collect();
+    format!("values=[{}]", v.join(", "))
 }
 
 /// VACASK identifiers carry no punctuation.

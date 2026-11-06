@@ -162,7 +162,7 @@ impl W<'_, '_> {
         // `.step param` names become control variables, so they are no
         // netlist parameters.
         let tb = self.fold();
-        let stepped: Vec<String> = tb.steps.iter().map(|s| s.1.to_ascii_lowercase()).collect();
+        let stepped = tb.stepped();
         let params = self.param_list(&deck.top.params, &stepped);
         if !params.is_empty() {
             self.line(&format!("parameters{params}"));

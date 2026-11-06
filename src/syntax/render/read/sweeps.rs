@@ -11,6 +11,7 @@
 //!
 //! Contents:
 //! - `pub(in crate::syntax::render) struct DcAxis`, `enum DcSweep`
+//! - `DcSweep::values(&self) -> Option<Vec<f64>>`
 //! - `Rd::dc_axes(&self, items: &[u32]) -> Option<Vec<DcAxis>>` (HSPICE's `type np` form too)
 //! - `Rd::step_list(&self, items: &[u32]) -> Option<(String, Vec<f64>)>`
 //! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`
@@ -35,6 +36,35 @@ pub(in crate::syntax::render) enum DcSweep {
     Log(Sweep),
     /// The values in order.
     List(Vec<f64>),
+}
+
+/// The most points a log axis expands to; a longer grid is refused.
+const LOG_POINTS_MAX: usize = 100_000;
+
+impl DcSweep {
+    /// A log or list axis's values in sweep order: `start·f^(k/n)` (`f` 10
+    /// or 2, `n` points per decade or octave) up to `stop` (Xyce RG `.DC`
+    /// `DEC`; Xyce 7.10 ran 1, 1.585, …, 10 for `DEC 5` over 1..10), or the
+    /// list as written; `None` for a linear axis, a log axis not over
+    /// `0 < start <= stop`, or more than `LOG_POINTS_MAX` points.
+    pub(in crate::syntax::render) fn values(&self) -> Option<Vec<f64>> {
+        let sw = match self {
+            DcSweep::Lin(..) => return None,
+            DcSweep::List(v) => return Some(v.clone()),
+            DcSweep::Log(sw) => sw,
+        };
+        if !(sw.start > 0.0 && sw.start <= sw.stop) {
+            return None;
+        }
+        let f: f64 = if sw.variation == "dec" { 10.0 } else { 2.0 };
+        let n = f64::from(sw.points);
+        let end = sw.stop * (1.0 + 1e-9);
+        let grid: Vec<f64> = (0..=LOG_POINTS_MAX)
+            .map(|k| sw.start * f.powf(k as f64 / n))
+            .take_while(|&x| x <= end)
+            .collect();
+        (grid.len() <= LOG_POINTS_MAX).then_some(grid)
+    }
 }
 
 impl Rd<'_> {

@@ -343,9 +343,10 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::StepList => match target {
             D::Xyce | D::Ltspice => Native,
             D::Ngspice | D::Espice | D::Hspice => Refuse(Code::W0016),
-            // Spectre's `sweep … values=[…]` and VACASK's `sweep` over
-            // values have one; not written yet.
-            D::Spectre | D::Vacask => Refuse(Code::W0015),
+            // Spectre `sweep param=p values=[…]` (Reference 19.1
+            // pp.406-409); VACASK `sweep … values=[…]` (`lib/answeep.cpp`
+            // `setupValueSweep`).
+            D::Spectre | D::Vacask => Native,
             D::Cdl | D::Verilog => Native,
         },
         Construct::TranStartup => match target {
@@ -359,9 +360,10 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Xyce | D::Ltspice => Native,
             D::Hspice => Spell(Alt::DcType),
             D::Ngspice | D::Espice => Refuse(Code::W0038),
-            // Spectre's `dc` (`dec=`, `values=`) and VACASK's `sweep`
-            // (`mode="dec"`, `values=`) have one; not written yet.
-            D::Spectre | D::Vacask => Refuse(Code::W0015),
+            // Each axis as its values (`DcSweep::values`): Spectre `dc` and
+            // `sweep` `values=[…]` (Reference 19.1 pp.406-409), VACASK
+            // `sweep … values=[…]` (`lib/answeep.cpp` `setupValueSweep`).
+            D::Spectre | D::Vacask => Native,
             D::Cdl | D::Verilog => Native,
         },
         Construct::Tf => match target {

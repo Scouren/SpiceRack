@@ -17316,3 +17316,274 @@ xyce/MEASURE_CONT/STEP/TrigTargTest1DC.cir spectre now written: .global_param re
 xyce/MEASURE_DC/STEP/TrigTargTest1DC.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
 xyce/PARSER/nakedRandomGlobal.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
 xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
+
+# Phase 7: integrate: dc dec/list and step list on Spectre/VACASK
+# (render::named, capability DcLogList/StepList). A `.dc` axis by decade,
+# octave or list (Xyce RG `.DC`, LTspice `.dc`, HSPICE `.DC … DEC|POI`) is
+# its values, start·10^(k/n) (or 2^) to stop or the list as written: Spectre
+# `dc`/`sweep … values=[…]` (Reference 19.1 pp.406-409), VACASK `sweep …
+# values=[…]` (lib/answeep.cpp setupValueSweep); a list `.step` is Spectre's
+# `sweep param=p values=[…]` and VACASK's value sweep of its control var
+# (`temp` the `option="temp"`). Oracle: VACASK runs against the closed forms
+# (test_vacask_runs), Spectre text by clause. Per set: hspice 4, ltspice 34, xyce 223.
+hspice/hspice/dc_dec_grid.sp spectre now written: its .dc log/list axis as values=[…]; was refused
+hspice/hspice/dc_dec_grid.sp vacask now written: its .dc log/list axis as values=[…]; was refused
+hspice/hspice/dc_poi_grid.sp spectre now written: its .dc log/list axis as values=[…]; was refused
+hspice/hspice/dc_poi_grid.sp vacask now written: its .dc log/list axis as values=[…]; was refused
+ltspice/ltspice_demos/LTC1966_TA09.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_demos/LTC1966_TA09.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1021-5.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1021-5.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1050.net spectre now written: its .dc log/list axis as values=[…]; was refused
+ltspice/ltspice_examples/1050A.net spectre now written: its .dc log/list axis as values=[…]; was refused
+ltspice/ltspice_examples/1194.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1194.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1206.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1206.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1223.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1223.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1228.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1228.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1565.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1789-1.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1789-1.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1789-10.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1789-10.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1966.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1966.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1970.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/1970.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/5505-1.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/5505-1.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/5505-2.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/5505-2.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/Howland.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/Howland.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/LM78XX.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/SOAtherm-Tutorial.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/SoftDiodeRecovery.net spectre now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/SoftDiodeRecovery.net vacask now written: its list .step as a sweep over values=[…]; was refused
+ltspice/ltspice_examples/dimmer.net spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_1190_SON/mutInd1.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_1190_SON/mutInd1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_1190_SON/mutInd1_baseline.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_1190_SON/mutInd1_baseline.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_1353/150nm_nmos.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/BUG_1353/150nm_nmos.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/BUG_1353/150nm_pmos.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/BUG_1353/150nm_pmos.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_28_SON/bug_28_son4.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_381/comparator3.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_381/comparator3.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_457_SON/bug457.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_457_SON/bug457.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_681_SON/bsim3_681.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_681_SON/bsim3_681.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_681_SON/bsim4_681.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_681_SON/bsim4_681.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_754_SON/newton_and_swept.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_754_SON/newton_and_swept.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_and_swept.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_and_swept.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_and_swept.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_and_swept.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline_forglobal.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/BUG_806_SON/mos2_baseline_forglobal.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/bsim3_test1.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/bsim3_test1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/bsim3_test1Ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/bsim3_test1Ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos1_test1.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos1_test1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos1_test1Ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos1_test1Ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos2_test1.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos2_test1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos2_test1Ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos2_test1Ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos3_test1.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos3_test1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos3_test1Ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos3_test1Ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos6_test1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_239/mos6_test1Ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_405/test2.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_405/test2.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a0.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a0.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a1.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a1.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a2.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a2.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a3.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a3.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a4.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_a4.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b0.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b0.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b1.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b1.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b2.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b2.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b3.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b3.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b4.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_b4.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c0.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c0.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c1.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c1.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c2.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c2.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c3.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c3.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c4.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c4.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c5.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c5.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c6.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_492/test_c6.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_536/dcDecBaseline.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_536/dcDecBaseline.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_536/dcListBaseline.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_536/dcListBaseline.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_536/dcOctBaseline.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/Certification_Tests/ISSUE_536/dcOctBaseline.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/DC_UPGRADE/dcDec.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/DC_UPGRADE/dcDec.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/DC_UPGRADE/dcList.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/DC_UPGRADE/dcList.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/DC_UPGRADE/dcOct.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/DC_UPGRADE/dcOct.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/DTEMP/b3soi_nmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_nmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_nmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_nmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_pmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_pmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_pmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/b3soi_pmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_nmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_nmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_nmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_nmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_pmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_pmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_pmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.61_pmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_nmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_nmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_nmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_nmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_pmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_pmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_pmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.7_pmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_nmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_nmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_nmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_nmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_pmos_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_pmos_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_pmos_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/bsim4.82_pmos_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/njfet_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/njfet_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmesfet_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmesfet_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos1_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos1_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos1_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos1_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos2_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos2_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos2_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos2_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos3_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos3_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos3_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos3_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos6_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos6_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos6_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/nmos6_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/npn_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/npn_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/npn_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/npn_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pjfet_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pjfet_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmesfet_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmesfet_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos1_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos1_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos1_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos1_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos2_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos2_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos2_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos2_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos3_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos3_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos3_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos3_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos6_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos6_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos6_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pmos6_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pnp_dtemp.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pnp_dtemp.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pnp_ref.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/DTEMP/pnp_ref.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/MEASURE_DC/REMEASURE/RemeasureDecadeDCStep.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/MEASURE_DC/REMEASURE/RemeasureListDCStep.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/MEASURE_DC/REMEASURE/RemeasureOctaveDCStep.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/MINDUCTORS/mutIndStep.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/MINDUCTORS/mutIndStep.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/Message/Input/SweepParams_parseSweepParams2.cir vacask now written: its .dc log/list axis as values=[…]; was refused
+xyce/PARAM_REFACTOR/paramDep3.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/PARAM_REFACTOR/paramDep3.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/PARAM_REFACTOR/paramDep4.cir spectre now written: its list .step as a sweep over values=[…]; was refused
+xyce/PARAM_REFACTOR/paramDep4.cir vacask now written: its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_asym_nmos_idvg0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_asym_nmos_idvg0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_asym_pmos_idvg0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_asym_pmos_idvg0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0_allsw0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0_allsw0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0_swigate1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0_swigate1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0_swimpact1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvg0_swimpact1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_allsw0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_allsw0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_outvars.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_swigate1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_swigate1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_swimpact1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_nmos_idvgh_swimpact1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0_allsw0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0_allsw0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0_swigate1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0_swigate1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0_swimpact1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvg0_swimpact1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh_allsw0.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh_allsw0.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh_swigate1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh_swigate1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh_swimpact1.cir spectre now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/PSP103/psp_symm_pmos_idvgh_swimpact1.cir vacask now written: its .dc log/list axis as values=[…] and its list .step as a sweep over values=[…]; was refused
+xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir spectre now written: its .dc log/list axis as values=[…]; was refused
+xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir vacask now written: its .dc log/list axis as values=[…]; was refused

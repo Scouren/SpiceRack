@@ -179,3 +179,50 @@ fn a_one_point_sweep_is_points_zero() {
     assert_eq!(out.len(), 1, "{out:?}");
     close(out[0].re, 0.5, 1e-9);
 }
+
+/// The Xyce deck `deck` written for VACASK and run.
+fn run_xyce(deck: &str) -> RawData {
+    let text = emit_from(deck, Dialect::Xyce, &spicerack::syntax::lexicon::XYCE)
+        .unwrap_or_else(|c| panic!("refused {c:?}"));
+    run_text(&text)
+}
+
+#[test]
+fn a_decade_or_list_dc_sweeps_xyces_points() {
+    // Xyce RG `.DC DEC src start stop points`: start·10^(k/n) to stop
+    // (Xyce 7.10 ran 1, 1.585, …, 10 for DEC 5 over 1..10); `LIST` the
+    // values as written, the first axis fastest. Closed form: v(1) is V1.
+    let raw = run_xyce("t\nV1 1 0 1\nR1 1 0 1k\n.DC DEC V1 1 10 5\n.end\n");
+    let v = col(&raw, "1");
+    assert_eq!(v.len(), 6, "{v:?}");
+    for (k, x) in v.iter().enumerate() {
+        close(*x, 10f64.powf(k as f64 / 5.0), 1e-12);
+    }
+    let deck = "t\nV1 1 0 0\nV2 2 0 0\nR1 1 0 1k\nR2 2 0 1k\n.DC V1 LIST 0 0.5 2 V2 0 1 1\n.end\n";
+    let raw = run_xyce(deck);
+    let (a, b) = (col(&raw, "1"), col(&raw, "2"));
+    assert_eq!(a.len(), 6, "{a:?}");
+    for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+        close(*x, [0.0, 0.5, 2.0][i % 3], 1e-12);
+        close(*y, (i / 3) as f64, 1e-12);
+    }
+}
+
+#[test]
+fn a_list_step_sweeps_its_values() {
+    // Xyce RG `.STEP <name> LIST <val>*`: one run per value. Closed form:
+    // 1 mA into r, v(1) = r·1 mA; `temp` steps the temperature option
+    // (`lib/answeep.cpp` `option=`, Celsius).
+    let raw = run_xyce("t\n.param r=1k\nR1 1 0 {r}\nI1 0 1 1m\n.step r list 1k 2k 5k\n.op\n.end\n");
+    let v = col(&raw, "1");
+    assert_eq!(v.len(), 3, "{v:?}");
+    for (x, want) in v.iter().zip([1.0, 2.0, 5.0]) {
+        close(*x, want, 1e-9);
+    }
+    // `tc1` (ngspice manual §3.2.4, Xyce RG resistor): R = 1k·(1 + 0.01·(T - 27)).
+    let raw = run_xyce("t\nR1 1 0 1k tc1=0.01\nI1 0 1 1m\n.step temp list 25 100\n.op\n.end\n");
+    let v = col(&raw, "1");
+    assert_eq!(v.len(), 2, "{v:?}");
+    close(v[0], 0.98, 1e-9);
+    close(v[1], 1.73, 1e-9);
+}
