@@ -414,13 +414,5 @@ impl Lexicon {
 /// The lexicon dialect `d`'s text is read with; `None` for the dialects
 /// with no reader (CDL, Verilog).
 pub fn of(d: Dialect) -> Option<&'static Lexicon> {
-    match d {
-        Dialect::Ngspice | Dialect::Espice => Some(&NGSPICE),
-        Dialect::Hspice => Some(&HSPICE),
-        Dialect::Ltspice => Some(&LTSPICE),
-        Dialect::Xyce => Some(&XYCE),
-        Dialect::Spectre => Some(&SPECTRE),
-        Dialect::Vacask => Some(&VACASK),
-        Dialect::Cdl | Dialect::Verilog => None,
-    }
+    crate::syntax::Lang::from(d).lexicon()
 }

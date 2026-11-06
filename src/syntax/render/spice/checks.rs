@@ -62,8 +62,7 @@ impl W<'_, '_> {
         }
         self.ternary_checks(&blocks);
         let caret = caret_means_power(self.rd.d) != caret_means_power(self.d);
-        let stat = crate::syntax::render::capability::action(self.d, Construct::StatisticalCall)
-            != Action::Native;
+        let stat = self.cells[Construct::StatisticalCall as usize] != Action::Native;
         if !caret && !stat {
             return;
         }

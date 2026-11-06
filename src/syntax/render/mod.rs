@@ -21,9 +21,9 @@
 //! Contents:
 //! - `pub mod capability`, `pub mod spelling`
 //! - `pub struct Source<'a>`, `pub enum Numbers`, `pub const NGBEHAVIOR: &str`, `pub struct Written`, `pub struct Diags`
-//! - `pub fn render(src: &Source, target: Dialect) -> Result<Written, Diags>`
-//! - `pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: Dialect) -> Result<Written, Diags>`
-//! - `pub fn render_text(text: &str, d: Dialect, name: &str, target: Dialect) -> Result<Written, Diags>`
+//! - `pub fn render(src: &Source, target: impl Into<Lang>) -> Result<Written, Diags>`
+//! - `pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
+//! - `pub fn render_text(text: &str, d: Dialect, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
 //! - `pub enum Reference`, `pub fn references(src: &Source) -> Vec<Reference>`
 //! - `pub fn writes(target: Dialect) -> bool`
 
@@ -38,11 +38,11 @@ mod role;
 pub mod spelling;
 mod spice;
 
-use crate::syntax::Dialect;
 use crate::syntax::ast::Ast;
 use crate::syntax::diag::{self, Diag, Kind};
 use crate::syntax::resolve::{FileId, Kit, Role};
 use crate::syntax::token::Tokens;
+use crate::syntax::{Dialect, Lang};
 use crate::syntax::{lexicon, parse, tokenize};
 
 /// One file to write: its tree and tokens, the dialect it was read in, the
@@ -115,43 +115,20 @@ pub enum Reference {
 /// # Panics
 /// When `target` is not one [`writes`] names; when `src.kit`'s file is not
 /// `src.ast`'s.
-pub fn render(src: &Source, target: Dialect) -> Result<Written, Diags> {
-    assert!(writes(target), "render: a target with a writer");
-    let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.dialect, src.name, src.kit);
-    rd.write_for(target);
-    deck.given_loads.extend(src.loads.iter().cloned());
-    deck.numbers = src.numbers;
-    let (text, written) = match target {
-        Dialect::Spectre | Dialect::Vacask => named::write(&mut rd, &deck, target),
-        _ => spice::write(&mut rd, &deck, target),
-    };
-    // The earlier stages' notes: the kit's for its file (the parser's
-    // copied, then its own), else the parser's; then the reader's and the
-    // writer's.
-    let mut diags = match src.kit {
-        Some((kit, f)) => kit.file(f).diags.clone(),
-        None => src.ast.diags().to_vec(),
-    };
-    diags.extend(deck.notes.iter().copied());
-    diags.extend(written);
-    let refused = diags
-        .iter()
-        .any(|d| diag::info(d.code).kind == Kind::Refusal);
-    let text = (!refused).then_some(text);
-    diag::sort(&mut diags);
-    let messages = diag::messages(&diags, src.tokens, src.name);
-    let diags = Diags { diags, messages };
-    match text {
-        Some(text) => Ok(Written { text, notes: diags }),
-        None => Err(diags),
-    }
+pub fn render(src: &Source, target: impl Into<Lang>) -> Result<Written, Diags> {
+    render_lang(src, target.into())
 }
 
 /// File `file` of `kit` written for `target`, its deck named `name`.
 ///
 /// # Panics
 /// As [`render`]; when `file` is a Verilog-A source or unread.
-pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: Dialect) -> Result<Written, Diags> {
+pub fn render_kit(
+    kit: &Kit,
+    file: FileId,
+    name: &str,
+    target: impl Into<Lang>,
+) -> Result<Written, Diags> {
     let f = kit.file(file);
     assert!(
         matches!(f.role, Role::Deck | Role::Library),
@@ -176,7 +153,12 @@ pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: Dialect) -> Resul
 ///
 /// # Panics
 /// As [`render`]; when `d` has no reader (CDL, Verilog).
-pub fn render_text(text: &str, d: Dialect, name: &str, target: Dialect) -> Result<Written, Diags> {
+pub fn render_text(
+    text: &str,
+    d: Dialect,
+    name: &str,
+    target: impl Into<Lang>,
+) -> Result<Written, Diags> {
     let lex = lexicon::of(d).expect("a dialect with a reader");
     let t = tokenize(text, lex);
     let ast = parse(&t, lex);
@@ -231,4 +213,39 @@ pub fn references(src: &Source) -> Vec<Reference> {
 /// modules (`spice::verilog`).
 pub fn writes(target: Dialect) -> bool {
     Dialect::ALL.contains(&target)
+}
+
+// ---- private ----
+
+/// [`render`], its target resolved to a row.
+fn render_lang(src: &Source, target: Lang) -> Result<Written, Diags> {
+    assert!(writes(target.dialect()), "render: a target with a writer");
+    let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.dialect, src.name, src.kit);
+    rd.write_for(target);
+    deck.given_loads.extend(src.loads.iter().cloned());
+    deck.numbers = src.numbers;
+    let (text, written) = match target.dialect() {
+        Dialect::Spectre | Dialect::Vacask => named::write(&mut rd, &deck, target),
+        _ => spice::write(&mut rd, &deck, target),
+    };
+    // The earlier stages' notes: the kit's for its file (the parser's
+    // copied, then its own), else the parser's; then the reader's and the
+    // writer's.
+    let mut diags = match src.kit {
+        Some((kit, f)) => kit.file(f).diags.clone(),
+        None => src.ast.diags().to_vec(),
+    };
+    diags.extend(deck.notes.iter().copied());
+    diags.extend(written);
+    let refused = diags
+        .iter()
+        .any(|d| diag::info(d.code).kind == Kind::Refusal);
+    let text = (!refused).then_some(text);
+    diag::sort(&mut diags);
+    let messages = diag::messages(&diags, src.tokens, src.name);
+    let diags = Diags { diags, messages };
+    match text {
+        Some(text) => Ok(Written { text, notes: diags }),
+        None => Err(diags),
+    }
 }

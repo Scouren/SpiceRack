@@ -20,7 +20,7 @@
 use super::W;
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
-use crate::syntax::render::capability::{Action, Alt, Construct, action};
+use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt};
 use crate::syntax::render::spelling::spelling;
@@ -350,7 +350,7 @@ impl W<'_, '_> {
         let ngspice = matches!(self.d, Dialect::Ngspice | Dialect::Espice);
         // Asked here, not through `ask`: a deck with no save card has no
         // token to note an omission at.
-        let written = match action(self.d, Construct::Save) {
+        let written = match self.cells[Construct::Save as usize] {
             Action::Spell(Alt::Omit(_)) => tb.saves.is_empty(),
             Action::Spell(Alt::Probe) if !noise => {
                 for s in &tb.saves {

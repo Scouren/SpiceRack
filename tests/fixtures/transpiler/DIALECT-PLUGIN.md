@@ -739,10 +739,48 @@ Risks:
 - **Leaked rows**: bounded by `LANGS_MAX`; a notebook re-registering a
   changed plugin gets `Redefined`, not a leak.
 
-## Open questions for the user
+## Decisions
 
-1. Behaviours named for their origin (`card_rules: Ltspice`), or split into
-   finer, neutral ones before they become API (more enums, a longer P2)?
-2. `runs_on` trusts the author that the simulator reads the plugin's text.
-   Should registration instead require that the plugin changes no reading
-   row of that built-in (only spelling and cells)?
+Taken from the user's defaults and this doc's recommendations (team lead,
+2026-11-06):
+
+1. Plugins are netlist-only; `runs_on(Simulator)` lets one that extends a
+   runnable built-in run on that built-in's backend, the author's claim
+   that it reads the text (§6.5), checked for acme by oracle 5.
+2. A plugin gets its `simulator lang=<name>` region (§6.5).
+3. No read hooks: no built-in needs one (§6.4); oracle 2 would say if one
+   did.
+4. Registration is explicit, `register_dialect()`.
+5. A plugin may extend a plugin; cycles cannot be written (§5).
+6. Behaviours are named for their origin (`card_rules: Ltspice`); a
+   finer, neutral split waits for a second definition that needs it.
+
+## Done
+
+- **P0** (on b0952a7): §6.1's inventory, 88 sites. Recounted after the
+  round-1 merges, before P2.
+- **P1**: `syntax/lang.rs`: `Lang(u16)` and the rows (`dialect`,
+  `lexicon`, `spelling`, the capability column `cells`), the built-ins at
+  their `Dialect::ALL` positions, filled at compile time from today's
+  tables. `lexicon::of` reads the row; `render`, `render_kit` and
+  `render_text` take `impl Into<Lang>`; both writers take the `Lang` and
+  read `spelling()` and `cells()` from it (`W::ask` is a cell load);
+  `Rd::write_for` takes the `Lang`. Narrower than the table above, by
+  need: the builder and validator land with the first definition (P3),
+  `Lexicon::lang` with the first reader of it (plugin regions, P8), the
+  registry's append path with plugins (P8); `Source`, `Rd` and `Kit` keep
+  their `Dialect` until P2 removes the checks that read it.
+  Gate: `golden record` of this commit and of its parent (b0952a7,
+  recorded the same way) are byte-identical (`diff -r`, MANIFEST
+  included); `golden diff` against `baseline-daa0ad0-fx13` with
+  `migration.xfail`: IDENTICAL except 4132 listed xfails, as the parent.
+  Probes (`asm_probe.py`, release, `codegen-units=1`, the parent's listing
+  as `hand_`): `tokenize::tokenize` EQUIVALENT (1402 instructions, 56
+  calls, both); `render::named::W::ask` reported RESIDUE on its own body
+  (45 against 42 instructions), but the 42 call the out-of-line
+  `capability::action` (128 instructions) that the new body replaces with
+  a three-instruction cell load, so with the helper counted, as
+  `zero-cost.md` says to, it is NEGATIVE (45 against 170, one call against
+  two). `render::spice::W::ask` is inlined into its callers in both
+  builds.
+

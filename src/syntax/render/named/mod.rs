@@ -22,7 +22,7 @@
 //! groups).
 //!
 //! Contents:
-//! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> Result<String, Vec<Diag>>`
+//! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)`
 
 mod analyses;
 mod bench;
@@ -37,17 +37,18 @@ mod vacask;
 mod vacask_bench;
 mod vacask_cards;
 
-use super::capability::{Action, Alt, Construct, Rule, action};
+use super::capability::{Action, Alt, Construct, Rule};
 use super::draws::{self, Draws, Layers};
 use super::names::Names;
 use super::out::{Out, Space};
 use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
-use super::spelling::{Spelling, spelling};
-use crate::syntax::Dialect;
+use super::spelling::Spelling;
 use crate::syntax::ast::NONE;
 use crate::syntax::diag::{Code, Diag};
+use crate::syntax::lang::Cells;
 use crate::syntax::resolve::Role;
+use crate::syntax::{Dialect, Lang};
 use lift::Lifted;
 
 /// The writer's state for one deck.
@@ -55,6 +56,8 @@ struct W<'a, 'r> {
     rd: &'r Rd<'a>,
     deck: &'r Deck,
     sp: &'static Spelling,
+    /// What the target does with each construct.
+    cells: &'static Cells,
     /// The target.
     d: Dialect,
     /// The deck was read in the target's dialect: its names keep their
@@ -77,9 +80,10 @@ struct W<'a, 'r> {
 ///
 /// # Panics
 /// For a target outside the named family (Spectre, VACASK).
-pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<Diag>) {
+pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
+    let target = lang.dialect();
     let mut refused = Vec::new();
-    let lifted = match action(target, Construct::StatisticalCall) {
+    let lifted = match lang.action(Construct::StatisticalCall) {
         Action::Lift(Rule::RackVars) => lift::lift(rd, deck, &mut refused),
         Action::Lift(Rule::VacaskCalls) => {
             lift::vacask_calls(rd, deck, &mut refused);
@@ -87,7 +91,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         }
         _ => Lifted::default(),
     };
-    let draws = match action(target, Construct::Statistics) {
+    let draws = match lang.action(Construct::Statistics) {
         Action::Lift(Rule::StatisticsDraws) => {
             draws::lift(rd, deck, Layers::One).unwrap_or_else(|d| {
                 refused.push(d);
@@ -99,7 +103,8 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
     let mut w = W {
         rd,
         deck,
-        sp: spelling(target),
+        sp: lang.spelling(),
+        cells: lang.cells(),
         d: target,
         keep_case: rd.d == target,
         lifted,
@@ -123,7 +128,7 @@ impl W<'_, '_> {
     /// `c`'s action for the target; a refusal, or the note of a drop or a
     /// copy, is recorded at `token`.
     fn ask(&mut self, c: Construct, token: u32) -> Action {
-        let a = action(self.d, c);
+        let a = self.cells[c as usize];
         match a {
             Action::Refuse(code) => self.refuse(code, token),
             Action::Spell(Alt::Omit(code) | Alt::Copy(code)) => self.note(code, token),

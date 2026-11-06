@@ -21,7 +21,7 @@
 //! level 49).
 //!
 //! Contents:
-//! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> Result<String, Vec<Diag>>`
+//! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)`
 
 mod analyses;
 mod bench;
@@ -36,22 +36,25 @@ mod verilog;
 mod xyce_options;
 
 use super::Numbers;
-use super::capability::{Action, Alt, Construct, Rule, action};
+use super::capability::{Action, Alt, Construct, Rule};
 use super::draws::{self, Layers};
 use super::names;
 use super::out::{Out, Space};
 use super::read::{Block, Comp, Deck, Func, Raw, Rd, Section, Visit};
 use super::role::{self, Frame};
-use super::spelling::{FuncForm, Spelling, spelling};
-use crate::syntax::Dialect;
+use super::spelling::{FuncForm, Spelling};
 use crate::syntax::diag::{Code, Diag};
+use crate::syntax::lang::Cells;
 use crate::syntax::resolve::Role;
+use crate::syntax::{Dialect, Lang};
 
 /// The writer's state for one deck.
 struct W<'a, 'r> {
     rd: &'r Rd<'a>,
     deck: &'r Deck,
     sp: &'static Spelling,
+    /// What the target does with each construct.
+    cells: &'static Cells,
     /// The target.
     d: Dialect,
     /// The deck's numbers were read with ngspice's arithmetic.
@@ -77,10 +80,10 @@ struct W<'a, 'r> {
 /// refusals when any construct has no meaning-keeping form there (the text
 /// is then not the deck), the notes of what is kept or left out. The `Lift`
 /// rules record their fixups in `rd` before anything is written.
-pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<Diag>) {
-    let sp = spelling(target);
+pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
+    let (sp, cells, target) = (lang.spelling(), lang.cells(), lang.dialect());
     let mut diags = Vec::new();
-    let draws = match action(target, Construct::Statistics) {
+    let draws = match lang.action(Construct::Statistics) {
         Action::Lift(Rule::StatisticsDraws) => {
             draws::lift(rd, deck, Layers::Two).unwrap_or_else(|d| {
                 diags.push(d);
@@ -94,6 +97,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         rd,
         deck,
         sp,
+        cells,
         d: target,
         // CDL's cards are the old layout's ngspice cards,
         // which spells numbers without ngspice's arithmetic.
@@ -177,7 +181,7 @@ impl W<'_, '_> {
     /// `c`'s action for the target; a refusal, or the note of a drop or a
     /// copy, is recorded at `token`.
     fn ask(&mut self, c: Construct, token: u32) -> Action {
-        let a = action(self.d, c);
+        let a = self.cells[c as usize];
         match a {
             Action::Refuse(code) => self.refuse(code, token),
             Action::Spell(Alt::Omit(code) | Alt::Copy(code)) => self.note(code, token),
