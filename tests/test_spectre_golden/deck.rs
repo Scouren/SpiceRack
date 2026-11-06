@@ -190,3 +190,18 @@ fn a_file_read_inside_a_subcircuit_is_refused() {
                 .subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n";
     assert_eq!(spectre(deck).unwrap_err(), [Code::W0128]);
 }
+
+/// Spectre's `ahdl_include` reads a Verilog-A source and compiles it
+/// (Spectre Reference 5.0, `ahdl_include`); a compiled OSDI binary is no
+/// source for it, so an `.osdi` load is refused (W0004) and a `.va` load
+/// written as is.
+#[test]
+fn an_osdi_load_is_refused_and_a_verilog_a_load_included() {
+    let deck = "t\nR1 a 0 1k\n.op\n.end\n";
+    assert_eq!(
+        spectre_with(deck, &["psp103v4.osdi".into()]).unwrap_err(),
+        [Code::W0004]
+    );
+    let va = spectre_with(deck, &["res.va".into()]).unwrap();
+    assert!(va.contains("\nahdl_include \"res.va\"\n"), "{va}");
+}

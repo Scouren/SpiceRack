@@ -821,7 +821,7 @@ def spectre(d):
         .refuse(Construct.CaretReread, Code.W0002)
         .lift(Construct.StatisticalCall, Rule.RackVars)
         .native(Construct.VerilogALoad)
-        .native(Construct.OsdiLoad)
+        .refuse(Construct.OsdiLoad, Code.W0004)
         .native(Construct.OsdiInstance)
         .native(Construct.LibWholeFile)
         .omit(Construct.NgBehavior, Code.W0030)

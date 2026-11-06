@@ -232,7 +232,10 @@ pub(super) fn spectre() -> DialectDef {
         .refuse(Construct::CaretReread, Code::W0002)
         .lift(Construct::StatisticalCall, Rule::RackVars)
         .native(Construct::VerilogALoad)
-        .native(Construct::OsdiLoad)
+        // `ahdl_include` reads and compiles a Verilog-A source (Spectre
+        // Reference 5.0, `ahdl_include`); a compiled OSDI binary is none,
+        // and the kit knows no source behind one.
+        .refuse(Construct::OsdiLoad, Code::W0004)
         .native(Construct::OsdiInstance)
         .native(Construct::LibWholeFile)
         .omit(Construct::NgBehavior, Code::W0030)

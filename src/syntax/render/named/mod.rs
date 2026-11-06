@@ -5,7 +5,8 @@
 //! This file is the Spectre spine (title, functions, globals, loads,
 //! includes, parameters and `statistics`, models, subcircuits, sections,
 //! the body, the testbench) and the block-level statements; `cards` writes
-//! instances, waveforms and models, `bench` the testbench and analyses,
+//! instances, waveforms and models, `statistics` the `statistics` blocks,
+//! `bench` the testbench and analyses,
 //! `checks` the deck-wide refusals (both targets'), `lift` the Monte Carlo
 //! rules (Spectre's `Lift(RackVars)`, VACASK's `Lift(VacaskCalls)`: fixups
 //! over `Call` nodes) and `sites` the expressions they walk, `vacask` the
@@ -211,12 +212,19 @@ impl W<'_, '_> {
             }
             self.line(&s);
         }
-        for &n in &top.loads {
-            let p = self.rd.unquote(self.rd.fields(n)[0]);
-            self.line(&format!("ahdl_include \"{p}\""));
-        }
-        for p in &deck.given_loads {
-            self.line(&format!("ahdl_include \"{p}\""));
+        // A load that is no Verilog-A source (an `.osdi`) asks its cell.
+        let read = top
+            .loads
+            .iter()
+            .map(|&n| (self.rd.unquote(self.rd.fields(n)[0]), self.rd.main(n)));
+        let given = deck.given_loads.iter().map(|p| (p.clone(), 0));
+        for (p, tok) in read.chain(given).collect::<Vec<_>>() {
+            match crate::veriloga::is_source(&p) {
+                true => self.line(&format!("ahdl_include \"{p}\"")),
+                false => {
+                    self.ask(Construct::OsdiLoad, tok);
+                }
+            }
         }
         self.unwritten_loads();
         self.file_cards(top);

@@ -1045,7 +1045,10 @@ class TestTestbenchCreation:
         assert deck.count(".include /c.inc") == 1
         assert deck.count(".lib /c.lib tt") == 1
         assert deck.count("pre_osdi /c.osdi") == 1
-        assert 'include "/c.lib" section=tt' in tb.netlist("spectre")
+        assert 'include "/c.lib" section=tt' in tb.netlist("vacask")
+        # Spectre's ahdl_include compiles Verilog-A source, no OSDI binary.
+        with pytest.raises(RuntimeError, match="W0004"):
+            tb.netlist("spectre")
 
     def test_unknown_backend_is_refused_at_selection(self):
         ps = import_spicerack()

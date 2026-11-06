@@ -208,7 +208,7 @@ Declared in `src/backend/mod.rs`; these gate automatic backend selection, and so
 | | ngspice | ltspice | vacask | spectre | espice |
 |---|---|---|---|---|---|
 | XSPICE | yes | no | no | no | no |
-| OSDI | yes | no | yes | yes | `.va` via VerA only; `.osdi` refused |
+| OSDI | yes | no | yes | `.va` (`ahdl_include`) only; `.osdi` refused | `.va` via VerA only; `.osdi` refused |
 | `.measure` | yes | yes | **no** | yes | yes |
 | `.step` params | **no** | yes | yes | yes | **no** |
 | control blocks | yes | no | no | no | no |

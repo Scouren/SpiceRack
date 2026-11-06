@@ -32506,3 +32506,5 @@ xyce/VERILOGPLUGIN/Issue398_AF.cir vacask a library: no title line and no contro
 xyce/VERILOGPLUGIN/Issue398.cir vacask a library: no title line and no control block (V3b)
 xyce/VERILOGPLUGIN/Issue399.cir vacask a library: no title line and no control block (V3b)
 xyce/YACC/ForcedDampedHO.cir vacask a library: no title line and no control block (V3b)
+# Phase 7: named-write-r2: an .osdi load on Spectre refused W0004 (ahdl_include reads Verilog-A source, Spectre Reference 5.0)
+vacask/demo/hierarchy/hier.sim spectre refused W0004: its load "resistor.osdi" is a compiled OSDI binary, which ahdl_include does not read

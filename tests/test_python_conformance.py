@@ -283,8 +283,9 @@ EXPECTED = {
     'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'lib': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'raw_spice': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # LTspice has no Verilog-A or OSDI loader (W0004, writer B's 53199ba).
-    'osdi': (OK, 'W0004', 'W0004', 'W0004', 'W0004', OK, OK, OK, OK),
+    # LTspice has no Verilog-A or OSDI loader (W0004, writer B's 53199ba);
+    # Spectre's ahdl_include compiles Verilog-A source, no OSDI binary.
+    'osdi': (OK, 'W0004', 'W0004', 'W0004', 'W0004', 'W0004', OK, OK, OK),
     'veriloga': (OK, OK, OK, 'W0004', 'W0004', OK, OK, OK, OK),
     # XSPICE d_cosim, an A element: ngspice and ESPice only, as `A` (stream F put iverilog in .#testing).
     'verilog': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
