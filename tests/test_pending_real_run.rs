@@ -191,18 +191,19 @@ cq q 0 q={1n*v(q)}
         rel: 1e-3,
         hand_only: false,
     },
-    // PWL 0 -> 1 V over 1 ms, repeating from t=0 of the list (r=0), delayed
-    // 0.5 ms (td): at 2.25 ms the local time is (2.25-0.5) mod 1 = 0.75 ms.
+    // A PWL triangle 0 -> 1 -> 0 V over 2 ms, repeating from t=0 of the list
+    // (r=0), delayed 0.5 ms (td): at 2.25 ms the local time is
+    // (2.25-0.5) mod 2 = 1.75 ms, on the falling edge: 0.25 V.
     Deck {
         stem: "p_pwl_repeat",
         rows: "PwlRepeatV",
         src: "a repeating, delayed PWL
-v1 a 0 pwl(0 0 1m 1 r=0 td=0.5m)
+v1 a 0 pwl(0 0 1m 1 2m 0) r=0 td=0.5m
 r1 a 0 1k
 .tran 10u 2.25m
 .end
 ",
-        want: &[("tran1", "a", 0.75)],
+        want: &[("tran1", "a", 0.25)],
         rel: 1e-6,
         hand_only: false,
     },

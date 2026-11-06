@@ -157,6 +157,14 @@ const DECKS: [(&str, &str); 4] = [
     ("t_m4_dependent.scs", DEPENDENT),
 ];
 
+/// Nodes where VACASK's model is not ngspice-45's: upstream VACASK
+/// (`36be560`) ships the diode of ngspice-47-159 (`devices/spice/diode.va`
+/// header), whose reverse breakdown at 60 C is not ngspice-45's: node 4
+/// (`dj`, bv=12 tcv=1e-3) -11.9024 V against -11.8876 V, node 8 (`ndiode`,
+/// bv=11.7 tcv=0) -11.8877 V against -11.8273 V. A listed node that agrees
+/// fails until its entry goes.
+const VACASK_DIFFERS: &[(&str, &str)] = &[("d", "4"), ("d", "8")];
+
 // ---- private ----
 
 /// `src` (ngspice) written for `to`, which must not refuse it.
@@ -383,7 +391,13 @@ fn vacask_lands_where_ngspice_does() {
             };
             seen += 1;
             let rel = (v - want.1).abs() / want.1.abs().max(1e-30);
-            assert!(rel <= tol, "{name}: {node}: vacask {v} ngspice {}", want.1);
+            let known = VACASK_DIFFERS.contains(&(name, node.as_str()));
+            assert_eq!(
+                rel <= tol,
+                !known,
+                "{name}: {node}: vacask {v} ngspice {} (listed: {known})",
+                want.1
+            );
         }
         assert!(
             seen >= 3,

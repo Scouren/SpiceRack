@@ -7,7 +7,7 @@
   "p_tf.cir": { "rows": "Tf", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "tf1:transfer_function": 3.333333333333333e-1, "tf1:output_impedance_at_v(out)": 6.666666666666666e2 } },
   "p_branch_param.cir": { "rows": "BranchParam", "status": "refused W0013", "rel_tol": 1e-9, "values": { "op1:out": 1e0 } },
   "p_charge_capacitor.cir": { "rows": "ChargeCapacitor; .tran", "status": "pending-real-run", "rel_tol": 1e-3, "values": { "tran1:q": 1e0 } },
-  "p_pwl_repeat.cir": { "rows": "PwlRepeatV", "status": "pending-real-run", "rel_tol": 1e-6, "values": { "tran1:a": 7.5e-1 } },
+  "p_pwl_repeat.cir": { "rows": "PwlRepeatV", "status": "refused W0008", "rel_tol": 1e-6, "values": { "tran1:a": 2.5e-1 } },
   "p_dc_sweep.cir": { "rows": ".dc", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "dc1:out": 6.666666666666666e-1 } },
   "p_models.cir": { "rows": "D Q M (level 1) models", "status": "pending-real-run", "rel_tol": 1e-3, "values": { "op1:a": 6.29441e-1, "op1:coll": 4.087723e0, "op1:drain": 4.509803921568627e0 } },
   "p_measure_save.cir": { "rows": "Measure; Save; UnmappedOption", "status": "pending-real-run", "rel_tol": 1e-3, "values": { "measure:vmax": 1e0 } }
