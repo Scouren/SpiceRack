@@ -424,6 +424,18 @@ catalogue! {
         cite: "ngspice manual §15.3.4 (`.noise … pts_per_summary`: the per-device contributions); LTspice help `.NOISE` (no summary field)",
         explain: "The source asks for a noise summary (each device's contribution) every N points; the target's `.noise` card has no such field, so it is left out. The noise spectrum is the same; read the contributions from the target's own noise output.",
     }
+    /// An ngspice `{}` value's ternary in a then-branch, written as ngspice's evaluator reads it (`a?b?c:d:e` as `a?c:e`).
+    W0034 Note {
+        title: "a nested ternary written as ngspice reads it",
+        cite: "ngspice-45 src/frontend/numparam/xpressn.c (the `first-of-triple` operator stack); C's grammar (Xyce RG §2.1.18) reads `a?(b?c:d):e`",
+        explain: "ngspice's `{}` evaluator reads `a?b?c:d:e` as `a?c:e`, dropping `b` and `d`; C's grammar, which the target follows, reads `a?(b?c:d):e`. The deck is written with ngspice's value (`a?c:e`). If the source meant C's grouping, parenthesize it there.",
+    }
+    /// An ngspice ternary in a then-branch that ngspice reads no one way: nested deeper, or in a function body.
+    W0035 Refusal {
+        title: "a nested ternary ngspice reads no one way",
+        cite: "ngspice-45 src/frontend/numparam/xpressn.c (`{}` values) and its B-source parser (C's grammar), run by hand",
+        explain: "ngspice reads a function body's `a?b?c:d:e` by C's grammar in a B source and as `a?c:e` in a `{}` value, and a deeper nest in a then-branch by neither rule, so the source has no single meaning to write. Parenthesize the then-branch in the source.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

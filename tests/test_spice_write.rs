@@ -444,3 +444,24 @@ fn a_path_with_a_blank_is_quoted() {
         "{xy}"
     );
 }
+
+/// ngspice-45's `{}` evaluator (numparam, `xpressn.c`) reads
+/// `a?b?c:d:e` as `a?c:e`: real ngspice gives 4 for `1?0?4:8:16`, where
+/// C's grouping gives 8. That is the source's meaning, so another family
+/// gets `1?4:16` with a note (W0034). A function body's is refused
+/// (W0035): ngspice reads it by C's grammar in a B source and its own way
+/// in a `{}` value; so is a deeper nest, which ngspice reads by neither.
+#[test]
+fn an_ngspice_nested_ternary_is_written_as_ngspice_reads_it() {
+    let deck = "* t\nV1 a 0 {1?0?4:8:16}\nR1 a 0 1k\n.op\n.end\n";
+    assert!((ngspice_op(deck, "a") - 4.0).abs() < 1e-12);
+    let w = render_text(deck, Dialect::Ngspice, "t", Dialect::Xyce).expect("written");
+    assert!(w.text.contains("{1?4 :16}"), "{}", w.text);
+    assert!(w.notes.diags.iter().any(|d| d.code == Code::W0034));
+    let hs = write(deck, Dialect::Ngspice, Dialect::Hspice);
+    assert!(hs.contains("'1?4:16'"), "{hs}");
+    let func = "* t\n.func f(x) {x>0?x>1?4:8:16}\nV1 a 0 {f(1)}\nR1 a 0 1k\n.op\n.end\n";
+    assert!(refusal(func, Dialect::Ngspice, Dialect::Xyce).contains(&Code::W0035));
+    let deep = deck.replace("1?0?4:8:16", "0?0?4:1?8:16:32");
+    assert!(refusal(&deep, Dialect::Ngspice, Dialect::Xyce).contains(&Code::W0035));
+}

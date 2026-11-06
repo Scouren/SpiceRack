@@ -8233,3 +8233,16 @@ xyce/XDM/SPECTRE/OTHER_PARSING/unsupported_lines_options.cir espice .tran 0 T ha
 xyce/XDM/SPECTRE/OTHER_PARSING/unsupported_lines_options.cir ngspice .tran 0 T has the step T/50 (ngspice stops on a zero step)
 xyce/XDM/TSPICE/DIODE_CLIPPER/diodeClipper.cir espice .tran 0 T has the step T/50 (ngspice stops on a zero step)
 xyce/XDM/TSPICE/DIODE_CLIPPER/diodeClipper.cir ngspice .tran 0 T has the step T/50 (ngspice stops on a zero step)
+
+# Phase 7: spice-write: ternaries in B sources and ngspice's own grouping.
+# A B source's expression now gets the ternary spelling too (a then-branch's
+# ternary parenthesized, C's grammar, which ngspice's B-source parser reads
+# as well: V(1)>0?(2*V(1)<5?1:2):0 is the same value on ngspice-45). An
+# ngspice deck's `{}` then-branch ternary is written as ngspice's evaluator
+# reads it (a?c:e, W0034) and a deeper one or one in a function refused
+# (W0035); no golden deck holds either.
+xyce/TERNARY_OP/ternary_op.cir cdl B1n's then-branch ternary parenthesized
+xyce/TERNARY_OP/ternary_op.cir espice B1n's then-branch ternary parenthesized
+xyce/TERNARY_OP/ternary_op.cir hspice B1n's then-branch ternary parenthesized
+xyce/TERNARY_OP/ternary_op.cir ltspice B1n's then-branch ternary parenthesized
+xyce/TERNARY_OP/ternary_op.cir ngspice B1n's then-branch ternary parenthesized

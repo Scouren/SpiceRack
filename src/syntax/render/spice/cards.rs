@@ -16,6 +16,7 @@
 
 use super::W;
 use super::laplace::{self, Laplace};
+use super::ternary::{Read, parenthesize};
 use crate::syntax::Dialect;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule, action};
 use crate::syntax::render::out::Space;
@@ -137,6 +138,8 @@ impl W<'_, '_> {
                 } else {
                     let key = if current { 'I' } else { 'V' };
                     let expr = self.names.refs(self.scope, &expr);
+                    // ngspice's B-source parser reads `?:` by C's grammar.
+                    let expr = self.ternaries_as(&expr, Read::C);
                     match self.ask(Construct::BehaviouralSource, tok) {
                         // The map names it `G1`/`E1` (`renamed`).
                         Action::Spell(Alt::VolCur) if current => {
@@ -221,17 +224,23 @@ impl W<'_, '_> {
         }
     }
 
-    /// `e`'s ternaries as another family reads them (`ternary`): a
-    /// then-branch's parenthesized when the source reads C's grammar, not
-    /// ngspice's (which reads one its own way), a blank before each `:`
-    /// on Xyce.
+    /// `e`'s ternaries, in a `{}` value, as another family reads them
+    /// (`ternary`): grouped as the source groups a then-branch's (C's, or
+    /// ngspice's `{}` evaluator's), a blank before each `:` on Xyce.
     pub(super) fn ternaries(&self, e: &str) -> String {
-        let from = self.rd.d.family();
-        if from == self.d.family() {
+        let read = match self.rd.d.family() {
+            Dialect::Ngspice => Read::Ngspice,
+            _ => Read::C,
+        };
+        self.ternaries_as(e, read)
+    }
+
+    /// `e`'s ternaries for another family, grouped as `read` groups them.
+    fn ternaries_as(&self, e: &str, read: Read) -> String {
+        if self.rd.d.family() == self.d.family() {
             return e.to_string();
         }
-        let xyce = self.d == Dialect::Xyce;
-        super::ternary::parenthesize(e, from != Dialect::Ngspice, xyce)
+        parenthesize(e, read, self.d == Dialect::Xyce)
     }
 }
 
