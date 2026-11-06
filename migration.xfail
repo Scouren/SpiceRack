@@ -17107,3 +17107,212 @@ xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir xyce written differently: .DC LI
 # pre_osdi), dropped before with a W0025 note: ngspice writes it back,
 # VACASK as `load`, ESPice, HSPICE and Xyce refuse W0004 (14 lines of the
 # "inputs misread" section above now say so; status only, no diff).
+
+# Phase 7: integrate: stream D's readings meet stream C's writers. A deck
+# each branch alone left refused is written once both land: D reads the
+# line it was refused for (LTspice .backanno left out W0036, Xyce
+# .global_param, VACASK's benchmark ngspice decks read as ngspice), and C's
+# writer spells what the other branch still refused (bsource, oct values,
+# nested dc sweep, sectionless include, .print as save, option flags noted
+# W0024, VACASK one-point sweep points=0). Per set: ltspice 156, xyce 36,
+# vacask 8.
+ltspice/ltspice_demos/LT1568_DC675BF02.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF03.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF04.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF05.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF06.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF07.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF08.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF09.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT1568_DC675BF10.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT6261_BesselSecondOrder.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT6261_BesselSecondOrder_.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT6261_BesselSecondOrder_1.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT6261_ButterworthThirdOrder.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT6261_ButterworthThirdOrder_.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LT6261_ButterworthThirdOrder_1.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LTC6078_TA10.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LTC6078_TA15.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_demos/LTC6081_TA01.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1028.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1028A.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1028CS.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1067.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1068-200.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1068-25.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1068-50.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1068.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1113.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1115.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1124.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1126.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1128.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1190.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1191.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1192.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1207.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1208.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1209.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1213.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1214.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1217.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1224.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1226.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1252.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1351.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1352.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1353.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1354.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1355.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1356.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1357.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1358.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1359.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1360.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1361.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1362.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1363.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1364.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1365.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1367.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1462.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1463.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1464.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1465.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1466.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1466L.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1467.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1467L.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1468-2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1468.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1469-2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1494.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1495.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1496.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1498.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1499.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1562-2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1562.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1562A.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1563-2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1563-3.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1563.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1567.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1568.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1630.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1631.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1792.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1793.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1800.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1801.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1802.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1812.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1813.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1814.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1818.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/1819.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2078.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2078A.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2079.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2079A.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2178.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2178A.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2179.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2179A.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2311-12.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2311-14.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2945.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/2946.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/4350.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-1.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-3.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-4.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-5.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-6.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-7.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5400-8.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/5507.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6078.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6079.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6081.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6082.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6200-10.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6220.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6221.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6222.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6228.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6233-10.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6233.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6234.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6235.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6253-7.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6261.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6262.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6263.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6268.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6269.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6601-1.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6601-2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6605-10.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6605-14.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/6605-7.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/Cohn.net spectre now written: .backanno left out (D); .ac oct as values=[…] (C); was refused
+ltspice/ltspice_examples/IGBT.net spectre now written: .backanno left out (D); a nested .dc as sweep (C); was refused
+ltspice/ltspice_examples/Linkwitz.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/MeasureBW.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/MonteCarlo.net spectre now written: .backanno left out (D); .ac oct as values=[…] (C); was refused
+ltspice/ltspice_examples/UniversalOpamp2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/butter.net spectre now written: .backanno left out (D); .ac oct as values=[…] (C); was refused
+ltspice/ltspice_examples/curvetrace.net spectre now written: .backanno left out (D); a nested .dc as sweep, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/logamp.net spectre now written: .backanno left out (D); a B source as bsource, a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/noise.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/notch.net spectre now written: .backanno left out (D); .ac oct as values=[…] (C); was refused
+ltspice/ltspice_examples/opamp.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/phono.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f" (C); was refused
+ltspice/ltspice_examples/stepAC.net spectre now written: .backanno left out (D); .ac oct as values=[…] (C); was refused
+ltspice/ltspice_examples/varactor2.net spectre now written: .backanno left out (D); .ac oct as values=[…], a sectionless .lib as include "f", .print as save (C); was refused
+vacask/benchmark/c6288/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/graetz/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/mul/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/rc/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/ring/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/ring/ngspice/runme_current.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+vacask/benchmark/vadistiller/mul/ngspice/runme.sim spectre now written: read as ngspice (D); its option flags noted W0024, not refused (C); was refused
+xyce/Certification_Tests/BUG_1190_SON/bsim3.cir spectre now written: .global_param read (D); .print as save (C); was refused
+xyce/Certification_Tests/BUG_1190_SON/bsim4.cir spectre now written: .global_param read (D); .print as save (C); was refused
+xyce/Certification_Tests/BUG_1801/bug_1801_A0.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_1801/bug_1801_A1.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_1801/bug_1801_B0.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_1801/bug_1801_B1.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_2039/bug_2039.cir spectre now written: .global_param read (D); a B source as bsource (C); was refused
+xyce/Certification_Tests/BUG_754_SON/newton_globalparam.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_1.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_2.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_3.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_4.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source2_stepped_5.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_1.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_2.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_3.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_4.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/source_stepped_5.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_754_SON/sourcestep_globalparam.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/BUG_812_SON/global_accessor_interference.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_a1.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_a2.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_a3.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_a4.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_c1.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_c2.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_c3.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_c4.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_c5.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/Certification_Tests/ISSUE_494/test_c6.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/MEASURE_CONT/STEP/DerivTest1DC.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
+xyce/MEASURE_CONT/STEP/FindWhenTest1DC.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
+xyce/MEASURE_CONT/STEP/TrigTargTest1DC.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
+xyce/MEASURE_DC/STEP/TrigTargTest1DC.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
+xyce/PARSER/nakedRandomGlobal.cir vacask now written: .global_param read (D); its one-point .dc is a sweep of points=0 (C); was refused
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir spectre now written: .global_param read (D); a B source as bsource, .print as save (C); was refused
