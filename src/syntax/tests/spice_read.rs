@@ -521,3 +521,20 @@ fn an_hspice_noise_takes_the_ac_sweep_and_a_keyword_dc_reads() {
         assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
     }
 }
+
+#[test]
+fn an_hspice_only_analysis_is_refused_as_the_targets_lack() {
+    // HSPICE UG `.SN`, `.TRANNOISE`, `.LSTB` (no ngspice, Xyce, LTspice
+    // or VACASK analysis of the kind: W0015), `.STATEYE` (HSPICE's own:
+    // W0039), not W0001. Checks: 2 per deck, 2 decks.
+    for (line, code) in [
+        (".lstb mode=single vsource=vlstb", Code::W0015),
+        (".stateye T=1n trf=10p", Code::W0039),
+    ] {
+        let text = format!("t\nr1 a 0 1k\nv1 a 0 1\n{line}\n.op\n.end\n");
+        let ng = render_text(&text, Dialect::Hspice, "t", Dialect::Ngspice).expect_err("refused");
+        let codes: Vec<Code> = ng.diags.iter().map(|g| g.code).collect();
+        assert_eq!(codes, [code], "{}", ng.messages);
+        assert!(render_text(&text, Dialect::Hspice, "t", Dialect::Hspice).is_ok());
+    }
+}

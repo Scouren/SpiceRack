@@ -36,6 +36,9 @@ pub enum Construct {
     /// Xyce's `.sens` (objective, parameters, over the deck's analysis),
     /// kept as text.
     XyceSens,
+    /// HSPICE's `.sn`, `.snnoise`, `.snxf`, `.trannoise`, `.lstb`, kept as
+    /// text.
+    HspiceAnalysis,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -228,6 +231,17 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             // Spectre's `sens` covers dc and ac; not written yet.
+            D::Spectre => Refuse(Code::W0015),
+            D::Verilog => Refuse(Code::W0001),
+        },
+        // ngspice manual ch.11, Xyce RG, LTspice help, VACASK: no
+        // shooting-Newton noise or transfer, transient noise analysis or
+        // loop-stability analysis. Spectre's pss/pnoise/pxf, `tran`
+        // noise and `stb` have them; not written yet.
+        Construct::HspiceAnalysis => match target {
+            D::Hspice => Native,
+            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            D::Ngspice | D::Espice | D::Xyce | D::Ltspice | D::Vacask => Refuse(Code::W0015),
             D::Spectre => Refuse(Code::W0015),
             D::Verilog => Refuse(Code::W0001),
         },
@@ -520,10 +534,11 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 38] = [
+    const CONSTRUCTS: [Construct; 39] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
+        Construct::HspiceAnalysis,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,

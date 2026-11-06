@@ -27103,3 +27103,9 @@ hspice/hspice/sample_rc.sp hspice written differently: HSPICE .noise over the .a
 hspice/hspice/sample_rc_beta.sp cdl written differently: HSPICE .noise over the .ac sweep / keyword .dc read
 hspice/hspice/sample_rc_beta.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
 spice-bench/ngspice/examples/various/tmp-noise.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+
+# Phase 7: spice-read: HSPICE-only analyses (render::read refused.rs
+# kept_construct; capability HspiceAnalysis). `.sn`, `.snnoise`, `.snxf`,
+# `.trannoise`, `.lstb` refuse W0015 (no SPICE target nor VACASK has the
+# analysis; Spectre's placeholder), `.stateye` W0039, not W0001. No line:
+# refusals compared by status only.
