@@ -1,4 +1,3 @@
-4049OSC/4049osc.cir mismatch # tran V(1): 0 leaves the tube at t=0 (tol 5.043e-2)
 ABM/ascth.cir target-fails # Unexpected format: Unexpected EOF in header
 ABM/limit.cir mismatch # tran V(1): 0.09990234374999962 leaves the tube at t=0.5199804687499999 (tol 5.000e-2)
 ABM/stp.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'stp' at line 5
@@ -246,7 +245,6 @@ Certification_Tests/BUG_1826/linear_simple_param.cir target-fails # no raw file 
 Certification_Tests/BUG_1962/ic.cir mismatch # tran V(2): -0.1877024052511381 leaves the tube at t=0.0005 (tol 9.946e-3)
 Certification_Tests/BUG_1962/measure.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v] | Undefined parameter [v]
 Certification_Tests/BUG_2007/gstep.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-Certification_Tests/BUG_201_SON/bug201a.cir mismatch # tran V(1): 0 leaves the tube at t=0 (tol 6.495e-1)
 Certification_Tests/BUG_201_SON/bug201b.cir mismatch # tran V(1): -66 leaves the tube at t=0 (tol 6.600e-1)
 Certification_Tests/BUG_2039/bug_2039.cir mismatch # tran 2A: -0.01 leaves the tube at t=0 (tol 1.020e-4)
 Certification_Tests/BUG_229_SON/bug229son.cir mismatch # tran V(1): -0.9714042612453866 leaves the tube at t=0.000711847221350207 (tol 1.000e-2)
@@ -282,8 +280,8 @@ Certification_Tests/BUG_311/bug_311_a.cir target-fails # no raw file .cross_sim_
 Certification_Tests/BUG_311/bug_311_b.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 22 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted d
 Certification_Tests/BUG_325_SON/vbic_3T_et_cf.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: q1 c b 0 vbicmodel | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/BUG_325_SON/vbic_3T_et_cf_m2.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: q1 c b 0 vbicmodel m=2 | Simulation interrupted due to error! | Error: circuit not parsed.
-Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir slow # ngspice timed out on the written deck
-Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir slow # ngspice timed out on the written deck
+Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir slow # quarantined
+Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir slow # quarantined
 Certification_Tests/BUG_343/bug_343.cir mismatch # tran V(1): 1.0006465840945937 leaves the tube at t=0.00075 (tol 2.099e-1)
 Certification_Tests/BUG_372/invert1-sim.cir mismatch # tran VDDDEV#branch: -0.0029648003110620083 leaves the tube at t=0.0000015048960408435864 (tol 3.006e-5)
 Certification_Tests/BUG_372/invert1.cir mismatch # tran VDDDEV#branch: -0.0029692751229603753 leaves the tube at t=0.0000015049046263396088 (tol 3.013e-5)
@@ -483,18 +481,12 @@ CircuitSim90/MOS3/gm17.cir mismatch # tran V(16): -0.000000005154272335557597 le
 CircuitSim90/MOS3/gm2.cir mismatch # tran VDD#branch: -0.00967087605702495 leaves the tube at t=0.000000042000000000000006 (tol 9.671e-5)
 CircuitSim90/MOS3/mike2.cir mismatch # tran VDD#branch: -0.27164087205083637 leaves the tube at t=0.000000015349326481991392 (tol 2.716e-3)
 CircuitSim90/MOS3/todd3.cir mismatch # tran VAMP#branch: 0.0031028311738562466 leaves the tube at t=0.0000000010915028442609008 (tol 3.103e-5)
-DIAGNOSTIC/CurrentCheck1.cir mismatch # tran NODE1: 0 leaves the tube at t=0 (tol 5.043e-2)
 DIAGNOSTIC/DC_CurrentCheck1.cir mismatch # dc V1#branch: -0.000000000012789633501266042+0i vs -0.000000000005859290695235809+0i at -1 (tol 2.026e-12)
 DIAGNOSTIC/DC_ExVCheck1.cir mismatch # dc V1#branch: -0.000000000012789633501266042+0i vs -0.000000000005859290695235809+0i at -1 (tol 2.026e-12)
 DIAGNOSTIC/DC_ExVICheck1.cir mismatch # dc V1#branch: -0.000000000012789633501266042+0i vs -0.000000000005859290695235809+0i at -1 (tol 2.026e-12)
 DIAGNOSTIC/DC_GStep.cir mismatch # dc V(5): -12.467531657381851+0i vs -0.0003898518551960948+0i at 0 (tol 2.686e-2)
 DIAGNOSTIC/DC_Ring51.cir slow # quarantined
 DIAGNOSTIC/DC_VICheck1.cir mismatch # dc V1#branch: -0.000000000012789633501266042+0i vs -0.000000000005859290695235809+0i at -1 (tol 2.026e-12)
-DIAGNOSTIC/ExVCheck1.cir mismatch # tran NODE1: 0 leaves the tube at t=0 (tol 5.043e-2)
-DIAGNOSTIC/ExVICheck1.cir mismatch # tran NODE1: 0 leaves the tube at t=0 (tol 5.043e-2)
-DIAGNOSTIC/ExtremaCheck1.cir mismatch # tran NODE1: 0 leaves the tube at t=0 (tol 5.043e-2)
-DIAGNOSTIC/VICheck1.cir mismatch # tran NODE1: 0 leaves the tube at t=0 (tol 5.043e-2)
-DIAGNOSTIC/VoltageCheck1.cir mismatch # tran NODE1: 0 leaves the tube at t=0 (tol 5.043e-2)
 DIODE_ANALYTIC/breakdown_model.cir mismatch # tran V(1): 1.2 leaves the tube at t=0 (tol 1.200e-2)
 DIODE_ANALYTIC/forward_model.cir mismatch # tran V(2): 0 leaves the tube at t=0 (tol 1.997e-3)
 DIODE_ANALYTIC/reverse_model.cir mismatch # tran V(1): 1 leaves the tube at t=0 (tol 1.000e-2)
@@ -569,8 +561,8 @@ LEAD_CURRENTS/lead_min_ac.cir mismatch # plots ["op"] became ["ac", "op"]
 LTRA/ltra1.cir mismatch # tran V(100): 0.46681337015201163 leaves the tube at t=0.000000011304608227824232 (tol 5.610e-2)
 LTRA/ltra2.cir mismatch # tran V1#branch: 0.0069574881183347495 leaves the tube at t=0.0000000021328134031570598 (tol 3.291e-4)
 LTRA/ltra3.cir mismatch # tran V(3): 0.37630219503443 leaves the tube at t=0.000000031753987916230536 (tol 8.116e-3)
-LTRA/square-wave-gen-resistor-compact.cir slow # ngspice timed out on the written deck
-LTRA/square-wave-gen-resistor.cir slow # ngspice timed out on the written deck
+LTRA/square-wave-gen-resistor-compact.cir slow # quarantined
+LTRA/square-wave-gen-resistor.cir slow # quarantined
 LUMPEDLINE/baselineLumpedLine.cir mismatch # tran 1B: -0.14498790723931973 leaves the tube at t=0.0000006334134722967974 (tol 1.178e-2)
 MCNC_BJT_LATCH/latch.cir mismatch # tran VREF#branch: 0.0018988876953777145 leaves the tube at t=0.000000021 (tol 1.899e-5)
 MCNC_BJT_OPAMPAL/opampal.cir mismatch # tran VVIN#branch: -0.00000016134418585703294 leaves the tube at t=0.000011000000000000001 (tol 1.877e-9)
@@ -688,7 +680,6 @@ MEXTRAM/RGummel_Ie_noFlip_P.cir target-fails # ngspice swapped the model: Level 
 MEXTRAM/acFreq_Gbb.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 MEXTRAM/acFreq_Gbb_noFlip_P.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 MINCAPRES/mincr.cir mismatch # tran 2A: 0.9361818808315894 leaves the tube at t=0 (tol 1.000e-2)
-MINDUCTORS/InductorICBug.cir mismatch # tran V(2): 0 leaves the tube at t=0 (tol 4.571e-2)
 MINDUCTORS/MINDUCTORS_IC.cir mismatch # tran V(2): -500 leaves the tube at t=0 (tol 5.000e0)
 MINDUCTORS/MINDUCTORS_IC2baseline.cir mismatch # tran V(2): -500 leaves the tube at t=0 (tol 5.000e0)
 MINDUCTORS/cpldLMIs.cir mismatch # tran: stop time Some(0.025) -> Some(2.9536882726817453e-5)
@@ -829,6 +820,7 @@ PSP103/invert_psp_testDTA1.cir target-fails # ngspice swapped the model: Level m
 PSP103/invert_psp_testDTA2.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mn1 v
 RESISTOR/resistor_lv3.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
 RESISTOR/resistor_lv3_2.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
+ROM/MULTIPORT/RLC_mesh2.cir target-fails # ngspice wrote past 2147483648 bytes
 ROM/cab_dak_sig_o_simple.cir mismatch # tran CABLEEND: 0.709773006377744 leaves the tube at t=0.00000011119356155429531 (tol 9.093e-3)
 SANDLER21/sandler21.cir mismatch # tran V(1): 0.012754436069687644 leaves the tube at t=0.0011607171242355243 (tol 1.132e-1)
 SANDLER22/sandler22.cir mismatch # tran V(4): 5.063378303425906 leaves the tube at t=0.0005998033489313946 (tol 5.102e-2)
@@ -880,7 +872,6 @@ THERMAL_RESISTOR/linear.cir target-fails # no raw file .cross_sim_out.raw: Undef
 TIA/ERROROPTION/erroroption.cir mismatch # tran VDDDEV#branch: -0.0006856768718502152 leaves the tube at t=0.0000015900000000000004 (tol 6.857e-6)
 TIA/MINORDER/capacitor.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [pi] | Formula() error. | Undefined parameter [s] | Undefined parameter [s]
 TIA/MINORDER/invert.cir mismatch # tran VDDDEV#branch: -0.0006453328659304003 leaves the tube at t=0.000001584123304055893 (tol 6.453e-6)
-TIA/TRAP/4049OSC/4049osc.cir mismatch # tran V(1): 0 leaves the tube at t=0 (tol 5.044e-2)
 TIA/TRAP/CAPACITOR/capacitor.cir mismatch # tran V(1): 1 leaves the tube at t=0 (tol 1.000e-2)
 TIA/TRAP/CAPACITOR/capacitor1.cir mismatch # tran V(1): 1 leaves the tube at t=0 (tol 1.000e-2)
 TIA/TRAP/CAPACITOR/rc_osc.cir mismatch # tran V(1): 0.9161067788244022 leaves the tube at t=0.0000018434276800000003 (tol 1.000e-2)
@@ -963,9 +954,7 @@ Verilog_POWER/power_juncap200_gear.cir mismatch # tran V(3): 0.00000288030336460
 Verilog_POWER/power_mextram_gear.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1)
 Verilog_POWER/power_vbic13_3T_gear.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: q1 collector1 base1 emitter1 qjunk1 | Simulation interrupted due to error! | Error: circuit 
 Verilog_POWER/power_vbic13_4T_gear.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: q1 collector1 base1 emitter1 0 qjunk1 | Simulation interrupted due to error! | Error: circui
-WAMPDE/BLOCKING/block.cir mismatch # tran V(4): 0 leaves the tube at t=0 (tol 1.200e-1)
 WAMPDE/BLOCKING/simple_single_channel.cir mismatch # tran V(1): 12.000001537961754 leaves the tube at t=0.00000511 (tol 1.200e-1)
-WAMPDE/PIERCE/pierce_withbjt.cir mismatch # tran V(4): 0 leaves the tube at t=0 (tol 8.083e-3)
 WAMPDE/invert1.cir mismatch # tran VDDDEV#branch: -0.0006357839607357947 leaves the tube at t=0.0000015837795147382513 (tol 6.454e-6)
 WAMPDE/invert1_WAMPDE.cir mismatch # tran VDDDEV#branch: -0.0006357839607357947 leaves the tube at t=0.0000015837795147382513 (tol 6.454e-6)
 XDM/HSPICE/DIODE_CLIPPER/diodeClipper.cir mismatch # tran V1#branch: 0.0019866567671866526 leaves the tube at t=0.0012549924350169315 (tol 1.987e-5)

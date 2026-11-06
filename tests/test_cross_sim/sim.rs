@@ -41,6 +41,10 @@ pub enum Ran {
     Failed(String),
 }
 
+/// Bytes one simulator may write to any one file: a runaway transient's raw
+/// file dies at the cap (SIGXFSZ) instead of filling the disk.
+const FSIZE: u64 = 2 << 30;
+
 /// The deck's own name inside the run directory: hidden, so it never shadows
 /// a file of the corpus beside it.
 const DECK: &str = ".cross_sim_deck";
@@ -133,11 +137,15 @@ fn run_in(
         Sim::Ngspice | Sim::NgspiceHsa => ngspice_text(text, &raw),
         _ => text.to_string(),
     };
+    if matches!(sim, Sim::Ngspice | Sim::NgspiceHsa) {
+        link_osdi(dir, &text);
+    }
     std::fs::write(&file, &text).unwrap_or_else(|e| harness(&e));
     let mut c = Command::new("timeout");
     c.arg((10 * secs).to_string())
         .arg("prlimit")
         .arg(format!("--cpu={secs}"))
+        .arg(format!("--fsize={FSIZE}"))
         .env("OMP_NUM_THREADS", "1")
         .current_dir(dir);
     match sim {
@@ -169,6 +177,15 @@ fn run_in(
     let out = c.arg(&file).output().unwrap_or_else(|e| harness(&e));
     if timed_out(&out) {
         return Ok(Ran::Timeout);
+    }
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if out.status.signal() == Some(25) || out.status.code() == Some(153) {
+            return Ok(Ran::Failed(format!(
+                "{} wrote past {FSIZE} bytes",
+                sim.name()
+            )));
+        }
     }
     let log = (String::from_utf8_lossy(&out.stdout) + String::from_utf8_lossy(&out.stderr))
         .replace(&format!("{}/", dir.display()), "");
@@ -212,6 +229,36 @@ fn harness(e: &std::io::Error) -> ! {
     panic!("cross_sim harness: {e}")
 }
 
+/// Each bare `pre_osdi <name>.osdi` of `text` that is not beside the deck,
+/// linked from VACASK's module directory (`<vacask>/../lib/vacask/mod`):
+/// a VACASK deck loads a model from its module path (VACASK
+/// docs/startup-paths.md), a user running it on ngspice puts that file
+/// beside the deck.
+fn link_osdi(dir: &Path, text: &str) {
+    let names = text
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("pre_osdi"))
+        .map(|n| n.trim().trim_matches(['"', '\'']))
+        .filter(|n| n.ends_with(".osdi") && !n.contains('/') && !dir.join(n).exists());
+    let mut mods = None;
+    for n in names {
+        let m = mods.get_or_insert_with(vacask_modules);
+        if let Some(m) = m
+            && m.join(n).is_file()
+        {
+            let _ = std::os::unix::fs::symlink(m.join(n), dir.join(n));
+        }
+    }
+}
+
+/// VACASK's module directory, beside its binary on `PATH`.
+fn vacask_modules() -> Option<std::path::PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    let bin = std::env::split_paths(&path).find(|d| d.join("vacask").is_file())?;
+    let real = std::fs::canonicalize(bin.join("vacask")).ok()?;
+    Some(real.parent()?.parent()?.join("lib/vacask/mod"))
+}
+
 /// `timeout` exits 124 itself; a CPU-limit kill (SIGXCPU, SIGKILL at the
 /// hard limit) is re-raised on `timeout`, so there is no exit code.
 fn timed_out(o: &std::process::Output) -> bool {
@@ -239,10 +286,11 @@ fn errors(log: &str) -> String {
         if !CAUSES.iter().any(|c| low.contains(c)) || low.contains("fatal error in ngspice") {
             continue;
         }
-        // Xyce wraps its location ("... at" / "or near line 8"): the cause
+        // Xyce wraps its location ("... at" / "or near line 8", "... at or" /
+        // "near line 8"): the cause
         // is the line after the wrap.
         let after = |k: usize| all.get(i + k).copied().unwrap_or("");
-        let next = if after(1).starts_with("or near") {
+        let next = if after(1).starts_with("or near") || after(1).starts_with("near line") {
             after(2)
         } else {
             after(1)

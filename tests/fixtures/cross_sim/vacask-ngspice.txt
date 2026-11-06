@@ -1,11 +1,8 @@
 benchmark/graetz/vacask/runme.sim mismatch # ngspice stops: timestep too small at 10.9 ms (the deck's own ngspice version, benchmark/graetz/ngspice, uses rgnd=1meg and klu); the written text is the circuit, ngspice's convergence on rgnd=1G
-benchmark/ring/vacask/runme.sim target-fails # pre_osdi psp103v4.osdi: VACASK finds a bare .osdi on its module path (docs/startup-paths.md), ngspice beside the deck; the load's spelling is right
-benchmark/vadistiller/bjtring/vacask/runme.sim mismatch # icmode="uic" with no ic: VACASK reports the zero state at t=0, ngspice its uic point with the sources on (cmd-analysis-tran.md: 'the timepoint at t=0 is not correct (like in SPICE)'); the deck's own ngspice version is this text
-benchmark/vadistiller/jfetring/vacask/runme.sim mismatch # icmode="uic" with no ic: VACASK reports the zero state at t=0, ngspice its uic point with the sources on (cmd-analysis-tran.md); the deck's own ngspice version (vadistiller/jfetring/ngspice) is this text
-benchmark/vadistiller/mul/vacask/runme.sim mismatch # diode cascade with tt=4.32u: VACASK runs its spice/sn/diode.osdi build, ngspice its own diode (read as the SPICE d); not triaged (benchmark/mul/vacask, the same cascade without tt, passes)
-demo/sc/lpfilter.sim target-fails # pre_osdi opamp.osdi, psp103v4.osdi: VACASK's module path (docs/startup-paths.md), not beside the deck
+benchmark/ring/vacask/runme.sim target-fails # (psp103v4.osdi now linked from VACASK's module path) an OSDI instance's expression written bare: `pd=2*( w+ld)` on `n.xu1.xmp.nm ... psp103p`, ngspice 'unknown parameter (*)': ngspice wants {...} (stream B)
+benchmark/vadistiller/mul/vacask/runme.sim mismatch # simulator differs: ngspice on the corpus's own ngspice version of this cascade gives v(10) = 31.82/46.44/48.78 V at 0.29/1/5 ms, on the written deck 31.74/46.48/48.76, VACASK 28.30/38.06/36.82 (its spice/sn/diode.osdi, ngspice-47's diode, with tt=4.32u)
+demo/sc/lpfilter.sim target-fails # (opamp.osdi, psp103v4.osdi now linked) VACASK's built-in constant m_pi copied: ngspice 'Undefined parameter [m_pi]' (ngspice: pi) (stream A/B)
 demo/spice/mos2inv.sim mismatch # vdd current at an edge (3.05 us, a 5e-5 A tube): VACASK runs its OSDI build of MOS2 (devices/spice/mos2.va), ngspice its own; not triaged (mos1, mos3, mos6, mos9 inv pass)
 test/resonator.sim mismatch # a lossless LC under trap: VACASK steps up to 46 us (step=2u is its first step, no max), ngspice holds 2 us (TSTEP): the phases part after 1 ms
-test/test_inverter.sim target-fails # pre_osdi bsimbulk106.osdi: VACASK's module path (docs/startup-paths.md), not beside the deck
 test/test_optpar.sim target-fails # $temp in an expression copied as written: ngspice's is temper (FINDINGS-A round 2)
 test/timestep.sim mismatch # a tolerance test: relref="alllocal", tran_lteratio=3.5 have no ngspice option, so the step control (and a 2% L1 difference) is each simulator's
