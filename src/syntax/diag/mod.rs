@@ -32,12 +32,12 @@
 //! - `pub enum Code`, `Code::ALL: &[Code]`, `pub enum Kind`, `pub struct Info`,
 //!   `pub const fn info(c: Code) -> Info`
 //! - `pub struct Diag { pub code: Code, pub token: u32, pub detail: u16 }`, `Diag::new(code: Code, token: u32, detail: u16) -> Diag`
-//! - `pub fn sort(diags: &mut [Diag])`
-//! - `pub fn messages(diags: &[Diag], t: &Tokens, file: &str) -> String`
+//! - `pub fn sort(diags: &mut [Diag])`, `pub fn messages(diags: &[Diag], t: &Tokens, file: &str) -> String`
+//!   (`messages.rs`)
 
-use std::fmt::Write as _;
+mod messages;
 
-use crate::syntax::token::Tokens;
+pub use messages::{messages, sort};
 
 /// What a diagnostic means for the file it is on.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -377,11 +377,11 @@ catalogue! {
         cite: "Xyce RG pp.96-104 (`.options <pkg>`); VACASK docs/cmd-options.md",
         explain: "The option is another simulator's own (VACASK's on a SPICE target, Xyce's packaged options on Spectre or VACASK) or only cosmetic, so it is left out. Set the target's own option if one has the same effect.",
     }
-    /// A `.control` line other than an analysis, or a VACASK `control` line that steers only the script: not written.
+    /// A `.control` line other than an analysis: not written.
     W0025 Note {
         title: "a control-block line not written",
-        cite: "ngspice manual ch.13 (the control language is a script, not a netlist); VACASK simulator/cmd.cpp (`abort`, `print`, `postprocess`)",
-        explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated, nor VACASK's `abort`, `print` and `postprocess`, which change no number. Run the script on its simulator, or rewrite it for the target's own scripting.",
+        cite: "ngspice manual ch.13 (the control language is a script, not a netlist)",
+        explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated. Run the script on ngspice, or rewrite it for the target's own scripting. (A VACASK control block's script lines are W0120.)",
     }
     /// A waveform's arguments past the count the target's form takes.
     W0026 Note {
@@ -530,11 +530,11 @@ catalogue! {
         cite: "HSPICE UG B-2008.09 App. A (`multiplier`); ngspice manual §2.11.5; Xyce RG Table 2-33",
         explain: "The call's arguments have no meaning in the target's statistical form (HSPICE's four-argument multiplier, a count no dialect reads). Write the call with ngspice's arguments.",
     }
-    /// A source waveform the target cannot run as SPICE does (Spectre's AM; VACASK's PWL, a SIN phase, an EXP delay that is no number).
+    /// A source waveform the target cannot run as SPICE does (Spectre's AM; VACASK's PWL repeat, a SIN phase, an EXP delay that is no number).
     W0108 Refusal {
         title: "a source waveform the target cannot run",
-        cite: "Spectre Reference 5.0 p.685 (no AM equation); VACASK vsource (`sine` ignores a phase; PWL)",
-        explain: "The target's source runs this waveform otherwise (Spectre has no AM; VACASK ignores a SIN phase). Write the waveform as a behavioural source or a PWL.",
+        cite: "Spectre Reference 5.0 p.685 (no AM equation); VACASK vsource (`sine` ignores a phase; a PWL `period` repeats from time 0 with the last value the first: `docs/dev-builtin-src.md`)",
+        explain: "The target's source runs this waveform otherwise (Spectre has no AM; VACASK ignores a SIN phase and repeats a PWL only whole). Write the waveform as a behavioural source or a PWL without the repeat.",
     }
     /// A `.measure` the target has no statement for (VACASK).
     W0109 Refusal {
@@ -579,12 +579,38 @@ catalogue! {
         cite: "Spectre Reference 19.1 p.166 (`variations`, default `process`); VACASK docs/cmd-analysis-mc.md (`mc` draws at every call site)",
         explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Write `variations=all`, or keep the deck's draws to the scope the montecarlo names.",
     }
+    // W0120–W0124: the Spectre and VACASK reader's (`render::read::named*`).
+    /// A VACASK control command or `embed` that only steers a VACASK run
+    /// and its scripts, not written on another target.
+    W0120 Note {
+        title: "a VACASK script line with no circuit meaning, not written",
+        cite: "VACASK docs cmd-errorhandling.md (`abort`), cmd-print.md, cmd-postprocess.md, input-embed.md (a file written for a script)",
+        explain: "`abort` sets VACASK's error policy, `print` writes to its console, `postprocess` runs a program after the run, and an `embed` that no `load` or `include` of the deck reads writes a file for such a program: none changes a number of the circuit, and the target has no such step, so it is left out. Run the script on the target's own results.",
+    }
+    /// A loaded module named as one of the target's built-in devices.
+    W0121 Refusal {
+        title: "a Verilog-A module named as a built-in device of the target",
+        cite: "ngspice-45 run: `.model dmod diode` with VACASK's `diode.osdi` loaded reads `diode` as its built-in `Diode` (\"unrecognized parameter (diode)\") and the `N` instance fails (\"incorrect model type! Expected OSDI device\"); `devhelp` lists the built-in names",
+        explain: "The target looks a model's type up among its built-in devices before the OSDI modules it loaded, so a module named as one of them (`diode`, `resistor`, `bjt`, …) cannot be instantiated. Rename the module in its Verilog-A source and load that build.",
+    }
     /// A `.tf` written as Spectre's `xf` at frequency 0: its input and
     /// output resistances are not computed.
     W0125 Note {
         title: "a transfer function's input and output resistance not computed",
         cite: "Spectre Reference 19.1 pp.438-439 (xf: transfer functions from every source)",
         explain: "SPICE's `.tf` gives the gain and the input and output resistances at the operating point; Spectre's `xf` at `values=[0]` gives the transfer function from every source to the output, no resistance. Add a test source and compute the resistance from its transfer function.",
+    }
+    /// A SPICE `.include` or `.lib` inside a `.subckt`, on Spectre.
+    W0128 Refusal {
+        title: "a file read inside a subcircuit, on Spectre",
+        cite: "ngspice manual §2.7 (a `.lib` in a `.subckt` is local to it); Spectre Reference 19.1 pp.533-535 (`subckt`: no clause on an `include` in its body)",
+        explain: "ngspice scopes what a file read inside a `.subckt` defines to that subcircuit; no Spectre clause here says an `include` in a `subckt` body does the same, and leaving the file out changes which subcircuits and models the body sees. Read the file at the top level, renaming what collides.",
+    }
+    /// A model parameter the VACASK module the card maps to does not declare.
+    W0129 Refusal {
+        title: "a model parameter the VACASK module lacks",
+        cite: "VACASK 36be560 `devices/spice/<module>.va` (its `parameter` and `aliasparam` names; VACASK stops on another: \"Parameter '…' not found.\"); ngspice-45 `devices/<dev>/*.c` (the names the device reads)",
+        explain: "The card sets a parameter the source simulator reads (or, from a dialect other than ngspice, may read) but the `sp_*` module VACASK builds from ngspice's device code does not declare (an initial condition, a self-heating or a version switch), so VACASK has no equation for it. Remove the parameter, or set the condition the VACASK way (`ic=` on the analysis).",
     }
     // W0201–W0300: the rules a dialect definition declares.
     /// A refusal a dialect definition declared (`DialectDef::code`): its id and message are the definition's.
@@ -610,56 +636,6 @@ impl Diag {
             detail,
         }
     }
-}
-
-/// Sorts `diags` by source position (token), then code: the order their
-/// messages are rendered in.
-pub fn sort(diags: &mut [Diag]) {
-    diags.sort_by_key(|d| (d.token, d.code));
-}
-
-/// `diags` (one file's) as messages, one a line, sorted by source
-/// position: `file:line:column: CODE title`, the line and column computed
-/// here from each diagnostic's token in `t`.
-///
-/// # Panics
-/// When a diagnostic's token is not one of `t`'s.
-pub fn messages(diags: &[Diag], t: &Tokens, file: &str) -> String {
-    let mut sorted = diags.to_vec();
-    sort(&mut sorted);
-    let mut out = String::new();
-    for d in &sorted {
-        assert!(
-            (d.token as usize) < t.len(),
-            "a diagnostic on a token of `t`"
-        );
-        let at = t.location(d.token);
-        let r = match d.code {
-            Code::W0201 | Code::W0202 => {
-                let p = crate::syntax::lang::plugin_code(d.detail);
-                writeln!(
-                    out,
-                    "{file}:{}:{}: {:?} {}:{} {}",
-                    at.line,
-                    at.column,
-                    d.code,
-                    p.lang.name(),
-                    p.id,
-                    p.message
-                )
-            }
-            _ => writeln!(
-                out,
-                "{file}:{}:{}: {:?} {}",
-                at.line,
-                at.column,
-                d.code,
-                info(d.code).title
-            ),
-        };
-        r.expect("a String takes writes");
-    }
-    out
 }
 
 #[cfg(test)]

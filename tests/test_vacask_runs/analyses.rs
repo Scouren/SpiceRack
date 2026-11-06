@@ -247,3 +247,16 @@ fn spectre_lin_is_steps_on_vacask_too() {
     assert_eq!(f.len(), 11, "{f:?}\n{deck}");
     close(f[10], 2.0, 1e-12);
 }
+
+#[test]
+fn a_number_keeps_the_digits_the_source_wrote() {
+    // ngspice reads `10u` as 9.999999999999999e-6 and `2.25m` as
+    // 2.2500000000000004e-3; VACASK's lexer scales a suffixed mantissa the
+    // same way (`docs/input-numbers.md`), so `10u` is the same double.
+    let deck = "t\nV1 a 0 1\nR1 a 0 1k\n.tran 10u 2.25m\n.end\n";
+    let w = spicerack::syntax::render::render_text(deck, Dialect::Ngspice, "t", Dialect::Vacask)
+        .unwrap();
+    assert!(w.text.contains("tran step=10u stop=2.25m"), "{}", w.text);
+    let time = col(&run_text(&w.text), "time");
+    close(*time.last().unwrap(), 2.25e-3, 1e-12);
+}

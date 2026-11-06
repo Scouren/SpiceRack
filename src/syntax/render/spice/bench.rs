@@ -19,7 +19,7 @@
 
 use super::W;
 use crate::syntax::Lang;
-use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm};
+use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
@@ -50,9 +50,11 @@ pub(super) struct Tb {
     steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
     /// Each list `.step`'s name, values and first token.
     step_lists: Vec<(String, Vec<f64>, u32)>,
-    /// VACASK control lines kept as text, with their statement's first
-    /// token: none is written (`W::vacask_lines`).
-    pub(super) extra: Vec<(String, u32)>,
+    /// VACASK control statements kept as text: none is written
+    /// (`W::vacask_lines`).
+    pub(super) extra: Vec<u32>,
+    /// Each VACASK `save` naming a module's output variable (not written).
+    unsaved: Vec<u32>,
     /// `ngbehavior=`'s mode, with its statement's first token.
     pub(super) ngbehavior: Option<(String, u32)>,
 }
@@ -143,6 +145,9 @@ impl W<'_, '_> {
         self.respell_refs(&mut tb);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
+        }
+        for &tok in &tb.unsaved {
+            self.note(Code::W0023, tok);
         }
         if self.b.options_form == OptionsForm::XycePackages {
             for l in self.xyce_options(&tb) {
@@ -264,19 +269,18 @@ impl W<'_, '_> {
         }
     }
 
-    /// VACASK control lines the reader kept as text (VACASK
-    /// `simulator/cmd.cpp`): `abort`, `print` and `postprocess` steer the
-    /// script and `save` the outputs, so each is left out (W0025, W0023);
-    /// another (`alter`, `var`, `clear`, `elaborate`, an analysis kept as
-    /// text) changes what runs and is refused as VACASK's text.
-    pub(super) fn vacask_lines(&mut self, lines: &[(String, u32)]) {
-        for (l, tok) in lines {
-            let head = l.split(|c: char| c.is_whitespace() || c == '(').next();
-            match head.unwrap_or("") {
-                "abort" | "print" | "postprocess" => self.note(Code::W0025, *tok),
-                "save" => self.note(Code::W0023, *tok),
+    /// VACASK control statements the reader kept as text: a script line
+    /// (`abort`, `print`, `postprocess`: `Rd::vacask_script`) left out
+    /// (W0120), any other (`alter`, `var`, `clear`, `elaborate`, an
+    /// analysis kept as text) changes what runs and is refused as VACASK's
+    /// text; CDL writes neither (W0028).
+    pub(super) fn vacask_lines(&mut self, lines: &[u32]) {
+        for &n in lines {
+            let tok = self.rd.main(n);
+            match self.b.writer {
+                Writer::Cdl => self.note(Code::W0028, tok),
                 _ => {
-                    self.ask(Construct::ForeignText, *tok);
+                    self.ask(self.rd.kept_construct(tok), tok);
                 }
             }
         }
@@ -335,7 +339,16 @@ impl W<'_, '_> {
             BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
             BenchCard::Print(k, outs) => tb.prints.push((k, outs, tok)),
             BenchCard::Meas(m) => tb.measures.push(m),
-            BenchCard::Extra(l) => tb.extra.push((l, tok)),
+            // A VACASK `save` is a save list; any other kept control
+            // statement is asked about where the testbench is written.
+            BenchCard::Extra(n) => match self.rd.vacask_saves(n) {
+                Some((s, dropped)) => {
+                    tb.save_tok.get_or_insert(self.rd.main(n));
+                    tb.saves.extend(s);
+                    tb.unsaved.extend(dropped.then(|| self.rd.main(n)));
+                }
+                None => tb.extra.push(n),
+            },
         }
     }
 

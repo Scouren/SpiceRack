@@ -59,6 +59,9 @@ impl W<'_, '_> {
                     'C' => ('c', "capacitor"),
                     _ => ('l', "inductor"),
                 };
+                let mut params = params;
+                let extra = self.parasitics(letter, n, &n1, &n2, &mut params);
+                let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let (name, n1, n2) = (self.dev(own), self.node(&n1), self.node(&n2));
                 if ngspice
                     && letter == 'R'
@@ -71,6 +74,7 @@ impl W<'_, '_> {
                         self.params(&kept)
                     ));
                 }
+                let params = self.tran_ic(letter, params, n);
                 let params = match ngspice && letter != 'L' {
                     true => self.element_rows(letter, &params, n)?,
                     false => params,
@@ -81,8 +85,9 @@ impl W<'_, '_> {
                     v => format!(" {l}={}", self.val(v)),
                 };
                 format!(
-                    "{l}{name} ({n1} {n2}) {master}{value}{}",
-                    self.params(&params)
+                    "{l}{name} ({n1} {n2}) {master}{value}{}{}",
+                    self.params(&params),
+                    self.part_lines(extra)
                 )
             }
             Card::Charge {
@@ -134,12 +139,14 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
-                parasitics: _,
+                mut parasitics,
             } => {
                 if let Some(port) = port {
                     let ac = (ac_mag, ac_phase);
                     return self.port(tok, own, port, [&np, &nm], (&value, wave.is_some()), ac);
                 }
+                let extra = self.parasitics(letter, n, &np, &nm, &mut parasitics);
+                let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let (l, master) = match letter {
                     'V' => ('v', "vsource"),
                     _ => ('i', "isource"),
@@ -165,6 +172,7 @@ impl W<'_, '_> {
                     s.push(' ');
                     s.push_str(&w);
                 }
+                s.push_str(&self.part_lines(extra));
                 s
             }
             Card::Behavioural {
@@ -252,6 +260,12 @@ impl W<'_, '_> {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }
+                // A loaded module's instance keeps its name as read (no
+                // letter: Spectre names by statement, not by letter).
+                let prefix = match letter {
+                    'N' => String::new(),
+                    l => l.to_ascii_lowercase().to_string(),
+                };
                 let params =
                     match letter == 'D' && self.rd.b.model_semantics == ModelSemantics::Ngspice {
                         true => self.element_rows(letter, &params, n)?,
@@ -260,7 +274,7 @@ impl W<'_, '_> {
                 let ns: Vec<String> = nodes.iter().map(|x| self.node(x)).collect();
                 format!(
                     "{}{} ({}) {}{}",
-                    letter.to_ascii_lowercase(),
+                    prefix,
                     self.dev(own),
                     ns.join(" "),
                     self.node(&model),

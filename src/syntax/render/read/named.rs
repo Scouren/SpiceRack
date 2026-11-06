@@ -13,6 +13,7 @@
 //! Contents:
 //! - `fn spectre_kind(master: &str, ty: Option<&str>) -> (String, Option<&'static str>)`
 //! - `fn vacask_kind(module: &str, ty: Option<f64>) -> Option<(String, Option<&'static str>)>`
+//! - `const OSDI: &str`, `fn vacask_model_kind(module: &str, ty: Option<f64>) -> String`
 //! - `fn vacask_builtin(module: &str) -> Option<&'static str>`
 //! - `Rd::declarations(&self, stmts: &[u32]) -> (HashMap<String, String>, Vec<String>)`
 //! - `Rd::instances(&mut self, stmts: &[u32])`, `Rd::declared(&self, n: u32, name: &str, letters: &[char]) -> Option<String>`
@@ -30,6 +31,10 @@ use crate::syntax::ast::{Header, NONE, Node, Tag};
 use crate::syntax::behaviour::NamedRules;
 use crate::syntax::statement::Statement;
 use crate::syntax::token::Tag as T;
+
+/// The prefix of a VACASK model kind that is a loaded module's
+/// ([`vacask_model_kind`]).
+pub(super) const OSDI: &str = "osdi:";
 
 /// The module names the old VACASK writer declares itself (the old lowering).
 const VACASK_BUILTINS: &[&str] = &[
@@ -98,6 +103,18 @@ pub(super) fn vacask_kind(module: &str, ty: Option<f64>) -> Option<(String, Opti
     }
 }
 
+/// What a VACASK `model NAME <module>` declares, as `Rd::declarations`
+/// names it: a SPICE kind (`sp_<module>`), `=<builtin>`, or any other
+/// module, a Verilog-A one a `load` brings (`docs/cir-masters.md`: a
+/// model's master is a builtin or a loaded module), `osdi:<module>`.
+pub(super) fn vacask_model_kind(module: &str, ty: Option<f64>) -> String {
+    match (vacask_kind(module, ty), vacask_builtin(module)) {
+        (Some((kind, _)), _) => kind,
+        (None, Some(b)) => format!("={b}"),
+        (None, None) => format!("{OSDI}{module}"),
+    }
+}
+
 /// The built-in a VACASK `model NAME <module>` names (the old lowering's
 /// `vacask_builtin`).
 pub(super) fn vacask_builtin(module: &str) -> Option<&'static str> {
@@ -127,16 +144,8 @@ impl<'a> Rd<'a> {
                     }
                     let ty = self.get(&p, "type");
                     if self.b.named_rules == NamedRules::Vacask {
-                        match vacask_kind(&master, ty.and_then(|t| self.number(t))) {
-                            Some((kind, _)) => {
-                                kinds.insert(name, kind);
-                            }
-                            None => {
-                                if let Some(b) = vacask_builtin(&master) {
-                                    kinds.insert(name, format!("={b}"));
-                                }
-                            }
-                        }
+                        let ty = ty.and_then(|t| self.number(t));
+                        kinds.insert(name, vacask_model_kind(&master, ty));
                     } else {
                         let ty = ty.map(|t| self.text(t));
                         kinds.insert(name, spectre_kind(&master, ty.as_deref()).0);
@@ -421,9 +430,25 @@ impl<'a> Rd<'a> {
         let head = self.ttag(self.main(n));
         match self.tag(n) {
             Tag::Card if matches!(head, T::KwLoad | T::KwAhdlInclude) => {
+                // VACASK's build of the SPICE set, which VACASK's writer
+                // loads for what it writes, and its own linear R, C and L
+                // (`docs/dev-vacask.md`), which only VACASK loads: the
+                // reader writes their instances as R, C, L and SPICE cards.
                 let path = self.unquote(self.fields(n)[0]);
-                if !(self.b.named_rules == NamedRules::Vacask && path.starts_with("spice/")) {
-                    here.loads.push(n);
+                let linear = ["resistor.osdi", "capacitor.osdi", "inductor.osdi"];
+                // `spice/<m>.osdi` of a module with a SPICE kind only: any
+                // other (`sp_jfet2`) is a loaded module's model.
+                let spice = path
+                    .strip_prefix("spice/")
+                    .and_then(|f| f.rsplit('/').next())
+                    .and_then(|f| f.strip_suffix(".osdi"))
+                    .is_some_and(|m| {
+                        !vacask_model_kind(&format!("sp_{m}"), None).starts_with(OSDI)
+                    });
+                match self.b.named_rules == NamedRules::Vacask {
+                    true if spice => {}
+                    true if linear.contains(&path.as_str()) => here.own_loads.push(n),
+                    _ => here.loads.push(n),
                 }
                 true
             }

@@ -1,6 +1,6 @@
 //! Spectre and VACASK instance statements → [`Card`] views (by built-in
 //! master or model kind, or a subcircuit instance), with their source
-//! waveforms, as the old lowering typed them; a master another file of the
+//! waveforms (`named_waves`), as the old lowering typed them; a master another file of the
 //! kit declares is read as `syntax::resolve` binds it.
 //!
 //! Cites: the old lowering's named elements;
@@ -9,10 +9,11 @@
 //!
 //! Contents:
 //! - `fn unquoted(v: &str) -> Option<String>`
-//! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::strip(&self, name: &str, letter: char) -> String`
+//! - `Rd::named_inst(&self, n: u32) -> Option<Card>`, `Rd::velems(&self, v: u32) -> Vec<u32>`,
+//!   `Rd::strip(&self, name: &str, letter: char) -> String`
 
-use super::named::{spectre_kind, vacask_builtin, vacask_kind};
-use super::{Card, Num, Rd, Val, Wave, WaveKind};
+use super::named::{OSDI, spectre_kind, vacask_model_kind};
+use super::{Card, Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::NamedRules;
 use crate::syntax::resolve::{Binding, Def, DefKind, Polarity};
@@ -20,7 +21,6 @@ use crate::syntax::resolve::{Binding, Def, DefKind, Polarity};
 /// The keys one dialect's built-in masters use (the old lowering).
 struct Keys {
     source: &'static [&'static str],
-    damp: &'static str,
     gm: &'static str,
     rm: &'static str,
     probe: &'static str,
@@ -55,7 +55,6 @@ const SPECTRE: Keys = Keys {
         "wave",
         "pwlperiod",
     ],
-    damp: "damp",
     gm: "gm",
     rm: "rm",
     probe: "probe",
@@ -68,7 +67,6 @@ const VACASK: Keys = Keys {
         "dc", "mag", "phase", "type", "val0", "val1", "delay", "rise", "fall", "width", "period",
         "sinedc", "ampl", "freq", "theta", "modindex", "modfreq", "tau1", "td2", "tau2", "wave",
     ],
-    damp: "theta",
     gm: "gain",
     rm: "gain",
     probe: "ctlinst",
@@ -119,6 +117,29 @@ impl<'a> Rd<'a> {
                 .map(|(k, v)| (k.clone(), self.vtext(*v)))
                 .collect()
         };
+        // A device's parameters: VACASK's `$mfactor` (N in parallel,
+        // `docs/cir-mfactor.md`) is SPICE's multiplier `m` (ngspice manual
+        // §3.3.1, §7.1, §11.1); VACASK's build of a SPICE device names an
+        // instance parameter that shares a model parameter's name
+        // `instance_<p>` (`devices/spice/bsim3v3.va`, `bsim4v8.va`
+        // headers), SPICE's `<p>`.
+        let device = |used: &[&str]| -> Vec<(String, String)> {
+            let mut v = kept(used);
+            for (k, _) in &mut v {
+                if self.b.named_rules != NamedRules::Vacask {
+                    continue;
+                }
+                if k == "$mfactor" {
+                    *k = "m".into();
+                } else if let Some(p) = k.strip_prefix("instance_") {
+                    *k = p.to_string();
+                }
+            }
+            v
+        };
+        // Whether every parameter is one of `known` (a card with no field
+        // for another would drop it).
+        let only = |known: &[&str]| p.iter().all(|(k, _)| known.contains(&k.as_str()));
         let two = || match ns.as_slice() {
             [a, b] => Some((a.clone(), b.clone())),
             _ => None,
@@ -145,7 +166,7 @@ impl<'a> Rd<'a> {
                     n2,
                     value: self.value(self.get(&p, key)?),
                     model: None,
-                    params: kept(&[key]),
+                    params: device(&[key]),
                 }
             }
             "vsource" | "isource" => {
@@ -154,7 +175,13 @@ impl<'a> Rd<'a> {
                     return None;
                 }
                 let wave = self.named_waveform(&p)?;
-                let value = self.get(&p, "dc").map_or(Val::Num(0.0), |v| self.value(v));
+                // VACASK: `dc` is `type="dc"`'s value; a waveform's DC value
+                // is its value at t = 0 (`docs/dev-builtin-src.md`; a VACASK
+                // op of `dc=5 type="pulse" val0=1` is 1).
+                let value = match (&wave, self.b.named_rules) {
+                    (Some(w), NamedRules::Vacask) => w.at_zero(),
+                    _ => self.get(&p, "dc").map_or(Val::Num(0.0), |v| self.value(v)),
+                };
                 let letter = if master == "vsource" { 'v' } else { 'i' };
                 Card::Source {
                     letter: letter.to_ascii_uppercase(),
@@ -173,6 +200,9 @@ impl<'a> Rd<'a> {
                 let [np, nm, ncp, ncm] = ns.as_slice() else {
                     return None;
                 };
+                if !only(&["gain", keys.gm]) {
+                    return None;
+                }
                 let (letter, gain) = match master.as_str() {
                     "vcvs" => ('e', num("gain")?),
                     _ => ('g', num(keys.gm)?),
@@ -186,6 +216,9 @@ impl<'a> Rd<'a> {
             }
             "cccs" | "ccvs" => {
                 let (np, nm) = two()?;
+                if !only(&["gain", keys.rm, keys.probe]) {
+                    return None;
+                }
                 // The controlling source as the name map spells its
                 // declaration (`in1` is `vin1`); none: no SPICE card.
                 let vsense = self.declared(n, &ident(keys.probe)?, &['V'])?;
@@ -201,7 +234,8 @@ impl<'a> Rd<'a> {
                 }
             }
             m if m == keys.mutual
-                && (self.b.named_rules == NamedRules::Spectre || ns.is_empty()) =>
+                && (self.b.named_rules == NamedRules::Spectre || ns.is_empty())
+                && only(&["ind1", "ind2", keys.coupling]) =>
             {
                 let refs = vec![ident("ind1")?, ident("ind2")?];
                 Card::Coupling {
@@ -260,9 +294,25 @@ impl<'a> Rd<'a> {
                     params: kept(&[]),
                 });
             }
+            // A loaded module's instance: ngspice's OSDI `N` card (manual
+            // §13: an instance of a `.model` of the module), named as read.
+            m if kind_of.as_deref().is_some_and(|k| k.starts_with(OSDI)) => Card::Semi {
+                letter: 'N',
+                name: name.to_lowercase(),
+                nodes: ns,
+                model: m.to_string(),
+                // A loaded module's own parameter names, `$mfactor` its `m`.
+                params: kept(&[])
+                    .into_iter()
+                    .map(|(k, v)| match k.as_str() {
+                        "$mfactor" => ("m".into(), v),
+                        _ => (k, v),
+                    })
+                    .collect(),
+            },
             m => {
                 let kind = kind_of.as_deref()?;
-                let (model, params) = (m.to_string(), kept(&[]));
+                let (model, params) = (m.to_string(), device(&[]));
                 let letter = match (kind, ns.len()) {
                     ("d", 2) => 'd',
                     ("npn" | "pnp", 3..=5) => 'q',
@@ -280,6 +330,15 @@ impl<'a> Rd<'a> {
                 }
             }
         })
+    }
+
+    /// A vector's element rows, each with its sign (`-1` is a `Unary` row
+    /// whose number is -1; `[CMP]` `vsource` `wave`).
+    pub(super) fn velems(&self, v: u32) -> Vec<u32> {
+        if self.tag(v) != Tag::Vector {
+            return vec![v];
+        }
+        self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec()
     }
 
     /// `name`'s SPICE spelling: the letter a writer adds back is dropped
@@ -312,10 +371,7 @@ impl<'a> Rd<'a> {
                 let p = *polarity == Some(Polarity::P);
                 if self.b.named_rules == NamedRules::Vacask {
                     let ty = polarity.map(|_| if p { -1.0 } else { 1.0 });
-                    return match vacask_kind(word, ty) {
-                        Some((kind, _)) => Some(Declared::Model(kind)),
-                        None => vacask_builtin(word).map(|b| Declared::Model(format!("={b}"))),
-                    };
+                    return Some(Declared::Model(vacask_model_kind(word, ty)));
                 }
                 let ty = p.then_some(if word == "bjt" { "pnp" } else { "p" });
                 Some(Declared::Model(spectre_kind(word, ty).0))
@@ -341,183 +397,4 @@ impl<'a> Rd<'a> {
             &SPECTRE
         }
     }
-
-    /// the old lowering's `named_waveform`.
-    fn named_waveform(&self, p: &[(String, u32)]) -> Option<Option<Wave>> {
-        let keys = self.keys();
-        let f = |k: &str| {
-            self.get(p, k)
-                .map_or(Some(Num::Num(0.0)), |v| self.irnum(v))
-        };
-        let ty = self
-            .get(p, "type")
-            .map(|t| self.text(t).trim_matches('"').to_string());
-        let fm = ty.as_deref() == Some("fm")
-            || (ty.as_deref() == Some("sine") && self.get(p, "fmmodindex").is_some());
-        let spectre_exp = self.b.named_rules == NamedRules::Spectre && ty.as_deref() == Some("exp");
-        if (fm || spectre_exp)
-            && self
-                .get(p, "delay")
-                .is_some_and(|v| self.number(v) != Some(0.0))
-        {
-            return None;
-        }
-        if ty.as_deref() != Some("pwl") && self.get(p, "pwlperiod").is_some() {
-            return None;
-        }
-        Some(Some(match ty.as_deref() {
-            None | Some("dc") => return Some(None),
-            Some("pulse") => Wave {
-                kind: WaveKind::Pulse,
-                args: vec![
-                    f("val0")?,
-                    f("val1")?,
-                    f("delay")?,
-                    f("rise")?,
-                    f("fall")?,
-                    f("width")?,
-                    f("period")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("sine") if self.get(p, "fmmodindex").is_some() => Wave {
-                kind: WaveKind::Sffm,
-                args: vec![
-                    f("sinedc")?,
-                    f("ampl")?,
-                    f("freq")?,
-                    f("fmmodindex")?,
-                    f("fmmodfreq")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("sine") => Wave {
-                kind: WaveKind::Sin,
-                args: vec![
-                    f("sinedc")?,
-                    f("ampl")?,
-                    f("freq")?,
-                    f("delay")?,
-                    f(keys.damp)?,
-                    f("sinephase")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("exp") if self.b.named_rules == NamedRules::Vacask => {
-                let n = |k: &str| self.get(p, k).map_or(Some(0.0), |v| self.number(v));
-                Wave {
-                    kind: WaveKind::Exp,
-                    args: vec![
-                        f("val0")?,
-                        f("val1")?,
-                        Num::Num(n("delay")?),
-                        f("tau1")?,
-                        Num::Num(n("delay")? + n("td2")?),
-                        f("tau2")?,
-                    ],
-                    repeat: None,
-                    delay: None,
-                    cut: false,
-                }
-            }
-            Some("exp") => Wave {
-                kind: WaveKind::Exp,
-                args: vec![
-                    f("val0")?,
-                    f("val1")?,
-                    f("td1")?,
-                    f("tau1")?,
-                    f("td2")?,
-                    f("tau2")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("fm") => Wave {
-                kind: WaveKind::Sffm,
-                args: vec![
-                    f("sinedc")?,
-                    f("ampl")?,
-                    f("freq")?,
-                    f("modindex")?,
-                    f("modfreq")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("am") => Wave {
-                kind: WaveKind::Am,
-                args: vec![
-                    f("ampl")?,
-                    f("sinedc")?,
-                    f("modfreq")?,
-                    f("freq")?,
-                    f("delay")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
-            Some("pwl") if self.b.named_rules == NamedRules::Spectre => {
-                let w = self.get(p, "wave")?;
-                let xs: Vec<Num> = self
-                    .velems(w)
-                    .into_iter()
-                    .map(|x| self.irnum(x))
-                    .collect::<Option<_>>()?;
-                if !xs.len().is_multiple_of(2) {
-                    return None;
-                }
-                let repeat = match self.get(p, "pwlperiod") {
-                    Some(v) if pwl_period(&xs)? == self.number(v)? => Some(Num::Num(0.0)),
-                    Some(_) => return None,
-                    None => None,
-                };
-                let delay = match self.get(p, "delay") {
-                    Some(v) => Some(self.irnum(v)?).filter(|d| *d != Num::Num(0.0)),
-                    None => None,
-                };
-                Wave {
-                    kind: WaveKind::Pwl,
-                    args: xs,
-                    repeat,
-                    delay,
-                    cut: false,
-                }
-            }
-            Some(_) => return None,
-        }))
-    }
-
-    /// A vector's element rows, each with its sign (`-1` is a `Unary` row
-    /// whose number is -1; `[CMP]` `vsource` `wave`).
-    fn velems(&self, v: u32) -> Vec<u32> {
-        if self.tag(v) != Tag::Vector {
-            return vec![v];
-        }
-        self.ast.list(self.ast.rhs(Node(v)) + 1).to_vec()
-    }
-}
-
-/// The Spectre `pwlperiod` that repeats PWL points `xs` (time, value flat)
-/// exactly as ngspice's `r=0` does, when one does: numeric points from
-/// t = 0 whose last value equals the first, the last segment at least the
-/// default `twidth` (period/1000) long (Spectre Reference 5.0, `vsource`
-/// #17, #18, p.686). `None` otherwise.
-fn pwl_period(xs: &[Num]) -> Option<f64> {
-    let n = xs.len();
-    if n < 4 {
-        return None;
-    }
-    let (t0, v0) = (xs[0].num()?, xs[1].num()?);
-    let (tp, tn, vn) = (xs[n - 4].num()?, xs[n - 2].num()?, xs[n - 1].num()?);
-    (t0 == 0.0 && vn == v0 && tn > 0.0 && tn - tp >= tn / 1000.0).then_some(tn)
 }

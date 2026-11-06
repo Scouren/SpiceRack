@@ -961,6 +961,31 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   definition file, the `O` and `P` device rows `Devices::LossyLine` and
   `Devices::XycePort`; the Python enums, `builtin_dialects.py` and the
   pinned dumps follow.
+- **Merge of p7-integrate 9fb1535** (streams F, C and A round 2): its
+  new identity checks are declared properties, no new behaviour enum
+  needed. The VACASK reader's checks (`== Dialect::Vacask`,
+  `!= Dialect::Spectre` in `read::named`, `named_blocks`,
+  `named_elements`, the new `named_waves` and `named_control`, the kept
+  text's `text_dialect`) read `named_rules`; a source read with ngspice's
+  model meaning (C/L `IC=` without `uic` noted W0112, the parameters a
+  VACASK module lacks, W0129) reads `model_semantics`; an LTspice
+  source's parasitics on the named targets read `card_rules`; a Spectre
+  source's own include in a subcircuit (else W0128) reads `named_rules`;
+  the writers' "is the target VACASK / CDL" read `writer`; Xyce's
+  `.options` packages read `options_form`; the W0121 refusal (a loaded
+  module named as an ngspice built-in device) is asked by a target whose
+  loads are `LoadForm::Ngspice`. Its two constructs (`VacaskScript`,
+  `OsdiInstance`) are cells in every definition file; the VACASK script
+  lines are left out where the target's `VacaskScript` cell is an `Omit`
+  (was "unless CDL" / "unless VACASK"). `capability::action` stays
+  deleted (`ngspice_device` and its table stay). `diag.rs` passed 500
+  lines and is `diag/mod.rs` (the catalogue) and `diag/messages.rs`;
+  the named writer's `statistics` block moved to `named/statistics.rs`.
+  Python enums follow from the Rust lists; `builtin_dialects.py` and the
+  pinned dumps gained the two cells.
+- Named gap, **a `Kit` holding a plugin**: `resolve::Kit` (`Kit::load(.., dialect: Dialect, ..)`, `Kit::dialect`)
+  keeps its `Dialect`, so a kit's files are read and
+  written only in a built-in dialect; a plugin kit is not supported.
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).

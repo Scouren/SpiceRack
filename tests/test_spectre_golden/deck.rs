@@ -179,3 +179,14 @@ fn a_saved_subcircuit_node_keeps_its_hierarchy() {
         spicerack::syntax::render::render_text(deck, Dialect::Xyce, "t", Dialect::Spectre).unwrap();
     assert!(w.text.contains("\nsave x1.n\n"), "{}", w.text);
 }
+
+/// ngspice §2.7 scopes a `.lib` read inside a `.subckt` to it
+/// (`lib-processing/ex1b.sp`: 1.0 V on ngspice; the file left out, the
+/// top's `inner` gives 1.3333 V). `[REF]` pp.533-535 has no clause on an
+/// `include` in a `subckt` body: refused (W0128), never dropped.
+#[test]
+fn a_file_read_inside_a_subcircuit_is_refused() {
+    let deck = "t\nX1 9 0 sub1\n.subckt sub1 n1 n2\n.lib inner.lib res\nX1 n1 n2 inner\n.ends\n\
+                .subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n";
+    assert_eq!(spectre(deck).unwrap_err(), [Code::W0128]);
+}

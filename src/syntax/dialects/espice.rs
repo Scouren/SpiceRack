@@ -33,6 +33,7 @@ pub(super) fn espice() -> DialectDef {
         // The capability cells it answers otherwise than ngspice.
         .spell(Construct::VerilogALoad, Alt::Hdl)
         .refuse(Construct::OsdiLoad, Code::W0004)
+        .refuse(Construct::OsdiInstance, Code::W0004)
         .omit(Construct::NgBehavior, Code::W0030)
         .lift(Construct::Laplace, Rule::LaplaceTable)
         .native(Construct::PwlRepeatI)

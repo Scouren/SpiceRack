@@ -1,4 +1,4 @@
-//! What VACASK cannot do (measures, PWL, behavioural sources, switches,
+//! What VACASK cannot do (measures, a PWL repeat, behavioural sources, switches,
 //! transmission lines, XSPICE, ...) -> a refusal code, never a broken deck.
 //!
 //! Cites: real VACASK, for what it refuses or runs wrong.
@@ -20,8 +20,12 @@ fn refusals_are_errors_not_broken_decks() {
         "measures must refuse"
     );
 
-    // PWL parses and then returns an identically-zero transient.
-    assert!(refuses(&with("V1 a 0 0 PWL(0 0 1m 1)")), "PWL must refuse");
+    // A PWL repeat (`r=`): VACASK's `period` repeats from time 0 and wants
+    // the last value equal to the first (`docs/dev-builtin-src.md`, PWL).
+    assert!(
+        refuses(&with("V1 a 0 PWL(0 0 1m 1) r=0")),
+        "PWL r= must refuse"
+    );
 
     // No behavioural sources, switches, transmission lines or XSPICE; a SIN
     // phase VACASK accepts and then ignores.

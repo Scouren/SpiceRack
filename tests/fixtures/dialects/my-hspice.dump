@@ -58,10 +58,12 @@ cell.ForeignText Refuse(W0001)
 cell.PrivateText Refuse(W0039)
 cell.XyceSens Refuse(W0015)
 cell.HspiceAnalysis Native
+cell.VacaskScript Spell(Omit(W0120))
 cell.CaretReread Refuse(W0002)
 cell.StatisticalCall Native
 cell.VerilogALoad Spell(Hdl)
 cell.OsdiLoad Refuse(W0004)
+cell.OsdiInstance Refuse(W0004)
 cell.LibWholeFile Spell(Include)
 cell.NgBehavior Spell(Omit(W0030))
 cell.LibSection Native

@@ -284,8 +284,10 @@ impl W<'_, '_> {
                 params,
                 ..
             } => {
-                if letter == 'O' {
-                    self.ask(Construct::LossyLine, tok);
+                // An `O` (LTRA) line, an `N` (OSDI) instance.
+                let asked = [('O', Construct::LossyLine), ('N', Construct::OsdiInstance)];
+                if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
+                    self.ask(c, tok);
                 }
                 format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
             }

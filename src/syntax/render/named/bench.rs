@@ -56,8 +56,10 @@ pub(super) struct Tb {
     pub(super) steps: Vec<Step>,
     /// Each list `.step`'s name, values and first token.
     pub(super) step_lists: Vec<(String, Vec<f64>, u32)>,
-    /// VACASK control lines kept as text.
-    pub(super) extra: Vec<String>,
+    /// VACASK control statements kept as text.
+    pub(super) extra: Vec<u32>,
+    /// Each VACASK `save` naming a module's output variable (not written).
+    pub(super) unsaved: Vec<u32>,
 }
 
 /// A `.step`: its sweep keyword, parameter, start, stop and step, and its
@@ -184,8 +186,11 @@ impl W<'_, '_> {
             self.line(&body);
             self.line("simulator lang=spectre");
         }
-        for l in &tb.extra {
-            self.line(l);
+        // A VACASK control statement: a script line left out, any other
+        // refused (no Spectre statement says it).
+        for &n in &tb.extra {
+            let tok = self.rd.main(n);
+            self.ask(self.rd.kept_construct(tok), tok);
         }
         self.line("");
         let mut block: Vec<String> = Vec::new();
@@ -267,6 +272,9 @@ impl W<'_, '_> {
         for &tok in &tb.xyce {
             self.note(Code::W0024, tok);
         }
+        for &tok in &tb.unsaved {
+            self.note(Code::W0023, tok);
+        }
         for &tok in &tb.ngbehavior {
             self.ask(Construct::NgBehavior, tok);
         }
@@ -343,7 +351,16 @@ impl W<'_, '_> {
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
                     BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
-                    BenchCard::Extra(l) => tb.extra.push(l),
+                    // A VACASK `save` is a save list (VACASK's own writer
+                    // copies the statement).
+                    BenchCard::Extra(n) => match self.rd.vacask_saves(n) {
+                        Some((s, dropped)) if self.b.writer != Writer::Vacask => {
+                            tb.save_tok.get_or_insert(self.rd.main(n));
+                            tb.saves.extend(s);
+                            tb.unsaved.extend(dropped.then(|| self.rd.main(n)));
+                        }
+                        _ => tb.extra.push(n),
+                    },
                 }
             }
         }

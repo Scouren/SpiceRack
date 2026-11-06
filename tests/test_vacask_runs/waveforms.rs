@@ -49,3 +49,69 @@ fn a_pulse_train_runs() {
     close(at(2.5e-4), 0.0, 1e-3); // after the fall
     close(at(3.5e-4), 1.0, 1e-3); // second period
 }
+
+#[test]
+fn a_waveform_sources_dc_value_drives_the_dc_analyses() {
+    // ngspice-45 (run by hand: "dc value used for op instead of transient
+    // time=0 value") gives the op and every `.dc` point the card's DC value
+    // and starts `.tran` at the waveform's time-zero value. VACASK's source
+    // computes its waveform's in every analysis (`lib/devvisrc.cpp`
+    // `sourceCompute`), so a `dc=` beside `type="pulse"` and a sweep of it
+    // did nothing (rca3040: v(1) 0, not -0.25 V).
+    let deck = "t\nV1 a 0 dc 1 pulse(2 5 1n 1n 1n 10n 20n)\nR1 a 0 1k\n\
+                Vin b 0 sin(0 0.1 50meg)\nR2 b 0 1k\n.op\n.dc vin -0.25 0.25 0.25\n\
+                .tran 1n 2n\n.end\n";
+    let netlist = emit(deck).unwrap();
+    let plots = Dialect::Vacask
+        .run_all(&netlist)
+        .unwrap_or_else(|e| panic!("{e}\n{netlist}"));
+    close(col(&plots[0], "a")[0], 1.0, 1e-9);
+    let b = col(&plots[1], "b");
+    for (v, want) in b.iter().zip([-0.25, 0.0, 0.25]) {
+        assert!((v - want).abs() <= 1e-9, "dc b {v}, want {want}\n{netlist}");
+    }
+    close(col(&plots[2], "a")[0], 2.0, 1e-9);
+}
+
+/// The raw column `name` at time `t`, read off the transient's samples by
+/// linear interpolation (a PWL is linear between its points, which VACASK
+/// keeps as breakpoints).
+fn at(raw: &RawData, name: &str, t: f64) -> f64 {
+    let (time, v) = (col(raw, "time"), col(raw, name));
+    let k = time.iter().position(|&x| x >= t).expect("t inside the run");
+    if k == 0 || time[k] == t {
+        return v[k];
+    }
+    let f = (t - time[k - 1]) / (time[k] - time[k - 1]);
+    v[k - 1] + f * (v[k] - v[k - 1])
+}
+
+#[test]
+fn a_pwl_source_runs_with_its_delay() {
+    // Upstream VACASK evaluates `type="pwl"` (`lib/devvisrc.cpp` L910,
+    // 36be560); the pinned fork ran it as 0 V. ngspice manual §4.1.4: the
+    // value held before the first point and after the last, linear
+    // between, all shifted by `td`.
+    let deck =
+        |td: &str| format!("t\nV1 a 0 PWL(0 0 1m 1 2m 0.5){td}\nR1 a 0 1k\n.tran 10u 3m\n.end\n");
+    let raw = run(&deck(""));
+    for (t, want) in [(0.5e-3, 0.5), (1e-3, 1.0), (1.5e-3, 0.75), (2.5e-3, 0.5)] {
+        close(at(&raw, "a", t), want, 1e-9);
+    }
+    let raw = run(&deck(" td=0.5m"));
+    for (t, want) in [(0.25e-3, 0.0), (1e-3, 0.5), (1.5e-3, 1.0), (2e-3, 0.75)] {
+        close(at(&raw, "a", t), want, 1e-9);
+    }
+}
+
+#[test]
+fn a_whole_pwl_repeat_is_its_period() {
+    // ngspice `r=0` repeats the points from time 0 (manual §4.1.4); with
+    // the last value the first that is VACASK's `period` (the last point
+    // dropped, `docs/dev-builtin-src.md`). A triangle of period 2 ms.
+    let deck = "t\nV1 a 0 PWL(0 0 1m 1 2m 0) r=0\nR1 a 0 1k\n.tran 10u 5m\n.end\n";
+    let raw = run(deck);
+    for (t, want) in [(2.5e-3, 0.5), (3e-3, 1.0), (4.5e-3, 0.5)] {
+        close(at(&raw, "a", t), want, 1e-9);
+    }
+}

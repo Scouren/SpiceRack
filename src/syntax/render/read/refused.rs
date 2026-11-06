@@ -13,7 +13,7 @@
 
 use super::{Kept, Rd};
 use crate::syntax::ast::{Node, Tag};
-use crate::syntax::behaviour::CardRules;
+use crate::syntax::behaviour::{CardRules, NamedRules};
 use crate::syntax::render::capability::Construct;
 use crate::syntax::token::Tag as T;
 
@@ -284,6 +284,12 @@ impl Rd<'_> {
             "powergridbusshunt",
             "powergridtransformer",
         ];
+        if self.text_behaviours(tok).named_rules == NamedRules::Vacask {
+            return match self.vacask_script(tok) {
+                true => Construct::VacaskScript,
+                false => Construct::ForeignText,
+            };
+        }
         let w = self.t.text(tok).to_ascii_lowercase();
         if self.text_behaviours(tok).card_rules == CardRules::Hspice {
             return match w.as_str() {

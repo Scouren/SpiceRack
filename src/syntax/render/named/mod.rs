@@ -9,7 +9,7 @@
 //! `checks` the deck-wide refusals (both targets'), `lift` the Monte Carlo
 //! rules (Spectre's `Lift(RackVars)`, VACASK's `Lift(VacaskCalls)`: fixups
 //! over `Call` nodes) and `sites` the expressions they walk, `vacask` the
-//! VACASK spine and its blocks and models, `vacask_cards` its instances,
+//! VACASK spine and its blocks, `vacask_models` its models, `vacask_cards` its instances,
 //! `vacask_bench` its `control` block. The two share the reader's plan, the checks, the
 //! testbench fold and the lift's walk; their decks differ around them.
 //!
@@ -31,11 +31,14 @@ mod cards;
 mod checks;
 mod lift;
 mod params;
+mod parasitics;
 mod sites;
 mod sources;
+mod statistics;
 mod vacask;
 mod vacask_bench;
 mod vacask_cards;
+mod vacask_models;
 
 use super::capability::{Action, Alt, Construct, Rule};
 use super::draws::{self, Draws, Layers};
@@ -46,7 +49,7 @@ use super::role::{self, Frame};
 use super::spelling::Spelling;
 use crate::syntax::Lang;
 use crate::syntax::ast::NONE;
-use crate::syntax::behaviour::{Behaviours, Writer};
+use crate::syntax::behaviour::{Behaviours, NamedRules, Writer};
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
 use crate::syntax::resolve::Role;
@@ -322,68 +325,6 @@ impl W<'_, '_> {
         s
     }
 
-    /// `statistics { … }`: block `b`'s, then the lift's for the top or
-    /// section `at` (`[REF]` pp.175-179), one statement a line.
-    fn statistics(&mut self, b: &Block, at: Option<usize>) {
-        for &st in &b.statistics {
-            let s = self.rd.statistics(st);
-            self.stat_block(&s);
-        }
-        if let Some(s) = self.lifted.block_at(at) {
-            self.stat_block(&s);
-        }
-    }
-
-    fn stat_block(&mut self, st: &super::read::Stats) {
-        self.line("statistics {");
-        self.o.indent();
-        self.o.indent();
-        let scopes = [
-            ("process", &st.process, &st.truncate[1]),
-            ("mismatch", &st.mismatch, &st.truncate[2]),
-        ];
-        for (name, varies, t) in scopes {
-            if varies.is_empty() && t.is_none() {
-                continue;
-            }
-            self.line(&format!("{name} {{"));
-            self.o.indent();
-            self.o.indent();
-            for x in varies {
-                let key = if x.dist == "unif" { "N" } else { "std" };
-                let pct = if x.percent { " percent=yes" } else { "" };
-                let spread = self.value_text(&x.spread);
-                self.line(&format!(
-                    "vary {} dist={} {key}={spread}{pct}",
-                    x.param, x.dist
-                ));
-            }
-            if let Some(t) = t {
-                self.line(&format!("truncate tr={}", self.value_text(t)));
-            }
-            self.o.dedent();
-            self.o.dedent();
-            self.line("}");
-        }
-        for (params, devices, cc) in &st.correlations {
-            let mut s = String::from("correlate");
-            if !devices.is_empty() {
-                s.push_str(&format!(" dev=[{}]", devices.join(" ")));
-            }
-            if !params.is_empty() {
-                s.push_str(&format!(" param=[{}]", params.join(" ")));
-            }
-            s.push_str(&format!(" cc={}", self.value_text(cc)));
-            self.line(&s);
-        }
-        if let Some(t) = &st.truncate[0] {
-            self.line(&format!("truncate tr={}", self.value_text(t)));
-        }
-        self.o.dedent();
-        self.o.dedent();
-        self.line("}");
-    }
-
     /// `subckt name (ports)` … `ends name` (`[REF]` pp.533-535), an empty
     /// body one blank line.
     fn subckt(&mut self, sc: &Block) {
@@ -396,6 +337,15 @@ impl W<'_, '_> {
         self.line(&format!("subckt {name} ({})", ports.join(" ")));
         if empty(sc) && head.params.is_empty() {
             self.line("");
+        }
+        // A Spectre deck's own include in a subckt is Spectre's; another
+        // dialect's file read there has no clause here saying Spectre
+        // scopes it (ngspice §2.7 does), so it is refused, not dropped.
+        let first = sc.includes.first().or(sc.libs.first());
+        match (self.rd.b.named_rules == NamedRules::Spectre, first) {
+            (true, _) => self.file_cards(sc),
+            (false, Some(&n)) => self.refuse(Code::W0128, self.rd.main(n)),
+            (false, None) => {}
         }
         self.body(sc, None);
         self.line(&format!("ends {name}"));
@@ -470,9 +420,18 @@ impl W<'_, '_> {
         }
     }
 
-    /// The text a block keeps, a line each.
+    /// The text a block keeps, a line each; off VACASK, a VACASK script
+    /// line (`Rd::vacask_script`, noted by `checks`) is left out.
     fn kept(&mut self, raw: &[Raw]) {
         for &r in raw {
+            let (Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) = r;
+            let omit = matches!(
+                self.cells[Construct::VacaskScript as usize],
+                Action::Spell(Alt::Omit(_))
+            );
+            if omit && self.rd.vacask_script(self.rd.main(n)) {
+                continue;
+            }
             match r {
                 Raw::Line(n) => {
                     let l = self.rd.line(n);
@@ -548,9 +507,10 @@ impl W<'_, '_> {
         }
     }
 
-    /// A number in Spectre's suffixes (`[KUN]` Table B.1: `M` is mega).
+    /// A number in Spectre's suffixes (`[KUN]` Table B.1: `M` is mega),
+    /// in the fewest digits ([`super::spelling::shortest`]).
     fn num(&self, v: f64) -> String {
-        self.sp.format(v)
+        super::spelling::shortest(v, self.sp.format(v), "M")
     }
 
     /// A value kept as SPICE text, in Spectre's spelling: without its
