@@ -7294,3 +7294,31 @@ spice-bench/ngspice/tests/vbic/noise_scale_test.sp xyce written: its options map
 spice-bench/ngspice/tests/vbic/temp.sp xyce written: its options map to Xyce packages or are left out (W0024), no longer refused W0017
 spice-bench/postlayout/tdc_sky130.sp xyce written: its options map to Xyce packages or are left out (W0024), no longer refused W0017
 spice-bench/powergrid/ibmpg1t.sp xyce written: its options map to Xyce packages or are left out (W0024), no longer refused W0017
+
+# Phase 7: spice-write: VACASK control lines (FINDINGS-A, S-class). A VACASK
+# `control` line the reader kept as text is no longer copied as a card onto
+# the SPICE targets and CDL (`abort always` was an A element to ngspice):
+# `abort`, `print`, `postprocess` steer only the script (VACASK
+# simulator/cmd.cpp) and are left out (W0025), `save` too (W0023); `elaborate`,
+# `alter`, `var`, `clear` change what runs and are refused W0001 (CDL leaves
+# them out, W0028).
+vacask/benchmark/graetz/vacask/debug_graetz.sim cdl its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/benchmark/graetz/vacask/debug_graetz.sim espice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/benchmark/graetz/vacask/debug_graetz.sim hspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/benchmark/graetz/vacask/debug_graetz.sim ltspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/benchmark/graetz/vacask/debug_graetz.sim ngspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/benchmark/graetz/vacask/debug_graetz.sim xyce its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/parser.sim cdl its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/parser.sim espice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/parser.sim hspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/parser.sim ltspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/parser.sim ngspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/parser.sim xyce its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/sipfx.sim cdl its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/sipfx.sim espice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/sipfx.sim hspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/sipfx.sim ltspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/sipfx.sim ngspice its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/rpn/sipfx.sim xyce its VACASK abort/print lines are left out (W0025), no longer copied as cards
+vacask/demo/hierarchy/hier.sim cdl its VACASK elaborate/print lines are left out, no longer copied
+vacask/demo/hierarchy/hier.sim ngspice refused W0001: `elaborate circuit("sub1")` changes the top (was copied as a card)

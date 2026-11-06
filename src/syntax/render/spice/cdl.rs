@@ -1,8 +1,7 @@
 //! The deck → CDL in the xschem layout: the SPICE writer's CDL row. Each
 //! block (the top, then each subcircuit) is one `.SUBCKT … .ENDS` around
 //! its elements, each an ngspice card ([`W::card`]), sorted by element
-//! name; then the deck's VACASK control text, a comment per Verilog-A load,
-//! the top's models, `.END`. A schematic tool's LVS netlist: no analyses,
+//! name; then a comment per Verilog-A load, the top's models, `.END`. A schematic tool's LVS netlist: no analyses,
 //! sections, branches, includes or text kept as the source's are written,
 //! each noted (`W0028`).
 //!
@@ -34,9 +33,7 @@ impl W<'_, '_> {
         self.o.token(&format!("* {}", deck.top.name), Space::Line);
         self.cdl_block(&deck.top, true);
         let extra = self.fold().extra;
-        for l in &extra {
-            self.o.token(l, Space::Line);
-        }
+        self.vacask_lines(&extra);
         for sc in &deck.defs {
             self.cdl_block(sc, false);
         }

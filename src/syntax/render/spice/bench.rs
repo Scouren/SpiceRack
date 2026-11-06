@@ -8,12 +8,14 @@
 //! (`.meas`), §15.4.2 (`.four`, the `fourier` command), §17.5 (`-b -r`:
 //! "No .measure possible in batch mode"); HSPICE `.probe`, `.option post`,
 //! `.option delmax`, `START=`; Xyce RG pp.96-104 (`.options <pkg>`), p.155
-//! (`.step`), Table 6-1; LTspice help (`.step param`, no `.print`).
+//! (`.step`), Table 6-1; LTspice help (`.step param`, no `.print`); VACASK
+//! `simulator/cmd.cpp` (the `control` commands).
 //!
 //! Contents:
 //! - `fn is_four(line: &str) -> bool`, `fn is_continuation(line: &str) -> bool`
 //! - `pub(super) struct Tb`, `W::fold(&self) -> Tb`
 //! - `W::control_run(&self) -> Option<Vec<String>>`, `W::bench(&mut self, control: Option<&[String]>)`, `W::runs(&self) -> bool`
+//! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
 
 use super::W;
 use crate::syntax::Dialect;
@@ -46,8 +48,9 @@ pub(super) struct Tb {
     measures: Vec<String>,
     /// Each `.step`'s sweep, name, numbers and first token.
     steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
-    /// VACASK control lines kept as text.
-    pub(super) extra: Vec<String>,
+    /// VACASK control lines kept as text, with their statement's first
+    /// token: none is written (`W::vacask_lines`).
+    pub(super) extra: Vec<(String, u32)>,
     /// `ngbehavior=`'s mode, with its statement's first token.
     pub(super) ngbehavior: Option<(String, u32)>,
 }
@@ -87,7 +90,6 @@ impl W<'_, '_> {
         for b in self.deck.defs.iter().chain(std::iter::once(&self.deck.top)) {
             lines.extend(self.raw_lines(&b.raw));
         }
-        lines.extend(tb.extra.iter().cloned());
         let raw = || lines.iter().map(String::as_str);
         let mut fourier = fourier_commands(raw());
         for (a, _) in &tb.analyses {
@@ -210,7 +212,7 @@ impl W<'_, '_> {
             };
             self.o.token(&line, Space::Line);
         }
-        self.write_raw(&tb.extra);
+        self.vacask_lines(&tb.extra);
         match control {
             Some(fourier) => {
                 // `fourier` reads the current plot: it follows the first
@@ -243,12 +245,30 @@ impl W<'_, '_> {
             }
         }
     }
+
+    /// VACASK control lines the reader kept as text (VACASK
+    /// `simulator/cmd.cpp`): `abort`, `print` and `postprocess` steer the
+    /// script and `save` the outputs, so each is left out (W0025, W0023);
+    /// another (`alter`, `var`, `clear`, `elaborate`, an analysis kept as
+    /// text) changes what runs and is refused as VACASK's text.
+    pub(super) fn vacask_lines(&mut self, lines: &[(String, u32)]) {
+        for (l, tok) in lines {
+            let head = l.split(|c: char| c.is_whitespace() || c == '(').next();
+            match head.unwrap_or("") {
+                "abort" | "print" | "postprocess" => self.note(Code::W0025, *tok),
+                "save" => self.note(Code::W0023, *tok),
+                _ => {
+                    self.ask(Construct::ForeignText, *tok);
+                }
+            }
+        }
+    }
 }
 
 // ---- private ----
 
 impl W<'_, '_> {
-    /// `tb`'s outputs (saves, prints, measures, the text kept) with each
+    /// `tb`'s outputs (saves, prints, measures) with each
     /// `i(name)` of a renamed element spelled as its declaration
     /// (`names::Names::refs`); the testbench is the top's.
     fn respell_refs(&self, tb: &mut Tb) {
@@ -256,7 +276,6 @@ impl W<'_, '_> {
         let refs = |v: &mut Vec<String>| v.iter_mut().for_each(|s| *s = self.names.refs(top, s));
         refs(&mut tb.saves);
         refs(&mut tb.measures);
-        refs(&mut tb.extra);
         tb.prints.iter_mut().for_each(|(_, outs, _)| refs(outs));
     }
 
@@ -295,7 +314,7 @@ impl W<'_, '_> {
             BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
             BenchCard::Print(k, outs) => tb.prints.push((k, outs, tok)),
             BenchCard::Meas(m) => tb.measures.push(m),
-            BenchCard::Extra(l) => tb.extra.push(l),
+            BenchCard::Extra(l) => tb.extra.push((l, tok)),
         }
     }
 
