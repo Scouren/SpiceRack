@@ -79,13 +79,15 @@ impl<'a> Rd<'a> {
         let p = self.pairs(n);
         let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
         let s = |k: &str| self.get(&p, k).map(|v| self.text(v));
+        // `[REF]` p.43: `lin=` and `log=` count steps, so a point more than
+        // the IR's total; `dec=` counts points per decade.
         let sweep = || -> Option<Sweep> {
-            let (variation, points) = ["dec", "lin", "log"]
+            let (variation, n) = ["dec", "lin", "log"]
                 .into_iter()
                 .find_map(|v| num(v).map(|x| (v, x as u32)))?;
             Some(Sweep {
                 variation,
-                points,
+                points: n.saturating_add(u32::from(variation != "dec")),
                 start: num("start")?,
                 stop: num("stop")?,
             })

@@ -229,16 +229,20 @@ impl W<'_, '_> {
         })
     }
 
-    /// `start=1 stop=1M dec=10`: a sweep's interval. Spectre has no `oct`
-    /// (`[REF]` p.43):
+    /// `start=1 stop=1M dec=10`: a sweep's interval. `lin=` and `log=`
+    /// count steps, one fewer than the points (`[REF]` p.43), so one point
+    /// is `values=[start]`. Spectre has no `oct` (`[REF]` p.43):
     /// its points are `values=[…]`, ngspice's grid (`acan.c`: `f *=
     /// 2^(1/n)` from `start` while `f <= stop + 2^(1/n)*stop*reltol`).
     // ponytail: reltol is ngspice's default 1e-3, not the deck's; it moves
     // only whether a point a hair past `stop` is kept.
     fn points(&mut self, sw: &Sweep, tok: u32) -> Option<String> {
-        if sw.variation != "oct" {
-            let (a, b) = (self.num(sw.start), self.num(sw.stop));
-            return Some(format!("start={a} stop={b} {}={}", sw.variation, sw.points));
+        let (a, b) = (self.num(sw.start), self.num(sw.stop));
+        match (sw.variation, sw.points) {
+            ("oct", _) => {}
+            ("dec", n) => return Some(format!("start={a} stop={b} dec={n}")),
+            (_, 1) => return Some(format!("values=[{a}]")),
+            (v, n) => return Some(format!("start={a} stop={b} {v}={}", n.saturating_sub(1))),
         }
         let delta = 2f64.powf(1.0 / f64::from(sw.points));
         let end = sw.stop + delta * sw.stop * 1e-3;

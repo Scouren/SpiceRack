@@ -22,6 +22,7 @@
 //!   `Analysis::fourier_count(&self, d: Dialect) -> Result<Option<Vec<String>>, String>`,
 //!   `Analysis::spectre(&self) -> Result<String, String>`
 //! - `pub(super) fn nfreqs(analyses: &[Analysis]) -> Result<Option<String>, String>`
+//! - `pub(super) fn snum(v: f64) -> String`
 //! - `pub(super) struct DcSweep`, `pub(super) struct FreqSweep`, `pub(super) struct PssBase`
 
 use std::fmt::Write as _;
@@ -328,8 +329,8 @@ impl Analysis {
         })
     }
 
-    /// Whether a frequency sweep of the analysis is Spectre's `log=N` (N
-    /// points in total): no SPICE target, nor VACASK, has that spacing
+    /// Whether a frequency sweep of the analysis is log-spaced over N points
+    /// in total (Spectre's `log=`): no SPICE target, nor VACASK, has that spacing
     /// (ngspice manual §11.3.1, `.ac dec|oct|lin`).
     pub(super) fn log_sweep(&self) -> bool {
         let f = match self {
@@ -425,16 +426,7 @@ impl Analysis {
             let (f, t) = (snum(p.fundamental), snum(p.stabilization));
             format!("pss1 pss fund={f} tstab={t} harms={}\n", p.harmonics)
         };
-        let range = |f: &FreqSweep| -> Result<String, String> {
-            let (a, b) = (snum(f.start), snum(f.stop));
-            match f.variation {
-                Sweep::Oct => Err(
-                    "frequency sweep type 'oct' (Spectre accepts only dec/lin/log, see spectre -h ac)"
-                        .into(),
-                ),
-                v => Ok(format!("start={a} stop={b} {}={}", v.name(), f.points)),
-            }
-        };
+        let range = super::spectre::range;
         Ok(match self {
             // `[REF]` p.272-274: `fund` (#2), `harms` (#4), `tstab` (#6), and
             // for an autonomous circuit the observed node as the terminals;
@@ -583,15 +575,9 @@ pub(super) fn nfreqs(analyses: &[Analysis]) -> Result<Option<String>, String> {
     }
 }
 
-// ---- private ----
-
-fn w(s: &mut String, args: std::fmt::Arguments<'_>) {
-    s.write_fmt(args).expect("a String takes any write");
-}
-
 /// A number in Spectre's scale factors (`M` mega, `G`, `T`), which differ
 /// from SPICE's `meg`, `g`, `t`.
-fn snum(v: f64) -> String {
+pub(super) fn snum(v: f64) -> String {
     let s = crate::unit::format_spice_number(v);
     for (spice, spectre) in [("meg", "M"), ("g", "G"), ("t", "T")] {
         if let Some(head) = s.strip_suffix(spice) {
@@ -599,6 +585,12 @@ fn snum(v: f64) -> String {
         }
     }
     s
+}
+
+// ---- private ----
+
+fn w(s: &mut String, args: std::fmt::Arguments<'_>) {
+    s.write_fmt(args).expect("a String takes any write");
 }
 
 /// A SPICE signal (`V(out)`) as the bare node Spectre names.
