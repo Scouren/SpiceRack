@@ -31899,7 +31899,7 @@ vacask/benchmark/vadistiller/mul/vacask/runme.sim ltspice now written: its VACAS
 vacask/benchmark/vadistiller/mul/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
 vacask/benchmark/vadistiller/mul/vacask/runme.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
 vacask/benchmark/vadistiller/mul/vacask/runme.sim xyce now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
-vacask/demo/hierarchy/hier.sim spectre now refused W0001: a VACASK control command with a circuit meaning (elaborate), was copied as a card line
+vacask/demo/hierarchy/hier.sim spectre now refused W0001: a VACASK control command with a circuit meaning (elaborate), was copied as a card line; and (named-write-r2) refused W0004: its load "resistor.osdi" is a compiled OSDI binary, which ahdl_include does not read
 vacask/demo/rpn/parser.sim spectre its VACASK script lines (abort, print) left out W0120, were copied as card lines
 vacask/demo/rpn/sipfx.sim spectre its VACASK script lines (abort, print) left out W0120, were copied as card lines
 vacask/demo/spice/bsim3v3nqs.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
@@ -32117,7 +32117,7 @@ vacask/test/test_optpar.sim xyce now written: its VACASK temp sweep as .dc temp;
 # `spice/<m>.osdi` load of a module with no mapped kind (sp_jfet2) is kept.
 # VACASK and Spectre write the model and instance in their own spelling,
 # the instance named as read; CDL writes the N card.
-pdk-vacask/demo/cmos180n.lib vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+pdk-vacask/demo/cmos180n.lib vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text); and (named-write-r2) a library: no title line and no control block (V3b)
 vacask/demo/limiting/builtin.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/demo/limiting/custom.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/demo/natures/ddt.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
@@ -32314,7 +32314,6 @@ pdk-sky130A/libs.tech/combined/rescap/sky130_fd_pr__model__cap_vpp_only_pq.model
 pdk-sky130A/libs.tech/combined/sky130.lib.spice vacask a library: no title line and no control block (V3b)
 pdk-sky130A/libs.tech/combined/sonos_e/begin_of_life/mm.spice vacask a library: no title line and no control block (V3b)
 pdk-sky130A/libs.tech/combined/sonos_p/begin_of_life/mm.spice vacask a library: no title line and no control block (V3b)
-pdk-vacask/demo/cmos180n.lib vacask a library: no title line and no control block (V3b)
 spice-bench/ngspice/examples/snapshot/adder_mos.sp vacask a library: no title line and no control block (V3b)
 vacask/benchmark/graetz/gnucap/runme.sim vacask a library: no title line and no control block (V3b)
 vacask/benchmark/mul/gnucap/runme.sim vacask a library: no title line and no control block (V3b)
@@ -32507,4 +32506,3 @@ xyce/VERILOGPLUGIN/Issue398.cir vacask a library: no title line and no control b
 xyce/VERILOGPLUGIN/Issue399.cir vacask a library: no title line and no control block (V3b)
 xyce/YACC/ForcedDampedHO.cir vacask a library: no title line and no control block (V3b)
 # Phase 7: named-write-r2: an .osdi load on Spectre refused W0004 (ahdl_include reads Verilog-A source, Spectre Reference 5.0)
-vacask/demo/hierarchy/hier.sim spectre refused W0004: its load "resistor.osdi" is a compiled OSDI binary, which ahdl_include does not read
