@@ -230,14 +230,18 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Xyce => Native,
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
-            // Spectre's `sens` covers dc and ac; not written yet.
+            // Spectre's `sens` covers dc and ac (Reference 19.1 p.524), so
+            // Xyce's `.sens` over a `.tran` (118 corpus decks) has none
+            // (class G); over an op or a `.dc`, no clause read here maps
+            // Xyce's objective expression onto `sens`'s output list.
             D::Spectre => Refuse(Code::W0015),
             D::Verilog => Refuse(Code::W0001),
         },
         // ngspice manual ch.11, Xyce RG, LTspice help, VACASK: no
         // shooting-Newton noise or transfer, transient noise analysis or
         // loop-stability analysis. Spectre's pss/pnoise/pxf, `tran`
-        // noise and `stb` have them; not written yet.
+        // noise and `stb` are the same analyses, but no HSPICE or Spectre
+        // clause read here maps their parameters: refused until one is.
         Construct::HspiceAnalysis => match target {
             D::Hspice => Native,
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
@@ -387,7 +391,10 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         },
         // ngspice manual §6.3 and LTspice help `O` (LTRA); Xyce RG; ESPice
         // 0.3.0 runs it (checked); HSPICE's lossy line is its W element
-        // (no `O`), Spectre's `tline` and VACASK no LTRA model.
+        // (no `O`). VACASK 36be560 ships no transmission line at all
+        // (`devices/`, `devices/spice/`): class G. Spectre's `tline` has a
+        // lossy form, but no clause read here maps LTRA's R, L, G, C, LEN
+        // onto it: refused until one is (no manual in this tree).
         Construct::LossyLine => match target {
             D::Ngspice | D::Espice | D::Xyce | D::Ltspice => Native,
             D::Hspice | D::Spectre | D::Vacask => Refuse(Code::W0105),

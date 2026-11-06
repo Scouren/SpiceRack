@@ -8,13 +8,14 @@
 //!
 //! Contents:
 //! - `W::vacask_card(&mut self, n: u32) -> Option<String>`
+//! - `W::dc_alters(&self, swept: &[String]) -> Vec<(String, &'static str)>`
 
 use super::W;
 use super::vacask::{num, q};
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Card, Num, Val, Wave, WaveKind};
+use crate::syntax::render::read::{Card, Comp, Num, Val, Wave, WaveKind};
 
 impl W<'_, '_> {
     /// Element `n`'s statement, with no line end; `None` when it is
@@ -55,6 +56,9 @@ impl W<'_, '_> {
                         self.inst_params(&kept)
                     ));
                 }
+                let mut params = self.tran_ic(letter, params, n);
+                let extra = self.parasitics(letter, n, &n1, &n2, &mut params);
+                let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let (l, m) = match letter {
                     'R' => ('r', "resistor"),
                     'C' => ('c', "capacitor"),
@@ -65,12 +69,13 @@ impl W<'_, '_> {
                     v => format!(" {l}={}", self.vval(v)),
                 };
                 format!(
-                    "{l}{} ({} {}) {}{value}{}",
+                    "{l}{} ({} {}) {}{value}{}{}",
                     q(own),
                     q(&n1),
                     q(&n2),
                     model.map_or(m.to_string(), |m| q(&m)),
-                    self.inst_params(&params)
+                    self.inst_params(&params),
+                    self.part_lines(extra)
                 )
             }
             // One `mutual` per pair, the first keeping the name.
@@ -98,12 +103,14 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
-                parasitics: _,
+                mut parasitics,
             } => {
                 if port.is_some() {
                     self.ask(Construct::RfPort, tok);
                     return None;
                 }
+                let extra = self.parasitics(letter, n, &np, &nm, &mut parasitics);
+                let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let (l, m) = match letter {
                     'V' => ('v', "vsource"),
                     _ => ('i', "isource"),
@@ -129,6 +136,7 @@ impl W<'_, '_> {
                     s.push(' ');
                     s.push_str(&w);
                 }
+                s.push_str(&self.part_lines(extra));
                 s
             }
             Card::Linear {
@@ -209,6 +217,48 @@ impl W<'_, '_> {
         })
     }
 
+    /// The top's waveform sources the DC analyses must see as `type="dc"`,
+    /// each instance name and its waveform's `type`: VACASK evaluates the
+    /// waveform in every analysis (`lib/devvisrc.cpp` `sourceCompute`),
+    /// ngspice gives op and `.dc` the card's DC value (run by hand: "dc
+    /// value used for op instead of transient time=0 value"). Only those
+    /// whose DC value is not the waveform's at time zero, or that a `.dc`
+    /// in `swept` sweeps.
+    pub(super) fn dc_alters(&self, swept: &[String]) -> Vec<(String, &'static str)> {
+        let mut out = Vec::new();
+        for &c in &self.deck.top.comps {
+            let Comp::Card(n) = c else { continue };
+            let Card::Source {
+                letter,
+                value,
+                wave: Some(w),
+                ..
+            } = self.rd.card_view(n)
+            else {
+                continue;
+            };
+            let kind = match w.kind {
+                WaveKind::Sin => "sine",
+                WaveKind::Pulse => "pulse",
+                WaveKind::Exp => "exp",
+                WaveKind::Sffm => "fm",
+                WaveKind::Am => "am",
+                WaveKind::Pwl => "pwl",
+                // Not a VACASK waveform (NoiseWave).
+                WaveKind::Trnoise | WaveKind::Trrandom => continue,
+            };
+            let name = format!(
+                "{}{}",
+                letter.to_ascii_lowercase(),
+                q(&self.names.decl(n)[1..])
+            );
+            if value != w.at_zero() || swept.iter().any(|s| s.eq_ignore_ascii_case(&name)) {
+                out.push((name, kind));
+            }
+        }
+        out
+    }
+
     /// `w` as `type="…"` parameters; `None` when it is refused.
     fn vacask_wave(&mut self, w: &Wave, tok: u32) -> Option<String> {
         let a: Vec<String> = w.args.iter().map(|x| self.vacask_num(x)).collect();
@@ -265,10 +315,29 @@ impl W<'_, '_> {
                 "type=\"am\" sinedc={} ampl={} freq={} modfreq={} delay={}",
                 a[1], a[0], a[3], a[2], a[4]
             ),
-            // PWL comes back identically zero in VACASK's transient.
+            // `type="pwl"` holds the first value before the first point
+            // and the last after, as ngspice does; `delay` is `td=`
+            // (`docs/dev-builtin-src.md`, `lib/devvisrc.cpp` L910 at
+            // 36be560). Its `period` repeats from time 0 and wants the
+            // last value equal to the first: only that `r=0` has a form.
             WaveKind::Pwl => {
-                self.refuse(Code::W0108, tok);
-                return None;
+                let n = w.args.len();
+                let whole = n >= 4
+                    && w.args[0] == Num::Num(0.0)
+                    && w.args[1] == w.args[n - 1]
+                    && w.repeat == Some(Num::Num(0.0));
+                if w.repeat.is_some() && !whole {
+                    self.refuse(Code::W0108, tok);
+                    return None;
+                }
+                let mut s = format!("type=\"pwl\" wave=[{}]", a.join(", "));
+                if whole {
+                    s.push_str(&format!(" period={}", a[n - 2]));
+                }
+                if let Some(d) = &w.delay {
+                    s.push_str(&format!(" delay={}", self.vacask_num(d)));
+                }
+                s
             }
             WaveKind::Trnoise | WaveKind::Trrandom => {
                 self.ask(Construct::NoiseWave, tok);

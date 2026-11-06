@@ -30,7 +30,7 @@ pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
 mod cdl;
 mod checks;
 mod laplace;
-mod parasitics;
+pub(in crate::syntax::render) mod parasitics;
 mod prints;
 mod sweeps;
 mod ternary;

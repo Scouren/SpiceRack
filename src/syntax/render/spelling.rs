@@ -15,6 +15,7 @@
 //! - `pub struct Spelling`, `pub enum FuncForm`, `pub const fn spelling(target: Dialect) -> &'static Spelling`
 //! - `Spelling::letter(&self, p: Primitive) -> char`, `Spelling::number(&self, v: f64, exact: bool) -> String`,
 //!   `Spelling::decimal(&self, v: f64, exact: bool) -> String`, `Spelling::format(&self, v: f64) -> String`
+//! - `pub fn shortest(v: f64, written: String, mega: &str) -> String`
 
 use crate::syntax::Dialect;
 use crate::syntax::device::{self, Primitive};
@@ -213,7 +214,38 @@ impl Spelling {
     }
 }
 
+/// `written`, a target's exact spelling of `v`, or, when it has fewer
+/// significant digits, the spelling ngspice reads as exactly `v`
+/// ([`crate::unit::ngspice_spelling`]: the digits an ngspice deck wrote)
+/// in the target's suffixes, `mega` for `meg` and `T`, `G` uppercase
+/// (Spectre's and VACASK's are case-sensitive): `10u`, not
+/// `9.999999999999999e-6`. Both readers scale a mantissa by the suffix
+/// as ngspice does (VACASK `docs/input-numbers.md`).
+pub fn shortest(v: f64, written: String, mega: &str) -> String {
+    let short = crate::unit::ngspice_spelling(v);
+    if significant(&short) >= significant(&written) {
+        return written;
+    }
+    let short = match short.strip_suffix("meg") {
+        Some(m) => format!("{m}{mega}"),
+        None => short.replace('t', "T").replace('g', "G"),
+    };
+    debug_assert!(!short.contains("mil"), "{short}");
+    short
+}
+
 // ---- private ----
+
+/// The significant digits of a number's spelling: its mantissa's digits
+/// between the first and the last nonzero one.
+fn significant(s: &str) -> usize {
+    let m = s
+        .split(|c: char| c.is_ascii_alphabetic())
+        .next()
+        .unwrap_or(s);
+    let digits: String = m.chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.trim_matches('0').len().max(1)
+}
 
 /// The ladder rung keeping `|v| / multiplier` in [1, 1000), clamped to the
 /// ends; `(1.0, 0)` for zero.
@@ -253,6 +285,27 @@ mod tests {
         Dialect::Xyce,
         Dialect::Ltspice,
     ];
+
+    /// The pending-real-run decks' `.tran 10u 2.25m` (ngspice reads
+    /// `10u` as 9.999999999999999e-6, `2.25m` as 2.2500000000000004e-3):
+    /// the source's digits, in the target's suffixes.
+    #[test]
+    fn shortest_spells_the_digits_ngspice_read() {
+        let v = crate::unit::ngspice_value("10u").unwrap();
+        assert_eq!(shortest(v, format!("{v:e}"), "M"), "10u");
+        let v = crate::unit::ngspice_value("2.25m").unwrap();
+        assert_eq!(shortest(v, format!("{v:e}"), "M"), "2.25m");
+        assert_eq!(shortest(4e3, "4e3".into(), "M"), "4e3");
+        assert_eq!(shortest(1.5e6, "1.5000000000000002e6".into(), "M"), "1.5M");
+        assert_eq!(
+            shortest(1.5e6, "1.5000000000000002e6".into(), "meg"),
+            "1.5meg"
+        );
+        assert_eq!(
+            shortest(2e9 + 2.0, "2.000000002e9".into(), "M"),
+            "2.000000002e9"
+        );
+    }
 
     #[test]
     fn letters_invert_the_lexicon_device_table() {

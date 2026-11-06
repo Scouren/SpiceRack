@@ -352,9 +352,12 @@ fn pending(ext: &str, target: Dialect) -> String {
             Some(codes) => format!("refused {}", codes.trim()),
             None => "pending-real-run".into(),
         };
+        // Spectre's `xf` gives transfer functions only, no impedance
+        // (Reference 19.1 pp.438-439; the writer notes W0125).
         let values: Vec<String> = d
             .want
             .iter()
+            .filter(|(_, v, _)| !(target == Dialect::Spectre && v.contains("impedance")))
             .map(|(a, v, x)| format!("\"{a}:{v}\": {x:e}"))
             .collect();
         out.push_str(&format!(

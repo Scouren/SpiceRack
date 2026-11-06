@@ -254,7 +254,7 @@ EXPECTED = {
     'subcircuit': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pulse': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'pwl': (OK, OK, OK, OK, OK, OK, 'W0108', OK, OK),
+    'pwl': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
     'exp': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sffm': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

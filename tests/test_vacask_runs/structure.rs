@@ -30,17 +30,14 @@ fn step_params_sweep_a_netlist_variable() {
     close(out[2], 2.0 * 1000.0 / 4000.0, 1e-9);
 }
 
-// Known failure: upstream VACASK (`36be560`) reads a mixed list as
-// `{"out", 0.5}` (a run gives out = 0.5 at t = 0); `["out"; 0.5]`, the
-// fork's form and still its docs/cmd-analysis-tran.md:26, is a parse error
-// there. The VACASK writer's `ic=`/`nodeset=` spelling moves to `{...}`
-// (FINDINGS-oracles.md); then this marker goes.
+// Upstream VACASK (`36be560`) reads a mixed list as `{"out", 0.5}`;
+// `["out"; 0.5]`, the fork's form and still its docs/cmd-analysis-tran.md:26,
+// is "Parser syntax error, unexpected ;" there.
 #[test]
-#[should_panic(expected = "unexpected ;")]
 fn initial_conditions_reach_the_analysis() {
     let deck = "ic\nR1 vin out 1k\nC1 out 0 1u\nV1 vin 0 1\n.ic V(out)=0.5\n.tran 25u 1m 0 25u UIC\n.end\n";
     let netlist = emit(deck).unwrap();
-    assert!(netlist.contains("ic=[\"out\"; 5e-1]"), "{}", netlist);
+    assert!(netlist.contains("ic={\"out\", 5e-1}"), "{}", netlist);
     let raw = run(deck);
     close(col(&raw, "out")[0], 0.5, 1e-9);
 }
@@ -118,4 +115,37 @@ fn a_print_of_nodes_and_source_currents_is_in_the_raw_file() {
             .unwrap();
     let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
     assert_eq!(codes, [Code::W0023], "{}", w.notes.messages);
+}
+
+#[test]
+fn a_library_read_inside_a_subcircuit_stays_in_its_scope() {
+    // ngspice §2.7 scopes what a `.lib` inside a `.subckt` defines to it
+    // (`lib-processing/ex1b.sp`: ngspice 1.0 V). VACASK's `include` is
+    // textual (`lib/dfllexer.l`) and a subckt may hold one, so written
+    // inside `sub1` the library's `inner` (2k) shadows the top's (4k) there
+    // only: 1 mA into 4k || 2k || 4k = 1.0 V. Dropped, it ran 1.3333 V.
+    let dir = tempfile::tempdir().unwrap();
+    let lib = dir.path().join("inner.lib");
+    std::fs::write(
+        &lib,
+        "section res\nsubckt inner (n1 n2)\n  r3 (n1 n2) resistor r=2e3\nends\nendsection\n",
+    )
+    .unwrap();
+    let deck = format!(
+        "t\nI1 9 0 -1mA\nX1 9 0 sub1\nR2 9 0 4k\nX3 9 0 inner\n.subckt sub1 n1 n2\n\
+         .lib {} res\nX1 n1 n2 inner\n.ends\n.subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n",
+        lib.display()
+    );
+    close(col(&run(&deck), "9")[0], 1.0, 1e-9);
+}
+
+#[test]
+fn a_device_ic_without_uic_is_left_out() {
+    // ngspice applies `IC=` only with `.tran … uic` (manual, C and L), so
+    // the op sets the capacitor: b = 1 V from t=0. VACASK's `sp_capacitor`
+    // has no `ic` ("Parameter 'ic' not found."; `capacitor.va` notes).
+    let deck = "t\nV1 a 0 1\nR1 a b 1k\nC1 b 0 1u IC=0.3\n.tran 10u 1m\n.end\n";
+    let b = col(&run(deck), "b");
+    close(b[0], 1.0, 1e-9);
+    close(*b.last().unwrap(), 1.0, 1e-9);
 }

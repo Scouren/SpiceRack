@@ -522,11 +522,11 @@ catalogue! {
         cite: "HSPICE UG B-2008.09 App. A (`multiplier`); ngspice manual §2.11.5; Xyce RG Table 2-33",
         explain: "The call's arguments have no meaning in the target's statistical form (HSPICE's four-argument multiplier, a count no dialect reads). Write the call with ngspice's arguments.",
     }
-    /// A source waveform the target cannot run as SPICE does (Spectre's AM; VACASK's PWL, a SIN phase, an EXP delay that is no number).
+    /// A source waveform the target cannot run as SPICE does (Spectre's AM; VACASK's PWL repeat, a SIN phase, an EXP delay that is no number).
     W0108 Refusal {
         title: "a source waveform the target cannot run",
-        cite: "Spectre Reference 5.0 p.685 (no AM equation); VACASK vsource (`sine` ignores a phase; PWL)",
-        explain: "The target's source runs this waveform otherwise (Spectre has no AM; VACASK ignores a SIN phase). Write the waveform as a behavioural source or a PWL.",
+        cite: "Spectre Reference 5.0 p.685 (no AM equation); VACASK vsource (`sine` ignores a phase; a PWL `period` repeats from time 0 with the last value the first: `docs/dev-builtin-src.md`)",
+        explain: "The target's source runs this waveform otherwise (Spectre has no AM; VACASK ignores a SIN phase and repeats a PWL only whole). Write the waveform as a behavioural source or a PWL without the repeat.",
     }
     /// A `.measure` the target has no statement for (VACASK).
     W0109 Refusal {
@@ -577,6 +577,18 @@ catalogue! {
         title: "a transfer function's input and output resistance not computed",
         cite: "Spectre Reference 19.1 pp.438-439 (xf: transfer functions from every source)",
         explain: "SPICE's `.tf` gives the gain and the input and output resistances at the operating point; Spectre's `xf` at `values=[0]` gives the transfer function from every source to the output, no resistance. Add a test source and compute the resistance from its transfer function.",
+    }
+    /// A SPICE `.include` or `.lib` inside a `.subckt`, on Spectre.
+    W0128 Refusal {
+        title: "a file read inside a subcircuit, on Spectre",
+        cite: "ngspice manual §2.7 (a `.lib` in a `.subckt` is local to it); Spectre Reference 19.1 pp.533-535 (`subckt`: no clause on an `include` in its body)",
+        explain: "ngspice scopes what a file read inside a `.subckt` defines to that subcircuit; no Spectre clause here says an `include` in a `subckt` body does the same, and leaving the file out changes which subcircuits and models the body sees. Read the file at the top level, renaming what collides.",
+    }
+    /// A model parameter the VACASK module the card maps to does not declare.
+    W0129 Refusal {
+        title: "a model parameter the VACASK module lacks",
+        cite: "VACASK 36be560 `devices/spice/<module>.va` (its `parameter` and `aliasparam` names; VACASK stops on another: \"Parameter '…' not found.\"); ngspice-45 `devices/<dev>/*.c` (the names the device reads)",
+        explain: "The card sets a parameter the source simulator reads (or, from a dialect other than ngspice, may read) but the `sp_*` module VACASK builds from ngspice's device code does not declare (an initial condition, a self-heating or a version switch), so VACASK has no equation for it. Remove the parameter, or set the condition the VACASK way (`ic=` on the analysis).",
     }
 }
 

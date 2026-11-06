@@ -212,3 +212,19 @@ fn spectre_dc_dec_and_list_and_a_list_step_are_values() {
     let want = "sweep1_r sweep param=r values=[1k 2k] {\n  op1 dc\n}";
     assert!(sp.contains(want), "{sp}");
 }
+
+/// The pending-real-run decks' `.tran 10u 2.25m` read as ngspice reads it
+/// (9.999999999999999e-6, 2.2500000000000004e-3): written in the source's
+/// digits and Spectre's suffixes (`[KUN]` Table B.1), not the double's
+/// seventeen.
+#[test]
+fn a_number_keeps_the_digits_the_source_wrote() {
+    let w = spicerack::syntax::render::render_text(
+        "t\nR1 a 0 1k\n.tran 10u 2.25m\n.end\n",
+        Dialect::Ngspice,
+        "t",
+        Dialect::Spectre,
+    )
+    .unwrap();
+    assert!(w.text.contains("tran step=10u stop=2.25m"), "{}", w.text);
+}

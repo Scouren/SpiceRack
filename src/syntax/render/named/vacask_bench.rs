@@ -117,7 +117,28 @@ impl W<'_, '_> {
         for l in &tb.extra {
             self.line(&format!("  {l}"));
         }
+        let swept: Vec<String> = tb
+            .analyses
+            .iter()
+            .flat_map(|(a, _)| match a {
+                Ana::Dc(sw) => sw.iter().map(|s| s.0.clone()).collect(),
+                Ana::DcAxes(axes) => axes.iter().map(|x| x.src.clone()).collect(),
+                _ => vec![],
+            })
+            .collect();
+        let alters = self.dc_alters(&swept);
+        let mut dc_types = false;
         for (idx, (a, tok)) in tb.analyses.iter().enumerate() {
+            // The DC analyses see a waveform source's DC value
+            // (`W::dc_alters`), a transient its waveform.
+            let tran = spectre_kind(a) == Some("tran")
+                || matches!(a, Ana::MonteCarlo { inner: (_, k), .. } if k.eq_ignore_ascii_case("tran"));
+            if !alters.is_empty() && tran == dc_types {
+                dc_types = !tran;
+                for line in alter_lines(&alters, dc_types) {
+                    self.line(&format!("  {line}"));
+                }
+            }
             // A `sweep` binds to the next `analysis`: the stepped sweeps
             // are repeated ahead of each.
             for s in &sweeps {
@@ -363,13 +384,16 @@ impl W<'_, '_> {
 // ---- private ----
 
 impl W<'_, '_> {
-    /// `ic=["n"; v; …]`: each node and its value ([`W::vval`]).
+    /// ` ic={"n", v, …}`: each node and its value ([`W::vval`]), upstream
+    /// VACASK's mixed list (36be560; a run of `ic={"out", 0.5}` starts out
+    /// at 0.5 V). The fork's `["n"; v]` is its "unexpected ;", `["n", v]`
+    /// its "Vector component type incompatibility".
     fn node_list(&self, key: &str, items: &[(String, Val)]) -> String {
         let body: Vec<String> = items
             .iter()
-            .map(|(n, v)| format!("\"{}\"; {}", n.to_ascii_lowercase(), self.vval(v)))
+            .map(|(n, v)| format!("\"{}\", {}", n.to_ascii_lowercase(), self.vval(v)))
             .collect();
-        format!(" {key}=[{}]", body.join("; "))
+        format!(" {key}={{{}}}", body.join(", "))
     }
 }
 
@@ -388,6 +412,19 @@ fn spectre_kind(a: &Ana) -> Option<&'static str> {
         Ana::Four(..) => "fourier",
         Ana::MonteCarlo { .. } | Ana::Spectre { .. } => return None,
     })
+}
+
+/// `alter instance("v1", …) type="dc"` (`docs/cmd-alter.md`), or with
+/// `dc` false each source's own waveform `type` back.
+fn alter_lines(alters: &[(String, &str)], dc: bool) -> Vec<String> {
+    if dc {
+        let names: Vec<String> = alters.iter().map(|(n, _)| format!("\"{n}\"")).collect();
+        return vec![format!("alter instance({}) type=\"dc\"", names.join(", "))];
+    }
+    alters
+        .iter()
+        .map(|(n, t)| format!("alter instance(\"{n}\") type=\"{t}\""))
+        .collect()
 }
 
 /// A DC sweep of instance `src`'s `dc` from `start` by `step` over the
