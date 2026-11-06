@@ -60,7 +60,7 @@ pub fn parse(src: &str, d: Dialect) -> Result<(Tokens<'_>, Ast<'_>), String> {
 ///
 /// # Panics
 /// When `d` has no reader (CDL, Verilog).
-pub fn kit(entries: &[PathBuf], form: Form, d: Dialect, root: &Path) -> Kit {
+pub fn kit(entries: &[PathBuf], form: Form, d: impl Into<Lang>, root: &Path) -> Kit {
     let mut load = |p: &Path| {
         if !p.starts_with(root) {
             return Err(LoadError::Refused);

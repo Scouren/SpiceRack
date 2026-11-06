@@ -195,7 +195,7 @@ fn kits_resolve() {
             );
         }
         let c = counts.entry(kset).or_default();
-        let lex = Lang::from(kit.dialect()).lexicon().expect("a reader");
+        let lex = kit.lang().lexicon().expect("a reader");
         for (k, file) in kit.files().iter().enumerate() {
             if !matches!(file.role, Role::Deck | Role::Library) {
                 continue;

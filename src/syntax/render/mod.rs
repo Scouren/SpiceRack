@@ -219,15 +219,13 @@ pub fn render_kit(
         matches!(f.role, Role::Deck | Role::Library),
         "render_kit: a file the kit read"
     );
-    let lex = Lang::from(kit.dialect())
-        .lexicon()
-        .expect("a kit's dialect has a reader");
+    let lex = kit.lang().lexicon().expect("a kit's dialect has a reader");
     let t = tokenize(&f.text, lex);
     let ast = parse(&t, lex);
     let src = Source {
         ast: &ast,
         tokens: &t,
-        lang: kit.dialect().into(),
+        lang: kit.lang(),
         name,
         kit: Some((kit, file)),
         loads: &[],

@@ -319,10 +319,10 @@ impl Lexer<'_> {
         }
     }
 
-    /// [`Lexicon::regions_registered`]: the lexicon of the plugin language
-    /// the statement at `at` names, if it is `simulator lang=<name>`: one
-    /// registry lookup per switch statement, never per token. The
-    /// built-ins' regions are the lexicon's own rows.
+    /// [`Lexicon::regions_registered`]: the lexicon of the registered
+    /// language the statement at `at` names, if it is `simulator
+    /// lang=<name>` and the lexicon's own rows do not name it: one registry
+    /// lookup per switch statement, never per token.
     fn registered_region(&self, at: usize) -> Option<&'static Lexicon> {
         if !self.lex.regions_registered {
             return None;
@@ -333,10 +333,7 @@ impl Lexer<'_> {
             .take_while(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
             .count();
         let name = std::str::from_utf8(&self.src[from..from + len]).ok()?;
-        let lang = crate::syntax::Lang::from_name(name)?;
-        (lang.index() as usize >= crate::syntax::Lang::BUILTIN_COUNT)
-            .then(|| lang.lexicon())
-            .flatten()
+        crate::syntax::Lang::from_name(name)?.lexicon()
     }
 
     /// Whether the statement at `at` is `simulator lang=<to>`.

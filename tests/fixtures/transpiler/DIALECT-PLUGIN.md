@@ -983,9 +983,7 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   the named writer's `statistics` block moved to `named/statistics.rs`.
   Python enums follow from the Rust lists; `builtin_dialects.py` and the
   pinned dumps gained the two cells.
-- Named gap, **a `Kit` holding a plugin**: `resolve::Kit` (`Kit::load(.., dialect: Dialect, ..)`, `Kit::dialect`)
-  keeps its `Dialect`, so a kit's files are read and
-  written only in a built-in dialect; a plugin kit is not supported.
+- ~~Named gap, a `Kit` holding a plugin~~: closed after 5dbc454, below.
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).
@@ -998,3 +996,15 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   the Python re-declarations). No code in `syntax/` names a built-in
   outside its definition and the tests; the no-back-door oracle covers
   both.
+- **After the merge (5dbc454)**: `resolve::Kit::load(.., lang: impl
+  Into<Lang>, ..)` and `Kit::lang()` replace the kit's `Dialect`, and
+  `import::kit` takes any language, so a kit's files are read in a
+  registered plugin's language (`tests/test_dialect_kit.rs`: acme's
+  `#`, `.subcircuit` and `x` mega read through a kit, written to ngspice).
+  The tokenizer's registry fallback for `simulator lang=<name>` no longer
+  skips the built-ins by index: a language the lexicon's own region rows
+  do not list is looked up among every registered one (`lang=espice` in a
+  given deck opens ESPice's lexicon; red on the old filter). No code in
+  `syntax/` treats a built-in specially; `Dialect` remains only as the
+  built-ins' names (`From<Dialect> for Lang`) and the backend's
+  simulators.
