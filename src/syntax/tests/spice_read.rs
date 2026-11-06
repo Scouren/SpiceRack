@@ -332,3 +332,20 @@ fn a_control_pre_osdi_is_the_decks_osdi_load() {
         .text;
     assert!(va.lines().any(|l| l == "load \"psp103v4.osdi\""), "{va}");
 }
+
+#[test]
+fn an_initial_condition_by_expression_is_written_in_the_targets_delimiters() {
+    // Xyce RG `.IC`/`.NODESET` (`V(node)=value`, bare `node value`; a
+    // value may be a braced expression); ngspice manual `.ic`. Read as a
+    // number only before (W0001). Checks: 3.
+    let text = "t\n.param V1=1.0\nC1 1 0 1u\nR1 1 0 1k\n.ic v(1)={V1}\n.nodeset 1 {2*V1}\n.tran 0.1m 1m\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == ".ic V(1)={V1}"), "{ng}");
+    assert!(ng.lines().any(|l| l == ".nodeset V(1)={2*V1}"), "{ng}");
+    let hs = render_text(text, Dialect::Xyce, "t", Dialect::Hspice)
+        .expect("written")
+        .text;
+    assert!(hs.lines().any(|l| l == ".ic V(1)='V1'"), "{hs}");
+}

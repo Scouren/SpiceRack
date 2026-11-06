@@ -63,7 +63,7 @@ impl<'a> Rd<'a> {
             Bench::Options(n) => vec![BenchCard::Options(self.spectre_options(n))],
             Bench::NodeVals(n) => self
                 .node_vals(n)
-                .map(|v| BenchCard::NodeVals(self.tag(n) == Tag::Ic, v))
+                .map(|v| BenchCard::NodeVals(self.tag(n) == Tag::Ic, nums(v)))
                 .into_iter()
                 .collect(),
             Bench::Control(n) => self.vacask_control(n),
@@ -186,6 +186,13 @@ impl<'a> Rd<'a> {
 }
 
 // ---- private ----
+
+/// Numbered node values as [`BenchCard::NodeVals`] holds them.
+fn nums(v: Vec<(String, f64)>) -> Vec<(String, super::Val)> {
+    v.into_iter()
+        .map(|(n, x)| (n, super::Val::Num(x)))
+        .collect()
+}
 
 impl<'a> Rd<'a> {
     /// `name montecarlo numruns=N [seed=S] [variations=v] { inner kind }`
@@ -369,8 +376,8 @@ impl<'a> Rd<'a> {
                     startup: false,
                 };
                 return Some(vec![
-                    BenchCard::NodeVals(true, ic),
-                    BenchCard::NodeVals(false, ns),
+                    BenchCard::NodeVals(true, nums(ic)),
+                    BenchCard::NodeVals(false, nums(ns)),
                     BenchCard::Ana(a),
                 ]);
             }

@@ -22,7 +22,7 @@ use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct, action};
 use crate::syntax::render::out::Space;
-use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt};
+use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val};
 use crate::syntax::render::spelling::spelling;
 
 /// The testbench, folded from its statements in read order.
@@ -35,8 +35,8 @@ pub(super) struct Tb {
     pub(super) xyce: Vec<(String, String)>,
     pub(super) temp: Option<f64>,
     pub(super) tnom: Option<f64>,
-    ics: Vec<(String, f64)>,
-    nodesets: Vec<(String, f64)>,
+    ics: Vec<(String, Val)>,
+    nodesets: Vec<(String, Val)>,
     saves: Vec<String>,
     /// The first save card's first token.
     save_tok: Option<u32>,
@@ -174,13 +174,19 @@ impl W<'_, '_> {
                 self.o.token(&format!(".options tnom={t}"), Space::Line);
             }
         }
-        for (n, v) in &tb.ics {
-            let v = self.sp.decimal(*v, self.x);
-            self.o.token(&format!(".ic V({n})={v}"), Space::Line);
-        }
-        for (n, v) in &tb.nodesets {
-            let v = self.sp.decimal(*v, self.x);
-            self.o.token(&format!(".nodeset V({n})={v}"), Space::Line);
+        for (card, vals) in [(".ic", &tb.ics), (".nodeset", &tb.nodesets)] {
+            for (n, v) in vals {
+                let v = match v {
+                    Val::Num(x) => self.sp.decimal(*x, self.x),
+                    // Xyce, ngspice, HSPICE and LTspice take an expression
+                    // in their delimiters here (Xyce RG `.IC`, ngspice
+                    // manual `.ic`, HSPICE `.IC`; ngspice-45 and Xyce 7.10
+                    // ran `.ic v(1)={V1}`).
+                    Val::Expr(e) => format!("{}{e}{}", self.sp.expr.0, self.sp.expr.1),
+                    Val::Raw(t) => t.clone(),
+                };
+                self.o.token(&format!("{card} V({n})={v}"), Space::Line);
+            }
         }
         self.saves(&tb);
         self.prints(&tb.prints, &tb.analyses);

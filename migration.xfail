@@ -26610,3 +26610,78 @@ spice-bench/ngspice/tests/regression/sens/sens-ac-1.sp spectre .ac lin 1 is valu
 spice-bench/ngspice/tests/regression/sens/sens-ac-2.sp spectre .ac lin 1 is values=[1M]; was lin=1 (2 points)
 xyce/MEASURE_NOISE/InputNoiseOps.cir spectre .noise lin 10 is lin=9 steps; was lin=10
 xyce/MEASURE_NOISE/OutputNoiseOps.cir spectre .noise lin 10 is lin=9 steps; was lin=10
+# Phase 7: spice-read: .ic/.nodeset values by expression (render::read
+# testbench, named_bench; BenchCard::NodeVals holds a Val; the three
+# writers' arms: spice/bench.rs, named/bench.rs, named/vacask_bench.rs).
+# `.ic v(1)={V1}` and Xyce's bare `.nodeset 1 {V1}` read (a number only
+# before: W0001); a SPICE target writes the expression in its delimiters,
+# Spectre as written, VACASK through its expression spelling. ngspice's
+# own `.ic v(a)={x} v(b)={x}` is now one card per node, like a numbered
+# one. Oracle: Xyce 7.10 vs ngspice-45 on the 7 Xyce decks now written
+# (counts in the commit).
+spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp cdl written differently: .ic/.nodeset value by expression read
+spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp espice written differently: .ic/.nodeset value by expression read
+spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp ngspice written differently: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/lotka_volterra.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir espice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir hspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir spectre now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir vacask now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_592_SON/bug_592.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_592_SON/bug_592.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/XDM/HSPICE/INITIAL_CONDITION/ic_in_subckt.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/XDM/HSPICE/INITIAL_CONDITION/ic_in_subckt.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/IC_AND_NODESET/ic_in_subckt.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/IC_AND_NODESET/ic_in_subckt.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/IC_AND_NODESET/nodeset_in_subckt.cir cdl written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/IC_AND_NODESET/nodeset_in_subckt.cir xyce written differently: .ic/.nodeset value by expression read

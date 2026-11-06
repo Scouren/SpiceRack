@@ -18,10 +18,10 @@
 //! - `Rd::numw(&self, k: u32) -> bool`
 //! - `Rd::wordw(&self, k: u32) -> bool`, `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
 
-use super::Rd;
 use super::options::Opt;
 use super::outputs::print_kind;
 use super::sweeps::DcSweep;
+use super::{Rd, Val};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::token::Tag as T;
@@ -46,8 +46,9 @@ pub(in crate::syntax::render) enum BenchCard {
         values: Vec<f64>,
     },
     Temp(f64),
-    /// `.ic` (`true`) or `.nodeset` values.
-    NodeVals(bool, Vec<(String, f64)>),
+    /// `.ic` (`true`) or `.nodeset` values: numbers, or expressions
+    /// (Xyce `.ic v(1)={V1}`).
+    NodeVals(bool, Vec<(String, Val)>),
     /// `.print [kind] outputs`.
     Print(String, Vec<String>),
     /// A `.meas` card's line.
@@ -196,9 +197,12 @@ impl<'a> Rd<'a> {
             Card::StepList(param, values) => BenchCard::StepList { param, values },
             Card::Temp(v) => BenchCard::Temp(self.number(v)?),
             Card::NodeVals(vals) => {
-                let v: Vec<(String, f64)> = vals
+                let v: Vec<(String, Val)> = vals
                     .iter()
-                    .map(|&(k, v)| Some((self.name_of(k), self.number(v)?)))
+                    .map(|&(k, v)| match self.value(v) {
+                        Val::Raw(_) => None,
+                        x => Some((self.name_of(k), x)),
+                    })
                     .collect::<Option<_>>()?;
                 BenchCard::NodeVals(self.head_kind(n) != "nodeset", v)
             }
