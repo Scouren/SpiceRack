@@ -34,7 +34,9 @@
 //! `CROSS_SIM_ONLY=<text>` runs only the decks whose path holds it
 //! (`@<file>`: those the file lists, one corpus-relative path a line);
 //! `CROSS_SIM_TUBE=<fraction>` widens the transient time tube (triage only:
-//! the lists hold at the default 0.01);
+//! the lists hold at the default 0.01); `CROSS_SIM_TMAX=<n>` gives
+//! ngspice's `.tran` a TMAX of a 1/n of the run (triage: is ngspice's step,
+//! bounded by TSTEP, the difference?);
 //! `CROSS_SIM_KEEP=1` keeps every run's directory (the decks as run, the
 //! simulator's output) and prints where.
 //!

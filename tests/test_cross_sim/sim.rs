@@ -398,6 +398,13 @@ fn has_control(text: &str) -> bool {
 /// the current plot at the end of the last block.
 fn ngspice_text(text: &str, raw: &Path) -> String {
     let (title, body) = text.split_once('\n').unwrap_or((text, ""));
+    let body = match std::env::var("CROSS_SIM_TMAX")
+        .ok()
+        .and_then(|n| n.parse::<f64>().ok())
+    {
+        Some(n) => body.lines().map(|l| tmax(l, n) + "\n").collect(),
+        None => body.to_string(),
+    };
     let mut out = format!("{title}\n.option seed=1\n{body}");
     if has_control(text)
         && let Some(at) = out.to_ascii_lowercase().rfind("\n.endc")
@@ -405,6 +412,53 @@ fn ngspice_text(text: &str, raw: &Path) -> String {
         out.insert_str(at, &format!("\nwrite {}", raw.display()));
     }
     out
+}
+
+/// Triage only (`CROSS_SIM_TMAX=<n>`): a `.tran TSTEP TSTOP [TSTART]` line
+/// with TMAX = (TSTOP - TSTART)/n added, so ngspice's step is no longer
+/// bounded by TSTEP alone (its default TMAX, ngspice manual `.tran`).
+fn tmax(line: &str, n: f64) -> String {
+    let w: Vec<&str> = line.split_whitespace().collect();
+    let tran = w
+        .first()
+        .is_some_and(|c| c.eq_ignore_ascii_case(".tran") || c.eq_ignore_ascii_case("tran"));
+    let nums: Vec<f64> = w.iter().skip(1).map_while(|x| number(x)).collect();
+    if !tran || !(2..=3).contains(&nums.len()) || w.len() != nums.len() + 1 {
+        return line.to_string();
+    }
+    let start = nums.get(2).copied().unwrap_or(0.0);
+    format!(
+        "{} {} {} {start:e} {:e}",
+        w[0],
+        w[1],
+        w[2],
+        (nums[1] - start) / n
+    )
+}
+
+/// A SPICE number with its scale suffix (`2m`, `100n`, `1meg`, `5ms`): the
+/// longest prefix that reads as a float, then the suffix.
+fn number(word: &str) -> Option<f64> {
+    let low = word.to_ascii_lowercase();
+    let (v, tail) = (1..=low.len())
+        .rev()
+        .filter(|&i| low.is_char_boundary(i))
+        .find_map(|i| low[..i].parse::<f64>().ok().map(|v| (v, &low[i..])))?;
+    let scale = [
+        ("meg", 1e6),
+        ("t", 1e12),
+        ("g", 1e9),
+        ("k", 1e3),
+        ("m", 1e-3),
+        ("u", 1e-6),
+        ("n", 1e-9),
+        ("p", 1e-12),
+        ("f", 1e-15),
+    ]
+    .iter()
+    .find(|(s, _)| tail.starts_with(s))
+    .map_or(1.0, |&(_, k)| k);
+    Some(v * scale)
 }
 
 /// The raw files a VACASK deck writes, one per `analysis <name>` in deck
