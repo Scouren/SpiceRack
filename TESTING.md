@@ -129,7 +129,11 @@ fixtures `baseline-daa0ad0` lacks, recorded through the old writer) is
 manifest and no output for them: no old writer is left to record them, so
 their outputs are listed in `migration.xfail` as new inputs.
 `baseline-daa0ad0-fx13` is fx12 with T-M4's new content hash (its
-resistor written noiseless), phase 7's gate.
+resistor written noiseless). `baseline-daa0ad0-fx14` is fx13 with stream
+F's 22 pending-real-run decks (`tests/spectre/p_*.scs`,
+`tests/ltspice/p_*.cir`, `tests/test_pending_real_run.rs`) in its manifest
+and no output for them (listed in `migration.xfail` as new inputs), phase
+7's gate from the merge of stream F.
 
 Inputs (the `MANIFEST` of each record lists them, with content hashes):
 

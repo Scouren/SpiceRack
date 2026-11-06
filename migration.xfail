@@ -26411,7 +26411,8 @@ xyce/UNARYOPS/unary_funcs.cir ngspice if(c,a,b) written ((c)?(a):(b))
 
 # Phase 7: integrate: stream F's pending-real-run decks (tests/spectre/p_*.scs,
 # tests/ltspice/p_*.cir, tests/test_pending_real_run.rs) are new fixture
-# inputs with no output in baseline-daa0ad0-fx13; their written text is
+# inputs with no output in baseline-daa0ad0-fx14 (fx13 with them in its
+# manifest, TESTING.md); their written text is
 # pinned beside them and checked against closed forms there (pending.json).
 # The .cir decks are read by extension as Xyce (src/bin/golden/inputs.rs).
 # Per set: fixtures 176 (22 inputs).
