@@ -13,11 +13,13 @@
 //! - `pub(super) fn from_source(text: &str, d: Option<Dialect>) -> Result<Body, String>`
 //! - `pub(super) fn with_loads(text: &str, loads: &[String]) -> String`
 //! - `pub(super) fn read_deck(text: &str, d: Option<Dialect>) -> Result<Body, String>`
+//! - `pub(super) fn library_marker(lib: &ModelLibrary) -> String`,
+//!   `pub(super) fn libraries(text: &str) -> Vec<ModelLibrary>`
 
 use std::borrow::Cow;
 use std::fmt::Write as _;
 
-use super::model::{Body, Card, params};
+use super::model::{Body, Card, ModelLibrary, params};
 use crate::syntax::ast::{Ast, Node, Tag};
 use crate::syntax::lexicon::NGSPICE_GIVEN;
 use crate::syntax::token::{Tag as T, Tokens};
@@ -27,6 +29,9 @@ use crate::syntax::{Dialect, parse, tokenize};
 /// (`* spicerack-source ngspice`): a comment in every SPICE dialect and in
 /// Spectre.
 pub(super) const HEADER: &str = "* spicerack-source ";
+
+/// The start of a [`library_marker`] line.
+const LIBRARY: &str = "* spicerack-library ";
 
 /// `b` as the stored text of an ngspice deck that defines it
 /// ([`with_loads`]): `.subckt` with its includes, `.lib` calls, models,
@@ -182,6 +187,58 @@ pub(super) fn read_deck(text: &str, d: Option<Dialect>) -> Result<Body, String> 
         }
     }
     Ok(b)
+}
+
+/// The comment line before a model library's ngspice line in the store:
+/// `* spicerack-library <path> [corner=<c>] [setup=<p>]… [<family>=<p>]…`,
+/// so a testbench read back writes each target's own path ([`libraries`]).
+/// ponytail: paths are blank-separated words; a path with a blank in it
+/// does not round-trip (an ngspice `.lib` path cannot hold one unquoted).
+pub(super) fn library_marker(lib: &ModelLibrary) -> String {
+    let mut out = format!("{LIBRARY}{}", lib.path);
+    if let Some(c) = &lib.corner {
+        w(&mut out, format_args!(" corner={c}"));
+    }
+    for s in &lib.setup_includes {
+        w(&mut out, format_args!(" setup={s}"));
+    }
+    for (family, p) in &lib.backend_paths {
+        w(&mut out, format_args!(" {family}={p}"));
+    }
+    out.push('\n');
+    out
+}
+
+/// The model libraries `text`'s [`library_marker`] lines name, each
+/// `placed`: its lines are already the deck's own, as written.
+pub(super) fn libraries(text: &str) -> Vec<ModelLibrary> {
+    let marked = text.lines().filter_map(|l| l.strip_prefix(LIBRARY));
+    marked
+        .map(|rest| {
+            let mut words = rest.split_whitespace();
+            let path = words.next().unwrap_or_default().to_string();
+            let mut lib = ModelLibrary {
+                name: std::path::Path::new(&path)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("library")
+                    .to_string(),
+                path,
+                corner: None,
+                backend_paths: Default::default(),
+                setup_includes: Vec::new(),
+                placed: true,
+            };
+            for (k, v) in words.filter_map(|kv| kv.split_once('=')) {
+                match k {
+                    "corner" => lib.corner = Some(v.into()),
+                    "setup" => lib.setup_includes.push(v.into()),
+                    family => _ = lib.backend_paths.insert(family.into(), v.into()),
+                }
+            }
+            lib
+        })
+        .collect()
 }
 
 // ---- private ----

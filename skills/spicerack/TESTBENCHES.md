@@ -167,7 +167,8 @@ anyway would be reporting its own setup:
   transient, without `.four`. That needs N > 2 × the highest harmonic, because the edges
   sample the phase at N·f_ref.
 - **Delta-sigma in-band SQNR, comparator noise** — the first needs a band-limited,
-  Hann-windowed spectrum core; the second needs device transient noise (VACASK only).
+  Hann-windowed spectrum core; the second needs device transient noise, which no
+  backend here runs (ngspice has none; the pinned VACASK build has no `trannoise`).
 - **Startup margin** (`bandgap_reference`) — a DC sweep is a continuation and can
   march along the degenerate zero-current branch; only a transient from a genuinely
   off state proves startup.

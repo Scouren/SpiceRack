@@ -32,6 +32,7 @@
 //! - `pub(super) fn region_dialect(name: &str) -> Result<Dialect, String>`
 //! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`
 
+use std::borrow::Cow;
 use std::fmt::Write as _;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -58,11 +59,12 @@ pub(super) struct Deck {
 }
 
 impl Deck {
-    /// The deck `backend` runs: every runnable dialect, and HSPICE, which
-    /// is written but never run here.
+    /// The deck written in `backend`'s dialect: every dialect the renderer
+    /// writes (`render::writes`), runnable here or not (HSPICE, Xyce, CDL,
+    /// Verilog are written, never run).
     pub(super) fn netlist(&self, backend: &str) -> PyResult<String> {
         let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
-            .filter(|d| *d == Dialect::Hspice || crate::backend::RUNNABLE.contains(d))
+            .filter(|d| render::writes(*d))
             .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
         self.lowered()?.write(d).map_err(PyRuntimeError::new_err)
     }
@@ -82,22 +84,41 @@ impl Deck {
     }
 
     /// The deck's stored source (`store::with_loads`): its ngspice text,
-    /// a model library at its ngspice path.
+    /// a model library at its ngspice path behind the store's line of its
+    /// every path (`store::library_marker`).
     pub(super) fn to_source(&self) -> PyResult<String> {
         let deck = self.lowered()?;
         let text = deck
             .source(Dialect::Ngspice)
             .map_err(PyRuntimeError::new_err)?;
-        Ok(super::store::with_loads(&text, &deck.top.osdi))
+        let mut out = String::with_capacity(text.len() + 256);
+        let mut fresh: Vec<&ModelLibrary> = deck.libraries.iter().filter(|l| !l.placed).collect();
+        for l in text.lines() {
+            if let Some(i) = fresh.iter().position(|lib| lib.line(&lib.path) == l) {
+                out.push_str(&super::store::library_marker(fresh.remove(i)));
+            }
+            out.push_str(l);
+            out.push('\n');
+        }
+        Ok(super::store::with_loads(&out, &deck.top.osdi))
     }
 
-    /// `backend::check` as `"Severity: message"` lines.
+    /// `backend::check` as `"Severity: message"` lines, then the writer's
+    /// refusal of the deck for `backend`, if it refuses it.
     pub(super) fn issues(&self, backend: &str) -> Vec<String> {
         let elements = self.bodies().map(|b| b.elements.len() + b.instances.len());
-        crate::backend::check(self.needs(), elements.sum(), backend)
+        let mut out: Vec<String> = crate::backend::check(self.needs(), elements.sum(), backend)
             .into_iter()
             .map(|issue| format!("{:?}: {}", issue.severity, issue.message))
-            .collect()
+            .collect();
+        let refused =
+            crate::backend::parse(backend).map(|d| self.lowered().map(|deck| deck.write(d)));
+        if let Some(Ok(Err(why))) = refused {
+            out.push(format!(
+                "Error: Backend '{backend}' does not write this deck: {why}"
+            ));
+        }
+        out
     }
 
     /// The ngspice card of `body`'s first element or instance called
@@ -173,7 +194,9 @@ impl Deck {
     fn for_run(&self, backend: Option<&str>) -> PyResult<(Dialect, String)> {
         let deck = self.lowered()?;
         let first = deck.analyses().first().map_or(Kind::Op, Analysis::kind);
-        let sim = crate::backend::select(first, backend, deck.needs()).map_err(runtime_err)?;
+        let writes = |d| deck.write(d).is_ok();
+        let sim =
+            crate::backend::select(first, backend, deck.needs(), writes).map_err(runtime_err)?;
         let text = deck.write(sim).map_err(runtime_err)?;
         Ok((sim, text))
     }
@@ -274,18 +297,11 @@ impl Deck {
             );
         }
         file_cards(&mut out, &self.top);
-        for lib in &self.libraries {
+        for lib in self.libraries.iter().filter(|l| !l.placed) {
             for s in &lib.setup_includes {
                 line(&mut out, &format!(".include {s}"));
             }
-            let path = lib
-                .backend_paths
-                .get(d.family().name())
-                .unwrap_or(&lib.path);
-            match &lib.corner {
-                Some(corner) => line(&mut out, &format!(".lib {path} {corner}")),
-                None => line(&mut out, &format!(".include {path}")),
-            }
+            line(&mut out, &lib.line(lib.path_for(d)));
         }
         for (k, v) in &self.top.params {
             line(&mut out, &format!(".param {k}={v}"));
@@ -310,7 +326,23 @@ impl Deck {
             body(&mut out, sc);
             line(&mut out, &format!(".ends {}", sc.name));
         }
-        body(&mut out, &self.top);
+        let mut top = Cow::Borrowed(&self.top);
+        for lib in self.libraries.iter().filter(|l| l.placed) {
+            let (given, wanted) = (lib.line(&lib.path), lib.line(lib.path_for(d)));
+            for l in top
+                .to_mut()
+                .raw
+                .iter_mut()
+                .filter(|l| l.lines().any(|x| x == given))
+            {
+                *l = l
+                    .lines()
+                    .map(|x| if x == given { wanted.as_str() } else { x })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+            }
+        }
+        body(&mut out, &top);
         if let Some(tb) = &self.bench {
             bench(&mut out, tb, d)?;
         }
@@ -398,6 +430,12 @@ fn bench(out: &mut String, tb: &Bench, d: Dialect) -> Result<(), String> {
         let _ = writeln!(out, "{card}");
     }
     for a in &tb.analyses {
+        // CDL and Verilog write no analysis.
+        let analyses = !matches!(d, Dialect::Spectre | Dialect::Cdl | Dialect::Verilog);
+        if a.log_sweep() && analyses {
+            let what = format!("frequency sweep 'log' (N points in total) on {}", d.name());
+            return Err(unsupported(&what));
+        }
         if let Analysis::Fourier { .. } = a
             && let Some(lines) = a.fourier_count(d).map_err(|why| unsupported(&why))?
         {
@@ -436,9 +474,10 @@ fn region(out: &mut String, lang: &str, lines: &[String]) {
     let _ = writeln!(out, "simulator lang=spice");
 }
 
-/// The refusal of an analysis no dialect here has a statement for.
+/// The refusal (W0040) of an analysis argument the target has no word for.
 fn unsupported(what: &str) -> String {
-    format!("Unsupported analysis: {what}")
+    let code = crate::syntax::diag::Code::W0040;
+    format!("{code:?} {}: {what}", crate::syntax::diag::info(code).title)
 }
 
 #[cfg(test)]
@@ -530,5 +569,297 @@ mod tests {
         // (none given) cannot share it.
         let two = deck(vec![four(Some(5)), four(None)]);
         assert!(two.write(Dialect::Ngspice).is_err());
+    }
+
+    /// One of each analysis the Python API queues, and the variants whose
+    /// arguments some target has no word for.
+    fn every_analysis() -> Vec<(&'static str, Analysis)> {
+        use crate::python::analysis::{DcSweep, FreqSweep, PssBase};
+        use crate::python::keywords::{PzKind, PzTransfer, SpectreAnalysis, Sweep};
+        let fs = || FreqSweep {
+            variation: Sweep::Dec,
+            points: 10,
+            start: 1.0,
+            stop: 1e6,
+        };
+        let pb = || PssBase {
+            fundamental: 1e6,
+            stabilization: 1e-6,
+            harmonics: 5,
+        };
+        vec![
+            ("op", Analysis::Op),
+            (
+                "dc",
+                Analysis::Dc {
+                    sweeps: vec![DcSweep {
+                        source: "Vin".into(),
+                        start: 0.0,
+                        stop: 1.0,
+                        step: 0.1,
+                    }],
+                },
+            ),
+            (
+                "dc2",
+                Analysis::Dc {
+                    sweeps: vec![
+                        DcSweep {
+                            source: "Vin".into(),
+                            start: 0.0,
+                            stop: 1.0,
+                            step: 0.1,
+                        },
+                        DcSweep {
+                            source: "Vin2".into(),
+                            start: 0.0,
+                            stop: 1.0,
+                            step: 0.5,
+                        },
+                    ],
+                },
+            ),
+            ("ac", Analysis::Ac { sweep: fs() }),
+            (
+                "ac_log",
+                Analysis::Ac {
+                    sweep: FreqSweep {
+                        variation: Sweep::Log,
+                        ..fs()
+                    },
+                },
+            ),
+            (
+                "ac_oct",
+                Analysis::Ac {
+                    sweep: FreqSweep {
+                        variation: Sweep::Oct,
+                        ..fs()
+                    },
+                },
+            ),
+            (
+                "tran",
+                Analysis::Transient {
+                    step: 1e-6,
+                    stop: 1e-3,
+                    start: None,
+                    max_step: None,
+                    uic: false,
+                },
+            ),
+            (
+                "tran_full",
+                Analysis::Transient {
+                    step: 1e-6,
+                    stop: 1e-3,
+                    start: Some(1e-4),
+                    max_step: Some(1e-6),
+                    uic: true,
+                },
+            ),
+            (
+                "noise",
+                Analysis::Noise {
+                    output: "out".into(),
+                    reference: "0".into(),
+                    source: "Vin".into(),
+                    sweep: fs(),
+                    points_per_summary: None,
+                },
+            ),
+            (
+                "noise_pps",
+                Analysis::Noise {
+                    output: "out".into(),
+                    reference: "0".into(),
+                    source: "Vin".into(),
+                    sweep: fs(),
+                    points_per_summary: Some(5),
+                },
+            ),
+            (
+                "tf",
+                Analysis::Tf {
+                    output: "V(out)".into(),
+                    source: "Vin".into(),
+                },
+            ),
+            (
+                "sens",
+                Analysis::Sensitivity {
+                    output: "V(out)".into(),
+                    ac: None,
+                },
+            ),
+            (
+                "sens_ac",
+                Analysis::Sensitivity {
+                    output: "V(out)".into(),
+                    ac: Some(fs()),
+                },
+            ),
+            (
+                "pz",
+                Analysis::PoleZero {
+                    nodes: ["in".into(), "0".into(), "out".into(), "0".into()],
+                    tf_type: PzTransfer::Vol,
+                    pz_type: PzKind::Pz,
+                },
+            ),
+            (
+                "disto",
+                Analysis::Distortion {
+                    sweep: fs(),
+                    f2overf1: None,
+                },
+            ),
+            (
+                "disto_f2",
+                Analysis::Distortion {
+                    sweep: fs(),
+                    f2overf1: Some(0.9),
+                },
+            ),
+            (
+                "pss",
+                Analysis::Pss {
+                    fundamental: 1e6,
+                    stabilization: 1e-5,
+                    observe_node: "out".into(),
+                    points_per_period: 128,
+                    harmonics: 10,
+                    sc_iter: None,
+                    steady_coeff: None,
+                    uic: false,
+                },
+            ),
+            (
+                "pss_ctl",
+                Analysis::Pss {
+                    fundamental: 1e6,
+                    stabilization: 1e-5,
+                    observe_node: "out".into(),
+                    points_per_period: 128,
+                    harmonics: 10,
+                    sc_iter: Some(20),
+                    steady_coeff: None,
+                    uic: false,
+                },
+            ),
+            (
+                "hb",
+                Analysis::HarmonicBalance {
+                    frequencies: vec![1e6],
+                    harmonics: vec![7],
+                },
+            ),
+            ("sp", Analysis::SPar { sweep: fs() }),
+            (
+                "stb",
+                Analysis::Stability {
+                    probe: "Iprb".into(),
+                    sweep: fs(),
+                },
+            ),
+            (
+                "trannoise",
+                Analysis::TransientNoise {
+                    step: 1e-9,
+                    stop: 1e-6,
+                },
+            ),
+            (
+                "four",
+                Analysis::Fourier {
+                    fundamental: 1e3,
+                    outputs: vec!["V(out)".into()],
+                    harmonics: None,
+                },
+            ),
+            (
+                "four_n",
+                Analysis::Fourier {
+                    fundamental: 1e3,
+                    outputs: vec!["V(out)".into()],
+                    harmonics: Some(5),
+                },
+            ),
+            (
+                "sweep",
+                Analysis::SpectreSweep {
+                    param: "r".into(),
+                    start: 1.0,
+                    stop: 2.0,
+                    step: 0.5,
+                    inner: "ac1".into(),
+                    inner_type: SpectreAnalysis::Ac,
+                },
+            ),
+            (
+                "mc",
+                Analysis::SpectreMonteCarlo {
+                    iterations: 5,
+                    inner: "ac1".into(),
+                    inner_type: SpectreAnalysis::Ac,
+                    seed: Some(1),
+                },
+            ),
+            (
+                "pac",
+                Analysis::SpectrePac {
+                    pss: pb(),
+                    sweep: fs(),
+                    sweep_type: "relative".into(),
+                },
+            ),
+            (
+                "pnoise",
+                Analysis::SpectrePnoise {
+                    pss: pb(),
+                    output: "out".into(),
+                    reference: "".into(),
+                    sweep: fs(),
+                },
+            ),
+            (
+                "pxf",
+                Analysis::SpectrePxf {
+                    pss: pb(),
+                    output: "out".into(),
+                    sweep: fs(),
+                },
+            ),
+            (
+                "pstb",
+                Analysis::SpectrePstb {
+                    pss: pb(),
+                    probe: "Iprb".into(),
+                    sweep: fs(),
+                },
+            ),
+        ]
+    }
+
+    #[test]
+    fn a_run_lands_only_where_the_writer_writes_the_deck() {
+        // Oracle: the renderer's verdict. Whatever `select` picks among the
+        // installed backends, the deck written for it has no refusal; a
+        // route that names a backend whose writer refuses the analysis
+        // (`sp` and `stb` on VACASK once did) is skipped, not run.
+        for (name, a) in every_analysis() {
+            let mut d = deck(vec![a]);
+            d.top
+                .elements
+                .push(Card::element("in", "Vin in 0 1 AC 1".into()));
+            let kind = d.analyses()[0].kind();
+            let writes = |t| d.write(t).is_ok();
+            if let Ok(sim) = crate::backend::select(kind, None, d.needs(), writes) {
+                assert!(
+                    d.write(sim).is_ok(),
+                    "{name} routed to {sim:?}, which refuses it"
+                );
+            }
+        }
     }
 }

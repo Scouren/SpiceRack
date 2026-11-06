@@ -33,7 +33,7 @@ Each of these returns a plausible wrong number rather than an error.
 
 **`ac[node]` is the real part, not the magnitude.** For a Bode plot use `ac.magnitude(node)`, `ac.magnitude_db(node)` and `ac.phase(node)` (degrees). At 100 Hz on a 159 Hz RC, `ac["vout"]` reads 0.7170 while `|H|` is 0.8467. `.magnitude()` exists only on `AcAnalysis`.
 
-**ngspice has no `.step`.** `tb.step()` then `netlist("ngspice")` raises an error (`W0016`), and a run without a forced backend auto-routes away from ngspice (to VACASK when installed). Sweep by rebuilding the testbench in a Python loop, one run per point — `run_corners` does exactly that for corners and seeds. LTspice, VACASK and Spectre support parameter sweeps natively.
+**ngspice has no `.step`.** `tb.step()` then `netlist("ngspice")` raises an error (`W0016`), and a run without a forced backend auto-routes away from ngspice (to VACASK when installed). Sweep by rebuilding the testbench in a Python loop, one run per point — `run_corners` does exactly that for corners and seeds. LTspice, VACASK and Spectre support parameter sweeps natively; a stepped result concatenates the steps on the analysis axis (VACASK adds the step value as `step_<param>`), and a stepped `OperatingPoint` raises `ValueError` rather than return the first step.
 
 **Use ASCII micro units: `u_uF`, `u_uH`, `u_uA`, `u_uV`, `u_uW`, `u_us`.** Python normalises identifiers, so a `u_µF` spelled with U+00B5 cannot be imported. The `u_Ω` family does work.
 
@@ -55,7 +55,7 @@ Bandwidth defaults to the half-power point, `HALF_POWER_DB` = 3.0103 dB. A round
 
 ## Backends
 
-Names: `ngspice` (aliases `ngspice-subprocess`, `ngspice-shared`), `ltspice`, `vacask` (alias `vacask-shared`), `spectre`, `espice` — nothing else (no Xyce); `with_backend()` / `simulator()` raise `ValueError` on any other name. Pick one with `tb.with_backend(name)`, or for every run that names none with `SPICERACK_BACKEND=<name>`. On `espice`, `veriloga()` becomes `.hdl` (VerA, no OpenVAF) and `osdi()` is refused. Forced `vacask` rejects `dc`. `ngspice` is the default and the only one assumed present. Declared features gate backend selection, so a bench that asks for `.measure` support will not route to vacask. Check with `tb.check_backend(name)` and `ps.CircuitSimulator.available_backends()`.
+Names: `ngspice` (aliases `ngspice-subprocess`, `ngspice-shared`), `ltspice`, `vacask` (alias `vacask-shared`), `spectre`, `espice` — nothing else (no Xyce); `with_backend()` / `simulator()` raise `ValueError` on any other name. `tb.netlist(name)` also writes `hspice`, `xyce`, `cdl` and `verilog`, which no backend runs. Pick one with `tb.with_backend(name)`, or for every run that names none with `SPICERACK_BACKEND=<name>`. On `espice`, `veriloga()` becomes `.hdl` (VerA, no OpenVAF) and `osdi()` is refused. `ngspice` is the default and the only one assumed present. Declared features gate backend selection, so a bench that asks for `.measure` support will not route to vacask, and a run lands only on a backend whose writer writes the deck (`tb.check_backend(name)` names a writer's refusal code too). Check with `tb.check_backend(name)` and `ps.CircuitSimulator.available_backends()`.
 
 → Element signatures per class, analysis signatures, the unit list, and the backend capability matrix: [`REFERENCE.md`](REFERENCE.md)
 

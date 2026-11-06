@@ -153,7 +153,9 @@ Keyword arguments to `X` and `instance` become instance parameters
 A subcircuit is saved as its source text: the ngspice deck that defines it,
 behind one line naming the dialect (`* spicerack-source ngspice`). Any
 dialect reads back (`from_source(text, dialect)`); a `Testbench` saves and
-loads the same way. The JSON form is gone.
+loads the same way. A `ModelLibrary`'s other paths (`spectre=`, ...) are kept
+on a `* spicerack-library` comment line before its `.lib`, so a loaded
+testbench writes each target's own path. The JSON form is gone.
 
 ```python
 import tempfile, os

@@ -18,7 +18,9 @@ lib = ps.ModelLibrary(f"{gf}/sm141064.ngspice", corner="typical",
 ```
 
 * `ModelLibrary(path, corner=None, setup_includes=None, **backend_paths)` —
-  `backend_paths` maps a backend to its own file, e.g. `spectre="/pdk/x.scs"`.
+  `backend_paths` maps a backend to its own file, e.g. `spectre="/pdk/x.scs"`;
+  `tb.save_source()` keeps them (a `* spicerack-library` line), so a loaded bench
+  writes each target's path.
   `setup_includes` are `.include`d before the `.lib`: gf180mcu's corner sections read
   `fnoicor`, `sw_stat_mismatch`, ... from `design.ngspice`; without it every one is a
   `Formula() error`.

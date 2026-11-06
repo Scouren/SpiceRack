@@ -33,10 +33,11 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(n1, n2, n3, n4, tf_type, pz_type)` | `PoleZeroAnalysis` |
 | `distortion(...)` | `DistortionAnalysis` |
-| `pss`, `s_param`, `harmonic_balance`, `stability`, `transient_noise`, `network_params` | RF and periodic analyses; each runs only where a backend supports it (see below) |
+| `pss`, `s_param`, `harmonic_balance`, `stability`, `network_params` | RF and periodic analyses; each runs only where a backend supports it (see below) |
+| `transient_noise(step_time, end_time)` | ngspice's transient noise: a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources (no device noise) |
 | `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` is a deprecated alias), `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | Spectre only |
 
-`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre only), in any
+`variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre's `log=N`, N points in total; every other target refuses it, `W0040`), in any
 case; any other name raises `ValueError` when the analysis is built. The same
 holds for the other keywords: `polezero`/`add_polezero` `tf_type` (`vol`, `cur`)
 and `pz_type` (`pol`, `zer`, `pz`), `step_sweep` (`lin`, `dec`, `oct`, `log`),
@@ -80,6 +81,10 @@ print(res.measures["vmax"])
 
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
 emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
+A stepped result holds every step's points one after another on the analysis's
+own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a vector beside
+them (`dc["step_r"]` on VACASK); an `OperatingPoint` holds one point, so reading
+a stepped one raises `ValueError`.
 
 ### ngspice compatibility mode
 
@@ -100,19 +105,23 @@ fails the run.
 ## Netlists without simulating
 
 ```python
-print(tb.netlist("ngspice"))      # also "ltspice", "vacask", "spectre", "espice", "hspice"
+print(tb.netlist("ngspice"))      # any dialect: "ltspice", "vacask", "spectre", "espice",
+                                  # "hspice", "xyce", "cdl", "verilog"
 ```
 
-To write a deck with several analyses, queue them with the `add_*` twins
-(`add_operating_point`, `add_ac`, `add_transient`, `add_noise`, `add_tf`,
-`add_fourier`, ...) and print `tb.netlist(...)`. HSPICE is netlist-only: there
-is no HSPICE runner.
+To write a deck with several analyses, queue them with the `add_*` twins: every
+run method has one with the same arguments (`add_operating_point`, `add_ac`,
+`add_transient`, `add_noise`, `add_tf`, `add_fourier`, `add_pss`,
+`add_s_param`, `add_harmonic_balance`, `add_stability`, `add_transient_noise`,
+`add_network_params`, `add_spectre_pac`, ...) and print `tb.netlist(...)`. HSPICE, Xyce, CDL and Verilog
+are netlist-only: `netlist()` writes them, `run()` needs one of ngspice,
+LTspice, VACASK, Spectre or ESPice.
 
 `tb.run()` runs the queued analyses as that one deck and returns one result per
 analysis, in the order they were queued, each the type its immediate twin
 returns (`None` for `add_fourier`, whose table goes to stdout). ngspice runs a
 deck's analyses in its own order, so results are matched to analyses by plot
-name, never by position. `pss`, `hb`, `stb`, transient noise and the Spectre
+name, never by position. `pss`, `hb`, `stb` and the Spectre
 analyses run alone; queued beside others, `run()` raises rather than guess
 which plot is theirs. A Spectre `montecarlo` (`add_spectre_monte_carlo`) is also
 written for VACASK, as an `mc` loop around the deck's analysis of its inner
@@ -144,7 +153,9 @@ tb.with_backend("ngspice")                        # pin one for this bench
 ```
 
 Without a choice, SpiceRack picks an installed backend that supports what the
-circuit and the analysis need. `SPICERACK_BACKEND=vacask` in the environment
+circuit and the analysis need and whose writer writes the deck: a run never
+lands where `netlist()` would refuse it. `tb.check_backend(name)` lists the
+writer's refusal (its code) beside the missing features. `SPICERACK_BACKEND=vacask` in the environment
 sets the default for every run. A flat `Circuit` takes it as
 `circuit.simulator(simulator="vacask")`.
 
@@ -155,7 +166,7 @@ sets the default for every run. A flat `Circuit` takes it as
 | `.meas` | yes | yes | no | yes | yes |
 | `.step` sweeps | no | yes | yes | yes | no |
 | Laplace sources | yes | yes | no | no | yes |
-| Digital Verilog | yes | no | no | yes | no |
+| Digital Verilog | yes | no | no | no | no |
 
 The same design runs on several simulators with a loop:
 

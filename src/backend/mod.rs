@@ -19,7 +19,7 @@
 //!   `Dialect::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn available() -> &'static [Dialect]`
 //! - `pub enum Kind`, `Kind::name(self) -> &'static str`
-//! - `pub fn select(kind: Kind, override_backend: Option<&str>, needs: u8) -> Result<Dialect, BackendError>`
+//! - `pub fn select(kind: Kind, override_backend: Option<&str>, needs: u8, writes: impl Fn(Dialect) -> bool) -> Result<Dialect, BackendError>`
 //! - `pub struct Issue`, `pub enum IssueSeverity`,
 //!   `pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue>`
 //! - `pub mod espice`, `ltspice`, `ngspice`, `spectre`, `vacask`
@@ -144,8 +144,10 @@ const LTSPICE_CAPS: u8 = MEASURES | STEP_PARAMS | LAPLACE;
 // VACASK: `load "x.osdi"`; no measurement statement ("Command not found");
 // `var` + `sweep` does parameter sweeps; its `control` is not ngspice's.
 const VACASK_CAPS: u8 = OSDI | STEP_PARAMS;
-// Spectre: `.measure` per Spectre Reference 19.1 p.17; xrun co-simulation.
-const SPECTRE_CAPS: u8 = OSDI | MEASURES | STEP_PARAMS | VERILOG_COSIM;
+// Spectre: `.measure` per Spectre Reference 19.1 p.17. No Verilog
+// co-simulation: a `verilog(mode="simulate")` block is ngspice's XSPICE
+// `d_cosim` (`python::verilog`), which Spectre cannot run.
+const SPECTRE_CAPS: u8 = OSDI | MEASURES | STEP_PARAMS;
 // ESPice: Verilog-A via VerA `.hdl` (counts as osdi); `.step` lands every
 // point as a separate plot in one raw file, which parse_raw does not split.
 // Laplace: its own `E/G … LAPLACE` card (`render::spice::laplace`).
@@ -293,11 +295,13 @@ pub fn available() -> &'static [Dialect] {
 /// Pick the backend for an analysis of `kind`. An explicit name (argument,
 /// else `$SPICERACK_BACKEND`) wins if it can run the analysis; otherwise
 /// the first installed backend, in `route` order, that has every `needs`
-/// bit (`feature`).
+/// bit (`feature`) and whose writer writes the deck (`writes`: the
+/// renderer's verdict, so a run never lands where the deck is refused).
 pub fn select(
     kind: Kind,
     override_backend: Option<&str>,
     needs: u8,
+    writes: impl Fn(Dialect) -> bool,
 ) -> Result<Dialect, BackendError> {
     let (dialects, alternative) = route(kind);
     let analysis = kind.name();
@@ -317,23 +321,25 @@ pub fn select(
     if available.is_empty() {
         return Err(BackendError::NoBackend);
     }
-    for d in dialects {
-        if let Some(&k) = available.iter().find(|&&k| k == *d && runs(k, needs)) {
-            return Ok(k);
-        }
-    }
-    if dialects[0] != Dialect::Ngspice {
-        let names: Vec<_> = available.iter().map(|k| k.name()).collect();
-        return Err(unsupported(
-            analysis,
-            &names.join(", "),
-            dialects[0],
-            alternative,
-        ));
+    let installed = |d: &&Dialect| available.contains(d) && writes(**d);
+    if let Some(&d) = dialects.iter().filter(installed).find(|d| runs(**d, needs)) {
+        return Ok(d);
     }
     // ponytail: universal analysis, no backend matches the features — run on
-    // the first one and let the simulator report what it cannot do.
-    Ok(available[0])
+    // the first one that writes the deck and let the simulator report what
+    // it cannot do.
+    match dialects.iter().find(installed) {
+        Some(&d) if dialects[0] == Dialect::Ngspice => Ok(d),
+        _ => {
+            let names: Vec<_> = available.iter().map(|k| k.name()).collect();
+            Err(unsupported(
+                analysis,
+                &names.join(", "),
+                dialects[0],
+                alternative,
+            ))
+        }
+    }
 }
 
 impl Kind {
@@ -415,10 +421,13 @@ fn route(kind: Kind) -> (&'static [Dialect], &'static str) {
         Kind::Sens => (&[Ngspice, Spectre, Espice], "N/A"),
         Kind::SensAc => (&[Ngspice, Spectre], "N/A"),
         Kind::Hb => (&[Vacask, Spectre], "long .tran() + discard startup + FFT"),
-        Kind::Sp => (&[Vacask, Spectre, Ngspice], "N/A"),
-        Kind::Stb => (&[Vacask, Spectre], ".ac() + Middlebrook method"),
+        // VACASK's analyses (the pinned build's test decks): op, ac, acxf,
+        // dcinc, dcxf, noise, tran, hb; no `sp`, no `stb`.
+        Kind::Sp => (&[Spectre, Ngspice], "N/A"),
+        Kind::Stb => (&[Spectre], ".ac() + Middlebrook method"),
         Kind::Pss => (&[Spectre, Ngspice], "long .tran() + discard startup"),
-        Kind::TranNoise => (&[Vacask], ".tran() with trnoise sources"),
+        // ngspice's `TRNOISE` sources (manual §4.1.7) are the noise.
+        Kind::TranNoise => (&[Ngspice], "N/A"),
         Kind::Pac | Kind::Pnoise | Kind::Pxf | Kind::Pstb => (&[Spectre], "N/A"),
     }
 }
@@ -561,7 +570,7 @@ mod tests {
         use Dialect::*;
         assert_eq!(route(Kind::Pz).0, &[Ngspice]);
         assert_eq!(route(Kind::Hb).0, &[Vacask, Spectre]);
-        assert_eq!(route(Kind::TranNoise).0, &[Vacask]);
+        assert_eq!(route(Kind::TranNoise).0, &[Ngspice]);
         assert_eq!(route(Kind::Sens).0, &[Ngspice, Spectre, Espice]);
         assert_eq!(route(Kind::SensAc).0, &[Ngspice, Spectre]);
         assert_eq!(route(Kind::Tran).0, RUNNABLE);
@@ -575,21 +584,21 @@ mod tests {
     #[test]
     fn explicit_backend_must_run_the_analysis() {
         assert_eq!(
-            select(Kind::Pz, Some("ngspice"), 0).unwrap(),
+            select(Kind::Pz, Some("ngspice"), 0, |_| true).unwrap(),
             Dialect::Ngspice
         );
         assert_eq!(
-            select(Kind::Dc, Some("vacask-shared"), 0).unwrap(),
+            select(Kind::Dc, Some("vacask-shared"), 0, |_| true).unwrap(),
             Dialect::Vacask
         );
         assert!(
-            matches!(select(Kind::Pz, Some("ltspice"), 0), Err(BackendError::UnsupportedAnalysis { analysis, .. }) if analysis == "pz")
+            matches!(select(Kind::Pz, Some("ltspice"), 0, |_| true), Err(BackendError::UnsupportedAnalysis { analysis, .. }) if analysis == "pz")
         );
         assert!(matches!(
-            select(Kind::Hb, Some("ngspice"), 0),
+            select(Kind::Hb, Some("ngspice"), 0, |_| true),
             Err(BackendError::UnsupportedAnalysis { .. })
         ));
-        assert!(select(Kind::Op, Some("xyce"), 0).is_err());
+        assert!(select(Kind::Op, Some("xyce"), 0, |_| true).is_err());
     }
 
     #[test]

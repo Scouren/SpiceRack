@@ -138,7 +138,7 @@ pub(super) fn typed_result(
         Analysis::Stability { .. } | Analysis::SpectrePstb { .. } => {
             Py::new(py, PyStabilityAnalysis { inner: r() })?.into_any()
         }
-        Analysis::TransientNoise => {
+        Analysis::TransientNoise { .. } => {
             Py::new(py, PyTransientNoiseAnalysis { inner: r() })?.into_any()
         }
         Analysis::SpectreSweep { .. } | Analysis::SpectreMonteCarlo { .. } => {
@@ -211,13 +211,11 @@ impl PyRawData {
 #[pymethods]
 impl PyOperatingPoint {
     fn __getitem__(&self, name: &str) -> PyResult<f64> {
-        self.value(name)
-            .ok_or_else(|| PyKeyError::new_err(format!("Node '{}' not found", name)))
+        self.value(name, PyKeyError::new_err)
     }
 
     fn __getattr__(&self, name: &str) -> PyResult<f64> {
-        self.value(name)
-            .ok_or_else(|| PyAttributeError::new_err(format!("No node '{}'", name)))
+        self.value(name, PyAttributeError::new_err)
     }
 
     /// Parsed .meas results as {name: value} dict
@@ -228,8 +226,21 @@ impl PyOperatingPoint {
 }
 
 impl PyOperatingPoint {
-    fn value(&self, name: &str) -> Option<f64> {
-        self.inner.get(name)?.first().copied()
+    /// The one point's value; `missing` for no such node, a `ValueError`
+    /// for a run that wrote several points (a `.step` around the operating
+    /// point), whose values one float cannot hold.
+    fn value(&self, name: &str, missing: fn(String) -> PyErr) -> PyResult<f64> {
+        let col = self
+            .inner
+            .get(name)
+            .ok_or_else(|| missing(format!("No node '{name}'")))?;
+        match *col {
+            [v] => Ok(v),
+            ref all => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "'{name}' holds {} points, one per .step point: an OperatingPoint holds one",
+                all.len()
+            ))),
+        }
     }
 }
 

@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
-use super::analysis::Analysis;
+use super::analysis::{Analysis, PssBase};
 use super::args::{Num, PyValueArg};
 use super::card::{self, dc_sweeps};
 use super::circuit::hoisted;
@@ -202,6 +202,79 @@ impl PyTestbench {
         Ok(())
     }
 
+    #[pyo3(signature = (fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=false))]
+    fn add_pss(mut slf: PyRefMut<'_, Self>, fundamental_frequency: f64, stabilization_time: f64, observe_node: &str, points_per_period: u32, harmonics: u32, sc_iter: Option<u32>, steady_coeff: Option<f64>, uic: bool) {
+        let a = card::pss(fundamental_frequency, stabilization_time, observe_node, points_per_period, harmonics, sc_iter, steady_coeff, uic);
+        slf.as_super().tb().analyses.push(a);
+    }
+
+    #[pyo3(signature = (variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10))]
+    fn add_s_param(mut slf: PyRefMut<'_, Self>, variation: &str, number_of_points: u32, start_frequency: f64, stop_frequency: f64) -> PyResult<()> {
+        slf.as_super().tb().analyses.push(card::s_param(variation, number_of_points, start_frequency, stop_frequency)?);
+        Ok(())
+    }
+
+    /// LTspice `.net` over an `.ac`: the `.ac` queued, `.net` an LTspice line.
+    #[pyo3(signature = (output_current, input_source, z_in=50.0, z_out=50.0, variation="dec", points=100, start_freq=1e3, stop_freq=1e9))]
+    fn add_network_params(mut slf: PyRefMut<'_, Self>, output_current: &str, input_source: &str, z_in: f64, z_out: f64, variation: &str, points: u32, start_freq: f64, stop_freq: f64) -> PyResult<()> {
+        let ac = card::ac(variation, points, start_freq, stop_freq)?;
+        let tb = slf.as_super().tb();
+        tb.analyses.push(ac);
+        tb.extra_lines.push((card::network_params(output_current, input_source, z_in, z_out), crate::syntax::Dialect::Ltspice));
+        Ok(())
+    }
+
+    #[pyo3(signature = (fundamental_frequencies, num_harmonics=None))]
+    fn add_harmonic_balance(mut slf: PyRefMut<'_, Self>, fundamental_frequencies: Vec<f64>, num_harmonics: Option<Vec<u32>>) {
+        slf.as_super().tb().analyses.push(card::harmonic_balance(fundamental_frequencies, num_harmonics));
+    }
+
+    #[pyo3(signature = (probe, variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e10))]
+    fn add_stability(mut slf: PyRefMut<'_, Self>, probe: &str, variation: &str, number_of_points: u32, start_frequency: f64, stop_frequency: f64) -> PyResult<()> {
+        slf.as_super().tb().analyses.push(card::stability(probe, variation, number_of_points, start_frequency, stop_frequency)?);
+        Ok(())
+    }
+
+    #[pyo3(signature = (step_time, end_time))]
+    fn add_transient_noise(mut slf: PyRefMut<'_, Self>, step_time: f64, end_time: f64) {
+        slf.as_super().tb().analyses.push(Analysis::TransientNoise { step: step_time, stop: end_time });
+    }
+
+    #[pyo3(signature = (pss_fundamental, pss_stabilization, pss_harmonics=10, variation="dec", points=100, start_freq=1.0, stop_freq=1e9, sweep_type="relative"))]
+    fn add_spectre_pac(mut slf: PyRefMut<'_, Self>, pss_fundamental: f64, pss_stabilization: f64, pss_harmonics: u32, variation: &str, points: u32, start_freq: f64, stop_freq: f64, sweep_type: &str) -> PyResult<()> {
+        let pss = PssBase { fundamental: pss_fundamental, stabilization: pss_stabilization, harmonics: pss_harmonics };
+        let sweep = card::sweep(variation, points, start_freq, stop_freq)?;
+        slf.as_super().tb().analyses.push(Analysis::SpectrePac { pss, sweep, sweep_type: sweep_type.into() });
+        Ok(())
+    }
+
+    #[pyo3(signature = (pss_fundamental, pss_stabilization, output_node, ref_node, pss_harmonics=10, variation="dec", points=100, start_freq=1.0, stop_freq=1e9))]
+    fn add_spectre_pnoise(mut slf: PyRefMut<'_, Self>, pss_fundamental: f64, pss_stabilization: f64, output_node: &str, ref_node: &str, pss_harmonics: u32, variation: &str, points: u32, start_freq: f64, stop_freq: f64) -> PyResult<()> {
+        let pss = PssBase { fundamental: pss_fundamental, stabilization: pss_stabilization, harmonics: pss_harmonics };
+        let sweep = card::sweep(variation, points, start_freq, stop_freq)?;
+        slf.as_super().tb().analyses.push(Analysis::SpectrePnoise { pss, output: output_node.into(), reference: ref_node.into(), sweep });
+        Ok(())
+    }
+
+    /// `source` is accepted as on `spectre_pxf` and not written: `pxf`
+    /// names no input source (`[REF]` p.303-304).
+    #[pyo3(signature = (pss_fundamental, pss_stabilization, output_node, source, pss_harmonics=10, variation="dec", points=100, start_freq=1.0, stop_freq=1e9))]
+    fn add_spectre_pxf(mut slf: PyRefMut<'_, Self>, pss_fundamental: f64, pss_stabilization: f64, output_node: &str, source: &str, pss_harmonics: u32, variation: &str, points: u32, start_freq: f64, stop_freq: f64) -> PyResult<()> {
+        let _ = source;
+        let pss = PssBase { fundamental: pss_fundamental, stabilization: pss_stabilization, harmonics: pss_harmonics };
+        let sweep = card::sweep(variation, points, start_freq, stop_freq)?;
+        slf.as_super().tb().analyses.push(Analysis::SpectrePxf { pss, output: output_node.into(), sweep });
+        Ok(())
+    }
+
+    #[pyo3(signature = (pss_fundamental, pss_stabilization, probe, pss_harmonics=10, variation="dec", points=100, start_freq=1.0, stop_freq=1e9))]
+    fn add_spectre_pstb(mut slf: PyRefMut<'_, Self>, pss_fundamental: f64, pss_stabilization: f64, probe: &str, pss_harmonics: u32, variation: &str, points: u32, start_freq: f64, stop_freq: f64) -> PyResult<()> {
+        let pss = PssBase { fundamental: pss_fundamental, stabilization: pss_stabilization, harmonics: pss_harmonics };
+        let sweep = card::sweep(variation, points, start_freq, stop_freq)?;
+        slf.as_super().tb().analyses.push(Analysis::SpectrePstb { pss, probe: probe.into(), sweep });
+        Ok(())
+    }
+
     /// Runs every queued analysis (`add_*`) as one deck and returns one
     /// result per analysis, in queue order, each the type its single-analysis
     /// twin returns (`op, tran = tb.run()`); `None` for `add_fourier`, whose
@@ -235,7 +308,8 @@ impl PyTestbench {
     fn from_source(py: Python<'_>, text: &str, dialect: Option<&str>) -> PyResult<Py<Self>> {
         let d = dialect.map(str::parse).transpose().map_err(PyValueError::new_err)?;
         let top = super::store::read_deck(text, d).map_err(PyValueError::new_err)?;
-        let deck = Deck { top, bench: Some(Default::default()), ..Default::default() };
+        let libraries = super::store::libraries(text);
+        let deck = Deck { top, libraries, bench: Some(Default::default()), ..Default::default() };
         let sim = PySimulator { deck, backend: None, save_currents: false };
         Py::new(py, PyClassInitializer::from(sim).add_subclass(Self {}))
     }
@@ -343,6 +417,7 @@ impl PyModelLibrary {
                 corner: corner.map(str::to_string),
                 backend_paths: bp,
                 setup_includes: setup_includes.unwrap_or_default(),
+                placed: false,
             },
         })
     }

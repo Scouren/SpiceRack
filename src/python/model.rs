@@ -13,7 +13,8 @@
 //!   `Card::source(name: &str, head: String, value: &Value, tail: String) -> Card`,
 //!   `Card::set_value(&mut self, v: f64) -> bool`
 //! - `pub(super) struct Body`, `pub(super) struct Bench`, `pub(super) struct Step`,
-//!   `pub(super) struct ModelLibrary`, `pub(super) struct Func`
+//!   `pub(super) struct ModelLibrary`, `ModelLibrary::line(&self, path: &str) -> String`,
+//!   `ModelLibrary::path_for(&self, d: Dialect) -> &str`, `pub(super) struct Func`
 //! - `pub(super) enum Value`, `Value::text(&self) -> String`
 //! - `pub(super) fn num(v: f64) -> String`, `pub(super) fn dec(v: f64) -> String`,
 //!   `pub(super) fn params(ps: &[(String, String)]) -> String`
@@ -108,6 +109,9 @@ pub(super) struct ModelLibrary {
     pub(super) corner: Option<String>,
     pub(super) backend_paths: std::collections::BTreeMap<String, String>,
     pub(super) setup_includes: Vec<String>,
+    /// Read back from the store: its ngspice lines are among the top's raw
+    /// lines, which the deck writes with the target family's path.
+    pub(super) placed: bool,
 }
 
 /// A `.func name(args) {body}`.
@@ -154,6 +158,23 @@ impl Card {
         };
         self.text = format!("{head} {}{tail}", num(v));
         true
+    }
+}
+
+impl ModelLibrary {
+    /// The `.lib` (with a corner) or `.include` line naming `path`.
+    pub(super) fn line(&self, path: &str) -> String {
+        match &self.corner {
+            Some(corner) => format!(".lib {path} {corner}"),
+            None => format!(".include {path}"),
+        }
+    }
+
+    /// The path the deck for `d` loads: `d`'s family's, else the ngspice one.
+    pub(super) fn path_for(&self, d: Dialect) -> &str {
+        self.backend_paths
+            .get(d.family().name())
+            .unwrap_or(&self.path)
     }
 }
 

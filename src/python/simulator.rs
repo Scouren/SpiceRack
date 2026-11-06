@@ -322,16 +322,7 @@ impl PySimulator {
         steady_coeff: Option<f64>,
         uic: bool,
     ) -> PyResult<PyPssAnalysis> {
-        let a = Analysis::Pss {
-            fundamental: fundamental_frequency,
-            stabilization: stabilization_time,
-            observe_node: observe_node.into(),
-            points_per_period,
-            harmonics,
-            sc_iter,
-            steady_coeff,
-            uic,
-        };
+        let a = card::pss(fundamental_frequency, stabilization_time, observe_node, points_per_period, harmonics, sc_iter, steady_coeff, uic);
         Ok(PyPssAnalysis {
             inner: Results::from_raw(self.run(a)?),
         })
@@ -345,9 +336,7 @@ impl PySimulator {
         start_frequency: f64,
         stop_frequency: f64,
     ) -> PyResult<PySParamAnalysis> {
-        let a = Analysis::SPar {
-            sweep: card::sweep(variation, number_of_points, start_frequency, stop_frequency)?,
-        };
+        let a = card::s_param(variation, number_of_points, start_frequency, stop_frequency)?;
         Ok(PySParamAnalysis {
             inner: Results::from_raw(self.run(a)?),
         })
@@ -368,8 +357,7 @@ impl PySimulator {
     ) -> PyResult<PySParamAnalysis> {
         let mut deck = self.deck(card::ac(variation, points, start_freq, stop_freq)?);
         if let Some(tb) = &mut deck.bench {
-            // LTspice's card: no other dialect has `.net`.
-            let net = format!(".net {output_current} {input_source} Rout={z_out} Rin={z_in}");
+            let net = card::network_params(output_current, input_source, z_in, z_out);
             tb.extra_lines.push((net, crate::syntax::Dialect::Ltspice));
         }
         Ok(PySParamAnalysis {
@@ -383,11 +371,7 @@ impl PySimulator {
         fundamental_frequencies: Vec<f64>,
         num_harmonics: Option<Vec<u32>>,
     ) -> PyResult<PyHarmonicBalanceAnalysis> {
-        let harmonics = num_harmonics.unwrap_or_else(|| vec![7; fundamental_frequencies.len()]);
-        let a = Analysis::HarmonicBalance {
-            frequencies: fundamental_frequencies,
-            harmonics,
-        };
+        let a = card::harmonic_balance(fundamental_frequencies, num_harmonics);
         Ok(PyHarmonicBalanceAnalysis {
             inner: Results::from_raw(self.run(a)?),
         })
@@ -402,10 +386,7 @@ impl PySimulator {
         start_frequency: f64,
         stop_frequency: f64,
     ) -> PyResult<PyStabilityAnalysis> {
-        let a = Analysis::Stability {
-            probe: probe.into(),
-            sweep: card::sweep(variation, number_of_points, start_frequency, stop_frequency)?,
-        };
+        let a = card::stability(probe, variation, number_of_points, start_frequency, stop_frequency)?;
         Ok(PyStabilityAnalysis {
             inner: Results::from_raw(self.run(a)?),
         })
@@ -413,10 +394,7 @@ impl PySimulator {
 
     #[pyo3(signature = (step_time, end_time))]
     fn transient_noise(&self, step_time: f64, end_time: f64) -> PyResult<PyTransientNoiseAnalysis> {
-        // Every backend refuses it (`Analysis::spectre`), so the times reach
-        // no deck.
-        let _ = (step_time, end_time);
-        let a = Analysis::TransientNoise;
+        let a = Analysis::TransientNoise { step: step_time, stop: end_time };
         Ok(PyTransientNoiseAnalysis {
             inner: Results::from_raw(self.run(a)?),
         })

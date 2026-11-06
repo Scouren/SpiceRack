@@ -56,7 +56,7 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
 /// # Errors
 /// As [`run_all`], and `SimulationError` when an analysis's plot is not
 /// among those the run wrote, or it is an analysis whose plot is not
-/// matched here (`pss`, `hb`, `stb`, transient noise, the Spectre-only
+/// matched here (`pss`, `hb`, `stb`, the Spectre-only
 /// ones) run beside others.
 pub fn run_each(
     sim: Dialect,
@@ -92,7 +92,7 @@ pub fn run_each(
             Kind::Op => "Operating Point",
             Kind::Dc => "DC transfer characteristic",
             Kind::Ac => "AC Analysis",
-            Kind::Tran => "Transient Analysis",
+            Kind::Tran | Kind::TranNoise => "Transient Analysis",
             Kind::Noise => "Noise Spectral Density Curves",
             Kind::Tf => "Transfer Function",
             Kind::Sens | Kind::SensAc => "Sensitivity Analysis",
@@ -102,7 +102,6 @@ pub fn run_each(
             Kind::Pss
             | Kind::Hb
             | Kind::Stb
-            | Kind::TranNoise
             | Kind::SpectreSweep
             | Kind::SpectreMonteCarlo
             | Kind::Pac
@@ -130,7 +129,6 @@ fn unmatched(a: Kind) -> &'static str {
         Kind::Pss => "Pss",
         Kind::Hb => "HarmonicBalance",
         Kind::Stb => "Stability",
-        Kind::TranNoise => "TransientNoise",
         Kind::SpectreSweep => "SpectreSweep",
         Kind::SpectreMonteCarlo => "SpectreMonteCarlo",
         Kind::Pac => "SpectrePac",
@@ -141,6 +139,7 @@ fn unmatched(a: Kind) -> &'static str {
         | Kind::Dc
         | Kind::Ac
         | Kind::Tran
+        | Kind::TranNoise
         | Kind::Noise
         | Kind::Tf
         | Kind::Sens

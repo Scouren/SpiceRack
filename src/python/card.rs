@@ -14,6 +14,11 @@
 //! - `pub(super) fn distortion(variation, points, start, stop, f2overf1) -> PyResult<Analysis>`
 //! - `pub(super) fn spectre_sweep(param, start, stop, step, inner, inner_type) -> PyResult<Analysis>`
 //! - `pub(super) fn spectre_monte_carlo(iterations, inner, inner_type, seed) -> PyResult<Analysis>`
+//! - `pub(super) fn pss(fundamental, stabilization, observe_node, points_per_period, harmonics, sc_iter, steady_coeff, uic) -> Analysis`
+//! - `pub(super) fn s_param(variation, points, start, stop) -> PyResult<Analysis>`
+//! - `pub(super) fn harmonic_balance(frequencies: Vec<f64>, harmonics: Option<Vec<u32>>) -> Analysis`
+//! - `pub(super) fn stability(probe, variation, points, start, stop) -> PyResult<Analysis>`
+//! - `pub(super) fn network_params(output_current, input_source, z_in, z_out) -> String`
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -177,4 +182,69 @@ pub(super) fn spectre_monte_carlo(
         inner_type,
         seed,
     })
+}
+
+/// `.pss`, with ngspice's shooting controls (`sc_iter`, `steady_coeff`,
+/// `uic`; manual §11.3.12).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn pss(
+    fundamental: f64,
+    stabilization: f64,
+    observe_node: &str,
+    points_per_period: u32,
+    harmonics: u32,
+    sc_iter: Option<u32>,
+    steady_coeff: Option<f64>,
+    uic: bool,
+) -> Analysis {
+    Analysis::Pss {
+        fundamental,
+        stabilization,
+        observe_node: observe_node.into(),
+        points_per_period,
+        harmonics,
+        sc_iter,
+        steady_coeff,
+        uic,
+    }
+}
+
+/// `.sp`; `variation` per [`sweep`].
+pub(super) fn s_param(variation: &str, points: u32, start: f64, stop: f64) -> PyResult<Analysis> {
+    Ok(Analysis::SPar {
+        sweep: sweep(variation, points, start, stop)?,
+    })
+}
+
+/// Harmonic balance over `frequencies`, seven harmonics each unless given.
+pub(super) fn harmonic_balance(frequencies: Vec<f64>, harmonics: Option<Vec<u32>>) -> Analysis {
+    let harmonics = harmonics.unwrap_or_else(|| vec![7; frequencies.len()]);
+    Analysis::HarmonicBalance {
+        frequencies,
+        harmonics,
+    }
+}
+
+/// Spectre `stb` around `probe`; `variation` per [`sweep`].
+pub(super) fn stability(
+    probe: &str,
+    variation: &str,
+    points: u32,
+    start: f64,
+    stop: f64,
+) -> PyResult<Analysis> {
+    Ok(Analysis::Stability {
+        probe: probe.into(),
+        sweep: sweep(variation, points, start, stop)?,
+    })
+}
+
+/// LTspice's `.net` card (no other dialect has one), beside an `.ac`.
+pub(super) fn network_params(
+    output_current: &str,
+    input_source: &str,
+    z_in: f64,
+    z_out: f64,
+) -> String {
+    format!(".net {output_current} {input_source} Rout={z_out} Rin={z_in}")
 }
