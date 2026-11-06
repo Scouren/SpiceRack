@@ -12,18 +12,18 @@
 //! Contents:
 //! - `pub(crate) fn register_builtins()`
 
+mod cdl;
 mod espice;
 mod hspice;
 mod ltspice;
 mod ngspice;
+mod ngspice_given;
+mod spectre;
+mod vacask;
+mod verilog;
 mod xyce;
 
-use crate::syntax::behaviour;
 use crate::syntax::def::register;
-use crate::syntax::lang::{self, CONSTRUCT_COUNT, CONSTRUCTS, Row};
-use crate::syntax::lexicon;
-use crate::syntax::render::capability::{Action, action};
-use crate::syntax::render::spelling::spelling;
 use crate::syntax::{Dialect, Lang};
 
 /// Registers every built-in, at its constant handle.
@@ -50,42 +50,50 @@ pub(crate) fn register_builtins() {
             Dialect::Hspice => register(hspice::hspice()).expect("hspice registers"),
             Dialect::Xyce => register(xyce::xyce()).expect("xyce registers"),
             Dialect::Ltspice => register(ltspice::ltspice()).expect("ltspice registers"),
-            _ => lang::append(|_| from_tables(d)).expect("a slot for a built-in"),
+            Dialect::Spectre => register(spectre::spectre()).expect("spectre registers"),
+            Dialect::Vacask => register(vacask::vacask()).expect("vacask registers"),
+            Dialect::Cdl => register(cdl::cdl()).expect("cdl registers"),
+            Dialect::Verilog => register(verilog::verilog()).expect("verilog registers"),
         };
         assert_eq!(got, Lang::from(d), "{d:?} at its handle");
     }
-}
-
-// ---- private ----
-
-/// Built-in `d`'s row, from its old per-dialect tables.
-fn from_tables(d: Dialect) -> Row {
-    let lexicon = match d {
-        Dialect::Ngspice | Dialect::Espice => Some(&lexicon::NGSPICE),
-        Dialect::Hspice => Some(&lexicon::HSPICE),
-        Dialect::Ltspice => Some(&lexicon::LTSPICE),
-        Dialect::Xyce => Some(&lexicon::XYCE),
-        Dialect::Spectre => Some(&lexicon::SPECTRE),
-        Dialect::Vacask => Some(&lexicon::VACASK),
-        Dialect::Cdl | Dialect::Verilog => None,
-    };
-    let mut cells = [Action::Native; CONSTRUCT_COUNT];
-    for (i, c) in CONSTRUCTS.into_iter().enumerate() {
-        cells[i] = action(d, c);
-    }
-    Row {
-        name: d.name(),
-        lexicon,
-        spelling: spelling(d),
-        cells,
-        behaviours: behaviour::builtin(d),
-    }
+    let given = register(ngspice_given::ngspice_given()).expect("ngspice-given registers");
+    assert_eq!(given, Lang::NGSPICE_GIVEN);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::syntax::behaviour;
+    use crate::syntax::lang::{CONSTRUCT_COUNT, CONSTRUCTS, Row};
+    use crate::syntax::lexicon;
     use crate::syntax::lexicon::Lexicon;
+    use crate::syntax::render::capability::{Action, action};
+    use crate::syntax::render::spelling::spelling;
+
+    /// Built-in `d`'s row, from its old per-dialect tables.
+    fn from_tables(d: Dialect) -> Row {
+        let lexicon = match d {
+            Dialect::Ngspice | Dialect::Espice => Some(&lexicon::NGSPICE),
+            Dialect::Hspice => Some(&lexicon::HSPICE),
+            Dialect::Ltspice => Some(&lexicon::LTSPICE),
+            Dialect::Xyce => Some(&lexicon::XYCE),
+            Dialect::Spectre => Some(&lexicon::SPECTRE),
+            Dialect::Vacask => Some(&lexicon::VACASK),
+            Dialect::Cdl | Dialect::Verilog => None,
+        };
+        let mut cells = [Action::Native; CONSTRUCT_COUNT];
+        for (i, c) in CONSTRUCTS.into_iter().enumerate() {
+            cells[i] = action(d, c);
+        }
+        Row {
+            name: d.name(),
+            lexicon,
+            spelling: spelling(d),
+            cells,
+            behaviours: behaviour::builtin(d),
+        }
+    }
 
     #[test]
     fn each_built_in_row_is_its_old_tables() {
@@ -115,6 +123,14 @@ mod tests {
             }
             assert_eq!(*got.behaviours(), want.behaviours, "{d:?}");
         }
+    }
+
+    #[test]
+    fn the_given_decks_lexicon_is_its_old_one() {
+        // The oracle is the old `lexicon::NGSPICE_GIVEN`.
+        let got = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
+        same_lexicon(got, &lexicon::NGSPICE_GIVEN, Dialect::Ngspice);
+        assert_eq!(Lang::NGSPICE_GIVEN.name(), "ngspice-given");
     }
 
     /// `a` reads text as `b` does: every field, its tables flattened to the

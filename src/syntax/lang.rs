@@ -13,7 +13,7 @@
 //! Cites: none (a registry; each row's tables cite their manuals).
 //!
 //! Contents:
-//! - `pub struct Lang`, `Lang::{NGSPICE, ESPICE, HSPICE, XYCE, LTSPICE, SPECTRE, VACASK, CDL, VERILOG}: Lang`,
+//! - `pub struct Lang`, `Lang::{NGSPICE, ESPICE, HSPICE, XYCE, LTSPICE, SPECTRE, VACASK, CDL, VERILOG, NGSPICE_GIVEN}: Lang`,
 //!   `Lang::BUILTIN_COUNT: usize`
 //! - `pub type Cells`, `pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT]`, `pub const CONSTRUCT_COUNT: usize`,
 //!   `pub const LANGS_MAX: usize`
@@ -130,8 +130,11 @@ impl Lang {
     pub const VACASK: Lang = Lang(6);
     pub const CDL: Lang = Lang(7);
     pub const VERILOG: Lang = Lang(8);
+    /// The Python API's decks: ngspice text with decimal numbers, `.step`
+    /// and dialect regions (`syntax::dialects::ngspice_given`).
+    pub const NGSPICE_GIVEN: Lang = Lang(9);
     /// How many built-ins there are: the first registered handles.
-    pub const BUILTIN_COUNT: usize = 9;
+    pub const BUILTIN_COUNT: usize = 10;
 
     /// The name it was registered under (`ngspice`, ...).
     pub fn name(self) -> &'static str {
