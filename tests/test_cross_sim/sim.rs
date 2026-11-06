@@ -94,7 +94,7 @@ fn run_in(
     files: &[(String, String)],
     secs: u64,
 ) -> Result<Ran, String> {
-    let mut tmp = Some(tempfile::TempDir::new().map_err(|e| e.to_string())?);
+    let mut tmp = Some(tempfile::TempDir::new().unwrap_or_else(|e| harness(&e)));
     let kept = tmp
         .as_ref()
         .map(|t| t.path().to_path_buf())
@@ -119,10 +119,10 @@ fn run_in(
     for (name, body) in files {
         let at = dir.join(name);
         if let Some(parent) = at.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            std::fs::create_dir_all(parent).unwrap_or_else(|e| harness(&e));
         }
         let _ = std::fs::remove_file(&at);
-        std::fs::write(&at, body).map_err(|e| e.to_string())?;
+        std::fs::write(&at, body).unwrap_or_else(|e| harness(&e));
     }
     let ext = deck
         .extension()
@@ -133,7 +133,7 @@ fn run_in(
         Sim::Ngspice | Sim::NgspiceHsa => ngspice_text(text, &raw),
         _ => text.to_string(),
     };
-    std::fs::write(&file, &text).map_err(|e| e.to_string())?;
+    std::fs::write(&file, &text).unwrap_or_else(|e| harness(&e));
     let mut c = Command::new("timeout");
     c.arg((10 * secs).to_string())
         .arg("prlimit")
@@ -166,7 +166,7 @@ fn run_in(
             }
         }
     }
-    let out = c.arg(&file).output().map_err(|e| e.to_string())?;
+    let out = c.arg(&file).output().unwrap_or_else(|e| harness(&e));
     if timed_out(&out) {
         return Ok(Ran::Timeout);
     }
@@ -204,6 +204,12 @@ fn run_in(
         return Ok(Ran::Failed(format!("no plot: {}", errors(&log))));
     }
     Ok(Ran::Plots(plots))
+}
+
+/// A run directory or process the harness itself cannot make (a full
+/// disk, a missing `timeout`): no verdict on the deck, so the test stops.
+fn harness(e: &std::io::Error) -> ! {
+    panic!("cross_sim harness: {e}")
 }
 
 /// `timeout` exits 124 itself; a CPU-limit kill (SIGXCPU, SIGKILL at the
