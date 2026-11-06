@@ -114,7 +114,8 @@ impl W<'_, '_> {
             ic.push_str(&self.node_list("nodeset", &tb.nodesets));
         }
         // `Construct::Save` is `Spell(Omit)`: VACASK saves every node.
-        for l in &tb.extra {
+        for &n in &tb.extra {
+            let l = self.rd.line(n);
             self.line(&format!("  {l}"));
         }
         for (idx, (a, tok)) in tb.analyses.iter().enumerate() {

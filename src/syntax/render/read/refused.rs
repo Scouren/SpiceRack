@@ -284,6 +284,12 @@ impl Rd<'_> {
             "powergridbusshunt",
             "powergridtransformer",
         ];
+        if self.text_dialect(tok) == Dialect::Vacask {
+            return match self.vacask_script(tok) {
+                true => Construct::VacaskScript,
+                false => Construct::ForeignText,
+            };
+        }
         let w = self.t.text(tok).to_ascii_lowercase();
         if self.text_dialect(tok) == Dialect::Hspice {
             return match w.as_str() {

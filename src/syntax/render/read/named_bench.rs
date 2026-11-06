@@ -13,6 +13,7 @@
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
 //! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
 //! - `Rd::node_vals(&self, n: u32) -> Option<Vec<(String, f64)>>`
+//! - `Rd::vacask_script(&self, head: u32) -> bool`
 
 use super::named_elements::unquoted;
 use super::{Ana, Bench, BenchCard, Opt, Rd, Sweep};
@@ -183,6 +184,27 @@ impl<'a> Rd<'a> {
             })
             .collect()
     }
+
+    /// Whether the VACASK statement at token `head` (its first) only steers a VACASK run and its
+    /// scripts: the control commands `abort` (the error policy,
+    /// `docs/cmd-errorhandling.md`), `print` (the console,
+    /// `cmd-print.md`), `postprocess` (a program run after the analyses,
+    /// `cmd-postprocess.md`), and an `embed` of a file no `load` or
+    /// `include` of the deck reads (`input-embed.md`: the file is written
+    /// for such a program).
+    pub(in crate::syntax::render) fn vacask_script(&self, head: u32) -> bool {
+        if self.d != Dialect::Vacask {
+            return false;
+        }
+        match self.ttag(head) {
+            // `embed "file" <<<MARK`: the file is the next token.
+            T::KwEmbed => {
+                let file = self.t.text(head + 1).trim().trim_matches('"');
+                head < self.line_last(head) && !self.reads_file(file)
+            }
+            _ => matches!(self.t.text(head), "abort" | "print" | "postprocess"),
+        }
+    }
 }
 
 // ---- private ----
@@ -195,6 +217,30 @@ fn nums(v: Vec<(String, f64)>) -> Vec<(String, super::Val)> {
 }
 
 impl<'a> Rd<'a> {
+    /// Whether a `load` or `include` anywhere in the file names `file`.
+    fn reads_file(&self, file: &str) -> bool {
+        let mut work: Vec<u32> = self.ast.fields(self.ast.root()).to_vec();
+        while let Some(s) = work.pop() {
+            if matches!(
+                self.tag(s),
+                Tag::Subckt | Tag::Section | Tag::Library | Tag::If | Tag::Else
+            ) {
+                work.extend(self.body(s));
+                work.extend(self.ast.next(Node(s)).map(|nx| nx.0));
+                continue;
+            }
+            let names = matches!(self.ttag(self.main(s)), T::KwLoad | T::KwInclude)
+                && self
+                    .fields(s)
+                    .first()
+                    .is_some_and(|&f| self.unquote(f) == file);
+            if names {
+                return true;
+            }
+        }
+        false
+    }
+
     /// `name montecarlo numruns=N [seed=S] [variations=v] { inner kind }`
     /// (`[REF]` p.174, `variations` p.166) over one analysis statement with
     /// no nodes and no parameters (the Python API's `inner_analysis` and
@@ -260,11 +306,11 @@ impl<'a> Rd<'a> {
     }
 
     /// A VACASK `control` block: its options and analyses, the rest kept as
-    /// lines (the old lowering's `ControlBlock`).
+    /// statements (the old lowering's `ControlBlock`).
     fn vacask_control(&self, n: u32) -> Vec<BenchCard> {
         let mut out = Vec::new();
         let mut sweeps: Vec<u32> = Vec::new();
-        let extra = |out: &mut Vec<BenchCard>, s: u32| out.push(BenchCard::Extra(self.line(s)));
+        let extra = |out: &mut Vec<BenchCard>, s: u32| out.push(BenchCard::Extra(s));
         for &st in self.body(n) {
             let head = self.ttag(self.main(st));
             if head == T::KwSweep {

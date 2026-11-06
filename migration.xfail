@@ -27304,3 +27304,105 @@ xyce/Output/SPARAMS/zparams-ts2.cir spectre now written: its P port and .LIN rea
 xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
 xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
 xyce/YLIN/ylin-5port-linAnalysis.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+# Phase 7: spectre-read-r2: VACASK script lines (render::read::named_bench
+# vacask_control, refused kept_construct; W0120 new). A VACASK control
+# command with no circuit meaning (`abort`, `print`, `postprocess`: VACASK
+# docs cmd-errorhandling.md, cmd-print.md, cmd-postprocess.md) and an
+# `embed` of a file no `load`/`include` reads (input-embed.md) are left out
+# with a W0120 note off VACASK; were copied into the SPICE and Spectre decks
+# as card lines, or refused W0001 (embed). Any other control statement the
+# reader keeps (`elaborate`, `alter`, `var`, an analysis it does not read)
+# is refused W0001 off VACASK, was copied as a card line (S-class: hier.sim
+# was written with `elaborate circuit("sub1")` as an element line). VACASK
+# and CDL copy them as before. Oracle: VACASK on the original vs ngspice on
+# the written deck (tests/test_vacask_import.rs; the corpus decks by hand).
+vacask/benchmark/graetz/vacask/debug_graetz.sim espice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/benchmark/graetz/vacask/debug_graetz.sim hspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/benchmark/graetz/vacask/debug_graetz.sim ltspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/benchmark/graetz/vacask/debug_graetz.sim ngspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/benchmark/graetz/vacask/debug_graetz.sim spectre its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/benchmark/graetz/vacask/debug_graetz.sim xyce its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/benchmark/graetz/vacask/runme.sim espice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/graetz/vacask/runme.sim hspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/graetz/vacask/runme.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/graetz/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/graetz/vacask/runme.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/graetz/vacask/runme.sim xyce now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/mul/vacask/runme.sim espice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/mul/vacask/runme.sim hspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/mul/vacask/runme.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/mul/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/mul/vacask/runme.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/mul/vacask/runme.sim xyce now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/rc/vacask/runme.sim espice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/rc/vacask/runme.sim hspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/rc/vacask/runme.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/rc/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/rc/vacask/runme.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/rc/vacask/runme.sim xyce now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/bjtring/vacask/runme.sim espice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/bjtring/vacask/runme.sim hspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/bjtring/vacask/runme.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/bjtring/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/bjtring/vacask/runme.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/bjtring/vacask/runme.sim xyce now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/jfetring/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/mul/vacask/runme.sim espice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/mul/vacask/runme.sim hspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/mul/vacask/runme.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/mul/vacask/runme.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/mul/vacask/runme.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/benchmark/vadistiller/mul/vacask/runme.sim xyce now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/hierarchy/hier.sim ltspice now refused W0001: a VACASK control command with a circuit meaning (elaborate), was copied as a card line
+vacask/demo/hierarchy/hier.sim ngspice now refused W0001: a VACASK control command with a circuit meaning (elaborate), was copied as a card line
+vacask/demo/hierarchy/hier.sim spectre now refused W0001: a VACASK control command with a circuit meaning (elaborate), was copied as a card line
+vacask/demo/rpn/parser.sim espice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/parser.sim hspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/parser.sim ltspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/parser.sim ngspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/parser.sim spectre its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/parser.sim xyce its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/sipfx.sim espice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/sipfx.sim hspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/sipfx.sim ltspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/sipfx.sim ngspice its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/sipfx.sim spectre its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/rpn/sipfx.sim xyce its VACASK script lines (abort, print) left out W0120, were copied as card lines
+vacask/demo/spice/bsim3v3nqs.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/bsim3v3nqs.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/bsim3v3nqs.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/bsim4v8nqs.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/bsim4v8nqs.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/bsim4v8nqs.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos1inv.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos1inv.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos1inv.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos2inv.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos2inv.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos2inv.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos3inv.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos3inv.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos3inv.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos6inv.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos6inv.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos9inv.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mos9inv.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mutual.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mutual.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/demo/spice/mutual.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/resonator.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/resonator.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/resonator.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_capacitor.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_capacitor.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_capacitor.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_mutual.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_mutual.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_mutual.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_tran.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_tran.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/test_tran.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/timestep.sim ltspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/timestep.sim ngspice now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused
+vacask/test/timestep.sim spectre now written: its VACASK script lines (abort, print, postprocess, an embed nothing loads) left out W0120; was refused

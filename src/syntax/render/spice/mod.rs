@@ -542,10 +542,16 @@ impl W<'_, '_> {
         out
     }
 
-    /// The text of `raw`, one string per line.
+    /// The text of `raw`, one string per line; a VACASK script line
+    /// (`Rd::vacask_script`, noted by `checks`) is left out, but CDL's
+    /// layout copies it as it copies all kept text.
     fn raw_lines(&self, raw: &[Raw]) -> Vec<String> {
         let mut out = Vec::new();
         for &r in raw {
+            let (Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) = r;
+            if self.d != Dialect::Cdl && self.rd.vacask_script(self.rd.main(n)) {
+                continue;
+            }
             match r {
                 Raw::Line(n) => out.push(self.rd.line(n)),
                 Raw::Lines(n) => out.extend(self.rd.lines(n)),

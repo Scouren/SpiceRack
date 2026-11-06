@@ -369,11 +369,11 @@ catalogue! {
         cite: "Xyce RG pp.96-104 (`.options <pkg>`); VACASK docs/cmd-options.md",
         explain: "The option is another simulator's own (VACASK's on a SPICE target, Xyce's packaged options on Spectre or VACASK) or only cosmetic, so it is left out. Set the target's own option if one has the same effect.",
     }
-    /// A `.control` line other than an analysis, or a VACASK `control` line that steers only the script: not written.
+    /// A `.control` line other than an analysis: not written.
     W0025 Note {
         title: "a control-block line not written",
-        cite: "ngspice manual ch.13 (the control language is a script, not a netlist); VACASK simulator/cmd.cpp (`abort`, `print`, `postprocess`)",
-        explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated, nor VACASK's `abort`, `print` and `postprocess`, which change no number. Run the script on its simulator, or rewrite it for the target's own scripting.",
+        cite: "ngspice manual ch.13 (the control language is a script, not a netlist)",
+        explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated. Run the script on ngspice, or rewrite it for the target's own scripting. (A VACASK control block's script lines are W0120.)",
     }
     /// A waveform's arguments past the count the target's form takes.
     W0026 Note {
@@ -570,6 +570,14 @@ catalogue! {
         title: "a Monte Carlo the target varies wider",
         cite: "Spectre Reference 19.1 p.166 (`variations`, default `process`); VACASK docs/cmd-analysis-mc.md (`mc` draws at every call site)",
         explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Write `variations=all`, or keep the deck's draws to the scope the montecarlo names.",
+    }
+    // W0120–W0124: the Spectre and VACASK reader's (`render::read::named*`).
+    /// A VACASK control command or `embed` that only steers a VACASK run
+    /// and its scripts, not written on another target.
+    W0120 Note {
+        title: "a VACASK script line with no circuit meaning, not written",
+        cite: "VACASK docs cmd-errorhandling.md (`abort`), cmd-print.md, cmd-postprocess.md, input-embed.md (a file written for a script)",
+        explain: "`abort` sets VACASK's error policy, `print` writes to its console, `postprocess` runs a program after the run, and an `embed` that no `load` or `include` of the deck reads writes a file for such a program: none changes a number of the circuit, and the target has no such step, so it is left out. Run the script on the target's own results.",
     }
     /// A `.tf` written as Spectre's `xf` at frequency 0: its input and
     /// output resistances are not computed.

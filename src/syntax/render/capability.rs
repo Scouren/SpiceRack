@@ -39,6 +39,9 @@ pub enum Construct {
     /// HSPICE's `.sn`, `.snnoise`, `.snxf`, `.trannoise`, `.lstb`, kept as
     /// text.
     HspiceAnalysis,
+    /// A VACASK script line with no circuit meaning (`abort`, `print`,
+    /// `postprocess`, an `embed` nothing loads: `Rd::vacask_script`).
+    VacaskScript,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -220,6 +223,18 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0039),
             D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0039),
+        },
+        // VACASK docs cmd-errorhandling.md, cmd-print.md,
+        // cmd-postprocess.md, input-embed.md: the run's own steps, no
+        // number of the circuit.
+        Construct::VacaskScript => match target {
+            D::Vacask => Native,
+            // As `ForeignText`: the xschem layout copies it.
+            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => {
+                Spell(Alt::Omit(Code::W0120))
+            }
+            D::Spectre | D::Verilog => Spell(Alt::Omit(Code::W0120)),
         },
         // ngspice's `.sens` is one output's sensitivity to every parameter
         // at the operating point or over an AC sweep (manual, `.SENS`);
@@ -534,11 +549,12 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 39] = [
+    const CONSTRUCTS: [Construct; 40] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
         Construct::HspiceAnalysis,
+        Construct::VacaskScript,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,
