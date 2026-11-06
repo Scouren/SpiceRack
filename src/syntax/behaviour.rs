@@ -17,7 +17,8 @@
 //! - `pub enum Writer`, `pub enum NumberReading`, `pub enum ModelSemantics`, `pub enum SourceRules`,
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
-//!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`
+//!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
+//!   `pub enum ExprEval`
 
 use crate::syntax::Lang;
 
@@ -63,6 +64,9 @@ pub struct Behaviours {
     pub include_scope: IncludeScope,
     /// Write: the named writer's parameter rows.
     pub named_params: NamedParams,
+    /// Read and write: whose evaluator reads a `{}` expression (a
+    /// then-branch ternary's grouping, `if()`, `sdt()`).
+    pub expr_eval: ExprEval,
     /// Write: the Spectre analysis kinds the target has an analysis for.
     pub spectre_analyses: &'static [&'static str],
 }
@@ -207,6 +211,17 @@ pub enum ParamForm {
     Xyce,
 }
 
+/// Whose evaluator reads a `{}` expression (`render::spice::ternary`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ExprEval {
+    /// C's grammar: `a?b?c:d:e` is `a?(b?c:d):e`; `if()` and `sdt()` are
+    /// whatever the dialect's function table holds.
+    C,
+    /// ngspice-45's numparam: `a?b?c:d:e` is `a?c:e`; no `if()`, no
+    /// `sdt()` in a B source (manual §5.1).
+    Ngspice,
+}
+
 /// The named writer's parameter rows.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NamedParams {
@@ -240,6 +255,7 @@ impl Behaviours {
         param_form: ParamForm::Plain,
         include_scope: IncludeScope::Local,
         named_params: NamedParams::None,
+        expr_eval: ExprEval::C,
         spectre_analyses: &[],
     };
 }

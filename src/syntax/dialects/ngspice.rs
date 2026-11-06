@@ -11,7 +11,8 @@
 //! - `pub(super) fn ngspice() -> DialectDef`
 
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, ControlBlock, LoadForm, ModelSemantics, NumberReading, SourceRules,
+    AnalysisForm, CardRules, ControlBlock, ExprEval, LoadForm, ModelSemantics, NumberReading,
+    SourceRules,
 };
 use crate::syntax::def::{Devices, DialectDef, Keywords, Operators};
 use crate::syntax::diag::Code;
@@ -128,6 +129,7 @@ pub(super) fn ngspice() -> DialectDef {
         .load_form(LoadForm::Ngspice)
         .control_block(ControlBlock::Ngspice)
         .analysis_form(AnalysisForm::Ngspice)
+        .expr_eval(ExprEval::Ngspice)
         .spectre_analysis("pz")
         .spectre_analysis("sp")
         .spectre_analysis("sens")

@@ -17,8 +17,7 @@
 
 use super::W;
 use super::ternary::{Nest, ngspice_nest};
-use crate::syntax::Lang;
-use crate::syntax::behaviour::Writer;
+use crate::syntax::behaviour::{ExprEval, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Block, Card, Comp, Func, Num, Val};
@@ -65,7 +64,7 @@ impl W<'_, '_> {
         self.ternary_checks(&blocks);
         // Xyce's time integral: ngspice's B source has `ddt`, no integral
         // (manual §5.1).
-        if self.b.text_family == Lang::NGSPICE {
+        if self.b.expr_eval == ExprEval::Ngspice {
             let exprs = self.expressions(&blocks);
             let sdt = |f: &str| f.eq_ignore_ascii_case("sdt");
             if let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(sdt)) {
@@ -121,7 +120,7 @@ impl<'r> W<'_, 'r> {
     /// refused, as ngspice reads its body by C's grammar in a B source
     /// and its own way in a `{}` value. A B source's is C's (no code).
     fn ternary_checks(&mut self, blocks: &[&Block]) {
-        if self.rd.b.text_family != Lang::NGSPICE || self.b.text_family == Lang::NGSPICE {
+        if self.rd.b.expr_eval != ExprEval::Ngspice || self.b.expr_eval == ExprEval::Ngspice {
             return;
         }
         let deck = self.deck;

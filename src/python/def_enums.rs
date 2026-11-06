@@ -19,7 +19,7 @@ use pyo3::types::PyType;
 
 use crate::syntax::Dialect;
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, ControlBlock, Coupling, EndRule, IncludeScope, LoadForm,
+    AnalysisForm, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope, LoadForm,
     ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, SourceRules,
     ValueQuoting, Writer,
 };
@@ -320,6 +320,7 @@ py_units!(
     IncludeScope,
     [Local, Global]
 );
+py_units!(PyExprEval, "ExprEval", ExprEval, [C, Ngspice]);
 py_units!(
     PyNamedParams,
     "NamedParams",
@@ -433,6 +434,7 @@ pub(super) fn add_enums(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add(m, PyParamForm::UNITS, PyParamForm)?;
     add(m, PyIncludeScope::UNITS, PyIncludeScope)?;
     add(m, PyNamedParams::UNITS, PyNamedParams)?;
+    add(m, PyExprEval::UNITS, PyExprEval)?;
     add(m, PyConstruct::UNITS, PyConstruct)?;
     add(m, PyCode::UNITS, PyCode)?;
     add(m, PyAnalysis::UNITS, PyAnalysis)?;

@@ -19,8 +19,7 @@
 use super::W;
 use super::laplace::{self, Laplace};
 use super::ternary::{Read, parenthesize, spell_if};
-use crate::syntax::Lang;
-use crate::syntax::behaviour::{Coupling, ParamForm, ValueQuoting};
+use crate::syntax::behaviour::{Coupling, ExprEval, ParamForm, ValueQuoting};
 use crate::syntax::lang::Cells;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::out::Space;
@@ -253,7 +252,7 @@ impl W<'_, '_> {
     /// (`ternary`): grouped as the source groups a then-branch's (C's, or
     /// ngspice's `{}` evaluator's), a blank before each `:` on Xyce.
     pub(super) fn ternaries(&self, e: &str) -> String {
-        let read = match self.rd.b.text_family == Lang::NGSPICE {
+        let read = match self.rd.b.expr_eval == ExprEval::Ngspice {
             true => Read::Ngspice,
             false => Read::C,
         };
@@ -267,7 +266,7 @@ impl W<'_, '_> {
             return e.to_string();
         }
         // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
-        let e = match self.b.text_family == Lang::NGSPICE {
+        let e = match self.b.expr_eval == ExprEval::Ngspice {
             true => spell_if(e),
             false => e.to_string(),
         };

@@ -135,7 +135,7 @@ ps.register_dialect(MyNgspice("my-ngspice-doc"))
 
 `spicerack.def_.DialectDef` has one method per Rust call of
 `spicerack::syntax::def::DialectDef`, same name, same arguments, each
-returning the definition: identity (`extends`), lines (`title`,
+returning the definition: identity (`extends`, `renamed`), lines (`title`,
 `fold_case`, `comment_line`, `comment_col1`, `comment_tail`, `cont_skip`,
 `dollar`, `plus`, `backslash`, `end`, `stop`, `join`, ...), words
 (`quote`, `string`, `ident_start`, `directive`, `keywords`, `keyword`,

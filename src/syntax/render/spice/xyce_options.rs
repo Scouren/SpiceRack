@@ -16,7 +16,6 @@
 
 use super::W;
 use super::bench::Tb;
-use crate::syntax::Lang;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 
@@ -92,7 +91,7 @@ impl W<'_, '_> {
             };
             items.push((pkg.into(), kv(key, v)));
         }
-        let xyce = Lang::XYCE.spelling();
+        let xyce = self.sp;
         if let Some(t) = tb.temp {
             items.push(("device".into(), kv("temp", &xyce.number(t, false))));
         }

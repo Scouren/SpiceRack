@@ -17,7 +17,7 @@
 //!
 //! Contents:
 //! - `pub struct DialectDef`, `pub enum Keywords`, `pub enum Operators`, `pub enum Devices`
-//! - `DialectDef::new(name: &str) -> DialectDef`, `DialectDef::extends(self, base: Lang) -> DialectDef`
+//! - `DialectDef::new(name: &str) -> DialectDef`, `DialectDef::renamed(self, name: &str) -> DialectDef`, `DialectDef::extends(self, base: Lang) -> DialectDef`
 //! - the lexicon calls: `title`, `fold_case`, `comment_line`, `comment_col1`, `blank_led_comment`,
 //!   `cont_skip`, `comment_tail`, `block_comment`, `long_strings`, `dollar`, `plus`, `backslash`,
 //!   `end`, `stop`, `join`, `quote`, `string`, `string_expr`, `name_escape`, `ident_start`,
@@ -31,7 +31,7 @@
 //! - the behaviour calls: `writer`, `text_family`, `caret_power`, `hier_sep`, `number_reading`,
 //!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
-//!   `named_params`, `spectre_analysis`
+//!   `named_params`, `expr_eval`, `spectre_analysis`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
 //!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
@@ -43,9 +43,9 @@ mod freeze;
 mod plugin;
 
 use crate::syntax::behaviour::{
-    AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, IncludeScope, LoadForm,
-    ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, SourceRules,
-    ValueQuoting, Writer,
+    AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope,
+    LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm,
+    SourceRules, ValueQuoting, Writer,
 };
 use crate::syntax::device::{self, Device};
 use crate::syntax::diag::{Code, Kind};
@@ -221,6 +221,13 @@ impl DialectDef {
             runs_on: None,
             base: None,
         }
+    }
+
+    /// The same definition under `name`: a built-in's calls registered
+    /// again as a language of its own (`tests/dialect_defs.rs`).
+    pub fn renamed(mut self, name: &str) -> DialectDef {
+        self.name = name.to_string();
+        self
     }
 
     /// Copies registered language `base`: its lexicon (shared until a
@@ -609,6 +616,7 @@ impl DialectDef {
     set!(param_form, b.param_form: ParamForm);
     set!(include_scope, b.include_scope: IncludeScope);
     set!(named_params, b.named_params: NamedParams);
+    set!(expr_eval, b.expr_eval: ExprEval);
 
     /// A region kept as `lang`'s text is written as written here.
     pub fn text_family(mut self, lang: Lang) -> Self {

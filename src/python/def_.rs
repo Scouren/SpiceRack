@@ -143,6 +143,7 @@ impl From<PyLang> for Lang {
 // ---- private ----
 
 calls! {
+    renamed(name: &str);
     extends(base: PyLang);
     title(v: bool);
     fold_case(v: bool);
@@ -220,6 +221,7 @@ calls! {
     param_form(v: PyParamForm);
     include_scope(v: PyIncludeScope);
     named_params(v: PyNamedParams);
+    expr_eval(v: PyExprEval);
     text_family(lang: PyLang);
     spectre_analysis(kind: &str);
     code(id: &str, kind: PyKind, message: &str);
