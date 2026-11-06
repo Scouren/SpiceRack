@@ -296,7 +296,7 @@ impl<'a> Rd<'a> {
                 let letter = self.letter(n);
                 match e {
                     Element::Vcvs | Element::Vccs => {
-                        if let [_, _, a] = items
+                        if let [_, _, a, mods @ ..] = items
                             && self.tag(*a) == Tag::Assign
                         {
                             let key = self.key(*a).to_ascii_lowercase();
@@ -309,7 +309,7 @@ impl<'a> Rd<'a> {
                                 name,
                                 np,
                                 nm,
-                                expr: self.body_text(v),
+                                expr: self.modified(self.body_text(v), mods)?,
                                 value: v,
                             });
                         }
@@ -425,6 +425,26 @@ impl<'a> Rd<'a> {
             .params
             .iter()
             .all(|(k, _)| SAME.iter().any(|s| k.eq_ignore_ascii_case(s)))
+    }
+
+    /// HSPICE's E/G output modifiers after `VALUE=` (HSPICE UG, E and G
+    /// elements: `SCALE` multiplies the value, `MAX` and `MIN` clamp it)
+    /// applied to `expr`; `None` for any other trailing item.
+    fn modified(&self, expr: String, mods: &[u32]) -> Option<String> {
+        let mut e = expr;
+        for &m in mods {
+            if self.d != Dialect::Hspice || self.tag(m) != Tag::Assign {
+                return None;
+            }
+            let v = self.body_text(self.ast.rhs(Node(m)));
+            e = match self.key(m).to_ascii_lowercase().as_str() {
+                "scale" => format!("({e})*({v})"),
+                "max" => format!("min({e}, {v})"),
+                "min" => format!("max({e}, {v})"),
+                _ => return None,
+            };
+        }
+        Some(e)
     }
 
     /// A linear controlled source's items less a trailing `M=` and its

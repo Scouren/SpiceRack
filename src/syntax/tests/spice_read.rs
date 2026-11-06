@@ -538,3 +538,17 @@ fn an_hspice_only_analysis_is_refused_as_the_targets_lack() {
         assert!(render_text(&text, Dialect::Hspice, "t", Dialect::Hspice).is_ok());
     }
 }
+
+#[test]
+fn an_hspice_value_modifier_scales_or_clamps_the_value() {
+    // HSPICE UG, E/G `VALUE=` with `SCALE=`, `MAX=`, `MIN=`; the ESPice
+    // corpus's value_modifier.sp analytic oracle (v(a) = 0.5: 3 and 0.4),
+    // which ngspice-45 gave on the written deck. Checks: 2.
+    let text = "t\nva a 0 0.5\ne1 o1 0 value='2*v(a)' scale=3\nr1 o1 0 1k\ne2 o2 0 value='2*v(a)' max=0.4\nr2 o2 0 1k\n.op\n.end\n";
+    let ng = render_text(text, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in ["B1 o1 0 V=(2*v(a))*(3)", "B2 o2 0 V=min(2*v(a), 0.4)"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+}
