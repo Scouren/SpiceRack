@@ -56,6 +56,7 @@ mod outputs;
 mod refused;
 mod shapes;
 mod sources;
+mod sweeps;
 mod testbench;
 mod text;
 mod unlift;
@@ -68,6 +69,7 @@ pub(in crate::syntax::render) use named_bench::spectre_refusal;
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
+pub(in crate::syntax::render) use sweeps::{DcAxis, DcSweep};
 pub(in crate::syntax::render) use testbench::{Ana, BenchCard, Sweep};
 pub(in crate::syntax::render) use unlift::{Lift, Step};
 pub(in crate::syntax::render) use values::Val;
@@ -80,8 +82,9 @@ pub(in crate::syntax::render) struct Rd<'a> {
     pub(in crate::syntax::render) t: &'a Tokens<'a>,
     /// The dialect the file was read in (its family: ESPice reads ngspice).
     pub(in crate::syntax::render) d: Dialect,
-    /// The deck's `.model` names, lowercased (the old lowering).
-    models: HashSet<String>,
+    /// The deck's `.model` names, lowercased (the old lowering), each to
+    /// its (last) card.
+    models: HashMap<String, u32>,
     /// Spectre/VACASK: model kinds by name, and subcircuit names.
     kinds: HashMap<String, String>,
     subckts: Vec<String>,
@@ -104,6 +107,9 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// The `Num` nodes' tokens, sorted, once a writer names its target: the
     /// numbers it respells (a probe's `v(1a)` holds a name).
     nums: Vec<u32>,
+    /// The top's Xyce `.global_param` assignments, read as `.param`s
+    /// ([`Rd::global_param`]).
+    global_params: HashSet<u32>,
 }
 
 /// What the reader made of a file: every block and the deck-wide lists, in
@@ -122,8 +128,9 @@ pub(in crate::syntax::render) struct Deck {
     pub(in crate::syntax::render) bench: Vec<Bench>,
     /// The reader's notes: what it read and leaves out.
     pub(in crate::syntax::render) notes: Vec<Diag>,
-    /// The top's Verilog-A and OSDI loads given beside the text
-    /// ([`super::Source::loads`]), after those read from it.
+    /// The top's Verilog-A and OSDI loads not on a load card: a given
+    /// ngspice deck's `.control` `pre_osdi` lines, then those given beside
+    /// the text ([`super::Source::loads`]).
     pub(in crate::syntax::render) given_loads: Vec<String>,
     /// [`super::Source::numbers`].
     pub(in crate::syntax::render) numbers: super::Numbers,
@@ -258,6 +265,8 @@ enum Scope {
 struct Acc {
     globals: Vec<String>,
     funcs: Vec<Func>,
+    /// The top `.control` block's `pre_osdi` paths.
+    control_loads: Vec<String>,
     defs: Vec<Block>,
     sections: Vec<Section>,
     bench: Vec<Bench>,
@@ -305,7 +314,7 @@ pub(in crate::syntax::render) fn read<'a>(
         ast,
         t,
         d,
-        models: HashSet::new(),
+        models: HashMap::new(),
         kinds: HashMap::new(),
         subckts: Vec::new(),
         insts: HashMap::new(),
@@ -316,6 +325,7 @@ pub(in crate::syntax::render) fn read<'a>(
         fixes: HashMap::new(),
         target: None,
         nums: Vec::new(),
+        global_params: HashSet::new(),
     };
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
@@ -342,7 +352,7 @@ pub(in crate::syntax::render) fn read<'a>(
         funcs: acc.funcs,
         bench: acc.bench,
         notes: acc.notes,
-        given_loads: Vec::new(),
+        given_loads: acc.control_loads,
         numbers: super::Numbers::Read,
     };
     rd.unlift(&mut deck);
@@ -551,8 +561,19 @@ impl<'a> Rd<'a> {
             Tag::Data => self.raw(n, here, true),
             Tag::Control => {
                 for &c in self.body(n) {
+                    let head = self.main(c);
+                    let last = self.line_last(head);
                     if self.tag(c) == Tag::Analysis && self.testbench_peg(c) {
                         acc.bench.push(Bench::Card(c));
+                    } else if scope == Scope::Top
+                        && self.t.text(head).eq_ignore_ascii_case("pre_osdi")
+                        && head < last
+                    {
+                        // ngspice manual, `pre_osdi file`: an OSDI load
+                        // before the circuit is parsed.
+                        let p = self.span(head + 1, last);
+                        acc.control_loads
+                            .push(p.trim().trim_matches('"').to_string());
                     } else {
                         // The script's other lines are not read.
                         acc.notes.push(Diag {
@@ -629,14 +650,14 @@ impl<'a> Rd<'a> {
 
     /// The `.model` names the grammar read, lowercased, anywhere in the
     /// deck but kept-whole blocks.
-    fn model_names(&self, stmts: &[u32]) -> HashSet<String> {
-        let mut out = HashSet::new();
+    fn model_names(&self, stmts: &[u32]) -> HashMap<String, u32> {
+        let mut out = HashMap::new();
         let mut work: Vec<u32> = stmts.iter().rev().copied().collect();
         while let Some(s) = work.pop() {
             match self.tag(s) {
                 Tag::Model => {
                     if let Some(m) = self.model_head(s) {
-                        out.insert(self.text(m.0).to_ascii_lowercase());
+                        out.insert(self.text(m.0).to_ascii_lowercase(), s);
                     }
                 }
                 Tag::Data | Tag::Control => {}

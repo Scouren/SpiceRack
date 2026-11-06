@@ -11,7 +11,9 @@
 //! now identical (`XPASS`). `MANIFEST` is compared without its `output`
 //! lines (the files say that); any other difference there (an input's hash,
 //! a set, a kit's read order) means the two trees read different inputs,
-//! which no xfail line excuses.
+//! which no xfail line excuses, except an input's own `input` line under a
+//! `<set>/<relpath> manifest <reason>` line (the input read in another
+//! dialect: its outputs then differ too, each listed).
 //!
 //! A refusal the renderer wrote (`codes: …` on its first line) is compared
 //! by its codes, never its messages: two such files with one code line are
@@ -38,8 +40,9 @@ use spicerack::syntax::Dialect;
 /// The first line of a renderer's refusal starts so, its codes after it.
 pub(super) const CODES: &str = "codes: ";
 
-/// Output-file stems that are not dialects.
-const STEMS: [&str; 1] = ["parse"];
+/// Xfail targets that are not dialects: an output-file stem (`parse`), or
+/// the input's own MANIFEST line (`manifest`).
+const STEMS: [&str; 2] = ["parse", "manifest"];
 
 /// Output-file stems a baseline holds that no record writes any more.
 const GONE: [&str; 2] = ["ir", "report"];
@@ -68,19 +71,22 @@ pub(super) fn diff(
         Ok(lines.map(str::to_string).collect())
     };
     let (ma, mb) = (inputs(a)?, inputs(b)?);
-    for l in ma.difference(&mb) {
-        println!("MANIFEST -{l}");
-        ok = false;
-    }
-    for l in mb.difference(&ma) {
-        println!("MANIFEST +{l}");
+    let mut differ: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+    let changed = ma.symmetric_difference(&mb).map(|l| (l, ma.contains(l)));
+    for (l, gone) in changed {
+        let input = l.strip_prefix("input ").and_then(|r| r.split(' ').next());
+        let k = input.map(|i| (i.to_string(), "manifest".to_string()));
+        if let Some(k) = k.filter(|k| listed.contains_key(k)) {
+            differ.entry(k).or_default().push("MANIFEST".into());
+            continue;
+        }
+        println!("MANIFEST {}{l}", if gone { "-" } else { "+" });
         ok = false;
     }
     // Every output file, by key.
     let (mut fa, mut fb) = (BTreeSet::new(), BTreeSet::new());
     walk(a, "", &mut fa);
     walk(b, "", &mut fb);
-    let mut differ: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
     let mut refusals = String::new();
     // Keys refused on both sides with other texts: the same, in the mode.
     let mut refused_both: BTreeSet<(String, String)> = BTreeSet::new();
@@ -243,5 +249,27 @@ mod tests {
         assert!(parse_xfail("set/a.sp spectre\n").is_err());
         assert!(parse_xfail("set/a.sp nothing here\n").is_err());
         assert!(parse_xfail("s/a ir r\ns/a ir r\n").is_err());
+    }
+
+    #[test]
+    fn a_listed_manifest_line_excuses_only_that_inputs_line() {
+        let root = std::env::temp_dir().join(format!("golden-diff-{}", std::process::id()));
+        let tree = |name: &str, d: &str| {
+            let dir = root.join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            let m = format!("set v vacask 2\ninput v/a.sim {d} deck 1\ninput v/b.sim {d} deck 2\n");
+            std::fs::write(dir.join("MANIFEST"), m).unwrap();
+            dir
+        };
+        let (a, b) = (tree("a", "vacask"), tree("b", "ngspice"));
+        let one = root.join("one.xfail");
+        std::fs::write(&one, "v/a.sim manifest read as ngspice\n").unwrap();
+        assert!(!diff(&a, &b, Some(&one), None, None).unwrap());
+        let both = root.join("both.xfail");
+        std::fs::write(&both, "v/a.sim manifest x\nv/b.sim manifest x\n").unwrap();
+        assert!(diff(&a, &b, Some(&both), None, None).unwrap());
+        // XPASS: listed, but the line is the same.
+        assert!(!diff(&a, &a, Some(&both), None, None).unwrap());
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

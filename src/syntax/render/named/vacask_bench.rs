@@ -135,6 +135,10 @@ impl W<'_, '_> {
                 self.refuse(Code::W0015, tok);
                 return vec![];
             }
+            Ana::DcAxes(_) => {
+                self.ask(Construct::DcLogList, tok);
+                return vec![];
+            }
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
             Ana::Spectre { kind, .. } => {
                 self.refuse(
@@ -181,6 +185,7 @@ impl W<'_, '_> {
                 start,
                 max_step,
                 uic,
+                ..
             } => {
                 // VACASK always saves from t=0.
                 if start.unwrap_or(0.0) != 0.0 {
@@ -231,6 +236,7 @@ impl W<'_, '_> {
             | Ana::Pz(..)
             | Ana::Sp(..)
             | Ana::Four(..)
+            | Ana::DcAxes(_)
             | Ana::MonteCarlo { .. }
             | Ana::Spectre { .. } => unreachable!("refused above"),
         }
@@ -320,7 +326,7 @@ impl W<'_, '_> {
 /// `dc` with no sweep, a transfer function `xf`); `None` for a Monte Carlo.
 fn spectre_kind(a: &Ana) -> Option<&'static str> {
     Some(match a {
-        Ana::Op | Ana::Dc(_) => "dc",
+        Ana::Op | Ana::Dc(_) | Ana::DcAxes(_) => "dc",
         Ana::Ac(_) => "ac",
         Ana::Sp(_) => "sp",
         Ana::Tran { .. } => "tran",

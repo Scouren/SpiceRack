@@ -54,6 +54,8 @@ pub(super) struct Tb {
     pub(super) measures: Vec<(String, u32)>,
     /// Each `.step`'s sweep, name, numbers and first token.
     pub(super) steps: Vec<Step>,
+    /// Each list `.step`'s first token (neither target writes one yet).
+    pub(super) step_lists: Vec<u32>,
     /// VACASK control lines kept as text.
     pub(super) extra: Vec<String>,
 }
@@ -220,6 +222,9 @@ impl W<'_, '_> {
         for &tok in &tb.ngbehavior {
             self.ask(Construct::NgBehavior, tok);
         }
+        for &tok in &tb.step_lists {
+            self.ask(Construct::StepList, tok);
+        }
         if let Some(tok) = tb.save_tok {
             self.ask(Construct::Save, tok);
         }
@@ -282,6 +287,7 @@ impl W<'_, '_> {
                     BenchCard::Step { sweep, param, nums } => {
                         tb.steps.push((sweep, param, nums, tok))
                     }
+                    BenchCard::StepList { .. } => tb.step_lists.push(tok),
                     BenchCard::Temp(t) => tb.temp = Some(t),
                     BenchCard::NodeVals(true, v) => tb.ics.extend(v),
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
@@ -382,6 +388,10 @@ impl W<'_, '_> {
         Some(match a {
             // `[REF]`: `dc1 dc`, a `dc` with no sweep is the operating point.
             Ana::Op => "op1 dc".into(),
+            Ana::DcAxes(_) => {
+                self.ask(Construct::DcLogList, tok);
+                return None;
+            }
             // SPICE's first sweep is the inner one; each further one a
             // `sweep` around it (`[REF]` pp.406-409: `dev`/`param`,
             // `start`/`stop`/`step`, analyses in braces).
@@ -413,6 +423,7 @@ impl W<'_, '_> {
                 start,
                 max_step,
                 uic,
+                ..
             } => {
                 let mut s = format!("tran1 tran step={} stop={}", n(self, *step), n(self, *stop));
                 if let Some(st) = start {

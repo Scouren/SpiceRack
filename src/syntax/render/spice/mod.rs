@@ -24,9 +24,11 @@
 
 mod bench;
 mod cards;
+pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
 mod cdl;
 mod checks;
 mod laplace;
+mod sweeps;
 mod verilog;
 mod xyce_options;
 
@@ -336,7 +338,11 @@ impl W<'_, '_> {
                 v = d.to_string();
             }
             let v = self.spelled(&v);
-            self.o.token(&format!(".param {name}={v}"), Space::Line);
+            let kw = match self.d == Dialect::Xyce && self.rd.global_param(a) {
+                true => ".global_param",
+                false => ".param",
+            };
+            self.o.token(&format!("{kw} {name}={v}"), Space::Line);
         }
     }
 
@@ -503,9 +509,9 @@ impl W<'_, '_> {
         let mut out = Vec::new();
         for &c in &b.comps {
             if let Comp::Card(n) = c
-                && let super::read::Card::Coupling { l1, l2, .. } = self.rd.card_view(n)
+                && let super::read::Card::Coupling { ls, .. } = self.rd.card_view(n)
             {
-                out.extend([l1, l2]);
+                out.extend(ls);
             }
         }
         out

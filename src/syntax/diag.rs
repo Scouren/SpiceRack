@@ -406,6 +406,30 @@ catalogue! {
         cite: "ngspice manual, the compatibility modes (`set ngbehavior` in `.spiceinit`, or `-D ngbehavior=`, read before the deck)",
         explain: "`.options ngbehavior=` selects how ngspice reads the deck (`hsa`, `ps`, `lt`, …); ngspice takes it on its command line, and no other target has such a mode, so it is left out. The target reads the deck in its own dialect.",
     }
+    /// An LTspice `.backanno`: an annotation request with no simulation meaning, not written.
+    W0036 Note {
+        title: "an annotation directive with no simulation meaning, not written",
+        cite: "LTspice help (`.BACKANNO`: annotate the subcircuit pin names onto the port currents)",
+        explain: "LTspice adds `.backanno` to a netlist it writes from a schematic, so that the waveform viewer names a subcircuit's port currents by its pins. It changes no number of the run, and no other simulator has it, so the reader leaves it out on every target.",
+    }
+    /// LTspice's `.tran … startup` on a target with no such ramp.
+    W0037 Refusal {
+        title: "a transient start-up ramp the target lacks",
+        cite: "LTspice help (`.TRAN` modifier `startup`: the operating point with the independent sources off, each ramped on over the first 20 µs); ngspice manual, transient options (`RAMPTIME`, a ramp of given length whose shape LTspice does not state); HSPICE, Xyce RG `.TRAN`, Spectre, VACASK: no start-up ramp",
+        explain: "The transient starts from an operating point with every independent source at zero and ramps them on over its first 20 µs. The target has no such start: without it the run starts from the full-source operating point, another answer for a circuit that latches or soft-starts. Ramp the sources in the deck (a PWL from zero) and drop `startup`.",
+    }
+    /// A `.dc` axis by decade, octave or list on a target whose `.dc` is linear only.
+    W0038 Refusal {
+        title: "a log or list DC sweep the target lacks",
+        cite: "ngspice manual, `.dc` (`.dc srcnam vstart vstop vincr [src2 …]`: linear only); Xyce RG `.DC` (`DEC`, `OCT`, `LIST`)",
+        explain: "A `.dc` axis sweeps by decade, by octave or over a list of values, and the target's `.dc` steps linearly only. Sweep the values another way (a `.control` loop of `alter` and `op`, a linear sweep covering them) or run the deck on a simulator with log sweeps.",
+    }
+    /// A statement only its own simulator has (Xyce's own analyses and `Y` devices).
+    W0039 Refusal {
+        title: "a statement only its source simulator has",
+        cite: "Xyce RG, analysis commands (`.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`) and devices (`Y` devices: neuron, synapse, ROM, reaction network, general external, accelerometer, power grid); none in the ngspice manual, HSPICE, LTspice help, Spectre Reference, VACASK docs",
+        explain: "The statement is an analysis or a device that only the simulator the deck was written for has, so no other target can run it. Run the deck on that simulator, or replace the device with a model the target has.",
+    }
     // W0040–W0044: the Python deck builder's (`python::deck`).
     /// An analysis argument from the Python API the target has no word for.
     W0040 Refusal {

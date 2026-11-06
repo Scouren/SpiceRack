@@ -17,7 +17,8 @@
 //! - `Rd::subckt_head(&self, n: u32) -> Option<Head>`, `Rd::model_head(&self, n: u32) -> Option<Node>`
 //! - `Rd::model_view(&self, n: u32) -> Model`, `Rd::include_path(&self, n: u32) -> String`,
 //!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::func_view(&self, f: Func) -> (String, Vec<String>, String)`,
-//!   `Rd::func_span(&self, f: Func) -> Option<(u32, u32)>`, `Rd::param_view(&self, a: u32) -> (String, String)`
+//!   `Rd::func_span(&self, f: Func) -> Option<(u32, u32)>`, `Rd::param_view(&self, a: u32) -> (String, String)`,
+//!   `Rd::global_param(&self, a: u32) -> bool`
 
 use super::{Acc, Block, Func, Kept, Rd, Scope};
 use crate::syntax::Dialect;
@@ -60,6 +61,16 @@ impl Rd<'_> {
         // `Raw_lt`, the old Xyce grammar's `Raw_xy`) is tried before the
         // shared dot cards.
         let word = self.head_word(n);
+        // LTspice's `.backanno` names port currents for its viewer and
+        // changes no number (LTspice help): left out, noted.
+        if self.d == Dialect::Ltspice && word == "backanno" && self.fields(n).is_empty() {
+            let token = self.main(n);
+            acc.notes.push(crate::syntax::diag::Diag {
+                code: crate::syntax::diag::Code::W0036,
+                token,
+            });
+            return;
+        }
         if self.dialect_raw(&word) {
             return self.keep(n, here, Kept::Raw);
         }
@@ -215,6 +226,9 @@ impl Rd<'_> {
                 [p] if self.tag(*p) == Tag::Str => self.path_of(*p),
                 _ => self.span(self.main(first), self.line_last(self.main(n))),
             }
+        } else if self.d == Dialect::Ltspice && items.len() > 1 {
+            // LTspice help, `.INCLUDE <filename>`: the rest of the card.
+            self.rest_path(n)
         } else {
             self.path_of(first)
         }
@@ -231,6 +245,10 @@ impl Rd<'_> {
         }
         match self.fields(n) {
             [p] => (self.path_of(*p), String::new()),
+            // LTspice has no sections: the rest of the card is the file,
+            // blanks and all (LTspice help, `.LIB <filename>`; the
+            // corpus's `.lib C:\users\brian\My Documents\…\standard.dio`).
+            [_, ..] if self.d == Dialect::Ltspice => (self.rest_path(n), String::new()),
             [p, s, ..] => (self.path_of(*p), self.text(*s)),
             [] => unreachable!("lib_call read it"),
         }
@@ -270,6 +288,15 @@ impl Rd<'_> {
         }
     }
 
+    /// Whether the `.param` assignment `a` is an Xyce `.global_param`'s:
+    /// Xyce runs a constant instance `temp={…}` from a `.param` at the
+    /// swept temperature, from a `.global_param` at its value
+    /// (Xyce_Regression BUG_1203_SON/dot_step.cir, run both ways), so
+    /// Xyce writes it back as `.global_param`.
+    pub(in crate::syntax::render) fn global_param(&self, a: u32) -> bool {
+        self.global_params.contains(&a)
+    }
+
     /// A `.param` assignment's name and value text.
     pub(in crate::syntax::render) fn param_view(&self, a: u32) -> (String, String) {
         (
@@ -297,6 +324,18 @@ impl Rd<'_> {
     }
 
     /// A path item without its quotes (the old lowering's `path`).
+    /// The text of card `n` from its first field to the line's end, a path
+    /// with blanks in it.
+    fn rest_path(&self, n: u32) -> String {
+        let first = self.main(self.fields(n)[0]);
+        let t = self.span(first, self.line_last(self.main(n)));
+        let t = t.trim();
+        match t.as_bytes() {
+            [b'"', .., b'"'] => t[1..t.len() - 1].to_string(),
+            _ => t.to_string(),
+        }
+    }
+
     fn path_of(&self, p: u32) -> String {
         let t = self.text(p);
         let p = t.trim();
@@ -391,6 +430,9 @@ impl Rd<'_> {
         inside: bool,
         acc: &mut Acc,
     ) -> Result<(), Kept> {
+        if self.d == Dialect::Xyce && self.global_swept(n) {
+            return Err(Kept::Raw);
+        }
         let items = self.fields(n).to_vec();
         let ngspice = self.d == Dialect::Ngspice;
         let lt_params = self.d == Dialect::Ltspice && self.head_word(n) == "params";
@@ -437,6 +479,9 @@ impl Rd<'_> {
             } else if inside {
                 here.locals.push(a);
             } else {
+                if self.d == Dialect::Xyce && self.head_word(n) == "global_param" {
+                    self.global_params.insert(a);
+                }
                 here.params.push(a);
             }
         }

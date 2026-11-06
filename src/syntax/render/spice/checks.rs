@@ -1,7 +1,8 @@
 //! The deck-wide refusals the SPICE-family writer makes before it writes: a
 //! statement kept as another family's text (`ForeignText`), a `^` the
 //! target reads with the other meaning (`CaretReread`), a statistical call
-//! the target has no function for (`StatisticalCall`). Each reads every
+//! the target has no function for (`StatisticalCall`), an LTspice
+//! `.tran … startup` the target has no ramp for (`TranStartup`). Each reads every
 //! block the deck writes (definitions, sections, branches) and every
 //! expression the old reader kept as text.
 //!
@@ -29,10 +30,20 @@ impl W<'_, '_> {
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
         let foreign = |tok: &u32| self.rd.text_dialect(*tok).family() != self.d.family();
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
-        if let Some(&tok) = other.first() {
-            self.ask(Construct::ForeignText, tok);
+        // A statement whose target lacks it is that statement's refusal,
+        // the rest foreign text's (one note each kind).
+        let mut asked = Vec::new();
+        for &tok in &other {
+            let c = self.rd.kept_construct(tok);
+            if !asked.contains(&c) {
+                asked.push(c);
+                self.ask(c, tok);
+            }
         }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));
+        if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {
+            self.ask(Construct::TranStartup, tok);
+        }
         // A waveform's values past its form's count are not written.
         for b in &blocks {
             for &c in &b.comps {

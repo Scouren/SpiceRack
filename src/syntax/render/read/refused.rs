@@ -8,9 +8,13 @@
 //! Contents:
 //! - `Rd::refused(&self, n: u32) -> Kept`
 //! - `Rd::dialect_raw(&self, w: &str) -> bool`
+//! - `Rd::kept_construct(&self, tok: u32) -> Construct`
+//! - `Rd::global_swept(&self, n: u32) -> bool`
 
 use super::{Kept, Rd};
 use crate::syntax::Dialect;
+use crate::syntax::ast::{Node, Tag};
+use crate::syntax::render::capability::Construct;
 use crate::syntax::token::Tag as T;
 
 /// the old SPICE grammar's `rawkind`: the dot words whose card, when no rule reads it,
@@ -161,7 +165,6 @@ impl<'a> Rd<'a> {
             "savestate",
             "loadstate",
             "softstart",
-            "backanno",
             "savebias",
             "loadbias",
             "machine",
@@ -176,7 +179,6 @@ impl<'a> Rd<'a> {
         ];
         const XY: &[&str] = &[
             "embeddedsampling",
-            "global_param",
             "temperature",
             "preprocess",
             "objective",
@@ -196,6 +198,102 @@ impl<'a> Rd<'a> {
             Dialect::Ltspice => LT.contains(&w),
             Dialect::Xyce => XY.contains(&w),
             _ => false,
+        }
+    }
+}
+
+impl Rd<'_> {
+    /// Whether the Xyce `.global_param` card `n` assigns a value that
+    /// reads, itself or through another `.global_param`, a variable Xyce
+    /// sweeps (`temp`, `vt`, `freq`, `hertz`, `time`): Xyce re-evaluates
+    /// such a value as the run goes, a `.param` it fixes once (Xyce 7.10
+    /// runs `{TEMP+10}` and `{log10(freq)+1}` otherwise as `.param`). Such a
+    /// card is kept as text; any other is a `.param`.
+    pub(in crate::syntax::render) fn global_swept(&self, n: u32) -> bool {
+        const SWEPT: [&str; 5] = ["temp", "vt", "freq", "hertz", "time"];
+        let assigns = |c: u32| {
+            self.fields(c)
+                .iter()
+                .copied()
+                .filter(move |&a| self.tag(a) == Tag::Assign)
+        };
+        let cards: Vec<u32> = self
+            .ast
+            .fields(self.ast.root())
+            .iter()
+            .copied()
+            .filter(|&c| self.tag(c) == Tag::Param && self.head_kind(c) == "global_param")
+            .collect();
+        // ponytail: the deck's `.global_param` cards scanned per card; a
+        // set built once in `read` if a deck holds thousands.
+        let mut swept: Vec<String> = Vec::new();
+        // Each pass adds a name or ends, so it runs at most one pass per card.
+        for _ in 0..=cards.len() {
+            let before = swept.len();
+            for a in cards.iter().flat_map(|&c| assigns(c)) {
+                let name = self.text(self.ast.lhs(Node(a))).to_ascii_lowercase();
+                let body = self.vtext(self.ast.rhs(Node(a))).to_ascii_lowercase();
+                let mut words = body.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'));
+                if !swept.contains(&name)
+                    && words.any(|w| SWEPT.contains(&w) || swept.iter().any(|s| s == w))
+                {
+                    swept.push(name);
+                }
+            }
+            if swept.len() == before {
+                break;
+            }
+        }
+        assigns(n).any(|a| swept.contains(&self.text(self.ast.lhs(Node(a))).to_ascii_lowercase()))
+    }
+
+    /// What the statement kept as text from another dialect at token `tok`
+    /// is to a writer: one only its own simulator has (Xyce's multi-time,
+    /// model-order-reduction and uncertainty analyses, RG analysis
+    /// commands `.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`, `.RESULT`;
+    /// its netlist rewrites `.PREPROCESS`; its own `Y` devices, RG `Y`
+    /// devices: neuron, synapse, reduced-order model, reaction network,
+    /// general external, accelerometer, power grid, PDE (TCAD), none of
+    /// which ngspice, HSPICE, LTspice, Spectre or VACASK has); Xyce's
+    /// `.SENS` (an objective's sensitivity to listed parameters over the
+    /// deck's `.dc`, `.tran` or `.ac`, RG `.SENS`); else foreign text.
+    pub(in crate::syntax::render) fn kept_construct(&self, tok: u32) -> Construct {
+        const XY_CARDS: [&str; 6] = [
+            ".mpde",
+            ".mor",
+            ".pce",
+            ".embeddedsampling",
+            ".result",
+            ".preprocess",
+        ];
+        const XY_DEVICES: [&str; 14] = [
+            "neuron",
+            "synapse",
+            "rom",
+            "rxn",
+            "genext",
+            "acc",
+            "pde",
+            "pgbr",
+            "pgbs",
+            "pggb",
+            "pgtr",
+            "powergridbranch",
+            "powergridbusshunt",
+            "powergridtransformer",
+        ];
+        if self.text_dialect(tok) != Dialect::Xyce {
+            return Construct::ForeignText;
+        }
+        let w = self.t.text(tok).to_ascii_lowercase();
+        let private = match w.strip_prefix('y') {
+            Some(ty) => XY_DEVICES.contains(&ty),
+            None => XY_CARDS.contains(&w.as_str()),
+        };
+        match w.as_str() {
+            _ if private => Construct::PrivateText,
+            ".sens" => Construct::XyceSens,
+            _ => Construct::ForeignText,
         }
     }
 }

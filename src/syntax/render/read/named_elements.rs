@@ -200,11 +200,10 @@ impl<'a> Rd<'a> {
                 }
             }
             m if m == keys.mutual && (self.d == Dialect::Spectre || ns.is_empty()) => {
-                let refs = [ident("ind1")?, ident("ind2")?];
+                let refs = vec![ident("ind1")?, ident("ind2")?];
                 Card::Coupling {
                     name: self.strip(&name, 'k'),
-                    l1: self.strip(&refs[0], 'l'),
-                    l2: self.strip(&refs[1], 'l'),
+                    ls: refs.iter().map(|r| self.strip(r, 'l')).collect(),
                     refs,
                     k: num(keys.coupling)?,
                 }

@@ -16,6 +16,7 @@
 //! - `Rd::card_view(&self, n: u32) -> Card`, `Rd::letter(&self, n: u32) -> char`
 
 use super::{Block, Comp, Rd, Val, Wave};
+use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::device::Primitive as Element;
 
@@ -42,13 +43,14 @@ pub(in crate::syntax::render) enum Card {
         charge: String,
         params: Vec<(String, String)>,
     },
-    /// `K1 L1 L2 k`: the inductor names after their letter, and as the
-    /// card wrote them (the references the name map looks up).
+    /// `K1 L1 L2 … k`: the inductor names after their letter, and as the
+    /// card wrote them (the references the name map looks up); every pair
+    /// coupled by `k` (Xyce RG and LTspice help, `K` with more than two
+    /// inductors).
     Coupling {
         name: String,
-        l1: String,
-        l2: String,
-        refs: [String; 2],
+        ls: Vec<String>,
+        refs: Vec<String>,
         k: f64,
     },
     /// `V`, `I`.
@@ -225,15 +227,36 @@ impl<'a> Rd<'a> {
                 self.rcl(n, e, name, node(0)?, node(1)?, &items[2..])?
             }
             Element::Coupling => {
-                let [a, b, k] = items else { return None };
-                if !self.is_word(*a) || !self.is_word(*b) || !self.is_word(*k) {
+                let (k, ls) = items.split_last()?;
+                // ngspice's `K` couples two inductors (manual, coupled
+                // inductors); Xyce's and LTspice's any number.
+                let many = matches!(self.d, Dialect::Xyce | Dialect::Ltspice);
+                if ls.len() < 2 || (ls.len() > 2 && !many) {
+                    return None;
+                }
+                if !ls.iter().chain([k]).all(|&x| self.is_word(x)) {
+                    return None;
+                }
+                let refs: Vec<String> = ls.iter().map(|&x| self.text(x)).collect();
+                // Past two, each an inductor's name, once (Xyce also reads
+                // `K1 L1 L2 0.75 K2 L1 L3 0.8`, two cards on a line).
+                let named = |r: &String| r.starts_with(['l', 'L']);
+                if refs.len() > 2
+                    && (!refs.iter().all(named)
+                        || refs
+                            .iter()
+                            .enumerate()
+                            .any(|(i, r)| refs[..i].iter().any(|q| q.eq_ignore_ascii_case(r))))
+                {
                     return None;
                 }
                 Card::Coupling {
                     name,
-                    l1: self.text(*a).get(1..)?.to_string(),
-                    l2: self.text(*b).get(1..)?.to_string(),
-                    refs: [self.text(*a), self.text(*b)],
+                    ls: refs
+                        .iter()
+                        .map(|r| r.get(1..).map(str::to_string))
+                        .collect::<Option<_>>()?,
+                    refs,
                     k: self.number(*k)?,
                 }
             }
@@ -263,6 +286,7 @@ impl<'a> Rd<'a> {
                                 value: v,
                             });
                         }
+                        let (items, m) = self.multiplier(e, items)?;
                         let [_, _, c, d, g] = items else { return None };
                         if ![c, d, g].iter().all(|&&k| self.is_word(k)) {
                             return None;
@@ -271,10 +295,11 @@ impl<'a> Rd<'a> {
                             letter,
                             name,
                             nodes: vec![np, nm, self.text(*c), self.text(*d)],
-                            gain: self.number(*g)?,
+                            gain: self.number(*g)? * m,
                         }
                     }
                     _ => {
+                        let (items, m) = self.multiplier(e, items)?;
                         let [_, _, v, g] = items else { return None };
                         if !self.is_word(*v) || !self.is_word(*g) {
                             return None;
@@ -283,7 +308,7 @@ impl<'a> Rd<'a> {
                             letter,
                             name,
                             nodes: vec![np, nm, self.text(*v)],
-                            gain: self.number(*g)?,
+                            gain: self.number(*g)? * m,
                         }
                     }
                 }
@@ -319,14 +344,26 @@ impl<'a> Rd<'a> {
                         .find(|&&p| self.key(p).eq_ignore_ascii_case(key))
                         .and_then(|&p| self.number(self.ast.rhs(Node(p))))
                 };
-                if pairs.len() != 2 {
+                let known = ["z0", "td", "f", "nl"];
+                if !pairs
+                    .iter()
+                    .all(|&p| known.iter().any(|k| self.key(p).eq_ignore_ascii_case(k)))
+                {
                     return None;
                 }
+                // The delay, or a frequency at which the line is `nl`
+                // wavelengths long (default a quarter): td = nl / f
+                // (ngspice manual and Xyce RG, lossless transmission line `T`).
+                let td = match (get("td"), get("f")) {
+                    (Some(td), None) if pairs.len() == 2 => td,
+                    (None, Some(f)) if f > 0.0 && pairs.len() <= 3 => get("nl").unwrap_or(0.25) / f,
+                    _ => return None,
+                };
                 Card::Line {
                     name,
                     nodes: items[..4].iter().map(|&k| self.text(k)).collect(),
                     z0: get("z0")?,
-                    td: get("td")?,
+                    td,
                 }
             }
             // else: the ngspice letters the old reader had no rule for.
@@ -338,6 +375,41 @@ impl<'a> Rd<'a> {
             | Element::CodeModel
             | Element::Osdi => return None,
         })
+    }
+
+    /// Whether model word `m` names a deck `.model` whose every parameter
+    /// means the same in ngspice: `TC1`, `TC2` (quadratic temperature
+    /// coefficients), `TNOM`. Xyce's `R`, `C`, `L` model parameters of the
+    /// same name are multipliers (Xyce RG, resistor, capacitor and
+    /// inductor model parameters), ngspice's the default value (manual,
+    /// semiconductor resistor and capacitor; Xyce 7.10 runs `L1 2 0 IND 5m`
+    /// with `L=2` at 10 mH, ngspice-45 at 5 mH), so such a card stays text.
+    fn same_rcl_model(&self, m: u32) -> bool {
+        const SAME: [&str; 3] = ["tc1", "tc2", "tnom"];
+        let Some(&card) = self.models.get(&self.text(m).to_ascii_lowercase()) else {
+            return false;
+        };
+        self.model_view(card, NONE)
+            .params
+            .iter()
+            .all(|(k, _)| SAME.iter().any(|s| k.eq_ignore_ascii_case(s)))
+    }
+
+    /// A linear controlled source's items less a trailing `M=` and its
+    /// value (1 without one): `M` parallel copies of a current-output source
+    /// (G, F) is the gain times `M` (Xyce RG and ngspice manual, the
+    /// controlled sources' `m=`); `None` for an `M=` on E or H, or one not a number.
+    fn multiplier<'i>(&self, e: Element, items: &'i [u32]) -> Option<(&'i [u32], f64)> {
+        match items.split_last() {
+            Some((&a, rest))
+                if self.tag(a) == Tag::Assign && self.key(a).eq_ignore_ascii_case("m") =>
+            {
+                let current = matches!(e, Element::Vccs | Element::Cccs);
+                current.then_some(())?;
+                Some((rest, self.number(self.ast.rhs(Node(a)))?))
+            }
+            _ => Some((items, 1.0)),
+        }
     }
 
     /// An R, C or L card's value, model and parameters.
@@ -354,9 +426,35 @@ impl<'a> Rd<'a> {
             Some(&v) if self.tag(v) != Tag::Assign => (Some(v), &rest[1..]),
             _ => (None, rest),
         };
+        // Xyce's `R1 a b RMOD 1k`: the model before the value (Xyce RG,
+        // resistor and capacitor `[model name] [value]`), the value before
+        // the model for every other SPICE (ngspice manual, semiconductor
+        // resistor and capacitor).
+        let mut swapped = None;
+        let (val, inst) = match (val, inst.split_first()) {
+            (Some(m), Some((&v, tail)))
+                if self.d == Dialect::Xyce
+                    && self.tag(v) != Tag::Assign
+                    && self.number(v).is_some()
+                    && self.same_rcl_model(m)
+                    && tail.iter().all(|&a| {
+                        // ngspice's own instance words of the same meaning
+                        // (Xyce RG and ngspice manual, R, C, L instance
+                        // parameters); Xyce's `TC=a,b` is not ngspice's.
+                        self.tag(a) == Tag::Assign
+                            && ["temp", "ic", "m", "tc1", "tc2"]
+                                .iter()
+                                .any(|w| self.key(a).eq_ignore_ascii_case(w))
+                    }) =>
+            {
+                swapped = Some(m);
+                (Some(v), tail)
+            }
+            _ => (val, inst),
+        };
         // The kit's model word: the value, or a word after it.
         let kit_model = self.kit_split(n).map(|s| s.master.0);
-        let late = kit_model.filter(|m| inst.contains(m));
+        let late = swapped.or(kit_model.filter(|m| inst.contains(m)));
         let inst: Vec<u32> = inst.iter().copied().filter(|&k| Some(k) != late).collect();
         let inst = &inst[..];
         if val.is_some_and(|v| !self.val_ok(v) || self.tag(v) == Tag::Seq) || !self.inst_ok(inst) {
@@ -386,7 +484,7 @@ impl<'a> Rd<'a> {
             Some(v)
                 if self.is_word(v)
                     && self.number(v).is_none()
-                    && (self.models.contains(&self.text(v).to_ascii_lowercase())
+                    && (self.models.contains_key(&self.text(v).to_ascii_lowercase())
                         || kit_model == Some(v)) =>
             {
                 model = Some(self.text(v));
