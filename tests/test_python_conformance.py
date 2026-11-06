@@ -203,7 +203,7 @@ EXPECTED = {
     'dc': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'dc_temp': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'ac': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'ac_oct': (OK, OK, OK, OK, OK, 'W0015', OK, OK, OK),
+    'ac_oct': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'ac_log': ('W0040', 'W0040', 'W0040', 'W0040', 'W0040', OK, 'W0040', OK, OK),
     'tran': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # VACASK refuses `.tran … uic` (W0015): its `tran` has `icmode`; writer C (FINDINGS-python.md).
@@ -214,27 +214,28 @@ EXPECTED = {
     'tf': (OK, OK, OK, 'W0015', OK, OK, OK, OK, OK),
     'dc_sensitivity': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     'ac_sensitivity': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    'polezero': (OK, OK, 'W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, OK),
+    'polezero': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
     # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
     'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
     # Xyce and HSPICE have `.LIN`: writer B (FINDINGS-python.md).
     's_param': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    # VACASK has `hb` (its test_hb1.sim), Xyce `.HB`: writers C and B (FINDINGS-python.md).
-    'harmonic_balance': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
-    'stability': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
+    # read::spectre_refusal): writers C and B (FINDINGS-python.md).
+    'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
+    'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
     'transient_noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'fourier': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
     'fourier_count': (OK, OK, 'W0040', 'W0040', OK, OK, 'W0015', OK, OK),
     'network_params': ('W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', 'W0001', OK, OK),
     # LTspice and Xyce `.step` over the one analysis: stream A (Spectre analyses as Bench analyses).
-    'spectre_sweep': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'spectre_sweep': ('W0015', 'W0015', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
     'spectre_monte_carlo': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, OK, OK, OK),
-    'spectre_pac': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
-    'spectre_pnoise': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
-    'spectre_pxf': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
-    'spectre_pstb': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'spectre_pac': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    'spectre_pnoise': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    'spectre_pxf': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    'spectre_pstb': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
     'options': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'temperature': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'initial_condition': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -263,8 +264,8 @@ EXPECTED = {
     'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # Spectre has `port`, HSPICE and Xyce a `P` port: writers C and B (FINDINGS-python.md).
-    'rf_port': (OK, OK, 'W0007', 'W0007', 'W0007', 'W0007', 'W0007', OK, OK),
+    # HSPICE and Xyce have a `P` port: writer B (FINDINGS-python.md).
+    'rf_port': (OK, OK, 'W0007', 'W0007', 'W0007', OK, 'W0007', OK, OK),
     'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -274,7 +275,7 @@ EXPECTED = {
     'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'BV_BI': (OK, OK, OK, OK, OK, 'W0102', 'W0102', OK, OK),
+    'BV_BI': (OK, OK, OK, OK, OK, OK, 'W0102', OK, OK),
     'POLY': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),

@@ -24,7 +24,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `R` | `(name, positive, negative, value, *, raw_spice=None, **params)` |
 | `C`, `L` | `(name, positive, negative, value, **params)` |
 | `K` | `(name, inductor1, inductor2, *, coupling)` |
-| `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None)`; `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice only) |
+| `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None)`; `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; other targets refuse it, `W0007`) |
 | `BV`, `BI` | `(name, positive, negative, *, expression)` |
 | `E` | `(name, positive, negative, *, control_positive, control_negative, voltage_gain)` |
 | `G` | `(name, positive, negative, *, control_positive, control_negative, transconductance)` |
