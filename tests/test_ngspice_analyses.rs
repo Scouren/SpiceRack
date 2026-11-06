@@ -15,6 +15,8 @@
 #[macro_use]
 mod common;
 
+use spicerack::syntax::Lang;
+
 use spicerack::backend::Dialect;
 
 analysis_suite!(Dialect::Ngspice, tf_columns: ("output_impedance_at_v(out)", "v1#input_impedance"));
@@ -122,16 +124,16 @@ fn four_prints_the_harmonic_table_to_stdout() {
 #[test]
 fn measure_survives_alongside_an_osdi_control_block() {
     use spicerack::syntax::render::{Numbers, Source, render};
-    use spicerack::syntax::{lexicon::NGSPICE, parse, tokenize};
+    use spicerack::syntax::{parse, tokenize};
     let text = "* osdi + meas\nV1 in 0 0\nR1 in out 10k\nR2 out 0 10k\n\
          .meas dc vhalf FIND V(out) AT=10\n.dc V1 0 10 1\n.end\n";
     // An ngspice deck has no load card (`pre_osdi` is a `.control`
     // command), so the load is given beside the text.
     let (t, loads) = (
-        tokenize(text, &NGSPICE),
+        tokenize(text, Lang::NGSPICE.lexicon().expect("a reader")),
         ["/nonexistent/model.osdi".to_string()],
     );
-    let ast = parse(&t, &NGSPICE);
+    let ast = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
     let src = Source {
         ast: &ast,
         tokens: &t,

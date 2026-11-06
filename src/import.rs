@@ -13,12 +13,14 @@
 //! - `pub fn kit(entries: &[PathBuf], form: Form, d: Dialect, root: &Path) -> Kit`
 //! - `pub fn dump(src: &str, d: Dialect) -> Result<String, String>`
 
+use crate::syntax::Lang;
+
 use std::path::{Path, PathBuf};
 
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::resolve::{Form, Kit, LoadError};
 use crate::syntax::token::Tokens;
-use crate::syntax::{self, Dialect, lexicon};
+use crate::syntax::{self, Dialect};
 
 /// Deck bytes as text: UTF-16LE with a BOM (LTspice), UTF-8, else Latin-1
 /// (LTspice's older netlists, SSR "Encoding"), so a `µ` survives.
@@ -44,7 +46,9 @@ pub fn decode(bytes: &[u8]) -> String {
 /// front end itself never fails, it keeps what it cannot read as
 /// `Verbatim` statements with a `P` diagnostic.
 pub fn parse(src: &str, d: Dialect) -> Result<(Tokens<'_>, Ast<'_>), String> {
-    let lex = lexicon::of(d).ok_or_else(|| format!("no {d:?} reader yet"))?;
+    let lex = Lang::from(d)
+        .lexicon()
+        .ok_or_else(|| format!("no {d:?} reader yet"))?;
     let t = syntax::tokenize(src, lex);
     let ast = syntax::parse(&t, lex);
     Ok((t, ast))

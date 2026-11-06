@@ -20,6 +20,8 @@
 //! - `Rd::pairs(&self, n: u32) -> Vec<(String, u32)>`, `Rd::get(&self, p: &[(String, u32)], k: &str) -> Option<u32>`
 //! - `Rd::unquote(&self, p: u32) -> String`
 
+use crate::syntax::Lang;
+
 use std::collections::HashMap;
 
 use super::blocks::Opened;
@@ -356,7 +358,7 @@ impl<'a> Rd<'a> {
         self.tag(n) == Tag::Instance
             && self.master(n).is_some_and(|m| {
                 matches!(
-                    crate::syntax::lexicon::SPECTRE.master(&m),
+                    Lang::SPECTRE.lexicon().expect("a reader").master(&m),
                     Some(Statement::Analysis(_))
                 )
             })

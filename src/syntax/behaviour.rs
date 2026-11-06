@@ -13,13 +13,13 @@
 //! Cites: none (each code path cites its manual where it is read).
 //!
 //! Contents:
-//! - `pub struct Behaviours`, `Behaviours::DEFAULT`, `pub const fn builtin(d: Dialect) -> Behaviours`
+//! - `pub struct Behaviours`, `Behaviours::DEFAULT`
 //! - `pub enum Writer`, `pub enum NumberReading`, `pub enum ModelSemantics`, `pub enum SourceRules`,
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum NamedParams`
 
-use crate::syntax::{Dialect, Lang};
+use crate::syntax::Lang;
 
 /// A language's behaviours.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -229,129 +229,4 @@ impl Behaviours {
         named_params: NamedParams::None,
         spectre_analyses: &[],
     };
-}
-
-/// Built-in `d`'s behaviours: each field what `d`'s code path did.
-pub const fn builtin(d: Dialect) -> Behaviours {
-    use Dialect as D;
-    let ngspice = matches!(d, D::Ngspice);
-    Behaviours {
-        writer: match d {
-            D::Cdl => Writer::Cdl,
-            D::Verilog => Writer::Verilog,
-            D::Spectre => Writer::Spectre,
-            D::Vacask => Writer::Vacask,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Writer::Cards,
-        },
-        text_family: match d {
-            D::Espice => Lang::NGSPICE,
-            D::Ngspice => Lang::NGSPICE,
-            D::Ltspice => Lang::LTSPICE,
-            D::Spectre => Lang::SPECTRE,
-            D::Vacask => Lang::VACASK,
-            D::Hspice => Lang::HSPICE,
-            D::Xyce => Lang::XYCE,
-            D::Cdl => Lang::CDL,
-            D::Verilog => Lang::VERILOG,
-        },
-        caret_power: !matches!(d, D::Ltspice | D::Xyce | D::Vacask),
-        hier_sep: if matches!(d, D::Xyce) { ':' } else { '.' },
-        numbers: if ngspice {
-            NumberReading::Ngspice
-        } else {
-            NumberReading::Decimal
-        },
-        model_semantics: if ngspice {
-            ModelSemantics::Ngspice
-        } else {
-            ModelSemantics::Other
-        },
-        source_rules: if ngspice {
-            SourceRules::Ngspice
-        } else {
-            SourceRules::Spice
-        },
-        card_rules: match d {
-            D::Ngspice => CardRules::Ngspice,
-            D::Hspice => CardRules::Hspice,
-            D::Ltspice => CardRules::Ltspice,
-            D::Xyce => CardRules::Xyce,
-            D::Espice | D::Spectre | D::Vacask | D::Cdl | D::Verilog => CardRules::Spice,
-        },
-        named_rules: match d {
-            D::Spectre => NamedRules::Spectre,
-            D::Vacask => NamedRules::Vacask,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice | D::Cdl | D::Verilog => {
-                NamedRules::None
-            }
-        },
-        options_form: match d {
-            D::Xyce => OptionsForm::XycePackages,
-            D::Spectre => OptionsForm::Spectre,
-            D::Vacask => OptionsForm::Vacask,
-            D::Ngspice | D::Espice | D::Hspice | D::Ltspice | D::Cdl | D::Verilog => {
-                OptionsForm::Spice
-            }
-        },
-        load_form: match d {
-            D::Ngspice => LoadForm::Ngspice,
-            D::Espice => LoadForm::Espice,
-            D::Hspice => LoadForm::Hspice,
-            D::Xyce => LoadForm::Xyce,
-            D::Ltspice => LoadForm::Ltspice,
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => LoadForm::None,
-        },
-        control_block: if ngspice {
-            ControlBlock::Ngspice
-        } else {
-            ControlBlock::None
-        },
-        analysis_form: match d {
-            D::Ngspice => AnalysisForm::Ngspice,
-            D::Espice => AnalysisForm::Espice,
-            D::Hspice => AnalysisForm::Hspice,
-            D::Xyce => AnalysisForm::Xyce,
-            D::Ltspice => AnalysisForm::Ltspice,
-            D::Spectre | D::Vacask | D::Cdl | D::Verilog => AnalysisForm::Plain,
-        },
-        end_rule: if matches!(d, D::Hspice) {
-            EndRule::WhenRuns
-        } else {
-            EndRule::Always
-        },
-        value_quoting: if matches!(d, D::Hspice) {
-            ValueQuoting::Hspice
-        } else {
-            ValueQuoting::AsWritten
-        },
-        coupling: if matches!(d, D::Xyce | D::Ltspice) {
-            Coupling::OneCard
-        } else {
-            Coupling::Pairs
-        },
-        param_form: if matches!(d, D::Xyce) {
-            ParamForm::Xyce
-        } else {
-            ParamForm::Plain
-        },
-        named_params: match d {
-            D::Spectre => NamedParams::Spectre,
-            D::Vacask => NamedParams::Vacask,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice | D::Cdl | D::Verilog => {
-                NamedParams::None
-            }
-        },
-        // ngspice-45 runs no `.pss`; HSPICE: `.pz`, `.sens`, `.lin`, `.hb`,
-        // an analysis's `sweep` and `monte=`; Xyce: `.hb`, `.lin`, `.sens`,
-        // `.step`, `.sampling` (RG Table 6-1); LTspice: `.step`; VACASK:
-        // `hb`, `sweep`, `acxf`, `mc` (`docs/analysis_types.md`).
-        spectre_analyses: match d {
-            D::Ngspice | D::Espice => &["pz", "sp", "sens"],
-            D::Hspice => &["pz", "sens", "sp", "hb", "sweep", "montecarlo"],
-            D::Xyce => &["hb", "sp", "sens", "sweep", "montecarlo"],
-            D::Ltspice => &["sweep"],
-            D::Vacask => &["hb", "sweep", "xf", "montecarlo"],
-            D::Spectre | D::Cdl | D::Verilog => &[],
-        },
-    }
 }

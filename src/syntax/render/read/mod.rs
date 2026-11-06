@@ -532,7 +532,7 @@ impl<'a> Rd<'a> {
         match self.tag(n) {
             Tag::Title | Tag::End => {}
             Tag::Verbatim | Tag::Line => self.unparsed(n, here),
-            // A region of another dialect's text (`lexicon::NGSPICE_GIVEN`):
+            // A region of another dialect's text (`Lang::NGSPICE_GIVEN`):
             // kept as that dialect's text, which only it writes; but a
             // Spectre analysis at the top is an analysis (`Ana`), which
             // each target spells or refuses (VACASK's `mc` for a

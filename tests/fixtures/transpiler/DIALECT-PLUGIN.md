@@ -783,4 +783,40 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   `zero-cost.md` says to, it is NEGATIVE (45 against 170, one call against
   two). `render::spice::W::ask` is inlined into its callers in both
   builds.
-
+- **P1b** (on 613966e): the construct table lists the constructs streams
+  B and D added; their capability reads read the target's cells.
+- **P0 recount** (613966e): 108 identity sites (88 at b0952a7).
+- **P2**: `syntax/behaviour.rs`, 15 behaviour enums and four plain rows
+  (`text_family`, `caret_power`, `hier_sep`, `spectre_analyses`); all 108
+  sites read a property of the source's (`Rd::b`) or target's (`W::b`)
+  language. Each built-in's values are what its code path did, so the
+  grouping is exact for the built-ins. Narrower than §6.1: the rows §6.1
+  A and B list (keyword, master-letter, function-name tables) are
+  behaviours for now (`card_rules`, `named_rules`); turning them into
+  tables is a later compression with no golden change to prove it.
+- **P3**: `syntax/def` (`DialectDef`, `register`, `RegisterError`), the
+  registry behind `Lang` (one `OnceLock` slot per row, an append lock,
+  the built-ins registered first at constant handles in the order
+  ngspice, espice, hspice, xyce, ltspice, spectre, vacask, cdl, verilog,
+  ngspice-given); `Lexicon::lang` and `Spelling::lang` replace their
+  `Dialect` fields; a frozen lexicon's `lang` is the definition's
+  `text_family`. Tables keep declaration order; a single-row call
+  replaces a held key in place; a shared table (`keywords`, `operators`,
+  `devices`) adds only the keys the definition does not hold, as "the
+  first table holding a word wins" did.
+- **P4-P7**: every built-in declared in `syntax/dialects/<d>.rs` with the
+  public calls only (each lexicon translated from `lexicon/<d>.rs` with its
+  rule citations; its spelling, behaviours and all 35 cells). Until P9 a
+  test checked each registered row field by field against the old tables.
+- **P9**: deleted the old tables: the seven lexicon consts and
+  `NGSPICE_GIVEN` (the `lexicon/<d>.rs` files keep their rule tests, now
+  against the registered lexicons), the nine `Spelling` rows and
+  `spelling()`, `capability::action` and its 30 matches,
+  `behaviour::builtin`, `lexicon::of`: 1,781 lines deleted, 376 added in
+  P9 (the branch so far: 4,442 added, 1,751 deleted over 80 files,
+  migration notes included). `Dialect` stays as the built-ins' names
+  (`From<Dialect> for Lang`, the backend's simulators, `Kit`); nothing in
+  `syntax` branches on it.
+- Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
+  included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
+  the listed xfails (25,596 on 613966e).

@@ -224,7 +224,7 @@ impl Rd<'_> {
             return Some(Card::StepList(name, values));
         }
         // ngspice has no `.step`, so one in a deck read as ngspice is the
-        // given deck's (`lexicon::NGSPICE_GIVEN`): Xyce's form (RG p.155),
+        // given deck's (`Lang::NGSPICE_GIVEN`): Xyce's form (RG p.155),
         // whose `lin|dec|oct` LTspice shares, and Spectre's total-count
         // `log` (Reference 19.1 p.406-410 `sweep`), which Python's
         // `step_sweep` names.

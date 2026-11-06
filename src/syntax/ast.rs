@@ -97,7 +97,7 @@ pub enum Tag {
     Control,
     /// Spectre `simulator lang=spice` … `simulator lang=spectre`, and in a
     /// SPICE file a `simulator lang=<dialect>` … `simulator lang=spice`
-    /// region (`lexicon::NGSPICE_GIVEN`): the region's statements, read by
+    /// region (`Lang::NGSPICE_GIVEN`): the region's statements, read by
     /// its lexicon. Fields: the head's; body.
     Region,
     /// Lines kept whole: `.data` … `.enddata`, `.variation` …

@@ -19,33 +19,17 @@
 //! - `pub enum Join`, `pub enum Dollar`, `pub enum Backslash`, `pub struct End`, `pub enum Quote`,
 //!   `pub struct Quoting`, `pub enum Caret`, `pub struct Ops`, `Ops::TERNARY: u8`
 //! - `pub struct Numbers`, `pub enum Scale`, `pub enum Tail`, `pub enum Arithmetic`
-//! - `pub const NGSPICE`, `NGSPICE_GIVEN`, `HSPICE`, `LTSPICE`, `XYCE`, `SPECTRE`, `VACASK: Lexicon`
 //! - `pub(crate) const SPICE_KEYWORDS`, `pub(crate) const SPICE_OPERATORS: &[(&str, Tag)]`
-//! - `pub fn of(d: Dialect) -> Option<&'static Lexicon>`
 
+use crate::syntax::Lang;
 use crate::syntax::device::{self, Device};
 use crate::syntax::statement::{Analysis, Statement};
 use crate::syntax::token::Tag;
-use crate::syntax::{Dialect, Lang};
-
-mod hspice;
-mod ltspice;
-mod ngspice;
-mod spectre;
-mod vacask;
-mod xyce;
-
-pub use hspice::HSPICE;
-pub use ltspice::LTSPICE;
-pub use ngspice::{NGSPICE, NGSPICE_GIVEN};
-pub use spectre::SPECTRE;
-pub use vacask::VACASK;
-pub use xyce::XYCE;
 
 /// One dialect's lexical rules. Line structure first, then words, then the
 /// tables the parser reads.
 pub struct Lexicon {
-    /// The language whose text this reads (ESPice reads [`NGSPICE`]).
+    /// The language whose text this reads (ESPice reads `Lang::NGSPICE`'s).
     pub lang: Lang,
     /// Line 1 of a top-level file is the title, whatever it holds.
     pub title: bool,
@@ -142,7 +126,7 @@ pub struct Lexicon {
     /// its lexicon until the statement that switches back (`simulator
     /// lang=spectre` in a Spectre file, `simulator lang=spice` in a SPICE
     /// one): Spectre's `spice` (the old Spectre grammar's hook), and in
-    /// [`NGSPICE_GIVEN`] each target dialect's own.
+    /// `Lang::NGSPICE_GIVEN` each target dialect's own.
     pub regions: &'static [(&'static str, &'static Lexicon)],
 }
 
@@ -412,8 +396,15 @@ impl Lexicon {
     }
 }
 
-/// The lexicon dialect `d`'s text is read with; `None` for the dialects
-/// with no reader (CDL, Verilog).
-pub fn of(d: Dialect) -> Option<&'static Lexicon> {
-    crate::syntax::Lang::from(d).lexicon()
-}
+#[cfg(test)]
+mod hspice;
+#[cfg(test)]
+mod ltspice;
+#[cfg(test)]
+mod ngspice;
+#[cfg(test)]
+mod spectre;
+#[cfg(test)]
+mod vacask;
+#[cfg(test)]
+mod xyce;

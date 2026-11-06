@@ -46,6 +46,8 @@
 //! - `pub fn role(t: &Tokens, ast: &Ast) -> Role`
 //! - `pub(super) fn key(name: &str, fold: bool) -> String`
 
+use crate::syntax::Lang;
+
 use std::collections::{HashMap, VecDeque};
 use std::path::{Component, Path, PathBuf};
 
@@ -54,7 +56,7 @@ use crate::syntax::ast::{Ast, Node};
 use crate::syntax::device::Primitive;
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::token::Tokens;
-use crate::syntax::{lexicon, parse, tokenize};
+use crate::syntax::{parse, tokenize};
 
 mod declare;
 mod lookup;
@@ -102,7 +104,7 @@ pub struct File {
     /// The text the kit parsed: the loaded text, behind one empty title
     /// line for a file read in [`Form::Library`] (so token and line numbers
     /// count that line); a Verilog-A source's text as loaded; empty for an
-    /// unread file. `tokenize(&text, lexicon::of(kit.dialect()))` and
+    /// unread file. `tokenize(&text, Lang::from(kit.dialect()).lexicon())` and
     /// `parse` rebuild the tree every answer's node ids name.
     pub text: String,
     /// The parse's `P` rows and resolve's `R` rows, sorted by token. An `R`
@@ -319,7 +321,9 @@ impl Kit {
         dialect: Dialect,
         load: &mut dyn FnMut(&Path) -> Result<String, LoadError>,
     ) -> Kit {
-        let lex = lexicon::of(dialect).expect("Kit::load: a dialect with a reader");
+        let lex = Lang::from(dialect)
+            .lexicon()
+            .expect("Kit::load: a dialect with a reader");
         let mut kit = Kit {
             dialect,
             files: Vec::new(),

@@ -5,6 +5,8 @@
 //!
 //! Contents: none (tests only).
 
+use spicerack::syntax::Lang;
+
 use super::*;
 
 // ---- private ----
@@ -88,7 +90,12 @@ fn a_sectionless_library_call_includes_the_whole_file() {
         "t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.lib {}\n.op\n.end\n",
         lib.display()
     );
-    let netlist = emit_from(&deck, Dialect::Ltspice, &lexicon::LTSPICE).unwrap();
+    let netlist = emit_from(
+        &deck,
+        Dialect::Ltspice,
+        Lang::LTSPICE.lexicon().expect("a reader"),
+    )
+    .unwrap();
     assert!(!netlist.contains("section="), "{netlist}");
     // 1 V over 1k into 1k || 1k: 1/3 V.
     close(col(&run_text(&netlist), "b")[0], 1.0 / 3.0, 1e-9);

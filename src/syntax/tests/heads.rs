@@ -6,8 +6,9 @@
 //!
 //! Contents: none (tests only).
 
+use crate::syntax::Lang;
+
 use super::read;
-use crate::syntax::lexicon::{HSPICE, NGSPICE, SPECTRE, VACASK};
 
 // ---- private ----
 
@@ -15,7 +16,10 @@ use crate::syntax::lexicon::{HSPICE, NGSPICE, SPECTRE, VACASK};
 fn spice_instance_x_master_either_side() {
     // ngspice manual §2.4.3: `XYYY N1 N2 SUBNAM p=v`; sky130's alias puts
     // the parameters first (`X1 a b w=1 sub`). Checks: 2.
-    let (top, codes) = read("t\nX1 a b sub w=1\nX2 a b w=1 sub\n", &NGSPICE);
+    let (top, codes) = read(
+        "t\nX1 a b sub w=1\nX2 a b w=1 sub\n",
+        Lang::NGSPICE.lexicon().expect("a reader"),
+    );
     assert_eq!(
         top,
         [
@@ -36,7 +40,7 @@ fn element_cards_split_by_their_device_row() {
     // bulkless `Mxxx nd ng ns mname`, `WYYY N+ N- VNAM MODEL`, `TXXX N1 N2
     // N3 N4 Z0=VALUE`, ngspice's OSDI `NXXX n1 ... mname`. Checks: 2.
     let src = "t\nR1 a b 1k rmod\nK1 L1 L2 0.9\nV1 a 0 dc 1 ac 1\nE1 a b c d 2\nF1 a b vs 2\nD1 a k dmod area=2\nQ1 c b e s qmod off\nM1 d g s b nch w=1u\nM2 d g s nch\nW1 a b vc wmod\nT1 a 0 b 0 z0=50\nN1 a b c va\n";
-    let (top, codes) = read(src, &NGSPICE);
+    let (top, codes) = read(src, Lang::NGSPICE.lexicon().expect("a reader"));
     assert_eq!(
         top,
         [
@@ -61,7 +65,10 @@ fn element_cards_split_by_their_device_row() {
 fn a_letter_no_table_holds_has_no_primitive() {
     // HSPICE reads only the twenty shared letters (`syntax::device::SPICE`);
     // its legal neighbour is ngspice's `N1` above. Checks: 1.
-    let (top, _) = read("t\nN1 a b c va\n", &HSPICE);
+    let (top, _) = read(
+        "t\nN1 a b c va\n",
+        Lang::HSPICE.lexicon().expect("a reader"),
+    );
     assert_eq!(
         top,
         ["Instance\"N1\"<- w\"N1\" -|>[w\"a\" w\"b\" w\"c\" w\"va\"]"]
@@ -76,7 +83,7 @@ fn spectre_analyses_controls_and_options_by_master() {
     // analyses in braces; the legal neighbour `x1 (a b) set` is an
     // instance. Checks: 2.
     let src = "t\ntran1 tran stop=1n\nnoise1 (out 0) noise iprobe=v1\nopt1 options reltol=1e-3\ni1 info what=models\nx1 (a b) set\nsw1 sweep param=temp values=[1 2] {\ntr2 tran stop=1n\n}\n";
-    let (top, codes) = read(src, &SPECTRE);
+    let (top, codes) = read(src, Lang::SPECTRE.lexicon().expect("a reader"));
     assert_eq!(
         top,
         [
@@ -97,7 +104,7 @@ fn vacask_analysis_and_options_in_control() {
     // <kind> k=v`; a kind the table lacks keeps its word, code `-`.
     // Checks: 2.
     let src = "t\ncontrol\noptions reltol=1e-3\nanalysis op1 op\nanalysis x1 zz\nendc\n";
-    let (top, codes) = read(src, &VACASK);
+    let (top, codes) = read(src, Lang::VACASK.lexicon().expect("a reader"));
     assert_eq!(
         top,
         [
@@ -113,7 +120,7 @@ fn spectre_instance_with_and_without_parentheses() {
     // the master is the last bare word before the first `name=`. Checks: 2.
     let (top, codes) = read(
         "t\nr1 (a b) resistor r=1k\nr2 a b resistor r=2k\n",
-        &SPECTRE,
+        Lang::SPECTRE.lexicon().expect("a reader"),
     );
     assert_eq!(
         top,

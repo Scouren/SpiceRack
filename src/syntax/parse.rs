@@ -387,12 +387,11 @@ impl<'s> Parser<'_, 's> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syntax::lexicon::{HSPICE, NGSPICE};
-    use crate::syntax::tokenize;
+    use crate::syntax::{Lang, tokenize};
 
     fn tags(src: &str) -> Vec<Tag> {
-        let t = tokenize(src, &NGSPICE);
-        let a = parse(&t, &NGSPICE);
+        let t = tokenize(src, Lang::NGSPICE.lexicon().expect("a reader"));
+        let a = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
         a.fields(a.root()).iter().map(|&n| a.tag(Node(n))).collect()
     }
 
@@ -407,8 +406,8 @@ mod tests {
         for _ in 0..n {
             src.push_str(".ends\n");
         }
-        let t = tokenize(&src, &NGSPICE);
-        let a = parse(&t, &NGSPICE);
+        let t = tokenize(&src, Lang::NGSPICE.lexicon().expect("a reader"));
+        let a = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
         assert!(a.diags().is_empty());
         let mut s = Node(a.fields(a.root())[1]);
         for _ in 1..n {
@@ -423,8 +422,8 @@ mod tests {
         // No clause: the parser's own cap, DEPTH_MAX.
         let n = 10_000;
         let src = format!("t\n.param a={}1{}\n", "(".repeat(n), ")".repeat(n));
-        let t = tokenize(&src, &NGSPICE);
-        let a = parse(&t, &NGSPICE);
+        let t = tokenize(&src, Lang::NGSPICE.lexicon().expect("a reader"));
+        let a = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
         assert!(a.diags().iter().any(|d| d.code == Code::P0006));
         assert_eq!(tags(&src), [Tag::Title, Tag::Param]);
     }
@@ -432,16 +431,19 @@ mod tests {
     #[test]
     fn a_stray_closer_is_a_card_with_p0004() {
         // ngspice manual §2.5: `.ends` closes a `.subckt`.
-        let t = tokenize("t\n.ends\n", &NGSPICE);
-        let a = parse(&t, &NGSPICE);
+        let t = tokenize("t\n.ends\n", Lang::NGSPICE.lexicon().expect("a reader"));
+        let a = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
         assert_eq!(a.diags()[0].code, Code::P0004);
         assert_eq!(a.tag(Node(a.fields(a.root())[1])), Tag::Card);
     }
 
     #[test]
     fn an_unclosed_block_is_p0003_and_holds_the_rest() {
-        let t = tokenize("t\n.subckt s a\nR1 a 0 1\n", &NGSPICE);
-        let a = parse(&t, &NGSPICE);
+        let t = tokenize(
+            "t\n.subckt s a\nR1 a 0 1\n",
+            Lang::NGSPICE.lexicon().expect("a reader"),
+        );
+        let a = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
         assert_eq!(a.diags()[0].code, Code::P0003);
         let s = Node(a.fields(a.root())[1]);
         assert_eq!(a.body(s).len(), 1);
@@ -452,8 +454,8 @@ mod tests {
     fn if_chains_share_their_endif() {
         // ngspice manual §2.15: `.if` … `.elseif` … `.else` … `.endif`.
         let src = "t\n.if (a)\nR1 a 0 1\n.elseif (b)\nR2 a 0 2\n.else\nR3 a 0 3\n.endif\n";
-        let t = tokenize(src, &NGSPICE);
-        let a = parse(&t, &NGSPICE);
+        let t = tokenize(src, Lang::NGSPICE.lexicon().expect("a reader"));
+        let a = parse(&t, Lang::NGSPICE.lexicon().expect("a reader"));
         assert!(a.diags().is_empty());
         let top = a.fields(a.root());
         assert_eq!(top.len(), 2);
@@ -471,8 +473,11 @@ mod tests {
     #[test]
     fn hspice_glue_joins_a_word() {
         // HSPICE L6: `\\` joins the next line with nothing between.
-        let t = tokenize("t\nR1 ab\\\\\ncd 0 1\n", &HSPICE);
-        let a = parse(&t, &HSPICE);
+        let t = tokenize(
+            "t\nR1 ab\\\\\ncd 0 1\n",
+            Lang::HSPICE.lexicon().expect("a reader"),
+        );
+        let a = parse(&t, Lang::HSPICE.lexicon().expect("a reader"));
         let inst = Node(a.fields(a.root())[1]);
         let w = Node(a.header(inst).nodes[0]);
         assert_eq!(a.name(crate::syntax::ast::Name(a.rhs(w))), "abcd");

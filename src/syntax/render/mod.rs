@@ -44,7 +44,7 @@ use crate::syntax::diag::{self, Diag, Kind};
 use crate::syntax::resolve::{FileId, Kit, Role};
 use crate::syntax::token::Tokens;
 use crate::syntax::{Dialect, Lang};
-use crate::syntax::{lexicon, parse, tokenize};
+use crate::syntax::{parse, tokenize};
 
 /// One file to write: its tree and tokens, the dialect it was read in, the
 /// name its deck is written under (the title), the kit it was read in,
@@ -135,7 +135,9 @@ pub fn render_kit(
         matches!(f.role, Role::Deck | Role::Library),
         "render_kit: a file the kit read"
     );
-    let lex = lexicon::of(kit.dialect()).expect("a kit's dialect has a reader");
+    let lex = Lang::from(kit.dialect())
+        .lexicon()
+        .expect("a kit's dialect has a reader");
     let t = tokenize(&f.text, lex);
     let ast = parse(&t, lex);
     let src = Source {
@@ -160,7 +162,7 @@ pub fn render_text(
     name: &str,
     target: impl Into<Lang>,
 ) -> Result<Written, Diags> {
-    let lex = lexicon::of(d).expect("a dialect with a reader");
+    let lex = Lang::from(d).lexicon().expect("a dialect with a reader");
     let t = tokenize(text, lex);
     let ast = parse(&t, lex);
     let src = Source {

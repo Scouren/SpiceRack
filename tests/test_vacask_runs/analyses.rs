@@ -5,6 +5,8 @@
 //!
 //! Contents: none (tests only).
 
+use spicerack::syntax::Lang;
+
 use super::*;
 
 // ---- private ----
@@ -182,7 +184,7 @@ fn a_one_point_sweep_is_points_zero() {
 
 /// The Xyce deck `deck` written for VACASK and run.
 fn run_xyce(deck: &str) -> RawData {
-    let text = emit_from(deck, Dialect::Xyce, &spicerack::syntax::lexicon::XYCE)
+    let text = emit_from(deck, Dialect::Xyce, Lang::XYCE.lexicon().expect("a reader"))
         .unwrap_or_else(|c| panic!("refused {c:?}"));
     run_text(&text)
 }

@@ -28,6 +28,8 @@
 //!
 //! Contents: none (tests only).
 
+use spicerack::syntax::Lang;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -38,7 +40,6 @@ use spicerack::import::decode;
 use spicerack::syntax::Dialect;
 use spicerack::syntax::ast::{self, NONE, Node};
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::lexicon::{self, HSPICE, SPECTRE};
 use spicerack::syntax::render::{Numbers, Source, render};
 use spicerack::syntax::resolve::{Binding, DefKind, FileId, Kit, LoadError, Role};
 use spicerack::syntax::token::Tag;
@@ -56,7 +57,7 @@ fn lang_switch() {
     // `.param rsh_spice=100` continued by `+ rvc=0.01`.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pdk_sections/bare.scs");
     let src = decode(&std::fs::read(&path).expect("bare.scs"));
-    let t = tokenize(&src, &SPECTRE);
+    let t = tokenize(&src, Lang::SPECTRE.lexicon().expect("a reader"));
     let tags = t.tags();
     let at = |tag: Tag| tags.iter().position(|&x| x == tag).expect("tag present") as u32;
     let (on, off) = (at(Tag::LangSpice), at(Tag::LangSpectre));
@@ -81,16 +82,22 @@ fn lang_switch() {
         ]
     );
     assert_eq!(tags[on as usize + 1], Tag::KwParam);
-    assert!((on + 1..off).all(|i| std::ptr::eq(t.lexicon_at(i), &HSPICE)));
+    assert!(
+        (on + 1..off)
+            .all(|i| std::ptr::eq(t.lexicon_at(i), Lang::HSPICE.lexicon().expect("a reader")))
+    );
     assert_eq!(tags[off as usize + 1], Tag::KwParam);
-    assert!(std::ptr::eq(t.lexicon_at(off + 1), &SPECTRE));
+    assert!(std::ptr::eq(
+        t.lexicon_at(off + 1),
+        Lang::SPECTRE.lexicon().expect("a reader")
+    ));
 
     // Every Spectre fixture: one marker per `simulator lang=spice` line, and
     // nothing in a region lexed by Spectre's rules.
     for (key, src, d) in
         every_input().filter(|(k, _, d)| *d == Dialect::Spectre && k.starts_with("fixtures/"))
     {
-        let t = tokenize(&src, &SPECTRE);
+        let t = tokenize(&src, Lang::SPECTRE.lexicon().expect("a reader"));
         let lines = src
             .lines()
             .filter(|l| {
@@ -188,7 +195,7 @@ fn kits_resolve() {
             );
         }
         let c = counts.entry(kset).or_default();
-        let lex = lexicon::of(kit.dialect()).expect("a reader");
+        let lex = Lang::from(kit.dialect()).lexicon().expect("a reader");
         for (k, file) in kit.files().iter().enumerate() {
             if !matches!(file.role, Role::Deck | Role::Library) {
                 continue;
@@ -270,7 +277,7 @@ fn timed() {
     let (mut bytes, mut tokens, mut nodes) = (0usize, 0usize, 0usize);
     let (mut lexing, mut parsing, mut rendering) = (0.0f64, 0.0f64, 0.0f64);
     for (key, src, d) in every_input() {
-        let lex = lexicon::of(d).expect("lexicon");
+        let lex = Lang::from(d).lexicon().expect("lexicon");
         let at = Instant::now();
         let t = tokenize(&src, lex);
         lexing += at.elapsed().as_secs_f64();

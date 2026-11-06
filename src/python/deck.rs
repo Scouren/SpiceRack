@@ -8,7 +8,7 @@
 //! for what only Spectre says (the analyses with no ngspice card, and
 //! `pss` on a Spectre target: `Analysis::in_spectre_region`), its Spectre
 //! statement in a `simulator lang=spectre` region of the source
-//! (`lexicon::NGSPICE_GIVEN`); a Fourier analysis's harmonic count is
+//! (`Lang::NGSPICE_GIVEN`); a Fourier analysis's harmonic count is
 //! ngspice's `.options nfreqs=` card, or the analysis in LTspice's or
 //! Spectre's words in its region (`Analysis::fourier_count`). A line
 //! given as one dialect's text (`extra_line`) sits in that dialect's
@@ -31,6 +31,8 @@
 //! - `pub(super) fn check_backend_name(name: &str) -> PyResult<()>`
 //! - `pub(super) fn region_dialect(name: &str) -> Result<Dialect, String>`
 //! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`
+
+use crate::syntax::Lang;
 
 use std::borrow::Cow;
 use std::fmt::Write as _;
@@ -168,7 +170,7 @@ pub(super) fn check_backend_name(name: &str) -> PyResult<()> {
 /// A name no dialect has; a dialect with no region (CDL, Verilog).
 pub(super) fn region_dialect(name: &str) -> Result<Dialect, String> {
     let d = name.parse::<Dialect>()?.family();
-    let regions = crate::syntax::lexicon::NGSPICE_GIVEN.regions;
+    let regions = Lang::NGSPICE_GIVEN.lexicon().expect("a reader").regions;
     match regions.iter().any(|(n, _)| *n == d.name()) {
         true => Ok(d),
         false => {
@@ -255,7 +257,7 @@ impl Deck {
     fn write(&self, d: Dialect) -> Result<String, String> {
         let name = self.top.name.as_str();
         let source = self.source(d)?;
-        let lex = &crate::syntax::lexicon::NGSPICE_GIVEN;
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
         let tokens = crate::syntax::tokenize(&source, lex);
         let ast = crate::syntax::parse(&tokens, lex);
         let src = render::Source {

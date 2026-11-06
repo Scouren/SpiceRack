@@ -190,7 +190,7 @@ impl Value {
 }
 
 /// `v` in SI form (`10k`, `2.5n`), which the deck's lexicon
-/// (`lexicon::NGSPICE_GIVEN`) reads back as exactly `v`.
+/// (`Lang::NGSPICE_GIVEN`) reads back as exactly `v`.
 pub(super) fn num(v: f64) -> String {
     crate::unit::format_spice_number(v)
 }
@@ -220,11 +220,11 @@ mod tests {
 
     #[test]
     fn a_number_reads_back_as_the_same_double() {
-        use crate::syntax::{lexicon::NGSPICE_GIVEN, token::Tag, tokenize};
+        use crate::syntax::{Lang, token::Tag, tokenize};
         for v in [1e3, 3.3, 0.1 + 0.2, 1e-9, 2.5e-6, -4.7e-12, 1e-4, 1e300_f64] {
             for s in [num(v.abs()), dec(v.abs())] {
                 let deck = format!("t\nR1 a b {s}\n");
-                let t = tokenize(&deck, &NGSPICE_GIVEN);
+                let t = tokenize(&deck, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
                 let i = t.tags().iter().position(|&g| g == Tag::Number).unwrap();
                 assert_eq!(t.value(i as u32), v.abs(), "{s}");
             }

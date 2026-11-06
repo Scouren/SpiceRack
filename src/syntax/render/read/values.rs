@@ -311,7 +311,7 @@ impl Rd<'_> {
             if !ngspice_num(s) {
                 return None;
             }
-            // `lexicon::NGSPICE_GIVEN` reads its numbers correctly rounded.
+            // `Lang::NGSPICE_GIVEN` reads its numbers correctly rounded.
             if lex.numbers.arithmetic == Arithmetic::Decimal {
                 let (neg, body) = (s.starts_with('-'), s.trim_start_matches(['-', '+']));
                 let v = crate::syntax::number::value(body, lex);

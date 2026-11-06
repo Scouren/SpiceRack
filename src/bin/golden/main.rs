@@ -33,6 +33,8 @@
 //!
 //! Contents: none (a binary; `main` is its entry).
 
+use spicerack::syntax::Lang;
+
 use std::io::Write as _;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
@@ -41,8 +43,8 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use spicerack::import::decode;
+use spicerack::syntax::Dialect;
 use spicerack::syntax::render::{self, Diags};
-use spicerack::syntax::{Dialect, lexicon};
 
 mod diff;
 mod inputs;
@@ -195,7 +197,7 @@ fn record_one(out: &Path, input: &Input) -> std::io::Result<Vec<String>> {
         Ok(())
     };
     let (src, name) = source(&decode(&bytes), input.form, &input.path);
-    if lexicon::of(input.dialect).is_none() {
+    if Lang::from(input.dialect).lexicon().is_none() {
         put(
             "parse.refused",
             &format!("no {:?} reader yet\n", input.dialect),

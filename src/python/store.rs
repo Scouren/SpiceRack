@@ -16,12 +16,13 @@
 //! - `pub(super) fn library_marker(lib: &ModelLibrary) -> String`,
 //!   `pub(super) fn libraries(text: &str) -> Vec<ModelLibrary>`
 
+use crate::syntax::Lang;
+
 use std::borrow::Cow;
 use std::fmt::Write as _;
 
 use super::model::{Body, Card, ModelLibrary, params};
 use crate::syntax::ast::{Ast, Node, Tag};
-use crate::syntax::lexicon::NGSPICE_GIVEN;
 use crate::syntax::token::{Tag as T, Tokens};
 use crate::syntax::{Dialect, parse, tokenize};
 
@@ -80,8 +81,8 @@ pub(super) fn to_source(b: &Body) -> Result<String, String> {
 /// As [`read_deck`]; text that defines no subcircuit.
 pub(super) fn from_source(text: &str, d: Option<Dialect>) -> Result<Body, String> {
     let text = ngspice_text(text, d)?;
-    let t = tokenize(&text, &NGSPICE_GIVEN);
-    let a = parse(&t, &NGSPICE_GIVEN);
+    let t = tokenize(&text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
+    let a = parse(&t, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let top = a.fields(a.root());
     let sc = top.iter().copied().find(|&n| a.tag(Node(n)) == Tag::Subckt);
     let Some(sc) = sc else {
@@ -150,8 +151,8 @@ pub(super) fn with_loads(text: &str, loads: &[String]) -> String {
 /// ngspice; a [`HEADER`] naming no dialect.
 pub(super) fn read_deck(text: &str, d: Option<Dialect>) -> Result<Body, String> {
     let text = ngspice_text(text, d)?;
-    let t = tokenize(&text, &NGSPICE_GIVEN);
-    let a = parse(&t, &NGSPICE_GIVEN);
+    let t = tokenize(&text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
+    let a = parse(&t, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let top = a.fields(a.root());
     let line_start = |n: u32| {
         let at = t.start(a.main_token(Node(n))) as usize;
@@ -316,7 +317,7 @@ fn ngspice_text(text: &str, d: Option<Dialect>) -> Result<Cow<'_, str>, String> 
     if d.family() == Dialect::Ngspice {
         return Ok(Cow::Borrowed(body));
     }
-    if crate::syntax::lexicon::of(d).is_none() {
+    if crate::syntax::Lang::from(d).lexicon().is_none() {
         return Err(format!("no {} reader", d.name()));
     }
     let w = crate::syntax::render::render_text(body, d, "source", Dialect::Ngspice);

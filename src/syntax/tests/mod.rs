@@ -9,10 +9,12 @@
 //!
 //! Contents: none (tests only).
 
+use crate::syntax::Lang;
+
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::device::Primitive;
 use crate::syntax::diag::Code;
-use crate::syntax::lexicon::{HSPICE, LTSPICE, Lexicon, NGSPICE, SPECTRE, VACASK, XYCE};
+use crate::syntax::lexicon::Lexicon;
 use crate::syntax::statement::{Analysis, Command};
 use crate::syntax::token::Tokens;
 use crate::syntax::{parse, tokenize};
@@ -127,8 +129,8 @@ fn show(a: &Ast, t: &Tokens, n: u32) -> String {
 fn title_and_end() {
     // ngspice manual §1.2: line 1 is the title; §1.7: `.end` is a card.
     // Expect: Title then End. Codes: none. Checks: 2.
-    let t = tokenize("t\n.end\n", &NGSPICE);
-    let a = parse(&t, &NGSPICE);
+    let t = tokenize("t\n.end\n", lex(Lang::NGSPICE));
+    let a = parse(&t, lex(Lang::NGSPICE));
     let tags: Vec<Tag> = a.fields(a.root()).iter().map(|&n| a.tag(Node(n))).collect();
     assert_eq!(tags, [Tag::Title, Tag::End]);
     assert!(a.diags().is_empty());
@@ -138,7 +140,7 @@ fn title_and_end() {
 fn verbatim_for_a_headless_line() {
     // ngspice manual §2: a card starts with a letter or a dot; `5 a b` has
     // neither. Expect: Verbatim with P0001. Checks: 2.
-    let (top, codes) = read("t\n5 a b\n", &NGSPICE);
+    let (top, codes) = read("t\n5 a b\n", lex(Lang::NGSPICE));
     assert_eq!(top, ["Verbatim\"5\""]);
     assert_eq!(codes, [Code::P0001]);
 }
@@ -147,7 +149,10 @@ fn verbatim_for_a_headless_line() {
 fn include_and_lib_call() {
     // ngspice manual §2.6 `.include filename`, §2.7 `.lib filename libname`:
     // a path is one blank-free chunk. Checks: 2.
-    let (top, codes) = read("t\n.include a/b(1).sp\n.lib \"m.lib\" tt\n", &NGSPICE);
+    let (top, codes) = read(
+        "t\n.include a/b(1).sp\n.lib \"m.lib\" tt\n",
+        lex(Lang::NGSPICE),
+    );
     assert_eq!(
         top,
         [
@@ -165,7 +170,7 @@ fn subckt_with_params() {
     // the `.ends` as closer. Checks: 2.
     let (top, codes) = read(
         "t\n.subckt s a b params: w=1\nR1 a b 1k\n.ends s\n",
-        &NGSPICE,
+        lex(Lang::NGSPICE),
     );
     assert_eq!(
         top,
@@ -180,7 +185,10 @@ fn subckt_with_params() {
 fn section_is_lib_with_one_word() {
     // ngspice manual §2.7: `.lib libname` ... `.endl` defines a section; a
     // second section head inside one does not nest (P0009). Checks: 2.
-    let (top, codes) = read("t\n.lib tt\n.lib ss\n.param a=1\n.endl\n", &NGSPICE);
+    let (top, codes) = read(
+        "t\n.lib tt\n.lib ss\n.param a=1\n.endl\n",
+        lex(Lang::NGSPICE),
+    );
     assert_eq!(
         top,
         ["Section\".lib\"[w\"tt\"]{Verbatim\".lib\" Param\".param\"[w\"a\"=n\"1\"]}"]
@@ -194,7 +202,7 @@ fn library_holds_sections() {
     // `section name` ... `endsection`. Checks: 2.
     let (top, codes) = read(
         "t\nlibrary L\nsection tt\nparameters a=1\nendsection tt\nendlibrary L\n",
-        &SPECTRE,
+        lex(Lang::SPECTRE),
     );
     assert_eq!(
         top,
@@ -212,7 +220,7 @@ fn if_else_chain() {
     // trees. Checks: 2.
     let (top, codes) = read(
         "t\n.if (a == 1)\nR1 a 0 1\n.elseif (b)\n.else\n.endif\n",
-        &NGSPICE,
+        lex(Lang::NGSPICE),
     );
     assert_eq!(
         top,
@@ -229,7 +237,7 @@ fn spectre_if_else_and_unbraced_branch() {
     // statement a braced list or one card. Checks: 2.
     let (top, codes) = read(
         "t\nif (m == 0) {\nr0 (a b) resistor r=1\n} else\nr1 (a b) resistor r=2\n",
-        &SPECTRE,
+        lex(Lang::SPECTRE),
     );
     assert_eq!(
         top,
@@ -245,7 +253,7 @@ fn spectre_condition_over_two_lines() {
     // Spectre UG p.59: a statement ends at the line's end; inside open
     // parentheses it does not (the condition of `if (a &&` ⏎ `b) {`).
     // Checks: 2.
-    let (top, codes) = read("t\nif (a &&\n b) {\n}\n", &SPECTRE);
+    let (top, codes) = read("t\nif (a &&\n b) {\n}\n", lex(Lang::SPECTRE));
     assert_eq!(top, ["If\"if\"[Paren\"(\"[(&& i\"a\" i\"b\")]]{}"]);
     assert!(codes.is_empty());
 }
@@ -254,7 +262,7 @@ fn spectre_condition_over_two_lines() {
 fn control_reads_analysis_commands_only() {
     // ngspice manual §13.1: `.control` ... `.endc` is a script; its `tran`
     // runs the analysis (read as `.tran`), the rest are lines. Checks: 2.
-    let (top, codes) = read("t\n.control\ntran 1n 10n\nrun\n.endc\n", &NGSPICE);
+    let (top, codes) = read("t\n.control\ntran 1n 10n\nrun\n.endc\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         ["Control\".control\"[]{Analysis\"tran\"<Tran - -|>[w\"1n\" w\"10n\"] Line\"run\"}"]
@@ -268,7 +276,7 @@ fn region_reads_spice_inside_spectre() {
     // lang=spectre`; the region is SPICE. Checks: 2.
     let (top, codes) = read(
         "t\nsimulator lang=spice\n.param a=1\nsimulator lang=spectre\n",
-        &SPECTRE,
+        lex(Lang::SPECTRE),
     );
     assert_eq!(
         top,
@@ -279,15 +287,14 @@ fn region_reads_spice_inside_spectre() {
 
 #[test]
 fn a_given_ngspice_deck_holds_regions_of_other_dialects() {
-    // `lexicon::NGSPICE_GIVEN`: `simulator lang=spectre` opens a region read
+    // `Lang::NGSPICE_GIVEN`: `simulator lang=spectre` opens a region read
     // as Spectre (Spectre Reference 19.1 p.406 `sweep … { … }`, p.174
     // `montecarlo`), `simulator lang=spice` closes it; `lang=ltspice` reads
     // LTspice (its `.net` a card of its own). The cards around stay ngspice.
     // Checks: 4.
-    use crate::syntax::lexicon::NGSPICE_GIVEN;
     let src = "t\nR1 a 0 1k\nsimulator lang=spectre\nsweep1 sweep param=r start=1k stop=2k step=1k {\n  ac1 ac\n}\nsimulator lang=spice\n.op\nsimulator lang=ltspice\n.net I(R1) V1\nsimulator lang=spice\n";
-    let t = tokenize(src, &NGSPICE_GIVEN);
-    let a = parse(&t, &NGSPICE_GIVEN);
+    let t = tokenize(src, lex(Lang::NGSPICE_GIVEN));
+    let a = parse(&t, lex(Lang::NGSPICE_GIVEN));
     let top: Vec<Tag> = a.fields(a.root()).iter().map(|&n| a.tag(Node(n))).collect();
     assert_eq!(
         top,
@@ -311,7 +318,7 @@ fn a_given_ngspice_deck_holds_regions_of_other_dialects() {
     );
     assert!(a.diags().is_empty(), "{:?}", a.diags());
     // The same text in plain ngspice holds no region.
-    let (top, _) = read(src, &NGSPICE);
+    let (top, _) = read(src, lex(Lang::NGSPICE));
     assert!(top.iter().all(|s| !s.starts_with("Region")), "{top:?}");
 }
 
@@ -319,7 +326,7 @@ fn a_given_ngspice_deck_holds_regions_of_other_dialects() {
 fn data_block_is_lines() {
     // HSPICE UG `.DATA` ... `.ENDDATA`: rows of numbers, kept as lines.
     // Checks: 2.
-    let (top, codes) = read("t\n.data d\n1 2\n.enddata\n", &NGSPICE);
+    let (top, codes) = read("t\n.data d\n1 2\n.enddata\n", lex(Lang::NGSPICE));
     assert_eq!(top, ["Data\".data\"[w\"d\"]{Line\"1\"}"]);
     assert!(codes.is_empty());
 }
@@ -328,7 +335,7 @@ fn data_block_is_lines() {
 fn param_values_run_across_blanks_to_the_next_key() {
     // ngspice manual §2.4.1: `.param a = b + c`; sky130's `a = '-1*x' + b =
     // 2`: an operator before `key =` separates. Checks: 2.
-    let (top, codes) = read("t\n.param r = a + 1 s='-1*x' + t = 2\n", &NGSPICE);
+    let (top, codes) = read("t\n.param r = a + 1 s='-1*x' + t = 2\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         [
@@ -341,7 +348,7 @@ fn param_values_run_across_blanks_to_the_next_key() {
 #[test]
 fn func_definition() {
     // ngspice manual §2.4.2: `.func name(args) {body}`. Checks: 2.
-    let (top, codes) = read("t\n.func f(x) {x*2}\n", &NGSPICE);
+    let (top, codes) = read("t\n.func f(x) {x*2}\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         ["Func\".func\"[Group\"f\"[w\"x\"] Delimited\"{\"[(* i\"x\" n\"2\")]]"]
@@ -353,7 +360,7 @@ fn func_definition() {
 fn spectre_real_function_over_three_lines() {
     // Spectre UG p.92: `real f(real a) { return expr }`, the brace on the
     // next line. Checks: 2.
-    let (top, codes) = read("t\nreal f(real a)\n{\nreturn a*2;\n}\n", &SPECTRE);
+    let (top, codes) = read("t\nreal f(real a)\n{\nreturn a*2;\n}\n", lex(Lang::SPECTRE));
     assert_eq!(
         top,
         ["Func\"real\"[w\"f\" w\"real\" w\"a\"]{Card\"return\"[(* i\"a\" n\"2\")]}"]
@@ -365,7 +372,7 @@ fn spectre_real_function_over_three_lines() {
 fn model_matrix_is_a_seq() {
     // ngspice manual §2.3 `.model name type (p=v ...)`; a CPL model's matrix
     // `c=1e-10 -6e-11` is two numbers (the old SPICE grammar's `MVal`). Checks: 2.
-    let (top, codes) = read("t\n.model m cpl (c=1e-10 -6e-11 r=1)\n", &NGSPICE);
+    let (top, codes) = read("t\n.model m cpl (c=1e-10 -6e-11 r=1)\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         ["Model\".model\"[w\"m\" w\"cpl\" w\"c\"=Seq[w\"1e-10\" w\"-6e-11\"] w\"r\"=w\"1\"]"]
@@ -376,7 +383,7 @@ fn model_matrix_is_a_seq() {
 #[test]
 fn spectre_model_group_bins() {
     // Spectre UG p.108: `model name master {` bins `1: p=v` `}`. Checks: 2.
-    let (top, codes) = read("t\nmodel n bsim4 {\n1: lmin=1\n}\n", &SPECTRE);
+    let (top, codes) = read("t\nmodel n bsim4 {\n1: lmin=1\n}\n", lex(Lang::SPECTRE));
     assert_eq!(
         top,
         ["Model\"model\"[w\"n\" w\"bsim4\"]{Card\"1\"[w\":\" w\"lmin\"=n\"1\"]}"]
@@ -390,7 +397,7 @@ fn testbench_cards() {
     // `.print`), §15.4 (`.meas`), §11.2 (`.ic`, `.nodeset`), §2.11 (`.temp`),
     // §2.8 (`.global`). Checks: 2.
     let src = "t\n.options reltol=1e-3 klu\n.tran 1n 10n\n.save v(a)\n.print tran v(a)\n.meas tran x find v(a) at=1n\n.ic v(a)=1\n.nodeset v(b)=0\n.temp 27\n.global vdd\n";
-    let (top, codes) = read(src, &NGSPICE);
+    let (top, codes) = read(src, lex(Lang::NGSPICE));
     assert_eq!(
         top,
         [
@@ -411,7 +418,7 @@ fn testbench_cards() {
 #[test]
 fn step_card() {
     // LTspice SCR `.STEP param R 1k 10k 1k`. Checks: 2.
-    let (top, codes) = read("t\n.step param r 1k 10k 1k\n", &LTSPICE);
+    let (top, codes) = read("t\n.step param r 1k 10k 1k\n", lex(Lang::LTSPICE));
     assert_eq!(
         top,
         ["Step\".step\"[w\"param\" w\"r\" w\"1k\" w\"10k\" w\"1k\"]"]
@@ -425,7 +432,7 @@ fn statistics_process_vary() {
     // dist=gauss std=1 } }`, on one line. Checks: 2.
     let (top, codes) = read(
         "t\nstatistics { process { vary p dist=gauss std=1 } }\n",
-        &SPECTRE,
+        lex(Lang::SPECTRE),
     );
     assert_eq!(
         top,
@@ -440,7 +447,7 @@ fn statistics_process_vary() {
 fn card_for_other_directives() {
     // ngspice manual §11.3: `.mc`, `.pss` and other analyses the IR does not
     // model keep their fields. Checks: 2.
-    let (top, codes) = read("t\n.mc 10 tran\n", &NGSPICE);
+    let (top, codes) = read("t\n.mc 10 tran\n", lex(Lang::NGSPICE));
     assert_eq!(top, ["Card\".mc\"[w\"10\" w\"tran\"]"]);
     assert!(codes.is_empty());
 }
@@ -449,7 +456,7 @@ fn card_for_other_directives() {
 fn words_join_gapless_tokens() {
     // ngspice manual §2.1: node names are any non-separator characters
     // (`net-1`, `vdd!`, `n<3>`); INPgetTok reads `10%3` as one token. Checks: 2.
-    let (top, codes) = read("t\nR1 net-1 vdd! 10%3\n", &NGSPICE);
+    let (top, codes) = read("t\nR1 net-1 vdd! 10%3\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         ["Instance\"R1\"<Resistor w\"R1\" -|w\"net-1\" w\"vdd!\">[w\"10%3\"]"]
@@ -461,7 +468,10 @@ fn words_join_gapless_tokens() {
 fn group_and_probe() {
     // ngspice manual §4.1 waveforms `SIN(VO VA FREQ)`; §2.8.5 `v(a,b)` in an
     // expression is a probe. Checks: 2.
-    let (top, codes) = read("t\nV1 a 0 sin(0 1 1k)\nB1 a 0 v={v(a,b)*2}\n", &NGSPICE);
+    let (top, codes) = read(
+        "t\nV1 a 0 sin(0 1 1k)\nB1 a 0 v={v(a,b)*2}\n",
+        lex(Lang::NGSPICE),
+    );
     assert_eq!(
         top,
         [
@@ -475,7 +485,7 @@ fn group_and_probe() {
 #[test]
 fn element_comma_vector_is_a_seq() {
     // ngspice manual §3.3.2 `ic=0,-5`: an instance's comma vector. Checks: 2.
-    let (top, codes) = read("t\nC1 a 0 1p ic=0,-5\n", &NGSPICE);
+    let (top, codes) = read("t\nC1 a 0 1p ic=0,-5\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         ["Instance\"C1\"<Capacitor w\"C1\" -|w\"a\" w\"0\">[w\"1p\" w\"ic\"=Seq[n\"0\" w\"-5\"]]"]
@@ -489,7 +499,7 @@ fn hspice_string_is_an_expression() {
     // `'expr'`'s is; a broken one is one `Bad` and P0002; T2: `$` inside is
     // text; a path `"…"` is a string. Checks: 3.
     let src = "t\n.param a=\"1+2\" b=\"1+\" c=\"x$y\"\n.include \"a b.sp\"\n";
-    let (top, codes) = read(src, &HSPICE);
+    let (top, codes) = read(src, lex(Lang::HSPICE));
     assert_eq!(
         top,
         [
@@ -498,7 +508,7 @@ fn hspice_string_is_an_expression() {
         ]
     );
     assert_eq!(codes, [Code::P0002]);
-    let t = tokenize(src, &HSPICE);
+    let t = tokenize(src, lex(Lang::HSPICE));
     assert!(t.tags().contains(&crate::syntax::token::Tag::DoubleQuote));
 }
 
@@ -508,19 +518,19 @@ fn operators_follow_each_dialects_table() {
     // CER: the sign binds tighter than `**`; Xyce RG Table 2-32: `**` groups
     // to the right; Spectre UG p.87: `c ? a : b`. Checks: 4.
     assert_eq!(
-        read("t\n.param a={-2^2}\n", &NGSPICE).0,
+        read("t\n.param a={-2^2}\n", lex(Lang::NGSPICE)).0,
         ["Param\".param\"[w\"a\"=Delimited\"{\"[(- (^ n\"2\" n\"2\"))]]"]
     );
     assert_eq!(
-        read("t\n.param a={-2**2}\n", &LTSPICE).0,
+        read("t\n.param a={-2**2}\n", lex(Lang::LTSPICE)).0,
         ["Param\".param\"[w\"a\"=Delimited\"{\"[(** (- n\"2\") n\"2\")]]"]
     );
     assert_eq!(
-        read("t\n.param a={2**3**2}\n", &XYCE).0,
+        read("t\n.param a={2**3**2}\n", lex(Lang::XYCE)).0,
         ["Param\".param\"[w\"a\"=Delimited\"{\"[(** n\"2\" (** n\"3\" n\"2\"))]]"]
     );
     assert_eq!(
-        read("t\nparameters a=b>1 ? 1 : 2\n", &SPECTRE).0,
+        read("t\nparameters a=b>1 ? 1 : 2\n", lex(Lang::SPECTRE)).0,
         ["Param\"parameters\"[w\"a\"=(? (> i\"b\" n\"1\") n\"1\" n\"2\")]"]
     );
 }
@@ -528,7 +538,7 @@ fn operators_follow_each_dialects_table() {
 #[test]
 fn call_ident_str() {
     // Spectre UG p.87: function calls and names; §2.5 strings. Checks: 2.
-    let (top, codes) = read("t\nparameters a=max(b, 1) s=\"x\"\n", &SPECTRE);
+    let (top, codes) = read("t\nparameters a=max(b, 1) s=\"x\"\n", lex(Lang::SPECTRE));
     assert_eq!(
         top,
         ["Param\"parameters\"[w\"a\"=Call\"max\"[i\"b\" n\"1\"] w\"s\"=s\"\\\"x\\\"\"]"]
@@ -541,25 +551,33 @@ fn vector_list_index() {
     // Spectre §5: `[1p 2p]` blank-separated; VACASK P740-P781: `[a, b]`,
     // `{a, b}`, `x[i]`. Checks: 3.
     assert_eq!(
-        read("t\nc1 (a b) capacitor c=[1p 2p]\n", &SPECTRE).0,
+        read("t\nc1 (a b) capacitor c=[1p 2p]\n", lex(Lang::SPECTRE)).0,
         [
             "Instance\"c1\"<Capacitor w\"c1\" w\"capacitor\"|w\"a\" w\"b\">[w\"c\"=Vector\"[\"[n\"1p\" n\"2p\"]]"
         ]
     );
     assert_eq!(
-        read("t\nparameters v=[1, 2] l={1, 2} x=v[1]\n", &VACASK).0,
+        read(
+            "t\nparameters v=[1, 2] l={1, 2} x=v[1]\n",
+            lex(Lang::VACASK)
+        )
+        .0,
         [
             "Param\"parameters\"[w\"v\"=Vector\"[\"[n\"1\" n\"2\"] w\"l\"=List\"{\"[n\"1\" n\"2\"] w\"x\"=Index[i\"v\" n\"1\"]]"
         ]
     );
-    assert!(read("t\nparameters x=v[1]\n", &VACASK).1.is_empty());
+    assert!(
+        read("t\nparameters x=v[1]\n", lex(Lang::VACASK))
+            .1
+            .is_empty()
+    );
 }
 
 #[test]
 fn bad_expression_and_unclosed_delimiter() {
     // ngspice manual §2.1: `{expr}` must hold one expression and close on
     // its card: `{1 2}` is P0002, `{1+` is P0008. Checks: 2.
-    let (top, codes) = read("t\n.param a={1 2} b={1+\n", &NGSPICE);
+    let (top, codes) = read("t\n.param a={1 2} b={1+\n", lex(Lang::NGSPICE));
     assert_eq!(
         top,
         ["Param\".param\"[w\"a\"=Delimited\"{\"[Bad\"1\"] w\"b\"=Bad\"{\"]"]
@@ -571,7 +589,7 @@ fn bad_expression_and_unclosed_delimiter() {
 fn nan_number_and_invalid_byte() {
     // Spectre §2.4: `1k5` is no number (P0005); a control byte is no token
     // (P0007), so `b=` has no value (P0002). Checks: 1.
-    let (_, codes) = read("t\nparameters a=1k5 b=\x01\n", &SPECTRE);
+    let (_, codes) = read("t\nparameters a=1k5 b=\x01\n", lex(Lang::SPECTRE));
     assert_eq!(codes, [Code::P0005, Code::P0007, Code::P0002]);
 }
 
@@ -579,6 +597,11 @@ fn nan_number_and_invalid_byte() {
 fn unclosed_and_stray_blocks() {
     // ngspice manual §2.5: `.subckt` needs its `.ends` (P0003); an `.endl`
     // with no `.lib` open is P0004. Checks: 1.
-    let (_, codes) = read("t\n.endl\n.subckt s a\n", &NGSPICE);
+    let (_, codes) = read("t\n.endl\n.subckt s a\n", lex(Lang::NGSPICE));
     assert_eq!(codes, [Code::P0004, Code::P0003]);
+}
+
+/// Built-in `l`'s lexicon.
+fn lex(l: Lang) -> &'static Lexicon {
+    l.lexicon().expect("a reader")
 }

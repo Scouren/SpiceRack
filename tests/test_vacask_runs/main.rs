@@ -11,6 +11,8 @@
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
 
+use spicerack::syntax::Lang;
+
 use spicerack::backend::Dialect;
 use spicerack::result::RawData;
 use spicerack::syntax::diag::Code;
@@ -35,10 +37,14 @@ fn have_vacask() -> bool {
 
 /// The ngspice deck `deck` (line 1 its title) written for VACASK, or the
 /// codes of its refusal. Its numbers are read as the doubles they spell
-/// (`lexicon::NGSPICE_GIVEN`, as the Python API's decks are), which also
+/// (`Lang::NGSPICE_GIVEN`, as the Python API's decks are), which also
 /// reads a `.step`.
 fn emit(deck: &str) -> Result<String, Vec<Code>> {
-    emit_from(deck, Dialect::Ngspice, &lexicon::NGSPICE_GIVEN)
+    emit_from(
+        deck,
+        Dialect::Ngspice,
+        Lang::NGSPICE_GIVEN.lexicon().expect("a reader"),
+    )
 }
 
 /// [`emit`] for a deck in dialect `d`, read with `lex`.

@@ -20,9 +20,11 @@
 //!
 //! Contents: none (tests only).
 
+use spicerack::syntax::Lang;
+
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::{Numbers, Source, render};
-use spicerack::syntax::{Dialect, lexicon, parse, tokenize};
+use spicerack::syntax::{Dialect, parse, tokenize};
 
 mod analyses;
 mod components;
@@ -32,7 +34,7 @@ mod deck;
 
 /// The ngspice deck `deck` (line 1 its title) written for Spectre, or the
 /// codes of its refusal. Its numbers are read as the doubles they spell
-/// (`lexicon::NGSPICE_GIVEN`, as the Python API's decks are), so `100n` is
+/// (`Lang::NGSPICE_GIVEN`, as the Python API's decks are), so `100n` is
 /// 1e-7 and not ngspice's digit-by-digit 1.0000000000000001e-7.
 fn spectre(deck: &str) -> Result<String, Vec<Code>> {
     spectre_with(deck, &[])
@@ -40,7 +42,7 @@ fn spectre(deck: &str) -> Result<String, Vec<Code>> {
 
 /// [`spectre`], with the top's Verilog-A loads given beside the text.
 fn spectre_with(deck: &str, loads: &[String]) -> Result<String, Vec<Code>> {
-    let lex = &lexicon::NGSPICE_GIVEN;
+    let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
     let t = tokenize(deck, lex);
     let ast = parse(&t, lex);
     let src = Source {
