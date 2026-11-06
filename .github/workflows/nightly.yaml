@@ -1,7 +1,9 @@
 name: Nightly
 
 # The nightly tier (TESTING.md): every spice-bench deck and pinned corpus
-# through the importer, re-emitted and re-run on ngspice. Too slow for the
+# through the importer, re-emitted and re-run on ngspice, and across
+# simulators (tests/test_cross_sim/: each deck on its own simulator against
+# the deck written for another). Too slow for the
 # merge gate (about 20 min of a 4-vCPU runner).
 
 on:
@@ -28,3 +30,6 @@ jobs:
 
       - name: Import suite over the corpora
         run: nix develop .#testing --command cargo test --no-default-features --features corpus --release --test test_import_suite -- --nocapture
+
+      - name: Every corpus deck across simulators
+        run: nix develop .#testing --command cargo test --no-default-features --features corpus --release --test test_cross_sim -- --nocapture

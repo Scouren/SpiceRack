@@ -1,0 +1,108 @@
+circuitsim90/BJT/vreg.sp mismatch # dc v(2): 0.5586759973994992+0i vs 0.5651719649161091+0i at 2 (tol 4.595e-3)
+circuitsim90/MOS2/ab_ac.sp mismatch # ac v(18): -2923.888930836546+0.0248810538697466i vs -2836.018098941056+0.023435298285597393i at 1 (tol 5.848e0)
+circuitsim90/MOS2/g1310.sp target-fails # no raw file tran1.raw: This is vacask unknown.
+circuitsim90/MOS2/gm6.sp mismatch # op v(13): 0.40898654762563585+0i vs 0+0i at 0 (tol 8.200e-4)
+circuitsim90/MOS2/hussamp.sp target-fails # no raw file op1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","
+circuitsim90/MOS2/ring.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","
+circuitsim90/MOS2/schmitfast.sp target-fails # no raw file dc1.raw: This is vacask unknown. | worst residual=0.00e+00 @ (unknown), worst delta=0.00e+00 >TOL @ (unknown)
+circuitsim90/MOS2/schmitslow.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+circuitsim90/MOS2/toronto.sp target-fails # no raw file tran1.raw: This is vacask unknown.
+circuitsim90/MOS3/arom.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","
+circuitsim90/MOS3/gm1.sp target-fails # no raw file tran1.raw: This is vacask unknown. | worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 >TOL @ (unknown)
+circuitsim90/MOS3/gm19.sp target-fails # no raw file tran1.raw: This is vacask unknown.
+circuitsim90/MOS3/gm3.sp target-fails # no raw file op1.raw: This is vacask unknown.
+circuitsim90/MOS3/mike2.sp mismatch # tran i(vpulse): -0.0020017239627740935 leaves the tube at t=0.0000000010047600892638032 (tol 2.311e-5)
+circuitsim90/MOS3/rich3.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","
+ngspice/examples/control_structs/if-batchmode.sp mismatch # tran i(v0): -0.000999000999000999 leaves the tube at t=0.000001 (tol 9.990e-6)
+ngspice/examples/hicum2/hic2_gum.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/hicum2/hic2_gum_inv.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/hicum2/hic2_noise.sp target-fails # no raw file op1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/hicum2/hic2_tran.sp target-fails # no raw file op1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/measure/rc-meas-ac-control.sp target-fails # no raw file ac1.raw: This is vacask unknown.
+ngspice/examples/mos/nmos_out_BSIM330_plainwrite.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/nmos_out_BSIM330_svg.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/nmos_pmos_BSIM330.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/nmos_pmos_BSIM482.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/nmos_pmos_drainresistor.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/nmos_pmos_plotting.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/ro-meas.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/mos/ro_17_4.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] became ["noise"]
+ngspice/examples/noise/resdiv.sp mismatch # plots ["noise", "noise", "noise", "total", "total", "total"] became ["noise", "noise", "noise"]
+ngspice/examples/numparam/pintest.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/optran/TLV6001-test.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/optran/TLV9002-test.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/p-to-n-examples/555-timer-2.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/p-to-n-examples/MOS1_out.sp mismatch # dc: sweep grid changed (306 -> 306 points)
+ngspice/examples/p-to-n-examples/OP_MCP6041.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/p-to-n-examples/op-test-adi.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/snapshot/adder_mos.sp target-fails # no plot: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/snapshot/adder_mos_circ.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/soi/inv_tr.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/soi/ring51_40.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/svg/nmos_out_BSIM330_png.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/svg/nmos_out_BSIM330_ps.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/svg/nmos_out_BSIM330_svg-2.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/svg/nmos_out_BSIM330_svg.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/svg/nmos_out_BSIM330_various.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])
+ngspice/examples/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
+ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@d1[gd]", "@d1[cd]", "@d1[qd]"] vs ["1", "d1:a_int", "d1:implicit_equation_0", "v1:flow(br)"])
+ngspice/examples/various/gain_stage.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/examples/various/todo-temper-3.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/examples/vbic/npn_gum.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/vbic/npn_out.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/vbic/npn_out_qs.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/examples/vbic/vbic_ac_par.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c1355/c1355.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c1355/c1355_ann.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c1908/c1908.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c432/c432.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c499/c499.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c499/c499_ann.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c880/c880.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/iscas85/c880/c880_ann.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/kicad/sallen_key-bandpass-072/sallen_key_bp.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/optran/TLV6001-test.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/optran/TLV9002-test.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/optran/simple-tran.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","
+ngspice/paranoia/pton/555-timer-2.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/pton/MOS1_out.sp mismatch # dc: sweep grid changed (306 -> 306 points)
+ngspice/paranoia/pton/OP_MCP6041.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/pton/Optimos_out.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/pton/op-test-adi.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
+ngspice/paranoia/various/gain_stage.sp target-fails # no raw file ac1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/paranoia/various/nmos_pmos_BSIM330.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/paranoia/various/nmos_pmos_plotting.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/paranoia/various/ro_17_4.sp target-fails # no raw file tran1.raw: This is vacask unknown. | Parser syntax error, unexpected floating point number, expecting identifier or )
+ngspice/paranoia/vbic/npn_gum.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/vbic/npn_out.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/vbic/vbic_ac_par.sp target-fails # no raw file dc1.raw: This is vacask unknown. | Syntax error, unexpected string.
+ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/paranoia/vdmos/VDMOS-DIO-AC.sp target-fails # no raw file ac1.raw: This is vacask unknown.
+ngspice/paranoia/vdmos/vdmos-out.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/paranoia/vdmos/vdmos-out_ir.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/paranoia/vdmos/vdmos-out_ir_mtr.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/tests/general/fourbitadder.sp mismatch # tran v(x1.x1.x1.x6.8): 0.00004785659230303885 leaves the tube at t=0.000000000038400000000000004 (tol 2.781e-6)
+ngspice/tests/general/mosamp.sp mismatch # tran v(5): 7.48424320532575 leaves the tube at t=0.000005006817099418725 (tol 1.363e-1)
+ngspice/tests/general/rc.sp target-fails # no raw file tran1.raw: This is vacask unknown.
+ngspice/tests/general/rca3040.sp mismatch # dc v(1): -0.25+0i vs 0+0i at -0.25 (tol 5.020e-4)
+ngspice/tests/hfet/id_vgs.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/tests/jfet/jfet_vds-vgs.sp mismatch # dc: sweep grid changed (104 -> 104 points)
+ngspice/tests/regression/lib-processing/ex1a.sp target-fails # no raw file op1.raw: This is vacask unknown. | Syntax error, unexpected end of file while looking for section 'RES'.
+ngspice/tests/regression/lib-processing/ex1b.sp mismatch # op v(9): 1+0i vs 1.3333333333333333+0i at 0 (tol 2.002e-3)
+ngspice/tests/regression/lib-processing/ex2a.sp target-fails # no raw file op1.raw: This is vacask unknown. | Syntax error, unexpected end of file while looking for section 'MOS'.
+ngspice/tests/regression/lib-processing/ex3a.sp target-fails # no raw file op1.raw: This is vacask unknown. | Syntax error, unexpected end of file while looking for section 'MOS'.
+ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["1", "v1:flow(br)"])
+ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file op1.raw: This is vacask unknown. | Circuit has no unknowns.
+ngspice/tests/regression/misc/if-elseif.sp target-fails # no raw file op1.raw: This is vacask unknown. | Parser syntax error, unexpected =
+ngspice/tests/regression/misc/test-noise-2.sp mismatch # plots ["noise", "total"] became ["noise"]
+ngspice/tests/regression/misc/test-noise-3.sp mismatch # plots ["noise", "noise", "total", "total"] became ["noise", "noise"]
+ngspice/tests/regression/model/binning-1.sp target-fails # no raw file op1.raw: This is vacask unknown.
+ngspice/tests/regression/temper/temper-1.sp target-fails # no raw file op1.raw: This is vacask unknown.
+ngspice/tests/regression/temper/temper-2.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/tests/regression/temper/temper-3.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/tests/regression/temper/temper-res-1.sp target-fails # no raw file dc1.raw: This is vacask unknown.
+ngspice/tests/resistance/res_array.sp target-fails # no raw file op1.raw: This is vacask unknown.
+ngspice/tests/resistance/res_partition.sp target-fails # no raw file op1.raw: This is vacask unknown.
