@@ -32,8 +32,11 @@ use crate::syntax::diag::Code;
 pub enum Construct {
     /// A statement kept as text from another dialect family.
     ForeignText,
-    /// Such a statement only its own simulator has (`Rd::private`).
+    /// Such a statement only its own simulator has (`Rd::kept_construct`).
     PrivateText,
+    /// Xyce's `.sens` (objective, parameters, over the deck's analysis),
+    /// kept as text.
+    XyceSens,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -195,6 +198,19 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
             D::Cdl => Spell(Alt::Copy(Code::W0027)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0039),
             D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0039),
+        },
+        // ngspice's `.sens` is one output's sensitivity to every parameter
+        // at the operating point or over an AC sweep (manual, `.SENS`);
+        // HSPICE's `.SENS` the DC operating point's; neither has it over a
+        // transient or a DC sweep, nor of an expression; LTspice and
+        // VACASK have no sensitivity analysis.
+        Construct::XyceSens => match target {
+            D::Xyce => Native,
+            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            D::Ngspice | D::Espice | D::Hspice | D::Ltspice | D::Vacask => Refuse(Code::W0015),
+            // Spectre's `sens` covers dc and ac; not written yet.
+            D::Spectre => Refuse(Code::W0015),
+            D::Verilog => Refuse(Code::W0001),
         },
         Construct::CaretReread => Refuse(Code::W0002),
         Construct::NgBehavior => match target {
@@ -435,9 +451,10 @@ mod tests {
         assert_eq!(action(D::Ltspice, Construct::LibWholeFile), Action::Native);
     }
 
-    const CONSTRUCTS: [Construct; 34] = [
+    const CONSTRUCTS: [Construct; 35] = [
         Construct::ForeignText,
         Construct::PrivateText,
+        Construct::XyceSens,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,

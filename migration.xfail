@@ -13240,3 +13240,219 @@ hspice/hspice/dcvolt_uic.sp ngspice now written: bare .ic pairs read (was W0001)
 hspice/hspice/dcvolt_uic.sp spectre now written: bare .ic pairs read (was W0001)
 hspice/hspice/dcvolt_uic.sp vacask now written: bare .ic pairs read (was W0001)
 hspice/hspice/dcvolt_uic.sp xyce now written: bare .ic pairs read (was W0001)
+
+# Phase 7: spice-read: Xyce .DC LIN, R/C/L model before the value, K over
+# three or more inductors, Xyce .SENS and Xyce-only cards (render::read
+# sweeps, testbench, elements, refused; spice/cards.rs C/L model order;
+# capability XyceSens). `.DC LIN src a b c` is the linear .dc (Xyce RG
+# .DC). Xyce's `R1 a b RMOD 1k` reads as value then model when the model
+# holds only TC1/TC2/TNOM and the card only TEMP/IC/M/TC1/TC2 (Xyce's
+# model R/C/L multiply the value, ngspice's do not: Xyce 7.10 10 mH,
+# ngspice-45 5 mH; such a card stays text); a C or L model is written
+# before the value (ngspice-45: `C1 1 0 1u CM` is "unknown parameter").
+# `K1 L1 L2 L3 k` (Xyce RG, LTspice help) is every pair: Xyce and LTspice
+# write one card, the others one per pair (`K1`, `K1_2`, …); LTspice's
+# implicit Rser=1m now skips the inductors such a K couples. Xyce .SENS
+# refuses W0015 (ngspice .sens: one output, op or AC), .PREPROCESS,
+# .RESULT and YPDE W0039 (status only here). Oracle: Xyce 7.10 on the
+# original vs ngspice-45 on the written deck (counts in the commit).
+ltspice/ltspice_demos/LT1241_TA06.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1241_TA06.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1242_TA06.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1242_TA06.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1243_TA06.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1243_TA06.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1244_TA06.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT1244_TA06.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_demos/LT3798_DC1817A.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1183.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1183.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1184.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1184.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1186F.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1241.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1241.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1242.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1242.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1244.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1244.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1245.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1245.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1786F.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/1786F.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/3799-1.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/3799.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/P2.net espice now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/P2.net hspice now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/P2.net ngspice now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/P2.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/P2.net xyce now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/Transformer2.net espice now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/Transformer2.net hspice now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/Transformer2.net ngspice now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/Transformer2.net spectre now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/Transformer2.net vacask now written: K over 3+ inductors read (every pair)
+ltspice/ltspice_examples/Transformer2.net xyce now written: K over 3+ inductors read (every pair)
+xyce/BUG_374/capacitor-bug.cir cdl written differently: R/C/L model before the value read
+xyce/BUG_374/capacitor-bug.cir espice now written: R/C/L model before the value read
+xyce/BUG_374/capacitor-bug.cir hspice now written: R/C/L model before the value read
+xyce/BUG_374/capacitor-bug.cir ngspice now written: R/C/L model before the value read
+xyce/BUG_374/capacitor-bug.cir xyce written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_1398/RLC.cir cdl written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_1398/RLC.cir xyce written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_1770/HBT_IV_nosweep.cir cdl written differently: .DC LIN read
+xyce/Certification_Tests/BUG_1770/HBT_IV_nosweep.cir espice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1770/HBT_IV_nosweep.cir hspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1770/HBT_IV_nosweep.cir ltspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1770/HBT_IV_nosweep.cir ngspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1770/HBT_IV_nosweep.cir xyce written differently: .DC LIN read
+xyce/Certification_Tests/BUG_1774/HBT_IV_step.cir ltspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1775/HBT_IV.cir espice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1775/HBT_IV.cir hspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1775/HBT_IV.cir ltspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1775/HBT_IV.cir ngspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1776/HBT_IV_10X50_20100217.cir ltspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1822/FBH_HBT.cir cdl written differently: .DC LIN read
+xyce/Certification_Tests/BUG_1822/FBH_HBT.cir espice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1822/FBH_HBT.cir hspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1822/FBH_HBT.cir ltspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1822/FBH_HBT.cir ngspice now written: .DC LIN read
+xyce/Certification_Tests/BUG_1822/FBH_HBT.cir xyce written differently: .DC LIN read
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir cdl written differently: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir espice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir hspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir ltspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir ngspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir spectre now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_even_ps.cir vacask now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir cdl written differently: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir espice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir hspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir ltspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir ngspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir spectre now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_1957/mutindlin_odd_ps.cir vacask now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_518_SON/bug518.cir cdl written differently: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_518_SON/bug518.cir xyce written differently: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_546_SON/tempcap.cir cdl written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap.cir espice now written: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap.cir hspice now written: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap.cir ngspice now written: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap.cir xyce written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap_instance.cir cdl written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap_instance.cir espice now written: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap_instance.cir hspice now written: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap_instance.cir ngspice now written: R/C/L model before the value read
+xyce/Certification_Tests/BUG_546_SON/tempcap_instance.cir xyce written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir cdl written differently: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir espice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir hspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir ltspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir ngspice now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir spectre now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir vacask now written: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_575_SON/bug575son.cir xyce written differently: K over 3+ inductors read (every pair)
+xyce/Certification_Tests/BUG_647_SON/tempind.cir cdl written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_647_SON/tempind.cir xyce written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_647_SON/tempind_modpar.cir cdl written differently: R/C/L model before the value read
+xyce/Certification_Tests/BUG_647_SON/tempind_modpar.cir xyce written differently: R/C/L model before the value read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir cdl written differently: .DC LIN read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir espice now written: .DC LIN read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir hspice now written: .DC LIN read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir ltspice now written: .DC LIN read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir ngspice now written: .DC LIN read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir spectre now written: .DC LIN read
+xyce/MEASURE/REMEASURE/UnsupportedRemeasureModes.cir xyce written differently: .DC LIN read
+xyce/Message/Device/CircuitBlock_handlePass1_1.cir cdl written differently: R/C/L model before the value read
+xyce/Message/Device/CircuitBlock_handlePass1_1.cir espice now written: R/C/L model before the value read
+xyce/Message/Device/CircuitBlock_handlePass1_1.cir hspice now written: R/C/L model before the value read
+xyce/Message/Device/CircuitBlock_handlePass1_1.cir ngspice now written: R/C/L model before the value read
+xyce/Message/Device/CircuitBlock_handlePass1_1.cir xyce written differently: R/C/L model before the value read
+xyce/TEMPCAP/tempcap.cir cdl written differently: R/C/L model before the value read
+xyce/TEMPCAP/tempcap.cir espice now written: R/C/L model before the value read
+xyce/TEMPCAP/tempcap.cir hspice now written: R/C/L model before the value read
+xyce/TEMPCAP/tempcap.cir ngspice now written: R/C/L model before the value read
+xyce/TEMPCAP/tempcap.cir xyce written differently: R/C/L model before the value read
+xyce/TEMPCAP/tempcap_instance.cir cdl written differently: R/C/L model before the value read
+xyce/TEMPCAP/tempcap_instance.cir espice now written: R/C/L model before the value read
+xyce/TEMPCAP/tempcap_instance.cir hspice now written: R/C/L model before the value read
+xyce/TEMPCAP/tempcap_instance.cir ngspice now written: R/C/L model before the value read
+xyce/TEMPCAP/tempcap_instance.cir xyce written differently: R/C/L model before the value read
+xyce/TEMPIND/tempind.cir cdl written differently: R/C/L model before the value read
+xyce/TEMPIND/tempind.cir espice now written: R/C/L model before the value read
+xyce/TEMPIND/tempind.cir hspice now written: R/C/L model before the value read
+xyce/TEMPIND/tempind.cir ngspice now written: R/C/L model before the value read
+xyce/TEMPIND/tempind.cir xyce written differently: R/C/L model before the value read
+xyce/TEMPIND/tempind_instance.cir cdl written differently: R/C/L model before the value read
+xyce/TEMPIND/tempind_instance.cir espice now written: R/C/L model before the value read
+xyce/TEMPIND/tempind_instance.cir hspice now written: R/C/L model before the value read
+xyce/TEMPIND/tempind_instance.cir ngspice now written: R/C/L model before the value read
+xyce/TEMPIND/tempind_instance.cir xyce written differently: R/C/L model before the value read
+xyce/VBIC13/HBT_IV.cir espice now written: .DC LIN read
+xyce/VBIC13/HBT_IV.cir hspice now written: .DC LIN read
+xyce/VBIC13/HBT_IV.cir ltspice now written: .DC LIN read
+xyce/VBIC13/HBT_IV.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir ltspice now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir spectre now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir vacask now written: .DC LIN read
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters_translation_inside_subckt.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir spectre now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir vacask now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ground_node_synonym_in_subckt_instantiation.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ground_node_synonym_in_subckt_instantiation.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir ltspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir ltspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir spectre now written: .DC LIN read
+xyce/XDM/HSPICE/OTHER_PARSING/ternary_operator.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/multi_temperature_statement.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/multi_temperature_statement.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir ltspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir spectre now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir vacask now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/single_temperature_statement.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir ltspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir spectre now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir vacask now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_default_setting.cir xyce written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir cdl written differently: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir espice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir hspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir ltspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir ngspice now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir spectre now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir vacask now written: .DC LIN read
+xyce/XDM/HSPICE/TEMPERATURE/tnom_option_setting.cir xyce written differently: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir cdl written differently: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir espice now written: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir hspice now written: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir ltspice now written: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir ngspice now written: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir spectre now written: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir vacask now written: .DC LIN read
+xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir xyce written differently: .DC LIN read

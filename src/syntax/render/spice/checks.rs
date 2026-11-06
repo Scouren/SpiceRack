@@ -30,13 +30,15 @@ impl W<'_, '_> {
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
         let foreign = |tok: &u32| self.rd.text_dialect(*tok).family() != self.d.family();
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
-        let (private, other): (Vec<u32>, Vec<u32>) =
-            other.iter().partition(|&&t| self.rd.private(t));
-        if let Some(&tok) = private.first() {
-            self.ask(Construct::PrivateText, tok);
-        }
-        if let Some(&tok) = other.first() {
-            self.ask(Construct::ForeignText, tok);
+        // A statement whose target lacks it is that statement's refusal,
+        // the rest foreign text's (one note each kind).
+        let mut asked = Vec::new();
+        for &tok in &other {
+            let c = self.rd.kept_construct(tok);
+            if !asked.contains(&c) {
+                asked.push(c);
+                self.ask(c, tok);
+            }
         }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));
         if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {

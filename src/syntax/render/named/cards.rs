@@ -114,13 +114,16 @@ impl W<'_, '_> {
                     self.params(&params)
                 )
             }
-            Card::Coupling { l1, l2, k, .. } => format!(
-                "k{} mutual_inductor coupling={} ind1=l{} ind2=l{}",
-                self.dev(own),
-                self.num(k),
-                self.dev(&l1),
-                self.dev(&l2)
-            ),
+            // One `mutual_inductor` per pair, the first keeping the name.
+            Card::Coupling { ls, k, .. } => crate::syntax::render::spice::pairs(&ls)
+                .enumerate()
+                .map(|(i, (a, b))| {
+                    let (own, k, a, b) = (self.dev(own), self.num(k), self.dev(a), self.dev(b));
+                    let n = crate::syntax::render::spice::pair_suffix(i);
+                    format!("k{own}{n} mutual_inductor coupling={k} ind1=l{a} ind2=l{b}")
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
             Card::Source {
                 letter,
                 name: _,

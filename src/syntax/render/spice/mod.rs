@@ -24,6 +24,7 @@
 
 mod bench;
 mod cards;
+pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
 mod cdl;
 mod checks;
 mod laplace;
@@ -508,9 +509,9 @@ impl W<'_, '_> {
         let mut out = Vec::new();
         for &c in &b.comps {
             if let Comp::Card(n) = c
-                && let super::read::Card::Coupling { l1, l2, .. } = self.rd.card_view(n)
+                && let super::read::Card::Coupling { ls, .. } = self.rd.card_view(n)
             {
-                out.extend([l1, l2]);
+                out.extend(ls);
             }
         }
         out

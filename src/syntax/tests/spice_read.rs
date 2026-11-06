@@ -222,3 +222,68 @@ fn a_parallel_current_source_multiplies_its_gain_and_xyce_noop_is_uic() {
     assert!(ng.lines().any(|l| l == "G1 3 0 2 0 0.2"), "{ng}");
     assert!(ng.lines().any(|l| l == ".tran 1u 10u UIC"), "{ng}");
 }
+
+#[test]
+fn a_xyce_sensitivity_is_an_analysis_the_spice_targets_lack() {
+    // Xyce RG `.SENS` (`objfunc=` over the deck's `.tran`); ngspice manual
+    // `.SENS` (one output, operating point or AC only): W0015, not W0001.
+    // Xyce RG `.PREPROCESS`, `YPDE`: Xyce's own (W0039). Checks: 2 + 2.
+    let text = "t\nV1 1 0 1\nR1 1 0 1k\n.sens objfunc={v(1)} param=R1:R\n.tran 1u 1m\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice).expect_err("refused");
+    let codes: Vec<Code> = ng.diags.iter().map(|g| g.code).collect();
+    assert_eq!(codes, [Code::W0015], "{}", ng.messages);
+    assert!(render_text(text, Dialect::Xyce, "t", Dialect::Xyce).is_ok());
+    for line in [
+        ".preprocess replaceground true",
+        "YPDE d1 1 0 DIODE na=1e15",
+    ] {
+        let text = format!("t\nR1 1 0 1k\n{line}\n.op\n.end\n");
+        let ng = render_text(&text, Dialect::Xyce, "t", Dialect::Ngspice).expect_err("refused");
+        let codes: Vec<Code> = ng.diags.iter().map(|g| g.code).collect();
+        assert_eq!(codes, [Code::W0039], "{}", ng.messages);
+    }
+}
+
+#[test]
+fn a_xyce_lin_dc_and_a_model_before_the_value_read() {
+    // Xyce RG `.DC [LIN] src start stop step`; Xyce RG resistor and
+    // capacitor `[model name] [value]`; ngspice-45 reads an R's model
+    // after its value or before, a C's or an L's only before (run: `C1 1 0
+    // 1u CM` is "unknown parameter (cm)"). Checks: 4.
+    let text = "t\nV1 1 0 1\nR2 2 0 1k\nRm 1 2 RMOD 1k\n.model RMOD R (TC1=0.01)\nC1 2 0 CMOD 1p\n.model CMOD C\n.DC LIN V1 1 5 2\n.print dc v(2)\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in [".dc V1 1 5 2", "Rm 1 2 1k RMOD", "C1 2 0 CMOD 1p"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    // Xyce's model `L` multiplies the value (Xyce 7.10: 10 mH), ngspice's
+    // does not (ngspice-45: 5 mH), so the card stays Xyce's text.
+    let text = "t\nI1 0 1 SIN(0 1m 1k)\nL1 1 0 IND 5m\n.model IND L (L=2)\n.tran 1u 2m\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice).expect_err("refused");
+    assert!(
+        ng.diags.iter().any(|g| g.code == Code::W0001),
+        "{}",
+        ng.messages
+    );
+}
+
+#[test]
+fn a_coupling_of_three_inductors_is_every_pair_where_k_takes_two() {
+    // Xyce RG and LTspice help `K`: one card couples every pair of its
+    // inductors; ngspice manual `K` (two inductors), Spectre
+    // `mutual_inductor`: one card per pair. Xyce 7.10 ran the one-card deck
+    // and ngspice-45 the pairwise one to the same v(3), v(4) (8e-4 of
+    // scale, the step error at 1 µs). Checks: 3 + 1.
+    let text = "t\nV1 1 0 SIN(0 1 1k)\nR1 1 2 10\nL1 2 0 1m\nL2 3 0 2m\nL3 4 0 3m\nR2 3 0 100\nR3 4 0 50\nK1 L1 L2 L3 0.9\n.tran 1u 3m\n.end\n";
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    for want in ["K1 L1 L2 0.9", "K1_2 L1 L3 0.9", "K1_3 L2 L3 0.9"] {
+        assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
+    }
+    let lt = render_text(text, Dialect::Xyce, "t", Dialect::Ltspice)
+        .expect("written")
+        .text;
+    assert!(lt.lines().any(|l| l == "K1 L1 L2 L3 0.9"), "{lt}");
+}

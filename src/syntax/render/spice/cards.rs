@@ -12,6 +12,8 @@
 //!
 //! Contents:
 //! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`
+//! - `pub(in crate::syntax::render) fn pairs<T>(items: &[T]) -> impl Iterator<Item = (&T, &T)>`,
+//!   `pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String`
 
 use super::W;
 use super::laplace::{self, Laplace};
@@ -51,11 +53,19 @@ impl W<'_, '_> {
                     self.ask(Construct::RclModel, tok);
                 }
                 let mut s = format!("{decl} {n1} {n2}");
+                // ngspice-45 reads a C or L model only before the value
+                // (`C1 1 0 1u CM`: "unknown parameter (cm)"; run), as
+                // HSPICE (`Cxxx n1 n2 [mname] [C=]val`) and Xyce RG do; an R
+                // either way.
+                let early = model.as_ref().filter(|_| letter != 'R');
+                if let Some(m) = early {
+                    s.push_str(&format!(" {m}"));
+                }
                 match &value {
                     Val::Raw(t) if t.is_empty() => {}
                     v => s.push_str(&format!(" {}", self.value(v))),
                 }
-                if let Some(m) = model {
+                if let Some(m) = model.as_ref().filter(|_| early.is_none()) {
                     s.push_str(&format!(" {m}"));
                 }
                 s + &self.params(&params)
@@ -74,18 +84,31 @@ impl W<'_, '_> {
                 };
                 format!("{decl} {n1} {n2} {q}{}", self.params(&params))
             }
-            Card::Coupling {
-                l1, l2, refs, k, ..
-            } => {
+            Card::Coupling { ls, refs, k, .. } => {
                 // Each inductor as the map spells its declaration in this
                 // scope; one declared elsewhere gains its letter as written.
-                let l = |r: &str, rest: &str| {
-                    self.names
-                        .reference(self.scope, r, 'L')
-                        .map_or_else(|| format!("L{rest}"), str::to_string)
-                };
-                let (l1, l2) = (l(&refs[0], &l1), l(&refs[1], &l2));
-                format!("{decl} {l1} {l2} {}", self.sp.decimal(k, self.x))
+                let l: Vec<String> = refs
+                    .iter()
+                    .zip(&ls)
+                    .map(|(r, rest)| {
+                        self.names
+                            .reference(self.scope, r, 'L')
+                            .map_or_else(|| format!("L{rest}"), str::to_string)
+                    })
+                    .collect();
+                let k = self.sp.decimal(k, self.x);
+                // Xyce and LTspice couple every pair on one card (RG `K`,
+                // LTspice help `K`); the others one card per pair, the
+                // first keeping the name.
+                if matches!(self.d, Dialect::Xyce | Dialect::Ltspice) {
+                    format!("{decl} {} {k}", l.join(" "))
+                } else {
+                    pairs(&l)
+                        .enumerate()
+                        .map(|(i, (a, b))| format!("{decl}{} {a} {b} {k}", pair_suffix(i)))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
             }
             Card::Source {
                 letter,
@@ -218,6 +241,25 @@ impl W<'_, '_> {
         } else {
             v.to_string()
         }
+    }
+}
+
+/// Every pair of `items`, in card order (`a b`, `a c`, `b c`): the couplings
+/// of a `K` over more than two inductors.
+pub(in crate::syntax::render) fn pairs<T>(items: &[T]) -> impl Iterator<Item = (&T, &T)> {
+    items
+        .iter()
+        .enumerate()
+        .flat_map(move |(i, a)| items[i + 1..].iter().map(move |b| (a, b)))
+}
+
+/// The name suffix of a `K`'s `i`th pair: none for the first (it keeps the
+/// card's name), `_2`, `_3`, … after.
+pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String {
+    if i == 0 {
+        String::new()
+    } else {
+        format!("_{}", i + 1)
     }
 }
 

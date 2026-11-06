@@ -80,8 +80,9 @@ pub(in crate::syntax::render) struct Rd<'a> {
     pub(in crate::syntax::render) t: &'a Tokens<'a>,
     /// The dialect the file was read in (its family: ESPice reads ngspice).
     pub(in crate::syntax::render) d: Dialect,
-    /// The deck's `.model` names, lowercased (the old lowering).
-    models: HashSet<String>,
+    /// The deck's `.model` names, lowercased (the old lowering), each to
+    /// its (last) card.
+    models: HashMap<String, u32>,
     /// Spectre/VACASK: model kinds by name, and subcircuit names.
     kinds: HashMap<String, String>,
     subckts: Vec<String>,
@@ -303,7 +304,7 @@ pub(in crate::syntax::render) fn read<'a>(
         ast,
         t,
         d,
-        models: HashSet::new(),
+        models: HashMap::new(),
         kinds: HashMap::new(),
         subckts: Vec::new(),
         kit,
@@ -624,14 +625,14 @@ impl<'a> Rd<'a> {
 
     /// The `.model` names the grammar read, lowercased, anywhere in the
     /// deck but kept-whole blocks.
-    fn model_names(&self, stmts: &[u32]) -> HashSet<String> {
-        let mut out = HashSet::new();
+    fn model_names(&self, stmts: &[u32]) -> HashMap<String, u32> {
+        let mut out = HashMap::new();
         let mut work: Vec<u32> = stmts.iter().rev().copied().collect();
         while let Some(s) = work.pop() {
             match self.tag(s) {
                 Tag::Model => {
                     if let Some(m) = self.model_head(s) {
-                        out.insert(self.text(m.0).to_ascii_lowercase());
+                        out.insert(self.text(m.0).to_ascii_lowercase(), s);
                     }
                 }
                 Tag::Data | Tag::Control => {}

@@ -46,12 +46,13 @@ impl Rd<'_> {
             return self.dc_axes_hspice(items);
         }
         let word = |k: u32| self.wordw(k).then(|| self.text(k).to_ascii_lowercase());
-        let (mut axes, mut i) = (Vec::new(), 0);
+        let (mut axes, mut i, mut lin_kw) = (Vec::new(), 0, false);
         // Each axis takes at least two items, so the loop ends by the card's length.
         while i < items.len() {
             let kw =
                 word(items[i]).filter(|w| matches!(w.as_str(), "lin" | "dec" | "oct" | "list"));
             if kw.is_some() {
+                lin_kw |= kw.as_deref() == Some("lin");
                 i += 1;
             }
             let &src = items.get(i)?;
@@ -97,7 +98,9 @@ impl Rd<'_> {
                 sweep,
             });
         }
-        let plain = axes.iter().all(|a| matches!(a.sweep, DcSweep::Lin(..)));
+        // A linear sweep read here only with Xyce's `LIN` keyword (Xyce
+        // RG `.DC`); the plain `.dc` reads the others.
+        let plain = !lin_kw && axes.iter().all(|a| matches!(a.sweep, DcSweep::Lin(..)));
         (!axes.is_empty() && !plain).then_some(axes)
     }
 

@@ -8,12 +8,13 @@
 //! Contents:
 //! - `Rd::refused(&self, n: u32) -> Kept`
 //! - `Rd::dialect_raw(&self, w: &str) -> bool`
-//! - `Rd::private(&self, tok: u32) -> bool`
+//! - `Rd::kept_construct(&self, tok: u32) -> Construct`
 //! - `Rd::global_swept(&self, n: u32) -> bool`
 
 use super::{Kept, Rd};
 use crate::syntax::Dialect;
 use crate::syntax::ast::{Node, Tag};
+use crate::syntax::render::capability::Construct;
 use crate::syntax::token::Tag as T;
 
 /// the old SPICE grammar's `rawkind`: the dot words whose card, when no rule reads it,
@@ -246,23 +247,33 @@ impl Rd<'_> {
         assigns(n).any(|a| swept.contains(&self.text(self.ast.lhs(Node(a))).to_ascii_lowercase()))
     }
 
-    /// Whether the statement kept as text at token `tok` is one only its
-    /// own simulator has, so every other target lacks it: Xyce's
-    /// multi-time, model-order-reduction and uncertainty analyses (RG
-    /// analysis commands `.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`) and its own `Y`
-    /// devices (RG, `Y` devices: neuron, synapse, reduced-order model, reaction
-    /// network, general external, accelerometer, power-grid branch, bus,
-    /// generator and transformer), none of which ngspice, HSPICE,
-    /// LTspice, Spectre or VACASK has.
-    pub(in crate::syntax::render) fn private(&self, tok: u32) -> bool {
-        const XY_CARDS: [&str; 4] = [".mpde", ".mor", ".pce", ".embeddedsampling"];
-        const XY_DEVICES: [&str; 13] = [
+    /// What the statement kept as text from another dialect at token `tok`
+    /// is to a writer: one only its own simulator has (Xyce's multi-time,
+    /// model-order-reduction and uncertainty analyses, RG analysis
+    /// commands `.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`, `.RESULT`;
+    /// its netlist rewrites `.PREPROCESS`; its own `Y` devices, RG `Y`
+    /// devices: neuron, synapse, reduced-order model, reaction network,
+    /// general external, accelerometer, power grid, PDE (TCAD), none of
+    /// which ngspice, HSPICE, LTspice, Spectre or VACASK has); Xyce's
+    /// `.SENS` (an objective's sensitivity to listed parameters over the
+    /// deck's `.dc`, `.tran` or `.ac`, RG `.SENS`); else foreign text.
+    pub(in crate::syntax::render) fn kept_construct(&self, tok: u32) -> Construct {
+        const XY_CARDS: [&str; 6] = [
+            ".mpde",
+            ".mor",
+            ".pce",
+            ".embeddedsampling",
+            ".result",
+            ".preprocess",
+        ];
+        const XY_DEVICES: [&str; 14] = [
             "neuron",
             "synapse",
             "rom",
             "rxn",
             "genext",
             "acc",
+            "pde",
             "pgbr",
             "pgbs",
             "pggb",
@@ -272,12 +283,17 @@ impl Rd<'_> {
             "powergridtransformer",
         ];
         if self.text_dialect(tok) != Dialect::Xyce {
-            return false;
+            return Construct::ForeignText;
         }
         let w = self.t.text(tok).to_ascii_lowercase();
-        match w.strip_prefix('y') {
+        let private = match w.strip_prefix('y') {
             Some(ty) => XY_DEVICES.contains(&ty),
             None => XY_CARDS.contains(&w.as_str()),
+        };
+        match w.as_str() {
+            _ if private => Construct::PrivateText,
+            ".sens" => Construct::XyceSens,
+            _ => Construct::ForeignText,
         }
     }
 }

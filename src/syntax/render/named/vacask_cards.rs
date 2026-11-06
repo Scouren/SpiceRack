@@ -73,13 +73,21 @@ impl W<'_, '_> {
                     self.inst_params(&params)
                 )
             }
-            Card::Coupling { l1, l2, k, .. } => format!(
-                "k{} () mutual k={} ind1=\"l{}\" ind2=\"l{}\"",
-                q(own),
-                num(k),
-                q(&l1),
-                q(&l2)
-            ),
+            // One `mutual` per pair, the first keeping the name.
+            Card::Coupling { ls, k, .. } => crate::syntax::render::spice::pairs(&ls)
+                .enumerate()
+                .map(|(i, (a, b))| {
+                    let suffix = crate::syntax::render::spice::pair_suffix(i);
+                    format!(
+                        "k{}{suffix} () mutual k={} ind1=\"l{}\" ind2=\"l{}\"",
+                        q(own),
+                        num(k),
+                        q(a),
+                        q(b)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
             Card::Source {
                 letter,
                 name: _,

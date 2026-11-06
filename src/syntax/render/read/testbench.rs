@@ -21,6 +21,7 @@
 use super::Rd;
 use super::options::Opt;
 use super::outputs::print_kind;
+use super::sweeps::DcSweep;
 use crate::syntax::Dialect;
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::token::Tag as T;
@@ -491,7 +492,18 @@ impl<'a> Rd<'a> {
                     .map(|s| Some((self.text(s[0]), num(s[1])?, num(s[2])?, num(s[3])?)))
                     .collect::<Option<_>>()?,
             ),
-            Card::DcAxes(axes) => Ana::DcAxes(axes.clone()),
+            // Xyce's `.DC LIN src a b c` is the plain linear sweep.
+            Card::DcAxes(axes) => match axes
+                .iter()
+                .map(|a| match a.sweep {
+                    DcSweep::Lin(x, y, z) => Some((a.src.clone(), x, y, z)),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+            {
+                Some(lin) => Ana::Dc(lin),
+                None => Ana::DcAxes(axes.clone()),
+            },
             Card::Freq(false, f) => Ana::Ac(sweep(f)?),
             Card::Freq(true, f) => Ana::Sp(sweep(f)?),
             Card::Tran(nums, pair, uic, startup) => {
