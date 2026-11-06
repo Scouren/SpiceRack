@@ -12,7 +12,7 @@ use super::W;
 use super::sweeps::dc_axis;
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
-use crate::syntax::render::capability::{Action, Alt, Construct, action};
+use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::read::Ana;
 
 impl W<'_, '_> {
@@ -123,7 +123,7 @@ impl W<'_, '_> {
                     s.push_str(" UIC");
                 }
                 // Refused on a target without it (`W::checks`).
-                if *startup && action(self.d, Construct::TranStartup) == Action::Native {
+                if *startup && self.cells[Construct::TranStartup as usize] == Action::Native {
                     s.push_str(" startup");
                 }
                 s

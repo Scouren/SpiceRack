@@ -105,7 +105,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         o: Out::new(4096),
         diags,
         draws,
-        names: names::Names::new(rd, deck, |_, c| cards::renamed(rd, target, c)),
+        names: names::Names::new(rd, deck, |_, c| cards::renamed(rd, cells, c)),
         scope: crate::syntax::ast::NONE,
         drop_four: false,
         in_section: false,

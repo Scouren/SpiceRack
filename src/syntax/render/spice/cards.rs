@@ -12,7 +12,7 @@
 //!
 //! Contents:
 //! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`, `W::ternaries(&self, e: &str) -> String`
-//! - `pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String>`
+//! - `pub(super) fn renamed(rd: &Rd, cells: &Cells, card: &Card) -> Option<String>`
 //! - `pub(in crate::syntax::render) fn pairs<T>(items: &[T]) -> impl Iterator<Item = (&T, &T)>`,
 //!   `pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String`
 
@@ -20,7 +20,8 @@ use super::W;
 use super::laplace::{self, Laplace};
 use super::ternary::{Read, parenthesize};
 use crate::syntax::Dialect;
-use crate::syntax::render::capability::{Action, Alt, Construct, Rule, action};
+use crate::syntax::lang::Cells;
+use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::WaveKind;
 use crate::syntax::render::read::{Card, Num, Rd, Val, Wave};
@@ -267,11 +268,11 @@ impl W<'_, '_> {
     }
 }
 
-/// The name `target` writes behavioural source `card` under, where its
+/// The name a target (its `cells`) writes behavioural source `card` under, where its
 /// spelling takes another letter: HSPICE's `E1`/`G1` for `B1` (`vol=`,
 /// `cur=`), a Laplace lift's `EB1`/`GB1`, ngspice's XSPICE `AB1`. `None`:
 /// the map's `B1`.
-pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String> {
+pub(super) fn renamed(rd: &Rd, cells: &Cells, card: &Card) -> Option<String> {
     let Card::Behavioural {
         current,
         name,
@@ -283,13 +284,13 @@ pub(super) fn renamed(rd: &Rd, target: Dialect, card: &Card) -> Option<String> {
     };
     let letter = if *current { 'G' } else { 'E' };
     if !laplace::has_laplace(rd, *value) {
-        let vol_cur = action(target, Construct::BehaviouralSource) == Action::Spell(Alt::VolCur);
+        let vol_cur = cells[Construct::BehaviouralSource as usize] == Action::Spell(Alt::VolCur);
         return vol_cur.then(|| format!("{letter}{name}"));
     }
     // A constant `H(s)` is a plain controlled source on every target.
     match (
         laplace::read(rd, *value),
-        action(target, Construct::Laplace),
+        cells[Construct::Laplace as usize],
     ) {
         (Some(Laplace::Gain { .. }), _) => Some(format!("{letter}B{name}")),
         (Some(Laplace::Xfer { .. }), Action::Lift(Rule::LaplaceXfer)) => Some(format!("AB{name}")),
