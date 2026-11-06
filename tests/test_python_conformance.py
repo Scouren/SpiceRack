@@ -258,7 +258,9 @@ EXPECTED = {
     'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
     'exp': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sffm': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'am': (OK, OK, OK, OK, OK, 'W0108', OK, OK, OK),
+    # Xyce and LTspice have no AM source; VACASK's `type="am"` cannot hold a
+    # zero carrier (`offset=0`: modindex VMA/VMO); stream D's AM order.
+    'am': (OK, OK, OK, 'W0108', 'W0108', 'W0108', 'W0108', OK, OK),
     'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

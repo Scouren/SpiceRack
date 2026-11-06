@@ -30,11 +30,12 @@ impl<'a> Rd<'a> {
         let fm = ty.as_deref() == Some("fm")
             || (ty.as_deref() == Some("sine") && self.get(p, "fmmodindex").is_some());
         let spectre_exp = self.b.named_rules == NamedRules::Spectre && ty.as_deref() == Some("exp");
-        if (fm || spectre_exp)
-            && self
-                .get(p, "delay")
-                .is_some_and(|v| self.number(v) != Some(0.0))
-        {
+        let nonzero = |k: &str| self.get(p, k).is_some_and(|v| self.number(v) != Some(0.0));
+        if (fm || spectre_exp) && nonzero("delay") {
+            return None;
+        }
+        // SFFM holds no modulation phase (`Wave::args`).
+        if fm && nonzero("modphase") {
             return None;
         }
         if ty.as_deref() != Some("pwl") && self.get(p, "pwlperiod").is_some() {
@@ -128,19 +129,40 @@ impl<'a> Rd<'a> {
                 delay: None,
                 cut: false,
             },
-            Some("am") => Wave {
-                kind: WaveKind::Am,
-                args: vec![
-                    f("ampl")?,
-                    f("sinedc")?,
-                    f("modfreq")?,
-                    f("freq")?,
-                    f("delay")?,
-                ],
-                repeat: None,
-                delay: None,
-                cut: false,
-            },
+            // VACASK `type="am"` (`lib/devvisrc.cpp`): `sinedc + ampl
+            // sin(2π freq t' + phase)(1 + modindex sin(2π modfreq t' +
+            // modphase))`, its value at `delay` before it; ngspice-45's
+            // order (`Wave::args`) is 0 before TD, so a delayed AM reads
+            // only with no offset; one with a carrier phase not at all
+            // (the pinned VACASK runs it as 0).
+            Some("am") if self.b.named_rules == NamedRules::Vacask => {
+                let n = |k: &str, d: f64| match self.get(p, k) {
+                    Some(v) => self.number(v),
+                    None => Some(d),
+                };
+                let (dc, ampl, mi) = (n("sinedc", 0.0)?, n("ampl", 0.0)?, n("modindex", 0.5)?);
+                let (delay, phase) = (n("delay", 0.0)?, n("phase", 0.0)?);
+                if phase != 0.0 || n("sinephase", 0.0)? != 0.0 || delay != 0.0 && dc != 0.0 {
+                    return None;
+                }
+                let v = [
+                    dc,
+                    ampl,
+                    ampl * mi,
+                    n("modfreq", 1e3)?,
+                    n("freq", 0.0)?,
+                    delay,
+                ];
+                let mut args: Vec<Num> = v.into_iter().map(Num::Num).collect();
+                args.extend([Num::Num(n("modphase", 0.0)?), Num::Num(phase)]);
+                Wave {
+                    kind: WaveKind::Am,
+                    args,
+                    repeat: None,
+                    delay: None,
+                    cut: false,
+                }
+            }
             Some("pwl") if self.b.named_rules == NamedRules::Spectre => {
                 let w = self.get(p, "wave")?;
                 let xs: Vec<Num> = self

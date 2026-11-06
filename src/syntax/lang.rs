@@ -49,7 +49,7 @@ pub struct Lang(u16);
 pub type Cells = [Action; CONSTRUCT_COUNT];
 
 /// How many [`Construct`]s there are.
-pub const CONSTRUCT_COUNT: usize = 41;
+pub const CONSTRUCT_COUNT: usize = 42;
 
 /// How many languages can be registered, the built-ins among them.
 pub const LANGS_MAX: usize = 64;
@@ -85,6 +85,7 @@ pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT] = [
     Construct::LocalFunc,
     Construct::TableSource,
     Construct::LossyLine,
+    Construct::AmWave,
     Construct::Step,
     Construct::StepList,
     Construct::TranStartup,
@@ -384,19 +385,20 @@ const fn position(c: Construct) -> usize {
         Construct::LocalFunc => 24,
         Construct::TableSource => 25,
         Construct::LossyLine => 26,
-        Construct::Step => 27,
-        Construct::StepList => 28,
-        Construct::TranStartup => 29,
-        Construct::DcLogList => 30,
-        Construct::Tf => 31,
-        Construct::Sens => 32,
-        Construct::SensAc => 33,
-        Construct::PoleZero => 34,
-        Construct::SParameter => 35,
-        Construct::Print => 36,
-        Construct::Save => 37,
-        Construct::UnmappedOption => 38,
-        Construct::Statistics => 39,
-        Construct::Measure => 40,
+        Construct::AmWave => 27,
+        Construct::Step => 28,
+        Construct::StepList => 29,
+        Construct::TranStartup => 30,
+        Construct::DcLogList => 31,
+        Construct::Tf => 32,
+        Construct::Sens => 33,
+        Construct::SensAc => 34,
+        Construct::PoleZero => 35,
+        Construct::SParameter => 36,
+        Construct::Print => 37,
+        Construct::Save => 38,
+        Construct::UnmappedOption => 39,
+        Construct::Statistics => 40,
+        Construct::Measure => 41,
     }
 }

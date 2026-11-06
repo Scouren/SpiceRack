@@ -101,7 +101,20 @@ macro_rules! pymethods_with_waves {
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
                 offset: Num, amplitude: Num, modulating_frequency: Num, carrier_frequency: Num, signal_delay: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
             ) -> PyResult<()> {
-                let wf = Wave::new("AM", &[&amplitude, &offset, &modulating_frequency, &carrier_frequency, &signal_delay], Value::Num(0.0));
+                // PySpice's `amplitude·(offset + sin(2π fm t'))·sin(2π fc t')`
+                // in ngspice-45's `AM(VO VMO VMA FM FC TD)` (`vsrcload.c`):
+                // VO 0, VMO amplitude·offset, VMA amplitude.
+                let vmo = match (&amplitude.0, &offset.0) {
+                    (Value::Num(a), Value::Num(o)) => Num::of(a * o),
+                    (a, o) => {
+                        let bare = |v: &Value| match v {
+                            Value::Expr(e) => e.clone(),
+                            v => v.text(),
+                        };
+                        Num(Value::Expr(format!("({})*({})", bare(a), bare(o))))
+                    }
+                };
+                let wf = Wave::new("AM", &[&Num::of(0.0), &vmo, &amplitude, &modulating_frequency, &carrier_frequency, &signal_delay], Value::Num(0.0));
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);
                 Ok(())
             }

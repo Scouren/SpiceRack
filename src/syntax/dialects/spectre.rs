@@ -251,6 +251,7 @@ pub(super) fn spectre() -> DialectDef {
         .refuse(Construct::LocalFunc, Code::W0106)
         .refuse(Construct::TableSource, Code::W0102)
         .refuse(Construct::LossyLine, Code::W0105)
+        .refuse(Construct::AmWave, Code::W0108)
         .native(Construct::Step)
         .native(Construct::StepList)
         .refuse(Construct::TranStartup, Code::W0037)

@@ -376,11 +376,11 @@ py_enum!(PyAlt, "Alt", Alt, units = &[
     Alt::ChargeQuoted, Alt::ChargeBraced, Alt::ChargeBare, Alt::VolCur, Alt::BracedBehaviour,
     Alt::FuncParam, Alt::Hdl, Alt::PreOsdi, Alt::Probe, Alt::DcType, Alt::Include,
     Alt::BsourceCharge, Alt::Bsource, Alt::PwlPeriod, Alt::NgBehaviorLine, Alt::SpiceRegion,
-    Alt::PwlValue, Alt::XycePort, Alt::XyceLin,
+    Alt::PwlValue, Alt::XycePort, Alt::XyceLin, Alt::HspiceAm, Alt::AmNoOffset,
 ], covers = [
     ChargeQuoted, ChargeBraced, ChargeBare, VolCur, BracedBehaviour, FuncParam, Hdl, PreOsdi,
     Probe, DcType, Include, BsourceCharge, Bsource, PwlPeriod, NgBehaviorLine, SpiceRegion,
-    PwlValue, XycePort, XyceLin
+    PwlValue, XycePort, XyceLin, HspiceAm, AmNoOffset
 ] | Alt::Omit(_) | Alt::Copy(_), data = ["Omit", "Copy"] {
     #[staticmethod]
     #[pyo3(name = "Omit")]

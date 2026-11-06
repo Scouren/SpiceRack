@@ -89,6 +89,8 @@ pub enum Construct {
     TableSource,
     /// An `O` lossy line on an LTRA model.
     LossyLine,
+    /// An AM source waveform.
+    AmWave,
     /// `.step`.
     Step,
     /// `.step <name> list <values>`.
@@ -160,6 +162,10 @@ pub enum Alt {
     PwlValue,
     /// `P n+ n- port=n z0=z` (Xyce).
     XycePort,
+    /// `AM(SA OC FM FC TD)` (HSPICE).
+    HspiceAm,
+    /// ngspice's `AM(…)` with no VO offset (ESPice).
+    AmNoOffset,
     /// `.LIN` beside an `.AC` of the sweep (Xyce).
     XyceLin,
     /// Not written, the code the note the writer records for it.
@@ -321,7 +327,7 @@ mod tests {
         );
     }
 
-    const CONSTRUCTS: [Construct; 41] = [
+    const CONSTRUCTS: [Construct; 42] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -349,6 +355,7 @@ mod tests {
         Construct::LocalFunc,
         Construct::TableSource,
         Construct::LossyLine,
+        Construct::AmWave,
         Construct::Step,
         Construct::StepList,
         Construct::TranStartup,

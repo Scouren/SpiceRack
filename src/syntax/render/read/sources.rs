@@ -30,8 +30,11 @@ pub(in crate::syntax::render) enum Num {
 #[derive(Clone, PartialEq, Debug)]
 pub(in crate::syntax::render) struct Wave {
     pub(in crate::syntax::render) kind: WaveKind,
-    /// The values: SIN 6, PULSE 7, EXP 6, SFFM 5, AM 5, TRNOISE 7,
-    /// TRRANDOM 5 (the type first), PWL its pairs flat.
+    /// The values: SIN 6, PULSE 7, EXP 6, SFFM 5, TRNOISE 7, TRRANDOM 5
+    /// (the type first), PWL its pairs flat; AM 8 in ngspice-45's order
+    /// `VO VMO VMA FM FC TD PHASEM PHASEC`, the value `VO + (VMO + VMA
+    /// sin(2π FM t' + PHASEM)) sin(2π FC t' + PHASEC)`, t' = t - TD, 0
+    /// before TD (ngspice-45 `vsrcload.c`).
     pub(in crate::syntax::render) args: Vec<Num>,
     /// PWL `r=`, `td=`.
     pub(in crate::syntax::render) repeat: Option<Num>,
@@ -339,6 +342,45 @@ impl<'a> Rd<'a> {
         None
     }
 
+    /// An AM's values in ngspice-45's order ([`Wave::args`]). ngspice:
+    /// `AM(VO VMO VMA FM FC [TD [PHASEM [PHASEC]]])` (`vsrcload.c`; FM
+    /// and FC default to a share of the run's stop time, so they must be
+    /// given here); HSPICE: `AM(SA OC FM FC [TD])`, `SA (OC + sin(2π FM
+    /// t')) sin(2π FC t')` (HSPICE UG, AM source), so VO 0, VMO SA·OC,
+    /// VMA SA. No other SPICE dialect has AM.
+    fn am(&self, a: Vec<Num>) -> Option<Wave> {
+        let z = || Num::Num(0.0);
+        let args = match (self.b.source_rules, self.b.card_rules) {
+            (SourceRules::Ngspice, _) if (5..=8).contains(&a.len()) => {
+                let mut v = a;
+                v.resize(8, z());
+                v
+            }
+            (_, CardRules::Hspice) if (4..=5).contains(&a.len()) => {
+                let (sa, oc) = (a[0].num()?, a[1].num()?);
+                let td = a.get(4).cloned().unwrap_or_else(z);
+                vec![
+                    z(),
+                    Num::Num(sa * oc),
+                    a[0].clone(),
+                    a[2].clone(),
+                    a[3].clone(),
+                    td,
+                    z(),
+                    z(),
+                ]
+            }
+            _ => return None,
+        };
+        Some(Wave {
+            kind: WaveKind::Am,
+            args,
+            repeat: None,
+            delay: None,
+            cut: false,
+        })
+    }
+
     /// The waveform a word names.
     fn wave(&self, w: u32) -> Option<WaveKind> {
         let ngspice = self.b.source_rules == SourceRules::Ngspice;
@@ -359,6 +401,9 @@ impl<'a> Rd<'a> {
     /// A waveform's values → its view (the old lowering's `waveform`).
     fn waveform(&self, w: WaveKind, vals: &[u32]) -> Option<Wave> {
         let a: Vec<Num> = vals.iter().map(|&v| self.irnum(v)).collect::<Option<_>>()?;
+        if w == WaveKind::Am {
+            return self.am(a);
+        }
         if matches!(w, WaveKind::Sffm | WaveKind::Am)
             && a[a.len().min(5)..].iter().any(|x| *x != Num::Num(0.0))
         {

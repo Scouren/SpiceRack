@@ -191,6 +191,7 @@ pub(super) fn xyce() -> DialectDef {
         .native(Construct::LocalFunc)
         .native(Construct::TableSource)
         .native(Construct::LossyLine)
+        .refuse(Construct::AmWave, Code::W0108)
         .native(Construct::Step)
         .native(Construct::StepList)
         .refuse(Construct::TranStartup, Code::W0037)

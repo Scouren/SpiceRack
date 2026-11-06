@@ -556,3 +556,52 @@ fn an_hspice_value_modifier_scales_or_clamps_the_value() {
         assert!(ng.lines().any(|l| l == want), "{want}\n{ng}");
     }
 }
+
+#[test]
+fn an_am_source_is_read_in_its_dialects_order() {
+    // ngspice-45 `vsrcload.c`: AM(VO VMO VMA FM FC TD PHASEM PHASEC),
+    // VO + (VMO + VMA sin(2π FM t')) sin(2π FC t'); ngspice-45 ran it to that
+    // closed form to 5e-9. HSPICE UG: AM(SA OC FM FC TD) = SA (OC + sin)
+    // sin, i.e. VO 0, VMO SA·OC, VMA SA (ngspice-45 ran the written deck to
+    // the HSPICE form, 5e-9). VACASK `lib/devvisrc.cpp` type="am": its
+    // written deck ran to the closed form (4e-16); a carrier phase, which
+    // the pinned VACASK drops, is refused. Xyce and LTspice have no AM.
+    // Checks: 2 + 1 + 2 + 2.
+    let ng = "t\nV1 1 0 AM(0.5 1 0.25 1k 20k 0 30 60)\nR1 1 0 1k\n.tran 1u 2m\n.end\n";
+    let back = render_text(ng, Dialect::Ngspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(
+        back.lines()
+            .any(|l| l == "V1 1 0 0 AM(0.5 1 0.25 1000 20000 0 30 60)"),
+        "{back}"
+    );
+    let va = render_text(ng, Dialect::Ngspice, "t", Dialect::Vacask).expect_err("refused");
+    assert!(
+        va.diags.iter().any(|g| g.code == Code::W0108),
+        "{}",
+        va.messages
+    );
+    let hs = "t\nv1 1 0 AM(2 0.5 1k 20k 0.1m)\nr1 1 0 1k\n.tran 1u 2m\n.end\n";
+    let n = render_text(hs, Dialect::Hspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(
+        n.lines()
+            .any(|l| l == "V1 1 0 0 AM(0 1 2 1000 20000 0.0001)"),
+        "{n}"
+    );
+    let ng0 = "t\nV1 1 0 AM(0.5 1 0.25 1k 20k 0 30)\nR1 1 0 1k\n.tran 1u 2m\n.end\n";
+    let va = render_text(ng0, Dialect::Ngspice, "t", Dialect::Vacask)
+        .expect("written")
+        .text;
+    assert!(va.contains("type=\"am\" sinedc=5e-1 ampl=1e0 modindex=2.5e-1 modfreq=1e3 freq=2e4 delay=0 modphase=3e1"), "{va}");
+    for t in [Dialect::Xyce, Dialect::Ltspice] {
+        let e = render_text(ng0, Dialect::Ngspice, "t", t).expect_err("refused");
+        assert!(
+            e.diags.iter().any(|g| g.code == Code::W0108),
+            "{t:?} {}",
+            e.messages
+        );
+    }
+}
