@@ -236,12 +236,15 @@ impl W<'_, '_> {
     }
 }
 
-/// A plain number VACASK cannot misread: no suffix (SPICE's are
-/// case-blind, VACASK's not: `M` is milli in one and mega in the other).
+/// A number VACASK cannot misread: no suffix (SPICE's are case-blind,
+/// VACASK's not: `M` is milli in one and mega in the other), but where
+/// a suffix keeps fewer digits
+/// ([`crate::syntax::render::spelling::shortest`]: `10u`; lowercase but
+/// `T`, `G`, and `meg` for mega).
 pub(super) fn num(v: f64) -> String {
     match v == 0.0 {
         true => "0".to_string(),
-        false => format!("{v:e}"),
+        false => crate::syntax::render::spelling::shortest(v, format!("{v:e}"), "meg"),
     }
 }
 

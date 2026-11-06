@@ -548,9 +548,10 @@ impl W<'_, '_> {
         }
     }
 
-    /// A number in Spectre's suffixes (`[KUN]` Table B.1: `M` is mega).
+    /// A number in Spectre's suffixes (`[KUN]` Table B.1: `M` is mega),
+    /// in the fewest digits ([`super::spelling::shortest`]).
     fn num(&self, v: f64) -> String {
-        self.sp.format(v)
+        super::spelling::shortest(v, self.sp.format(v), "M")
     }
 
     /// A value kept as SPICE text, in Spectre's spelling: without its
