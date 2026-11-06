@@ -418,6 +418,12 @@ catalogue! {
         cite: "the source dialect's grammar, at the parse note beside this code (P0002, P0003, P0008)",
         explain: "The parser kept this text as written: an expression that is no expression, an unclosed delimiter, a block the file ends inside. A target of the source's own dialect gets it back as written; another target would read text no rule checked. Fix the source at the parse note.",
     }
+    /// A noise analysis's points per summary on a target whose `.noise` has no such field: not written.
+    W0033 Note {
+        title: "a noise summary interval not written",
+        cite: "ngspice manual §15.3.4 (`.noise … pts_per_summary`: the per-device contributions); LTspice help `.NOISE` (no summary field)",
+        explain: "The source asks for a noise summary (each device's contribution) every N points; the target's `.noise` card has no such field, so it is left out. The noise spectrum is the same; read the contributions from the target's own noise output.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

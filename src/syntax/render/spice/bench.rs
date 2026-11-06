@@ -471,10 +471,11 @@ impl W<'_, '_> {
                 }
                 let mut s = format!(".noise {out} {source} {}", sweep(self, sw));
                 // `pts_per_summary` is an ngspice/SPICE3 extension; LTspice's
-                // `.noise` card stops at the stop frequency.
-                let ng = matches!(self.d, Dialect::Ngspice | Dialect::Espice | Dialect::Xyce);
-                if let (Some(p), true) = (pps, ng) {
-                    s.push_str(&format!(" {p}"));
+                // `.noise` card stops at the stop frequency (W0033).
+                match (pps, self.d) {
+                    (Some(_), Dialect::Ltspice) => self.note(Code::W0033, tok),
+                    (Some(p), _) => s.push_str(&format!(" {p}")),
+                    (None, _) => {}
                 }
                 s
             }

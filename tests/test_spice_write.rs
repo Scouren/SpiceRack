@@ -351,3 +351,23 @@ fn a_vacask_control_line_is_left_out_or_refused_off_vacask() {
     let codes = refusal(&alter, Dialect::Vacask, Dialect::Ngspice);
     assert!(codes.contains(&Code::W0001), "{codes:?}");
 }
+
+// ── noise summary ──
+
+/// ngspice manual §15.3.4: `.noise … pts_per_summary` adds each device's
+/// contribution every N points; LTspice's `.NOISE` (help: output, source,
+/// sweep, points, start, stop) has no such field, so it is left out with a
+/// note (W0033), where the old writer dropped it silently; ngspice keeps it.
+#[test]
+fn ltspice_notes_the_noise_summary_it_leaves_out() {
+    let deck = "* t\nV1 in 0 dc 0 ac 1\nR1 in out 1k\nC1 out 0 1n\n\
+        .noise v(out) V1 dec 10 1k 100meg 5\n.end\n";
+    let w = render_text(deck, Dialect::Ngspice, "t", Dialect::Ltspice).expect("written");
+    assert!(w.text.contains("dec 10 1k 100meg\n"), "{}", w.text);
+    assert!(
+        w.notes.diags.iter().any(|d| d.code == Code::W0033),
+        "{}",
+        w.text
+    );
+    assert!(write(deck, Dialect::Ngspice, Dialect::Ngspice).contains("100meg 5\n"));
+}
