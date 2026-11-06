@@ -209,7 +209,7 @@ EXPECTED = {
     # VACASK refuses `.tran … uic` (W0015): its `tran` has `icmode`; writer C (FINDINGS-python.md).
     'tran_full': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
     'noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # ngspice's points-per-summary is dropped on LTspice, Spectre, VACASK with no note (writers B/C; FINDINGS-python.md).
+    # ngspice's points-per-summary: LTspice notes W0033 (writer B); Spectre, VACASK drop it with no note (writer C; FINDINGS-python.md).
     'noise_summary': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'tf': (OK, OK, OK, 'W0015', OK, OK, OK, OK, OK),
     'dc_sensitivity': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
@@ -285,10 +285,9 @@ EXPECTED = {
     'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'lib': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'raw_spice': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # LTspice writes the deck without the OSDI load (S3, writer B).
-    'osdi': (OK, 'W0004', 'W0004', 'W0004', OK, OK, OK, OK, OK),
-    # LTspice writes the deck without the Verilog-A load (S3, writer B).
-    'veriloga': (OK, OK, OK, 'W0004', OK, OK, OK, OK, OK),
+    # LTspice has no Verilog-A or OSDI loader (W0004, writer B's 53199ba).
+    'osdi': (OK, 'W0004', 'W0004', 'W0004', 'W0004', OK, OK, OK, OK),
+    'veriloga': (OK, OK, OK, 'W0004', 'W0004', OK, OK, OK, OK),
     'verilog': (NEEDS_IVERILOG,) * 9,
     'X': (OK,) * 9,
     'I': (OK,) * 9,

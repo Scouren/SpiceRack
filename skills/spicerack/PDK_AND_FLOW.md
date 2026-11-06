@@ -105,7 +105,7 @@ dut.raw_spice("N1 inp inn out ampmod")
 * No device method for VA instances — use an `N` line via `raw_spice`.
 * Per backend: ngspice `.control / pre_osdi / .endc`; vacask `load "<p>"` (and needs
   VACASK instance syntax in `raw_spice`); spectre gets `ahdl_include` but **drops all
-  `raw_spice`**; ltspice drops OSDI silently.
+  `raw_spice`**; ltspice refuses a Verilog-A or OSDI load (`W0004`: it has no loader).
 * `verilog(...)` on a `Subcircuit` DUT is applied when the Testbench runs, but
   `tb.netlist()` does not show it.
 

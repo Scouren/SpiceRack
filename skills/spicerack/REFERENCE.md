@@ -108,6 +108,8 @@ queued beside others raise instead.
 case; any other name raises `ValueError` at the call, before anything runs. So
 do the `.pz` types (`vol`/`cur`, `pol`/`zer`/`pz`), a `step_sweep` type and a
 Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...).
+`noise`'s `points_per_summary` is ngspice's, HSPICE's and Xyce's last field;
+LTspice's `.noise` has none, so it is left out there with a note (W0033).
 
 `add_fourier` emits ngspice's `.four`, whose output table is not parsed — the
 harmonics are unreachable. For THD, compute a Goertzel over the transient

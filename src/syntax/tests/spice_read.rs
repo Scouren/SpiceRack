@@ -304,11 +304,15 @@ fn an_ltspice_library_path_with_blanks_is_one_file() {
             .any(|l| l == "include \"C:\\users\\My Documents\\std.dio\""),
         "{sp}"
     );
-    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice).expect_err("refused");
+    // ngspice: the whole file is `.include`, the blank path quoted (ngspice
+    // manual §2.6).
+    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
     assert!(
-        ng.diags.iter().any(|g| g.code == Code::W0005),
-        "{}",
-        ng.messages
+        ng.lines()
+            .any(|l| l == ".include \"C:\\users\\My Documents\\std.dio\""),
+        "{ng}"
     );
 }
 

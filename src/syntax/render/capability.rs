@@ -7,9 +7,8 @@
 //!
 //! `Spell` and `Lift` keep the meaning: a named alternative form, or a
 //! rewrite into extra statements recorded as fixups. Anything that cannot
-//! keep its meaning is `Refuse` with a `W` code. Three cells answer as the
-//! old writers behaved, where that drops or garbles something: each is
-//! marked `// quirk:` (the golden gate holds them until phase 7 decides).
+//! keep its meaning is `Refuse` with a `W` code. Phase 7 decided every
+//! cell that answered as the old writers behaved (the `// quirk:` cells).
 //!
 //! CDL's row is the SPICE writer's (its elements are ngspice cards in the
 //! xschem layout). Spectre's and VACASK's are the named writer's
@@ -147,6 +146,10 @@ pub enum Alt {
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
     Copy(Code),
+    /// `.include "file"`: LTspice's whole-file `.lib` (ngspice §2.6;
+    /// HSPICE `.INCLUDE`; Xyce RG `.INCLUDE`), where `.lib file` alone
+    /// would open a section definition.
+    Include,
     /// `c1 (a b) bsource q=expr` (Spectre Reference 19.1 p.459).
     BsourceCharge,
     /// `b1 (a b) bsource v=expr` / `i=expr` (Spectre Reference 5.0
@@ -190,9 +193,9 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
     use Dialect as D;
     match c {
         Construct::ForeignText => match target {
-            // quirk: the xschem layout (CDL) copies another family's text
-            // as written, as the old writer did; phase 7 refuses it.
-            D::Cdl => Spell(Alt::Copy(Code::W0027)),
+            // An LVS netlist leaves out what it cannot check: no reader
+            // reads CDL, so every kept text is another family's.
+            D::Cdl => Spell(Alt::Omit(Code::W0028)),
             D::Ngspice | D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0001),
             D::Spectre | D::Vacask | D::Verilog => Refuse(Code::W0001),
         },
@@ -231,22 +234,18 @@ pub const fn action(target: Dialect, c: Construct) -> Action {
         Construct::VerilogALoad => match target {
             D::Ngspice => Spell(Alt::PreOsdi),
             D::Espice | D::Hspice => Spell(Alt::Hdl),
-            D::Xyce => Refuse(Code::W0004),
-            // quirk: the old LTspice writer drops a load (LTspice has no
-            // OSDI loader); phase 7 refuses it.
-            D::Ltspice => Spell(Alt::Omit(Code::W0022)),
+            // LTspice has no Verilog-A or OSDI loader (LTspice help).
+            D::Xyce | D::Ltspice => Refuse(Code::W0004),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
         },
         Construct::OsdiLoad => match target {
             D::Ngspice => Spell(Alt::PreOsdi),
-            D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0004),
-            // quirk: as `VerilogALoad`.
-            D::Ltspice => Spell(Alt::Omit(Code::W0022)),
+            D::Espice | D::Hspice | D::Xyce | D::Ltspice => Refuse(Code::W0004),
             D::Spectre | D::Vacask | D::Cdl | D::Verilog => Native,
         },
         Construct::LibWholeFile => match target {
             D::Ltspice => Native,
-            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Refuse(Code::W0005),
+            D::Ngspice | D::Espice | D::Hspice | D::Xyce => Spell(Alt::Include),
             // `include "file"` reads the whole file (Spectre Reference 5.0
             // p.875; VACASK `lib/dfllexer.l`, `INCEND`).
             D::Spectre | D::Vacask => Native,

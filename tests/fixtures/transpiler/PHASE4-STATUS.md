@@ -173,10 +173,8 @@ others are recorded through `codegen::netlist`, so the whole tree diffs.
    text, as the old writer did (`calls`, `contains('^')`, a `ponytail:`);
    over `Call` nodes and the operator tokens they would be a walk of the
    value trees, with the same verdict on the corpus to be checked.
-4. **Three capability cells reproduce a silent drop** (`// quirk:` in
-   `capability.rs`): LTspice drops a Verilog-A/OSDI load (`Spell(Omit)`,
-   two cells); CDL copies another family's text (`ForeignText`: `Native`).
-   Phase 7 decides.
+4. **No capability cell reproduces a silent drop any more**: phase 7
+   decided each `// quirk:` cell (`capability.rs`).
 5. The reader duplicates `syntax::adapter`'s rules (copied, then typed to
    views). Phase 6 deletes the adapter; the rules live here after it.
 6. `Spelling` holds what the six rows differ in; the dot-card keywords the
@@ -203,25 +201,17 @@ Each is a `// quirk:` in the code, the old bytes kept in this phase.
 
 **The file role** (`role::frame` against the old rules; `spice/mod.rs`
 `W::frame`, `spice/cdl.rs`):
-- P7-1. A library (`Role::Library`) is written with a title line and a
-  closing `.end` on every SPICE target, and its Verilog-A loads in an
-  ngspice `.control` / `pre_osdi` block; the role writes it bare. Every
-  PDK kit file the gate reads is one (sky130, gf180mcu, IHP, VACASK's
-  `cmos180n.lib`), and every corpus deck with no analysis, control block or
-  top-level source.
-- P7-2. HSPICE: a deck (`Role::Deck`) with no analysis (sources alone, or
-  a control block) ends without `.END`, the old writer's guess at a
-  library; the role ends it. (A library with no analysis agrees.)
-- P7-3. CDL: the layout titles and ends (`.END`) a library too.
+- P7-1, P7-2, P7-3: decided (phase 7, spice-write): kept. A library is
+  framed as a deck on every SPICE target and CDL: `resolve::role` guesses
+  the role from the text (a Python circuit with no analysis, a deck running
+  only Xyce `.hb`, is a library to it), and the frame is harmless where a
+  library is included (a `*` title; ngspice-45 and Xyce 7.10 read an
+  included `.end` as nothing; ngspice runs an included `.control`).
+  HSPICE ends a file with `.END` only when it runs an analysis (`.END` ends
+  the run in an included file). `tests/test_spice_write.rs`.
 
 **The name map** (`render/names.rs`: a declaration gains its letter, a
 reference does not):
-- P7-7. HSPICE writes a `B` source as `E1`/`G1` (`vol=`/`cur=`), and the
-  Laplace lift a `B1` as `EB1`/`GB1`/`AB1` (+ `.model B1_xfer`): renames of
-  the declaration alone, which a reference (`i(B1)`) does not follow and
-  which may meet a deck's own `E1` (`spice/cards.rs`).
-- P7-8. CDL writes an instance with the old IR's letter rule (`Xx2` is
-  `x2`), not the map's `Xx2` (`spice/cdl.rs`).
 - SPICE input: a declaration's letter is uppercased (`vsense` is
   `Vsense`), a reference keeps its case: harmless (SPICE folds case), no
   fix needed. `v1` → `vv1` cannot arise in the SPICE writer: the map adds a
@@ -232,10 +222,10 @@ reference does not):
   `ground 0` and a `control` block (`named::W::frame`).
 
 **CDL** (`spice/cdl.rs`):
-- P7-9. Another family's text is copied as written (`ForeignText`:
-  `Native`, a capability quirk).
-- P7-10. Subcircuit models, sections, conditionals, includes and functions
-  are not written (the LVS layout's old shape), with no diagnostic.
+- P7-10: decided (phase 7, spice-write): coded, not written. Subcircuit
+  models, sections, conditionals, includes and functions are each a
+  `W0028` note (`cdl::unwritten`): Cadence CDL has no sections or
+  conditionals, and an include names a simulator's file, not CDL.
 
 ## Differences from the old pipeline the corpus does not reach
 

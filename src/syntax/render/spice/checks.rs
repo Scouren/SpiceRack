@@ -1,8 +1,10 @@
 //! The deck-wide refusals the SPICE-family writer makes before it writes: a
-//! statement kept as another family's text (`ForeignText`), a `^` the
+//! statement kept as another family's text (`ForeignText`), text that did
+//! not parse for another dialect (W0032), a `^` the
 //! target reads with the other meaning (`CaretReread`), a statistical call
 //! the target has no function for (`StatisticalCall`), an LTspice
-//! `.tran … startup` the target has no ramp for (`TranStartup`). Each reads every
+//! `.tran … startup` the target has no ramp for (`TranStartup`), an ngspice
+//! then-branch ternary another family groups otherwise (W0034, W0035). Each reads every
 //! block the deck writes (definitions, sections, branches) and every
 //! expression the old reader kept as text.
 //!
@@ -10,9 +12,10 @@
 //! `gauss(x)`); Xyce RG §2.1.18.
 //!
 //! Contents:
-//! - `W::checks(&mut self)`
+//! - `W::checks(&mut self)`, `W::unparsed(&mut self)`
 
 use super::W;
+use super::ternary::{Nest, ngspice_nest};
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
@@ -31,9 +34,11 @@ impl W<'_, '_> {
         let foreign = |tok: &u32| self.rd.text_dialect(*tok).family() != self.d.family();
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
         // A statement whose target lacks it is that statement's refusal,
-        // the rest foreign text's (one note each kind).
+        // the rest foreign text's (one note each kind); CDL leaves each
+        // out, noted where it does (`cdl::unwritten`).
         let mut asked = Vec::new();
-        for &tok in &other {
+        let cdl = self.d == Dialect::Cdl;
+        for &tok in other.iter().filter(|_| !cdl) {
             let c = self.rd.kept_construct(tok);
             if !asked.contains(&c) {
                 asked.push(c);
@@ -55,6 +60,7 @@ impl W<'_, '_> {
                 }
             }
         }
+        self.ternary_checks(&blocks);
         let caret = caret_means_power(self.rd.d) != caret_means_power(self.d);
         let stat = crate::syntax::render::capability::action(self.d, Construct::StatisticalCall)
             != Action::Native;
@@ -70,11 +76,69 @@ impl W<'_, '_> {
             self.ask(Construct::StatisticalCall, *tok);
         }
     }
+
+    /// Text that did not parse is the source's own: its dialect gets it
+    /// back as written, another target refuses it (W0032) unless the
+    /// statement holding it was left out (a drop note at its first token).
+    /// Asked once the deck is written, when its drops are noted.
+    pub(super) fn unparsed(&mut self) {
+        if self.rd.d.family() == self.d.family() {
+            return;
+        }
+        let drops = [Code::W0021, Code::W0023, Code::W0024, Code::W0028];
+        let dropped: Vec<(u32, u32)> = self
+            .diags
+            .iter()
+            .filter(|d| drops.contains(&d.code))
+            .map(|d| (d.token, self.rd.line_last(d.token)))
+            .collect();
+        let unread = [Code::P0002, Code::P0003, Code::P0008];
+        let bad = self.rd.ast.diags().iter().find(|d| {
+            unread.contains(&d.code) && !dropped.iter().any(|&(a, b)| (a..=b).contains(&d.token))
+        });
+        if let Some(d) = bad {
+            self.refuse(Code::W0032, d.token);
+        }
+    }
 }
 
 // ---- private ----
 
 impl<'r> W<'_, 'r> {
+    /// An ngspice deck's then-branch ternary on another family
+    /// (`ternary`): in a `{}` value, written as ngspice's evaluator reads
+    /// it (W0034), or refused when nested deeper (W0035); in a function,
+    /// refused, as ngspice reads its body by C's grammar in a B source
+    /// and its own way in a `{}` value. A B source's is C's (no code).
+    fn ternary_checks(&mut self, blocks: &[&Block]) {
+        if self.rd.d.family() != Dialect::Ngspice || self.d.family() == Dialect::Ngspice {
+            return;
+        }
+        let deck = self.deck;
+        let funcs = deck.funcs.len() + deck.sections.iter().map(|s| s.funcs.len()).sum::<usize>();
+        let mut b_exprs: Vec<(String, u32)> = Vec::new();
+        for b in blocks {
+            for &c in &b.comps {
+                if let Comp::Card(n) = c
+                    && let Card::Behavioural { expr, .. } = self.rd.card_view(n)
+                {
+                    b_exprs.push((expr, self.rd.main(n)));
+                }
+            }
+        }
+        let exprs = self.expressions(blocks);
+        for (i, (e, tok)) in exprs.iter().enumerate() {
+            match (i < funcs, ngspice_nest(e)) {
+                (_, Nest::Flat) => {}
+                (true, _) | (false, Nest::Deep) => self.refuse(Code::W0035, *tok),
+                (false, Nest::One) if !b_exprs.contains(&(e.clone(), *tok)) => {
+                    self.note(Code::W0034, *tok)
+                }
+                (false, Nest::One) => {}
+            }
+        }
+    }
+
     /// Every block the deck writes from: the top, its definitions, each
     /// section's body and definitions, and the branches inside each.
     fn blocks(&self) -> Vec<&'r Block> {

@@ -305,7 +305,12 @@ fn what_a_writer_leaves_out_or_copies_is_a_note_by_code() {
     let spectre = "// t\nsimulator lang=spectre\nahdl_include \"m.va\"\nr1 (a 0) resistor r=1k\n";
     let cases: [(&str, Dialect, Dialect, Code); 10] = [
         (spectre, Dialect::Spectre, Dialect::Cdl, Code::W0021),
-        (spectre, Dialect::Spectre, Dialect::Ltspice, Code::W0022),
+        (
+            "// t\nsimulator lang=spectre\nsubckt s a\nahdl_include \"m.va\"\nr1 (a 0) resistor r=1k\nends s\n",
+            Dialect::Spectre,
+            Dialect::Ngspice,
+            Code::W0022,
+        ),
         (
             "t\nR1 a 0 1k\n.tran 1n 10n\n.print tran v(a)\n.end\n",
             Dialect::Ngspice,

@@ -122,6 +122,8 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 
 `variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (Spectre's `log=N`, N points in total; every other target refuses it, `W0040`), in any
 case; any other name raises `ValueError` when the analysis is built.
+`noise`'s `points_per_summary` is ngspice's, HSPICE's and Xyce's last field;
+LTspice's `.noise` has none, so it is left out there with a note (W0033).
 
 ## Results
 

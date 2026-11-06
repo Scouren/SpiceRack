@@ -243,8 +243,8 @@ catalogue! {
     /// A Verilog-A load the target loads another way (an OSDI binary where it compiles the source, or a command-line plugin).
     W0004 Refusal {
         title: "a Verilog-A load the target cannot spell",
-        cite: "ngspice manual §13 (`pre_osdi`); HSPICE `.hdl`; Xyce RG (`-plugin`)",
-        explain: "The target loads compiled models in a way a deck line cannot name (Xyce takes a `-plugin` on its command line). Load the model through the simulator's own mechanism.",
+        cite: "ngspice manual §13 (`pre_osdi`); HSPICE `.hdl`; Xyce RG (`-plugin`); LTspice help (no Verilog-A or OSDI loader)",
+        explain: "The target loads compiled models in a way a deck line cannot name (Xyce takes a `-plugin` on its command line), or cannot load one at all (LTspice). Load the model through the simulator's own mechanism.",
     }
     /// A `.lib file` with no section: LTspice reads the whole file; another target reads the card as a section definition.
     W0005 Refusal {
@@ -353,8 +353,8 @@ catalogue! {
     /// or inside a subcircuit (the writers load the top's alone).
     W0022 Note {
         title: "a Verilog-A load not written",
-        cite: "LTspice help (no OSDI or Verilog-A loader)",
-        explain: "The writer leaves the load out, as the old writer did: LTspice has no way to load a compiled model (phase 7 refuses it), and a load inside a subcircuit is not written on any target but ESPice. An instance of the model then names nothing the simulator knows; load it at the top.",
+        cite: "ngspice manual §13 (`pre_osdi`, a deck-level command)",
+        explain: "A load inside a subcircuit is not written on any target but ESPice. An instance of the model then names nothing the simulator knows; load it at the top.",
     }
     /// An output request (`.print`, `.save`, `.probe`) not written.
     W0023 Note {
@@ -369,11 +369,11 @@ catalogue! {
         cite: "Xyce RG pp.96-104 (`.options <pkg>`); VACASK docs/cmd-options.md",
         explain: "The option is another simulator's own (VACASK's on a SPICE target, Xyce's packaged options on Spectre or VACASK) or only cosmetic, so it is left out. Set the target's own option if one has the same effect.",
     }
-    /// A `.control` line other than an analysis: not written.
+    /// A `.control` line other than an analysis, or a VACASK `control` line that steers only the script: not written.
     W0025 Note {
         title: "a control-block line not written",
-        cite: "ngspice manual ch.13 (the control language is a script, not a netlist)",
-        explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated. Run the script on ngspice, or rewrite it for the target's own scripting.",
+        cite: "ngspice manual ch.13 (the control language is a script, not a netlist); VACASK simulator/cmd.cpp (`abort`, `print`, `postprocess`)",
+        explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated, nor VACASK's `abort`, `print` and `postprocess`, which change no number. Run the script on its simulator, or rewrite it for the target's own scripting.",
     }
     /// A waveform's arguments past the count the target's form takes.
     W0026 Note {
@@ -392,19 +392,49 @@ catalogue! {
     W0028 Note {
         title: "a statement the CDL layout does not write",
         cite: "Cadence CDL (no analyses); the xschem layout (`render::spice::cdl`)",
-        explain: "CDL is a netlist for LVS: analyses, library sections, conditionals, includes, functions and a subcircuit's models are not written. Netlist the deck for a simulator to keep them.",
+        explain: "CDL is a netlist for LVS: analyses, library sections, conditionals, includes, functions, a subcircuit's models and text kept as the source's (no rule read it) are not written. Netlist the deck for a simulator to keep them.",
     }
-    /// What structural Verilog has no form for, left out: a primitive element or kept text (a comment in its place), an instance's parameters, anything but subcircuits and their instances.
+    /// What structural Verilog has no form for, left out: a primitive element or kept text (a comment in its place), a parameter that is no number, anything but subcircuits and their instances.
     W0029 Note {
         title: "a statement structural Verilog does not write",
         cite: "IEEE 1364-2005 §12.1 (modules), §12.2.2 (port connections); the xschem layout (`render::spice::verilog`)",
-        explain: "Structural Verilog holds modules and their instances: a primitive element (R, C, a source) is a comment naming this code, and parameters, models and analyses are not written. Netlist the deck for a simulator to keep them.",
+        explain: "Structural Verilog holds modules and their instances: a primitive element (R, C, a source) is a comment naming this code, and a parameter that is an expression, models and analyses are not written. Netlist the deck for a simulator to keep them.",
     }
     /// ngspice's compatibility mode on a target that has none.
     W0030 Note {
         title: "ngspice's compatibility mode not written",
         cite: "ngspice manual, the compatibility modes (`set ngbehavior` in `.spiceinit`, or `-D ngbehavior=`, read before the deck)",
         explain: "`.options ngbehavior=` selects how ngspice reads the deck (`hsa`, `ps`, `lt`, …); ngspice takes it on its command line, and no other target has such a mode, so it is left out. The target reads the deck in its own dialect.",
+    }
+    /// A sweep by total point count (Spectre's `log=N`) on a SPICE target, which sweeps by points per decade or octave, or linearly.
+    W0031 Refusal {
+        title: "a `log` sweep the target lacks",
+        cite: "ngspice manual §11.3 (`.ac`, `.noise`, `.sp`, `.sens`: `dec|oct|lin`); HSPICE `.AC` (DEC, OCT, LIN, POI); Xyce RG `.AC` (DEC, OCT, LIN); LTspice help (`.ac oct|dec|lin`)",
+        explain: "`log` is Spectre's sweep of a total number of points spaced logarithmically; the SPICE targets' `.ac`, `.noise`, `.sp` and `.sens … ac` take `dec` or `oct` (points per decade or octave) or `lin`, and ngspice stops on `log`. Spell the sweep as `dec` points per decade.",
+    }
+    /// Text the parser could not read (P0002, P0003, P0008), kept as written, on a target of another dialect.
+    W0032 Refusal {
+        title: "text that did not parse, for another dialect",
+        cite: "the source dialect's grammar, at the parse note beside this code (P0002, P0003, P0008)",
+        explain: "The parser kept this text as written: an expression that is no expression, an unclosed delimiter, a block the file ends inside. A target of the source's own dialect gets it back as written; another target would read text no rule checked. Fix the source at the parse note.",
+    }
+    /// A noise analysis's points per summary on a target whose `.noise` has no such field: not written.
+    W0033 Note {
+        title: "a noise summary interval not written",
+        cite: "ngspice manual §15.3.4 (`.noise … pts_per_summary`: the per-device contributions); LTspice help `.NOISE` (no summary field)",
+        explain: "The source asks for a noise summary (each device's contribution) every N points; the target's `.noise` card has no such field, so it is left out. The noise spectrum is the same; read the contributions from the target's own noise output.",
+    }
+    /// An ngspice `{}` value's ternary in a then-branch, written as ngspice's evaluator reads it (`a?b?c:d:e` as `a?c:e`).
+    W0034 Note {
+        title: "a nested ternary written as ngspice reads it",
+        cite: "ngspice-45 src/frontend/numparam/xpressn.c (the `first-of-triple` operator stack); C's grammar (Xyce RG §2.1.18) reads `a?(b?c:d):e`",
+        explain: "ngspice's `{}` evaluator reads `a?b?c:d:e` as `a?c:e`, dropping `b` and `d`; C's grammar, which the target follows, reads `a?(b?c:d):e`. The deck is written with ngspice's value (`a?c:e`). If the source meant C's grouping, parenthesize it there.",
+    }
+    /// An ngspice ternary in a then-branch that ngspice reads no one way: nested deeper, or in a function body.
+    W0035 Refusal {
+        title: "a nested ternary ngspice reads no one way",
+        cite: "ngspice-45 src/frontend/numparam/xpressn.c (`{}` values) and its B-source parser (C's grammar), run by hand",
+        explain: "ngspice reads a function body's `a?b?c:d:e` by C's grammar in a B source and as `a?c:e` in a `{}` value, and a deeper nest in a then-branch by neither rule, so the source has no single meaning to write. Parenthesize the then-branch in the source.",
     }
     /// An LTspice `.backanno`: an annotation request with no simulation meaning, not written.
     W0036 Note {

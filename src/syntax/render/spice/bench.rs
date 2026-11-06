@@ -1,22 +1,23 @@
 //! The testbench → SPICE-family cards: the deck's testbench statements
 //! folded in read order (options merged into one card, the last `.temp`
 //! winning), then options, temperature, initial conditions, saves, prints,
-//! measures, `.step`s and the analyses, which an ngspice deck with a
+//! measures, `.step`s and the analyses (`analyses.rs`), which an ngspice deck with a
 //! `.meas` or `.four` runs from one `.control` block.
 //!
 //! Cites: ngspice manual §11.1-§11.3 (analyses), §15.4.3 (`.save`), §15.6
 //! (`.meas`), §15.4.2 (`.four`, the `fourier` command), §17.5 (`-b -r`:
 //! "No .measure possible in batch mode"); HSPICE `.probe`, `.option post`,
 //! `.option delmax`, `START=`; Xyce RG pp.96-104 (`.options <pkg>`), p.155
-//! (`.step`), Table 6-1; LTspice help (`.step param`, no `.print`).
+//! (`.step`), Table 6-1; LTspice help (`.step param`, no `.print`); VACASK
+//! `simulator/cmd.cpp` (the `control` commands).
 //!
 //! Contents:
 //! - `fn is_four(line: &str) -> bool`, `fn is_continuation(line: &str) -> bool`
 //! - `pub(super) struct Tb`, `W::fold(&self) -> Tb`
 //! - `W::control_run(&self) -> Option<Vec<String>>`, `W::bench(&mut self, control: Option<&[String]>)`, `W::runs(&self) -> bool`
+//! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
 
 use super::W;
-use super::sweeps::dc_axis;
 use crate::syntax::Dialect;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct, action};
@@ -49,8 +50,9 @@ pub(super) struct Tb {
     steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
     /// Each list `.step`'s name, values and first token.
     step_lists: Vec<(String, Vec<f64>, u32)>,
-    /// VACASK control lines kept as text.
-    pub(super) extra: Vec<String>,
+    /// VACASK control lines kept as text, with their statement's first
+    /// token: none is written (`W::vacask_lines`).
+    pub(super) extra: Vec<(String, u32)>,
     /// `ngbehavior=`'s mode, with its statement's first token.
     pub(super) ngbehavior: Option<(String, u32)>,
 }
@@ -90,7 +92,6 @@ impl W<'_, '_> {
         for b in self.deck.defs.iter().chain(std::iter::once(&self.deck.top)) {
             lines.extend(self.raw_lines(&b.raw));
         }
-        lines.extend(tb.extra.iter().cloned());
         let raw = || lines.iter().map(String::as_str);
         let mut fourier = fourier_commands(raw());
         for (a, _) in &tb.analyses {
@@ -138,7 +139,8 @@ impl W<'_, '_> {
 
     /// The testbench's cards.
     pub(super) fn bench(&mut self, control: Option<&[String]>) {
-        let tb = self.fold();
+        let mut tb = self.fold();
+        self.respell_refs(&mut tb);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
         }
@@ -228,7 +230,7 @@ impl W<'_, '_> {
                 Space::Line,
             );
         }
-        self.write_raw(&tb.extra);
+        self.vacask_lines(&tb.extra);
         match control {
             Some(fourier) => {
                 // `fourier` reads the current plot: it follows the first
@@ -261,11 +263,40 @@ impl W<'_, '_> {
             }
         }
     }
+
+    /// VACASK control lines the reader kept as text (VACASK
+    /// `simulator/cmd.cpp`): `abort`, `print` and `postprocess` steer the
+    /// script and `save` the outputs, so each is left out (W0025, W0023);
+    /// another (`alter`, `var`, `clear`, `elaborate`, an analysis kept as
+    /// text) changes what runs and is refused as VACASK's text.
+    pub(super) fn vacask_lines(&mut self, lines: &[(String, u32)]) {
+        for (l, tok) in lines {
+            let head = l.split(|c: char| c.is_whitespace() || c == '(').next();
+            match head.unwrap_or("") {
+                "abort" | "print" | "postprocess" => self.note(Code::W0025, *tok),
+                "save" => self.note(Code::W0023, *tok),
+                _ => {
+                    self.ask(Construct::ForeignText, *tok);
+                }
+            }
+        }
+    }
 }
 
 // ---- private ----
 
 impl W<'_, '_> {
+    /// `tb`'s outputs (saves, prints, measures) with each
+    /// `i(name)` of a renamed element spelled as its declaration
+    /// (`names::Names::refs`); the testbench is the top's.
+    fn respell_refs(&self, tb: &mut Tb) {
+        let top = crate::syntax::ast::NONE;
+        let refs = |v: &mut Vec<String>| v.iter_mut().for_each(|s| *s = self.names.refs(top, s));
+        refs(&mut tb.saves);
+        refs(&mut tb.measures);
+        tb.prints.iter_mut().for_each(|(_, outs, _)| refs(outs));
+    }
+
     /// One testbench card into `tb`.
     fn fold_one(&self, tb: &mut Tb, card: BenchCard, tok: u32) {
         match card {
@@ -302,7 +333,7 @@ impl W<'_, '_> {
             BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
             BenchCard::Print(k, outs) => tb.prints.push((k, outs, tok)),
             BenchCard::Meas(m) => tb.measures.push(m),
-            BenchCard::Extra(l) => tb.extra.push(l),
+            BenchCard::Extra(l) => tb.extra.push((l, tok)),
         }
     }
 
@@ -348,183 +379,6 @@ impl W<'_, '_> {
         };
         if let Some(tok) = tb.save_tok.filter(|_| !written) {
             self.note(Code::W0023, tok);
-        }
-    }
-
-    /// `a`'s card (HSPICE's `.tran` with a step cap and `.noise` take two
-    /// lines); an analysis the target lacks is refused, written empty.
-    fn analysis(&mut self, a: &Ana, tok: u32) -> String {
-        let num = |w: &Self, v: f64| w.sp.number(v, w.x);
-        let hs = self.d == Dialect::Hspice;
-        let sweep = |w: &Self, s: &crate::syntax::render::read::Sweep| {
-            format!(
-                "{} {} {} {}",
-                s.variation,
-                s.points,
-                num(w, s.start),
-                num(w, s.stop)
-            )
-        };
-        match a {
-            Ana::Op => ".op".into(),
-            Ana::Dc(sweeps) => {
-                let mut s = String::from(".dc");
-                for (src, a, b, c) in sweeps {
-                    s.push_str(&format!(
-                        " {src} {} {} {}",
-                        num(self, *a),
-                        num(self, *b),
-                        num(self, *c)
-                    ));
-                }
-                s
-            }
-            Ana::DcAxes(axes) => {
-                let hspice = match self.ask(Construct::DcLogList, tok) {
-                    Action::Native => false,
-                    Action::Spell(Alt::DcType) => true,
-                    _ => return String::new(),
-                };
-                let mut s = String::from(".dc");
-                for ax in axes {
-                    s.push_str(&dc_axis(self, ax, hspice));
-                }
-                s
-            }
-            Ana::Ac(sw) => format!(".ac {}", sweep(self, sw)),
-            // HSPICE reads extra positional fields as further step/stop
-            // segments, so the start is `START=` and the step cap `delmax`.
-            Ana::Tran {
-                step,
-                stop,
-                start,
-                max_step,
-                uic,
-                ..
-            } if hs => {
-                let mut s = String::new();
-                if let Some(ms) = max_step {
-                    s.push_str(&format!(".option delmax={}\n", num(self, *ms)));
-                }
-                s.push_str(&format!(".tran {} {}", num(self, *step), num(self, *stop)));
-                if let Some(st) = start {
-                    s.push_str(&format!(" START={}", num(self, *st)));
-                }
-                if *uic {
-                    s.push_str(" UIC");
-                }
-                s
-            }
-            Ana::Tran {
-                step,
-                stop,
-                start,
-                max_step,
-                uic,
-                startup,
-            } => {
-                let mut s = format!(".tran {} {}", num(self, *step), num(self, *stop));
-                if let Some(st) = start {
-                    s.push_str(&format!(" {}", num(self, *st)));
-                }
-                if let Some(ms) = max_step {
-                    if start.is_none() {
-                        s.push_str(" 0");
-                    }
-                    s.push_str(&format!(" {}", num(self, *ms)));
-                }
-                if *uic {
-                    s.push_str(" UIC");
-                }
-                // Refused on a target without it (`W::checks`).
-                if *startup && action(self.d, Construct::TranStartup) == Action::Native {
-                    s.push_str(" startup");
-                }
-                s
-            }
-            Ana::Noise {
-                output,
-                reference,
-                source,
-                sweep: sw,
-                pps,
-            } => {
-                let out = if reference.is_empty() || reference == "0" {
-                    format!("V({output})")
-                } else {
-                    format!("V({output},{reference})")
-                };
-                // HSPICE: `.noise ov src inter` takes its frequencies from
-                // `.ac`.
-                if hs {
-                    return format!(
-                        ".ac {}\n.noise {out} {source} {}",
-                        sweep(self, sw),
-                        pps.unwrap_or(0)
-                    );
-                }
-                let mut s = format!(".noise {out} {source} {}", sweep(self, sw));
-                // `pts_per_summary` is an ngspice/SPICE3 extension; LTspice's
-                // `.noise` card stops at the stop frequency.
-                let ng = matches!(self.d, Dialect::Ngspice | Dialect::Espice | Dialect::Xyce);
-                if let (Some(p), true) = (pps, ng) {
-                    s.push_str(&format!(" {p}"));
-                }
-                s
-            }
-            Ana::Tf(out, src) => match self.ask(Construct::Tf, tok) {
-                Action::Native => format!(".tf {out} {src}"),
-                _ => String::new(),
-            },
-            Ana::Four(f, outs) => {
-                let mut s = format!(".four {}", num(self, *f));
-                for o in outs {
-                    s.push_str(&format!(" {o}"));
-                }
-                s
-            }
-            Ana::Sens(out, ac) => {
-                let c = if ac.is_some() {
-                    Construct::SensAc
-                } else {
-                    Construct::Sens
-                };
-                if self.ask(c, tok) != Action::Native {
-                    return String::new();
-                }
-                let mut s = format!(".sens {out}");
-                if let Some(sw) = ac {
-                    s.push_str(&format!(" AC {}", sweep(self, sw)));
-                }
-                s
-            }
-            Ana::Pz(nodes, tf, pz) => match self.ask(Construct::PoleZero, tok) {
-                Action::Native => format!(".pz {} {tf} {pz}", nodes.join(" ")),
-                _ => String::new(),
-            },
-            Ana::Sp(sw) => match self.ask(Construct::SParameter, tok) {
-                // ponytail: Rust `{}` numbers, byte for byte what the old
-                // writer sent ngspice for this card.
-                Action::Native => format!(
-                    ".sp {} {} {} {}",
-                    sw.variation, sw.points, sw.start, sw.stop
-                ),
-                _ => String::new(),
-            },
-            // No SPICE statement is Spectre's `montecarlo`: ngspice's Monte
-            // Carlo is a `.control` loop, Xyce's `.sampling`, HSPICE's an
-            // analysis's `sweep monte=`.
-            Ana::MonteCarlo { .. } => {
-                self.refuse(Code::W0015, tok);
-                String::new()
-            }
-            Ana::Spectre { kind, .. } => {
-                self.refuse(
-                    crate::syntax::render::read::spectre_refusal(self.d, kind),
-                    tok,
-                );
-                String::new()
-            }
         }
     }
 }

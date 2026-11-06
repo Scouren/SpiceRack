@@ -10,7 +10,8 @@
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
 //! options), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
-//! transfer function a Laplace lift reads,
+//! transfer function a Laplace lift reads, `ternary` a `?:` as the
+//! target reads it,
 //! `cdl` CDL's layout; the `statistics` lift (`render::draws`) and the name
 //! map (`render::names`) are shared with the named writer.
 //!
@@ -22,6 +23,7 @@
 //! Contents:
 //! - `pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> Result<String, Vec<Diag>>`
 
+mod analyses;
 mod bench;
 mod cards;
 pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
@@ -29,6 +31,7 @@ mod cdl;
 mod checks;
 mod laplace;
 mod sweeps;
+mod ternary;
 mod verilog;
 mod xyce_options;
 
@@ -98,7 +101,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         o: Out::new(4096),
         diags,
         draws,
-        names: names::Names::new(rd, deck),
+        names: names::Names::new(rd, deck, |_, c| cards::renamed(rd, target, c)),
         scope: crate::syntax::ast::NONE,
         drop_four: false,
         in_section: false,
@@ -111,6 +114,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
     w.checks();
     if target == Dialect::Cdl {
         w.cdl();
+        w.unparsed();
         return (w.o.finish(), w.diags);
     }
     let frame = w.frame();
@@ -145,34 +149,26 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, target: Dialect) -> (String, Vec<D
         // The deck ends on its last card's line end.
         false => w.o.pop(),
     }
+    w.unparsed();
     (w.o.finish(), w.diags)
 }
 
 // ---- private ----
 
 impl W<'_, '_> {
-    /// What the deck is written in: what its role says ([`role::frame`]),
-    /// but for the old writer's rules where they give other bytes, which
-    /// the golden gate holds until phase 7.
+    /// What the deck is written in. Every file is framed as a deck (title,
+    /// `.end`, control blocks), a library too: the role is a guess from the
+    /// text (`resolve::role` takes a Python circuit with no analysis yet,
+    /// or a deck running only analyses kept as text, Xyce's `.hb`, for a
+    /// library), and the frame costs a library nothing where it is
+    /// included: a title line is a `*` comment, ngspice-45 and Xyce 7.10
+    /// read an included `.end` as nothing and ngspice runs an included
+    /// `.control` block (each run by hand). HSPICE's `.END` ends the run
+    /// even in an included file, so there a file that runs no analysis (a
+    /// library rendered alone, or sources alone) ends without one.
     fn frame(&self) -> Frame {
-        let role = self.rd.role();
-        let mut f = role::frame(role);
-        if role == Role::Library {
-            // quirk: the old writer titled and ended a library, and loaded
-            // its Verilog-A in a `.control` block, as any deck; phase 7
-            // writes it bare.
-            f = Frame {
-                title: true,
-                end: true,
-                control: true,
-                ground: true,
-            };
-        }
+        let mut f = role::frame(Role::Deck);
         if self.d == Dialect::Hspice {
-            // quirk: the old HSPICE writer's guess at the role: `.END` ends
-            // the run even in an included file, so a file with no analysis
-            // (a library, or a deck of sources alone) ends without one;
-            // phase 7 asks the role.
             f.end = self.runs();
         }
         f
@@ -283,7 +279,7 @@ impl W<'_, '_> {
     fn funcs(&mut self, funcs: &[Func]) {
         for &f in funcs {
             let (name, args, body) = self.rd.func_view(f);
-            let args = args.join(", ");
+            let (args, body) = (args.join(", "), self.ternaries(&body));
             let tok = match f {
                 Func::Param(a) | Func::Card(a) | Func::Real(a) => self.rd.main(a),
             };
@@ -302,16 +298,28 @@ impl W<'_, '_> {
     /// `.lib` inside a `.subckt` to that subcircuit, so hoisting one
     /// changes which models it sees.
     fn file_cards(&mut self, b: &Block) {
-        let q = self.sp.path_quote;
+        // A path with a blank is quoted where the target writes paths
+        // bare (ngspice §2.6 and Xyce RG `.INCLUDE` read `"…"`), or it
+        // would be a path and a section.
+        let quote = |p: &str| match self.sp.path_quote {
+            "" if p.contains(char::is_whitespace) => "\"",
+            q => q,
+        };
         for &inc in &b.includes {
             let p = self.rd.include_path(inc);
+            let q = quote(&p);
             self.o.token(&format!(".include {q}{p}{q}"), Space::Line);
         }
         for &lib in &b.libs {
             let (p, section) = self.rd.lib_view(lib);
+            let q = quote(&p);
             if section.is_empty() {
-                if self.ask(Construct::LibWholeFile, self.rd.main(lib)) == Action::Native {
-                    self.o.token(&format!(".lib {q}{p}{q}"), Space::Line);
+                match self.ask(Construct::LibWholeFile, self.rd.main(lib)) {
+                    Action::Native => self.o.token(&format!(".lib {q}{p}{q}"), Space::Line),
+                    Action::Spell(Alt::Include) => {
+                        self.o.token(&format!(".include {q}{p}{q}"), Space::Line)
+                    }
+                    _ => {}
                 }
                 continue;
             }

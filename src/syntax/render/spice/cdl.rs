@@ -1,9 +1,9 @@
 //! The deck → CDL in the xschem layout: the SPICE writer's CDL row. Each
 //! block (the top, then each subcircuit) is one `.SUBCKT … .ENDS` around
 //! its elements, each an ngspice card ([`W::card`]), sorted by element
-//! name; then the deck's VACASK control text, a comment per Verilog-A load,
-//! the top's models, `.END`. A schematic tool's LVS netlist: no analyses,
-//! sections, branches or includes are written, each noted (`W0028`).
+//! name; then a comment per Verilog-A load, the top's models, `.END`. A schematic tool's LVS netlist: no analyses,
+//! sections, branches, includes or text kept as the source's are written,
+//! each noted (`W0028`).
 //!
 //! The layout is the old xschem layout writer's (for a deck with nothing
 //! beside it), byte for byte (TESTING.md, "Golden gate"); where it
@@ -20,21 +20,20 @@
 
 use super::W;
 use crate::syntax::diag::{Code, Diag, Kind, info};
+use crate::syntax::render::capability::Construct;
 use crate::syntax::render::out::{Out, Space};
-use crate::syntax::render::read::{Bench, Block, Card, Comp, Func};
+use crate::syntax::render::read::{Bench, Block, Card, Comp, Func, Raw};
 
 impl W<'_, '_> {
     /// The deck, in the xschem layout.
     pub(super) fn cdl(&mut self) {
         let deck = self.deck;
-        // quirk: the layout titles and ends every file, a library too, where
-        // `role::frame` writes a library bare; phase 7 asks the frame.
+        // Every file titled and ended, a library too, as the SPICE spine's
+        // frame (`W::frame`).
         self.o.token(&format!("* {}", deck.top.name), Space::Line);
         self.cdl_block(&deck.top, true);
         let extra = self.fold().extra;
-        for l in &extra {
-            self.o.token(l, Space::Line);
-        }
+        self.vacask_lines(&extra);
         for sc in &deck.defs {
             self.cdl_block(sc, false);
         }
@@ -99,9 +98,6 @@ impl W<'_, '_> {
         for l in lines.iter().filter(|l| !l.is_empty()) {
             self.o.token(l.strip_suffix('\n').unwrap_or(l), Space::Line);
         }
-        for l in self.raw_lines(&b.raw) {
-            self.o.token(&l, Space::Line);
-        }
         self.o.token(&format!(".ENDS {}", b.name), Space::Line);
     }
 
@@ -116,7 +112,12 @@ impl W<'_, '_> {
         for &c in &b.comps {
             out.push(match c {
                 Comp::Card(n) => self.cdl_card(n, coupled.as_deref()),
-                Comp::Raw(n) => self.rd.line(n),
+                // An element kept as text no rule read: a comment, as a
+                // card with no form is.
+                Comp::Raw(n) => {
+                    self.note(Code::W0021, self.rd.main(n));
+                    format!("* error: W0001 {}", info(Code::W0001).title)
+                }
             });
         }
         for &(_, n) in &b.insts {
@@ -148,26 +149,19 @@ impl W<'_, '_> {
         format!("* error: {}", codes.join("; "))
     }
 
-    /// An `X` card as the old layout spelled an instance: `X` and the name
-    /// after its letter, unless that already starts with an `X`.
+    /// An `X` card, named as the map declares it (`names`: its letter, then
+    /// its name).
     fn cdl_instance(&self, n: u32) -> String {
         let Card::Inst {
-            name,
             ports,
             master,
             params,
+            ..
         } = self.rd.card_view(n)
         else {
             unreachable!("an instance the reader placed");
         };
-        // quirk: the old layout's letter rule (`Xx2` is `x2`), not the name
-        // map's; phase 7 writes the map's name.
-        let x = if name.starts_with(['x', 'X']) {
-            ""
-        } else {
-            "X"
-        };
-        let mut s = format!("{x}{name}");
+        let mut s = self.names.decl(n).to_string();
         for p in &ports {
             s.push(' ');
             s.push_str(p);
@@ -184,7 +178,7 @@ impl W<'_, '_> {
 impl W<'_, '_> {
     /// Notes what the layout does not write (an LVS netlist's shape):
     /// analyses and outputs, sections, branches, includes, functions, a
-    /// subcircuit's models and loads.
+    /// subcircuit's models and loads, kept text.
     fn unwritten(&mut self) {
         let deck = self.deck;
         let rd = self.rd;
@@ -217,6 +211,12 @@ impl W<'_, '_> {
         }
         for n in at {
             self.note(Code::W0028, rd.main(n));
+        }
+        // Statements kept as the source's text, which no rule checked.
+        for b in std::iter::once(&deck.top).chain(&deck.defs) {
+            for &(Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) in &b.raw {
+                self.ask(Construct::ForeignText, rd.main(n));
+            }
         }
     }
 }
