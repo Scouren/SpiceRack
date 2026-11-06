@@ -68,7 +68,7 @@ const VERILOG_FAILS: &[(&str, &str)] = &[
     ),
     (
         "inverter_chain",
-        "subcircuit `buf` written as `module buf`: a Verilog keyword (IEEE 1800-2017 Annex B), so `buf Xb (.in(in), ...)` reads as a gate",
+        "ground written as the escaped net `\\0 ` and never declared, as divider_params (the keyword `buf` is escaped `\\buf ` since stream B's 080a996)",
     ),
 ];
 

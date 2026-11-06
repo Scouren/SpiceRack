@@ -193,10 +193,8 @@ FEATURES = {
 # each refusal is the target lacking the construct (class G) unless a line
 # below says otherwise, with the owner and the findings file entry.
 OK = "ok"
-# A known failure, by name: a `verilog(mode="simulate")` block is compiled
-# when the deck is written, and `.#testing` has no Icarus Verilog (stream F,
-# FINDINGS-python.md). The row fails once iverilog is there, until it is
-# reviewed.
+# A `verilog(mode="simulate")` block is compiled by Icarus Verilog when the
+# deck is written; without iverilog every cell reads this, and fails.
 NEEDS_IVERILOG = "needs iverilog"
 EXPECTED = {
     'op': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -288,7 +286,8 @@ EXPECTED = {
     # LTspice has no Verilog-A or OSDI loader (W0004, writer B's 53199ba).
     'osdi': (OK, 'W0004', 'W0004', 'W0004', 'W0004', OK, OK, OK, OK),
     'veriloga': (OK, OK, OK, 'W0004', 'W0004', OK, OK, OK, OK),
-    'verilog': (NEEDS_IVERILOG,) * 9,
+    # XSPICE d_cosim, an A element: ngspice and ESPice only, as `A` (stream F put iverilog in .#testing).
+    'verilog': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'X': (OK,) * 9,
     'I': (OK,) * 9,
 }

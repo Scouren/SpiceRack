@@ -1,3 +1,4 @@
+4049OSC/4049osc.cir mismatch # tran V(1): 0 leaves the tube at t=0 (tol 5.043e-2)
 ABM/ascth.cir target-fails # Unexpected format: Unexpected EOF in header
 ABM/limit.cir mismatch # tran V(1): 0.09990234374999962 leaves the tube at t=0.5199804687499999 (tol 5.000e-2)
 ABM/sdt.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'sdt' at line 4
@@ -470,6 +471,7 @@ Certification_Tests/ISSUE_405/precedence_b1.cir mismatch # op V(2): 0.9795918367
 Certification_Tests/ISSUE_405/precedence_b2.cir mismatch # op V(2): 0.9795918367346939+0i vs 0.9887640449438201+0i at 0 (tol 1.961e-3)
 Certification_Tests/ISSUE_451/issue451.cir mismatch # op V(2): 0.875+0i vs 0.7499999999999999+0i at 0 (tol 1.752e-3)
 Certification_Tests/ISSUE_451/issue451_ref.cir target-fails # Unexpected format: Unexpected EOF in header
+Certification_Tests/ISSUE_494/test_b3.cir mismatch # tran V(2): 4.932163601172179 leaves the tube at t=0.000001213999999999998 (tol 4.999e-2)
 Certification_Tests/ISSUE_494/test_b3soi_inv0.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [lnmos] | Undefined parameter [lpmos]
 Certification_Tests/ISSUE_740/issue740.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: .tran 0 200n | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/MOS1_Invert_Cascade/inverter_cascade_15.cir mismatch # tran OUT10: 5.400871058082966 leaves the tube at t=0.00002258431523806645 (tol 5.401e-2)
@@ -549,7 +551,7 @@ HOMOTOPY/continuation2_mos1.cir target-fails # no raw file .cross_sim_out.raw: E
 HOMOTOPY/continuation2_mos2.cir target-fails # no raw file .cross_sim_out.raw: Error on line 37 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
 HOMOTOPY/continuation2_mos3.cir target-fails # no raw file .cross_sim_out.raw: Error on line 37 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
 HOMOTOPY/continuation2_mos6.cir target-fails # no raw file .cross_sim_out.raw: Error on line 37 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
-HOMOTOPY/continuation3.cir target-fails # no raw file .cross_sim_out.raw: Error on line 37 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
+HOMOTOPY/continuation3.cir mismatch # tran: ngspice stops after 3 points (BSIM-SOI, no Xyce continuation); was target-fails on .tran 0 (B 44f1a25)
 HOMOTOPY/continuation3_bsim3.cir target-fails # no raw file .cross_sim_out.raw: Error on line 38 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
 HOMOTOPY/continuation3_bsim4.cir target-fails # no raw file .cross_sim_out.raw: Error on line 38 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
 HOMOTOPY/continuation3_mos1.cir target-fails # no raw file .cross_sim_out.raw: Error on line 37 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
@@ -660,7 +662,6 @@ MEASURE/REMEASURE/bad_remeasure_line2.cir target-fails # no plot: Error: TSTEP i
 MEASURE/REMEASURE/bad_remeasure_line3.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE/REMEASURE/bad_remeasure_line4.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE/REMEASURE/node_not_in_remeasured_file.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
-MEASURE/RFCEquality.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE/RFCEqualityTrigTarg.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE/RMSTest.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE/RiseFallCrossTest.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
@@ -751,7 +752,6 @@ MEASURE_CONT/STEP/DerivTestTran.s1.cir target-fails # no plot: Error: TSTEP is i
 MEASURE_CONT/STEP/FindWhenTestTran.s0.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE_CONT/STEP/FindWhenTestTran.s1.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE_CONT/STEP/TrigTargTestTran.s0.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
-MEASURE_CONT/STEP/TrigTargTestTran.s1.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE_CONT/TrigTargTestNoise.cir mismatch # noise: no vector in common (["V(1)", "V(2)", "V(3)", "B", "C", "D"] vs ["onoise_spectrum", "inoise_spectrum"])
 MEASURE_CONT/TrigTargTestTran.cir target-fails # no plot: Error: TSTEP is invalid, must be greater than zero. | Error: .print: no tran analysis found.
 MEASURE_CONT/USE_CONT_FILES/DuplicateMeasureNames.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [stdout]
@@ -1016,6 +1016,7 @@ THERMAL_RESISTOR/linear.cir target-fails # no raw file .cross_sim_out.raw: Undef
 TIA/ERROROPTION/erroroption.cir mismatch # tran VDDDEV#branch: -0.0006856768718502152 leaves the tube at t=0.0000015900000000000004 (tol 6.857e-6)
 TIA/MINORDER/capacitor.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [pi] | Formula() error. | Undefined parameter [s] | Undefined parameter [s]
 TIA/MINORDER/invert.cir mismatch # tran VDDDEV#branch: -0.0006453328659304003 leaves the tube at t=0.000001584123304055893 (tol 6.453e-6)
+TIA/TRAP/4049OSC/4049osc.cir mismatch # tran V(1): 0 leaves the tube at t=0 (tol 5.044e-2)
 TIA/TRAP/CAPACITOR/capacitor.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: .tran 0 5m | Simulation interrupted due to error! | Error: circuit not parsed.
 TIA/TRAP/CAPACITOR/capacitor1.cir mismatch # tran V(1): 1 leaves the tube at t=0 (tol 1.000e-2)
 TIA/TRAP/CAPACITOR/rc_osc.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: .tran 0 200u | Simulation interrupted due to error! | Error: circuit not parsed.
@@ -1101,7 +1102,6 @@ Verilog_POWER/power_vbic13_4T_gear.cir target-fails # no raw file .cross_sim_out
 WAMPDE/BLOCKING/simple_single_channel.cir mismatch # tran V(1): 12.000001537961754 leaves the tube at t=0.00000511 (tol 1.200e-1)
 WAMPDE/invert1.cir mismatch # tran VDDDEV#branch: -0.0006357839607357947 leaves the tube at t=0.0000015837795147382513 (tol 6.454e-6)
 WAMPDE/invert1_WAMPDE.cir mismatch # tran VDDDEV#branch: -0.0006357839607357947 leaves the tube at t=0.0000015837795147382513 (tol 6.454e-6)
-WAMPDE/sandler24.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'poly' at line 17
 WAMPDE/sandler24_WAMPDE.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'poly' at line 17
 XDM/HSPICE/CONTROLLED_SOURCES/f_sources.cir target-fails # no raw file .cross_sim_out.raw: Error on line 17 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.
 XDM/HSPICE/CONTROLLED_SOURCES/h_sources.cir target-fails # no raw file .cross_sim_out.raw: Error on line 17 or its substitute:: .tran 0 1u | Simulation interrupted due to error! | Error: circuit not parsed.

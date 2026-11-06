@@ -1,4 +1,3 @@
 benchmark/graetz/vacask/debug_graetz.sim source-fails # no raw file tran1.raw: This is vacask unknown. | worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 @ (unknown) | worst residual=0.00e+00 >TOL @ (un
-demo/hierarchy/hier.sim source-fails # no plot: This is vacask unknown.
 demo/rpn/parser.sim source-fails # no plot: This is vacask unknown.
 demo/rpn/sipfx.sim source-fails # no plot: This is vacask unknown.
