@@ -609,17 +609,17 @@ xyce/PARAMS2/Params_C5_hs.cir spectre a `real` function's `return 1F*X` is `retu
 # tests/fixtures/conformance_noise.txt with Xyce's error-message decks.
 vacask/benchmark/c6288/ngspice-sparse/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/c6288/ngspice-sparse/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/c6288/ngspice-sparse/runme.sim espice read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/c6288/ngspice-sparse/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
+vacask/benchmark/c6288/ngspice-sparse/runme.sim hspice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/c6288/ngspice-sparse/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/c6288/ngspice-sparse/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/c6288/ngspice-sparse/runme.sim spectre read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/c6288/ngspice-sparse/runme.sim vacask read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/c6288/ngspice-sparse/runme.sim xyce read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice-sparse/runme.sim xyce read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/c6288/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/c6288/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/c6288/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/c6288/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/c6288/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
+vacask/benchmark/c6288/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/c6288/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/c6288/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/c6288/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
@@ -682,15 +682,15 @@ vacask/benchmark/rc/xyce/runme.sim vacask read as xyce, was VACASK (P0001): now 
 vacask/benchmark/rc/xyce/runme.sim xyce read as xyce, was VACASK (P0001): now written
 vacask/benchmark/ring/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/ring/ngspice/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/ring/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/ring/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
+vacask/benchmark/ring/ngspice/runme.sim hspice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/ring/ngspice/runme.sim ltspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/ring/ngspice/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/ring/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/ring/ngspice/runme_current.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/ring/ngspice/runme_current.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/ring/ngspice/runme_current.sim espice read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/ring/ngspice/runme_current.sim hspice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/ring/ngspice/runme_current.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
+vacask/benchmark/ring/ngspice/runme_current.sim hspice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/ring/ngspice/runme_current.sim ltspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/ring/ngspice/runme_current.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/ring/ngspice/runme_current.sim vacask read as ngspice, was VACASK (P0001): now written
@@ -712,7 +712,7 @@ vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim ngspice read as ngspice, 
 vacask/benchmark/vadistiller/bjtring/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/bjtring/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
 vacask/benchmark/vadistiller/bjtring/xyce/runme.sim manifest read as xyce: the deck sits in a xyce directory of VACASK's benchmark tree
@@ -731,12 +731,12 @@ vacask/benchmark/vadistiller/c6288/ngspice/runme.sim ngspice read as ngspice, wa
 vacask/benchmark/vadistiller/c6288/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
 vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/c6288/ngspicecg/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
 vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/c6288/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
 vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
@@ -748,7 +748,7 @@ vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim ngspice read as ngspice,
 vacask/benchmark/vadistiller/jfetring/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/jfetring/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0024 W0025)
 vacask/benchmark/vadistiller/mul/ngspice/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
@@ -760,7 +760,7 @@ vacask/benchmark/vadistiller/mul/ngspice/runme.sim ngspice read as ngspice, was 
 vacask/benchmark/vadistiller/mul/ngspice/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0017 W0024 W0025)
 vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim manifest read as ngspice: the deck sits in a ngspice directory of VACASK's benchmark tree
 vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim cdl read as ngspice, was VACASK (P0001): now written
-vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): now written
+vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim espice read as ngspice, was VACASK (P0001): refused W0004 for its .control pre_osdi load (status only)
 vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim ngspice read as ngspice, was VACASK (P0001): now written
 vacask/benchmark/vadistiller/mul/ngspiceva/runme.sim vacask read as ngspice, was VACASK (P0001): now refused by its own reading (W0001 W0017 W0024 W0025)
 
@@ -13418,3 +13418,9 @@ xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir xyce written differently: .DC LI
 # whole-file .lib: W0005 on the SPICE targets, W0110 on Spectre and VACASK.
 # 47 lines of the sections above ("now written" for decks so read) are
 # gone: those decks are refused again, as in the baseline (status only).
+
+# Phase 7: spice-read: a given ngspice deck's `.control` `pre_osdi file`
+# (render::read mod.rs) is the deck's OSDI load (ngspice manual,
+# pre_osdi), dropped before with a W0025 note: ngspice writes it back,
+# VACASK as `load`, ESPice, HSPICE and Xyce refuse W0004 (14 lines of the
+# "inputs misread" section above now say so; status only, no diff).

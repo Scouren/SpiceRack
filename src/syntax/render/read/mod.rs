@@ -121,8 +121,9 @@ pub(in crate::syntax::render) struct Deck {
     pub(in crate::syntax::render) bench: Vec<Bench>,
     /// The reader's notes: what it read and leaves out.
     pub(in crate::syntax::render) notes: Vec<Diag>,
-    /// The top's Verilog-A and OSDI loads given beside the text
-    /// ([`super::Source::loads`]), after those read from it.
+    /// The top's Verilog-A and OSDI loads not on a load card: a given
+    /// ngspice deck's `.control` `pre_osdi` lines, then those given beside
+    /// the text ([`super::Source::loads`]).
     pub(in crate::syntax::render) given_loads: Vec<String>,
     /// [`super::Source::numbers`].
     pub(in crate::syntax::render) numbers: super::Numbers,
@@ -257,6 +258,8 @@ enum Scope {
 struct Acc {
     globals: Vec<String>,
     funcs: Vec<Func>,
+    /// The top `.control` block's `pre_osdi` paths.
+    control_loads: Vec<String>,
     defs: Vec<Block>,
     sections: Vec<Section>,
     bench: Vec<Bench>,
@@ -339,7 +342,7 @@ pub(in crate::syntax::render) fn read<'a>(
         funcs: acc.funcs,
         bench: acc.bench,
         notes: acc.notes,
-        given_loads: Vec::new(),
+        given_loads: acc.control_loads,
         numbers: super::Numbers::Read,
     };
     rd.unlift(&mut deck);
@@ -547,8 +550,19 @@ impl<'a> Rd<'a> {
             Tag::Data => self.raw(n, here, true),
             Tag::Control => {
                 for &c in self.body(n) {
+                    let head = self.main(c);
+                    let last = self.line_last(head);
                     if self.tag(c) == Tag::Analysis && self.testbench_peg(c) {
                         acc.bench.push(Bench::Card(c));
+                    } else if scope == Scope::Top
+                        && self.t.text(head).eq_ignore_ascii_case("pre_osdi")
+                        && head < last
+                    {
+                        // ngspice manual, `pre_osdi file`: an OSDI load
+                        // before the circuit is parsed.
+                        let p = self.span(head + 1, last);
+                        acc.control_loads
+                            .push(p.trim().trim_matches('"').to_string());
                     } else {
                         // The script's other lines are not read.
                         acc.notes.push(Diag {

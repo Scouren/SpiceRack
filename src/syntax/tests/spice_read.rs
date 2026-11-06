@@ -310,3 +310,20 @@ fn an_ltspice_library_path_with_blanks_is_one_file() {
         ng.messages
     );
 }
+
+#[test]
+fn a_control_pre_osdi_is_the_decks_osdi_load() {
+    // ngspice manual `pre_osdi file` (an OSDI load before the netlist is
+    // parsed). Dropped before (W0025), so the deck loaded no PSP103. VACASK's
+    // benchmark/ring/ngspice deck as written for ngspice ran on ngspice-45
+    // to the original's v(1) (5.6e-17 V over 20,552 points). Checks: 2.
+    let text = "t\nR1 1 0 1k\nI1 0 1 1m\n.control\npre_osdi psp103v4.osdi\nop\n.endc\n.end\n";
+    let ng = render_text(text, Dialect::Ngspice, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    assert!(ng.lines().any(|l| l == "pre_osdi psp103v4.osdi"), "{ng}");
+    let va = render_text(text, Dialect::Ngspice, "t", Dialect::Vacask)
+        .expect("written")
+        .text;
+    assert!(va.lines().any(|l| l == "load \"psp103v4.osdi\""), "{va}");
+}
