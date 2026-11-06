@@ -1,0 +1,22 @@
+// t
+
+simulator lang=spectre
+
+
+v1 (in 0) vsource dc=2
+r1 (in out) resistor r=2k
+r2 (out 0) resistor r=1k
+c1 (out 0) capacitor c=1n
+i1 (0 n1) isource dc=1m
+l1 (n1 n2) inductor l=1u
+r4 (n2 0) resistor r=1k
+e1 (e 0 out 0) vcvs gain=2
+re (e 0) resistor r=1k
+g1 (0 g out 0) vccs gm=1m
+rg (g 0) resistor r=1k
+f1 (0 f) cccs probe=v1 gain=3
+rf (f 0) resistor r=1
+h1 (h 0) ccvs probe=v1 rm=100
+rh (h 0) resistor r=1k
+
+op1 dc

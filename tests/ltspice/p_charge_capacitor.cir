@@ -1,0 +1,5 @@
+* t
+Iq 0 q 1u
+Cq q 0 Q=1n*v(q)
+.tran 9.999999999999999e-6 1m UIC
+.end

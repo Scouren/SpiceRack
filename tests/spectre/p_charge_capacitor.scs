@@ -1,0 +1,9 @@
+// t
+
+simulator lang=spectre
+
+
+iq (0 q) isource dc=1u
+cq (q 0) bsource q=1n*v(q)
+
+tran1 tran step=9.999999999999999e-6 stop=1m skipdc=yes

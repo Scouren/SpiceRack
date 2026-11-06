@@ -1,0 +1,6 @@
+* t
+V1 in 0 2
+R1 in out 2k
+R2 out 0 1k
+.tf v(out) v1
+.end

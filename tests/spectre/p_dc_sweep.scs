@@ -1,0 +1,10 @@
+// t
+
+simulator lang=spectre
+
+
+v1 (in 0) vsource dc=0
+r1 (in out) resistor r=2k
+r2 (out 0) resistor r=1k
+
+dc1 dc dev=v1 param=dc start=0 stop=2 step=500m

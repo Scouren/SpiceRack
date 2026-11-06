@@ -352,6 +352,9 @@
             openvafAlias
             vacask
             espice.packages.${system}.espice
+            # tests/test_cross_sim/: the Xyce corpus on its own simulator and
+            # the decks written for Xyce (nixpkgs' xyce, pinned by flake.lock).
+            pkgs.xyce
           ];
           # tests/test_import_suite/: the spice-bench round trip and the
           # per-dialect fixpoint corpora.
