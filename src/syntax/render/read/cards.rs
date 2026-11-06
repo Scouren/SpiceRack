@@ -226,6 +226,9 @@ impl Rd<'_> {
                 [p] if self.tag(*p) == Tag::Str => self.path_of(*p),
                 _ => self.span(self.main(first), self.line_last(self.main(n))),
             }
+        } else if self.d == Dialect::Ltspice && items.len() > 1 {
+            // LTspice help, `.INCLUDE <filename>`: the rest of the card.
+            self.rest_path(n)
         } else {
             self.path_of(first)
         }
@@ -242,6 +245,10 @@ impl Rd<'_> {
         }
         match self.fields(n) {
             [p] => (self.path_of(*p), String::new()),
+            // LTspice has no sections: the rest of the card is the file,
+            // blanks and all (LTspice help, `.LIB <filename>`; the
+            // corpus's `.lib C:\users\brian\My Documents\…\standard.dio`).
+            [_, ..] if self.d == Dialect::Ltspice => (self.rest_path(n), String::new()),
             [p, s, ..] => (self.path_of(*p), self.text(*s)),
             [] => unreachable!("lib_call read it"),
         }
@@ -317,6 +324,18 @@ impl Rd<'_> {
     }
 
     /// A path item without its quotes (the old lowering's `path`).
+    /// The text of card `n` from its first field to the line's end, a path
+    /// with blanks in it.
+    fn rest_path(&self, n: u32) -> String {
+        let first = self.main(self.fields(n)[0]);
+        let t = self.span(first, self.line_last(self.main(n)));
+        let t = t.trim();
+        match t.as_bytes() {
+            [b'"', .., b'"'] => t[1..t.len() - 1].to_string(),
+            _ => t.to_string(),
+        }
+    }
+
     fn path_of(&self, p: u32) -> String {
         let t = self.text(p);
         let p = t.trim();

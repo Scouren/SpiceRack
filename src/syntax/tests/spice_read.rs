@@ -287,3 +287,26 @@ fn a_coupling_of_three_inductors_is_every_pair_where_k_takes_two() {
         .text;
     assert!(lt.lines().any(|l| l == "K1 L1 L2 L3 0.9"), "{lt}");
 }
+
+#[test]
+fn an_ltspice_library_path_with_blanks_is_one_file() {
+    // LTspice help `.LIB <filename>`, `.INCLUDE <filename>`: no sections,
+    // the rest of the card is the file. Read as file `C:\…\My` and section
+    // `Documents\std.dio` before; Spectre wrote `include "C:\users\My"
+    // section=Documents\std.dio`. Checks: 2.
+    let text = "* t\n.lib C:\\users\\My Documents\\std.dio\nR1 1 0 1k\n.op\n.end\n";
+    let sp = render_text(text, Dialect::Ltspice, "t", Dialect::Spectre)
+        .expect("written")
+        .text;
+    assert!(
+        sp.lines()
+            .any(|l| l == "include \"C:\\users\\My Documents\\std.dio\" section="),
+        "{sp}"
+    );
+    let ng = render_text(text, Dialect::Ltspice, "t", Dialect::Ngspice).expect_err("refused");
+    assert!(
+        ng.diags.iter().any(|g| g.code == Code::W0005),
+        "{}",
+        ng.messages
+    );
+}

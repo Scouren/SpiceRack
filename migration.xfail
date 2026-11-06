@@ -11162,13 +11162,9 @@ ltspice/ltspice_examples/ADuM4136.net ltspice .backanno left out (W0036); .tran 
 ltspice/ltspice_examples/ADuM4136.net spectre now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/ADuM4136.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/BandGaps.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/BandGaps.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/BandGaps.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/BandGaps.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/BandGaps.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/BandGaps.net spectre now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/BandGaps.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/BandGaps.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/Clapp.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/Clapp.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/Cohn.net cdl the .backanno and .tran lines no longer copied
@@ -11179,13 +11175,9 @@ ltspice/ltspice_examples/Cohn.net ngspice now written: the .backanno it was refu
 ltspice/ltspice_examples/Cohn.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/Cohn.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/DCopPnt.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/DCopPnt.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/DCopPnt.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/DCopPnt.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/DCopPnt.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/DCopPnt.net spectre now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/DCopPnt.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/DCopPnt.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/Eg1.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/Eg1.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/Eg2.net cdl the .backanno and .tran lines no longer copied
@@ -11195,19 +11187,13 @@ ltspice/ltspice_examples/Eg3.net ltspice .backanno left out (W0036); .tran read 
 ltspice/ltspice_examples/Electrometer.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/Electrometer.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/Fc.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/Fc.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/Fc.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/Fc.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/Fc.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/GFT.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/GFT.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/HalfSlope.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/HalfSlope.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/HandsFreePreamp.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/HandsFreePreamp.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/HandsFreePreamp.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/HandsFreePreamp.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/HandsFreePreamp.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/Hartly.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/Hartly.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/Howland.net cdl the .backanno and .tran lines no longer copied
@@ -11232,13 +11218,9 @@ ltspice/ltspice_examples/IdealTransformer.net ltspice .backanno left out (W0036)
 ltspice/ltspice_examples/LM308.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/LM308.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/LM741.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/LM741.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/LM741.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/LM741.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/LM741.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/LM741.net spectre now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/LM741.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/LM741.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/LM78XX.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/LM78XX.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/LT3001.net cdl the .backanno and .tran lines no longer copied
@@ -11297,23 +11279,15 @@ ltspice/ltspice_examples/LoopGain2.net ltspice .backanno left out (W0036); .tran
 ltspice/ltspice_examples/MC1648.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/MC1648.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/MeasureBW.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/MeasureBW.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/MeasureBW.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/MeasureBW.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/MeasureBW.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/MeasureBW.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/MonteCarlo.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/MonteCarlo.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/MonteCarlo.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/MonteCarlo.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/NE555.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/NE555.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/NE555.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/NE555.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/NE555.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/NE555.net spectre now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/NE555.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/NE555.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/NoiseFigure.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/NoiseFigure.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/NonLinearTransformer.net cdl the .backanno and .tran lines no longer copied
@@ -11463,12 +11437,8 @@ ltspice/ltspice_examples/colpits.net ltspice .backanno left out (W0036); .tran r
 ltspice/ltspice_examples/colpits2.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/colpits2.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/curvetrace.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/curvetrace.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/curvetrace.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/curvetrace.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/curvetrace.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/curvetrace.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/curvetrace.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/dimmer.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/dimmer.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/elip_grd.net cdl the .backanno and .tran lines no longer copied
@@ -11488,16 +11458,9 @@ ltspice/ltspice_examples/gr_del.net spectre now written: the .backanno it was re
 ltspice/ltspice_examples/gr_del.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/gr_del.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/logamp.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/logamp.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/logamp.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/logamp.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/logamp.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/noise.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/noise.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/noise.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/noise.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/noise.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/noise.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/notch.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/notch.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/notch.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
@@ -11544,12 +11507,8 @@ ltspice/ltspice_examples/steptemp.net ltspice .backanno left out (W0036); .tran 
 ltspice/ltspice_examples/varactor.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/varactor.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/varactor2.net cdl the .backanno and .tran lines no longer copied
-ltspice/ltspice_examples/varactor2.net espice now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/varactor2.net hspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/varactor2.net ltspice .backanno left out (W0036); .tran read as the analysis
-ltspice/ltspice_examples/varactor2.net ngspice now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/varactor2.net vacask now written: the .backanno it was refused for (W0001) is left out (W0036)
-ltspice/ltspice_examples/varactor2.net xyce now written: the .backanno it was refused for (W0001) is left out (W0036)
 ltspice/ltspice_examples/varistor.net cdl the .backanno and .tran lines no longer copied
 ltspice/ltspice_examples/varistor.net ltspice .backanno left out (W0036); .tran read as the analysis
 ltspice/ltspice_examples/wavein.net cdl the .backanno and .tran lines no longer copied
@@ -13217,8 +13176,6 @@ xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir cdl read: .dc dec/oct/list; wri
 xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir hspice now written: .dc dec/oct/list read (was W0001)
 xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir ltspice now written: .dc dec/oct/list read (was W0001)
 xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir xyce read: .dc dec/oct/list; written in the target form
-ltspice/ltspice_examples/LM78XX.net xyce now written: .step list read (was W0001)
-ltspice/ltspice_examples/SoftDiodeRecovery.net xyce now written: .step list read (was W0001)
 ltspice/ltspice_examples/dimmer.net xyce now written: .step list read (was W0001)
 
 # Phase 7: spice-read: HSPICE `.dc var DEC|OCT|LIN|POI np …` and bare
@@ -13282,11 +13239,7 @@ ltspice/ltspice_examples/1786F.net spectre now written: K over 3+ inductors read
 ltspice/ltspice_examples/1786F.net vacask now written: K over 3+ inductors read (every pair)
 ltspice/ltspice_examples/3799-1.net spectre now written: K over 3+ inductors read (every pair)
 ltspice/ltspice_examples/3799.net spectre now written: K over 3+ inductors read (every pair)
-ltspice/ltspice_examples/P2.net espice now written: K over 3+ inductors read (every pair)
-ltspice/ltspice_examples/P2.net hspice now written: K over 3+ inductors read (every pair)
-ltspice/ltspice_examples/P2.net ngspice now written: K over 3+ inductors read (every pair)
 ltspice/ltspice_examples/P2.net spectre now written: K over 3+ inductors read (every pair)
-ltspice/ltspice_examples/P2.net xyce now written: K over 3+ inductors read (every pair)
 ltspice/ltspice_examples/Transformer2.net espice now written: K over 3+ inductors read (every pair)
 ltspice/ltspice_examples/Transformer2.net hspice now written: K over 3+ inductors read (every pair)
 ltspice/ltspice_examples/Transformer2.net ngspice now written: K over 3+ inductors read (every pair)
@@ -13456,3 +13409,12 @@ xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir ngspice now written: .DC LIN rea
 xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir spectre now written: .DC LIN read
 xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir vacask now written: .DC LIN read
 xyce/XDM/SPECTRE/OTHER_PARSING/dc_directive.cir xyce written differently: .DC LIN read
+
+# Phase 7: spice-read: an LTspice .lib or .include path with blanks
+# (render::read cards). LTspice has no sections (LTspice help, .LIB
+# <filename>): `.lib C:\users\brian\My Documents\…\standard.dio` is one
+# file, read before as file `C:\users\brian\My`, section `Documents\…`
+# and written so (a wrong file on every target but LTspice). It is now a
+# whole-file .lib: W0005 on the SPICE targets, W0110 on Spectre and VACASK.
+# 47 lines of the sections above ("now written" for decks so read) are
+# gone: those decks are refused again, as in the baseline (status only).
