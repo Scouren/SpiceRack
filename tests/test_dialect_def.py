@@ -1,14 +1,22 @@
 """The Python dialect-definition API (`spicerack.def_`, `spicerack.dialects`;
 DIALECT-PLUGIN.md §2, §4, §5).
 
+The registry is one per process: each test registers its plugins under
+names of its own (`uniq`), so no test sees another's and their order
+cannot matter.
+
 Oracles: the Rust rows' pinned dumps (`tests/fixtures/dialects/*.dump`,
 written by `tests/test_dialect_plugin.rs` from the same calls in Rust):
 acme and `MyHspice` declared here register rows whose `dump()` equals the
-Rust ones byte for byte (oracle 3); the Rust variants' names (`variants()`,
+Rust ones byte for byte, and every built-in declared again here with its
+Rust file's calls (`builtin_dialects.py`) dumps its Rust row, names aside
+(oracle 3); the Rust variants' names (`variants()`,
 from Rust's `Debug`) against each Python class's members (oracle 9); the
 catalogue's `W0201` message with the definition's id; ngspice itself for a
 plugin that runs on it (the same operating point as the ngspice deck).
 """
+import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,6 +24,8 @@ import pytest
 import spicerack as ps
 from spicerack.def_ import (Alt, Answer, Arithmetic, Construct, FuncForm, Kind, Lang,
                             NumberReading, Scale, Simulator, Tag)
+
+from builtin_dialects import BUILTINS
 
 PINS = Path(__file__).resolve().parent / "fixtures" / "dialects"
 CALLS = []
@@ -61,37 +71,89 @@ class MyHspice(ps.dialects.HSPICE):
                 .refuse_code(Construct.Step, "MY001"))
 
 
-def acme():
-    return ps.register_dialect(Acme("acme"))
+@pytest.fixture
+def uniq(request):
+    """`uniq(base)`: a dialect name only this test registers."""
+    test = re.sub(r"[^A-Za-z0-9]+", "-", request.node.name).strip("-")
+    return lambda base: f"{base}-{test}"
 
 
-def test_acme_dumps_the_rust_row():
-    assert acme().dump() == (PINS / "acme.dump").read_text()
+@pytest.fixture
+def acme(uniq):
+    """§2's acme, registered under this test's own name."""
+    name = uniq("acme")
+    ps.register_dialect(Acme(name))
+    return name
 
 
-def test_my_hspice_dumps_the_rust_extends():
-    assert ps.register_dialect(MyHspice("my-hspice")).dump() == (PINS / "my-hspice.dump").read_text()
+def test_acme_dumps_the_rust_row(acme):
+    assert Lang.from_name(acme).dump().replace(acme, "acme") == (PINS / "acme.dump").read_text()
 
 
-def test_registration_is_idempotent_and_refuses_another_definition():
-    assert acme() == acme()
+def test_my_hspice_dumps_the_rust_extends(uniq):
+    name = uniq("my-hspice")
+    got = ps.register_dialect(MyHspice(name)).dump().replace(name, "my-hspice")
+    assert got == (PINS / "my-hspice.dump").read_text()
+
+
+@pytest.mark.parametrize("builtin", sorted(BUILTINS))
+def test_a_built_in_declared_from_python_dumps_the_rust_row(builtin, uniq):
+    calls, rust = BUILTINS[builtin]
+
+    class Again(ps.Dialect):
+        def define(self, d):
+            return calls(d)
+
+    name = uniq(rust.name())
+    want = rust.dump().splitlines()
+    got = ps.register_dialect(Again(name)).dump().splitlines()
+    assert len(got) == len(want)
+    for w, g in zip(want, got):
+        if w != g:
+            # Only the rows naming the language itself differ.
+            assert w.split(" ")[0] in ("name", "lex.lang", "sp.lexicon", "behaviours"), (w, g)
+            assert g.replace(name, rust.name()) == w
+
+
+def test_registration_is_idempotent_and_refuses_another_definition(acme):
+    assert ps.register_dialect(Acme(acme)) == Lang.from_name(acme)
 
     class Other(Acme):
         def define(self, d):
             return super().define(d).scale("y", Scale.Exp(3))
 
     with pytest.raises(ValueError, match="registered with another definition"):
-        ps.register_dialect(Other("acme"))
+        ps.register_dialect(Other(acme))
 
 
-def test_class_attributes_are_one_argument_calls():
+def test_class_attributes_are_one_argument_calls(uniq):
     class Sugar(ps.Dialect):
         extends = Lang.NGSPICE
         fold_case = False
 
-    sugar = ps.register_dialect(Sugar("sugar"))
-    want = ps.def_.register(ps.def_.DialectDef("sugar-calls").extends(Lang.NGSPICE).fold_case(False))
-    assert sugar.dump().replace("sugar", "X") == want.dump().replace("sugar-calls", "X")
+    a, b = uniq("sugar"), uniq("sugar-calls")
+    sugar = ps.register_dialect(Sugar(a))
+    want = ps.def_.register(ps.def_.DialectDef(b).extends(Lang.NGSPICE).fold_case(False))
+    assert sugar.dump().replace(a, "X") == want.dump().replace(b, "X")
+
+
+def test_a_hook_is_held_once_per_registered_row(uniq):
+    """One Python hook object per new row: none for a definition never
+    registered, none for an equal re-registration (rows are never freed,
+    so each registration with a hook holds its hook for good)."""
+    def hook(cards):
+        return [Answer.Text(c.text) for c in cards]
+
+    def with_hook(name):
+        return ps.def_.DialectDef(name).extends(Lang.NGSPICE).hook(".noise", hook)
+
+    before = sys.getrefcount(hook)
+    names = [uniq(f"hooked{i}") for i in range(3)]
+    for name in names:
+        ps.def_.register(with_hook(name))
+        ps.def_.register(with_hook(name))
+    with_hook(uniq("never-registered"))
+    assert sys.getrefcount(hook) == before + len(names)
 
 
 ENUMS = [n for n in dir(ps.def_) if hasattr(getattr(ps.def_, n), "variants")]
@@ -120,10 +182,9 @@ def test_every_vocabulary_enum_is_exported():
 NOISE = "* t\nV1 in 0 1 AC 1\nR1 in out 1k\nR2 out 0 1k\n.noise v(out) V1 dec 10 1 1meg\n.noise v(in) V1 dec 5 1 1k\n.end\n"
 
 
-def test_a_python_hook_is_called_once_per_deck_and_spliced():
-    acme()
+def test_a_python_hook_is_called_once_per_deck_and_spliced(acme):
     before = len(CALLS)
-    text = ps.Testbench.from_source(NOISE, dialect="ngspice").netlist("acme")
+    text = ps.Testbench.from_source(NOISE, dialect="ngspice").netlist(acme)
     assert [l for l in text.splitlines() if "noise" in l] == [
         ".noise_acme out=V(out) src=V1 dec 10 1 1meg",
         ".noise_acme out=V(in) src=V1 dec 5 1 1k",
@@ -131,46 +192,43 @@ def test_a_python_hook_is_called_once_per_deck_and_spliced():
     assert CALLS[before:] == [2]
 
 
-def test_a_hook_refusal_raises_with_its_code():
-    acme()
+def test_a_hook_refusal_raises_with_its_code(acme):
     tb = ps.Testbench.from_source("* t\nV2 in 0 1 AC 1\nR1 in 0 1k\n.noise v(in) V2 dec 10 1 1k\n.end\n")
-    with pytest.raises(RuntimeError, match=r"W0201 acme:ACME002 acme's .noise takes one source"):
-        tb.netlist("acme")
+    with pytest.raises(RuntimeError, match=rf"W0201 {acme}:ACME002 acme's .noise takes one source"):
+        tb.netlist(acme)
 
 
-def test_a_refused_construct_raises_with_its_code():
-    acme()
+def test_a_refused_construct_raises_with_its_code(acme):
     tb = ps.Testbench.from_source(
         "* t\nV1 in 0 1\nB1 out 0 V=Laplace(v(in), 1/(1+s*1e-3))\nR1 out 0 1k\n.op\n.end\n")
-    with pytest.raises(RuntimeError, match=r":3:1: W0201 acme:ACME001 acme has no Laplace sources"):
-        tb.netlist("acme")
+    with pytest.raises(RuntimeError, match=rf":3:1: W0201 {acme}:ACME001 acme has no Laplace sources"):
+        tb.netlist(acme)
 
 
-def test_acme_text_reads_and_writes():
-    acme()
+def test_acme_text_reads_and_writes(acme):
     own = "# t\n.subcircuit load n PARAMS: r=1k ; a tail\nR1 n 0 {r}\n.endsub load\nV1 in 0 2x\nX1 in load r=2k\n.op\n.end\n"
-    ng = ps.Testbench.from_source(own, dialect="acme").netlist("ngspice")
+    ng = ps.Testbench.from_source(own, dialect=acme).netlist("ngspice")
     assert ".subckt load n PARAMS: r=1k" in ng and "2meg" in ng
-    back = ps.Testbench.from_source(ng, dialect="ngspice").netlist("acme")
+    back = ps.Testbench.from_source(ng, dialect="ngspice").netlist(acme)
     assert ".subcircuit load n PARAMS: r=1k" in back and ".endsub load" in back
 
 
-def test_a_netlist_only_plugin_does_not_run():
-    acme()
+def test_a_netlist_only_plugin_does_not_run(acme):
     tb = ps.Testbench.from_source("* t\nV1 in 0 1\nR1 in 0 1k\n.end\n")
     tb.add_operating_point()
-    tb.with_backend("acme")
-    with pytest.raises(RuntimeError, match="no simulator runs 'acme'"):
+    tb.with_backend(acme)
+    with pytest.raises(RuntimeError, match=f"no simulator runs '{acme}'"):
         tb.run()
 
 
 @pytest.mark.needs("ngspice")
-def test_a_plugin_that_runs_on_ngspice_gives_ngspice_results():
+def test_a_plugin_that_runs_on_ngspice_gives_ngspice_results(uniq):
     class MyNgspice(ps.dialects.NGSPICE):
         def define(self, d):
             return super().define(d).comment_tail("//").runs_on(Simulator.Ngspice)
 
-    lang = ps.register_dialect(MyNgspice("my-ngspice"))
+    mine = uniq("my-ngspice")
+    lang = ps.register_dialect(MyNgspice(mine))
     assert lang.runs_on() == Simulator.Ngspice
 
     def op(backend):
@@ -184,4 +242,4 @@ def test_a_plugin_that_runs_on_ngspice_gives_ngspice_results():
         (result,) = tb.run()
         return result["b"]
 
-    assert op("my-ngspice") == op("ngspice") == pytest.approx(1.5, abs=1e-9)
+    assert op(mine) == op("ngspice") == pytest.approx(1.5, abs=1e-9)

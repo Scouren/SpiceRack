@@ -31,6 +31,12 @@ use crate::syntax::{Dialect, Lang};
 #[pyclass(name = "DialectDef", module = "spicerack.def_")]
 pub(super) struct PyDialectDef {
     def: DialectDef,
+    /// Its name (`new`, `renamed`): a registration of a held name makes
+    /// no new row.
+    name: String,
+    /// Its Python hooks by head, in `hook` order: held by the hook table
+    /// only once registered as a new row.
+    hooks: Vec<(String, Py<PyAny>)>,
 }
 
 #[pyclass(name = "Lang", module = "spicerack.def_", eq, frozen)]
@@ -53,8 +59,9 @@ pub(super) struct PyAnswer {
 }
 
 /// The Python hooks, by the id their definition's `external_hook` holds.
-// ponytail: never freed, as a registered row is never freed; bounded by
-// how many `hook` calls a process makes.
+/// A hook is added when its definition registers a new row and never
+/// freed, as the row is never freed: one leak per registration with a
+/// hook, bounded by `LANGS_MAX` rows.
 static HOOKS: Mutex<Vec<Py<PyAny>>> = Mutex::new(Vec::new());
 
 /// Generates `PyDialectDef`'s methods: each Rust call of the same name,
@@ -143,8 +150,6 @@ impl From<PyLang> for Lang {
 // ---- private ----
 
 calls! {
-    renamed(name: &str);
-    extends(base: PyLang);
     title(v: bool);
     fold_case(v: bool);
     comment_line(s: &str);
@@ -235,7 +240,24 @@ calls! {
     @extra {
         #[new]
         fn new(name: &str) -> Self {
-            Self { def: DialectDef::new(name) }
+            Self { def: DialectDef::new(name), name: name.into(), hooks: Vec::new() }
+        }
+
+        /// `DialectDef::renamed`.
+        fn renamed<'py>(mut slf: PyRefMut<'py, Self>, name: &str) -> PyRefMut<'py, Self> {
+            let d = std::mem::replace(&mut slf.def, DialectDef::new(""));
+            slf.def = d.renamed(name);
+            slf.name = name.into();
+            slf
+        }
+
+        /// `DialectDef::extends`: the base's tables, its hooks among them,
+        /// replace every earlier call's, this definition's hooks too.
+        fn extends<'py>(mut slf: PyRefMut<'py, Self>, base: PyLang) -> PyRefMut<'py, Self> {
+            let d = std::mem::replace(&mut slf.def, DialectDef::new(""));
+            slf.def = d.extends(base.into());
+            slf.hooks.clear();
+            slf
         }
 
         /// `DialectDef::end`: `End(col1, then_blank, stops)` or `None`.
@@ -263,27 +285,40 @@ calls! {
         }
 
         /// `DialectDef::hook`: the cards headed `head` are answered by
-        /// `f(cards) -> [Answer]`, called once per deck.
+        /// `f(cards) -> [Answer]`, called once per deck. Its table row is
+        /// held now (an id is given at `register`).
         fn hook<'py>(mut slf: PyRefMut<'py, Self>, head: &str, f: Py<PyAny>) -> PyRefMut<'py, Self> {
-            let mut hooks = HOOKS.lock().unwrap_or_else(|p| p.into_inner());
-            let id = u16::try_from(hooks.len()).expect("fewer than 65536 hooks");
-            hooks.push(f);
             let d = std::mem::replace(&mut slf.def, DialectDef::new(""));
-            slf.def = d.external_hook(head, id);
+            slf.def = d.external_hook(head, u16::MAX);
+            match slf.hooks.iter_mut().find(|h| h.0 == head) {
+                Some(h) => h.1 = f,
+                None => slf.hooks.push((head.into(), f)),
+            }
             slf
         }
     }
 }
 
 #[pyfunction]
-/// Registers `d` (a copy: `d` stays usable): its `Lang`.
+/// Registers `d` (a copy: `d` stays usable): its `Lang`. Its hooks are
+/// held from here, once, when it makes a new row.
 ///
 /// # Errors
 /// `ValueError` with `RegisterError`'s message.
-fn register(d: PyRef<'_, PyDialectDef>) -> PyResult<PyLang> {
-    def_register(d.def.clone())
-        .map(PyLang)
-        .map_err(|e| PyValueError::new_err(e.to_string()))
+fn register(py: Python<'_>, d: PyRef<'_, PyDialectDef>) -> PyResult<PyLang> {
+    let mut held = HOOKS.lock().unwrap_or_else(|p| p.into_inner());
+    let mut def = d.def.clone();
+    for (k, (head, _)) in d.hooks.iter().enumerate() {
+        let id = u16::try_from(held.len() + k).expect("fewer than 65535 hooks");
+        assert!(id < u16::MAX, "u16::MAX is the unregistered hook");
+        def = def.external_hook(head, id);
+    }
+    let fresh = Lang::from_name(&d.name).is_none();
+    let lang = def_register(def).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    if fresh {
+        held.extend(d.hooks.iter().map(|h| h.1.clone_ref(py)));
+    }
+    Ok(PyLang(lang))
 }
 
 #[pymethods]

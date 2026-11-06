@@ -158,6 +158,10 @@ A hook takes the cards of one head as the plugin's writer wrote them
 (`Card.head`, `.words`, `.params` (`name=value` pairs), `.text`) and
 returns one `Answer` per card: `Answer.Text(text)` replaces the card,
 `Answer.Refuse(id)` refuses the deck with the definition's code `id`. It
-is called once per deck with every card of its head. Its text is written,
+is called once per deck with every card of its head. A hook is held from
+the registration that makes its dialect's row, for the life of the process
+(a row is never freed: one hook object per hooked registration, at most
+`LANGS_MAX` rows); a definition never registered, or registered again
+equal, holds none. Its text is written,
 never read back: a deck holding a hooked card reads back in the plugin's
 dialect only if the hook writes text the definition reads.
