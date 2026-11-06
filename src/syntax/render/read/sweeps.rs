@@ -14,10 +14,13 @@
 //! - `DcSweep::values(&self) -> Option<Vec<f64>>`
 //! - `Rd::dc_axes(&self, items: &[u32]) -> Option<Vec<DcAxis>>` (HSPICE's `type np` form too)
 //! - `Rd::step_list(&self, items: &[u32]) -> Option<(String, Vec<f64>)>`
-//! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`
+//! - `Rd::step(&self, n: u32, items: &[u32]) -> Option<Card>`, `Rd::xyce_lin(&self, n: u32) -> Option<Card>`,
+//!   `Rd::top_ac(&self) -> Option<[u32; 4]>`,
+//!   `Rd::noise(&self, n: u32, items: &[u32]) -> Option<Card>`
 
 use super::Rd;
 use super::testbench::{Card, Sweep};
+use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::CardRules;
 
 /// One `.dc` axis: its source (or parameter) and how it sweeps.
@@ -158,6 +161,87 @@ impl Rd<'_> {
             .map(|&k| self.number(k))
             .collect::<Option<_>>()?;
         Some((self.text(*name), v))
+    }
+
+    /// Xyce's `.LIN [k=v]…` (Xyce RG `.LIN`): the S (and Y, Z) parameters
+    /// over the deck's `.AC` sweep, ngspice's `.sp` of that sweep (ngspice
+    /// manual `.sp`; Xyce 7.10 and ngspice-45 gave the same S11, S21, S22,
+    /// run); `None` with `SPARCALC=0` (no S computed) or no `.AC`. Its
+    /// other keys choose the output file's form only.
+    pub(super) fn xyce_lin(&self, n: u32) -> Option<Card> {
+        let pairs = self.fields(n);
+        let off = pairs.iter().any(|&a| {
+            self.tag(a) == Tag::Assign
+                && self.key(a).eq_ignore_ascii_case("sparcalc")
+                && self.number(self.ast.rhs(Node(a))) == Some(0.0)
+        });
+        if off || !pairs.iter().all(|&a| self.tag(a) == Tag::Assign) {
+            return None;
+        }
+        Some(Card::Freq(true, self.top_ac()?))
+    }
+
+    /// The deck's first top `.ac` card's `variation points start stop`
+    /// items, by that card's own rule (testbench `read_card`).
+    pub(super) fn top_ac(&self) -> Option<[u32; 4]> {
+        let ac = self
+            .ast
+            .fields(self.ast.root())
+            .iter()
+            .copied()
+            .find(|&s| self.tag(s) == Tag::Analysis && self.head_kind(s) == "ac")?;
+        match self.fields(ac) {
+            &[v, a, b, c] if self.wordw(v) && [a, b, c].iter().all(|&k| self.numw(k)) => {
+                Some([v, a, b, c])
+            }
+            _ => None,
+        }
+    }
+
+    /// A `.noise` card's parts: `v(out[,ref]) src variation points start
+    /// stop [pts_per_summary]`, or HSPICE's `out src [interval]` over the
+    /// deck's `.ac`.
+    pub(super) fn noise(&self, n: u32, items: &[u32]) -> Option<Card> {
+        // HSPICE `.NOISE out src [interval]` sweeps the deck's `.AC`.
+        let (items, spaced) = match items {
+            [g, src, rest @ ..] if self.b.card_rules == CardRules::Hspice && rest.len() <= 1 => {
+                let ac = self.top_ac()?;
+                let v: Vec<u32> = [*g, *src]
+                    .into_iter()
+                    .chain(ac)
+                    .chain(rest.iter().copied())
+                    .collect();
+                (v, self.spaced(n, items))
+            }
+            _ => (items.to_vec(), self.spaced(n, items)),
+        };
+        let [g, src, var, a, b, c, rest @ ..] = &items[..] else {
+            return None;
+        };
+        if rest.len() > 1 || self.tag(*g) != Tag::Group || !self.group_closed(*g) || !spaced {
+            return None;
+        }
+        let gn = self.ast.lhs(Node(*g));
+        if gn == NONE || !self.text(gn).eq_ignore_ascii_case("v") {
+            return None;
+        }
+        let nodes = self.group_items(*g);
+        if nodes.is_empty() || nodes.len() > 2 || !nodes.iter().all(|&k| self.wordw(k)) {
+            return None;
+        }
+        if !self.wordw(*src)
+            || !self.wordw(*var)
+            || ![a, b, c].iter().all(|&&k| self.numw(k))
+            || rest.iter().any(|&k| !self.numw(k))
+        {
+            return None;
+        }
+        Some(Card::Noise(
+            nodes.iter().map(|&k| self.text(k)).collect(),
+            *src,
+            [*var, *a, *b, *c],
+            rest.first().copied(),
+        ))
     }
 
     /// HSPICE's `.DC src DEC|OCT np start stop`, `src POI n v…` and `src

@@ -9,7 +9,7 @@
 //! - `W::analysis(&mut self, a: &Ana, tok: u32) -> String`
 
 use super::W;
-use super::sweeps::dc_axis;
+use super::sweeps::{dc_axis, has_ac, xyce_lin};
 use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
@@ -147,11 +147,11 @@ impl W<'_, '_> {
                 // HSPICE: `.noise ov src inter` takes its frequencies from
                 // `.ac`.
                 if hs {
-                    return format!(
-                        ".ac {}\n.noise {out} {source} {}",
-                        sweep(self, sw),
-                        pps.unwrap_or(0)
-                    );
+                    let ac = match has_ac(self, sw) {
+                        true => String::new(),
+                        false => format!(".ac {}\n", sweep(self, sw)),
+                    };
+                    return format!("{ac}.noise {out} {source} {}", pps.unwrap_or(0));
                 }
                 let mut s = format!(".noise {out} {source} {}", sweep(self, sw));
                 // `pts_per_summary` is an ngspice/SPICE3 extension; LTspice's
@@ -194,6 +194,7 @@ impl W<'_, '_> {
                 _ => String::new(),
             },
             Ana::Sp(sw) => match self.ask(Construct::SParameter, tok) {
+                Action::Spell(Alt::XyceLin) => xyce_lin(self, sw, tok, &sweep(self, sw)),
                 // ponytail: Rust `{}` numbers, byte for byte what the old
                 // writer sent ngspice for this card.
                 Action::Native => format!(

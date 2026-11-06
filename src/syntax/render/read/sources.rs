@@ -14,7 +14,7 @@
 
 use super::{Card, Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::SourceRules;
+use crate::syntax::behaviour::{CardRules, SourceRules};
 use crate::syntax::device::Primitive as Element;
 
 /// A waveform value: a number or an expression (without delimiters).
@@ -79,6 +79,9 @@ impl<'a> Rd<'a> {
             return None;
         }
         let (np, nm) = (self.text(items[0]), self.text(items[1]));
+        if self.b.card_rules == CardRules::Xyce && self.letter(n) == 'P' {
+            return self.xyce_port(&items[2..], name, np, nm);
+        }
         let mut j = 2;
         let mut lead = None;
         if let Some(&v) = items.get(2)
@@ -100,11 +103,22 @@ impl<'a> Rd<'a> {
         let (mut value, mut dc_given, mut ac_magnitude, mut ac_phase, mut wf) =
             (Val::Num(0.0), false, None, None, None);
         let (mut repeat, mut delay, mut portnum, mut z0) = (None, None, None, None);
+        let mut parasitics = Vec::new();
         if let Some(v) = lead {
             (value, dc_given) = (self.value(v), true);
         }
         for s in specs {
             match s {
+                // LTspice help, Voltage Source: `Rser=`, `Cpar=`.
+                Spec::Pair(key, val)
+                    if self.b.card_rules == CardRules::Ltspice
+                        && e == Element::VoltageSource
+                        && matches!(key.as_str(), "rser" | "cpar") =>
+                {
+                    self.irnum(val)?;
+                    let key = if key == "rser" { "Rser" } else { "Cpar" };
+                    parasitics.push((key.to_string(), self.vtext(val)));
+                }
                 Spec::Pair(key, val) => {
                     let v = self.irnum(val)?;
                     match key.as_str() {
@@ -161,6 +175,38 @@ impl<'a> Rd<'a> {
             ac_phase,
             wave: wf,
             port,
+            parasitics,
+        })
+    }
+
+    /// Xyce's `P n+ n- port=n [z0=z]` (Xyce RG, port device: z0 50 when
+    /// not given) as ngspice's port source `V … portnum n z0 z` (ngspice
+    /// manual, `.sp`: Xyce 7.10's `.LIN` and ngspice-45's `.sp` gave the
+    /// same S, run); `None` for a port with a source value or a waveform.
+    fn xyce_port(&self, rest: &[u32], name: String, np: String, nm: String) -> Option<Card> {
+        let (mut num, mut z0) = (None, 50.0);
+        for &a in rest {
+            if self.tag(a) != Tag::Assign {
+                return None;
+            }
+            let v = self.ast.rhs(Node(a));
+            match self.key(a).to_ascii_lowercase().as_str() {
+                "port" => num = Some(self.count(v)?),
+                "z0" => z0 = self.number(v)?,
+                _ => return None,
+            }
+        }
+        Some(Card::Source {
+            letter: 'V',
+            name: format!("P{name}"),
+            np,
+            nm,
+            value: Val::Num(0.0),
+            ac_mag: None,
+            ac_phase: None,
+            wave: None,
+            port: Some((num?, z0)),
+            parasitics: vec![],
         })
     }
 }
@@ -260,6 +306,17 @@ impl<'a> Rd<'a> {
                 k += 1;
             }
             return Some((Spec::Wave(w, vals), k));
+        }
+        // LTspice help, Voltage Source: `Rser=`, `Cpar=`.
+        if self.b.card_rules == CardRules::Ltspice
+            && self.tag(it) == Tag::Assign
+            && ["rser", "cpar"]
+                .iter()
+                .any(|w| self.key(it).eq_ignore_ascii_case(w))
+        {
+            let v = self.ast.rhs(Node(it));
+            let key = self.key(it).to_ascii_lowercase();
+            return self.val_ok(v).then_some((Spec::Pair(key, v), j + 1));
         }
         if ngspice {
             let keys = ["portnum", "z0", "td", "r"];

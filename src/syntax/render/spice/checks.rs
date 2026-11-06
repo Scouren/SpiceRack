@@ -95,12 +95,23 @@ impl W<'_, '_> {
             return;
         }
         let drops = [Code::W0021, Code::W0023, Code::W0024, Code::W0028];
-        let dropped: Vec<(u32, u32)> = self
+        let mut dropped: Vec<(u32, u32)> = self
             .diags
             .iter()
             .filter(|d| drops.contains(&d.code))
             .map(|d| (d.token, self.rd.line_last(d.token)))
             .collect();
+        // A `TABLE` source is read from its text (`Rd::table_source`), so
+        // a parse note inside it is no unread text.
+        let blocks = self.blocks();
+        let comps = blocks.iter().flat_map(|b| &b.comps);
+        dropped.extend(comps.filter_map(|c| match *c {
+            Comp::Card(n) if matches!(self.rd.card_view(n), Card::Table { .. }) => {
+                let t = self.rd.main(n);
+                Some((t, self.rd.line_last(t)))
+            }
+            _ => None,
+        }));
         let unread = [Code::P0002, Code::P0003, Code::P0008];
         let bad = self.rd.ast.diags().iter().find(|d| {
             unread.contains(&d.code) && !dropped.iter().any(|&(a, b)| (a..=b).contains(&d.token))
@@ -274,7 +285,7 @@ fn card_exprs(c: Card, tok: u32, out: &mut Vec<(String, u32)>) {
             }
             out.extend(expr(value));
         }
-        Card::Behavioural { expr, .. } => out.push((expr, tok)),
+        Card::Behavioural { expr, .. } | Card::Table { expr, .. } => out.push((expr, tok)),
         Card::Charge { charge, params, .. } => {
             out.push((charge, tok));
             out.extend(params.into_iter().map(at));

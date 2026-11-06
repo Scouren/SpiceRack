@@ -57,6 +57,7 @@ sp.ngspice_numbers false
 cell.ForeignText Refuse(W0001)
 cell.PrivateText Refuse(W0039)
 cell.XyceSens Refuse(W0015)
+cell.HspiceAnalysis Native
 cell.CaretReread Refuse(W0002)
 cell.StatisticalCall Native
 cell.VerilogALoad Spell(Hdl)
@@ -75,6 +76,9 @@ cell.NoiseWave Refuse(W0009)
 cell.Conditional Native
 cell.BranchParam Refuse(W0014)
 cell.Func Spell(FuncParam)
+cell.LocalFunc Native
+cell.TableSource Refuse(W0102)
+cell.LossyLine Refuse(W0105)
 cell.Step Refuse(W0201) MY001
 cell.StepList Refuse(W0016)
 cell.TranStartup Refuse(W0037)
@@ -89,5 +93,5 @@ cell.Save Spell(Probe)
 cell.UnmappedOption Native
 cell.Statistics Lift(StatisticsDraws)
 cell.Measure Native
-behaviours Behaviours { writer: Cards, text_family: my-hspice, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Other, source_rules: Spice, card_rules: Hspice, named_rules: None, options_form: Spice, load_form: Hspice, control_block: None, analysis_form: Hspice, end_rule: WhenRuns, value_quoting: Hspice, coupling: Pairs, param_form: Plain, include_scope: Local, named_params: None, expr_eval: C, spectre_analyses: ["pz", "sens", "sp", "hb", "sweep", "montecarlo"] }
+behaviours Behaviours { writer: Cards, text_family: my-hspice, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Other, source_rules: Spice, card_rules: Hspice, named_rules: None, options_form: Spice, load_form: Hspice, control_block: None, analysis_form: Hspice, end_rule: WhenRuns, value_quoting: Hspice, coupling: Pairs, param_form: Plain, include_scope: Local, named_params: None, expr_eval: C, parasitics: Elements, spectre_analyses: ["pz", "sens", "sp", "hb", "sweep", "montecarlo"] }
 code MY001 Refusal "our HSPICE build has no .step"

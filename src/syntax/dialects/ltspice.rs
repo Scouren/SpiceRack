@@ -12,7 +12,7 @@
 //! Contents:
 //! - `pub(super) fn ltspice() -> DialectDef`
 
-use crate::syntax::behaviour::{AnalysisForm, CardRules, Coupling, LoadForm};
+use crate::syntax::behaviour::{AnalysisForm, CardRules, Coupling, LoadForm, Parasitics};
 use crate::syntax::def::{Devices, DialectDef, Keywords};
 use crate::syntax::diag::Code;
 use crate::syntax::lexicon::{
@@ -123,6 +123,7 @@ pub(super) fn ltspice() -> DialectDef {
     }
     d = d.keywords(Keywords::Spice);
     d = d.devices(Devices::Spice);
+    d = d.devices(Devices::LossyLine);
     d
         // The spelling.
         .comment("*")
@@ -135,12 +136,14 @@ pub(super) fn ltspice() -> DialectDef {
         .card_rules(CardRules::Ltspice)
         .load_form(LoadForm::Ltspice)
         .analysis_form(AnalysisForm::Ltspice)
+        .parasitics(Parasitics::Ltspice)
         .coupling(Coupling::OneCard)
         .spectre_analysis("sweep")
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0015)
+        .refuse(Construct::HspiceAnalysis, Code::W0015)
         .refuse(Construct::CaretReread, Code::W0002)
         .refuse(Construct::StatisticalCall, Code::W0003)
         .refuse(Construct::VerilogALoad, Code::W0004)
@@ -159,6 +162,9 @@ pub(super) fn ltspice() -> DialectDef {
         .refuse(Construct::Conditional, Code::W0013)
         .refuse(Construct::BranchParam, Code::W0014)
         .native(Construct::Func)
+        .refuse(Construct::LocalFunc, Code::W0106)
+        .refuse(Construct::TableSource, Code::W0102)
+        .native(Construct::LossyLine)
         .native(Construct::Step)
         .native(Construct::StepList)
         .native(Construct::TranStartup)

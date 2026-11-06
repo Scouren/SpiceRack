@@ -18,7 +18,7 @@
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
-//!   `pub enum ExprEval`
+//!   `pub enum ExprEval`, `pub enum Parasitics`
 
 use crate::syntax::Lang;
 
@@ -67,6 +67,8 @@ pub struct Behaviours {
     /// Read and write: whose evaluator reads a `{}` expression (a
     /// then-branch ternary's grouping, `if()`, `sdt()`).
     pub expr_eval: ExprEval,
+    /// Write: an LTspice element's parasitics (`Rser=`, `Cpar=`, …).
+    pub parasitics: Parasitics,
     /// Write: the Spectre analysis kinds the target has an analysis for.
     pub spectre_analyses: &'static [&'static str],
 }
@@ -222,6 +224,17 @@ pub enum ExprEval {
     Ngspice,
 }
 
+/// How an LTspice element's parasitics are written (`spice::parasitics`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Parasitics {
+    /// As explicit R, L and C elements.
+    Elements,
+    /// LTspice's own parameters, as read.
+    Ltspice,
+    /// A C's or L's as read, a V source's as elements (CDL, Verilog).
+    Netlist,
+}
+
 /// The named writer's parameter rows.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NamedParams {
@@ -256,6 +269,7 @@ impl Behaviours {
         include_scope: IncludeScope::Local,
         named_params: NamedParams::None,
         expr_eval: ExprEval::C,
+        parasitics: Parasitics::Elements,
         spectre_analyses: &[],
     };
 }

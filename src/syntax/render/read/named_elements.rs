@@ -166,6 +166,7 @@ impl<'a> Rd<'a> {
                     ac_phase: num("phase"),
                     wave,
                     port: None,
+                    parasitics: vec![],
                 }
             }
             "vcvs" | "vccs" => {

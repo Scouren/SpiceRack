@@ -134,6 +134,7 @@ impl W<'_, '_> {
                 ac_phase,
                 wave,
                 port,
+                parasitics: _,
             } => {
                 if let Some(port) = port {
                     let ac = (ac_mag, ac_phase);
@@ -174,6 +175,10 @@ impl W<'_, '_> {
                 value,
                 ..
             } => self.bsource_card(tok, own, current, [&np, &nm], &expr, value)?,
+            Card::Table { .. } => {
+                self.ask(Construct::TableSource, tok);
+                return None;
+            }
             Card::Linear {
                 letter,
                 name: _,
@@ -243,7 +248,7 @@ impl W<'_, '_> {
             } => {
                 // `[CMP]` mos models: `d g s b model`; no mapped terminal
                 // list for a MOSFET without its bulk or with extra nodes.
-                if letter == 'M' && nodes.len() != 4 {
+                if letter == 'M' && nodes.len() != 4 || letter == 'O' {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }

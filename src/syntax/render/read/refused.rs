@@ -256,7 +256,9 @@ impl Rd<'_> {
     /// general external, accelerometer, power grid, PDE (TCAD), none of
     /// which ngspice, HSPICE, LTspice, Spectre or VACASK has); Xyce's
     /// `.SENS` (an objective's sensitivity to listed parameters over the
-    /// deck's `.dc`, `.tran` or `.ac`, RG `.SENS`); else foreign text.
+    /// deck's `.dc`, `.tran` or `.ac`, RG `.SENS`); HSPICE's StatEye (its
+    /// own) and its RF, transient-noise and loop-stability analyses; else
+    /// foreign text.
     pub(in crate::syntax::render) fn kept_construct(&self, tok: u32) -> Construct {
         const XY_CARDS: [&str; 6] = [
             ".mpde",
@@ -282,10 +284,22 @@ impl Rd<'_> {
             "powergridbusshunt",
             "powergridtransformer",
         ];
+        let w = self.t.text(tok).to_ascii_lowercase();
+        if self.text_behaviours(tok).card_rules == CardRules::Hspice {
+            return match w.as_str() {
+                // HSPICE's StatEye (HSPICE UG, signal integrity): no other
+                // simulator has one.
+                ".stateye" => Construct::PrivateText,
+                // HSPICE RF shooting-Newton (`.SN`, `.SNNOISE`, `.SNXF`),
+                // transient noise, loop stability (HSPICE UG): no SPICE
+                // target has these analyses.
+                ".sn" | ".snnoise" | ".snxf" | ".trannoise" | ".lstb" => Construct::HspiceAnalysis,
+                _ => Construct::ForeignText,
+            };
+        }
         if self.text_behaviours(tok).card_rules != CardRules::Xyce {
             return Construct::ForeignText;
         }
-        let w = self.t.text(tok).to_ascii_lowercase();
         let private = match w.strip_prefix('y') {
             Some(ty) => XY_DEVICES.contains(&ty),
             None => XY_CARDS.contains(&w.as_str()),

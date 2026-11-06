@@ -37,4 +37,5 @@ pub(super) fn espice() -> DialectDef {
         .lift(Construct::Laplace, Rule::LaplaceTable)
         .native(Construct::PwlRepeatI)
         .refuse(Construct::NoiseWave, Code::W0009)
+        .refuse(Construct::TableSource, Code::W0102)
 }

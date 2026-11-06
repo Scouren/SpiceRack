@@ -217,8 +217,8 @@ EXPECTED = {
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
     'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
-    # Xyce and HSPICE have `.LIN`: writer B (FINDINGS-python.md).
-    's_param': (OK, OK, 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # Xyce: P ports and `.LIN` (D's a5f2c0a); HSPICE has `.LIN`: writer B (FINDINGS-python.md).
+    's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0015', OK, OK),
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
@@ -262,8 +262,8 @@ EXPECTED = {
     'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # HSPICE and Xyce have a `P` port: writer B (FINDINGS-python.md).
-    'rf_port': (OK, OK, 'W0007', 'W0007', 'W0007', OK, 'W0007', OK, OK),
+    # Xyce's P port (D's a5f2c0a); HSPICE has a `P` port: writer B (FINDINGS-python.md).
+    'rf_port': (OK, OK, 'W0007', OK, 'W0007', OK, 'W0007', OK, OK),
     'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

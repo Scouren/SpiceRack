@@ -18,10 +18,10 @@
 //! - `Rd::numw(&self, k: u32) -> bool`
 //! - `Rd::wordw(&self, k: u32) -> bool`, `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
 
-use super::Rd;
 use super::options::Opt;
 use super::outputs::print_kind;
 use super::sweeps::DcSweep;
+use super::{Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::CardRules;
 use crate::syntax::token::Tag as T;
@@ -46,8 +46,9 @@ pub(in crate::syntax::render) enum BenchCard {
         values: Vec<f64>,
     },
     Temp(f64),
-    /// `.ic` (`true`) or `.nodeset` values.
-    NodeVals(bool, Vec<(String, f64)>),
+    /// `.ic` (`true`) or `.nodeset` values: numbers, or expressions
+    /// (Xyce `.ic v(1)={V1}`).
+    NodeVals(bool, Vec<(String, Val)>),
     /// `.print [kind] outputs`.
     Print(String, Vec<String>),
     /// A `.meas` card's line.
@@ -196,9 +197,12 @@ impl<'a> Rd<'a> {
             Card::StepList(param, values) => BenchCard::StepList { param, values },
             Card::Temp(v) => BenchCard::Temp(self.number(v)?),
             Card::NodeVals(vals) => {
-                let v: Vec<(String, f64)> = vals
+                let v: Vec<(String, Val)> = vals
                     .iter()
-                    .map(|&(k, v)| Some((self.name_of(k), self.number(v)?)))
+                    .map(|&(k, v)| match self.value(v) {
+                        Val::Raw(_) => None,
+                        x => Some((self.name_of(k), x)),
+                    })
                     .collect::<Option<_>>()?;
                 BenchCard::NodeVals(self.head_kind(n) != "nodeset", v)
             }
@@ -272,6 +276,7 @@ impl<'a> Rd<'a> {
         let hspice = self.b.card_rules == CardRules::Hspice;
         let lt = self.b.card_rules == CardRules::Ltspice;
         match self.tag(n) {
+            _ if self.b.card_rules == CardRules::Xyce && kind == "lin" => self.xyce_lin(n),
             Tag::Options => self.options_ok(n).then_some(Card::Options),
             Tag::Temp => match items {
                 [v] if self.val_ok(*v) && self.tag(*v) != Tag::Seq => Some(Card::Temp(*v)),
@@ -331,6 +336,20 @@ impl<'a> Rd<'a> {
                     && let Some(axes) = self.dc_axes(items) =>
                 {
                     Some(Card::DcAxes(axes))
+                }
+                // HSPICE `.DC var START=a STOP=b STEP=c`.
+                "dc" if hspice
+                    && let [v, a, b, c] = items
+                    && [(a, "start"), (b, "stop"), (c, "step")]
+                        .iter()
+                        .all(|&(&k, w)| {
+                            self.tag(k) == Tag::Assign && self.key(k).eq_ignore_ascii_case(w)
+                        }) =>
+                {
+                    let r = |k: u32| self.ast.rhs(Node(k));
+                    let s = [*v, r(*a), r(*b), r(*c)];
+                    (self.wordw(s[0]) && s[1..].iter().all(|&k| self.number(k).is_some()))
+                        .then(|| Card::Dc(vec![s]))
                 }
                 "dc" => {
                     if items.is_empty() || !items.len().is_multiple_of(4) || !self.spaced(n, items)
@@ -426,40 +445,6 @@ impl<'a> Rd<'a> {
             return None;
         }
         Some(Card::Tran(nums.to_vec(), start, uic, startup))
-    }
-
-    fn noise(&self, n: u32, items: &[u32]) -> Option<Card> {
-        let [g, src, var, a, b, c, rest @ ..] = items else {
-            return None;
-        };
-        if rest.len() > 1
-            || self.tag(*g) != Tag::Group
-            || !self.group_closed(*g)
-            || !self.spaced(n, items)
-        {
-            return None;
-        }
-        let gn = self.ast.lhs(Node(*g));
-        if gn == NONE || !self.text(gn).eq_ignore_ascii_case("v") {
-            return None;
-        }
-        let nodes = self.group_items(*g);
-        if nodes.is_empty() || nodes.len() > 2 || !nodes.iter().all(|&k| self.wordw(k)) {
-            return None;
-        }
-        if !self.wordw(*src)
-            || !self.wordw(*var)
-            || ![a, b, c].iter().all(|&&k| self.numw(k))
-            || rest.iter().any(|&k| !self.numw(k))
-        {
-            return None;
-        }
-        Some(Card::Noise(
-            nodes.iter().map(|&k| self.text(k)).collect(),
-            *src,
-            [*var, *a, *b, *c],
-            rest.first().copied(),
-        ))
     }
 
     fn sens(&self, n: u32) -> Option<Card> {

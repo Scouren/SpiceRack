@@ -20,8 +20,8 @@ use pyo3::types::PyType;
 use crate::syntax::Dialect;
 use crate::syntax::behaviour::{
     AnalysisForm, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope, LoadForm,
-    ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, SourceRules,
-    ValueQuoting, Writer,
+    ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, Parasitics,
+    SourceRules, ValueQuoting, Writer,
 };
 use crate::syntax::def::{Devices, Keywords, Operators};
 use crate::syntax::diag::{Code, Kind};
@@ -233,7 +233,7 @@ py_units!(
     PyDevices,
     "Devices",
     Devices,
-    [Spice, NgspiceOwn, Spectre, Vacask]
+    [Spice, NgspiceOwn, LossyLine, XycePort, Spectre, Vacask]
 );
 py_units!(
     PyRule,
@@ -322,6 +322,12 @@ py_units!(
 );
 py_units!(PyExprEval, "ExprEval", ExprEval, [C, Ngspice]);
 py_units!(
+    PyParasitics,
+    "Parasitics",
+    Parasitics,
+    [Elements, Ltspice, Netlist]
+);
+py_units!(
     PyNamedParams,
     "NamedParams",
     NamedParams,
@@ -370,9 +376,11 @@ py_enum!(PyAlt, "Alt", Alt, units = &[
     Alt::ChargeQuoted, Alt::ChargeBraced, Alt::ChargeBare, Alt::VolCur, Alt::BracedBehaviour,
     Alt::FuncParam, Alt::Hdl, Alt::PreOsdi, Alt::Probe, Alt::DcType, Alt::Include,
     Alt::BsourceCharge, Alt::Bsource, Alt::PwlPeriod, Alt::NgBehaviorLine, Alt::SpiceRegion,
+    Alt::PwlValue, Alt::XycePort, Alt::XyceLin,
 ], covers = [
     ChargeQuoted, ChargeBraced, ChargeBare, VolCur, BracedBehaviour, FuncParam, Hdl, PreOsdi,
-    Probe, DcType, Include, BsourceCharge, Bsource, PwlPeriod, NgBehaviorLine, SpiceRegion
+    Probe, DcType, Include, BsourceCharge, Bsource, PwlPeriod, NgBehaviorLine, SpiceRegion,
+    PwlValue, XycePort, XyceLin
 ] | Alt::Omit(_) | Alt::Copy(_), data = ["Omit", "Copy"] {
     #[staticmethod]
     #[pyo3(name = "Omit")]
@@ -435,6 +443,7 @@ pub(super) fn add_enums(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add(m, PyIncludeScope::UNITS, PyIncludeScope)?;
     add(m, PyNamedParams::UNITS, PyNamedParams)?;
     add(m, PyExprEval::UNITS, PyExprEval)?;
+    add(m, PyParasitics::UNITS, PyParasitics)?;
     add(m, PyConstruct::UNITS, PyConstruct)?;
     add(m, PyCode::UNITS, PyCode)?;
     add(m, PyAnalysis::UNITS, PyAnalysis)?;

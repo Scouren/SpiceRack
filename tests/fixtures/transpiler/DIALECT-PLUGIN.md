@@ -949,6 +949,18 @@ Taken from the user's defaults and this doc's recommendations (team lead,
     name (a quirk kept from the old reader): neither changes a built-in or
     a clone's bytes, each a named-built-in reference a later definition
     call could replace.
+- **Merge of p7-integrate ac33748** (stream D round 3): its eleven new
+  identity checks are declared properties: the reader's Xyce, LTspice and
+  HSPICE rules (`.LIN`, the `P` port, `TABLE`, the `O` line, V
+  parasitics, HSPICE `.noise`/`.dc START=`/`VALUE=` modifiers, HSPICE-only
+  analyses) read `card_rules`; the writer's LTspice parasitics read a new
+  behaviour `Parasitics` (`Elements`, `Ltspice`, `Netlist`: CDL and
+  Verilog keep a C's or L's as read); its five new constructs
+  (`HspiceAnalysis`, `LocalFunc`, `TableSource`, `LossyLine`, and the
+  `XycePort`/`XyceLin`/`PwlValue` alternatives) are cells in every
+  definition file, the `O` and `P` device rows `Devices::LossyLine` and
+  `Devices::XycePort`; the Python enums, `builtin_dialects.py` and the
+  pinned dumps follow.
 - Every phase's gate: `golden record` byte-identical (`diff -r`, MANIFEST
   included) to its parent's record, `golden diff` vs fx13 IDENTICAL except
   the listed xfails (25,596 on 613966e).

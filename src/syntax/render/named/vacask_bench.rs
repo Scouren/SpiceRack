@@ -17,7 +17,7 @@ use super::vacask::{num, respell};
 use crate::syntax::behaviour::NamedRules;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
-use crate::syntax::render::read::{Ana, DcSweep, Sweep};
+use crate::syntax::render::read::{Ana, DcSweep, Sweep, Val};
 
 /// `.options` keys that only steer a simulator's bookkeeping or printing:
 /// dropping one changes no number in the raw file.
@@ -108,10 +108,10 @@ impl W<'_, '_> {
         }
         let mut ic = String::new();
         if !tb.ics.is_empty() {
-            ic.push_str(&node_list("ic", &tb.ics));
+            ic.push_str(&self.node_list("ic", &tb.ics));
         }
         if !tb.nodesets.is_empty() {
-            ic.push_str(&node_list("nodeset", &tb.nodesets));
+            ic.push_str(&self.node_list("nodeset", &tb.nodesets));
         }
         // `Construct::Save` is `Spell(Omit)`: VACASK saves every node.
         for l in &tb.extra {
@@ -362,6 +362,17 @@ impl W<'_, '_> {
 
 // ---- private ----
 
+impl W<'_, '_> {
+    /// `ic=["n"; v; …]`: each node and its value ([`W::vval`]).
+    fn node_list(&self, key: &str, items: &[(String, Val)]) -> String {
+        let body: Vec<String> = items
+            .iter()
+            .map(|(n, v)| format!("\"{}\"; {}", n.to_ascii_lowercase(), self.vval(v)))
+            .collect();
+        format!(" {key}=[{}]", body.join("; "))
+    }
+}
+
 /// The Spectre analysis keyword of `a` (`[REF]`: an operating point is a
 /// `dc` with no sweep, a transfer function `xf`); `None` for a Monte Carlo.
 fn spectre_kind(a: &Ana) -> Option<&'static str> {
@@ -377,15 +388,6 @@ fn spectre_kind(a: &Ana) -> Option<&'static str> {
         Ana::Four(..) => "fourier",
         Ana::MonteCarlo { .. } | Ana::Spectre { .. } => return None,
     })
-}
-
-/// ` ic=["n"; v; …]`.
-fn node_list(key: &str, items: &[(String, f64)]) -> String {
-    let body: Vec<String> = items
-        .iter()
-        .map(|(n, v)| format!("\"{}\"; {}", n.to_ascii_lowercase(), num(*v)))
-        .collect();
-    format!(" {key}=[{}]", body.join("; "))
 }
 
 /// A DC sweep of instance `src`'s `dc` from `start` by `step` over the

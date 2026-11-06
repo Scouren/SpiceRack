@@ -23,7 +23,7 @@ use super::W;
 use crate::syntax::behaviour::{ModelSemantics, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt};
+use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
@@ -37,8 +37,8 @@ pub(super) struct Tb {
     pub(super) vacask: Vec<(String, String, u32)>,
     pub(super) temp: Option<f64>,
     pub(super) tnom: Option<f64>,
-    pub(super) ics: Vec<(String, f64)>,
-    pub(super) nodesets: Vec<(String, f64)>,
+    pub(super) ics: Vec<(String, Val)>,
+    pub(super) nodesets: Vec<(String, Val)>,
     pub(super) saves: Vec<String>,
     /// The first save card's first token.
     pub(super) save_tok: Option<u32>,
@@ -142,7 +142,12 @@ impl W<'_, '_> {
         for (word, vals) in [("ic", &tb.ics), ("nodeset", &tb.nodesets)] {
             for (node, v) in vals {
                 let node = bare_node(&self.signal(node)).to_string();
-                self.line(&format!("{word} {node}={}", self.num(*v)));
+                // An expression as cards.rs's `val` writes one.
+                let v = match v {
+                    Val::Num(x) => self.num(*x),
+                    Val::Expr(e) | Val::Raw(e) => e.clone(),
+                };
+                self.line(&format!("{word} {node}={v}"));
             }
         }
         for s in &tb.saves {

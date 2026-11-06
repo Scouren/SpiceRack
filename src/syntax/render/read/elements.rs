@@ -43,6 +43,16 @@ pub(in crate::syntax::render) enum Card {
         charge: String,
         params: Vec<(String, String)>,
     },
+    /// Xyce's `E`/`G` `TABLE {expr} = (x,y) …`: the output (a current for
+    /// G) by straight lines between the points, constant past either end.
+    Table {
+        current: bool,
+        name: String,
+        np: String,
+        nm: String,
+        expr: String,
+        points: Vec<(f64, f64)>,
+    },
     /// `K1 L1 L2 … k`: the inductor names after their letter, and as the
     /// card wrote them (the references the name map looks up); every pair
     /// coupled by `k` (Xyce RG and LTspice help, `K` with more than two
@@ -65,6 +75,9 @@ pub(in crate::syntax::render) enum Card {
         wave: Option<Wave>,
         /// ngspice `portnum n z0 Z`.
         port: Option<(u32, f64)>,
+        /// LTspice's `Rser=` and `Cpar=` (the source's series resistance,
+        /// its parallel capacitance), each key and value text as written.
+        parasitics: Vec<(String, String)>,
     },
     /// `B … V=` / `I=`, `E … value=`, `G … cur=`: the expression's text,
     /// and its tree (the value node).
@@ -198,6 +211,20 @@ impl<'a> Rd<'a> {
                 | Element::VoltageSource
                 | Element::CurrentSource
         );
+        if matches!(e, Element::Vcvs | Element::Vccs)
+            && let [a, b, ..] = items
+            && self.is_word(*a)
+            && self.is_word(*b)
+            && let Some(t) = self.table_source(
+                n,
+                e == Element::Vccs,
+                name.clone(),
+                self.text(*a),
+                self.text(*b),
+            )
+        {
+            return Some(t);
+        }
         let head = items.len().min(2);
         // A `B` card's body after `key =` is text to the card's end.
         let spaced = match e {
@@ -269,7 +296,7 @@ impl<'a> Rd<'a> {
                 let letter = self.letter(n);
                 match e {
                     Element::Vcvs | Element::Vccs => {
-                        if let [_, _, a] = items
+                        if let [_, _, a, mods @ ..] = items
                             && self.tag(*a) == Tag::Assign
                         {
                             let key = self.key(*a).to_ascii_lowercase();
@@ -282,7 +309,7 @@ impl<'a> Rd<'a> {
                                 name,
                                 np,
                                 nm,
-                                expr: self.body_text(v),
+                                expr: self.modified(self.body_text(v), mods)?,
                                 value: v,
                             });
                         }
@@ -315,6 +342,13 @@ impl<'a> Rd<'a> {
             }
             Element::Behavioural => self.behavioural(n, name)?,
             Element::Diode | Element::Bjt | Element::Mosfet | Element::Jfet | Element::Mesfet => {
+                self.semiconductor(n, e, name)?
+            }
+            // Xyce's and LTspice's `O` (four nodes, an LTRA model) is
+            // ngspice's (manual §6.3, Xyce RG lossy transmission line).
+            Element::LossyLine
+                if matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice) =>
+            {
                 self.semiconductor(n, e, name)?
             }
             Element::VoltageSwitch | Element::CurrentSwitch => {
@@ -393,6 +427,26 @@ impl<'a> Rd<'a> {
             .params
             .iter()
             .all(|(k, _)| SAME.iter().any(|s| k.eq_ignore_ascii_case(s)))
+    }
+
+    /// HSPICE's E/G output modifiers after `VALUE=` (HSPICE UG, E and G
+    /// elements: `SCALE` multiplies the value, `MAX` and `MIN` clamp it)
+    /// applied to `expr`; `None` for any other trailing item.
+    fn modified(&self, expr: String, mods: &[u32]) -> Option<String> {
+        let mut e = expr;
+        for &m in mods {
+            if self.b.card_rules != CardRules::Hspice || self.tag(m) != Tag::Assign {
+                return None;
+            }
+            let v = self.body_text(self.ast.rhs(Node(m)));
+            e = match self.key(m).to_ascii_lowercase().as_str() {
+                "scale" => format!("({e})*({v})"),
+                "max" => format!("min({e}, {v})"),
+                "min" => format!("max({e}, {v})"),
+                _ => return None,
+            };
+        }
+        Some(e)
     }
 
     /// A linear controlled source's items less a trailing `M=` and its

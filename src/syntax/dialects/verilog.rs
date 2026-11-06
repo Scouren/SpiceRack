@@ -7,7 +7,7 @@
 //! - `pub(super) fn verilog() -> DialectDef`
 
 use crate::syntax::Lang;
-use crate::syntax::behaviour::Writer;
+use crate::syntax::behaviour::{Parasitics, Writer};
 use crate::syntax::def::DialectDef;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
@@ -16,6 +16,7 @@ use crate::syntax::render::spelling::FuncForm;
 /// Structural Verilog: one module per subcircuit, its instances.
 pub(super) fn verilog() -> DialectDef {
     DialectDef::new("verilog")
+        .parasitics(Parasitics::Netlist)
         .writer(Writer::Verilog)
         // The spelling: ngspice's cards.
         .write_lexicon(Lang::NGSPICE)
@@ -29,6 +30,7 @@ pub(super) fn verilog() -> DialectDef {
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0001)
+        .refuse(Construct::HspiceAnalysis, Code::W0001)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)
         .native(Construct::VerilogALoad)
@@ -47,6 +49,9 @@ pub(super) fn verilog() -> DialectDef {
         .native(Construct::Conditional)
         .native(Construct::BranchParam)
         .native(Construct::Func)
+        .native(Construct::LocalFunc)
+        .native(Construct::TableSource)
+        .native(Construct::LossyLine)
         .native(Construct::Step)
         .native(Construct::StepList)
         .native(Construct::TranStartup)

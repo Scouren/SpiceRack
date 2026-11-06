@@ -227,6 +227,7 @@ calls! {
     include_scope(v: PyIncludeScope);
     named_params(v: PyNamedParams);
     expr_eval(v: PyExprEval);
+    parasitics(v: PyParasitics);
     text_family(lang: PyLang);
     spectre_analysis(kind: &str);
     code(id: &str, kind: PyKind, message: &str);

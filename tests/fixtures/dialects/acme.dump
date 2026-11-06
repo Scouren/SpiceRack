@@ -57,6 +57,7 @@ sp.ngspice_numbers false
 cell.ForeignText Refuse(W0001)
 cell.PrivateText Refuse(W0039)
 cell.XyceSens Refuse(W0015)
+cell.HspiceAnalysis Refuse(W0015)
 cell.CaretReread Refuse(W0002)
 cell.StatisticalCall Native
 cell.VerilogALoad Spell(PreOsdi)
@@ -75,6 +76,9 @@ cell.NoiseWave Native
 cell.Conditional Native
 cell.BranchParam Refuse(W0014)
 cell.Func Spell(FuncParam)
+cell.LocalFunc Native
+cell.TableSource Spell(PwlValue)
+cell.LossyLine Native
 cell.Step Refuse(W0016)
 cell.StepList Refuse(W0016)
 cell.TranStartup Refuse(W0037)
@@ -89,7 +93,7 @@ cell.Save Native
 cell.UnmappedOption Native
 cell.Statistics Lift(StatisticsDraws)
 cell.Measure Native
-behaviours Behaviours { writer: Cards, text_family: acme, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Ngspice, source_rules: Ngspice, card_rules: Ngspice, named_rules: None, options_form: Spice, load_form: Ngspice, control_block: Ngspice, analysis_form: Ngspice, end_rule: Always, value_quoting: AsWritten, coupling: Pairs, param_form: Plain, include_scope: Local, named_params: None, expr_eval: Ngspice, spectre_analyses: ["pz", "sp", "sens"] }
+behaviours Behaviours { writer: Cards, text_family: acme, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Ngspice, source_rules: Ngspice, card_rules: Ngspice, named_rules: None, options_form: Spice, load_form: Ngspice, control_block: Ngspice, analysis_form: Ngspice, end_rule: Always, value_quoting: AsWritten, coupling: Pairs, param_form: Plain, include_scope: Local, named_params: None, expr_eval: Ngspice, parasitics: Elements, spectre_analyses: ["pz", "sp", "sens"] }
 code ACME001 Refusal "acme has no Laplace sources"
 code ACME002 Refusal "acme's .noise takes one source"
 write_head KwSubckt ".subcircuit"

@@ -36,18 +36,31 @@ impl W<'_, '_> {
                 self.ask(c, tok);
             }
         }
+        if let Some(&(Func::Param(n) | Func::Card(n) | Func::Real(n))) =
+            blocks.iter().flat_map(|b| &b.funcs).next()
+        {
+            self.ask(Construct::LocalFunc, self.rd.main(n));
+        }
         own.iter().for_each(|&tok| self.note(Code::W0027, tok));
         if let Some(tok) = self.rd.tran_startup(&self.deck.bench) {
             self.ask(Construct::TranStartup, tok);
         }
-        // A waveform's values past its form's count are not written.
+        // A waveform's values past its form's count are not written; no
+        // source parasitic is (spice/parasitics.rs writes them).
         for b in &blocks {
             for &c in &b.comps {
-                if let Comp::Card(n) = c
-                    && let Card::Source { wave: Some(w), .. } = self.rd.card_view(n)
-                    && w.cut
-                {
+                let Comp::Card(n) = c else { continue };
+                let Card::Source {
+                    wave, parasitics, ..
+                } = self.rd.card_view(n)
+                else {
+                    continue;
+                };
+                if wave.is_some_and(|w| w.cut) {
                     self.note(Code::W0026, self.rd.main(n));
+                }
+                if !parasitics.is_empty() {
+                    self.refuse(Code::W0114, self.rd.main(n));
                 }
             }
         }
@@ -238,7 +251,7 @@ fn card_exprs(c: Card, tok: u32, out: &mut Vec<(String, u32)>) {
             }
             out.extend(expr(value));
         }
-        Card::Behavioural { expr, .. } => out.push((expr, tok)),
+        Card::Behavioural { expr, .. } | Card::Table { expr, .. } => out.push((expr, tok)),
         Card::Charge { charge, params, .. } => {
             out.push((charge, tok));
             out.extend(params.into_iter().map(at));

@@ -13,8 +13,8 @@ from spicerack.def_ import (Alt, Analysis, AnalysisForm, Arithmetic, Backslash, 
                             Code, Command, Construct, ControlBlock, Coupling, Devices, Dollar, End,
                             EndRule, ExprEval, FuncForm, IncludeScope, Join, Keywords, Lang,
                             LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading,
-                            Operators, OptionsForm, ParamForm, Quote, Quoting, Rule, Scale, SourceRules,
-                            Statement, Tag, Tail, ValueQuoting, Writer)
+                            Operators, OptionsForm, ParamForm, Parasitics, Quote, Quoting, Rule,
+                            Scale, SourceRules, Statement, Tag, Tail, ValueQuoting, Writer)
 
 
 def ngspice(d):
@@ -117,6 +117,7 @@ def ngspice(d):
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .refuse(Construct.XyceSens, Code.W0015)
+        .refuse(Construct.HspiceAnalysis, Code.W0015)
         .refuse(Construct.CaretReread, Code.W0002)
         .native(Construct.StatisticalCall)
         .spell(Construct.VerilogALoad, Alt.PreOsdi)
@@ -135,6 +136,9 @@ def ngspice(d):
         .native(Construct.Conditional)
         .refuse(Construct.BranchParam, Code.W0014)
         .native(Construct.Func)
+        .native(Construct.LocalFunc)
+        .spell(Construct.TableSource, Alt.PwlValue)
+        .native(Construct.LossyLine)
         .refuse(Construct.Step, Code.W0016)
         .refuse(Construct.StepList, Code.W0016)
         .refuse(Construct.TranStartup, Code.W0037)
@@ -170,7 +174,8 @@ def espice(d):
         .omit(Construct.NgBehavior, Code.W0030)
         .lift(Construct.Laplace, Rule.LaplaceTable)
         .native(Construct.PwlRepeatI)
-        .refuse(Construct.NoiseWave, Code.W0009))
+        .refuse(Construct.NoiseWave, Code.W0009)
+        .refuse(Construct.TableSource, Code.W0102))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,
@@ -280,6 +285,7 @@ def hspice(d):
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .refuse(Construct.XyceSens, Code.W0015)
+        .native(Construct.HspiceAnalysis)
         .refuse(Construct.CaretReread, Code.W0002)
         .native(Construct.StatisticalCall)
         .spell(Construct.VerilogALoad, Alt.Hdl)
@@ -298,6 +304,9 @@ def hspice(d):
         .native(Construct.Conditional)
         .refuse(Construct.BranchParam, Code.W0014)
         .spell(Construct.Func, Alt.FuncParam)
+        .native(Construct.LocalFunc)
+        .refuse(Construct.TableSource, Code.W0102)
+        .refuse(Construct.LossyLine, Code.W0105)
         .refuse(Construct.Step, Code.W0016)
         .refuse(Construct.StepList, Code.W0016)
         .refuse(Construct.TranStartup, Code.W0037)
@@ -409,6 +418,8 @@ def xyce(d):
     for s, t in XYCE_OWN_KEYWORDS:
         d = d.keyword(s, t)
     d = d.devices(Devices.Spice)
+    d = d.devices(Devices.LossyLine)
+    d = d.devices(Devices.XycePort)
     return (d
         # The spelling.
         .comment("*")
@@ -435,6 +446,7 @@ def xyce(d):
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .native(Construct.XyceSens)
+        .refuse(Construct.HspiceAnalysis, Code.W0015)
         .refuse(Construct.CaretReread, Code.W0002)
         .native(Construct.StatisticalCall)
         .refuse(Construct.VerilogALoad, Code.W0004)
@@ -446,13 +458,16 @@ def xyce(d):
         .spell(Construct.ChargeCapacitor, Alt.ChargeBraced)
         .spell(Construct.BehaviouralSource, Alt.BracedBehaviour)
         .refuse(Construct.Laplace, Code.W0011)
-        .refuse(Construct.RfPort, Code.W0007)
+        .spell(Construct.RfPort, Alt.XycePort)
         .refuse(Construct.PwlRepeatV, Code.W0008)
         .refuse(Construct.PwlRepeatI, Code.W0008)
         .refuse(Construct.NoiseWave, Code.W0009)
         .refuse(Construct.Conditional, Code.W0013)
         .refuse(Construct.BranchParam, Code.W0014)
         .native(Construct.Func)
+        .native(Construct.LocalFunc)
+        .native(Construct.TableSource)
+        .native(Construct.LossyLine)
         .native(Construct.Step)
         .native(Construct.StepList)
         .refuse(Construct.TranStartup, Code.W0037)
@@ -461,7 +476,7 @@ def xyce(d):
         .refuse(Construct.Sens, Code.W0015)
         .refuse(Construct.SensAc, Code.W0015)
         .refuse(Construct.PoleZero, Code.W0015)
-        .refuse(Construct.SParameter, Code.W0015)
+        .spell(Construct.SParameter, Alt.XyceLin)
         .native(Construct.Print)
         .omit(Construct.Save, Code.W0023)
         .refuse(Construct.UnmappedOption, Code.W0017)
@@ -555,6 +570,7 @@ def ltspice(d):
         d = d.keyword(s, t)
     d = d.keywords(Keywords.Spice)
     d = d.devices(Devices.Spice)
+    d = d.devices(Devices.LossyLine)
     return (d
         # The spelling.
         .comment("*")
@@ -567,12 +583,14 @@ def ltspice(d):
         .card_rules(CardRules.Ltspice)
         .load_form(LoadForm.Ltspice)
         .analysis_form(AnalysisForm.Ltspice)
+        .parasitics(Parasitics.Ltspice)
         .coupling(Coupling.OneCard)
         .spectre_analysis("sweep")
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .refuse(Construct.XyceSens, Code.W0015)
+        .refuse(Construct.HspiceAnalysis, Code.W0015)
         .refuse(Construct.CaretReread, Code.W0002)
         .refuse(Construct.StatisticalCall, Code.W0003)
         .refuse(Construct.VerilogALoad, Code.W0004)
@@ -591,6 +609,9 @@ def ltspice(d):
         .refuse(Construct.Conditional, Code.W0013)
         .refuse(Construct.BranchParam, Code.W0014)
         .native(Construct.Func)
+        .refuse(Construct.LocalFunc, Code.W0106)
+        .refuse(Construct.TableSource, Code.W0102)
+        .native(Construct.LossyLine)
         .native(Construct.Step)
         .native(Construct.StepList)
         .native(Construct.TranStartup)
@@ -785,6 +806,7 @@ def spectre(d):
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .refuse(Construct.XyceSens, Code.W0015)
+        .refuse(Construct.HspiceAnalysis, Code.W0015)
         .refuse(Construct.CaretReread, Code.W0002)
         .lift(Construct.StatisticalCall, Rule.RackVars)
         .native(Construct.VerilogALoad)
@@ -803,6 +825,9 @@ def spectre(d):
         .native(Construct.Conditional)
         .native(Construct.BranchParam)
         .native(Construct.Func)
+        .refuse(Construct.LocalFunc, Code.W0106)
+        .refuse(Construct.TableSource, Code.W0102)
+        .refuse(Construct.LossyLine, Code.W0105)
         .native(Construct.Step)
         .native(Construct.StepList)
         .refuse(Construct.TranStartup, Code.W0037)
@@ -958,6 +983,7 @@ def vacask(d):
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .refuse(Construct.XyceSens, Code.W0015)
+        .refuse(Construct.HspiceAnalysis, Code.W0015)
         .refuse(Construct.CaretReread, Code.W0002)
         .lift(Construct.StatisticalCall, Rule.VacaskCalls)
         .native(Construct.VerilogALoad)
@@ -976,6 +1002,9 @@ def vacask(d):
         .native(Construct.Conditional)
         .refuse(Construct.BranchParam, Code.W0014)
         .refuse(Construct.Func, Code.W0106)
+        .refuse(Construct.LocalFunc, Code.W0106)
+        .refuse(Construct.TableSource, Code.W0102)
+        .refuse(Construct.LossyLine, Code.W0105)
         .native(Construct.Step)
         .native(Construct.StepList)
         .refuse(Construct.TranStartup, Code.W0037)
@@ -994,6 +1023,7 @@ def vacask(d):
 
 def cdl(d):
     return (d
+        .parasitics(Parasitics.Netlist)
         .writer(Writer.Cdl)
         # The spelling: ngspice's cards.
         .write_lexicon(Lang.NGSPICE)
@@ -1007,6 +1037,7 @@ def cdl(d):
         .omit(Construct.ForeignText, Code.W0028)
         .copy(Construct.PrivateText, Code.W0027)
         .copy(Construct.XyceSens, Code.W0027)
+        .copy(Construct.HspiceAnalysis, Code.W0027)
         .refuse(Construct.CaretReread, Code.W0002)
         .native(Construct.StatisticalCall)
         .native(Construct.VerilogALoad)
@@ -1025,6 +1056,9 @@ def cdl(d):
         .native(Construct.Conditional)
         .native(Construct.BranchParam)
         .native(Construct.Func)
+        .native(Construct.LocalFunc)
+        .native(Construct.TableSource)
+        .native(Construct.LossyLine)
         .native(Construct.Step)
         .native(Construct.StepList)
         .native(Construct.TranStartup)
@@ -1043,6 +1077,7 @@ def cdl(d):
 
 def verilog(d):
     return (d
+        .parasitics(Parasitics.Netlist)
         .writer(Writer.Verilog)
         # The spelling: ngspice's cards.
         .write_lexicon(Lang.NGSPICE)
@@ -1056,6 +1091,7 @@ def verilog(d):
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
         .refuse(Construct.XyceSens, Code.W0001)
+        .refuse(Construct.HspiceAnalysis, Code.W0001)
         .refuse(Construct.CaretReread, Code.W0002)
         .native(Construct.StatisticalCall)
         .native(Construct.VerilogALoad)
@@ -1074,6 +1110,9 @@ def verilog(d):
         .native(Construct.Conditional)
         .native(Construct.BranchParam)
         .native(Construct.Func)
+        .native(Construct.LocalFunc)
+        .native(Construct.TableSource)
+        .native(Construct.LossyLine)
         .native(Construct.Step)
         .native(Construct.StepList)
         .native(Construct.TranStartup)
@@ -1103,7 +1142,6 @@ def ngspice_given(d):
         .region("ltspice", Lang.LTSPICE)
         .region("xyce", Lang.XYCE)
         .regions_registered(True))
-
 
 
 # Each built-in: its function here and its registered Rust row.

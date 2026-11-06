@@ -31,7 +31,7 @@
 //! - the behaviour calls: `writer`, `text_family`, `caret_power`, `hier_sep`, `number_reading`,
 //!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
-//!   `named_params`, `expr_eval`, `spectre_analysis`
+//!   `named_params`, `expr_eval`, `parasitics`, `spectre_analysis`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
 //!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
@@ -45,7 +45,7 @@ mod plugin;
 use crate::syntax::behaviour::{
     AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope,
     LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm,
-    SourceRules, ValueQuoting, Writer,
+    Parasitics, SourceRules, ValueQuoting, Writer,
 };
 use crate::syntax::device::{self, Device};
 use crate::syntax::diag::{Code, Kind};
@@ -111,6 +111,10 @@ pub enum Devices {
     Spice,
     /// ngspice's own letters.
     NgspiceOwn,
+    /// The `O` lossy line (Xyce, LTspice).
+    LossyLine,
+    /// Xyce's `P` port.
+    XycePort,
     /// Spectre's masters.
     Spectre,
     /// VACASK's built-in modules.
@@ -480,6 +484,8 @@ impl DialectDef {
         let rows = match table {
             Devices::Spice => device::SPICE,
             Devices::NgspiceOwn => device::NGSPICE_OWN,
+            Devices::LossyLine => device::LOSSY_LINE,
+            Devices::XycePort => device::XYCE_PORT,
             Devices::Spectre => device::SPECTRE,
             Devices::Vacask => device::VACASK,
         };
@@ -617,6 +623,7 @@ impl DialectDef {
     set!(include_scope, b.include_scope: IncludeScope);
     set!(named_params, b.named_params: NamedParams);
     set!(expr_eval, b.expr_eval: ExprEval);
+    set!(parasitics, b.parasitics: Parasitics);
 
     /// A region kept as `lang`'s text is written as written here.
     pub fn text_family(mut self, lang: Lang) -> Self {

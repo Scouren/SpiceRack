@@ -139,6 +139,8 @@ pub(super) fn xyce() -> DialectDef {
         d = d.keyword(s, t);
     }
     d = d.devices(Devices::Spice);
+    d = d.devices(Devices::LossyLine);
+    d = d.devices(Devices::XycePort);
     d
         // The spelling.
         .comment("*")
@@ -165,6 +167,7 @@ pub(super) fn xyce() -> DialectDef {
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
         .native(Construct::XyceSens)
+        .refuse(Construct::HspiceAnalysis, Code::W0015)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)
         .refuse(Construct::VerilogALoad, Code::W0004)
@@ -176,13 +179,16 @@ pub(super) fn xyce() -> DialectDef {
         .spell(Construct::ChargeCapacitor, Alt::ChargeBraced)
         .spell(Construct::BehaviouralSource, Alt::BracedBehaviour)
         .refuse(Construct::Laplace, Code::W0011)
-        .refuse(Construct::RfPort, Code::W0007)
+        .spell(Construct::RfPort, Alt::XycePort)
         .refuse(Construct::PwlRepeatV, Code::W0008)
         .refuse(Construct::PwlRepeatI, Code::W0008)
         .refuse(Construct::NoiseWave, Code::W0009)
         .refuse(Construct::Conditional, Code::W0013)
         .refuse(Construct::BranchParam, Code::W0014)
         .native(Construct::Func)
+        .native(Construct::LocalFunc)
+        .native(Construct::TableSource)
+        .native(Construct::LossyLine)
         .native(Construct::Step)
         .native(Construct::StepList)
         .refuse(Construct::TranStartup, Code::W0037)
@@ -191,7 +197,7 @@ pub(super) fn xyce() -> DialectDef {
         .refuse(Construct::Sens, Code::W0015)
         .refuse(Construct::SensAc, Code::W0015)
         .refuse(Construct::PoleZero, Code::W0015)
-        .refuse(Construct::SParameter, Code::W0015)
+        .spell(Construct::SParameter, Alt::XyceLin)
         .native(Construct::Print)
         .omit(Construct::Save, Code::W0023)
         .refuse(Construct::UnmappedOption, Code::W0017)

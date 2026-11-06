@@ -34,6 +34,9 @@ pub enum Construct {
     /// Xyce's `.sens` (objective, parameters, over the deck's analysis),
     /// kept as text.
     XyceSens,
+    /// HSPICE's `.sn`, `.snnoise`, `.snxf`, `.trannoise`, `.lstb`, kept as
+    /// text.
+    HspiceAnalysis,
     /// A `^` the target reads with the other meaning (power, XOR).
     CaretReread,
     /// A call of `agauss`, `gauss`, `aunif`, `unif` or `limit`.
@@ -73,6 +76,13 @@ pub enum Construct {
     BranchParam,
     /// `.func f(x) body`.
     Func,
+    /// A `.func` local to a subcircuit (it reads the subcircuit's
+    /// parameters, or another `.func` shares its name).
+    LocalFunc,
+    /// Xyce's `E`/`G` `TABLE`.
+    TableSource,
+    /// An `O` lossy line on an LTRA model.
+    LossyLine,
     /// `.step`.
     Step,
     /// `.step <name> list <values>`.
@@ -140,6 +150,12 @@ pub enum Alt {
     /// `.dc src DEC|OCT np start stop`, `.dc src POI n v…` (HSPICE `.DC`,
     /// the `type np` form).
     DcType,
+    /// An E/G `value={pwl(expr, x, y, …)}` (ngspice).
+    PwlValue,
+    /// `P n+ n- port=n z0=z` (Xyce).
+    XycePort,
+    /// `.LIN` beside an `.AC` of the sweep (Xyce).
+    XyceLin,
     /// Not written, the code the note the writer records for it.
     Omit(Code),
     /// Written as is, the code the note the writer records for it.
@@ -230,10 +246,11 @@ mod tests {
         );
     }
 
-    const CONSTRUCTS: [Construct; 35] = [
+    const CONSTRUCTS: [Construct; 39] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
+        Construct::HspiceAnalysis,
         Construct::NgBehavior,
         Construct::CaretReread,
         Construct::StatisticalCall,
@@ -252,6 +269,9 @@ mod tests {
         Construct::Conditional,
         Construct::BranchParam,
         Construct::Func,
+        Construct::LocalFunc,
+        Construct::TableSource,
+        Construct::LossyLine,
         Construct::Step,
         Construct::StepList,
         Construct::TranStartup,

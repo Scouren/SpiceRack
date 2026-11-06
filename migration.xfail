@@ -17685,10 +17685,10 @@ xyce/Certification_Tests/BUG_67/bug_67.cir hspice written with unparsed text (66
 xyce/Certification_Tests/BUG_67/bug_67.cir ltspice written with unparsed text (66:12: P0002) is refused W0032
 xyce/Certification_Tests/BUG_67/bug_67.cir ngspice written with unparsed text (66:12: P0002) is refused W0032
 xyce/Certification_Tests/BUG_730/bug_730.cir cdl written with unparsed text (39:11: P0002) is refused W0032
-xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir cdl written with unparsed text (40:28: P0002) is refused W0032
-xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir cdl written with unparsed text (31:28: P0002) is refused W0032
-xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir cdl written with unparsed text (31:28: P0002) is refused W0032
-xyce/Certification_Tests/BUG_794_SON/test1.cir cdl written with unparsed text (9:39: P0002) is refused W0032
+xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir cdl written with unparsed text (40:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir cdl written with unparsed text (31:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir cdl written with unparsed text (31:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_794_SON/test1.cir cdl written with unparsed text (9:39: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
 xyce/FOURIER/bad_dot_four_line1.cir cdl written with unparsed text (24:7: P0008) is refused W0032
 xyce/GenCoupAPI/genextDC.cir cdl written with unparsed text (10:25: P0002) is refused W0032
 xyce/GenCoupAPI/genextLeadCurr.cir cdl written with unparsed text (15:28: P0002) is refused W0032
@@ -17732,7 +17732,7 @@ xyce/MPDE/sandler24.cir hspice written with unparsed text (75:14: P0002) is refu
 xyce/MPDE/sandler24.cir ltspice written with unparsed text (75:14: P0002) is refused W0032
 xyce/MPDE/sandler24.cir ngspice written with unparsed text (75:14: P0002) is refused W0032
 xyce/MPDE/sandler24_MPDE.cir cdl written with unparsed text (73:14: P0002) is refused W0032
-xyce/Message/Device/DeviceBlock_extractBehavioralDeviceData.cir cdl written with unparsed text (16:16: P0008) is refused W0032
+xyce/Message/Device/DeviceBlock_extractBehavioralDeviceData.cir cdl written with unparsed text (16:16: P0008) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
 xyce/Message/Device/DeviceBlock_extractInstanceParam.cir cdl written with unparsed text (28:13: P0002) is refused W0032
 xyce/Message/Function/invalid_math_operator.cir espice written with unparsed text (6:20: P0002) is refused W0032
 xyce/Message/Function/invalid_math_operator.cir hspice written with unparsed text (6:20: P0002) is refused W0032
@@ -17787,10 +17787,10 @@ xyce/POLY/twoVarThirdOrd.cir espice written with unparsed text (27:28: P0002) is
 xyce/POLY/twoVarThirdOrd.cir hspice written with unparsed text (27:28: P0002) is refused W0032
 xyce/POLY/twoVarThirdOrd.cir ltspice written with unparsed text (27:28: P0002) is refused W0032
 xyce/POLY/twoVarThirdOrd.cir ngspice written with unparsed text (27:28: P0002) is refused W0032
-xyce/POWER/power_e_gear.cir cdl written with unparsed text (20:28: P0002) is refused W0032
-xyce/POWER/power_e_trap.cir cdl written with unparsed text (20:28: P0002) is refused W0032
-xyce/POWER/power_g_gear.cir cdl written with unparsed text (20:28: P0002) is refused W0032
-xyce/POWER/power_g_trap.cir cdl written with unparsed text (20:28: P0002) is refused W0032
+xyce/POWER/power_e_gear.cir cdl written with unparsed text (20:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_trap.cir cdl written with unparsed text (20:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_gear.cir cdl written with unparsed text (20:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_trap.cir cdl written with unparsed text (20:28: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
 xyce/POWERNODE/sixNode_top.cir cdl written with unparsed text (42:9: P0002) is refused W0032
 xyce/SANDLER24/sandler24.cir cdl written with unparsed text (67:14: P0002) is refused W0032
 xyce/SANDLER24/sandler24.cir espice written with unparsed text (67:14: P0002) is refused W0032
@@ -17820,8 +17820,8 @@ xyce/WAMPDE/sandler24_WAMPDE.cir espice written with unparsed text (72:14: P0002
 xyce/WAMPDE/sandler24_WAMPDE.cir hspice written with unparsed text (72:14: P0002) is refused W0032
 xyce/WAMPDE/sandler24_WAMPDE.cir ltspice written with unparsed text (72:14: P0002) is refused W0032
 xyce/WAMPDE/sandler24_WAMPDE.cir ngspice written with unparsed text (72:14: P0002) is refused W0032
-xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir cdl written with unparsed text (24:47: P0002) is refused W0032
-xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir cdl written with unparsed text (28:46: P0002) is refused W0032
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir cdl written with unparsed text (24:47: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir cdl written with unparsed text (28:46: P0002) is refused W0032; and (spice-read) written differently: Xyce E/G TABLE read
 
 # Phase 7: spice-write: CDL kept text (P7-9). No reader reads CDL, so text
 # the reader kept as the source's (P0001, a statement or element no rule
@@ -17840,7 +17840,7 @@ hspice/hspice/behavioural_sources.sp cdl kept text left out (W0028), a kept elem
 hspice/hspice/behavioural_time_delay.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/checks.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/connect.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-hspice/hspice/dc_start_stop.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+hspice/hspice/dc_start_stop.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: HSPICE .noise over the .ac sweep / keyword .dc read
 hspice/hspice/fft_hann.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/fft_kaiser.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/fft_meas.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -17861,7 +17861,7 @@ hspice/hspice/meas_ptdnoise.sp cdl kept text left out (W0028), a kept element a 
 hspice/hspice/net_one_port.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/net_tpad_y.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/net_tpad_z.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-hspice/hspice/noise_ac_sweep.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+hspice/hspice/noise_ac_sweep.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: HSPICE .noise over the .ac sweep / keyword .dc read
 hspice/hspice/pattern_source.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/pole_source.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/pole_step.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -17872,8 +17872,8 @@ hspice/hspice/ptdnoise_time_sweep.sp cdl kept text left out (W0028), a kept elem
 hspice/hspice/pz_source.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/s_element.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/s_element_tran.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-hspice/hspice/sample_rc.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-hspice/hspice/sample_rc_beta.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+hspice/hspice/sample_rc.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc_beta.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: HSPICE .noise over the .ac sweep / keyword .dc read
 hspice/hspice/sn_rc.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/snac_rc.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 hspice/hspice/snnoise_rc.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -17932,7 +17932,7 @@ spice-bench/ngspice/examples/measure/inv-meas-tran-control.sp cdl kept text left
 spice-bench/ngspice/examples/measure/inv-meas-tran.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 spice-bench/ngspice/examples/p-to-n-examples/switch-oscillators.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 spice-bench/ngspice/examples/probe/555-timer-2.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
 spice-bench/ngspice/examples/probe/F5TurboV2-Probe.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 spice-bench/ngspice/examples/probe/ac-test.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 spice-bench/ngspice/examples/probe/cntrl-sources.sp cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18133,12 +18133,12 @@ xyce/BJT_EXTNODE/npn_rc_re_3.cir cdl kept text left out (W0028), a kept element 
 xyce/BSIM4_Versioning/bsim4_test1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/BSRC/bsrc1_m.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/BSRC/bsrc2_m.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/BUG_174/nlrcs10.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/BUG_174/nlrcs10.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/BUG_374/resistor-bug.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/CAPACITOR/ErrorMessageTest.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/COMPLEX_NUM/test4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/COMPLEX_NUM/test5.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_1012/negtable.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_1012/negtable.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce E/G TABLE read
 xyce/Certification_Tests/BUG_1020_SON/subcparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_expr2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_1035_SON/RC_AC_data_expr3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18170,7 +18170,7 @@ xyce/Certification_Tests/BUG_1296/1296.cir cdl kept text left out (W0028), a kep
 xyce/Certification_Tests/BUG_1302/bug_1302.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_1325_SON/Win/inc_lib_file_absolute_path.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_1325_SON/inc_lib_file_absolute_path.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_133/bug_133.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_133/bug_133.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce E/G TABLE read
 xyce/Certification_Tests/BUG_1376/lower_case.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_1376/upper_case.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_141_SON/dig_count.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18193,12 +18193,12 @@ xyce/Certification_Tests/BUG_28_SON/bug_28_son5_1.cir cdl kept text left out (W0
 xyce/Certification_Tests/BUG_28_SON/bug_28_son5_2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_28_SON/bug_28_son5_3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_294_SON/bjt_save.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_311/bug_311_a.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_311/bug_311_b.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_311/bug_311_a.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_b.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
 xyce/Certification_Tests/BUG_340/stepRC-hb.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_384_SON/invalid_enhancement_specie.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_384_SON/invalid_enhancement_type.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18224,13 +18224,13 @@ xyce/Certification_Tests/BUG_538_SON/bug_538_son_5.cir cdl kept text left out (W
 xyce/Certification_Tests/BUG_538_SON/bug_538_son_5_baseline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_538_SON/bug_538_son_7.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_538_SON/bug_538_son_7_baseline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_544_SON/bug_544.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_544_SON/bug_544.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/Certification_Tests/BUG_546_SON/tempcap_instance2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_547_SON/mb_orig.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_573_SON/common_emitter_hb.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_577_SON/bug577son.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_587/587.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_592_SON/bug_592.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_592_SON/bug_592.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
 xyce/Certification_Tests/BUG_606_SON/global_params.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_606_SON/global_params_dev_options.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_606_SON/global_params_step.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18269,7 +18269,7 @@ xyce/Certification_Tests/BUG_702/dup-external.cir cdl kept text left out (W0028)
 xyce/Certification_Tests/BUG_702/dup-inlined.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_702/empty-initcond.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_702/external.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_702/inlined-multiple.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_702/inlined-multiple.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/Certification_Tests/BUG_702/inlined-single.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_702/missing-initcond.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_702/precedence.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18293,7 +18293,7 @@ xyce/Certification_Tests/BUG_966_SON/tran-sens-error.cir cdl kept text left out 
 xyce/Certification_Tests/BUG_966_SON/tran-sens-multifile.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_966_SON/tran-sens-nooverwrite.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_966_SON/tran-sens.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Certification_Tests/BUG_983_SON/ltra.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Certification_Tests/BUG_983_SON/ltra.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
 xyce/Certification_Tests/BUG_983_SON/memristorPEM.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_988_SON/ydevices.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Certification_Tests/BUG_991_SON/BH_nogap.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18488,12 +18488,12 @@ xyce/HB/invert_hb_accurate_nostartup.cir cdl kept text left out (W0028), a kept 
 xyce/HB/invert_hb_corrected.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/HB/invert_hb_lapack.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/IBIS/ibis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/IC_AND_NODESET/dcvolt_cap3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/IC_AND_NODESET/dcvolt_cap4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/IC_AND_NODESET/hussamp_par1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/IC_AND_NODESET/hussamp_par2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/IC_AND_NODESET/ic_cap3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/IC_AND_NODESET/ic_cap4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/IC_AND_NODESET/dcvolt_cap3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
 xyce/INDUCTOR/ErrorMessageTest.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/INVALID_CHARS/comma_fails_device_name.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/INVALID_CHARS/comma_fails_node_name.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18514,16 +18514,16 @@ xyce/LEAD_CURRENTS/lead_min_gear.cir cdl kept text left out (W0028), a kept elem
 xyce/LEAD_CURRENTS/lead_min_trap.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/LEAD_CURRENTS/lead_pde_dio.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/LEAD_CURRENTS/lead_unsupported_devices.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/ErrorMessageTest.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/bad_model_parameters.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/ltra1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/ltra2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/ltra3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/square-wave-gen-resistor-compact.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/square-wave-gen-resistor.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/zero_length_lc_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/zero_length_rc_rg_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/LTRA/zero_length_rlc_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/LTRA/ErrorMessageTest.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/bad_model_parameters.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/ltra1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/ltra2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/ltra3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/square-wave-gen-resistor-compact.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/square-wave-gen-resistor.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/zero_length_lc_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/zero_length_rc_rg_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
+xyce/LTRA/zero_length_rlc_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
 xyce/LUMPEDLINE/lumpedLine.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/LUMPEDLINE/lumpedLine_issue191.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MAX_TIME_STEP/max_time_step.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18532,7 +18532,7 @@ xyce/MEASURE/PrecisionTest.cir cdl kept text left out (W0028), a kept element a 
 xyce/MEASURE/REMEASURE/RemeasureDotData.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MEASURE/REMEASURE/RemeasureStepGnuplotData.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MEASURE_AC/AvgTestAC.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/MEASURE_AC/RFParamsOps.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/MEASURE_AC/RFParamsOps.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/MEASURE_DC/AvgTest1DC.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MEASURE_DC/DotData.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MEASURE_DC/DoubleDCOP.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18562,7 +18562,7 @@ xyce/MEMRISTOR/memristorPEM1wIC.cir cdl kept text left out (W0028), a kept eleme
 xyce/MEMRISTOR/memristorPEM2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MEMRISTOR/memristorTEAM_lp_trap.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MEMRISTOR/memristorTEAM_test.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/MEMRISTOR/memristorYakopcic.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/MEMRISTOR/memristorYakopcic.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/MINDUCTORS/MINDUCTORS_IC3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MINDUCTORS/MINDUCTORS_IC3baseline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MINDUCTORS/MINDUCTORS_IC4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18612,10 +18612,10 @@ xyce/MIXED_SIGNAL/Python/getDeviceReturnCodes.cir cdl kept text left out (W0028)
 xyce/MIXED_SIGNAL/Python/getDeviceReturnCodesSubckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MIXED_SIGNAL/Python/interfaceErrorMessages.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MIXED_SIGNAL/Python/runCircuitWithBogoDAC.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/MIXED_SIGNAL/Python/runCircuitWithDACs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/MIXED_SIGNAL/Python/runCircuitWithDACs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/MIXED_SIGNAL/VPI/ADCStateTest.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MIXED_SIGNAL/VPI/ADCtest.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/MIXED_SIGNAL/VPI/runXyceWithDAC.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/MIXED_SIGNAL/VPI/runXyceWithDAC.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/MODEL_BINNING/tranInverterBinning.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MPDE/DCMIX_BAL/dcmix_bal.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/MPDE/FORCED_OSCILLATOR/forced_oscillator.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18635,7 +18635,7 @@ xyce/Message/Device/DeviceBlock_extractSwitchDeviceData.cir cdl kept text left o
 xyce/Message/Device/DeviceBlock_extractUDeviceData.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Device/DeviceBlock_extractYDeviceData.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Device/DeviceEntity_sensAvailDefaultParam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Message/Input/AC_doInit2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Message/Input/AC_doInit2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/Message/Input/AC_doInit3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Input/AC_doInit4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Input/AC_extractACData1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18663,10 +18663,10 @@ xyce/Message/Input/SAMPLING_setAnalysisParams3.cir cdl kept text left out (W0028
 xyce/Message/Input/SweepParams_parseSweepParams.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Input/SweepParams_parseSweepParams1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Input/SweepParams_processDataStatements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Message/Subcircuit/subckt_j1_dup_error.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Message/Subcircuit/subckt_j1_dup_error.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/Message/Subcircuit/subckt_noname.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Message/Subcircuit/subckt_unused.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Message/Topology/Bad_Voltage_Node_Error.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Message/Topology/Bad_Voltage_Node_Error.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce E/G TABLE read
 xyce/NEURON/CS_Patch.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/NEURON/Cable_HH_Membrane.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/NEURON/Cable_Passive_Membrane.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18692,7 +18692,7 @@ xyce/NEURON/synapseDCOP-level4.cir cdl kept text left out (W0028), a kept elemen
 xyce/NEURON/synapticCurrent-level3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/NEURON/synapticCurrent-level4.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/NEURONPOP/NeuronPopLv1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/NL_RESISTOR/nlrcs10.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/NL_RESISTOR/nlrcs10.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/NOISE/commonEmitterBjt_ngspice.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/NOISE/res_noise_ngspice.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/AC-SENS/ac-sens-csv.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18716,7 +18716,7 @@ xyce/Output/Dasho/hb.cir cdl kept text left out (W0028), a kept element a W0001 
 xyce/Output/Dasho/printLine_for_hb_ic.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/Dasho/printLine_for_hb_startup.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/Dasho/printLine_for_hb_td.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/Dasho/sparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Output/Dasho/sparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/Output/Dasho/tran-stepnum-col.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/Dasho/tran.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/ES/dashRNotSupported.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -18797,36 +18797,36 @@ xyce/Output/SENS/sens-tranadjoint-noindex.cir cdl kept text left out (W0028), a 
 xyce/Output/SENS/sens-tranadjoint-overrideRaw.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/SENS/sens-tranadjoint-unsupportedProbeFormat.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/Output/SENS/sens-tranadjoint-unsupportedRawFormat.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/InvalidDotLinParams1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/InvalidDotLinParams2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/InvalidRFParamOp-NoLin.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/InvalidRFParamOp-Step-NoLin.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/InvalidRFParamOp.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/InvalidRFParamOp1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/NegativeZ0.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/RCladderSP1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/RCladderSP1_step.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/RCladderSPdc.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/RCladderSPtran.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Output/SPARAMS/InvalidDotLinParams1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp-NoLin.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp-Step-NoLin.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/NegativeZ0.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSP1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSP1_step.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSPdc.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSPtran.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/Output/SPARAMS/ac.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/dashRNotSupported.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/multi-parameter.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-phase-in-radians.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts1-1port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts1-3port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts1-4port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts1-5port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/sparams-ts2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/yparams-ts1-1port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/yparams-ts1-2port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/yparams-ts2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/zparams-ts1-1port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/zparams-ts1-2port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/Output/SPARAMS/zparams-ts2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/PARAMS2/Params_A8.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/PARAMS2/Params_A8_hs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/Output/SPARAMS/dashRNotSupported.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/multi-parameter.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-phase-in-radians.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-1port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-3port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-4port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-5port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-1port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-2port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-1port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-2port.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/PARAMS2/Params_A8.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/PARAMS2/Params_A8_hs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/PARAM_REFACTOR/paramDep1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/PARAM_REFACTOR/paramStep2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/PARAM_REFACTOR/sensCapGear_baseline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -19093,16 +19093,16 @@ xyce/SENS/unsupportedRawFormat.cir cdl kept text left out (W0028), a kept elemen
 xyce/SENS/vpulse.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/SENS/vpwl.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/SENS/vsffm.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SIMULINK/1Dac2ADCSystem.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SIMULINK/TestNetlist3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/SIMULINK/1Dac2ADCSystem.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SIMULINK/TestNetlist3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/SUBCKT/subckt_a4_ends_warning.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_i2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_i3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_i3_hs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_j1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_j1_dup.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_j1_dup_error.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/SUBCKT/subckt_j1_hs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/SUBCKT/subckt_i2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3_hs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup_error.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_hs.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .func inside a .subckt read
 xyce/TEMPCAP/tempcap_instance2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/TEMPIND/tempind_instance2.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/TRANSLINE/ErrorMessageTest1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -19129,7 +19129,7 @@ xyce/WAMPDE/OSCILLATOR/lcosc.cir cdl kept text left out (W0028), a kept element 
 xyce/WAMPDE/Todd_test.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/WAMPDE/VCO/lcosc.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/HSPICE/INITIAL_CONDITION/ic_global_node_warning.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/HSPICE/INITIAL_CONDITION/ic_in_subckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/XDM/HSPICE/INITIAL_CONDITION/ic_in_subckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
 xyce/XDM/HSPICE/MODELS/capacitor_model_statements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/HSPICE/MODELS/inductor_model_statements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/HSPICE/MODELS/resistor_model_statements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -19137,14 +19137,14 @@ xyce/XDM/HSPICE/NODESET/nodeset_global_node_warning.cir cdl kept text left out (
 xyce/XDM/HSPICE/OTHER_PARSING/gnd_exclamation_point_node_symbol.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/HSPICE/OTHER_PARSING/gnd_node_symbol.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/HSPICE/OTHER_PARSING/ground_node_symbol.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce E/G TABLE read
 xyce/XDM/PSPICE/IC_AND_NODESET/ic_global_node_warning.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/PSPICE/IC_AND_NODESET/ic_in_subckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/XDM/PSPICE/IC_AND_NODESET/ic_in_subckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
 xyce/XDM/PSPICE/IC_AND_NODESET/nodeset_global_node_warning.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/PSPICE/IC_AND_NODESET/nodeset_in_subckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/XDM/PSPICE/LOSSY_TRANSLINE/lossy_transline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/XDM/PSPICE/IC_AND_NODESET/nodeset_in_subckt.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/LOSSY_TRANSLINE/lossy_transline.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: O lossy line read
 xyce/XDM/PSPICE/MODELS/capacitor_model_statements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/PSPICE/MODELS/inductor_model_statements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/XDM/PSPICE/MODELS/resistor_model_statements.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -19176,10 +19176,10 @@ xyce/YLIN/test_ylin2.cir cdl kept text left out (W0028), a kept element a W0001 
 xyce/YLIN/test_ylin5.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-2port-defaultOptions-ts1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-2port-defaultOptions.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/YLIN/ylin-2port-diffZ0-sparam-linAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/YLIN/ylin-2port-diffZ0-sparam-linAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/YLIN/ylin-2port-diffZ0-sparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-2port-hbAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/YLIN/ylin-2port-linAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/YLIN/ylin-2port-linAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/YLIN/ylin-2port-sparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-2port-yparam-db.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-2port-yparam-freqMult.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -19194,7 +19194,7 @@ xyce/YLIN/ylin-2port-yparam-ts1.cir cdl kept text left out (W0028), a kept eleme
 xyce/YLIN/ylin-2port-yparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-2port-zparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-5port-hbAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
-xyce/YLIN/ylin-5port-linAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
+xyce/YLIN/ylin-5port-linAnalysis.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021); and (spice-read) written differently: Xyce P port and .LIN read
 xyce/YLIN/ylin-5port-yparam-cw.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-5port-yparam-ts1.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
 xyce/YLIN/ylin-5port-yparam.cir cdl kept text left out (W0028), a kept element a W0001 comment (W0021)
@@ -26610,3 +26610,697 @@ spice-bench/ngspice/tests/regression/sens/sens-ac-1.sp spectre .ac lin 1 is valu
 spice-bench/ngspice/tests/regression/sens/sens-ac-2.sp spectre .ac lin 1 is values=[1M]; was lin=1 (2 points)
 xyce/MEASURE_NOISE/InputNoiseOps.cir spectre .noise lin 10 is lin=9 steps; was lin=10
 xyce/MEASURE_NOISE/OutputNoiseOps.cir spectre .noise lin 10 is lin=9 steps; was lin=10
+# Phase 7: spice-read: .ic/.nodeset values by expression (render::read
+# testbench, named_bench; BenchCard::NodeVals holds a Val; the three
+# writers' arms: spice/bench.rs, named/bench.rs, named/vacask_bench.rs).
+# `.ic v(1)={V1}` and Xyce's bare `.nodeset 1 {V1}` read (a number only
+# before: W0001); a SPICE target writes the expression in its delimiters,
+# Spectre as written, VACASK through its expression spelling. ngspice's
+# own `.ic v(a)={x} v(b)={x}` is now one card per node, like a numbered
+# one. Oracle: Xyce 7.10 vs ngspice-45 on the 7 Xyce decks now written
+# (counts in the commit).
+spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp espice written differently: .ic/.nodeset value by expression read
+spice-bench/ngspice/examples/probe/Dual-NMOS-amp.sp ngspice written differently: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/lotka_volterra.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir espice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir hspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir spectre now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_1145_SON/tranRc.cir vacask now written: .ic/.nodeset value by expression read
+xyce/Certification_Tests/BUG_592_SON/bug_592.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap3.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/dcvolt_cap4.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par1.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/hussamp_par2.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap3.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir espice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir hspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir ltspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir ngspice now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir spectre now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir vacask now written: .ic/.nodeset value by expression read
+xyce/IC_AND_NODESET/ic_cap4.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/XDM/HSPICE/INITIAL_CONDITION/ic_in_subckt.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/IC_AND_NODESET/ic_in_subckt.cir xyce written differently: .ic/.nodeset value by expression read
+xyce/XDM/PSPICE/IC_AND_NODESET/nodeset_in_subckt.cir xyce written differently: .ic/.nodeset value by expression read
+
+# Phase 7: spice-read: .func inside a .subckt (render::read cards; Block
+# funcs; spice/mod.rs subckt, named/checks.rs, cdl.rs; capability
+# LocalFunc). One whose body reads only its arguments, under a name no
+# other .func has, moves to the deck's top (same meaning everywhere); any
+# other is the subcircuit's: ngspice, ESPice, Xyce and HSPICE write it in
+# the .subckt, LTspice, Spectre (Reference p.871: functions at the top
+# level only) and VACASK refuse W0106. Oracle: ngspice-45 and Xyce 7.10
+# (counts in the commit).
+xyce/BUG_174/nlrcs10.cir espice now written: .func inside a .subckt read
+xyce/BUG_174/nlrcs10.cir hspice now written: .func inside a .subckt read
+xyce/BUG_174/nlrcs10.cir ltspice now written: .func inside a .subckt read
+xyce/BUG_174/nlrcs10.cir ngspice now written: .func inside a .subckt read
+xyce/BUG_174/nlrcs10.cir xyce written differently: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_a.cir espice now written: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_a.cir hspice now written: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_a.cir ngspice now written: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_a.cir xyce written differently: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_b.cir espice now written: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_b.cir hspice now written: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_b.cir ngspice now written: .func inside a .subckt read
+xyce/Certification_Tests/BUG_311/bug_311_b.cir xyce written differently: .func inside a .subckt read
+xyce/Certification_Tests/BUG_544_SON/bug_544.cir xyce written differently: .func inside a .subckt read
+xyce/Certification_Tests/BUG_702/inlined-multiple.cir xyce written differently: .func inside a .subckt read
+xyce/MEMRISTOR/memristorYakopcic.cir xyce written differently: .func inside a .subckt read
+xyce/MIXED_SIGNAL/Python/runCircuitWithDACs.cir xyce written differently: .func inside a .subckt read
+xyce/MIXED_SIGNAL/VPI/runXyceWithDAC.cir xyce written differently: .func inside a .subckt read
+xyce/Message/Subcircuit/subckt_j1_dup_error.cir espice now written: .func inside a .subckt read
+xyce/Message/Subcircuit/subckt_j1_dup_error.cir hspice now written: .func inside a .subckt read
+xyce/Message/Subcircuit/subckt_j1_dup_error.cir ngspice now written: .func inside a .subckt read
+xyce/Message/Subcircuit/subckt_j1_dup_error.cir xyce written differently: .func inside a .subckt read
+xyce/NL_RESISTOR/nlrcs10.cir espice now written: .func inside a .subckt read
+xyce/NL_RESISTOR/nlrcs10.cir hspice now written: .func inside a .subckt read
+xyce/NL_RESISTOR/nlrcs10.cir ltspice now written: .func inside a .subckt read
+xyce/NL_RESISTOR/nlrcs10.cir ngspice now written: .func inside a .subckt read
+xyce/NL_RESISTOR/nlrcs10.cir xyce written differently: .func inside a .subckt read
+xyce/PARAMS2/Params_A8.cir espice now written: .func inside a .subckt read
+xyce/PARAMS2/Params_A8.cir hspice now written: .func inside a .subckt read
+xyce/PARAMS2/Params_A8.cir ngspice now written: .func inside a .subckt read
+xyce/PARAMS2/Params_A8.cir xyce written differently: .func inside a .subckt read
+xyce/PARAMS2/Params_A8_hs.cir espice now written: .func inside a .subckt read
+xyce/PARAMS2/Params_A8_hs.cir hspice now written: .func inside a .subckt read
+xyce/PARAMS2/Params_A8_hs.cir ngspice now written: .func inside a .subckt read
+xyce/PARAMS2/Params_A8_hs.cir xyce written differently: .func inside a .subckt read
+xyce/SIMULINK/1Dac2ADCSystem.cir xyce written differently: .func inside a .subckt read
+xyce/SIMULINK/TestNetlist3.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_i2.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i2.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i2.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i2.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3_hs.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3_hs.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3_hs.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_i3_hs.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup_error.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup_error.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup_error.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_dup_error.cir xyce written differently: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_hs.cir espice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_hs.cir hspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_hs.cir ngspice now written: .func inside a .subckt read
+xyce/SUBCKT/subckt_j1_hs.cir xyce written differently: .func inside a .subckt read
+
+# Phase 7: spice-read: Xyce's E/G TABLE (render::read tables.rs; Card::Table;
+# capability TableSource). `TABLE {expr} = (x,y) …` (braces, `=` and an
+# outer parenthesis optional) over node voltages and branch currents: Xyce
+# writes `TABLE {expr} = (x,y) …`, ngspice `value={pwl(expr, x0-1, y0, …,
+# xn+1, yn)}` (flat past the ends, as Xyce: ngspice's own TABLE smooths
+# each corner), ESPice, HSPICE, LTspice, Spectre and VACASK refuse W0102.
+# Oracle: Xyce 7.10 vs ngspice-45 (counts in the commit).
+xyce/Certification_Tests/BUG_1012/negtable.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_1012/negtable.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_133/bug_133.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_133/bug_133.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_f_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_746_SON/raw_file_g_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_794_SON/test1.cir ngspice now written: Xyce E/G TABLE read
+xyce/Certification_Tests/BUG_794_SON/test1.cir xyce written differently: Xyce E/G TABLE read
+xyce/Message/Device/DeviceBlock_extractBehavioralDeviceData.cir xyce written differently: Xyce E/G TABLE read
+xyce/Message/Topology/Bad_Voltage_Node_Error.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_gear.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_e_gear.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_e_trap.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_e_trap.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_gear.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_g_gear.cir xyce written differently: Xyce E/G TABLE read
+xyce/POWER/power_g_trap.cir ngspice now written: Xyce E/G TABLE read
+xyce/POWER/power_g_trap.cir xyce written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir ngspice now written: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_g_table_syntax.cir xyce written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/e_sources.cir xyce written differently: Xyce E/G TABLE read
+xyce/XDM/PSPICE/CONTROLLED_SOURCES/g_sources.cir xyce written differently: Xyce E/G TABLE read
+
+# Phase 7: spice-read: LTspice C/L parasitics as elements (spice/parasitics.rs,
+# spice/cards.rs Rcl arm). On ngspice, ESPice, HSPICE and Xyce an LTspice
+# C's or L's Rser/Lser (series, on internal nodes `{decl}_s1`, `_s2`) and
+# Rpar/Cpar (across the card's nodes) are written as R, L, C elements, the
+# part's ratings (V, Irms, Ipk, mfg, pn, type, pppkg, mtbf) left out; the
+# implicit Rser=1m of an uncoupled L likewise. No golden line: every
+# LTspice deck holding one is still refused on those targets (W0005,
+# W0037), compared by status only.
+
+# Phase 7: spice-read: an LTspice V source's Rser=/Cpar= (render::read
+# sources; Card::Source parasitics; spice/cards.rs, named cards). Read (as
+# text before, W0001): LTspice writes them back, ngspice, ESPice, HSPICE and
+# Xyce as a series R on `{decl}_s1` and a C across, Spectre and VACASK
+# refuse W0114. Oracle: closed form on ngspice-45 (in the commit).
+ltspice/ltspice_examples/TransmissionLineInverter.net espice now written: LTspice V Rser read
+ltspice/ltspice_examples/TransmissionLineInverter.net hspice now written: LTspice V Rser read
+ltspice/ltspice_examples/TransmissionLineInverter.net ngspice now written: LTspice V Rser read
+ltspice/ltspice_examples/TransmissionLineInverter.net xyce now written: LTspice V Rser read
+
+# Phase 7: spice-read: Xyce's and LTspice's O lossy line (device.rs
+# LOSSY_LINE in the Xyce and LTspice lexicons; render::read elements,
+# devices; capability LossyLine). `O n1 n2 n3 n4 model` on an LTRA model is
+# ngspice's own element: ngspice, ESPice, Xyce and LTspice write it,
+# HSPICE (W element), Spectre and VACASK refuse W0105. Oracle: Xyce 7.10 vs
+# ngspice-45 (counts in the commit).
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir espice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir ltspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir ngspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir xyce written differently: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir espice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir ltspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir ngspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir xyce written differently: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir espice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir ltspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir ngspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir xyce written differently: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir espice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir ltspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir ngspice now written: O lossy line read
+xyce/Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir xyce written differently: O lossy line read
+xyce/Certification_Tests/BUG_983_SON/ltra.cir espice now written: O lossy line read
+xyce/Certification_Tests/BUG_983_SON/ltra.cir ltspice now written: O lossy line read
+xyce/Certification_Tests/BUG_983_SON/ltra.cir ngspice now written: O lossy line read
+xyce/Certification_Tests/BUG_983_SON/ltra.cir xyce written differently: O lossy line read
+xyce/LTRA/ErrorMessageTest.cir espice now written: O lossy line read
+xyce/LTRA/ErrorMessageTest.cir ltspice now written: O lossy line read
+xyce/LTRA/ErrorMessageTest.cir ngspice now written: O lossy line read
+xyce/LTRA/ErrorMessageTest.cir xyce written differently: O lossy line read
+xyce/LTRA/bad_model_parameters.cir espice now written: O lossy line read
+xyce/LTRA/bad_model_parameters.cir ltspice now written: O lossy line read
+xyce/LTRA/bad_model_parameters.cir ngspice now written: O lossy line read
+xyce/LTRA/bad_model_parameters.cir xyce written differently: O lossy line read
+xyce/LTRA/ltra-rc.cir espice now written: O lossy line read
+xyce/LTRA/ltra-rc.cir ltspice now written: O lossy line read
+xyce/LTRA/ltra-rc.cir ngspice now written: O lossy line read
+xyce/LTRA/ltra1.cir espice now written: O lossy line read
+xyce/LTRA/ltra1.cir ltspice now written: O lossy line read
+xyce/LTRA/ltra1.cir ngspice now written: O lossy line read
+xyce/LTRA/ltra1.cir xyce written differently: O lossy line read
+xyce/LTRA/ltra2.cir espice now written: O lossy line read
+xyce/LTRA/ltra2.cir ltspice now written: O lossy line read
+xyce/LTRA/ltra2.cir ngspice now written: O lossy line read
+xyce/LTRA/ltra2.cir xyce written differently: O lossy line read
+xyce/LTRA/ltra3.cir espice now written: O lossy line read
+xyce/LTRA/ltra3.cir ltspice now written: O lossy line read
+xyce/LTRA/ltra3.cir ngspice now written: O lossy line read
+xyce/LTRA/ltra3.cir xyce written differently: O lossy line read
+xyce/LTRA/square-wave-gen-resistor-compact.cir espice now written: O lossy line read
+xyce/LTRA/square-wave-gen-resistor-compact.cir ltspice now written: O lossy line read
+xyce/LTRA/square-wave-gen-resistor-compact.cir ngspice now written: O lossy line read
+xyce/LTRA/square-wave-gen-resistor-compact.cir xyce written differently: O lossy line read
+xyce/LTRA/square-wave-gen-resistor.cir espice now written: O lossy line read
+xyce/LTRA/square-wave-gen-resistor.cir ltspice now written: O lossy line read
+xyce/LTRA/square-wave-gen-resistor.cir ngspice now written: O lossy line read
+xyce/LTRA/square-wave-gen-resistor.cir xyce written differently: O lossy line read
+xyce/LTRA/zero_length_lc_line.cir espice now written: O lossy line read
+xyce/LTRA/zero_length_lc_line.cir ltspice now written: O lossy line read
+xyce/LTRA/zero_length_lc_line.cir ngspice now written: O lossy line read
+xyce/LTRA/zero_length_lc_line.cir xyce written differently: O lossy line read
+xyce/LTRA/zero_length_rc_rg_line.cir espice now written: O lossy line read
+xyce/LTRA/zero_length_rc_rg_line.cir ltspice now written: O lossy line read
+xyce/LTRA/zero_length_rc_rg_line.cir ngspice now written: O lossy line read
+xyce/LTRA/zero_length_rc_rg_line.cir xyce written differently: O lossy line read
+xyce/LTRA/zero_length_rlc_line.cir espice now written: O lossy line read
+xyce/LTRA/zero_length_rlc_line.cir ltspice now written: O lossy line read
+xyce/LTRA/zero_length_rlc_line.cir ngspice now written: O lossy line read
+xyce/LTRA/zero_length_rlc_line.cir xyce written differently: O lossy line read
+xyce/XDM/PSPICE/LOSSY_TRANSLINE/lossy_transline.cir espice now written: O lossy line read
+xyce/XDM/PSPICE/LOSSY_TRANSLINE/lossy_transline.cir ltspice now written: O lossy line read
+xyce/XDM/PSPICE/LOSSY_TRANSLINE/lossy_transline.cir ngspice now written: O lossy line read
+xyce/XDM/PSPICE/LOSSY_TRANSLINE/lossy_transline.cir xyce written differently: O lossy line read
+
+# Phase 7: spice-read: Xyce's P port and .LIN (device.rs XYCE_PORT;
+# render::read sources, sweeps, cards; spice/cards.rs, spice/bench.rs;
+# capability RfPort and SParameter cells for Xyce). `P n+ n- port=n
+# [z0=z]` is ngspice's port source `VP… portnum n z0 z`; `.LIN` over the
+# deck's `.AC` is Ana::Sp: ngspice and ESPice write `.sp`, Xyce writes its
+# own `.LIN` card back (an ngspice `.sp` as `.ac` + `.LIN`) and its ports
+# as `P`. Oracle: Xyce 7.10 Touchstone vs ngspice-45 S_i_j (in the commit).
+xyce/MEASURE_AC/RFParamsOps.cir espice now written: Xyce P port and .LIN read
+xyce/MEASURE_AC/RFParamsOps.cir ngspice now written: Xyce P port and .LIN read
+xyce/MEASURE_AC/RFParamsOps.cir xyce written differently: Xyce P port and .LIN read
+xyce/Message/Input/AC_doInit2.cir espice now written: Xyce P port and .LIN read
+xyce/Message/Input/AC_doInit2.cir ngspice now written: Xyce P port and .LIN read
+xyce/Message/Input/AC_doInit2.cir spectre now written: Xyce P port and .LIN read
+xyce/Message/Input/AC_doInit2.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/Dasho/sparam.cir espice now written: Xyce P port and .LIN read
+xyce/Output/Dasho/sparam.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/Dasho/sparam.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams1.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams1.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams1.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams2.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams2.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidDotLinParams2.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp-NoLin.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp-NoLin.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp-NoLin.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp-Step-NoLin.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp1.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp1.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/InvalidRFParamOp1.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/NegativeZ0.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/NegativeZ0.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/NegativeZ0.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSP1.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSP1.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSP1.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSP1_step.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSPdc.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/RCladderSPtran.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/dashRNotSupported.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/dashRNotSupported.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/dashRNotSupported.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/multi-parameter.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/multi-parameter.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/multi-parameter.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-phase-in-radians.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-phase-in-radians.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-phase-in-radians.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-1port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-1port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-1port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-3port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-3port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-3port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-4port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-4port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-4port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-5port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-5port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-5port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/sparams-ts2.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-1port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-1port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-1port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-2port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-2port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts1-2port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts2.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts2.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/yparams-ts2.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-1port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-1port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-1port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-2port.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-2port.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts1-2port.cir xyce written differently: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts2.cir espice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts2.cir ngspice now written: Xyce P port and .LIN read
+xyce/Output/SPARAMS/zparams-ts2.cir xyce written differently: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir espice now written: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir ngspice now written: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir xyce written differently: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir espice now written: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir ngspice now written: Xyce P port and .LIN read
+xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir xyce written differently: Xyce P port and .LIN read
+xyce/YLIN/ylin-2port-diffZ0-sparam-linAnalysis.cir xyce written differently: Xyce P port and .LIN read
+xyce/YLIN/ylin-2port-linAnalysis.cir xyce written differently: Xyce P port and .LIN read
+xyce/YLIN/ylin-5port-linAnalysis.cir espice now written: Xyce P port and .LIN read
+xyce/YLIN/ylin-5port-linAnalysis.cir ngspice now written: Xyce P port and .LIN read
+xyce/YLIN/ylin-5port-linAnalysis.cir xyce written differently: Xyce P port and .LIN read
+
+# Phase 7: spice-read: HSPICE `.noise out src [interval]` over the .ac
+# sweep and `.dc var START= STOP= STEP=` (render::read testbench, sweeps
+# top_ac; spice/bench.rs, spice/sweeps.rs has_ac). Read (as text before);
+# HSPICE writes no second `.ac` when the deck has one of the sweep (an
+# ngspice deck's `.noise` for HSPICE likewise, tmp-noise.sp). Oracle: the
+# ESPice corpus's noise_ac_sweep.expected.json (ngspice twin), exact.
+hspice/hspice/dc_start_stop.sp espice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp ltspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp ngspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp spectre now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp vacask now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/dc_start_stop.sp xyce now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp espice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp ltspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp ngspice now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp spectre now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp vacask now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/noise_ac_sweep.sp xyce now written: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+hspice/hspice/sample_rc_beta.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+spice-bench/ngspice/examples/various/tmp-noise.sp hspice written differently: HSPICE .noise over the .ac sweep / keyword .dc read
+
+# Phase 7: spice-read: HSPICE-only analyses (render::read refused.rs
+# kept_construct; capability HspiceAnalysis). `.sn`, `.snnoise`, `.snxf`,
+# `.trannoise`, `.lstb` refuse W0015 (no SPICE target nor VACASK has the
+# analysis; Spectre's placeholder), `.stateye` W0039, not W0001. No line:
+# refusals compared by status only.
+
+# Phase 7: integrate: stream D round 3's readings meet the merged writers.
+# A deck refused on D's round-3 base is written once it lands on
+# p7-integrate: LTspice decks whose C/L/V parasitics D now writes as
+# explicit elements, with B's .include and D's .backanno note; Xyce decks on
+# Spectre whose P port/.LIN or .ic by expression D now reads, with the
+# Spectre port, C's bsource and save. Per set: ltspice 259, xyce 31.
+ltspice/ltspice_demos/LT1083-5_TA01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083-5_TA01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083-5_TA01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083-5_TA01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083_TA01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083_TA01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083_TA01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1083_TA01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084-5_TA01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084-5_TA01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084-5_TA01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084-5_TA01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084_TA01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084_TA01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084_TA01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1084_TA01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085-5_TA01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085-5_TA01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085-5_TA01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085-5_TA01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085_TA01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085_TA01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085_TA01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1085_TA01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1086_TA14.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1086_TA14.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1086_TA14.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1086_TA14.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1116_AI01.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1116_AI01.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1116_AI01.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT1116_AI01.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3651-8_V23N1F5.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3651-8_V23N1F5.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3651-8_V23N1F5.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3651-8_V23N1F5.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC_.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC_.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC_.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3798_LT8309_EnergyStarNoPFC_.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799-1_DC1816A.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799-1_DC1816A.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799-1_DC1816A.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799-1_DC1816A.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799_DC1595A.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799_DC1595A.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799_DC1595A.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT3799_DC1595A.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT4320_DC2465A.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT4320_DC2465A.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT4320_DC2465A.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LT4320_DC2465A.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC4415_DC1819.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC4415_DC1819.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC4415_DC1819.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC4415_DC1819.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_DIFF_Input.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_DIFF_Input.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_DIFF_Input.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_DIFF_Input.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_SE_Input.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_SE_Input.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_SE_Input.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6400-20_SE_Input.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6404-1_SE_RBal.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6752_F12.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6752_F12.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6752_F12.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_demos/LTC6752_F12.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-12.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-12.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-12.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-12.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-5.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-5.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-5.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083-5.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1083.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-12.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-12.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-12.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-12.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-3.3.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-3.3.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-3.3.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-3.3.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-5.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-5.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-5.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084-5.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1084.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-12.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-12.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-12.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-12.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.3.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.3.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.3.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.3.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.6.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.6.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.6.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-3.6.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-5.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-5.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-5.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085-5.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1085.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-12.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-12.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-12.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-12.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-2.85.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-2.85.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-2.85.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-2.85.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.3.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.3.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.3.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.3.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.6.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.6.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.6.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-3.6.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-5.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-5.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-5.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086-5.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086H.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086H.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086H.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1086H.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1232.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1232.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1232.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1232.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1235.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1235.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1235.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1235.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1249.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1249.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1249.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1249.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1397.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1397.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1397.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1397.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1803.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1803.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1803.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1804.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1804.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1804.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1805.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1805.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1805.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1807.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1807.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1807.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1807.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1809.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1809.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1809.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1809.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1810.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1810.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1810.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/1810.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/3109.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/3109.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/3109.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/3109.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320-1.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320-1.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320-1.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320-1.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/4320.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/5532.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6205.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6205.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6205.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6205.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6206.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6206.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6206.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6206.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6207.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6207.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6207.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/6207.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/690.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/690.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/690.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/690.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/691.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/691.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/691.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/691.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/692.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/692.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/692.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/692.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/693.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/693.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/693.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/693.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694-3.3.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694-3.3.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694-3.3.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694-3.3.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/694.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695-3.3.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695-3.3.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695-3.3.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695-3.3.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/695.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/699.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/699.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/699.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/699.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8065.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8065.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8065.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8065.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8066.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8066.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8066.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/AD8066.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/NoiseFigure.net espice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/NoiseFigure.net hspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/NoiseFigure.net ngspice now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+ltspice/ltspice_examples/NoiseFigure.net xyce now written: its C/L/V Rser/Lser/Rpar/Cpar written as elements (D's c9af5e9, 315f0ff), its whole-file .lib as .include (B); was refused
+xyce/Certification_Tests/BUG_1145_SON/lotka_volterra.cir spectre now written: its .ic/.nodeset by expression (D's c7590e7), B sources as bsource (C), .print as save (C); was refused
+xyce/MEASURE_AC/RFParamsOps.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/Dasho/sparam.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp, .print as save (C); was refused
+xyce/Output/SPARAMS/InvalidDotLinParams1.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/InvalidDotLinParams2.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/InvalidRFParamOp-NoLin.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/InvalidRFParamOp-Step-NoLin.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/InvalidRFParamOp.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/InvalidRFParamOp1.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/NegativeZ0.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/RCladderSP1.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/RCladderSP1_step.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/dashRNotSupported.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/multi-parameter.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-phase-in-radians.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts1-1port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts1-3port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts1-4port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts1-5port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/sparams-ts2.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/yparams-ts1-1port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/yparams-ts1-2port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/yparams-ts2.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/zparams-ts1-1port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/zparams-ts1-2port.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/Output/SPARAMS/zparams-ts2.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
+xyce/YLIN/ylin-5port-linAnalysis.cir spectre now written: its P port and .LIN read (D's a5f2c0a) as Spectre's port and sp; was refused
