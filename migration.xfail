@@ -26603,7 +26603,7 @@ fixtures/tests/spectre/p_tf.scs xyce a new input: stream F's pending-real-run de
 # earlier sections' lines: both Tschebyschef-LP (sp lin=99), diffpair_spiceManLIN
 # (lin=99), diffpair_spiceManOld and lowpass_fd (values=[…]), the three
 # ErrorTestAC/UnsupportedRemeasureTypes (lin=26/26/12).
-spice-bench/ngspice/examples/inductive-systems/positive-definite-4.sp spectre .ac lin 5000 is lin=4999 steps; was lin=5000
+spice-bench/ngspice/examples/inductive-systems/positive-definite-4.sp spectre .ac lin 5000 is lin=4999 steps; was lin=5000; and (named-write-r2) numbers in the fewest digits ngspice reads as the same double
 spice-bench/ngspice/tests/regression/misc/ac-zero.sp spectre .ac lin 1 0 0 is values=[0]; was lin=1 (2 points)
 spice-bench/ngspice/tests/regression/misc/empty-1.sp spectre .ac lin 3 is lin=2 steps; was lin=3
 spice-bench/ngspice/tests/regression/sens/sens-ac-1.sp spectre .ac lin 1 is values=[1M]; was lin=1 (2 points)
