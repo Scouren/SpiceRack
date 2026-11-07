@@ -33575,3 +33575,19 @@ xyce/TIA/TRAP/teststep1.cir espice refused W0049: a Xyce device IC= ngspice hold
 xyce/TIA/TRAP/teststep1.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
 xyce/TIA/TRAP/teststepgear1.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
 xyce/TIA/TRAP/teststepgear1.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+
+# Phase 7: spice-write (Phase 0 merge): CDL's cards are ngspice's, so a Xyce or
+# HSPICE SFFM is written in ngspice's order there too (spice/waves.rs, the
+# rule B's commit 531240e states; its record left CDL in the source's order).
+hspice/hspice/sffm_order.sp cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/ISFFM/isffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SENS/dummy_devLevelParams_isffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SENS/dummy_devLevelParams_vsffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SENS/dummy_isffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SENS/dummy_vsffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SENS/fddevLevelParams_isffm2.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SENS/fdisffm2.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SOURCES/sources.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/VSFFM/vsffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/XDM/HSPICE/INDEPENDENT_SOURCES/i_sources_sffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/XDM/HSPICE/INDEPENDENT_SOURCES/v_sources_sffm.cir cdl SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
