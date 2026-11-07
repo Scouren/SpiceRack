@@ -78,6 +78,8 @@ Parameters go on the `.model` card. A parameter the module marks
 Needs `openvaf` on `$PATH` (except on ESPice), and an ngspice whose OSDI
 version matches it. `dut.osdi("model.osdi")` loads a binary you compiled
 yourself; `ps.compile_veriloga("model.va")` compiles one and returns its path.
+Spectre compiles Verilog-A itself (`ahdl_include`) and takes no OSDI binary:
+there, load the `.va` with `veriloga()`; an `osdi()` deck is refused (W0004).
 
 ## Digital Verilog
 

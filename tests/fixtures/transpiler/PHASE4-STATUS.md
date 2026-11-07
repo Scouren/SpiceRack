@@ -218,8 +218,11 @@ reference does not):
   letter only to a name that does not start with it; it is the SPICE →
   Spectre direction's (the named writer's) case.
 
-- P7-11. Spectre and VACASK title a library too, and VACASK gives it
-  `ground 0` and a `control` block (`named::W::frame`).
+- P7-11: decided (phase 7, named-write-r2): a VACASK library has no
+  title (VACASK reads it as a statement where the file is included) and
+  no `control` (a second block there; with no analysis it runs nothing);
+  its `ground 0` is kept, as `resolve::role` calls a deck with no analysis
+  a library too. Spectre's title is a comment, kept.
 
 **CDL** (`spice/cdl.rs`):
 - P7-10: decided (phase 7, spice-write): coded, not written. Subcircuit
