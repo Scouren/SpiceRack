@@ -13,6 +13,7 @@
 //!   `Rd::strip(&self, name: &str, letter: char) -> String`
 
 use super::named::{OSDI, spectre_kind, vacask_model_kind};
+use super::named_waves::vacask_at_zero;
 use super::{Card, Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::NamedRules;
@@ -65,8 +66,8 @@ const SPECTRE: Keys = Keys {
 const VACASK: Keys = Keys {
     source: &[
         "dc", "mag", "phase", "type", "val0", "val1", "delay", "rise", "fall", "width", "period",
-        "sinedc", "ampl", "freq", "theta", "modindex", "modfreq", "modphase", "tau1", "td2",
-        "tau2", "wave",
+        "sinedc", "ampl", "freq", "theta", "modindex", "modfreq", "modphase", "tdphase", "tau1",
+        "td2", "tau2", "wave",
     ],
     gm: "gain",
     rm: "gain",
@@ -180,7 +181,7 @@ impl<'a> Rd<'a> {
                 // is its value at t = 0 (`docs/dev-builtin-src.md`; a VACASK
                 // op of `dc=5 type="pulse" val0=1` is 1).
                 let value = match (&wave, self.b.named_rules) {
-                    (Some(w), NamedRules::Vacask) => w.at_zero(),
+                    (Some(w), NamedRules::Vacask) => vacask_at_zero(w),
                     _ => self.get(&p, "dc").map_or(Val::Num(0.0), |v| self.value(v)),
                 };
                 let letter = if master == "vsource" { 'v' } else { 'i' };

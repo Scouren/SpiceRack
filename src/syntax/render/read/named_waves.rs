@@ -8,8 +8,9 @@
 //!
 //! Contents:
 //! - `Rd::named_waveform(&self, p: &[(String, u32)]) -> Option<Option<Wave>>`
+//! - `fn vacask_at_zero(w: &Wave) -> Val`
 
-use super::{Num, Rd, Wave, WaveKind};
+use super::{Num, Rd, Val, Wave, WaveKind};
 use crate::syntax::behaviour::NamedRules;
 
 impl<'a> Rd<'a> {
@@ -34,8 +35,9 @@ impl<'a> Rd<'a> {
         if (fm || spectre_exp) && nonzero("delay") {
             return None;
         }
-        // SFFM holds no modulation phase (`Wave::args`).
-        if fm && nonzero("modphase") {
+        // SFFM holds no modulation phase (`Wave::args`); only an AM's
+        // carrier phase `tdphase` is read.
+        if fm && nonzero("modphase") || ty.as_deref() != Some("am") && nonzero("tdphase") {
             return None;
         }
         if ty.as_deref() != Some("pwl") && self.get(p, "pwlperiod").is_some() {
@@ -129,39 +131,40 @@ impl<'a> Rd<'a> {
                 delay: None,
                 cut: false,
             },
-            // VACASK `type="am"` (`lib/devvisrc.cpp`): `sinedc + ampl
-            // sin(2π freq t' + phase)(1 + modindex sin(2π modfreq t' +
-            // modphase))`, its value at `delay` before it; ngspice-45's
-            // order (`Wave::args`) is 0 before TD, so a delayed AM reads
-            // only with no offset; one with a carrier phase not at all
-            // (the pinned VACASK runs it as 0).
+            // VACASK `type="am"` (`lib/devvisrc.cpp`; its own
+            // `test/test_viwfm.sim` i5): `sinedc + ampl sin(2π freq t' +
+            // tdphase)(1 + modindex sin(2π modfreq t' + modphase))`, its
+            // value at `delay` before it; `phase` is the AC phase only.
+            // ngspice-45's order (`Wave::args`) is 0 before TD, so a
+            // delayed AM reads only when its value at `delay` is 0.
             Some("am") if self.b.named_rules == NamedRules::Vacask => {
                 let n = |k: &str, d: f64| match self.get(p, k) {
                     Some(v) => self.number(v),
                     None => Some(d),
                 };
-                let (dc, ampl, mi) = (n("sinedc", 0.0)?, n("ampl", 0.0)?, n("modindex", 0.5)?);
-                let (delay, phase) = (n("delay", 0.0)?, n("phase", 0.0)?);
-                if phase != 0.0 || n("sinephase", 0.0)? != 0.0 || delay != 0.0 && dc != 0.0 {
-                    return None;
-                }
+                let (ampl, mi) = (n("ampl", 0.0)?, n("modindex", 0.5)?);
                 let v = [
-                    dc,
+                    n("sinedc", 0.0)?,
                     ampl,
                     ampl * mi,
                     n("modfreq", 1e3)?,
                     n("freq", 0.0)?,
-                    delay,
+                    n("delay", 0.0)?,
+                    n("modphase", 0.0)?,
+                    n("tdphase", 0.0)?,
                 ];
-                let mut args: Vec<Num> = v.into_iter().map(Num::Num).collect();
-                args.extend([Num::Num(n("modphase", 0.0)?), Num::Num(phase)]);
-                Wave {
+                let w = Wave {
                     kind: WaveKind::Am,
-                    args,
+                    args: v.into_iter().map(Num::Num).collect(),
                     repeat: None,
                     delay: None,
                     cut: false,
+                };
+                if n("sinephase", 0.0)? != 0.0 || v[5] != 0.0 && vacask_at_zero(&w) != Val::Num(0.0)
+                {
+                    return None;
                 }
+                w
             }
             Some("pwl") if self.b.named_rules == NamedRules::Spectre => {
                 let w = self.get(p, "wave")?;
@@ -192,6 +195,19 @@ impl<'a> Rd<'a> {
             }
             Some(_) => return None,
         }))
+    }
+}
+
+/// A VACASK source's value at t = 0 (its op value, `docs/dev-builtin-src.md`),
+/// `w` read by [`Rd::named_waveform`]: an AM's formula at `t' = 0`, every
+/// other kind [`Wave::at_zero`].
+pub(super) fn vacask_at_zero(w: &Wave) -> Val {
+    let a: Vec<f64> = w.args.iter().filter_map(Num::num).collect();
+    match (w.kind, a.as_slice()) {
+        (WaveKind::Am, [vo, vmo, vma, _, _, _, pm, pc]) => {
+            Val::Num(vo + (vmo + vma * pm.to_radians().sin()) * pc.to_radians().sin())
+        }
+        _ => w.at_zero(),
     }
 }
 

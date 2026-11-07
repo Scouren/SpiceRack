@@ -115,3 +115,38 @@ fn a_whole_pwl_repeat_is_its_period() {
         close(at(&raw, "a", t), want, 1e-9);
     }
 }
+
+#[test]
+fn a_vacask_am_source_runs_on_ngspice_from_its_time_zero_value() {
+    // VACASK's own `test/test_viwfm.sim` i5 (36be560): `type="am"` is
+    // sinedc + ampl sin(2π freq t + tdphase)(1 + modindex sin(2π modfreq t
+    // + modphase)), `tdphase` the carrier phase and `phase` the AC phase
+    // only; its op is that at t = 0 (-2.5 V here). The deck written for
+    // ngspice (`DC <v(0)> AC 1 -30 AM(…)`) runs to VACASK's own op and
+    // transient (ngspice holds 0 at t = 0 itself, so from the first step).
+    let deck = "am\nground 0\nload \"resistor.osdi\"\nmodel resistor resistor\n\
+        model vsource vsource\n\
+        v5 (5 0) vsource type=\"am\" sinedc=0.5 ampl=2.0 freq=1000 tdphase=-90 \
+        modfreq=50 modphase=90 modindex=0.5 mag=1 phase=-30\n\
+        r5 (5 0) resistor r=1\n\
+        control\n  analysis op1 op\n  analysis tran1 tran step=10u stop=2m maxstep=10u\nendc\n";
+    let va = Dialect::Vacask
+        .run_all(deck)
+        .unwrap_or_else(|e| panic!("vacask: {e}"));
+    let ng = spicerack::syntax::render::render_text(deck, Dialect::Vacask, "am", Dialect::Ngspice)
+        .unwrap_or_else(|e| panic!("{}", e.messages))
+        .text;
+    let got = Dialect::Ngspice
+        .run_all(&ng)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{ng}"));
+    close(col(&va[0], "5")[0], -2.5, 1e-9);
+    close(col(&got[0], "v(5)")[0], -2.5, 1e-9);
+    for t in [0.25e-3, 0.5e-3, 1e-3, 1.5e-3, 2e-3] {
+        let want = at(&va[1], "5", t);
+        let g = at(&got[1], "v(5)", t);
+        assert!(
+            (g - want).abs() <= 1e-3 * 4.0,
+            "t={t} ngspice {g} vacask {want}\n{ng}"
+        );
+    }
+}
