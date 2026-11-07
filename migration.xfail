@@ -32415,3 +32415,61 @@ hspice/hspice/tran_segments.sp xyce now written: HSPICE .tran segments read as o
 # ngspice, ESPice, Xyce, LTspice and VACASK (no W element), W0001 on
 # Spectre (stream C: `mtline`), not W0001 on the SPICE targets. No line:
 # refusals are compared by status only.
+
+# Phase 7: spice-read: HSPICE .temp t1 t2 … as a step over temp (Alt::TempList,
+# the HSPICE definition row): an HSPICE temperature list is written
+# .step temp list on Xyce/LTspice, a temp sweep on Spectre/VACASK; a Xyce
+# .step temp list is written .temp t1 t2 … on HSPICE.
+hspice/hspice/temp_list.sp ltspice now written: a temperature list is a step over temp
+hspice/hspice/temp_list.sp spectre now written: a temperature list is a step over temp
+hspice/hspice/temp_list.sp vacask now written: a temperature list is a step over temp
+hspice/hspice/temp_list.sp xyce now written: a temperature list is a step over temp
+xyce/Certification_Tests/BUG_1776/HBT_IV_10X50_20100217.cir hspice now written: a temperature list is a step over temp
+xyce/Certification_Tests/BUG_260_SON/bug_260_son.cir hspice now written: a temperature list is a step over temp
+xyce/DIODE/Level2_Temp_Dep_Breakdown.cir hspice now written: a temperature list is a step over temp
+xyce/DTEMP/b3soi_nmos_ref.cir hspice now written: a temperature list is a step over temp
+xyce/DTEMP/Level2_Diode_Ref.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_Ib.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_Ib_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_Ib_TRANS.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_Ic.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_Ic_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_Ib.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_Ib_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_Ic.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_Ic_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_MLF_Ib.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_MLF_Ib_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_MLF_Ic.cir hspice now written: a temperature list is a step over temp
+xyce/MEXTRAM/FGummel_low_MLF_Ic_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/PARAM_REFACTOR/paramDep3.cir hspice now written: a temperature list is a step over temp
+xyce/PARAM_REFACTOR/paramDep4.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/asym_nmos_idvdh_dt.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/asym_pmos_idvdh_dt.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_asym_nmos_idvg0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_asym_pmos_idvg0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvg0_allsw0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvg0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvg0_swigate1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvg0_swimpact1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvgh_allsw0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvgh.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvgh_outvars.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvgh_swigate1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_nmos_idvgh_swimpact1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvg0_allsw0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvg0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvg0_swigate1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvg0_swimpact1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvgh_allsw0.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvgh.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvgh_swigate1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/psp_symm_pmos_idvgh_swimpact1.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/sym_nmos_idvdh_dt.cir hspice now written: a temperature list is a step over temp
+xyce/PSP103/sym_pmos_idvdh_dt.cir hspice now written: a temperature list is a step over temp
+xyce/VBIC13/dcTemp_3T.cir hspice now written: a temperature list is a step over temp
+xyce/VBIC13/dcTemp_3T_m.cir hspice now written: a temperature list is a step over temp
+xyce/VBIC13/dcTemp_3T_noFlip_P.cir hspice now written: a temperature list is a step over temp
+xyce/VBIC13/dcTemp.cir hspice now written: a temperature list is a step over temp
+xyce/VBIC13/dcTemp_m.cir hspice now written: a temperature list is a step over temp
+xyce/VBIC13/dcTemp_noFlip_P.cir hspice now written: a temperature list is a step over temp
