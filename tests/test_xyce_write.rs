@@ -21,7 +21,8 @@ use std::path::Path;
 use sim::{Ran, Sim};
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::render_text;
+use spicerack::syntax::render::{render_kit, render_text};
+use spicerack::syntax::resolve::{FileId, Form, Kit, LoadError};
 
 /// CPU seconds a run of these few-element decks may take.
 const SECS: u64 = 20;
@@ -183,20 +184,60 @@ fn a_hicum_level_8_is_xyce_level_234() {
 /// RG `D`, `Q` model tables: Xyce's level-1 diode and BJT have none of
 /// ngspice's `tlev`/`tlevc` temperature coefficients (ngspice-45 `dio.c`
 /// `cta`, `bjt.c` `tbf1`), and Xyce 7.10 runs a card setting one with a
-/// warning only: refused. At its off value the parameter is left out.
+/// warning only. The instance using such a card is refused (W0050), the
+/// card left out (W0053); a card no instance uses only noted, the deck
+/// written. At its off value the parameter is left out of the card.
 #[test]
-fn a_parameter_xyce_lacks_is_refused() {
-    for card in [
-        ".model dm d level=3 is=1e-14 tlevc=1 cta=1e-3",
-        ".model qn npn is=1e-16 tbf1=4e-3",
+fn a_parameter_xyce_lacks_is_refused_where_it_is_used() {
+    for (card, inst) in [
+        (".model dm d level=3 is=1e-14 tlevc=1 cta=1e-3", "d1 1 0 dm"),
+        (".model qn npn is=1e-16 tbf1=4e-3", "q1 1 1 0 qn"),
     ] {
-        let deck = format!("* t\n{card}\nv1 1 0 1\n.op\n.end\n");
-        assert_eq!(refusal(&deck), [Code::W0050], "{card}");
+        let deck = format!("* t\n{card}\nv1 1 0 1\n{inst}\n.op\n.end\n");
+        assert_eq!(refusal(&deck), [Code::W0053, Code::W0050], "{card}");
+        let unused = format!("* t\n{card}\nv1 1 0 1\nr1 1 0 1k\n.op\n.end\n");
+        let w = render_text(&unused, Dialect::Ngspice, "t", Dialect::Xyce).expect("written");
+        let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+        assert_eq!(codes, [Code::W0053], "{card}");
+        assert!(!w.text.contains(".model"), "{}", w.text);
     }
     let off = "* t\n.model dm d level=3 is=1e-14 tlevc=0 cta=0 bv_max=5\n\
         i1 0 1 1m\nd1 1 0 dm\n.op\n.end\n";
     assert!(!write(off).contains("cta"), "{}", write(off));
     same_op(off, "1");
+}
+
+/// The gf180 shape: a library section holding a card Xyce lacks
+/// parameters for and one it computes, called by `.lib`. The deck using
+/// the good card is written (and the library, the bad card left out,
+/// W0053); the deck using the bad card is refused at its instance (W0050),
+/// the card judged in the library's own file.
+#[test]
+fn a_library_card_is_judged_at_the_deck_that_uses_it() {
+    let lib = "* lib\n.lib dio\n.model good d is=1e-14\n\
+        .model bad d level=3 is=1e-14 tlevc=1 cta=1e-3\n.endl dio\n";
+    for (inst, refused) in [("d1 1 0 good", false), ("d1 1 0 bad", true)] {
+        let deck = format!("* t\n.lib 'lib.sp' dio\ni1 0 1 1m\n{inst}\n.op\n.end\n");
+        let files = [("/k/t.sp", deck.as_str()), ("/k/lib.sp", lib)];
+        let kit = Kit::load(&["/k/t.sp".into()], Form::Deck, Dialect::Ngspice, &mut |p| {
+            files
+                .iter()
+                .find(|(n, _)| Path::new(n) == p)
+                .map(|(_, t)| t.to_string())
+                .ok_or(LoadError::NotFound)
+        });
+        let top = render_kit(&kit, FileId(0), "t", Dialect::Xyce);
+        match (top, refused) {
+            (Err(e), true) => {
+                let codes: Vec<Code> = e.diags.iter().map(|d| d.code).collect();
+                assert_eq!(codes, [Code::W0050], "{inst}");
+            }
+            (Ok(_), false) => {}
+            (r, _) => panic!("{inst}: {:?}", r.map(|w| w.text).map_err(|e| e.messages)),
+        }
+        let w = render_kit(&kit, FileId(1), "t", Dialect::Xyce).expect("the library written");
+        assert!(w.text.contains(".model good") && !w.text.contains(".model bad"), "{}", w.text);
+    }
 }
 
 /// RG capacitor and inductor model `C`, `L` (multipliers): ngspice's model
@@ -206,9 +247,9 @@ fn a_parameter_xyce_lacks_is_refused() {
 /// stream B's writer.)
 #[test]
 fn a_c_or_l_model_value_is_refused() {
-    for card in [".model my c c=1p", ".model my l l=1u"] {
-        let deck = format!("* t\n{card}\nv1 1 0 1\n.op\n.end\n");
-        assert_eq!(refusal(&deck), [Code::W0051], "{card}");
+    for (card, inst) in [(".model my c c=1p", "c1 1 0 my"), (".model my l l=1u", "l1 1 0 my")] {
+        let deck = format!("* t\n{card}\nv1 1 0 1\n{inst}\n.op\n.end\n");
+        assert_eq!(refusal(&deck), [Code::W0053, Code::W0051], "{card}");
     }
 }
 
@@ -250,5 +291,5 @@ fn a_trig_targ_measure_runs_on_xyce() {
 #[test]
 fn an_ngspice_vdmos_is_refused() {
     let deck = "* t\n.model n1 vdmos vto=1 kp=1e-5\nvd d 0 1\nm1 d d 0 n1\n.op\n.end\n";
-    assert_eq!(refusal(deck), [Code::W0050]);
+    assert_eq!(refusal(deck), [Code::W0053, Code::W0050]);
 }

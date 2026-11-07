@@ -55,8 +55,9 @@ impl W<'_, '_> {
                 {
                     params.push(("Rser".into(), "1m".into()));
                 }
-                if model.is_some() {
+                if let Some(m) = &model {
                     self.ask(Construct::RclModel, tok);
+                    self.xyce_instance(n, m, tok);
                 }
                 // An LTspice C's or L's parasitics as elements where the
                 // target's C and L take none (`parasitics`).
@@ -289,6 +290,7 @@ impl W<'_, '_> {
                 if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
                     self.ask(c, tok);
                 }
+                self.xyce_instance(n, &model, tok);
                 format!("{decl} {} {model}{}", nodes.join(" "), self.params(&params))
             }
             Card::Switch { nodes, model, .. } => format!("{decl} {} {model}", nodes.join(" ")),

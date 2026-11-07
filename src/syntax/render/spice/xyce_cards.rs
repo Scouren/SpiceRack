@@ -1,5 +1,8 @@
 //! The Xyce target's spellings of another dialect's cards: a `k=v` value
-//! that is one bare parameter name, braced; a measure's `TRIG v(1) VAL=0.5` as Xyce's `TRIG
+//! that is one bare parameter name, braced; an instance of a model card
+//! Xyce cannot compute (`xyce_models`, the card left out where it is
+//! declared) refused where the deck elaborates it, its card judged in
+//! whichever kit file holds it; a measure's `TRIG v(1) VAL=0.5` as Xyce's `TRIG
 //! v(1)=0.5`.
 //!
 //! Cites: Xyce RG 7.10 `.SUBCKT` (`PARAMS:` defaults) and §2.2 (`{}`
@@ -13,10 +16,14 @@
 //! §11.4 (`TRIG <variable> VAL=<value>`).
 //!
 //! Contents:
-//! - `W::param_value(&self, v: &str) -> String`, `W::xyce_measure(&self, line: String) -> String`
+//! - `W::param_value(&self, v: &str) -> String`, `W::xyce_measure(&self, line: String) -> String`,
+//!   `W::xyce_instance(&mut self, n: u32, master: &str, tok: u32)`
 
 use super::W;
-use crate::syntax::behaviour::ParamForm;
+use super::xyce_models::xyce_model;
+use crate::syntax::ast::NONE;
+use crate::syntax::behaviour::{ModelSemantics, ParamForm};
+use crate::syntax::render::read::file_models;
 
 impl W<'_, '_> {
     /// A `k=v` parameter's value, [`W::spelled`]; on Xyce, another
@@ -27,6 +34,37 @@ impl W<'_, '_> {
             return format!("{{{v}}}");
         }
         self.spelled(v)
+    }
+
+    /// Instance `n` (master `master`, its card's token `tok`) on Xyce,
+    /// from ngspice's equations: refused with its model card's code when
+    /// Xyce cannot compute the card (W0050, W0051).
+    pub(super) fn xyce_instance(&mut self, n: u32, master: &str, tok: u32) {
+        let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
+        if self.b.param_form != ParamForm::Xyce || !ngspice {
+            return;
+        }
+        let Some(at) = self.rd.instance_model(n, master) else {
+            return;
+        };
+        if let (Some(file), Some(kit)) = (at.0, self.rd.kit())
+            && self.xyce_files.insert(file)
+        {
+            let judged = file_models(kit, file, |_, m| xyce_model(true, &m.kind, &m.params).err());
+            for (card, code) in judged {
+                self.xyce_verdicts.insert((Some(file), card), code);
+            }
+        }
+        let code = match at.0 {
+            None => {
+                let m = self.rd.model_view(at.1, NONE);
+                xyce_model(true, &m.kind, &m.params).err()
+            }
+            Some(_) => self.xyce_verdicts.get(&at).copied().flatten(),
+        };
+        if let Some(code) = code {
+            self.refuse(code, tok);
+        }
     }
 
     /// Measure card `line` with each `TRIG|TARG <variable> VAL=<value>`

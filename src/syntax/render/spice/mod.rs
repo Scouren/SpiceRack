@@ -41,6 +41,8 @@ mod xyce_cards;
 mod xyce_models;
 mod xyce_options;
 
+use std::collections::{HashMap, HashSet};
+
 use super::Numbers;
 use super::capability::{Action, Alt, Construct, Rule, ngspice_device};
 use super::draws::{self, Layers};
@@ -56,7 +58,7 @@ use crate::syntax::behaviour::{
 };
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
-use crate::syntax::resolve::Role;
+use crate::syntax::resolve::{FileId, Role};
 
 /// The writer's state for one deck.
 struct W<'a, 'r> {
@@ -86,6 +88,10 @@ struct W<'a, 'r> {
     drop_four: bool,
     /// A section's definitions are being written.
     in_section: bool,
+    /// Xyce: each model card's refusal, judged once (`xyce_cards`), by
+    /// its file (`None`: this one) and card; and the kit files judged.
+    xyce_verdicts: HashMap<(Option<FileId>, u32), Option<Code>>,
+    xyce_files: HashSet<FileId>,
 }
 
 /// The deck `rd` read, written for `target`, and its diagnostics: the
@@ -124,6 +130,8 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         scope: crate::syntax::ast::NONE,
         drop_four: false,
         in_section: false,
+        xyce_verdicts: HashMap::new(),
+        xyce_files: HashSet::new(),
     };
     // Verilog evaluates nothing, so no deck-wide check refuses it.
     if b.writer == Writer::Verilog {
@@ -392,23 +400,29 @@ impl W<'_, '_> {
 
     fn models(&mut self, b: &Block) {
         for &(m, bin) in &b.models {
-            self.model(m, bin);
-            self.o.token("", Space::Line);
+            if self.model(m, bin) {
+                self.o.token("", Space::Line);
+            }
         }
     }
 
     /// `.model name kind (k=v …)`, on Xyce as its device reads it
-    /// (`xyce_models`). The parameter list is separated from the type by a
+    /// (`xyce_models`; one it cannot compute is left out, W0053, and false
+    /// returned: nothing written). The parameter list is separated from the type by a
     /// space: ngspice-45 drops the parameters of an OSDI model written
     /// `vres(r=3k)`.
-    fn model(&mut self, n: u32, bin: u32) {
+    fn model(&mut self, n: u32, bin: u32) -> bool {
         let mut m = self.rd.model_view(n, bin);
         if self.b.param_form == ParamForm::Xyce {
             let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
             match xyce_models::xyce_model(ngspice, &m.kind, &m.params) {
                 Ok(Some(params)) => m.params = params,
                 Ok(None) => {}
-                Err(code) => self.refuse(code, self.rd.main(n)),
+                // Left out: an instance of it is refused (`xyce_cards`).
+                Err(_) => {
+                    self.note(Code::W0053, self.rd.main(n));
+                    return false;
+                }
             }
         }
         // A loaded module named as a built-in device: ngspice reads the
@@ -432,6 +446,7 @@ impl W<'_, '_> {
             line.push(')');
         }
         self.o.token(&line, Space::None);
+        true
     }
 
     fn subckt(&mut self, sc: &Block) {
