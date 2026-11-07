@@ -303,6 +303,10 @@ impl Rd<'_> {
                 // stability (HSPICE UG): no SPICE target has these analyses.
                 ".sn" | ".snac" | ".snnoise" | ".snxf" | ".ptdnoise" | ".sample" | ".trannoise"
                 | ".lstb" => Construct::HspiceAnalysis,
+                // HSPICE UG, W element: `Wxxx in… ref out… ref N=n
+                // RLGCmodel=…` (or `RLGCfile`, `TABLEmodel`, `Umodel`,
+                // `FSmodel`, `Smodel`), a lossy multi-conductor line.
+                w if w.starts_with('w') && self.w_line(tok) => Construct::HspiceWLine,
                 _ => Construct::ForeignText,
             };
         }
@@ -322,3 +326,23 @@ impl Rd<'_> {
 }
 
 // ---- private ----
+
+impl Rd<'_> {
+    /// Whether the HSPICE text at `tok` is a W element's line: one of its
+    /// model keys on the card (HSPICE UG, W element).
+    fn w_line(&self, tok: u32) -> bool {
+        const KEYS: [&str; 6] = [
+            "rlgcmodel",
+            "rlgcfile",
+            "tablemodel",
+            "umodel",
+            "fsmodel",
+            "smodel",
+        ];
+        let line = self.span(tok, self.line_last(tok)).to_ascii_lowercase();
+        line.split(|c: char| c.is_whitespace()).any(|w| {
+            KEYS.iter()
+                .any(|k| w.strip_prefix(k).is_some_and(|r| r.starts_with('=')))
+        })
+    }
+}

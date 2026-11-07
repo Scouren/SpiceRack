@@ -515,7 +515,7 @@ catalogue! {
     /// A device the target has no master or terminal list for (a MOSFET without its bulk or with extra nodes, a current-controlled switch; in VACASK a POLY source, a charge capacitor, a switch, a line).
     W0105 Refusal {
         title: "a device the target has no master or terminals for",
-        cite: "Spectre Reference 5.0 (mos, relay, vsource chapters)",
+        cite: "Spectre Reference 5.0 (mos, relay, vsource chapters); HSPICE UG, W element (RLGC lossy lines): the ngspice manual, Xyce RG and LTspice help list no W element (ngspice's `W` is a current switch, its coupled lines `P` take other parameters)",
         explain: "The target has no device with this element's terminals (a MOSFET with three or five nodes, a current-controlled switch, a POLY source). Connect the missing terminal, or model the device another way.",
     }
     /// A function the target cannot define (a body over `v()`/`i()`; VACASK has none).

@@ -119,6 +119,9 @@ pub enum Construct {
     Statistics,
     /// `.measure`.
     Measure,
+    /// HSPICE's W element (a multi-conductor lossy line on an RLGC,
+    /// tabular, U, FS or S model), kept as text.
+    HspiceWLine,
 }
 
 /// What a writer does with a construct.
@@ -168,6 +171,8 @@ pub enum Alt {
     AmNoOffset,
     /// `.pz v(out) src` (HSPICE).
     HspicePz,
+    /// `.temp t1 t2 …` for a temperature list, no other list (HSPICE).
+    TempList,
     /// `.LIN` beside an `.AC` of the sweep (Xyce).
     XyceLin,
     /// Not written, the code the note the writer records for it.
@@ -329,7 +334,7 @@ mod tests {
         );
     }
 
-    const CONSTRUCTS: [Construct; 42] = [
+    const CONSTRUCTS: [Construct; 43] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -372,5 +377,6 @@ mod tests {
         Construct::UnmappedOption,
         Construct::Statistics,
         Construct::Measure,
+        Construct::HspiceWLine,
     ];
 }

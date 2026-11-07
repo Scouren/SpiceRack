@@ -96,6 +96,7 @@ cell.Save Native
 cell.UnmappedOption Native
 cell.Statistics Lift(StatisticsDraws)
 cell.Measure Native
+cell.HspiceWLine Refuse(W0105)
 behaviours Behaviours { writer: Cards, text_family: acme, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Ngspice, source_rules: Ngspice, card_rules: Ngspice, named_rules: None, options_form: Spice, load_form: Ngspice, control_block: Ngspice, analysis_form: Ngspice, end_rule: Always, value_quoting: AsWritten, coupling: Pairs, param_form: Plain, include_scope: Local, named_params: None, analysis_masters: None, expr_eval: Ngspice, parasitics: Elements, spectre_analyses: ["pz", "sp", "sens"] }
 code ACME001 Refusal "acme has no Laplace sources"
 code ACME002 Refusal "acme's .noise takes one source"

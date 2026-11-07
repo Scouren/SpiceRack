@@ -144,6 +144,7 @@ pub(super) fn ltspice() -> DialectDef {
         .refuse(Construct::PrivateText, Code::W0039)
         .refuse(Construct::XyceSens, Code::W0015)
         .refuse(Construct::HspiceAnalysis, Code::W0015)
+        .refuse(Construct::HspiceWLine, Code::W0105)
         .omit(Construct::VacaskScript, Code::W0120)
         .refuse(Construct::CaretReread, Code::W0002)
         .refuse(Construct::StatisticalCall, Code::W0003)

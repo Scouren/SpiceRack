@@ -32408,3 +32408,10 @@ hspice/hspice/tran_segments.sp ngspice now written: HSPICE .tran segments read a
 hspice/hspice/tran_segments.sp spectre now written: HSPICE .tran segments read as one run to the last stop
 hspice/hspice/tran_segments.sp vacask now written: HSPICE .tran segments read as one run to the last stop
 hspice/hspice/tran_segments.sp xyce now written: HSPICE .tran segments read as one run to the last stop
+
+# Phase 7: spice-read: HSPICE's W element (render::read refused.rs
+# kept_construct, w_line; Construct::HspiceWLine in every definition).
+# An RLGC/tabular/U/FS/S-model W line kept as HSPICE text refuses W0105 on
+# ngspice, ESPice, Xyce, LTspice and VACASK (no W element), W0001 on
+# Spectre (stream C: `mtline`), not W0001 on the SPICE targets. No line:
+# refusals are compared by status only.

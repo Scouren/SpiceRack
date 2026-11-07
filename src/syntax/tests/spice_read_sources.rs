@@ -330,3 +330,48 @@ fn an_hspice_tran_in_segments_runs_to_the_last_stop_at_the_finest_step() {
         .text;
     assert!(ng.lines().any(|l| l == ".tran 100p 40n"), "{ng}");
 }
+
+#[test]
+fn an_hspice_w_line_is_refused_where_no_w_element_is() {
+    // HSPICE UG, W element (`RLGCmodel=`); the ngspice manual, Xyce RG and
+    // LTspice help have no such element (ngspice's `W` is a current
+    // switch): W0105, not W0001; HSPICE copies it. Checks: 3 + 1.
+    let text = "t\nv1 a 0 1\nw1 a 0 b 0 rlgcmodel=line n=1 l=0.2\nr1 b 0 50\n.op\n.end\n";
+    for t in [Dialect::Ngspice, Dialect::Xyce, Dialect::Ltspice] {
+        let e = render_text(text, Dialect::Hspice, "t", t).expect_err("refused");
+        let codes: Vec<Code> = e.diags.iter().map(|g| g.code).collect();
+        assert_eq!(codes, [Code::W0105], "{t:?} {}", e.messages);
+    }
+    assert!(render_text(text, Dialect::Hspice, "t", Dialect::Hspice).is_ok());
+}
+
+#[test]
+fn an_hspice_temperature_list_is_a_step_over_temp() {
+    // HSPICE UG `.TEMP t1 t2 t3`: each analysis at each temperature; Xyce
+    // RG and LTspice help `.step temp list`. Xyce 7.10 ran the written
+    // deck (TNOM 25 as HSPICE's) to the corpus's temp_list.expected.json
+    // (ngspice-45 at each temperature) within 2e-5; HSPICE writes `.temp`
+    // back; ngspice has no `.step` (W0016). Checks: 3.
+    let text = "t\ni1 0 a 1m\nd1 a 0 dmod\n.model dmod d is=1e-14\n.temp -55 25 125\n.op\n.end\n";
+    let w = |t| render_text(text, Dialect::Hspice, "t", t);
+    assert!(
+        w(Dialect::Xyce)
+            .expect("written")
+            .text
+            .lines()
+            .any(|l| l == ".step temp list -55 25 125")
+    );
+    assert!(
+        w(Dialect::Hspice)
+            .expect("written")
+            .text
+            .lines()
+            .any(|l| l == ".temp -55 25 125")
+    );
+    let ng = w(Dialect::Ngspice).expect_err("refused");
+    assert!(
+        ng.diags.iter().any(|g| g.code == Code::W0016),
+        "{}",
+        ng.messages
+    );
+}
