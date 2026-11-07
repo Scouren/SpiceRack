@@ -9,6 +9,11 @@
 //! Xyce 7.10 reads `p:n` as one hierarchical name ("syntax error in
 //! expression"), so on Xyce each ternary `:` has a blank before it.
 //!
+//! `log` is the natural logarithm on ngspice, HSPICE and LTspice
+//! (ngspice manual §2.8.5) and base 10 on Xyce (RG §2.3; Xyce 7.10 by
+//! hand: `log(100)` is 2, `ln(100)` 4.605), so it is renamed between them
+//! (`rename_call`).
+//!
 //! Xyce's and LTspice's `if(c,a,b)` is `((c)?(a):(b))` where the target
 //! has no `if` (ngspice-45: "no such function 'if'", run by hand).
 //!
@@ -20,6 +25,11 @@
 //! - `pub(super) fn parenthesize(e: &str, read: Read, blank: bool) -> String`
 //! - `pub(super) fn ngspice_nest(e: &str) -> Nest`
 //! - `pub(super) fn spell_if(e: &str) -> String`
+//! - `pub(super) fn rename_call(e: &str, from: &str, to: &str) -> String`
+//! - `pub(super) fn spell_nint(e: &str, to_xyce: bool) -> String`
+//! - `pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String`
+//! - `pub(super) fn nominal(e: &str) -> String`
+//! - `pub(super) fn spell_clamp(e: &str) -> String`
 
 use std::cell::Cell;
 
@@ -94,10 +104,109 @@ pub(super) fn ngspice_nest(e: &str) -> Nest {
 /// `e` with each `if(c, a, b)` call spelled `((c)?(a):(b))`, inner calls
 /// first; a call of another arity as written.
 pub(super) fn spell_if(e: &str) -> String {
-    if !e.to_ascii_lowercase().contains("if") {
-        return e.to_string();
+    let ternary = |a: &[String]| match a {
+        [c, x, y] => Some(format!("(({c})?({x}):({y}))")),
+        _ => None,
+    };
+    map_calls(e, "if", &ternary, 0)
+}
+
+/// `e` with each name `from` (any case, whole, not a call, a node or a
+/// device's `@x[...]`; `1m`'s suffix is no name) renamed `to`.
+pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String {
+    let b = e.as_bytes();
+    let ident = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    let mut out = String::with_capacity(e.len() + 4);
+    let mut i = 0;
+    while i < b.len() {
+        let end = i + from.len();
+        let hit = (i == 0 || !(ident(b[i - 1]) || matches!(b[i - 1], b'.' | b'@' | b'[')))
+            && e.get(i..end).is_some_and(|w| w.eq_ignore_ascii_case(from))
+            && b.get(end).is_none_or(|&c| !ident(c) && c != b'(');
+        if hit {
+            out.push_str(to);
+            i = end;
+            continue;
+        }
+        let next = e[i..].chars().next().map_or(1, char::len_utf8);
+        out.push_str(&e[i..i + next]);
+        i += next;
     }
-    ifs(e, 0)
+    out
+}
+
+/// `e` with each statistical call at its nominal, as HSPICE and Xyce
+/// evaluate one outside a Monte Carlo run: `agauss(n, …)`, `gauss`,
+/// `aunif`, `unif`, two-argument `limit` are `n`, Xyce's `rand()` 0.5 (Xyce 7.10 by
+/// hand: all five at 1 for n = 1, `2*rand()` 1; HSPICE: ESPice's reading
+/// of `param_distributions.sp` gives the nominal -2 mA), where ngspice
+/// draws one (-2.178 mA).
+pub(super) fn nominal(e: &str) -> String {
+    let first = |a: &[String]| a.first().filter(|_| a.len() >= 2).map(|n| format!("({n})"));
+    let mut e = e.to_string();
+    for f in ["agauss", "gauss", "aunif", "unif"] {
+        e = map_calls(&e, f, &first, 0);
+    }
+    // Xyce's three-argument `limit(x, lo, hi)` is a clamp (RG §2.3).
+    let pair = |a: &[String]| (a.len() == 2).then(|| format!("({})", a[0]));
+    e = map_calls(&e, "limit", &pair, 0);
+    let half = |a: &[String]| (a.len() == 1 && a[0].is_empty()).then(|| "0.5".to_string());
+    map_calls(&e, "rand", &half, 0)
+}
+
+/// `e` with each three-argument `limit(x, lo, hi)`, Xyce's and LTspice's
+/// clamp (Xyce RG §2.3), spelled `min(max(x, lo), hi)`: ngspice-45's
+/// `limit` is a statistical call (`limit(3,0,2)` is 5 in `{}`, 0 in a B
+/// source, run by hand; `min(max(3,0),2)` is 2).
+pub(super) fn spell_clamp(e: &str) -> String {
+    let clamp = |a: &[String]| match a {
+        [x, lo, hi] => Some(format!("min(max({x}, {lo}), {hi})")),
+        _ => None,
+    };
+    map_calls(e, "limit", &clamp, 0)
+}
+
+/// `e` with each `nint(x)` rounding as the source's does on the target:
+/// ngspice's rounds a half to even (`nint(2.5)` is 2, `nint(-1.5)` -2:
+/// C's `rint`, run by hand), Xyce's away from zero (3, -2; Xyce 7.10 by
+/// hand). `to_xyce`: ngspice's rounding spelled for Xyce, else Xyce's
+/// for ngspice; the spellings ran by hand on both at ±0.5, ±1.5, 2.5.
+pub(super) fn spell_nint(e: &str, to_xyce: bool) -> String {
+    let round = |a: &[String]| match a {
+        [x] if to_xyce => {
+            let r = format!("floor(({x})+0.5)");
+            Some(format!(
+                "((({x})+0.5)=={r} && fmod({r},2)!=0 ? {r}-1 : {r})"
+            ))
+        }
+        [x] => Some(format!("(({x})>=0 ? floor(({x})+0.5) : ceil(({x})-0.5))")),
+        _ => None,
+    };
+    map_calls(e, "nint", &round, 0)
+}
+
+/// `e` with each call of `from` (any case, a whole name before `(`)
+/// renamed `to`.
+pub(super) fn rename_call(e: &str, from: &str, to: &str) -> String {
+    let b = e.as_bytes();
+    let ident = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    let mut out = String::with_capacity(e.len() + 4);
+    let mut i = 0;
+    while i < b.len() {
+        let end = i + from.len();
+        let hit = (i == 0 || !ident(b[i - 1]))
+            && e.get(i..end).is_some_and(|w| w.eq_ignore_ascii_case(from))
+            && e[end..].trim_start().starts_with('(');
+        if hit {
+            out.push_str(to);
+            i = end;
+            continue;
+        }
+        let next = e[i..].chars().next().map_or(1, char::len_utf8);
+        out.push_str(&e[i..i + next]);
+        i += next;
+    }
+    out
 }
 
 // ---- private ----
@@ -204,23 +313,28 @@ fn top(s: &str) -> Vec<(usize, u8)> {
     out
 }
 
-/// `s` with its `if` calls spelled, at nesting `depth`.
-fn ifs(s: &str, depth: u32) -> String {
+/// `s` with each call of `name` (any case, a whole name) spelled by
+/// `f` from its arguments, inner calls first; a call `f` declines
+/// (`None`) as written. At nesting `depth`.
+fn map_calls(s: &str, name: &str, f: &dyn Fn(&[String]) -> Option<String>, depth: u32) -> String {
     let b = s.as_bytes();
+    let n = name.len();
     let mut out = String::with_capacity(s.len() + 8);
     let mut i = 0;
     while i < b.len() {
         let word = i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_');
         let call = word
             && depth < DEPTH
-            && s[i..].len() > 2
-            && s[i..i + 2].eq_ignore_ascii_case("if")
-            && b[i + 2] == b'(';
-        if let Some(j) = call.then(|| close(b, i + 2)).flatten() {
-            let args = commas(&s[i + 3..j]);
-            if let [c, x, y] = args.as_slice() {
-                let [c, x, y] = [c, x, y].map(|a| ifs(a.trim(), depth + 1));
-                out.push_str(&format!("(({c})?({x}):({y}))"));
+            && s.get(i..i + n)
+                .is_some_and(|w| w.eq_ignore_ascii_case(name))
+            && b.get(i + n) == Some(&b'(');
+        if let Some(j) = call.then(|| close(b, i + n)).flatten() {
+            let args: Vec<String> = commas(&s[i + n + 1..j])
+                .iter()
+                .map(|a| map_calls(a.trim(), name, f, depth + 1))
+                .collect();
+            if let Some(spelled) = f(&args) {
+                out.push_str(&spelled);
                 i = j + 1;
                 continue;
             }
@@ -282,7 +396,10 @@ fn close(b: &[u8], i: usize) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Nest, Read, ngspice_nest, parenthesize, spell_if};
+    use super::{
+        Nest, Read, ngspice_nest, nominal, parenthesize, rename_call, rename_word, spell_clamp,
+        spell_if, spell_nint,
+    };
 
     #[test]
     fn a_c_then_branch_ternary_is_parenthesized() {
@@ -316,6 +433,56 @@ mod tests {
             "((a)?(((b)?(1):(2))):(f(c,d)))"
         );
         assert_eq!(spell_if("diff(a,b)+if(a,b)"), "diff(a,b)+if(a,b)");
+    }
+
+    #[test]
+    fn a_draw_is_its_nominal() {
+        assert_eq!(nominal("agauss(1k,100,3)+2*rand()"), "(1k)+2*0.5");
+        assert_eq!(nominal("limit(2k, 500)*unif(a,0.1)"), "(2k)*(a)");
+        assert_eq!(nominal("gauss(x)"), "gauss(x)");
+        assert_eq!(nominal("limit(t-d,0,1)"), "limit(t-d,0,1)");
+    }
+
+    #[test]
+    fn a_clamp_is_min_of_max() {
+        assert_eq!(
+            spell_clamp("limit(t-d,0,1)+limit(a,b)"),
+            "min(max(t-d, 0), 1)+limit(a,b)"
+        );
+    }
+
+    #[test]
+    fn nint_rounds_as_its_source() {
+        let x = spell_nint("nint(value)", true);
+        let r = "floor((value)+0.5)";
+        assert_eq!(
+            x,
+            format!("(((value)+0.5)=={r} && fmod({r},2)!=0 ? {r}-1 : {r})")
+        );
+        assert_eq!(
+            spell_nint("NINT(a)", false),
+            "((a)>=0 ? floor((a)+0.5) : ceil((a)-0.5))"
+        );
+    }
+
+    #[test]
+    fn a_name_is_renamed_whole() {
+        assert_eq!(
+            rename_word("M*1m+mx+m(2)+2*M", "m", "m_1"),
+            "m_1*1m+mx+m(2)+2*m_1"
+        );
+    }
+
+    #[test]
+    fn a_call_is_renamed_whole() {
+        assert_eq!(
+            rename_call("log(2.7)+LOG (v(1))", "log", "ln"),
+            "ln(2.7)+ln (v(1))"
+        );
+        assert_eq!(
+            rename_call("log10(x)+blog(x)+log", "log", "ln"),
+            "log10(x)+blog(x)+log"
+        );
     }
 
     #[test]

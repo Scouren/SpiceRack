@@ -14,11 +14,11 @@
 //! Contents:
 //! - `fn is_four(line: &str) -> bool`, `fn is_continuation(line: &str) -> bool`
 //! - `pub(super) struct Tb`, `W::fold(&self) -> Tb`
-//! - `W::control_run(&self) -> Option<Vec<String>>`, `W::bench(&mut self, control: Option<&[String]>)`, `W::runs(&self) -> bool`
+//! - `W::control_run(&self) -> Option<Vec<String>>`, `W::bench(&mut self, control: Option<&[String]>)`, `W::runs(&self) -> bool`, `W::tran_uic(&self) -> bool`, `W::monte_carlo(&self) -> bool`
 //! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
 
 use super::W;
-use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm, Writer};
+use crate::syntax::behaviour::{AnalysisForm, ControlBlock, NetlistRules, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
@@ -45,6 +45,8 @@ pub(super) struct Tb {
     /// written: VACASK's own, or Xyce's on another target.
     dropped: Vec<u32>,
     measures: Vec<String>,
+    /// Each measure's statement's first token.
+    meas_toks: Vec<u32>,
     /// Each `.step`'s sweep, name, numbers and first token.
     steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
     /// Each list `.step`'s name, values and first token.
@@ -138,10 +140,28 @@ impl W<'_, '_> {
         !self.fold().analyses.is_empty()
     }
 
+    /// Whether a transient of the deck has UIC.
+    pub(super) fn tran_uic(&self) -> bool {
+        let tb = self.fold();
+        tb.analyses
+            .iter()
+            .any(|(a, _)| matches!(a, Ana::Tran { uic: true, .. }))
+    }
+
+    /// Whether the deck runs a Monte Carlo analysis.
+    pub(super) fn monte_carlo(&self) -> bool {
+        let tb = self.fold();
+        tb.analyses
+            .iter()
+            .any(|(a, _)| matches!(a, Ana::MonteCarlo { .. }))
+    }
+
     /// The testbench's cards.
     pub(super) fn bench(&mut self, control: Option<&[String]>) {
         let mut tb = self.fold();
         self.respell_refs(&mut tb);
+        let runs = !tb.analyses.is_empty();
+        self.hspice_defaults(&mut tb, runs);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
         }
@@ -153,21 +173,8 @@ impl W<'_, '_> {
                 self.o.token(&l, Space::Line);
             }
         } else {
-            let opts: Vec<String> = tb
-                .portable
-                .iter()
-                .map(|(k, v, _)| {
-                    let k = if k == "max_iterations" { "ITL1" } else { k };
-                    if v.is_empty() {
-                        k.to_string()
-                    } else {
-                        format!("{k}={v}")
-                    }
-                })
-                .collect();
-            if !opts.is_empty() {
-                self.o
-                    .token(&format!(".options {}", opts.join(" ")), Space::Line);
+            if let Some(line) = self.options_line(&tb) {
+                self.o.token(&line, Space::Line);
             }
             if let Some(t) = tb.temp {
                 let t = self.sp.decimal(t, self.x);
@@ -192,9 +199,19 @@ impl W<'_, '_> {
                 self.o.token(&format!("{card} V({n})={v}"), Space::Line);
             }
         }
+        for (n, v) in std::mem::take(&mut self.device_ics) {
+            if !tb.ics.iter().any(|(m, _)| m.eq_ignore_ascii_case(&n)) {
+                self.o.token(&format!(".ic V({n})={v}"), Space::Line);
+            }
+        }
         self.saves(&tb);
         self.prints(&tb.prints, &tb.analyses);
-        for m in &tb.measures {
+        for (m, &tok) in tb.measures.iter().zip(&tb.meas_toks) {
+            let ng = |r: NetlistRules| r == NetlistRules::Ngspice;
+            if !ng(self.rd.b.netlist_rules) && ng(self.b.netlist_rules) && !ngspice_measures(m) {
+                self.refuse(Code::W0048, tok);
+                continue;
+            }
             // `.MEASURE TRAN ...` is already a card, in any case.
             let card = m.get(..5).is_some_and(|p| p.eq_ignore_ascii_case(".meas"));
             let line = format!("{}{m}", if card { "" } else { ".meas " });
@@ -337,7 +354,10 @@ impl W<'_, '_> {
             BenchCard::NodeVals(true, v) => tb.ics.extend(v),
             BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
             BenchCard::Print(k, outs) => tb.prints.push((k, outs, tok)),
-            BenchCard::Meas(m) => tb.measures.push(m),
+            BenchCard::Meas(m) => {
+                tb.measures.push(m);
+                tb.meas_toks.push(tok);
+            }
             // A VACASK `save` is a save list; any other kept control
             // statement is asked about where the testbench is written.
             BenchCard::Extra(n) => match self.rd.vacask_saves(n) {
@@ -448,4 +468,24 @@ fn fourier_commands<'a>(lines: impl Iterator<Item = &'a str>) -> Vec<String> {
         }
     }
     out
+}
+
+/// Whether ngspice-45's `.meas` reads measure `m`: an analysis it
+/// measures (manual §15.4: `.meas {DC|AC|TRAN|SP}`; `.meas noise` is
+/// "unrecognized analysis type 'noise'", run by hand) and no Xyce-only
+/// qualifier (`RFC_LEVEL`, Xyce RG `.MEASURE`).
+fn ngspice_measures(m: &str) -> bool {
+    let mut words = m.split_whitespace();
+    let first = words.next().unwrap_or("");
+    let kind = match first
+        .get(..5)
+        .is_some_and(|p| p.eq_ignore_ascii_case(".meas"))
+    {
+        true => words.next().unwrap_or(""),
+        false => first,
+    };
+    let known = ["tran", "ac", "dc", "sp"]
+        .iter()
+        .any(|k| kind.eq_ignore_ascii_case(k));
+    known && !m.to_ascii_lowercase().contains("rfc_level")
 }

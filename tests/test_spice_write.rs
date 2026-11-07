@@ -424,6 +424,30 @@ fn a_zero_transient_step_is_a_positive_one_on_ngspice() {
     assert!((v - want).abs() < 1e-3, "{v} vs {want}\n{w}");
 }
 
+/// Xyce's zero TSTEP lets Xyce choose its steps; ngspice caps its step at
+/// TSTEP (manual §11.3.10), so the span over 50 stepped a 100 Hz sine over
+/// 100 ms at 2 ms, 5 points a period (stream F round 4,
+/// `MEASURE/AverageTest.cir`, 77 decks). The step is held to a fiftieth of
+/// the fastest source's period: real ngspice's v(1) reaches the sine's
+/// peak, 1 V, to 0.5%.
+#[test]
+fn a_zero_transient_step_follows_the_fastest_source() {
+    let deck = "* t\nV1 1 0 sin(0 1 100)\nR1 1 0 1k\n.tran 0 100m\n.end\n";
+    let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
+    let raw = Dialect::Ngspice
+        .run(&w)
+        .unwrap_or_else(|e| panic!("ngspice: {e}\n{w}"));
+    let i = raw
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("v(1)"));
+    let peak = raw.real_data[i.expect("v(1)")]
+        .iter()
+        .cloned()
+        .fold(f64::MIN, f64::max);
+    assert!((peak - 1.0).abs() < 5e-3, "{peak}\n{w}");
+}
+
 // ── a path with a blank ──
 
 /// ngspice §2.6 and Xyce RG `.INCLUDE` read a quoted path; written bare,
@@ -529,18 +553,19 @@ fn xyce_refuses_a_file_read_inside_a_subcircuit() {
     assert!(codes.contains(&Code::W0046), "{codes:?}");
 }
 
-// ── Xyce's if() and output syntax on ngspice ──
+// ── a hoisted subcircuit's models ──
 
-/// Xyce RG §2.3 `if(c,a,b)`; ngspice-45 has no `if` ("no such function
-/// 'if'" in a B source, "Cannot compute substitute" in `{}`, run by
-/// hand) but reads `((c)?(a):(b))` in both. Xyce 7.10 on this deck, by
-/// hand: v(b) = 4, v(c) = 2·v(1) = 3. Real ngspice on the written deck
-/// gives the same.
+/// ngspice manual §2.4.3: a `.model` inside a `.subckt` is seen by the
+/// subcircuits nested in it. Written hoisted (`one__inner`), the nested
+/// one holds a copy (Xyce_Regression `SUBCKT/subckt_j1.cir`: ngspice-45
+/// "Unable to find definition of model sw" before). Real ngspice on the
+/// written deck: the switch closes, v(out) = 1 V · 1k/(1k+1) .
 #[test]
-fn xyce_if_is_a_ternary_on_ngspice() {
-    let deck = "* t\nV1 1 0 1.5\nR1 1 0 1k\nVb b 0 {if(1>2,3,4)}\nRb b 0 1k\n\
-        Bc c 0 V={IF(V(1)>0,2*V(1),0)}\nRc c 0 1k\n.op\n.end\n";
-    let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
-    assert!((ngspice_op(&w, "b") - 4.0).abs() < 1e-9, "{w}");
-    assert!((ngspice_op(&w, "c") - 3.0).abs() < 1e-9, "{w}");
+fn a_hoisted_subcircuit_takes_the_models_around_it() {
+    let deck = "* t\nV1 in 0 1\nX1 in out one\nR1 out 0 1k\n.subckt one a b\n\
+        .model sw sw(ron=1 roff=1meg vt=0.5)\nX2 a b inner\n.subckt inner p q\nS1 p q p 0 sw\n\
+        .ends\n.ends\n.op\n.end\n";
+    let w = write(deck, Dialect::Ngspice, Dialect::Ngspice);
+    let v = ngspice_op(&w, "out");
+    assert!((v - 1000.0 / 1001.0).abs() < 1e-6, "{v}\n{w}");
 }

@@ -487,6 +487,24 @@ catalogue! {
         cite: "ngspice manual §2.7 (a `.lib` in a `.subckt` is local to it); Xyce 7.10 run by hand (a `.include` there defines globally, a `.lib` there is \"Invalid device type\")",
         explain: "ngspice scopes the subcircuits and models a file read inside a `.subckt` defines to that subcircuit; Xyce makes them global, where they replace the deck's own of the same name. Read the file at the top level, renaming what collides.",
     }
+    /// A subcircuit instance's multiplicity `m` on a target that has none.
+    W0047 Refusal {
+        title: "a subcircuit multiplicity the target lacks",
+        cite: "ngspice manual §2.4.3 (an `X` line's `m`, unless the subcircuit declares `m`); Xyce RG `X` (`M`, always); ESPice run by hand (`m=5` on an `X` line changes nothing)",
+        explain: "The source multiplies the subcircuit instance by `m` (parallel copies); the target ignores `m` on an `X` line, so the instance would count once. Write the copies out, or scale the subcircuit's elements by a parameter.",
+    }
+    /// A `.measure` of an analysis, or with a qualifier, the target's `.meas` does not read.
+    W0048 Refusal {
+        title: "a measure the target cannot take",
+        cite: "ngspice manual §15.4 (`.meas {DC|AC|TRAN|SP}`; ngspice-45: \"unrecognized analysis type 'noise'\"); Xyce RG `.MEASURE` (`RFC_LEVEL`, Xyce's own)",
+        explain: "The measure reads an analysis the target's `.meas` does not (a noise run on ngspice) or a qualifier only the source has (Xyce's `RFC_LEVEL`). Measure the result in post-processing, or rewrite the measure with the target's own forms (`when`, `find … at=`).",
+    }
+    /// A device's `IC=` the source holds in its operating point, on a target that applies it only under UIC and cannot hold it by `.ic`.
+    W0049 Refusal {
+        title: "a device initial condition the target applies only with UIC",
+        cite: "Xyce RG (C, L, Q, M `IC=`: applied in the DCOP); ngspice manual §3.3.5, §3.3.9 (\"only if the uic option is specified\"), §15.2.2 (`.ic` holds node voltages)",
+        explain: "The source holds the device's initial condition in its operating point; the target ignores it unless the transient has UIC, and its `.ic` holds node voltages only, so a floating capacitor's, an inductor's or a transistor's IC has no spelling. Add UIC to the transient (the source's meaning then differs in the operating point), or replace the IC with an `.ic` on the nodes.",
+    }
     // W0101–W0200: the named writer's (Spectre, VACASK).
     /// A flag (a parameter with no value) a target taking only `name=value` cannot spell.
     W0101 Refusal {

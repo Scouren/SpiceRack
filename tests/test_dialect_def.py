@@ -174,7 +174,7 @@ def test_every_vocabulary_enum_is_exported():
         "Devices", "Statement", "Analysis", "Command", "Simulator", "Writer", "NumberReading",
         "ModelSemantics", "SourceRules", "CardRules", "NamedRules", "OptionsForm", "LoadForm",
         "ControlBlock", "AnalysisForm", "EndRule", "ValueQuoting", "Coupling", "ParamForm",
-        "NamedParams", "IncludeScope", "ExprEval", "Parasitics",
+        "NamedParams", "IncludeScope", "ExprEval", "Parasitics", "NetlistRules",
     }
     assert ps.def_.Keyword is Tag
 

@@ -52,6 +52,8 @@ Certification_Tests/BUG_25_SON/testCombined1.cir source-fails # no raw file .cro
 Certification_Tests/BUG_294_SON/bjt_load.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: Could not find include file bjt.ic | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERR
 Certification_Tests/BUG_302/bug_302.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 Certification_Tests/BUG_333_SON/bug_333_son.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Certification_Tests/BUG_333_SON/bug_333_son_restarted.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 7
+Certification_Tests/BUG_333_SON/bug_333_son_restarted_unpacked.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 7
 Certification_Tests/BUG_354_SON/bad_function.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Cannot find global function definition for FABS in expression | Netlist error: Fun
 Certification_Tests/BUG_354_SON/bad_leadcurrent.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Cannot find global function definition for IV in expression | Netlist error: Funct
 Certification_Tests/BUG_354_SON/bad_parameter.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Function or variable BAR is not defined | Simulation aborted due to error.  There 
@@ -80,8 +82,6 @@ Certification_Tests/BUG_456/converter_restart_output.cir source-fails # no raw f
 Certification_Tests/BUG_456/converter_restart_unpacked.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 15
 Certification_Tests/BUG_456/emitter_restart.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 10
 Certification_Tests/BUG_456/emitter_restart_gear.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 10
-Certification_Tests/BUG_456/push_pull_xyce_restart.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 79
-Certification_Tests/BUG_456/push_pull_xyce_restart_unpacked.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 79
 Certification_Tests/BUG_456/simple.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 Certification_Tests/BUG_467_SON/rc_simple_xyce.cir slow # quarantined
 Certification_Tests/BUG_468_SON/bug_468.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Duplicate model definition NMOS | Simulation aborted due to error.  There are 0 MS
@@ -241,9 +241,13 @@ LEAD_CURRENTS/lead_unsupported_devices_ac.cir source-fails # no raw file .cross_
 LEAD_CURRENTS/lead_unsupported_multiterm_syntax.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 25 | Netlist error: Function or variable I(M1) is not defined | Netlist error: Function or variable I
 LEAD_CURRENTS/lead_vdmos_gear.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 20 | Netlist error: Function or variable FAILVALUE is not defined | Netlist error: Too many dependent
 LEAD_CURRENTS/lead_vdmos_trap.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 20 | Netlist error: Function or variable FAILVALUE is not defined | Netlist error: Too many dependent
+LTRA/ErrorMessageTest.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Device model NOPARAMS: Invalid specification. Specify at least two of R, L, | Netl
+LTRA/bad_model_parameters.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Device model RNEG: R, L, C, G or length (LEN) must not be negative | Netlist error
 LTRA/ltra_LC_hb.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 LTRA/ltra_RLC_hb.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 LTRA/ltra_step.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+LTRA/zero_length_lc_line.cir source-fails # Parse error: Bad num_points: cannot parse integer from empty string
+LTRA/zero_length_rlc_line.cir source-fails # Parse error: Bad num_points: cannot parse integer from empty string
 MEASURE/MeasfailOption.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 MEASURE/MeasfailOptionTrigTarg.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 MEASURE/MeasoutOption.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
@@ -259,21 +263,13 @@ MEASURE/bad_dot_measure_line8.cir source-fails # no raw file .cross_sim_out.raw:
 MEASURE/bad_error_measure_line1.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: In measure INDEPVARCOLINVALID, using data from file | ErrorTestRawDataMisOrdered.prn. Requested column for indepe
 MEASURE/dotOpNoTran.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Netlist analysis statement and measure mode (TRAN) for measure
 MEASURE/invalid_nodes.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Function or variable V(BOGONODE) is not defined | Netlist error: Function or varia
-MEASURE/measure_tran_analysis_mismatch.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Netlist analysis statement and measure mode (DC) for measure | Netlist error: Netl
 MEASURE_AC/DotOpNoAC.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Netlist analysis statement and measure mode (AC) for measure
 MEASURE_AC/REMEASURE/UnsupportedRemeasureTypes.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Only AVG, DERIV, EQN/PARAM, ERR, ERR1, ERR2, ERROR, FIND, INTEG, MIN, MAX, | Only 
-MEASURE_AC/measure_ac_analysis_mismatch.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Netlist analysis statement and measure mode (DC) for measure | Netlist error: Netl
+MEASURE_AC/RFParamsOps.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
 MEASURE_AC/unsupported_ac_measure_types.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Only AVG, DERIV, EQN/PARAM, ERR, ERR1, ERR2, ERROR, FIND, INTEG, MIN, MAX, | Only 
-MEASURE_CONT/unsupported_cont_measure_types.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Only DERIV, FIND, TRIG, TARG and WHEN measure types are supported for | Netlist er
 MEASURE_DC/MeasfailOption.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
-MEASURE_DC/REMEASURE/remeasure_dc_analysis_mismatch.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Netlist analysis statement and measure mode (TRAN) for measure | Netlist error: Ne
 MEASURE_DC/bad_error_measure_line1.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: In measure DEPVARCOLINVALID, using data from file | ErrorTest1DCRawData.prn. Requested column for dependent varia
-MEASURE_DC/measure_dc_analysis_mismatch.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Netlist analysis statement and measure mode (TRAN) for measure | Netlist error: Ne
 MEASURE_DC/unsupported_dc_measure_types.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Only AVG, DERIV, EQN/PARAM, ERR, ERR1, ERR2, ERROR, FIND, INTEG, MIN, MAX, | Only 
-MEASURE_FFT/missing_fft_line.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: No .FFT statement in netlist for measure THD | Simulation aborted due to error.  T
-MEASURE_NOISE/DotOpNoNoise.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 6 | Netlist error: Netlist analysis statement and measure mode (NOISE) for measure
-MEASURE_NOISE/measure_noise_analysis_mismatch.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 6 | Netlist error: Netlist analysis statement and measure mode (DC) for measure | Netlist error: Netl
-MEASURE_NOISE/unsupported_noise_measure_types.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Only AVG, DERIV, EQN/PARAM, ERR, ERR1, ERR2, ERROR, FIND, INTEG, MIN, MAX, | Only 
 MFG_SOLN/CAPACITOR/capacitor.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Parameter name FREQ is a reserved variable name and is not permitted | Simulation 
 MIXED_SIGNAL/Python/DCOPfailures.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3
 MIXED_SIGNAL/Python/netlistError.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
@@ -316,6 +312,7 @@ Message/Device/DeviceModel_setModParams_3.cir source-fails # no raw file .cross_
 Message/Device/DeviceModel_setModParams_4.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Device model CD4020: The temperature interpolation capability, invoked by | Simula
 Message/Function/func_error.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: Unable to resolve parameter PUKE found in .PARAM statement PUKE | Netlist error: Unable to resolve parameter BLET
 Message/Input/AC_doInit.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Message/Input/AC_doInit2.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3
 Message/Input/AC_extractACData.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 Message/Input/AC_setAnalysisParams.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 Message/Input/AC_setAnalysisParams2.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: Illegal values for start or end frequencies on .AC line. Both | Simulation aborted
@@ -347,6 +344,7 @@ Message/Print/bad_nodename.cir source-fails # no raw file .cross_sim_out.raw: Ne
 Message/Print/bad_variable.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: There were 2 undefined symbols in .PRINT command: node C, node | Simulation aborted due to error.  There are 0 MS
 Message/Print/multiple_format_same_file.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: File x: multiple print statements to this file with differing | Simulation aborted due to error.  There are 0 MSG
 Message/Subcircuit/subckt_a2_dup_error.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: Duplicate nodes in .subckt INV1 point to different nodes in X | Netlist error in file .cross_sim_deck.cir at: Err
+Message/Subcircuit/subckt_j1_dup_error.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: Duplicate nodes in .subckt ONEBIT point to different nodes in X | Netlist error in file .cross_sim_deck.cir at: E
 NOISE/invalid_device.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: There were 2 undefined symbols in .PRINT command: device Q2, | Simulation aborted due to error.  There are 0 MSG_
 NOISE/unsupported_analysis_mode.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 2 | Netlist error: INOISE operator only supported for .NOISE analyses | Netlist error: ONOISE operato
 NOISE/unsupported_device_source.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 12 | Netlist error: Function or variable DNO(C1) is not defined | Netlist error: Function or variable
@@ -354,16 +352,40 @@ Nonlinear/ConvergenceTests/NLStrategy1.cir source-fails # no raw file .cross_sim
 Nonlinear/ConvergenceTests/NLStrategy3.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 16 | Error - NOX::Direction::Factory::buildDirection() - Invalid choice for "Method" in "Direction" s
 Nonlinear/ConvergenceTests/NLStrategy4.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 16 | Error - NOX::Direction::Factory::buildDirection() - Invalid choice for "Method" in "Direction" s
 Output/Dasho/nooverwrite_measure.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Output/Dasho/sparam.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
 Output/ES/printLine_for_es-proj-pce-tran-prn.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Unrecognized parenthetical specification in .print near _quad_pce_variance | Netli
 Output/ES/printLine_for_es-regr-pce-tran-prn.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Unrecognized parenthetical specification in .print near _regr_pce_variance | Netli
 Output/ES/printLine_for_es-specific-print-params-prn.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: There were 30 undefined symbols in .PRINT command: _0, _1, _10, | Simulation aborted due to error.  There are 0 M
 Output/Other/NoiseNamesfile.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Model is required for device M2 and no valid model card found. | Simulation aborte
 Output/SENS/diode.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 Output/SPARAMS/InvalidDotLinParams.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Output/SPARAMS/InvalidDotLinParams1.cir source-fails # no raw file .cross_sim_out.raw: 
+Output/SPARAMS/InvalidDotLinParams2.cir source-fails # no raw file .cross_sim_out.raw: 
+Output/SPARAMS/InvalidRFParamOp-NoLin.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13 | Netlist error: S(), Y() and Z() operators only supported for .LIN analyses | Netlist error: S(),
+Output/SPARAMS/InvalidRFParamOp.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13 | Netlist error: Indices for S(), Y() and Z() operators must be > 0 | Netlist error: Indices for S
+Output/SPARAMS/InvalidRFParamOp1.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
+Output/SPARAMS/NegativeZ0.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
+Output/SPARAMS/RCladderSP1.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
+Output/SPARAMS/dashRNotSupported.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
 Output/SPARAMS/dc.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 3 | Netlist error: S(), Y() and Z() operators only supported for .LIN analyses | Netlist error: Funct
+Output/SPARAMS/multi-parameter.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
+Output/SPARAMS/sparams-phase-in-radians.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
+Output/SPARAMS/sparams-ts1-1port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
+Output/SPARAMS/sparams-ts1-3port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 15
+Output/SPARAMS/sparams-ts1-4port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 16
+Output/SPARAMS/sparams-ts1-5port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 17
+Output/SPARAMS/sparams-ts1-dataFormat.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
 Output/SPARAMS/sparams-ts1.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Output/SPARAMS/sparams-ts2-dataFormat.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
+Output/SPARAMS/sparams-ts2.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 15
+Output/SPARAMS/yparams-ts1-1port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
+Output/SPARAMS/yparams-ts1-2port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
 Output/SPARAMS/yparams-ts1.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Output/SPARAMS/yparams-ts2.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
+Output/SPARAMS/zparams-ts1-1port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 13
+Output/SPARAMS/zparams-ts1-2port.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
 Output/SPARAMS/zparams-ts1.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Output/SPARAMS/zparams-ts2.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 14
 PARAMS1/params_a.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 PARAM_RSP/BSIM_fit.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Device model NDEVICE: Cannot convert parameter A0 to a numeric value from | Netlis
 PARAM_RSP/rc_template.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Illegal value found for device R1 for parameter = R value = DAKOTA_R1R | Netlist e
@@ -431,16 +453,16 @@ SUBCKT/subckt_b.cir source-fails # no raw file .cross_sim_out.raw: Netlist error
 SUBCKT/subckt_e.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 SUBCKT/subckt_f.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 SUBCKT/subckt_g.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+SUBCKT/subckt_j1_dup_error.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: Duplicate nodes in .subckt ONEBIT point to different nodes in X | Netlist error in file .cross_sim_deck.cir at: E
 SUBCKT/subckt_k.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 SUBCKT/subckt_l.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 SUPERNODE/supernode6.cir source-fails # no raw file .cross_sim_out.raw: 
-TIA/TRAP/teststep1.cir source-fails # Parse error: Bad num_points: cannot parse integer from empty string
-TIA/TRAP/teststepgear1.cir source-fails # Parse error: Bad num_points: cannot parse integer from empty string
 TRANSLINE/transline_hb.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 TimeDepMutInd/timeDepMutInd.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 TwoLevelAPI/twoLevelLinearDC.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 TwoLevelAPI/twoLevelLinearTran.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 VALGRIND/valgrind.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+VANOISE/ekv_150nm_nmos_noise.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.cir at: Model is required for device M1 and no valid model card found. | Simulation aborte
 VERILOGPLUGIN/Backlog106.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 VERILOGPLUGIN/Bugfix35_AF.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 VERILOGPLUGIN/Bugfix36_AF.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
@@ -461,5 +483,8 @@ Verilog_LEAD_CURRENTS/lead_vbic_4t_gear.cir source-fails # no raw file .cross_si
 Verilog_LEAD_CURRENTS/lead_vbic_gear.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 15 | Netlist error: Function or variable FAILVALUE is not defined | Netlist error: Too many dependent
 XDM/HSPICE/OTHER_PARSING/macro_statement.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: There were 3 undefined symbols in .PRINT command: node X1.A1, | Simulation aborted due to error.  There are 0 MSG
 XDM/HSPICE/OTHER_PARSING/subcircuit_node_delineation.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: There were 4 undefined symbols in .PRINT command: node X1.A1, | Simulation aborted due to error.  There are 0 MSG
+XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 6
+XDM/HSPICE/SPARAMS/telegrapher_line.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 7
 XDM/PSPICE/IC_AND_NODESET/ic_nodeset.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 10
 YACC/ForcedDampedHO.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+YLIN/ylin-5port-linAnalysis.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 17

@@ -32140,3 +32140,671 @@ vacask/test/test_opnl.sim spectre now written: a model of the loaded Verilog-A m
 vacask/test/test_opsweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_sweep.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
 vacask/test/test_sweepvar.sim vacask a model of a loaded module and its instances written in VACASK's spelling (were copied as text)
+
+# Phase 7: spice-write: Xyce outputs on ngspice. A Xyce deck's .print outputs
+# are spelled as ngspice-45 reads them (manual §15.4.1, §31.1 @dev[param]):
+# I(R1) @R1[i] (D @D[id], I @I[current]), IB(Q1) @Q1[ib], V(X1:N1)
+# V(X1.N1), R1:R @R1[R]; a print format (PRECISION=, WIDTH=, FILE=,
+# FORMAT=) left out (W0024); ONOISE/INOISE (V²/Hz; ngspice's is V/√Hz),
+# DNO()/DNI()/N() and arithmetic on a current (ngspice prints i(V1) for
+# i(V1)*2) left out (W0023). 40 sampled written decks on ngspice-45:
+# warnings/errors 177 -> 55, clean runs 1 -> 26.
+xyce/B4SOI_450/invert_b4soi_4.5.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/B4SOI_450/test1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/B4SOI_450/test1_shmod1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/B4SOI_461/invert_b4soi.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/B4SOI_461/test1_shmod1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/B4SOI/invert_b4soi.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/B4SOI/test1_shmod1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM3_GM/nmosGm1_rev.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM3_GM/pmosGm1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM3_GM/pmosGm1_rev.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM4_GM/nmosGm1_rev.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM4_GM/pmosGm1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM4_GM/pmosGm1_rev.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/BSIM4_v4p82/test2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_option_scale2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_option_scale2Ref.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_option_scale.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_option_scaleRef.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_scale2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_scale2Ref.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_scale.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_scaleRef.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1325_SON/inc_lib_file_relative_path.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1325_SON/top_level/top_level_file_path.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1325_SON/Win/drive_letter_no_slash_path.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1325_SON/Win/inc_lib_file_relative_path.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1358/bug_1358_quotes.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1416/bug_1416_dc.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1416/bug_1416_tran.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1636/foo.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_1946/bug_1946.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_2007/gstep.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_225/bug_225.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_22_SON/bug22.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_243/bug_243_mpi.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_263/bug_263.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_269_SON/bug269_printFormatRaw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_272_SON/bug272_probe.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_302/DC_comma.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_302/DC_delimiter_invalid.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_302/DC_tab.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_372/invert_b3soi.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_372/invert_b3soi-sim.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_372/invert_bsim3.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_372/invert_bsim3-sim.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_372/invert_bsim4.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_372/invert_bsim4-sim.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_386/diode.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_39_SON/bug39_int.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_39_SON/bug39_limit.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_39_SON/bug39_pow.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_39_SON/bug39_sign.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_440_SON/bug440a.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_440_SON/bug440b.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_440_SON/bug440.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_442/bug_442_baseline.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_442/bug_442_baseline_unpacked.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_442/bug_442_restarted.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_442/bug_442_restarted_unpacked.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_461_SON/bug461_printFormatRaw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_461_SON/bug461_printFormatRaw_versionOn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_519_SON/bug_519_SON.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_524_SON/rmod_resmod.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_2_baseline.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_6_baseline.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_538_SON/bug_538_son_6.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_601_SON/bug_601.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_61/capacitor.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_646_SON/bug_646_ac.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_655_SON/contLine.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_655_SON/contLine_with_spaces.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_668/bug_668_probe.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_668/bug_668_raw_asciiprintline.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_668/bug_668_raw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_668/bug_668_raw_printline.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_668/bug_668_tecplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_695/bug695.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_701_SON/ac_files_fallback.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_701_SON/ac_files_fallback_csv.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_746_SON/raw_file_bjt.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_746_SON/raw_file_jfet.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_746_SON/raw_file_mesfet.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_746_SON/raw_file_nsoi_mosfet.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_746_SON/raw_file_r_l_c_devices.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_834/inv1_tran.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_834/inv2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_834/inv.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_834/inv_loca.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_903_SON/bug_903_ac.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_971_SON/invalid_parameter.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_981_SON/bug981A.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUG_981_SON/bug981B.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUGS_ISSUE_54/multiSubcktPar.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/BUGS_ISSUE_54/multiSubcktParRef.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/ISSUE_202/first.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/ISSUE_202/first_last.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Certification_Tests/ISSUE_202/last.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/CircuitSim90/MOS3/arom.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DAKOTA/res.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DIODE/diode_with_sidewall.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DIODE/diode_with_sidewall_fcs.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DIODE/diode_with_sidewall_mjsw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DIODE/diode_with_sidewall_nbv.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DIODE/diode_with_sidewall_ns.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/DIODE/diode_with_sidewall_php.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/EKV26/test_ekv26_nmos.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/EKV26/test_ekv26_pmos.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/FOURIER/CMOS_inverter_lead_currents.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/FOURIER/lead_current_power.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/GROUND_PATH/IndPathToGround.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/HICUM/noise_npn_full_sh_ac.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/INVALID_CHARS/colon_in_node_name2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/INVALID_CHARS/colon_in_node_name.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/INVALID_CHARS/period_in_node_name.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/INVALID_CHARS/valid_chars_device_node_names2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/INVALID_CHARS/valid_chars_device_node_names.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/INVALID_CHARS/valid_chars_noise_expressions.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/LEAD_CURRENTS/lead_unsupported_devices_ac.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_CONT/unsupported_cont_measure_types.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/AvgTest2DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/bad_error_measure_line1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/DerivTest1DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/EquationEvalTestDC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/ErrorTest1DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/ErrorTest2DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/FindWhenTest1DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/FindWhenTest2DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/IntegTest1DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/MaxMinPPTest2DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/measure_dc_analysis_mismatch.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/REMEASURE/remeasure_dc_analysis_mismatch.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/REMEASURE/RemeasureLeadCurrents.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/REMEASURE/RemeasureNoIndexError.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/REMEASURE/RemeasureStepNumCol.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/RMSTest1DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/TrigTargTest1DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/TrigTargTest2DC.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_DC/unsupported_dc_measure_types.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/DerivTestNoise.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/EquationEvalTestNoise.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/InputNoiseOps.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/IntegTestNoise.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/MaxMinPPTestNoise.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/measure_noise_analysis_mismatch.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/oneSweepValue.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/OutputNoiseOps.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/RMSTestNoise.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MEASURE_NOISE/unsupported_noise_measure_types.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Device/Core_SafeBarrier_1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Device/Device_BSIM3SOI_WLwarning.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Input/CircuitBlock_extractSubcircuitData_1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Input/OutputMgr_parsePRINTBlock.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Print/bad_device_parameter.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Print/multiple_format_same_file.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Message/Subcircuit/subckt_a2_dup_error.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MODEL_BINNING/complicatedLW.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MOS13_IC/invert42_mos3.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/MOS13_IC/invert50_mos1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/NOISE/invalid_device.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/NOISE/unsupported_device_source.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/ONEBIT/onebit.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/ac-gnuplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/ac-prn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/ac-probe.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/ac-raw-ascii.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/ac-raw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/ac-tecplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/op-csv.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/op-raw-ascii.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/AC/op-raw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/Dasho/noise.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-csv.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-gnuplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-multiprn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-prn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-probe.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-raw-ascii.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-raw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-tecplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/DC/dc-touchstone-defaults-to-prn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-csv.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-gnuplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-prn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-prn-noindex.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-probe-defaults-to-prn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-raw-defaults-to-prn.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-raw-override-ascii.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-raw-override.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/noise-tecplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/op-raw-override-ascii.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/NOISE/op-raw-override.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/Other/NoiseNamesfile.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-prn-comma.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-prn-precision.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-prn-timescalefactor.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-prn-width.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-raw-ascii.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-raw.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/Output/TRAN/tran-tecplot.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PARAM_REFACTOR/paramDep5.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PARSER/aAsAmp.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/POWERNODE/sixNode.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/POWERNODE/sixNode_in.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PSP102/invert_psp.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PSP103/invert_psp.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PSP103/invert_psp_testDTA0.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PSP103/invert_psp_testDTA1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/PSP103/invert_psp_testDTA2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/RESISTOR/resistor_lv3_2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/RESISTOR/resistor_lv3.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SANDLER25/sandler25.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a0.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a1.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a1_dup.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a2_dup.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a2_dup_error.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a3.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a3_hs.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a4.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a4_hs.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a5.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/SUBCKT/subckt_a5_hs.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/TR_TRAN/tran.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/VANOISE/bsimcmg_noise_111_m_baseline.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/VANOISE/bsimcmg_noise_111_m.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/VERILOG_MODEL_BINNING/invert_psp102.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/VERILOGPLUGIN/testBacklog527_2.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/VERILOGPLUGIN/testBacklog527_3.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/CONTROLLED_SOURCES/current_controlled_sources_w_extraneous_identifiers.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/CONTROLLED_SOURCES/voltage_controlled_sources_w_extraneous_identifiers.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/MODELS/correct_instance_parameters.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/MODELS/model_level_translation.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/MODELS/multiple_devices_same_model.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/OTHER_PARSING/library_parsing.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/OTHER_PARSING/macro_statement.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/OTHER_PARSING/mixed_param_and_func.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/OTHER_PARSING/special_variables.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/HSPICE/OTHER_PARSING/subcircuit_node_delineation.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/CONTROLLED_SOURCES/e_sources.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/CONTROLLED_SOURCES/f_sources.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/CONTROLLED_SOURCES/g_sources.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/CONTROLLED_SOURCES/h_sources.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/INDEPENDENT_SOURCES/i_sources.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/INDEPENDENT_SOURCES/v_sources.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+xyce/XDM/TSPICE/OTHER_PARSING/subckt.cir ngspice Xyce .print outputs spelled for ngspice (@dev[param], x1.n1) or left out (W0023, W0024)
+
+# Phase 7: spice-write: log's base (FINDINGS-oracles X1). `log` is natural on
+# ngspice, HSPICE and LTspice (ngspice §2.8.5) and base 10 on Xyce (RG §2.3;
+# Xyce 7.10 by hand: log(100)=2, ln(100)=4.605): ln() for Xyce from those,
+# log10() from Xyce for them. Xyce on the written log-functions-1 reads
+# ln(2.7)=0.99325 (was 0.43136). PARSER/hspiceMath.cir is meant for Xyce's
+# `-hspice-ext math` command line, which the deck does not carry: its log is
+# written for Xyce's default (base 10).
+pdk-sky130A/libs.tech/combined/continuous/models_resistors.spice xyce log written in the target base (ln on Xyce, log10 from Xyce)
+spice-bench/ngspice/tests/regression/misc/log-functions-1.sp xyce log written in the target base (ln on Xyce, log10 from Xyce)
+xyce/ABM_LOG/log.cir espice log written in the target base (ln on Xyce, log10 from Xyce)
+xyce/ABM_LOG/log.cir hspice log written in the target base (ln on Xyce, log10 from Xyce)
+xyce/ABM_LOG/log.cir ltspice log written in the target base (ln on Xyce, log10 from Xyce)
+xyce/ABM_LOG/log.cir ngspice log written in the target base (ln on Xyce, log10 from Xyce)
+xyce/PARSER/hspiceMath.cir ltspice log written in the target base (ln on Xyce, log10 from Xyce)
+
+# Phase 7: spice-write: R model values on Xyce (FINDINGS-oracles X2, X3). An
+# ngspice R model's r=/resistance= is the resistance of an instance with no
+# value (manual §3.3.2); Xyce's model R multiplies the instance value (1k by
+# default; Xyce 7.10 by hand: 2 MΩ for `.model my r r=2k` + `r1 2 0 my`).
+# For Xyce the instance takes the value (the innermost declaring scope's,
+# §2.4.3) and the model drops it. Xyce on the written model-scope-5 gives
+# 2k 4k 1k 8k 1k 8k 43, ngspice's values.
+spice-bench/ngspice/tests/regression/model/instance-defaults.sp xyce an R model value written on its instances, left out of the model (Xyce multiplies by it)
+spice-bench/ngspice/tests/regression/subckt-processing/model-scope-5.sp xyce an R model value written on its instances, left out of the model (Xyce multiplies by it)
+spice-bench/ngspice/tests/regression/temper/temper-3.sp xyce an R model value written on its instances, left out of the model (Xyce multiplies by it)
+spice-bench/ngspice/tests/regression/temper/temper-res-1.sp xyce an R model value written on its instances, left out of the model (Xyce multiplies by it)
+
+# Phase 7: spice-write: nint's rounding (FINDINGS-oracles X11). ngspice's nint
+# rounds a half to even (nint(2.5)=2), Xyce's away from zero (3); for Xyce
+# an ngspice nint is spelled with floor/fmod, for ngspice a Xyce nint with
+# floor/ceil (each run by hand on both). Xyce on the written xpressn-3: all
+# 29 gold/numeric/B triples agree.
+spice-bench/ngspice/tests/regression/parser/xpressn-3.sp xyce nint spelled with floor/fmod (half to even, as ngspice)
+
+# Phase 7: spice-write: Xyce's M on an X line (FINDINGS-oracles Y2). Xyce's M
+# on a subcircuit instance is its multiplicity even where the subcircuit
+# declares M; ngspice-45 takes a declared M as the parameter and an
+# undeclared one as the multiplicity (each run by hand). For ngspice the
+# declared M is renamed m_1 in its declaration and body. Xyce on the
+# source and ngspice on the written deck agree on test_a3 (1/6 V; 0.5 V
+# before), test_b3, bsrc3_m, subckt_b2.
+xyce/BSRC/bsrc3_m.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/BSRC/bsrc4_m.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_a3.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_a4.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b1.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3soi_inv1.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b4.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/SUBCKT/subckt_b2.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/SUBCKT/subckt_b2_hs.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/SUBCKT/subckt_b3.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/SUBCKT/subckt_b3_hs.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/VCCS/vccs_nl3_m.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+xyce/VCCS/vccs_nl4_m.cir ngspice a Xyce subcircuit parameter M renamed m_1 (X's M is the multiplicity)
+
+# Phase 7: spice-write: ESPice and subcircuit multiplicity. ESPice ignores m=
+# on an X line (by hand: m=5 gives 0.5 V where ngspice gives 1/6 V), so an
+# instance the source multiplies (ngspice: m!=1 on a master that does not
+# declare m; Xyce: M!=1) is refused W0047 there.
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__cap_vpp_11p3x11p8_l1m1m2m3m4_shieldm5_nhv.model.spice espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__rf_nfet_01v8.pm3.spice espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__rf_nfet_g5v0d10v5.pm3.spice espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__rf_pfet_01v8.pm3.spice espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+pdk-sky130A/libs.tech/combined/continuous/models_fet.spice espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+pdk-sky130A/libs.tech/combined/continuous/models_resistors.spice espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/BSRC/bsrc3_m.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/BSRC/bsrc4_m.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_a1.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_a2.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_a3.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_a4.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b1.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b2.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3soi_inv1.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3soi_inv2.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3soi_inv3.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3soi_inv4.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b3soi_inv5.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_b4.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_c1.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_c2.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_c3.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_c4.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_c5.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/Certification_Tests/ISSUE_267/test_c6.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/MODEL_BINNING/complicatedLW.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/SUBCKT/subckt_b2.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/SUBCKT/subckt_b2_hs.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/SUBCKT/subckt_b3.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/SUBCKT/subckt_b3_hs.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/VCCS/vccs_nl3_m.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+xyce/VCCS/vccs_nl4_m.cir espice refused W0047: an X line with m != 1 (ESPice has no subcircuit multiplicity)
+
+# Phase 7: spice-write: HSPICE's defaults and options (FINDINGS-oracles,
+# HSPICE -> ngspice). A running HSPICE deck that sets no TEMP/TNOM gets
+# HSPICE's 25 C written for ngspice, ESPice, LTspice and Xyce (27 C
+# defaults): ngspice on the written tnom_default gives ESPice's 0.785904
+# (0.791142 before). On ngspice GSHUNT is RSHUNT=1/g; GMINDC has no ngspice
+# option: refused W0017 (gmindc.sp, and gshunt.sp, which sets it too).
+hspice/hspice/cshunt_delmax.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/cshunt_delmax.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/cshunt_delmax.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/gmindc.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/gmindc.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/gmindc.sp ngspice refused W0017: gmindc has no ngspice option
+hspice/hspice/gshunt.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/gshunt.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/gshunt.sp ngspice refused W0017: gmindc has no ngspice option
+hspice/hspice/hspice_expressions.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/hspice_expressions.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_events.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_events.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_events.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_forms.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_forms.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_forms.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/meas_forms.sp xyce HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/op_times.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/op_times.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/op_times.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/op_times.sp xyce HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/param_distributions.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/param_distributions.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/param_distributions.sp xyce HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/resistor_default_tnom.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/resistor_default_tnom.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/resistor_default_tnom.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/resistor_default_tnom.sp xyce HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/search_lib.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/search_lib.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/search_lib.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/sffm_order.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/sffm_order.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/sffm_order.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/sffm_order.sp xyce HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/tnom_default.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/tnom_default.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/tnom_default.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/hspice/tnom_default.sp xyce HSPICE TEMP/TNOM default 25 C written
+hspice/syntax/hspice_suffix.sp espice HSPICE TEMP/TNOM default 25 C written
+hspice/syntax/hspice_suffix.sp ltspice HSPICE TEMP/TNOM default 25 C written
+hspice/syntax/hspice_suffix.sp ngspice HSPICE TEMP/TNOM default 25 C written
+hspice/syntax/hspice_suffix.sp xyce HSPICE TEMP/TNOM default 25 C written
+
+# Phase 7: spice-write: statistical calls outside Monte Carlo (FINDINGS-oracles
+# HSPICE param_distributions, Y6). HSPICE and Xyce evaluate agauss, gauss,
+# aunif, unif and two-argument limit to the nominal outside a Monte Carlo
+# run, Xyce's rand() to 0.5 (Xyce 7.10 by hand); ngspice and ESPice draw.
+# Written for them, each is its nominal (ngspice: -2 mA on the test deck,
+# ESPice's HSPICE reading; -2.178 mA before). Xyce's 3-argument limit is a
+# clamp and stays.
+fixtures/tests/fixtures/transpiler/func_stats.cir espice a statistical call written at its nominal (no Monte Carlo run)
+fixtures/tests/fixtures/transpiler/func_stats.cir ngspice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_option_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/b3soi_invert_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/mos1_invert_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/mos2_invert_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/mos3_invert_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/mos6_invert_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_1041_SON/vdmos_tran_scale2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_39_SON/bug39_limit.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_742/bug_742.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/BUG_742/bug_742.cir ngspice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/bsim3_test2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos1_test2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos1_test2Ref.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos2_test2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos2_test2Ref.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos3_test2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos3_test2Ref.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos6_test2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/mos6_test2Ref.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/vdmos_test2.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/Certification_Tests/ISSUE_239/vdmos_test2Ref.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/PARSER/nakedRandom.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/PARSER/paramFunc6.cir espice a statistical call written at its nominal (no Monte Carlo run)
+xyce/PARSER/random.cir espice a statistical call written at its nominal (no Monte Carlo run)
+
+# Phase 7: spice-write: Xyce's clamp on ngspice. Xyce's and LTspice's
+# 3-argument limit(x, lo, hi) is a clamp (Xyce 7.10 by hand: limit(3,0,2)=2);
+# ngspice-45's limit is a statistical call (5 in {}, 0 in a B source): written
+# min(max(x, lo), hi). Xyce on the source and ngspice on the written
+# ABM/limit.cir agree (they differed before).
+xyce/ABM/limit.cir espice limit(x,lo,hi) written min(max(x, lo), hi)
+xyce/ABM/limit.cir ngspice limit(x,lo,hi) written min(max(x, lo), hi)
+xyce/BINARYOPS/binary_funcs.cir espice limit(x,lo,hi) written min(max(x, lo), hi)
+xyce/BINARYOPS/binary_funcs.cir ngspice limit(x,lo,hi) written min(max(x, lo), hi)
+
+# Phase 7: spice-write: SFFM's argument order (FINDINGS-oracles, HSPICE
+# sffm_order). ngspice-45's SFFM is (VO VA FM MDI FC), the modulation
+# frequency third (vsrcload.c; by hand sffm(0 1 10meg 0 1meg) at 25 ns:
+# ngspice 0.156, Xyce 1.000); HSPICE's, Xyce's, LTspice's (VO VA FC MDI FS):
+# the two swap across. Xyce on ISFFM/isffm.cir against ngspice on the
+# written deck: max |i(vmon)| difference 9.99 before, 0.103 after (the
+# interpolation between the two time grids).
+xyce/ISFFM/isffm.cir espice SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/ISFFM/isffm.cir ngspice SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SOURCES/sources.cir espice SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/SOURCES/sources.cir ngspice SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+xyce/VSFFM/vsffm.cir espice SFFM's FC and FS swapped for ngspice's (VO VA FM MDI FC)
+
+# Phase 7: spice-write: hoisted models, Xyce global nodes, measures ngspice
+# cannot take. A nested subcircuit written hoisted takes a copy of the
+# models around it (ngspice §2.4.3; subckt_j1 "Unable to find definition of
+# model sw" before). A Xyce `$G_` global node is a `.global G_…` node on
+# ngspice and HSPICE, where `$` starts a comment (bjt_baseline: ngspice now
+# runs and matches Xyce 7.10 to 1.8e-5 V; it stopped before). A Xyce
+# .measure of an analysis ngspice's .meas lacks (NOISE, *_CONT, FFT) or with
+# RFC_LEVEL is refused W0048 on ngspice and ESPice (class G).
+spice-bench/ngspice/tests/regression/subckt-processing/model-scope-5.sp espice a hoisted subcircuit takes the models around it
+spice-bench/ngspice/tests/regression/subckt-processing/model-scope-5.sp hspice a hoisted subcircuit takes the models around it
+spice-bench/ngspice/tests/regression/subckt-processing/model-scope-5.sp ngspice a hoisted subcircuit takes the models around it
+xyce/Certification_Tests/BUG_294_SON/bjt_baseline.cir espice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_294_SON/bjt_baseline.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_294_SON/bjt_baseline.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_294_SON/bjt_load.cir espice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_294_SON/bjt_load.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_294_SON/bjt_load.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_307/bug_307_d.cir espice a hoisted subcircuit takes the models around it
+xyce/Certification_Tests/BUG_307/bug_307_d.cir hspice a hoisted subcircuit takes the models around it
+xyce/Certification_Tests/BUG_307/bug_307_d.cir ltspice a hoisted subcircuit takes the models around it
+xyce/Certification_Tests/BUG_307/bug_307_d.cir ngspice a hoisted subcircuit takes the models around it
+xyce/Certification_Tests/BUG_307/bug_307_d.cir xyce a hoisted subcircuit takes the models around it
+xyce/Certification_Tests/BUG_360_SON/nand8.cir espice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_360_SON/nand8.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/BUG_360_SON/nand8.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/Certification_Tests/ISSUE_229/GlobalInExpressionBug.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/GLOBALNODE/global.cir espice .global G_… for Xyce's $G_ nodes
+xyce/GLOBALNODE/global.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/GLOBALNODE/global.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/GMIN_STEPPING/gstep2.cir espice .global G_… for Xyce's $G_ nodes
+xyce/GMIN_STEPPING/gstep2.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/GMIN_STEPPING/gstep2.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline2.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline2.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline2.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline3.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline3.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline3.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline4.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline4.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline4.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline5.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline5.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/bjt_baseline5.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_bjt.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_bjt.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_bjt.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_bjt2.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_bjt2.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_bjt2.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_gmin_bjt.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_gmin_bjt.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/ic_gmin_bjt.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/nodeset_bjt.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/nodeset_bjt.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/nodeset_bjt.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/nodeset_bjt2.cir espice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/nodeset_bjt2.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/IC_AND_NODESET/nodeset_bjt2.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/MEASURE_AC/measure_ac_analysis_mismatch.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_AC/measure_ac_analysis_mismatch.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/DerivTest1DC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/DerivTest1DC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/DerivTestAC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/DerivTestAC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/DerivTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/DerivTestNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/FindWhenTest1DC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/FindWhenTest1DC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/FindWhenTestAC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/FindWhenTestAC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/FindWhenTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/FindWhenTestNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/TrigTargTest1DC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/TrigTargTest1DC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/TrigTargTestAC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/TrigTargTestAC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/TrigTargTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/TrigTargTestNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/USE_CONT_FILES/AC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/USE_CONT_FILES/AC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/USE_CONT_FILES/DC.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/USE_CONT_FILES/DC.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/USE_CONT_FILES/Noise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/USE_CONT_FILES/Noise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_CONT/unsupported_cont_measure_types.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_DC/REMEASURE/remeasure_dc_analysis_mismatch.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_DC/measure_dc_analysis_mismatch.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/DerivTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/DotOpNoNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/DotOpNoNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/EquationEvalTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/ErrorTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/ErrorTestNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/FindWhenTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/FindWhenTestNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/InputNoiseOps.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/IntegTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/MaxMinPPTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/OutputNoiseOps.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/REMEASURE/UnsupportedRemeasureMode.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/REMEASURE/UnsupportedRemeasureMode.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/RMSTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/TrigTargTestNoise.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/TrigTargTestNoise.cir ngspice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/measure_noise_analysis_mismatch.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/oneSweepValue.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/MEASURE_NOISE/unsupported_noise_measure_types.cir espice refused W0048: a Xyce .measure ngspice's .meas cannot take
+xyce/SAVE_AND_LOAD/bjt_baseline.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_baseline.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_baseline.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_default_baseline.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_default_baseline.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_default_baseline.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_default_load.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_default_load.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_default_load.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_load.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_load.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_load.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_no_save.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_no_save.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_no_save.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_sub_default_type_level_baseline.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_sub_default_type_level_baseline.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_sub_default_type_level_baseline.cir ngspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_sub_default_type_level_load.cir espice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_sub_default_type_level_load.cir hspice .global G_… for Xyce's $G_ nodes
+xyce/SAVE_AND_LOAD/bjt_sub_default_type_level_load.cir ngspice .global G_… for Xyce's $G_ nodes
+
+# Phase 7: spice-write: Xyce device IC=, duplicate parameters, TC pairs, the
+# zero tran step from the sources (FINDINGS-oracles Y4, round 4). A Xyce
+# capacitor-to-ground IC= (held in Xyce's DCOP) is an .ic on ngspice/ESPice
+# when no transient has UIC; any other device IC= is refused W0049 there. A
+# Xyce parameter defined twice keeps its first value (Xyce's). TC=a,b is
+# tc1/tc2 on ngspice. A zero TSTEP is capped at a fiftieth of the fastest
+# periodic source's period (the 77 aliasing decks; their .tran lines are
+# listed in the zero-tran-step section).
+xyce/ACtests/SANDLER16/sandler16.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/ACtests/SANDLER16/sandler16.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/BJT_IC/bjt_ic.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/BJT_IC/bjt_ic.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/BJT_IC/bjt_ic_nonzero.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/BJT_IC/bjt_ic_nonzero.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_201_SON/bug201b.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_baseline.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_baseline.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_baseline_unpacked.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_baseline_unpacked.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_restart.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_restart.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_restart_unpacked.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_456/push_pull_xyce_restart_unpacked.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/BUG_746_SON/raw_file_r_l_c_devices.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/Certification_Tests/ISSUE_202/first_last.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_202/first_last.cir hspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_202/first_last.cir ltspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_a1.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_a1.cir hspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_a1.cir ltspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_a2.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_a2.cir hspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_a2.cir ltspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_b1.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_b1.cir hspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_b1.cir ltspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_b2.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_b2.cir hspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/Certification_Tests/ISSUE_405/precedence_b2.cir ltspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/DIODE_ANALYTIC/breakdown_model.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/DIODE_ANALYTIC/breakdown_model.cir ngspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/DIODE_ANALYTIC/forward_model.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/DIODE_ANALYTIC/forward_model.cir ngspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/DIODE_ANALYTIC/reverse_model.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/DIODE_ANALYTIC/reverse_model.cir ngspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/IC_AND_NODESET/ring_osc_bsim3.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/IC_AND_NODESET/ring_osc_bsim4.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/INIT_CONDS/inv1xIC.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/INIT_CONDS/ring_osc_bsim3.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/LEAD_CURRENTS/lead_r_c_gear.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/LEAD_CURRENTS/lead_r_c_trap.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/MINDUCTORS/MINDUCTORS_IC.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/MINDUCTORS/MINDUCTORS_IC2.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/MINDUCTORS/MINDUCTORS_IC2baseline.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/MINDUCTORS/cpldLMIs_ic.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/MOS13_IC/invert42_mos3.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/MOS13_IC/invert50_mos1.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/MULTIPLICITY_FACTOR/ErrorMessageTest.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/MULTIPLICITY_FACTOR/ErrorMessageTest.cir ngspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/MULTIPLICITY_FACTOR/capacitor_ic.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/NMOS_ANALYTIC/mosfet_level1.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/NMOS_ANALYTIC/mosfet_level1.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/POWER/power_r_c_gear.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/POWER/power_r_c_trap.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/TIA/TRAP/CAPACITOR/capacitor1.cir espice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/TIA/TRAP/CAPACITOR/capacitor1.cir ngspice a grounded C's Xyce IC= written .ic / a duplicate parameter's first value kept
+xyce/TIA/TRAP/push_pullLte2.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/push_pullLte2.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/push_pull_xyce_baseline.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/push_pull_xyce_baseline.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/teststep1.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/teststep1.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/teststepgear1.cir espice refused W0049: a Xyce device IC= ngspice holds only under UIC
+xyce/TIA/TRAP/teststepgear1.cir ngspice refused W0049: a Xyce device IC= ngspice holds only under UIC

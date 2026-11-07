@@ -1,10 +1,1 @@
-hspice/gmindc.sp mismatch # op i(v1): -0.0010000000000099998+0i vs -0.0000000000010099997673979242+0i at 0 (tol 2.000e-6)
-hspice/gshunt.sp mismatch # op v(a): 0.5+0i vs 1+0i at 0 (tol 1.002e-3)
-hspice/hspice_expressions.sp target-fails # no raw file .cross_sim_out.raw: Undefined parameter [t2]
-hspice/meas_events.sp target-fails # no raw file .cross_sim_out.raw: Undefined parameter [trig] | Undefined parameter [ta]
 hspice/op_times.sp mismatch # plots ["op", "op", "tran"] became ["op", "tran"]
-hspice/param_distributions.sp mismatch # op i(v1): -0.002+0i vs -0.0021780781375893062+0i at 0 (tol 4.000e-6)
-hspice/resistor_default_tnom.sp mismatch # op i(v1): -0.0005+0i vs -0.000505050505050505+0i at 0 (tol 1.000e-6)
-hspice/search_lib.sp target-fails # no raw file .cross_sim_out.raw: Error: Could not find include file divider.inc
-hspice/sffm_order.sp mismatch # tran i(v1): -0.0002786275076158472 leaves the tube at t=0.00000000428 (tol 1.000e-5)
-hspice/tnom_default.sp mismatch # op v(a): 0.7859038965696223+0i vs 0.7911422670721461+0i at 0 (tol 1.574e-3)
