@@ -11,7 +11,7 @@
 //! `vol=`/`cur=`; LTspice help (`Q=`).
 //!
 //! Contents:
-//! - `W::card(&mut self, n: u32)`, `W::spelled(&self, v: &str) -> String`, `W::value(&self, v: &Val) -> String`, `W::ternaries(&self, e: &str) -> String`
+//! - `W::card(&mut self, n: u32)`, `W::value(&self, v: &Val) -> String`
 //! - `pub(super) fn renamed(rd: &Rd, cells: &Cells, card: &Card) -> Option<String>`
 //! - `pub(in crate::syntax::render) fn pairs<T>(items: &[T]) -> impl Iterator<Item = (&T, &T)>`,
 //!   `pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String`
@@ -19,10 +19,9 @@
 use super::W;
 use super::laplace::{self, Laplace};
 use super::parasitics;
-use super::ternary::{Read, parenthesize, spell_if};
-use crate::syntax::behaviour::{
-    CardRules, Coupling, ExprEval, ParamForm, Parasitics, ValueQuoting,
-};
+use super::ternary::Read;
+use crate::syntax::behaviour::{CardRules, Coupling, NetlistRules, Parasitics};
+use crate::syntax::diag::Code;
 use crate::syntax::lang::Cells;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::out::Space;
@@ -57,6 +56,21 @@ impl W<'_, '_> {
                 if model.is_some() {
                     self.ask(Construct::RclModel, tok);
                 }
+                self.device_ic(letter, &[&n1, &n2], &params, tok);
+                // `TC=a,b` (Xyce, PSpice) is `tc1=a tc2=b` on ngspice
+                // (manual §3.3.1: "unknown parameter (0)" for `tc=0,0`).
+                if self.b.netlist_rules == NetlistRules::Ngspice
+                    && let Some(i) = params
+                        .iter()
+                        .position(|(k, v)| k.eq_ignore_ascii_case("tc") && v.contains(','))
+                {
+                    let (_, v) = params.remove(i);
+                    let pairs = ["tc1", "tc2"].iter().zip(v.split(','));
+                    let pairs: Vec<(String, String)> = pairs
+                        .map(|(k, c)| (k.to_string(), c.trim().to_string()))
+                        .collect();
+                    params.splice(i..i, pairs);
+                }
                 // An LTspice C's or L's parasitics as elements where the
                 // target's C and L take none (`parasitics`).
                 let lt = self.rd.b.card_rules == CardRules::Ltspice;
@@ -75,7 +89,18 @@ impl W<'_, '_> {
                     s.push_str(&format!(" {m}"));
                 }
                 match &value {
-                    Val::Raw(t) if t.is_empty() => {}
+                    // Xyce's R model `R` multiplies the instance value
+                    // (default 1k), where ngspice's is the value
+                    // (`W::r_default`): the instance takes it.
+                    Val::Raw(t) if t.is_empty() => {
+                        let given = params.iter().any(|(k, _)| {
+                            k.eq_ignore_ascii_case("r") || k.eq_ignore_ascii_case("resistance")
+                        });
+                        let model = model.as_deref().filter(|_| !given);
+                        if let Some(r) = model.and_then(|m| self.r_default(letter, m)) {
+                            s.push_str(&format!(" {}", self.spelled(&r)));
+                        }
+                    }
                     v => s.push_str(&format!(" {}", self.value(v))),
                 }
                 if let Some(m) = model.as_ref().filter(|_| early.is_none()) {
@@ -290,6 +315,8 @@ impl W<'_, '_> {
                 }
                 // An OSDI module's instance (ngspice manual §13); a module
                 // named directly takes a model of its own, its parameters.
+                let nodes_ref: Vec<&String> = nodes.iter().collect();
+                self.device_ic(letter, &nodes_ref, &params, tok);
                 let ps = self.params(&params);
                 match self.rd.va_module(n) {
                     Some(m) if ps.is_empty() => format!(
@@ -317,6 +344,21 @@ impl W<'_, '_> {
                 params,
                 ..
             } => {
+                // ESPice has no subcircuit multiplicity (run by hand: `m=5`
+                // on an `X` line changes nothing), where ngspice's `m` is
+                // one unless the master declares `m`, Xyce's always.
+                let one = |v: &str| v.trim().parse::<f64>() == Ok(1.0);
+                let is_m = |(k, v): &(String, String)| k.eq_ignore_ascii_case("m") && !one(v);
+                if !self.b.subckt_multiplicity
+                    && params.iter().any(is_m)
+                    && match self.rd.b.netlist_rules {
+                        NetlistRules::Xyce => true,
+                        NetlistRules::Ngspice => !self.declares(&master, "m"),
+                        _ => false,
+                    }
+                {
+                    self.refuse(Code::W0047, tok);
+                }
                 let mut s = decl;
                 for p in &ports {
                     s.push(' ');
@@ -328,21 +370,6 @@ impl W<'_, '_> {
         self.o.token(&line, Space::None);
     }
 
-    /// A value kept as SPICE text, as the target reads it: as written, but
-    /// for HSPICE, which reads braces as name bytes and an unquoted value
-    /// as one word starting with a letter, or a number: any other
-    /// expression is quoted (`{a*2}` is `'a*2'`, `{a} + b` is `'(a) + b'`);
-    /// a run of numbers (a matrix) is not. A ternary is
-    /// spelled for the target ([`W::ternaries`]).
-    pub(super) fn spelled(&self, v: &str) -> String {
-        let v = self.ternaries(v);
-        if self.b.value_quoting == ValueQuoting::Hspice {
-            hspice_value(&v)
-        } else {
-            v
-        }
-    }
-
     /// A value field: a number in the target's format, an expression in its
     /// delimiters, raw text as written.
     pub(super) fn value(&self, v: &Val) -> String {
@@ -351,31 +378,6 @@ impl W<'_, '_> {
             Val::Expr(e) => format!("{}{}{}", self.sp.expr.0, self.ternaries(e), self.sp.expr.1),
             Val::Raw(t) => t.clone(),
         }
-    }
-
-    /// `e`'s ternaries, in a `{}` value, as another family reads them
-    /// (`ternary`): grouped as the source groups a then-branch's (C's, or
-    /// ngspice's `{}` evaluator's), a blank before each `:` on Xyce.
-    pub(super) fn ternaries(&self, e: &str) -> String {
-        let read = match self.rd.b.expr_eval == ExprEval::Ngspice {
-            true => Read::Ngspice,
-            false => Read::C,
-        };
-        self.ternaries_as(e, read)
-    }
-
-    /// `e`'s ternaries for another family, grouped as `read` groups them,
-    /// an `if()` one on ngspice's family.
-    fn ternaries_as(&self, e: &str, read: Read) -> String {
-        if self.rd.b.text_family == self.b.text_family {
-            return e.to_string();
-        }
-        // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
-        let e = match self.b.expr_eval == ExprEval::Ngspice {
-            true => spell_if(e),
-            false => e.to_string(),
-        };
-        parenthesize(&e, read, self.b.param_form == ParamForm::Xyce)
     }
 }
 
@@ -449,45 +451,4 @@ impl W<'_, '_> {
         }
         s
     }
-}
-
-/// [`W::spelled`] for HSPICE.
-fn hspice_value(v: &str) -> String {
-    let t = v.trim();
-    let number = |s: &str| {
-        let m = s.strip_prefix(['-', '+']).unwrap_or(s);
-        crate::unit::parse_spice_number(m)
-            .is_some_and(|(_, end, _)| m[end..].bytes().all(|c| c.is_ascii_alphabetic()))
-    };
-    let word = |s: &str| s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_');
-    let quoted = (t.starts_with('\'') || t.starts_with('"')) && t.len() > 1;
-    // Words split at blanks outside parentheses (`unif(1k, 0.1)` is one); a
-    // run of numbers is a vector (a CPL model's matrix), not an expression.
-    let mut depth = 0i32;
-    let words: Vec<&str> = t
-        .split(|c: char| {
-            depth += i32::from(c == '(') - i32::from(c == ')');
-            depth == 0 && c.is_whitespace()
-        })
-        .filter(|w| !w.is_empty())
-        .collect();
-    let plain = match words[..] {
-        [w] => number(w) || word(w),
-        _ => words.iter().all(|w| number(w)),
-    };
-    if !t.contains('{') && (quoted || plain) {
-        return v.to_string();
-    }
-    let t = t
-        .strip_prefix('\'')
-        .and_then(|r| r.strip_suffix('\''))
-        .unwrap_or(t);
-    let mut depth = 0i32;
-    let closes = t.char_indices().find(|&(_, c)| {
-        depth += i32::from(c == '{') - i32::from(c == '}');
-        depth == 0
-    });
-    let single = t.starts_with('{') && closes.is_some_and(|(i, _)| i + 1 == t.len());
-    let e = if single { &t[1..t.len() - 1] } else { t };
-    format!("'{}'", e.trim().replace('{', "(").replace('}', ")"))
 }

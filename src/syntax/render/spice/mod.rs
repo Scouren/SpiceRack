@@ -8,7 +8,8 @@
 //! `.end`; the frame of title, `.end` and control blocks decided once, by
 //! the file's role) and the block-level cards; `cards` writes elements and
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
-//! options, `prints` the `.print` cards), `checks` the deck-wide
+//! options, `ngspice_options` the others' and HSPICE's defaults, `prints`
+//! the `.print` cards), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
 //! target reads it,
@@ -29,11 +30,17 @@ mod cards;
 pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
 mod cdl;
 mod checks;
+mod globals;
+mod initial;
 mod laplace;
+mod model_cards;
+mod ngspice_options;
 pub(in crate::syntax::render) mod parasitics;
 mod prints;
 mod sweeps;
 mod ternary;
+mod tstep;
+mod values;
 mod verilog;
 mod waves;
 mod xyce_options;
@@ -48,7 +55,8 @@ use super::role::{self, Frame};
 use super::spelling::{FuncForm, Spelling};
 use crate::syntax::Lang;
 use crate::syntax::behaviour::{
-    Behaviours, CardRules, EndRule, IncludeScope, LoadForm, NumberReading, ParamForm, Writer,
+    Behaviours, CardRules, EndRule, ExprEval, IncludeScope, LoadForm, NetlistRules, NumberReading,
+    ParamForm, Writer,
 };
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
@@ -82,6 +90,18 @@ struct W<'a, 'r> {
     drop_four: bool,
     /// A section's definitions are being written.
     in_section: bool,
+    /// The name a Xyce subcircuit's `M` parameter is written under while
+    /// its body is (`W::subckt`).
+    m_param: Option<String>,
+    /// The source evaluates a statistical function to its nominal (HSPICE
+    /// or Xyce outside a Monte Carlo run) where the target draws one
+    /// (`ternary::nominal`).
+    nominal: bool,
+    /// The source applies a device `IC=` in its operating point where the
+    /// target does only under UIC (a Xyce deck on ngspice; `W::device_ic`).
+    dcop_ic: bool,
+    /// The `.ic` node values the devices' `IC=` become (`W::device_ic`).
+    device_ics: Vec<(String, String)>,
 }
 
 /// The deck `rd` read, written for `target`, and its diagnostics: the
@@ -120,7 +140,16 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         scope: crate::syntax::ast::NONE,
         drop_four: false,
         in_section: false,
+        m_param: None,
+        nominal: false,
+        dcop_ic: false,
+        device_ics: Vec::new(),
     };
+    let (from, to) = (rd.b.netlist_rules, b.netlist_rules);
+    w.dcop_ic = from == NetlistRules::Xyce && to == NetlistRules::Ngspice && !w.tran_uic();
+    w.nominal = matches!(rd.b.expr_eval, ExprEval::Hspice | ExprEval::Xyce)
+        && b.expr_eval == ExprEval::Ngspice
+        && !w.monte_carlo();
     // Verilog evaluates nothing, so no deck-wide check refuses it.
     if b.writer == Writer::Verilog {
         w.verilog();
@@ -165,7 +194,16 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         false => w.o.pop(),
     }
     w.unparsed();
-    (w.o.finish(), w.diags)
+    let text = w.o.finish();
+    let text = match rd.b.netlist_rules == NetlistRules::Xyce
+        && matches!(
+            b.netlist_rules,
+            NetlistRules::Ngspice | NetlistRules::Hspice
+        ) {
+        true => globals::xyce_globals(&text),
+        false => text,
+    };
+    (text, w.diags)
 }
 
 // ---- private ----
@@ -362,10 +400,20 @@ impl W<'_, '_> {
     /// `.param name=value`, one card each, in order, with the draws the
     /// `statistics` lift puts before each and the value it gives one.
     fn param_cards(&mut self, params: &[u32]) {
+        // Xyce keeps a parameter's first definition, ngspice its last
+        // (Xyce_Regression `ISSUE_202/first_last.cir`: R1 = 1 kΩ on Xyce,
+        // 1 Ω on ngspice for the deck as read): only the first is written.
+        let xyce = |r: NetlistRules| r == NetlistRules::Xyce;
+        let first = xyce(self.rd.b.netlist_rules) && !xyce(self.b.netlist_rules);
+        let mut seen: Vec<String> = Vec::new();
         for &a in params {
+            let (name, mut v) = self.rd.param_view(a);
+            if first && seen.iter().any(|n| n.eq_ignore_ascii_case(&name)) {
+                continue;
+            }
+            seen.push(name.clone());
             let draws = self.draws.before(a).to_vec();
             self.param_lines(&draws);
-            let (name, mut v) = self.rd.param_view(a);
             if let Some(d) = self.draws.value(a) {
                 v = d.to_string();
             }
@@ -386,56 +434,6 @@ impl W<'_, '_> {
         }
     }
 
-    fn models(&mut self, b: &Block) {
-        for &(m, bin) in &b.models {
-            self.model(m, bin);
-            self.o.token("", Space::Line);
-        }
-    }
-
-    /// `.model name kind (k=v …)`. Xyce rejects BSIM3 as level 8 and reads
-    /// 49. The parameter list is separated from the type by a space:
-    /// ngspice-45 drops the parameters of an OSDI model written
-    /// `vres(r=3k)`.
-    fn model(&mut self, n: u32, bin: u32) {
-        let m = self.rd.model_view(n, bin);
-        // A loaded module named as a built-in device: ngspice reads the
-        // built-in (W0121's run).
-        if self.b.load_form == LoadForm::Ngspice
-            && self.rd.osdi_module(n)
-            && self
-                .b
-                .builtin_devices
-                .iter()
-                .any(|d| d.eq_ignore_ascii_case(&m.kind))
-        {
-            self.refuse(Code::W0121, self.rd.main(n));
-        }
-        let mos = m.kind.eq_ignore_ascii_case("nmos") || m.kind.eq_ignore_ascii_case("pmos");
-        let mut line = format!(".model {} {}", m.name, m.kind);
-        for (i, (k, v)) in m.params.iter().enumerate() {
-            let v = if self.b.param_form == ParamForm::Xyce
-                && mos
-                && k.eq_ignore_ascii_case("level")
-                && v.trim() == "8"
-            {
-                "49"
-            } else {
-                v
-            };
-            let open = if i == 0 { " (" } else { " " };
-            if v.is_empty() {
-                line.push_str(&format!("{open}{k}"));
-            } else {
-                line.push_str(&format!("{open}{k}={}", self.spelled(v)));
-            }
-        }
-        if !m.params.is_empty() {
-            line.push(')');
-        }
-        self.o.token(&line, Space::None);
-    }
-
     fn subckt(&mut self, sc: &Block) {
         self.scope = sc.node;
         let head = self
@@ -452,7 +450,25 @@ impl W<'_, '_> {
             line.push(' ');
             line.push_str(word);
         }
+        // Xyce's `M` on an `X` line is the multiplicity even where the
+        // subcircuit declares `M` (Xyce RG `X`; ISSUE_267/test_a3.cir: 5
+        // copies), ngspice's only where it does not (run by hand): the
+        // parameter takes another name there.
+        let is_m = |k: &str| k.eq_ignore_ascii_case("m");
+        if self.rd.b.netlist_rules == NetlistRules::Xyce
+            && self.b.netlist_rules == NetlistRules::Ngspice
+            && self.b.subckt_multiplicity
+            && head.params.iter().any(|(k, _)| is_m(k))
+        {
+            let taken = |n: &str| head.params.iter().any(|(k, _)| k.eq_ignore_ascii_case(n));
+            let name = (1..).map(|i| format!("m_{i}")).find(|n| !taken(n));
+            self.m_param = name;
+        }
         for (k, v) in &head.params {
+            let k = match &self.m_param {
+                Some(m) if is_m(k) => m.as_str(),
+                _ => k.as_str(),
+            };
             line.push_str(&format!(" {k}={}", self.spelled(v)));
         }
         // A Spectre or VACASK subcircuit's `parameters` are its defaults.
@@ -471,12 +487,18 @@ impl W<'_, '_> {
             self.funcs(&sc.funcs);
         }
         self.models(sc);
+        // A nested subcircuit, hoisted, takes the models around it.
+        for (m, bin) in self.inherited_models(sc) {
+            self.model(m, bin);
+            self.o.token("", Space::Line);
+        }
         self.body(
             sc,
             self.rd.b.card_rules == CardRules::Ltspice && !self.in_section,
         );
         self.o.token(&format!(".ends {}", sc.name), Space::Line);
         self.scope = crate::syntax::ast::NONE;
+        self.m_param = None;
     }
 
     /// `.lib <name>` … `.endl <name>`, the body written as a deck's top is.

@@ -12,7 +12,9 @@
 //! Contents:
 //! - `pub(super) fn ltspice() -> DialectDef`
 
-use crate::syntax::behaviour::{AnalysisForm, CardRules, Coupling, LoadForm, Parasitics};
+use crate::syntax::behaviour::{
+    AnalysisForm, CardRules, Coupling, ExprEval, LoadForm, NetlistRules, Parasitics,
+};
 use crate::syntax::def::{Devices, DialectDef, Keywords};
 use crate::syntax::diag::Code;
 use crate::syntax::lexicon::{
@@ -136,6 +138,8 @@ pub(super) fn ltspice() -> DialectDef {
         .card_rules(CardRules::Ltspice)
         .load_form(LoadForm::Ltspice)
         .analysis_form(AnalysisForm::Ltspice)
+        .expr_eval(ExprEval::Ltspice)
+        .netlist_rules(NetlistRules::Ltspice)
         .parasitics(Parasitics::Ltspice)
         .coupling(Coupling::OneCard)
         .spectre_analysis("sweep")

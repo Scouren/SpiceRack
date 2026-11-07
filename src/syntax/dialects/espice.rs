@@ -30,6 +30,9 @@ pub(super) fn espice() -> DialectDef {
         .load_form(LoadForm::Espice)
         .control_block(ControlBlock::None)
         .analysis_form(AnalysisForm::Espice)
+        // ESPice ignores `m` on an `X` line (run by hand: `m=5` gives
+        // one copy's 0.5 V where ngspice gives 1/6 V).
+        .subckt_multiplicity(false)
         // The capability cells it answers otherwise than ngspice.
         .spell(Construct::VerilogALoad, Alt::Hdl)
         .refuse(Construct::OsdiLoad, Code::W0004)

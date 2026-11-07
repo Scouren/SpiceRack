@@ -31,8 +31,8 @@
 //! - the behaviour calls: `writer`, `text_family`, `caret_power`, `hier_sep`, `number_reading`,
 //!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
-//!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `spectre_analysis`, `temp_name`,
-//!   `builtin_constant`, `builtin_device`
+//!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `netlist_rules`,
+//!   `subckt_multiplicity`, `spectre_analysis`, `temp_name`, `builtin_constant`, `builtin_device`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
 //!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
@@ -46,8 +46,8 @@ mod tables;
 
 use crate::syntax::behaviour::{
     AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope,
-    LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm,
-    Parasitics, SourceRules, ValueQuoting, Writer,
+    LoadForm, ModelSemantics, NamedParams, NamedRules, NetlistRules, NumberReading, OptionsForm,
+    ParamForm, Parasitics, SourceRules, ValueQuoting, Writer,
 };
 use crate::syntax::device::{self, Device};
 use crate::syntax::diag::{Code, Kind};
@@ -633,6 +633,8 @@ impl DialectDef {
     }
     set!(expr_eval, b.expr_eval: ExprEval);
     set!(parasitics, b.parasitics: Parasitics);
+    set!(netlist_rules, b.netlist_rules: NetlistRules);
+    set!(subckt_multiplicity, b.subckt_multiplicity: bool);
 
     /// A region kept as `lang`'s text is written as written here.
     pub fn text_family(mut self, lang: Lang) -> Self {

@@ -2588,6 +2588,7 @@ ngspice/tests/mesa/mesa21.sp mismatch # dc i(vids): -0.2702700677977017+0i vs -0
 ngspice/tests/mesa/mesgout.sp mismatch # ac v(2): -0.0008965907949260534+0.0000000000000000006902361887721685i vs -0.00003383462022906502+0.0000000000000000006842424518353349i at 0.001 (tol 5.594e-6)
 ngspice/tests/mesa/mesinv.sp mismatch # dc v(40): 0.6021137958405641+0i vs 0.6035812134661475+0i at 0 (tol 1.206e-3)
 ngspice/tests/mesa/mesosc.sp mismatch # tran v(xinv05.2): 0.30144319703198635 leaves the tube at t=0.000000005 (tol 5.655e-3)
+ngspice/tests/polezero/filt_multistage.sp simulator-differs # ESPice's HSPICE reading of .pz v(out) src (stream D bacb084) finds pole(1) -5e10 where ngspice finds -1e8 on the original: not triaged; op v(pole(1)): -50000000000.00001+0i vs -99999999.99999999+-0i at 0 (tol 1.000e8)
 ngspice/tests/regression/lib-processing/ex1b.sp simulator-differs # op v(9): 1+0i vs 1.3333333333333335+0i at 0 (tol 2.002e-3)
 ngspice/tests/regression/lib-processing/ex2a.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound
 ngspice/tests/regression/lib-processing/ex3a.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound

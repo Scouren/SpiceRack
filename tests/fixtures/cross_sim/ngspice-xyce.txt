@@ -3351,14 +3351,8 @@ ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_ou
 ngspice/tests/regression/misc/asrc-tc-2.sp mismatch # plots ["op", "op"] became ["op"]
 ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["V(1)", "V1#branch"])
 ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file .cross_sim_out.raw: 
-ngspice/tests/regression/misc/log-functions-1.sp mismatch # op v(n2): 0.9932517730102833+0i vs 0.4313637641589873+0i at 0 (tol 1.989e-3)
 ngspice/tests/regression/misc/test-noise-2.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/tests/regression/misc/test-noise-3.sp mismatch # plots ["noise", "noise", "total", "total"] became ["noise"]
-ngspice/tests/regression/model/instance-defaults.sp mismatch # op i(v1): -0.0005+0i vs -0.001+0i at 0 (tol 1.000e-6)
-ngspice/tests/regression/parser/xpressn-3.sp mismatch # op v(n1085_n): 2+0i vs 3+0i at 0 (tol 4.002e-3)
-ngspice/tests/regression/subckt-processing/model-scope-5.sp mismatch # op v(n1001_t): 2000+0i vs 2000000+0i at 0 (tol 4.000e0)
-ngspice/tests/regression/temper/temper-3.sp mismatch # dc i(v1): -0.0049504950495049506+0i vs -0.000004950495049504951+0i at 10 (tol 9.901e-6)
-ngspice/tests/regression/temper/temper-res-1.sp mismatch # dc i(v2): -0.005628521797951112+0i vs -0.000005628521797951113+0i at 10 (tol 1.126e-5)
 ngspice/tests/resistance/res_array.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type TRAN and print type AC are inconsistent. | Simulation aborted due to error.  There are 0 MSG_FATAL 
 ngspice/tests/resistance/res_partition.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unrecognized parameter AC for device R2 | Netlist error in file .cross_sim_deck.sp 
 ngspice/tests/vbic/FO.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file .cross_sim_deck.sp at: Unrecognized parenthetical specification in .print near .print dc -i ( vc ) | Netli

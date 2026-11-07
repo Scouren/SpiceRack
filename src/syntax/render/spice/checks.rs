@@ -13,7 +13,7 @@
 //! `gauss(x)`); Xyce RG §2.1.18.
 //!
 //! Contents:
-//! - `W::checks(&mut self)`, `W::unparsed(&mut self)`
+//! - `W::checks(&mut self)`, `W::unparsed(&mut self)`, `W::blocks(&self) -> Vec<&Block>`
 
 use super::W;
 use super::ternary::{Nest, ngspice_nest};
@@ -125,6 +125,32 @@ impl W<'_, '_> {
     }
 }
 
+impl<'r> W<'_, 'r> {
+    /// Every block the deck writes from: the top, its definitions, each
+    /// section's body and definitions, and the branches inside each.
+    pub(super) fn blocks(&self) -> Vec<&'r Block> {
+        let deck = self.deck;
+        let sections = deck
+            .sections
+            .iter()
+            .flat_map(|s| std::iter::once(&s.body).chain(&s.defs));
+        let mut out = Vec::new();
+        let mut work: Vec<&Block> = std::iter::once(&deck.top)
+            .chain(&deck.defs)
+            .chain(sections)
+            .collect();
+        work.reverse();
+        while let Some(b) = work.pop() {
+            out.push(b);
+            let branches = b.conds.iter().flat_map(|(_, c)| &c.branches);
+            let mut inner: Vec<&Block> = branches.map(|(_, body)| body).collect();
+            inner.reverse();
+            work.extend(inner);
+        }
+        out
+    }
+}
+
 // ---- private ----
 
 impl<'r> W<'_, 'r> {
@@ -160,30 +186,6 @@ impl<'r> W<'_, 'r> {
                 (false, Nest::One) => {}
             }
         }
-    }
-
-    /// Every block the deck writes from: the top, its definitions, each
-    /// section's body and definitions, and the branches inside each.
-    fn blocks(&self) -> Vec<&'r Block> {
-        let deck = self.deck;
-        let sections = deck
-            .sections
-            .iter()
-            .flat_map(|s| std::iter::once(&s.body).chain(&s.defs));
-        let mut out = Vec::new();
-        let mut work: Vec<&Block> = std::iter::once(&deck.top)
-            .chain(&deck.defs)
-            .chain(sections)
-            .collect();
-        work.reverse();
-        while let Some(b) = work.pop() {
-            out.push(b);
-            let branches = b.conds.iter().flat_map(|(_, c)| &c.branches);
-            let mut inner: Vec<&Block> = branches.map(|(_, body)| body).collect();
-            inner.reverse();
-            work.extend(inner);
-        }
-        out
     }
 
     /// A function's first token.

@@ -18,7 +18,7 @@
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
-//!   `pub enum ExprEval`, `pub enum Parasitics`
+//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`
 
 use crate::syntax::Lang;
 
@@ -73,6 +73,13 @@ pub struct Behaviours {
     pub expr_eval: ExprEval,
     /// Write: an LTspice element's parasitics (`Rser=`, `Cpar=`, …).
     pub parasitics: Parasitics,
+    /// Read and write: whose simulator's netlist rules give the deck its
+    /// meaning beyond its text (`render::spice`: a model `R`, an `X`
+    /// line's `M`, a parameter defined twice, a device `IC=`, SFFM's
+    /// order, the default TNOM, a zero TSTEP).
+    pub netlist_rules: NetlistRules,
+    /// Write: an `X` line's `m` multiplies the instance (ESPice ignores it).
+    pub subckt_multiplicity: bool,
     /// Write: the Spectre analysis kinds the target has an analysis for.
     pub spectre_analyses: &'static [&'static str],
     /// Read and write: the expression word for the circuit temperature
@@ -237,8 +244,40 @@ pub enum ExprEval {
     /// whatever the dialect's function table holds.
     C,
     /// ngspice-45's numparam: `a?b?c:d:e` is `a?c:e`; no `if()`, no
-    /// `sdt()` in a B source (manual §5.1).
+    /// `sdt()` in a B source (manual §5.1); `log` natural, `nint` to even,
+    /// a statistical call drawn, `limit(nom, var)` a distribution.
     Ngspice,
+    /// Xyce's: C's grouping; `log` base 10 (RG §2.3), `nint` away from
+    /// zero, a statistical call at its nominal outside sampling, `rand()`
+    /// 0.5, `limit(x, lo, hi)` a clamp.
+    Xyce,
+    /// HSPICE's: C's grouping; `log` natural, a statistical call at its
+    /// nominal outside a Monte Carlo run, a double-quoted value an
+    /// expression.
+    Hspice,
+    /// LTspice's: C's grouping; `log` natural, `limit(x, lo, hi)` a clamp.
+    Ltspice,
+}
+
+/// Whose simulator's netlist rules give a deck its meaning
+/// (`Behaviours::netlist_rules`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NetlistRules {
+    /// None of the rules below of its own.
+    Spice,
+    /// ngspice: a model `r=` is the resistance; an `X` line's `m` the
+    /// multiplicity unless declared; a parameter's last definition; a
+    /// device IC only under UIC; SFFM (VO VA FM MDI FC); TNOM 27 °C; a
+    /// TSTEP of 0 refused.
+    Ngspice,
+    /// Xyce: a model `R` multiplies the instance value; `M` the
+    /// multiplicity; a parameter's first definition; a device IC in the
+    /// DCOP; `$G_` global nodes; TSTEP 0 the simulator's choice.
+    Xyce,
+    /// HSPICE: TNOM and TEMP 25 °C; GSHUNT, GMINDC, SEARCH options.
+    Hspice,
+    /// LTspice: TSTEP 0 the simulator's choice.
+    Ltspice,
 }
 
 /// How an LTspice element's parasitics are written (`spice::parasitics`).
@@ -288,6 +327,8 @@ impl Behaviours {
         analysis_masters: None,
         expr_eval: ExprEval::C,
         parasitics: Parasitics::Elements,
+        netlist_rules: NetlistRules::Spice,
+        subckt_multiplicity: true,
         spectre_analyses: &[],
         temp_name: "",
         builtin_constants: &[],

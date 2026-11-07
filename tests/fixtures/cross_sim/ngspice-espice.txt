@@ -1854,13 +1854,11 @@ ngspice/examples/noise/resdiv.sp simulator-differs # total v(onoise_total): 0.00
 ngspice/examples/optran/F5TurboV2thermal-optran.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars
 ngspice/examples/optran/TLV9002-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ COM SW+ VALUE = {IF((V(OLN,COM)>10E-3 | V(OLP,COM)>10E-3),1,0)} | Error: .cross_sim_d
-ngspice/examples/p-to-n-examples/555-timer-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: eout out gnd value= { if ( (v(in1+,in1-) > {vthres1}) | (v(in2+,in2-) > {vthres2}), voutl 
 ngspice/examples/p-to-n-examples/logic.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: B1 1 0 V=~(~v(9)&v(8)) + 0.5 | Error: .cross_sim_deck.sp: ParseError
 ngspice/examples/p-to-n-examples/op-test-adi.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xopmap.q1: model 'qp' (ako:qp350) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/p-to-n-examples/op-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars
 ngspice/examples/p-to-n-examples/switch-oscillators.sp simulator-differs # tran v(n001): 0.31623329732011457 leaves the tube at t=0.000000024061815495362968 (tol 3.000e-2)
 ngspice/examples/p-to-n-examples/switch-oscillators_inc.sp simulator-differs # tran v(n017): 1.5919871999572544 leaves the tube at t=0.0000000001337620228735427 (tol 3.000e-2)
-ngspice/examples/probe/555-timer-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: eout out gnd value= { if ( (v(in1+,in1-) > {vthres1}) | (v(in2+,in2-) > {vthres2}), voutl 
 ngspice/examples/probe/Dual-NMOS-amp.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card:  | Error: .cross_sim_deck.sp: ParseError
 ngspice/examples/probe/F5TurboV2-Probe.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/probe/mos-test.sp simulator-differs # tran: no vector in common (["i(mp1:s)", "i(mn1:s)", "v(in)", "v(out)", "v(vd_mn1:d:s)", "v(vd_mp1:d_mn1:d)"] vs ["@mn1[id]"])
@@ -1886,7 +1884,6 @@ ngspice/examples/various/roessler-attractor.sp simulator-differs # tran v(x): 6.
 ngspice/examples/various/tmp-noise-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: b2  2 0  i=v(1) tc1=0.001 | Error: .cross_sim_deck.sp: ParseError
 ngspice/examples/various/tmp-noise.sp mismatch # plots ["op", "op", "total", "total"] became ["op", "op", "total", "total", "total", "total"]
 ngspice/examples/various/todo-temper-3.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
-ngspice/examples/various/v-i-sources-am-ffm.sp simulator-fails # no raw file .cross_sim_out.raw: error: v1: AM with a nonzero VO offset | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/vbic/npn_gum.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/examples/vbic/npn_out.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/examples/vbic/vbic99_dc.sp simulator-fails # no raw file .cross_sim_out.raw: error: q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
@@ -1922,7 +1919,6 @@ ngspice/paranoia/measure/func_cap.sp simulator-fails # no raw file .cross_sim_ou
 ngspice/paranoia/optran/F5TurboV2thermal-ic-out.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/paranoia/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars
 ngspice/paranoia/optran/TLV9002-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ COM SW+ VALUE = {IF((V(OLN,COM)>10E-3 | V(OLP,COM)>10E-3),1,0)} | Error: .cross_sim_d
-ngspice/paranoia/pton/555-timer-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: eout out gnd value= { if ( (v(in1+,in1-) > {vthres1}) | (v(in2+,in2-) > {vthres2}), voutl 
 ngspice/paranoia/pton/Optimos_out.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
 ngspice/paranoia/pton/op-test-adi.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xopmap.q1: model 'qp' (ako:qp350) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/paranoia/pton/op-test-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars

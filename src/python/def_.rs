@@ -229,6 +229,8 @@ calls! {
     analysis_masters(lang: PyLang);
     expr_eval(v: PyExprEval);
     parasitics(v: PyParasitics);
+    netlist_rules(v: PyNetlistRules);
+    subckt_multiplicity(v: bool);
     text_family(lang: PyLang);
     spectre_analysis(kind: &str);
     temp_name(word: &str);

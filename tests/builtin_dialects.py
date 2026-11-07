@@ -11,7 +11,7 @@ given and returns it.
 """
 from spicerack.def_ import (Alt, Analysis, AnalysisForm, Arithmetic, Backslash, CardRules, Caret,
                             Code, Command, Construct, ControlBlock, Coupling, Devices, Dollar, End,
-                            EndRule, ExprEval, FuncForm, IncludeScope, Join, Keywords, Lang,
+                            EndRule, ExprEval, FuncForm, IncludeScope, Join, Keywords, Lang, NetlistRules,
                             LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading,
                             Operators, OptionsForm, ParamForm, Parasitics, Quote, Quoting, Rule,
                             Scale, SourceRules, Statement, Tag, Tail, ValueQuoting, Writer)
@@ -110,6 +110,7 @@ def ngspice(d):
         .control_block(ControlBlock.Ngspice)
         .analysis_form(AnalysisForm.Ngspice)
         .expr_eval(ExprEval.Ngspice)
+        .netlist_rules(NetlistRules.Ngspice)
         .spectre_analysis("pz")
         .spectre_analysis("sp")
         .spectre_analysis("sens")
@@ -234,6 +235,7 @@ def espice(d):
         .load_form(LoadForm.Espice)
         .control_block(ControlBlock.None_)
         .analysis_form(AnalysisForm.Espice)
+        .subckt_multiplicity(False)
         # The capability cells it answers otherwise than ngspice.
         .spell(Construct.VerilogALoad, Alt.Hdl)
         .refuse(Construct.OsdiLoad, Code.W0004)
@@ -345,6 +347,8 @@ def hspice(d):
         .analysis_form(AnalysisForm.Hspice)
         .end_rule(EndRule.WhenRuns)
         .value_quoting(ValueQuoting.Hspice)
+        .expr_eval(ExprEval.Hspice)
+        .netlist_rules(NetlistRules.Hspice)
         .spectre_analysis("pz")
         .spectre_analysis("sens")
         .spectre_analysis("sp")
@@ -518,6 +522,8 @@ def xyce(d):
         .analysis_form(AnalysisForm.Xyce)
         .coupling(Coupling.OneCard)
         .param_form(ParamForm.Xyce)
+        .expr_eval(ExprEval.Xyce)
+        .netlist_rules(NetlistRules.Xyce)
         .include_scope(IncludeScope.Global)
         .spectre_analysis("hb")
         .spectre_analysis("sp")
@@ -674,6 +680,8 @@ def ltspice(d):
         .card_rules(CardRules.Ltspice)
         .load_form(LoadForm.Ltspice)
         .analysis_form(AnalysisForm.Ltspice)
+        .expr_eval(ExprEval.Ltspice)
+        .netlist_rules(NetlistRules.Ltspice)
         .parasitics(Parasitics.Ltspice)
         .coupling(Coupling.OneCard)
         .spectre_analysis("sweep")

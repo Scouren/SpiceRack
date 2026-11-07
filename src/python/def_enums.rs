@@ -20,8 +20,8 @@ use pyo3::types::PyType;
 use crate::syntax::Dialect;
 use crate::syntax::behaviour::{
     AnalysisForm, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope, LoadForm,
-    ModelSemantics, NamedParams, NamedRules, NumberReading, OptionsForm, ParamForm, Parasitics,
-    SourceRules, ValueQuoting, Writer,
+    ModelSemantics, NamedParams, NamedRules, NetlistRules, NumberReading, OptionsForm, ParamForm,
+    Parasitics, SourceRules, ValueQuoting, Writer,
 };
 use crate::syntax::def::{Devices, Keywords, Operators};
 use crate::syntax::diag::{Code, Kind};
@@ -320,7 +320,18 @@ py_units!(
     IncludeScope,
     [Local, Global]
 );
-py_units!(PyExprEval, "ExprEval", ExprEval, [C, Ngspice]);
+py_units!(
+    PyExprEval,
+    "ExprEval",
+    ExprEval,
+    [C, Ngspice, Xyce, Hspice, Ltspice]
+);
+py_units!(
+    PyNetlistRules,
+    "NetlistRules",
+    NetlistRules,
+    [Spice, Ngspice, Xyce, Hspice, Ltspice]
+);
 py_units!(
     PyParasitics,
     "Parasitics",
@@ -444,6 +455,7 @@ pub(super) fn add_enums(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add(m, PyNamedParams::UNITS, PyNamedParams)?;
     add(m, PyExprEval::UNITS, PyExprEval)?;
     add(m, PyParasitics::UNITS, PyParasitics)?;
+    add(m, PyNetlistRules::UNITS, PyNetlistRules)?;
     add(m, PyConstruct::UNITS, PyConstruct)?;
     add(m, PyCode::UNITS, PyCode)?;
     add(m, PyAnalysis::UNITS, PyAnalysis)?;

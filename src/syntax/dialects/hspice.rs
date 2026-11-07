@@ -13,7 +13,9 @@
 //! Contents:
 //! - `pub(super) fn hspice() -> DialectDef`
 
-use crate::syntax::behaviour::{AnalysisForm, CardRules, EndRule, LoadForm, ValueQuoting};
+use crate::syntax::behaviour::{
+    AnalysisForm, CardRules, EndRule, ExprEval, LoadForm, NetlistRules, ValueQuoting,
+};
 use crate::syntax::def::{Devices, DialectDef, Keywords};
 use crate::syntax::diag::Code;
 use crate::syntax::lexicon::{
@@ -137,6 +139,8 @@ pub(super) fn hspice() -> DialectDef {
         .analysis_form(AnalysisForm::Hspice)
         .end_rule(EndRule::WhenRuns)
         .value_quoting(ValueQuoting::Hspice)
+        .expr_eval(ExprEval::Hspice)
+        .netlist_rules(NetlistRules::Hspice)
         .spectre_analysis("pz")
         .spectre_analysis("sens")
         .spectre_analysis("sp")

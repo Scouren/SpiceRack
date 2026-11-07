@@ -10,6 +10,7 @@
 //!   `W::wave(&self, w: &Wave) -> String`
 
 use super::W;
+use crate::syntax::behaviour::{NetlistRules, Writer};
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::read::{Num, Val, Wave, WaveKind};
 
@@ -82,6 +83,19 @@ impl W<'_, '_> {
             WaveKind::Trrandom => {
                 let kind = w.args[0].num().expect("a TRRANDOM type");
                 args[0] = format!("{}", kind as u8);
+            }
+            // ngspice-45's SFFM is (VO VA FM MDI FC), the modulation
+            // frequency third and the carrier fifth (`vsrcload.c`; by hand:
+            // sffm(0 1 10meg 0 1meg) at 25 ns is 0.156 on ngspice, 1.000 on
+            // Xyce); SPICE3's, HSPICE's, Xyce's and LTspice's is (VO VA FC
+            // MDI FS). The reader keeps the source's order.
+            // CDL's cards are ngspice's.
+            WaveKind::Sffm
+                if (self.rd.b.netlist_rules == NetlistRules::Ngspice)
+                    != (self.b.netlist_rules == NetlistRules::Ngspice
+                        || self.b.writer == Writer::Cdl) =>
+            {
+                args.swap(2, 4)
             }
             _ => {}
         }

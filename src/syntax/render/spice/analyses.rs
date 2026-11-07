@@ -101,15 +101,15 @@ impl W<'_, '_> {
                 startup,
             } => {
                 // ngspice stops on a zero step (Xyce's and LTspice's "the
-                // simulator's choice"): the span over 50, ngspice's own
-                // default step cap (manual §11.3.10).
+                // simulator's choice"): one from the deck's sources
+                // (`tstep`).
                 let zero = *step <= 0.0
                     && matches!(
                         self.b.analysis_form,
                         AnalysisForm::Ngspice | AnalysisForm::Espice
                     );
                 let step = if zero {
-                    (stop - start.unwrap_or(0.0)) / 50.0
+                    self.chosen_step(stop - start.unwrap_or(0.0))
                 } else {
                     *step
                 };
