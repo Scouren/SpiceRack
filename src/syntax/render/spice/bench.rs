@@ -169,7 +169,14 @@ impl W<'_, '_> {
                 self.o
                     .token(&format!(".options {}", opts.join(" ")), Space::Line);
             }
-            if let Some(t) = tb.temp {
+            // A temperature list sets the temperature of every run (Xyce
+            // RG `.STEP`), and HSPICE writes it as its own `.temp` below.
+            let listed = self.cells[Construct::StepList as usize] == Action::Spell(Alt::TempList)
+                && tb
+                    .step_lists
+                    .iter()
+                    .any(|(p, ..)| p.eq_ignore_ascii_case("temp"));
+            if let Some(t) = tb.temp.filter(|_| !listed) {
                 let t = self.sp.decimal(t, self.x);
                 self.o.token(&format!(".temp {t}"), Space::Line);
             }
@@ -219,12 +226,24 @@ impl W<'_, '_> {
             self.o.token(&line, Space::Line);
         }
         for (param, values, tok) in &tb.step_lists {
-            if self.ask(Construct::StepList, *tok) != Action::Native {
+            let act = self.ask(Construct::StepList, *tok);
+            let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
+            let temp = param.eq_ignore_ascii_case("temp");
+            // HSPICE UG `.TEMP t1 t2 …`: the analyses at each temperature.
+            if act == Action::Spell(Alt::TempList) {
+                match temp {
+                    true => self
+                        .o
+                        .token(&format!(".temp {}", vals.join(" ")), Space::Line),
+                    false => self.refuse(Code::W0016, *tok),
+                }
+                continue;
+            }
+            if act != Action::Native {
                 continue;
             }
             // Xyce RG `.STEP <name> LIST`; LTspice help `.step
             // param <name> list`, `temp` bare.
-            let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
             let name = match (self.b.analysis_form, param.eq_ignore_ascii_case("temp")) {
                 (AnalysisForm::Ltspice, false) => format!("param {param}"),
                 _ => param.clone(),

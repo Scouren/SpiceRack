@@ -83,7 +83,7 @@ cell.TableSource Refuse(W0102)
 cell.LossyLine Refuse(W0105)
 cell.AmWave Spell(HspiceAm)
 cell.Step Refuse(W0201) MY001
-cell.StepList Refuse(W0016)
+cell.StepList Spell(TempList)
 cell.TranStartup Refuse(W0037)
 cell.DcLogList Spell(DcType)
 cell.Tf Native

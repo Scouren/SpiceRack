@@ -171,6 +171,8 @@ pub enum Alt {
     AmNoOffset,
     /// `.pz v(out) src` (HSPICE).
     HspicePz,
+    /// `.temp t1 t2 …` for a temperature list, no other list (HSPICE).
+    TempList,
     /// `.LIN` beside an `.AC` of the sweep (Xyce).
     XyceLin,
     /// Not written, the code the note the writer records for it.

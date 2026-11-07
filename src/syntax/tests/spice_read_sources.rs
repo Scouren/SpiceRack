@@ -344,3 +344,34 @@ fn an_hspice_w_line_is_refused_where_no_w_element_is() {
     }
     assert!(render_text(text, Dialect::Hspice, "t", Dialect::Hspice).is_ok());
 }
+
+#[test]
+fn an_hspice_temperature_list_is_a_step_over_temp() {
+    // HSPICE UG `.TEMP t1 t2 t3`: each analysis at each temperature; Xyce
+    // RG and LTspice help `.step temp list`. Xyce 7.10 ran the written
+    // deck (TNOM 25 as HSPICE's) to the corpus's temp_list.expected.json
+    // (ngspice-45 at each temperature) within 2e-5; HSPICE writes `.temp`
+    // back; ngspice has no `.step` (W0016). Checks: 3.
+    let text = "t\ni1 0 a 1m\nd1 a 0 dmod\n.model dmod d is=1e-14\n.temp -55 25 125\n.op\n.end\n";
+    let w = |t| render_text(text, Dialect::Hspice, "t", t);
+    assert!(
+        w(Dialect::Xyce)
+            .expect("written")
+            .text
+            .lines()
+            .any(|l| l == ".step temp list -55 25 125")
+    );
+    assert!(
+        w(Dialect::Hspice)
+            .expect("written")
+            .text
+            .lines()
+            .any(|l| l == ".temp -55 25 125")
+    );
+    let ng = w(Dialect::Ngspice).expect_err("refused");
+    assert!(
+        ng.diags.iter().any(|g| g.code == Code::W0016),
+        "{}",
+        ng.messages
+    );
+}

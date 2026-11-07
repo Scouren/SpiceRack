@@ -286,6 +286,15 @@ impl<'a> Rd<'a> {
             Tag::Options => self.options_ok(n).then_some(Card::Options),
             Tag::Temp => match items {
                 [v] if self.val_ok(*v) && self.tag(*v) != Tag::Seq => Some(Card::Temp(*v)),
+                // HSPICE UG `.TEMP t1 t2 …`: every analysis at each
+                // temperature, a `.step temp list` (Xyce RG `.STEP`).
+                [_, _, ..] if hspice && self.spaced(n, items) => {
+                    let v = items
+                        .iter()
+                        .map(|&k| self.number(k))
+                        .collect::<Option<_>>()?;
+                    Some(Card::StepList("temp".into(), v))
+                }
                 _ => None,
             },
             // Bare `node value` pairs: Xyce 7.10 runs `.ic 1 1.0` as `.ic
