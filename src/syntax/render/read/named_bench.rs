@@ -8,7 +8,7 @@
 //! (`analysis`, `sweep`, `options`).
 //!
 //! Contents:
-//! - `fn spectre_refusal(target: &Behaviours, kind: &str) -> Code`
+//! - `fn spectre_refusal(target: &Behaviours, kind: &str) -> Code`, `fn vacask_refusal(rd: &Rd, target: &Behaviours, tok: u32) -> Option<Code>`
 //! - `Rd::bench_cards(&self, b: Bench) -> Vec<BenchCard>`
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
 //! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
@@ -35,6 +35,40 @@ pub(in crate::syntax::render) fn spectre_refusal(target: &Behaviours, kind: &str
     }
 }
 
+/// What `target` refuses the VACASK `analysis NAME KIND` statement at
+/// token `tok` with, when its kind is one no SPICE card reads (VACASK docs
+/// cmd-analysis-*.md: `dcinc`, `acxf`, `acstb`, `hb`, `hbac`, `hbnoise`,
+/// `pss`, `pac`, `pnoise`, `trannoise`): `W0001` where the target has an
+/// analysis of the kind (`Behaviours::vacask_analyses`), `W0015` where it
+/// lacks one; `None` for any other statement.
+pub(in crate::syntax::render) fn vacask_refusal(
+    rd: &Rd,
+    target: &Behaviours,
+    tok: u32,
+) -> Option<Code> {
+    const KINDS: [&str; 10] = [
+        "dcinc",
+        "acxf",
+        "acstb",
+        "hb",
+        "hbac",
+        "hbnoise",
+        "pss",
+        "pac",
+        "pnoise",
+        "trannoise",
+    ];
+    let vacask = rd.text_behaviours(tok).named_rules == NamedRules::Vacask;
+    let kind = rd.t.text(tok + 2);
+    if !vacask || rd.t.text(tok) != "analysis" || !KINDS.contains(&kind) {
+        return None;
+    }
+    Some(match target.vacask_analyses.contains(&kind) {
+        true => Code::W0001,
+        false => Code::W0015,
+    })
+}
+
 impl<'a> Rd<'a> {
     /// What testbench item `b` adds, in order; empty when the IR held
     /// nothing of it.
@@ -46,11 +80,14 @@ impl<'a> Rd<'a> {
                 let outs = self.saves(n).expect("a save the reader placed");
                 vec![BenchCard::Saves(outs)]
             }
-            Bench::Analysis(n) => self
-                .spectre_analysis(n)
-                .map(BenchCard::Ana)
-                .into_iter()
-                .collect(),
+            Bench::Analysis(n) => match self.spectre_sweep(n) {
+                Some(cards) => cards,
+                None => self
+                    .spectre_analysis(n)
+                    .map(BenchCard::Ana)
+                    .into_iter()
+                    .collect(),
+            },
             Bench::Options(n) => vec![BenchCard::Options(self.spectre_options(n))],
             Bench::NodeVals(n) => self
                 .node_vals(n)
@@ -227,6 +264,57 @@ impl<'a> Rd<'a> {
             variations,
             inner: (self.text(ih.name), self.text(ih.master)),
         })
+    }
+
+    /// `name sweep param=p start= stop= step= | lin=N | values=[…] { one
+    /// analysis }` over a netlist parameter (`[REF]` 19.1 pp.406-409:
+    /// `lin=` counts steps): the `.step` and the analysis it repeats;
+    /// `None` for any other sweep (a device's parameter, nested sweeps),
+    /// which stays the Spectre statement.
+    fn spectre_sweep(&self, n: u32) -> Option<Vec<BenchCard>> {
+        let h = self.ast.header(Node(n));
+        if self.text(h.master) != "sweep" || !h.nodes.is_empty() {
+            return None;
+        }
+        let p = self.pairs(n);
+        let known = ["param", "start", "stop", "step", "lin", "values"];
+        if p.iter().any(|(k, _)| !known.contains(&k.as_str())) {
+            return None;
+        }
+        let num = |k: &str| self.get(&p, k).and_then(|v| self.number(v));
+        let param = self.get(&p, "param").map(|v| self.text(v))?;
+        let &[inner] = self.body(n) else {
+            return None;
+        };
+        let a = (self.tag(inner) == Tag::Analysis).then(|| self.spectre_analysis(inner))??;
+        if matches!(a, Ana::Spectre { .. }) {
+            return None;
+        }
+        let step = match (self.get(&p, "values"), num("step"), num("lin")) {
+            (Some(v), None, None) => BenchCard::StepList {
+                param,
+                values: self
+                    .velems(v)
+                    .into_iter()
+                    .map(|x| self.number(x))
+                    .collect::<Option<_>>()?,
+            },
+            (None, step, lin) => {
+                let (start, stop) = (num("start")?, num("stop")?);
+                let step = match (step, lin) {
+                    (Some(s), None) => s,
+                    (None, Some(l)) if l >= 1.0 => (stop - start) / l,
+                    _ => return None,
+                };
+                BenchCard::Step {
+                    sweep: None,
+                    param,
+                    nums: [start, stop, step],
+                }
+            }
+            _ => return None,
+        };
+        Some(vec![step, BenchCard::Ana(a)])
     }
 
     /// `name options k=v` (the old lowering's `spectre_options`).

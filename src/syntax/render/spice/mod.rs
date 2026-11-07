@@ -39,7 +39,7 @@ mod waves;
 mod xyce_options;
 
 use super::Numbers;
-use super::capability::{Action, Alt, Construct, Rule, ngspice_device};
+use super::capability::{Action, Alt, Construct, Rule};
 use super::draws::{self, Layers};
 use super::names;
 use super::out::{Out, Space};
@@ -403,7 +403,11 @@ impl W<'_, '_> {
         // built-in (W0121's run).
         if self.b.load_form == LoadForm::Ngspice
             && self.rd.osdi_module(n)
-            && ngspice_device(&m.kind)
+            && self
+                .b
+                .builtin_devices
+                .iter()
+                .any(|d| d.eq_ignore_ascii_case(&m.kind))
         {
             self.refuse(Code::W0121, self.rd.main(n));
         }

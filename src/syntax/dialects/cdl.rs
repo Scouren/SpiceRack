@@ -33,6 +33,7 @@ pub(super) fn cdl() -> DialectDef {
         .copy(Construct::HspiceAnalysis, Code::W0027)
         .copy(Construct::HspiceWLine, Code::W0027)
         .copy(Construct::VacaskScript, Code::W0027)
+        .copy(Construct::VacaskElaborate, Code::W0027)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)
         .native(Construct::VerilogALoad)

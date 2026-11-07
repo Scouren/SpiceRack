@@ -236,10 +236,7 @@ impl W<'_, '_> {
         // `[CMP]` p.884 ("Temperature as a parameter"): Spectre's `temp` is
         // ngspice's `temper`, re-evaluated as the temperature changes; so is
         // VACASK's `$temp` (`docs/cmd-options-temp.md`). All are Celsius.
-        let temp = match self.b.named_params {
-            NamedParams::Vacask => "$temp",
-            NamedParams::Spectre | NamedParams::None => "temp",
-        };
+        let temp = self.b.temp_name;
         let expr = words(&expr, |w| match w.eq_ignore_ascii_case("temper") {
             true => temp.to_string(),
             false => w.to_string(),

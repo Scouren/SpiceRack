@@ -1008,3 +1008,16 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   `syntax/` treats a built-in specially; `Dialect` remains only as the
   built-ins' names (`From<Dialect> for Lang`) and the backend's
   simulators.
+- **Stream A round 3's rows** (on 1dcf1f7): `temp_name(word)` (the
+  expression word for the circuit temperature: ngspice and HSPICE
+  `temper`, Spectre, Xyce and LTspice `temp`, VACASK `$temp`; a named
+  source's word is respelled as the target's, `Rd::write_for`, and the
+  named writer reads the target's), `builtin_constant(name, value)`
+  (VACASK's `docs/expr-constants.md` constants, written as their values
+  off VACASK) and `builtin_device(name)` (ngspice-45's `devhelp` names: a
+  loaded module named as one is refused W0121), all in `def/tables.rs`
+  with `spectre_analysis`, and `vacask_analysis(kind)` (the VACASK analyses
+  no SPICE card reads that a target has: W0001 there, W0015 where it
+  lacks one; Spectre 5.0 has xf, stb, pss, pac, pnoise, no hb); construct
+  `VacaskElaborate` (W0122) appended to `CONSTRUCTS`, a cell in every
+  definition.

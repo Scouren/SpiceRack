@@ -11,8 +11,11 @@
 //!
 //! Contents:
 //! - `Rd::vacask_control(&self, n: u32) -> Vec<BenchCard>`
+//! - `Rd::vacask_promoted(&self, stmts: &[u32]) -> HashSet<String>`
 //! - `Rd::vacask_script(&self, head: u32) -> bool`
 //! - `Rd::vacask_saves(&self, n: u32) -> Option<(Vec<String>, bool)>`
+
+use std::collections::HashSet;
 
 use super::named_elements::unquoted;
 use super::{Ana, BenchCard, DcAxis, DcSweep, Opt, Rd, Sweep};
@@ -27,8 +30,16 @@ impl<'a> Rd<'a> {
         let mut out = Vec::new();
         let mut sweeps: Vec<u32> = Vec::new();
         let extra = |out: &mut Vec<BenchCard>, s: u32| out.push(BenchCard::Extra(s));
+        let promoting = self
+            .sole_elaborate(n)
+            .filter(|(_, names)| names.iter().all(|x| self.promoted.contains(x)))
+            .map(|(st, _)| st);
         for &st in self.body(n) {
             let head = self.ttag(self.main(st));
+            // The one `elaborate` the reader read as the top.
+            if promoting == Some(st) {
+                continue;
+            }
             if head == T::KwSweep {
                 sweeps.push(st);
                 continue;
@@ -58,6 +69,34 @@ impl<'a> Rd<'a> {
             extra(&mut out, s);
         }
         out
+    }
+
+    /// The subcircuits a VACASK deck's control block makes toplevel
+    /// circuits beside the default one (`docs/cmd-elaboration.md`:
+    /// `elaborate circuit("sub1", …)` promotes each, its models and
+    /// definitions in the global scope), read as the top itself: when the
+    /// block's only `elaborate` comes before its first analysis and names
+    /// top-level subcircuits with no terminals. Empty otherwise (a deck that
+    /// elaborates twice runs two circuits, `Rd::kept_construct`).
+    pub(super) fn vacask_promoted(&self, stmts: &[u32]) -> HashSet<String> {
+        if self.b.named_rules != NamedRules::Vacask {
+            return HashSet::new();
+        }
+        let control = stmts.iter().copied().find(|&s| self.tag(s) == Tag::Control);
+        let Some((_, names)) = control.and_then(|c| self.sole_elaborate(c)) else {
+            return HashSet::new();
+        };
+        let portless = |name: &str| {
+            stmts.iter().any(|&s| {
+                self.tag(s) == Tag::Subckt
+                    && self.fields(s).len() == 1
+                    && self.name_of(self.fields(s)[0]) == name
+            })
+        };
+        match names.iter().all(|n| portless(n)) {
+            true => names.into_iter().collect(),
+            false => HashSet::new(),
+        }
     }
 
     /// Whether the VACASK statement at token `head` (its first) only steers a VACASK run and its
@@ -121,6 +160,38 @@ impl<'a> Rd<'a> {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// Control block `n`'s `elaborate circuit[("a", …)]` and the names it
+    /// promotes, when it is the block's only `elaborate` and comes before
+    /// its first `analysis`; `None` otherwise or for another form
+    /// (`topdef=`, `elaborate changes`).
+    fn sole_elaborate(&self, n: u32) -> Option<(u32, Vec<String>)> {
+        let is = |s: u32, w: &str| self.t.text(self.main(s)) == w;
+        let body = self.body(n);
+        let mut els = body.iter().copied().filter(|&s| is(s, "elaborate"));
+        let (st, None) = (els.next()?, els.next()) else {
+            return None;
+        };
+        let first_analysis = body
+            .iter()
+            .position(|&s| self.ttag(self.main(s)) == T::KwAnalysis);
+        let at = body.iter().position(|&s| s == st)?;
+        if first_analysis.is_some_and(|a| a < at) {
+            return None;
+        }
+        let rest = self.line(st);
+        let rest = rest
+            .strip_prefix("elaborate")?
+            .trim()
+            .strip_prefix("circuit")?
+            .trim();
+        if rest.is_empty() {
+            return Some((st, vec![]));
+        }
+        let inner = rest.strip_prefix('(')?.strip_suffix(')')?;
+        let names = inner.split(',').map(|a| unquoted(a.trim()));
+        Some((st, names.collect::<Option<Vec<_>>>()?))
+    }
+
     /// Whether a `load` or `include` anywhere in the file names `file`.
     fn reads_file(&self, file: &str) -> bool {
         let mut work: Vec<u32> = self.ast.fields(self.ast.root()).to_vec();
@@ -201,7 +272,36 @@ impl<'a> Rd<'a> {
             NONE => String::new(),
             w => self.text(w),
         };
+        // A node list of one or two strings (`out=["o"]`, `["o", "r"]`,
+        // cmd-analysis-noise.md), or one string.
+        let nodes = |k: &str| -> Option<(String, String)> {
+            let v = self.get(&p, k)?;
+            let items: Vec<String> = self
+                .velems(v)
+                .into_iter()
+                .map(|x| unquoted(&self.text(x)))
+                .collect::<Option<_>>()?;
+            match items.as_slice() {
+                [o] => Some((o.clone(), "0".into())),
+                [o, r] => Some((o.clone(), r.clone())),
+                _ => None,
+            }
+        };
         let freq = || -> Option<Sweep> {
+            // `values=[f]` (cmd-analysis-ac.md): one frequency, SPICE's
+            // one-point linear sweep.
+            if let Some(v) = self.get(&p, "values") {
+                let [f] = self.velems(v)[..] else {
+                    return None;
+                };
+                let f = self.number(f)?;
+                return Some(Sweep {
+                    variation: "lin",
+                    points: 1,
+                    start: f,
+                    stop: f,
+                });
+            }
             let mode = ["dec", "oct", "lin", "log"]
                 .into_iter()
                 .find(|m| s("mode").is_some_and(|x| x.eq_ignore_ascii_case(m)))?;
@@ -251,8 +351,8 @@ impl<'a> Rd<'a> {
                 ]);
             }
             "noise" => Ana::Noise {
-                output: s("out")?,
-                reference: "0".into(),
+                output: nodes("out")?.0,
+                reference: nodes("out")?.1,
                 source: self.declared(st, &s("in")?, &['V', 'I'])?,
                 sweep: freq()?,
                 pps: None,
@@ -273,6 +373,9 @@ impl<'a> Rd<'a> {
         let s = |k: &str| self.get(&p, k).and_then(|v| unquoted(&self.text(v)));
         let src = match (s("instance"), s("parameter"), s("option")) {
             (Some(i), Some(dc), None) if dc == "dc" => self.declared(sw, &i, &['V', 'I'])?,
+            // A resistor's `r`: SPICE's `.dc` sweeps a resistor too
+            // (ngspice manual §15.3.2).
+            (Some(i), Some(r), None) if r == "r" => self.resistor(sw, &i)?,
             (None, None, Some(t)) if t == "temp" => "temp".into(),
             _ => return None,
         };
@@ -312,6 +415,19 @@ impl<'a> Rd<'a> {
             (Some(_), None) => return None,
         };
         Some(DcAxis { src, sweep })
+    }
+
+    /// The SPICE name of resistor `name` (referenced in statement `n`'s
+    /// scope): `r` and its name; `None` for any other instance.
+    fn resistor(&self, n: u32, name: &str) -> Option<String> {
+        let scope = self.scope_of.get(&n).copied().unwrap_or(NONE);
+        let &k = self.insts.get(&(scope, name.to_string()))?;
+        match self.named_inst(k)? {
+            super::Card::Rcl {
+                letter: 'R', name, ..
+            } => Some(format!("r{name}")),
+            _ => None,
+        }
     }
 
     /// `ic=["n"; v; ...]` (or `{"n", v, ...}`) → node values (the old

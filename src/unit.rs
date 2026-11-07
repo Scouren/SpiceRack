@@ -7,7 +7,7 @@
 //! - `pub const SPICE_SCALES: &[(&str, f64)]`
 //! - `pub const UNITS: &[(&str, f64, &str)]`
 //! - `pub struct UnitValue`, `UnitValue::str_spice(&self) -> String`, `impl Display for UnitValue`
-//! - `pub fn parse_spice_number(t: &str) -> Option<(f64, usize, &'static str)>`
+//! - `pub fn parse_spice_number(t: &str) -> Option<(f64, usize, &'static str)>`, `pub fn spice_bare(v: &str) -> bool`
 //! - `pub fn ngspice_value(t: &str) -> Option<f64>`
 //! - `pub fn format_spice_number(v: f64) -> String`
 //! - `pub fn ngspice_spelling(v: f64) -> String`
@@ -286,6 +286,18 @@ impl fmt::Display for UnitValue {
         let (mult, suffix) = si_prefix(self.value);
         write!(f, "{}{}{}", unscale(self.value, mult), suffix, self.symbol)
     }
+}
+
+/// Whether `v` is one SPICE number (a sign, digits, a scale or unit
+/// tail) or one name, which an instance line reads bare (ngspice
+/// substitutes a parameter named alone); `2*(w+ld)` is neither.
+pub fn spice_bare(v: &str) -> bool {
+    let t = v.trim();
+    let body = t.strip_prefix(['+', '-']).unwrap_or(t);
+    let name = t.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+        && t.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_');
+    name || crate::unit::parse_spice_number(body)
+        .is_some_and(|(_, len, _)| body[len..].bytes().all(|c| c.is_ascii_alphabetic()))
 }
 
 // ---- private ----

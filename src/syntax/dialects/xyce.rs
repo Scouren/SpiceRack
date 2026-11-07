@@ -163,6 +163,10 @@ pub(super) fn xyce() -> DialectDef {
         .spectre_analysis("sens")
         .spectre_analysis("sweep")
         .spectre_analysis("montecarlo")
+        // The circuit temperature in an expression (RG, special variable TEMP).
+        .temp_name("temp")
+        // The VACASK analyses it has (Xyce RG .HB).
+        .vacask_analysis("hb")
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
@@ -170,6 +174,7 @@ pub(super) fn xyce() -> DialectDef {
         .refuse(Construct::HspiceAnalysis, Code::W0015)
         .refuse(Construct::HspiceWLine, Code::W0105)
         .omit(Construct::VacaskScript, Code::W0120)
+        .refuse(Construct::VacaskElaborate, Code::W0122)
         .refuse(Construct::CaretReread, Code::W0002)
         .native(Construct::StatisticalCall)
         .refuse(Construct::VerilogALoad, Code::W0004)

@@ -139,6 +139,8 @@ pub(super) fn ltspice() -> DialectDef {
         .parasitics(Parasitics::Ltspice)
         .coupling(Coupling::OneCard)
         .spectre_analysis("sweep")
+        // The circuit temperature in an expression (help, temp).
+        .temp_name("temp")
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
@@ -146,6 +148,7 @@ pub(super) fn ltspice() -> DialectDef {
         .refuse(Construct::HspiceAnalysis, Code::W0015)
         .refuse(Construct::HspiceWLine, Code::W0105)
         .omit(Construct::VacaskScript, Code::W0120)
+        .refuse(Construct::VacaskElaborate, Code::W0122)
         .refuse(Construct::CaretReread, Code::W0002)
         .refuse(Construct::StatisticalCall, Code::W0003)
         .refuse(Construct::VerilogALoad, Code::W0004)

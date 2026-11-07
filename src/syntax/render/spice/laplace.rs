@@ -19,8 +19,11 @@
 //! - `pub(super) enum Laplace`
 //! - `fn has_laplace(rd: &Rd, v: u32) -> bool`, `fn read(rd: &Rd, v: u32) -> Option<Laplace>`
 //! - `fn coeff_array(c: &[f64]) -> String`, `fn horner(c: &[f64]) -> String`
+//! - `W::laplace(&mut self, decl: &str, np: &str, nm: &str, value: u32, current: bool, tok: u32) -> String`
 
+use super::W;
 use crate::syntax::ast::{NONE, Name, Node, Tag};
+use crate::syntax::render::capability::{Action, Construct, Rule};
 use crate::syntax::render::read::Rd;
 
 /// What a `Laplace(...)` source is.
@@ -133,6 +136,70 @@ pub(super) fn horner(c: &[f64]) -> String {
         out = format!("({out}*s+{})", coeff(v));
     }
     out
+}
+
+impl W<'_, '_> {
+    /// A `Laplace(...)` behavioural source, rewritten into a card the
+    /// target parses (`Lift`): ngspice's XSPICE `s_xfer` (instance and
+    /// `.model`), HSPICE's and ESPice's `LAPLACE` table, LTspice's
+    /// `Laplace=`; a constant `H(s)` is a plain controlled source anywhere.
+    pub(super) fn laplace(
+        &mut self,
+        decl: &str,
+        np: &str,
+        nm: &str,
+        value: u32,
+        current: bool,
+        tok: u32,
+    ) -> String {
+        // `decl` is the map's: the source's name after the lift's letter
+        // (`renamed`).
+        let ((ip, im), num, den) = match read(self.rd, value) {
+            Some(Laplace::Gain {
+                input: (ip, im),
+                gain,
+            }) => {
+                return format!(
+                    "{decl} {np} {nm} {ip} {im} {}",
+                    self.sp.number(gain, self.x)
+                );
+            }
+            Some(Laplace::Xfer { input, num, den }) => (input, num, den),
+            None => {
+                self.refuse(crate::syntax::diag::Code::W0010, tok);
+                return String::new();
+            }
+        };
+        match self.ask(Construct::Laplace, tok) {
+            Action::Lift(Rule::LaplaceAttr) => format!(
+                "{decl} {np} {nm} {ip} {im} Laplace={}/{}",
+                horner(&num),
+                horner(&den),
+            ),
+            Action::Lift(Rule::LaplaceTable) => {
+                let asc = |c: &[f64]| coeff_array(&c.iter().rev().copied().collect::<Vec<_>>());
+                format!(
+                    "{decl} {np} {nm} LAPLACE {ip} {im} {} / {}",
+                    asc(&num),
+                    asc(&den)
+                )
+            }
+            Action::Lift(Rule::LaplaceXfer) => {
+                let port = if current { "id" } else { "vd" };
+                // One integrator stage per denominator order.
+                let ic = vec!["0"; den.len() - 1].join(" ");
+                // The model is named after the source, its `A` left off.
+                let model = &decl[1..];
+                format!(
+                    "{decl} %vd({ip} {im}) %{port}({np} {nm}) {model}_xfer\n\
+                     .model {model}_xfer s_xfer(num_coeff=[{}] den_coeff=[{}] int_ic=[{ic}])",
+                    coeff_array(&num),
+                    coeff_array(&den),
+                )
+            }
+            _ => String::new(),
+        }
+    }
 }
 
 // ---- private ----

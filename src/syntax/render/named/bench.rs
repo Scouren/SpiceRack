@@ -191,7 +191,12 @@ impl W<'_, '_> {
         // refused (no Spectre statement says it).
         for &(n, _) in &tb.extra {
             let tok = self.rd.main(n);
-            self.ask(self.rd.kept_construct(tok), tok);
+            match crate::syntax::render::read::vacask_refusal(self.rd, self.b, tok) {
+                Some(c) => self.refuse(c, tok),
+                None => {
+                    self.ask(self.rd.kept_construct(tok), tok);
+                }
+            }
         }
         self.line("");
         let mut block: Vec<String> = Vec::new();

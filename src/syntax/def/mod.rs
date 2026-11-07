@@ -31,7 +31,8 @@
 //! - the behaviour calls: `writer`, `text_family`, `caret_power`, `hier_sep`, `number_reading`,
 //!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
-//!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `spectre_analysis`
+//!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `spectre_analysis`, `temp_name`,
+//!   `builtin_constant`, `builtin_device`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
 //!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
@@ -41,6 +42,7 @@ mod copy;
 mod dump;
 mod freeze;
 mod plugin;
+mod tables;
 
 use crate::syntax::behaviour::{
     AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope,
@@ -635,16 +637,6 @@ impl DialectDef {
     /// A region kept as `lang`'s text is written as written here.
     pub fn text_family(mut self, lang: Lang) -> Self {
         self.text_family = Some(lang);
-        self
-    }
-
-    /// The target has an analysis for Spectre analysis `kind`.
-    pub fn spectre_analysis(mut self, kind: &str) -> Self {
-        let mut v = self.b.spectre_analyses.to_vec();
-        if !v.contains(&kind) {
-            v.push(leak(kind));
-        }
-        self.b.spectre_analyses = Box::leak(v.into_boxed_slice());
         self
     }
 }
