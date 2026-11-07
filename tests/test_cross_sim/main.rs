@@ -31,7 +31,12 @@
 //!
 //! `CROSS_SIM_BLESS=<dir>` writes each cell's observed list to `<dir>`, for
 //! review against the tree's; `CROSS_SIM_JOBS` sets the workers (one per CPU);
-//! `CROSS_SIM_ONLY=<text>` runs only the decks whose path holds it;
+//! `CROSS_SIM_ONLY=<text>` runs only the decks whose path holds it
+//! (`@<file>`: those the file lists, one corpus-relative path a line);
+//! `CROSS_SIM_TUBE=<fraction>` widens the transient time tube (triage only:
+//! the lists hold at the default 0.01); `CROSS_SIM_TMAX=<n>` gives
+//! ngspice's `.tran` a TMAX of a 1/n of the run (triage: is ngspice's step,
+//! bounded by TSTEP, the difference?);
 //! `CROSS_SIM_KEEP=1` keeps every run's directory (the decks as run, the
 //! simulator's output) and prints where.
 //!
@@ -93,6 +98,10 @@ enum Verdict {
 
 /// CPU seconds per run.
 const SECS: u64 = 60;
+
+/// Bytes free under the temp dir a run needs before it starts: 12 workers,
+/// each run's files capped at `sim::FSIZE`, with room to spare.
+const DISK_MIN: u64 = 30 << 30;
 
 /// Decks per cell in the merge tier's sample.
 const SAMPLE: usize = 48;
@@ -239,6 +248,13 @@ fn sweep(c: &Corpus, sample: Option<usize>) {
             c.var
         )
     });
+    let free = free_bytes(&std::env::temp_dir());
+    assert!(
+        free >= DISK_MIN,
+        "{} GB free under the temp dir, {} needed (GAPS-BRIEF \"Disk\")",
+        free >> 30,
+        DISK_MIN >> 30
+    );
     for s in std::iter::once(c.sim).chain(c.targets.iter().map(|t| t.sim)) {
         assert!(
             s.on_path(),
@@ -249,7 +265,15 @@ fn sweep(c: &Corpus, sample: Option<usize>) {
     let mut all = Vec::new();
     files(Path::new(&root), c.ext, &mut all);
     let only = std::env::var("CROSS_SIM_ONLY").unwrap_or_default();
-    all.retain(|p| (c.keep)(&p.to_string_lossy()) && p.to_string_lossy().contains(&only));
+    let wanted: Option<BTreeSet<String>> = only.strip_prefix('@').map(|f| {
+        let text = std::fs::read_to_string(f).unwrap_or_else(|e| panic!("CROSS_SIM_ONLY {f}: {e}"));
+        text.lines().map(|l| l.trim().to_string()).collect()
+    });
+    let picked = |p: &Path| match &wanted {
+        Some(set) => set.contains(&*p.strip_prefix(&root).unwrap_or(p).to_string_lossy()),
+        None => p.to_string_lossy().contains(&only),
+    };
+    all.retain(|p| (c.keep)(&p.to_string_lossy()) && picked(p));
     all.sort();
     assert!(!all.is_empty(), "no *.{} under {root}", c.ext);
     if let Some(n) = sample {
@@ -418,7 +442,9 @@ fn check(
             }
             Ok(files) => files,
         };
-        let a = match original.get_or_insert_with(|| sim::run(c.sim, deck, &src, &[], SECS)) {
+        let a = match original
+            .get_or_insert_with(|| uic_start(c.sim, &src, sim::run(c.sim, deck, &src, &[], SECS)))
+        {
             Ran::Plots(p) => p,
             Ran::Timeout => {
                 source = Some(("slow", format!("{} timed out", c.sim.name())));
@@ -486,4 +512,69 @@ fn files(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
             out.push(p);
         }
     }
+}
+
+/// `ran` without its transient's t = 0 row when `src` is a Xyce deck whose
+/// `.tran` has UIC or NOOP, or a VACASK deck's `tran` with `icmode="uic"`:
+/// Xyce runs NOOP as UIC (the same `.prn` bytes) and both print the zero
+/// start state at t = 0 even on a source's node (VACASK
+/// docs/cmd-analysis-tran.md: "the timepoint at t=0 is not correct"),
+/// where ngspice prints t = 0 with the sources applied; after t = 0 all
+/// start from that state.
+fn uic_start(sim: sim::Sim, src: &str, ran: Ran) -> Ran {
+    let xyce = |l: &str| {
+        l.starts_with(".tran")
+            && l.split(|c: char| c.is_whitespace() || c == ',')
+                .any(|w| w == "uic" || w == "noop")
+    };
+    let vacask = |l: &str| l.contains(" tran ") && l.contains("icmode=\"uic\"");
+    let skip = src.lines().any(|l| {
+        let l = l.trim_start().to_ascii_lowercase();
+        match sim {
+            sim::Sim::Xyce => xyce(&l),
+            sim::Sim::Vacask => vacask(&l),
+            _ => false,
+        }
+    });
+    let Ran::Plots(mut plots) = ran else {
+        return ran;
+    };
+    if skip {
+        for p in &mut plots {
+            let at0 = p
+                .real_data
+                .first()
+                .is_some_and(|t| t.first() == Some(&0.0) && t.len() > 1);
+            let timed = p
+                .variables
+                .first()
+                .is_some_and(|v| v.name.eq_ignore_ascii_case("time"));
+            if at0 && timed {
+                p.real_data.iter_mut().for_each(|c| {
+                    c.remove(0);
+                });
+                p.complex_data
+                    .iter_mut()
+                    .filter(|c| !c.is_empty())
+                    .for_each(|c| {
+                        c.remove(0);
+                    });
+            }
+        }
+    }
+    Ran::Plots(plots)
+}
+
+/// Bytes available on the file system holding `dir`, by `df`.
+fn free_bytes(dir: &Path) -> u64 {
+    let out = std::process::Command::new("df")
+        .args(["--output=avail", "-B1"])
+        .arg(dir)
+        .output()
+        .expect("df on PATH");
+    let text = String::from_utf8_lossy(&out.stdout);
+    text.lines()
+        .nth(1)
+        .and_then(|l| l.trim().parse().ok())
+        .expect("df's avail column")
 }

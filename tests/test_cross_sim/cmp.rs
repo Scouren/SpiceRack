@@ -97,6 +97,15 @@ fn kind(p: &RawData) -> &'static str {
     }
 }
 
+/// The time tube's half-width as a fraction of the stop time: 1%, or
+/// `CROSS_SIM_TUBE` (triage: does a wider window clear an edge?).
+fn tube() -> f64 {
+    std::env::var("CROSS_SIM_TUBE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.01)
+}
+
 /// A vector's name as every simulator here spells it: lower case, `v(x)`
 /// as `x`, a branch current as `<device>#branch`, hierarchy joined by `.`.
 fn normal(name: &str) -> String {
@@ -130,9 +139,11 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
     let (xa, xb) = (a.re(0), b.re(0));
     if first == 1 && k != "tran" {
         let span = xa.iter().fold(0.0f64, |m, x| m.max(x.abs()));
-        let same = |ys: &[f64]| {
-            ys.len() == xa.len() && xa.iter().zip(ys).all(|(x, y)| (x - y).abs() <= 1e-9 * span)
-        };
+        // A grid point holds to 1e-9 of the span, or to 1e-6 of itself: a
+        // log sweep's points are printed to 7 digits in Xyce's noise table.
+        let close = |x: f64, y: f64| (x - y).abs() <= (1e-9 * span).max(1e-6 * x.abs());
+        let same =
+            |ys: &[f64]| ys.len() == xa.len() && xa.iter().zip(ys).all(|(&x, &y)| close(x, y));
         // A nested `.dc` is one plot over the inner source in ngspice; VACASK
         // writes each sweep's vector first, the outer one (`sweep1`) before
         // the inner (`vsweep`). The grid holds if any leading vector is `a`'s.
@@ -170,7 +181,7 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
         if k == "tran" {
             let tol = TRAN * swing + 2.0 * floor;
             let (ra, rb) = (a.re(i), b.re(j));
-            let dx = 0.01 * xa.last().copied().unwrap_or(0.0);
+            let dx = tube() * xa.last().copied().unwrap_or(0.0);
             if let Some(p) = leaves_tube(&xa, &ra, &xb, &rb, dx, tol) {
                 return Err(format!(
                     "tran {}: {} leaves the tube at t={} (tol {tol:.3e})",

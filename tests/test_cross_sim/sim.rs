@@ -17,7 +17,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use spicerack::result::RawData;
+use spicerack::result::{RawData, VarInfo, VarType};
 
 /// A simulator a cell runs, with the reading mode it is started in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +40,10 @@ pub enum Ran {
     /// No result: the reason, with the simulator's first error lines.
     Failed(String),
 }
+
+/// Bytes one simulator may write to any one file: a runaway transient's raw
+/// file dies at the cap (SIGXFSZ) instead of filling the disk.
+const FSIZE: u64 = 2 << 30;
 
 /// The deck's own name inside the run directory: hidden, so it never shadows
 /// a file of the corpus beside it.
@@ -94,7 +98,7 @@ fn run_in(
     files: &[(String, String)],
     secs: u64,
 ) -> Result<Ran, String> {
-    let mut tmp = Some(tempfile::TempDir::new().map_err(|e| e.to_string())?);
+    let mut tmp = Some(tempfile::TempDir::new().unwrap_or_else(|e| harness(&e)));
     let kept = tmp
         .as_ref()
         .map(|t| t.path().to_path_buf())
@@ -119,10 +123,10 @@ fn run_in(
     for (name, body) in files {
         let at = dir.join(name);
         if let Some(parent) = at.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            std::fs::create_dir_all(parent).unwrap_or_else(|e| harness(&e));
         }
         let _ = std::fs::remove_file(&at);
-        std::fs::write(&at, body).map_err(|e| e.to_string())?;
+        std::fs::write(&at, body).unwrap_or_else(|e| harness(&e));
     }
     let ext = deck
         .extension()
@@ -133,11 +137,15 @@ fn run_in(
         Sim::Ngspice | Sim::NgspiceHsa => ngspice_text(text, &raw),
         _ => text.to_string(),
     };
-    std::fs::write(&file, &text).map_err(|e| e.to_string())?;
+    if matches!(sim, Sim::Ngspice | Sim::NgspiceHsa) {
+        link_osdi(dir, &text);
+    }
+    std::fs::write(&file, &text).unwrap_or_else(|e| harness(&e));
     let mut c = Command::new("timeout");
     c.arg((10 * secs).to_string())
         .arg("prlimit")
         .arg(format!("--cpu={secs}"))
+        .arg(format!("--fsize={FSIZE}"))
         .env("OMP_NUM_THREADS", "1")
         .current_dir(dir);
     match sim {
@@ -166,9 +174,18 @@ fn run_in(
             }
         }
     }
-    let out = c.arg(&file).output().map_err(|e| e.to_string())?;
+    let out = c.arg(&file).output().unwrap_or_else(|e| harness(&e));
     if timed_out(&out) {
         return Ok(Ran::Timeout);
+    }
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if out.status.signal() == Some(25) || out.status.code() == Some(153) {
+            return Ok(Ran::Failed(format!(
+                "{} wrote past {FSIZE} bytes",
+                sim.name()
+            )));
+        }
     }
     let log = (String::from_utf8_lossy(&out.stdout) + String::from_utf8_lossy(&out.stderr))
         .replace(&format!("{}/", dir.display()), "");
@@ -200,10 +217,111 @@ fn run_in(
                 .filter(|p| !p.plot_name.eq_ignore_ascii_case("constants")),
         );
     }
+    if sim == Sim::Xyce
+        && let Some(n) = xyce_noise(&dir.join(format!("{DECK}.{ext}_noise.dat")))
+    {
+        plots.retain(|p| !p.plot_name.to_ascii_lowercase().contains("noise"));
+        plots.push(n);
+    }
     if plots.is_empty() {
         return Ok(Ran::Failed(format!("no plot: {}", errors(&log))));
     }
     Ok(Ran::Plots(plots))
+}
+
+/// A run directory or process the harness itself cannot make (a full
+/// disk, a missing `timeout`): no verdict on the deck, so the test stops.
+fn harness(e: &std::io::Error) -> ! {
+    panic!("cross_sim harness: {e}")
+}
+
+/// Each bare `pre_osdi <name>.osdi` of `text` that is not beside the deck,
+/// linked from VACASK's module directory (`<vacask>/../lib/vacask/mod`):
+/// a VACASK deck loads a model from its module path (VACASK
+/// docs/startup-paths.md), a user running it on ngspice puts that file
+/// beside the deck.
+fn link_osdi(dir: &Path, text: &str) {
+    let names = text
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("pre_osdi"))
+        .map(|n| n.trim().trim_matches(['"', '\'']))
+        .filter(|n| n.ends_with(".osdi") && !n.contains('/') && !dir.join(n).exists());
+    let mut mods = None;
+    for n in names {
+        let m = mods.get_or_insert_with(vacask_modules);
+        if let Some(m) = m
+            && m.join(n).is_file()
+        {
+            let _ = std::os::unix::fs::symlink(m.join(n), dir.join(n));
+        }
+    }
+}
+
+/// VACASK's module directory, beside its binary on `PATH`.
+fn vacask_modules() -> Option<std::path::PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    let bin = std::env::split_paths(&path).find(|d| d.join("vacask").is_file())?;
+    let real = std::fs::canonicalize(bin.join("vacask")).ok()?;
+    Some(real.parent()?.parent()?.join("lib/vacask/mod"))
+}
+
+/// Xyce's noise spectra, which its raw file leaves out (it holds the ac
+/// node voltages): `<deck>_noise.dat`, a Tecplot table of frequency,
+/// Re/Im of the output and each `*noise*` density in V^2/Hz (for a 50k
+/// divider `onoise_spectrum` is 8.3e-16 = 4kTR). As one noise plot in
+/// ngspice's units, V/sqrt(Hz) (the square root of each density), the
+/// Re/Im columns dropped.
+fn xyce_noise(path: &Path) -> Option<RawData> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let (head, body) = text.split_once("ZONE")?;
+    let names: Vec<String> = head
+        .split('"')
+        .skip(3)
+        .step_by(2)
+        .map(|n| n.trim().to_string())
+        .collect();
+    let mut cols: Vec<Vec<f64>> = vec![Vec::new(); names.len()];
+    for l in body.lines().skip(1) {
+        let row: Vec<f64> = l
+            .split_whitespace()
+            .filter_map(|w| w.parse().ok())
+            .collect();
+        if row.len() == names.len() {
+            row.iter().zip(&mut cols).for_each(|(&v, c)| c.push(v));
+        }
+    }
+    let keep: Vec<usize> = (0..names.len())
+        .filter(|&i| i == 0 || names[i].to_ascii_lowercase().contains("noise"))
+        .collect();
+    let variables = keep
+        .iter()
+        .enumerate()
+        .map(|(k, &i)| VarInfo {
+            index: k,
+            name: names[i].clone(),
+            var_type: if i == 0 {
+                VarType::Frequency
+            } else {
+                VarType::Voltage
+            },
+        })
+        .collect();
+    let real_data = keep
+        .iter()
+        .map(|&i| {
+            if i == 0 {
+                cols[0].clone()
+            } else {
+                cols[i].iter().map(|v| v.sqrt()).collect()
+            }
+        })
+        .collect();
+    Some(RawData {
+        plot_name: "Noise Spectral Density Curves".into(),
+        variables,
+        real_data,
+        ..Default::default()
+    })
 }
 
 /// `timeout` exits 124 itself; a CPU-limit kill (SIGXCPU, SIGKILL at the
@@ -233,10 +351,11 @@ fn errors(log: &str) -> String {
         if !CAUSES.iter().any(|c| low.contains(c)) || low.contains("fatal error in ngspice") {
             continue;
         }
-        // Xyce wraps its location ("... at" / "or near line 8"): the cause
+        // Xyce wraps its location ("... at" / "or near line 8", "... at or" /
+        // "near line 8"): the cause
         // is the line after the wrap.
         let after = |k: usize| all.get(i + k).copied().unwrap_or("");
-        let next = if after(1).starts_with("or near") {
+        let next = if after(1).starts_with("or near") || after(1).starts_with("near line") {
             after(2)
         } else {
             after(1)
@@ -279,6 +398,13 @@ fn has_control(text: &str) -> bool {
 /// the current plot at the end of the last block.
 fn ngspice_text(text: &str, raw: &Path) -> String {
     let (title, body) = text.split_once('\n').unwrap_or((text, ""));
+    let body = match std::env::var("CROSS_SIM_TMAX")
+        .ok()
+        .and_then(|n| n.parse::<f64>().ok())
+    {
+        Some(n) => body.lines().map(|l| tmax(l, n) + "\n").collect(),
+        None => body.to_string(),
+    };
     let mut out = format!("{title}\n.option seed=1\n{body}");
     if has_control(text)
         && let Some(at) = out.to_ascii_lowercase().rfind("\n.endc")
@@ -286,6 +412,53 @@ fn ngspice_text(text: &str, raw: &Path) -> String {
         out.insert_str(at, &format!("\nwrite {}", raw.display()));
     }
     out
+}
+
+/// Triage only (`CROSS_SIM_TMAX=<n>`): a `.tran TSTEP TSTOP [TSTART]` line
+/// with TMAX = (TSTOP - TSTART)/n added, so ngspice's step is no longer
+/// bounded by TSTEP alone (its default TMAX, ngspice manual `.tran`).
+fn tmax(line: &str, n: f64) -> String {
+    let w: Vec<&str> = line.split_whitespace().collect();
+    let tran = w
+        .first()
+        .is_some_and(|c| c.eq_ignore_ascii_case(".tran") || c.eq_ignore_ascii_case("tran"));
+    let nums: Vec<f64> = w.iter().skip(1).map_while(|x| number(x)).collect();
+    if !tran || !(2..=3).contains(&nums.len()) || w.len() != nums.len() + 1 {
+        return line.to_string();
+    }
+    let start = nums.get(2).copied().unwrap_or(0.0);
+    format!(
+        "{} {} {} {start:e} {:e}",
+        w[0],
+        w[1],
+        w[2],
+        (nums[1] - start) / n
+    )
+}
+
+/// A SPICE number with its scale suffix (`2m`, `100n`, `1meg`, `5ms`): the
+/// longest prefix that reads as a float, then the suffix.
+fn number(word: &str) -> Option<f64> {
+    let low = word.to_ascii_lowercase();
+    let (v, tail) = (1..=low.len())
+        .rev()
+        .filter(|&i| low.is_char_boundary(i))
+        .find_map(|i| low[..i].parse::<f64>().ok().map(|v| (v, &low[i..])))?;
+    let scale = [
+        ("meg", 1e6),
+        ("t", 1e12),
+        ("g", 1e9),
+        ("k", 1e3),
+        ("m", 1e-3),
+        ("u", 1e-6),
+        ("n", 1e-9),
+        ("p", 1e-12),
+        ("f", 1e-15),
+    ]
+    .iter()
+    .find(|(s, _)| tail.starts_with(s))
+    .map_or(1.0, |&(_, k)| k);
+    Some(v * scale)
 }
 
 /// The raw files a VACASK deck writes, one per `analysis <name>` in deck

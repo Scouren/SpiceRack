@@ -7,4 +7,4 @@ benchmark/c6288/vacask/test_ivdd.sim slow # quarantined: the c6288 multiplier be
 benchmark/graetz/vacask/debug_graetz.sim source-fails # no raw file tran1.raw: This is vacask unknown. | worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 @ (unknown) | worst residual=0.00e+00 >TOL @ (un
 demo/rpn/parser.sim source-fails # no plot: This is vacask unknown.
 demo/rpn/sipfx.sim source-fails # no plot: This is vacask unknown.
-test/test_opstore.sim source-fails # VACASK 36be560: "Parser syntax error, unexpected ;, expecting ] or ," (the corpus is the fork bcd48e2's tree)
+test/test_opstore.sim source-fails # no raw file op1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","

@@ -21,6 +21,11 @@ use spicerack::syntax::render::render_text;
 /// The runs of each Monte Carlo loop.
 const N: usize = 2000;
 
+/// ngspice's random seed (the `setseed` command, ngspice manual chapter
+/// 13): every draw is made after it, so each run of the test gives the
+/// same bytes (`draws_are_the_same_every_run`).
+const SEED: u32 = 7;
+
 // ---- private ----
 
 /// `src` (read in `d`) written for `to`, which must not refuse it.
@@ -30,9 +35,15 @@ fn written(src: &str, d: Dialect, to: Dialect) -> String {
         .text
 }
 
-/// T-N0: agauss(1k,100,3) has std(R1) = 33.3, so v(out) has mean 0.5 and
-/// std 2.5e-4 * 33.3 = 8.33e-3; aunif(1k,100) std(R1) = 100/sqrt(3) = 57.7,
-/// std 1.443e-2; limit(1k,50) is exactly 1k/2050 or 1k/1950. Each on real
+/// T-N0: agauss(1k,100,3) has std(R1) = 33.3, so v(out) has std 2.5e-4 *
+/// 33.3 = 8.33e-3; aunif(1k,100) std(R1) = 100/sqrt(3) = 57.7, std
+/// 1.443e-2; limit(1k,50) is exactly 1k/2050 or 1k/1950. The mean is not
+/// the linearized 0.5: v(out) = 1k/(2k + d) is convex in d, so E[v(out)] =
+/// 0.5 + 1k*var(d)/(2k)^3 for a normal d (the next term is 3e-7 of it),
+/// and exactly 1k/(2a) * ln((2k+a)/(2k-a)) for d uniform on [-a, a]; for
+/// aunif that is 0.500417, 1.3 standard errors of the mean (sigma/sqrt(N)
+/// = 3.2e-4) above 0.5, which made a 4-sigma bound around 0.5 fail one run
+/// in a few. Each on real
 /// ngspice as written and as written back from its Spectre text (the calls
 /// lifted into `rack_*` variables, then read back), at the closed form's
 /// tolerances (mean within 4 sigma/sqrt(N), std within 4 sigma/sqrt(2N)).
@@ -41,12 +52,20 @@ fn written(src: &str, d: Dialect, to: Dialect) -> String {
 /// forms: std 50 is 1.25e-2, N=100 is 1.443e-2.
 #[test]
 fn t_n0_draws_through_spectre_match_the_closed_forms() {
-    for (r, sigma) in [
-        ("agauss(1k,100,3)", 2.5e-4 * 100.0 / 3.0),
-        ("aunif(1k,100)", 2.5e-4 * 100.0 / 3f64.sqrt()),
+    for (r, mu, sigma) in [
+        (
+            "agauss(1k,100,3)",
+            gauss_mean(100.0 / 3.0),
+            2.5e-4 * 100.0 / 3.0,
+        ),
+        (
+            "aunif(1k,100)",
+            unif_mean(100.0),
+            2.5e-4 * 100.0 / 3f64.sqrt(),
+        ),
     ] {
         for (k, rows) in divider(r).iter().enumerate() {
-            matches(&rows[0], 0.5, sigma, &format!("{r} deck {k}"));
+            matches(&rows[0], mu, sigma, &format!("{r} deck {k}"));
         }
     }
     for rows in divider("limit(1k,50)") {
@@ -63,17 +82,40 @@ fn t_n0_draws_through_spectre_match_the_closed_forms() {
                 .all(|t| rows[0].iter().any(|v| (v - t).abs() < 1e-6))
         );
     }
-    for (vary, sigma) in [
-        ("dist=gauss std=50", 2.5e-4 * 50.0),
-        ("dist=unif N=100", 2.5e-4 * 100.0 / 3f64.sqrt()),
+    for (vary, mu, sigma) in [
+        ("dist=gauss std=50", gauss_mean(50.0), 2.5e-4 * 50.0),
+        (
+            "dist=unif N=100",
+            unif_mean(100.0),
+            2.5e-4 * 100.0 / 3f64.sqrt(),
+        ),
     ] {
         let scs = format!(
             "// t\nsimulator lang=spectre\nparameters rv=1k\nstatistics {{\n  process {{ vary rv {vary} }}\n}}\nv1 (in 0) vsource dc=1\nr1 (in out) resistor r=rv\nr2 (out 0) resistor r=1k\n"
         );
         let sp = written(&scs, Dialect::Spectre, Dialect::Ngspice);
         assert!(sp.contains("rv__mc="), "{sp}");
-        matches(&runs(&sp, &["out"])[0], 0.5, sigma, vary);
+        matches(&runs(&sp, &["out"])[0], mu, sigma, vary);
     }
+}
+
+/// Determinism (AGENTS.md: 1 run and N runs give the same bytes): two
+/// loops over one deck draw the same values, bit for bit.
+#[test]
+fn draws_are_the_same_every_run() {
+    let deck = "t\nv1 in 0 1\nr1 in out r='aunif(1k,100)'\nr2 out 0 1k\n.end\n";
+    let (a, b) = (runs(deck, &["out"]), runs(deck, &["out"]));
+    assert_eq!(a, b);
+    let hash = a[0].iter().fold(0xcbf2_9ce4_8422_2325u64, |h, v| {
+        (h ^ v.to_bits()).wrapping_mul(0x100_0000_01b3)
+    });
+    eprintln!("draws: FNV-1a {hash:016x} over {N} values");
+    let distinct: std::collections::BTreeSet<u64> = a[0].iter().map(|v| v.to_bits()).collect();
+    assert!(
+        distinct.len() > N * 9 / 10,
+        "{} distinct draws of {N}",
+        distinct.len()
+    );
 }
 
 /// T-N1: a subcircuit's own draw is independent per instance; a top
@@ -133,12 +175,14 @@ fn both(deck: &str, probes: &[&str]) -> [Vec<Vec<f64>>; 2] {
 }
 
 /// ngspice's operating point `N` times, the circuit re-read with fresh
-/// draws between runs (`mc_source`, ngspice manual §13.5.48).
+/// draws before each run (`mc_source`, ngspice manual §13.5.48), every one
+/// after `setseed SEED`: the draws of the deck's first reading come from a
+/// clock seed, so that reading is never measured.
 fn runs(deck: &str, probes: &[&str]) -> Vec<Vec<f64>> {
     let body = deck.trim_end().trim_end_matches(".end");
     let print: Vec<String> = probes.iter().map(|p| format!("v({p})")).collect();
     let text = format!(
-        "{body}\n.control\nlet i = 0\ndowhile i < {N}\n  if i > 0\n    mc_source\n  end\n  op\n  print {}\n  let i = i + 1\nend\n.endc\n.end\n",
+        "{body}\n.control\nsetseed {SEED}\nlet i = 0\ndowhile i < {N}\n  mc_source\n  op\n  print {}\n  let i = i + 1\nend\n.endc\n.end\n",
         print.join(" ")
     );
     let dir = tempfile::tempdir().unwrap();
@@ -164,6 +208,16 @@ fn runs(deck: &str, probes: &[&str]) -> Vec<Vec<f64>> {
         String::from_utf8_lossy(&out.stderr)
     );
     rows
+}
+
+/// E[1k/(2k + d)] for d normal with std `s`, to second order (doc of T-N0).
+fn gauss_mean(s: f64) -> f64 {
+    0.5 + 1e3 * s * s / 8e9
+}
+
+/// E[1k/(2k + d)] for d uniform on [-a, a], exactly (doc of T-N0).
+fn unif_mean(a: f64) -> f64 {
+    1e3 / (2.0 * a) * ((2e3 + a) / (2e3 - a)).ln()
 }
 
 fn mean(x: &[f64]) -> f64 {
