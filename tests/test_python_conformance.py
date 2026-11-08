@@ -271,7 +271,7 @@ EXPECTED = {
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'M_three_node': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0105', OK, OK),
+    'M_three_node': (OK, OK, OK, 'W0050+W0053', OK, 'W0104+W0105', 'W0105', OK, OK),
     'J': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
