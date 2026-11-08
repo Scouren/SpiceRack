@@ -7,6 +7,8 @@ temperature, initial conditions, saves, measures, step sweeps.
 These tests do NOT require a simulator backend -- they only test
 the Python binding layer and netlist generation.
 
+Oracle: the expected netlist lines and Python errors, written by hand.
+
 Run: maturin develop && pytest tests/test_python_simulator.py -v
 """
 import math

@@ -1,6 +1,8 @@
 """
 Python tests for the unit system via PyO3 bindings.
 
+Oracle: SI prefix values by hand (1k = 1000, 10p = 1e-11).
+
 Run with: maturin develop && pytest tests/
 """
 import pytest

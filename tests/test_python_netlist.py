@@ -4,6 +4,9 @@ Comprehensive netlist generation tests.
 Covers: every component type, waveform sources, directives, edge cases,
 unit integration, element access, subcircuit instances, ground aliasing.
 
+Oracle: the expected netlist lines, written by hand from each card's syntax
+(ngspice manual §2, §3).
+
 Run: maturin develop && pytest tests/test_python_netlist.py -v
 """
 import pytest
