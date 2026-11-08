@@ -98,14 +98,14 @@ BSIM4_rbodymod2/test6.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-
 BSIM4_rbodymod2/test7.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.000787288180101079+0i vs -0.0007855676604010845+0i at 1.04 (tol 1.715e-6)
 BSIM4_rbodymod2/test8.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: 0.0006377548705301063+0i vs 0.0006341088345945861+0i at -0.32 (tol 3.644e-6)
 BSIM4_rbodymod2/test9.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: 0.0004570215678821272+0i vs 0.00045241179241321594+0i at -0.1 (tol 4.413e-6)
-BSIM4_v4p82/test1.cir mismatch # dc VB#branch: 0.0000000003897007659907384+0i vs 0.00000000039463253725172804+0i at 0 (tol 3.038e-12)
+BSIM4_v4p82/test1.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VB#branch: 0.0000000003897007659907384+0i vs 0.00000000039463253725172804+0i at 0 (tol 3.038e-12)
 BSIM4_v4p82/test10.cir mismatch # dc VD#branch: 0.000004902537151799217+0i vs 0.0000006787565130319457+0i at -0.54 (tol 4.197e-6)
 BSIM4_v4p82/test13.cir mismatch # dc VB#branch: -0.000000000000863163618384237+0i vs -0.00000000000601262815415615+0i at -0.9400000000000001 (tol 4.379e-12)
 BSIM4_v4p82/test14.cir mismatch # dc VB#branch: -0.000000000010741322246667632+0i vs -0.0000000000019144600400381225+0i at -0.86 (tol 8.800e-12)
 BSIM4_v4p82/test2.cir mismatch # dc VD#branch: -0.000006502855519505791+0i vs -0.00003662113752685598+0i at 0.02 (tol 1.455e-5)
 BSIM4_v4p82/test3.cir mismatch # dc VD#branch: -0.000013933958316252117+0i vs -0.0000018735974903101735+0i at 0.3 (tol 1.198e-5)
-BSIM4_v4p82/test4.cir mismatch # dc VG#branch: -0.0000003022213384545269+0i vs -0.00000030423459969342037+0i at 0.98 (tol 1.922e-9)
-BSIM4_v4p82/test5.cir mismatch # dc VB#branch: 0.00000000028683609587065034+0i vs 0.0000000002903466190325219+0i at 1.1800000000000002 (tol 3.115e-12)
+BSIM4_v4p82/test4.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VG#branch: -0.0000003022213384545269+0i vs -0.00000030423459969342037+0i at 0.98 (tol 1.922e-9)
+BSIM4_v4p82/test5.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VB#branch: 0.00000000028683609587065034+0i vs 0.0000000002903466190325219+0i at 1.1800000000000002 (tol 3.115e-12)
 BSIM4_v4p82/test6.cir mismatch # dc VB#branch: 0.0000000000008195172562568242+0i vs 0.000000000004367499722342906+0i at 0.94 (tol 2.476e-12)
 BSIM4_v4p82/test7.cir mismatch # dc VB#branch: 0.000000000007893666877357281+0i vs 0.000000000001628247732900881+0i at 0.86 (tol 4.658e-12)
 BSIM4_v4p82/test9.cir mismatch # dc VD#branch: 0.00000039540721427983133+0i vs 0.000006000829804207352+0i at -0.54 (tol 5.544e-6)
@@ -185,8 +185,8 @@ Certification_Tests/BUG_1041_SON/mos3_invert_scale2Ref.cir simulator-differs:ref
 Certification_Tests/BUG_1041_SON/mos3_invert_scaleRef.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.0018153640726264885 leaves the tube at t=0.0000015043422539743238 (tol 1.815e-5)
 Certification_Tests/BUG_1041_SON/mos6_invert_scale.cir mismatch # tran IN: 4.925429859607785 leaves the tube at t=0.00000150040625 (tol 5.000e-2)
 Certification_Tests/BUG_1041_SON/mos6_invert_scale2.cir mismatch # tran IN: 4.925429859607785 leaves the tube at t=0.00000150040625 (tol 5.000e-2)
-Certification_Tests/BUG_1041_SON/mos6_invert_scale2Ref.cir mismatch # tran VOUT: -0.31416975891954935 leaves the tube at t=0.000001502336162865126 (tol 4.426e-2)
-Certification_Tests/BUG_1041_SON/mos6_invert_scaleRef.cir mismatch # tran VOUT: -0.31416975891954935 leaves the tube at t=0.000001502336162865126 (tol 4.426e-2)
+Certification_Tests/BUG_1041_SON/mos6_invert_scale2Ref.cir simulator-differs:third-simulator reason=S-MOS6-XYCE-LAMBDA proof=s-mos6-xyce-lambda.md # tran VOUT: -0.31416975891954935 leaves the tube at t=0.000001502336162865126 (tol 4.426e-2)
+Certification_Tests/BUG_1041_SON/mos6_invert_scaleRef.cir simulator-differs:third-simulator reason=S-MOS6-XYCE-LAMBDA proof=s-mos6-xyce-lambda.md # tran VOUT: -0.31416975891954935 leaves the tube at t=0.000001502336162865126 (tol 4.426e-2)
 Certification_Tests/BUG_1041_SON/vdmos_tran_scale.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 3 4 2 0 irf130 w=0.386e6 l=2.5 | Simulation interrupted due to error! | Error: circuit no
 Certification_Tests/BUG_1041_SON/vdmos_tran_scale2.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 3 4 2 0 irf130 w=0.386e6 l=2.5 | Simulation interrupted due to error! | Error: circuit no
 Certification_Tests/BUG_1041_SON/vdmos_tran_scale2Ref.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 3 4 2 0 irf130 w=0.386 l=2.5u | Simulation interrupted due to error! | Error: circuit not
@@ -341,7 +341,7 @@ Certification_Tests/BUG_967/bug_967.cir mismatch # tran V(2): 0.0000021103682875
 Certification_Tests/BUG_981_SON/bug981A.cir mismatch # tran V(1): 5.160602794142788 leaves the tube at t=0.001 (tol 6.967e-2)
 Certification_Tests/BUG_981_SON/bug981B.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_983_SON/jfet.cir mismatch # tran VDS1#branch: 338.9491718773294 leaves the tube at t=0.0000000010000006103515626 (tol 3.741e0)
-Certification_Tests/BUG_983_SON/mesfet.cir mismatch # tran: stop time Some(9.999999999999999e-6) -> Some(1.0000014699384472e-9)
+Certification_Tests/BUG_983_SON/mesfet.cir simulator-differs:third-simulator reason=O-NG-STOPS proof=bug983-mesfet.md # tran: stop time Some(9.999999999999999e-6) -> Some(1.0000014699384472e-9)
 Certification_Tests/BUG_983_SON/mosfet.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.00177123610662972 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
 Certification_Tests/BUG_983_SON/nsoi.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran NB: 0.5171929477276188 leaves the tube at t=0.0000015256206272468985 (tol 5.178e-3)
 Certification_Tests/BUG_983_SON/nsoi4.cir target-fails # no raw file .cross_sim_out.raw: Error on line 12 or its substitute:: mn1 nda ng ns ne nb cmosn l=0.258u w=19.585u | Simulation interrupted due to error! | Error
@@ -358,7 +358,7 @@ Certification_Tests/ISSUE_239/mos2_test2Ref.cir mismatch # tran VDDDEV#branch: -
 Certification_Tests/ISSUE_239/mos3_test2.cir mismatch # tran IN: 4.930539007175088 leaves the tube at t=0.00000150040625 (tol 5.000e-2)
 Certification_Tests/ISSUE_239/mos3_test2Ref.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.0018153640726264885 leaves the tube at t=0.0000015043422539743238 (tol 1.815e-5)
 Certification_Tests/ISSUE_239/mos6_test2.cir mismatch # tran IN: 4.925429859607785 leaves the tube at t=0.00000150040625 (tol 5.000e-2)
-Certification_Tests/ISSUE_239/mos6_test2Ref.cir mismatch # tran VDDDEV#branch: 0.0005519372666014815 leaves the tube at t=0.000003009818370751337 (tol 1.326e-5)
+Certification_Tests/ISSUE_239/mos6_test2Ref.cir simulator-differs:third-simulator reason=S-MOS6-XYCE-LAMBDA proof=s-mos6-xyce-lambda.md # tran VDDDEV#branch: 0.0005519372666014815 leaves the tube at t=0.000003009818370751337 (tol 1.326e-5)
 Certification_Tests/ISSUE_239/vdmos_test2.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 3 4 2 0 irf130 w=0.386e6 l=    2.215085376580802e+00 | Simulation interrupted due to erro
 Certification_Tests/ISSUE_239/vdmos_test2Ref.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 3 4 2 0 irf130 w=0.386e6u l=    2.215085376580802e-06 | Simulation interrupted due to err
 Certification_Tests/ISSUE_267/test_a1.cir mismatch # op V(2): 0.16666666666666669+0i vs 0.33333333333333337+0i at 0 (tol 3.353e-4)
@@ -471,7 +471,7 @@ ISFFM/isffm.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=ha
 JUNCAP200/DiodeClipper.cir mismatch # tran V(2): -0.014465014665564614 leaves the tube at t=0.0005824469561641759 (tol 7.542e-2)
 LTRA/ltra1.cir mismatch # tran V(100): 0.46681337015201163 leaves the tube at t=0.000000011304608227824232 (tol 5.610e-2)
 LTRA/ltra2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V1#branch: 0.0069574881183347495 leaves the tube at t=0.0000000021328134031570598 (tol 3.291e-4)
-LTRA/ltra3.cir mismatch # tran V(3): 0.37630219503443 leaves the tube at t=0.000000031753987916230536 (tol 8.116e-3)
+LTRA/ltra3.cir simulator-differs:third-simulator reason=S-LTRA3-LADDER proof=ltra3-ladder.md # tran V(3): 0.37630219503443 leaves the tube at t=0.000000031753987916230536 (tol 8.116e-3)
 LTRA/square-wave-gen-resistor-compact.cir slow # quarantined
 LTRA/square-wave-gen-resistor.cir slow # quarantined
 LUMPEDLINE/baselineLumpedLine.cir mismatch # tran 1B: -0.14498790723931973 leaves the tube at t=0.0000006334134722967974 (tol 1.178e-2)
@@ -542,7 +542,7 @@ MODEL_BINNING/comparatorBinning_forGlobal.cir mismatch # tran V(1): -0.376285159
 MODEL_BINNING/complicatedLW.cir target-fails # no raw file .cross_sim_out.raw: Error on line 21 or its substitute:: m.xinv1.xmn1.mnfet vout in 0 0 0 cmosn w=    4.000000000000000e-06     l=    1.500000000000
 MODEL_BINNING/globalPar_comparatorBaseline.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 MODEL_BINNING/globalPar_comparatorBinning.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
-MOS6/invert_mos6.cir mismatch # tran VOUT: -0.31416975891954935 leaves the tube at t=0.000001502336162865126 (tol 4.426e-2)
+MOS6/invert_mos6.cir simulator-differs:third-simulator reason=S-MOS6-XYCE-LAMBDA proof=s-mos6-xyce-lambda.md # tran VOUT: -0.31416975891954935 leaves the tube at t=0.000001502336162865126 (tol 4.426e-2)
 MOSFET_ParamAliases/invert1.cir mismatch # tran VDDDEV#branch: -0.001771236106629716 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
 MOSFET_ParamAliases/invert1_alt.cir mismatch # tran VDDDEV#branch: -0.001771236106629716 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
 MOSFET_ParamAliases/invert2.cir mismatch # tran VDDDEV#branch: -0.0017813441098159942 leaves the tube at t=0.0000015043416796341296 (tol 1.803e-5)
