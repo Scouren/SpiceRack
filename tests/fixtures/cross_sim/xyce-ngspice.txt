@@ -98,7 +98,6 @@ BSIM4_rbodymod2/test6.X.cir mismatch # dc VDS#branch: -0.0002975276275886967+0i 
 BSIM4_rbodymod2/test7.X.cir mismatch # dc VDS#branch: -0.000787288180101079+0i vs -0.0007855676604010845+0i at 1.04 (tol 1.715e-6)
 BSIM4_rbodymod2/test8.X.cir mismatch # dc VDS#branch: 0.0006377548705301063+0i vs 0.0006341088345945861+0i at -0.32 (tol 3.644e-6)
 BSIM4_rbodymod2/test9.X.cir mismatch # dc VDS#branch: 0.0004570215678821272+0i vs 0.00045241179241321594+0i at -0.1 (tol 4.413e-6)
-BSIM4_v4p7/gain-stage1-bsim4p7.cir mismatch # noise inoise_spectrum: 0.00000233673532947144+0i vs 0.00000023226998520705779+0i at 100000000 (tol 2.016e-6)
 BSIM4_v4p82/test1.cir mismatch # dc VB#branch: 0.0000000003897007659907384+0i vs 0.00000000039463253725172804+0i at 0 (tol 3.038e-12)
 BSIM4_v4p82/test10.cir mismatch # dc VD#branch: 0.000004902537151799217+0i vs 0.0000006787565130319457+0i at -0.54 (tol 4.197e-6)
 BSIM4_v4p82/test13.cir mismatch # dc VB#branch: -0.000000000000863163618384237+0i vs -0.00000000000601262815415615+0i at -0.9400000000000001 (tol 4.379e-12)
@@ -573,7 +572,6 @@ MVS2/etsoi.cir target-fails # ngspice swapped the model: Level must be < 99 (Set
 MVS2/hemt.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 4 or its substitute:: m1 drain gate source mvs_2_0_0_hemt | not enough nodes 
 Message/Topology/Supernode_Warning.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
 NJFET_DC/njfet-2109.cir mismatch # dc VDS#branch: -0.0001649032985970153+0i vs -0.001912651242304979+0i at 1 (tol 8.281e-7)
-NOISE/gain-stage_b3.cir mismatch # noise inoise_spectrum: 0.019582390048204026+0i vs 0.0019582604835444903+0i at 100 (tol 4.116e-5)
 Nonlinear/ConvergenceTests/NLStrategy2.cir mismatch # tran V(1): -0.3762875070434149 leaves the tube at t=0.000000010954772022827602 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/NLStrategy5.cir mismatch # tran V(1): -0.3762862707533511 leaves the tube at t=0.000000010954800834658948 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/NLStrategy6.cir mismatch # tran V(1): -0.3762850999920565 leaves the tube at t=0.000000010954828121258379 (tol 2.277e-2)

@@ -48,6 +48,10 @@ pub struct Tol {
     /// The writer noted outputs the target writes no vector for (W0052: an
     /// integrated noise, an `@dev[param]`): the reference's are not compared.
     pub noted_drops: bool,
+    /// A source's AC magnitude is not 1: the input-referred noise is
+    /// divided by it in Xyce, not in ngspice (G-NOISE-INPUT-REF), so it is
+    /// not compared.
+    ac_scaled: bool,
 }
 
 /// RELTOL, VNTOL, ABSTOL and GMIN, the defaults both simulators share.
@@ -104,10 +108,12 @@ impl Tol {
             abstol: ABSTOL,
             autonomous: true,
             noted_drops: false,
+            ac_scaled: false,
         };
         for line in decks.iter().flat_map(|d| d.lines()) {
             let l = line.trim_start().to_ascii_lowercase();
             t.autonomous &= !waveform_source(&l);
+            t.ac_scaled |= ac_magnitude(&l).is_some_and(|m| m != 1.0);
             if !l.starts_with(".option") {
                 continue;
             }
@@ -138,8 +144,17 @@ impl Tol {
 fn kind(p: &RawData) -> &'static str {
     let scale = p.variables.first();
     let named = |n: &str| scale.is_some_and(|v| v.name.eq_ignore_ascii_case(n));
-    if p.plot_name.to_ascii_lowercase().contains("noise") {
-        return if p.re(0).len() <= 1 { "total" } else { "noise" };
+    let name = p.plot_name.to_ascii_lowercase();
+    if name.contains("noise") {
+        // By name where the simulator gives one (ngspice: "Noise Spectral
+        // Density Curves", "Integrated Noise"): a one-point spectrum is
+        // still a spectrum.
+        return match (name.contains("integrated"), name.contains("density")) {
+            (true, _) => "total",
+            (_, true) => "noise",
+            _ if p.re(0).len() <= 1 => "total",
+            _ => "noise",
+        };
     }
     // A complex plot is an ac sweep, one point or many (`.ac dec 1 1k 1k`);
     // a real one-point plot an operating point whatever its scale (Xyce's
@@ -237,7 +252,9 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         .fold(0.0, f64::max);
     let mut shared = 0;
     for (i, v) in a.variables.iter().enumerate().skip(first) {
-        if t.noted_drops && v.name.contains('@') {
+        if t.noted_drops && v.name.contains('@')
+            || t.ac_scaled && v.name.to_ascii_lowercase().starts_with("inoise")
+        {
             continue;
         }
         let Some(&j) = in_b.get(&normal(&v.name)) else {
@@ -316,6 +333,21 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// The AC magnitude an independent source `line` (lower case) gives,
+/// `ac <mag>` or `ac=<mag>`; `None` when it gives none.
+fn ac_magnitude(line: &str) -> Option<f64> {
+    if !line.starts_with(['v', 'i']) {
+        return None;
+    }
+    let w: Vec<&str> = line.split_whitespace().collect();
+    let k = w.iter().position(|x| *x == "ac" || x.starts_with("ac="))?;
+    let v = match w[k].strip_prefix("ac=") {
+        Some(v) if !v.is_empty() => v,
+        _ => w.get(k + 1)?.trim_start_matches('='),
+    };
+    spicerack::unit::parse_spice_number(v).map(|(x, _, _)| x)
 }
 
 /// Whether `line` (lower case) is an independent V or I source with a

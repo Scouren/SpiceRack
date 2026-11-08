@@ -1882,7 +1882,6 @@ ngspice/examples/various/bjt_ac_par.sp simulator-fails # no raw file .cross_sim_
 ngspice/examples/various/diode_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @d1[gd]: d1 has no variable 'gd'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/roessler-attractor.sp simulator-differs # tran v(x): 6.2592552217138575 leaves the tube at t=153.61596000036945 (tol 1.143e-1)
 ngspice/examples/various/tmp-noise-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: b2  2 0  i=v(1) tc1=0.001 | Error: .cross_sim_deck.sp: ParseError
-ngspice/examples/various/tmp-noise.sp mismatch # plots ["op", "op", "total", "total"] became ["op", "op", "total", "total", "total", "total"]
 ngspice/examples/various/todo-temper-3.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
 ngspice/examples/vbic/npn_gum.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/examples/vbic/npn_out.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
