@@ -69,33 +69,25 @@ impl Deck {
     /// `UserWarning`, its message `spicerack <deck>:<line>:<col>: <code>
     /// <title>`.
     pub(super) fn netlist(&self, backend: &str) -> PyResult<String> {
-        let built_in = Dialect::from_backend_name(&backend.to_ascii_lowercase())
-            .filter(|d| render::writes(*d));
-        let d = built_in
+        let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
+            .filter(|d| render::writes(*d))
             .map(Lang::from)
             .or_else(|| super::def_::plugin(backend))
             .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
-        let deck = self.lowered()?;
-        let text = deck.write_to(d).map_err(PyRuntimeError::new_err)?;
-        // ponytail: a built-in target's notes; a plugin's hooks run in
-        // `write_to` only, so its notes are not re-derived here.
-        if let Some(b) = built_in {
-            let notes = deck.write_with(b.into(), |src, l| {
-                render::render(src, l)
-                    .map(|w| w.notes.messages)
-                    .map_err(|e| e.messages)
-            });
-            Python::with_gil(|py| -> PyResult<()> {
-                let category = py.get_type::<pyo3::exceptions::PyUserWarning>();
-                for line in notes.unwrap_or_default().lines().filter(|l| !l.is_empty()) {
-                    let msg = std::ffi::CString::new(format!("spicerack {line}"))
-                        .expect("a message has no NUL");
-                    PyErr::warn(py, &category, &msg, 1)?;
-                }
-                Ok(())
-            })?;
-        }
-        Ok(text)
+        let written = self
+            .lowered()?
+            .write_to(d)
+            .map_err(PyRuntimeError::new_err)?;
+        Python::with_gil(|py| -> PyResult<()> {
+            let category = py.get_type::<pyo3::exceptions::PyUserWarning>();
+            for line in written.notes.messages.lines().filter(|l| !l.is_empty()) {
+                let msg = std::ffi::CString::new(format!("spicerack {line}"))
+                    .expect("a message has no NUL");
+                PyErr::warn(py, &category, &msg, 1)?;
+            }
+            Ok(())
+        })?;
+        Ok(written.text)
     }
 
     /// Runs the deck on `backend` (`None`: the best installed one for its
@@ -234,7 +226,7 @@ impl Deck {
                     lang.name()
                 ))
             })?;
-            return Ok((sim, deck.write_to(lang).map_err(runtime_err)?));
+            return Ok((sim, deck.write_to(lang).map_err(runtime_err)?.text));
         }
         let first = deck.analyses().first().map_or(Kind::Op, Analysis::kind);
         let writes = |d| deck.write(d).is_ok();
@@ -306,18 +298,19 @@ impl Deck {
         self.write_with(d.into(), plain)
     }
 
-    /// The deck written for `lang`, a plugin's Python hooks called.
-    fn write_to(&self, lang: Lang) -> Result<String, String> {
+    /// The deck written for `lang` with its notes, a plugin's Python hooks
+    /// called.
+    fn write_to(&self, lang: Lang) -> Result<render::Written, String> {
         self.write_with(lang, super::def_::render)
     }
 
     /// The deck rendered for `lang` by `render`: its ngspice source for the
     /// built-in in `lang`'s chain.
-    fn write_with(
+    fn write_with<T>(
         &self,
         lang: Lang,
-        render: impl Fn(&render::Source, Lang) -> Result<String, String>,
-    ) -> Result<String, String> {
+        render: impl Fn(&render::Source, Lang) -> Result<T, String>,
+    ) -> Result<T, String> {
         let name = self.top.name.as_str();
         let source = self.source(super::def_::builtin_of(lang))?;
         let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
