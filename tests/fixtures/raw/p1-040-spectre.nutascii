@@ -1,0 +1,16 @@
+Title: p1-040 RC divider
+Date: Sat Nov 7 2026
+Plotname: DC Analysis `op1'
+Flags: real
+No. Variables: 4
+No. Points: 1
+Variables:
+	0	dummy	voltage
+	1	in	voltage
+	2	out	voltage
+	3	v1:p	current
+Values:
+ 0	0.0
+	2.0
+	0.6666667
+	-0.0006667

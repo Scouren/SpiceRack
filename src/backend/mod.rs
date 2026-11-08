@@ -494,10 +494,10 @@ fn read_results(path: &Path, stdout: String) -> Result<Vec<RawData>, BackendErro
         ))
     })?;
     // Spectre's PSF keeps its magic in the trailer. It is not read: the
-    // Spectre backend asks for `-format nutbin`.
+    // Spectre backend asks for `-format nutascii`.
     if bytes.len() >= 12 && &bytes[bytes.len() - 12..bytes.len() - 4] == b"Clarissa" {
         return Err(BackendError::SimulationError(
-            "PSF output is not read; run Spectre with -format nutbin".into(),
+            "PSF output is not read; run Spectre with -format nutascii".into(),
         ));
     }
     let mut plots = rawfile::parse_raw_all(&bytes)?;

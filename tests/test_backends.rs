@@ -293,3 +293,27 @@ fn p1_007_ltspice_runs_one_analysis_per_deck() {
             .for_each(|&v| assert!((v - 0.5).abs() < 1e-6, "{k:?}: {v}"));
     }
 }
+
+#[test]
+fn p1_040_p1_047_spectre_nutascii_and_nutbin_read() {
+    // tests/fixtures/raw/p1-040-spectre.nutascii and p1-047-spectre.nutbin
+    // (README): Spectre 25.1's op plot as settle-remote recorded it (ZERO
+    // D43), its nutbin big-endian IEEE f64. Both read to the recorded names
+    // and values, the binary twin exactly equal to the text one.
+    let read = |f: &str| {
+        let p = format!("{}/tests/fixtures/raw/{f}", env!("CARGO_MANIFEST_DIR"));
+        spicerack::rawfile::parse_raw(&std::fs::read(p).expect("fixture")).expect(f)
+    };
+    let (text, bin) = (
+        read("p1-040-spectre.nutascii"),
+        read("p1-047-spectre.nutbin"),
+    );
+    for r in [&text, &bin] {
+        assert_eq!(r.plot_name, "DC Analysis `op1'");
+        let names: Vec<&str> = r.variables.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(names, ["dummy", "in", "out", "v1:p"]);
+        let vals: Vec<f64> = (0..4).map(|i| r.re(i)[0]).collect();
+        assert_eq!(vals, [0.0, 2.0, 0.6666667, -6.667e-4]);
+    }
+    assert_eq!(text.real_data, bin.real_data);
+}

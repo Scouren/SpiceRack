@@ -1,4 +1,4 @@
-//! Parser for nutmeg-format `.raw` files (ngspice, VACASK, LTspice, Spectre nutbin):
+//! Parser for nutmeg-format `.raw` files (ngspice, VACASK, LTspice, Spectre nutbin and nutascii):
 //! `key: value` header lines, a `Variables:` block, then `Binary:` or `Values:` and the data.
 //! [`parse_raw`] reads the first plot; [`parse_raw_all`] reads every plot
 //! (ngspice writes one per analysis, not in card order).
@@ -222,7 +222,8 @@ fn split_steps(raw: RawData) -> Vec<RawData> {
         .collect()
 }
 
-/// Little-endian values, point-major (`p*nv + v`) or, with FastAccess,
+/// Little-endian values (Spectre's nutbin: big-endian, [`big_endian`]),
+/// point-major (`p*nv + v`) or, with FastAccess,
 /// variable-major: f64 each, or, unless `double` (an LTspice raw without
 /// its `double` flag), the scale (variable 0) f64 and the rest float32; a
 /// complex plot's pairs are f64 always (settle-api row 15, measured).
@@ -246,7 +247,14 @@ fn parse_binary(
             body.len()
         )));
     }
-    let f = |j: usize| f64::from_le_bytes(body[j * 8..j * 8 + 8].try_into().expect("8-byte slice"));
+    let big = big_endian(&raw.plot_name);
+    let f = |j: usize| {
+        let b: [u8; 8] = body[j * 8..j * 8 + 8].try_into().expect("8-byte slice");
+        match big {
+            true => f64::from_be_bytes(b),
+            false => f64::from_le_bytes(b),
+        }
+    };
     let slot = |v: usize, p: usize| width * if fast_access { v * np + p } else { p * nv + v };
     if raw.is_complex {
         raw.complex_data = (0..nv)
@@ -262,6 +270,14 @@ fn parse_binary(
             .collect();
     }
     Ok(need)
+}
+
+/// Whether a binary plot is Spectre's: Spectre names a plot after its
+/// analysis instance in `` `name' `` quotes (``DC Analysis `op1'``) and
+/// writes nutbin big-endian IEEE f64 (settle-remote P1-040, Spectre 25.1);
+/// ngspice, VACASK, Xyce and LTspice write little-endian.
+fn big_endian(plot_name: &str) -> bool {
+    plot_name.contains('`')
 }
 
 /// [`parse_binary`]'s LTspice rows: the scale f64, the rest float32,
