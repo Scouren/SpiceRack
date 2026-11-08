@@ -3,14 +3,14 @@ circuitsim90/MOS2/ab_integ.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS2/ab_opamp.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS2/gm6.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS2/hussamp.sp mismatch # plots ["op", "tran"] became ["tran"]
+circuitsim90/MOS2/nand.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+circuitsim90/MOS2/pump.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+circuitsim90/MOS2/ring.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(2): 0.51398545047556 leaves the tube at t=0.00000009053104541064522 (tol 3.055e-2)
+circuitsim90/MOS2/toronto.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(24): 1.2256894594351704 leaves the tube at t=0.0000005018600306872237 (tol 5.026e-2)
 circuitsim90/MOS2_LARGE/add20.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 2479
 circuitsim90/MOS2_LARGE/dac.sp mismatch # tran v(1085): 0.00004040824660718652 leaves the tube at t=0.00000011686888058021189 (tol 2.579e-6)
 circuitsim90/MOS2_LARGE/fadd32.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined
-circuitsim90/MOS2/nand.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-circuitsim90/MOS2/pump.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-circuitsim90/MOS2/ring.sp mismatch # tran v(2): 0.51398545047556 leaves the tube at t=0.00000009053104541064522 (tol 3.055e-2)
-circuitsim90/MOS2/toronto.sp mismatch # tran v(24): 1.2256894594351704 leaves the tube at t=0.0000005018600306872237 (tol 5.026e-2)
 circuitsim90/MOS3/arom.sp slow # quarantined
 circuitsim90/MOS3/gm17.sp mismatch # tran v(4): 4.813072814687794 leaves the tube at t=0.0000000000016000000000000003 (tol 5.000e-2)
 circuitsim90/MOS3/gm19.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
@@ -103,19 +103,12 @@ cmcqa/hicum/hicum_fgum_ac_npn_full_subcoupl_peri_con_ac.sp mismatch # ac v(therm
 cmcqa/hicum/hicum_fgum_ac_npn_full_subtran_ac.sp mismatch # ac v(therm_110): -0.13581662483485166-0.45889081839351464i vs -0.13646962966796078-0.459958550050667i at 10000000000 (tol 9.591e-4)
 cmcqa/hicum/hicum_fgum_ac_npn_internal_ac.sp mismatch # ac i(vbase_185): 0.0009059039559979125+0.004899185428832291i vs 0.0009397529520157186+0.004895236355008448i at 10000000000 (tol 1.471e-5)
 cmcqa/hicum/hicum_fgum_ac_npn_lat_nqs_ac.sp mismatch # ac i(vbase_185): 0.0011685201555989878+0.005361147642093037i vs 0.0012033592925459221+0.005353931840568101i at 10000000000 (tol 1.613e-5)
-cmcqa/hicum/hicum_fout_npn_1D_npn_1D_breakdown.sp mismatch # dc i(vsubs_6): 0.0000000000020500000000000008+0i vs 0+0i at 2.0500000000000007 (tol 2.012e-12)
-cmcqa/hicum/hicum_fout_npn_1D_npn_1D_no_aval.sp mismatch # dc i(vsubs_6): 0.0000000000020500000000000008+0i vs 0+0i at 2.0500000000000007 (tol 2.012e-12)
-cmcqa/hicum/hicum_fout_npn_1D_npn_1D.sp mismatch # dc i(vsubs_6): 0.0000000000020500000000000008+0i vs 0+0i at 2.0500000000000007 (tol 2.012e-12)
 cmcqa/hicum/hicum_fout_npn_1D_npn_cornoise.sp mismatch # plots ["op"] became ["dc"]
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_sh.sp mismatch # plots ["op"] became ["dc"]
-cmcqa/hicum/hicum_fout_npn_1D_npn_full.sp mismatch # dc i(vsubs_6): 0.0000000000020131513789707312+0i vs -0.00000000000000000000000000000000000000000002473069176784421+0i at 2.0500000000000007 (tol 2.010e-12)
+cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl.sp mismatch # plots ["op"] became ["dc"]
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl_peri_bias.sp mismatch # plots ["op"] became ["dc"]
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl_peri_con.sp mismatch # plots ["op"] became ["dc"]
-cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl.sp mismatch # plots ["op"] became ["dc"]
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_subtran.sp mismatch # plots ["op"] became ["dc"]
-cmcqa/hicum/hicum_fout_npn_1D_npn_internal.sp mismatch # dc i(vsubs_6): 0.0000000000020500000000000008+0i vs 0+0i at 2.0500000000000007 (tol 2.012e-12)
-cmcqa/hicum/hicum_fout_npn_1D_npn_lat_nqs.sp mismatch # dc i(vsubs_6): 0.0000000000020500000000000008+0i vs 0+0i at 2.0500000000000007 (tol 2.012e-12)
-cmcqa/hicum/hicum_fout_npn_1D_npn_vert_nqs.sp mismatch # dc i(vsubs_6): 0.0000000000020500000000000008+0i vs 0+0i at 2.0500000000000007 (tol 2.012e-12)
 cmcqa/hicum/hicum_noise_npn_cornoise_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
 cmcqa/hicum/hicum_noise_npn_cornoise_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
 cmcqa/hicum/hicum_noise_npn_cornoise_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
@@ -136,8 +129,8 @@ cmcqa/hicum/hicum_noise_npn_full_subtran_ac_3.sp mismatch # plots ["noise", "tot
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/control_structs/if-batchmode.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: ALL | Simulation aborted due to error.  There are 0 MSG_FATAL err
 ngspice/examples/ddt/ddt-test3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-ngspice/examples/hicum2/hic2_gum_inv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/examples/hicum2/hic2_gum.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
+ngspice/examples/hicum2/hic2_gum_inv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/examples/hicum2/hic2_noise.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/examples/hicum2/hic2_tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/examples/measure/func_cap.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {{max(icap_calc(1,2,3,4))}} | Netlist error: syntax error in expression {{max(icap_cal
@@ -150,13 +143,12 @@ ngspice/examples/mos/nmos_pmos_BSIM330.sp target-fails # no raw file .cross_sim_
 ngspice/examples/mos/nmos_pmos_BSIM482.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 16
 ngspice/examples/mos/nmos_pmos_drainresistor.sp slow # quarantined
 ngspice/examples/mos/nmos_pmos_plotting.sp target-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 18
-ngspice/examples/mos/ro_17_4.sp mismatch # tran i(vdd): -0.3335242810047126 leaves the tube at t=0.0000000000010000000000000002 (tol 3.335e-3)
 ngspice/examples/mos/ro-meas.sp mismatch # tran v(xro.n2): 0.7617871250767438 leaves the tube at t=0.0000000008145599999999978 (tol 1.576e-2)
 ngspice/examples/noise/resdiv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
 ngspice/examples/p-to-n-examples/logic.sp mismatch # tran v(1): 1.5 leaves the tube at t=0 (tol 1.500e-2)
 ngspice/examples/p-to-n-examples/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/p-to-n-exampl
-ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.x1.net.1): 1.6918072410561842 leaves the tube at t=0.0000006064999999999999 (tol 1.918e-2)
 ngspice/examples/snapshot/adder_mos.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/snapshot/adde
+ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.x1.net.1): 1.6918072410561842 leaves the tube at t=0.0000006064999999999999 (tol 1.918e-2)
 ngspice/examples/soa/nic_soa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/examples/soi/Inv_chain.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
 ngspice/examples/soi/inv_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
@@ -166,19 +158,19 @@ ngspice/examples/various/roessler-attractor.sp mismatch # tran v(x): -7.55996730
 ngspice/examples/various/tmp-noise.sp mismatch # plots ["ac", "noise", "noise", "op"] became ["ac", "op"]: two one-point .noise spectra, now paired by plot name (P1-015), have no Xyce counterpart (Xyce runs one .NOISE; not triaged)
 ngspice/examples/vbic/DFF_Y_ECL.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/examples/vbic/npn_gum.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/qnva.mod
-ngspice/examples/vbic/npn_out_qs.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/Infineon
 ngspice/examples/vbic/npn_out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/qnva.mod
+ngspice/examples/vbic/npn_out_qs.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/Infineon
 ngspice/examples/vbic/vbic99_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/examples/vbic/vbic99_tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/examples/vbic/vbic_ac_par.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/Infineon
-ngspice/iscas85/c1355/c1355_ann.sp slow # quarantined
 ngspice/iscas85/c1355/c1355.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+ngspice/iscas85/c1355/c1355_ann.sp slow # quarantined
 ngspice/iscas85/c1908/c1908.sp slow # quarantined
 ngspice/iscas85/c432/c432.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-ngspice/iscas85/c499/c499_ann.sp slow # quarantined
 ngspice/iscas85/c499/c499.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-ngspice/iscas85/c880/c880_ann.sp slow # quarantined
+ngspice/iscas85/c499/c499_ann.sp slow # quarantined
 ngspice/iscas85/c880/c880.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
+ngspice/iscas85/c880/c880_ann.sp slow # quarantined
 ngspice/paranoia/measure/func_cap.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {{max(icap_calc(1,2,3,4))}} | Netlist error: syntax error in expression {{max(icap_cal
 ngspice/paranoia/measure/mos-meas-dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: node 1 | Simulation aborted due to error.  There are 0 MSG_FATAL 
 ngspice/paranoia/measure/rc-meas-ac.sp mismatch # ac: sweep grid changed (41 -> 34 points)
@@ -202,22 +194,22 @@ ngspice/tests/bsim3soidd/t4.sp target-fails # no raw file .cross_sim_out.raw: Ne
 ngspice/tests/bsim3soidd/t5.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/bsim3soipd/ring51.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type TRAN are inconsistent. | Simulation aborted due to error.  There are 0 MSG_FATAL 
 ngspice/tests/bsim3soipd/t4.sp mismatch # dc i(vb): 0+0i vs -0.000000000006278979391451045+0i at 0 (tol 2.000e-12)
-ngspice/tests/general/fourbitadder.sp mismatch # tran v(x1.x1.x1.x5.8): -0.0006232238726266992 leaves the tube at t=0.0000000036177435765459917 (tol 2.519e-5)
-ngspice/tests/general/rca3040.sp mismatch # plots ["ac", "dc", "tran"] became ["tran"]
+ngspice/tests/general/fourbitadder.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(x1.x1.x1.x5.8): -0.0006232238726266992 leaves the tube at t=0.0000000036177435765459917 (tol 2.519e-5)
 ngspice/tests/general/rc.sp mismatch # tran v(1): 0.011117920800000002 leaves the tube at t=0.0011117920800000002 (tol 1.000e-2)
+ngspice/tests/general/rca3040.sp mismatch # plots ["ac", "dc", "tran"] became ["tran"]
 ngspice/tests/hfet/id_vgs.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/hfet/inverter.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/tests/jfet/jfet_vds-vgs.sp mismatch # plots ["dc", "op"] became ["dc"]
+ngspice/tests/mes/subth.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: VIDS#BRANCH | Simulation aborted due to error.  There are 0 MSG_F
+ngspice/tests/mesa/mesa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
 ngspice/tests/mesa/mesa11.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/mesa/mesa13.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type VIG#BRANCH are inconsistent. | Simulation aborted due to error.  There are 0 MSG_
 ngspice/tests/mesa/mesa14.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
 ngspice/tests/mesa/mesa15.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/mesa/mesa21.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type VIDS#BRANCH are inconsistent. | Simulation aborted due to error.  There are 0 MSG
-ngspice/tests/mesa/mesa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
 ngspice/tests/mesa/mesgout.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/mesa/mesinv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
 ngspice/tests/mesa/mesosc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
-ngspice/tests/mes/subth.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: VIDS#BRANCH | Simulation aborted due to error.  There are 0 MSG_F
 ngspice/tests/mos6/mos6inv.sp mismatch # tran i(vin): -0.00006723369385653813 leaves the tube at t=0.00000000046 (tol 6.811e-7)
 ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): -0.0000008905818325687239 leaves the tube at t=0.000000038139999999999996 (tol 9.868e-8)
 ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {100*foo0()} | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MS

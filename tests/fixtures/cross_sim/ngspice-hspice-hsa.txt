@@ -1,7 +1,7 @@
 circuitsim90/MOS2/e1480.sp target-fails # no raw file .cross_sim_out.raw: Error on line 250 or its substitute:: .tran 2n 200.00000000000003n start=1n | Error: unknown parameter on .tran - ignored | Simu
 circuitsim90/MOS2/schmitfast.sp mismatch # dc v(6): 4.99999995719043+0i vs 0.3394862400952683+0i at 1.8199999999999648 (tol 1.000e-2)
 circuitsim90/MOS2/schmitslow.sp mismatch # dc v(6): 4.379670729479332+0i vs 1.1471448442419472+0i at 2.3559999999999057 (tol 1.000e-2)
-circuitsim90/MOS3/arom.sp mismatch # tran v(52): 1.7705129455530249 leaves the tube at t=0.0000005299999999999999 (tol 4.569e-2)
+circuitsim90/MOS3/arom.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(52): 1.7705129455530249 leaves the tube at t=0.0000005299999999999999 (tol 4.569e-2)
 cmcqa/hicum/hicum_fout_npn_1D_npn_full.sp mismatch # dc v(q4#collCI): 4.390256844063931+0i vs 4.093330456988516+0i at 4.399999999999992 (tol 9.630e-3)
 cmcqa/hicum/hicum_fout_npn_1D_npn_internal.sp mismatch # dc i(vemit_3): 0.0002212157041125585+0i vs 0.25276214651232465+0i at 4.99999999999999 (tol 5.002e-7)
 cmcqa/hicum/hicum_fout_npn_1D_npn_lat_nqs.sp mismatch # dc i(vemit_3): 0.00023406346533051594+0i vs 0.3037883385545541+0i at 5.549999999999988 (tol 5.002e-7)

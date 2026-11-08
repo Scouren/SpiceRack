@@ -21,9 +21,7 @@ circuitsim90/MOS3/gm3.sp target-fails # no raw file op1.raw: convergence not all
 circuitsim90/MOS3/jge.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 53 step(s) tried.
 circuitsim90/MOS3/mike2.sp mismatch # tran i(vpulse): -0.0020017239627740935 leaves the tube at t=0.0000000010047600892638032 (tol 2.311e-5)
 circuitsim90/MOS3/rich3.sp target-fails # no raw file tran1.raw: worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 >TOL @ (unknown) | NR solver failed to converge. | Leaving core NR loop in
-ngspice/examples/control_structs/if-batchmode.sp mismatch # tran i(v0): -0.000999000999000999 leaves the tube at t=0.000001 (tol 9.990e-6)
 ngspice/examples/measure/rc-meas-ac-control.sp target-fails # no raw file ac1.raw: Refactorization failed, size=5, rank=4. | Factorization failed, size=5, rank=4, zero pivot @ node 'mid1'. | Leaving core NR loop in iterati
-ngspice/examples/mos/nmos_out_BSIM330_plainwrite.sp mismatch # dc: sweep grid changed (205 -> 246 points)
 ngspice/examples/mos/nmos_pmos_BSIM330.sp mismatch # dc: sweep grid changed (186 -> 186 points)
 ngspice/examples/mos/nmos_pmos_BSIM482.sp mismatch # dc: sweep grid changed (186 -> 186 points)
 ngspice/examples/mos/nmos_pmos_drainresistor.sp mismatch # dc: sweep grid changed (246 -> 186 points)
