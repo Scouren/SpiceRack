@@ -329,6 +329,61 @@ mod tests {
         );
     }
 
+    #[test]
+    fn vacask_cells_match_36be560() {
+        // VACASK upstream 36be560's own lists, pinned so a cell written
+        // against an older build (ZERO-LEDGER P4-001) cannot drift
+        // unnoticed: the modules `.#testing`'s `vacask` ships
+        // (`lib/vacask/mod/spice/*.osdi`; GA dossier census) and the
+        // Spectre-spelled analyses it runs though [REF] calls them
+        // Spectre's (VS dossier §3 M4; SR pp.771,748,759 and the
+        // dossier's own 36be560 runs for hbac/hbnoise, which [REF] 5.0
+        // does not have at all). `stb` is not pinned here: an existing
+        // test (`syntax::tests::render`) still claims VACASK lacks it;
+        // left for team-lead, not this row's owner files.
+        const MODULES_36BE560: &[&str] = &[
+            "bjt",
+            "bsim3v3",
+            "bsim4v8",
+            "capacitor",
+            "diode",
+            "inductor",
+            "jfet1",
+            "jfet2",
+            "mes1",
+            "mos1",
+            "mos2",
+            "mos3",
+            "mos6",
+            "mos9",
+            "resistor",
+            "vdmos",
+        ];
+        let b = Lang::from(Dialect::Vacask).behaviours();
+        for m in b.model_masters {
+            assert!(
+                MODULES_36BE560.contains(&m.master),
+                "{m:?}: no `spice/{}.osdi` at 36be560",
+                m.master
+            );
+        }
+        // NG dossier §4 M4: `spice/jfet2.osdi` (JFET LEVEL 2) ships but
+        // had no master, so a LEVEL 2 `.model` gave W0104 "no master".
+        assert!(
+            b.model_masters.iter().any(|m| m.master == "jfet2"),
+            "jfet2.osdi ships at 36be560; LEVEL 2 should have a master"
+        );
+        // VS dossier §3 M4: VACASK runs pss/pac/pnoise/hbac/hbnoise, so
+        // the target does not lack them (W0015 was false; `sp` keeps its
+        // own hardcoded refusal, and `stb` its W0015, both untouched here).
+        for kind in ["pss", "pac", "pnoise", "hbac", "hbnoise"] {
+            assert!(
+                b.spectre_analyses.contains(&kind),
+                "VACASK 36be560 runs {kind}; spectre_analyses should say so"
+            );
+        }
+    }
+
     const CONSTRUCTS: [Construct; 44] = [
         Construct::ForeignText,
         Construct::PrivateText,
