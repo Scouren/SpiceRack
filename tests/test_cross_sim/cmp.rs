@@ -23,7 +23,8 @@
 //! RELTOL, ABSTOL defaults).
 //!
 //! Contents:
-//! - `pub struct Tol`, `Tol::of(decks: &[&str]) -> Tol`
+//! - `pub struct Tol`, `Tol::of(decks: &[&str]) -> Tol` (an autonomous deck's transient by period
+//!   and peak-to-peak)
 //! - `pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String>`
 
 use std::collections::HashMap;
@@ -41,6 +42,9 @@ pub struct Tol {
     reltol: f64,
     vntol: f64,
     abstol: f64,
+    /// No independent source has a waveform: an autonomous circuit, whose
+    /// transient is compared by period and peak-to-peak.
+    autonomous: bool,
 }
 
 /// RELTOL, VNTOL, ABSTOL and GMIN, the defaults both simulators share.
@@ -94,9 +98,11 @@ impl Tol {
             reltol: RELTOL,
             vntol: VNTOL,
             abstol: ABSTOL,
+            autonomous: true,
         };
         for line in decks.iter().flat_map(|d| d.lines()) {
             let l = line.trim_start().to_ascii_lowercase();
+            t.autonomous &= !waveform_source(&l);
             if !l.starts_with(".option") {
                 continue;
             }
@@ -256,6 +262,10 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
                 .filter(|&p| xa[p] >= lo && xa[p] <= hi)
                 .collect();
             let (ta, va): (Vec<f64>, Vec<f64>) = keep.iter().map(|&p| (xa[p], ra[p])).unzip();
+            let current = v.var_type == VarType::Current;
+            if t.autonomous && oscillates_alike(&ta, &va, &xb, &rb, tol, current) {
+                continue;
+            }
             if let Some(p) = leaves_tube(&ta, &va, &xb, &rb, dx, tol) {
                 return Err(format!(
                     "tran {}: {} leaves the tube at t={} (tol {tol:.3e})",
@@ -297,6 +307,72 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// Whether `line` (lower case) is an independent V or I source with a
+/// time waveform (SPICE's and Xyce's spellings, with or without parens).
+fn waveform_source(line: &str) -> bool {
+    if !line.starts_with(['v', 'i']) {
+        return false;
+    }
+    let words = [
+        "sin", "pulse", "pwl", "exp", "sffm", "am", "trnoise", "trrandom",
+    ];
+    line.split(|c: char| c.is_whitespace() || c == '(')
+        .skip(1)
+        .any(|w| words.contains(&w))
+}
+
+/// An autonomous oscillation (mismatches.md §4.1: phases drift over many
+/// cycles, pointwise comparison fails), over the second half of each run:
+/// a node crosses its mid level at least 4 times in both, the mean periods
+/// agree to TRAN (1%) and the peak-to-peak swings to `tol`; a current
+/// (`current`: a supply's spikes, one per stage) by its mean to `tol`.
+fn oscillates_alike(
+    xa: &[f64],
+    ya: &[f64],
+    xb: &[f64],
+    yb: &[f64],
+    tol: f64,
+    current: bool,
+) -> bool {
+    let half = |x: &[f64]| x.partition_point(|&t| t < x.last().copied().unwrap_or(0.0) / 2.0);
+    let shape = |x: &[f64], y: &[f64]| -> Option<(f64, f64)> {
+        let from = half(x);
+        let (x, y) = (&x[from..], &y[from..]);
+        let (lo, hi) = y
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &v| {
+                (a.min(v), b.max(v))
+            });
+        let mid = (lo + hi) / 2.0;
+        let ups: Vec<f64> = (1..y.len())
+            .filter(|&k| y[k - 1] < mid && y[k] >= mid)
+            .map(|k| x[k - 1] + (mid - y[k - 1]) / (y[k] - y[k - 1]) * (x[k] - x[k - 1]))
+            .collect();
+        (ups.len() >= 4).then(|| {
+            (
+                (ups[ups.len() - 1] - ups[0]) / (ups.len() - 1) as f64,
+                hi - lo,
+            )
+        })
+    };
+    let mean = |x: &[f64], y: &[f64]| -> Option<f64> {
+        let from = half(x);
+        let (x, y) = (&x[from..], &y[from..]);
+        let span = x.last()? - x.first()?;
+        let area: f64 = (1..x.len())
+            .map(|k| (y[k] + y[k - 1]) / 2.0 * (x[k] - x[k - 1]))
+            .sum();
+        (span > 0.0).then(|| area / span)
+    };
+    if current {
+        return matches!((mean(xa, ya), mean(xb, yb)), (Some(a), Some(b)) if (a - b).abs() <= tol);
+    }
+    match (shape(xa, ya), shape(xb, yb)) {
+        (Some((pa, sa)), Some((pb, sb))) => (pa - pb).abs() <= TRAN * pa && (sa - sb).abs() <= tol,
+        _ => false,
+    }
 }
 
 #[cfg(test)]
