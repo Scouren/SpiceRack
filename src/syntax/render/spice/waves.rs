@@ -53,7 +53,7 @@ impl W<'_, '_> {
                     self.refuse(crate::syntax::diag::Code::W0108, tok);
                 }
             }
-            _ => {}
+            WaveKind::Pwl | WaveKind::Sin | WaveKind::Pulse | WaveKind::Exp | WaveKind::Sffm => {}
         }
     }
 
@@ -90,7 +90,13 @@ impl W<'_, '_> {
             // MDI FS). The reader keeps the source's order.
             // CDL's cards are ngspice's.
             WaveKind::Sffm if self.pair.sffm_swap => args.swap(2, 4),
-            _ => {}
+            WaveKind::Sin
+            | WaveKind::Pulse
+            | WaveKind::Pwl
+            | WaveKind::Exp
+            | WaveKind::Sffm
+            | WaveKind::Am
+            | WaveKind::Trnoise => {}
         }
         let mut s = format!("{word}({})", args.join(" "));
         if let Some(r) = &w.repeat {

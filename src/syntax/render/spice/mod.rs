@@ -323,7 +323,7 @@ impl W<'_, '_> {
                     self.ask(c, *tok);
                 }
             }
-            _ => {}
+            LoadForm::Ngspice | LoadForm::Xyce | LoadForm::None => {}
         }
         // ESPice loads a subcircuit's too (above); the others the top's.
         if self.b.load_form != LoadForm::Espice {
