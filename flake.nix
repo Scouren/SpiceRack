@@ -359,7 +359,11 @@
         devShells.testing = pkgs.mkShell {
           inputsFrom = [ dev ];
           packages = [
-            pkgs.ngspice
+            # ngspice-45 with its periodic steady-state analysis (`.pss`,
+            # manual §11.3.12), off in the default build: ZERO D5.
+            (pkgs.ngspice.overrideAttrs (o: {
+              configureFlags = (o.configureFlags or [ ]) ++ [ "--enable-pss" ];
+            }))
             openvaf
             openvafAlias
             vacask

@@ -28,7 +28,7 @@ provenance, never by re-deriving it the way the writer does.
 
 | File | Oracle |
 |---|---|
-| `test_ngspice_analyses.rs` | real ngspice; each analysis asserts a closed-form number (`.sp`: a matched T pad). `.pss`: ngspice-45 has none, so its card against the ngspice manual example (§11.3.12) |
+| `test_ngspice_analyses.rs` | real ngspice; each analysis asserts a closed-form number (`.sp`: a matched T pad). `.pss` (ngspice-45 built `--enable-pss` in `.#testing`): a van der Pol tank to its closed-form limit cycle (2 V, 5.03292 MHz), and its card against the manual example (§11.3.12) |
 | `test_espice_analyses.rs` | real ESPice; the same closed forms as the ngspice suite |
 | `test_laplace_ngspice.rs` | real ngspice 44.2; closed-form Laplace responses |
 | `test_sources/` | real ngspice (and ESPice) against the waveform closed forms: PWL `r=`/`td=`; TRNOISE/TRRANDOM against their distribution, five standard errors at N = 4000; each dialect without a form refuses. Imported ngspice PWL `r=`/`td=`, `portnum`/`z0` and `.sp`: the original deck and the deck written from it on real ngspice, every vector of every plot equal to 1e-12. Imported Spectre PWL `delay`/`pwlperiod`: the Spectre Reference 5.0 semantics (`vsource` #4, #17, #18, p.686) as the closed form, on real ngspice running the deck written from it, to 1e-9 V |

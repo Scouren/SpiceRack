@@ -401,11 +401,9 @@ fn rf_ports_are_refused_where_no_dialect_form_exists() {
 
 // ── .pss ──
 
-/// ngspice-45 as built here answers `.pss` with "unimplemented dot command"
-/// (the manual calls PSS experimental, §11.3.12), so the oracle is the
-/// manual's own example card, `.pss 624e6 1u v_plus 1024 10 150 5e-3 uic`:
-/// read and written back, it reads, token by token, as the same numbers
-/// ngspice would parse.
+/// The manual's own example card, `.pss 624e6 1u v_plus 1024 10 150 5e-3
+/// uic` (§11.3.12): read and written back, it reads, token by token, as the
+/// same numbers ngspice would parse.
 #[test]
 fn pss_card_matches_the_manual_example() {
     let manual = ".pss 624e6 1u v_plus 1024 10 150 5e-3 uic";
@@ -428,17 +426,30 @@ fn pss_card_matches_the_manual_example() {
     }
 }
 
-/// ngspice-45 here has no `.pss` at all: pinned, so a build that grows it
-/// fails this test and the manual-example golden above can become a run.
+/// ngspice-45 built with `--enable-pss` (flake.nix, ZERO D5) runs `.pss`,
+/// autonomous only (manual §11.3.12): a van der Pol tank, L 1 uH, C 1 nF
+/// and the cell i = -1m v + (1m/3) v^3, whose closed-form limit cycle has
+/// amplitude 2 V at f0 = 1/(2 pi sqrt(LC)) = 5.03292 MHz (weak
+/// nonlinearity; ESPice's own run: 2.00187 V, 5.03159 MHz). The time-domain
+/// plot holds one period: its span is 1/f.
 #[test]
-fn this_ngspice_has_no_pss() {
-    let deck = "* pss\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 159.15n\n.pss 1k 5m out 128 5 50 1e-3\n.end\n";
-    let err = Dialect::Ngspice
-        .run(deck)
-        .expect_err("ngspice-45 ran .pss: replace the golden with a run")
-        .to_string();
-    // Line 5 is the `.pss` card ("unimplemented dot command '.pss'").
-    assert!(err.contains("Error on line 5"), "{err}");
+fn pss_runs_a_van_der_pol_oscillator_to_its_limit_cycle() {
+    let deck = "* vdp\nL1 x 0 1u\nC1 x 0 1n\nB1 x 0 I=-1m*v(x)+(1m/3)*v(x)*v(x)*v(x)\n\
+                .ic v(x)=0.1\n.pss 5e6 10u x 128 10 50 1e-3 uic\n.end\n";
+    let plots = Dialect::Ngspice.run_all(deck).unwrap_or_else(|e| panic!("{e}"));
+    let td = plots
+        .iter()
+        .find(|p| p.plot_name.starts_with("Time Domain"))
+        .unwrap_or_else(|| panic!("no time-domain plot"));
+    let col = |n: &str| {
+        let i = td.variables.iter().position(|v| v.name.eq_ignore_ascii_case(n)).expect(n);
+        td.re(i).into_owned()
+    };
+    let (t, v) = (col("time"), col("v(x)"));
+    let amplitude = v.iter().fold(0.0f64, |m, x| m.max(x.abs()));
+    let f = 1.0 / (t[t.len() - 1] - t[0]);
+    assert!((amplitude - 2.0).abs() <= 0.01 * 2.0, "amplitude {amplitude}");
+    assert!((f - 5.03292e6).abs() <= 1e-3 * 5.03292e6, "f {f}");
 }
 
 // ── ngbehavior ──
