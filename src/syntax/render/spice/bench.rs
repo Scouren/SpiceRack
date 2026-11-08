@@ -334,6 +334,10 @@ impl W<'_, '_> {
     /// The analyses: from one `.control` block with `control`'s `fourier`
     /// commands ([`W::control_run`]), else one card each.
     fn run_analyses(&mut self, tb: &Tb, control: Option<&[String]>) {
+        // Paired with `W::control_run`, which decides the block.
+        if control.is_some() {
+            assert_eq!(self.b.control_block, ControlBlock::Ngspice);
+        }
         match control {
             Some(fourier) => {
                 // `fourier` reads the current plot: it follows the first

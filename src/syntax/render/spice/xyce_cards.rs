@@ -101,6 +101,8 @@ impl W<'_, '_> {
             }
         }
         out.push_str(&line[at..]);
+        // Each rewrite drops ` VAL`: never longer.
+        debug_assert!(out.len() <= line.len());
         out
     }
 }

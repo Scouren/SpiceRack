@@ -34,7 +34,8 @@ pub(super) fn xyce_globals(text: &str) -> String {
         })
     };
     let mut out = text.to_string();
-    let mut names = Vec::with_capacity(found.len());
+    let found_len = found.len();
+    let mut names = Vec::with_capacity(found_len);
     for g in found {
         let base = &g[1..];
         let name = std::iter::once(base.to_string())
@@ -44,6 +45,8 @@ pub(super) fn xyce_globals(text: &str) -> String {
         out = out.replace(g, &name);
         names.push(name);
     }
+    debug_assert!(!out.contains("$G_"), "every $G_ node renamed");
+    debug_assert_eq!(names.len(), found_len);
     let line = format!(".global {}\n", names.join(" "));
     match out.find('\n') {
         Some(i) if out.starts_with('*') => format!("{}{line}{}", &out[..=i], &out[i + 1..]),

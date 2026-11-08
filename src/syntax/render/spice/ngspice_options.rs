@@ -74,6 +74,10 @@ impl W<'_, '_> {
                 format!("{k}={v}")
             });
         }
+        assert!(
+            opts.len() <= tb.portable.len(),
+            "one option per portable option at most"
+        );
         (!opts.is_empty()).then(|| format!(".options {}", opts.join(" ")))
     }
 }
