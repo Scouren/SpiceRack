@@ -18,7 +18,8 @@
 //! line stage did, `refused` sorts what the old grammar refused, `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
-//! the model card an instance uses); `walk` steps a
+//! the model card an instance uses), `control` a `.control` block's lines
+//! (`controlled` is E/F/G/H); `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
 //!
 //! Cites: the old lowering
@@ -47,6 +48,7 @@ use blocks::Opened;
 mod analyses;
 mod blocks;
 mod cards;
+mod control;
 mod controlled;
 mod devices;
 mod elements;
@@ -601,31 +603,7 @@ impl<'a> Rd<'a> {
                 false => self.raw(n, here, true),
             },
             Tag::Data => self.raw(n, here, true),
-            Tag::Control => {
-                for &c in self.body(n) {
-                    let head = self.main(c);
-                    let last = self.line_last(head);
-                    if self.tag(c) == Tag::Analysis && self.testbench_peg(c) {
-                        acc.bench.push(Bench::Card(c));
-                    } else if scope == Scope::Top
-                        && self.t.text(head).eq_ignore_ascii_case("pre_osdi")
-                        && head < last
-                    {
-                        // ngspice manual, `pre_osdi file`: an OSDI load
-                        // before the circuit is parsed.
-                        let p = self.span(head + 1, last);
-                        acc.control_loads
-                            .push(p.trim().trim_matches('"').to_string());
-                    } else {
-                        // The script's other lines are not read.
-                        acc.notes.push(Diag::new(
-                            crate::syntax::diag::Code::W0025,
-                            self.main(c),
-                            0,
-                        ));
-                    }
-                }
-            }
+            Tag::Control => self.control(n, scope, acc),
             Tag::Instance => self.element(n, here),
             _ => self.dot_card(n, here, scope, inside, acc),
         }
