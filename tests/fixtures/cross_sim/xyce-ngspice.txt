@@ -412,17 +412,17 @@ CircuitSim90/MOS2/cram.cir mismatch # tran VD#branch: -0.001361806923229818 leav
 CircuitSim90/MOS2/g1310.cir mismatch # tran VIN#branch: -0.0004793557776083115 leaves the tube at t=0.000000019136000000000003 (tol 5.451e-6)
 CircuitSim90/MOS2/gm6.cir mismatch # tran V(13): -0.000000000000000000000083308381649482 leaves the tube at t=0 (tol 9.094e-3)
 CircuitSim90/MOS2/mux8.cir mismatch # tran V220#branch: 0.0006794012844957967 leaves the tube at t=0.00000850506497194321 (tol 1.263e-5)
-CircuitSim90/MOS2/ring.cir simulator-differs:refinement # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran V(10): 3.142914960606579 leaves the tube at t=0.0000000019570539291314028 (tol 3.143e-2)
+CircuitSim90/MOS2/ring.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran V(10): 3.142914960606579 leaves the tube at t=0.0000000019570539291314028 (tol 3.143e-2)
 CircuitSim90/MOS2/slowlatch.cir mismatch # tran VC#branch: -0.00003208714534869549 leaves the tube at t=0.000000020004375000000005 (tol 5.669e-7)
 CircuitSim90/MOS2/toronto.cir mismatch # tran V(23): 0.13259001624181715 leaves the tube at t=0.0000010021304178551478 (tol 1.757e-3)
 CircuitSim90/MOS2_LARGE/dac.cir mismatch # tran V(106): 0.008009242038937195 leaves the tube at t=0 (tol 1.005e-4)
 CircuitSim90/MOS2_LARGE/mem_plus.cir slow # quarantined
 CircuitSim90/MOS2_LARGE/sqrt.cir mismatch # tran V(174): 0.9861809899446817 leaves the tube at t=0.0000005441151506436056 (tol 1.078e-2)
 CircuitSim90/MOS2_LARGE/voter25.cir slow # quarantined
-CircuitSim90/MOS3/gm1.cir simulator-differs:refinement # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran VDD#branch: -0.00008134923541957278 leaves the tube at t=0.00000006046998421303272 (tol 6.241e-5)
+CircuitSim90/MOS3/gm1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran VDD#branch: -0.00008134923541957278 leaves the tube at t=0.00000006046998421303272 (tol 6.241e-5)
 CircuitSim90/MOS3/gm17.cir mismatch # tran V(16): -0.000000005154272335557597 leaves the tube at t=0.0000000007750000000000001 (tol 5.295e-4)
 CircuitSim90/MOS3/gm2.cir mismatch # tran VDD#branch: -0.00967087605702495 leaves the tube at t=0.000000042000000000000006 (tol 9.671e-5)
-CircuitSim90/MOS3/mike2.cir simulator-differs:refinement # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran VDD#branch: -0.27164087205083637 leaves the tube at t=0.000000015349326481991392 (tol 2.716e-3)
+CircuitSim90/MOS3/mike2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran VDD#branch: -0.27164087205083637 leaves the tube at t=0.000000015349326481991392 (tol 2.716e-3)
 CircuitSim90/MOS3/todd3.cir mismatch # tran VAMP#branch: 0.0031028311738562466 leaves the tube at t=0.0000000010915028442609008 (tol 3.103e-5)
 DIAGNOSTIC/DC_GStep.cir mismatch # dc V(5): -12.467531657381851+0i vs -0.0003898518551960948+0i at 0 (tol 2.686e-2)
 DIAGNOSTIC/DC_Ring51.cir slow # quarantined

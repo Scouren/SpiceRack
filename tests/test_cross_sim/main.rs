@@ -18,9 +18,14 @@
 //! `tests/fixtures/cross_sim/<cell>.txt`, and the lists are compared by
 //! name: an unlisted failure fails, and so does a listed deck that passes or
 //! fails in another class, until the line goes. A `mismatch` line is a
-//! wrong number in a written deck; `simulator-differs` a mismatch the
-//! target's simulator also gives on the original (ESPice reads ngspice), so
-//! the simulators disagree and the writer is cleared; `target-fails` the
+//! wrong number in a written deck; `simulator-differs:<kind>
+//! reason=<rule-id> proof=<file>` a mismatch the simulators make, not the
+//! writer: `source` the target's simulator gives it on the original too
+//! (ESPice reads ngspice), `refinement` both decks agree once refined to
+//! TMAX (TSTOP-TSTART)/2000 (both `proof=harness`), and `third-simulator`,
+//! `reference-data`, `closed-form`, `self-inconsistency` a proof file under
+//! `proof/` that settles a deck still observed as a mismatch (`listed`,
+//! mismatches.md §4.3); `target-fails` the
 //! written deck does not run; `simulator-fails` neither does the original on
 //! the target's simulator (ESPice lacks what the deck uses); `slow` a deck past the CPU budget, quarantined by name and not
 //! simulated. An original that does not run on its own simulator
@@ -373,7 +378,14 @@ fn against(
             .iter()
             .map(|(d, (class, why))| {
                 let why: String = why.replace('\n', " ").chars().take(160).collect();
-                format!("{d} {class} # {why}\n")
+                // A kind the harness proves itself carries its rule and
+                // `proof=harness` (P1-030 line form).
+                let proof = match *class {
+                    "simulator-differs:source" => " reason=S-TARGET-ON-SOURCE proof=harness",
+                    "simulator-differs:refinement" => " reason=S-NUMERIC-CONVERGES proof=harness",
+                    _ => "",
+                };
+                format!("{d} {class}{proof} # {why}\n")
             })
             .collect();
         let _ = std::fs::create_dir_all(&dir);
@@ -387,7 +399,11 @@ fn against(
     }
     for (d, class) in list.iter().filter(|(d, _)| decks.contains(d)) {
         let now = seen.get(d).map(|s| s.0);
-        if now != Some(class.as_str()) {
+        // A kind a proof file settles (a third simulator, reference data, a
+        // closed form, a self-inconsistent source) is observed as a mismatch.
+        let proven =
+            class.starts_with("simulator-differs:") && !HARNESS_KINDS.contains(&&class[18..]);
+        if now != Some(class.as_str()) && !(proven && now == Some("mismatch")) {
             let now = now.unwrap_or("pass or refused");
             bad.push(format!("{name}: {d} listed {class}, now {now}"));
         }
@@ -465,7 +481,7 @@ fn check(
                 Ok(()) => Verdict::Pass,
                 Err(why) => match t.control.map(|s| sim::run(s, deck, &src, &[], 2 * SECS)) {
                     Some(Ran::Plots(o)) if cmp::compare(&o, &b, tol).is_ok() => {
-                        fails("simulator-differs", &why)
+                        fails("simulator-differs:source", &why)
                     }
                     _ if why.starts_with("tran") && refines(c, t, deck, &src, text, tol) => {
                         fails("simulator-differs:refinement", &why)
@@ -513,19 +529,56 @@ fn fails(class: &'static str, why: &dyn std::fmt::Display) -> Verdict {
 }
 
 /// A cell's list: deck path -> class, `#` to the end of a line a comment.
+/// A `simulator-differs:<kind>` line names its rule and its proof
+/// (`<deck> simulator-differs:<kind> reason=<rule-id> proof=<file>`, ZERO
+/// P1-030): a kind outside [`KINDS`], or no rule or proof, fails the gate;
+/// `proof=harness` only for the kinds the harness runs itself, any other a
+/// file under `tests/fixtures/cross_sim/proof/`.
 fn listed(cell: &str) -> BTreeMap<String, String> {
-    let path = format!(
-        "{}/tests/fixtures/cross_sim/{cell}.txt",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let text = std::fs::read_to_string(&path).unwrap_or_default();
+    let dir = format!("{}/tests/fixtures/cross_sim", env!("CARGO_MANIFEST_DIR"));
+    let text = std::fs::read_to_string(format!("{dir}/{cell}.txt")).unwrap_or_default();
     text.lines()
         .filter_map(|l| {
-            let mut w = l.split('#').next()?.split_whitespace();
-            Some((w.next()?.to_string(), w.next()?.to_string()))
+            let w: Vec<&str> = l.split('#').next()?.split_whitespace().collect();
+            let (deck, class) = (*w.first()?, *w.get(1)?);
+            if let Some(kind) = class.strip_prefix("simulator-differs") {
+                let kind = kind.strip_prefix(':').unwrap_or("");
+                let field = |k: &str| w.iter().find_map(|x| x.strip_prefix(k));
+                let (rule, proof) = (field("reason="), field("proof="));
+                assert!(
+                    KINDS.contains(&kind) && rule.is_some_and(|r| !r.is_empty()),
+                    "{cell}: {deck}: a simulator-differs line needs a kind of {KINDS:?} and reason=<rule-id>"
+                );
+                match proof {
+                    Some("harness") => assert!(
+                        HARNESS_KINDS.contains(&kind),
+                        "{cell}: {deck}: proof=harness only for {HARNESS_KINDS:?}"
+                    ),
+                    Some(f) => assert!(
+                        Path::new(&format!("{dir}/proof/{f}")).is_file(),
+                        "{cell}: {deck}: proof file tests/fixtures/cross_sim/proof/{f} missing"
+                    ),
+                    None => panic!("{cell}: {deck}: a simulator-differs line needs proof=<file>"),
+                }
+            }
+            Some((deck.to_string(), class.to_string()))
         })
         .collect()
 }
+
+/// The kinds of `simulator-differs` (mismatches.md §4.3).
+const KINDS: [&str; 6] = [
+    "third-simulator",
+    "reference-data",
+    "closed-form",
+    "source",
+    "refinement",
+    "self-inconsistency",
+];
+
+/// The kinds the harness proves by its own runs: the target's simulator on
+/// the original (`source`), both refined (`refinement`).
+const HARNESS_KINDS: [&str; 2] = ["source", "refinement"];
 
 /// Files ending in `.ext` under `dir`.
 fn files(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
