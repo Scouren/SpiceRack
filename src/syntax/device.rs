@@ -36,14 +36,16 @@
 //! - `pub const SPICE`, `NGSPICE_OWN`, `LOSSY_LINE`, `XYCE_PORT`, `SPECTRE`, `VACASK: &[Device]`, `pub const FLAGS: &[&str]`
 //! - `pub fn find(tables: &[&'static [Device]], word: &str, fold: bool) -> Option<&'static Device>`
 //! - `pub fn spelling(tables: &[&'static [Device]], p: Primitive) -> Option<&'static Device>`
-//! - `Primitive::ALL: [Primitive; 26]`, `Primitive::from_u32(code: u32) -> Option<Primitive>`
+//! - `Primitive::COUNT`, `Primitive::ALL`, `Primitive::from_u32(code: u32) -> Option<Primitive>`
 
 use Model as M;
 use Primitive as P;
 use Terminals as N;
 use Value as V;
 
-/// What an element is, whatever its dialect spells it.
+kinds! {
+/// What an element is, whatever its dialect spells it. A new primitive is
+/// one line at the end of this list (its code is its position).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Primitive {
@@ -84,8 +86,15 @@ pub enum Primitive {
     /// ngspice `N`, an OSDI (compiled Verilog-A) device.
     Osdi,
 }
+}
 
 /// One table row: a spelling and the shape of the cards that use it.
+///
+/// The tables write a row as `row(word, primitive, terminals, refs, model,
+/// value)`, these fields in order, one row per line. A new spelling of an
+/// existing primitive is one row appended to its dialect's table (the
+/// first row naming a primitive is the one writers use); a new primitive
+/// is a [`Primitive`] variant first.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Device {
     /// A SPICE letter (lowercase), or a Spectre or VACASK master word.
@@ -151,6 +160,7 @@ pub const FLAGS: &[&str] = &["thermal", "off", "on"];
 
 /// The element letters every SPICE dialect reads (ngspice, HSPICE, Xyce and
 /// LTspice share these twenty), in the module header's general forms.
+#[rustfmt::skip]
 pub const SPICE: &[Device] = &[
     row("r", P::Resistor, N::Fixed(2), 0, M::InArgs, V::First),
     row("c", P::Capacitor, N::Fixed(2), 0, M::InArgs, V::First),
@@ -162,14 +172,7 @@ pub const SPICE: &[Device] = &[
     row("g", P::Vccs, N::Fixed(4), 0, M::None, V::First),
     row("f", P::Cccs, N::Fixed(2), 1, M::None, V::First),
     row("h", P::Ccvs, N::Fixed(2), 1, M::None, V::First),
-    row(
-        "b",
-        P::Behavioural,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["v", "i"]),
-    ),
+    row("b", P::Behavioural, N::Fixed(2), 0, M::None, V::Keys(&["v", "i"])),
     row("d", P::Diode, N::Fixed(2), 0, M::AfterNodes, V::None),
     row("q", P::Bjt, N::Range(3, 5), 0, M::AfterNodes, V::None),
     // ngspice's bulk MOSFET has 4 nodes, HSPICE's bulk is optional, BSIMSOI
@@ -177,27 +180,14 @@ pub const SPICE: &[Device] = &[
     row("m", P::Mosfet, N::Range(3, 7), 0, M::AfterNodes, V::None),
     row("j", P::Jfet, N::Fixed(3), 0, M::AfterNodes, V::None),
     row("z", P::Mesfet, N::Fixed(3), 0, M::AfterNodes, V::None),
-    row(
-        "s",
-        P::VoltageSwitch,
-        N::Fixed(4),
-        0,
-        M::AfterNodes,
-        V::None,
-    ),
-    row(
-        "w",
-        P::CurrentSwitch,
-        N::Fixed(2),
-        1,
-        M::AfterNodes,
-        V::None,
-    ),
+    row("s", P::VoltageSwitch, N::Fixed(4), 0, M::AfterNodes, V::None),
+    row("w", P::CurrentSwitch, N::Fixed(2), 1, M::AfterNodes, V::None),
     row("t", P::TransmissionLine, N::Fixed(4), 0, M::None, V::None),
     row("x", P::Subckt, N::Any, 0, M::Subckt, V::None),
 ];
 
 /// ngspice's own letters, past [`SPICE`].
+#[rustfmt::skip]
 pub const NGSPICE_OWN: &[Device] = &[
     row("o", P::LossyLine, N::Fixed(4), 0, M::AfterNodes, V::None),
     row("u", P::RcLine, N::Fixed(3), 0, M::AfterNodes, V::None),
@@ -209,108 +199,38 @@ pub const NGSPICE_OWN: &[Device] = &[
 
 /// The lossy transmission line `O` Xyce and LTspice share with ngspice
 /// (Xyce RG, LTspice help: four nodes, an LTRA model).
-pub const LOSSY_LINE: &[Device] = &[row(
-    "o",
-    P::LossyLine,
-    N::Fixed(4),
-    0,
-    M::AfterNodes,
-    V::None,
-)];
+#[rustfmt::skip]
+pub const LOSSY_LINE: &[Device] = &[
+    row("o", P::LossyLine, N::Fixed(4), 0, M::AfterNodes, V::None),
+];
 
 /// Xyce's port `P n+ n- port=n z0=z` (Xyce RG, port device), read as
 /// ngspice's port source (`V … portnum n z0 z`).
-pub const XYCE_PORT: &[Device] = &[row(
-    "p",
-    P::VoltageSource,
-    N::Fixed(2),
-    0,
-    M::None,
-    V::Specs,
-)];
+#[rustfmt::skip]
+pub const XYCE_PORT: &[Device] = &[
+    row("p", P::VoltageSource, N::Fixed(2), 0, M::None, V::Specs),
+];
 
 /// The Spectre masters an instance names directly (`r1 (a b) resistor
 /// r=1k`). The polynomial sources read as their linear primitive, so the
 /// first spelling of each primitive is the one a writer uses.
+#[rustfmt::skip]
 pub const SPECTRE: &[Device] = &[
-    row(
-        "resistor",
-        P::Resistor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["r"]),
-    ),
-    row(
-        "capacitor",
-        P::Capacitor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["c"]),
-    ),
-    row(
-        "inductor",
-        P::Inductor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["l"]),
-    ),
-    row(
-        "mutual_inductor",
-        P::Coupling,
-        N::Fixed(0),
-        0,
-        M::None,
-        V::Keys(&["coupling"]),
-    ),
-    row(
-        "vsource",
-        P::VoltageSource,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["dc"]),
-    ),
-    row(
-        "isource",
-        P::CurrentSource,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["dc"]),
-    ),
+    row("resistor", P::Resistor, N::Fixed(2), 0, M::None, V::Keys(&["r"])),
+    row("capacitor", P::Capacitor, N::Fixed(2), 0, M::None, V::Keys(&["c"])),
+    row("inductor", P::Inductor, N::Fixed(2), 0, M::None, V::Keys(&["l"])),
+    row("mutual_inductor", P::Coupling, N::Fixed(0), 0, M::None, V::Keys(&["coupling"])),
+    row("vsource", P::VoltageSource, N::Fixed(2), 0, M::None, V::Keys(&["dc"])),
+    row("isource", P::CurrentSource, N::Fixed(2), 0, M::None, V::Keys(&["dc"])),
     row("vcvs", P::Vcvs, N::Fixed(4), 0, M::None, V::Keys(&["gain"])),
     row("vccs", P::Vccs, N::Fixed(4), 0, M::None, V::Keys(&["gm"])),
     row("cccs", P::Cccs, N::Fixed(2), 0, M::None, V::Keys(&["gain"])),
     row("ccvs", P::Ccvs, N::Fixed(2), 0, M::None, V::Keys(&["rm"])),
     row("pvcvs", P::Vcvs, N::Any, 0, M::None, V::Keys(&["coeffs"])),
     row("pvccs", P::Vccs, N::Any, 0, M::None, V::Keys(&["coeffs"])),
-    row(
-        "pcccs",
-        P::Cccs,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["coeffs"]),
-    ),
-    row(
-        "pccvs",
-        P::Ccvs,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["coeffs"]),
-    ),
-    row(
-        "bsource",
-        P::Behavioural,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["v", "i", "q"]),
-    ),
+    row("pcccs", P::Cccs, N::Fixed(2), 0, M::None, V::Keys(&["coeffs"])),
+    row("pccvs", P::Ccvs, N::Fixed(2), 0, M::None, V::Keys(&["coeffs"])),
+    row("bsource", P::Behavioural, N::Fixed(2), 0, M::None, V::Keys(&["v", "i", "q"])),
     row("diode", P::Diode, N::Fixed(2), 0, M::None, V::None),
     row("bjt", P::Bjt, N::Range(3, 4), 0, M::None, V::None),
     row("mos1", P::Mosfet, N::Fixed(4), 0, M::None, V::None),
@@ -322,83 +242,21 @@ pub const SPECTRE: &[Device] = &[
 
 /// The VACASK device modules a `model NAME <module>` names: the built-ins,
 /// then the SPICE set VACASK builds as OSDI (`spice/*.osdi`).
+#[rustfmt::skip]
 pub const VACASK: &[Device] = &[
-    row(
-        "resistor",
-        P::Resistor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["r"]),
-    ),
-    row(
-        "capacitor",
-        P::Capacitor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["c"]),
-    ),
-    row(
-        "inductor",
-        P::Inductor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["l"]),
-    ),
-    row(
-        "mutual",
-        P::Coupling,
-        N::Fixed(0),
-        0,
-        M::None,
-        V::Keys(&["k"]),
-    ),
-    row(
-        "vsource",
-        P::VoltageSource,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["dc"]),
-    ),
-    row(
-        "isource",
-        P::CurrentSource,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["dc"]),
-    ),
+    row("resistor", P::Resistor, N::Fixed(2), 0, M::None, V::Keys(&["r"])),
+    row("capacitor", P::Capacitor, N::Fixed(2), 0, M::None, V::Keys(&["c"])),
+    row("inductor", P::Inductor, N::Fixed(2), 0, M::None, V::Keys(&["l"])),
+    row("mutual", P::Coupling, N::Fixed(0), 0, M::None, V::Keys(&["k"])),
+    row("vsource", P::VoltageSource, N::Fixed(2), 0, M::None, V::Keys(&["dc"])),
+    row("isource", P::CurrentSource, N::Fixed(2), 0, M::None, V::Keys(&["dc"])),
     row("vcvs", P::Vcvs, N::Fixed(4), 0, M::None, V::Keys(&["gain"])),
     row("vccs", P::Vccs, N::Fixed(4), 0, M::None, V::Keys(&["gain"])),
     row("cccs", P::Cccs, N::Fixed(2), 0, M::None, V::Keys(&["gain"])),
     row("ccvs", P::Ccvs, N::Fixed(2), 0, M::None, V::Keys(&["gain"])),
-    row(
-        "sp_resistor",
-        P::Resistor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["r"]),
-    ),
-    row(
-        "sp_capacitor",
-        P::Capacitor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["c"]),
-    ),
-    row(
-        "sp_inductor",
-        P::Inductor,
-        N::Fixed(2),
-        0,
-        M::None,
-        V::Keys(&["l"]),
-    ),
+    row("sp_resistor", P::Resistor, N::Fixed(2), 0, M::None, V::Keys(&["r"])),
+    row("sp_capacitor", P::Capacitor, N::Fixed(2), 0, M::None, V::Keys(&["c"])),
+    row("sp_inductor", P::Inductor, N::Fixed(2), 0, M::None, V::Keys(&["l"])),
     row("sp_diode", P::Diode, N::Fixed(2), 0, M::None, V::None),
     row("sp_bjt", P::Bjt, N::Range(3, 4), 0, M::None, V::None),
     row("sp_mos1", P::Mosfet, N::Fixed(4), 0, M::None, V::None),
@@ -435,36 +293,6 @@ pub fn spelling(tables: &[&'static [Device]], p: Primitive) -> Option<&'static D
 }
 
 impl Primitive {
-    /// Every primitive, in discriminant order.
-    pub const ALL: [Primitive; 26] = [
-        P::Resistor,
-        P::Capacitor,
-        P::Inductor,
-        P::Coupling,
-        P::VoltageSource,
-        P::CurrentSource,
-        P::Vcvs,
-        P::Vccs,
-        P::Cccs,
-        P::Ccvs,
-        P::Behavioural,
-        P::Diode,
-        P::Bjt,
-        P::Mosfet,
-        P::Jfet,
-        P::Mesfet,
-        P::VoltageSwitch,
-        P::CurrentSwitch,
-        P::TransmissionLine,
-        P::Subckt,
-        P::LossyLine,
-        P::RcLine,
-        P::Txl,
-        P::CoupledLines,
-        P::CodeModel,
-        P::Osdi,
-    ];
-
     /// The primitive stored as `code` (`p as u32`); `None` for any other
     /// word ([`crate::syntax::ast::NONE`]).
     pub fn from_u32(code: u32) -> Option<Primitive> {
@@ -538,5 +366,14 @@ mod tests {
             assert_eq!(Primitive::from_u32(p as u32), Some(p));
         }
         assert_eq!(Primitive::from_u32(u32::MAX), None);
+        // The codes are stored in the tree: each keeps its position.
+        let names: Vec<String> = Primitive::ALL.iter().map(|p| format!("{p:?}")).collect();
+        assert_eq!(
+            names.join(" "),
+            "Resistor Capacitor Inductor Coupling VoltageSource CurrentSource Vcvs Vccs Cccs \
+             Ccvs Behavioural Diode Bjt Mosfet Jfet Mesfet VoltageSwitch CurrentSwitch \
+             TransmissionLine Subckt LossyLine RcLine Txl CoupledLines CodeModel Osdi"
+        );
+        assert_eq!(Primitive::COUNT, 26);
     }
 }

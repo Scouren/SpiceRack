@@ -29,6 +29,7 @@ impl Parser<'_, '_> {
     /// The tokens from the cursor to `self.end` as one expression; a `Bad`
     /// with a `P0002` when they are not one.
     pub(super) fn expr_all(&mut self) -> Node {
+        debug_assert!(self.i <= self.end, "the cursor is in the statement");
         let start = self.i;
         if start >= self.end {
             self.ast.diag(Code::P0002, start.saturating_sub(1));
@@ -36,7 +37,7 @@ impl Parser<'_, '_> {
         }
         let mark = self.ast.mark();
         let (depth, capped) = (self.depth, self.capped);
-        match self.expr_bp(0) {
+        let e = match self.expr_bp(0) {
             Ok(e) if self.i == self.end => e,
             _ => {
                 let deep = self.capped && !capped;
@@ -49,13 +50,16 @@ impl Parser<'_, '_> {
                 self.i = self.end;
                 self.ast.push(Tag::Bad, start, self.end - 1, NONE)
             }
-        }
+        };
+        debug_assert_eq!(self.i, self.end, "one expression takes every token");
+        e
     }
 
     /// One expression from the cursor, taking the binary operators that
     /// bind at least `min_bp`; `Err` when the tokens there start none (the
     /// cursor is then anywhere: the caller resets).
     pub(super) fn expr_bp(&mut self, min_bp: u8) -> Result<Node, ()> {
+        debug_assert!(self.i <= self.end, "the cursor is in the expression");
         self.depth += 1;
         let r = if self.depth > DEPTH_MAX {
             self.capped = true;

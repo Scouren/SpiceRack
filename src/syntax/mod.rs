@@ -30,6 +30,10 @@
 //!   `pub mod resolve`, `pub mod statement`, `pub mod token`
 //! - `pub use dialect::Dialect`, `pub use lang::Lang`, `pub use tokenize::tokenize`, `pub use parse::{parse, DEPTH_MAX}`
 
+// First: the modules below use its `kinds!` macro.
+#[macro_use]
+mod kinds;
+
 pub mod ast;
 pub mod behaviour;
 pub mod def;

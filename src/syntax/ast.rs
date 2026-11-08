@@ -23,6 +23,15 @@
 //! its tokens run from there to the next [`token::Tag::EndOfStatement`]
 //! (a block's last token is its closer's).
 //!
+//! Adding a tag: a variant of [`Tag`] in its group, its doc saying how
+//! `main_token`, `lhs`, `rhs` and its extra words read (one of the layouts
+//! above where it can); [`Tag::has_header`] when its `lhs` is a header;
+//! then the parser transform that pushes it (`spice.rs` for a SPICE dot
+//! card, `named.rs` for a Spectre/VACASK keyword), then the arm in each
+//! exhaustive match over `Tag` (`resolve/walk.rs`, `import.rs`), which the
+//! compiler lists. A new keyword that needs
+//! no node of its own is a [`Tag::Card`] and adds no tag.
+//!
 //! Cites: Zig 0.17 `lib/std/zig/Ast.zig` (rows, `extra_data`, `errors`, tag
 //! docs).
 //!
@@ -283,6 +292,13 @@ pub struct Ast<'s> {
     diags: Vec<Diag>,
 }
 
+// A node row is a tag byte and three `u32` words (Zig `Ast.Node`), 13 B;
+// a handle is one `u32`.
+const _: () = assert!(size_of::<Tag>() == 1);
+const _: () = assert!(size_of::<Tag>() + 3 * size_of::<u32>() == 13);
+const _: () = assert!(size_of::<Node>() == 4);
+const _: () = assert!(size_of::<Name>() == 4);
+
 impl Tag {
     /// Whether the statement's `lhs` is a [`Header`] and its fields.
     pub fn has_header(self) -> bool {
@@ -346,11 +362,19 @@ impl<'s> Ast<'s> {
         Node(0)
     }
 
-    /// The list at `at`: `extra_data[at]` items after it.
+    /// The list at `at`: `extra_data[at]` items after it; empty for
+    /// [`NONE`].
+    ///
+    /// # Panics
+    /// When `at` is no offset `push_list` returned.
     pub fn list(&self, at: u32) -> &[u32] {
         if at == NONE {
             return &[];
         }
+        assert!(
+            (at as usize) < self.extra_data.len(),
+            "a list's length word"
+        );
         let n = self.extra_data[at as usize] as usize;
         &self.extra_data[at as usize + 1..at as usize + 1 + n]
     }
@@ -427,11 +451,15 @@ impl<'s> Ast<'s> {
         Node(id)
     }
 
-    /// Appends the list `[len, items...]`; returns its offset.
+    /// Appends the list `[len, items...]`; returns its offset, which
+    /// [`Ast::list`] reads back.
     pub fn push_list(&mut self, items: &[u32]) -> u32 {
         let at = u32::try_from(self.extra_data.len()).expect("fewer than u32::MAX extra words");
-        self.extra_data.push(items.len() as u32);
+        let n = u32::try_from(items.len()).expect("a list of fewer than u32::MAX items");
+        self.extra_data.push(n);
         self.extra_data.extend_from_slice(items);
+        // Paired with `list`: the length word reads back as the items.
+        debug_assert_eq!(self.list(at).len(), items.len());
         at
     }
 
@@ -460,6 +488,10 @@ impl<'s> Ast<'s> {
         nodes: &[u32],
         args: &[u32],
     ) -> u32 {
+        let nodes_len = self.tags.len() as u32;
+        debug_assert!(name == NONE || name < nodes_len, "the name is a node");
+        debug_assert!(master == NONE || master < nodes_len, "the master is a node");
+        debug_assert!(nodes.iter().all(|&n| n < nodes_len), "the nodes are nodes");
         let at = self.push_extra(&[name, master, code]);
         self.push_list(nodes);
         self.push_list(args);
@@ -473,12 +505,25 @@ impl<'s> Ast<'s> {
     }
 
     /// Rewrites the root's statement list.
+    ///
+    /// # Panics
+    /// When `list` is no pushed offset.
     pub fn set_root(&mut self, list: u32) {
+        assert!(
+            (list as usize) < self.extra_data.len(),
+            "the root's list is pushed"
+        );
+        assert_eq!(self.tags[0], Tag::Root);
         self.lhs[0] = list;
     }
 
     /// Rewrites node `n`'s `rhs` (a block's body, appended after its head).
+    ///
+    /// # Panics
+    /// When `n` is the root, or no node.
     pub fn set_rhs(&mut self, n: Node, rhs: u32) {
+        assert!(n.0 != 0, "the root has no rhs");
+        debug_assert!(rhs == NONE || (rhs as usize) < self.extra_data.len());
         self.rhs[n.0 as usize] = rhs;
     }
 
@@ -491,6 +536,7 @@ impl<'s> Ast<'s> {
         self.names.push(text.clone());
         self.name_ids.insert(text, id);
         debug_assert_eq!(self.names.len(), self.name_ids.len());
+        debug_assert_eq!(self.name_ids.get(self.name(id)), Some(&id));
         id
     }
 
@@ -505,8 +551,15 @@ impl<'s> Ast<'s> {
 
     /// Drops every node, extra word and diagnostic appended since `m`
     /// (interned names stay: ids are only ever added).
+    ///
+    /// # Panics
+    /// When `m` drops the root, or was taken after a later `reset`.
     pub fn reset(&mut self, m: Mark) {
         assert!(m.nodes >= 1, "the root stays");
+        // A mark taken after this state is no point to undo back to.
+        assert!(m.nodes <= self.tags.len(), "a mark from before");
+        assert!(m.extra <= self.extra_data.len(), "a mark from before");
+        assert!(m.diags <= self.diags.len(), "a mark from before");
         self.tags.truncate(m.nodes);
         self.main_tokens.truncate(m.nodes);
         self.lhs.truncate(m.nodes);
@@ -538,15 +591,6 @@ impl Ast<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn rows_are_thirteen_bytes_per_node() {
-        // Zig `Ast.Node`: a tag byte, the main token and two data words.
-        assert_eq!(size_of::<Tag>(), 1);
-        assert_eq!(size_of::<Tag>() + 3 * size_of::<u32>(), 13);
-        assert_eq!(size_of::<Node>(), 4);
-        assert_eq!(size_of::<Name>(), 4);
-    }
 
     #[test]
     fn names_are_numbered_in_first_seen_order() {

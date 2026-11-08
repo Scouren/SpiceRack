@@ -25,6 +25,7 @@ use crate::syntax::token::Tag as T;
 impl Parser<'_, '_> {
     /// The SPICE statement at the cursor, inside a block tagged `in_tag`.
     pub(super) fn spice(&mut self, in_tag: Tag) -> Head {
+        debug_assert!(self.i < self.end, "a statement has a head token");
         let first = self.i;
         let lex = self.t.lexicon_at(first);
         // `simulator lang=<dialect>` opens a region (`Lexicon::regions`).
@@ -87,6 +88,7 @@ impl Parser<'_, '_> {
         let head = self.i;
         self.i += 1;
         let args = self.items(mode);
+        debug_assert_eq!(self.i, self.end, "a dot card's fields run to its end");
         let code = analysis(kw).map_or(NONE, |a| a as u32);
         let h = self.ast.push_header(NONE, NONE, code, &[], &args);
         self.ast.push(tag, head, h, NONE)
@@ -95,8 +97,12 @@ impl Parser<'_, '_> {
 
 // ---- private ----
 
-/// The node and field mode of a dot card led by `kw`.
+/// The node and field mode of a dot card led by `kw`: an analysis keyword
+/// ([`analysis`]) is an `Analysis`.
 fn shape(kw: T) -> (Tag, Mode) {
+    if analysis(kw).is_some() {
+        return (Tag::Analysis, Mode::Fields);
+    }
     match kw {
         T::KwParam => (Tag::Param, Mode::Fields),
         T::KwFunc => (Tag::Func, Mode::Fields),
@@ -111,16 +117,6 @@ fn shape(kw: T) -> (Tag, Mode) {
         T::KwSave | T::KwProbe => (Tag::Save, Mode::Fields),
         T::KwPrint => (Tag::Print, Mode::Fields),
         T::KwMeas => (Tag::Measure, Mode::Fields),
-        T::KwOp
-        | T::KwDc
-        | T::KwAc
-        | T::KwTran
-        | T::KwNoise
-        | T::KwTf
-        | T::KwSens
-        | T::KwPz
-        | T::KwFour
-        | T::KwSp => (Tag::Analysis, Mode::Fields),
         T::KwStep => (Tag::Step, Mode::Fields),
         // else: any other keyword or directive (`.mc`, `.backanno`, a
         // Spectre word in a SPICE region) is a generic card.
@@ -128,7 +124,8 @@ fn shape(kw: T) -> (Tag, Mode) {
     }
 }
 
-/// The analysis an analysis card's keyword names.
+/// The analysis an analysis card's keyword names: a new SPICE analysis
+/// card is one arm here.
 fn analysis(kw: T) -> Option<Analysis> {
     Some(match kw {
         T::KwOp => Analysis::Op,

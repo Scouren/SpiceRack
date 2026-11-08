@@ -33,6 +33,8 @@ impl Parser<'_, '_> {
     /// Reads the Spectre or VACASK statement at the cursor (its units, for
     /// Spectre) onto the block stack.
     pub(super) fn named_statement(&mut self, stack: &mut Vec<Frame>) {
+        debug_assert!(self.i < self.end, "a statement has a head token");
+        debug_assert!(!stack.is_empty(), "the root frame is on the stack");
         let stmt_end = self.end;
         let braces = self.t.lexicon_at(self.i).heads_after.contains(&T::LBrace);
         while self.i < stmt_end {
@@ -88,6 +90,7 @@ impl Parser<'_, '_> {
             }
         }
         self.i = stmt_end;
+        debug_assert_eq!(self.end, stmt_end, "a unit's end is restored");
     }
 }
 

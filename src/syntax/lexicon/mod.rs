@@ -28,6 +28,18 @@ use crate::syntax::token::Tag;
 
 /// One dialect's lexical rules. Line structure first, then words, then the
 /// tables the parser reads.
+///
+/// Built only from a definition's calls, by `lexicon()` in `def/freeze.rs`
+/// (`syntax::def::register`). Adding a field (a fact a dialect differs on) is these
+/// sites, each a line or a row: the field here, with the default the
+/// built-ins keep; in `def/mod.rs`, the `Lex` field, its `set!` call (the
+/// definition call) and the header's Contents; `Lex::of` (`def/copy.rs`);
+/// `lexicon()` (`def/freeze.rs`); a `line(...)` in `dump` (`def/dump.rs`)
+/// and the two `tests/fixtures/dialects/*.dump` it changes; the Python
+/// binding's method list (`src/python/def_.rs`) and its mirror
+/// (`tests/builtin_dialects.py`); then the call in each
+/// `dialects/<name>.rs` that differs from the default, and the reader that
+/// reads it.
 pub struct Lexicon {
     /// The language whose text this reads (ESPice reads `Lang::NGSPICE`'s).
     pub lang: Lang,

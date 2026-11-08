@@ -55,12 +55,19 @@ impl Parser<'_, '_> {
 
     /// The items from the cursor to the statement's end, not yet a list.
     pub(super) fn items(&mut self, mode: Mode) -> Vec<u32> {
+        debug_assert!(self.i <= self.end, "the cursor is in the statement");
+        debug_assert!((self.end as usize) < self.t.len(), "the end is a token");
         let mut items = Vec::new();
         while self.i < self.end {
+            let at = self.i;
             if let Some(n) = self.item(mode) {
                 items.push(n.0);
             }
+            // Every item, or skipped separator, moves the cursor on: the
+            // loop runs at most `end - i` times.
+            debug_assert!(self.i > at, "an item reads a token");
         }
+        debug_assert_eq!(self.i, self.end, "the items run to the end");
         items
     }
 
@@ -76,8 +83,10 @@ impl Parser<'_, '_> {
 
     /// A `Word` from the cursor (which must not sit on a separator).
     pub(super) fn word(&mut self) -> Node {
+        debug_assert!(self.i < self.end, "a word is in the statement");
         debug_assert!(!self.separates(self.i), "a word starts at a word token");
         let (a, b) = (self.i, self.word_end(self.i));
+        debug_assert!(a <= b && b < self.end, "a word ends in the statement");
         self.i = b + 1;
         self.push_word(a, b)
     }
