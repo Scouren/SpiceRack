@@ -4,8 +4,18 @@
 //! placed by one exhaustive match, so a new class of line is a variant, its
 //! test in `Rd::control_line`, and its arm in `Rd::control`.
 //!
+//! This is the file `research/DESIGN-control-epochs.md` §4 names
+//! (`render/read/control.rs`), and [`ControlLine`] is a strict subset of the
+//! classes its step 4 (§6: the ngspice `.control` reader, the bounded
+//! unroller, W0131) reads. That step adds `Alter` (`alter`, `altermod`,
+//! `alterparam`, `reset`), `Loop` and `EndLoop` (`foreach`, `repeat`,
+//! `end`), and `Option`, each pushed as the design's `BenchCard`. It also
+//! splits [`ControlLine::Script`] into `NoEffect` (W0025: print, plot,
+//! write, set) and `DataDependent` (W0131).
+//!
 //! Cites: ngspice manual ch.17 (the control language), `pre_osdi file` (an
-//! OSDI load before the circuit is parsed); the old lowering's `.control`.
+//! OSDI load before the circuit is parsed); the old lowering's `.control`;
+//! DESIGN-control-epochs §4, §6 step 4.
 //!
 //! Contents:
 //! - `pub(super) enum ControlLine`
@@ -21,7 +31,9 @@ pub(super) enum ControlLine {
     Analysis,
     /// `pre_osdi file` at the top: the file's path.
     PreOsdi(String),
-    /// Any other line: the script's, not read.
+    /// Any other line: the script's, not read (W0025). DESIGN-control-epochs
+    /// step 4 splits it into its alter, loop, option, no-effect and
+    /// data-dependent classes.
     Script,
 }
 
