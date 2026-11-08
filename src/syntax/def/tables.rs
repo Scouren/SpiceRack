@@ -1,6 +1,7 @@
 //! The definition's list rows ([`DialectDef`]): the Spectre analyses a
 //! target has, the language's temperature word, builtin constants and
-//! built-in device names, each appended by one call.
+//! built-in device names, the SPICE options it maps, each appended by one
+//! call.
 //!
 //! Cites: none (each definition cites its manual where it declares a row).
 //!
@@ -8,8 +9,11 @@
 //! - `DialectDef::temp_name(self, word: &str) -> Self`, `DialectDef::builtin_constant(self, name: &str, value: &str) -> Self`
 //! - `DialectDef::builtin_device(self, name: &str) -> Self`, `DialectDef::spectre_analysis(self, kind: &str) -> Self`
 //! - `DialectDef::vacask_analysis(self, kind: &str) -> Self`
+//! - `DialectDef::option_to(self, spice: &str, own: &str) -> Self`, `DialectDef::option_method(self, spice: &str) -> Self`,
+//!   `DialectDef::option_cosmetic(self, spice: &str) -> Self`
 
-use super::{DialectDef, leak};
+use super::{DialectDef, leak, put};
+use crate::syntax::behaviour::OptionTo;
 
 impl DialectDef {
     /// The expression word for the circuit temperature.
@@ -54,6 +58,33 @@ impl DialectDef {
             v.push(leak(kind));
         }
         self.b.vacask_analyses = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// SPICE option `spice` is the target's option `own`, of the same
+    /// quantity: `.options VNTOL=1u` is Spectre `vabstol=1u`.
+    pub fn option_to(self, spice: &str, own: &str) -> Self {
+        self.option_row(spice, OptionTo::Name(leak(own)))
+    }
+
+    /// SPICE option `spice` is the integration method, its value spelled
+    /// by the writer (VACASK `tran_method`).
+    pub fn option_method(self, spice: &str) -> Self {
+        self.option_row(spice, OptionTo::Method)
+    }
+
+    /// SPICE option `spice` changes no number in the result (`acct`,
+    /// `nopage`): left out, noted W0024.
+    pub fn option_cosmetic(self, spice: &str) -> Self {
+        self.option_row(spice, OptionTo::Cosmetic)
+    }
+
+    /// Sets `spice`'s (lowercased) row of `option_map`: in place where it
+    /// holds the key, else last.
+    fn option_row(mut self, spice: &str, to: OptionTo) -> Self {
+        let mut v = self.b.option_map.to_vec();
+        put(&mut v, leak(&spice.to_ascii_lowercase()), to);
+        self.b.option_map = Box::leak(v.into_boxed_slice());
         self
     }
 }

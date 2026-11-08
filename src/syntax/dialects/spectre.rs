@@ -223,6 +223,23 @@ pub(super) fn spectre() -> DialectDef {
         .options_form(OptionsForm::Spectre)
         .named_params(NamedParams::Spectre)
         .analysis_masters(Lang::SPECTRE)
+        // SPICE's options and Spectre's of the same effect (`[REF]` 19.1
+        // pp.187-236, by number): `reltol` #1, `vabstol` #3, `iabstol` #4,
+        // `chargeabstol` #5, `temp` #6, `tnom` #7, `dcmaxiters` #56
+        // (ngspice's `itl1`, Xyce's `max_iterations`), `scale` #90, `gmin`
+        // #128, `pivrel` #181, `pivabs` #182 (SPICE's `pivtol`).
+        .option_to("reltol", "reltol")
+        .option_to("vntol", "vabstol")
+        .option_to("abstol", "iabstol")
+        .option_to("chgtol", "chargeabstol")
+        .option_to("temp", "temp")
+        .option_to("tnom", "tnom")
+        .option_to("itl1", "dcmaxiters")
+        .option_to("max_iterations", "dcmaxiters")
+        .option_to("scale", "scale")
+        .option_to("gmin", "gmin")
+        .option_to("pivrel", "pivrel")
+        .option_to("pivtol", "pivabs")
         // The circuit temperature in an expression ([CMP] 5.0 p.884).
         .temp_name("temp")
         // The VACASK analyses it has (Spectre Reference 5.0, Analysis Statements: xf, stb, pss p.771, pac p.748, pnoise p.759; no hb, dcinc or trannoise).

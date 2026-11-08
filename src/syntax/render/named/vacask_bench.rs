@@ -14,37 +14,10 @@ use super::W;
 use super::bench::{Step, Tb, bare_node};
 use super::lift::draw_scopes;
 use super::vacask::{num, respell};
-use crate::syntax::behaviour::NamedRules;
+use crate::syntax::behaviour::{NamedRules, OptionTo};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Ana, DcSweep, Sweep, Val};
-
-/// `.options` keys that only steer a simulator's bookkeeping or printing:
-/// dropping one changes no number in the raw file.
-const COSMETIC_OPTIONS: &[&str] = &[
-    "noacct",
-    "acct",
-    "list",
-    "node",
-    "post",
-    "trans",
-    "nopage",
-    "nomod",
-    "lvlcod",
-    "klu",
-    "sparse",
-    "savecurrents",
-    "numdgt",
-];
-
-/// `.options KEY=VALUE` whose VACASK spelling is the same word and the same
-/// quantity (`itl1`, `maxord` are rejected there). `scale` is the
-/// `$simparam("scale")` VACASK's `sp_*` modules read where ngspice's code
-/// reads `CKTscale` (`devices/spice/*.va` headers; `lib/osdidevice.cpp`
-/// `simParamNames`).
-const NUMERIC_OPTIONS: &[&str] = &[
-    "reltol", "abstol", "vntol", "chgtol", "gmin", "temp", "tnom", "scale",
-];
 
 impl W<'_, '_> {
     /// The `control` block: options, then per analysis the stepped sweeps
@@ -56,20 +29,19 @@ impl W<'_, '_> {
         let mut opts = String::from("  options rawfile=\"binary\"");
         for (k, v, tok) in &tb.options {
             let k = k.to_ascii_lowercase();
-            if NUMERIC_OPTIONS.contains(&k.as_str()) {
-                opts.push_str(&format!(" {k}={}", respell(v)));
-            } else if k == "method" {
-                match v.to_ascii_lowercase().as_str() {
+            match self.b.option_map.iter().find(|o| o.0 == k).map(|o| o.1) {
+                Some(OptionTo::Name(own)) => opts.push_str(&format!(" {own}={}", respell(v))),
+                Some(OptionTo::Method) => match v.to_ascii_lowercase().as_str() {
                     "trap" | "trapezoidal" => opts.push_str(" tran_method=\"trap\""),
                     "gear" | "gear2" => opts.push_str(" tran_method=\"gear2\""),
                     _ => {
                         self.ask(Construct::UnmappedOption, *tok);
                     }
+                },
+                Some(OptionTo::Cosmetic) => self.note(Code::W0024, *tok),
+                None => {
+                    self.ask(Construct::UnmappedOption, *tok);
                 }
-            } else if !COSMETIC_OPTIONS.contains(&k.as_str()) {
-                self.ask(Construct::UnmappedOption, *tok);
-            } else {
-                self.note(Code::W0024, *tok);
             }
         }
         for (k, v, _) in &tb.vacask {

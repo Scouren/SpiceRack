@@ -173,6 +173,36 @@ pub(super) fn vacask() -> DialectDef {
         .options_form(OptionsForm::Vacask)
         .named_params(NamedParams::Vacask)
         .analysis_masters(Lang::SPECTRE)
+        // `.options KEY=VALUE` whose VACASK spelling is the same word and
+        // the same quantity (`itl1`, `maxord` are rejected there). `scale`
+        // is the `$simparam("scale")` VACASK's `sp_*` modules read where
+        // ngspice's code reads `CKTscale` (`devices/spice/*.va` headers;
+        // `lib/osdidevice.cpp` `simParamNames`).
+        .option_to("reltol", "reltol")
+        .option_to("abstol", "abstol")
+        .option_to("vntol", "vntol")
+        .option_to("chgtol", "chgtol")
+        .option_to("gmin", "gmin")
+        .option_to("temp", "temp")
+        .option_to("tnom", "tnom")
+        .option_to("scale", "scale")
+        // `method=trap|gear` is `tran_method` (`docs/cmd-options-tran.md`).
+        .option_method("method")
+        // Keys that only steer a simulator's bookkeeping or printing:
+        // dropping one changes no number in the raw file.
+        .option_cosmetic("noacct")
+        .option_cosmetic("acct")
+        .option_cosmetic("list")
+        .option_cosmetic("node")
+        .option_cosmetic("post")
+        .option_cosmetic("trans")
+        .option_cosmetic("nopage")
+        .option_cosmetic("nomod")
+        .option_cosmetic("lvlcod")
+        .option_cosmetic("klu")
+        .option_cosmetic("sparse")
+        .option_cosmetic("savecurrents")
+        .option_cosmetic("numdgt")
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("xf")

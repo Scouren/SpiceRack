@@ -18,7 +18,7 @@
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
-//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`
+//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`, `pub enum OptionTo`
 
 use crate::syntax::Lang;
 
@@ -95,6 +95,24 @@ pub struct Behaviours {
     /// `hb`, …) that the target has an analysis for, untranslated (W0001);
     /// any other is one it lacks (W0015).
     pub vacask_analyses: &'static [&'static str],
+    /// Write: a SPICE `.options` key (lowercase) → its answer on the
+    /// target (`DialectDef::option_to`, `option_method`,
+    /// `option_cosmetic`); a key not here is unmapped (Spectre notes it
+    /// W0024, VACASK asks `Construct::UnmappedOption`).
+    pub option_map: &'static [(&'static str, OptionTo)],
+}
+
+/// What a SPICE `.options` key is on a target (`Behaviours::option_map`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum OptionTo {
+    /// The target's option of the same quantity, its value respelled.
+    Name(&'static str),
+    /// The integration method (`method=trap|gear`): the writer spells the
+    /// value (VACASK `tran_method="gear2"`).
+    Method,
+    /// Changes no number in the result (bookkeeping, printing): left out,
+    /// noted W0024.
+    Cosmetic,
 }
 
 /// The writer layout.
@@ -334,5 +352,6 @@ impl Behaviours {
         builtin_constants: &[],
         builtin_devices: &[],
         vacask_analyses: &[],
+        option_map: &[],
     };
 }

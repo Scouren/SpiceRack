@@ -237,6 +237,9 @@ calls! {
     builtin_constant(name: &str, value: &str);
     builtin_device(name: &str);
     vacask_analysis(kind: &str);
+    option_to(spice: &str, own: &str);
+    option_method(spice: &str);
+    option_cosmetic(spice: &str);
     code(id: &str, kind: PyKind, message: &str);
     refuse_code(c: PyConstruct, id: &str);
     omit_code(c: PyConstruct, id: &str);
