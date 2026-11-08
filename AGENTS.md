@@ -1,168 +1,95 @@
-# AGENTS.md
+# Working in this repository
 
-SpiceRack: build SPICE circuits in Python, netlist them for any simulator
-(ngspice, HSPICE, LTspice, VACASK, Spectre, ESPice), run them and read the
-results back. The core is a Rust crate (edition 2024) with PyO3 bindings
-shipped as the `spicerack` Python package. `README.md` is the overview;
-the reader and writer are `src/syntax/` (tokenize → parse → AST → resolve →
-render), and `TESTING.md` "Golden gate" is its byte-identical migration gate
-and phase list.
+The human designs; you type. Work in layers: finish one, show it, and wait for approval before going one level deeper. Every step ends on its "Done when".
 
-## Skills to load first
+Read `codebase-rules` before starting a module: it orders the skills below and settles their conflicts. Run `setup-matt-pocock-skills` once so `to-spec`, `to-tickets` and `triage` know the tracker. In their domains, `compiler-construction`, `gui-architecture`, `spice-engine` and `writing-perfect-verilog` apply on top of every step.
 
-Load each with the Skill tool (other agents: read
-`~/.claude/skills/<name>/SKILL.md` and the companion files it names). Source:
-https://github.com/OmarSiwy/NixOSConfig/tree/main/skills
+## Add a feature
 
-| Skill | Use it for here |
-|---|---|
-| `data-oriented-design` | The AST (`src/syntax/ast.rs`), the kit's tables and the result tables: the six questions, SoA, narrowest widths, handles |
-| `codebase-clean-code` | Owners: `import` reads files, `syntax` reads text into an AST and writes it in any dialect, `backend` runs one simulator each; one spine per direction |
-| `api-design` | Every `pub` item and the Python API (PySpice-close, backend neutral): usage code first, caller owns memory and flow |
-| `code-style` | File order, ≤500 code lines per file, `check_style.py` |
-| `simd-loops` | Hot loops over raw-file columns (`src/rawfile.rs`): the plain-loop forms, or explicit SIMD with a scalar oracle |
-| `doc-comments` | Every `pub` item |
-| `ponytail` (ultra) | How little code; never what shape the data takes |
-| `assertions` | Contracts, capacities, bounded loops |
-| `test-plan`, `tdd` | The oracles below, the gates, a feature's definition of done |
+1. Grill. Run `grill-with-docs` (it runs `grilling` and `domain-modeling`) and name the oracle for every output. Too big for one session: `wayfinder`. A question only running code can answer: `prototype`. Done when the human confirms a shared understanding; then `to-spec` and `to-tickets`.
+2. Blocks. `codebase-clean-code` steps 1 to 4 (data, owners, spines, seams), the six questions of `data-oriented-design`, and `test-plan` for each bug class's oracle and layer. Done when the human approves the tables, the ownership map and the seams.
+3. Definitions. Every type, field and signature, each body `todo!()` or `@panic("todo")`; `api-design` at any boundary another program calls; `ponytail` throughout. Done when it compiles and the human approves.
+4. Seams. Public bodies call other units, placed with `codebase-design`, each call carrying a `doc-comments` comment and `assertions` at entry and exit. Done when the human approves the list of seams under test.
+5. Private functions. Per seam, one `tdd` slice: write the test and watch it go red, propose the algorithm and its data movement, implement once approved, watch it go green. In `.zig` or `.rs`, the `zig` or `rust` skill; a hot branch, `branchless` then `simd-loops`; GPU work, `gpu-parallel-algorithm-thinking` then `gpu-kernel-optimization`. Done when every agreed seam has a green test.
+6. Seam checks. Pair every assertion across its seam, and add the property, differential, fuzz and exhaustive tests `test-plan` named. Done when every bug class names a test file.
+7. Final pass. `code-style`, the `doc-comments` audit, `code-review`, then `ponytail-review`. Done when the gate passes.
 
-Language:
+A ticket with no design decision left goes through `implement` in one piece.
 
-| Skill | Use it for here |
-|---|---|
-| `rust` | Types, memory, `zero-cost.md`: an abstraction enters a hot loop only with an `asm_probe` verdict; explicit SIMD is `fearless_simd` |
+## Fix a bug
 
-Project-specific:
+1. Reproduce with `diagnosing-bugs`. Done when one command goes red on the bug.
+2. Find the root cause: grep every caller of the function you will change, and fix it where they all route through. Done when the command goes green.
+3. Add the oracle that would have caught it (`test-plan`): a property, a reference or a generator feature. Done when it goes red on the old code.
+4. Final pass, as in feature step 7.
 
-| Skill | Use it for here |
-|---|---|
-| `compiler-construction` | `src/syntax` (tokenizer, lexicons, parser, AST, device table, resolve, renderers): one AST every dialect reads into, coded diagnostics, goldens |
-| `spice-engine` | Reading a simulator's result: which oracle (ngspice, VACASK, analytic) and at what tolerance |
+## Change a feature
 
-## The method
+1. State the change radius: run a `codebase-clean-code` change drill and list every existing function body the change edits. Done when the human accepts the number.
+2. Pin the current behaviour. Untested code gets `legacy-code` characterization tests at the seam first; restructure in `refactoring-patterns` steps. Done when the tests pass on the current code.
+3. Re-enter the feature steps at the highest layer the change touches: a new seam at step 4, a new algorithm at step 5. A rewrite is `rewrite-clean`, a port is `clean-room-pseudocode-pipeline`, and a whole repository is `codebase-improvement` or `improve-codebase-architecture`.
 
-Binding on every change, in every project.
+## Rulings
 
-### Code
+- Data layout beats code brevity; in hot code, small functions yield to it.
+- `ponytail` decides how little code to write, never the shape of the data.
+- A seam at ladder rung 5 or above enters hot code only with a zero-cost probe verdict.
+- Measure every performance change; a vector loop that benchmarks slower is reported, and the scalar loop stays.
+- Keep every NaN gate, allocation-failure path, `errdefer`, trust-boundary validation and numerical tolerance.
 
-- Five commitments: lean storage, no runtime residue, cheap change,
-  contained failure, proof by test.
-- Answer the six data questions before writing code. Then: one array per
-  field, the narrowest width the stated range allows, typed `u32` handles
-  with a sentinel, existence tables instead of flags, hot/cold split, tables
-  sized once from a named capacity, a compile-time size assertion on every
-  hot struct.
-- An abstraction on a hot path carries an assembly probe: FOLDED, IDENTICAL,
-  EQUIVALENT or NEGATIVE pass; RESIDUE fails the build. A "no residue" claim
-  cites the probe, a speed claim cites a benchmark. Dispatch per batch, never
-  per element.
-- A seam names what varies and needs a second case today; it sits on the
-  cheapest rung (concrete, free function, table, closed enum with exhaustive
-  switch, comptime, request table, function-pointer table, `dyn`, plugin).
-- Tables, transforms, one spine per pipeline (ifs up, fors down), one owner
-  writes each table and everyone else appends requests. Three likely changes
-  each have a change radius of zero; the compiler lists every other site.
-- APIs start from the caller's code. The caller owns memory and flow:
-  requests instead of callbacks, an immediate twin for anything retained.
-  Factor at the second real instance.
-- Branches: delete, then branchless, then vectorize along a lane axis. The
-  `W == 1` instantiation is the scalar oracle; vectorization is verified in
-  the assembly.
-- GPU: SoA always, the roofline ceiling named with its arithmetic before
-  tuning, data kept on the device, fixed-order reductions, the dependency DAG
-  recovered before porting. "This belongs on the CPU" is a valid verdict.
-- An operating error returns to the caller that can decide; a bug hits an
-  assertion. Two or more split, paired assertions per function, a bound on
-  every loop, input validated once at the edge, fallible work before the
-  commit.
-- Pass order: boundary, placement, data, zero-cost proof, contracts, tests,
-  branches, lanes. Data layout beats brevity. Every pass keeps NaN gates,
-  allocation-failure paths, `errdefer`s, trust-boundary validation and
-  tolerances.
+## The gate
 
-### Testing
+Done means: `check_style.py` exits 0; the suite passes in a safe build (Zig Debug or ReleaseSafe, Rust with debug assertions); touched files average two assertions per function; every rung-5+ seam has its probe verdict; the doc audit ran after the code. While iterating, run only your unit's tests, and use `long-term-garbage-collection` when builds queue or caches grow. Then `pr` for the description, `resolving-merge-conflicts` when the merge fights back, and `handoff` before the context fills. Repository-wide: `ponytail-audit` for bloat, `ponytail-debt` for deferred shortcuts.
 
-- The oracle is named before the code and never recomputes the answer the
-  way the code does. Cheapest first: assertions, a reference
-  implementation, a round trip, a certificate, a metamorphic relation, a
-  model, a golden with recorded provenance, a spec example.
-- The main bug class is a wrong number with no crash, which coverage and
-  fuzzing cannot see. A bug found by a person is a hole in the oracle set:
-  it lands with its regression test and the oracle or generator that would
-  have caught its class.
-- A new test goes red on the bug before it is trusted green.
-- Unsupported fails and never skips. A known failure is a named marker in
-  the tree; an unexpected pass fails until the marker goes. Name lists are
-  compared, never counts.
-- A tolerance follows the oracle's own accuracy. Determinism is a test:
-  1 job and N jobs give the same bytes, and the order is fixed, not the test.
-- A flaky test is fixed or quarantined the same day, never retried
-  silently.
-- Tiers: pre-commit under 10 s, merge under 15 min, nightly, release. A
-  release ships on numbers a script checks. The map lives in `TESTING.md`.
+## Skills
 
-### Builds
+Every skill named above is vendored in `.claude/skills/` (Claude Code loads them from there;
+other agents read `.claude/skills/<name>/SKILL.md` and the files it names). Source:
+https://github.com/OmarSiwy/NixOSConfig/tree/main/skills. Update by re-copying from there, never
+by editing the copy.
 
-- A build is a cache keyed on its declared inputs. Every producing step has
-  an output argument, every checking step an exit-code check, every file
-  read at run time is declared (`addFileInput`) or the step says
-  `has_side_effects`. Keys hash contents, never absolute paths.
-- Cut the artifact graph where edits land: one object per generated unit,
-  narrow imports for shared ones, kernels out of host graphs.
-- Zig edit loop: `zig build check --watch -fincremental`, one watch per
-  artifact across all worktrees; the result that counts comes from a plain
-  build. One global cache per toolchain store path; a worktree symlinks its
-  `.zig-cache` to the main checkout's.
-- Rust: flags live in `.cargo/config.toml`, never a one-off `RUSTFLAGS`;
-  `check`, `build`, `test` and rust-analyzer agree on features, profile and
-  target directory (rust-analyzer gets its own).
-- Nothing collects a cache. Keep a byte budget per cache and delete old
-  entries only while no build runs (the `long-term-garbage-collection`
-  skill); a warm cache is kept, never wiped by routine.
-- Gate on the exit code: `cmd | tail` swallows it, so use
-  `exit "${PIPESTATUS[0]}"`.
+## SpiceRack
 
-### Maintaining
+Build SPICE circuits in Python, netlist them for any simulator (ngspice, ESPice, HSPICE, Xyce,
+LTspice, Spectre, VACASK, CDL, Verilog), run them and read the results back. A Rust crate
+(edition 2024) with PyO3 bindings shipped as the `spicerack` package. `README.md` is the overview.
+The reader and writer are `src/syntax/`: tokenize → parse → AST → resolve → render, one AST every
+dialect reads into and every dialect is written from; dialects are declared definitions in
+`src/syntax/dialects/*.rs` (no `match Dialect`). `TESTING.md` holds the golden gate and the tiers.
 
-- `main` is green by machine: work lands through a pull request whose merge
-  result passed the required checks. No `dev` branch; topic branches are
-  deleted after the merge.
-- Bots never push to `main`. Generated output ships as a release asset or
-  through a gated pull request.
-- Every dependency is pinned by commit and content hash, the toolchain by
-  `flake.lock`, actions by SHA. A third-party input you hash is mirrored
-  somewhere you control.
-- The changelog is written by hand, one line per change citing its issue,
-  every number in it measured. A release refuses a version mismatch, builds
-  every target, checks every artifact and smokes the bundle.
-- CI holds: the merge gate, every target compiled, docs that execute,
-  reference suites gated by name, a nightly, the downstream contracts, the
-  release job.
+Owners: `import` reads files, `syntax` reads text into the AST and writes it in any dialect,
+`backend` runs one simulator each, `src/python/` + `python/spicerack/` is the Python API
+(backend neutral, PySpice-close). In this repo `compiler-construction` applies to `src/syntax`,
+`spice-engine` to reading a simulator's result, `simd-loops` to `src/rawfile.rs`.
 
-## Building
+### Build
 
-- Every build runs inside `nix develop -c …`; `nix develop .#testing` adds
-  ngspice, OpenVAF, VACASK and the sky130/gf180 PDKs the integration tests
-  run against. CI runs both suites in `.#testing`.
-- Rust: `cargo test` (name one test target with `--test <file>` while
-  iterating). Python: in a venv with `--system-site-packages`,
-  `maturin develop` then `python3 -m pytest`.
-- A change to the public Python API updates `docs/` and the user-facing
-  skill in `skills/spicerack/` in the same commit.
-- Run one cargo process per agent, and don't build while `free -g` shows
-  under 6 GB available.
+- Every build runs inside `nix develop -c …`; `nix develop .#testing` adds ngspice, Xyce,
+  OpenVAF, VACASK, ESPice and the sky130/gf180 PDKs the integration tests run against.
+- Rust: `cargo test` (`--test <file>` while iterating). Python: a venv with
+  `--system-site-packages`, `maturin develop`, `python3 -m pytest`.
+- Flags live in `.cargo/config.toml`, never a one-off `RUSTFLAGS`.
+- One cargo process per agent; don't build while `free -g` shows under 6 GB available or
+  `df -h /` under 30 GB free.
+- Gate on exit codes: `cmd | tail` swallows them, use `exit "${PIPESTATUS[0]}"`.
 
-## Testing
+### Test
 
-- Every test names its oracle: the independent thing that says the output is
-  wrong. A netlist is checked by running it on the real simulator or against
-  a golden with provenance, never by re-deriving it the way the writer does.
-- Unsupported fails and never skips: a missing simulator in `.#testing` is a
-  failure.
-- A golden that disagrees with an independent oracle is a bug in the code
-  that wrote it. Fix the code, regenerate the golden, and say so in the commit.
+- Every test names its oracle: a netlist is checked by running it on the real simulator or
+  against a golden with provenance, never by re-deriving it the way the writer does.
+- Unsupported fails and never skips: a missing simulator in `.#testing` is a failure. A known
+  failure is a named marker; an unexpected pass fails until the marker goes.
+- A golden that disagrees with an independent oracle is a bug in the code that wrote it: fix
+  the code, regenerate the golden, say so in the commit.
+- The golden gate: output bytes against the baseline with reviewed `migration.xfail` lines;
+  determinism (1 job = N jobs gives the same bytes). A performance change has zero golden diff.
 
-## Committing
+### Commit
 
-Commit at every green step: both suites passing, `cargo fmt --check` clean.
-The message says what changed and in which owner. Never commit red to `main`.
+- Commit at every green step: both suites passing, `cargo fmt --check`, clippy `-D warnings`,
+  `check_style.py src tests` clean. The message says what changed and in which owner.
+- Stage files by name, never `git add -A`; run simulators in a temp dir.
+- A change to the public Python API updates `docs/` and `skills/spicerack/` (the user-facing
+  skill) in the same commit.
+- `main` moves only through a pull request whose merge result passed the checks. Never commit
+  red to `main`; never push without the human's say.
