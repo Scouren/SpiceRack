@@ -14,37 +14,19 @@
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::{refusal, write};
 use spicerack::backend::Dialect;
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::render_text;
 
 // ---- private ----
-
-/// The deck `text` read as `from`, written for `to`; panics on a refusal.
-fn write(text: &str, from: Dialect, to: Dialect) -> String {
-    render_text(text, from, "t", to)
-        .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
-        .text
-}
-
-/// The codes the refusal of `text` (read as `from`, written for `to`) has.
-fn refusal(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
-    match render_text(text, from, "t", to) {
-        Ok(w) => panic!("written, not refused:\n{}", w.text),
-        Err(e) => e.diags.iter().map(|d| d.code).collect(),
-    }
-}
 
 /// The codes of the notes on `text` (read as `from`) written for `to`;
 /// panics on a refusal.
 fn notes(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
-    render_text(text, from, "t", to)
-        .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
-        .notes
-        .diags
-        .iter()
-        .map(|d| d.code)
-        .collect()
+    oracle::notes(&oracle::written(text, from, to))
 }
 
 #[test]
