@@ -2,8 +2,10 @@
 //! plus the side tables a later stage reads instead of re-lexing (number
 //! values, the physical line starts, the lexicon switches).
 //!
-//! A token's end is not stored: [`Tokens::end`] re-lexes it from `start`, as
-//! Zig's `Ast.tokenSlice` does. Comments, blank lines and continuation marks
+//! A token's end is stored beside its start (`ends`), so [`Tokens::end`] is
+//! a load: the renderer asks for it once per token per text it reads, and
+//! re-lexing it there (Zig's `Ast.tokenSlice`) was a fifth of the render.
+//! Comments, blank lines and continuation marks
 //! are not tokens: they stay in the gaps between token spans, where a
 //! renderer finds them (Zig `Render.zig:3074-3099`). Statement structure is
 //! tokens ([`Tag::EndOfStatement`], [`Tag::LangSpice`]).
@@ -18,15 +20,15 @@
 //! - `Tokens::source(&self) -> &'s str`, `Tokens::tags(&self) -> &[Tag]`,
 //!   `Tokens::len(&self) -> usize`, `Tokens::is_empty(&self) -> bool`,
 //!   `Tokens::start(&self, i: u32) -> u32`, `Tokens::end(&self, i: u32) -> u32`,
+//!   `Tokens::end_relexed(&self, i: u32) -> u32`,
 //!   `Tokens::text(&self, i: u32) -> &'s str`, `Tokens::value(&self, i: u32) -> f64`,
 //!   `Tokens::location(&self, i: u32) -> Location`,
 //!   `Tokens::lexicon_at(&self, i: u32) -> &'static Lexicon`
 
 use crate::syntax::lexicon::Lexicon;
-use crate::syntax::scan;
 
-/// A token's kind. Words are re-lexed from their start; every other tag but
-/// the zero-width structure tags spells itself ([`Tag::lexeme`]).
+/// A token's kind. Every tag but the words and the zero-width structure
+/// tags spells itself ([`Tag::lexeme`]).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Tag {
@@ -264,8 +266,8 @@ pub enum Tag {
 
 /// A file's tokens.
 ///
-/// Invariants: `tags` and `starts` have one row per token, `starts` never
-/// decreases; `number_tokens` lists every [`Tag::Number`] token in order,
+/// Invariants: `tags`, `starts` and `ends` have one row per token, `starts`
+/// never decreases, `starts[i] <= ends[i]`; `number_tokens` lists every [`Tag::Number`] token in order,
 /// `number_values` its value; `switches` lists every [`Tag::LangSpice`] and
 /// [`Tag::LangSpectre`] token in order.
 pub struct Tokens<'s> {
@@ -273,6 +275,9 @@ pub struct Tokens<'s> {
     pub(super) lexicon: &'static Lexicon,
     pub(super) tags: Vec<Tag>,
     pub(super) starts: Vec<u32>,
+    /// One past each token's last byte: every token writer fills it with
+    /// the end its lexer found (`tokenize`'s `push`).
+    pub(super) ends: Vec<u32>,
     /// The byte offset of each physical line's first byte.
     pub(super) line_starts: Vec<u32>,
     pub(super) number_tokens: Vec<u32>,
@@ -379,9 +384,17 @@ impl<'s> Tokens<'s> {
         self.starts[i as usize]
     }
 
-    /// One past token `i`'s last byte, re-lexed from its start: O(token
-    /// length), plus O(log switches) to find its lexicon.
+    /// One past token `i`'s last byte.
     pub fn end(&self, i: u32) -> u32 {
+        self.ends[i as usize]
+    }
+
+    /// Token `i`'s end re-lexed from its start: O(token length), plus
+    /// O(log switches) to find its lexicon. The reference [`Tokens::end`] is
+    /// held to (by `tokenize` in a debug build, and over every golden input
+    /// by `tests/test_syntax.rs`); nothing else calls it.
+    pub fn end_relexed(&self, i: u32) -> u32 {
+        use crate::syntax::scan;
         let start = self.start(i);
         match self.tags[i as usize] {
             Tag::EndOfStatement | Tag::LangSpice | Tag::LangSpectre => start,
@@ -440,11 +453,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rows_are_five_bytes_per_token_and_twelve_per_number() {
-        // A token row is a tag byte plus a u32 start (Zig `Ast.TokenList`);
-        // a number row is a u32 token index plus an f64 value.
+    fn rows_are_nine_bytes_per_token_and_twelve_per_number() {
+        // A token row is a tag byte plus a u32 start and a u32 end (Zig
+        // `Ast.TokenList` plus the end); a number row is a u32 token index
+        // plus an f64 value.
         assert_eq!(size_of::<Tag>(), 1);
-        assert_eq!(size_of::<Tag>() + size_of::<u32>(), 5);
+        assert_eq!(size_of::<Tag>() + 2 * size_of::<u32>(), 9);
         assert_eq!(size_of::<u32>() + size_of::<f64>(), 12);
         assert_eq!(size_of::<Location>(), 8);
     }
