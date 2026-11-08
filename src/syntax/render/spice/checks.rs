@@ -61,22 +61,22 @@ impl W<'_, '_> {
                 }
             }
         }
-        self.ternary_checks(&blocks);
         // Xyce's time integral: ngspice's B source has `ddt`, no integral
         // (manual §5.1).
-        if self.b.expr_eval == ExprEval::Ngspice {
-            let exprs = self.expressions(&blocks);
-            let sdt = |f: &str| f.eq_ignore_ascii_case("sdt");
-            if let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(sdt)) {
-                self.refuse(Code::W0045, *tok);
-            }
-        }
+        let sdt = self.b.expr_eval == ExprEval::Ngspice;
         let caret = self.pair.caret_reread;
         let stat = self.cells[Construct::StatisticalCall as usize] != Action::Native;
-        if !caret && !stat {
-            return;
+        // Every expression the deck carries, built once for the checks
+        // below that read it (the seam P9-012's AST walk replaces).
+        let exprs = match self.pair.ngspice_ternaries || sdt || caret || stat {
+            true => self.expressions(&blocks),
+            false => Vec::new(),
+        };
+        self.ternary_checks(&blocks, &exprs);
+        let is_sdt = |f: &str| f.eq_ignore_ascii_case("sdt");
+        if sdt && let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(is_sdt)) {
+            self.refuse(Code::W0045, *tok);
         }
-        let exprs = self.expressions(&blocks);
         if caret && let Some((_, tok)) = exprs.iter().find(|(e, _)| e.contains('^')) {
             self.ask(Construct::CaretReread, *tok);
         }
@@ -159,7 +159,7 @@ impl<'r> W<'_, 'r> {
     /// it (W0034), or refused when nested deeper (W0035); in a function,
     /// refused, as ngspice reads its body by C's grammar in a B source
     /// and its own way in a `{}` value. A B source's is C's (no code).
-    fn ternary_checks(&mut self, blocks: &[&Block]) {
+    fn ternary_checks(&mut self, blocks: &[&Block], exprs: &[(String, u32)]) {
         if !self.pair.ngspice_ternaries {
             return;
         }
@@ -175,7 +175,6 @@ impl<'r> W<'_, 'r> {
                 }
             }
         }
-        let exprs = self.expressions(blocks);
         for (i, (e, tok)) in exprs.iter().enumerate() {
             match (i < funcs, ngspice_nest(e)) {
                 (_, Nest::Flat) => {}
