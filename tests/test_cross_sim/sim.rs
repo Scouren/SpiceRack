@@ -448,7 +448,7 @@ fn ngspice_text(text: &str, raw: &Path) -> String {
 }
 
 /// A `.tran TSTEP TSTOP [TSTART [TMAX]]` line (or a `.control` `tran`)
-/// with TMAX at most (TSTOP - TSTART)/n, the words after the numbers
+/// with TMAX at most (TSTOP - TSTART)/n and TSTEP, the words after the numbers
 /// (`uic`) kept; any other line as it is. ngspice, Xyce and ESPice share
 /// the order (ngspice manual `.tran`, Xyce RG `.TRAN`).
 fn tmax(line: &str, n: f64) -> String {
@@ -461,7 +461,12 @@ fn tmax(line: &str, n: f64) -> String {
         return line.to_string();
     }
     let start = nums.get(2).copied().unwrap_or(0.0);
-    let cap = (nums[1] - start) / n;
+    // Never coarser than the run was: a TMAX given replaces ngspice's
+    // default min(TSTEP, span/50), so a TSTEP finer than span/n stays.
+    let cap = match nums[0] {
+        step if step > 0.0 => ((nums[1] - start) / n).min(step),
+        _ => (nums[1] - start) / n,
+    };
     let max = nums.get(3).map_or(cap, |&m| m.min(cap));
     let rest = w[1 + nums.len()..].join(" ");
     format!("{} {} {} {start:e} {max:e} {rest}", w[0], w[1], w[2])
