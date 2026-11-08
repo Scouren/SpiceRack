@@ -158,6 +158,9 @@ lands where `netlist()` would refuse it. `tb.check_backend(name)` lists the
 writer's refusal (its code) beside the missing features. `SPICERACK_BACKEND=vacask` in the environment
 sets the default for every run. A flat `Circuit` takes it as
 `circuit.simulator(simulator="vacask")`.
+LTspice is found as `ltspice` on PATH, the macOS app, or a Wine install under
+`WINEPREFIX` (default `~/.wine`); `SPICERACK_LTSPICE=<path>` names the
+executable outright (a `.exe` runs under Wine).
 
 | Feature | ngspice | LTspice | VACASK | Spectre | ESPice |
 | --- | --- | --- | --- | --- | --- |
