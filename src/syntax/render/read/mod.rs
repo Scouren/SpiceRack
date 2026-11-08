@@ -15,7 +15,8 @@
 //!
 //! This file is the spine: the plan's types and the statement dispatch;
 //! `blocks` walks the blocks on a heap stack, `text` joins tokens as the old
-//! line stage did, `refused` sorts what the old grammar refused, `values`,
+//! line stage did, `refused` sorts what the old grammar refused, `rejects`
+//! leaves out a line its own simulator rejects (P0010, P0011), `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
 //! the model card an instance uses), `control` a `.control` block's lines
@@ -64,6 +65,7 @@ mod named_waves;
 mod options;
 mod outputs;
 mod refused;
+mod rejects;
 mod shapes;
 mod sources;
 mod sweeps;
@@ -579,6 +581,11 @@ impl<'a> Rd<'a> {
                 Tag::Control => here.raw.push(Raw::Joined(n)),
                 _ => self.raw(n, here, false),
             }
+            return None;
+        }
+        // A line its own simulator rejects has no meaning: left out, noted.
+        if let Some(code) = self.rejected(n) {
+            acc.notes.push(Diag::new(code, self.main(n), 0));
             return None;
         }
         match self.tag(n) {

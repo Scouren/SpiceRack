@@ -166,3 +166,76 @@ xyce/YLIN/ISC_TD/ErrorMessageTest.cir error-message test
 vacask/benchmark/graetz/gnucap/runme.sim gnucap deck
 vacask/benchmark/mul/gnucap/runme.sim gnucap deck
 vacask/benchmark/rc/gnucap/runme.sim gnucap deck
+# Xyce_Regression decks Xyce 7.10 `-norun` rejects (ZERO-LEDGER P1-022;
+# the run: spicerack-golden/zp1-022-xyce-norun.tsv) for a class the reader
+# cannot see from one line, so no P0010 is raised on them. A deck whose
+# rejected line is one P0010's classes see is not here: the reader leaves
+# that line out with P0010 (`render/read/rejects.rs`).
+#
+# Cross-file: the line is right; the file it reads is missing, broken, or
+# a plugin Xyce was not given.
+xyce/Certification_Tests/BUG_1325_SON/Win/inc_lib_file_absolute_path.cir cross-file: a .lib at an absolute path Xyce cannot open
+xyce/Certification_Tests/BUG_1325_SON/inc_lib_file_absolute_path.cir cross-file: a .lib at an absolute path Xyce cannot open
+xyce/Certification_Tests/BUG_387_SON/bug_387.cir cross-file: the .lib file has no .ENDL for its section
+xyce/Certification_Tests/BUG_42_SON/bug42.cir cross-file: the .lib file has no .ENDL for its section
+xyce/Certification_Tests/BUG_671/vpwl_binaryfile.cir cross-file: a PWL FILE Xyce cannot read
+xyce/Certification_Tests/BUG_702/dup-external.cir cross-file: a .INITCOND file, given twice
+xyce/Certification_Tests/BUG_702/empty-initcond.cir cross-file: a .INITCOND file with no values
+xyce/Certification_Tests/BUG_702/missing-initcond.cir cross-file: a .INITCOND file that is not there
+xyce/VANOISE/ekv_150nm_nmos_noise.cir cross-file: a Verilog-A model Xyce was not given as a plugin
+xyce/VERILOGPLUGIN/DiodeClipper.cir cross-file: a Verilog-A device Xyce was not given as a plugin
+xyce/VERILOGPLUGIN/MultiplePlugins.cir cross-file: a Verilog-A device Xyce was not given as a plugin
+xyce/VERILOGPLUGIN/rlc_series.cir cross-file: a Verilog-A device Xyce was not given as a plugin
+xyce/YLIN/IncorrectNumNodes.cir cross-file: a YLIN's node count against its Touchstone file's ports
+xyce/PARAM_RSP/diode_template.cir cross-file: a Dakota template (`@selecttext(...)`), a netlist once Dakota fills it
+xyce/DAKOTA_BB/OPT_SOI/opt_soi.cir cross-file: a Dakota template (`dakota_A0` …), a netlist once Dakota fills it
+#
+# Semantic: each line reads; two of them together, or a value, do not.
+xyce/Certification_Tests/BUG_1037_SON/specials_in_subckt_dot_param.cir semantic: a .PRINT name the deck does not define
+xyce/LEAD_CURRENTS/lead_pde_2d.cir semantic: a .PRINT name the deck does not define
+xyce/Output/Dasho/printLine_for_hb_ic.cir semantic: a .PRINT name the deck does not define
+xyce/Output/Dasho/printLine_for_hb_startup.cir semantic: a .PRINT name the deck does not define
+xyce/Output/Dasho/printLine_for_hb_td.cir semantic: a .PRINT name the deck does not define
+xyce/SENS/dummy_devLevelParams_vsin.cir semantic: a .PRINT name the deck does not define
+xyce/SENS/dummy_vsin.cir semantic: a .PRINT name the deck does not define
+xyce/HB/invert_hb1.cir semantic: the .PRINT type is not the deck's analysis
+xyce/HB/RC/simpleRC-hb1.cir semantic: the .PRINT type is not the deck's analysis
+xyce/HB/RC/simpleRC-hb2.cir semantic: the .PRINT type is not the deck's analysis
+xyce/MPDE/OPAMP/ccmop.cir semantic: the .PRINT type is not the deck's analysis
+xyce/MPDE/RC/simpleRC-hb.cir semantic: the .PRINT type is not the deck's analysis
+xyce/Certification_Tests/BUG_702/dup-inlined.cir semantic: .INITCOND given twice
+xyce/Certification_Tests/ISSUE_61/issue61.cir semantic: a B source's current read by another B source
+xyce/ROL/amplifier.cir semantic: a .ROL sweep of a name that is no parameter
+xyce/TRANSLINE/invalid_instance_parameters.cir semantic: a T line's F or NL not positive
+xyce/PDE_1D_BJT/expressionDopingExample.cir semantic: a PDE doping expression naming an unknown symbol
+xyce/Certification_Tests/BUG_548/overlap.cir semantic: a PDE device's electrodes overlap (Xyce aborts at topology)
+xyce/MINDUCTORS/MINDUCTORS_IC4.cir Xyce 7.10 crashes on it (signal 11 under -norun)
+xyce/NEURON/Cable_UserDefined.cir Xyce 7.10 crashes on it (signal 11 under -norun)
+#
+# One line, outside P0010's classes (field counts of the analysis cards,
+# R/L/C fields, PWL points and `r=`): each rejected line has a form of its
+# own, named here until a reader rule sees it.
+xyce/Certification_Tests/BUG_198/bug_198.cir one line: free text Xyce reads as no card
+xyce/Certification_Tests/BUG_258/bug_198.cir one line: free text Xyce reads as no card
+xyce/Certification_Tests/BUG_1578/bug_1578.cir one line: free text Xyce reads as no card
+xyce/Certification_Tests/BUG_401/bad-device-line.cir one line: free text Xyce reads as no card
+xyce/Certification_Tests/BUG_401/extra-space.cir one line: free text Xyce reads as no card
+xyce/Certification_Tests/BUG_401/worse-device-line.cir one line: free text Xyce reads as no card
+xyce/CommandLine/bad_command_line.cir one line: free text Xyce reads as no card
+xyce/Certification_Tests/BUG_690/misspelled.cir one line: a misspelled dot card
+xyce/Certification_Tests/BUG_1116/bug_1116.cir one line: a diode with one node
+xyce/Certification_Tests/BUG_587/587.cir one line: a number with an expression for its exponent
+xyce/Certification_Tests/BUG_67/bug_67.cir one line: a POLY inside a brace expression
+xyce/Certification_Tests/BUG_726/adjacent.cir one line: two K elements on one line
+xyce/INVALID_CHARS/semicolon_fails.cir one line: a character Xyce names cannot hold
+xyce/INVALID_CHARS/right_curly_fails.cir one line: a character Xyce names cannot hold
+xyce/INVALID_CHARS/single_quote_fails.cir one line: a character Xyce names cannot hold
+xyce/LEAD_CURRENTS/lead_pde_2d2.cir one line: a lead current of a name with a blank
+xyce/FFT/bad_fft_line2.cir one line: a .FFT WINDOW, FORMAT or NP Xyce has not
+xyce/MEASURE/bad_dot_measure_line1.cir one line: a malformed .MEASURE
+xyce/MEASURE/bad_dot_measure_line2.cir one line: a malformed .MEASURE
+xyce/MEASURE/bad_dot_measure_line9.cir one line: a malformed .MEASURE
+xyce/MEASURE_FFT/bad_dot_measure_line2.cir one line: a malformed .MEASURE
+xyce/MEASURE_FFT/unsupported_fft_measure_types.cir one line: a malformed .MEASURE
+xyce/SENS/improperVectorParams.cir one line: a malformed .SENS parameter list
+xyce/VPAT/bad_vpat.cir one line: a malformed PAT source

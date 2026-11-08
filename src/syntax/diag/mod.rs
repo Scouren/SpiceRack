@@ -150,6 +150,19 @@ catalogue! {
     // P0010–P0014: stream D's reader codes (P1-022, P1-042, P4-100).
     // P0020–P0026: stream S3 (P8-149). P0030–P0039: S1. P0040–P0049: S2.
     // P0050–P0059: S3.
+    /// A line the source's own simulator (Xyce) rejects: left out, noted.
+    P0010 Note {
+        title: "source text its simulator rejects",
+        cite: "Xyce 7.10 `-norun`: \".TRAN line has an unexpected number of fields\", \".DC line not formatted correctly\" / \"Extraneous values on .DC line\", \".AC line has an unexpected number of fields\", \".NOISE line has an unexpected number of fields\", \".FFT line needs at least 2 arguments\", \".FOUR line needs at least 3 arguments\", \"Not enough fields on input line for device\", \"Unrecognized parameter\", \"PWL device missing source parameters\", \"Could not parse time/value pairs for PWL function\", \"PWL source repeat value (R) must be >= 0 and < last value\"",
+        explain: "Xyce stops on this line before it runs the deck (a field count its card does not take, a second value on an R, L or C, a PWL with no points or a repeat time outside them), so the line has no meaning to write. It is left out and the rest of the deck is written; fix the line in the source.",
+    }
+    /// An ngspice PWL `r=` that is not one of the wave's time points before
+    /// the last: left out, noted.
+    P0011 Note {
+        title: "a PWL repeat time no point of the wave",
+        cite: "ngspice-45 run: \"repeat start time value … does not match any time point given!\", \"… must be smaller than final time point given!\" (ngspice manual §4.1.4)",
+        explain: "ngspice repeats a PWL wave from the time point `r=` names, which must be one of the wave's time points before the last; any other value stops the run. The source is left out and the rest of the deck is written; set `r=` to one of the wave's time points.",
+    }
     /// An instance whose master names nothing the kit declares: no
     /// subcircuit, model or primitive. The instance keeps its name.
     R0001 Note {
