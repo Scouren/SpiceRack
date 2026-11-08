@@ -13,7 +13,7 @@
 //! - `pub enum Sim`, `Sim::name(self) -> &'static str`, `Sim::on_path(self) -> bool`
 //! - `pub enum Ran`
 //! - `pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: u64) -> Ran`
-//! - `pub fn refined(sim: Sim, text: &str) -> Option<String>`
+//! - `pub fn refined(sim: Sim, text: &str, n: f64) -> Option<String>`
 
 use std::path::Path;
 use std::process::Command;
@@ -90,15 +90,15 @@ pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: 
     }
 }
 
-/// `text` with every transient's TMAX at most (TSTOP - TSTART)/2000: the
+/// `text` with every transient's TMAX at most (TSTOP - TSTART)/n: the
 /// refinement oracle (ZERO-LEDGER P1-012, mismatches.md §4.2): a pair that
 /// agrees once both simulators take small steps differed numerically.
 /// `None` for a VACASK deck (its `tran` takes `maxstep=`, not refined here).
-pub fn refined(sim: Sim, text: &str) -> Option<String> {
+pub fn refined(sim: Sim, text: &str, n: f64) -> Option<String> {
     if sim == Sim::Vacask {
         return None;
     }
-    Some(text.lines().map(|l| tmax(l, 2000.0) + "\n").collect())
+    Some(text.lines().map(|l| tmax(l, n) + "\n").collect())
 }
 
 // ---- private ----

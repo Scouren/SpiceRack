@@ -16,7 +16,7 @@ circuitsim90/MOS3/gm17.sp mismatch # tran v(4): 4.813072814687794 leaves the tub
 circuitsim90/MOS3/gm19.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS3/gm3.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS3/jge.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-circuitsim90/MOS3/mike2.sp mismatch # tran i(vpulse): -0.0020232967180685846 leaves the tube at t=0.000000001011106874948874 (tol 2.311e-5)
+circuitsim90/MOS3/mike2.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/20000 both agree; was: tran i(vpulse): -0.0020232967180685846 leaves the tube at t=0.000000001011106874948874 (tol 2.311e-5)
 circuitsim90/MOS3/rich3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS3/todd3.sp mismatch # tran i(vamp): 0.0022356814081991774 leaves the tube at t=0.00000000593 (tol 3.070e-5)
 cmcqa/hicum/hicum_CBC_CCS_npn_1D_ac_T150.sp simulator-differs:reference-data reason=HICUM-L2-AC proof=hicum-l2-ac.md # ac i(vemit_68): -0.07786168302209301+0.000060119155154538284i vs -0.07699057578837298+0.00006011915660350261i at 1000000000 (tol 1.557e-4)

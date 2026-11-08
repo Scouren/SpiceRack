@@ -505,7 +505,7 @@ fn check(
 }
 
 /// The refinement oracle: the original on its simulator and the written
-/// deck on the target's, both at TMAX (TSTOP - TSTART)/2000
+/// deck on the target's, both at TMAX (TSTOP - TSTART)/2000 or /20000
 /// ([`sim::refined`]), agree. A transient mismatch that goes so is the two
 /// integrators' step choice, not the writer's.
 fn refines(
@@ -516,14 +516,19 @@ fn refines(
     text: &kit::Files,
     tol: cmp::Tol,
 ) -> bool {
-    let (Some(a), Some(b)) = (sim::refined(c.sim, src), sim::refined(t.sim, &text.0)) else {
-        return false;
-    };
-    let a = uic_start(c.sim, src, sim::run(c.sim, deck, &a, &[], 4 * SECS));
-    match (a, sim::run(t.sim, deck, &b, &text.1, 4 * SECS)) {
-        (Ran::Plots(a), Ran::Plots(b)) => cmp::compare(&a, &b, tol).is_ok(),
-        _ => false,
-    }
+    // TSTOP/2000, then TSTOP/20000 for the decks that converge only there
+    // (settle-ngspice: simpleRC2, colpitts, LUMPEDLINE pass at TSTOP/20000).
+    [2000.0, 20000.0].into_iter().any(|n| {
+        let (Some(a), Some(b)) = (sim::refined(c.sim, src, n), sim::refined(t.sim, &text.0, n))
+        else {
+            return false;
+        };
+        let a = uic_start(c.sim, src, sim::run(c.sim, deck, &a, &[], 4 * SECS));
+        match (a, sim::run(t.sim, deck, &b, &text.1, 4 * SECS)) {
+            (Ran::Plots(a), Ran::Plots(b)) => cmp::compare(&a, &b, tol).is_ok(),
+            _ => false,
+        }
+    })
 }
 
 fn fails(class: &'static str, why: &dyn std::fmt::Display) -> Verdict {
