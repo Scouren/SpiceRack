@@ -25,6 +25,47 @@ use crate::syntax::render::read::{Block, Card, Comp, Func, Num, Val};
 /// The statistical functions (ngspice §2.11.5).
 const STATISTICAL: [&str; 5] = ["agauss", "gauss", "aunif", "unif", "limit"];
 
+/// A deck-wide expression check: where `holds`, the first expression of
+/// the deck that `finds` matches gets `then`.
+struct ExprCheck {
+    holds: fn(&W<'_, '_>) -> bool,
+    finds: fn(&str) -> bool,
+    then: Then,
+}
+
+/// What an expression check records.
+#[derive(Clone, Copy)]
+enum Then {
+    /// A refusal with this code.
+    Refuse(Code),
+    /// The target's cell for this construct (`W::ask`).
+    Ask(Construct),
+}
+
+/// The deck-wide expression checks, in the order they are recorded. Adding
+/// one (a call or an operator the target has no form for): a row, gated on
+/// a `Pair` field or the target's cells, finding the call with [`calls`].
+const EXPR_CHECKS: &[ExprCheck] = &[
+    // Xyce's time integral: ngspice's B source has `ddt`, no integral
+    // (manual §5.1).
+    ExprCheck {
+        holds: |w| w.b.expr_eval == ExprEval::Ngspice,
+        finds: |e| calls(e).any(|f| f.eq_ignore_ascii_case("sdt")),
+        then: Then::Refuse(Code::W0045),
+    },
+    // `^` read with the other meaning (power or XOR).
+    ExprCheck {
+        holds: |w| w.pair.caret_reread,
+        finds: |e| e.contains('^'),
+        then: Then::Ask(Construct::CaretReread),
+    },
+    ExprCheck {
+        holds: |w| w.cells[Construct::StatisticalCall as usize] != Action::Native,
+        finds: |e| calls(e).any(|f| STATISTICAL.iter().any(|s| s.eq_ignore_ascii_case(f))),
+        then: Then::Ask(Construct::StatisticalCall),
+    },
+];
+
 impl W<'_, '_> {
     /// Records the deck-wide refusals.
     pub(super) fn checks(&mut self) {
@@ -61,28 +102,24 @@ impl W<'_, '_> {
                 }
             }
         }
-        // Xyce's time integral: ngspice's B source has `ddt`, no integral
-        // (manual §5.1).
-        let sdt = self.b.expr_eval == ExprEval::Ngspice;
-        let caret = self.pair.caret_reread;
-        let stat = self.cells[Construct::StatisticalCall as usize] != Action::Native;
+        let held: Vec<&ExprCheck> = EXPR_CHECKS.iter().filter(|c| (c.holds)(self)).collect();
         // Every expression the deck carries, built once for the checks
         // below that read it (the seam P9-012's AST walk replaces).
-        let exprs = match self.pair.ngspice_ternaries || sdt || caret || stat {
+        let exprs = match self.pair.ngspice_ternaries || !held.is_empty() {
             true => self.expressions(&blocks),
             false => Vec::new(),
         };
         self.ternary_checks(&blocks, &exprs);
-        let is_sdt = |f: &str| f.eq_ignore_ascii_case("sdt");
-        if sdt && let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(is_sdt)) {
-            self.refuse(Code::W0045, *tok);
-        }
-        if caret && let Some((_, tok)) = exprs.iter().find(|(e, _)| e.contains('^')) {
-            self.ask(Construct::CaretReread, *tok);
-        }
-        let is_stat = |f: &str| STATISTICAL.iter().any(|s| s.eq_ignore_ascii_case(f));
-        if stat && let Some((_, tok)) = exprs.iter().find(|(e, _)| calls(e).any(is_stat)) {
-            self.ask(Construct::StatisticalCall, *tok);
+        // Each check that holds, at the first expression it finds.
+        for c in held {
+            if let Some((_, tok)) = exprs.iter().find(|(e, _)| (c.finds)(e)) {
+                match c.then {
+                    Then::Refuse(code) => self.refuse(code, *tok),
+                    Then::Ask(construct) => {
+                        self.ask(construct, *tok);
+                    }
+                }
+            }
         }
     }
 
