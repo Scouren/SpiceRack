@@ -275,7 +275,6 @@ ngspice/tests/mesa/mesosc.sp target-fails # no raw file .cross_sim_out.raw: Netl
 ngspice/tests/mos6/mos6inv.sp mismatch # tran i(vin): -0.00006723369385653813 leaves the tube at t=0.00000000046 (tol 6.811e-7)
 ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): -0.0000008905818325687239 leaves the tube at t=0.000000038139999999999996 (tol 9.868e-8)
 ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {100*foo0()} | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MS
-ngspice/tests/regression/misc/asrc-tc-2.sp mismatch # plots ["op", "op"] became ["op"]
 ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["V(1)", "V1#branch"])
 ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file .cross_sim_out.raw: 
 ngspice/tests/regression/misc/test-noise-2.sp mismatch # plots ["noise", "total"] became ["noise"]

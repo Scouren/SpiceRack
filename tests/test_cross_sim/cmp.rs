@@ -83,8 +83,12 @@ fn kind(p: &RawData) -> &'static str {
     if p.plot_name.to_ascii_lowercase().contains("noise") {
         return if p.re(0).len() <= 1 { "total" } else { "noise" };
     }
-    // One point is an operating point whatever its scale: Xyce writes the
-    // `.op` beside an `.ac` as a one-point plot over frequency.
+    // A complex plot is an ac sweep, one point or many (`.ac dec 1 1k 1k`);
+    // a real one-point plot an operating point whatever its scale (Xyce's
+    // `-r` op plot is over TIME).
+    if p.is_complex {
+        return "ac";
+    }
     if p.re(0).len() <= 1 {
         return "op";
     }
@@ -135,7 +139,7 @@ fn column(r: &RawData, i: usize) -> Vec<Complex64> {
 fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
     // An op plot (and ngspice's one-point integrated noise) has no scale:
     // its first vector is a value.
-    let first = usize::from(k != "op" && a.re(0).len() > 1);
+    let first = usize::from(k != "op" && k != "total");
     let (xa, xb) = (a.re(0), b.re(0));
     if first == 1 && k != "tran" {
         let span = xa.iter().fold(0.0f64, |m, x| m.max(x.abs()));

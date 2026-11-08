@@ -1981,7 +1981,6 @@ ngspice/tests/polezero/pzt.sp simulator-differs # plots ["op"] became ["dc"]
 ngspice/tests/regression/lib-processing/ex1b.sp simulator-differs # op v(9): 1+0i vs 1.3333333333333335+0i at 0 (tol 2.002e-3)
 ngspice/tests/regression/misc/ac-zero.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .ac lin 1 0 0: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
 ngspice/tests/regression/misc/asrc-tc-1.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: b2  2 0  i=v(1) tc1=0.001 | Error: .cross_sim_deck.sp: ParseError
-ngspice/tests/regression/misc/asrc-tc-2.sp mismatch # op v(1): 10+0i vs 100+0i at 0 (tol 2.000e-2)
 ngspice/tests/regression/misc/bugs-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @v1[dc]: v1 has no variable 'dc'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/tests/regression/misc/empty-1.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: DeliveryFailed | Output error: DataLengthMismatch
 ngspice/tests/regression/misc/if-elseif.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: .elseif (select2 = 2) | Error: .cross_sim_deck.sp: ParseError
