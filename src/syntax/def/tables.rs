@@ -1,7 +1,7 @@
 //! The definition's list rows ([`DialectDef`]): the Spectre analyses a
 //! target has, the language's temperature word, builtin constants and
-//! built-in device names, the SPICE options it maps, each appended by one
-//! call.
+//! built-in device names, the SPICE options it maps, the master a SPICE
+//! `.model` type gets, each appended by one call.
 //!
 //! Cites: none (each definition cites its manual where it declares a row).
 //!
@@ -11,9 +11,11 @@
 //! - `DialectDef::vacask_analysis(self, kind: &str) -> Self`
 //! - `DialectDef::option_to(self, spice: &str, own: &str) -> Self`, `DialectDef::option_method(self, spice: &str) -> Self`,
 //!   `DialectDef::option_cosmetic(self, spice: &str) -> Self`
+//! - `DialectDef::model_master(self, kind: &str, levels: &[u32], master: &str, type_: Option<&str>) -> Self`,
+//!   `DialectDef::spice_model_type(self, kind: &str) -> Self`
 
 use super::{DialectDef, leak, put};
-use crate::syntax::behaviour::OptionTo;
+use crate::syntax::behaviour::{ModelMaster, OptionTo};
 
 impl DialectDef {
     /// The expression word for the circuit temperature.
@@ -85,6 +87,49 @@ impl DialectDef {
         let mut v = self.b.option_map.to_vec();
         put(&mut v, leak(&spice.to_ascii_lowercase()), to);
         self.b.option_map = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// SPICE `.model` type `kind` at any of `levels` is the target's master
+    /// `master`, written with `type=type_` (Spectre `bsim4 type=n`, VACASK
+    /// `sp_bsim4v8 type=-1`). A row of the same type and LEVELs is replaced
+    /// in place. The type is a SPICE one only once `spice_model_type`
+    /// names it.
+    pub fn model_master(
+        mut self,
+        kind: &str,
+        levels: &[u32],
+        master: &str,
+        type_: Option<&str>,
+    ) -> Self {
+        let row = ModelMaster {
+            kind: leak(&kind.to_ascii_lowercase()),
+            levels: Box::leak(levels.to_vec().into_boxed_slice()),
+            master: leak(master),
+            type_: type_.map(leak),
+        };
+        let mut v = self.b.model_masters.to_vec();
+        match v
+            .iter_mut()
+            .find(|m| m.kind == row.kind && m.levels == row.levels)
+        {
+            Some(m) => *m = row,
+            None => v.push(row),
+        }
+        self.b.model_masters = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// The target reads `.model` type `kind` as SPICE's: at a LEVEL no
+    /// `model_master` row covers it is refused (W0104), where a type not
+    /// named is written as a master of the target's own.
+    pub fn spice_model_type(mut self, kind: &str) -> Self {
+        let kind = kind.to_ascii_lowercase();
+        let mut v = self.b.spice_model_types.to_vec();
+        if !v.contains(&kind.as_str()) {
+            v.push(leak(&kind));
+        }
+        self.b.spice_model_types = Box::leak(v.into_boxed_slice());
         self
     }
 }

@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 
 use super::W;
 use super::vacask::q;
-use crate::syntax::behaviour::ModelSemantics;
+use crate::syntax::behaviour::{MasterAnswer, ModelSemantics};
 use crate::syntax::diag::Code;
 use crate::syntax::render::read::{Block, Model};
 
@@ -116,8 +116,9 @@ impl W<'_, '_> {
         Some(Some(rows))
     }
 
-    /// Model `m`'s line: LEVEL picks the module (a type or level with none
-    /// is `None`); a kind no SPICE type names is a module the deck loads
+    /// Model `m`'s line: its type and LEVEL pick the module (the target's
+    /// rows, `Behaviours::model_master`; a type or level with none is
+    /// `None`); a kind no SPICE type names is a module the deck loads
     /// itself, passed through ("Model not found" beats a substitute).
     fn vacask_model(
         &mut self,
@@ -138,20 +139,14 @@ impl W<'_, '_> {
                 level = super::spice_num(t)?.0 as u32;
             }
         }
-        let (module, sign) = match kind.as_str() {
-            "nmos" | "pmos" => (mos_module(level)?, if kind == "nmos" { 1 } else { -1 }),
-            // `.model x NPN (LEVEL=4)` is VBIC, `LEVEL=8` HICUM: other
-            // equations under the same keyword.
-            k if model_type(k).is_some() => {
-                if level != 1 {
-                    return None;
-                }
-                model_type(k)?
-            }
-            // `sp_resistor` renames the card's `r`/`tc1` to `model_r`…: a
-            // name-for-name card would set the instance's. No switches.
-            "r" | "c" | "l" | "res" | "cap" | "ind" | "sw" | "csw" => return None,
-            _ => {
+        // `.model x NPN (LEVEL=4)` is VBIC, `LEVEL=8` HICUM: other
+        // equations under the same keyword, so no row. `sp_resistor`
+        // renames the card's `r`/`tc1` to `model_r`…: a name-for-name card
+        // would set the instance's, so R, C, L (and switch) types have none.
+        let (module, sign) = match self.b.model_master(&kind, level) {
+            MasterAnswer::Master(r) => (r.master, r.type_),
+            MasterAnswer::Refused => return None,
+            MasterAnswer::AsWritten => {
                 return Some(format!(
                     "model {name} {kind}{}",
                     self.vacask_params(m, None)
@@ -164,15 +159,14 @@ impl W<'_, '_> {
         loads.insert(format!("spice/{module}.osdi"));
         // `type=` is the polarity, and keeps an otherwise empty list
         // non-empty: `model x sp_diode ( )` is a syntax error.
-        let lead = (sign != 0).then_some(sign);
         Some(format!(
             "model {name} sp_{module}{}",
-            self.vacask_list(lead, &rows)
+            self.vacask_list(sign, &rows)
         ))
     }
 
     /// ` (type=1 k=v …)`, or nothing: `m`'s parameters but its `level`.
-    fn vacask_params(&self, m: &Model, sign: Option<i8>) -> String {
+    fn vacask_params(&self, m: &Model, sign: Option<&str>) -> String {
         let rows = m
             .params
             .iter()
@@ -184,7 +178,7 @@ impl W<'_, '_> {
     }
 
     /// ` (type=1 k=v …)`, or nothing.
-    fn vacask_list(&self, sign: Option<i8>, rows: &[(String, String)]) -> String {
+    fn vacask_list(&self, sign: Option<&str>, rows: &[(String, String)]) -> String {
         let mut s = String::new();
         if let Some(t) = sign {
             s.push_str(&format!(" type={t}"));
@@ -210,37 +204,6 @@ fn vacask_has(module: &str, name: &str) -> bool {
 /// device VACASK's `sp_<module>` is built from.
 fn ngspice_reads(module: &str, name: &str) -> bool {
     has(NGSPICE, module, name)
-}
-
-/// SPICE MOSFET LEVEL → VACASK module; a level not here has none ("the
-/// nearest model" is other equations).
-fn mos_module(level: u32) -> Option<&'static str> {
-    Some(match level {
-        1 => "mos1",
-        2 => "mos2",
-        3 => "mos3",
-        6 => "mos6",
-        9 => "mos9",
-        49 | 8 => "bsim3v3",
-        54 | 14 => "bsim4v8",
-        _ => return None,
-    })
-}
-
-/// `.model` TYPE → (module, polarity), for the types whose parameters
-/// transcribe name for name at LEVEL 1.
-fn model_type(kind: &str) -> Option<(&'static str, i8)> {
-    Some(match kind {
-        "d" => ("diode", 0),
-        "npn" => ("bjt", 1),
-        "pnp" => ("bjt", -1),
-        "njf" => ("jfet1", 1),
-        "pjf" => ("jfet1", -1),
-        "nmf" => ("mes1", 1),
-        "pmf" => ("mes1", -1),
-        "vdmos" => ("vdmos", 1),
-        _ => return None,
-    })
 }
 
 fn has(table: &str, module: &str, name: &str) -> bool {

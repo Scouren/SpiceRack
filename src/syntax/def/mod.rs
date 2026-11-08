@@ -33,7 +33,7 @@
 //!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
 //!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `netlist_rules`,
 //!   `subckt_multiplicity`, `spectre_analysis`, `temp_name`, `builtin_constant`, `builtin_device`,
-//!   `vacask_analysis`, `option_to`, `option_method`, `option_cosmetic`
+//!   `vacask_analysis`, `option_to`, `option_method`, `option_cosmetic`, `model_master`, `spice_model_type`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
 //!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
