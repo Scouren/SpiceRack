@@ -17,6 +17,19 @@
 //! `cdl` CDL's layout; the `statistics` lift (`render::draws`) and the name
 //! map (`render::names`) are shared with the named writer.
 //!
+//! Where a change goes:
+//! - what one target does with a construct: its capability cell
+//!   (`Spell`/`Lift`/`Refuse`, `syntax::dialects`), read through `W::ask`;
+//! - a form of the target alone: a `Behaviours` field, read as `self.b`;
+//! - a rule between the source and the target (Xyce's model `R` on
+//!   ngspice, HSPICE's 25 °C elsewhere): a field of `pair::Pair`, read as
+//!   `self.pair`;
+//! - an expression rewrite for another family: a row of
+//!   `values::REWRITES`, its spelling in `ternary`;
+//! - an element card: its kind's `*_card` in `cards`; a testbench card:
+//!   its step of `bench::W::bench`; an analysis: its arm of
+//!   `analyses::W::analysis`; a model card: `model_cards::W::model`.
+//!
 //! Cites: ngspice manual ch.2 (the deck), §2.4.3 (`.subckt`), §2.6, §2.7
 //! (`.include`, `.lib`), §2.15 (`.if`); HSPICE `.END` (a library ends
 //! without one: the old HSPICE grammar's L9); Xyce RG Table 2-36 (BSIM3
@@ -447,6 +460,10 @@ impl W<'_, '_> {
     }
 
     fn subckt(&mut self, sc: &Block) {
+        // Subcircuits are written hoisted, one at a time (paired with the
+        // reset at the end).
+        assert_eq!(self.scope, crate::syntax::ast::NONE, "no subcircuit open");
+        assert!(self.m_param.is_none(), "no subcircuit's M renamed");
         self.scope = sc.node;
         let head = self
             .rd

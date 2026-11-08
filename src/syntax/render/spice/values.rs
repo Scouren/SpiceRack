@@ -1,8 +1,9 @@
 //! A value's text as the target reads it: HSPICE's quoting, and the
-//! expression spellings another family needs (`ternary`: grouping,
-//! `if()`, `log`'s base, `nint`'s rounding, a clamp, statistical calls at
-//! their nominal, a Xyce `M` renamed), and an R model's value where Xyce
-//! reads its model `R` as a multiplier.
+//! expression spellings another family needs (`REWRITES`, each spelled in
+//! `ternary`: `if()`, `log`'s base, `nint`'s rounding, a clamp,
+//! statistical calls at their nominal, a Xyce `M` renamed; then the
+//! ternaries' grouping), and an R model's value where Xyce reads its model
+//! `R` as a multiplier.
 //!
 //! Cites: per item.
 //!
