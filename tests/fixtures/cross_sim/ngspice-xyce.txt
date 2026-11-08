@@ -201,7 +201,6 @@ ngspice/examples/mos/ro-meas.sp mismatch # tran v(xro.n2): 0.7617871250767438 le
 ngspice/examples/mos/ro_17_4.sp mismatch # tran i(vdd): -0.3335242810047126 leaves the tube at t=0.0000000000010000000000000002 (tol 3.335e-3)
 ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/noise/resdiv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/examples/p-to-n-examples/MOS1_out.sp mismatch # dc i(vb): 0.000000000005430000000000002+0i vs 0.000000000007487829062052148+0i at 1.8000000000000005 (tol 2.030e-12)
 ngspice/examples/p-to-n-examples/logic.sp mismatch # tran v(1): 1.5 leaves the tube at t=0 (tol 1.500e-2)
 ngspice/examples/p-to-n-examples/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/p-to-n-exampl
 ngspice/examples/snapshot/adder_mos.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/snapshot/adde
@@ -235,7 +234,6 @@ ngspice/paranoia/measure/func_cap.sp target-fails # no raw file .cross_sim_out.r
 ngspice/paranoia/measure/mos-meas-dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: node 1 | Simulation aborted due to error.  There are 0 MSG_FATAL 
 ngspice/paranoia/measure/rc-meas-ac.sp mismatch # ac: sweep grid changed (41 -> 34 points)
 ngspice/paranoia/measure/simple-meas-tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | DERIV/DERIVATIVE, DUTY, EQN/PARAM, ERR, ERR1, ERR2, ERROR, FIND, WHEN, FOUR, | Simul
-ngspice/paranoia/pton/MOS1_out.sp mismatch # dc i(vb): 0.000000000005430000000000002+0i vs 0.000000000007487829062052148+0i at 1.8000000000000005 (tol 2.030e-12)
 ngspice/paranoia/pton/op-test-adi.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/pton/ad22057
 ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/paranoia/various/nmos_pmos_BSIM330.sp slow # quarantined

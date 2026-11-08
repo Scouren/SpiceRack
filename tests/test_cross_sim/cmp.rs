@@ -8,8 +8,10 @@
 //! runs: ngspice and Xyce both converge Newton to RELTOL = 1e-3 of the
 //! value plus VNTOL = 1e-6 V (ABSTOL = 1e-12 A for a current); VACASK and
 //! ESPice share those defaults. An op, dc or ac point passes within
-//! 2 * (RELTOL * swing + VNTOL), the swing being the vector's largest
-//! magnitude in the reference run. A transient also carries the local
+//! 2 * (RELTOL * swing + floor), the swing being the vector's largest
+//! magnitude in the reference run, the floor VNTOL for a voltage and
+//! ABSTOL + GMIN * Vmax for a current (Vmax the plot's largest node
+//! voltage: each simulator puts GMIN = 1e-12 S on other junctions). A transient also carries the local
 //! truncation error each integrator allows, TRTOL = 7 times RELTOL in
 //! ngspice and Xyce, so a point passes within 1e-2 of the swing (rounded up
 //! from 2 * 7e-3 / sqrt(2), the two errors independent) plus 2 * VNTOL,
@@ -30,10 +32,11 @@ use spicerack::result::{RawData, VarType};
 
 use super::tube::leaves_tube;
 
-/// RELTOL, VNTOL and ABSTOL, the defaults both simulators share.
+/// RELTOL, VNTOL, ABSTOL and GMIN, the defaults both simulators share.
 const RELTOL: f64 = 1e-3;
 const VNTOL: f64 = 1e-6;
 const ABSTOL: f64 = 1e-12;
+const GMIN: f64 = 1e-12;
 /// A transient point's tolerance, relative to the swing (module doc).
 const TRAN: f64 = 1e-2;
 
@@ -170,6 +173,13 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
     for (j, w) in b.variables.iter().enumerate().skip(first) {
         in_b.entry(normal(&w.name)).or_insert(j);
     }
+    // A current's floor: ABSTOL plus what GMIN at the plot's largest node
+    // voltage carries, since each simulator puts GMIN on other junctions.
+    let vmax = (first..a.variables.len())
+        .filter(|&i| a.variables[i].var_type == VarType::Voltage)
+        .flat_map(|i| column(a, i))
+        .map(|c| c.norm())
+        .fold(0.0, f64::max);
     let mut shared = 0;
     for (i, v) in a.variables.iter().enumerate().skip(first) {
         let Some(&j) = in_b.get(&normal(&v.name)) else {
@@ -179,7 +189,7 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
         let (ya, yb) = (column(a, i), column(b, j));
         let swing = ya.iter().map(|c| c.norm()).fold(0.0, f64::max);
         let floor = match v.var_type {
-            VarType::Current => ABSTOL,
+            VarType::Current => ABSTOL + GMIN * vmax,
             _ => VNTOL,
         };
         if k == "tran" {
