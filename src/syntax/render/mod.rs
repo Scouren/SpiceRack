@@ -20,7 +20,7 @@
 //!
 //! Contents:
 //! - `pub mod capability`, `pub mod spelling`
-//! - `pub struct Source<'a>`, `pub enum Numbers`, `pub const NGBEHAVIOR: &str`, `pub struct Written`, `pub struct Diags`
+//! - `pub struct Source<'a>`, `pub enum Numbers`, `pub const NGBEHAVIOR: &str`, `pub const LTSPICE_EACH: &str`, `pub struct Written`, `pub struct Diags`
 //! - `pub fn render(src: &Source, target: impl Into<Lang>) -> Result<Written, Diags>`
 //! - `pub struct Pending`, `pub struct Request`, `pub fn card_fields(text: &str) -> (&str, Vec<&str>, Vec<(&str, &str)>)`,
 //!   `pub fn render_pending(src: &Source, target: impl Into<Lang>) -> Result<Pending, Diags>`,
@@ -77,6 +77,12 @@ pub struct Source<'a> {
 /// the ngspice backend (`backend::ngspice`), the mode after it: ngspice
 /// reads the mode only before parsing (no card sets it).
 pub const NGBEHAVIOR: &str = "*spicerack ngbehavior=";
+
+/// The comment line before an LTspice deck's analysis cards when it holds
+/// more than one: LTspice runs one analysis a deck ("More than one analysis
+/// specified"), so `simulation::run_each` runs each card after this line
+/// alone (`.four` with the `.tran`), the rest of the deck the same.
+pub const LTSPICE_EACH: &str = "* spicerack: LTspice runs each analysis below alone";
 
 /// How an ngspice (or ESPice) deck spells the file's numbers.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

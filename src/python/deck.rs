@@ -25,7 +25,7 @@
 //! - `pub(super) struct Deck`
 //! - `Deck::netlist(&self, backend: &str) -> PyResult<String>`,
 //!   `Deck::run(&self, backend: Option<&str>) -> PyResult<RawData>`,
-//!   `Deck::run_each(&self, backend: Option<&str>) -> PyResult<Vec<Option<RawData>>>`,
+//!   `Deck::run_each(&self, backend: Option<&str>) -> PyResult<Vec<Vec<RawData>>>`,
 //!   `Deck::to_source(&self) -> PyResult<String>`, `Deck::issues(&self, backend: &str) -> Vec<String>`,
 //!   `Deck::card(body: &Body, name: &str) -> PyResult<String>`
 //! - `pub(super) fn check_backend_name(name: &str) -> PyResult<()>`
@@ -105,8 +105,9 @@ impl Deck {
         crate::simulation::run(sim, &text).map_err(runtime_err)
     }
 
-    /// Runs the deck once; one plot per queued analysis, in queue order.
-    pub(super) fn run_each(&self, backend: Option<&str>) -> PyResult<Vec<Option<RawData>>> {
+    /// Runs the deck once; each queued analysis's plots (one, one per
+    /// `.step`, none for a Fourier), in queue order.
+    pub(super) fn run_each(&self, backend: Option<&str>) -> PyResult<Vec<Vec<RawData>>> {
         let (sim, text) = self.for_run(backend)?;
         let kinds: Vec<Kind> = self.analyses().iter().map(Analysis::kind).collect();
         crate::simulation::run_each(sim, &text, &kinds).map_err(runtime_err)

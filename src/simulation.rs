@@ -9,10 +9,11 @@
 //! Contents:
 //! - `pub fn run(sim: Dialect, deck: &str) -> Result<RawData, BackendError>`
 //! - `pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError>`
-//! - `pub fn run_each(sim: Dialect, deck: &str, analyses: &[Kind]) -> Result<Vec<Option<RawData>>, BackendError>`
+//! - `pub fn run_each(sim: Dialect, deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError>`
 
 use crate::backend::{BackendError, Dialect, Kind, Plot};
 use crate::result::RawData;
+use crate::syntax::render::LTSPICE_EACH;
 
 /// Runs `deck`, written in `sim`'s dialect, on `sim`, tagging the result
 /// with the backend and its parsed `.meas` values. The first plot:
@@ -47,11 +48,12 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
 }
 
 /// [`run_all`], one entry per analysis of the deck, `analyses` in its
-/// order: that analysis's first plot, or `None` for a `Fourier`, which
-/// prints its table and writes none. ngspice runs a deck's analyses in its
-/// own order, so a plot is matched by its `Plotname` (ngspice's and
-/// ESPice's), not by position; VACASK's are in deck order, one per
-/// analysis. A lone analysis takes the first plot, as [`run`].
+/// order: that analysis's plots, one, or with `.step` one per step in step
+/// order (ZERO D42), or none for a `Fourier`, which prints its table and
+/// writes none. ngspice runs a deck's analyses in its own order, so a plot
+/// is matched by its `Plotname` (ngspice's and ESPice's), not by position;
+/// VACASK's are in deck order, one per analysis. A lone analysis takes the
+/// first plot, as [`run`], or every step.
 ///
 /// # Errors
 /// As [`run_all`], and `SimulationError` when an analysis's plot is not
@@ -62,16 +64,28 @@ pub fn run_each(
     sim: Dialect,
     deck: &str,
     analyses: &[Kind],
-) -> Result<Vec<Option<RawData>>, BackendError> {
+) -> Result<Vec<Vec<RawData>>, BackendError> {
+    if sim == Dialect::Ltspice && analyses.len() > 1 {
+        return ltspice_each(deck, analyses);
+    }
     let mut plots: Vec<Option<RawData>> = run_all(sim, deck)?.into_iter().map(Some).collect();
     assert!(!plots.is_empty(), "a run returns at least one plot");
+    let stepped = plots.iter().flatten().any(|p| !p.params.is_empty());
     if analyses.len() <= 1 {
-        plots.truncate(1);
-        return Ok(plots);
+        if !stepped {
+            plots.truncate(1);
+        }
+        return Ok(vec![plots.into_iter().flatten().collect()]);
     }
     let missing = |what: &str| {
         BackendError::SimulationError(format!("no {what} plot among those the run wrote"))
     };
+    if stepped {
+        // ponytail: steps come from LTspice alone, one analysis a deck
+        // (P1-007); a stepped run of several analyses is matched when a
+        // backend writes one.
+        return Err(missing("per-analysis stepped"));
+    }
     if sim == Dialect::Vacask {
         if plots.len() != analyses.len() {
             return Err(missing(&format!(
@@ -80,13 +94,13 @@ pub fn run_each(
                 analyses.len()
             )));
         }
-        return Ok(plots);
+        return Ok(plots.into_iter().flatten().map(|p| vec![p]).collect());
     }
     let mut out = Vec::with_capacity(analyses.len());
     for &a in analyses {
         let name = match a.spec().plot {
             Plot::Table => {
-                out.push(None);
+                out.push(Vec::new());
                 continue;
             }
             Plot::Named(name) => name,
@@ -98,8 +112,66 @@ pub fn run_each(
             .iter()
             .position(|p| p.as_ref().is_some_and(|p| p.plot_name.starts_with(name)))
             .ok_or_else(|| missing(name))?;
-        out.push(plots[i].take());
+        out.push(plots[i].take().into_iter().collect());
     }
     assert_eq!(out.len(), analyses.len());
     Ok(out)
+}
+
+// ---- private ----
+
+/// [`run_each`] on LTspice, which runs one analysis a deck: each analysis
+/// card after the writer's [`LTSPICE_EACH`] line run alone in the deck, a
+/// `.four` with the `.tran` (and no run of its own).
+///
+/// # Errors
+/// As [`run_all`], and `SimulationError` when the deck's analysis cards
+/// are not one per analysis.
+fn ltspice_each(deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError> {
+    let mismatch = || {
+        BackendError::SimulationError(format!(
+            "LTspice: the deck's analysis cards after `{LTSPICE_EACH}` are not its {} analyses",
+            analyses.len()
+        ))
+    };
+    let (head, rest) = deck.split_once(LTSPICE_EACH).ok_or_else(mismatch)?;
+    let (cards, tail): (Vec<&str>, Vec<&str>) = rest
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .partition(|l| !l.trim().eq_ignore_ascii_case(".end"));
+    if cards.len() != analyses.len() {
+        return Err(mismatch());
+    }
+    let four: Vec<&str> = cards
+        .iter()
+        .copied()
+        .filter(|c| is_card(c, ".four"))
+        .collect();
+    let mut out = Vec::with_capacity(analyses.len());
+    for card in &cards {
+        if is_card(card, ".four") {
+            out.push(Vec::new());
+            continue;
+        }
+        let with_four = if is_card(card, ".tran") {
+            four.join("\n")
+        } else {
+            String::new()
+        };
+        let one = format!("{head}{card}\n{with_four}\n{}\n", tail.join("\n"));
+        let plots = run_all(Dialect::Ltspice, &one)?;
+        let stepped = plots.iter().any(|p| !p.params.is_empty());
+        out.push(match stepped {
+            true => plots,
+            false => plots.into_iter().take(1).collect(),
+        });
+    }
+    assert_eq!(out.len(), analyses.len());
+    Ok(out)
+}
+
+/// Whether `line` is the `word` card (`.tran 1n 1u`, any case).
+fn is_card(line: &str, word: &str) -> bool {
+    let first = line.split_whitespace().next().unwrap_or("");
+    first.eq_ignore_ascii_case(word)
 }

@@ -50,6 +50,10 @@ pub struct RawData {
     /// reads its vectors by; `None` (a raw file read on its own) reads them
     /// as ngspice names them.
     pub backend_hint: Option<Dialect>,
+    /// The `.step` point this plot is: each stepped parameter and its
+    /// value, in the simulator's order; empty when nothing steps (ZERO D42:
+    /// a stepped run is one plot per step).
+    pub params: Vec<(String, f64)>,
 }
 
 /// One raw-file variable (a `Variables:` row).
@@ -70,6 +74,9 @@ pub enum VarType {
     Current,
     Time,
     Frequency,
+    /// `param`: LTspice's stepped parameter, column 0 of a stepped
+    /// operating point.
+    Param,
     /// Any other word (`notype`, LTspice's `device_current`, ...).
     Other,
 }
@@ -103,6 +110,7 @@ impl VarType {
             "current" => VarType::Current,
             "time" => VarType::Time,
             "frequency" => VarType::Frequency,
+            "param" => VarType::Param,
             _ => VarType::Other,
         }
     }

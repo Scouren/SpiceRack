@@ -26,18 +26,26 @@ pub enum RawFileError {
 /// Parse a .raw file from bytes. Handles UTF-8 and LTspice's UTF-16-LE headers.
 pub fn parse_raw(data: &[u8]) -> Result<RawData, RawFileError> {
     if utf16(data) {
-        return parse_utf8(&decode_utf16_le(data), true).map(|(r, _)| r);
+        let first = parse_raw_all(data)?.into_iter().next();
+        return Ok(first.expect("a raw file read holds at least one plot"));
     }
-    parse_utf8(data, false).map(|(r, _)| r)
+    parse_utf8(data, false).map(|(r, _, _)| r)
 }
 
 /// Every plot in the file, in file order. LTspice's UTF-16 files (with or
-/// without a byte-order mark) hold one.
+/// without a byte-order mark) hold one, or with `.step` one stepped plot,
+/// read as one plot per step (ZERO D42): a stepped operating point's steps
+/// carry their [`RawData::params`] (its column 0), any other's are the
+/// log's (`backend::ltspice`).
 pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
     if utf16(data) {
-        return parse_raw(data).map(|r| vec![r]);
+        let (raw, _, stepped) = parse_utf8(&decode_utf16_le(data), true)?;
+        return Ok(match stepped {
+            true => split_steps(raw),
+            false => vec![raw],
+        });
     }
-    let (first, mut used) = parse_utf8(data, false)?;
+    let (first, mut used, _) = parse_utf8(data, false)?;
     let mut plots = vec![first];
     // Every later plot starts with `Title:`, or `Plotname:` (Xyce 7.10's
     // `-r` file, its second plot). Anything else is trailing junk: ngspice
@@ -46,7 +54,7 @@ pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
         .iter()
         .any(|h| data[used..].trim_ascii_start().starts_with(h))
     {
-        let (raw, n) = parse_utf8(&data[used..], false)?;
+        let (raw, n, _) = parse_utf8(&data[used..], false)?;
         plots.push(raw);
         used += n;
     }
@@ -85,12 +93,14 @@ fn bad<E: std::fmt::Display>(what: &str) -> impl FnOnce(E) -> RawFileError + '_ 
     move |e| RawFileError::Parse(format!("Bad {what}: {e}"))
 }
 
-/// One plot from the start of `data`, and the bytes it spans; `ltspice`:
-/// the header was LTspice's UTF-16 (its element widths, [`parse_binary`]).
-fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize), RawFileError> {
+/// One plot from the start of `data`, the bytes it spans, and whether it
+/// is stepped; `ltspice`: the header was LTspice's UTF-16 (its element
+/// widths, [`parse_binary`]).
+fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize, bool), RawFileError> {
     let mut raw = RawData::default();
     let (mut num_vars, mut num_points) = (0usize, 0usize);
     let (mut in_variables, mut fast_access, mut double) = (false, false, !ltspice);
+    let mut stepped = false;
     let mut pos = 0;
 
     let is_binary = loop {
@@ -130,6 +140,7 @@ fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize), RawFileErr
                             raw.is_complex = flags.contains("complex");
                             fast_access = flags.contains("fastaccess");
                             double |= flags.contains("double");
+                            stepped = flags.contains("stepped");
                         }
                         "No. Variables" => num_vars = value.parse().map_err(bad("num_vars"))?,
                         "No. Points" => num_points = value.parse().map_err(bad("num_points"))?,
@@ -168,7 +179,47 @@ fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize), RawFileErr
         parse_ascii(&body[..end], &mut raw, num_vars, num_points)?;
         end
     };
-    Ok((raw, pos + used))
+    Ok((raw, pos + used, stepped))
+}
+
+/// A stepped plot as one plot per step. Column 0 a `param` (a stepped
+/// operating point): one point a step, the step's value that point's.
+/// Otherwise a step starts where column 0 comes back to its first value
+/// (time 0, the first frequency or sweep value) after leaving it.
+fn split_steps(raw: RawData) -> Vec<RawData> {
+    let axis = raw.re(0).into_owned();
+    if axis.is_empty() {
+        return vec![raw];
+    }
+    let param = raw.variables[0].var_type == VarType::Param;
+    let mut starts: Vec<usize> = (0..axis.len())
+        .filter(|&i| param || i == 0 || (axis[i] == axis[0] && axis[i - 1] != axis[0]))
+        .collect();
+    starts.push(axis.len());
+    starts
+        .windows(2)
+        .map(|w| RawData {
+            title: raw.title.clone(),
+            plot_name: raw.plot_name.clone(),
+            variables: raw.variables.clone(),
+            real_data: raw
+                .real_data
+                .iter()
+                .map(|c| c[w[0]..w[1]].to_vec())
+                .collect(),
+            complex_data: raw
+                .complex_data
+                .iter()
+                .map(|c| c[w[0]..w[1]].to_vec())
+                .collect(),
+            is_complex: raw.is_complex,
+            params: match param {
+                true => vec![(raw.variables[0].name.clone(), axis[w[0]])],
+                false => Vec::new(),
+            },
+            ..RawData::default()
+        })
+        .collect()
 }
 
 /// Little-endian values, point-major (`p*nv + v`) or, with FastAccess,

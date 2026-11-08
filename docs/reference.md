@@ -131,10 +131,12 @@ LTspice's `.noise` has none, so it is left out there with a note (W0033).
 ## Results
 
 Every result: `res["node"]` or `res.node` (a float for `OperatingPoint`, a list
-otherwise) and `res.measures` (`.meas` values by name). AC-type results add
+otherwise), `res.measures` (`.meas` values by name) and `res.params` (the
+`.step` point it is, `{param: value}`; `{}` when nothing steps). A run that
+LTspice steps returns a list of results, one per step. AC-type results add
 `magnitude(name)`, `magnitude_db(name)` and `phase(name)` (degrees). `RawData`
-has `title`, `plot_name`, `is_complex`, `variable_names`, `measures` and
-`complex(name)`.
+has `title`, `plot_name`, `is_complex`, `variable_names`, `measures`, `params`
+and `complex(name)`.
 
 ## Units (`spicerack.unit`)
 
