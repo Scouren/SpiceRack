@@ -154,30 +154,12 @@ impl W<'_, '_> {
                             format!("{c} ? {t} : {b}")
                         }
                         _ => {
-                            let fname = a.name(Name(a.lhs(node))).to_ascii_lowercase();
                             let n_args = a.list(a.rhs(node) + 1).len();
                             assert!(vals.len() >= n_args, "a call's arguments");
                             let args: Vec<String> =
                                 vals.drain(vals.len() - n_args..).map(|v| v.0).collect();
-                            let name = match fname.as_str() {
-                                f if SAME.contains(&f) => f.to_string(),
-                                "ln" => "log".to_string(),
-                                "log" if self.rd.b.card_rules != CardRules::Xyce => {
-                                    "log".to_string()
-                                }
-                                "pow" if ngspice && n_args == 2 => {
-                                    vals.push((
-                                        format!("pow(abs({}),{})", args[0], args[1]),
-                                        false,
-                                    ));
-                                    continue;
-                                }
-                                f if own.iter().any(|o| o == f) => {
-                                    a.name(Name(a.lhs(node))).to_string()
-                                }
-                                _ => return None,
-                            };
-                            vals.push((format!("{name}({})", args.join(",")), false));
+                            let call = self.call(a.name(Name(a.lhs(node))), &args, &own)?;
+                            vals.push((call, false));
                             continue;
                         }
                     };
@@ -227,6 +209,26 @@ impl W<'_, '_> {
             self.node(nodes[0]),
             self.node(nodes[1])
         ))
+    }
+
+    /// The call of `name` (as written) on `args` (each a written operand)
+    /// as Spectre's, `own` the deck's own functions (lowercase); `None`
+    /// when Spectre has no function of its meaning. One arm per SPICE
+    /// function: a rewrite (`limit` as `min(max)`, …) is one arm here.
+    fn call(&self, name: &str, args: &[String], own: &[String]) -> Option<String> {
+        let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
+        let f = name.to_ascii_lowercase();
+        let spelled = match f.as_str() {
+            f if SAME.contains(&f) => f.to_string(),
+            "ln" => "log".to_string(),
+            "log" if self.rd.b.card_rules != CardRules::Xyce => "log".to_string(),
+            "pow" if ngspice && args.len() == 2 => {
+                return Some(format!("pow(abs({}),{})", args[0], args[1]));
+            }
+            f if own.iter().any(|o| o == f) => name.to_string(),
+            _ => return None,
+        };
+        Some(format!("{spelled}({})", args.join(",")))
     }
 
     /// `v(a)`, `v(a,b)` with its nodes, `i(dev)` as Spectre's
