@@ -335,25 +335,7 @@ pub(in crate::syntax::render) fn read<'a>(
     if let Some((k, f)) = kit {
         assert_eq!(ast.len(), k.node_count(f), "read: the kit file's tree");
     }
-    let mut rd = Rd {
-        ast,
-        t,
-        d,
-        b: d.behaviours(),
-        models: HashMap::new(),
-        kinds: HashMap::new(),
-        subckts: Vec::new(),
-        insts: HashMap::new(),
-        scope_of: HashMap::new(),
-        kit,
-        masters: HashMap::new(),
-        unlifted: unlift::Unlift::default(),
-        fixes: HashMap::new(),
-        target: None,
-        nums: Vec::new(),
-        global_params: HashSet::new(),
-        promoted: HashSet::new(),
-    };
+    let mut rd = Rd::new(ast, t, d, kit);
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
         rd.promoted = rd.vacask_promoted(&top_stmts);
@@ -505,6 +487,30 @@ pub(in crate::syntax::render) fn unwrapped(t: &str) -> String {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// A reader of `ast` (the parse of `t`) in text family `d`, every
+    /// deck-wide table empty: the one place a new table is added.
+    fn new(ast: &'a Ast<'a>, t: &'a Tokens<'a>, d: Lang, kit: Option<(&'a Kit, FileId)>) -> Rd<'a> {
+        Rd {
+            ast,
+            t,
+            d,
+            b: d.behaviours(),
+            models: HashMap::new(),
+            kinds: HashMap::new(),
+            subckts: Vec::new(),
+            insts: HashMap::new(),
+            scope_of: HashMap::new(),
+            kit,
+            masters: HashMap::new(),
+            unlifted: unlift::Unlift::default(),
+            fixes: HashMap::new(),
+            target: None,
+            nums: Vec::new(),
+            global_params: HashSet::new(),
+            promoted: HashSet::new(),
+        }
+    }
+
     /// A card kept as text (the old lowering's `raw`): a block one raw line
     /// per line, a SPICE element in its place among the elements.
     fn raw(&mut self, n: u32, here: &mut Block, block: bool) {
