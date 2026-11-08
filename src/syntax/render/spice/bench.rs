@@ -13,8 +13,9 @@
 //!
 //! Contents:
 //! - `fn is_four(line: &str) -> bool`, `fn is_continuation(line: &str) -> bool`
-//! - `pub(super) struct Tb`, `W::fold(&self) -> Tb`
-//! - `W::control_run(&self) -> Option<Vec<String>>`, `W::bench(&mut self, control: Option<&[String]>)`, `W::runs(&self) -> bool`, `W::tran_uic(&self) -> bool`, `W::monte_carlo(&self) -> bool`
+//! - `pub(super) struct Tb`, `Tb::runs(&self) -> bool`, `Tb::tran_uic(&self) -> bool`, `Tb::monte_carlo(&self) -> bool`
+//! - `W::fold(&self) -> Tb`, `W::control_run(&self, tb: &Tb) -> Option<Vec<String>>`,
+//!   `W::bench(&mut self, mut tb: Tb, control: Option<&[String]>)`
 //! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
 
 use super::W;
@@ -64,6 +65,27 @@ pub(super) struct Tb {
 /// owns the run.
 const RUN_COMMANDS: [&str; 5] = ["run", "op", "ac", "tran", "dc"];
 
+impl Tb {
+    /// Whether the deck runs an analysis.
+    pub(super) fn runs(&self) -> bool {
+        !self.analyses.is_empty()
+    }
+
+    /// Whether a transient of the deck has UIC.
+    pub(super) fn tran_uic(&self) -> bool {
+        self.analyses
+            .iter()
+            .any(|(a, _)| matches!(a, Ana::Tran { uic: true, .. }))
+    }
+
+    /// Whether the deck runs a Monte Carlo analysis.
+    pub(super) fn monte_carlo(&self) -> bool {
+        self.analyses
+            .iter()
+            .any(|(a, _)| matches!(a, Ana::MonteCarlo { .. }))
+    }
+}
+
 /// True if `line` is a `.four` card (any case).
 pub(super) fn is_four(line: &str) -> bool {
     line.split_whitespace()
@@ -86,11 +108,10 @@ impl W<'_, '_> {
     /// for other targets, when nothing needs a block, the deck has no
     /// `.ac`/`.tran`/`.dc` for a `.measure` to read, or a raw control block
     /// already runs the deck.
-    pub(super) fn control_run(&self) -> Option<Vec<String>> {
+    pub(super) fn control_run(&self, tb: &Tb) -> Option<Vec<String>> {
         if self.b.control_block != ControlBlock::Ngspice {
             return None;
         }
-        let tb = self.fold();
         let mut lines: Vec<String> = Vec::new();
         for b in self.deck.defs.iter().chain(std::iter::once(&self.deck.top)) {
             lines.extend(self.raw_lines(&b.raw));
@@ -115,7 +136,8 @@ impl W<'_, '_> {
             .then_some(fourier)
     }
 
-    /// The deck's testbench statements, folded in read order.
+    /// The deck's testbench statements, folded in read order: once per
+    /// deck, by the spine (`spice::write`), which hands it to every step.
     pub(super) fn fold(&self) -> Tb {
         let mut tb = Tb::default();
         for &b in &self.deck.bench {
@@ -135,30 +157,8 @@ impl W<'_, '_> {
         tb
     }
 
-    /// Whether the deck runs an analysis.
-    pub(super) fn runs(&self) -> bool {
-        !self.fold().analyses.is_empty()
-    }
-
-    /// Whether a transient of the deck has UIC.
-    pub(super) fn tran_uic(&self) -> bool {
-        let tb = self.fold();
-        tb.analyses
-            .iter()
-            .any(|(a, _)| matches!(a, Ana::Tran { uic: true, .. }))
-    }
-
-    /// Whether the deck runs a Monte Carlo analysis.
-    pub(super) fn monte_carlo(&self) -> bool {
-        let tb = self.fold();
-        tb.analyses
-            .iter()
-            .any(|(a, _)| matches!(a, Ana::MonteCarlo { .. }))
-    }
-
-    /// The testbench's cards.
-    pub(super) fn bench(&mut self, control: Option<&[String]>) {
-        let mut tb = self.fold();
+    /// The testbench's cards, from `tb` ([`W::fold`]'s).
+    pub(super) fn bench(&mut self, mut tb: Tb, control: Option<&[String]>) {
         self.respell_refs(&mut tb);
         let runs = !tb.analyses.is_empty();
         self.hspice_defaults(&mut tb, runs);

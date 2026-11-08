@@ -156,11 +156,13 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         xyce_verdicts: HashMap::new(),
         xyce_files: HashSet::new(),
     };
+    // The testbench, folded once: every step below reads it.
+    let tb = w.fold();
     let (from, to) = (rd.b.netlist_rules, b.netlist_rules);
-    w.dcop_ic = from == NetlistRules::Xyce && to == NetlistRules::Ngspice && !w.tran_uic();
+    w.dcop_ic = from == NetlistRules::Xyce && to == NetlistRules::Ngspice && !tb.tran_uic();
     w.nominal = matches!(rd.b.expr_eval, ExprEval::Hspice | ExprEval::Xyce)
         && b.expr_eval == ExprEval::Ngspice
-        && !w.monte_carlo();
+        && !tb.monte_carlo();
     // Verilog evaluates nothing, so no deck-wide check refuses it.
     if b.writer == Writer::Verilog {
         w.verilog();
@@ -168,19 +170,23 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     }
     w.checks();
     if b.writer == Writer::Cdl {
-        w.cdl();
+        w.cdl(&tb.extra);
         w.unparsed();
         return (w.o.finish(), w.diags);
     }
-    let frame = w.frame();
-    let control = if frame.control { w.control_run() } else { None };
+    let frame = w.frame(&tb);
+    let control = if frame.control {
+        w.control_run(&tb)
+    } else {
+        None
+    };
     w.drop_four = control.is_some();
     if frame.title {
         w.o.token(&format!("{} {}", sp.comment, deck.top.name), Space::Line);
     }
     // ngspice reads its mode before the deck: the backend lifts this line.
-    if let Some((mode, tok)) = w.fold().ngbehavior
-        && w.ask(Construct::NgBehavior, tok) == Action::Spell(Alt::NgBehaviorLine)
+    if let Some((mode, tok)) = &tb.ngbehavior
+        && w.ask(Construct::NgBehavior, *tok) == Action::Spell(Alt::NgBehaviorLine)
     {
         w.o.token(&format!("{}{mode}", super::NGBEHAVIOR), Space::Line);
     }
@@ -198,7 +204,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         w.section(s);
     }
     w.body(&deck.top, true);
-    w.bench(control.as_deref());
+    w.bench(tb, control.as_deref());
     match frame.end {
         true => w.o.token(".end", Space::None),
         // The deck ends on its last card's line end.
@@ -230,10 +236,10 @@ impl W<'_, '_> {
     /// `.control` block (each run by hand). HSPICE's `.END` ends the run
     /// even in an included file, so there a file that runs no analysis (a
     /// library rendered alone, or sources alone) ends without one.
-    fn frame(&self) -> Frame {
+    fn frame(&self, tb: &bench::Tb) -> Frame {
         let mut f = role::frame(Role::Deck);
         if self.b.end_rule == EndRule::WhenRuns {
-            f.end = self.runs();
+            f.end = tb.runs();
         }
         f
     }
