@@ -465,6 +465,9 @@ fn check(
                     Some(Ran::Plots(o)) if cmp::compare(&o, &b, tol).is_ok() => {
                         fails("simulator-differs", &why)
                     }
+                    _ if why.starts_with("tran") && refines(c, t, deck, &src, &text, tol) => {
+                        fails("simulator-differs:refinement", &why)
+                    }
                     _ => fails("mismatch", &why),
                 },
             },
@@ -479,6 +482,28 @@ fn check(
         });
     }
     (source, out)
+}
+
+/// The refinement oracle: the original on its simulator and the written
+/// deck on the target's, both at TMAX (TSTOP - TSTART)/2000
+/// ([`sim::refined`]), agree. A transient mismatch that goes so is the two
+/// integrators' step choice, not the writer's.
+fn refines(
+    c: &Corpus,
+    t: &Target,
+    deck: &Path,
+    src: &str,
+    text: &kit::Files,
+    tol: cmp::Tol,
+) -> bool {
+    let (Some(a), Some(b)) = (sim::refined(c.sim, src), sim::refined(t.sim, &text.0)) else {
+        return false;
+    };
+    let a = uic_start(c.sim, src, sim::run(c.sim, deck, &a, &[], 4 * SECS));
+    match (a, sim::run(t.sim, deck, &b, &text.1, 4 * SECS)) {
+        (Ran::Plots(a), Ran::Plots(b)) => cmp::compare(&a, &b, tol).is_ok(),
+        _ => false,
+    }
 }
 
 fn fails(class: &'static str, why: &dyn std::fmt::Display) -> Verdict {

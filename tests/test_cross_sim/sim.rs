@@ -13,6 +13,7 @@
 //! - `pub enum Sim`, `Sim::name(self) -> &'static str`, `Sim::on_path(self) -> bool`
 //! - `pub enum Ran`
 //! - `pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: u64) -> Ran`
+//! - `pub fn refined(sim: Sim, text: &str) -> Option<String>`
 
 use std::path::Path;
 use std::process::Command;
@@ -87,6 +88,17 @@ pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: 
         Ok(r) => r,
         Err(e) => Ran::Failed(e),
     }
+}
+
+/// `text` with every transient's TMAX at most (TSTOP - TSTART)/2000: the
+/// refinement oracle (ZERO-LEDGER P1-012, mismatches.md §4.2): a pair that
+/// agrees once both simulators take small steps differed numerically.
+/// `None` for a VACASK deck (its `tran` takes `maxstep=`, not refined here).
+pub fn refined(sim: Sim, text: &str) -> Option<String> {
+    if sim == Sim::Vacask {
+        return None;
+    }
+    Some(text.lines().map(|l| tmax(l, 2000.0) + "\n").collect())
 }
 
 // ---- private ----
@@ -414,26 +426,26 @@ fn ngspice_text(text: &str, raw: &Path) -> String {
     out
 }
 
-/// Triage only (`CROSS_SIM_TMAX=<n>`): a `.tran TSTEP TSTOP [TSTART]` line
-/// with TMAX = (TSTOP - TSTART)/n added, so ngspice's step is no longer
-/// bounded by TSTEP alone (its default TMAX, ngspice manual `.tran`).
+/// A `.tran TSTEP TSTOP [TSTART [TMAX]]` line (or a `.control` `tran`)
+/// with TMAX at most (TSTOP - TSTART)/n, the words after the numbers
+/// (`uic`) kept; any other line as it is. ngspice, Xyce and ESPice share
+/// the order (ngspice manual `.tran`, Xyce RG `.TRAN`).
 fn tmax(line: &str, n: f64) -> String {
     let w: Vec<&str> = line.split_whitespace().collect();
     let tran = w
         .first()
         .is_some_and(|c| c.eq_ignore_ascii_case(".tran") || c.eq_ignore_ascii_case("tran"));
-    let nums: Vec<f64> = w.iter().skip(1).map_while(|x| number(x)).collect();
-    if !tran || !(2..=3).contains(&nums.len()) || w.len() != nums.len() + 1 {
+    let nums: Vec<f64> = w.iter().skip(1).map_while(|x| number(x)).take(4).collect();
+    if !tran || nums.len() < 2 {
         return line.to_string();
     }
     let start = nums.get(2).copied().unwrap_or(0.0);
-    format!(
-        "{} {} {} {start:e} {:e}",
-        w[0],
-        w[1],
-        w[2],
-        (nums[1] - start) / n
-    )
+    let cap = (nums[1] - start) / n;
+    let max = nums.get(3).map_or(cap, |&m| m.min(cap));
+    let rest = w[1 + nums.len()..].join(" ");
+    format!("{} {} {} {start:e} {max:e} {rest}", w[0], w[1], w[2])
+        .trim_end()
+        .to_string()
 }
 
 /// A SPICE number with its scale suffix (`2m`, `100n`, `1meg`, `5ms`): the
