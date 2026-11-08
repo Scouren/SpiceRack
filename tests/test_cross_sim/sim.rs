@@ -36,7 +36,8 @@ pub enum Sim {
 /// What one run gave.
 pub enum Ran {
     Plots(Vec<RawData>),
-    /// Past the CPU budget.
+    /// Past the CPU budget, or the output one ([`FSIZE`]): a resource
+    /// limit of the harness, not a result.
     Timeout,
     /// No result: the reason, with the simulator's first error lines.
     Failed(String),
@@ -187,17 +188,13 @@ fn run_in(
         }
     }
     let out = c.arg(&file).output().unwrap_or_else(|e| harness(&e));
-    if timed_out(&out) {
-        return Ok(Ran::Timeout);
-    }
-    {
+    // SIGXFSZ (25, or 128 + 25 from a shell): a file past FSIZE.
+    let past_fsize = {
         use std::os::unix::process::ExitStatusExt;
-        if out.status.signal() == Some(25) || out.status.code() == Some(153) {
-            return Ok(Ran::Failed(format!(
-                "{} wrote past {FSIZE} bytes",
-                sim.name()
-            )));
-        }
+        out.status.signal() == Some(25) || out.status.code() == Some(153)
+    };
+    if timed_out(&out) || past_fsize {
+        return Ok(Ran::Timeout);
     }
     let log = (String::from_utf8_lossy(&out.stdout) + String::from_utf8_lossy(&out.stderr))
         .replace(&format!("{}/", dir.display()), "");

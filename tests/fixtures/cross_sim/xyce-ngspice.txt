@@ -624,7 +624,7 @@ PSP103/invert_psp_testDTA1.cir target-fails # ngspice swapped the model: Level m
 PSP103/invert_psp_testDTA2.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mn1 v
 RESISTOR/resistor_lv3.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
 RESISTOR/resistor_lv3_2.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
-ROM/MULTIPORT/RLC_mesh2.cir target-fails # ngspice wrote past 2147483648 bytes
+ROM/MULTIPORT/RLC_mesh2.cir slow # ngspice past its output budget: 1082 vectors over 5 us at 10 ps, a 4.3 GB raw file
 ROM/cab_dak_sig_o_simple.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran CABLEEND: 0.709773006377744 leaves the tube at t=0.00000011119356155429531 (tol 9.093e-3)
 SANDLER21/sandler21.cir mismatch # tran V(1): 0.012754436069687644 leaves the tube at t=0.0011607171242355243 (tol 1.132e-1)
 SANDLER22/sandler22.cir mismatch # tran V(4): 5.063378303425906 leaves the tube at t=0.0005998033489313946 (tol 5.102e-2)

@@ -27,7 +27,8 @@
 //! `proof/` that settles a deck still observed as a mismatch (`listed`,
 //! mismatches.md §4.3); `target-fails` the
 //! written deck does not run; `simulator-fails` neither does the original on
-//! the target's simulator (ESPice lacks what the deck uses); `slow` a deck past the CPU budget, quarantined by name and not
+//! the target's simulator (ESPice lacks what the deck uses); `slow` a deck past the CPU budget or the
+//! output one (a raw file past 2 GiB), quarantined by name and not
 //! simulated. An original that does not run on its own simulator
 //! (`source-fails`, or `slow`) is named once per corpus, in
 //! `<corpus>-source.txt`, and no target of it is judged. A deck the writer refuses
@@ -466,7 +467,7 @@ fn check(
         {
             Ran::Plots(p) => p,
             Ran::Timeout => {
-                source = Some(("slow", format!("{} timed out", c.sim.name())));
+                source = Some(("slow", format!("{} past its budget", c.sim.name())));
                 out.push(Verdict::Source);
                 continue;
             }
@@ -493,7 +494,7 @@ fn check(
             },
             Ran::Timeout => fails(
                 "slow",
-                &format!("{} timed out on the written deck", t.sim.name()),
+                &format!("{} past its budget on the written deck", t.sim.name()),
             ),
             Ran::Failed(why) => match t.control.map(|s| sim::run(s, deck, &src, &[], 2 * SECS)) {
                 Some(Ran::Failed(_)) => fails("simulator-fails", &why),
