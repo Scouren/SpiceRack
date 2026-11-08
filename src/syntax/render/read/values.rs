@@ -353,7 +353,7 @@ impl Rd<'_> {
 /// the old ngspice grammar's `Num <- Mag scale? [a-z0-9_.%\\]*` over all of `s`, case
 /// folded.
 fn ngspice_num(s: &str) -> bool {
-    let b = s.to_ascii_lowercase().into_bytes();
+    let b = s.as_bytes();
     let mut q = usize::from(matches!(b.first(), Some(b'+' | b'-')));
     let digits = |q: usize| b[q..].iter().take_while(|c| c.is_ascii_digit()).count();
     let int = digits(q);
@@ -367,7 +367,7 @@ fn ngspice_num(s: &str) -> bool {
     } else if int == 0 {
         return false;
     }
-    if matches!(b.get(q), Some(b'e' | b'd')) {
+    if matches!(b.get(q), Some(b'e' | b'E' | b'd' | b'D')) {
         let sign = usize::from(matches!(b.get(q + 1), Some(b'+' | b'-')));
         let e = digits(q + 1 + sign);
         if e > 0 {
@@ -376,7 +376,7 @@ fn ngspice_num(s: &str) -> bool {
     }
     b[q..]
         .iter()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || b"_.%\\".contains(c))
+        .all(|c| c.is_ascii_alphanumeric() || b"_.%\\".contains(c))
 }
 
 /// An ngspice value as one expression (the old lowering's `one_group`).
