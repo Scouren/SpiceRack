@@ -95,16 +95,16 @@ fn golden_refuses_a_deck_extension_the_golden_gate_would_read() {
 fn tol_reproduces_each_migrated_form_exactly() {
     let same_op = |got: f64, want: f64| (got - want).abs() <= 1e-3 * want.abs();
     let both_op = |got: f64, want: f64| (got - want).abs() <= 1e-9 * want.abs().max(1e-12);
-    let forms: [(&dyn Fn(f64, f64) -> bool, Tol); 2] = [
+    let forms = [
         (
-            &same_op,
+            same_op as fn(f64, f64) -> bool,
             Tol {
                 rel: 1e-3,
                 floor: 0.0,
             },
         ),
         (
-            &both_op,
+            both_op,
             Tol {
                 rel: 1e-9,
                 floor: 1e-12,
