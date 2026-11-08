@@ -27,11 +27,18 @@ use crate::syntax::Dialect;
 /// `complex_data` (a backend may also fill `real_data` for its real-valued vectors).
 #[derive(Debug, Clone, Default)]
 pub struct RawData {
+    /// The `Title:` line: the deck's title.
     pub title: String,
+    /// The `Plotname:` line (`Transient Analysis`, ...), which
+    /// `simulation::run_each` matches an analysis by.
     pub plot_name: String,
+    /// One row per column, in file order; `variables[i].index == i`.
     pub variables: Vec<VarInfo>,
+    /// `real_data[v]`: every point of variable `v`; empty for a complex plot.
     pub real_data: Vec<Vec<f64>>,
+    /// `complex_data[v]`: every point of variable `v`; empty for a real plot.
     pub complex_data: Vec<Vec<Complex64>>,
+    /// `Flags: complex`.
     pub is_complex: bool,
     /// Captured stdout from simulator process (contains .meas results, etc.)
     pub stdout: String,
@@ -45,10 +52,13 @@ pub struct RawData {
     pub backend_hint: Option<Dialect>,
 }
 
+/// One raw-file variable (a `Variables:` row).
 #[derive(Debug, Clone)]
 pub struct VarInfo {
     /// Column in `real_data` / `complex_data`.
     pub index: usize,
+    /// As the simulator wrote it (`v(out)`, `i(v1)`, `V1:p`); `Results`
+    /// reads it through `normalize::canonical`.
     pub name: String,
     pub var_type: VarType,
 }
@@ -64,6 +74,8 @@ pub enum VarType {
     Other,
 }
 
+/// One `.meas` result as the simulator printed it (`measure_parse`). A
+/// measure that failed is not here: only the ones with a value are.
 #[derive(Debug, Clone)]
 pub struct MeasureResult {
     pub name: String,
@@ -76,7 +88,9 @@ pub struct MeasureResult {
 #[derive(Debug, Clone)]
 pub struct Results {
     pub raw: RawData,
+    /// Canonical node name → column.
     pub nodes: HashMap<String, usize>,
+    /// Canonical branch current (`i(v1)`) → column.
     pub branches: HashMap<String, usize>,
 }
 
@@ -114,6 +128,8 @@ impl RawData {
 }
 
 impl Results {
+    /// `raw` with every column named canonically, as a node or a branch
+    /// current; of two columns with one canonical name, the later wins.
     pub fn from_raw(raw: RawData) -> Self {
         let mut nodes = HashMap::new();
         let mut branches = HashMap::new();
@@ -126,6 +142,7 @@ impl Results {
             };
             map.insert(name, v.index);
         }
+        assert!(nodes.len() + branches.len() <= raw.variables.len());
         Self {
             raw,
             nodes,
@@ -156,6 +173,7 @@ impl Results {
         self.column(name).map(|i| self.raw.re(i))
     }
 
+    /// Complex waveform of `name`; `None` for no such column or a real one.
     pub fn complex(&self, name: &str) -> Option<&[Complex64]> {
         self.raw.complex(self.column(name)?)
     }
