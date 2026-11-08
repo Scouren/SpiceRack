@@ -288,6 +288,15 @@
           mkdir -p $out/bin && ln -s ${openvaf}/bin/openvaf-r $out/bin/openvaf
         '';
         # Read-only deck corpora for tests/test_import_suite/'s fixpoints.
+        # Xyce 7.10 with Verilog-A plugin support (ZERO D4): ADMS's
+        # `admsXml` and `buildxyceplugin.sh`, which compiles a `.va` into a
+        # library `Xyce -plugin` loads. nixpkgs' release and sources, built as
+        # shared libraries; its manuals and its own regression run left out
+        # (tests/test_cross_sim runs the corpus on it).
+        xyce = (pkgs.xyce.override { enableDocs = false; enableTests = false; }).overrideAttrs (o: {
+          cmakeFlags = (o.cmakeFlags or [ ]) ++ [ "-DXyce_PLUGIN_SUPPORT=ON" "-DBUILD_SHARED_LIBS=ON" ];
+          nativeBuildInputs = o.nativeBuildInputs ++ [ pkgs.adms ];
+        });
         xyceRegression = pkgs.fetchFromGitHub {
           owner = "Xyce";
           repo = "Xyce_Regression";
@@ -419,8 +428,10 @@
             vacask
             espice.packages.${system}.espice
             # tests/test_cross_sim/: the Xyce corpus on its own simulator and
-            # the decks written for Xyce (nixpkgs' xyce, pinned by flake.lock).
-            pkgs.xyce
+            # the decks written for Xyce (`xyce` above, pinned by flake.lock);
+            # cmake builds its Verilog-A plugins (tests/test_backends.rs p1_039).
+            xyce
+            pkgs.cmake
             # tests/test_structural.rs: netgen's LVS on the CDL written from a
             # deck, Icarus Verilog on the Verilog.
             pkgs.netgen-vlsi

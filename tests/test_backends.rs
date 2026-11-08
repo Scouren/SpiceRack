@@ -163,3 +163,47 @@ fn p1_005_ltspice_backend_deck_path_under_wine() {
         .expect("V(out)");
     assert!((op.re(i)[0] - 1.0).abs() <= 1e-9, "{}", op.re(i)[0]);
 }
+
+#[test]
+fn p1_039_xyce_verilog_plugin_toolchain_pinned() {
+    // `.#testing`'s Xyce 7.10 is built with plugin support (ZERO D4): ADMS
+    // compiles a Verilog-A resistor with `buildxyceplugin.sh`, and `Xyce
+    // -plugin` runs it as the lower leg of a 2 V, 1k/1k divider. Closed
+    // form V(out) = 1 V.
+    let dir = tempfile::tempdir().expect("temp dir");
+    let at = |f: &str| dir.path().join(f);
+    std::fs::write(
+        at("rva.va"),
+        "`include \"disciplines.vams\"\nmodule rva(p, n);\n  inout p, n;\n  electrical p, n;\n  \
+         parameter real r = 1k from (0:inf);\n  analog I(p, n) <+ V(p, n) / r;\nendmodule\n",
+    )
+    .expect("va");
+    let built = std::process::Command::new("buildxyceplugin.sh")
+        .args(["-o", "rva", "rva.va", "."])
+        .current_dir(dir.path())
+        .output()
+        .expect("`buildxyceplugin.sh` on PATH: run in `nix develop .#testing`");
+    assert!(built.status.success(), "{built:?}");
+    std::fs::write(
+        at("d.cir"),
+        "* plugin divider\nV1 in 0 2\nR1 in out 1k\nYrva r2 out 0 rmod\n.model rmod rva r=1k\n\
+         .op\n.print dc v(out)\n.end\n",
+    )
+    .expect("deck");
+    let run = std::process::Command::new("Xyce")
+        .arg("-plugin")
+        .arg(at("librva.so"))
+        .arg("d.cir")
+        .current_dir(dir.path())
+        .output()
+        .expect("Xyce on PATH");
+    assert!(run.status.success(), "{run:?}");
+    let prn = std::fs::read_to_string(at("d.cir.prn")).expect("d.cir.prn");
+    let v: f64 = prn
+        .lines()
+        .nth(1)
+        .and_then(|l| l.split_whitespace().nth(1))
+        .and_then(|x| x.parse().ok())
+        .unwrap_or_else(|| panic!("{prn}"));
+    assert!((v - 1.0).abs() <= 1e-9, "{v}");
+}
