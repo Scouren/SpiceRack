@@ -117,6 +117,12 @@ impl W<'_, '_> {
         // kept control line runs where it stood among the analyses (an
         // `elaborate` picks the circuit the next ones run on): each is
         // written before the analysis that followed it in the source.
+        // `W::fold` records each kept line's place in read order.
+        assert!(
+            tb.extra.is_sorted_by_key(|e| e.1),
+            "kept lines in read order"
+        );
+        assert!(tb.extra.iter().all(|e| e.1 <= tb.analyses.len()));
         let mut extra = tb.extra.iter().copied().peekable();
         let swept: Vec<String> = tb
             .analyses

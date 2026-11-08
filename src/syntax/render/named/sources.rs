@@ -8,6 +8,7 @@
 //! Contents:
 //! - `W::wave(&mut self, letter, w, tok) -> Option<String>`
 //! - `W::port(&mut self, tok, own, port, nodes, value, ac) -> Option<String>`
+//! - `fn assert_held(w: &Wave)`
 
 use super::W;
 use crate::syntax::diag::Code;
@@ -62,7 +63,12 @@ impl W<'_, '_> {
 
     /// `w` as `type=…` parameters (`[CMP]` pp.683-685: `dc pulse pwl sine
     /// exp`); `None` when it is refused.
+    ///
+    /// # Panics
+    /// When `w` holds other than its kind's value count ([`assert_held`]).
     pub(super) fn wave(&mut self, letter: char, w: &Wave, tok: u32) -> Option<String> {
+        assert_held(w);
+        assert!(matches!(letter, 'V' | 'I'), "a source's letter");
         let a: Vec<String> = w.args.iter().map(|x| self.wave_num(x)).collect();
         let zero = |x: &Num| *x == Num::Num(0.0);
         Some(match w.kind {
@@ -135,6 +141,25 @@ impl W<'_, '_> {
             }
         })
     }
+}
+
+/// Asserts that `w` holds its kind's value count, as the readers build it
+/// (`read::Wave::args`): SIN and EXP 6, PULSE and TRNOISE 7, SFFM and
+/// TRRANDOM 5, AM 8, PWL its pairs. The writers index the values by
+/// position.
+pub(super) fn assert_held(w: &Wave) {
+    let n = w.args.len();
+    let held = match w.kind {
+        WaveKind::Sin | WaveKind::Exp => 6,
+        WaveKind::Pulse | WaveKind::Trnoise => 7,
+        WaveKind::Sffm | WaveKind::Trrandom => 5,
+        WaveKind::Am => 8,
+        WaveKind::Pwl => {
+            assert!(n.is_multiple_of(2), "PWL values come in pairs");
+            return;
+        }
+    };
+    assert_eq!(n, held, "{:?} holds {held} values", w.kind);
 }
 
 // ---- private ----

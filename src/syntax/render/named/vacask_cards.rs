@@ -145,6 +145,10 @@ impl W<'_, '_> {
                 nodes,
                 gain,
             } => {
+                // E, G: two output and two controlling nodes; F, H: two
+                // output nodes and the sensing source.
+                let held = if matches!(letter, 'E' | 'G') { 4 } else { 3 };
+                assert_eq!(nodes.len(), held, "a linear {letter} card's nodes");
                 let ns: Vec<String> = nodes.iter().map(|x| q(x)).collect();
                 let name = q(own);
                 let g = num(gain);
@@ -266,6 +270,7 @@ impl W<'_, '_> {
 
     /// `w` as `type="…"` parameters; `None` when it is refused.
     fn vacask_wave(&mut self, w: &Wave, tok: u32) -> Option<String> {
+        super::sources::assert_held(w);
         let a: Vec<String> = w.args.iter().map(|x| self.vacask_num(x)).collect();
         Some(match w.kind {
             WaveKind::Sin => {
