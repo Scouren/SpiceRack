@@ -436,19 +436,28 @@ fn pss_card_matches_the_manual_example() {
 fn pss_runs_a_van_der_pol_oscillator_to_its_limit_cycle() {
     let deck = "* vdp\nL1 x 0 1u\nC1 x 0 1n\nB1 x 0 I=-1m*v(x)+(1m/3)*v(x)*v(x)*v(x)\n\
                 .ic v(x)=0.1\n.pss 5e6 10u x 128 10 50 1e-3 uic\n.end\n";
-    let plots = Dialect::Ngspice.run_all(deck).unwrap_or_else(|e| panic!("{e}"));
+    let plots = Dialect::Ngspice
+        .run_all(deck)
+        .unwrap_or_else(|e| panic!("{e}"));
     let td = plots
         .iter()
         .find(|p| p.plot_name.starts_with("Time Domain"))
         .unwrap_or_else(|| panic!("no time-domain plot"));
     let col = |n: &str| {
-        let i = td.variables.iter().position(|v| v.name.eq_ignore_ascii_case(n)).expect(n);
+        let i = td
+            .variables
+            .iter()
+            .position(|v| v.name.eq_ignore_ascii_case(n))
+            .expect(n);
         td.re(i).into_owned()
     };
     let (t, v) = (col("time"), col("v(x)"));
     let amplitude = v.iter().fold(0.0f64, |m, x| m.max(x.abs()));
     let f = 1.0 / (t[t.len() - 1] - t[0]);
-    assert!((amplitude - 2.0).abs() <= 0.01 * 2.0, "amplitude {amplitude}");
+    assert!(
+        (amplitude - 2.0).abs() <= 0.01 * 2.0,
+        "amplitude {amplitude}"
+    );
     assert!((f - 5.03292e6).abs() <= 1e-3 * 5.03292e6, "f {f}");
 }
 
