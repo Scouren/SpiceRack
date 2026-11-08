@@ -60,6 +60,9 @@ impl W<'_, '_> {
                 }
             }
         }
+        // A positive step no coarser than ngspice's own TMAX cap.
+        assert!(step > 0.0, "a chosen TSTEP is positive");
+        assert!(step <= span / 50.0, "a chosen TSTEP is at most span/50");
         step
     }
 }

@@ -17,6 +17,19 @@
 //! `cdl` CDL's layout; the `statistics` lift (`render::draws`) and the name
 //! map (`render::names`) are shared with the named writer.
 //!
+//! Where a change goes:
+//! - what one target does with a construct: its capability cell
+//!   (`Spell`/`Lift`/`Refuse`, `syntax::dialects`), read through `W::ask`;
+//! - a form of the target alone: a `Behaviours` field, read as `self.b`;
+//! - a rule between the source and the target (Xyce's model `R` on
+//!   ngspice, HSPICE's 25 °C elsewhere): a field of `pair::Pair`, read as
+//!   `self.pair`;
+//! - an expression rewrite for another family: a row of
+//!   `values::REWRITES`, its spelling in `ternary`;
+//! - an element card: its kind's `*_card` in `cards`; a testbench card:
+//!   its step of `bench::W::bench`; an analysis: its arm of
+//!   `analyses::W::analysis`; a model card: `model_cards::W::model`.
+//!
 //! Cites: ngspice manual ch.2 (the deck), §2.4.3 (`.subckt`), §2.6, §2.7
 //! (`.include`, `.lib`), §2.15 (`.if`); HSPICE `.END` (a library ends
 //! without one: the old HSPICE grammar's L9); Xyce RG Table 2-36 (BSIM3
@@ -36,6 +49,7 @@ mod initial;
 mod laplace;
 mod model_cards;
 mod ngspice_options;
+mod pair;
 pub(in crate::syntax::render) mod parasitics;
 mod prints;
 mod sweeps;
@@ -60,8 +74,7 @@ use super::role::{self, Frame};
 use super::spelling::{FuncForm, Spelling};
 use crate::syntax::Lang;
 use crate::syntax::behaviour::{
-    Behaviours, CardRules, EndRule, ExprEval, IncludeScope, LoadForm, NetlistRules, NumberReading,
-    ParamForm, Writer,
+    Behaviours, CardRules, EndRule, IncludeScope, LoadForm, NumberReading, ParamForm, Writer,
 };
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
@@ -78,6 +91,8 @@ struct W<'a, 'r> {
     details: &'static [u16; CONSTRUCT_COUNT],
     /// The target's behaviours.
     b: &'static Behaviours,
+    /// The rules between the source's behaviours and the target's.
+    pair: pair::Pair,
     /// The deck's numbers were read with ngspice's arithmetic.
     x: bool,
     o: Out,
@@ -137,6 +152,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         cells,
         details: &lang.row().details,
         b,
+        pair: pair::Pair::of(rd.b, b),
         // CDL's cards are the old layout's ngspice cards,
         // which spells numbers without ngspice's arithmetic.
         x: rd.b.numbers == NumberReading::Ngspice
@@ -156,11 +172,10 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         xyce_verdicts: HashMap::new(),
         xyce_files: HashSet::new(),
     };
-    let (from, to) = (rd.b.netlist_rules, b.netlist_rules);
-    w.dcop_ic = from == NetlistRules::Xyce && to == NetlistRules::Ngspice && !w.tran_uic();
-    w.nominal = matches!(rd.b.expr_eval, ExprEval::Hspice | ExprEval::Xyce)
-        && b.expr_eval == ExprEval::Ngspice
-        && !w.monte_carlo();
+    // The testbench, folded once: every step below reads it.
+    let tb = w.fold();
+    w.dcop_ic = w.pair.device_ic_in_op && !tb.tran_uic();
+    w.nominal = w.pair.stat_nominal && !tb.monte_carlo();
     // Verilog evaluates nothing, so no deck-wide check refuses it.
     if b.writer == Writer::Verilog {
         w.verilog();
@@ -168,19 +183,23 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     }
     w.checks();
     if b.writer == Writer::Cdl {
-        w.cdl();
+        w.cdl(&tb.extra);
         w.unparsed();
         return (w.o.finish(), w.diags);
     }
-    let frame = w.frame();
-    let control = if frame.control { w.control_run() } else { None };
+    let frame = w.frame(&tb);
+    let control = if frame.control {
+        w.control_run(&tb)
+    } else {
+        None
+    };
     w.drop_four = control.is_some();
     if frame.title {
         w.o.token(&format!("{} {}", sp.comment, deck.top.name), Space::Line);
     }
     // ngspice reads its mode before the deck: the backend lifts this line.
-    if let Some((mode, tok)) = w.fold().ngbehavior
-        && w.ask(Construct::NgBehavior, tok) == Action::Spell(Alt::NgBehaviorLine)
+    if let Some((mode, tok)) = &tb.ngbehavior
+        && w.ask(Construct::NgBehavior, *tok) == Action::Spell(Alt::NgBehaviorLine)
     {
         w.o.token(&format!("{}{mode}", super::NGBEHAVIOR), Space::Line);
     }
@@ -198,7 +217,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         w.section(s);
     }
     w.body(&deck.top, true);
-    w.bench(control.as_deref());
+    w.bench(tb, control.as_deref());
     match frame.end {
         true => w.o.token(".end", Space::None),
         // The deck ends on its last card's line end.
@@ -206,11 +225,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     }
     w.unparsed();
     let text = w.o.finish();
-    let text = match rd.b.netlist_rules == NetlistRules::Xyce
-        && matches!(
-            b.netlist_rules,
-            NetlistRules::Ngspice | NetlistRules::Hspice
-        ) {
+    let text = match w.pair.xyce_globals {
         true => globals::xyce_globals(&text),
         false => text,
     };
@@ -230,10 +245,10 @@ impl W<'_, '_> {
     /// `.control` block (each run by hand). HSPICE's `.END` ends the run
     /// even in an included file, so there a file that runs no analysis (a
     /// library rendered alone, or sources alone) ends without one.
-    fn frame(&self) -> Frame {
+    fn frame(&self, tb: &bench::Tb) -> Frame {
         let mut f = role::frame(Role::Deck);
         if self.b.end_rule == EndRule::WhenRuns {
-            f.end = self.runs();
+            f.end = tb.runs();
         }
         f
     }
@@ -321,7 +336,7 @@ impl W<'_, '_> {
                     self.ask(c, *tok);
                 }
             }
-            _ => {}
+            LoadForm::Ngspice | LoadForm::Xyce | LoadForm::None => {}
         }
         // ESPice loads a subcircuit's too (above); the others the top's.
         if self.b.load_form != LoadForm::Espice {
@@ -414,8 +429,7 @@ impl W<'_, '_> {
         // Xyce keeps a parameter's first definition, ngspice its last
         // (Xyce_Regression `ISSUE_202/first_last.cir`: R1 = 1 kΩ on Xyce,
         // 1 Ω on ngspice for the deck as read): only the first is written.
-        let xyce = |r: NetlistRules| r == NetlistRules::Xyce;
-        let first = xyce(self.rd.b.netlist_rules) && !xyce(self.b.netlist_rules);
+        let first = self.pair.first_param;
         let mut seen: Vec<String> = Vec::new();
         for &a in params {
             let (name, mut v) = self.rd.param_view(a);
@@ -446,6 +460,10 @@ impl W<'_, '_> {
     }
 
     fn subckt(&mut self, sc: &Block) {
+        // Subcircuits are written hoisted, one at a time (paired with the
+        // reset at the end).
+        assert_eq!(self.scope, crate::syntax::ast::NONE, "no subcircuit open");
+        assert!(self.m_param.is_none(), "no subcircuit's M renamed");
         self.scope = sc.node;
         let head = self
             .rd

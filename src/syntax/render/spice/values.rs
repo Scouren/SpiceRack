@@ -1,8 +1,9 @@
 //! A value's text as the target reads it: HSPICE's quoting, and the
-//! expression spellings another family needs (`ternary`: grouping,
-//! `if()`, `log`'s base, `nint`'s rounding, a clamp, statistical calls at
-//! their nominal, a Xyce `M` renamed), and an R model's value where Xyce
-//! reads its model `R` as a multiplier.
+//! expression spellings another family needs (`REWRITES`, each spelled in
+//! `ternary`: `if()`, `log`'s base, `nint`'s rounding, a clamp,
+//! statistical calls at their nominal, a Xyce `M` renamed; then the
+//! ternaries' grouping), and an R model's value where Xyce reads its model
+//! `R` as a multiplier.
 //!
 //! Cites: per item.
 //!
@@ -18,7 +19,57 @@ use super::W;
 use super::ternary::{
     Read, nominal, parenthesize, rename_call, rename_word, spell_clamp, spell_if, spell_nint,
 };
-use crate::syntax::behaviour::{ExprEval, NetlistRules, ParamForm, ValueQuoting};
+use crate::syntax::behaviour::{ExprEval, ParamForm, ValueQuoting};
+
+/// One expression rewrite: `apply` where `holds`.
+struct Rewrite {
+    holds: fn(&W<'_, '_>) -> bool,
+    apply: fn(&W<'_, '_>, &str) -> String,
+}
+
+/// The rewrites [`W::ternaries_as`] makes to an expression written for
+/// another text family, in order: each reads the one before's output.
+/// Adding one: a row at its place in the order, gated on a `Pair` field
+/// (`pair.rs`; a pair rule) or the writer's state, its spelling a function
+/// in `ternary.rs` (`map_calls` renames or rewrites one call).
+const REWRITES: &[Rewrite] = &[
+    // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
+    Rewrite {
+        holds: |w| w.pair.spell_if,
+        apply: |_, e| spell_if(e),
+    },
+    // `log` is base 10 on Xyce, natural on ngspice, HSPICE, LTspice.
+    Rewrite {
+        holds: |w| w.pair.log_to_ln,
+        apply: |_, e| rename_call(e, "log", "ln"),
+    },
+    Rewrite {
+        holds: |w| w.pair.log_to_log10,
+        apply: |_, e| rename_call(e, "log", "log10"),
+    },
+    // A statistical call at its nominal (`W::nominal`).
+    Rewrite {
+        holds: |w| w.nominal,
+        apply: |_, e| nominal(e),
+    },
+    Rewrite {
+        holds: |w| w.pair.spell_clamp,
+        apply: |_, e| spell_clamp(e),
+    },
+    // A Xyce subcircuit's declared `M`, renamed in its body (`W::m_rename`).
+    Rewrite {
+        holds: |w| w.m_param.is_some(),
+        apply: |w, e| rename_word(e, "m", w.m_param.as_deref().expect("an M renamed")),
+    },
+    Rewrite {
+        holds: |w| w.pair.nint_to_xyce,
+        apply: |_, e| spell_nint(e, true),
+    },
+    Rewrite {
+        holds: |w| w.pair.nint_to_ngspice,
+        apply: |_, e| spell_nint(e, false),
+    },
+];
 
 impl W<'_, '_> {
     /// A value kept as SPICE text, as the target reads it: as written, but
@@ -32,9 +83,7 @@ impl W<'_, '_> {
         // (`.param t2="a^3"`; ESPice's HSPICE reading: 8), the others as a
         // string (ngspice-45: "Undefined parameter [t2]").
         let quoted = v.len() > 1 && v.starts_with('"') && v.ends_with('"');
-        let hspice =
-            self.rd.b.expr_eval == ExprEval::Hspice && self.b.expr_eval != ExprEval::Hspice;
-        let v = match hspice && quoted {
+        let v = match self.pair.quoted_expr && quoted {
             true => format!("{{{}}}", &v[1..v.len() - 1]),
             false => v.to_string(),
         };
@@ -54,10 +103,7 @@ impl W<'_, '_> {
     /// written.
     pub(super) fn m_rename(&self, params: &[(String, String)]) -> Option<String> {
         let taken = |n: &str| params.iter().any(|(k, _)| k.eq_ignore_ascii_case(n));
-        let renamed = self.rd.b.netlist_rules == NetlistRules::Xyce
-            && self.b.netlist_rules == NetlistRules::Ngspice
-            && self.b.subckt_multiplicity
-            && taken("m");
+        let renamed = self.pair.xyce_m_rename && taken("m");
         renamed.then(|| (1..).map(|i| format!("m_{i}")).find(|n| !taken(n)))?
     }
 
@@ -81,8 +127,7 @@ impl W<'_, '_> {
     /// it out (`W::model`) and the instance takes it. `None` elsewhere, or
     /// for a model that also sets `rsh` (its geometry decides).
     pub(super) fn r_default(&self, letter: char, m: &str) -> Option<String> {
-        let xyce = |r: NetlistRules| r == NetlistRules::Xyce;
-        if letter != 'R' || !xyce(self.b.netlist_rules) || xyce(self.rd.b.netlist_rules) {
+        if letter != 'R' || !self.pair.r_model_multiplies {
             return None;
         }
         // The innermost block around this one that declares `m` (SPICE
@@ -158,39 +203,17 @@ impl W<'_, '_> {
         self.ternaries_as(e, read)
     }
 
-    /// `e`'s ternaries for another family, grouped as `read` groups them,
-    /// an `if()` one on ngspice's family; `log` renamed where its base
-    /// differs (`ternary::rename_call`), `nint` rounding as the source's.
+    /// `e` for another family: each of [`REWRITES`] that holds, in order,
+    /// then its ternaries grouped as `read` groups them (a blank before
+    /// each `:` on Xyce). As written for the source's own text family.
     pub(super) fn ternaries_as(&self, e: &str, read: Read) -> String {
-        if self.rd.b.text_family == self.b.text_family {
+        if !self.pair.foreign_text {
             return e.to_string();
         }
-        let (from, to) = (self.rd.b.expr_eval, self.b.expr_eval);
-        // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
-        let e = match to == ExprEval::Ngspice {
-            true => spell_if(e),
-            false => e.to_string(),
-        };
-        // `log` is base 10 on Xyce, natural on ngspice, HSPICE, LTspice.
-        let natural =
-            |x: ExprEval| matches!(x, ExprEval::Ngspice | ExprEval::Hspice | ExprEval::Ltspice);
-        let e = match (from, to) {
-            (f, ExprEval::Xyce) if natural(f) => rename_call(&e, "log", "ln"),
-            (ExprEval::Xyce, t) if natural(t) => rename_call(&e, "log", "log10"),
-            _ => e,
-        };
-        let e = if self.nominal { nominal(&e) } else { e };
-        let clamp = matches!(from, ExprEval::Xyce | ExprEval::Ltspice) && to == ExprEval::Ngspice;
-        let e = if clamp { spell_clamp(&e) } else { e };
-        let e = match &self.m_param {
-            Some(m) => rename_word(&e, "m", m),
-            None => e,
-        };
-        let e = match (from, to) {
-            (ExprEval::Ngspice, ExprEval::Xyce) => spell_nint(&e, true),
-            (ExprEval::Xyce, ExprEval::Ngspice) => spell_nint(&e, false),
-            _ => e,
-        };
+        let mut e = e.to_string();
+        for r in REWRITES.iter().filter(|r| (r.holds)(self)) {
+            e = (r.apply)(self, &e);
+        }
         parenthesize(&e, read, self.b.param_form == ParamForm::Xyce)
     }
 }

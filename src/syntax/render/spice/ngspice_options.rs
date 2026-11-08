@@ -15,15 +15,13 @@
 
 use super::W;
 use super::bench::Tb;
-use crate::syntax::behaviour::{ControlBlock, NetlistRules};
 use crate::syntax::diag::Code;
 
 impl W<'_, '_> {
     /// HSPICE's TNOM = TEMP = 25 °C written for a target defaulting to 27,
     /// where a running HSPICE deck sets neither.
     pub(super) fn hspice_defaults(&self, tb: &mut Tb, runs: bool) {
-        let hspice = |r: NetlistRules| r == NetlistRules::Hspice;
-        if !hspice(self.rd.b.netlist_rules) || hspice(self.b.netlist_rules) || !runs {
+        if !self.pair.hspice_elsewhere || !runs {
             return;
         }
         // `.option tnom=27` is a portable option, not a `Tnom`.
@@ -42,8 +40,7 @@ impl W<'_, '_> {
 
     /// The `.options` card of the portable options, `None` for none.
     pub(super) fn options_line(&mut self, tb: &Tb) -> Option<String> {
-        let from_hspice = self.rd.b.netlist_rules == NetlistRules::Hspice;
-        let hspice = from_hspice && self.b.control_block == ControlBlock::Ngspice;
+        let hspice = self.pair.hspice_options_on_ngspice;
         let mut opts: Vec<String> = Vec::with_capacity(tb.portable.len());
         for (k, v, tok) in &tb.portable {
             let k = if k == "max_iterations" {
@@ -55,7 +52,7 @@ impl W<'_, '_> {
             // HSPICE's SEARCH directories for `.include`/`.lib`: ngspice
             // has no such option (manual §11.1), so the files would not be
             // found (`search_lib.sp`: "Could not find include file").
-            if from_hspice && self.b.netlist_rules != NetlistRules::Hspice && lower == "search" {
+            if self.pair.hspice_elsewhere && lower == "search" {
                 self.refuse(Code::W0017, *tok);
                 continue;
             }
@@ -77,6 +74,10 @@ impl W<'_, '_> {
                 format!("{k}={v}")
             });
         }
+        assert!(
+            opts.len() <= tb.portable.len(),
+            "one option per portable option at most"
+        );
         (!opts.is_empty()).then(|| format!(".options {}", opts.join(" ")))
     }
 }

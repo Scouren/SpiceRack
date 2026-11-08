@@ -9,7 +9,7 @@
 //! - `W::models(&mut self, b: &Block)`, `W::model(&mut self, n: u32, bin: u32) -> bool`
 
 use super::{W, values, xyce_models};
-use crate::syntax::behaviour::{LoadForm, ModelSemantics, NetlistRules, ParamForm};
+use crate::syntax::behaviour::{LoadForm, ModelSemantics, ParamForm};
 use crate::syntax::diag::Code;
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::Block;
@@ -58,9 +58,8 @@ impl W<'_, '_> {
         let mut line = format!(".model {} {}", m.name, m.kind);
         // Xyce's R model `R` is a multiplier: the instance takes the
         // value (`W::r_default`).
-        let multiplier = self.b.netlist_rules == NetlistRules::Xyce
-            && self.rd.b.netlist_rules != NetlistRules::Xyce
-            && values::r_value(&m.kind, &m.params).is_some();
+        let multiplier =
+            self.pair.r_model_multiplies && values::r_value(&m.kind, &m.params).is_some();
         let params: Vec<&(String, String)> = m
             .params
             .iter()

@@ -10,7 +10,6 @@
 //!   `W::wave(&self, w: &Wave) -> String`
 
 use super::W;
-use crate::syntax::behaviour::{NetlistRules, Writer};
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::read::{Num, Val, Wave, WaveKind};
 
@@ -54,7 +53,7 @@ impl W<'_, '_> {
                     self.refuse(crate::syntax::diag::Code::W0108, tok);
                 }
             }
-            _ => {}
+            WaveKind::Pwl | WaveKind::Sin | WaveKind::Pulse | WaveKind::Exp | WaveKind::Sffm => {}
         }
     }
 
@@ -90,14 +89,14 @@ impl W<'_, '_> {
             // Xyce); SPICE3's, HSPICE's, Xyce's and LTspice's is (VO VA FC
             // MDI FS). The reader keeps the source's order.
             // CDL's cards are ngspice's.
-            WaveKind::Sffm
-                if (self.rd.b.netlist_rules == NetlistRules::Ngspice)
-                    != (self.b.netlist_rules == NetlistRules::Ngspice
-                        || self.b.writer == Writer::Cdl) =>
-            {
-                args.swap(2, 4)
-            }
-            _ => {}
+            WaveKind::Sffm if self.pair.sffm_swap => args.swap(2, 4),
+            WaveKind::Sin
+            | WaveKind::Pulse
+            | WaveKind::Pwl
+            | WaveKind::Exp
+            | WaveKind::Sffm
+            | WaveKind::Am
+            | WaveKind::Trnoise => {}
         }
         let mut s = format!("{word}({})", args.join(" "));
         if let Some(r) = &w.repeat {

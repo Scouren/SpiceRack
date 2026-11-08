@@ -16,7 +16,7 @@
 //! xschem layout writer's module notes.
 //!
 //! Contents:
-//! - `W::cdl(&mut self)`
+//! - `W::cdl(&mut self, extra: &[u32])`
 
 use super::W;
 use crate::syntax::diag::{Code, Diag, Kind, info};
@@ -25,15 +25,15 @@ use crate::syntax::render::out::{Out, Space};
 use crate::syntax::render::read::{Bench, Block, Card, Comp, Func, Raw};
 
 impl W<'_, '_> {
-    /// The deck, in the xschem layout.
-    pub(super) fn cdl(&mut self) {
+    /// The deck, in the xschem layout; `extra` the VACASK control
+    /// statements its testbench kept as text (`Tb::extra`).
+    pub(super) fn cdl(&mut self, extra: &[u32]) {
         let deck = self.deck;
         // Every file titled and ended, a library too, as the SPICE spine's
         // frame (`W::frame`).
         self.o.token(&format!("* {}", deck.top.name), Space::Line);
         self.cdl_block(&deck.top, true);
-        let extra = self.fold().extra;
-        self.vacask_lines(&extra);
+        self.vacask_lines(extra);
         for sc in &deck.defs {
             self.cdl_block(sc, false);
         }
