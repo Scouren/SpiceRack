@@ -158,6 +158,71 @@ fn a_level_3_diode_is_xyce_level_1() {
     same_op(deck, "1");
 }
 
+/// ngspice-45 `dio/diosetup.c:281-306`: a level-3 instance with `w` and
+/// `l` has area `(w+xw)(l+xw)·m·scale²` and perimeter `2((w+xw)+(l+xw))·m·
+/// scale`, `xw` the card's mask offset, and its currents are scaled by
+/// `m` again (m² in all); with only one of them area 1 and perimeter 0.
+/// Xyce's level-1 `D` has no `W` or `L` (RG 7.10 Table 2-46; Xyce 7.10
+/// stops: "Unrecognized fields for device D1"): written as `AREA`, `PJ`
+/// and `M`. 1 uA forward, m=2 (4x the m=1 current at the same bias).
+#[test]
+fn a_level_3_diode_with_w_and_l_is_xyce_area_and_pj() {
+    for inst in [
+        "d1 1 0 dm w=2u l=3u m=2",
+        "d1 1 0 dm w=2u l=3u",
+        "d1 1 0 dm w=2u m=2",
+    ] {
+        let deck = format!(
+            "* t\n.model dm d level=3 is=1e-3 jsw=1e-9 xw=0.1u\ni1 0 1 1u\n{inst}\n.op\n.end\n"
+        );
+        let line = write(&deck)
+            .lines()
+            .find(|l| l.starts_with("D1"))
+            .map(str::to_string);
+        assert!(
+            line.as_deref().is_some_and(|l| !l.contains("w=")),
+            "{line:?}"
+        );
+        same_op(&deck, "1");
+    }
+}
+
+/// ngspice's diode knee current `ik`/`ikf` is cd/(1+sqrt(cd/ikf))
+/// (ngspice-45 `dio/dioload.c:382-386`), Xyce's `IKF` the PSpice
+/// cd·sqrt(ikf/(ikf+cd)) (`N_DEV_Diode.C:2396-2401`; settle-xyce run: 22 %
+/// apart at 0.75 V): no rename maps one onto the other, so a card setting
+/// it is refused (W0050); at 0 (off in both) it is left out.
+#[test]
+fn a_diode_knee_current_is_refused() {
+    for card in [
+        ".model dm d is=1e-14 ikf=1e-3",
+        ".model dm d is=1e-14 ik=1e-3",
+    ] {
+        let deck = format!("* t\n{card}\ni1 0 1 1m\nd1 1 0 dm\n.op\n.end\n");
+        assert_eq!(refusal(&deck), [Code::W0053, Code::W0050], "{card}");
+    }
+    same_op(
+        "* t\n.model dm d is=1e-14 ikf=0\ni1 0 1 1m\nd1 1 0 dm\n.op\n.end\n",
+        "1",
+    );
+}
+
+/// RG 7.10 `Q` (level 234): "HICUM models require both a substrate and
+/// thermal node" (a 3- or 4-node instance is a netlist error on Xyce 7.10);
+/// ngspice's HICUM/L2 takes 3 to 5 (`hicum2`), the substrate at ground and
+/// the thermal node its own when left off. Written with 5: `0`, then a node
+/// of the instance's own.
+#[test]
+fn a_hicum_instance_has_xyce_s_five_nodes() {
+    for inst in ["q1 b b 0 qh", "q1 b b 0 0 qh"] {
+        let deck = format!(
+            "* t\n.model qh npn level=8 c10=9.074e-30 qp0=1.008e-13 cjei0=8.869e-15\n\
+             i1 0 b 10u\n{inst}\n.op\n.end\n"
+        );
+        same_op(&deck, "b");
+    }
+}
+
 /// RG `Q` (level 1): ngspice's BJT `tref` (`bjt.c`, alias of `tnom`) is
 /// Xyce's `TNOM`; Xyce 7.10 ignores `TREF` (the gf180 vnpn decks: 1.24e-10
 /// vs 1.55e-5 A). A diode-connected npn fed 10 uA, its card at -40 C.

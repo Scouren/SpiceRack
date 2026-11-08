@@ -20,10 +20,24 @@
 //! aliases).
 //!
 //! Contents:
+//! - `pub(super) enum Shape`, `pub(super) fn xyce_shape_of(kind: &str, params: &[(String, String)]) -> Shape`
 //! - `pub(super) fn xyce_model(ngspice: bool, kind: &str, params: &[(String, String)]) -> Result<Option<Vec<(String, String)>>, Code>`
 
 use crate::syntax::diag::Code;
 use crate::syntax::render::models::fold;
+
+/// What an ngspice card asks of the instance line Xyce reads it on.
+#[derive(Clone, PartialEq, Debug)]
+pub(super) enum Shape {
+    /// The line as written.
+    Plain,
+    /// A diode: no `w`/`l` (Xyce's `D` has none, RG 7.10 Table 2-46); at
+    /// level 3 (`Some`, the card's mask offset `xw`) they are its area and
+    /// perimeter (ngspice-45 `diosetup.c:281-306`).
+    Diode(Option<String>),
+    /// HICUM/L2: five nodes, as Xyce's level 234 takes (RG 7.10 `Q`).
+    Hicum,
+}
 
 const XYCE: &str = include_str!("xyce_params.txt");
 const NGSPICE: &str = include_str!("../named/ngspice_params.txt");
@@ -47,6 +61,8 @@ struct Device {
     level: &'static str,
     renames: &'static [(&'static str, &'static str)],
     off: &'static [(&'static str, Off)],
+    /// Names both devices read under other laws: refused off 0.
+    differ: &'static [&'static str],
 }
 
 /// The safe-operating-area limits ngspice reads only for a warning.
@@ -65,12 +81,15 @@ const SOA: &[(&str, Off)] = &[
 
 /// ngspice's diode (levels 1 and 3) as Xyce's level 1. `tcv` (alias
 /// `tbv1`) is ngspice's `bv - tcv*dt`, Xyce's `TBV1` the relative
-/// `bv*(1 + tbv1*dt)`: no rename.
+/// `bv*(1 + tbv1*dt)`: no rename. ngspice's knee current `ik`/`ikf` is
+/// cd/(1+sqrt(cd/ikf)) (`dioload.c:382-386`), Xyce's `IKF` the PSpice
+/// cd·sqrt(ikf/(ikf+cd)) (`N_DEV_Diode.C:2396-2401`): no rename either, so
+/// Xyce's same name is refused off 0 (`differ`). Level 3's mask offset `xw`
+/// is the instance's geometry (`xyce_card`), not a card parameter.
 const DIODE: Device = Device {
     key: "diode",
     level: "1",
     renames: &[
-        ("ik", "ikf"),
         ("isw", "jsw"),
         ("pb", "vj"),
         ("mj", "m"),
@@ -121,8 +140,9 @@ const DIODE: Device = Device {
         ("xp", Off::At(0.0)),
         ("xom", Off::Any),
         ("xoi", Off::Any),
-        ("xw", Off::At(0.0)),
+        ("xw", Off::Any),
     ],
+    differ: &["ik", "ikf"],
 };
 
 /// ngspice's Gummel-Poon BJT (level 1) as Xyce's level 1: Xyce has none of
@@ -164,6 +184,7 @@ const BJT: Device = Device {
         ("m", Off::At(1.0)),
         ("dtemp", Off::At(0.0)),
     ],
+    differ: &[],
 };
 
 /// ngspice's HICUM/L2 (level 8, `hicum2.c`) as Xyce's (level 234): the
@@ -192,7 +213,24 @@ const HICUM: Device = Device {
         ("area", Off::At(1.0)),
         ("m", Off::At(1.0)),
     ],
+    differ: &[],
 };
+
+/// The [`Shape`] ngspice's card `kind` with `params` gives its instances.
+pub(super) fn xyce_shape_of(kind: &str, params: &[(String, String)]) -> Shape {
+    let get = |n: &str| {
+        params
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(n))
+            .map(|(_, v)| v.trim())
+    };
+    match (kind.to_ascii_lowercase().as_str(), get("level")) {
+        ("d", Some("3")) => Shape::Diode(Some(get("xw").unwrap_or("0").to_string())),
+        ("d", _) => Shape::Diode(None),
+        ("npn" | "pnp", Some("8")) => Shape::Hicum,
+        _ => Shape::Plain,
+    }
+}
 
 /// The card of a `.model x <kind>` with `params` as Xyce reads it (a
 /// BSIM3 level from any dialect, the devices from a source `ngspice`'s
@@ -235,6 +273,12 @@ pub(super) fn xyce_model(
         if low == "level" {
             out.push((k.clone(), device.level.to_string()));
             continue;
+        }
+        if device.differ.contains(&low.as_str()) {
+            match fold(v) == Some(0.0) {
+                true => continue,
+                false => return Err(Code::W0050),
+            }
         }
         let name = device
             .renames

@@ -109,7 +109,7 @@ struct W<'a, 'r> {
     device_ics: Vec<(String, String)>,
     /// Xyce: each model card's refusal, judged once (`xyce_cards`), by
     /// its file (`None`: this one) and card; and the kit files judged.
-    xyce_verdicts: HashMap<(Option<FileId>, u32), Option<Code>>,
+    xyce_verdicts: HashMap<(Option<FileId>, u32), (Option<Code>, xyce_models::Shape)>,
     xyce_files: HashSet<FileId>,
 }
 

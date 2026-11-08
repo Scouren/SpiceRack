@@ -20,6 +20,7 @@ use super::W;
 use super::laplace::{self, Laplace};
 use super::parasitics;
 use super::ternary::Read;
+use super::xyce_cards::xyce_shape;
 use crate::syntax::behaviour::{CardRules, Coupling, NetlistRules, Parasitics};
 use crate::syntax::diag::Code;
 use crate::syntax::lang::Cells;
@@ -304,9 +305,9 @@ impl W<'_, '_> {
             }
             Card::Semi {
                 letter,
-                nodes,
+                mut nodes,
                 model,
-                params,
+                mut params,
                 ..
             } => {
                 // An `O` (LTRA) line, an `N` (OSDI) instance.
@@ -314,9 +315,10 @@ impl W<'_, '_> {
                 if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
                     self.ask(c, tok);
                 }
+                let shape = self.xyce_instance(n, &model, tok);
+                xyce_shape(shape, &decl, &mut nodes, &mut params);
                 // An OSDI module's instance (ngspice manual §13); a module
                 // named directly takes a model of its own, its parameters.
-                self.xyce_instance(n, &model, tok);
                 let nodes_ref: Vec<&String> = nodes.iter().collect();
                 self.device_ic(letter, &nodes_ref, &params, tok);
                 let ps = self.params(&params);

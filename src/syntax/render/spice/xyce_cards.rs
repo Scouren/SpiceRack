@@ -17,12 +17,14 @@
 //!
 //! Contents:
 //! - `W::param_value(&self, v: &str) -> String`, `W::xyce_measure(&self, line: String) -> String`,
-//!   `W::xyce_instance(&mut self, n: u32, master: &str, tok: u32)`
+//!   `W::xyce_instance(&mut self, n: u32, master: &str, tok: u32) -> Shape`
+//! - `pub(super) fn xyce_shape(shape: Shape, decl: &str, nodes: &mut Vec<String>, params: &mut Vec<(String, String)>)`
 
 use super::W;
-use super::xyce_models::xyce_model;
+use super::xyce_models::{Shape, xyce_model, xyce_shape_of};
 use crate::syntax::ast::NONE;
 use crate::syntax::behaviour::{ModelSemantics, ParamForm};
+use crate::syntax::render::models::fold;
 use crate::syntax::render::read::file_models;
 
 impl W<'_, '_> {
@@ -38,33 +40,41 @@ impl W<'_, '_> {
 
     /// Instance `n` (master `master`, its card's token `tok`) on Xyce,
     /// from ngspice's equations: refused with its model card's code when
-    /// Xyce cannot compute the card (W0050, W0051).
-    pub(super) fn xyce_instance(&mut self, n: u32, master: &str, tok: u32) {
+    /// Xyce cannot compute the card (W0050, W0051); the [`Shape`] its card
+    /// asks of the line ([`xyce_shape`]), [`Shape::Plain`] elsewhere.
+    pub(super) fn xyce_instance(&mut self, n: u32, master: &str, tok: u32) -> Shape {
         let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
         if self.b.param_form != ParamForm::Xyce || !ngspice {
-            return;
+            return Shape::Plain;
         }
         let Some(at) = self.rd.instance_model(n, master) else {
-            return;
+            return Shape::Plain;
+        };
+        let judge = |kind: &str, p: &[(String, String)]| {
+            (xyce_model(true, kind, p).err(), xyce_shape_of(kind, p))
         };
         if let (Some(file), Some(kit)) = (at.0, self.rd.kit())
             && self.xyce_files.insert(file)
         {
-            let judged = file_models(kit, file, |_, m| xyce_model(true, &m.kind, &m.params).err());
-            for (card, code) in judged {
-                self.xyce_verdicts.insert((Some(file), card), code);
+            for (card, v) in file_models(kit, file, |_, m| judge(&m.kind, &m.params)) {
+                self.xyce_verdicts.insert((Some(file), card), v);
             }
         }
-        let code = match at.0 {
+        let (code, shape) = match at.0 {
             None => {
                 let m = self.rd.model_view(at.1, NONE);
-                xyce_model(true, &m.kind, &m.params).err()
+                judge(&m.kind, &m.params)
             }
-            Some(_) => self.xyce_verdicts.get(&at).copied().flatten(),
+            Some(_) => self
+                .xyce_verdicts
+                .get(&at)
+                .cloned()
+                .unwrap_or((None, Shape::Plain)),
         };
         if let Some(code) = code {
             self.refuse(code, tok);
         }
+        shape
     }
 
     /// Measure card `line` with each `TRIG|TARG <variable> VAL=<value>`
@@ -94,6 +104,53 @@ impl W<'_, '_> {
         }
         out.push_str(&line[at..]);
         out
+    }
+}
+
+/// Instance line `decl` (`nodes`, `params`) in the [`Shape`] its card
+/// asks on Xyce. A HICUM: the substrate `0` and a thermal node of its own
+/// where ngspice's 3 or 4 nodes leave them off (RG 7.10 `Q`: "HICUM models
+/// require both a substrate and thermal node"). A diode: no `w`/`l`; at
+/// level 3 with both, `AREA=(w+xw)(l+xw)·m` and `PJ=2((w+xw)+(l+xw))·m`
+/// (ngspice-45 `diosetup.c:304-305`; `M` stays, so the currents scale by
+/// m² as ngspice's do), with one only area 1 and perimeter 0, Xyce's
+/// defaults.
+pub(super) fn xyce_shape(
+    shape: Shape,
+    decl: &str,
+    nodes: &mut Vec<String>,
+    params: &mut Vec<(String, String)>,
+) {
+    match shape {
+        Shape::Plain => {}
+        Shape::Hicum => {
+            if nodes.len() == 3 {
+                nodes.push("0".into());
+            }
+            if nodes.len() == 4 {
+                nodes.push(format!("{decl}_dt"));
+            }
+        }
+        Shape::Diode(xw) => {
+            let mut take = |n: &str| {
+                let i = params.iter().position(|(k, _)| k.eq_ignore_ascii_case(n))?;
+                Some(params.remove(i).1)
+            };
+            let (w, l) = (take("w"), take("l"));
+            let (Some(xw), Some(w), Some(l)) = (xw, w, l) else {
+                return;
+            };
+            // ponytail: ngspice's `.options scale` (scale² on the area,
+            // scale on the perimeter) is taken as 1; fold it in when a deck
+            // sets it beside a level-3 diode.
+            params.retain(|(k, _)| !["area", "pj"].iter().any(|p| k.eq_ignore_ascii_case(p)));
+            let m = params
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case("m"))
+                .map_or("1".to_string(), |(_, v)| v.clone());
+            params.push(("area".into(), product(&[&w, &xw], &[&l, &xw], &m, false)));
+            params.push(("pj".into(), product(&[&w, &xw], &[&l, &xw], &m, true)));
+        }
     }
 }
 
@@ -134,4 +191,27 @@ fn words(line: &str) -> Vec<(usize, usize)> {
         out.push((s, line.len()));
     }
     out
+}
+
+/// `(a0+a1)·(b0+b1)·m` (or, `sum`, `2((a0+a1)+(b0+b1))·m`): a number when
+/// every value folds, else a Xyce `{}` expression of them.
+fn product(a: &[&String; 2], b: &[&String; 2], m: &str, sum: bool) -> String {
+    let bare = |v: &str| v.trim().trim_matches(['{', '}', '\'']).to_string();
+    let nums: Option<Vec<f64>> = [a[0], a[1], b[0], b[1]]
+        .iter()
+        .map(|v| fold(&bare(v)))
+        .chain([fold(&bare(m))])
+        .collect();
+    if let Some(x) = nums {
+        let v = match sum {
+            true => 2.0 * ((x[0] + x[1]) + (x[2] + x[3])) * x[4],
+            false => (x[0] + x[1]) * (x[2] + x[3]) * x[4],
+        };
+        return format!("{v:e}");
+    }
+    let (a0, a1, b0, b1, m) = (bare(a[0]), bare(a[1]), bare(b[0]), bare(b[1]), bare(m));
+    match sum {
+        true => format!("{{2*(({a0})+({a1})+({b0})+({b1}))*({m})}}"),
+        false => format!("{{(({a0})+({a1}))*(({b0})+({b1}))*({m})}}"),
+    }
 }
