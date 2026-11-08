@@ -144,23 +144,11 @@ impl<'a> Rd<'a> {
     /// An element card onto `here`: a typed card, a subcircuit instance, or
     /// a raw line.
     pub(super) fn element(&mut self, n: u32, here: &mut Block) {
-        if !self
-            .t
-            .text(self.main(n))
-            .starts_with(|c: char| c.is_ascii_alphabetic())
-        {
-            // quirk: the old SPICE grammar's `element_any <- &[a-z] Name`:
-            // an element's name starts with a letter; any other line is
-            // `Unparsed`.
-            return self.unparsed(n, here);
-        }
-        let has_fields = self.fields_ok(n);
-        match self.try_card(n) {
-            Some(Card::Inst { .. }) => here.insts.push((here.comps.len() as u32, n)),
-            Some(_) => here.comps.push(Comp::Card(n)),
-            None if has_fields => self.raw(n, here, false),
-            None => self.unparsed(n, here),
-        }
+        assert_eq!(self.tag(n), Tag::Instance, "an element card");
+        let before = here.comps.len() + here.insts.len() + here.raw.len();
+        self.place_element(n, here);
+        let after = here.comps.len() + here.insts.len() + here.raw.len();
+        assert_eq!(after, before + 1, "an element placed once");
     }
 
     /// The view of an element [`Rd::element`] placed as a typed card or an
@@ -191,6 +179,28 @@ impl<'a> Rd<'a> {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// Element `n` onto `here`; the one place a typed element's [`Card`]
+    /// is first built (`try_card`), where a table of views would be filled.
+    fn place_element(&mut self, n: u32, here: &mut Block) {
+        if !self
+            .t
+            .text(self.main(n))
+            .starts_with(|c: char| c.is_ascii_alphabetic())
+        {
+            // quirk: the old SPICE grammar's `element_any <- &[a-z] Name`:
+            // an element's name starts with a letter; any other line is
+            // `Unparsed`.
+            return self.unparsed(n, here);
+        }
+        let has_fields = self.fields_ok(n);
+        match self.try_card(n) {
+            Some(Card::Inst { .. }) => here.insts.push((here.comps.len() as u32, n)),
+            Some(_) => here.comps.push(Comp::Card(n)),
+            None if has_fields => self.raw(n, here, false),
+            None => self.unparsed(n, here),
+        }
+    }
+
     /// What the old reader typed element `n` as; `None` for a raw one.
     fn try_card(&self, n: u32) -> Option<Card> {
         if self.named() {

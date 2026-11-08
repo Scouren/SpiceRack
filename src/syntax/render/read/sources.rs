@@ -20,7 +20,9 @@ use crate::syntax::device::Primitive as Element;
 /// A waveform value: a number or an expression (without delimiters).
 #[derive(Clone, PartialEq, Debug)]
 pub(in crate::syntax::render) enum Num {
+    /// A number.
     Num(f64),
+    /// An expression, its delimiters dropped.
     Expr(String),
 }
 

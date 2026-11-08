@@ -357,6 +357,7 @@ impl<'a> Rd<'a> {
             .collect()
     }
 
+    /// The value node of key `k` (case as written) among `pairs` `p`.
     pub(in crate::syntax::render) fn get(&self, p: &[(String, u32)], k: &str) -> Option<u32> {
         p.iter().find(|(n, _)| n == k).map(|(_, v)| *v)
     }

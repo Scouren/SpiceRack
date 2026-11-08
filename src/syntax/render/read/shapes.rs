@@ -123,10 +123,12 @@ impl<'a> Rd<'a> {
         t[1..].to_string()
     }
 
+    /// Whether item `n` is one word (`n` a node, never `NONE`).
     pub(in crate::syntax::render) fn is_word(&self, n: u32) -> bool {
         self.tag(n) == Tag::Word
     }
 
+    /// Whether item `n` is the word `w`, in any case.
     pub(in crate::syntax::render) fn word_is(&self, n: u32, w: &str) -> bool {
         self.is_word(n) && self.text(n).eq_ignore_ascii_case(w)
     }

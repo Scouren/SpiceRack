@@ -226,7 +226,9 @@ pub(in crate::syntax::render) enum Comp {
 /// One entry of a block's element order ([`Block::elements`]).
 #[derive(Clone, Copy)]
 pub(in crate::syntax::render) enum Elem {
+    /// A typed card or a raw element line.
     Comp(Comp),
+    /// An `X` card's node.
     Inst(u32),
     /// The index of the block's conditional.
     Cond(usize),
@@ -370,6 +372,8 @@ pub(in crate::syntax::render) fn read<'a>(
         numbers: super::Numbers::Read,
     };
     rd.unlift(&mut deck);
+    assert_eq!(deck.top.name, name, "the top under its name");
+    assert_eq!(deck.top.node, NONE, "the top is no subcircuit");
     (rd, deck)
 }
 
@@ -390,26 +394,36 @@ impl<'a> Rd<'a> {
         }
     }
 
+    /// Whether the file is Spectre or VACASK (statements by name), not SPICE.
     pub(in crate::syntax::render) fn named(&self) -> bool {
         self.b.named_rules != NamedRules::None
     }
 
+    /// Node `n`'s tag.
     pub(in crate::syntax::render) fn tag(&self, n: u32) -> Tag {
         self.ast.tag(Node(n))
     }
 
+    /// Node `n`'s main token: a statement's first, an item's anchor.
     pub(in crate::syntax::render) fn main(&self, n: u32) -> u32 {
         self.ast.main_token(Node(n))
     }
 
+    /// Statement `n`'s items after its head, borrowed from the tree.
     pub(in crate::syntax::render) fn fields(&self, n: u32) -> &'a [u32] {
         self.ast.fields(Node(n))
     }
 
+    /// Block `n`'s statements (empty for a flat statement), borrowed from
+    /// the tree.
     pub(in crate::syntax::render) fn body(&self, n: u32) -> &'a [u32] {
         self.ast.body(Node(n))
     }
 
+    /// Token `k`'s tag.
+    ///
+    /// # Panics
+    /// When `k` is past the last token.
     pub(in crate::syntax::render) fn ttag(&self, k: u32) -> T {
         self.t.tags()[k as usize]
     }
@@ -466,6 +480,11 @@ impl Block {
             out.push(Elem::Comp(c));
         }
         out.extend(placed.map(|(_, e)| e));
+        assert_eq!(
+            out.len(),
+            n + self.insts.len() + self.conds.len(),
+            "every element once"
+        );
         out
     }
 }
@@ -538,6 +557,7 @@ impl<'a> Rd<'a> {
         here.raw.push(Raw::Line(n));
     }
 
+    /// A card the old reader could not lower, kept as `k` says.
     fn keep(&mut self, n: u32, here: &mut Block, k: Kept) {
         match k {
             Kept::Raw => self.raw(n, here, false),
@@ -613,6 +633,7 @@ impl<'a> Rd<'a> {
     /// `.lib name` … `.endl`: its cards read as at the top, into the
     /// section's own body and definitions (the old lowering's `section`).
     fn section(&mut self, n: u32, library: Option<String>, acc: &mut Acc) -> Section {
+        assert_eq!(self.tag(n), Tag::Section, "a section");
         let name_item = self.fields(n)[0];
         let mut body = Block {
             name: self.name_of(name_item),
@@ -621,6 +642,7 @@ impl<'a> Rd<'a> {
         let (first, first_f) = (acc.defs.len(), acc.funcs.len());
         let stmts = self.body(n).to_vec();
         self.cards(&stmts, &mut body, Scope::Section, acc);
+        assert!(acc.defs.len() >= first, "a section's definitions follow");
         Section {
             node: n,
             library,

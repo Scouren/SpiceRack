@@ -264,6 +264,7 @@ impl<'a> Rd<'a> {
         w.strip_prefix('.').unwrap_or(&w).to_string()
     }
 
+    /// Whether item `k` is a word that reads as a number.
     pub(super) fn numw(&self, k: u32) -> bool {
         self.tag(k) == Tag::Word && self.number(k).is_some()
     }
