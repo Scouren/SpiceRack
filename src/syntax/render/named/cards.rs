@@ -15,17 +15,10 @@
 //! - `W::card(&mut self, n: u32) -> Option<String>`, `W::models(&mut self, b: &Block)`
 
 use super::W;
-use crate::syntax::behaviour::ModelSemantics;
+use crate::syntax::behaviour::{Behaviours, MasterAnswer, ModelSemantics};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Block, Card, Model, Val};
-
-/// `.model` types SPICE defines; a kind outside this list is a Spectre
-/// master already.
-const SPICE_MODEL_TYPES: &[&str] = &[
-    "nmos", "pmos", "npn", "pnp", "d", "njf", "pjf", "nmf", "pmf", "r", "c", "l", "sw", "csw",
-    "vdmos", "ltra", "txl", "cpl", "urc",
-];
 
 /// A model's Spectre master (`None`: its kind as written) and `type=`.
 type Master = (Option<&'static str>, Option<&'static str>);
@@ -358,7 +351,8 @@ impl W<'_, '_> {
                 Some((base, _)) => models[i..]
                     .iter()
                     .take_while(|(m, _)| {
-                        bin(m).is_some_and(|(b, _)| b == base) && spectre_master(m) == Some(master)
+                        bin(m).is_some_and(|(b, _)| b == base)
+                            && spectre_master(self.b, m) == Some(master)
                     })
                     .count(),
                 None => 0,
@@ -422,7 +416,7 @@ impl W<'_, '_> {
     fn master(&mut self, m: &Model, tok: u32) -> Option<Master> {
         let found = match self.table_kind(m) {
             Some(k) => Some((Some(k.spectre), None)),
-            None => spectre_master(m),
+            None => spectre_master(self.b, m),
         };
         if found.is_none() {
             self.refuse(Code::W0104, tok);
@@ -463,35 +457,22 @@ impl W<'_, '_> {
     }
 }
 
-/// The Spectre master for `m` and its `type=` (`[REF]` p.498); `None` when
-/// a SPICE kind (and level) has none: written as its SPICE type it names
-/// no Spectre master, and "the nearest model" is other equations.
-fn spectre_master(m: &Model) -> Option<Master> {
+/// The Spectre master for `m` and its `type=` (`[REF]` p.498), from the
+/// target's rows (`Behaviours::model_master`); `None` when a SPICE kind
+/// (and level) has none: written as its SPICE type it names no Spectre
+/// master, and "the nearest model" is other equations.
+fn spectre_master(b: &Behaviours, m: &Model) -> Option<Master> {
     let level = m
         .params
         .iter()
         .find(|(k, _)| k.eq_ignore_ascii_case("level"))
         .and_then(|(_, v)| super::spice_num(v.trim()))
         .map_or(1, |(l, _)| l as u32);
-    let mos = |l: u32| match l {
-        1 => Some("mos1"),
-        2 => Some("mos2"),
-        3 => Some("mos3"),
-        8 | 49 => Some("bsim3v3"),
-        14 | 54 => Some("bsim4"),
-        _ => None,
-    };
-    let kind = m.kind.to_ascii_lowercase();
-    let found = match kind.as_str() {
-        "nmos" => mos(level).map(|m| (m, Some("n"))),
-        "pmos" => mos(level).map(|m| (m, Some("p"))),
-        "npn" if level == 1 => Some(("bjt", Some("npn"))),
-        "pnp" if level == 1 => Some(("bjt", Some("pnp"))),
-        "d" if level == 1 => Some(("diode", None)),
-        k if !SPICE_MODEL_TYPES.contains(&k) => return Some((None, None)),
-        _ => None,
-    };
-    found.map(|(m, t)| (Some(m), t))
+    match b.model_master(&m.kind.to_ascii_lowercase(), level) {
+        MasterAnswer::Master(r) => Some((Some(r.master), r.type_)),
+        MasterAnswer::AsWritten => Some((None, None)),
+        MasterAnswer::Refused => None,
+    }
 }
 
 /// A SPICE bin's base name and number: `nch.1` is `("nch", "1")`.

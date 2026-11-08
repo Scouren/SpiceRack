@@ -909,6 +909,60 @@ def spectre(d):
         .options_form(OptionsForm.Spectre)
         .named_params(NamedParams.Spectre)
         .analysis_masters(Lang.SPECTRE)
+        # SPICE's options and Spectre's of the same effect (`[REF]` 19.1
+        # pp.187-236, by number): `reltol` #1, `vabstol` #3, `iabstol` #4,
+        # `chargeabstol` #5, `temp` #6, `tnom` #7, `dcmaxiters` #56
+        # (ngspice's `itl1`, Xyce's `max_iterations`), `scale` #90, `gmin`
+        # #128, `pivrel` #181, `pivabs` #182 (SPICE's `pivtol`).
+        .option_to("reltol", "reltol")
+        .option_to("vntol", "vabstol")
+        .option_to("abstol", "iabstol")
+        .option_to("chgtol", "chargeabstol")
+        .option_to("temp", "temp")
+        .option_to("tnom", "tnom")
+        .option_to("itl1", "dcmaxiters")
+        .option_to("max_iterations", "dcmaxiters")
+        .option_to("scale", "scale")
+        .option_to("gmin", "gmin")
+        .option_to("pivrel", "pivrel")
+        .option_to("pivtol", "pivabs")
+        # The master a SPICE `.model` type gets at a LEVEL (`[REF]` 19.1 p.498
+        # `model name master type=`; `[CMP]` 5.0 mos1/mos2/mos3, bsim3v3, bsim4,
+        # bjt, diode; ngspice-45 `inpdomod.c` LEVEL per type). A SPICE type with
+        # no row at its LEVEL is refused (W0104); the line types and `res`,
+        # `cap`, `ind` are none of Spectre's SPICE types.
+        .model_master("nmos", [1], "mos1", "n")
+        .model_master("nmos", [2], "mos2", "n")
+        .model_master("nmos", [3], "mos3", "n")
+        .model_master("nmos", [8, 49], "bsim3v3", "n")
+        .model_master("nmos", [14, 54], "bsim4", "n")
+        .model_master("pmos", [1], "mos1", "p")
+        .model_master("pmos", [2], "mos2", "p")
+        .model_master("pmos", [3], "mos3", "p")
+        .model_master("pmos", [8, 49], "bsim3v3", "p")
+        .model_master("pmos", [14, 54], "bsim4", "p")
+        .model_master("npn", [1], "bjt", "npn")
+        .model_master("pnp", [1], "bjt", "pnp")
+        .model_master("d", [1], "diode", None)
+        .spice_model_type("nmos")
+        .spice_model_type("pmos")
+        .spice_model_type("npn")
+        .spice_model_type("pnp")
+        .spice_model_type("d")
+        .spice_model_type("njf")
+        .spice_model_type("pjf")
+        .spice_model_type("nmf")
+        .spice_model_type("pmf")
+        .spice_model_type("r")
+        .spice_model_type("c")
+        .spice_model_type("l")
+        .spice_model_type("sw")
+        .spice_model_type("csw")
+        .spice_model_type("vdmos")
+        .spice_model_type("ltra")
+        .spice_model_type("txl")
+        .spice_model_type("cpl")
+        .spice_model_type("urc")
         # The circuit temperature in an expression ([CMP] 5.0 p.884).
         .temp_name("temp")
         # The VACASK analyses it has (Spectre Reference 5.0, Analysis Statements: xf, stb, pss p.771, pac p.748, pnoise p.759; no hb, dcinc or trannoise).
@@ -1096,6 +1150,82 @@ def vacask(d):
         .options_form(OptionsForm.Vacask)
         .named_params(NamedParams.Vacask)
         .analysis_masters(Lang.SPECTRE)
+        # `.options KEY=VALUE` whose VACASK spelling is the same word and
+        # the same quantity (`itl1`, `maxord` are rejected there). `scale`
+        # is the `$simparam("scale")` VACASK's `sp_*` modules read where
+        # ngspice's code reads `CKTscale` (`devices/spice/*.va` headers;
+        # `lib/osdidevice.cpp` `simParamNames`).
+        .option_to("reltol", "reltol")
+        .option_to("abstol", "abstol")
+        .option_to("vntol", "vntol")
+        .option_to("chgtol", "chgtol")
+        .option_to("gmin", "gmin")
+        .option_to("temp", "temp")
+        .option_to("tnom", "tnom")
+        .option_to("scale", "scale")
+        # `method=trap|gear` is `tran_method` (`docs/cmd-options-tran.md`).
+        .option_method("method")
+        # Keys that only steer a simulator's bookkeeping or printing:
+        # dropping one changes no number in the raw file.
+        .option_cosmetic("noacct")
+        .option_cosmetic("acct")
+        .option_cosmetic("list")
+        .option_cosmetic("node")
+        .option_cosmetic("post")
+        .option_cosmetic("trans")
+        .option_cosmetic("nopage")
+        .option_cosmetic("nomod")
+        .option_cosmetic("lvlcod")
+        .option_cosmetic("klu")
+        .option_cosmetic("sparse")
+        .option_cosmetic("savecurrents")
+        .option_cosmetic("numdgt")
+        # The module a SPICE `.model` type gets at a LEVEL (VACASK 36be560
+        # `devices/spice/*.va`: `sp_<module>`, `type=±1`; ngspice-45
+        # `inpdomod.c` LEVEL per type): `.model x NPN (LEVEL=4)` is VBIC, other
+        # equations, so no row. R, C, L and switch types have none (`sp_resistor`
+        # renames the card's `r`/`tc1` to `model_r`…); the line types are no
+        # SPICE type here: passed through ("Model not found" beats a substitute).
+        .model_master("nmos", [1], "mos1", "1")
+        .model_master("nmos", [2], "mos2", "1")
+        .model_master("nmos", [3], "mos3", "1")
+        .model_master("nmos", [6], "mos6", "1")
+        .model_master("nmos", [9], "mos9", "1")
+        .model_master("nmos", [8, 49], "bsim3v3", "1")
+        .model_master("nmos", [14, 54], "bsim4v8", "1")
+        .model_master("pmos", [1], "mos1", "-1")
+        .model_master("pmos", [2], "mos2", "-1")
+        .model_master("pmos", [3], "mos3", "-1")
+        .model_master("pmos", [6], "mos6", "-1")
+        .model_master("pmos", [9], "mos9", "-1")
+        .model_master("pmos", [8, 49], "bsim3v3", "-1")
+        .model_master("pmos", [14, 54], "bsim4v8", "-1")
+        .model_master("d", [1], "diode", None)
+        .model_master("npn", [1], "bjt", "1")
+        .model_master("pnp", [1], "bjt", "-1")
+        .model_master("njf", [1], "jfet1", "1")
+        .model_master("pjf", [1], "jfet1", "-1")
+        .model_master("nmf", [1], "mes1", "1")
+        .model_master("pmf", [1], "mes1", "-1")
+        .model_master("vdmos", [1], "vdmos", "1")
+        .spice_model_type("nmos")
+        .spice_model_type("pmos")
+        .spice_model_type("npn")
+        .spice_model_type("pnp")
+        .spice_model_type("d")
+        .spice_model_type("njf")
+        .spice_model_type("pjf")
+        .spice_model_type("nmf")
+        .spice_model_type("pmf")
+        .spice_model_type("vdmos")
+        .spice_model_type("r")
+        .spice_model_type("c")
+        .spice_model_type("l")
+        .spice_model_type("sw")
+        .spice_model_type("csw")
+        .spice_model_type("res")
+        .spice_model_type("cap")
+        .spice_model_type("ind")
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("xf")

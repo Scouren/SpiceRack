@@ -143,7 +143,11 @@ returning the definition: identity (`extends`, `renamed`), lines (`title`,
 numbers (`exponent`, `scale`, `tail`, `arithmetic`), elements (`devices`,
 `device`, `master`, `analysis`, `region`), spelling (`comment`,
 `path_quote`, `expr`, `func`, `subckt_params`, `write_head`,
-`write_master`, `option`), the capability cells (`native`, `spell`,
+`write_master`, `option`), the named writers' maps (`option_to`,
+`option_method`, `option_cosmetic`: what a SPICE `.options` key is on a
+Spectre or VACASK target; `model_master(kind, levels, master, type_)` and
+`spice_model_type(kind)`: the master a SPICE `.model` type gets at a
+LEVEL, `levels` a list), the capability cells (`native`, `spell`,
 `lift`, `refuse`, `omit`, `copy`, `refuse_code`, `omit_code`), the
 behaviours (`writer`, `card_rules`, `control_block`, ...), `code`, `hook`
 and `runs_on`. `ps.def_.register(d)` registers a `DialectDef` directly.

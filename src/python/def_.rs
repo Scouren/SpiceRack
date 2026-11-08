@@ -237,6 +237,10 @@ calls! {
     builtin_constant(name: &str, value: &str);
     builtin_device(name: &str);
     vacask_analysis(kind: &str);
+    option_to(spice: &str, own: &str);
+    option_method(spice: &str);
+    option_cosmetic(spice: &str);
+    spice_model_type(kind: &str);
     code(id: &str, kind: PyKind, message: &str);
     refuse_code(c: PyConstruct, id: &str);
     omit_code(c: PyConstruct, id: &str);
@@ -265,6 +269,19 @@ calls! {
             let d = std::mem::replace(&mut slf.def, DialectDef::new(""));
             slf.def = d.extends(base.into());
             slf.hooks.clear();
+            slf
+        }
+
+        /// `DialectDef::model_master`: `levels` a list of LEVELs.
+        fn model_master<'py>(
+            mut slf: PyRefMut<'py, Self>,
+            kind: &str,
+            levels: Vec<u32>,
+            master: &str,
+            type_: Option<&str>,
+        ) -> PyRefMut<'py, Self> {
+            let d = std::mem::replace(&mut slf.def, DialectDef::new(""));
+            slf.def = d.model_master(kind, &levels, master, type_);
             slf
         }
 

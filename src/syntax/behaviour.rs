@@ -18,7 +18,8 @@
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
-//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`
+//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`, `pub enum OptionTo`
+//! - `pub struct ModelMaster`, `Behaviours::model_master(&self, kind: &str, level: u32) -> MasterAnswer`, `pub enum MasterAnswer`
 
 use crate::syntax::Lang;
 
@@ -95,6 +96,58 @@ pub struct Behaviours {
     /// `hb`, …) that the target has an analysis for, untranslated (W0001);
     /// any other is one it lacks (W0015).
     pub vacask_analyses: &'static [&'static str],
+    /// Write: a SPICE `.options` key (lowercase) → its answer on the
+    /// target (`DialectDef::option_to`, `option_method`,
+    /// `option_cosmetic`); a key not here is unmapped (Spectre notes it
+    /// W0024, VACASK asks `Construct::UnmappedOption`).
+    pub option_map: &'static [(&'static str, OptionTo)],
+    /// Write: the master a SPICE `.model` type gets at a LEVEL, one row
+    /// per (type, LEVELs) (`DialectDef::model_master`).
+    pub model_masters: &'static [ModelMaster],
+    /// Write: the `.model` types (lowercase) the target reads as SPICE's
+    /// (`DialectDef::spice_model_type`): one with no `model_masters` row
+    /// at its LEVEL is refused (W0104: "the nearest model" is other
+    /// equations); a type not here is a master of the target's own,
+    /// written as it is (Spectre `bsim4`, a module a VACASK deck loads).
+    pub spice_model_types: &'static [&'static str],
+}
+
+/// A SPICE `.model` type's master at some LEVELs (`Behaviours::model_masters`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ModelMaster {
+    /// The SPICE type, lowercase.
+    pub kind: &'static str,
+    /// The LEVELs it covers (no `level` is 1).
+    pub levels: &'static [u32],
+    /// The target's master (Spectre `bsim4`; VACASK module `bsim4v8`,
+    /// written `sp_bsim4v8`).
+    pub master: &'static str,
+    /// Its `type=` value (Spectre `n`, VACASK `-1`); `None`: none written.
+    pub type_: Option<&'static str>,
+}
+
+/// A target's answer for a `.model` type at a LEVEL (`Behaviours::model_master`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MasterAnswer {
+    /// The target's master for it.
+    Master(&'static ModelMaster),
+    /// A SPICE type the target has no master of at that LEVEL.
+    Refused,
+    /// No SPICE type the target lists: a master of the target's own.
+    AsWritten,
+}
+
+/// What a SPICE `.options` key is on a target (`Behaviours::option_map`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum OptionTo {
+    /// The target's option of the same quantity, its value respelled.
+    Name(&'static str),
+    /// The integration method (`method=trap|gear`): the writer spells the
+    /// value (VACASK `tran_method="gear2"`).
+    Method,
+    /// Changes no number in the result (bookkeeping, printing): left out,
+    /// noted W0024.
+    Cosmetic,
 }
 
 /// The writer layout.
@@ -334,5 +387,22 @@ impl Behaviours {
         builtin_constants: &[],
         builtin_devices: &[],
         vacask_analyses: &[],
+        option_map: &[],
+        model_masters: &[],
+        spice_model_types: &[],
     };
+
+    /// The master SPICE `.model` type `kind` (lowercase) gets at `level`.
+    pub fn model_master(&self, kind: &str, level: u32) -> MasterAnswer {
+        debug_assert!(!kind.bytes().any(|b| b.is_ascii_uppercase()));
+        let row = self
+            .model_masters
+            .iter()
+            .find(|m| m.kind == kind && m.levels.contains(&level));
+        match row {
+            Some(m) => MasterAnswer::Master(m),
+            None if self.spice_model_types.contains(&kind) => MasterAnswer::Refused,
+            None => MasterAnswer::AsWritten,
+        }
+    }
 }

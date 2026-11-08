@@ -1021,3 +1021,17 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   lacks one; Spectre 5.0 has xf, stb, pss, pac, pnoise, no hb); construct
   `VacaskElaborate` (W0122) appended to `CONSTRUCTS`, a cell in every
   definition.
+- **Cleanup C5's rows**: `option_to(spice, own)`, `option_method(spice)`
+  and `option_cosmetic(spice)` (`def/tables.rs`, `Behaviours::option_map`)
+  replace the named writers' private option tables (Spectre's
+  `SPECTRE_OPTIONS`, VACASK's numeric and cosmetic lists and its `method`
+  branch): what a SPICE `.options` key is on the target is a row in
+  `dialects/spectre.rs` or `dialects/vacask.rs`; a key with no row is
+  noted W0024 on Spectre, asked as `UnmappedOption` on VACASK.
+  `model_master(kind, levels, master, type_)` and `spice_model_type(kind)`
+  (`Behaviours::model_masters`, `spice_model_types`, read through
+  `Behaviours::model_master`) replace `SPICE_MODEL_TYPES`, the Spectre
+  writer's `spectre_master` match and VACASK's `mos_module`/`model_type`:
+  a type at a LEVEL with a row is that master (`type=` its value), a
+  SPICE type with none is refused (W0104), any other word is a master of
+  the target's own, written as it is.

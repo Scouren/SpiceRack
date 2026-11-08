@@ -20,7 +20,7 @@
 //! - `fn bare_node(s: &str) -> &str`
 
 use super::W;
-use crate::syntax::behaviour::{ModelSemantics, OptionsForm, Writer};
+use crate::syntax::behaviour::{ModelSemantics, OptionTo, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val};
@@ -82,25 +82,6 @@ pub(super) enum Signal<'s> {
     Current(&'s str),
 }
 
-/// SPICE's options and Spectre's of the same effect (`[REF]` pp.187-236,
-/// by number): `reltol` #1, `vabstol` #3, `iabstol` #4, `chargeabstol` #5,
-/// `temp` #6, `tnom` #7, `dcmaxiters` #56 (ngspice's `itl1`, Xyce's `max_iterations`), `scale`
-/// #90, `gmin` #128, `pivrel` #181, `pivabs` #182 (SPICE's `pivtol`).
-const SPECTRE_OPTIONS: &[(&str, &str)] = &[
-    ("reltol", "reltol"),
-    ("vntol", "vabstol"),
-    ("abstol", "iabstol"),
-    ("chgtol", "chargeabstol"),
-    ("temp", "temp"),
-    ("tnom", "tnom"),
-    ("itl1", "dcmaxiters"),
-    ("max_iterations", "dcmaxiters"),
-    ("scale", "scale"),
-    ("gmin", "gmin"),
-    ("pivrel", "pivrel"),
-    ("pivtol", "pivabs"),
-];
-
 impl Tb {
     /// The parameters the `.step`s sweep, list ones too, lowered.
     pub(super) fn stepped(&self) -> Vec<String> {
@@ -123,7 +104,7 @@ impl W<'_, '_> {
         }
         // `[REF]` p.236: `o1 options scale=1.2`; options take `name=value`
         // only. A SPICE option is written where Spectre has one of the same
-        // effect ([`SPECTRE_OPTIONS`]), its number respelled (SPICE
+        // effect (`Behaviours::option_map`), its number respelled (SPICE
         // `VNTOL=1M` is milli); any other (a flag such as `ACCT`, `itl4`,
         // `method`) is not written: noted.
         let mut opts = Vec::new();
@@ -131,7 +112,10 @@ impl W<'_, '_> {
             let k = k.to_ascii_lowercase();
             let spectre = match self.rd.b.options_form {
                 OptionsForm::Spectre => Some(k.as_str()),
-                _ => SPECTRE_OPTIONS.iter().find(|o| o.0 == k).map(|o| o.1),
+                _ => match self.b.option_map.iter().find(|o| o.0 == k) {
+                    Some(&(_, OptionTo::Name(own))) => Some(own),
+                    _ => None,
+                },
             };
             match spectre {
                 Some(name) if !v.is_empty() => opts.push(format!("{name}={}", self.value_text(v))),

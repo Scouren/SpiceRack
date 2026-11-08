@@ -4,7 +4,8 @@
 //! the deck written from it, a number with each suffix of each reader,
 //! inside an expression, reads back as the same value in every target, a
 //! `.step log` is Spectre's sweep or refused, and a region's Spectre
-//! `montecarlo` is Spectre's and VACASK's `mc` or refused. Each test names
+//! `montecarlo` is Spectre's and VACASK's `mc` or refused, and a `.model`
+//! type's master rows hold one row per type and LEVEL. Each test names
 //! its clause, the text derived by hand, and how many checks it makes.
 //!
 //! Contents: none (tests only).
@@ -333,4 +334,48 @@ fn given(text: &str, target: Dialect) -> Result<String, String> {
         numbers: Numbers::Given,
     };
     render(&src, target).map(|w| w.text).map_err(|d| d.messages)
+}
+
+#[test]
+fn a_model_type_and_level_has_one_master_row_of_a_spice_type() {
+    // The master rows' own contract (`DialectDef::model_master`), in every
+    // built-in: no (type, LEVEL) in two rows, each row's type one the
+    // target reads as SPICE's. Then the three answers against the masters
+    // the old matches gave (`[REF]` 19.1 p.498; VACASK 36be560
+    // `devices/spice/*.va`): BSIM4 at LEVEL 54, a level-6 MOSFET only on
+    // VACASK, a line type passed through on VACASK only. Checks: 8 plus
+    // two per row.
+    use crate::syntax::behaviour::MasterAnswer as A;
+    for d in Dialect::ALL {
+        let b = Lang::from(d).behaviours();
+        for (i, m) in b.model_masters.iter().enumerate() {
+            let twice = b.model_masters[i + 1..]
+                .iter()
+                .any(|n| n.kind == m.kind && n.levels.iter().any(|l| m.levels.contains(l)));
+            assert!(!twice, "{d:?}: {} at a LEVEL twice", m.kind);
+            assert!(b.spice_model_types.contains(&m.kind), "{d:?}: {}", m.kind);
+        }
+    }
+    let (sp, va) = (Lang::SPECTRE.behaviours(), Lang::VACASK.behaviours());
+    let master = |a: A| match a {
+        A::Master(m) => Some((m.master, m.type_)),
+        _ => None,
+    };
+    assert_eq!(
+        master(sp.model_master("nmos", 54)),
+        Some(("bsim4", Some("n")))
+    );
+    assert_eq!(
+        master(va.model_master("pmos", 54)),
+        Some(("bsim4v8", Some("-1")))
+    );
+    assert_eq!(sp.model_master("nmos", 6), A::Refused);
+    assert_eq!(
+        master(va.model_master("nmos", 6)),
+        Some(("mos6", Some("1")))
+    );
+    assert_eq!(sp.model_master("ltra", 1), A::Refused);
+    assert_eq!(va.model_master("ltra", 1), A::AsWritten);
+    assert_eq!(sp.model_master("bsim4", 1), A::AsWritten);
+    assert_eq!(va.model_master("res", 1), A::Refused);
 }
