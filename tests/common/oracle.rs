@@ -273,7 +273,9 @@ pub fn closed_form(
 /// `tests/fixtures/golden/<name>`, whose first line is `provenance:
 /// <provenance>` (who checked the text, against which manual page or pinned
 /// run), then a blank line, then the text. `SPICERACK_BLESS=1` writes the
-/// fixture; review its diff before committing.
+/// fixture; review its diff before committing. Name it `.txt`: a deck
+/// extension (`.sp`, `.scs`, …) under `tests/` makes it a golden-gate input
+/// (`src/bin/golden/inputs.rs`).
 ///
 /// ```ignore
 /// // Ledger P3-075: Spectre takes the portable method=gear.
@@ -291,6 +293,10 @@ pub fn golden(name: &str, provenance: &str, got: &str) {
         "{name}: a golden names its provenance"
     );
     assert!(!provenance.contains('\n'), "{name}: provenance is one line");
+    assert!(
+        name.ends_with(".txt"),
+        "{name}: a golden is .txt, never a deck extension"
+    );
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/golden")
         .join(name);

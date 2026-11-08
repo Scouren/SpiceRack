@@ -79,3 +79,9 @@ fn value_refuses_a_time_past_the_axis() {
 fn value_names_a_missing_vector() {
     value(&[ramp()], "x", At::First);
 }
+
+#[test]
+#[should_panic(expected = "never a deck extension")]
+fn golden_refuses_a_deck_extension_the_golden_gate_would_read() {
+    oracle::golden("spectre/x.scs", "by hand", "");
+}
