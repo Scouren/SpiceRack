@@ -5,6 +5,9 @@ Tests all lint checks: missing .end, missing ground, duplicate elements,
 floating nodes, zero-value components, missing models, undefined params,
 backend-specific checks.
 
+Oracle: each deck breaks one rule on purpose (or none), and the expected issue
+list was written by hand. Issue lists are compared as lists, never as counts.
+
 Run: maturin develop && pytest tests/test_python_lint.py -v
 """
 import pytest
@@ -24,8 +27,8 @@ class TestLintBasic:
         result = lint()(
             ".title clean\nV1 in 0 DC 1\nR1 in out 1k\nR2 out 0 2k\n.op\n.end\n"
         )
-        assert len(result["errors"]) == 0
-        assert len(result["warnings"]) == 0
+        assert result["errors"] == []
+        assert result["warnings"] == []
 
     def test_returns_dict_with_keys(self):
         result = lint()(".title t\nR1 a 0 1k\n.end\n")
@@ -262,8 +265,8 @@ class TestLintOnGenerated:
         )
         netlist = str(c)
         result = lint()(netlist)
-        assert len(result["errors"]) == 0
-        assert len(result["warnings"]) == 0
+        assert result["errors"] == []
+        assert result["warnings"] == []
 
     def test_generated_cmos_inv_warns_about_models(self):
         import spicerack
@@ -337,4 +340,4 @@ class TestLintOnGenerated:
         )
         netlist = str(c)
         result = lint()(netlist)
-        assert len(result["errors"]) == 0
+        assert result["errors"] == []
