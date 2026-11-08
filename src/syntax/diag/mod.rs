@@ -36,6 +36,8 @@
 //!   (`messages.rs`)
 
 mod messages;
+#[macro_use]
+mod table;
 
 pub use messages::{messages, sort};
 
@@ -71,42 +73,6 @@ pub struct Diag {
     /// `W0201`, `W0202`: the declared code it is (`lang::plugin_code`);
     /// 0 for every other code.
     pub detail: u16,
-}
-
-/// Defines [`Code`], [`Code::ALL`] and [`info`] from one list of rows, so
-/// a code cannot lack its row nor be missing from `ALL`.
-macro_rules! catalogue {
-    ($(
-        $(#[$doc:meta])*
-        $code:ident $kind:ident {
-            title: $title:literal,
-            cite: $cite:literal,
-            explain: $explain:literal $(,)?
-        }
-    )*) => {
-        /// A diagnostic's code.
-        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-        pub enum Code {
-            $($(#[$doc])* $code,)*
-        }
-
-        impl Code {
-            /// Every code, in catalogue order.
-            pub const ALL: &[Code] = &[$(Code::$code),*];
-        }
-
-        /// Code `c`'s row.
-        pub const fn info(c: Code) -> Info {
-            match c {
-                $(Code::$code => Info {
-                    title: $title,
-                    cite: $cite,
-                    explain: $explain,
-                    kind: Kind::$kind,
-                },)*
-            }
-        }
-    };
 }
 
 catalogue! {

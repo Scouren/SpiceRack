@@ -9,6 +9,7 @@
 //! Contents:
 //! - `W::spelled(&self, v: &str) -> String`, `W::ternaries(&self, e: &str) -> String`,
 //!   `W::ternaries_as(&self, e: &str, read: Read) -> String`
+//! - `W::m_rename(&self, params: &[(String, String)]) -> Option<String>`
 //! - `W::declares(&self, master: &str, p: &str) -> bool`, `W::r_default(&self, letter: char, m: &str) -> Option<String>`
 //! - `W::encloses(&self, outer: u32, inner: u32) -> bool`, `W::inherited_models(&self, sc: &Block) -> Vec<(u32, u32)>`
 //! - `pub(super) fn r_value(kind: &str, params: &[(String, String)]) -> Option<String>`
@@ -43,6 +44,21 @@ impl W<'_, '_> {
         } else {
             v
         }
+    }
+
+    /// The name a Xyce subcircuit's declared `M` (in `params`, its head's)
+    /// is written under on ngspice, where an `X` line's `M` is the
+    /// multiplicity only where the subcircuit does not declare `m`; Xyce's
+    /// is the multiplicity even where declared (Xyce RG `X`;
+    /// ISSUE_267/test_a3.cir: 5 copies; ngspice run by hand). `None`: as
+    /// written.
+    pub(super) fn m_rename(&self, params: &[(String, String)]) -> Option<String> {
+        let taken = |n: &str| params.iter().any(|(k, _)| k.eq_ignore_ascii_case(n));
+        let renamed = self.rd.b.netlist_rules == NetlistRules::Xyce
+            && self.b.netlist_rules == NetlistRules::Ngspice
+            && self.b.subckt_multiplicity
+            && taken("m");
+        renamed.then(|| (1..).map(|i| format!("m_{i}")).find(|n| !taken(n)))?
     }
 
     /// Whether subcircuit `master`, as the deck defines it, declares

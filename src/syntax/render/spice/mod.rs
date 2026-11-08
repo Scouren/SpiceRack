@@ -461,20 +461,8 @@ impl W<'_, '_> {
             line.push(' ');
             line.push_str(word);
         }
-        // Xyce's `M` on an `X` line is the multiplicity even where the
-        // subcircuit declares `M` (Xyce RG `X`; ISSUE_267/test_a3.cir: 5
-        // copies), ngspice's only where it does not (run by hand): the
-        // parameter takes another name there.
+        self.m_param = self.m_rename(&head.params);
         let is_m = |k: &str| k.eq_ignore_ascii_case("m");
-        if self.rd.b.netlist_rules == NetlistRules::Xyce
-            && self.b.netlist_rules == NetlistRules::Ngspice
-            && self.b.subckt_multiplicity
-            && head.params.iter().any(|(k, _)| is_m(k))
-        {
-            let taken = |n: &str| head.params.iter().any(|(k, _)| k.eq_ignore_ascii_case(n));
-            let name = (1..).map(|i| format!("m_{i}")).find(|n| !taken(n));
-            self.m_param = name;
-        }
         for (k, v) in &head.params {
             let k = match &self.m_param {
                 Some(m) if is_m(k) => m.as_str(),
