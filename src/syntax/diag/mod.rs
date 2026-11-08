@@ -25,6 +25,18 @@
 //! row are one entry, so no code lacks a row; `tests` checks each row and
 //! the ranges.
 //!
+//! Adding a code is one entry: take the next free number of your block
+//! (the `// Wxxxx–Wyyyy:` headers inside `catalogue!` name each block's
+//! owner, from `research/ZERO-LEDGER.md` "Code ranges"), write
+//! `/// <one line>` then `Wnnnn Refusal|Note { title, cite, explain }` at
+//! its numeric place (the codes stay ascending: `Code`'s `Ord` is the
+//! order two diagnostics on one token are rendered in, and
+//! `codes_follow_their_stage_ranges` fails out of order). `cite` names
+//! the target's manual clause (or the run) that makes it a refusal;
+//! `Kind::Refusal` stops the deck, `Kind::Note` keeps it. Raise it from a
+//! capability cell (`DialectDef::refuse`/`omit`/`copy`, in
+//! `syntax::dialects`) or push `Diag::new(code, token, 0)` from a stage.
+//!
 //! Cites: Zig 0.17 `lib/std/zig/Ast.zig` (`Ast.Error`); VerA
 //! `lib/diag/code.zig`.
 //!
@@ -74,6 +86,10 @@ pub struct Diag {
     /// 0 for every other code.
     pub detail: u16,
 }
+
+// A stage appends one per finding; 8 bytes holds a code, a token and a
+// detail (P9-018).
+const _: () = assert!(size_of::<Diag>() == 8);
 
 catalogue! {
     /// A statement no rule reads; kept as a `Verbatim` node.
@@ -131,6 +147,9 @@ catalogue! {
         cite: "ngspice manual §2.7; Spectre Reference 19.1 p.498",
         explain: "A library section opens before the previous one closed. Close the first section (`.endl`, `endsection`) before opening the next.",
     }
+    // P0010–P0014: stream D's reader codes (P1-022, P1-042, P4-100).
+    // P0020–P0026: stream S3 (P8-149). P0030–P0039: S1. P0040–P0049: S2.
+    // P0050–P0059: S3.
     /// An instance whose master names nothing the kit declares: no
     /// subcircuit, model or primitive. The instance keeps its name.
     R0001 Note {
@@ -196,6 +215,9 @@ catalogue! {
         cite: "ngspice manual §2.7; Spectre Reference 19.1 p.498 (include ... section=)",
         explain: "The file is read but declares no section of that name. Check the section's spelling (corner names such as `tt` are case-sensitive in Spectre).",
     }
+    // R0011–R0019: R0011 S2 (import-files). R0020–R0029: S1.
+    // R0030–R0039: S2. R0040–R0049: S3.
+    // W0001–W0100: the SPICE-family writer and the rules both writers share.
     /// A statement kept as text from another dialect family: only its own family reads it.
     W0001 Refusal {
         title: "a statement kept as another dialect's text",
@@ -627,6 +649,13 @@ catalogue! {
         cite: "VACASK 36be560 `devices/spice/<module>.va` (its `parameter` and `aliasparam` names; VACASK stops on another: \"Parameter '…' not found.\"); ngspice-45 `devices/<dev>/*.c` (the names the device reads)",
         explain: "The card sets a parameter the source simulator reads (or, from a dialect other than ngspice, may read) but the `sp_*` module VACASK builds from ngspice's device code does not declare (an initial condition, a self-heating or a version switch), so VACASK has no equation for it. Remove the parameter, or set the condition the VACASK way (`ic=` on the analysis).",
     }
+    // W0130–W0139: codes the ledger assigned one by one (ZERO-LEDGER "Code
+    // ranges"): W0130 S2 StepStates, W0131 S1 REFUSE-SOURCE (P4-096), W0132
+    // S2 no line fit, W0133 S2 pac without pss, W0134 S1 (P4-103), W0135 S1
+    // (P4-104), W0136-W0137 S3 (P8-149); W0138 free.
+    // W0140–W0159: stream S1 (Phases 3, 4).
+    // W0160–W0179: stream S2 (Phase 5).
+    // W0180–W0199: stream S3 (Phases 8, 6).
     // W0201–W0300: the rules a dialect definition declares.
     /// A refusal a dialect definition declared (`DialectDef::code`): its id and message are the definition's.
     W0201 Refusal {

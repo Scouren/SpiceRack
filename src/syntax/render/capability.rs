@@ -247,6 +247,68 @@ mod tests {
     }
 
     #[test]
+    fn construct_order_is_pinned() {
+        // A cell's index is its construct's discriminant (`Lang::cells`,
+        // the dumps): a new construct is appended, never inserted.
+        let names: Vec<String> = crate::syntax::lang::CONSTRUCTS
+            .iter()
+            .map(|c| format!("{c:?}"))
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "ForeignText",
+                "PrivateText",
+                "XyceSens",
+                "HspiceAnalysis",
+                "VacaskScript",
+                "CaretReread",
+                "StatisticalCall",
+                "VerilogALoad",
+                "OsdiLoad",
+                "OsdiInstance",
+                "LibWholeFile",
+                "NgBehavior",
+                "LibSection",
+                "RclModel",
+                "ChargeCapacitor",
+                "BehaviouralSource",
+                "Laplace",
+                "RfPort",
+                "PwlRepeatV",
+                "PwlRepeatI",
+                "NoiseWave",
+                "Conditional",
+                "BranchParam",
+                "Func",
+                "LocalFunc",
+                "TableSource",
+                "LossyLine",
+                "AmWave",
+                "Step",
+                "StepList",
+                "TranStartup",
+                "DcLogList",
+                "Tf",
+                "Sens",
+                "SensAc",
+                "PoleZero",
+                "SParameter",
+                "Print",
+                "Save",
+                "UnmappedOption",
+                "Statistics",
+                "Measure",
+                "HspiceWLine",
+                "VacaskElaborate",
+            ]
+        );
+        for (i, c) in crate::syntax::lang::CONSTRUCTS.into_iter().enumerate() {
+            assert_eq!(c as usize, i, "{c:?}");
+        }
+    }
+
+    #[test]
     fn the_spice_family_differs_only_where_its_manuals_do() {
         use Dialect as D;
         assert_eq!(

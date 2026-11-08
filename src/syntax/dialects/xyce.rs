@@ -215,4 +215,9 @@ pub(super) fn xyce() -> DialectDef {
         .refuse(Construct::UnmappedOption, Code::W0017)
         .lift(Construct::Statistics, Rule::StatisticsDraws)
         .native(Construct::Measure)
+    // A new construct's cell is appended below its stream's marker
+    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+    // --- S1
+    // --- S2
+    // --- S3
 }

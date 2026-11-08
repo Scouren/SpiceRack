@@ -4,6 +4,33 @@
 //! names another (ESPice extends ngspice, Spectre's `spice` region is
 //! HSPICE's) comes after it.
 //!
+//! Every per-dialect difference is a declared row here, never a `match`
+//! on the dialect in a stage. The capability column is the one most rows
+//! change: one call per `Construct` per file
+//! (`.refuse(Construct::X, Code::W…)`, `.native`, `.spell(…, Alt::…)`,
+//! `.lift(…, Rule::…)`, `.omit`, `.copy`), found by grepping
+//! `Construct::X` in the target's file.
+//!
+//! - Changing a cell edits that one line, and the same call in the
+//!   Python mirror `tests/builtin_dialects.py` (the function named for the
+//!   dialect, same order): `tests/test_dialect_def.py` compares the two
+//!   rows' dumps, so a missed mirror fails pytest.
+//! - `espice.rs` and `ngspice_given.rs` extend ngspice: a construct they do
+//!   not answer takes ngspice's cell. A cell changed in `ngspice.rs` is
+//!   ESPice's too unless `espice.rs` answers it.
+//! - A new construct (a `Construct` variant, `render::capability`) needs a
+//!   cell in each file that does not extend another (cdl, hspice, ltspice,
+//!   ngspice, spectre, vacask, verilog, xyce) and in each mirror; a
+//!   missing one fails `register` with `RegisterError::Unanswered`, naming
+//!   the language and the construct, at the first read of any language.
+//!   Append it at the end of the column under the stream's `// S1`/`// S2`
+//!   /`// S3` marker.
+//! - A new built-in: a file here, a `Lang` constant at the next handle
+//!   (`lang.rs`), one line in `register_builtins` after what it extends.
+//!
+//! These files are compiled again by `tests/dialect_defs.rs` in another
+//! crate, so they name only `pub` items.
+//!
 //! Cites: none (each definition cites its manual).
 //!
 //! Contents:
