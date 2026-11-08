@@ -28,12 +28,14 @@ use crate::syntax::Dialect;
 /// Prefixes of the LTspice log lines that are no measure result: a line
 /// with a `:` this table does not name is read as `name: value`. A new
 /// log line LTspice writes is a row here.
-const LTSPICE_NOT_MEASURES: [&str; 5] = [
+const LTSPICE_NOT_MEASURES: [&str; 6] = [
     "Circuit:",
     "Date:",
     "Total elapsed",
     ".step",
     "Measurement:",
+    // The `.options` echo (`Options:plotwinsize=0 numdgt=15`).
+    "Options:",
 ];
 
 /// Parse measure results from `backend`'s output, in its format; with no
@@ -295,6 +297,30 @@ Measurement: avg_vout
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "avg_vout");
         assert!((results[0].value - 1.65).abs() < 1e-10);
+    }
+
+    #[test]
+    fn an_ltspice_options_line_is_no_measure() {
+        // LTspice 26.1.1 under Wine wrote this log for `* meas / V1 in 0 2 /
+        // R1 in out 1k / R2 out 0 1k / .options plotwinsize=0 numdgt=15 /
+        // .op / .meas op vout FIND V(out)` (2026-11-08): one measure, vout =
+        // 1 V (the divider); its `Options:` echo is not a measure `Options`.
+        let log = "\
+LTspice 26.1.1 for Windows
+Circuit: Z:\\tmp\\zp1-008\\m.cir
+Start Time: Sun Nov  8 04:52:36 2026
+Options:plotwinsize=0 numdgt=15
+solver = Normal
+tnom = 27
+Direct Newton iteration succeeded in finding operating point.
+Total elapsed time: 0.016 seconds.
+
+vout: V(out)=1 at 2
+";
+        let results = parse_ltspice(log);
+        assert_eq!(results.len(), 1, "{results:?}");
+        assert_eq!(results[0].name, "vout");
+        assert_eq!(results[0].value, 1.0);
     }
 
     #[test]
