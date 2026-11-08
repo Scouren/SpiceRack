@@ -46,6 +46,7 @@ use blocks::Opened;
 
 mod blocks;
 mod cards;
+mod controlled;
 mod devices;
 mod elements;
 mod funcs;
