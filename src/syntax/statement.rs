@@ -17,11 +17,13 @@
 //! (its `share/doc/vacask/{demo,test}` decks).
 //!
 //! Contents:
-//! - `pub enum Analysis`, `Analysis::ALL: [Analysis; 40]`, `Analysis::from_u32(code: u32) -> Option<Analysis>`
-//! - `pub enum Command`, `Command::ALL: [Command; 10]`, `Command::from_u32(code: u32) -> Option<Command>`
+//! - `pub enum Analysis`, `Analysis::COUNT`, `Analysis::ALL`, `Analysis::from_u32(code: u32) -> Option<Analysis>`
+//! - `pub enum Command`, `Command::COUNT`, `Command::ALL`, `Command::from_u32(code: u32) -> Option<Command>`
 //! - `pub enum Statement`
 
-/// An analysis kind, whatever its dialect spells it.
+kinds! {
+/// An analysis kind, whatever its dialect spells it. A new kind is one
+/// line at the end of this list (its code is its position).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Analysis {
@@ -73,7 +75,9 @@ pub enum Analysis {
     /// VACASK `acxf`, the AC transfer function.
     Acxf,
 }
+}
 
+kinds! {
 /// A Spectre control statement (`options` is [`Statement::Options`]).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -89,6 +93,7 @@ pub enum Command {
     Info,
     Set,
 }
+}
 
 /// What a master word makes of a Spectre `name [(nodes)] word params`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -103,16 +108,6 @@ pub enum Statement {
 }
 
 impl Analysis {
-    /// Every kind, in discriminant order.
-    pub const ALL: [Analysis; 40] = {
-        use Analysis::*;
-        [
-            Op, Dc, Ac, Tran, Noise, Tf, Sens, Pz, Four, Sp, Montecarlo, Acmatch, Dcmatch, Hbnoise,
-            Qpnoise, Fourier, Pdisto, Pnoise, Hbstb, Envlp, Hbsp, Hbac, Hbxf, Qpac, Qpsp, Qpss,
-            Qpxf, Sweep, Pac, Psp, Pss, Pstb, Pxf, Tdr, Stb, Hb, Xf, Dcinc, Dcxf, Acxf,
-        ]
-    };
-
     /// The kind stored as `code` (`a as u32`); `None` for any other word.
     pub fn from_u32(code: u32) -> Option<Analysis> {
         Analysis::ALL.get(code as usize).copied()
@@ -120,14 +115,6 @@ impl Analysis {
 }
 
 impl Command {
-    /// Every control statement, in discriminant order.
-    pub const ALL: [Command; 10] = {
-        use Command::*;
-        [
-            Altergroup, Checklimit, Paramtest, Paramset, Assert, Alter, Check, Shell, Info, Set,
-        ]
-    };
-
     /// The statement stored as `code`; `None` for any other word.
     pub fn from_u32(code: u32) -> Option<Command> {
         Command::ALL.get(code as usize).copied()
@@ -150,5 +137,23 @@ mod tests {
         }
         assert_eq!(Analysis::from_u32(u32::MAX), None);
         assert_eq!(Command::from_u32(u32::MAX), None);
+    }
+
+    #[test]
+    fn codes_are_pinned() {
+        // A code is stored in the tree (`Header::code`): each kind keeps its
+        // position, so a new kind goes at the end of its list.
+        let names = |v: Vec<String>| v.join(" ");
+        assert_eq!(
+            names(Analysis::ALL.iter().map(|a| format!("{a:?}")).collect()),
+            "Op Dc Ac Tran Noise Tf Sens Pz Four Sp Montecarlo Acmatch Dcmatch Hbnoise \
+             Qpnoise Fourier Pdisto Pnoise Hbstb Envlp Hbsp Hbac Hbxf Qpac Qpsp Qpss Qpxf \
+             Sweep Pac Psp Pss Pstb Pxf Tdr Stb Hb Xf Dcinc Dcxf Acxf"
+        );
+        assert_eq!(
+            names(Command::ALL.iter().map(|c| format!("{c:?}")).collect()),
+            "Altergroup Checklimit Paramtest Paramset Assert Alter Check Shell Info Set"
+        );
+        assert_eq!((Analysis::COUNT, Command::COUNT), (40, 10));
     }
 }

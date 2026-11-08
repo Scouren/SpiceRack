@@ -36,14 +36,16 @@
 //! - `pub const SPICE`, `NGSPICE_OWN`, `LOSSY_LINE`, `XYCE_PORT`, `SPECTRE`, `VACASK: &[Device]`, `pub const FLAGS: &[&str]`
 //! - `pub fn find(tables: &[&'static [Device]], word: &str, fold: bool) -> Option<&'static Device>`
 //! - `pub fn spelling(tables: &[&'static [Device]], p: Primitive) -> Option<&'static Device>`
-//! - `Primitive::ALL: [Primitive; 26]`, `Primitive::from_u32(code: u32) -> Option<Primitive>`
+//! - `Primitive::COUNT`, `Primitive::ALL`, `Primitive::from_u32(code: u32) -> Option<Primitive>`
 
 use Model as M;
 use Primitive as P;
 use Terminals as N;
 use Value as V;
 
-/// What an element is, whatever its dialect spells it.
+kinds! {
+/// What an element is, whatever its dialect spells it. A new primitive is
+/// one line at the end of this list (its code is its position).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Primitive {
@@ -83,6 +85,7 @@ pub enum Primitive {
     CodeModel,
     /// ngspice `N`, an OSDI (compiled Verilog-A) device.
     Osdi,
+}
 }
 
 /// One table row: a spelling and the shape of the cards that use it.
@@ -290,36 +293,6 @@ pub fn spelling(tables: &[&'static [Device]], p: Primitive) -> Option<&'static D
 }
 
 impl Primitive {
-    /// Every primitive, in discriminant order.
-    pub const ALL: [Primitive; 26] = [
-        P::Resistor,
-        P::Capacitor,
-        P::Inductor,
-        P::Coupling,
-        P::VoltageSource,
-        P::CurrentSource,
-        P::Vcvs,
-        P::Vccs,
-        P::Cccs,
-        P::Ccvs,
-        P::Behavioural,
-        P::Diode,
-        P::Bjt,
-        P::Mosfet,
-        P::Jfet,
-        P::Mesfet,
-        P::VoltageSwitch,
-        P::CurrentSwitch,
-        P::TransmissionLine,
-        P::Subckt,
-        P::LossyLine,
-        P::RcLine,
-        P::Txl,
-        P::CoupledLines,
-        P::CodeModel,
-        P::Osdi,
-    ];
-
     /// The primitive stored as `code` (`p as u32`); `None` for any other
     /// word ([`crate::syntax::ast::NONE`]).
     pub fn from_u32(code: u32) -> Option<Primitive> {
@@ -393,5 +366,14 @@ mod tests {
             assert_eq!(Primitive::from_u32(p as u32), Some(p));
         }
         assert_eq!(Primitive::from_u32(u32::MAX), None);
+        // The codes are stored in the tree: each keeps its position.
+        let names: Vec<String> = Primitive::ALL.iter().map(|p| format!("{p:?}")).collect();
+        assert_eq!(
+            names.join(" "),
+            "Resistor Capacitor Inductor Coupling VoltageSource CurrentSource Vcvs Vccs Cccs \
+             Ccvs Behavioural Diode Bjt Mosfet Jfet Mesfet VoltageSwitch CurrentSwitch \
+             TransmissionLine Subckt LossyLine RcLine Txl CoupledLines CodeModel Osdi"
+        );
+        assert_eq!(Primitive::COUNT, 26);
     }
 }
