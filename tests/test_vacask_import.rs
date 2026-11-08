@@ -14,6 +14,10 @@
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::notes;
 use spicerack::backend::Dialect;
 use spicerack::result::RawData;
 use spicerack::syntax::diag::{Code, Kind, info};
@@ -85,11 +89,6 @@ fn refusals(w: Result<Written, Vec<Code>>) -> Vec<Code> {
         .collect()
 }
 
-/// The note and refusal codes of `w`.
-fn codes(w: &Written) -> Vec<Code> {
-    w.notes.diags.iter().map(|d| d.code).collect()
-}
-
 /// The first plot `d` writes for `deck`.
 fn run(d: Dialect, deck: &str) -> RawData {
     d.run(deck)
@@ -123,9 +122,9 @@ fn a_vacask_script_line_is_left_out_with_a_note_and_the_numbers_stay() {
     for target in [Dialect::Ngspice, Dialect::Spectre] {
         let w = written(SCRIPTED, target).unwrap_or_else(|c| panic!("{target:?}: {c:?}"));
         assert!(
-            codes(&w).contains(&Code::W0120),
+            notes(&w).contains(&Code::W0120),
             "{target:?}: {:?}",
-            codes(&w)
+            notes(&w)
         );
         for word in ["abort", "print", "postprocess", "embed", "done"] {
             assert!(
@@ -246,7 +245,7 @@ fn a_vacask_option_spice_names_alike_is_the_targets_option() {
         );
         let w = written(&deck, Dialect::Ngspice).expect("written");
         assert!(w.text.contains(card), "{opt}:\n{}", w.text);
-        assert!(!codes(&w).contains(&Code::W0024), "{opt}: {:?}", codes(&w));
+        assert!(!notes(&w).contains(&Code::W0024), "{opt}: {:?}", notes(&w));
     }
 }
 
@@ -283,7 +282,7 @@ fn a_vacask_save_is_the_targets_save_list() {
     );
     let w = written(&deck, Dialect::Ngspice).expect("written");
     assert!(w.text.contains(".save all v(2) i(v1)\n"), "{}", w.text);
-    assert!(codes(&w).contains(&Code::W0023), "{:?}", codes(&w));
+    assert!(notes(&w).contains(&Code::W0023), "{:?}", notes(&w));
     let n = run(Dialect::Ngspice, &w.text);
     assert!((node(&n, "2") - 9.0).abs() < 1e-9);
     // Only VACASK reads `p(...)`, `default`: its own writer keeps the line.

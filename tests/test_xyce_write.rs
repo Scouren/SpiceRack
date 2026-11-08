@@ -12,20 +12,16 @@
 //!
 //! Contents: none (tests only).
 
-#[path = "test_cross_sim/sim.rs"]
-#[allow(dead_code)]
-mod sim;
+#[path = "common/oracle.rs"]
+mod oracle;
 
 use std::path::Path;
 
-use sim::{Ran, Sim};
+use oracle::{At, Tol, closed_form, sim_pair};
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::{render_kit, render_text};
+use spicerack::syntax::render::render_kit;
 use spicerack::syntax::resolve::{FileId, Form, Kit, LoadError};
-
-/// CPU seconds a run of these few-element decks may take.
-const SECS: u64 = 20;
 
 // ---- private ----
 
@@ -59,62 +55,34 @@ fn xyce_measure(text: &str, name: &str) -> f64 {
 /// which a junction's temperature scaling (Eg/kT, about 45) amplifies; a
 /// card read at another temperature moves `v` by tens of percent.
 fn same_op(deck: &str, node: &str) {
-    let xyce = write(deck);
-    let want = op(Sim::Ngspice, deck, node);
-    let got = op(Sim::Xyce, &xyce, node);
-    assert!(
-        (got - want).abs() <= 1e-3 * want.abs(),
-        "xyce v({node}) = {got}, ngspice {want}\n{xyce}"
-    );
+    let tol = Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    sim_pair(Dialect::Ngspice, deck, Dialect::Xyce, node, At::First, tol);
 }
 
 /// `deck` (ngspice text) on real ngspice, and written for Xyce on real
 /// Xyce: each operating point's `v(node)` is `want` (to 1e-9 relative).
 fn both_op(deck: &str, node: &str, want: f64) {
-    let xyce = write(deck);
-    for (sim, text) in [(Sim::Ngspice, deck), (Sim::Xyce, xyce.as_str())] {
-        let got = op(sim, text, node);
-        assert!(
-            (got - want).abs() <= 1e-9 * want.abs().max(1e-12),
-            "{}: v({node}) = {got}, want {want}\n{text}",
-            sim.name()
-        );
-    }
+    let (on, tol) = (
+        [Dialect::Ngspice, Dialect::Xyce],
+        Tol {
+            rel: 1e-9,
+            floor: 1e-12,
+        },
+    );
+    closed_form(Dialect::Ngspice, deck, &on, node, At::First, want, tol);
 }
 
 /// The ngspice deck `text` written for Xyce; panics on a refusal.
 fn write(text: &str) -> String {
-    render_text(text, Dialect::Ngspice, "t", Dialect::Xyce)
-        .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
-        .text
+    oracle::write(text, Dialect::Ngspice, Dialect::Xyce)
 }
 
 /// The codes the refusal of the ngspice deck `text` for Xyce has.
 fn refusal(text: &str) -> Vec<Code> {
-    match render_text(text, Dialect::Ngspice, "t", Dialect::Xyce) {
-        Ok(w) => panic!("written, not refused:\n{}", w.text),
-        Err(e) => e.diags.iter().map(|d| d.code).collect(),
-    }
-}
-
-/// `text` on `sim`: the operating point's `v(node)`.
-fn op(sim: Sim, text: &str, node: &str) -> f64 {
-    let plots = match sim::run(sim, Path::new("/nonexistent/t.cir"), text, &[], SECS) {
-        Ran::Plots(p) => p,
-        Ran::Timeout => panic!("{}: past {SECS} s\n{text}", sim.name()),
-        Ran::Failed(e) => panic!("{}: {e}\n{text}", sim.name()),
-    };
-    let want = format!("v({node})");
-    for p in &plots {
-        if let Some(i) = p
-            .variables
-            .iter()
-            .position(|v| v.name.eq_ignore_ascii_case(&want) || v.name.eq_ignore_ascii_case(node))
-        {
-            return p.real_data[i][0];
-        }
-    }
-    panic!("{}: no {want} in {text}", sim.name())
+    oracle::refusal(text, Dialect::Ngspice, Dialect::Xyce)
 }
 
 /// RG `.SUBCKT` (`PARAMS:`): a subcircuit default is a
@@ -280,8 +248,8 @@ fn a_parameter_xyce_lacks_is_refused_where_it_is_used() {
         let deck = format!("* t\n{card}\nv1 1 0 1\n{inst}\n.op\n.end\n");
         assert_eq!(refusal(&deck), [Code::W0053, Code::W0050], "{card}");
         let unused = format!("* t\n{card}\nv1 1 0 1\nr1 1 0 1k\n.op\n.end\n");
-        let w = render_text(&unused, Dialect::Ngspice, "t", Dialect::Xyce).expect("written");
-        let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+        let w = oracle::written(&unused, Dialect::Ngspice, Dialect::Xyce);
+        let codes = oracle::notes(&w);
         assert_eq!(codes, [Code::W0053], "{card}");
         assert!(!w.text.contains(".model"), "{}", w.text);
     }
@@ -362,9 +330,8 @@ fn outputs_xyce_writes_no_vector_for_are_noted() {
         (".save @r1[i]\n.op", Code::W0052),
     ] {
         let deck = format!("* t\n{rc}{bench}\n.end\n");
-        let w = render_text(&deck, Dialect::Ngspice, "t", Dialect::Xyce)
-            .unwrap_or_else(|e| panic!("{}\n{deck}", e.messages));
-        let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+        let w = oracle::written(&deck, Dialect::Ngspice, Dialect::Xyce);
+        let codes = oracle::notes(&w);
         assert!(codes.contains(&code), "{bench}: {codes:?}\n{}", w.text);
     }
 }

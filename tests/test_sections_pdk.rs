@@ -10,6 +10,10 @@
 
 use std::path::Path;
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::notes;
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::{self, Code};
 use spicerack::syntax::render::{Written, render_text};
@@ -33,7 +37,7 @@ fn gf180mcu_model_file_round_trips_through_sections() {
     let pdk = Path::new(&root).join("gf180mcuD/libs.tech/ngspice");
     let src = std::fs::read_to_string(pdk.join("sm141064.ngspice")).unwrap();
     let w = written(&src, Dialect::Ngspice, "sm141064", Dialect::Ngspice);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     // The `.param`s inside its `.subckt`s are the definitions' locals: as
     // many in the written file as in the source (one a card there).
     let locals = |text: &str| {
@@ -148,7 +152,7 @@ fn gf180mcu_sections_cross_to_spectre() {
                     continue;
                 }
             };
-            assert_eq!(codes(&back), [] as [Code; 0], "{f} {name}:\n{scs}");
+            assert_eq!(notes(&back), [] as [Code; 0], "{f} {name}:\n{scs}");
             let spice = written(&one, Dialect::Ngspice, "gf180", Dialect::Ngspice);
             assert_eq!(
                 meaning(&back.text),
@@ -242,7 +246,7 @@ fn sky130_corner_file_reads_into_sections() {
     )
     .unwrap();
     let w = written(&src, Dialect::Ngspice, "sky130", Dialect::Ngspice);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     let scanned: Vec<&str> = src
         .lines()
         .filter_map(|l| l.strip_prefix(".lib "))
@@ -384,7 +388,7 @@ fn vacask_library_round_trips_through_sections() {
     // `*` lines between the sections: VACASK skips everything outside a
     // section while it looks for one (lib/dfllexer.l, `SECLOOK`), so these
     // are text no VACASK statement reads, kept as written.
-    let unread = codes(&w).iter().filter(|&&c| c == Code::P0001).count();
+    let unread = notes(&w).iter().filter(|&&c| c == Code::P0001).count();
     assert_eq!(unread, 5, "{}", w.notes.messages);
     for l in [
         "* Worst power",
@@ -436,11 +440,6 @@ fn vacask_library_round_trips_through_sections() {
 /// `src` (read in `d`) written for `to`, which must not refuse it.
 fn written(src: &str, d: Dialect, name: &str, to: Dialect) -> Written {
     render_text(src, d, name, to).unwrap_or_else(|e| panic!("{to:?}: {}", e.messages))
-}
-
-/// The codes of the notes on a written deck, in source order.
-fn codes(w: &Written) -> Vec<Code> {
-    w.notes.diags.iter().map(|d| d.code).collect()
 }
 
 /// `src` written in `d`, read back and written again: the same text, which
