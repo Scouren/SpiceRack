@@ -25,20 +25,19 @@ pub enum RawFileError {
 
 /// Parse a .raw file from bytes. Handles UTF-8 and LTspice's UTF-16-LE headers.
 pub fn parse_raw(data: &[u8]) -> Result<RawData, RawFileError> {
-    let utf16 = data.starts_with(&[0xFF, 0xFE])
-        || (data.len() >= 10 && data[1] == 0 && data[3] == 0 && data[5] == 0);
-    if utf16 {
-        return parse_utf8(&decode_utf16_le(data)).map(|(r, _)| r);
+    if utf16(data) {
+        return parse_utf8(&decode_utf16_le(data), true).map(|(r, _)| r);
     }
-    parse_utf8(data).map(|(r, _)| r)
+    parse_utf8(data, false).map(|(r, _)| r)
 }
 
-/// Every plot in the file, in file order. LTspice's UTF-16 files hold one.
+/// Every plot in the file, in file order. LTspice's UTF-16 files (with or
+/// without a byte-order mark) hold one.
 pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
-    if data.starts_with(&[0xFF, 0xFE]) {
+    if utf16(data) {
         return parse_raw(data).map(|r| vec![r]);
     }
-    let (first, mut used) = parse_utf8(data)?;
+    let (first, mut used) = parse_utf8(data, false)?;
     let mut plots = vec![first];
     // Every later plot starts with `Title:`, or `Plotname:` (Xyce 7.10's
     // `-r` file, its second plot). Anything else is trailing junk: ngspice
@@ -47,7 +46,7 @@ pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
         .iter()
         .any(|h| data[used..].trim_ascii_start().starts_with(h))
     {
-        let (raw, n) = parse_utf8(&data[used..])?;
+        let (raw, n) = parse_utf8(&data[used..], false)?;
         plots.push(raw);
         used += n;
     }
@@ -56,13 +55,24 @@ pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
 
 // ---- private ----
 
-/// LTspice header text is UTF-16-LE (ASCII in the low byte); binary data after
+/// LTspice's UTF-16-LE header: a byte-order mark, or none (LTspice 26
+/// writes none) and ASCII's zero high bytes.
+fn utf16(data: &[u8]) -> bool {
+    data.starts_with(&[0xFF, 0xFE])
+        || (data.len() >= 10 && data[1] == 0 && data[3] == 0 && data[5] == 0)
+}
+
+/// LTspice header text is UTF-16-LE (one unit a character); binary data after
 /// `Binary:` is copied through untouched.
 fn decode_utf16_le(data: &[u8]) -> Vec<u8> {
     let body = data.strip_prefix(&[0xFF, 0xFE]).unwrap_or(data);
     let mut out = Vec::with_capacity(body.len() / 2);
     for (k, pair) in body.chunks_exact(2).enumerate() {
-        out.push(pair[0]);
+        // A header character outside ASCII (`Hz½` in a noise plot's name)
+        // is one UTF-16 unit, written as its UTF-8 bytes.
+        let c = char::from_u32(u32::from(u16::from_le_bytes([pair[0], pair[1]])));
+        let mut buf = [0u8; 4];
+        out.extend_from_slice(c.unwrap_or('?').encode_utf8(&mut buf).as_bytes());
         if pair[0] == b'\n' && out.trim_ascii_end().ends_with(b"Binary:") {
             out.extend_from_slice(&body[2 * k + 2..]);
             break;
@@ -75,11 +85,12 @@ fn bad<E: std::fmt::Display>(what: &str) -> impl FnOnce(E) -> RawFileError + '_ 
     move |e| RawFileError::Parse(format!("Bad {what}: {e}"))
 }
 
-/// One plot from the start of `data`, and the bytes it spans.
-fn parse_utf8(data: &[u8]) -> Result<(RawData, usize), RawFileError> {
+/// One plot from the start of `data`, and the bytes it spans; `ltspice`:
+/// the header was LTspice's UTF-16 (its element widths, [`parse_binary`]).
+fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize), RawFileError> {
     let mut raw = RawData::default();
     let (mut num_vars, mut num_points) = (0usize, 0usize);
-    let (mut in_variables, mut fast_access) = (false, false);
+    let (mut in_variables, mut fast_access, mut double) = (false, false, !ltspice);
     let mut pos = 0;
 
     let is_binary = loop {
@@ -118,6 +129,7 @@ fn parse_utf8(data: &[u8]) -> Result<(RawData, usize), RawFileError> {
                             let flags = value.to_lowercase();
                             raw.is_complex = flags.contains("complex");
                             fast_access = flags.contains("fastaccess");
+                            double |= flags.contains("double");
                         }
                         "No. Variables" => num_vars = value.parse().map_err(bad("num_vars"))?,
                         "No. Points" => num_points = value.parse().map_err(bad("num_points"))?,
@@ -145,7 +157,7 @@ fn parse_utf8(data: &[u8]) -> Result<(RawData, usize), RawFileError> {
 
     let body = &data[pos..];
     let used = if is_binary {
-        parse_binary(body, &mut raw, num_vars, num_points, fast_access)?
+        parse_binary(body, &mut raw, num_vars, num_points, fast_access, double)?
     } else {
         // The values end where the next plot's header begins.
         let end = [&b"\nTitle:"[..], b"\nPlotname:"]
@@ -159,15 +171,22 @@ fn parse_utf8(data: &[u8]) -> Result<(RawData, usize), RawFileError> {
     Ok((raw, pos + used))
 }
 
-/// Little-endian f64s, point-major (`p*nv + v`) or, with FastAccess, variable-major.
-/// One length check, then each column is gathered straight from the byte block.
+/// Little-endian values, point-major (`p*nv + v`) or, with FastAccess,
+/// variable-major: f64 each, or, unless `double` (an LTspice raw without
+/// its `double` flag), the scale (variable 0) f64 and the rest float32; a
+/// complex plot's pairs are f64 always (settle-api row 15, measured).
+/// One length check, then each column is gathered straight from the bytes.
 fn parse_binary(
     body: &[u8],
     raw: &mut RawData,
     nv: usize,
     np: usize,
     fast_access: bool,
+    double: bool,
 ) -> Result<usize, RawFileError> {
+    if !raw.is_complex && !double {
+        return parse_f32(body, raw, nv, np);
+    }
     let width = if raw.is_complex { 2 } else { 1 };
     let need = nv * np * width * 8;
     if body.len() < need {
@@ -191,6 +210,33 @@ fn parse_binary(
             .map(|v| (0..np).map(|p| f(slot(v, p))).collect())
             .collect();
     }
+    Ok(need)
+}
+
+/// [`parse_binary`]'s LTspice rows: the scale f64, the rest float32,
+/// point-major (LTspice writes no FastAccess).
+fn parse_f32(body: &[u8], raw: &mut RawData, nv: usize, np: usize) -> Result<usize, RawFileError> {
+    let row = 8 + 4 * nv.saturating_sub(1);
+    let need = row * np;
+    if body.len() < need {
+        return Err(RawFileError::Format(format!(
+            "Binary block is {} bytes, expected {need}",
+            body.len()
+        )));
+    }
+    let at = |p: usize, v: usize| -> f64 {
+        let o = p * row;
+        match v {
+            0 => f64::from_le_bytes(body[o..o + 8].try_into().expect("8 bytes")),
+            _ => {
+                let o = o + 8 + 4 * (v - 1);
+                f32::from_le_bytes(body[o..o + 4].try_into().expect("4 bytes")).into()
+            }
+        }
+    };
+    raw.real_data = (0..nv)
+        .map(|v| (0..np).map(|p| at(p, v)).collect())
+        .collect();
     Ok(need)
 }
 

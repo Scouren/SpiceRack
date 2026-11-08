@@ -2,3 +2,4 @@ Raw files written by real simulators, each a spec example for `src/rawfile.rs`.
 One line each: file, tool and version, host, date, deck, command.
 
 p1-001.raw  Xyce 7.10.0-opensource (nix .#testing), local, 2026-11-08, Xyce_Regression Netlists/Output/AC/op-raw.cir, `Xyce -r p1-001.raw op-raw.cir`
+p1-006-<a>.raw  LTspice 26.1.1 for Windows (installer sha256 f22163f15420e43a2d5c66440e038ef031a9f019a181f396b95edcef5eebc357) under Wine 11.9, local, 2026-11-08, p1-006-<a>.cir (a = op dc ac tran noise tf), `LTspice.exe -b p1-006-<a>.cir` (spicerack-golden/ltspice/run-ltspice.sh)
