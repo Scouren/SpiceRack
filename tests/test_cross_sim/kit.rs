@@ -6,7 +6,7 @@
 //! Cites: none (the kit walk is `spicerack::import::kit`).
 //!
 //! Contents:
-//! - `pub type Files = (String, Vec<(String, String)>)`
+//! - `pub type Files = (String, Vec<(String, String)>, Vec<Code>)`
 //! - `pub fn write(kit: &Kit, deck: &Path, target: Dialect) -> Result<Files, String>`
 //! - `pub fn codes(messages: &str) -> String`
 
@@ -15,12 +15,14 @@ use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
 use spicerack::syntax::Dialect;
+use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::render_kit;
 use spicerack::syntax::resolve::{FileId, Kit, Role};
 
-/// The deck written, and each included file written, by its name beside
-/// the deck.
-pub type Files = (String, Vec<(String, String)>);
+/// The deck written, each included file written (by its name beside the
+/// deck), and the deck's note codes (W0052: an output the target writes no
+/// vector for).
+pub type Files = (String, Vec<(String, String)>, Vec<Code>);
 
 /// Every included library rendered once per target: a PDK model file
 /// (gf180's sm141064.ngspice) is reached by a thousand decks.
@@ -74,7 +76,8 @@ pub fn write(kit: &Kit, deck: &Path, target: Dialect) -> Result<Files, String> {
         .into_iter()
         .map(|(n, t, from)| (n, relink(&t, &from, &moved)))
         .collect();
-    Ok((relink(&top.text, dir, &moved), files))
+    let notes = top.notes.diags.iter().map(|d| d.code).collect();
+    Ok((relink(&top.text, dir, &moved), files, notes))
 }
 
 /// A refusal's codes, sorted and deduplicated, from its messages

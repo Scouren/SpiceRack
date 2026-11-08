@@ -45,6 +45,9 @@ pub struct Tol {
     /// No independent source has a waveform: an autonomous circuit, whose
     /// transient is compared by period and peak-to-peak.
     autonomous: bool,
+    /// The writer noted outputs the target writes no vector for (W0052: an
+    /// integrated noise, an `@dev[param]`): the reference's are not compared.
+    pub noted_drops: bool,
 }
 
 /// RELTOL, VNTOL, ABSTOL and GMIN, the defaults both simulators share.
@@ -67,7 +70,8 @@ const TRAN: f64 = 1e-2;
 /// `total`) where `a`, Xyce's, has only the spectrum.
 pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String> {
     let has = |k: &str| a.iter().any(|p| kind(p) == k);
-    let (op, ac, total) = (has("op"), has("ac") || !has("noise"), has("total"));
+    let total = has("total") && !tol.noted_drops;
+    let (op, ac) = (has("op"), has("ac") || !has("noise"));
     let kinds = |r: &[RawData]| {
         let mut k: Vec<&str> = r
             .iter()
@@ -99,6 +103,7 @@ impl Tol {
             vntol: VNTOL,
             abstol: ABSTOL,
             autonomous: true,
+            noted_drops: false,
         };
         for line in decks.iter().flat_map(|d| d.lines()) {
             let l = line.trim_start().to_ascii_lowercase();
@@ -232,6 +237,9 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         .fold(0.0, f64::max);
     let mut shared = 0;
     for (i, v) in a.variables.iter().enumerate().skip(first) {
+        if t.noted_drops && v.name.contains('@') {
+            continue;
+        }
         let Some(&j) = in_b.get(&normal(&v.name)) else {
             continue;
         };
@@ -291,7 +299,8 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
             }
         }
     }
-    if shared == 0 && a.variables.len() > first {
+    let dropped = |r: &RawData| r.variables.iter().skip(first).all(|v| v.name.contains('@'));
+    if shared == 0 && a.variables.len() > first && !(t.noted_drops && dropped(a)) {
         let names = |r: &RawData| -> Vec<String> {
             r.variables
                 .iter()

@@ -50,6 +50,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use spicerack::syntax::Dialect;
+use spicerack::syntax::diag::Code;
 use spicerack::syntax::resolve::Form;
 
 mod cmp;
@@ -457,7 +458,8 @@ fn check(
                 continue;
             }
         };
-        let tol = cmp::Tol::of(&[&src, &text.0]);
+        let mut tol = cmp::Tol::of(&[&src, &text.0]);
+        tol.noted_drops = text.2.contains(&Code::W0052);
         out.push(match sim::run(t.sim, deck, &text.0, &text.1, 2 * SECS) {
             Ran::Plots(b) => match cmp::compare(a, &b, tol) {
                 Ok(()) => Verdict::Pass,
