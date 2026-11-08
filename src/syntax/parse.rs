@@ -299,10 +299,19 @@ impl<'s> Parser<'_, 's> {
 
     /// `P0007` for an `Invalid` token and `P0005` for a NaN number.
     fn check_tokens(&mut self, first: u32, eos: u32) {
+        // One search for the statement's first number row, then a cursor
+        // forward through `number_tokens`, which lists them in token order.
+        let mut row = self.t.number_tokens.partition_point(|&n| n < first);
         for k in first..eos {
             match self.t.tags()[k as usize] {
                 T::Invalid => self.ast.diag(Code::P0007, k),
-                T::Number if self.t.value(k).is_nan() => self.ast.diag(Code::P0005, k),
+                T::Number => {
+                    debug_assert_eq!(self.t.number_tokens[row], k, "the cursor is at token k");
+                    if self.t.number_values[row].is_nan() {
+                        self.ast.diag(Code::P0005, k);
+                    }
+                    row += 1;
+                }
                 _ => {}
             }
         }

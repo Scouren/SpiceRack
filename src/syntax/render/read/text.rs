@@ -88,14 +88,22 @@ impl<'a> Rd<'a> {
     /// comment), nothing across an HSPICE `\\` glue; VACASK glues a bracket
     /// to what precedes it and puts a blank after it.
     pub(in crate::syntax::render) fn span(&self, a: u32, b: u32) -> String {
-        let mut out = String::new();
-        for k in a..=b {
-            if k > a {
-                out.push_str(&self.gap(k - 1, k));
+        // The common case, one copy: every gap is kept as written (no line
+        // break, no `/*`, so no HSPICE glue; no VACASK bracket rule), so the
+        // span is the source from `a`'s start to `b`'s end.
+        let lex = self.t.lexicon_at(a);
+        if a <= b
+            && lex.join != crate::syntax::lexicon::Join::Brackets
+            && std::ptr::eq(lex, self.t.lexicon_at(b))
+        {
+            let raw = &self.t.source()[self.t.start(a) as usize..self.t.end(b) as usize];
+            // One byte pass; a `/` (maybe `/*`) takes the slow path too.
+            if !raw.bytes().any(|c| c == b'\n' || c == b'/') {
+                debug_assert_eq!(raw, self.joined(a, b), "the fast path joins as the gaps do");
+                return raw.to_string();
             }
-            out.push_str(self.t.text(k));
         }
-        out
+        self.joined(a, b)
     }
 
     /// Every line of statement `n`, a block's head, body and closer
@@ -169,6 +177,19 @@ impl<'a> Rd<'a> {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// [`Rd::span`] token by token, each gap as [`Rd::gap`] puts it: the
+    /// fast path's reference and the path for every other span.
+    fn joined(&self, a: u32, b: u32) -> String {
+        let mut out = String::new();
+        for k in a..=b {
+            if k > a {
+                out.push_str(&self.gap(k - 1, k));
+            }
+            out.push_str(self.t.text(k));
+        }
+        out
+    }
+
     fn last_of_key(&self, n: Node) -> u32 {
         // An `Assign` with no value ends at its `=`, the token after its key.
         self.last(self.ast.lhs(n)) + 1
