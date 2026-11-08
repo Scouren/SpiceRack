@@ -207,6 +207,25 @@ fn a_diode_knee_current_is_refused() {
     );
 }
 
+/// ngspice-45 `dio/diotemp.c`: `tlev` 0 and 1 share every law but the
+/// breakdown voltage's, `bv - tcv·dt` at 0 and `bv·(1 - tcv·dt)` at 1
+/// (`tbv1` is `tcv`, `dio.c:119`); Xyce's `TBV1` is `bv·(1 + tbv1·dt)` (RG
+/// 7.10 `D`). So `tlev=1` is written as `TBV1=-tcv`, and a `tcv` under
+/// `tlev=0` refused (W0050). Run by hand at 100 C, card at 27, 1 mA
+/// reverse: ngspice tlev=1 tcv=1e-3 -4.635 V, Xyce TBV1=-1e-3 -4.63500 V.
+#[test]
+fn a_diode_breakdown_temperature_law_is_xyce_s_tbv1() {
+    let deck = |c: &str| {
+        format!(
+            "* t\n.model dm d is=1e-14 bv=5 ibv=1e-3 tref=27 {c}\ni1 1 0 1m\nd1 1 0 dm\n.temp 100\n.op\n.end\n"
+        )
+    };
+    same_op(&deck("tlev=1 tcv=1e-3"), "1");
+    same_op(&deck("tlev=1 tbv1=1e-3"), "1");
+    same_op(&deck("tlev=1"), "1");
+    assert_eq!(refusal(&deck("tbv1=1e-3")), [Code::W0053, Code::W0050]);
+}
+
 /// RG 7.10 `Q` (level 234): "HICUM models require both a substrate and
 /// thermal node" (a 3- or 4-node instance is a netlist error on Xyce 7.10);
 /// ngspice's HICUM/L2 takes 3 to 5 (`hicum2`), the substrate at ground and

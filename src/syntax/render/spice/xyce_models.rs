@@ -81,7 +81,9 @@ const SOA: &[(&str, Off)] = &[
 
 /// ngspice's diode (levels 1 and 3) as Xyce's level 1. `tcv` (alias
 /// `tbv1`) is ngspice's `bv - tcv*dt`, Xyce's `TBV1` the relative
-/// `bv*(1 + tbv1*dt)`: no rename. ngspice's knee current `ik`/`ikf` is
+/// `bv*(1 + tbv1*dt)`: no rename; but `tlev=1` makes ngspice's relative,
+/// `bv*(1 - tcv*dt)`, its only difference from `tlev=0` (`diotemp.c`), so
+/// there it is Xyce's `TBV1=-tcv` and `tlev` is left out (`breakdown`). ngspice's knee current `ik`/`ikf` is
 /// cd/(1+sqrt(cd/ikf)) (`dioload.c:382-386`), Xyce's `IKF` the PSpice
 /// cd·sqrt(ikf/(ikf+cd)) (`N_DEV_Diode.C:2396-2401`): no rename either, so
 /// Xyce's same name is refused off 0 (`differ`). Level 3's mask offset `xw`
@@ -101,9 +103,6 @@ const DIODE: Device = Device {
     ],
     off: &[
         ("d", Off::Any),
-        ("tbv1", Off::At(0.0)),
-        ("tcv", Off::At(0.0)),
-        ("tlev", Off::At(0.0)),
         ("tlevc", Off::At(0.0)),
         ("cta", Off::At(0.0)),
         ("ctc", Off::At(0.0)),
@@ -267,9 +266,24 @@ pub(super) fn xyce_model(
     let xyce = names(XYCE, device.key);
     let ngspice = names(NGSPICE, device.key);
     debug_assert!(!xyce.is_empty() && !ngspice.is_empty(), "{}", device.key);
+    let tlev = params
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("tlev"))
+        .map_or(Some(0.0), |(_, v)| fold(v));
     let mut out = Vec::with_capacity(params.len());
     for (k, v) in params {
         let low = k.to_ascii_lowercase();
+        if device.key == DIODE.key {
+            match breakdown(&low, v, tlev) {
+                Some(Ok(Some(p))) => out.push(p),
+                Some(Ok(None)) => {}
+                Some(Err(c)) => return Err(c),
+                None => {}
+            }
+            if matches!(low.as_str(), "tlev" | "tcv" | "tbv1") {
+                continue;
+            }
+        }
         if low == "level" {
             out.push((k.clone(), device.level.to_string()));
             continue;
@@ -349,4 +363,28 @@ fn leveled(params: &[(String, String)], level: &str) -> Vec<(String, String)> {
         }
     }
     out
+}
+
+/// ngspice's diode `tlev` and breakdown coefficient `tcv` (alias `tbv1`,
+/// `dio.c:118-119`) as Xyce's, for parameter `low` = `v` under `tlev`:
+/// `tlev` 0 or 1 is left out (`diotemp.c`: the two differ only in the
+/// breakdown law); `tcv` at 0 left out, under `tlev=1` (`bv*(1 -
+/// tcv*dt)`) Xyce's `TBV1=-tcv` (`bv*(1 + tbv1*dt)`, RG 7.10 `D`), under
+/// `tlev=0` (`bv - tcv*dt`) refused. `None`: not one of these names.
+fn breakdown(
+    low: &str,
+    v: &str,
+    tlev: Option<f64>,
+) -> Option<Result<Option<(String, String)>, Code>> {
+    Some(match low {
+        "tlev" if matches!(tlev, Some(0.0 | 1.0)) => Ok(None),
+        "tlev" => Err(Code::W0050),
+        "tcv" | "tbv1" if fold(v) == Some(0.0) => Ok(None),
+        "tcv" | "tbv1" if tlev == Some(1.0) => {
+            let neg = fold(v).map_or_else(|| format!("{{-({v})}}"), |x| format!("{}", -x));
+            Ok(Some(("tbv1".to_string(), neg)))
+        }
+        "tcv" | "tbv1" => Err(Code::W0050),
+        _ => return None,
+    })
 }
