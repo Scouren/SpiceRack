@@ -20,6 +20,56 @@ use super::ternary::{
 };
 use crate::syntax::behaviour::{ExprEval, ParamForm, ValueQuoting};
 
+/// One expression rewrite: `apply` where `holds`.
+struct Rewrite {
+    holds: fn(&W<'_, '_>) -> bool,
+    apply: fn(&W<'_, '_>, &str) -> String,
+}
+
+/// The rewrites [`W::ternaries_as`] makes to an expression written for
+/// another text family, in order: each reads the one before's output.
+/// Adding one: a row at its place in the order, gated on a `Pair` field
+/// (`pair.rs`; a pair rule) or the writer's state, its spelling a function
+/// in `ternary.rs` (`map_calls` renames or rewrites one call).
+const REWRITES: &[Rewrite] = &[
+    // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
+    Rewrite {
+        holds: |w| w.pair.spell_if,
+        apply: |_, e| spell_if(e),
+    },
+    // `log` is base 10 on Xyce, natural on ngspice, HSPICE, LTspice.
+    Rewrite {
+        holds: |w| w.pair.log_to_ln,
+        apply: |_, e| rename_call(e, "log", "ln"),
+    },
+    Rewrite {
+        holds: |w| w.pair.log_to_log10,
+        apply: |_, e| rename_call(e, "log", "log10"),
+    },
+    // A statistical call at its nominal (`W::nominal`).
+    Rewrite {
+        holds: |w| w.nominal,
+        apply: |_, e| nominal(e),
+    },
+    Rewrite {
+        holds: |w| w.pair.spell_clamp,
+        apply: |_, e| spell_clamp(e),
+    },
+    // A Xyce subcircuit's declared `M`, renamed in its body (`W::m_rename`).
+    Rewrite {
+        holds: |w| w.m_param.is_some(),
+        apply: |w, e| rename_word(e, "m", w.m_param.as_deref().expect("an M renamed")),
+    },
+    Rewrite {
+        holds: |w| w.pair.nint_to_xyce,
+        apply: |_, e| spell_nint(e, true),
+    },
+    Rewrite {
+        holds: |w| w.pair.nint_to_ngspice,
+        apply: |_, e| spell_nint(e, false),
+    },
+];
+
 impl W<'_, '_> {
     /// A value kept as SPICE text, as the target reads it: as written, but
     /// for HSPICE, which reads braces as name bytes and an unquoted value
@@ -152,36 +202,17 @@ impl W<'_, '_> {
         self.ternaries_as(e, read)
     }
 
-    /// `e`'s ternaries for another family, grouped as `read` groups them,
-    /// an `if()` one on ngspice's family; `log` renamed where its base
-    /// differs (`ternary::rename_call`), `nint` rounding as the source's.
+    /// `e` for another family: each of [`REWRITES`] that holds, in order,
+    /// then its ternaries grouped as `read` groups them (a blank before
+    /// each `:` on Xyce). As written for the source's own text family.
     pub(super) fn ternaries_as(&self, e: &str, read: Read) -> String {
-        let p = self.pair;
-        if !p.foreign_text {
+        if !self.pair.foreign_text {
             return e.to_string();
         }
-        // ngspice has no `if` (Xyce's, LTspice's): a ternary there.
-        let e = match p.spell_if {
-            true => spell_if(e),
-            false => e.to_string(),
-        };
-        // `log` is base 10 on Xyce, natural on ngspice, HSPICE, LTspice.
-        let e = match (p.log_to_ln, p.log_to_log10) {
-            (true, _) => rename_call(&e, "log", "ln"),
-            (_, true) => rename_call(&e, "log", "log10"),
-            _ => e,
-        };
-        let e = if self.nominal { nominal(&e) } else { e };
-        let e = if p.spell_clamp { spell_clamp(&e) } else { e };
-        let e = match &self.m_param {
-            Some(m) => rename_word(&e, "m", m),
-            None => e,
-        };
-        let e = match (p.nint_to_xyce, p.nint_to_ngspice) {
-            (true, _) => spell_nint(&e, true),
-            (_, true) => spell_nint(&e, false),
-            _ => e,
-        };
+        let mut e = e.to_string();
+        for r in REWRITES.iter().filter(|r| (r.holds)(self)) {
+            e = (r.apply)(self, &e);
+        }
         parenthesize(&e, read, self.b.param_form == ParamForm::Xyce)
     }
 }
