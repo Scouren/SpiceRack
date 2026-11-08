@@ -25,6 +25,17 @@
 use crate::result::MeasureResult;
 use crate::syntax::Dialect;
 
+/// Prefixes of the LTspice log lines that are no measure result: a line
+/// with a `:` this table does not name is read as `name: value`. A new
+/// log line LTspice writes is a row here.
+const LTSPICE_NOT_MEASURES: [&str; 5] = [
+    "Circuit:",
+    "Date:",
+    "Total elapsed",
+    ".step",
+    "Measurement:",
+];
+
 /// Parse measure results from `backend`'s output, in its format; with no
 /// backend (or one whose format is not known here), whichever format finds
 /// results, ngspice's first.
@@ -147,13 +158,7 @@ fn parse_ltspice(text: &str) -> Vec<MeasureResult> {
             continue;
         }
 
-        // Skip non-measurement lines
-        if trimmed.starts_with("Circuit:")
-            || trimmed.starts_with("Date:")
-            || trimmed.starts_with("Total elapsed")
-            || trimmed.starts_with(".step")
-            || trimmed.starts_with("Measurement:")
-        {
+        if LTSPICE_NOT_MEASURES.iter().any(|p| trimmed.starts_with(p)) {
             continue;
         }
 
