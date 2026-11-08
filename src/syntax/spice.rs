@@ -97,8 +97,12 @@ impl Parser<'_, '_> {
 
 // ---- private ----
 
-/// The node and field mode of a dot card led by `kw`.
+/// The node and field mode of a dot card led by `kw`: an analysis keyword
+/// ([`analysis`]) is an `Analysis`.
 fn shape(kw: T) -> (Tag, Mode) {
+    if analysis(kw).is_some() {
+        return (Tag::Analysis, Mode::Fields);
+    }
     match kw {
         T::KwParam => (Tag::Param, Mode::Fields),
         T::KwFunc => (Tag::Func, Mode::Fields),
@@ -113,16 +117,6 @@ fn shape(kw: T) -> (Tag, Mode) {
         T::KwSave | T::KwProbe => (Tag::Save, Mode::Fields),
         T::KwPrint => (Tag::Print, Mode::Fields),
         T::KwMeas => (Tag::Measure, Mode::Fields),
-        T::KwOp
-        | T::KwDc
-        | T::KwAc
-        | T::KwTran
-        | T::KwNoise
-        | T::KwTf
-        | T::KwSens
-        | T::KwPz
-        | T::KwFour
-        | T::KwSp => (Tag::Analysis, Mode::Fields),
         T::KwStep => (Tag::Step, Mode::Fields),
         // else: any other keyword or directive (`.mc`, `.backanno`, a
         // Spectre word in a SPICE region) is a generic card.
@@ -130,7 +124,8 @@ fn shape(kw: T) -> (Tag, Mode) {
     }
 }
 
-/// The analysis an analysis card's keyword names.
+/// The analysis an analysis card's keyword names: a new SPICE analysis
+/// card is one arm here.
 fn analysis(kw: T) -> Option<Analysis> {
     Some(match kw {
         T::KwOp => Analysis::Op,
