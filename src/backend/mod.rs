@@ -1,15 +1,20 @@
-//! Simulator backends: the [`RUNNABLE`] dialects, one `match` per question.
+//! Simulator backends: the [`RUNNABLE`] dialects, one row each in
+//! `BACKENDS`, and the analysis kinds, one row each in `Kind::spec`.
 //!
 //! A backend executes netlist text verbatim, in its own [`Dialect`]. Turning
 //! a deck into that text is `syntax::render`'s job. Netlist text in, [`RawData`] plots
 //! out, through one subprocess per run.
+//!
+//! Adding a simulator: its file here (`run`) and one `BACKENDS` row; the
+//! kinds it runs that are not universal name it in their `Kind::spec` arm.
+//! Adding an analysis kind: one `Kind` variant and its `Kind::spec` arm.
 //!
 //! Cites: Spectre Reference 19.1 p.17 (`.measure`); each simulator's file
 //! cites its own CLI.
 //!
 //! Contents:
 //! - `pub enum BackendError`
-//! - `pub const RUNNABLE: [Dialect; 5]`
+//! - `pub const RUNNABLE: [Dialect; BACKENDS.len()]`
 //! - `pub use crate::syntax::Dialect`
 //! - `pub mod feature`: `XSPICE`, `OSDI`, `MEASURES`, `STEP_PARAMS`, `CONTROL_BLOCKS`,
 //!   `LAPLACE`, `VERILOG_COSIM`, `ALL` (`u8` bits)
@@ -18,11 +23,13 @@
 //! - `Dialect::capabilities(self) -> u8`, `Dialect::run(self, netlist: &str) -> Result<RawData, BackendError>`,
 //!   `Dialect::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn available() -> &'static [Dialect]`
-//! - `pub enum Kind`, `Kind::name(self) -> &'static str`
+//! - `pub use kind::Kind`, `pub(crate) use kind::{Plot, Spec}` (`kind.rs`: the analysis kinds)
 //! - `pub fn select(kind: Kind, override_backend: Option<&str>, needs: u8, writes: impl Fn(Dialect) -> bool) -> Result<Dialect, BackendError>`
 //! - `pub struct Issue`, `pub enum IssueSeverity`,
 //!   `pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue>`
 //! - `pub mod espice`, `ltspice`, `ngspice`, `spectre`, `vacask`
+
+mod kind;
 
 pub mod espice;
 pub mod ltspice;
@@ -35,6 +42,9 @@ use std::process::Command;
 use std::sync::OnceLock;
 
 use feature::*;
+
+pub use kind::Kind;
+pub(crate) use kind::{Plot, Spec};
 
 use crate::rawfile;
 use crate::result::RawData;
@@ -83,46 +93,17 @@ pub enum BackendError {
     Io(#[from] std::io::Error),
 }
 
-/// The dialects a simulator here runs; a universal analysis runs on each, in
-/// this order of preference.
-pub const RUNNABLE: [Dialect; 5] = [
-    Dialect::Ngspice,
-    Dialect::Ltspice,
-    Dialect::Vacask,
-    Dialect::Spectre,
-    Dialect::Espice,
-];
-
-/// An analysis's kind: what picks the simulator that runs it
-/// ([`select`]), and the plot a run writes for it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    Op,
-    Dc,
-    Ac,
-    Tran,
-    Noise,
-    Tf,
-    /// `.sens` at DC.
-    Sens,
-    /// `.sens … AC …`.
-    SensAc,
-    Pz,
-    Disto,
-    Pss,
-    Hb,
-    Sp,
-    Stb,
-    TranNoise,
-    /// `.four`: a table on stdout, no plot.
-    Fourier,
-    SpectreSweep,
-    SpectreMonteCarlo,
-    Pac,
-    Pnoise,
-    Pxf,
-    Pstb,
-}
+/// The dialects a simulator here runs (`BACKENDS`, in its order); a
+/// universal analysis runs on each, in this order of preference.
+pub const RUNNABLE: [Dialect; BACKENDS.len()] = {
+    let mut out = [Dialect::Ngspice; BACKENDS.len()];
+    let mut i = 0;
+    while i < BACKENDS.len() {
+        out[i] = BACKENDS[i].dialect;
+        i += 1;
+    }
+    out
+};
 
 /// One problem [`check`] finds with running a deck on a backend.
 #[derive(Debug, Clone, PartialEq)]
@@ -152,6 +133,62 @@ const SPECTRE_CAPS: u8 = OSDI | MEASURES | STEP_PARAMS;
 // point as a separate plot in one raw file, which parse_raw does not split.
 // Laplace: its own `E/G … LAPLACE` card (`render::spice::laplace`).
 const ESPICE_CAPS: u8 = OSDI | MEASURES | LAPLACE;
+
+/// One simulator SpiceRack drives: its dialect, what it can do
+/// (`feature` bits), whether it is installed, and the run (its file's
+/// `run`). A new simulator is a row here; the order is [`RUNNABLE`]'s.
+struct Backend {
+    dialect: Dialect,
+    caps: u8,
+    installed: fn() -> bool,
+    run: fn(&str) -> Result<Vec<RawData>, BackendError>,
+}
+
+const BACKENDS: [Backend; 5] = [
+    Backend {
+        dialect: Dialect::Ngspice,
+        caps: NGSPICE_CAPS,
+        installed: || is_on_path("ngspice"),
+        run: ngspice::run,
+    },
+    Backend {
+        dialect: Dialect::Ltspice,
+        caps: LTSPICE_CAPS,
+        installed: || ltspice::find().is_some(),
+        run: ltspice::run,
+    },
+    Backend {
+        dialect: Dialect::Vacask,
+        caps: VACASK_CAPS,
+        installed: || is_on_path("vacask"),
+        run: vacask::run,
+    },
+    Backend {
+        dialect: Dialect::Spectre,
+        caps: SPECTRE_CAPS,
+        installed: || is_on_path("spectre"),
+        run: spectre::run,
+    },
+    Backend {
+        dialect: Dialect::Espice,
+        caps: ESPICE_CAPS,
+        installed: || is_on_path("espice"),
+        run: espice::run,
+    },
+];
+
+// One row per dialect: a second row for one would never be reached.
+const _: () = {
+    let mut i = 0;
+    while i < BACKENDS.len() {
+        let mut j = i + 1;
+        while j < BACKENDS.len() {
+            assert!(BACKENDS[i].dialect as u8 != BACKENDS[j].dialect as u8);
+            j += 1;
+        }
+        i += 1;
+    }
+};
 
 // Seven features, one distinct bit each, inside the `u8`.
 const _: () = assert!(feature::ALL.count_ones() == 7);
@@ -228,14 +265,7 @@ impl Dialect {
     /// What this dialect's simulator can do, as `feature` bits; nothing
     /// for a dialect no simulator here runs.
     pub fn capabilities(self) -> u8 {
-        match self {
-            Dialect::Ngspice => NGSPICE_CAPS,
-            Dialect::Ltspice => LTSPICE_CAPS,
-            Dialect::Vacask => VACASK_CAPS,
-            Dialect::Spectre => SPECTRE_CAPS,
-            Dialect::Espice => ESPICE_CAPS,
-            Dialect::Hspice | Dialect::Xyce | Dialect::Cdl | Dialect::Verilog => 0,
-        }
+        backend(self).map_or(0, |b| b.caps)
     }
 
     /// Executes `netlist` (already in this dialect) and reads the results.
@@ -257,19 +287,15 @@ impl Dialect {
     /// # Errors
     /// As [`Self::run`].
     pub fn run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError> {
-        match self {
-            Dialect::Ngspice => ngspice::run(netlist),
-            Dialect::Ltspice => ltspice::run(netlist),
-            Dialect::Vacask => vacask::run(netlist),
-            Dialect::Spectre => spectre::run(netlist),
-            Dialect::Espice => espice::run(netlist),
-            Dialect::Hspice | Dialect::Xyce | Dialect::Cdl | Dialect::Verilog => {
-                Err(BackendError::SimulationError(format!(
-                    "no {} simulator is driven by SpiceRack",
-                    self.name()
-                )))
-            }
-        }
+        let Some(b) = backend(self) else {
+            return Err(BackendError::SimulationError(format!(
+                "no {} simulator is driven by SpiceRack",
+                self.name()
+            )));
+        };
+        let plots = (b.run)(netlist)?;
+        assert!(!plots.is_empty(), "a raw file read holds at least one plot");
+        Ok(plots)
     }
 }
 
@@ -277,18 +303,13 @@ impl Dialect {
 pub fn available() -> &'static [Dialect] {
     static CACHE: OnceLock<Vec<Dialect>> = OnceLock::new();
     CACHE.get_or_init(|| {
-        let found = [
-            (Dialect::Ngspice, is_on_path("ngspice")),
-            (Dialect::Ltspice, ltspice::find().is_some()),
-            (Dialect::Vacask, is_on_path("vacask")),
-            (Dialect::Spectre, is_on_path("spectre")),
-            (Dialect::Espice, is_on_path("espice")),
-        ];
+        let found: Vec<Dialect> = BACKENDS
+            .iter()
+            .filter(|b| (b.installed)())
+            .map(|b| b.dialect)
+            .collect();
+        assert!(found.len() <= RUNNABLE.len());
         found
-            .into_iter()
-            .filter(|&(_, ok)| ok)
-            .map(|(k, _)| k)
-            .collect()
     })
 }
 
@@ -303,8 +324,13 @@ pub fn select(
     needs: u8,
     writes: impl Fn(Dialect) -> bool,
 ) -> Result<Dialect, BackendError> {
-    let (dialects, alternative) = route(kind);
-    let analysis = kind.name();
+    let Spec {
+        name: analysis,
+        route: dialects,
+        alternative,
+        ..
+    } = kind.spec();
+    assert!(!dialects.is_empty(), "every kind runs somewhere");
     let env = std::env::var("SPICERACK_BACKEND")
         .ok()
         .filter(|s| !s.is_empty());
@@ -342,34 +368,6 @@ pub fn select(
     }
 }
 
-impl Kind {
-    /// The analysis's short name, as errors and `check` name it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Kind::Op => "op",
-            Kind::Dc => "dc",
-            Kind::Ac => "ac",
-            // `fourier`, `sweep` and `montecarlo` wrap a transient here.
-            Kind::Tran | Kind::Fourier | Kind::SpectreSweep | Kind::SpectreMonteCarlo => "tran",
-            Kind::Noise => "noise",
-            Kind::Tf => "tf",
-            Kind::Sens => "sens",
-            Kind::SensAc => "sens_ac",
-            Kind::Pz => "pz",
-            Kind::Disto => "disto",
-            Kind::Pss => "pss",
-            Kind::Hb => "hb",
-            Kind::Sp => "sp",
-            Kind::Stb => "stb",
-            Kind::TranNoise => "trannoise",
-            Kind::Pac => "pac",
-            Kind::Pnoise => "pnoise",
-            Kind::Pxf => "pxf",
-            Kind::Pstb => "pstb",
-        }
-    }
-}
-
 /// The issues `backend` raises against a deck that needs the `needs` bits
 /// (`feature`) and holds `elements` element and instance cards: each
 /// feature it lacks, and a large deck on ngspice. Pure: nothing runs.
@@ -400,36 +398,9 @@ pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue> {
 
 // ---- private ----
 
-/// The dialects that run `a`, in preference order, and the workaround to
-/// suggest without one. A universal analysis runs on every [`RUNNABLE`].
-fn route(kind: Kind) -> (&'static [Dialect], &'static str) {
-    use Dialect::*;
-    match kind {
-        // `tf` runs everywhere, so its old ".dc() with small-signal sweep"
-        // workaround could never be shown.
-        Kind::Op
-        | Kind::Dc
-        | Kind::Ac
-        | Kind::Tran
-        | Kind::Noise
-        | Kind::Tf
-        | Kind::Fourier
-        | Kind::SpectreSweep
-        | Kind::SpectreMonteCarlo => (&RUNNABLE, "N/A"),
-        Kind::Pz => (&[Ngspice], ".ac() + post-process for poles/zeros"),
-        Kind::Disto => (&[Ngspice], ".transient() + FFT post-processing"),
-        Kind::Sens => (&[Ngspice, Spectre, Espice], "N/A"),
-        Kind::SensAc => (&[Ngspice, Spectre], "N/A"),
-        Kind::Hb => (&[Vacask, Spectre], "long .tran() + discard startup + FFT"),
-        // VACASK's analyses (the pinned build's test decks): op, ac, acxf,
-        // dcinc, dcxf, noise, tran, hb; no `sp`, no `stb`.
-        Kind::Sp => (&[Spectre, Ngspice], "N/A"),
-        Kind::Stb => (&[Spectre], ".ac() + Middlebrook method"),
-        Kind::Pss => (&[Spectre, Ngspice], "long .tran() + discard startup"),
-        // ngspice's `TRNOISE` sources (manual §4.1.7) are the noise.
-        Kind::TranNoise => (&[Ngspice], "N/A"),
-        Kind::Pac | Kind::Pnoise | Kind::Pxf | Kind::Pstb => (&[Spectre], "N/A"),
-    }
+/// The [`BACKENDS`] row of `d`; `None` for a dialect no simulator here runs.
+fn backend(d: Dialect) -> Option<&'static Backend> {
+    BACKENDS.iter().find(|b| b.dialect == d)
 }
 
 fn unsupported(
@@ -568,14 +539,14 @@ mod tests {
     #[test]
     fn routes_match_the_analysis() {
         use Dialect::*;
-        assert_eq!(route(Kind::Pz).0, &[Ngspice]);
-        assert_eq!(route(Kind::Hb).0, &[Vacask, Spectre]);
-        assert_eq!(route(Kind::TranNoise).0, &[Ngspice]);
-        assert_eq!(route(Kind::Sens).0, &[Ngspice, Spectre, Espice]);
-        assert_eq!(route(Kind::SensAc).0, &[Ngspice, Spectre]);
-        assert_eq!(route(Kind::Tran).0, RUNNABLE);
+        assert_eq!(Kind::spec(Kind::Pz).route, &[Ngspice]);
+        assert_eq!(Kind::spec(Kind::Hb).route, &[Vacask, Spectre]);
+        assert_eq!(Kind::spec(Kind::TranNoise).route, &[Ngspice]);
+        assert_eq!(Kind::spec(Kind::Sens).route, &[Ngspice, Spectre, Espice]);
+        assert_eq!(Kind::spec(Kind::SensAc).route, &[Ngspice, Spectre]);
+        assert_eq!(Kind::spec(Kind::Tran).route, RUNNABLE);
         assert_eq!(
-            route(Kind::Tran).0.last(),
+            Kind::spec(Kind::Tran).route.last(),
             Some(&Espice),
             "espice is never preferred first"
         );

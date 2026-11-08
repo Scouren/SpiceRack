@@ -11,7 +11,7 @@
 //! - `pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn run_each(sim: Dialect, deck: &str, analyses: &[Kind]) -> Result<Vec<Option<RawData>>, BackendError>`
 
-use crate::backend::{BackendError, Dialect, Kind};
+use crate::backend::{BackendError, Dialect, Kind, Plot};
 use crate::result::RawData;
 
 /// Runs `deck`, written in `sim`'s dialect, on `sim`, tagging the result
@@ -84,31 +84,14 @@ pub fn run_each(
     }
     let mut out = Vec::with_capacity(analyses.len());
     for &a in analyses {
-        let name = match a {
-            Kind::Fourier => {
+        let name = match a.spec().plot {
+            Plot::Table => {
                 out.push(None);
                 continue;
             }
-            Kind::Op => "Operating Point",
-            Kind::Dc => "DC transfer characteristic",
-            Kind::Ac => "AC Analysis",
-            Kind::Tran | Kind::TranNoise => "Transient Analysis",
-            Kind::Noise => "Noise Spectral Density Curves",
-            Kind::Tf => "Transfer Function",
-            Kind::Sens | Kind::SensAc => "Sensitivity Analysis",
-            Kind::Pz => "Pole-Zero Analysis",
-            Kind::Disto => "DISTORTION",
-            Kind::Sp => "SP Analysis",
-            Kind::Pss
-            | Kind::Hb
-            | Kind::Stb
-            | Kind::SpectreSweep
-            | Kind::SpectreMonteCarlo
-            | Kind::Pac
-            | Kind::Pnoise
-            | Kind::Pxf
-            | Kind::Pstb => {
-                return Err(missing(&format!("matchable {}", unmatched(a))));
+            Plot::Named(name) => name,
+            Plot::Unmatched(py_name) => {
+                return Err(missing(&format!("matchable {py_name}")));
             }
         };
         let i = plots
@@ -119,34 +102,4 @@ pub fn run_each(
     }
     assert_eq!(out.len(), analyses.len());
     Ok(out)
-}
-
-// ---- private ----
-
-/// The analysis's name in a `run_each` error, as the Python API names it.
-fn unmatched(a: Kind) -> &'static str {
-    match a {
-        Kind::Pss => "Pss",
-        Kind::Hb => "HarmonicBalance",
-        Kind::Stb => "Stability",
-        Kind::SpectreSweep => "SpectreSweep",
-        Kind::SpectreMonteCarlo => "SpectreMonteCarlo",
-        Kind::Pac => "SpectrePac",
-        Kind::Pnoise => "SpectrePnoise",
-        Kind::Pxf => "SpectrePxf",
-        Kind::Pstb => "SpectrePstb",
-        Kind::Op
-        | Kind::Dc
-        | Kind::Ac
-        | Kind::Tran
-        | Kind::TranNoise
-        | Kind::Noise
-        | Kind::Tf
-        | Kind::Sens
-        | Kind::SensAc
-        | Kind::Pz
-        | Kind::Disto
-        | Kind::Sp
-        | Kind::Fourier => a.name(),
-    }
 }
