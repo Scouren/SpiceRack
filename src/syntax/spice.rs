@@ -25,6 +25,7 @@ use crate::syntax::token::Tag as T;
 impl Parser<'_, '_> {
     /// The SPICE statement at the cursor, inside a block tagged `in_tag`.
     pub(super) fn spice(&mut self, in_tag: Tag) -> Head {
+        debug_assert!(self.i < self.end, "a statement has a head token");
         let first = self.i;
         let lex = self.t.lexicon_at(first);
         // `simulator lang=<dialect>` opens a region (`Lexicon::regions`).
@@ -87,6 +88,7 @@ impl Parser<'_, '_> {
         let head = self.i;
         self.i += 1;
         let args = self.items(mode);
+        debug_assert_eq!(self.i, self.end, "a dot card's fields run to its end");
         let code = analysis(kw).map_or(NONE, |a| a as u32);
         let h = self.ast.push_header(NONE, NONE, code, &[], &args);
         self.ast.push(tag, head, h, NONE)
