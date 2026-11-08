@@ -40,9 +40,13 @@ pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
     }
     let (first, mut used) = parse_utf8(data)?;
     let mut plots = vec![first];
-    // Every later plot starts with `Title:`. Anything else is trailing junk:
-    // ngspice with `.options interp` writes past the rows it declares.
-    while data[used..].trim_ascii_start().starts_with(b"Title:") {
+    // Every later plot starts with `Title:`, or `Plotname:` (Xyce 7.10's
+    // `-r` file, its second plot). Anything else is trailing junk: ngspice
+    // with `.options interp` writes past the rows it declares.
+    while [&b"Title:"[..], b"Plotname:"]
+        .iter()
+        .any(|h| data[used..].trim_ascii_start().starts_with(h))
+    {
         let (raw, n) = parse_utf8(&data[used..])?;
         plots.push(raw);
         used += n;
@@ -144,9 +148,10 @@ fn parse_utf8(data: &[u8]) -> Result<(RawData, usize), RawFileError> {
         parse_binary(body, &mut raw, num_vars, num_points, fast_access)?
     } else {
         // The values end where the next plot's header begins.
-        let end = body
-            .windows(7)
-            .position(|w| w == b"\nTitle:")
+        let end = [&b"\nTitle:"[..], b"\nPlotname:"]
+            .iter()
+            .filter_map(|h| body.windows(h.len()).position(|w| w == *h))
+            .min()
             .map_or(body.len(), |i| i + 1);
         parse_ascii(&body[..end], &mut raw, num_vars, num_points)?;
         end

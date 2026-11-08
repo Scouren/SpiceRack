@@ -37,3 +37,21 @@ Values:\n\
     assert_eq!(result.variables.len(), 2);
     assert!((result.real_data[0][0] - 3.3).abs() < 1e-10);
 }
+
+#[test]
+fn p1_001_rawfile_drops_xyce_second_plot() {
+    // `Xyce -r p1-001.raw op-raw.cir` (Xyce 7.10, the corpus deck
+    // Output/AC/op-raw.cir: `.op` + `.ac dec 10 100 1g`; tests/fixtures/raw/
+    // README): two plots, the op and the 71-point ac, the second's header
+    // starting at `Plotname:` with no `Title:`. R1 10 ohm, V1 0 V.
+    let data = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/raw/p1-001.raw"
+    ))
+    .expect("the fixture");
+    let plots = spicerack::rawfile::parse_raw_all(&data).expect("parsed");
+    let names: Vec<&str> = plots.iter().map(|p| p.plot_name.as_str()).collect();
+    assert_eq!(names, ["DC operating point", "AC Analysis"]);
+    assert_eq!(plots[1].complex_data[0].len(), 71);
+    assert_eq!(plots[1].complex_data[0][0].re, 100.0);
+}

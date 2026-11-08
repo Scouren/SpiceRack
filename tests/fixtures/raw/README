@@ -1,0 +1,4 @@
+Raw files written by real simulators, each a spec example for `src/rawfile.rs`.
+One line each: file, tool and version, host, date, deck, command.
+
+p1-001.raw  Xyce 7.10.0-opensource (nix .#testing), local, 2026-11-08, Xyce_Regression Netlists/Output/AC/op-raw.cir, `Xyce -r p1-001.raw op-raw.cir`
