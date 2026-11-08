@@ -518,3 +518,67 @@ mod tests {
         assert!(!has_statistical("unif"), "a name, no call");
     }
 }
+
+/// Characterization of `lint_netlist`'s whole output (every check's
+/// findings, in order), recorded from the single-function version before
+/// the spine split (376d565): the split must give the same bytes.
+#[cfg(test)]
+mod characterization {
+    use super::lint_netlist;
+
+    const DECK: &str = "* every check
+R1 a b 0
+R1 c 0 1k
+C1 a n1 0
+D1 a b dmissing
+Q1 c b e qmissing
+M1 d g s b nmissing
+X1 a b sub
+V1 in 0 {vdd}
+.param r=agauss(1, 0.1, 3)
+R2 a 0 {r}
+R3 b 0 {r}
+.meas tran t1 max v(a)
+.pz v(a) 0 v(in) 0 vol pz
+.disto dec 10 1k 1meg
+.sens v(a)
+.control
+.endc
+";
+
+    /// No ground node: the one check `DECK` does not reach.
+    const FLOATING: &str = "* no ground
+R1 a b 1k
+.end
+";
+
+    fn dump(deck: &str, backend: Option<&str>) -> String {
+        let r = lint_netlist(deck, backend);
+        let mut s = String::new();
+        for f in r.errors.iter().chain(&r.warnings) {
+            s += &format!(
+                "{}|{}|{:?}|{:?}\n",
+                f.line, f.message, f.suggestion, f.backends
+            );
+        }
+        s
+    }
+
+    #[test]
+    fn the_whole_output_is_pinned() {
+        let got: Vec<String> = [
+            None,
+            Some("ngspice"),
+            Some("ltspice"),
+            Some("spectre"),
+            Some("vacask-shared"),
+        ]
+        .iter()
+        .map(|b| dump(DECK, *b))
+        .chain([dump(FLOATING, None)])
+        .collect();
+        let got = got.join("====\n");
+        let want = include_str!("../tests/fixtures/lint/whole_output.txt");
+        assert_eq!(got, want);
+    }
+}
