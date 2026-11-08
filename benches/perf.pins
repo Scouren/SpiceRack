@@ -1,0 +1,25 @@
+# benches/perf.py --pin: workload instr=<instructions:u> allocs=<n>
+parse:all allocs=15996687 instr=69488073311
+py:build instr=136392614
+py:columns instr=11821981793
+py:from_source instr=139749974
+py:netlist-ngspice instr=754335817
+py:netlist-spectre instr=927720327
+py:netlist-vacask instr=1208926997
+py:netlist-xyce instr=1049075015
+py:read_raw instr=520452233
+raw:ascii-50x20k allocs=3735 instr=3554658709
+raw:bin-200x100k allocs=2060 instr=2602144557
+render:pdk-sky130A allocs=43626770 instr=38186219494
+render:small allocs=5172986 instr=4231372674
+render:spice-bench-cdl allocs=393400749 instr=376936821930
+render:spice-bench-espice allocs=289355585 instr=305469237269
+render:spice-bench-hspice allocs=397143634 instr=396307805452
+render:spice-bench-ltspice allocs=437397687 instr=431280215253
+render:spice-bench-ngspice allocs=289554950 instr=305869433349
+render:spice-bench-spectre allocs=433410989 instr=385248487086
+render:spice-bench-vacask allocs=529340412 instr=479378230399
+render:spice-bench-verilog allocs=130838732 instr=166379050649
+render:spice-bench-xyce allocs=439858945 instr=432650415285
+render:xyce allocs=500811858 instr=412586699119
+tokenize:all allocs=5341474 instr=32664740057

@@ -12,6 +12,7 @@ trusts. The rules behind it are in `AGENTS.md` (Testing).
 | docs | the site builds strictly; every Python example in it runs | `nix develop .#docs -c mkdocs build --strict`; `tests/test_docs.py` | `.github/workflows/docs.yaml`; pytest |
 | release | tag matches `Cargo.toml` and `pyproject.toml`, wheels for every target, sdist | `.github/scripts/bump_version.py`, then the release workflow | `.github/workflows/tags.yaml`, `publish.yaml` |
 | nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
+| perf | instructions and allocations of the golden workload, the raw-file reader and the Python API ("Performance" below) | `python3 benches/perf.py pre-commit` (< 10 s), `merge` (≈ 2 min), `nightly` (≈ 5 min) | local, `nix develop .#testing`; every perf commit cites before and after |
 | golden | the transpiler rewrite's byte-identical gate against `9d1d6bb` ("Golden gate" below) | `golden record`, then `golden diff <baseline> <new> --xfail migration.xfail`; `golden check-determinism`; `cargo test --features corpus --test test_syntax` | local, before each rewrite phase lands |
 
 `.github/scripts/check_style.py` is vendored from the `code-style` skill
@@ -45,7 +46,7 @@ provenance, never by re-deriving it the way the writer does.
 | `test_sections_pdk.rs` | real PDK files: section names against a line scan, fixpoints; real ngspice on gf180mcu's `sm141064.ngspice` (nothing raw: subcircuit `.param`s are locals) and real VACASK on its `demo/cmos180n.lib`, written by SpiceRack, bit-identical to the original's run; gf180mcu's sections SPICE -> Spectre -> SPICE by meaning (those with an r or c model to Spectre only) or refused by named reason; sky130's combined library and the ~190 files it reaches, nothing unparsed or raw, written back as ngspice and as HSPICE and run on `tt` by ngspice bit-identical to the PDK's own files; ESPice `--tokenizer=hspice` on the HSPICE tree, a named known gap (+5.1%) |
 | `test_spectre_golden/` | goldens; Spectre is licence-gated, so the text is checked against the Spectre reference manual |
 | `test_ltspice_dialect.rs` | emitted text against the LTspice help; no LTspice binary, so unverified by execution |
-| `test_syntax.rs` | the hand-read `simulator lang=spice` region of `tests/fixtures/pdk_sections/bare.scs`, and one region marker per such line in every Spectre fixture; `kits_resolve`: every PDK kit and fixture as a `resolve::Kit`, its read order the golden walk's, every instance master bound or carrying its `R0001`, the counts printed; `throughput` (`--ignored`) times the stages (tokenize, parse, render) over every golden-gate input |
+| `test_syntax.rs` | the hand-read `simulator lang=spice` region of `tests/fixtures/pdk_sections/bare.scs`, and one region marker per such line in every Spectre fixture; `kits_resolve`: every PDK kit and fixture as a `resolve::Kit`, its read order the golden walk's, every instance master bound or carrying its `R0001`, the counts printed. The stages' throughput is the perf tier's (`benches/perf.py`) |
 | `test_verilog_a.rs` | the made-up Spectre kit `tests/fixtures/verilog_a/` (`.inc`: no golden input), read by hand: its Verilog-A module (ports in header order, `parameter` names, no `localparam`) declared at its `ahdl_include`, every instance bound, no `R` row |
 | `test_render.rs` | the pins `tests/fixtures/transpiler/pinned/`, the old writer's bytes (the pipeline the golden baseline recorded) for decks the corpus lacks: each Spectre `statistics` table (process, mismatch, correlations, sections) and each Laplace source on the five SPICE targets (the tables on Spectre and VACASK too), or the refusal's `W` codes |
 | `src/syntax` (`#[cfg(test)]`) | one test per node tag and per header shape, each against its manual clause with the tree derived by hand (`src/syntax/tests/`); the device tables read and written back (`device.rs`); resolve, one test per answer against its clause, from an in-memory loader (`src/syntax/resolve/tests.rs`; Verilog-A module headers against IEEE 1364-2005 §12.1 in `resolve/verilog_a.rs`); every reader's every number suffix inside an expression, written for every target and read back by the target's reader as the same value (`src/syntax/tests/render.rs`); 10⁴-deep `.subckt` and `.if` decks through the parser and the renderer in Debug on a test thread's stack (`src/syntax/tests/render.rs`; the writers and the plan's drop walk branches on a heap stack, `render/read/walk.rs`); structural Verilog (`render/spice/verilog.rs`) against IEEE 1364-2005 §12; the named writer's Monte Carlo rules (`render/named/lift.rs`) against the same hand-worked text (T-G1 to T-G4, T-G9, and VACASK's calls per its `docs/cmd-analysis-mc.md`), and the `tests/spectre/` decks real Spectre 21.1 ran, written byte for byte from their SPICE sources |
@@ -185,7 +186,8 @@ phase.
 Measured on a 32-thread, 31 GB development machine, 2026-11-03, release
 build, before phase 2b's switch: the phase-1 tokenizer gate read all 14,938
 inputs, 3,664,966 logical lines and 8,357,766 number tokens with 0
-differences in 25.9 s; `throughput` (`--ignored`): 201.3 MB, 30.1 M tokens,
+differences in 25.9 s; the then `throughput` test (now the perf tier's
+`tokenize` and `parse` workloads): 201.3 MB, 30.1 M tokens,
 26.1 M nodes, tokenize 2.36 s (85.3 MB/s), parse 3.44 s (58.5 MB/s). Phase
 6's `golden record` (every target through the renderer, Verilog's
 structural writer among them): 2 min 7 s wall, 268 s user, 2026-11-04.
@@ -194,6 +196,40 @@ structural writer among them): 2 min 7 s wall, 268 s user, 2026-11-04.
 nix develop .#testing -c env IHP_PDK=<...> cargo test -j 4 --release \
   --no-default-features --features corpus --test test_syntax -- --test-threads=4
 ```
+
+## Performance
+
+`benches/perfbench.rs` (a `[[bench]]`, `harness = false`) runs the golden
+workload in memory on one thread (`render <sets> [target]`, also `tokenize`,
+`parse`), and the raw-file reader on a generated file (`rawgen`, `raw`), with a
+counting global allocator. `benches/pybench.py` runs the Python API's
+builders and `read_raw` into numpy. `benches/perf.py <tier>` runs a tier's
+workloads under `perf stat --no-scale -e instructions:u` (the unscaled sum of a
+hybrid CPU's two PMUs), counting only the measured region (perf's control
+FIFO), and compares them with `benches/perf.pins`: +3% instructions or +2%
+allocations fails, a decrease prints the new number. Both counts are
+independent of machine load (allocations are exact; instructions repeat to
+0.2%); wall time is printed, never gated. `--pin` records the counts: pin on
+the parent commit, then measure the change.
+
+| Tier | Workloads |
+|---|---|
+| `pre-commit` | render `fixtures`, `hspice`, `vacask`, `pdk-vacask` to every target |
+| `merge` | tokenize, and tokenize + parse, every input (MB/s printed); render `xyce` and `pdk-sky130A` to every target; raw binary 200 × 100k and ASCII 50 × 20k; Python: 10k `Subcircuit.R`, `netlist` per target, `from_source`, `read_raw` and 199 columns into numpy (`maturin develop --release` first) |
+| `nightly` | render `spice-bench`, one target at a time |
+
+```sh
+nix develop .#testing -c env IHP_PDK=<...> PERF=<perf binary> python3 benches/perf.py merge
+```
+
+The profile and the work list behind it: `research/PERF.md` (the perf agent,
+2026-11-07). The pins reproduce its baselines: per statement per target,
+spice-bench → ngspice 87.6 allocations, Xyce → ngspice 249.6, sky130 →
+Spectre 4,944.1. Its instruction counts are perf's scaled ones: on this
+hybrid CPU a counter enabled on both core types and running on one is
+scaled up by perf, overstating by up to 2× and varying run to run (Xyce
+render: PERF.md 6.99e11, unscaled 4.13e11); the pins are unscaled, and
+match a run pinned to the P-cores (`taskset -c 0-15`) within 0.2%.
 
 ## Known gaps
 
