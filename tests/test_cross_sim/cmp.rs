@@ -23,7 +23,8 @@
 //! RELTOL, ABSTOL defaults).
 //!
 //! Contents:
-//! - `pub fn compare(a: &[RawData], b: &[RawData]) -> Result<(), String>`
+//! - `pub struct Tol`, `Tol::of(decks: &[&str]) -> Tol`
+//! - `pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String>`
 
 use std::collections::HashMap;
 
@@ -32,11 +33,22 @@ use spicerack::result::{RawData, VarType};
 
 use super::tube::leaves_tube;
 
+/// The accuracy a pair of decks asks of its simulators: each of RELTOL,
+/// VNTOL and ABSTOL the larger of the default and any `.options` value
+/// either deck sets (Xyce's `.options timeint reltol=` among them).
+#[derive(Clone, Copy, Debug)]
+pub struct Tol {
+    reltol: f64,
+    vntol: f64,
+    abstol: f64,
+}
+
 /// RELTOL, VNTOL, ABSTOL and GMIN, the defaults both simulators share.
 const RELTOL: f64 = 1e-3;
 const VNTOL: f64 = 1e-6;
 const ABSTOL: f64 = 1e-12;
 const GMIN: f64 = 1e-12;
+
 /// A transient point's tolerance, relative to the swing (module doc).
 const TRAN: f64 = 1e-2;
 
@@ -49,7 +61,7 @@ const TRAN: f64 = 1e-2;
 /// on an `.AC` sweep, which the deck written for it holds (HSPICE Reference
 /// Manual, `.NOISE`), and ngspice's integrated noise (a one-point plot,
 /// `total`) where `a`, Xyce's, has only the spectrum.
-pub fn compare(a: &[RawData], b: &[RawData]) -> Result<(), String> {
+pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String> {
     let has = |k: &str| a.iter().any(|p| kind(p) == k);
     let (op, ac, total) = (has("op"), has("ac") || !has("noise"), has("total"));
     let kinds = |r: &[RawData]| {
@@ -68,10 +80,42 @@ pub fn compare(a: &[RawData], b: &[RawData]) -> Result<(), String> {
         let pa = a.iter().filter(|p| kind(p) == k);
         let pb = b.iter().filter(|p| kind(p) == k);
         for (x, y) in pa.zip(pb) {
-            plot(k, x, y)?;
+            plot(k, x, y, tol)?;
         }
     }
     Ok(())
+}
+
+impl Tol {
+    /// The tolerances `decks` (the source and the deck written from it)
+    /// ask for: their `.option(s)` cards' `reltol`, `vntol`, `abstol`.
+    pub fn of(decks: &[&str]) -> Tol {
+        let mut t = Tol {
+            reltol: RELTOL,
+            vntol: VNTOL,
+            abstol: ABSTOL,
+        };
+        for line in decks.iter().flat_map(|d| d.lines()) {
+            let l = line.trim_start().to_ascii_lowercase();
+            if !l.starts_with(".option") {
+                continue;
+            }
+            let l = l.replace(" =", "=").replace("= ", "=");
+            for (k, v) in l.split_whitespace().filter_map(|w| w.split_once('=')) {
+                let Some((x, _, _)) = spicerack::unit::parse_spice_number(v) else {
+                    continue;
+                };
+                let slot = match k {
+                    "reltol" => &mut t.reltol,
+                    "vntol" => &mut t.vntol,
+                    "abstol" => &mut t.abstol,
+                    _ => continue,
+                };
+                *slot = slot.max(x);
+            }
+        }
+        t
+    }
 }
 
 // ---- private ----
@@ -139,7 +183,7 @@ fn column(r: &RawData, i: usize) -> Vec<Complex64> {
 }
 
 /// One pair of plots of kind `k`.
-fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
+fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
     // An op plot (and ngspice's one-point integrated noise) has no scale:
     // its first vector is a value.
     let first = usize::from(k != "op" && k != "total");
@@ -189,11 +233,11 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
         let (ya, yb) = (column(a, i), column(b, j));
         let swing = ya.iter().map(|c| c.norm()).fold(0.0, f64::max);
         let floor = match v.var_type {
-            VarType::Current => ABSTOL + GMIN * vmax,
-            _ => VNTOL,
+            VarType::Current => t.abstol + GMIN * vmax,
+            _ => t.vntol,
         };
         if k == "tran" {
-            let tol = TRAN * swing + 2.0 * floor;
+            let tol = TRAN * t.reltol / RELTOL * swing + 2.0 * floor;
             let (ra, rb) = (a.re(i), b.re(j));
             let dx = tube() * xa.last().copied().unwrap_or(0.0);
             // Only the time both runs cover is compared: a TSTART that one
@@ -219,7 +263,7 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
                 ));
             }
         } else {
-            let tol = 2.0 * (RELTOL * swing + floor);
+            let tol = 2.0 * (t.reltol * swing + floor);
             if ya.len() != yb.len() {
                 return Err(format!(
                     "{k} {}: {} -> {} points",

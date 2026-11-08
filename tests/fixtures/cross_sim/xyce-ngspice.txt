@@ -153,8 +153,6 @@ BSIMSOI3/b3soiTranDefaultsNoGminScaling.cir mismatch # tran V(3): 4.336324814114
 BSIMSOI3/b3soiTranDefaultsNoVoltLim.cir mismatch # tran VDD1#branch: -0.00004134269905545852 leaves the tube at t=0.000000003797229533988571 (tol 4.134e-7)
 BSRC/Bsrc_B1.cir mismatch # tran: stop time Some(0.002) -> Some(2.5600000000000006e-5)
 BSRC/bsrc4_m.cir mismatch # dc V(3): -15+0i vs -1.5+0i at 1 (tol 3.600e-1)
-BUG_237/Bug_237_A1.cir mismatch # tran VDDDEV#branch: -0.004697412466567564 leaves the tube at t=0.0000015066097523970837 (tol 4.699e-5)
-BUG_237/Bug_237_A2.cir mismatch # tran VDDDEV#branch: -0.0005122714204563149 leaves the tube at t=0.0000015041363964365293 (tol 7.334e-6)
 COMPARATOR/comparator.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 COMPLEX_NUM/test3.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [m] | Formula() error.
 CONNECTIVITY/connect.cir mismatch # not triaged: $G_BAD_PATH is now one .global node on ngspice (stream B e9c1a25, Xyce RG §2.3.4 $G_ is global; it was a node local to each subcircuit), a floating node of four 1 pF capacitors to the 15 V rail; ngspice moves 2.8e-4 V at the 1 ms edge (Phase 0 merge, 2026-11-07); tran V(10): -0.00028448357053050373 leaves the tube at t=0.0010191366324620243 (tol 9.432e-6)
@@ -212,7 +210,6 @@ Certification_Tests/BUG_1558/bug_1558_4.cir target-fails # no raw file .cross_si
 Certification_Tests/BUG_1602/vbic_3T_et_cf.cir target-fails # no raw file .cross_sim_out.raw: Error on line 9 or its substitute:: q1 c b 0 dt vbicmodel | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/BUG_1602/vbic_3T_et_cf_TNOM27.cir target-fails # no raw file .cross_sim_out.raw: Error on line 9 or its substitute:: q1 c b 0 dt vbicmodel | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/BUG_1602/vbic_3T_et_cf_TRANS.cir target-fails # no raw file .cross_sim_out.raw: Error on line 9 or its substitute:: q1 c b 0 dt vbicmodel | Simulation interrupted due to error! | Error: circuit not parsed.
-Certification_Tests/BUG_1636/foo.cir mismatch # tran VIN1#branch: 0.000014789711815736828 leaves the tube at t=0.0000015042544440014114 (tol 2.184e-7)
 Certification_Tests/BUG_1661/globalnode_expr_toplev.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v1 | Not enough parameters
 Certification_Tests/BUG_1692/bug_1692_0.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [lnmos] | Undefined parameter [lpmos]
 Certification_Tests/BUG_1692/bug_1692_1.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [lnmos] | Undefined parameter [lpmos]
@@ -272,10 +269,6 @@ Certification_Tests/BUG_372/invert6-sim.cir mismatch # tran VDDDEV#branch: -0.00
 Certification_Tests/BUG_372/invert6.cir mismatch # tran VDDDEV#branch: -0.0024188254127787195 leaves the tube at t=0.00000450468186543528 (tol 2.450e-5)
 Certification_Tests/BUG_372/invert_b3soi-sim.cir mismatch # tran VDDDEV#branch: -0.009186240140432013 leaves the tube at t=0.000001504438893791137 (tol 9.594e-5)
 Certification_Tests/BUG_372/invert_b3soi.cir mismatch # tran VDDDEV#branch: -0.008982119461212435 leaves the tube at t=0.0000015043852195581176 (tol 9.575e-5)
-Certification_Tests/BUG_372/invert_bsim3-sim.cir mismatch # tran VDDDEV#branch: -0.006869392618516122 leaves the tube at t=0.0000030067892894429916 (tol 7.462e-5)
-Certification_Tests/BUG_372/invert_bsim3.cir mismatch # tran VDDDEV#branch: -0.006869392618516128 leaves the tube at t=0.0000030067892894429916 (tol 7.462e-5)
-Certification_Tests/BUG_372/invert_bsim4-sim.cir mismatch # tran VDDDEV#branch: -0.053355685156237447 leaves the tube at t=0.0000015032481488231024 (tol 5.336e-4)
-Certification_Tests/BUG_372/invert_bsim4.cir mismatch # tran VDDDEV#branch: -0.05243165449838618 leaves the tube at t=0.0000030086984410821396 (tol 5.322e-4)
 Certification_Tests/BUG_37_SON/bug_37_son.cir target-fails # no raw file .cross_sim_out.raw: Error on line 44 or its substitute:: k9 l1 lp9 0.8 | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/BUG_381/comparator0_5_-10.cir mismatch # tran V(1): 0.1354137776473135 leaves the tube at t=0.000000000017786686355350404 (tol 5.034e-3)
 Certification_Tests/BUG_381/comparator0_5_0.cir mismatch # tran V(1): 0.14175438686072037 leaves the tube at t=0.000000000016330912100434208 (tol 5.208e-3)
@@ -615,7 +608,6 @@ Output/HOMOTOPY/homotopy-prn.cir mismatch # tran V(5): -12.467552218111747 leave
 Output/HOMOTOPY/homotopy-probe-defaults-to-prn.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-raw-defaults-to-prn.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-tecplot.cir mismatch # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-Output/Other/tran-timer.cir mismatch # tran V(6): 2.2876703372015585 leaves the tube at t=0.000000018650944770796552 (tol 2.535e-2)
 PARAMS1/params_a0.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2.000e-1)
 PARAMS1/params_a1.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2.000e-1)
 PARAMS2/Params_B3.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r1] | Undefined parameter [r1]
@@ -713,7 +705,6 @@ TIA/TRAP/IC_AND_NODESET/pierce2.cir mismatch # tran L1#branch: 0.000824177647880
 TIA/TRAP/IC_AND_NODESET/pierce3.cir mismatch # tran L1#branch: 0.0011708848288604972 leaves the tube at t=0.000001 (tol 6.229e-4)
 TIA/TRAP/IC_AND_NODESET/pierce_noop.cir mismatch # tran L1#branch: 0.0008241776478806345 leaves the tube at t=0.000001 (tol 6.229e-4)
 TL431/TL431.cir mismatch # tran V(3): 0.0015165285189651762 leaves the tube at t=0.0000049999999999999996 (tol 7.379e-5)
-TR_TRAN/tran.cir mismatch # tran OUT5: 5.056466396244013 leaves the tube at t=0.0000015042256716739947 (tol 5.099e-2)
 UNARYOPS/unary_funcs.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'arctan' at line 8
 VANOISE/bsim6_acnoise1d_sw.cir target-fails # no raw file .cross_sim_out.raw: Error on line 18 or its substitute:: m.x1.m1 x1.d x1.g x1.s x1.b x1:mymodel w=10.0e-6 l=0.1e-6 as=5e-12 ad=5e-12 ps=21e-6 pd=21e
 VANOISE/bsimcmg_noise.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 10 or its substitute:: m1 drain gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=

@@ -457,11 +457,12 @@ fn check(
                 continue;
             }
         };
+        let tol = cmp::Tol::of(&[&src, &text.0]);
         out.push(match sim::run(t.sim, deck, &text.0, &text.1, 2 * SECS) {
-            Ran::Plots(b) => match cmp::compare(a, &b) {
+            Ran::Plots(b) => match cmp::compare(a, &b, tol) {
                 Ok(()) => Verdict::Pass,
                 Err(why) => match t.control.map(|s| sim::run(s, deck, &src, &[], 2 * SECS)) {
-                    Some(Ran::Plots(o)) if cmp::compare(&o, &b).is_ok() => {
+                    Some(Ran::Plots(o)) if cmp::compare(&o, &b, tol).is_ok() => {
                         fails("simulator-differs", &why)
                     }
                     _ => fails("mismatch", &why),
