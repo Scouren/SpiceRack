@@ -1284,3 +1284,19 @@ def test_name_and_ports_read_back_in_declaration_order():
     sc = ps.Subcircuit("opamp", ["inp", "inn", "out", "vdd", "vss"])
     assert sc.name == "opamp"
     assert sc.ports == ["inp", "inn", "out", "vdd", "vss"]
+
+
+def test_a_written_decks_notes_are_python_warnings():
+    # API §4.1 (ZERO-LEDGER P1-028): a note the writer records (here W0023,
+    # Xyce writes no `.save`: Xyce RG 7.10 `.PRINT`) reaches Python as a
+    # UserWarning naming its code; the deck is still written.
+    ps = import_spicerack()
+    top = ps.Subcircuit("top", ["a"])
+    top.R(name="1", positive="a", negative=top.gnd, value=1e3)
+    tb = ps.Testbench(top)
+    tb.V("in", "a", "0", 1.0)
+    tb.save("v(a)")
+    tb.add_operating_point()
+    with pytest.warns(UserWarning, match="W0023"):
+        text = tb.netlist("xyce")
+    assert ".op" in text.lower()

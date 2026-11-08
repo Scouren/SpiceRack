@@ -25,7 +25,7 @@ SpiceRack builds a **deck** (SPICE netlist text), hands it to a simulator, and p
 4. **Save what you will read**: `tb.save("V(vout)")`. Completion: `.save` appears in the deck.
 5. **Run** — `tb.ac(...)`, `tb.transient(...)`, `tb.operating_point()`. Completion: the result object indexes without raising, and `len(result["vout"])` matches the expected point count.
 
-Read the deck with `tb.netlist(backend)` before running. It is plain text, and it is the ground truth for what the simulator will do.
+Read the deck with `tb.netlist(backend)` before running. It is plain text, and it is the ground truth for what the simulator will do. Whatever the target does not get as written (an output request, an option, an integrated noise) comes back as a `UserWarning` naming its code (`spicerack t:4:1: W0023 an output request not written`); the deck is still written.
 
 ## Traps
 

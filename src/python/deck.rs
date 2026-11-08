@@ -64,13 +64,38 @@ impl Deck {
     /// The deck written in `backend`'s dialect: every dialect the renderer
     /// writes (`render::writes`), runnable here or not (HSPICE, Xyce, CDL,
     /// Verilog are written, never run).
+    /// Each note the written deck carries (what the target does not get as
+    /// read: an output not written, an option left out) is a Python
+    /// `UserWarning`, its message `spicerack <deck>:<line>:<col>: <code>
+    /// <title>`.
     pub(super) fn netlist(&self, backend: &str) -> PyResult<String> {
-        let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
-            .filter(|d| render::writes(*d))
+        let built_in = Dialect::from_backend_name(&backend.to_ascii_lowercase())
+            .filter(|d| render::writes(*d));
+        let d = built_in
             .map(Lang::from)
             .or_else(|| super::def_::plugin(backend))
             .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
-        self.lowered()?.write_to(d).map_err(PyRuntimeError::new_err)
+        let deck = self.lowered()?;
+        let text = deck.write_to(d).map_err(PyRuntimeError::new_err)?;
+        // ponytail: a built-in target's notes; a plugin's hooks run in
+        // `write_to` only, so its notes are not re-derived here.
+        if let Some(b) = built_in {
+            let notes = deck.write_with(b.into(), |src, l| {
+                render::render(src, l)
+                    .map(|w| w.notes.messages)
+                    .map_err(|e| e.messages)
+            });
+            Python::with_gil(|py| -> PyResult<()> {
+                let category = py.get_type::<pyo3::exceptions::PyUserWarning>();
+                for line in notes.unwrap_or_default().lines().filter(|l| !l.is_empty()) {
+                    let msg = std::ffi::CString::new(format!("spicerack {line}"))
+                        .expect("a message has no NUL");
+                    PyErr::warn(py, &category, &msg, 1)?;
+                }
+                Ok(())
+            })?;
+        }
+        Ok(text)
     }
 
     /// Runs the deck on `backend` (`None`: the best installed one for its

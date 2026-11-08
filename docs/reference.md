@@ -85,7 +85,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `add_subcircuit(subckt)` | registers a child definition |
 | `use_pdk(lib)` | attaches a `ModelLibrary` |
 | `with_backend(name)` | pins the simulator |
-| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `RuntimeError` naming its code |
+| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `RuntimeError` naming its code; each note on the written deck (an output or option the target does not get, e.g. `W0023`) is a `UserWarning` `spicerack <deck>:<line>:<col>: <code> <title>` |
 | `to_source()`, `save_source(path)`, `Testbench.from_source(text, dialect=None)`, `Testbench.load(path)` | the store, as for `Subcircuit` (`save(*outputs)` stays the `.save` card): a deck read back writes the same netlists, a `ModelLibrary` at each target's path (a `* spicerack-library` line keeps them); its analyses are its text, and `run()` runs those queued on it |
 | `check_backend(name)` | reasons it will not run on `name`: missing features, and the writer's refusal with its code |
 | `global_nodes(*nodes)` | `.global` |
