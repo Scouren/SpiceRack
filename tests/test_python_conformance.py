@@ -65,6 +65,21 @@ def analysis(build):
     return f
 
 
+def oscillator(build):
+    """A van der Pol tank (L 1 uH, C 1 nF, cell i = -1m v + (1m/3) v^3): an
+    autonomous circuit, the only kind ngspice's and ESPice's `.pss` take
+    (ngspice manual §11.3.12); closed-form limit cycle 2 V at 5.03292 MHz."""
+    def f(mod):
+        d = mod.Subcircuit("vdp", ["x"])
+        d.L("1", "x", d.gnd, 1e-6)
+        d.C("1", "x", d.gnd, 1e-9)
+        d.BI("1", "x", d.gnd, expression="-1m*v(x)+(1m/3)*v(x)*v(x)*v(x)")
+        tb = mod.Testbench(d)
+        build(tb)
+        return tb
+    return f
+
+
 def setting(build):
     def f(mod):
         tb = bench(mod)
@@ -116,8 +131,8 @@ FEATURES = {
     "ac_sensitivity": analysis(lambda tb: tb.add_ac_sensitivity("V(out)")),
     "polezero": analysis(lambda tb: tb.add_polezero("in", "0", "out", "0", "vol", "pz")),
     "distortion": analysis(lambda tb: tb.add_distortion()),
-    "pss": analysis(lambda tb: tb.add_pss(1e6, 1e-5, "out")),
-    "pss_controls": analysis(lambda tb: tb.add_pss(1e6, 1e-5, "out", sc_iter=20)),
+    "pss": oscillator(lambda tb: tb.add_pss(5e6, 1e-5, "x")),
+    "pss_controls": oscillator(lambda tb: tb.add_pss(5e6, 1e-5, "x", sc_iter=20)),
     "s_param": analysis(lambda tb: tb.add_s_param()),
     "harmonic_balance": analysis(lambda tb: tb.add_harmonic_balance([1e6])),
     "stability": analysis(lambda tb: tb.add_stability("Vin")),
@@ -216,8 +231,10 @@ EXPECTED = {
     'polezero': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
-    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
-    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
+    # The van der Pol bench's cell is a B source, which the VACASK writer
+    # refuses too (W0102).
+    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001+W0102', OK, OK),
+    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001+W0102', OK, OK),
     # Xyce: P ports and `.LIN` (D's a5f2c0a); HSPICE has `.LIN`: writer B (FINDINGS-python.md).
     's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0015', OK, OK),
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
