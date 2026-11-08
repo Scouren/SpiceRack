@@ -139,9 +139,10 @@ and no output for them (listed in `migration.xfail` as new inputs), phase
 gate: a fresh record of `p7-integrate` 013421d (ZERO-LEDGER P1-055, D41),
 taken once P1-020, P1-024 and P1-025 had changed the input sets, so every
 line `migration.xfail` held against fx14 became baseline and the list
-restarted empty. Its `PROVENANCE` file names the commit, the IHP-Open-PDK
-commit (`5e6d592`), the `flake.lock` hash and the tool versions; 1 job and N
-jobs recorded it identically. Against the merge record before it, it lacks
+restarted empty. `baseline-013421d-fx15.PROVENANCE`, beside the record
+(not in it: `golden diff` would read it as an output), names the commit,
+the IHP-Open-PDK commit (`5e6d592`), the `flake.lock` hash and the tool
+versions; 1 job and N jobs recorded it identically. Against the merge record before it, it lacks
 only VACASK's 3 `benchmark/*/gnucap/runme.sim` inputs (P1-025).
 
 Inputs (the `MANIFEST` of each record lists them, with content hashes):
