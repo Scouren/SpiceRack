@@ -112,7 +112,9 @@ const CORPORA: [Corpus; 5] = [
         var: "VACASK_CORPUS",
         dialect: Dialect::Vacask,
         ext: "sim",
-        keep: |_| true,
+        // `benchmark/*/gnucap/runme.sim`: gnucap's SPICE mode
+        // (`vs ( 1 0 ) pulse ( iv=0 … )`), no SpiceRack reader's input.
+        keep: |p| !p.contains("/gnucap/"),
         own: vacask_benchmark,
         note: "VACASK sources",
     },
@@ -309,8 +311,8 @@ fn rel(root: &Path, p: &Path) -> String {
 /// VACASK's `benchmark/<circuit>/<simulator>/` decks are each simulator's
 /// own input, under VACASK's `.sim` name: `ngspice*` (ngspice, its `-sparse`,
 /// `cg` and `va` variants) and `xyce` directories hold ngspice and Xyce
-/// decks. `gnucap`'s are gnucap's SPICE mode, which no reader reads: they
-/// stay VACASK, named in `tests/fixtures/conformance_noise.txt`.
+/// decks. `gnucap`'s are gnucap's SPICE mode, which no reader reads: the
+/// corpus's `keep` leaves them out.
 fn vacask_benchmark(rel: &str) -> Option<Dialect> {
     let mut parts = rel.split('/');
     if parts.next() != Some("benchmark") {
