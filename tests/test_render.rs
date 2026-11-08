@@ -381,6 +381,27 @@ fn what_a_writer_leaves_out_or_copies_is_a_note_by_code() {
 }
 
 #[test]
+fn a_kept_statement_is_one_diagnostic_on_the_named_writers() {
+    // XY §3.1, §3.2: Spectre and VACASK wrote a W0001 beside each W0039
+    // statement and two W0001 for a deck's first kept statement
+    // (rallpack2.cir: 1,024 W0001 against 2 W0039). Each kept statement is
+    // one diagnostic: two Xyce-only `.PREPROCESS` lines are W0039 W0039.
+    let xyce = "t\nR1 a 0 1k\nV1 a 0 1\n.PREPROCESS REPLACEGROUND TRUE\n\
+                .PREPROCESS ADDRESISTORS NODCPATH 1G\n.op\n.end\n";
+    for t in [Dialect::Spectre, Dialect::Vacask] {
+        let e = render_text(xyce, Dialect::Xyce, "t", t).expect_err("refused");
+        let codes: Vec<Code> = e.diags.iter().map(|d| d.code).collect();
+        assert_eq!(codes, [Code::W0039, Code::W0039], "{t:?}");
+        // One kept element line (Xyce's PDE device): one diagnostic, its
+        // W0039, with no W0001 beside it.
+        let y = "t\nV1 1 0 1\nYPDE d1 1 0 DIODE na=1.0e15 nd=1.0e15\n.op\n.end\n";
+        let e = render_text(y, Dialect::Xyce, "t", t).expect_err("refused");
+        let codes: Vec<Code> = e.diags.iter().map(|d| d.code).collect();
+        assert_eq!(codes, [Code::W0039], "{t:?}");
+    }
+}
+
+#[test]
 fn a_diagnostic_is_anchored_at_its_statement_and_messages_are_in_source_order() {
     // LTspice reads `^` as XOR (W0002), and has no `aunif` form (W0003):
     // each anchored at the line holding it, not the deck's first token.

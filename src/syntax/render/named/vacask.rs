@@ -470,9 +470,8 @@ impl W<'_, '_> {
                         self.line(&format!("{}{line}", pad_of(at)));
                     }
                 }
-                Visit::Comp(_, Comp::Raw(n)) => {
-                    self.ask(Construct::ForeignText, self.rd.main(n));
-                }
+                // `checks` refuses a kept element line, once.
+                Visit::Comp(_, Comp::Raw(_)) => {}
                 Visit::Cond(at, _) => chain_pad = pad_of(at),
                 Visit::Branch(c, i) => {
                     let (head, body) = (c.branches[i].0, &c.branches[i].1);

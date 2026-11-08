@@ -410,11 +410,9 @@ impl W<'_, '_> {
                         self.line(&line);
                     }
                 }
-                Visit::Comp(_, Comp::Raw(n)) => {
-                    // A SPICE element line has no Spectre spelling (`checks`
-                    // refuses it).
-                    self.ask(Construct::ForeignText, self.rd.main(n));
-                }
+                // A SPICE element line has no Spectre spelling (`checks`
+                // refuses it, once).
+                Visit::Comp(_, Comp::Raw(_)) => {}
                 Visit::Cond(..) => {}
                 Visit::Branch(c, i) => {
                     let (head, body) = (c.branches[i].0, &c.branches[i].1);

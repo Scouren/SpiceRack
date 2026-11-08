@@ -26,15 +26,10 @@ impl W<'_, '_> {
         let raws: Vec<u32> = blocks.iter().flat_map(|b| self.raws(b)).collect();
         let foreign = |tok: &u32| self.rd.text_lang(*tok) != self.lang;
         let (other, own): (Vec<u32>, Vec<u32>) = raws.iter().partition(|t| foreign(t));
-        // A statement whose target lacks it is that statement's refusal,
-        // the rest foreign text's (one note each kind).
-        let mut asked = Vec::new();
+        // Each kept statement is one diagnostic: the construct the target
+        // lacks, or foreign text (the walkers ask nothing more).
         for &tok in &other {
-            let c = self.rd.kept_construct(tok);
-            if !asked.contains(&c) {
-                asked.push(c);
-                self.ask(c, tok);
-            }
+            self.ask(self.rd.kept_construct(tok), tok);
         }
         if let Some(&(Func::Param(n) | Func::Card(n) | Func::Real(n))) =
             blocks.iter().flat_map(|b| &b.funcs).next()
