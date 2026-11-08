@@ -34225,3 +34225,547 @@ spice-bench/ngspice/paranoia/vdmos/vdmosp-out-mtr.sp xyce now refused, W0050: a 
 spice-bench/ngspice/paranoia/vdmos/vdmosp-out-mtr.sp.sp xyce now refused, W0050: a model parameter or kind Xyce's devices lack (ngspice's tlev/tlevc coefficients, tunnelling, substrate diode, vdmos); was written, Xyce ignored the parameter
 spice-bench/ngspice/paranoia/vdmos/vdmosp-out.sp xyce now refused, W0050: a model parameter or kind Xyce's devices lack (ngspice's tlev/tlevc coefficients, tunnelling, substrate diode, vdmos); was written, Xyce ignored the parameter
 spice-bench/ngspice/paranoia/vdmos/vdmosp-out.sp.sp xyce now refused, W0050: a model parameter or kind Xyce's devices lack (ngspice's tlev/tlevc coefficients, tunnelling, substrate diode, vdmos); was written, Xyce ignored the parameter
+
+# Phase 7: zero P1 census (src/bin/golden): every corpus deck read in its Kit
+# with the files it includes (P1-020), Xyce NOISE/*_ngspice.cir read as
+# ngspice (P1-024). Reviewed by class: gf180 decks now see sm141064 and are refused at the instance
+# (stream X W0050); c6288 and kin bind their included masters; Xyce decks
+# name included models (RTEMP, copper) and HICUM cards (5th node).
+xyce/NOISE/commonEmitterBjt_ngspice.cir manifest read as ngspice, not Xyce (P1-024)
+xyce/NOISE/res_noise_ngspice.cir manifest read as ngspice, not Xyce (P1-024)
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwps_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_dnwpw_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_3p3_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_np_6p0_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_3p3_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_nwp_6p0_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_3p3_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_pn_6p0_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_cv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ff_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_ss_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_0.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_1.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_2.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_3.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_4.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_5.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_6.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/cmcqa/gf180/gf180_diode_sc_diode_iv_typical_7.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/ngspice/examples/hicum2/hic2_gum.sp xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/examples/hicum2/hic2_gum_inv.sp xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/examples/hicum2/hic2_noise.sp xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/examples/hicum2/hic2_tran.sp xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/examples/optran/F5TurboV2thermal-optran.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/ngspice/paranoia/optran/F5TurboV2thermal-ic-out.sp xyce now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+spice-bench/ngspice/tests/regression/misc/test-noise-2.sp espice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/tests/regression/misc/test-noise-2.sp hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-2.sp ngspice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/tests/regression/misc/test-noise-2.sp spectre now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-2.sp vacask now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-2.sp xyce now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-3.sp espice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/tests/regression/misc/test-noise-3.sp hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-3.sp ngspice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+spice-bench/ngspice/tests/regression/misc/test-noise-3.sp spectre now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-3.sp vacask now written: read with the files it includes (P1-020), the masters and models they declare bound
+spice-bench/ngspice/tests/regression/misc/test-noise-3.sp xyce now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask-ieb/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask-nocb/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask-nortc/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask/debug_run.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask/hmax_test.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/c6288/vacask/test_ivdd.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/ring/vacask/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim ltspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim spectre now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacask/runme.sim xyce now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/benchmark/vadistiller/c6288/vacaskcg/runme.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/bsim3-ptm/diffpair.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/sc/lpfilter.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim3v3inv.sim espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim3v3inv.sim hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim3v3inv.sim ltspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim3v3inv.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim3v3inv.sim spectre now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim3v3inv.sim xyce now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim4v8inv.sim espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim4v8inv.sim hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim4v8inv.sim ltspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim4v8inv.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim4v8inv.sim spectre now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/demo/spice/bsim4v8inv.sim xyce now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/test/test_inverter.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+vacask/test/test_opstore.sim ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_1826/linear_simple_param.cir cdl written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/Certification_Tests/BUG_1826/linear_simple_param.cir hspice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/Certification_Tests/BUG_1826/linear_simple_param.cir ltspice now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/Certification_Tests/BUG_1826/linear_simple_param.cir vacask now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/Certification_Tests/BUG_1826/linear_simple_param.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/Certification_Tests/BUG_402_SON/bug402XyceTempOptions.cir espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_402_SON/bug402XyceTempOptions.cir hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_402_SON/bug402XyceTempOptions.cir ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/Certification_Tests/BUG_402_SON/bug402XyceTempOptions.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/Certification_Tests/BUG_848/topoCheck.cir vacask now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/Certification_Tests/BUG_967/bug_967.cir vacask now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/DIODE/Zener_5229.cir espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/DIODE/Zener_5229.cir hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/DIODE/Zener_5229.cir ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/DIODE/Zener_5229.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/DTEMP/res_ref.cir hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/MULTIPLICITY_FACTOR/ErrorMessageTest.cir cdl written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/MULTIPLICITY_FACTOR/ErrorMessageTest.cir hspice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/MULTIPLICITY_FACTOR/ErrorMessageTest.cir ltspice now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/MULTIPLICITY_FACTOR/ErrorMessageTest.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/MULTIPLICITY_FACTOR/thermal_resistor.cir cdl written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/MULTIPLICITY_FACTOR/thermal_resistor.cir ltspice now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/MULTIPLICITY_FACTOR/thermal_resistor.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/NOISE/commonEmitterBjt_ngspice.cir espice read as the ngspice deck it is (P1-024)
+xyce/NOISE/commonEmitterBjt_ngspice.cir hspice read as the ngspice deck it is (P1-024)
+xyce/NOISE/commonEmitterBjt_ngspice.cir ltspice read as the ngspice deck it is (P1-024)
+xyce/NOISE/commonEmitterBjt_ngspice.cir ngspice read as the ngspice deck it is (P1-024)
+xyce/NOISE/commonEmitterBjt_ngspice.cir spectre read as the ngspice deck it is (P1-024)
+xyce/NOISE/commonEmitterBjt_ngspice.cir vacask read as the ngspice deck it is (P1-024)
+xyce/NOISE/commonEmitterBjt_ngspice.cir xyce read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir espice read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir hspice read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir ltspice read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir ngspice read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir spectre read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir vacask read as the ngspice deck it is (P1-024)
+xyce/NOISE/res_noise_ngspice.cir xyce read as the ngspice deck it is (P1-024)
+xyce/RESISTOR_TD/temp_dep.cir espice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/RESISTOR_TD/temp_dep.cir hspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/RESISTOR_TD/temp_dep.cir ngspice now written: read with the files it includes (P1-020), the masters and models they declare bound
+xyce/RESISTOR_TD/temp_dep.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/THERMAL_RESISTOR/constant.cir cdl written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/THERMAL_RESISTOR/constant.cir hspice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/THERMAL_RESISTOR/constant.cir ltspice now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/THERMAL_RESISTOR/constant.cir vacask now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/THERMAL_RESISTOR/constant.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/THERMAL_RESISTOR/linear.cir cdl written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/THERMAL_RESISTOR/linear.cir hspice written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known
+xyce/THERMAL_RESISTOR/linear.cir ltspice now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/THERMAL_RESISTOR/linear.cir vacask now refused: read with the files it includes (P1-020), the model card it uses is visible and refused at the instance
+xyce/THERMAL_RESISTOR/linear.cir xyce written differently: read with the files it includes (P1-020), a name the includes declare (model, HICUM card) now known

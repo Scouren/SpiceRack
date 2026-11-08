@@ -58,7 +58,7 @@ fn p1_001_rawfile_drops_xyce_second_plot() {
 
 #[test]
 fn p1_006_ltspice_raws_read_with_no_bom() {
-    // LTspice 26.1.1 under Wine on tests/fixtures/raw/p1-006-<a>.cir, one
+    // LTspice 26.1.1 under Wine on tests/fixtures/raw/p1-006-<a>.cir.txt, one
     // analysis each (README): a 2 V source over a 1k/1k divider, AC 1. Its
     // raw header is UTF-16LE with no byte-order mark; a transient's vectors
     // past time are float32. Closed forms: v(out) = 1 V (op, tran), 0, 0.5,

@@ -5,8 +5,8 @@
 //! filtered the way `tests/test_import_suite` walks them. A kit is its entry
 //! files plus every file their includes and `.lib` calls reach, breadth first,
 //! the way Interop's `pdk-models` walks one, and the read order goes into the
-//! manifest. Each kit file, and each fixture, is read in its
-//! `syntax::resolve::Kit` (phase 3); a corpus deck is read alone.
+//! manifest. Each corpus deck, kit file and fixture is read in its
+//! `syntax::resolve::Kit` (phase 3), a corpus deck with the files it includes.
 //!
 //! Cites: `tests/test_import_suite/main.rs` (`files`, `decks`, the corpus
 //! filters); Interop `src/pdk_models.rs` (`references`, `convert`: the walk
@@ -102,7 +102,9 @@ const CORPORA: [Corpus; 5] = [
         dialect: Dialect::Xyce,
         ext: "cir",
         keep: |_| true,
-        own: |_| None,
+        // `NOISE/*_ngspice.cir` are ngspice decks (their `.control`
+        // blocks, ngspice's `noise` vectors) kept beside the Xyce ones.
+        own: |p| p.ends_with("_ngspice.cir").then_some(Dialect::Ngspice),
         note: "Xyce_Regression Netlists",
     },
     Corpus {
@@ -191,13 +193,22 @@ pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
         ));
         all.extend(found.into_iter().map(|path| {
             let rel = rel(&root, &path);
+            let dialect = (c.own)(&rel).unwrap_or(c.dialect);
+            // With the files it includes, so a master they declare is
+            // bound (VACASK c6288 and its includes: only `elaborate` stays).
+            let kit = spicerack::import::kit(
+                std::slice::from_ref(&path),
+                resolve::Form::Deck,
+                dialect,
+                &root,
+            );
             Input {
                 set: c.set,
-                dialect: (c.own)(&rel).unwrap_or(c.dialect),
+                dialect,
                 rel,
                 path,
                 form: Form::Deck,
-                kit: None,
+                kit: Some((Arc::new(kit), FileId(0))),
             }
         }));
     }

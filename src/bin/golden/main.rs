@@ -13,12 +13,15 @@
 //! `syntax::render` writes from the file's AST and kit, or
 //! `<target>.refused`: its codes, sorted, on a first line (`codes: P0001
 //! W0013`), then its messages (`diag::messages`: `<deck>:<line>:<column>:
-//! <code> <title>`), which `diff` does not compare; `parse.refused` instead
+//! <code> <title>`), which `diff` does not compare; beside a `.txt`, its
+//! notes as `<target>.notes` in the same form when it has any (not
+//! compared: the census reads them); `parse.refused` instead
 //! when no lexicon reads the file's dialect; `<name>.panicked`, the panic
 //! message, when a call panics.
 //!
-//! The reader is the transpiler's front end: a corpus deck is read alone, a
-//! PDK kit file or a fixture in its `syntax::resolve::Kit` (phase 3). A
+//! The reader is the transpiler's front end: every input is read in its
+//! `syntax::resolve::Kit` (a corpus deck with the files it includes, a PDK
+//! kit file or a fixture with its kit). A
 //! record of `9d1d6bb` (the PEG reader and the old writers) is the oracle a
 //! new record is diffed against; its `ir.json` and `report.json` went with
 //! the IR (phase 6), so `diff` passes over them.
@@ -214,9 +217,16 @@ fn record_one(out: &Path, input: &Input) -> std::io::Result<Vec<String>> {
             None => render::render_text(&src, input.dialect, &name, d),
         };
         let written = catch_unwind(AssertUnwindSafe(render))
-            .map(|r| r.map(|w| w.text).map_err(|e| refused(&e)));
+            .map(|r| r.map(|w| (w.text, w.notes)).map_err(|e| refused(&e)));
         match written {
-            Ok(Ok(text)) => put(&format!("{t}.txt"), &text)?,
+            Ok(Ok((text, notes))) => {
+                put(&format!("{t}.txt"), &text)?;
+                // The written deck's notes (what it leaves out), the Z4
+                // census's input; `diff` passes over them.
+                if !notes.diags.is_empty() {
+                    put(&format!("{t}.notes"), &refused(&notes))?;
+                }
+            }
             Ok(Err(e)) => put(&format!("{t}.refused"), &e)?,
             Err(p) => put(&format!("{t}.panicked"), &panic_text(p))?,
         }

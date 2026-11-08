@@ -5,7 +5,8 @@
 //! directory and the output file's stem (a dialect name, or `parse`), so
 //! `ngspice.txt` and `ngspice.refused` are one key. A baseline's `ir.json`
 //! and `report.json` (the IR and its report, gone in phase 6) are passed
-//! over, as is every file of the target `--skip` names. An xfail
+//! over, as are the written decks' `.notes` and every file of the target
+//! `--skip` names. An xfail
 //! line is `<set>/<relpath> <target> <reason>`; `#` starts a comment. Strict,
 //! as VerA's: an unlisted difference fails, and so does a listed key that is
 //! now identical (`XPASS`). `MANIFEST` is compared without its `output`
@@ -92,7 +93,7 @@ pub(super) fn diff(
     let mut refused_both: BTreeSet<(String, String)> = BTreeSet::new();
     let passed = |rel: &str| {
         let t = key(rel).1;
-        GONE.contains(&t.as_str()) || Some(t.as_str()) == skip
+        GONE.contains(&t.as_str()) || Some(t.as_str()) == skip || rel.ends_with(".notes")
     };
     for rel in fa.union(&fb).filter(|r| !passed(r)) {
         let both = fa.contains(rel) && fb.contains(rel);
