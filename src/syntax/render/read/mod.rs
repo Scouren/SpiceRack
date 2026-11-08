@@ -44,6 +44,7 @@ use crate::syntax::resolve::{FileId, Kit, Role, Split};
 use crate::syntax::token::{Tag as T, Tokens};
 use blocks::Opened;
 
+mod analyses;
 mod blocks;
 mod cards;
 mod controlled;
