@@ -18,6 +18,10 @@
 
 use std::path::Path;
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::{notes, refusal, written};
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::render_text;
@@ -27,22 +31,8 @@ use spicerack::syntax::render::render_text;
 /// `deck` (ngspice) written for Spectre, with no note on it.
 fn spectre(deck: &str) -> String {
     let w = written(deck, Dialect::Ngspice, Dialect::Spectre);
-    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
-    assert_eq!(codes, [] as [Code; 0], "{}\n{deck}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}\n{deck}", w.notes.messages);
     w.text
-}
-
-/// `src` (read in `d`) written for `to`, which must not refuse it.
-fn written(src: &str, d: Dialect, to: Dialect) -> spicerack::syntax::render::Written {
-    render_text(src, d, "t", to).unwrap_or_else(|e| panic!("{to:?}: {}\n{src}", e.messages))
-}
-
-/// The codes `src` (read in `d`) is refused with on `to`.
-fn refused(src: &str, d: Dialect, to: Dialect) -> Vec<Code> {
-    match render_text(src, d, "t", to) {
-        Ok(w) => panic!("{to:?} wrote it:\n{}", w.text),
-        Err(e) => e.diags.iter().map(|d| d.code).collect(),
-    }
 }
 
 /// The `vary` lines of a Spectre deck, `(scope, line)`.
@@ -238,7 +228,7 @@ fn t_g10_spectre_and_vacask_write_ltspice_refuses() {
         "{sim}"
     );
     assert_eq!(
-        refused(deck, Dialect::Ngspice, Dialect::Ltspice),
+        refusal(deck, Dialect::Ngspice, Dialect::Ltspice),
         [Code::W0003]
     );
 }
@@ -395,7 +385,7 @@ fn t_r4_correlate() {
     );
     let dev = base.replace("CORR", "dev=[x1 x2]");
     assert_eq!(
-        refused(&dev, Dialect::Spectre, Dialect::Ngspice),
+        refusal(&dev, Dialect::Spectre, Dialect::Ngspice),
         [Code::W0018]
     );
 }

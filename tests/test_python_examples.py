@@ -4,6 +4,9 @@ Tests that all Python examples execute without errors.
 Each example generates a netlist and prints it. We import and run them
 to verify no crashes in the circuit builder or unit system.
 
+Oracle: exit status 0, plus the check line an example prints from its own
+closed form (`Match: yes`, `tau = R*C`).
+
 Run: maturin develop && pytest tests/test_python_examples.py -v
 """
 import pytest

@@ -15,6 +15,10 @@
 
 use std::path::Path;
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::notes;
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::{Written, render_text};
@@ -33,7 +37,7 @@ const BARE: &str = include_str!("fixtures/pdk_sections/bare.scs");
 #[test]
 fn spice_sections_hold_their_cards_and_nothing_leaks_to_the_top() {
     let w = written(SPICE, Dialect::Ngspice, "models", Dialect::Ngspice);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     // Nothing between the title and the first section, nothing after the
     // last but `.end`.
     assert!(w.text.starts_with("* models\n\n.lib tt\n"), "{}", w.text);
@@ -83,7 +87,7 @@ fn a_nested_section_is_unparsed_and_kept_in_its_section() {
     // `.lib b` is a section inside a section, kept as text (line 4); `.endl
     // a` a closer with no block open, kept as text at the top (line 8).
     assert_eq!(
-        codes(&w),
+        notes(&w),
         [
             Code::P0001,
             Code::P0009,
@@ -112,7 +116,7 @@ fn a_nested_section_is_unparsed_and_kept_in_its_section() {
         "{}",
         s.text
     );
-    assert_eq!(codes(&s), [Code::W0027], "{}", s.notes.messages);
+    assert_eq!(notes(&s), [Code::W0027], "{}", s.notes.messages);
 }
 
 /// A card that means something to the whole deck stays text in a section
@@ -129,7 +133,7 @@ fn a_testbench_card_in_a_section_stays_in_it() {
         w.text,
         "* t\n\n.lib a\n.func f(x) {x*2}\n.global vdd\n.option reltol=1e-4\n.op\n.endl a\n.end"
     );
-    assert_eq!(codes(&w), [Code::W0027; 3], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [Code::W0027; 3], "{}", w.notes.messages);
 }
 
 /// Read -> write -> read -> write gives the same text in each dialect.
@@ -154,7 +158,7 @@ fn each_dialect_is_a_fixpoint() {
     // Known gap: VACASK selects no bin by geometry, so the wrappers' `m0 ...
     // nch` names no VACASK model and reads back as text, one per corner.
     let again = written(&text, Dialect::Vacask, "models", Dialect::Vacask);
-    let kept = codes(&again).iter().filter(|&&c| c == Code::W0027).count();
+    let kept = notes(&again).iter().filter(|&&c| c == Code::W0027).count();
     assert_eq!(kept, 2, "{text}");
     // The rest has the SPICE meaning: the kept lines left out, and with
     // them the wrappers' element counts.
@@ -199,7 +203,7 @@ fn each_dialect_is_a_fixpoint() {
 #[test]
 fn spectre_sections_hold_their_cards() {
     let w = written(SPECTRE, Dialect::Spectre, "models", Dialect::Spectre);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     // Nothing at the top; both sections in their library.
     assert!(
         w.text
@@ -254,7 +258,7 @@ fn spectre_sections_hold_their_cards() {
 fn bare_spectre_sections_with_a_spice_region() {
     let text = fixpoint(BARE, Dialect::Spectre, "bare");
     let w = written(BARE, Dialect::Spectre, "bare", Dialect::Spectre);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     assert_eq!(
         text,
         "// bare\n\nsimulator lang=spectre\n\nsection tt\ninclude \"shared.scs\"\nparameters vth0n=450m u0n=30m rsh_spice=100 rvc=10m after=1\nendsection tt\nsection ff\ninclude \"shared.scs\"\nparameters vth0n=400m u0n=35m\nendsection ff\n\n"
@@ -273,7 +277,7 @@ fn bare_spectre_sections_with_a_spice_region() {
 fn ngspice_value_forms_and_statistical_functions() {
     let deck = "forms\n.param x=2\n.param a = '-1*x' + b = '0 - 2.5'\n.param c = {1+x} + x*0*AGAUSS(0,1,1)\n.param\n.model rr r rsh=10 dw={\"-a-b/8\"}\n.subckt two p n\n.param k={x*2}\nR1 p n {k+c}\n.ends twoV1 1 0 1\nR1 1 0 rr l=10 w=1\nX1 1 0 two\nVb 2 0 1\nRb 2 0 {b+10}\n.op\n.end\n";
     let w = written(deck, Dialect::Ngspice, "forms", Dialect::Ngspice);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     for card in [
         ".param x=2",
         ".param a='-1*x'",
@@ -326,7 +330,7 @@ fn ngspice_value_forms_and_statistical_functions() {
 fn charge_capacitor_and_late_subcircuit_name() {
     let deck = "q\nV1 a 0 pulse(0 1 0 1u 1u 1m 2m)\nR1 a b 1k\nCq b 0 q='1u*v(b)+0.5u*v(b)*v(b)'\n.tran 10u 2m\n.end\n";
     let w = written(deck, Dialect::Ngspice, "q", Dialect::Ngspice);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     assert!(
         w.text.contains("\nCq b 0 Q='1u*v(b)+0.5u*v(b)*v(b)'\n"),
         "{}",
@@ -359,7 +363,7 @@ fn charge_capacitor_and_late_subcircuit_name() {
 
     let late = "t\n.subckt pass d g s b w=1\nR1 d s {w}\n.ends pass\n.subckt latch d g s b\nxp d g s b w = {2} pass\n.ends latch\n";
     let w = written(late, Dialect::Ngspice, "t", Dialect::Ngspice);
-    assert_eq!(codes(&w), [] as [Code; 0], "{}", w.notes.messages);
+    assert_eq!(notes(&w), [] as [Code; 0], "{}", w.notes.messages);
     assert!(fixpoint(late, Dialect::Ngspice, "t").contains("\nXp d g s b pass w={2}\n"));
     // Two bare words after the parameters, or one before them: not that
     // shape; the first is kept as text, the second an instance of `c`.
@@ -369,7 +373,7 @@ fn charge_capacitor_and_late_subcircuit_name() {
         "t",
         Dialect::Ngspice,
     );
-    assert_eq!(codes(&other), [Code::W0027], "{}", other.notes.messages);
+    assert_eq!(notes(&other), [Code::W0027], "{}", other.notes.messages);
     assert!(other.text.contains("\nXr a b c w=1\n"), "{}", other.text);
 }
 
@@ -407,7 +411,7 @@ fn sections_cross_between_spice_and_spectre() {
         "{scs}"
     );
     let back = written(&scs, Dialect::Spectre, "models", Dialect::Ngspice);
-    assert_eq!(codes(&back), [] as [Code; 0], "{scs}");
+    assert_eq!(notes(&back), [] as [Code; 0], "{scs}");
     assert_eq!(meaning(&back.text), meaning(&spice), "{scs}");
     assert!(
         scs.contains("model nch bsim4 {\n1: type=n version=4.5 lmin=100n"),
@@ -420,7 +424,7 @@ fn sections_cross_between_spice_and_spectre() {
         "{sp}"
     );
     let again = written(&sp, Dialect::Ngspice, "models", Dialect::Spectre);
-    assert_eq!(codes(&again), [] as [Code; 0], "{sp}");
+    assert_eq!(notes(&again), [] as [Code; 0], "{sp}");
     let round = written(&again.text, Dialect::Spectre, "models", Dialect::Ngspice).text;
     assert_eq!(meaning(&round), meaning(&sp), "{sp}");
     assert!(!again.text.contains("library"), "{}", again.text);
@@ -479,11 +483,6 @@ fn simulators_run_each_corner_from_the_written_sections() {
 /// `src` (read in `d`) written for `to`, which must not refuse it.
 fn written(src: &str, d: Dialect, name: &str, to: Dialect) -> Written {
     render_text(src, d, name, to).unwrap_or_else(|e| panic!("{to:?}: {}\n{src}", e.messages))
-}
-
-/// The codes of the notes on a written deck, in source order.
-fn codes(w: &Written) -> Vec<Code> {
-    w.notes.diags.iter().map(|d| d.code).collect()
 }
 
 /// `src` written in `d`, read back and written again: the same text, which

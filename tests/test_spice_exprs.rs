@@ -10,40 +10,14 @@
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::{refusal, write};
 use spicerack::backend::Dialect;
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::render_text;
 
 // ---- private ----
-
-/// The deck `text` read as `from`, written for `to`; panics on a refusal.
-fn write(text: &str, from: Dialect, to: Dialect) -> String {
-    render_text(text, from, "t", to)
-        .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
-        .text
-}
-
-/// The codes the refusal of `text` (read as `from`, written for `to`) has.
-fn refusal(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
-    match render_text(text, from, "t", to) {
-        Ok(w) => panic!("written, not refused:\n{}", w.text),
-        Err(e) => e.diags.iter().map(|d| d.code).collect(),
-    }
-}
-
-/// `deck` run on real ngspice: the operating point's `v(name)`.
-fn ngspice_op(deck: &str, name: &str) -> f64 {
-    let raw = Dialect::Ngspice
-        .run(deck)
-        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
-    let want = format!("v({name})");
-    let i = raw
-        .variables
-        .iter()
-        .position(|v| v.name.eq_ignore_ascii_case(&want) || v.name.eq_ignore_ascii_case(name))
-        .unwrap_or_else(|| panic!("no {want} in {:?}", raw.variables));
-    raw.real_data[i][0]
-}
 
 // ── Xyce's if() and output syntax on ngspice ──
 
@@ -57,8 +31,14 @@ fn xyce_if_is_a_ternary_on_ngspice() {
     let deck = "* t\nV1 1 0 1.5\nR1 1 0 1k\nVb b 0 {if(1>2,3,4)}\nRb b 0 1k\n\
         Bc c 0 V={IF(V(1)>0,2*V(1),0)}\nRc c 0 1k\n.op\n.end\n";
     let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
-    assert!((ngspice_op(&w, "b") - 4.0).abs() < 1e-9, "{w}");
-    assert!((ngspice_op(&w, "c") - 3.0).abs() < 1e-9, "{w}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "b") - 4.0).abs() < 1e-9,
+        "{w}"
+    );
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "c") - 3.0).abs() < 1e-9,
+        "{w}"
+    );
 }
 
 /// Xyce RG `.PRINT` outputs on ngspice-45 (manual §15.4.1, §31.1 `@dev[param]`;
@@ -75,7 +55,7 @@ fn xyce_outputs_are_spelled_for_ngspice() {
     let deck = "* t\nV1 1 0 1\nR1 1 2 1k\nX1 2 0 half\nV5 5 0 1\nV6 6 0 0.7\nQ1 5 6 0 qn\n\
         .model qn npn\n.subckt half a b\nR9 a n1 1k\nR8 n1 b 1k\n.ends\n.tran 1u 10u\n\
         .print tran PRECISION=10 I(R1) {I(R1)*2} IB(Q1) V(X1:N1) R1:R DNO(R1)\n.end\n";
-    let w = render_text(deck, Dialect::Xyce, "t", Dialect::Ngspice).expect("written");
+    let w = oracle::written(deck, Dialect::Xyce, Dialect::Ngspice);
     assert!(
         w.text
             .contains(".print tran @R1[i] @Q1[ib] V(X1.N1) @R1[R]\n"),
@@ -113,7 +93,10 @@ fn log_keeps_its_base_across_ngspice_and_xyce() {
     );
     let xy = "* t\nV1 a 0 {log(100)}\nR1 a 0 1k\n.op\n.end\n";
     let ng = write(xy, Dialect::Xyce, Dialect::Ngspice);
-    assert!((ngspice_op(&ng, "a") - 2.0).abs() < 1e-9, "{ng}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &ng, "a") - 2.0).abs() < 1e-9,
+        "{ng}"
+    );
 }
 
 // ── R models on Xyce ──
@@ -127,7 +110,7 @@ fn log_keeps_its_base_across_ngspice_and_xyce() {
 #[test]
 fn an_r_model_value_is_the_instance_value_on_xyce() {
     let deck = "* t\nI1 0 2 1m\nr1 2 0 my\nr2 2 0 my r=1k\n.model my r(r=2k tc1=0)\n.op\n.end\n";
-    assert!((ngspice_op(deck, "2") - 2.0 / 3.0).abs() < 1e-9);
+    assert!((oracle::op(Dialect::Ngspice, deck, "2") - 2.0 / 3.0).abs() < 1e-9);
     let w = write(deck, Dialect::Ngspice, Dialect::Xyce);
     assert!(
         w.contains("R1 2 0 2k my") && w.contains("R2 2 0 my r=1k"),
@@ -138,7 +121,7 @@ fn an_r_model_value_is_the_instance_value_on_xyce() {
     // §2.4.3; `model-scope-5.sp`).
     let scoped = "* t\nI1 0 2 1m\nX1 2 s\n.subckt s a\n.model my r r=2k\nr1 a 0 my\n.ends\n\
         .model my r r=4k\n.op\n.end\n";
-    assert!((ngspice_op(scoped, "2") - 2.0).abs() < 1e-9);
+    assert!((oracle::op(Dialect::Ngspice, scoped, "2") - 2.0).abs() < 1e-9);
     let w = write(scoped, Dialect::Ngspice, Dialect::Xyce);
     assert!(w.contains("R1 a 0 2k my"), "{w}");
 }
@@ -154,11 +137,14 @@ fn an_r_model_value_is_the_instance_value_on_xyce() {
 #[test]
 fn nint_rounds_as_its_source() {
     let deck = "* t\nV1 a 0 {nint(2.5)}\nR1 a 0 1k\n.op\n.end\n";
-    assert!((ngspice_op(deck, "a") - 2.0).abs() < 1e-12);
+    assert!((oracle::op(Dialect::Ngspice, deck, "a") - 2.0).abs() < 1e-12);
     let w = write(deck, Dialect::Ngspice, Dialect::Xyce);
     assert!(w.contains("fmod(floor((2.5)+0.5),2)"), "{w}");
     let ng = write(deck, Dialect::Xyce, Dialect::Ngspice);
-    assert!((ngspice_op(&ng, "a") - 3.0).abs() < 1e-12, "{ng}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &ng, "a") - 3.0).abs() < 1e-12,
+        "{ng}"
+    );
 }
 
 // ── Xyce's M on an X line ──
@@ -176,7 +162,10 @@ fn xyce_m_on_an_instance_is_its_multiplicity_on_ngspice() {
         .subckt test A B PARAMS: M=2\nR1 A B {M/4}\n.ends\n.op\n.end\n";
     let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
     assert!(w.contains("PARAMS: m_1=2") && w.contains("{m_1/4}"), "{w}");
-    assert!((ngspice_op(&w, "2") - 1.0 / 6.0).abs() < 1e-9, "{w}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "2") - 1.0 / 6.0).abs() < 1e-9,
+        "{w}"
+    );
 }
 
 /// ESPice ignores `m` on an `X` line (run by hand: `Xtest1 2 3 test m=5`
@@ -186,7 +175,7 @@ fn xyce_m_on_an_instance_is_its_multiplicity_on_ngspice() {
 fn espice_refuses_a_subcircuit_multiplicity() {
     let deck = "* t\nVin 1 0 1\nRin 1 2 1\nXtest1 2 3 test m=5\nXtest2 3 0 test m=5\n\
         .subckt test A B\nR1 A B 0.5\n.ends\n.op\n.end\n";
-    assert!((ngspice_op(deck, "2") - 1.0 / 6.0).abs() < 1e-9);
+    assert!((oracle::op(Dialect::Ngspice, deck, "2") - 1.0 / 6.0).abs() < 1e-9);
     let codes = refusal(deck, Dialect::Ngspice, Dialect::Espice);
     assert!(codes.contains(&Code::W0047), "{codes:?}");
 }
@@ -205,10 +194,16 @@ fn hspice_defaults_and_options_keep_their_numbers_on_ngspice() {
     let tnom =
         "* t\ni1 0 a 1m\nd1 a 0 dmod\n.model dmod d is=1e-14 n=1.2 rs=5 eg=1.11 xti=3\n.op\n.end\n";
     let w = write(tnom, Dialect::Hspice, Dialect::Ngspice);
-    assert!((ngspice_op(&w, "a") - 0.785904).abs() < 1e-6, "{w}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "a") - 0.785904).abs() < 1e-6,
+        "{w}"
+    );
     let gshunt = "* t\n.option gshunt=1m post\ni1 0 a 1m\nr1 a 0 1k\n.op\n.end\n";
     let w = write(gshunt, Dialect::Hspice, Dialect::Ngspice);
-    assert!((ngspice_op(&w, "a") - 0.5).abs() < 1e-9, "{w}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "a") - 0.5).abs() < 1e-9,
+        "{w}"
+    );
     let gmindc =
         "* t\n.option gmindc=1e-3\nv1 0 a 1\nd1 a 0 dmod\n.model dmod d(is=1e-14)\n.op\n.end\n";
     let codes = refusal(gmindc, Dialect::Hspice, Dialect::Ngspice);
@@ -237,7 +232,10 @@ fn a_draw_outside_monte_carlo_is_its_nominal_on_ngspice() {
     assert!((i + 2e-3).abs() < 1e-12, "{i}\n{w}");
     let xy = "* t\n.param pc={2.0*rand()} pa={agauss(1,1)}\nV1 a 0 {pc+pa}\nR1 a 0 1\n.op\n.end\n";
     let ng = write(xy, Dialect::Xyce, Dialect::Ngspice);
-    assert!((ngspice_op(&ng, "a") - 2.0).abs() < 1e-12, "{ng}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &ng, "a") - 2.0).abs() < 1e-12,
+        "{ng}"
+    );
 }
 
 /// Xyce RG §2.3: `limit(x, lo, hi)` clamps x (Xyce 7.10 by hand:
@@ -248,8 +246,14 @@ fn a_draw_outside_monte_carlo_is_its_nominal_on_ngspice() {
 fn a_xyce_clamp_is_min_of_max_on_ngspice() {
     let deck = "* t\nV1 a 0 {limit(3,0,2)}\nR1 a 0 1k\nV3 c 0 1\nB1 d 0 V=limit(v(c)*3,0,2)\nR3 d 0 1k\n.op\n.end\n";
     let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
-    assert!((ngspice_op(&w, "a") - 2.0).abs() < 1e-12, "{w}");
-    assert!((ngspice_op(&w, "d") - 2.0).abs() < 1e-12, "{w}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "a") - 2.0).abs() < 1e-12,
+        "{w}"
+    );
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "d") - 2.0).abs() < 1e-12,
+        "{w}"
+    );
 }
 
 // ── SFFM's argument order ──
@@ -314,7 +318,10 @@ fn xyce_global_nodes_are_ngspice_globals() {
     let deck = "* t\nVDD $G_VDD 0 5\nX1 mid half\nR2 mid 0 1k\n.subckt half m\nR1 $G_VDD m 1k\n.ends\n.op\n.end\n";
     let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
     assert!(w.contains(".global G_VDD\n") && !w.contains('$'), "{w}");
-    assert!((ngspice_op(&w, "mid") - 2.5).abs() < 1e-9, "{w}");
+    assert!(
+        (oracle::op(Dialect::Ngspice, &w, "mid") - 2.5).abs() < 1e-9,
+        "{w}"
+    );
 }
 
 // ── measures ngspice cannot take ──

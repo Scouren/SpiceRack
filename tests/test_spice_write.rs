@@ -10,9 +10,12 @@
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::{refusal, write};
 use spicerack::backend::Dialect;
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::render_text;
 
 /// A `B` source beside the deck's own `E1`, its current measured.
 const B_AND_E1: &str = "* t\nV1 in 0 1\nB1 out 0 V=2*v(in)\nR1 out 0 1k\n\
@@ -20,35 +23,6 @@ const B_AND_E1: &str = "* t\nV1 in 0 1\nB1 out 0 V=2*v(in)\nR1 out 0 1k\n\
     .meas tran ib find i(B1) at=5u\n.meas tran vx find v(x) at=5u\n.end\n";
 
 // ---- private ----
-
-/// The deck `text` read as `from`, written for `to`; panics on a refusal.
-fn write(text: &str, from: Dialect, to: Dialect) -> String {
-    render_text(text, from, "t", to)
-        .unwrap_or_else(|e| panic!("{}\n{text}", e.messages))
-        .text
-}
-
-/// The codes the refusal of `text` (read as `from`, written for `to`) has.
-fn refusal(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
-    match render_text(text, from, "t", to) {
-        Ok(w) => panic!("written, not refused:\n{}", w.text),
-        Err(e) => e.diags.iter().map(|d| d.code).collect(),
-    }
-}
-
-/// `deck` run on real ngspice: the operating point's `v(name)`.
-fn ngspice_op(deck: &str, name: &str) -> f64 {
-    let raw = Dialect::Ngspice
-        .run(deck)
-        .unwrap_or_else(|e| panic!("ngspice: {e}\n{deck}"));
-    let want = format!("v({name})");
-    let i = raw
-        .variables
-        .iter()
-        .position(|v| v.name.eq_ignore_ascii_case(&want) || v.name.eq_ignore_ascii_case(name))
-        .unwrap_or_else(|| panic!("no {want} in {:?}", raw.variables));
-    raw.real_data[i][0]
-}
 
 /// A file in the temporary directory holding `text`: its path.
 fn scratch(name: &str, text: &str) -> std::path::PathBuf {
@@ -94,7 +68,7 @@ fn an_ltspice_whole_file_lib_is_an_include_on_the_spice_targets() {
         lib.display()
     );
     let ng = write(&deck, Dialect::Ltspice, Dialect::Ngspice);
-    let v = ngspice_op(&ng, "out");
+    let v = oracle::op(Dialect::Ngspice, &ng, "out");
     assert!((v - 0.75).abs() < 1e-9, "v(out) = {v}\n{ng}");
     // HSPICE `.INCLUDE`, Xyce RG `.INCLUDE`: the same card.
     for to in [Dialect::Espice, Dialect::Hspice, Dialect::Xyce] {
@@ -236,14 +210,14 @@ fn text_that_did_not_parse_reaches_its_own_dialect_only() {
 #[test]
 fn cdl_leaves_out_text_no_rule_read() {
     let deck = "* t\nR1 a 0 1k\nyfoo a 0 bar\n.backanno\n.wave x.wav 16 44100 a\n.end\n";
-    let w = render_text(deck, Dialect::Ltspice, "t", Dialect::Cdl).expect("written");
+    let w = oracle::written(deck, Dialect::Ltspice, Dialect::Cdl);
     assert!(
         !w.text.contains(".backanno") && !w.text.contains(".wave") && !w.text.contains("yfoo"),
         "{}",
         w.text
     );
     assert!(w.text.contains("* error: W0001 "), "{}", w.text);
-    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    let codes = oracle::notes(&w);
     assert!(
         codes.contains(&Code::W0028) && codes.contains(&Code::W0021),
         "{codes:?}"
@@ -282,7 +256,7 @@ fn a_library_is_framed_as_a_deck_where_that_reads_as_nothing() {
         "* t\nV1 in 0 1\n.include \"{}\"\nR1 in out 1k\nR3 out 0 3k\n.op\n.end\n",
         path.display()
     );
-    let v = ngspice_op(&deck, "out");
+    let v = oracle::op(Dialect::Ngspice, &deck, "out");
     assert!((v - 0.6).abs() < 1e-9, "v(out) = {v}\n{ng}");
     let hs = write(lib, Dialect::Ngspice, Dialect::Hspice);
     assert!(!hs.to_ascii_lowercase().contains(".end"), "{hs}");
@@ -306,7 +280,7 @@ fn a_library_is_framed_as_a_deck_where_that_reads_as_nothing() {
 #[test]
 fn xyce_takes_the_options_its_reference_guide_names() {
     let deck = "* t\nV1 a 0 1\nR1 a 0 1k\n.options acct abstol=1n method=gear maxord=2 delmax=1n scale=1u\n.tran 1n 10n\n.end\n";
-    let w = render_text(deck, Dialect::Ngspice, "t", Dialect::Xyce).expect("written");
+    let w = oracle::written(deck, Dialect::Ngspice, Dialect::Xyce);
     for line in [
         ".options nonlin abstol=1n\n",
         ".options timeint method=gear maxord=2 delmax=1n\n",
@@ -340,14 +314,14 @@ fn a_vacask_control_line_is_left_out_or_refused_off_vacask() {
         model v vsource\nv1 (a 0) v dc=1\nr1 (a b) r r=1k\nr2 (b 0) r r=1k\n\
         control\n  abort always\n  save v(b)\n  print stats\n  analysis op1 op\n\
         postprocess(PYTHON, \"runme.py\")\nendc\n";
-    let w = render_text(deck, Dialect::Vacask, "t", Dialect::Ngspice).expect("written");
+    let w = oracle::written(deck, Dialect::Vacask, Dialect::Ngspice);
     for word in ["abort", "print", "postprocess"] {
         assert!(!w.text.contains(word), "{word}\n{}", w.text);
     }
-    let codes: Vec<Code> = w.notes.diags.iter().map(|d| d.code).collect();
+    let codes = oracle::notes(&w);
     assert!(codes.contains(&Code::W0120), "{codes:?}");
     assert!(w.text.contains(".save v(b)"), "{}", w.text);
-    let v = ngspice_op(&w.text, "b");
+    let v = oracle::op(Dialect::Ngspice, &w.text, "b");
     assert!((v - 0.5).abs() < 1e-9, "{v}\n{}", w.text);
     let alter = deck.replace("print stats", "alter r1 r=2k");
     let codes = refusal(&alter, Dialect::Vacask, Dialect::Ngspice);
@@ -364,7 +338,7 @@ fn a_vacask_control_line_is_left_out_or_refused_off_vacask() {
 fn ltspice_notes_the_noise_summary_it_leaves_out() {
     let deck = "* t\nV1 in 0 dc 0 ac 1\nR1 in out 1k\nC1 out 0 1n\n\
         .noise v(out) V1 dec 10 1k 100meg 5\n.end\n";
-    let w = render_text(deck, Dialect::Ngspice, "t", Dialect::Ltspice).expect("written");
+    let w = oracle::written(deck, Dialect::Ngspice, Dialect::Ltspice);
     assert!(w.text.contains("dec 10 1k 100meg\n"), "{}", w.text);
     assert!(
         w.notes.diags.iter().any(|d| d.code == Code::W0033),
@@ -388,12 +362,12 @@ fn a_nested_ternary_keeps_its_meaning_across_dialects() {
     let deck =
         "* t\n.func val4(x,y) {x>0?y>0?4 :8 :8}\nV1 a 0 {val4(1,-1)}\nR1 a 0 1k\n.op\n.end\n";
     let w = write(deck, Dialect::Xyce, Dialect::Ngspice);
-    let v = ngspice_op(&w, "a");
+    let v = oracle::op(Dialect::Ngspice, &w, "a");
     assert!((v - 8.0).abs() < 1e-12, "{v}\n{w}");
     let ng = "* t\n.func lim(x,p,n) {x<p?p:x>n?n:x}\nV1 a 0 {lim(7,0,5)}\nR1 a 0 1k\n.op\n.end\n";
     let w = write(ng, Dialect::Ngspice, Dialect::Xyce);
     assert!(w.contains("{x<p?p :x>n?n :x}"), "{w}");
-    assert!((ngspice_op(ng, "a") - 5.0).abs() < 1e-12);
+    assert!((oracle::op(Dialect::Ngspice, ng, "a") - 5.0).abs() < 1e-12);
 }
 
 // ── transient step ──
@@ -461,7 +435,7 @@ fn a_path_with_a_blank_is_quoted() {
         lib.display()
     );
     let ng = write(&deck, Dialect::Ltspice, Dialect::Ngspice);
-    let v = ngspice_op(&ng, "out");
+    let v = oracle::op(Dialect::Ngspice, &ng, "out");
     assert!((v - 0.75).abs() < 1e-9, "v(out) = {v}\n{ng}");
     let xy = write(&deck, Dialect::Ltspice, Dialect::Xyce);
     assert!(
@@ -479,8 +453,8 @@ fn a_path_with_a_blank_is_quoted() {
 #[test]
 fn an_ngspice_nested_ternary_is_written_as_ngspice_reads_it() {
     let deck = "* t\nV1 a 0 {1?0?4:8:16}\nR1 a 0 1k\n.op\n.end\n";
-    assert!((ngspice_op(deck, "a") - 4.0).abs() < 1e-12);
-    let w = render_text(deck, Dialect::Ngspice, "t", Dialect::Xyce).expect("written");
+    assert!((oracle::op(Dialect::Ngspice, deck, "a") - 4.0).abs() < 1e-12);
+    let w = oracle::written(deck, Dialect::Ngspice, Dialect::Xyce);
     assert!(w.text.contains("{1?4 :16}"), "{}", w.text);
     assert!(w.notes.diags.iter().any(|d| d.code == Code::W0034));
     let hs = write(deck, Dialect::Ngspice, Dialect::Hspice);
@@ -504,7 +478,7 @@ fn an_ngspice_nested_ternary_is_written_as_ngspice_reads_it() {
 fn xyce_prints_are_spelled_or_left_out_on_ngspice() {
     let deck = "* t\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 1k\n.tran 1u 10u\n\
         .print tran v(2) {v(1) * 2} p(R1)\n.print homotopy v(2)\n.print dc v(2)\n.end\n";
-    let w = render_text(deck, Dialect::Xyce, "t", Dialect::Ngspice).expect("written");
+    let w = oracle::written(deck, Dialect::Xyce, Dialect::Ngspice);
     assert!(w.text.contains(".print tran v(2) v(1)*2\n"), "{}", w.text);
     assert!(
         !w.text.contains("homotopy") && !w.text.contains(".print dc"),
@@ -548,7 +522,7 @@ fn xyce_refuses_a_file_read_inside_a_subcircuit() {
          .include {}\nX1 n1 n2 inner\n.ends\n.subckt inner n1 n2\nR4 n1 n2 4k\n.ends\n.op\n.end\n",
         lib.display()
     );
-    assert!((ngspice_op(&deck, "9") - 1.0).abs() < 1e-9);
+    assert!((oracle::op(Dialect::Ngspice, &deck, "9") - 1.0).abs() < 1e-9);
     let codes = refusal(&deck, Dialect::Ngspice, Dialect::Xyce);
     assert!(codes.contains(&Code::W0046), "{codes:?}");
 }
@@ -566,6 +540,6 @@ fn a_hoisted_subcircuit_takes_the_models_around_it() {
         .model sw sw(ron=1 roff=1meg vt=0.5)\nX2 a b inner\n.subckt inner p q\nS1 p q p 0 sw\n\
         .ends\n.ends\n.op\n.end\n";
     let w = write(deck, Dialect::Ngspice, Dialect::Ngspice);
-    let v = ngspice_op(&w, "out");
+    let v = oracle::op(Dialect::Ngspice, &w, "out");
     assert!((v - 1000.0 / 1001.0).abs() < 1e-6, "{v}\n{w}");
 }

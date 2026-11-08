@@ -1,3 +1,10 @@
+"""Design testbench builders (`spicerack.testbenches`): the decks they emit and
+the metrics they extract and validate.
+
+Oracle: the expected cards, written by hand from each target's manual (Spectre
+Reference 19.1 cited where a test uses it), and metric values worked by hand from
+the given waveform points.
+"""
 from pathlib import Path
 
 import pytest

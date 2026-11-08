@@ -1,6 +1,9 @@
 """
 Python tests for spicerack — tests the PyO3 bindings.
 
+Oracle: the expected netlist lines, written by hand from each card's syntax
+(ngspice manual §2, §3); no simulator runs here.
+
 Run with: maturin develop && pytest tests/
 """
 import pytest

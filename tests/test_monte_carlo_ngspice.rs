@@ -15,8 +15,11 @@
 //!
 //! Contents: none (tests only).
 
+#[path = "common/oracle.rs"]
+mod oracle;
+
+use oracle::write as written;
 use spicerack::syntax::Dialect;
-use spicerack::syntax::render::render_text;
 
 /// The runs of each Monte Carlo loop.
 const N: usize = 2000;
@@ -27,13 +30,6 @@ const N: usize = 2000;
 const SEED: u32 = 7;
 
 // ---- private ----
-
-/// `src` (read in `d`) written for `to`, which must not refuse it.
-fn written(src: &str, d: Dialect, to: Dialect) -> String {
-    render_text(src, d, "t", to)
-        .unwrap_or_else(|e| panic!("{to:?}: {}\n{src}", e.messages))
-        .text
-}
 
 /// T-N0: agauss(1k,100,3) has std(R1) = 33.3, so v(out) has std 2.5e-4 *
 /// 33.3 = 8.33e-3; aunif(1k,100) std(R1) = 100/sqrt(3) = 57.7, std

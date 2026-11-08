@@ -1125,7 +1125,7 @@ class TestTestbenchCheckBackend:
         )
         tb = ps.Testbench(dut)
         issues = tb.check_backend("ngspice")
-        assert len(issues) == 0
+        assert issues == []
 
 def test_a_stored_testbench_keeps_each_targets_library_path():
     # Round trip: the bench read back from its store writes the netlists the
