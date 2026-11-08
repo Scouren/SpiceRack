@@ -7,6 +7,11 @@
 //! together, never of either alone; a rule of the target alone reads
 //! `W::b`, of the source alone `Rd::b`.
 //!
+//! Invariant: a field reads `Behaviours` only (the two dialects' declared
+//! facts), never a dialect's identity, so a plugin dialect gets the rule
+//! from what it declares; a rule with no declared fact behind it first
+//! gets a def row (`syntax::def`, `syntax::dialects`) and then a field.
+//!
 //! Adding a pair rule: one field here, documented with its evidence (the
 //! manual clause or the run), one line in [`Pair::of`], and the read of
 //! `self.pair.<field>` at the one site that writes it. An expression
