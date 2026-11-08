@@ -6,7 +6,10 @@
 //!   HSPICE tokens, against `bare.scs` read by hand;
 //! - `kits_resolve`: every PDK kit and fixture read as one `syntax::resolve`
 //!   kit: its read order is the manifest's (`inputs.rs`'s walk), and every
-//!   instance master binds or carries an `R0001`; the counts are printed.
+//!   instance master binds or carries an `R0001`; the counts are printed;
+//! - `token_ends`: every token's stored end is the end its lexer finds again
+//!   from its start (`Tokens::end_relexed`, the re-lex `end` was before the
+//!   column).
 //!
 //! The stages' throughput is the perf suite's (`benches/perf.py`,
 //! TESTING.md "Performance").
@@ -259,6 +262,19 @@ fn kits_resolve() {
     for (set, c) in &counts {
         println!("{set}: {c:?}");
     }
+}
+
+#[test]
+fn token_ends() {
+    let mut tokens = 0usize;
+    for (name, src, d) in every_input() {
+        let t = tokenize(&src, Lang::from(d).lexicon().expect("a reader"));
+        for i in 0..t.len() as u32 {
+            assert_eq!(t.end(i), t.end_relexed(i), "{name}: token {i}");
+        }
+        tokens += t.len();
+    }
+    println!("{tokens} token ends");
 }
 
 /// Every golden-gate input as `(set/relpath, the text today reads, dialect)`,

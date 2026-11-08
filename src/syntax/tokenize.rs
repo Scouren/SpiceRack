@@ -67,6 +67,7 @@ pub fn tokenize<'s>(source: &'s str, lexicon: &'static Lexicon) -> Tokens<'s> {
             lexicon,
             tags: Vec::with_capacity(src.len() / 8),
             starts: Vec::with_capacity(src.len() / 8),
+            ends: Vec::with_capacity(src.len() / 8),
             line_starts,
             number_tokens: Vec::new(),
             number_values: Vec::new(),
@@ -75,9 +76,9 @@ pub fn tokenize<'s>(source: &'s str, lexicon: &'static Lexicon) -> Tokens<'s> {
         },
     };
     if lexicon.title {
-        l.push(Tag::Title, 0);
         l.pos = line_end(src, 0);
-        l.push(Tag::EndOfStatement, l.pos);
+        l.push(Tag::Title, 0, l.pos);
+        l.push(Tag::EndOfStatement, l.pos, l.pos);
         l.next_line();
     }
     while l.pos < src.len() {
@@ -89,8 +90,8 @@ pub fn tokenize<'s>(source: &'s str, lexicon: &'static Lexicon) -> Tokens<'s> {
                 let at = l.pos + blanks(src, l.pos);
                 let (tag, end) = token_at(src, at, l.lex);
                 let tag = l.keyword(tag, at, end, true);
-                l.push(tag, at);
-                l.push(Tag::EndOfStatement, end);
+                l.push(tag, at, end);
+                l.push(Tag::EndOfStatement, end, end);
                 l.pos = line_end(src, at);
                 if l.lex.end.is_some_and(|e| e.stops) {
                     break;
@@ -103,15 +104,22 @@ pub fn tokenize<'s>(source: &'s str, lexicon: &'static Lexicon) -> Tokens<'s> {
             }
         }
     }
+    debug_assert!(
+        (0..l.out.len() as u32).all(|i| l.out.end(i) == l.out.end_relexed(i)),
+        "every stored end is the end the lexer finds again"
+    );
     l.out
 }
 
 // ---- private ----
 
 impl Lexer<'_> {
-    fn push(&mut self, tag: Tag, at: usize) {
+    /// Appends token `tag` spanning `at..end`.
+    fn push(&mut self, tag: Tag, at: usize, end: usize) {
+        debug_assert!(at <= end, "a token ends after it starts");
         self.out.tags.push(tag);
         self.out.starts.push(at as u32);
+        self.out.ends.push(end as u32);
     }
 
     /// Moves past the `\n` ending the current line.
@@ -245,7 +253,7 @@ impl Lexer<'_> {
             }
             let (tag, end) = token_at(self.src, p, self.lex);
             let tag = self.keyword(tag, p, end, head);
-            self.push(tag, p);
+            self.push(tag, p, end);
             if tag == Tag::Number {
                 let text = std::str::from_utf8(&self.src[p..end]).unwrap_or("");
                 self.out.number_tokens.push(self.out.tags.len() as u32 - 1);
@@ -268,12 +276,12 @@ impl Lexer<'_> {
             self.pos = end;
         }
         if self.out.tags.len() > first {
-            self.push(Tag::EndOfStatement, self.pos);
+            self.push(Tag::EndOfStatement, self.pos, self.pos);
         }
         if let Some((tag, to)) = switch {
             self.out.switches.push(self.out.tags.len() as u32);
             self.out.switch_lexicons.push(to);
-            self.push(tag, self.pos);
+            self.push(tag, self.pos, self.pos);
             self.home = match self.home {
                 Some(_) => None,
                 None => Some(self.lex),
@@ -448,7 +456,7 @@ impl Lexer<'_> {
                             .iter()
                             .rposition(|b| !b.is_ascii_alphabetic())
                             .map_or(0, |k| k + 1);
-                        token_at(src, s, lex).1 == p
+                        self.out.ends.last() == Some(&(p as u32))
                             && src[s..s + digits]
                                 .iter()
                                 .all(|b| b.is_ascii_digit() || b".eEdD+-".contains(b))
