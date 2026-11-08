@@ -8,7 +8,7 @@
 //! §2.8.5; LTspice help, Xyce RG §2.1.18 (`^` XOR).
 //!
 //! Contents:
-//! - `W::checks(&mut self)`, `fn calls(e: &str) -> impl Iterator<Item = &str>`
+//! - `W::checks(&mut self)`, `W::blocks(&self) -> Vec<&'r Block>`, `fn calls(e: &str) -> impl Iterator<Item = &str>`
 
 use super::W;
 use super::params::spelled_flag;
@@ -66,6 +66,32 @@ impl W<'_, '_> {
     }
 }
 
+impl<'r> W<'_, 'r> {
+    /// Every block the deck writes from: the top, its definitions, each
+    /// section's body and definitions, and the branches inside each.
+    pub(super) fn blocks(&self) -> Vec<&'r Block> {
+        let deck = self.deck;
+        let sections = deck
+            .sections
+            .iter()
+            .flat_map(|s| std::iter::once(&s.body).chain(&s.defs));
+        let mut work: Vec<&Block> = std::iter::once(&deck.top)
+            .chain(&deck.defs)
+            .chain(sections)
+            .collect();
+        work.reverse();
+        let mut out = Vec::new();
+        while let Some(b) = work.pop() {
+            out.push(b);
+            let branches = b.conds.iter().flat_map(|(_, c)| &c.branches);
+            let mut inner: Vec<&Block> = branches.map(|(_, body)| body).collect();
+            inner.reverse();
+            work.extend(inner);
+        }
+        out
+    }
+}
+
 /// The names `e` calls: each identifier followed by `(`.
 // ponytail: a scan over the kept text, as the old writer's `calls`; the
 // expression tree's `Call` nodes when the views keep nodes, not text.
@@ -90,30 +116,6 @@ pub(super) fn calls(e: &str) -> impl Iterator<Item = &str> {
 // ---- private ----
 
 impl<'r> W<'_, 'r> {
-    /// Every block the deck writes from: the top, its definitions, each
-    /// section's body and definitions, and the branches inside each.
-    fn blocks(&self) -> Vec<&'r Block> {
-        let deck = self.deck;
-        let sections = deck
-            .sections
-            .iter()
-            .flat_map(|s| std::iter::once(&s.body).chain(&s.defs));
-        let mut work: Vec<&Block> = std::iter::once(&deck.top)
-            .chain(&deck.defs)
-            .chain(sections)
-            .collect();
-        work.reverse();
-        let mut out = Vec::new();
-        while let Some(b) = work.pop() {
-            out.push(b);
-            let branches = b.conds.iter().flat_map(|(_, c)| &c.branches);
-            let mut inner: Vec<&Block> = branches.map(|(_, body)| body).collect();
-            inner.reverse();
-            work.extend(inner);
-        }
-        out
-    }
-
     /// A function's first token.
     fn func_token(&self, f: Func) -> u32 {
         let (Func::Param(n) | Func::Card(n) | Func::Real(n)) = f;

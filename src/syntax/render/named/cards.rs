@@ -193,6 +193,10 @@ impl W<'_, '_> {
                 nodes,
                 gain,
             } => {
+                // E, G: two output and two controlling nodes; F, H: two
+                // output nodes and the sensing source.
+                let held = if matches!(letter, 'E' | 'G') { 4 } else { 3 };
+                assert_eq!(nodes.len(), held, "a linear {letter} card's nodes");
                 let ns: Vec<String> = nodes.iter().map(|x| self.node(x)).collect();
                 let g = self.num(gain);
                 let name = self.dev(own);
@@ -359,6 +363,10 @@ impl W<'_, '_> {
                     .count(),
                 None => 0,
             };
+            assert!(
+                i + run <= models.len(),
+                "a model group inside the block's models"
+            );
             let Some((base, _)) = bin(first).filter(|_| run > 0) else {
                 let params = match self.table_kind(first) {
                     Some(k) => match self.model_rows(first, b.models[i].0, k) {
@@ -391,6 +399,8 @@ impl W<'_, '_> {
                 self.line(&line);
             }
             self.line("}");
+            // Each pass consumes at least one model: the loop ends.
+            assert!(run > 0, "a model group holds a bin");
             i += run;
         }
     }

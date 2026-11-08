@@ -256,6 +256,10 @@ impl W<'_, '_> {
             self.refuse(Code::W0015, tok);
             return None;
         }
+        assert!(
+            sw.start > 0.0 && delta > 1.0,
+            "an octave grid rises from start"
+        );
         Some(format!("values=[{}]", grid.join(" ")))
     }
 }

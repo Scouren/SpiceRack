@@ -86,7 +86,7 @@ enum Space {
 }
 
 /// Pre-scans `ast` (file `file`, tokens `t`; names compared case-blind
-/// where `fold`).
+/// where `fold`): every def and ref it returns names a node of `ast`.
 pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declared {
     let mut out = Declared {
         defs: Vec::new(),
@@ -220,6 +220,11 @@ pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declar
             }
         }
     });
+    // The pass declares this file's statements only, as a deck or a library.
+    assert!(out.defs.iter().all(|d| d.file == file), "a file's own defs");
+    assert!(out.defs.iter().all(|d| (d.node.0 as usize) < ast.len()));
+    assert!(out.refs.iter().all(|r| (r.node as usize) < ast.len()));
+    assert!(matches!(out.role, Role::Deck | Role::Library));
     out
 }
 

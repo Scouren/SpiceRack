@@ -129,6 +129,9 @@ pub(super) fn lookup(table: &Table, file: FileId, t: &Tokens, ast: &Ast) -> (Fac
     facts.scopes.sort_unstable_by_key(|e| e.0);
     facts.bindings.sort_unstable_by_key(|e| e.0);
     facts.splits.sort_unstable_by_key(|e| e.0);
+    // Every instance is a statement; a split corrects a bound instance.
+    assert!(facts.bindings.len() <= facts.scopes.len());
+    assert!(facts.splits.len() <= facts.bindings.len());
     (facts, diags)
 }
 
@@ -357,6 +360,7 @@ impl Site<'_, '_> {
             return Some(depth);
         }
         let at = self.chain.iter().position(|&s| s == d.within)?;
+        assert!(at < depth, "a chain position");
         Some(depth - 1 - at)
     }
 }

@@ -35,10 +35,15 @@ pub(super) struct Tb {
     /// VACASK's own options, values as written, with their statement's
     /// first token.
     pub(super) vacask: Vec<(String, String, u32)>,
+    /// The circuit temperature (°C), the last given.
     pub(super) temp: Option<f64>,
+    /// The nominal temperature (°C), the last given.
     pub(super) tnom: Option<f64>,
+    /// `.ic` nodes and values, in read order.
     pub(super) ics: Vec<(String, Val)>,
+    /// `.nodeset` nodes and values, in read order.
     pub(super) nodesets: Vec<(String, Val)>,
+    /// The signals every save card names, as written.
     pub(super) saves: Vec<String>,
     /// The first save card's first token.
     pub(super) save_tok: Option<u32>,
@@ -244,8 +249,6 @@ impl W<'_, '_> {
 }
 
 impl W<'_, '_> {
-    /// Notes what the testbench holds that neither target writes: each
-    /// `.print`, Xyce's own options, ngspice's mode, the save list where the target saves
     /// A node in a signal position (`save`, `ic`, `nodeset`), its
     /// hierarchy kept: each instance on the path and the node escaped,
     /// joined by `.` (`[CMP]` p.886: `OpAmp1.comp`); Xyce's separator
@@ -261,7 +264,10 @@ impl W<'_, '_> {
             .join(".")
     }
 
-    /// every node.
+    /// Notes what the testbench holds that neither target writes: each
+    /// `.print`, Xyce's own options, ngspice's mode, a VACASK save of a
+    /// module's output variable, a list `.step`, the save list where the
+    /// target saves every node.
     pub(super) fn unwritten_outputs(&mut self, tb: &Tb) {
         for (outs, tok) in &tb.prints {
             self.ask(Construct::Print, *tok);

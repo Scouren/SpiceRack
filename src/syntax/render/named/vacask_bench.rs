@@ -117,6 +117,12 @@ impl W<'_, '_> {
         // kept control line runs where it stood among the analyses (an
         // `elaborate` picks the circuit the next ones run on): each is
         // written before the analysis that followed it in the source.
+        // `W::fold` records each kept line's place in read order.
+        assert!(
+            tb.extra.is_sorted_by_key(|e| e.1),
+            "kept lines in read order"
+        );
+        assert!(tb.extra.iter().all(|e| e.1 <= tb.analyses.len()));
         let mut extra = tb.extra.iter().copied().peekable();
         let swept: Vec<String> = tb
             .analyses
@@ -169,32 +175,13 @@ impl W<'_, '_> {
     }
 
     /// Analysis `idx`'s lines (`analysis <kind><idx+1> …`, a DC sweep's
-    /// `sweep` lines first); empty when it is refused.
+    /// `sweep` lines first); empty when it is refused. One arm per kind: a
+    /// new `Ana` kind is one arm here.
     fn vacask_analysis(&mut self, idx: usize, a: &Ana, tok: u32) -> Vec<String> {
-        let kind = match a {
-            Ana::Op => "op",
-            Ana::Dc(_) | Ana::DcAxes(_) => "dc",
-            Ana::Ac(_) => "ac",
-            Ana::Tran { .. } => "tran",
-            Ana::Noise { .. } => "noise",
-            Ana::Tf(..) => "tf",
-            Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) => {
-                self.refuse(Code::W0015, tok);
-                return vec![];
-            }
-            Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
-            Ana::Spectre { kind, .. } => {
-                self.refuse(
-                    crate::syntax::render::read::spectre_refusal(self.b, kind),
-                    tok,
-                );
-                return vec![];
-            }
-        };
-        let name = format!("{kind}{}", idx + 1);
+        let name = |kind: &str| format!("{kind}{}", idx + 1);
         let mut out = Vec::new();
         match a {
-            Ana::Op => out.push(format!("analysis {name} op")),
+            Ana::Op => out.push(format!("analysis {} op", name("op"))),
             Ana::Dc(sweeps) => {
                 if sweeps.is_empty() {
                     self.refuse(Code::W0015, tok);
@@ -213,7 +200,7 @@ impl W<'_, '_> {
                         }
                     }
                 }
-                out.push(format!("  analysis {name} op"));
+                out.push(format!("  analysis {} op", name("dc")));
             }
             // A log or list axis is its values (`DcSweep::values`), the
             // first axis innermost as for `Ana::Dc`.
@@ -241,10 +228,10 @@ impl W<'_, '_> {
                     };
                     out.push(line);
                 }
-                out.push(format!("  analysis {name} op"));
+                out.push(format!("  analysis {} op", name("dc")));
             }
             Ana::Ac(sw) => match freq_sweep(sw) {
-                Some(f) => out.push(format!("analysis {name} ac {f}")),
+                Some(f) => out.push(format!("analysis {} ac {f}", name("ac"))),
                 None => {
                     self.refuse(Code::W0015, tok);
                     return vec![];
@@ -266,7 +253,8 @@ impl W<'_, '_> {
                 let native = self.rd.b.named_rules == NamedRules::Vacask;
                 let tmax = max_step.or((!native).then(|| step.min(stop / 50.0)));
                 let mut s = format!(
-                    "analysis {name} tran step={} stop={}",
+                    "analysis {} tran step={} stop={}",
+                    name("tran"),
                     num(*step),
                     num(*stop)
                 );
@@ -293,22 +281,28 @@ impl W<'_, '_> {
                     return vec![];
                 }
                 out.push(format!(
-                    "analysis {name} noise out=\"{}\" in=\"{}\" {}",
+                    "analysis {} noise out=\"{}\" in=\"{}\" {}",
+                    name("noise"),
                     bare_node(output).to_ascii_lowercase(),
                     source.to_ascii_lowercase(),
                     f.expect("checked")
                 ));
             }
             Ana::Tf(output, _) => out.push(format!(
-                "analysis {name} dcxf out=\"{}\"",
+                "analysis {} dcxf out=\"{}\"",
+                name("tf"),
                 bare_node(output).to_ascii_lowercase()
             )),
-            Ana::Sens(..)
-            | Ana::Pz(..)
-            | Ana::Sp(..)
-            | Ana::Four(..)
-            | Ana::MonteCarlo { .. }
-            | Ana::Spectre { .. } => unreachable!("refused above"),
+            Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) => {
+                self.refuse(Code::W0015, tok);
+            }
+            Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
+            Ana::Spectre { kind, .. } => {
+                self.refuse(
+                    crate::syntax::render::read::spectre_refusal(self.b, kind),
+                    tok,
+                );
+            }
         }
         out
     }
