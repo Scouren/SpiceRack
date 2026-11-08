@@ -89,10 +89,23 @@ pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String> {
         return Err(format!("plots {:?} became {:?}", kinds(a), kinds(b)));
     }
     for k in ["op", "dc", "ac", "tran", "noise", "total"] {
-        let pa = a.iter().filter(|p| kind(p) == k);
-        let pb = b.iter().filter(|p| kind(p) == k);
-        for (x, y) in pa.zip(pb) {
-            plot(k, x, y, tol)?;
+        let pa: Vec<&RawData> = a.iter().filter(|p| kind(p) == k).collect();
+        let mut pb: Vec<&RawData> = b.iter().filter(|p| kind(p) == k).collect();
+        // Plots of one kind pair by their grid, then in order: ngspice
+        // prepends each analysis job (`cktnewan.c:34-35`), so three `.dc`
+        // cards run in reverse deck order.
+        for x in pa {
+            let near = |u: f64, v: f64| (u - v).abs() <= 1e-9 * u.abs().max(v.abs()).max(1e-30);
+            let same = |p: &RawData, q: &RawData| {
+                let (s, t) = (p.re(0), q.re(0));
+                s.len() == t.len()
+                    && s.first().zip(t.first()).is_some_and(|(&u, &v)| near(u, v))
+                    && s.last().zip(t.last()).is_some_and(|(&u, &v)| near(u, v))
+            };
+            let j = pb.iter().position(|y| same(x, y)).unwrap_or(0);
+            if j < pb.len() {
+                plot(k, x, pb.remove(j), tol)?;
+            }
         }
     }
     Ok(())
