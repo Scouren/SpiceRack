@@ -142,3 +142,24 @@ fn p1_018_ltspice_wine_pinned_into_testing() {
         .expect("V(out)");
     assert!((op.re(i)[0] - 1.0).abs() <= 1e-9, "{}", op.re(i)[0]);
 }
+
+#[cfg(feature = "backend")]
+#[test]
+fn p1_005_ltspice_backend_deck_path_under_wine() {
+    // The LTspice backend end to end in `nix develop .#testing-ltspice`: the
+    // 1k/1k divider of p1_018, closed form V(out) = 1 V. Under the CI
+    // marker LTspice is absent (p1_018 checks it), so there is no run.
+    if std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_some() {
+        return;
+    }
+    let deck = "* divider\nV1 in 0 2\nR1 in out 1k\nR2 out 0 1k\n.op\n.end\n";
+    let op = spicerack::syntax::Dialect::Ltspice
+        .run(deck)
+        .expect("LTspice runs: `nix develop .#testing-ltspice`");
+    let i = op
+        .variables
+        .iter()
+        .position(|v| v.name == "V(out)")
+        .expect("V(out)");
+    assert!((op.re(i)[0] - 1.0).abs() <= 1e-9, "{}", op.re(i)[0]);
+}

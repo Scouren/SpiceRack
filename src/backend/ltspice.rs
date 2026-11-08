@@ -9,7 +9,7 @@
 //! - `pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn find() -> Option<(PathBuf, bool)>`
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::{BackendError, exec, is_on_path, read_results, scratch};
@@ -31,17 +31,7 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
     let deck = format!("{title}\n.options plotwinsize=0\n.options numdgt=15\n{body}");
     let (_dir, cir) = scratch(&deck, "deck.cir")?;
 
-    // `-b` is the headless switch for a netlist; it writes deck.raw and
-    // deck.log beside the input.
-    let mut cmd = if wine {
-        let mut c = Command::new("wine");
-        // UNVERIFIED: `-wine` is the LTspice XVII switch for the Windows build under Wine.
-        c.arg(&exe).arg("-wine");
-        c
-    } else {
-        Command::new(&exe)
-    };
-    cmd.arg("-b").arg(&cir);
+    let mut cmd = command(&exe, wine, &cir);
     // LTspice reports simulation errors (and `.meas` results) in the log.
     let stdout = exec(&mut cmd, "LTspice", Some(&cir.with_extension("log")))?;
     let log = std::fs::read_to_string(cir.with_extension("log")).unwrap_or_default();
@@ -80,4 +70,52 @@ pub fn find() -> Option<(PathBuf, bool)> {
     .find(|p| p.exists())
     .filter(|_| is_on_path("wine"))
     .map(|p| (p, true))
+}
+
+// ---- private ----
+
+/// `exe -b cir`, under `wine` when `wine`. `-b` is the headless switch for
+/// a netlist; it writes deck.raw and deck.log beside the input.
+fn command(exe: &Path, wine: bool, cir: &Path) -> Command {
+    if wine {
+        let mut c = Command::new("wine");
+        // `-wine`: the LTspice XVII switch for the Windows build under Wine
+        // (26.1.1 accepts it).
+        // Wine's LTspice reads a Windows path: `/` is its `Z:` drive.
+        c.arg(exe)
+            .arg("-wine")
+            .arg("-b")
+            .arg(format!("Z:{}", cir.display()));
+        c
+    } else {
+        let mut c = Command::new(exe);
+        c.arg("-b").arg(cir);
+        c
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn p1_005_a_wine_run_names_the_deck_by_its_z_drive_path() {
+        // LTspice 26.1.1 under Wine given `-b /tmp/x/deck.cir` finds no deck
+        // ("No schematic nor netlist specified", a dialog: headless, the run
+        // never returns); given `Z:/tmp/x/deck.cir` it runs it.
+        let cir = Path::new("/tmp/x/deck.cir");
+        let args = |c: Command| -> Vec<String> {
+            c.get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(
+            args(command(Path::new("LTspice.exe"), true, cir)),
+            ["LTspice.exe", "-wine", "-b", "Z:/tmp/x/deck.cir"]
+        );
+        assert_eq!(
+            args(command(Path::new("ltspice"), false, cir)),
+            ["-b", "/tmp/x/deck.cir"]
+        );
+    }
 }
