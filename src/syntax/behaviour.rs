@@ -23,6 +23,17 @@
 use crate::syntax::Lang;
 
 /// A language's behaviours.
+///
+/// Adding a behaviour is these sites, each a line or a row: the field here
+/// and its value in [`Behaviours::DEFAULT`]; for a new enum, the enum
+/// below and its import in `def/mod.rs`; the definition call (a `set!` in
+/// `def/mod.rs`, or a method in `def/tables.rs` for a list) and the
+/// header's Contents; the Python binding's method list
+/// (`src/python/def_.rs`) and its mirror (`tests/builtin_dialects.py`);
+/// the `behaviours` line of the two `tests/fixtures/dialects/*.dump`
+/// fixtures (it is the struct's `Debug`); then the call in each
+/// `dialects/<name>.rs` that differs from the default, and the one code
+/// path that reads it (`Rd::b` in a reader, `W::b` in a writer).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Behaviours {
     /// The writer layout its decks are written in.
