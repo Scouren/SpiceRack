@@ -9,6 +9,7 @@
 //!
 //! Contents:
 //! - `fn spectre_refusal(target: &Behaviours, kind: &str) -> Code`, `fn vacask_refusal(rd: &Rd, target: &Behaviours, tok: u32) -> Option<Code>`
+//! - `fn nums(v: Vec<(String, f64)>) -> Vec<(String, Val)>`
 //! - `Rd::bench_cards(&self, b: Bench) -> Vec<BenchCard>`
 //! - `Rd::spectre_analysis(&self, n: u32) -> Option<Ana>`
 //! - `Rd::saves(&self, n: u32) -> Option<Vec<String>>`
@@ -67,6 +68,13 @@ pub(in crate::syntax::render) fn vacask_refusal(
         true => Code::W0001,
         false => Code::W0015,
     })
+}
+
+/// Numbered node values as [`BenchCard::NodeVals`] holds them.
+pub(super) fn nums(v: Vec<(String, f64)>) -> Vec<(String, super::Val)> {
+    v.into_iter()
+        .map(|(n, x)| (n, super::Val::Num(x)))
+        .collect()
 }
 
 impl<'a> Rd<'a> {
@@ -214,13 +222,6 @@ impl<'a> Rd<'a> {
 }
 
 // ---- private ----
-
-/// Numbered node values as [`BenchCard::NodeVals`] holds them.
-fn nums(v: Vec<(String, f64)>) -> Vec<(String, super::Val)> {
-    v.into_iter()
-        .map(|(n, x)| (n, super::Val::Num(x)))
-        .collect()
-}
 
 impl<'a> Rd<'a> {
     /// `name montecarlo numruns=N [seed=S] [variations=v] { inner kind }`

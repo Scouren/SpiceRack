@@ -637,7 +637,7 @@ impl<'a> Rd<'a> {
         let last = self.line_last(first);
         first < last
             && self.ttag(first + 1) == T::LParen
-            && self.paren_close(first + 1) == Some(last)
+            && self.close_of(first + 1, T::LParen, T::RParen) == Some(last)
     }
 
     /// Whether a card in a section would reach past it (the old lowering's
@@ -650,14 +650,17 @@ impl<'a> Rd<'a> {
         }
     }
 
-    /// The `)` matching the `(` at token `open`, on its statement.
-    fn paren_close(&self, open: u32) -> Option<u32> {
+    /// The closer matching the opener at token `open` (`T::LParen` and
+    /// `T::RParen`, `T::LBrace` and `T::RBrace`), on its statement.
+    fn close_of(&self, open: u32, opener: T, closer: T) -> Option<u32> {
+        assert_eq!(self.ttag(open), opener, "an opener at `open`");
         let last = self.line_last(open);
         let mut depth = 0i32;
+        // Bounded by the statement: one pass per token.
         for k in open..=last {
             match self.ttag(k) {
-                T::LParen => depth += 1,
-                T::RParen => {
+                t if t == opener => depth += 1,
+                t if t == closer => {
                     depth -= 1;
                     if depth == 0 {
                         return Some(k);

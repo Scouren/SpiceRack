@@ -18,7 +18,7 @@
 //! - `Rd::tran_startup(&self, bench: &[Bench]) -> Option<u32>`
 //! - `Rd::head_kind(&self, n: u32) -> String`
 //! - `Rd::numw(&self, k: u32) -> bool`
-//! - `Rd::wordw(&self, k: u32) -> bool`, `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
+//! - `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
 
 use super::options::Opt;
 use super::outputs::print_kind;
@@ -268,10 +268,6 @@ impl<'a> Rd<'a> {
         self.tag(k) == Tag::Word && self.number(k).is_some()
     }
 
-    pub(super) fn wordw(&self, k: u32) -> bool {
-        self.tag(k) == Tag::Word
-    }
-
     /// quirk: whether every item follows the one before it (or the head) after
     /// blanks only: the old grammars' `s` between fields.
     pub(super) fn spaced(&self, n: u32, items: &[u32]) -> bool {
@@ -330,7 +326,7 @@ impl<'a> Rd<'a> {
                 }
                 items
                     .chunks(2)
-                    .map(|p| (self.wordw(p[0]) && self.val_ok(p[1])).then_some((p[0], p[1])))
+                    .map(|p| (self.is_word(p[0]) && self.val_ok(p[1])).then_some((p[0], p[1])))
                     .collect::<Option<Vec<_>>>()
                     .map(Card::NodeVals)
             }
@@ -347,14 +343,14 @@ impl<'a> Rd<'a> {
                         && self.val_ok(v);
                     let inside = if ok { self.group_items(g) } else { &[] };
                     match inside {
-                        [node] if self.wordw(*node) => Some((*node, v)),
+                        [node] if self.is_word(*node) => Some((*node, v)),
                         _ => None,
                     }
                 })
                 .collect::<Option<Vec<_>>>()
                 .map(Card::NodeVals),
             Tag::Save if kind == "probe" => self.probe_outs(n).map(Card::Probe),
-            Tag::Save => self.outs_after(n, 0).map(Card::Save),
+            Tag::Save => self.outs_text(&self.rest_text(n)).map(Card::Save),
             Tag::Print => {
                 let rest = self.rest_text(n);
                 let (pk, after) = print_kind(&rest);
@@ -384,7 +380,7 @@ impl<'a> Rd<'a> {
                 {
                     let r = |k: u32| self.ast.rhs(Node(k));
                     let s = [*v, r(*a), r(*b), r(*c)];
-                    (self.wordw(s[0]) && s[1..].iter().all(|&k| self.number(k).is_some()))
+                    (self.is_word(s[0]) && s[1..].iter().all(|&k| self.number(k).is_some()))
                         .then(|| Card::Dc(vec![s]))
                 }
                 "dc" => {
@@ -396,13 +392,13 @@ impl<'a> Rd<'a> {
                         items.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect();
                     sweeps
                         .iter()
-                        .all(|s| self.wordw(s[0]) && s[1..].iter().all(|&k| self.numw(k)))
+                        .all(|s| self.is_word(s[0]) && s[1..].iter().all(|&k| self.numw(k)))
                         .then_some(Card::Dc(sweeps))
                 }
                 "ac" | "sp" => match items {
                     [v, a, b, c]
                         if self.spaced(n, items)
-                            && self.wordw(*v)
+                            && self.is_word(*v)
                             && [a, b, c].iter().all(|&&k| self.numw(k)) =>
                     {
                         Some(Card::Freq(kind == "sp", [*v, *a, *b, *c]))
@@ -425,7 +421,7 @@ impl<'a> Rd<'a> {
                 "pz" if hspice => self.hspice_pz(n),
                 "pz" => match items {
                     [a, b, c, d, e, f]
-                        if self.spaced(n, items) && items.iter().all(|&k| self.wordw(k)) =>
+                        if self.spaced(n, items) && items.iter().all(|&k| self.is_word(k)) =>
                     {
                         Some(Card::Pz([*a, *b, *c, *d, *e, *f]))
                     }
@@ -451,7 +447,7 @@ impl<'a> Rd<'a> {
         // LTspice's `startup` (LTspice help, `.TRAN`).
         let (mut body, mut uic, mut startup) = (items, false, false);
         while let Some((&u, rest)) = body.split_last()
-            && self.wordw(u)
+            && self.is_word(u)
         {
             let w = self.text(u).to_ascii_lowercase();
             match w.as_str() {
@@ -496,7 +492,7 @@ impl<'a> Rd<'a> {
             return None;
         }
         if start.is_some_and(|p| {
-            !self.wordw(self.ast.lhs(Node(p))) || !self.val_ok(self.ast.rhs(Node(p)))
+            !self.is_word(self.ast.lhs(Node(p))) || !self.val_ok(self.ast.rhs(Node(p)))
         }) {
             return None;
         }
@@ -517,7 +513,7 @@ impl<'a> Rd<'a> {
                 let items = self.fields(n);
                 let tail = &items[items.len().checked_sub(4)?..];
                 (tail.iter().skip(1).all(|&k| self.numw(k))
-                    && self.wordw(tail[0])
+                    && self.is_word(tail[0])
                     && words.len() == 5)
                     .then(|| Card::Sens(out, Some([tail[0], tail[1], tail[2], tail[3]])))
             }

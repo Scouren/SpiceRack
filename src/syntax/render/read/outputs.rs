@@ -9,7 +9,6 @@
 //! Contents:
 //! - `fn print_kind(rest: &str) -> (&str, &str)`
 //! - `Rd::rest_text(&self, n: u32) -> String`
-//! - `Rd::outs_after(&self, n: u32, skip: usize) -> Option<Vec<String>>`
 //! - `Rd::outs_text(&self, rest: &str) -> Option<Vec<String>>`
 //! - `Rd::one_out<'r>(&self, rest: &'r str) -> Option<(String, &'r str)>`
 //! - `Rd::probe_outs(&self, n: u32) -> Option<Vec<String>>`
@@ -79,12 +78,6 @@ impl<'a> Rd<'a> {
         }
         let s = self.span(first, last);
         s[self.t.text(first).len()..].to_string()
-    }
-
-    /// The outputs after the head and `skip` items: the old SPICE grammar's `osep* s?`.
-    pub(in crate::syntax::render) fn outs_after(&self, n: u32, skip: usize) -> Option<Vec<String>> {
-        debug_assert_eq!(skip, 0);
-        self.outs_text(&self.rest_text(n))
     }
 
     /// quirk: the old SPICE grammar's `osep* s?` over `rest`: outputs after
