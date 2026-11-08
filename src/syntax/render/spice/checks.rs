@@ -71,7 +71,7 @@ impl W<'_, '_> {
                 self.refuse(Code::W0045, *tok);
             }
         }
-        let caret = self.rd.b.caret_power != self.b.caret_power;
+        let caret = self.pair.caret_reread;
         let stat = self.cells[Construct::StatisticalCall as usize] != Action::Native;
         if !caret && !stat {
             return;
@@ -91,7 +91,7 @@ impl W<'_, '_> {
     /// statement holding it was left out (a drop note at its first token).
     /// Asked once the deck is written, when its drops are noted.
     pub(super) fn unparsed(&mut self) {
-        if self.rd.b.text_family == self.b.text_family {
+        if !self.pair.foreign_text {
             return;
         }
         let drops = [Code::W0021, Code::W0023, Code::W0024, Code::W0028];
@@ -160,7 +160,7 @@ impl<'r> W<'_, 'r> {
     /// refused, as ngspice reads its body by C's grammar in a B source
     /// and its own way in a `{}` value. A B source's is C's (no code).
     fn ternary_checks(&mut self, blocks: &[&Block]) {
-        if self.rd.b.expr_eval != ExprEval::Ngspice || self.b.expr_eval == ExprEval::Ngspice {
+        if !self.pair.ngspice_ternaries {
             return;
         }
         let deck = self.deck;

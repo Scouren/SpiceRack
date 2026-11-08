@@ -23,7 +23,6 @@
 use super::W;
 use super::xyce_models::{Shape, xyce_model, xyce_shape_of};
 use crate::syntax::ast::NONE;
-use crate::syntax::behaviour::{ModelSemantics, ParamForm};
 use crate::syntax::render::models::fold;
 use crate::syntax::render::read::file_models;
 
@@ -32,7 +31,7 @@ impl W<'_, '_> {
     /// dialect's bare parameter name (`w=w`, `r0=rg`) braced (`{w}`), which
     /// Xyce reads unbraced as a string.
     pub(super) fn param_value(&self, v: &str) -> String {
-        if self.xyce_from_other() && bare_name(v) {
+        if self.pair.xyce_from_other && bare_name(v) {
             return format!("{{{v}}}");
         }
         self.spelled(v)
@@ -43,8 +42,7 @@ impl W<'_, '_> {
     /// Xyce cannot compute the card (W0050, W0051); the [`Shape`] its card
     /// asks of the line ([`xyce_shape`]), [`Shape::Plain`] elsewhere.
     pub(super) fn xyce_instance(&mut self, n: u32, master: &str, tok: u32) -> Shape {
-        let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
-        if self.b.param_form != ParamForm::Xyce || !ngspice {
+        if !self.pair.xyce_from_ngspice {
             return Shape::Plain;
         }
         let Some(at) = self.rd.instance_model(n, master) else {
@@ -81,7 +79,7 @@ impl W<'_, '_> {
     /// written `TRIG|TARG <variable>=<value>` on Xyce, from another
     /// dialect; `line` itself elsewhere.
     pub(super) fn xyce_measure(&self, line: String) -> String {
-        if !self.xyce_from_other() {
+        if !self.pair.xyce_from_other {
             return line;
         }
         let words = words(&line);
@@ -155,14 +153,6 @@ pub(super) fn xyce_shape(
 }
 
 // ---- private ----
-
-impl W<'_, '_> {
-    /// The target writes Xyce's parameters (`ParamForm::Xyce`) and the
-    /// source's are another dialect's.
-    fn xyce_from_other(&self) -> bool {
-        self.b.param_form == ParamForm::Xyce && self.rd.b.param_form != ParamForm::Xyce
-    }
-}
 
 /// `v` is one name: a letter or `_`, then letters, digits and `_`.
 fn bare_name(v: &str) -> bool {

@@ -19,7 +19,7 @@
 //! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
 
 use super::W;
-use crate::syntax::behaviour::{AnalysisForm, ControlBlock, NetlistRules, OptionsForm, Writer};
+use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
@@ -215,8 +215,7 @@ impl W<'_, '_> {
         self.saves(&tb);
         self.prints(&tb.prints, &tb.analyses);
         for (m, &tok) in tb.measures.iter().zip(&tb.meas_toks) {
-            let ng = |r: NetlistRules| r == NetlistRules::Ngspice;
-            if !ng(self.rd.b.netlist_rules) && ng(self.b.netlist_rules) && !ngspice_measures(m) {
+            if self.pair.foreign_measures && !ngspice_measures(m) {
                 self.refuse(Code::W0048, tok);
                 continue;
             }

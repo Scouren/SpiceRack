@@ -36,6 +36,7 @@ mod initial;
 mod laplace;
 mod model_cards;
 mod ngspice_options;
+mod pair;
 pub(in crate::syntax::render) mod parasitics;
 mod prints;
 mod sweeps;
@@ -60,8 +61,7 @@ use super::role::{self, Frame};
 use super::spelling::{FuncForm, Spelling};
 use crate::syntax::Lang;
 use crate::syntax::behaviour::{
-    Behaviours, CardRules, EndRule, ExprEval, IncludeScope, LoadForm, NetlistRules, NumberReading,
-    ParamForm, Writer,
+    Behaviours, CardRules, EndRule, IncludeScope, LoadForm, NumberReading, ParamForm, Writer,
 };
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
@@ -78,6 +78,8 @@ struct W<'a, 'r> {
     details: &'static [u16; CONSTRUCT_COUNT],
     /// The target's behaviours.
     b: &'static Behaviours,
+    /// The rules between the source's behaviours and the target's.
+    pair: pair::Pair,
     /// The deck's numbers were read with ngspice's arithmetic.
     x: bool,
     o: Out,
@@ -137,6 +139,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         cells,
         details: &lang.row().details,
         b,
+        pair: pair::Pair::of(rd.b, b),
         // CDL's cards are the old layout's ngspice cards,
         // which spells numbers without ngspice's arithmetic.
         x: rd.b.numbers == NumberReading::Ngspice
@@ -158,11 +161,8 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     };
     // The testbench, folded once: every step below reads it.
     let tb = w.fold();
-    let (from, to) = (rd.b.netlist_rules, b.netlist_rules);
-    w.dcop_ic = from == NetlistRules::Xyce && to == NetlistRules::Ngspice && !tb.tran_uic();
-    w.nominal = matches!(rd.b.expr_eval, ExprEval::Hspice | ExprEval::Xyce)
-        && b.expr_eval == ExprEval::Ngspice
-        && !tb.monte_carlo();
+    w.dcop_ic = w.pair.device_ic_in_op && !tb.tran_uic();
+    w.nominal = w.pair.stat_nominal && !tb.monte_carlo();
     // Verilog evaluates nothing, so no deck-wide check refuses it.
     if b.writer == Writer::Verilog {
         w.verilog();
@@ -212,11 +212,7 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     }
     w.unparsed();
     let text = w.o.finish();
-    let text = match rd.b.netlist_rules == NetlistRules::Xyce
-        && matches!(
-            b.netlist_rules,
-            NetlistRules::Ngspice | NetlistRules::Hspice
-        ) {
+    let text = match w.pair.xyce_globals {
         true => globals::xyce_globals(&text),
         false => text,
     };
@@ -420,8 +416,7 @@ impl W<'_, '_> {
         // Xyce keeps a parameter's first definition, ngspice its last
         // (Xyce_Regression `ISSUE_202/first_last.cir`: R1 = 1 kΩ on Xyce,
         // 1 Ω on ngspice for the deck as read): only the first is written.
-        let xyce = |r: NetlistRules| r == NetlistRules::Xyce;
-        let first = xyce(self.rd.b.netlist_rules) && !xyce(self.b.netlist_rules);
+        let first = self.pair.first_param;
         let mut seen: Vec<String> = Vec::new();
         for &a in params {
             let (name, mut v) = self.rd.param_view(a);

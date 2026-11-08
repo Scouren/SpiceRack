@@ -12,7 +12,7 @@
 //! - `W::prints(&mut self, prints: &[(String, Vec<String>, u32)], analyses: &[(Ana, u32)])`
 
 use super::W;
-use crate::syntax::behaviour::{AnalysisForm, NetlistRules};
+use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::out::Space;
@@ -54,7 +54,7 @@ impl W<'_, '_> {
                 let mut kept: Vec<String> = Vec::with_capacity(outs.len());
                 let (mut format, mut gone) = (false, !runs);
                 // An ngspice deck's outputs are ngspice's own.
-                let own = self.rd.b.netlist_rules == NetlistRules::Ngspice;
+                let own = !self.pair.foreign_prints;
                 for o in outs {
                     match if own {
                         Out::Kept(o.clone())

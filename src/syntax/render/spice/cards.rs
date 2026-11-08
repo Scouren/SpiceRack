@@ -21,7 +21,7 @@ use super::laplace::{self, Laplace};
 use super::parasitics;
 use super::ternary::Read;
 use super::xyce_cards::xyce_shape;
-use crate::syntax::behaviour::{CardRules, Coupling, NetlistRules, Parasitics};
+use crate::syntax::behaviour::{Coupling, NetlistRules, Parasitics};
 use crate::syntax::diag::Code;
 use crate::syntax::lang::Cells;
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
@@ -75,8 +75,7 @@ impl W<'_, '_> {
                 }
                 // An LTspice C's or L's parasitics as elements where the
                 // target's C and L take none (`parasitics`).
-                let lt = self.rd.b.card_rules == CardRules::Ltspice;
-                let extra = match lt && self.b.parasitics == Parasitics::Elements {
+                let extra = match self.pair.lt_parasitics {
                     true if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
                     _ => None,
                 };
