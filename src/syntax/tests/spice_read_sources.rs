@@ -375,3 +375,37 @@ fn an_hspice_temperature_list_is_a_step_over_temp() {
         ng.messages
     );
 }
+
+#[test]
+fn p1_042_ngspice_source_pwl_r_that() {
+    // ngspice-45 on `V1 a 0 PWL(0 0 1u 1 2u 0) r=…`, `R1 a 0 1k`, `.tran
+    // 0.1u 5u`: `r=0.5u` stops it ("repeat start time value 5e-07 … does
+    // not match any time point given!"), so does `r=2u` ("… must be
+    // smaller than final time point given!") and an I source's `r=0.5u`;
+    // `r=1u`, `r=1e-6`, `r=0` and `r=-1` run. The rejected source is left
+    // out with P0011; the ones ngspice runs carry none. Checks: 2 per
+    // rejected line, 1 per legal one.
+    let deck = |l: &str| format!("t\n{l}\nR1 a 0 1k\n.tran 0.1u 5u\n.end\n");
+    for l in [
+        "V1 a 0 PWL(0 0 1u 1 2u 0) r=0.5u",
+        "V1 a 0 PWL(0 0 1u 1 2u 0) r=2u",
+        "I1 a 0 PWL(0 0 1u 1 2u 0) r=0.5u",
+    ] {
+        let w = render_text(&deck(l), Dialect::Ngspice, "t", Dialect::Ngspice).expect(l);
+        assert!(w.notes.diags.iter().any(|g| g.code == Code::P0011), "{l}");
+        assert!(!w.text.contains("PWL"), "{l}: {}", w.text);
+    }
+    for l in [
+        "V1 a 0 PWL(0 0 1u 1 2u 0) r=1u",
+        "V1 a 0 PWL(0 0 1u 1 2u 0) r=1e-6",
+        "V1 a 0 PWL(0 0 1u 1 2u 0) r=0",
+        "V1 a 0 PWL(0 0 1u 1 2u 0) r=-1",
+    ] {
+        let codes: Vec<Code> = match render_text(&deck(l), Dialect::Ngspice, "t", Dialect::Ngspice)
+        {
+            Ok(w) => w.notes.diags.iter().map(|g| g.code).collect(),
+            Err(e) => e.diags.iter().map(|g| g.code).collect(),
+        };
+        assert!(!codes.contains(&Code::P0011), "{l}: {codes:?}");
+    }
+}

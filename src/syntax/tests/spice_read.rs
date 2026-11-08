@@ -382,3 +382,70 @@ fn a_subcircuit_func_is_the_subcircuits_or_the_tops() {
         "{sp}"
     );
 }
+
+#[test]
+fn p1_022_lines_source_own_simulator_rejects() {
+    // Xyce 7.10 `-norun` on a deck holding each line alone (V9 a 0 1, R9
+    // a 0 1, `.tran 1n 1u`): each stops Xyce with the message beside it
+    // (the corpus decks: Xyce_Regression BUG_204, BUG_636, DC_excessArgs,
+    // AC_extractACData1, NOISE_extractNOISEData1, bad_fft_line1,
+    // bad_dot_four_line1, DeviceBlock_extractNodes_1, query.cir,
+    // DeviceBlock_extractMIDeviceData2, BUG_657, BUG_80, BUG_630). Each
+    // is left out with P0010 on every target, no W0001; the legal
+    // neighbour of each class (Xyce runs it) carries no P0010. Checks: 3
+    // per rejected line × 2 targets, 1 per neighbour × 2 targets.
+    let rejected = [
+        ".DC VIN 5 5",                       // .DC line not formatted correctly
+        ".DC V1 -8.0 -4.0 0.0 4.0",          // Extraneous values on .DC line
+        ".tran 1u",                          // .TRAN line has an unexpected number of fields
+        ".ac dec 5 100",                     // .AC line has an unexpected number of fields
+        ".noise v(4) v1 dec 5 100",          // .NOISE line has an unexpected number of fields
+        ".FFT",                              // .FFT line needs at least 2 arguments
+        ".FOUR",                             // .FOUR line needs at least 3 arguments
+        "R2 out_1",                          // Not enough fields on input line for device R2
+        "R4 4a 4 1 1K",                      // Unrecognized parameter 1K for device R4
+        "Llead1 node1 0 10 20",              // Unrecognized parameter 20 for device LLEAD1
+        "V1 1 0 PWL",                        // PWL device missing source parameters
+        "V3 3 0 PWL TD=1",                   // PWL device missing source parameters
+        "V2 10 0 PWL ...",                   // Could not parse time/value pairs for PWL
+        "V1 1 0 PWL (0.0 0.0 1.0 1.0) R=-1", // PWL source repeat value (R) must be >= 0 and < last value
+        "V1 1 0 PWL (0.0 0.0 1.0) R=0",      // the same: (0,0) is the last whole pair
+    ];
+    let legal = [
+        ".DC V9 0 5 1 V8 0 1 0.5",
+        ".tran 1n 2u",
+        ".ac dec 5 1 100",
+        ".noise v(a) V9 dec 5 100 1k",
+        ".FFT v(a)",
+        ".FOUR 1k v(a)",
+        "R1 1 0 1k",
+        "C1 1 0 1p IC=1",
+        "V1 1 0 PWL 0 0 1u 1",
+        // Names Xyce reads with `#`, `+`, `[` in them (Xyce_Regression
+        // INVALID_CHARS/valid_chars_*.cir, CircuitSim90/MOS3/rich3.cir).
+        "rs#1 1 0 100k",
+        "R+ 1 2 100K",
+        ".DC v1[ 1 1 1",
+        // A continuation after a comment line (Xyce_Regression BUG_250).
+        "M1 a 0 0 0 NM\n;c\n+ L=1E-4 W=1000\n.model NM NMOS",
+    ];
+    let deck = |l: &str| {
+        format!("t\nV9 a 0 1\nV8 b 0 1\nR9 a 0 1\n{l}\n.tran 1n 1u\n.print tran v(a)\n.end\n")
+    };
+    for d in [Dialect::Ngspice, Dialect::Xyce] {
+        for l in rejected {
+            let w = render_text(&deck(l), Dialect::Xyce, "t", d).expect(l);
+            let codes: Vec<Code> = w.notes.diags.iter().map(|g| g.code).collect();
+            assert!(codes.contains(&Code::P0010), "{d:?} {l}: {codes:?}");
+            assert!(!codes.contains(&Code::W0001), "{d:?} {l}: {codes:?}");
+            assert!(!w.text.lines().any(|x| x == l), "{d:?} {l}: {}", w.text);
+        }
+        for l in legal {
+            let codes: Vec<Code> = match render_text(&deck(l), Dialect::Xyce, "t", d) {
+                Ok(w) => w.notes.diags.iter().map(|g| g.code).collect(),
+                Err(e) => e.diags.iter().map(|g| g.code).collect(),
+            };
+            assert!(!codes.contains(&Code::P0010), "{d:?} {l}: {codes:?}");
+        }
+    }
+}
