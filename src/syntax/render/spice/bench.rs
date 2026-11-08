@@ -157,10 +157,11 @@ impl W<'_, '_> {
         tb
     }
 
-    /// The testbench's cards, from `tb` ([`W::fold`]'s).
+    /// The testbench's cards, from `tb` ([`W::fold`]'s): the testbench
+    /// spine, one step a line.
     pub(super) fn bench(&mut self, mut tb: Tb, control: Option<&[String]>) {
         self.respell_refs(&mut tb);
-        let runs = !tb.analyses.is_empty();
+        let runs = tb.runs();
         self.hspice_defaults(&mut tb, runs);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
@@ -168,13 +169,51 @@ impl W<'_, '_> {
         for &tok in &tb.unsaved {
             self.note(Code::W0023, tok);
         }
+        self.options_cards(&tb);
+        self.node_values(&tb);
+        self.saves(&tb);
+        self.prints(&tb.prints, &tb.analyses);
+        self.measures(&tb);
+        self.steps(&tb);
+        self.step_lists(&tb);
+        self.vacask_lines(&tb.extra);
+        self.run_analyses(&tb, control);
+    }
+
+    /// VACASK control statements the reader kept as text: a script line
+    /// (`abort`, `print`, `postprocess`: `Rd::vacask_script`) left out
+    /// (W0120), any other (`alter`, `var`, `clear`, `elaborate`, an
+    /// analysis kept as text) changes what runs and is refused as VACASK's
+    /// text; CDL writes neither (W0028).
+    pub(super) fn vacask_lines(&mut self, lines: &[u32]) {
+        for &n in lines {
+            let tok = self.rd.main(n);
+            match self.b.writer {
+                Writer::Cdl => self.note(Code::W0028, tok),
+                _ => match crate::syntax::render::read::vacask_refusal(self.rd, self.b, tok) {
+                    Some(c) => self.refuse(c, tok),
+                    None => {
+                        self.ask(self.rd.kept_construct(tok), tok);
+                    }
+                },
+            }
+        }
+    }
+}
+
+// ---- private ----
+
+impl W<'_, '_> {
+    /// The options card(s) (Xyce's per package, `xyce_options`; the others'
+    /// one `.options`, `ngspice_options`), then `.temp` and `.options tnom`.
+    fn options_cards(&mut self, tb: &Tb) {
         if self.b.options_form == OptionsForm::XycePackages {
-            self.xyce_drops(&tb);
-            for l in self.xyce_options(&tb) {
+            self.xyce_drops(tb);
+            for l in self.xyce_options(tb) {
                 self.o.token(&l, Space::Line);
             }
         } else {
-            if let Some(line) = self.options_line(&tb) {
+            if let Some(line) = self.options_line(tb) {
                 self.o.token(&line, Space::Line);
             }
             // A temperature list sets the temperature of every run (Xyce
@@ -193,6 +232,11 @@ impl W<'_, '_> {
                 self.o.token(&format!(".options tnom={t}"), Space::Line);
             }
         }
+    }
+
+    /// The `.ic` and `.nodeset` cards, then the `.ic` a device `IC=` became
+    /// (`initial`) where the deck sets none for its node.
+    fn node_values(&mut self, tb: &Tb) {
         for (card, vals) in [(".ic", &tb.ics), (".nodeset", &tb.nodesets)] {
             for (n, v) in vals {
                 let v = match v {
@@ -212,8 +256,11 @@ impl W<'_, '_> {
                 self.o.token(&format!(".ic V({n})={v}"), Space::Line);
             }
         }
-        self.saves(&tb);
-        self.prints(&tb.prints, &tb.analyses);
+    }
+
+    /// The `.meas` cards; another dialect's measure ngspice-45 cannot read
+    /// refused (W0048).
+    fn measures(&mut self, tb: &Tb) {
         for (m, &tok) in tb.measures.iter().zip(&tb.meas_toks) {
             if self.pair.foreign_measures && !ngspice_measures(m) {
                 self.refuse(Code::W0048, tok);
@@ -225,6 +272,11 @@ impl W<'_, '_> {
             let line = self.xyce_measure(line);
             self.o.token(&line, Space::Line);
         }
+    }
+
+    /// The `.step` sweeps (Xyce's `.step <param>`, the others' `.step
+    /// param`); Spectre's total-count `log` refused (W0016).
+    fn steps(&mut self, tb: &Tb) {
         for (sweep, param, [a, b, c], tok) in &tb.steps {
             if self.ask(Construct::Step, *tok) != Action::Native {
                 continue;
@@ -243,6 +295,10 @@ impl W<'_, '_> {
             };
             self.o.token(&line, Space::Line);
         }
+    }
+
+    /// The list `.step`s; HSPICE's temperature list as `.temp t1 t2 …`.
+    fn step_lists(&mut self, tb: &Tb) {
         for (param, values, tok) in &tb.step_lists {
             let act = self.ask(Construct::StepList, *tok);
             let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
@@ -271,7 +327,11 @@ impl W<'_, '_> {
                 Space::Line,
             );
         }
-        self.vacask_lines(&tb.extra);
+    }
+
+    /// The analyses: from one `.control` block with `control`'s `fourier`
+    /// commands ([`W::control_run`]), else one card each.
+    fn run_analyses(&mut self, tb: &Tb, control: Option<&[String]>) {
         match control {
             Some(fourier) => {
                 // `fourier` reads the current plot: it follows the first
@@ -304,31 +364,6 @@ impl W<'_, '_> {
             }
         }
     }
-
-    /// VACASK control statements the reader kept as text: a script line
-    /// (`abort`, `print`, `postprocess`: `Rd::vacask_script`) left out
-    /// (W0120), any other (`alter`, `var`, `clear`, `elaborate`, an
-    /// analysis kept as text) changes what runs and is refused as VACASK's
-    /// text; CDL writes neither (W0028).
-    pub(super) fn vacask_lines(&mut self, lines: &[u32]) {
-        for &n in lines {
-            let tok = self.rd.main(n);
-            match self.b.writer {
-                Writer::Cdl => self.note(Code::W0028, tok),
-                _ => match crate::syntax::render::read::vacask_refusal(self.rd, self.b, tok) {
-                    Some(c) => self.refuse(c, tok),
-                    None => {
-                        self.ask(self.rd.kept_construct(tok), tok);
-                    }
-                },
-            }
-        }
-    }
-}
-
-// ---- private ----
-
-impl W<'_, '_> {
     /// `tb`'s outputs (saves, prints, measures) with each
     /// `i(name)` of a renamed element spelled as its declaration
     /// (`names::Names::refs`); the testbench is the top's.
