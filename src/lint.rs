@@ -93,10 +93,12 @@ const BACKEND_CARDS: &[BackendCard] = &[
     ),
 ];
 
-/// Lint a SPICE netlist; `backend` adds that simulator's card checks.
 /// The SPICE statistical functions (ngspice manual §2.11.5).
 const STATISTICAL: [&str; 5] = ["agauss", "gauss", "aunif", "unif", "limit"];
 
+/// Lints a SPICE netlist; `backend` adds that simulator's card checks
+/// ([`BACKEND_CARDS`]). Each check is one function below, run in this
+/// order: a new check is a function and a line here.
 pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
     let rows: Vec<Row> = netlist
         .lines()
@@ -110,51 +112,47 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             }
         })
         .collect();
-    let elems = || rows.iter().filter(|r| r.is_elem());
     let mut out = LintResult::default();
-    let err = |out: &mut LintResult, line, message| {
-        out.errors.push(Finding {
-            line,
-            message,
-            suggestion: None,
-            backends: &[],
-        })
-    };
-    let warn = |out: &mut LintResult, line, message, suggestion: String, backends| {
-        out.warnings.push(Finding {
-            line,
-            message,
-            suggestion: Some(suggestion),
-            backends,
-        })
-    };
+    end_card(&rows, &mut out);
+    ground_node(&rows, &mut out);
+    duplicate_names(&rows, &mut out);
+    floating_nodes(&rows, &mut out);
+    zero_values(&rows, &mut out);
+    undefined_models(&rows, &mut out);
+    undefined_params(&rows, &mut out);
+    random_params_read_twice(&rows, &mut out);
+    backend_cards(&rows, backend, &mut out);
+    out
+}
 
+// ---- private ----
+
+/// An error when no line is `.end`.
+fn end_card(rows: &[Row], out: &mut LintResult) {
     if !rows.iter().any(|r| r.text.eq_ignore_ascii_case(".end")) {
-        err(
-            &mut out,
-            rows.len(),
-            "Netlist does not end with .end".into(),
-        );
+        err(out, rows.len(), "Netlist does not end with .end".into());
     }
+}
 
+/// An error when no element line names node `0` or `gnd`.
+fn ground_node(rows: &[Row], out: &mut LintResult) {
     // Ground may sit on a `+` continuation line too.
     let ground = rows
         .iter()
         .filter(|r| !r.text.is_empty() && !r.text.starts_with(['*', '.']))
         .any(|r| r.toks.iter().any(|t| is_ground(t)));
     if !ground {
-        err(
-            &mut out,
-            0,
-            "No ground node (0 or gnd) found in netlist".into(),
-        );
+        err(out, 0, "No ground node (0 or gnd) found in netlist".into());
     }
+}
 
+/// An error per element named (any case) as an earlier one.
+fn duplicate_names(rows: &[Row], out: &mut LintResult) {
     let mut seen: HashMap<String, usize> = HashMap::new();
-    for r in elems().filter(|r| r.text.starts_with(|c: char| c.is_ascii_alphabetic())) {
+    for r in elems(rows).filter(|r| r.text.starts_with(|c: char| c.is_ascii_alphabetic())) {
         match seen.get(&r.toks[0].to_lowercase()) {
             Some(prev) => err(
-                &mut out,
+                out,
                 r.no,
                 format!(
                     "Duplicate element name '{}' (first defined on line {})",
@@ -166,11 +164,14 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             }
         }
     }
+}
 
+/// A warning per node only one element terminal reaches.
+fn floating_nodes(rows: &[Row], out: &mut LintResult) {
     // Floating nodes: (node, first line, terminal count) in first-seen order.
     let mut nodes: Vec<(String, usize, usize)> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
-    for r in elems() {
+    for r in elems(rows) {
         let t = &r.toks;
         let n = match r.kind() {
             'R' | 'C' | 'L' | 'V' | 'I' | 'D' | 'F' | 'H' | 'B' | 'W' => 2,
@@ -209,25 +210,28 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             node
         );
         warn(
-            &mut out,
+            out,
             line,
             msg,
             "Add another connection or remove the node".into(),
             &[],
         );
     }
+}
 
-    for r in elems().filter(|r| r.toks.get(3).is_some_and(|v| is_zero_value(v))) {
+/// A warning per R or C whose value is 0.
+fn zero_values(rows: &[Row], out: &mut LintResult) {
+    for r in elems(rows).filter(|r| r.toks.get(3).is_some_and(|v| is_zero_value(v))) {
         match r.kind() {
             'R' => warn(
-                &mut out,
+                out,
                 r.no,
                 format!("Resistor '{}' has zero resistance", r.toks[0]),
                 "Use a small value (e.g., 1m) or a voltage source instead".into(),
                 &["ngspice", "ltspice"],
             ),
             'C' => warn(
-                &mut out,
+                out,
                 r.no,
                 format!("Capacitor '{}' has zero capacitance", r.toks[0]),
                 "Remove the capacitor or use a small value".into(),
@@ -236,7 +240,11 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             _ => {}
         }
     }
+}
 
+/// A warning per D/Q/J/Z/M model that no `.model` here defines (none
+/// when a `.include` or `.lib` may define it).
+fn undefined_models(rows: &[Row], out: &mut LintResult) {
     // Model references; any .include/.lib may define them, so skip then.
     if !rows.iter().any(|r| r.card(".INCLUDE") || r.card(".LIB")) {
         let models: HashSet<String> = rows
@@ -245,7 +253,7 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             .filter_map(|r| r.toks.get(1))
             .map(|m| m.to_lowercase())
             .collect();
-        for r in elems() {
+        for r in elems(rows) {
             let pos = match r.kind() {
                 'D' => 3,
                 'Q' | 'J' | 'Z' => 4,
@@ -260,7 +268,7 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
                     r.toks[0], m
                 );
                 warn(
-                    &mut out,
+                    out,
                     r.no,
                     msg,
                     "Add a .model definition or .include the model file".into(),
@@ -269,7 +277,10 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             }
         }
     }
+}
 
+/// A warning per `{name}` with no `.param name=`.
+fn undefined_params(rows: &[Row], out: &mut LintResult) {
     // `{name}` with no `.param name=...`; expressions are not checked.
     let params: HashSet<String> = rows
         .iter()
@@ -290,7 +301,7 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             {
                 let msg = format!("Parameter '{{{}}}' used but not defined with .param", expr);
                 warn(
-                    &mut out,
+                    out,
                     r.no,
                     msg,
                     format!("Add: .param {} = <value>", expr),
@@ -300,7 +311,10 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             rest = &rest[s + e + 1..];
         }
     }
+}
 
+/// A warning per random `.param` read more than once.
+fn random_params_read_twice(rows: &[Row], out: &mut LintResult) {
     // A one-layer random `.param` read more than once: ngspice, HSPICE and
     // Xyce draw each read anew, Spectre and VACASK once per scope
     // (ngspice `inpcom.c` `inp_fix_agauss_in_param`; Spectre Reference 19.1
@@ -330,7 +344,7 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             - 1;
         if reads > 1 {
             warn(
-                &mut out,
+                out,
                 line,
                 format!(
                     "random .param '{name}' is read {reads} times: ngspice, HSPICE and Xyce draw each read anew, Spectre and VACASK once"
@@ -342,32 +356,61 @@ pub fn lint_netlist(netlist: &str, backend: Option<&str>) -> LintResult {
             );
         }
     }
+}
 
+/// The [`BACKEND_CARDS`] rows of `backend`'s family that a line matches.
+fn backend_cards(rows: &[Row], backend: Option<&str>, out: &mut LintResult) {
     // An alias (`ngspice-shared`) checks as the dialect it names.
     let family = backend.map_or("", |b| {
         crate::syntax::Dialect::from_backend_name(b).map_or(b, |d| d.name())
     });
-    for r in &rows {
+    for r in rows {
         for (fam, _, msg, sugg) in BACKEND_CARDS
             .iter()
             .filter(|c| c.0 == family && r.card(c.1))
         {
             match sugg {
                 Some(s) => warn(
-                    &mut out,
+                    out,
                     r.no,
                     msg.to_string(),
                     s.to_string(),
                     std::slice::from_ref(fam),
                 ),
-                None => err(&mut out, r.no, msg.to_string()),
+                None => err(out, r.no, msg.to_string()),
             }
         }
     }
-    out
 }
 
-// ---- private ----
+/// The element cards among `rows`.
+fn elems<'r, 'a>(rows: &'r [Row<'a>]) -> impl Iterator<Item = &'r Row<'a>> {
+    rows.iter().filter(|r| r.is_elem())
+}
+
+fn err(out: &mut LintResult, line: usize, message: String) {
+    out.errors.push(Finding {
+        line,
+        message,
+        suggestion: None,
+        backends: &[],
+    })
+}
+
+fn warn(
+    out: &mut LintResult,
+    line: usize,
+    message: String,
+    suggestion: String,
+    backends: &'static [&'static str],
+) {
+    out.warnings.push(Finding {
+        line,
+        message,
+        suggestion: Some(suggestion),
+        backends,
+    })
+}
 
 /// Whether `e` calls one of [`STATISTICAL`] (a three-argument `limit`,
 /// Xyce's clamp, is not one).
@@ -473,5 +516,69 @@ mod tests {
         assert!(!has_statistical("limit(x, 0, f(1, 2))"), "Xyce's clamp");
         assert!(!has_statistical("myagauss(1) + gauss_x + v.gauss(1)"));
         assert!(!has_statistical("unif"), "a name, no call");
+    }
+}
+
+/// Characterization of `lint_netlist`'s whole output (every check's
+/// findings, in order), recorded from the single-function version before
+/// the spine split (376d565): the split must give the same bytes.
+#[cfg(test)]
+mod characterization {
+    use super::lint_netlist;
+
+    const DECK: &str = "* every check
+R1 a b 0
+R1 c 0 1k
+C1 a n1 0
+D1 a b dmissing
+Q1 c b e qmissing
+M1 d g s b nmissing
+X1 a b sub
+V1 in 0 {vdd}
+.param r=agauss(1, 0.1, 3)
+R2 a 0 {r}
+R3 b 0 {r}
+.meas tran t1 max v(a)
+.pz v(a) 0 v(in) 0 vol pz
+.disto dec 10 1k 1meg
+.sens v(a)
+.control
+.endc
+";
+
+    /// No ground node: the one check `DECK` does not reach.
+    const FLOATING: &str = "* no ground
+R1 a b 1k
+.end
+";
+
+    fn dump(deck: &str, backend: Option<&str>) -> String {
+        let r = lint_netlist(deck, backend);
+        let mut s = String::new();
+        for f in r.errors.iter().chain(&r.warnings) {
+            s += &format!(
+                "{}|{}|{:?}|{:?}\n",
+                f.line, f.message, f.suggestion, f.backends
+            );
+        }
+        s
+    }
+
+    #[test]
+    fn the_whole_output_is_pinned() {
+        let got: Vec<String> = [
+            None,
+            Some("ngspice"),
+            Some("ltspice"),
+            Some("spectre"),
+            Some("vacask-shared"),
+        ]
+        .iter()
+        .map(|b| dump(DECK, *b))
+        .chain([dump(FLOATING, None)])
+        .collect();
+        let got = got.join("====\n");
+        let want = include_str!("../tests/fixtures/lint/whole_output.txt");
+        assert_eq!(got, want);
     }
 }

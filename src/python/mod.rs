@@ -58,7 +58,7 @@ mod unit;
 mod verilog;
 
 use circuit::PyCircuit;
-use results::*;
+use results::PyRawData;
 use simulator::PySimulator;
 use subcircuit::PySubcircuit;
 use testbench::{PyModelLibrary, PyTestbench};
@@ -70,23 +70,7 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyUnit>()?;
     m.add_class::<PyUnitValue>()?;
     m.add_class::<PySimulator>()?;
-    m.add_class::<PyOperatingPoint>()?;
-    m.add_class::<PyDcAnalysis>()?;
-    m.add_class::<PyAcAnalysis>()?;
-    m.add_class::<PyTransientAnalysis>()?;
-    m.add_class::<PyNoiseAnalysis>()?;
-    m.add_class::<PyTransferFunctionAnalysis>()?;
-    m.add_class::<PySensitivityAnalysis>()?;
-    m.add_class::<PyPoleZeroAnalysis>()?;
-    m.add_class::<PyDistortionAnalysis>()?;
-    // New analysis types
-    m.add_class::<PyPssAnalysis>()?;
-    m.add_class::<PySParamAnalysis>()?;
-    m.add_class::<PyHarmonicBalanceAnalysis>()?;
-    m.add_class::<PyStabilityAnalysis>()?;
-    m.add_class::<PyTransientNoiseAnalysis>()?;
-    // Spectre raw data type
-    m.add_class::<PyRawData>()?;
+    results::add_classes(m)?;
 
     // IR types
     m.add_class::<PySubcircuit>()?;

@@ -10,6 +10,7 @@
 //!   `PyDistortionAnalysis`, `PyPssAnalysis`, `PySParamAnalysis`,
 //!   `PyHarmonicBalanceAnalysis`, `PyStabilityAnalysis`, `PyTransientNoiseAnalysis`:
 //!   `pub(super) struct`s from `analysis_class!`
+//! - `pub(super) fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()>`
 //! - `pub(super) fn typed_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py<PyAny>>`
 
 use std::collections::HashMap;
@@ -85,23 +86,37 @@ macro_rules! analysis_class {
     };
 }
 
-analysis_class!(PyDcAnalysis, "DcAnalysis", sweep);
-analysis_class!(PyAcAnalysis, "AcAnalysis", frequency);
-analysis_class!(PyTransientAnalysis, "TransientAnalysis", time);
-analysis_class!(PyNoiseAnalysis, "NoiseAnalysis", frequency);
-analysis_class!(PyTransferFunctionAnalysis, "TransferFunctionAnalysis");
-analysis_class!(PySensitivityAnalysis, "SensitivityAnalysis");
-analysis_class!(PyPoleZeroAnalysis, "PoleZeroAnalysis");
-analysis_class!(PyDistortionAnalysis, "DistortionAnalysis", frequency);
-analysis_class!(PyPssAnalysis, "PssAnalysis", time);
-analysis_class!(PySParamAnalysis, "SParamAnalysis", frequency);
-analysis_class!(
-    PyHarmonicBalanceAnalysis,
-    "HarmonicBalanceAnalysis",
-    frequency
-);
-analysis_class!(PyStabilityAnalysis, "StabilityAnalysis", frequency);
-analysis_class!(PyTransientNoiseAnalysis, "TransientNoiseAnalysis", time);
+/// The analysis classes and [`add_classes`], which registers them: a new
+/// result class is one row here.
+macro_rules! analysis_classes {
+    ($(($ty:ident, $name:literal $(, $axis:ident)?)),* $(,)?) => {
+        $(analysis_class!($ty, $name $(, $axis)?);)*
+
+        /// Adds `OperatingPoint`, every analysis class and `RawData` to
+        /// the `_native` module.
+        pub(super) fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()> {
+            m.add_class::<PyOperatingPoint>()?;
+            $(m.add_class::<$ty>()?;)*
+            m.add_class::<PyRawData>()
+        }
+    };
+}
+
+analysis_classes! {
+    (PyDcAnalysis, "DcAnalysis", sweep),
+    (PyAcAnalysis, "AcAnalysis", frequency),
+    (PyTransientAnalysis, "TransientAnalysis", time),
+    (PyNoiseAnalysis, "NoiseAnalysis", frequency),
+    (PyTransferFunctionAnalysis, "TransferFunctionAnalysis"),
+    (PySensitivityAnalysis, "SensitivityAnalysis"),
+    (PyPoleZeroAnalysis, "PoleZeroAnalysis"),
+    (PyDistortionAnalysis, "DistortionAnalysis", frequency),
+    (PyPssAnalysis, "PssAnalysis", time),
+    (PySParamAnalysis, "SParamAnalysis", frequency),
+    (PyHarmonicBalanceAnalysis, "HarmonicBalanceAnalysis", frequency),
+    (PyStabilityAnalysis, "StabilityAnalysis", frequency),
+    (PyTransientNoiseAnalysis, "TransientNoiseAnalysis", time),
+}
 
 /// `raw` as the result class `a`'s single-analysis method returns; `None`
 /// (a Fourier's missing plot) as Python's `None`.
