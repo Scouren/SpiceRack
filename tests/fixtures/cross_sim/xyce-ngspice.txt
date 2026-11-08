@@ -219,7 +219,7 @@ Certification_Tests/BUG_1775/HBT_IV.cir target-fails # no raw file .cross_sim_ou
 Certification_Tests/BUG_1788/inv_tr_lev10.cir mismatch # tran VGATE#branch: -0.0046792939269548845 leaves the tube at t=0.00000000014737412497226637 (tol 4.679e-5)
 Certification_Tests/BUG_1788/inv_tr_lev57.cir mismatch # tran OUT: 1.6413745689387673 leaves the tube at t=0.00000000011378457333220437 (tol 1.658e-2)
 Certification_Tests/BUG_1797/one-shot_lev49.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
-Certification_Tests/BUG_1797/one-shot_lev9.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
+Certification_Tests/BUG_1797/one-shot_lev9.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
 Certification_Tests/BUG_1807/vbic_pnp_default.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: q 5 3 7 pbjt | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/BUG_1822/FBH_HBT.cir target-fails # no raw file .cross_sim_out.raw: Error on line 6 or its substitute:: qnpn_1 n_1 n_2 0 0 fbh_def | Simulation interrupted due to error! | Error: circuit not parse
 Certification_Tests/BUG_1826/linear_simple_global.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [table]
@@ -266,7 +266,7 @@ Certification_Tests/BUG_372/invert_b3soi-sim.cir mismatch # tran VDDDEV#branch: 
 Certification_Tests/BUG_372/invert_b3soi.cir mismatch # tran VDDDEV#branch: -0.008982119461212435 leaves the tube at t=0.0000015043852195581176 (tol 9.575e-5)
 Certification_Tests/BUG_37_SON/bug_37_son.cir target-fails # no raw file .cross_sim_out.raw: Error on line 44 or its substitute:: k9 l1 lp9 0.8 | Simulation interrupted due to error! | Error: circuit not parsed.
 Certification_Tests/BUG_381/comparator0_5_-10.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 0.1354137776473135 leaves the tube at t=0.000000000017786686355350404 (tol 5.034e-3)
-Certification_Tests/BUG_381/comparator0_5_0.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): 0.14175438686072037 leaves the tube at t=0.000000000016330912100434208 (tol 5.208e-3)
+Certification_Tests/BUG_381/comparator0_5_0.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 0.14175438686072037 leaves the tube at t=0.000000000016330912100434208 (tol 5.208e-3)
 Certification_Tests/BUG_381/comparator0_5_10.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 0.1493115292158213 leaves the tube at t=0.000000000016493464883361604 (tol 5.387e-3)
 Certification_Tests/BUG_381/comparator0_6_-10.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(2): 5.831040160781004 leaves the tube at t=0.00000000006182650967314539 (tol 5.917e-2)
 Certification_Tests/BUG_381/comparator0_6_0.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.46599143975887714 leaves the tube at t=0.0000000002751622867016052 (tol 5.209e-3)
@@ -274,7 +274,7 @@ Certification_Tests/BUG_381/comparator0_6_10.cir simulator-differs:refinement re
 Certification_Tests/BUG_381/comparator0_7_-10.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.44981424229011824 leaves the tube at t=0.0000000003004043076072029 (tol 5.032e-3)
 Certification_Tests/BUG_381/comparator0_7_0.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(2): 6.729406007857248 leaves the tube at t=0.00000000006258411867156304 (tol 6.773e-2)
 Certification_Tests/BUG_381/comparator0_7_10.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.4844861862075827 leaves the tube at t=0.00000000031774842460976786 (tol 5.389e-3)
-Certification_Tests/BUG_381/comparator1.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): 0.395176956785531 leaves the tube at t=0.00000000003150000000000001 (tol 1.027e-2)
+Certification_Tests/BUG_381/comparator1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 0.395176956785531 leaves the tube at t=0.00000000003150000000000001 (tol 1.027e-2)
 Certification_Tests/BUG_39_SON/bug39_sign.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [sign] | Formula() error. | Undefined parameter [res]
 Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir mismatch # dc VIN#branch: -0.005851007426488897+0i vs -0.0038310272757229313+0i at 0.76 (tol 1.502e-3)
 Certification_Tests/BUG_440_SON/bug440.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [id] | Undefined parameter [ig] | Undefined parameter [is] | Undefined parameter [ib]
@@ -337,7 +337,6 @@ Certification_Tests/BUG_966_SON/tran-homotopy-multifile.cir simulator-differs:th
 Certification_Tests/BUG_966_SON/tran-homotopy-nooverwrite.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Certification_Tests/BUG_966_SON/tran-homotopy.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Certification_Tests/BUG_966_SON/tran-nohomotopy.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-Certification_Tests/BUG_967/bug_967.cir mismatch # tran V(2): 0.000002110368287533369 leaves the tube at t=0.44526077756403837 (tol 2.056e-6)
 Certification_Tests/BUG_981_SON/bug981A.cir mismatch # tran V(1): 5.160602794142788 leaves the tube at t=0.001 (tol 6.967e-2)
 Certification_Tests/BUG_981_SON/bug981B.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_983_SON/jfet.cir mismatch # tran VDS1#branch: 338.9491718773294 leaves the tube at t=0.0000000010000006103515626 (tol 3.741e0)
@@ -457,7 +456,7 @@ IC_AND_NODESET/bjt_baseline4.cir mismatch # tran XN17:VB3: 0.0000000143366800831
 IC_AND_NODESET/bjt_baseline5.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 IC_AND_NODESET/ic_bjt.cir mismatch # tran VIN1#branch: -0.005036889565960961 leaves the tube at t=0 (tol 5.526e-5)
 IC_AND_NODESET/ic_bjt2.cir mismatch # tran VIN1#branch: -0.005036889565960961 leaves the tube at t=0 (tol 5.526e-5)
-IC_AND_NODESET/ic_comp.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.060014165981871204 leaves the tube at t=0.00000000058855310399904 (tol 1.688e-2)
+IC_AND_NODESET/ic_comp.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.060014165981871204 leaves the tube at t=0.00000000058855310399904 (tol 1.688e-2)
 IC_AND_NODESET/ic_gmin_bjt.cir mismatch # tran VIN1#branch: -0.00503688935060338 leaves the tube at t=0 (tol 5.526e-5)
 IC_AND_NODESET/nodeset_bjt.cir mismatch # tran XN15:VB3: 0.000000013920704224356513 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 IC_AND_NODESET/nodeset_bjt2.cir mismatch # tran XN15:VB3: 0.000000013920704224356513 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
@@ -566,7 +565,7 @@ Nonlinear/ConvergenceTests/SearchMethod2.cir simulator-differs:third-simulator r
 Nonlinear/ConvergenceTests/SearchMethod3.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762865551834795 leaves the tube at t=0.0000000109547942058092 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/SearchMethod4.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): 0.7688896722796699 leaves the tube at t=0 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/XyceTests.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
-ONESHOT/one-shot.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
+ONESHOT/one-shot.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
 OP/comparator_op.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 OP/gain-stagesoi_op.cir mismatch # plots ["op"] became ["ac", "op"]
 OP/sand25OpAlone.cir simulator-differs:third-simulator reason=S-XYCE-OUTLIER-3RD proof=s-xyce-outlier-3rd.md # op V(1): 0.0006592935750634707+0i vs 2.0006589630416975+0i at 0 (tol 3.319e-6)
@@ -666,7 +665,7 @@ SUPERNODE/supernode2.cir mismatch # dc V1#branch: -0.001+0i vs -0.0010986328125+
 SUPERNODE/supernode3.cir mismatch # dc V1#branch: -0.04+0i vs -0.040283203125+0i at 2 (tol 2.000e-4)
 SUPERNODE/supernode4.cir mismatch # dc V1#branch: -0.02+0i vs -0.019775390625+0i at 1 (tol 2.000e-4)
 SUPERNODE/supernode5.cir mismatch # dc C: 0.1822125813449024+0i vs 0.18165938722375619+0i at 4 (tol 4.575e-4)
-TERNARY_OP/ternary_op.cir simulator-differs:source reason=S-DC-SWEEP-ROUNDING proof=s-dc-sweep-rounding.md # dc 2N: 0+0i vs 1+0i at 0 (tol 4.002e-3)
+TERNARY_OP/ternary_op.cir simulator-differs:closed-form reason=S-DC-SWEEP-ROUNDING proof=s-dc-sweep-rounding.md # dc 2N: 0+0i vs 1+0i at 0 (tol 4.002e-3)
 THERMAL_RESISTOR/constant.cir target-fails # no raw file .cross_sim_out.raw: Error on line 4 or its substitute:: r1 1 0 copper l=0.1 a=1e-5 | unknown parameter (a) | Simulation interrupted due to error! | 
 THERMAL_RESISTOR/linear.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [table]
 TIA/ERROROPTION/erroroption.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.0006856768718502152 leaves the tube at t=0.0000015900000000000004 (tol 6.857e-6)

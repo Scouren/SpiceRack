@@ -1958,11 +1958,6 @@ cmcqa/psp/psp_sym_pmos_noise2_fntexc_T27_1.sp source-fails # ngspice swapped the
 cmcqa/psp/psp_sym_pmos_noise2_fntexc_T27_2.sp source-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 cmcqa/psp/psp_sym_pmos_noise2_fntexc_T27_3.sp source-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1)
 ngspice/examples/optran/HiPass3opamps_optran.sp source-fails # no raw file .cross_sim_out.raw: Error: Could not find include file opa1611.lib
-ngspice/examples/pss/colpitt_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 22 or its substitute:: .pss 3.1e6 500e-6 3 256 10 50 5e-3 | Simulation interrupted due to error! | Error: circuit 
-ngspice/examples/pss/compl_cross_quad_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 36 or its substitute:: .pss 500e6 1u 1 1024 10 10 5e-3 uic | Simulation interrupted due to error! | Error: circuit
-ngspice/examples/pss/hartley_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 22 or its substitute:: .pss 50 200e-3 2 1024 11 10 5e-3 uic | Simulation interrupted due to error! | Error: circui
-ngspice/examples/pss/ring_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 30 or its substitute:: .pss 624e6 500n 1 1024 10 5 5e-3 uic | Simulation interrupted due to error! | Error: circui
-ngspice/examples/pss/vackar_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 22 or its substitute:: .pss 1e6 10e-6 4 1024 10 50 5e-3 uic | Simulation interrupted due to error! | Error: circui
 ngspice/examples/pss/vdp_osc_pss.sp source-fails # no raw file .cross_sim_out.raw: Error on line 18 or its substitute:: .pss 0.8e6 130e-6 1 50 10 50 5e-3 uic | Simulation interrupted due to error! | Error: circu
 ngspice/examples/vdmos/dcdc.sp slow # quarantined
 ngspice/iscas85/c1908/c1908_ann.sp slow # quarantined
@@ -1981,6 +1976,7 @@ ngspice/kicad/GaN_Test/GaN_boost.sp slow # quarantined
 ngspice/paranoia/TransmissionLines/ltra5_1_line.sp source-fails # no raw file .cross_sim_out.raw: Error on line 164 or its substitute:: d.xrcv.d1 xrcv.1 3 diod1 | Simulation interrupted due to error! | Error: circuit not parse
 ngspice/paranoia/TransmissionLines/txl4_1_line.sp source-fails # no raw file .cross_sim_out.raw: Error on line 162 or its substitute:: d.xrcv.d1 xrcv.1 3 diod1 | Simulation interrupted due to error! | Error: circuit not parse
 ngspice/paranoia/vdmos/ro_11_vdmos.sp source-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m.xinv1.mp1 3 2 1 1 p1 l=2u w=20u | unknown parameter (l) | Simulation interrupted due to er
+ngspice/tests/bsim3soidd/ring51.sp slow # ngspice-45 at the 60 s CPU budget: a 100 s cell run of this deck alone, past it under load
 ngspice/tests/mesa/mesa-12.sp slow # quarantined
 ngspice/tests/mesa/mesa12.sp slow # quarantined
 ngspice/tests/vbic/FG.sp slow # quarantined
