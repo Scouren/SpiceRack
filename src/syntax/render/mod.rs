@@ -295,8 +295,11 @@ pub fn references(src: &Source) -> Vec<Reference> {
     out
 }
 
-/// Whether [`render`] writes `target`: every target, Verilog as structural
-/// modules (`spice::verilog`).
+/// Whether [`render`] writes `target`: true for every built-in
+/// [`Dialect`] today (Verilog as structural modules, `spice::verilog`).
+/// A plugin target is a [`Lang`], not a `Dialect`: whether it writes a
+/// given deck is that deck's render (`backend::select` takes it as its
+/// `writes` filter).
 pub fn writes(target: Dialect) -> bool {
     Dialect::ALL.contains(&target)
 }

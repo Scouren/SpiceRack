@@ -205,6 +205,25 @@ def test_a_refused_construct_raises_with_its_code(acme):
         tb.netlist(acme)
 
 
+def test_a_plugin_targets_note_is_a_python_warning(uniq):
+    """A plugin's Note-only omit (`omit_code` of a `Kind.Note` code) leaves
+    the construct out and writes the deck; the note reaches Python as a
+    `UserWarning` naming W0202 and the definition's id, as a built-in
+    target's notes do (ZERO-LEDGER P1-038, P1-028)."""
+    class Quiet(ps.dialects.NGSPICE):
+        def define(self, d):
+            return (super().define(d)
+                    .code("Q001", Kind.Note, "quiet drops Laplace sources")
+                    .omit_code(Construct.Laplace, "Q001"))
+
+    quiet = ps.register_dialect(Quiet(uniq("quiet"))).name()
+    tb = ps.Testbench.from_source(
+        "* t\nV1 in 0 1\nB1 out 0 V=Laplace(v(in), 1/(1+s*1e-3))\nR1 out 0 1k\n.op\n.end\n")
+    with pytest.warns(UserWarning, match=rf"W0202 {quiet}:Q001 quiet drops Laplace sources"):
+        text = tb.netlist(quiet)
+    assert "laplace" not in text.lower()
+
+
 def test_acme_text_reads_and_writes(acme):
     own = "# t\n.subcircuit load n PARAMS: r=1k ; a tail\nR1 n 0 {r}\n.endsub load\nV1 in 0 2x\nX1 in load r=2k\n.op\n.end\n"
     ng = ps.Testbench.from_source(own, dialect=acme).netlist("ngspice")

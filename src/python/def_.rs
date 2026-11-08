@@ -16,7 +16,7 @@
 //! - `pub(super) fn create_def_module(m: &Bound<'_, PyModule>) -> PyResult<()>`
 //! - `pub(super) fn plugin(name: &str) -> Option<Lang>`, `pub(super) fn parse_lang(name: &str) -> Result<Lang, String>`,
 //!   `pub(super) fn builtin_of(lang: Lang) -> Dialect`
-//! - `pub(super) fn render(src: &Source, lang: Lang) -> Result<String, String>`
+//! - `pub(super) fn render(src: &Source, lang: Lang) -> Result<render::Written, String>`
 
 use std::sync::Mutex;
 
@@ -124,21 +124,19 @@ pub(super) fn builtin_of(lang: Lang) -> Dialect {
 }
 
 /// `src` written for `lang`, its Python hooks called (once per hook per
-/// deck), or the refusal's messages.
+/// deck), with its notes; or the refusal's messages.
 ///
 /// # Errors
 /// The deck is refused; a hook raises, answers a different number of
 /// cards than it was given, or refuses with a code `lang` did not declare.
-pub(super) fn render(src: &Source, lang: Lang) -> Result<String, String> {
+pub(super) fn render(src: &Source, lang: Lang) -> Result<render::Written, String> {
     let messages = |e: render::Diags| e.messages.trim_end().to_string();
     let p = render::render_pending(src, lang).map_err(messages)?;
     let answers = match p.requests.is_empty() {
         true => Vec::new(),
         false => Python::with_gil(|py| answers(py, &p, lang))?,
     };
-    render::splice(src, p, &answers)
-        .map(|w| w.text)
-        .map_err(messages)
+    render::splice(src, p, &answers).map_err(messages)
 }
 
 impl From<PyLang> for Lang {

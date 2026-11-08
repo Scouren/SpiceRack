@@ -58,6 +58,11 @@ pub fn parse(src: &str, d: Dialect) -> Result<(Tokens<'_>, Ast<'_>), String> {
 /// decoded as [`decode`] does, and only under `root` (a path outside it is
 /// refused, `R0007`; a missing one is `R0006`).
 ///
+/// The confinement is lexical: a deck's path, its `..` resolved, must
+/// start with `root`, so no deck names its way out. A symlink inside
+/// `root` is part of the root (its installer put it there: a PDK's own
+/// links, a nix symlink farm) and is followed wherever it points.
+///
 /// # Panics
 /// When `d` has no reader (CDL, Verilog).
 pub fn kit(entries: &[PathBuf], form: Form, d: impl Into<Lang>, root: &Path) -> Kit {
