@@ -592,7 +592,6 @@ Output/AC/op-prn.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/AC/op-raw-ascii.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/AC/op-raw-override-ascii.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/AC/op-raw-override.cir mismatch # plots ["op"] became ["ac", "op"]
-Output/AC/op-raw.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/AC/op-td-prn.cir mismatch # plots ["op"] became ["ac", "op"]
 Output/DC/op-big-prn.cir mismatch # op V(1): 0.0006592935750634707+0i vs 2.0006589630416975+0i at 0 (tol 3.319e-6)
 Output/Dasho/ac.cir mismatch # plots ["op"] became ["ac", "op"]

@@ -172,7 +172,9 @@ fn kind(p: &RawData) -> &'static str {
     // A complex plot is an ac sweep, one point or many (`.ac dec 1 1k 1k`);
     // a real one-point plot an operating point whatever its scale (Xyce's
     // `-r` op plot is over TIME).
-    if p.is_complex {
+    // A pole-zero plot (ngspice's "Pole-Zero Analysis") is complex too, one
+    // point with no scale: an operating point's shape.
+    if p.is_complex && !name.contains("pole") {
         return "ac";
     }
     if p.re(0).len() <= 1 {
