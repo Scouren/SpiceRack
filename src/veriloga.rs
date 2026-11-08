@@ -22,6 +22,7 @@
 //!   `pub fn compile_osdi(va: &Path) -> Result<String, String>`,
 //!   `pub fn osdi_loads(loads: &[String]) -> Result<Vec<String>, String>`, `pub enum Lowered`,
 //!   `pub struct Cell`, `pub fn lower(vb: &VerilogBlock) -> Result<Lowered, String>`,
+//!   `pub(super) fn module_name(text: &str) -> Option<&str>`,
 //!   `pub(super) fn gate_instances(netlist: &str) -> Vec<(String, String, Vec<String>)>`
 
 use std::collections::BTreeMap;
@@ -236,10 +237,7 @@ mod run {
 
         let text = std::fs::read_to_string(&v)
             .map_err(|e| format!("Failed to read {}: {}", v.display(), e))?;
-        let top = regex::Regex::new(r"(?m)^\s*module\s+(\w+)")
-            .expect("static regex")
-            .captures(&text)
-            .map(|c| c[1].to_string())
+        let top = module_name(&text)
             .ok_or("Could not extract module name from Verilog source. Ensure source contains `module <name>`.")?;
         let synth = v.with_extension("synth.v");
         let script = format!(
@@ -284,29 +282,115 @@ mod run {
         })
     }
 
+    /// The name after the first `module` that leads a line (blanks before
+    /// it, at least one blank after it, maybe across lines): what the regex
+    /// `(?m)^\s*module\s+(\w+)` captured.
+    pub(super) fn module_name(text: &str) -> Option<&str> {
+        line_starts(text).find_map(|s| {
+            let rest = text[s..].trim_start().strip_prefix("module")?;
+            let name = rest.trim_start();
+            let n = word(name);
+            (name.len() < rest.len() && n > 0).then(|| &name[..n])
+        })
+    }
+
     /// Cell instances of a Yosys `write_verilog` netlist as (instance, cell, nets
-    /// in port order), e.g. `sky130_fd_sc_hd__and2_1 _0_ ( .A(\a ), .X(\out ) );`.
+    /// in port order), e.g. `sky130_fd_sc_hd__and2_1 _0_ ( .A(\a ), .X(\out ) );`:
+    /// what the regexes `(?m)^\s+(\w+)\s+(\w+)\s*\(([^;]+)\);` (an instance)
+    /// and `\.\s*\w+\s*\(\s*\\?([^\s)]+)\s*\)` (a port) captured.
     pub(super) fn gate_instances(netlist: &str) -> Vec<(String, String, Vec<String>)> {
-        let inst =
-            regex::Regex::new(r"(?m)^\s+(\w+)\s+(\w+)\s*\(([^;]+)\);").expect("static regex");
-        let port = regex::Regex::new(r"\.\s*\w+\s*\(\s*\\?([^\s)]+)\s*\)").expect("static regex");
-        inst.captures_iter(netlist)
-            .filter(|c| {
-                !matches!(
-                    &c[1],
-                    "wire" | "assign" | "input" | "output" | "module" | "endmodule" | "reg"
-                )
-            })
-            .map(|c| {
-                (
-                    c[2].to_string(),
-                    c[1].to_string(),
-                    port.captures_iter(&c[3])
-                        .map(|p| p[1].to_string())
-                        .collect(),
-                )
-            })
-            .collect()
+        let mut out = Vec::new();
+        let mut from = 0;
+        for s in line_starts(netlist) {
+            if s < from {
+                continue;
+            }
+            let Some((cell, inst, body, end)) = instance_at(netlist, s) else {
+                continue;
+            };
+            from = end;
+            if !matches!(
+                cell,
+                "wire" | "assign" | "input" | "output" | "module" | "endmodule" | "reg"
+            ) {
+                out.push((inst.to_string(), cell.to_string(), ports(body)));
+            }
+        }
+        out
+    }
+
+    /// Every line's first byte offset in `text`.
+    fn line_starts(text: &str) -> impl Iterator<Item = usize> + '_ {
+        std::iter::once(0).chain(text.match_indices('\n').map(|(i, _)| i + 1))
+    }
+
+    /// The length of the `\w+` run (letters, digits, `_`) `s` starts with.
+    fn word(s: &str) -> usize {
+        s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(s.len())
+    }
+
+    /// Blanks (at least one), a cell, blanks (at least one), an instance,
+    /// blanks, `(`, a body up to the first `;` with `)` before it: (cell,
+    /// instance, body, the offset past the `;`), from line start `s`.
+    fn instance_at(text: &str, s: usize) -> Option<(&str, &str, &str, usize)> {
+        let rest = &text[s..];
+        let at = rest.trim_start();
+        if at.len() == rest.len() {
+            return None;
+        }
+        let cell = &at[..word(at)];
+        let gap = &at[cell.len()..];
+        let at = gap.trim_start();
+        let inst = &at[..word(at)];
+        if cell.is_empty() || inst.is_empty() || at.len() == gap.len() {
+            return None;
+        }
+        let at = at[inst.len()..].trim_start().strip_prefix('(')?;
+        let semi = at.find(';')?;
+        let body = at[..semi].strip_suffix(')').filter(|b| !b.is_empty())?;
+        Some((cell, inst, body, text.len() - at.len() + semi + 1))
+    }
+
+    /// The net of each `.port(net)` in an instance's body, a leading `\`
+    /// (an escaped Verilog name) left off.
+    fn ports(body: &str) -> Vec<String> {
+        let mut nets = Vec::new();
+        let mut from = 0;
+        while let Some(k) = body[from..].find('.') {
+            let dot = from + k;
+            match port_at(&body[dot + 1..]) {
+                Some((net, len)) => {
+                    nets.push(net.to_string());
+                    from = dot + 1 + len;
+                }
+                None => from = dot + 1,
+            }
+        }
+        nets
+    }
+
+    /// After a `.`: blanks, a port name, blanks, `(`, blanks, an optional
+    /// `\`, the net (no blank, no `)`), blanks, `)`: (the net, the bytes
+    /// read).
+    fn port_at(s: &str) -> Option<(&str, usize)> {
+        let at = s.trim_start();
+        let name = word(at);
+        if name == 0 {
+            return None;
+        }
+        let at = at[name..].trim_start().strip_prefix('(')?.trim_start();
+        let stop = |c: char| c.is_whitespace() || c == ')';
+        let at = match at.strip_prefix('\\') {
+            Some(r) if r.starts_with(|c: char| !stop(c)) => r,
+            _ => at,
+        };
+        let net = &at[..at.find(stop).unwrap_or(at.len())];
+        if net.is_empty() {
+            return None;
+        }
+        let at = at[net.len()..].trim_start().strip_prefix(')')?;
+        Some((net, s.len() - at.len()))
     }
 
     /// (liberty, SPICE cell models) of `$PDK_ROOT/<pdk>[A]/libs.ref/<pdk>/`;
@@ -395,5 +479,91 @@ mod tests {
                 vec!["a".into(), "b".into(), "out".into()]
             )]
         );
+    }
+
+    #[cfg(feature = "backend")]
+    #[test]
+    fn yosys_scans_capture_what_the_regexes_did() {
+        // Each text, its module name and its cells as the `regex` 1.12.3
+        // patterns these scans replace captured them (recorded from both
+        // run side by side, 2026-11-08, before `regex` left).
+        type Gates = Vec<(&'static str, &'static str, Vec<&'static str>)>;
+        let cases: [(&str, Option<&str>, Gates); 23] = [
+            (
+                "module top(a, b, out);\n  input a;\n  sky130_fd_sc_hd__and2_1 _0_ ( .A(\\a ), .B(b), .X(\\out ) );\nendmodule\n",
+                Some("top"),
+                vec![("_0_", "sky130_fd_sc_hd__and2_1", vec!["a", "b", "out"])],
+            ),
+            ("", None, vec![]),
+            ("module", None, vec![]),
+            ("module x", Some("x"), vec![]),
+            ("modulex y\nmodule  z(", Some("z"), vec![]),
+            ("  // c\n\n   module\n\n  foo (a);", Some("foo"), vec![]),
+            ("x module y\n\tmodule  w_1$ (a)", Some("w_1"), vec![]),
+            ("\r\nmodule r\r\n", Some("r"), vec![]),
+            ("\n\nmodule é_ü(x)", Some("é_ü"), vec![]),
+            ("module ;\nmodule ok", Some("ok"), vec![]),
+            ("/* */ module no\n module yes", Some("yes"), vec![]),
+            (
+                "  c1 i1 (.A(x), .B( \\y ), .C(\\ ), .D(z ) , .E (w)) ;\n",
+                None,
+                vec![],
+            ),
+            (
+                "  c1 i1 (.A(x));\n  c2 i2 ( .Q(q) );",
+                None,
+                vec![("i1", "c1", vec!["x"]), ("i2", "c2", vec!["q"])],
+            ),
+            (
+                "\nc3 i3 (.A(a));\nc4 i4 (.A(b));\n  \nc5 i5 (.A(c));",
+                None,
+                vec![("i3", "c3", vec!["a"]), ("i5", "c5", vec!["c"])],
+            ),
+            (
+                "  wire w (x);\n  assign a (b);\n  input i (j);\n  reg r (s);\n",
+                None,
+                vec![],
+            ),
+            (
+                "  c6 i6 ();\n  c7 i7 ( ) ;\n  c8 i8 (.A(a)) x;\n  c9 i9 (.A(a) ; );",
+                None,
+                vec![],
+            ),
+            (
+                "  c10\n   i10\n (\n .A(\na\n)\n);\n",
+                None,
+                vec![("i10", "c10", vec!["a"])],
+            ),
+            (
+                "  c11 i11 (.A(a), .B(b)); c12 i12 (.A(z));\n  c13 i13 (.A(y));",
+                None,
+                vec![("i11", "c11", vec!["a", "b"]), ("i13", "c13", vec!["y"])],
+            ),
+            (
+                "  c14 i14 (. A ( \\x[0] ) , .B(\\\\b ), .C(c)d), .(e), .F(), .G(g h));",
+                None,
+                vec![("i14", "c14", vec!["x[0]", "\\b", "c"])],
+            ),
+            ("  c15 i15 (.A(a))\n  ;", None, vec![]),
+            ("\t c16 i16 (\\a);", None, vec![("i16", "c16", vec![])]),
+            (
+                "  c17 \\i17 (.A(a));\n  c18 i18(.A(a));",
+                None,
+                vec![("i18", "c18", vec!["a"])],
+            ),
+            (
+                "  c19 i19 (.A(a.b), .B(a .c));",
+                None,
+                vec![("i19", "c19", vec!["a.b"])],
+            ),
+        ];
+        for (text, module, gates) in cases {
+            assert_eq!(run::module_name(text), module, "{text:?}");
+            let want: Vec<(String, String, Vec<String>)> = gates
+                .into_iter()
+                .map(|(i, c, n)| (i.into(), c.into(), n.into_iter().map(Into::into).collect()))
+                .collect();
+            assert_eq!(run::gate_instances(text), want, "{text:?}");
+        }
     }
 }

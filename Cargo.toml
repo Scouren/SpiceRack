@@ -18,7 +18,6 @@ pyo3 = { version = "0.24", features = ["extension-module", "num-complex"], optio
 num-complex = "0.4"
 thiserror = "2"
 tempfile = { version = "3", optional = true }
-regex = { version = "1", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1"
@@ -30,7 +29,7 @@ default = ["python"]
 # Verilog tools (OpenVAF, Icarus, Yosys) and `backend::check`.
 # Without it the crate is the transpiler and the result readers: pure,
 # no I/O, and it builds for wasm32-unknown-unknown.
-backend = ["dep:tempfile", "dep:regex"]
+backend = ["dep:tempfile"]
 python = ["dep:pyo3", "backend"]
 # `corpus`: the nightly tier. Builds `tests/test_import_suite/`, which runs
 # every spice-bench deck and corpus `nix develop .#testing` pins (about 20 min
