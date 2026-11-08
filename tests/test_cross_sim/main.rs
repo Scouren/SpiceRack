@@ -467,7 +467,7 @@ fn check(
                     Some(Ran::Plots(o)) if cmp::compare(&o, &b, tol).is_ok() => {
                         fails("simulator-differs", &why)
                     }
-                    _ if why.starts_with("tran") && refines(c, t, deck, &src, &text, tol) => {
+                    _ if why.starts_with("tran") && refines(c, t, deck, &src, text, tol) => {
                         fails("simulator-differs:refinement", &why)
                     }
                     _ => fails("mismatch", &why),
