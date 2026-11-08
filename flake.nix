@@ -336,6 +336,56 @@
 
           pythonImportsCheck = [ "spicerack" ];
         };
+        # LTspice 26.1.1 (`.#testing-ltspice` only): the MSI unpacked by
+        # msitools, run as `ltspice -b deck.cir` under Wine in a headless X
+        # server, in a Wine prefix of its own; a `/path` argument goes in as
+        # its `Z:` drive path.
+        ltspice = let
+          msi = pkgs.requireFile {
+            name = "LTspice64.msi";
+            sha256 = "f22163f15420e43a2d5c66440e038ef031a9f019a181f396b95edcef5eebc357";
+            message = ''
+              LTspice 26.1.1's installer is not redistributable. Download
+              LTspice64.msi from analog.com and add it to the store:
+                nix-store --add-fixed sha256 LTspice64.msi
+            '';
+          };
+          app = pkgs.runCommand "ltspice-26.1.1" { nativeBuildInputs = [ pkgs.msitools ]; } ''
+            mkdir x && cd x && msiextract ${msi} > /dev/null
+            cp -r 'APPDIR:.' $out
+          '';
+        in pkgs.writeShellApplication {
+          name = "ltspice";
+          runtimeInputs = [ pkgs.wineWow64Packages.stable pkgs.xvfb-run pkgs.util-linux ];
+          text = ''
+            export WINEPREFIX="''${XDG_CACHE_HOME:-$HOME/.cache}/spicerack-ltspice"
+            export WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
+            unset WAYLAND_DISPLAY
+            # One run at a time: `xvfb-run -a` gives two runs started together
+            # the same display, and the first to end kills it under the other.
+            # ponytail: serialized (a run is about 2 s); a display per run if
+            # the tests ever run many LTspice decks.
+            mkdir -p "$WINEPREFIX"
+            exec 9> "$WINEPREFIX.lock"
+            flock 9
+            ini="$WINEPREFIX/drive_c/users/$(id -un)/AppData/Roaming/LTspice.ini"
+            if [ ! -e "$ini" ]; then
+              wineboot -i > /dev/null 2>&1
+              mkdir -p "$(dirname "$ini")"
+              # Without it the first run asks about analytics in a dialog
+              # and never returns.
+              printf '[Options]\r\nCaptureAnalytics=false\r\n' > "$ini"
+            fi
+            args=()
+            for a in "$@"; do
+              case $a in
+                /*) args+=("Z:$a") ;;
+                *) args+=("$a") ;;
+              esac
+            done
+            xvfb-run -a wine ${app}/LTspice.exe "''${args[@]}"
+          '';
+        };
         # Build and unit-test shell. No simulators: SpiceRack emits netlists and
         # runs whatever simulator the user has installed; it never ships one.
         dev = pkgs.mkShell {
@@ -391,6 +441,15 @@
           # examples 20 and 21: sky130 and gf180mcu, a ciel-layout PDK_ROOT.
           PDK_ROOT = pdks;
         };
+
+        # `nix develop .#testing-ltspice` (ZERO D40): `.#testing` plus LTspice
+        # 26.1.1 as `ltspice` (tests/test_backends.rs p1_018). The vendor MSI
+        # is not fetched: add it once with
+        # `nix-store --add-fixed sha256 LTspice64.msi`. CI runs `.#testing`
+        # with the marker LTSPICE_CI_PENDING_MIRROR until the MSI is mirrored.
+        devShells.testing-ltspice = self.devShells.${system}.testing.overrideAttrs (o: {
+          nativeBuildInputs = o.nativeBuildInputs ++ [ ltspice ];
+        });
 
         # `nix develop .#docs -c mkdocs build`: the documentation site from docs/.
         devShells.docs = pkgs.mkShell {

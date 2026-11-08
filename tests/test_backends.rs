@@ -1,6 +1,7 @@
 //! Raw files -> `spicerack::rawfile::parse_raw`: a truncated header is an
 //! error, not a panic; a complete ngspice ASCII raw file reads back its
-//! title, variables and values.
+//! title, variables and values. LTspice itself runs a closed-form deck in
+//! `nix develop .#testing-ltspice`.
 //!
 //! Cites: the ngspice raw file format (manual §17.6), as a spec example.
 //!
@@ -102,4 +103,42 @@ fn p1_006_ltspice_raws_read_with_no_bom() {
     close(col(&read("noise"), "gain")[0], 0.5);
     let tf = read("tf");
     close(tf.re(0)[0], 0.5);
+}
+
+#[test]
+fn p1_018_ltspice_wine_pinned_into_testing() {
+    // `nix develop .#testing-ltspice` (ZERO D40) puts LTspice 26.1.1 on PATH
+    // as `ltspice`, Wine under a headless X server. A 2 V source over a
+    // 1k/1k divider, closed form V(out) = 1 V. Outside that shell this
+    // fails. CI carries LTSPICE_CI_PENDING_MIRROR until the MSI is mirrored,
+    // and there LTspice running is the failure: drop the marker.
+    let dir = tempfile::tempdir().expect("temp dir");
+    let deck = dir.path().join("d.cir");
+    std::fs::write(
+        &deck,
+        "* divider\nV1 in 0 2\nR1 in out 1k\nR2 out 0 1k\n.op\n.end\n",
+    )
+    .expect("deck");
+    let run = std::process::Command::new("ltspice")
+        .arg("-b")
+        .arg(&deck)
+        .output();
+    if std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_some() {
+        assert!(
+            run.is_err(),
+            "LTspice ran: remove LTSPICE_CI_PENDING_MIRROR"
+        );
+        return;
+    }
+    let run = run.expect("`ltspice` on PATH: run in `nix develop .#testing-ltspice`");
+    assert!(run.status.success(), "{run:?}");
+    let raw = std::fs::read(deck.with_extension("raw")).expect("d.raw beside the deck");
+    let plots = spicerack::rawfile::parse_raw_all(&raw).expect("parsed");
+    let op = &plots[0];
+    let i = op
+        .variables
+        .iter()
+        .position(|v| v.name == "V(out)")
+        .expect("V(out)");
+    assert!((op.re(i)[0] - 1.0).abs() <= 1e-9, "{}", op.re(i)[0]);
 }

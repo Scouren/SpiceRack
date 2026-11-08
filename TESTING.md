@@ -8,7 +8,7 @@ trusts. The rules behind it are in `AGENTS.md` (Testing).
 | Tier | Runs | Command | Where |
 |---|---|---|---|
 | pre-commit | format, lints, house style | `cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && python3 .github/scripts/check_style.py src tests` | local; the same three run as the `lint` job in `.github/workflows/test.yaml` on every PR |
-| merge | both suites in the testing shell | `nix develop .#testing -c cargo test`, then `maturin develop && python3 -m pytest` in a `--system-site-packages` venv | `.github/workflows/test.yaml`, every PR and every push to `main` |
+| merge | both suites in the testing shell (locally `.#testing-ltspice`, below) | `nix develop .#testing -c cargo test`, then `maturin develop && python3 -m pytest` in a `--system-site-packages` venv | `.github/workflows/test.yaml`, every PR and every push to `main` |
 | docs | the site builds strictly; every Python example in it runs | `nix develop .#docs -c mkdocs build --strict`; `tests/test_docs.py` | `.github/workflows/docs.yaml`; pytest |
 | release | tag matches `Cargo.toml` and `pyproject.toml`, wheels for every target, sdist | `.github/scripts/bump_version.py`, then the release workflow | `.github/workflows/tags.yaml`, `publish.yaml` |
 | nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
@@ -238,6 +238,14 @@ match a run pinned to the P-cores (`taskset -c 0-15`) within 0.2%.
 corpora, and the sky130 `8afc834` and gf180mcu `1e35547` PDKs as `PDK_ROOT`,
 pinned by content hash in `flake.nix`'s `pdks`); outside it those tests fail, they
 never skip.
+
+`nix develop .#testing-ltspice` is `.#testing` plus LTspice 26.1.1 as
+`ltspice` (Wine, headless), from the vendor MSI pinned by sha256 with
+`requireFile` (add it once: `nix-store --add-fixed sha256 LTspice64.msi`).
+The LTspice-running tests (`test_backends.rs` `p1_018`) fail outside it. CI
+has no copy of the MSI yet: its merge tier runs `.#testing` with the marker
+`LTSPICE_CI_PENDING_MIRROR`, under which those tests require LTspice absent
+and fail once it runs, so the marker goes when the MSI is mirrored.
 
 - Three tests load sky130's whole `tt` corner in ngspice: examples 20 and 21
   and the `docs/models.md` blocks (`test_docs.py`). Each takes 34 s on an

@@ -1,9 +1,8 @@
 //! LTspice dialect audit.
 //!
-//! UNVERIFIED BY EXECUTION: no LTspice binary exists on this machine (wine is
-//! present, LTspice is not). Every assertion here checks the emitted text
-//! against LTspice's *documented* syntax. Nothing below was run through
-//! LTspice.
+//! Every assertion here checks the emitted text against LTspice's
+//! *documented* syntax; none runs it. LTspice 26.1.1 itself runs in
+//! `nix develop .#testing-ltspice` (`test_backends.rs`, `p1_018`).
 //!
 //! Cites: the LTspice help, per test.
 //!
