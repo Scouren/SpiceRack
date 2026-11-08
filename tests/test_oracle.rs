@@ -12,6 +12,7 @@ mod oracle;
 
 use oracle::{At, Tol, value};
 use spicerack::result::{RawData, VarInfo, VarType};
+use spicerack::syntax::Dialect;
 
 // ---- private ----
 
@@ -84,4 +85,72 @@ fn value_names_a_missing_vector() {
 #[should_panic(expected = "never a deck extension")]
 fn golden_refuses_a_deck_extension_the_golden_gate_would_read() {
     oracle::golden("spectre/x.scs", "by hand", "");
+}
+
+/// The two tolerance forms the migrated crates used, written as they were
+/// (`test_xyce_write.rs` `same_op` and `both_op` before `oracle.rs`), equal
+/// to their `Tol` on every edge: zero, the bound itself, either side of
+/// it, sign, NaN and infinity.
+#[test]
+fn tol_reproduces_each_migrated_form_exactly() {
+    let same_op = |got: f64, want: f64| (got - want).abs() <= 1e-3 * want.abs();
+    let both_op = |got: f64, want: f64| (got - want).abs() <= 1e-9 * want.abs().max(1e-12);
+    let forms: [(&dyn Fn(f64, f64) -> bool, Tol); 2] = [
+        (
+            &same_op,
+            Tol {
+                rel: 1e-3,
+                floor: 0.0,
+            },
+        ),
+        (
+            &both_op,
+            Tol {
+                rel: 1e-9,
+                floor: 1e-12,
+            },
+        ),
+    ];
+    let wants = [
+        0.0,
+        -0.0,
+        1e-15,
+        1e-12,
+        1.0,
+        -2.5,
+        3.3e6,
+        f64::NAN,
+        f64::INFINITY,
+    ];
+    let steps = [
+        0.0,
+        1e-21,
+        1e-15,
+        9.99e-4,
+        1e-3,
+        1.0001e-3,
+        1e-9,
+        1.0,
+        -1e-3,
+        f64::NAN,
+    ];
+    let mut differ = Vec::new();
+    for (i, (old, tol)) in forms.iter().enumerate() {
+        for &want in &wants {
+            for &d in &steps {
+                for got in [want + d, want - d, want * (1.0 + d), want * (1.0 - d)] {
+                    if old(got, want) != tol.within(got, want) {
+                        differ.push((i, got, want));
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(differ, [], "form, got, want where Tol differs");
+}
+
+#[test]
+#[should_panic(expected = "request one from remote-oracle")]
+fn a_missing_pin_says_who_records_it() {
+    oracle::pinned(Dialect::Spectre, "* no such deck\n.end\n", "out", At::First);
 }

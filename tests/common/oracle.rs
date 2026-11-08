@@ -19,11 +19,15 @@
 //! `tests/fixtures/spice_bench_known_failures.txt` are the pattern).
 //!
 //! Simulators run through the cross-sim harness (`tests/test_cross_sim/sim.rs`,
-//! included read-only), not `spicerack::backend`, so the oracle does not
-//! share code with what it checks. LTspice runs through the backend (the
-//! harness has no LTspice); Spectre and HSPICE proper have no local binary:
-//! their numbers are iccad4 pins (`tests/spectre/`, `tests/hspice/`), checked
-//! with [`golden`]. HSPICE text runs on ESPice `--tokenizer=hspice`.
+//! the implementer's Phase 1 file, included read-only), not
+//! `spicerack::backend`, so the oracle shares no code with what it checks.
+//! Only the private `harness` below calls into it (`sim::run`), so a change
+//! to its signature breaks one function here. LTspice runs through the
+//! backend (the harness has no LTspice). Spectre has no local binary: its
+//! numbers are the iccad4 runs `remote-oracle` records as pins ([`pinned`],
+//! ledger P1-043). `Dialect::Hspice` runs the HSPICE text on ESPice
+//! `--tokenizer=hspice` (the ledger's "ESP" oracle); a real HSPICE number is
+//! `pinned(Dialect::Hspice, …)`.
 //!
 //! Unsupported fails, never skips: a simulator missing from PATH fails the
 //! test; run in `nix develop .#testing`.
@@ -47,6 +51,8 @@
 //! - `pub fn run(on: Dialect, text: &str) -> Vec<RawData>`
 //! - `pub fn value(plots: &[RawData], node: &str, at: At) -> f64`
 //! - `pub fn op(on: Dialect, text: &str, node: &str) -> f64`
+//! - `pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64`
+//! - `pub fn measure(on: Dialect, text: &str, node: &str, at: At) -> f64`
 //! - `pub fn sim_pair(from: Dialect, deck: &str, to: Dialect, node: &str, at: At, tol: Tol) -> (f64, f64)`
 //! - `pub fn closed_form(from: Dialect, deck: &str, on: &[Dialect], node: &str, at: At, want: f64, tol: Tol)`
 //! - `pub fn golden(name: &str, provenance: &str, got: &str)`
@@ -60,7 +66,6 @@ mod sim;
 
 use std::path::Path;
 
-use sim::{Ran, Sim};
 use spicerack::result::RawData;
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
@@ -142,21 +147,17 @@ pub fn notes(w: &Written) -> Vec<Code> {
 /// local simulator: pin Spectre and check it with [`golden`]).
 pub fn run(on: Dialect, text: &str) -> Vec<RawData> {
     let sim = match on {
-        Dialect::Ngspice => Sim::Ngspice,
-        Dialect::Xyce => Sim::Xyce,
-        Dialect::Vacask => Sim::Vacask,
-        Dialect::Espice => Sim::Espice,
-        Dialect::Hspice => Sim::EspiceHspice,
+        Dialect::Ngspice => sim::Sim::Ngspice,
+        Dialect::Xyce => sim::Sim::Xyce,
+        Dialect::Vacask => sim::Sim::Vacask,
+        Dialect::Espice => sim::Sim::Espice,
+        Dialect::Hspice => sim::Sim::EspiceHspice,
         Dialect::Ltspice => return ltspice(text),
         Dialect::Spectre | Dialect::Cdl | Dialect::Verilog => {
-            panic!("no local {on:?} simulator: pin a real run (tests/spectre/) and use `golden`")
+            panic!("no local {on:?} simulator: a Spectre number is `pinned` (P1-043)")
         }
     };
-    match sim::run(sim, Path::new("/nonexistent/t.cir"), text, &[], SECS) {
-        Ran::Plots(p) => p,
-        Ran::Timeout => panic!("{}: past {SECS} s\n{text}", sim.name()),
-        Ran::Failed(e) => panic!("{}: {e}\n{text}", sim.name()),
-    }
+    harness(sim, text)
 }
 
 /// The vector `v(node)` (or `node`, case-folded) at `at`, from the first
@@ -197,6 +198,74 @@ pub fn op(on: Dialect, text: &str, node: &str) -> f64 {
     value(&run(on, text), node, At::First)
 }
 
+/// `v(node)` at `at` from the pin of the deck `text` on real `on` (Spectre
+/// or HSPICE on iccad4, recorded by `remote-oracle`; ledger P1-043). The pin
+/// is `tests/<spectre|hspice>/pins/<key>.pin`, `<key>` the deck's FNV-1a 64
+/// hash in 16 hex digits, so a writer change that moves one byte needs a new
+/// run. Its first line is `provenance: <tool version, host, date>`; each
+/// other line `<vector> <first|last|t=<time>> <value>`.
+///
+/// # Panics
+/// For a dialect with a local simulator, on a missing pin ("request one
+/// from remote-oracle via the ledger"), or when the pin lacks the value.
+// P1-043: the pin layout is this file's until P1-043 lands its reader.
+pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64 {
+    let dir = match on {
+        Dialect::Spectre => "spectre",
+        Dialect::Hspice => "hspice",
+        _ => panic!("{on:?} runs here: `run` it, a pin is for Spectre and HSPICE"),
+    };
+    let key = format!("{:016x}", fnv1a(text.as_bytes()));
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join(dir)
+        .join("pins")
+        .join(format!("{key}.pin"));
+    let pin = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!(
+            "no pin {}: request one from remote-oracle via the ledger (P1-043)\n{text}",
+            path.display()
+        )
+    });
+    let mut lines = pin.lines();
+    let provenance = lines.next().and_then(|l| l.strip_prefix("provenance: "));
+    assert!(
+        provenance.is_some_and(|p| !p.trim().is_empty()),
+        "{}: line 1 is `provenance: …`",
+        path.display()
+    );
+    let want = format!("v({node})");
+    for l in lines {
+        let f: Vec<&str> = l.split_whitespace().collect();
+        assert!(
+            f.len() == 3,
+            "{}: `{l}` is not `<vector> <at> <value>`",
+            path.display()
+        );
+        let name = f[0].eq_ignore_ascii_case(node) || f[0].eq_ignore_ascii_case(&want);
+        let here = match (at, f[1]) {
+            (At::First, "first") | (At::Last, "last") => true,
+            (At::Time(t), w) => w.strip_prefix("t=").and_then(|x| x.parse().ok()) == Some(t),
+            _ => false,
+        };
+        if name && here {
+            return f[2]
+                .parse()
+                .unwrap_or_else(|e| panic!("{}: `{l}`: {e}", path.display()));
+        }
+    }
+    panic!("{}: no {want} at {at:?}", path.display())
+}
+
+/// `v(node)` at `at` of the deck `text` on `on`: a run where one is local,
+/// the iccad4 pin for Spectre ([`pinned`]).
+pub fn measure(on: Dialect, text: &str, node: &str, at: At) -> f64 {
+    match on {
+        Dialect::Spectre => pinned(on, text, node, at),
+        _ => value(&run(on, text), node, at),
+    }
+}
+
 /// Template: a real-simulator pair. `deck` (read as `from`) on `from`'s
 /// simulator, and written for `to` on `to`'s, give the same `v(node)` at
 /// `at`; returns `(source, target)`. The oracle is the source simulator,
@@ -223,8 +292,8 @@ pub fn sim_pair(
     tol: Tol,
 ) -> (f64, f64) {
     let target = write(deck, from, to);
-    let want = value(&run(from, deck), node, at);
-    let got = value(&run(to, &target), node, at);
+    let want = measure(from, deck, node, at);
+    let got = measure(to, &target, node, at);
     assert!(
         tol.within(got, want),
         "{to:?} v({node}) = {got}, {from:?} {want} ({tol:?})\n{target}"
@@ -261,7 +330,7 @@ pub fn closed_form(
         } else {
             write(deck, from, d)
         };
-        let got = value(&run(d, &text), node, at);
+        let got = measure(d, &text, node, at);
         assert!(
             tol.within(got, want),
             "{d:?}: v({node}) = {got}, want {want} ({tol:?})\n{text}"
@@ -365,6 +434,25 @@ pub fn spec_refusal(cite: &str, text: &str, from: Dialect, to: Dialect, want: &[
 }
 
 // ---- private ----
+
+/// `text` on the cross-sim harness's `sim`: every plot. The one call into
+/// `tests/test_cross_sim/sim.rs` (the implementer's file): a change to
+/// `sim::run` breaks here only.
+fn harness(sim: sim::Sim, text: &str) -> Vec<RawData> {
+    match sim::run(sim, Path::new("/nonexistent/t.cir"), text, &[], SECS) {
+        sim::Ran::Plots(p) => p,
+        sim::Ran::Timeout => panic!("{sim:?}: past {SECS} s\n{text}"),
+        sim::Ran::Failed(e) => panic!("{sim:?}: {e}\n{text}"),
+    }
+}
+
+/// FNV-1a, 64 bit: a pin's key, stable across Rust releases (unlike
+/// `DefaultHasher`).
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
 
 /// `text` on LTspice, through `spicerack::backend` (the harness has no
 /// LTspice): every plot.
