@@ -8,8 +8,9 @@
 //! `.end`; the frame of title, `.end` and control blocks decided once, by
 //! the file's role) and the block-level cards; `cards` writes elements and
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
-//! options, `ngspice_options` the others' and HSPICE's defaults, `prints`
-//! the `.print` cards), `checks` the deck-wide
+//! options, `ngspice_options` the others' and HSPICE's defaults, `xyce_cards`
+//! Xyce's spellings of another dialect's cards, `xyce_models` its model cards,
+//! `prints` the `.print` cards), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
 //! target reads it,
@@ -43,7 +44,11 @@ mod tstep;
 mod values;
 mod verilog;
 mod waves;
+mod xyce_cards;
+mod xyce_models;
 mod xyce_options;
+
+use std::collections::{HashMap, HashSet};
 
 use super::Numbers;
 use super::capability::{Action, Alt, Construct, Rule};
@@ -60,7 +65,7 @@ use crate::syntax::behaviour::{
 };
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::lang::{CONSTRUCT_COUNT, Cells};
-use crate::syntax::resolve::Role;
+use crate::syntax::resolve::{FileId, Role};
 
 /// The writer's state for one deck.
 struct W<'a, 'r> {
@@ -102,6 +107,10 @@ struct W<'a, 'r> {
     dcop_ic: bool,
     /// The `.ic` node values the devices' `IC=` become (`W::device_ic`).
     device_ics: Vec<(String, String)>,
+    /// Xyce: each model card's refusal, judged once (`xyce_cards`), by
+    /// its file (`None`: this one) and card; and the kit files judged.
+    xyce_verdicts: HashMap<(Option<FileId>, u32), Option<Code>>,
+    xyce_files: HashSet<FileId>,
 }
 
 /// The deck `rd` read, written for `target`, and its diagnostics: the
@@ -144,6 +153,8 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         nominal: false,
         dcop_ic: false,
         device_ics: Vec::new(),
+        xyce_verdicts: HashMap::new(),
+        xyce_files: HashSet::new(),
     };
     let (from, to) = (rd.b.netlist_rules, b.netlist_rules);
     w.dcop_ic = from == NetlistRules::Xyce && to == NetlistRules::Ngspice && !w.tran_uic();
@@ -469,12 +480,12 @@ impl W<'_, '_> {
                 Some(m) if is_m(k) => m.as_str(),
                 _ => k.as_str(),
             };
-            line.push_str(&format!(" {k}={}", self.spelled(v)));
+            line.push_str(&format!(" {k}={}", self.param_value(v)));
         }
         // A Spectre or VACASK subcircuit's `parameters` are its defaults.
         for &a in &sc.params {
             let (k, v) = self.rd.param_view(a);
-            line.push_str(&format!(" {k}={}", self.spelled(&v)));
+            line.push_str(&format!(" {k}={}", self.param_value(&v)));
         }
         self.o.token(&line, Space::Line);
         self.file_cards(sc);

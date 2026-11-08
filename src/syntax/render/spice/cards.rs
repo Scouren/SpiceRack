@@ -53,8 +53,9 @@ impl W<'_, '_> {
                 {
                     params.push(("Rser".into(), "1m".into()));
                 }
-                if model.is_some() {
+                if let Some(m) = &model {
                     self.ask(Construct::RclModel, tok);
+                    self.xyce_instance(n, m, tok);
                 }
                 self.device_ic(letter, &[&n1, &n2], &params, tok);
                 // `TC=a,b` (Xyce, PSpice) is `tc1=a tc2=b` on ngspice
@@ -315,6 +316,7 @@ impl W<'_, '_> {
                 }
                 // An OSDI module's instance (ngspice manual §13); a module
                 // named directly takes a model of its own, its parameters.
+                self.xyce_instance(n, &model, tok);
                 let nodes_ref: Vec<&String> = nodes.iter().collect();
                 self.device_ic(letter, &nodes_ref, &params, tok);
                 let ps = self.params(&params);
@@ -435,7 +437,7 @@ pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String {
 // ---- private ----
 
 impl W<'_, '_> {
-    /// ` k=v` each (a flag bare), values [`W::spelled`].
+    /// ` k=v` each (a flag bare), values [`W::param_value`].
     fn params(&self, params: &[(String, String)]) -> String {
         let mut s = String::new();
         for (k, v) in params {
@@ -445,8 +447,11 @@ impl W<'_, '_> {
                 // A Spectre or VACASK expression is bare; a SPICE instance
                 // line reads one only in its delimiters (ngspice §2.8.5).
                 let bare = self.rd.named() && !v.starts_with('"') && !crate::unit::spice_bare(v);
-                let (open, close) = if bare { self.sp.expr } else { ("", "") };
-                s.push_str(&format!(" {k}={open}{}{close}", self.spelled(v)));
+                let v = match bare {
+                    true => format!("{}{}{}", self.sp.expr.0, self.spelled(v), self.sp.expr.1),
+                    false => self.param_value(v),
+                };
+                s.push_str(&format!(" {k}={v}"));
             }
         }
         s

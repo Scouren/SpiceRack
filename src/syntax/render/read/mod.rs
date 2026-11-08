@@ -17,7 +17,8 @@
 //! `blocks` walks the blocks on a heap stack, `text` joins tokens as the old
 //! line stage did, `refused` sorts what the old grammar refused, `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
-//! `cards`, `testbench`, `outputs` and `options` dot cards; `walk` steps a
+//! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
+//! the model card an instance uses); `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
 //!
 //! Cites: the old lowering
@@ -48,6 +49,7 @@ mod cards;
 mod devices;
 mod elements;
 mod funcs;
+mod model_cards;
 mod named;
 mod named_bench;
 mod named_blocks;
@@ -70,6 +72,7 @@ mod walk;
 
 pub(in crate::syntax::render) use cards::Model;
 pub(in crate::syntax::render) use elements::Card;
+pub(in crate::syntax::render) use model_cards::file_models;
 pub(in crate::syntax::render) use named_bench::{spectre_refusal, vacask_refusal};
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;

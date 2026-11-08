@@ -28,7 +28,7 @@ use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val};
 #[derive(Default)]
 pub(super) struct Tb {
     /// Each analysis, with its statement's first token.
-    analyses: Vec<(Ana, u32)>,
+    pub(super) analyses: Vec<(Ana, u32)>,
     /// The portable options, with their statement's first token.
     pub(super) portable: Vec<(String, String, u32)>,
     pub(super) xyce: Vec<(String, String)>,
@@ -36,11 +36,11 @@ pub(super) struct Tb {
     pub(super) tnom: Option<f64>,
     ics: Vec<(String, Val)>,
     nodesets: Vec<(String, Val)>,
-    saves: Vec<String>,
+    pub(super) saves: Vec<String>,
     /// The first save card's first token.
-    save_tok: Option<u32>,
+    pub(super) save_tok: Option<u32>,
     /// Each `.print`: its analysis, its outputs and its first token.
-    prints: Vec<(String, Vec<String>, u32)>,
+    pub(super) prints: Vec<(String, Vec<String>, u32)>,
     /// The first token of each options card holding an option not
     /// written: VACASK's own, or Xyce's on another target.
     dropped: Vec<u32>,
@@ -169,6 +169,7 @@ impl W<'_, '_> {
             self.note(Code::W0023, tok);
         }
         if self.b.options_form == OptionsForm::XycePackages {
+            self.xyce_drops(&tb);
             for l in self.xyce_options(&tb) {
                 self.o.token(&l, Space::Line);
             }
@@ -222,6 +223,7 @@ impl W<'_, '_> {
             // `.MEASURE TRAN ...` is already a card, in any case.
             let card = m.get(..5).is_some_and(|p| p.eq_ignore_ascii_case(".meas"));
             let line = format!("{}{m}", if card { "" } else { ".meas " });
+            let line = self.xyce_measure(line);
             self.o.token(&line, Space::Line);
         }
         for (sweep, param, [a, b, c], tok) in &tb.steps {
