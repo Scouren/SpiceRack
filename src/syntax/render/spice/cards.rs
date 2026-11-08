@@ -34,306 +34,26 @@ impl W<'_, '_> {
     /// inductors its `K` cards couple), an uncoupled inductor with no
     /// `Rser` carries LTspice's implicit `Rser=1m`.
     pub(super) fn card(&mut self, n: u32, coupled: Option<&[String]>) {
-        let tok = self.rd.main(n);
         // The name the letter policy gives the element (`names`).
         let decl = self.names.decl(n).to_string();
-        let line = match self.rd.card_view(n) {
-            Card::Rcl {
-                letter,
-                name,
-                n1,
-                n2,
-                value,
-                model,
-                mut params,
-            } => {
-                if letter == 'L'
-                    && let Some(c) = coupled
-                    && !c.contains(&name)
-                    && !params.iter().any(|(k, _)| k.eq_ignore_ascii_case("rser"))
-                {
-                    params.push(("Rser".into(), "1m".into()));
-                }
-                if let Some(m) = &model {
-                    self.ask(Construct::RclModel, tok);
-                    self.xyce_instance(n, m, tok);
-                }
-                self.device_ic(letter, &[&n1, &n2], &params, tok);
-                // `TC=a,b` (Xyce, PSpice) is `tc1=a tc2=b` on ngspice
-                // (manual §3.3.1: "unknown parameter (0)" for `tc=0,0`).
-                if self.b.netlist_rules == NetlistRules::Ngspice
-                    && let Some(i) = params
-                        .iter()
-                        .position(|(k, v)| k.eq_ignore_ascii_case("tc") && v.contains(','))
-                {
-                    let (_, v) = params.remove(i);
-                    let pairs = ["tc1", "tc2"].iter().zip(v.split(','));
-                    let pairs: Vec<(String, String)> = pairs
-                        .map(|(k, c)| (k.to_string(), c.trim().to_string()))
-                        .collect();
-                    params.splice(i..i, pairs);
-                }
-                // An LTspice C's or L's parasitics as elements where the
-                // target's C and L take none (`parasitics`).
-                let extra = match self.pair.lt_parasitics {
-                    true if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
-                    _ => None,
-                };
-                let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
-                let mut s = format!("{decl} {n1} {n2}");
-                // ngspice-45 reads a C or L model only before the value
-                // (`C1 1 0 1u CM`: "unknown parameter (cm)"; run), as
-                // HSPICE (`Cxxx n1 n2 [mname] [C=]val`) and Xyce RG do; an R
-                // either way.
-                let early = model.as_ref().filter(|_| letter != 'R');
-                if let Some(m) = early {
-                    s.push_str(&format!(" {m}"));
-                }
-                match &value {
-                    // Xyce's R model `R` multiplies the instance value
-                    // (default 1k), where ngspice's is the value
-                    // (`W::r_default`): the instance takes it.
-                    Val::Raw(t) if t.is_empty() => {
-                        let given = params.iter().any(|(k, _)| {
-                            k.eq_ignore_ascii_case("r") || k.eq_ignore_ascii_case("resistance")
-                        });
-                        let model = model.as_deref().filter(|_| !given);
-                        if let Some(r) = model.and_then(|m| self.r_default(letter, m)) {
-                            s.push_str(&format!(" {}", self.spelled(&r)));
-                        }
-                    }
-                    v => s.push_str(&format!(" {}", self.value(v))),
-                }
-                if let Some(m) = model.as_ref().filter(|_| early.is_none()) {
-                    s.push_str(&format!(" {m}"));
-                }
-                s.push_str(&self.params(&params));
-                for l in extra.map(|e| e.1).unwrap_or_default() {
-                    s.push('\n');
-                    s.push_str(&l);
-                }
-                s
+        let card = self.rd.card_view(n);
+        let line = match card {
+            Card::Rcl { .. } => self.rcl_card(n, card, coupled),
+            Card::Charge { .. } => self.charge_card(n, card),
+            Card::Coupling { .. } => self.coupling_card(n, card),
+            Card::Source { .. } => {
+                let (line, then) = self.source_card(n, card);
+                return self.o.token(&line, then);
             }
-            Card::Charge {
-                n1,
-                n2,
-                charge,
-                params,
-                ..
-            } => {
-                let q = match self.ask(Construct::ChargeCapacitor, tok) {
-                    Action::Spell(Alt::ChargeBraced) => format!("Q={{{charge}}}"),
-                    Action::Spell(Alt::ChargeBare) => format!("Q={charge}"),
-                    _ => format!("Q='{charge}'"),
-                };
-                format!("{decl} {n1} {n2} {q}{}", self.params(&params))
-            }
-            Card::Coupling { ls, refs, k, .. } => {
-                // Each inductor as the map spells its declaration in this
-                // scope; one declared elsewhere gains its letter as written.
-                let l: Vec<String> = refs
-                    .iter()
-                    .zip(&ls)
-                    .map(|(r, rest)| {
-                        self.names
-                            .reference(self.scope, r, 'L')
-                            .map_or_else(|| format!("L{rest}"), str::to_string)
-                    })
-                    .collect();
-                let k = self.sp.decimal(k, self.x);
-                // Xyce and LTspice couple every pair on one card (RG `K`,
-                // LTspice help `K`); the others one card per pair, the
-                // first keeping the name.
-                if self.b.coupling == Coupling::OneCard {
-                    format!("{decl} {} {k}", l.join(" "))
-                } else {
-                    pairs(&l)
-                        .enumerate()
-                        .map(|(i, (a, b))| format!("{decl}{} {a} {b} {k}", pair_suffix(i)))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                }
-            }
-            Card::Source {
-                letter,
-                np,
-                nm,
-                value,
-                ac_mag,
-                ac_phase,
-                wave,
-                port,
-                mut parasitics,
-                ..
-            } => {
-                if let Some(w) = &wave {
-                    self.wave_ok(letter, w, tok);
-                }
-                if let Some((num, z0)) = port
-                    && self.ask(Construct::RfPort, tok) == Action::Spell(Alt::XycePort)
-                {
-                    // Xyce's port carries no source value here.
-                    if value != Val::Num(0.0) || ac_mag.is_some() || wave.is_some() {
-                        self.refuse(crate::syntax::diag::Code::W0007, tok);
-                    }
-                    let name = decl.strip_prefix('V').filter(|r| r.starts_with(['P', 'p']));
-                    let name = name.map_or_else(|| format!("P{decl}"), str::to_string);
-                    let z0 = self.sp.decimal(z0, self.x);
-                    return self
-                        .o
-                        .token(&format!("{name} {np} {nm} port={num} z0={z0}"), Space::Line);
-                }
-                // LTspice writes its own; the others as elements.
-                let extra = match self.b.parasitics {
-                    Parasitics::Ltspice => None,
-                    Parasitics::Elements | Parasitics::Netlist => {
-                        parasitics::expand(&decl, &np, &nm, &mut parasitics)
-                    }
-                };
-                let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
-                let mut s = format!("{decl} {np} {nm} {}", self.value(&value));
-                if let Some(mag) = ac_mag {
-                    s.push_str(&format!(" AC {}", self.sp.decimal(mag, self.x)));
-                    if let Some(phase) = ac_phase {
-                        s.push_str(&format!(" {}", self.sp.decimal(phase, self.x)));
-                    }
-                }
-                if let Some((num, z0)) = port {
-                    s.push_str(&format!(
-                        " portnum {num} z0 {}",
-                        self.sp.decimal(z0, self.x)
-                    ));
-                }
-                if let Some(w) = &wave {
-                    s.push(' ');
-                    s.push_str(&self.wave(w));
-                }
-                s.push_str(&self.params(&parasitics));
-                for l in extra.map(|e| e.1).unwrap_or_default() {
-                    s.push('\n');
-                    s.push_str(&l);
-                }
-                s
-            }
-            Card::Table {
-                np,
-                nm,
-                expr,
-                points,
-                ..
-            } => {
-                let act = self.ask(Construct::TableSource, tok);
-                let n = |v: f64| self.sp.number(v, self.x);
-                match act {
-                    // ngspice manual, `pwl(x, x1, y1, …)` in an E/G value
-                    // (straight on past the ends, so a flat point is added
-                    // each side; ngspice-45 ran it equal to Xyce's TABLE).
-                    Action::Spell(Alt::PwlValue) => {
-                        let (x0, y0) = points[0];
-                        let (xn, yn) = points[points.len() - 1];
-                        let mut args = vec![format!("{}, {}", n(x0 - 1.0), n(y0))];
-                        args.extend(points.iter().map(|&(x, y)| format!("{}, {}", n(x), n(y))));
-                        args.push(format!("{}, {}", n(xn + 1.0), n(yn)));
-                        format!(
-                            "{decl} {np} {nm} value={{pwl({expr}, {})}}",
-                            args.join(", ")
-                        )
-                    }
-                    _ => {
-                        let pts: Vec<String> = points
-                            .iter()
-                            .map(|&(x, y)| format!("({},{})", n(x), n(y)))
-                            .collect();
-                        format!("{decl} {np} {nm} TABLE {{{expr}}} = {}", pts.join(" "))
-                    }
-                }
-            }
-            Card::Behavioural {
-                current,
-                np,
-                nm,
-                expr,
-                value,
-                ..
-            } => {
-                if laplace::has_laplace(self.rd, value) {
-                    self.laplace(&decl, &np, &nm, value, current, tok)
-                } else {
-                    let key = if current { 'I' } else { 'V' };
-                    let expr = self.names.refs(self.scope, &expr);
-                    // ngspice's B-source parser reads `?:` by C's grammar.
-                    let expr = self.ternaries_as(&expr, Read::C);
-                    match self.ask(Construct::BehaviouralSource, tok) {
-                        // The map names it `G1`/`E1` (`renamed`).
-                        Action::Spell(Alt::VolCur) if current => {
-                            format!("{decl} {np} {nm} cur='{expr}'")
-                        }
-                        Action::Spell(Alt::VolCur) => format!("{decl} {np} {nm} vol='{expr}'"),
-                        Action::Spell(Alt::BracedBehaviour) => {
-                            format!("{decl} {np} {nm} {key}={{{expr}}}")
-                        }
-                        _ => format!("{decl} {np} {nm} {key}={expr}"),
-                    }
-                }
-            }
+            Card::Table { .. } => self.table_card(n, card),
+            Card::Behavioural { .. } => self.behavioural_card(n, card),
             Card::Linear { nodes, gain, .. } => format!(
                 "{decl} {} {}",
                 nodes.join(" "),
                 self.sp.decimal(gain, self.x)
             ),
-            Card::Poly {
-                letter,
-                np,
-                nm,
-                controls,
-                coeffs,
-                ..
-            } => {
-                let dims = if matches!(letter, 'E' | 'G') {
-                    controls.len() / 2
-                } else {
-                    controls.len()
-                };
-                let coeffs: Vec<String> =
-                    coeffs.iter().map(|&c| self.sp.number(c, self.x)).collect();
-                format!(
-                    "{decl} {np} {nm} POLY({dims}) {} {}",
-                    controls.join(" "),
-                    coeffs.join(" ")
-                )
-            }
-            Card::Semi {
-                letter,
-                mut nodes,
-                model,
-                mut params,
-                ..
-            } => {
-                // An `O` (LTRA) line, an `N` (OSDI) instance.
-                let asked = [('O', Construct::LossyLine), ('N', Construct::OsdiInstance)];
-                if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
-                    self.ask(c, tok);
-                }
-                let shape = self.xyce_instance(n, &model, tok);
-                xyce_shape(shape, &decl, &mut nodes, &mut params);
-                // An OSDI module's instance (ngspice manual §13); a module
-                // named directly takes a model of its own, its parameters.
-                let nodes_ref: Vec<&String> = nodes.iter().collect();
-                self.device_ic(letter, &nodes_ref, &params, tok);
-                let ps = self.params(&params);
-                match self.rd.va_module(n) {
-                    Some(m) if ps.is_empty() => format!(
-                        ".model {decl}__va {m}\n{decl} {} {decl}__va",
-                        nodes.join(" ")
-                    ),
-                    Some(m) => format!(
-                        ".model {decl}__va {m} ({})\n{decl} {} {decl}__va",
-                        ps.trim_start(),
-                        nodes.join(" ")
-                    ),
-                    None => format!("{decl} {} {model}{ps}", nodes.join(" ")),
-                }
-            }
+            Card::Poly { .. } => self.poly_card(n, card),
+            Card::Semi { .. } => self.semi_card(n, card),
             Card::Switch { nodes, model, .. } => format!("{decl} {} {model}", nodes.join(" ")),
             Card::Line { nodes, z0, td, .. } => format!(
                 "{decl} {} Z0={} TD={}",
@@ -341,34 +61,7 @@ impl W<'_, '_> {
                 self.sp.decimal(z0, self.x),
                 self.sp.decimal(td, self.x)
             ),
-            Card::Inst {
-                ports,
-                master,
-                params,
-                ..
-            } => {
-                // ESPice has no subcircuit multiplicity (run by hand: `m=5`
-                // on an `X` line changes nothing), where ngspice's `m` is
-                // one unless the master declares `m`, Xyce's always.
-                let one = |v: &str| v.trim().parse::<f64>() == Ok(1.0);
-                let is_m = |(k, v): &(String, String)| k.eq_ignore_ascii_case("m") && !one(v);
-                if !self.b.subckt_multiplicity
-                    && params.iter().any(is_m)
-                    && match self.rd.b.netlist_rules {
-                        NetlistRules::Xyce => true,
-                        NetlistRules::Ngspice => !self.declares(&master, "m"),
-                        _ => false,
-                    }
-                {
-                    self.refuse(Code::W0047, tok);
-                }
-                let mut s = decl;
-                for p in &ports {
-                    s.push(' ');
-                    s.push_str(p);
-                }
-                format!("{s} {master}{}", self.params(&params))
-            }
+            Card::Inst { .. } => self.inst_card(n, card),
         };
         self.o.token(&line, Space::None);
     }
@@ -438,6 +131,399 @@ pub(in crate::syntax::render) fn pair_suffix(i: usize) -> String {
 // ---- private ----
 
 impl W<'_, '_> {
+    /// An R, C or L line: LTspice's implicit `Rser=1m` on an uncoupled L (with
+    /// `coupled`), the model where the target reads it, a Xyce R model's
+    /// value, `TC=a,b` as ngspice's `tc1`/`tc2`, LTspice parasitics as
+    /// elements (`parasitics`).
+    fn rcl_card(&mut self, n: u32, card: Card, coupled: Option<&[String]>) -> String {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Rcl {
+            letter,
+            name,
+            n1,
+            n2,
+            value,
+            model,
+            mut params,
+        } = card
+        else {
+            unreachable!("an R, C or L card")
+        };
+        if letter == 'L'
+            && let Some(c) = coupled
+            && !c.contains(&name)
+            && !params.iter().any(|(k, _)| k.eq_ignore_ascii_case("rser"))
+        {
+            params.push(("Rser".into(), "1m".into()));
+        }
+        if let Some(m) = &model {
+            self.ask(Construct::RclModel, tok);
+            self.xyce_instance(n, m, tok);
+        }
+        self.device_ic(letter, &[&n1, &n2], &params, tok);
+        // `TC=a,b` (Xyce, PSpice) is `tc1=a tc2=b` on ngspice
+        // (manual §3.3.1: "unknown parameter (0)" for `tc=0,0`).
+        if self.b.netlist_rules == NetlistRules::Ngspice
+            && let Some(i) = params
+                .iter()
+                .position(|(k, v)| k.eq_ignore_ascii_case("tc") && v.contains(','))
+        {
+            let (_, v) = params.remove(i);
+            let pairs = ["tc1", "tc2"].iter().zip(v.split(','));
+            let pairs: Vec<(String, String)> = pairs
+                .map(|(k, c)| (k.to_string(), c.trim().to_string()))
+                .collect();
+            params.splice(i..i, pairs);
+        }
+        // An LTspice C's or L's parasitics as elements where the
+        // target's C and L take none (`parasitics`).
+        let extra = match self.pair.lt_parasitics {
+            true if letter != 'R' => parasitics::expand(&decl, &n1, &n2, &mut params),
+            _ => None,
+        };
+        let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
+        let mut s = format!("{decl} {n1} {n2}");
+        // ngspice-45 reads a C or L model only before the value
+        // (`C1 1 0 1u CM`: "unknown parameter (cm)"; run), as
+        // HSPICE (`Cxxx n1 n2 [mname] [C=]val`) and Xyce RG do; an R
+        // either way.
+        let early = model.as_ref().filter(|_| letter != 'R');
+        if let Some(m) = early {
+            s.push_str(&format!(" {m}"));
+        }
+        match &value {
+            // Xyce's R model `R` multiplies the instance value
+            // (default 1k), where ngspice's is the value
+            // (`W::r_default`): the instance takes it.
+            Val::Raw(t) if t.is_empty() => {
+                let given = params.iter().any(|(k, _)| {
+                    k.eq_ignore_ascii_case("r") || k.eq_ignore_ascii_case("resistance")
+                });
+                let model = model.as_deref().filter(|_| !given);
+                if let Some(r) = model.and_then(|m| self.r_default(letter, m)) {
+                    s.push_str(&format!(" {}", self.spelled(&r)));
+                }
+            }
+            v => s.push_str(&format!(" {}", self.value(v))),
+        }
+        if let Some(m) = model.as_ref().filter(|_| early.is_none()) {
+            s.push_str(&format!(" {m}"));
+        }
+        s.push_str(&self.params(&params));
+        for l in extra.map(|e| e.1).unwrap_or_default() {
+            s.push('\n');
+            s.push_str(&l);
+        }
+        s
+    }
+
+    /// A charge capacitor (`Q=`), in the target's delimiters.
+    fn charge_card(&mut self, n: u32, card: Card) -> String {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Charge {
+            n1,
+            n2,
+            charge,
+            params,
+            ..
+        } = card
+        else {
+            unreachable!("a charge card")
+        };
+        let q = match self.ask(Construct::ChargeCapacitor, tok) {
+            Action::Spell(Alt::ChargeBraced) => format!("Q={{{charge}}}"),
+            Action::Spell(Alt::ChargeBare) => format!("Q={charge}"),
+            _ => format!("Q='{charge}'"),
+        };
+        format!("{decl} {n1} {n2} {q}{}", self.params(&params))
+    }
+
+    /// A `K` line: every pair on one card (Xyce, LTspice) or one card per pair.
+    fn coupling_card(&mut self, n: u32, card: Card) -> String {
+        let decl = self.names.decl(n).to_string();
+        let Card::Coupling { ls, refs, k, .. } = card else {
+            unreachable!("a coupling card")
+        };
+        // Each inductor as the map spells its declaration in this
+        // scope; one declared elsewhere gains its letter as written.
+        let l: Vec<String> = refs
+            .iter()
+            .zip(&ls)
+            .map(|(r, rest)| {
+                self.names
+                    .reference(self.scope, r, 'L')
+                    .map_or_else(|| format!("L{rest}"), str::to_string)
+            })
+            .collect();
+        let k = self.sp.decimal(k, self.x);
+        // Xyce and LTspice couple every pair on one card (RG `K`,
+        // LTspice help `K`); the others one card per pair, the
+        // first keeping the name.
+        if self.b.coupling == Coupling::OneCard {
+            format!("{decl} {} {k}", l.join(" "))
+        } else {
+            pairs(&l)
+                .enumerate()
+                .map(|(i, (a, b))| format!("{decl}{} {a} {b} {k}", pair_suffix(i)))
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+    }
+
+    /// An independent source: its value, AC, port, waveform and parasitics;
+    /// Xyce's RF port a `P` line of its own (the `Space` after it: a line
+    /// end for that one, none for the others).
+    fn source_card(&mut self, n: u32, card: Card) -> (String, Space) {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Source {
+            letter,
+            np,
+            nm,
+            value,
+            ac_mag,
+            ac_phase,
+            wave,
+            port,
+            mut parasitics,
+            ..
+        } = card
+        else {
+            unreachable!("a source card")
+        };
+        if let Some(w) = &wave {
+            self.wave_ok(letter, w, tok);
+        }
+        if let Some((num, z0)) = port
+            && self.ask(Construct::RfPort, tok) == Action::Spell(Alt::XycePort)
+        {
+            // Xyce's port carries no source value here.
+            if value != Val::Num(0.0) || ac_mag.is_some() || wave.is_some() {
+                self.refuse(crate::syntax::diag::Code::W0007, tok);
+            }
+            let name = decl.strip_prefix('V').filter(|r| r.starts_with(['P', 'p']));
+            let name = name.map_or_else(|| format!("P{decl}"), str::to_string);
+            let z0 = self.sp.decimal(z0, self.x);
+            return (format!("{name} {np} {nm} port={num} z0={z0}"), Space::Line);
+        }
+        // LTspice writes its own; the others as elements.
+        let extra = match self.b.parasitics {
+            Parasitics::Ltspice => None,
+            Parasitics::Elements | Parasitics::Netlist => {
+                parasitics::expand(&decl, &np, &nm, &mut parasitics)
+            }
+        };
+        let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
+        let mut s = format!("{decl} {np} {nm} {}", self.value(&value));
+        if let Some(mag) = ac_mag {
+            s.push_str(&format!(" AC {}", self.sp.decimal(mag, self.x)));
+            if let Some(phase) = ac_phase {
+                s.push_str(&format!(" {}", self.sp.decimal(phase, self.x)));
+            }
+        }
+        if let Some((num, z0)) = port {
+            s.push_str(&format!(
+                " portnum {num} z0 {}",
+                self.sp.decimal(z0, self.x)
+            ));
+        }
+        if let Some(w) = &wave {
+            s.push(' ');
+            s.push_str(&self.wave(w));
+        }
+        s.push_str(&self.params(&parasitics));
+        for l in extra.map(|e| e.1).unwrap_or_default() {
+            s.push('\n');
+            s.push_str(&l);
+        }
+        (s, Space::None)
+    }
+
+    /// An E/G `TABLE`: ngspice's `pwl()` value, or the native `TABLE`.
+    fn table_card(&mut self, n: u32, card: Card) -> String {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Table {
+            np,
+            nm,
+            expr,
+            points,
+            ..
+        } = card
+        else {
+            unreachable!("a table card")
+        };
+        let act = self.ask(Construct::TableSource, tok);
+        let n = |v: f64| self.sp.number(v, self.x);
+        match act {
+            // ngspice manual, `pwl(x, x1, y1, …)` in an E/G value
+            // (straight on past the ends, so a flat point is added
+            // each side; ngspice-45 ran it equal to Xyce's TABLE).
+            Action::Spell(Alt::PwlValue) => {
+                let (x0, y0) = points[0];
+                let (xn, yn) = points[points.len() - 1];
+                let mut args = vec![format!("{}, {}", n(x0 - 1.0), n(y0))];
+                args.extend(points.iter().map(|&(x, y)| format!("{}, {}", n(x), n(y))));
+                args.push(format!("{}, {}", n(xn + 1.0), n(yn)));
+                format!(
+                    "{decl} {np} {nm} value={{pwl({expr}, {})}}",
+                    args.join(", ")
+                )
+            }
+            _ => {
+                let pts: Vec<String> = points
+                    .iter()
+                    .map(|&(x, y)| format!("({},{})", n(x), n(y)))
+                    .collect();
+                format!("{decl} {np} {nm} TABLE {{{expr}}} = {}", pts.join(" "))
+            }
+        }
+    }
+
+    /// A behavioural source: a Laplace lift (`laplace`), HSPICE's
+    /// `vol=`/`cur=`, or `V=`/`I=` braced or bare.
+    fn behavioural_card(&mut self, n: u32, card: Card) -> String {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Behavioural {
+            current,
+            np,
+            nm,
+            expr,
+            value,
+            ..
+        } = card
+        else {
+            unreachable!("a behavioural card")
+        };
+        if laplace::has_laplace(self.rd, value) {
+            self.laplace(&decl, &np, &nm, value, current, tok)
+        } else {
+            let key = if current { 'I' } else { 'V' };
+            let expr = self.names.refs(self.scope, &expr);
+            // ngspice's B-source parser reads `?:` by C's grammar.
+            let expr = self.ternaries_as(&expr, Read::C);
+            match self.ask(Construct::BehaviouralSource, tok) {
+                // The map names it `G1`/`E1` (`renamed`).
+                Action::Spell(Alt::VolCur) if current => {
+                    format!("{decl} {np} {nm} cur='{expr}'")
+                }
+                Action::Spell(Alt::VolCur) => format!("{decl} {np} {nm} vol='{expr}'"),
+                Action::Spell(Alt::BracedBehaviour) => {
+                    format!("{decl} {np} {nm} {key}={{{expr}}}")
+                }
+                _ => format!("{decl} {np} {nm} {key}={expr}"),
+            }
+        }
+    }
+
+    /// A `POLY(n)` controlled source.
+    fn poly_card(&mut self, n: u32, card: Card) -> String {
+        let decl = self.names.decl(n).to_string();
+        let Card::Poly {
+            letter,
+            np,
+            nm,
+            controls,
+            coeffs,
+            ..
+        } = card
+        else {
+            unreachable!("a poly card")
+        };
+        let dims = if matches!(letter, 'E' | 'G') {
+            controls.len() / 2
+        } else {
+            controls.len()
+        };
+        let coeffs: Vec<String> = coeffs.iter().map(|&c| self.sp.number(c, self.x)).collect();
+        format!(
+            "{decl} {np} {nm} POLY({dims}) {} {}",
+            controls.join(" "),
+            coeffs.join(" ")
+        )
+    }
+
+    /// A semiconductor, `O` or `N` line: its Xyce shape (`xyce_cards`), a
+    /// device `IC=` (`initial`), an OSDI module's own model.
+    fn semi_card(&mut self, n: u32, card: Card) -> String {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Semi {
+            letter,
+            mut nodes,
+            model,
+            mut params,
+            ..
+        } = card
+        else {
+            unreachable!("a semiconductor card")
+        };
+        // An `O` (LTRA) line, an `N` (OSDI) instance.
+        let asked = [('O', Construct::LossyLine), ('N', Construct::OsdiInstance)];
+        if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
+            self.ask(c, tok);
+        }
+        let shape = self.xyce_instance(n, &model, tok);
+        xyce_shape(shape, &decl, &mut nodes, &mut params);
+        // An OSDI module's instance (ngspice manual §13); a module
+        // named directly takes a model of its own, its parameters.
+        let nodes_ref: Vec<&String> = nodes.iter().collect();
+        self.device_ic(letter, &nodes_ref, &params, tok);
+        let ps = self.params(&params);
+        match self.rd.va_module(n) {
+            Some(m) if ps.is_empty() => format!(
+                ".model {decl}__va {m}\n{decl} {} {decl}__va",
+                nodes.join(" ")
+            ),
+            Some(m) => format!(
+                ".model {decl}__va {m} ({})\n{decl} {} {decl}__va",
+                ps.trim_start(),
+                nodes.join(" ")
+            ),
+            None => format!("{decl} {} {model}{ps}", nodes.join(" ")),
+        }
+    }
+
+    /// An `X` line; an `m` the target ignores where the source multiplies
+    /// by it is refused (W0047).
+    fn inst_card(&mut self, n: u32, card: Card) -> String {
+        let tok = self.rd.main(n);
+        let decl = self.names.decl(n).to_string();
+        let Card::Inst {
+            ports,
+            master,
+            params,
+            ..
+        } = card
+        else {
+            unreachable!("an instance card")
+        };
+        // ESPice has no subcircuit multiplicity (run by hand: `m=5`
+        // on an `X` line changes nothing), where ngspice's `m` is
+        // one unless the master declares `m`, Xyce's always.
+        let one = |v: &str| v.trim().parse::<f64>() == Ok(1.0);
+        let is_m = |(k, v): &(String, String)| k.eq_ignore_ascii_case("m") && !one(v);
+        if !self.b.subckt_multiplicity
+            && params.iter().any(is_m)
+            && match self.rd.b.netlist_rules {
+                NetlistRules::Xyce => true,
+                NetlistRules::Ngspice => !self.declares(&master, "m"),
+                _ => false,
+            }
+        {
+            self.refuse(Code::W0047, tok);
+        }
+        let mut s = decl;
+        for p in &ports {
+            s.push(' ');
+            s.push_str(p);
+        }
+        format!("{s} {master}{}", self.params(&params))
+    }
+
     /// ` k=v` each (a flag bare), values [`W::param_value`].
     fn params(&self, params: &[(String, String)]) -> String {
         let mut s = String::new();
