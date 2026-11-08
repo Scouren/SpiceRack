@@ -47,7 +47,7 @@ impl W<'_, '_> {
     /// The whole VACASK deck, ending in a line end.
     pub(super) fn vacask(&mut self) {
         let deck = self.deck;
-        let blocks = self.vacask_blocks();
+        let blocks = self.blocks();
         let mut funcs = deck
             .funcs
             .iter()
@@ -334,29 +334,6 @@ impl<'r> W<'_, 'r> {
                     .flat_map(|(_, c)| &c.branches)
                     .map(|(_, body)| body),
             );
-        }
-        out
-    }
-
-    /// Every block a body is written from, branches included.
-    fn vacask_blocks(&self) -> Vec<&'r Block> {
-        let deck = self.deck;
-        let sections = deck
-            .sections
-            .iter()
-            .flat_map(|s| std::iter::once(&s.body).chain(&s.defs));
-        let mut work: Vec<&Block> = std::iter::once(&deck.top)
-            .chain(&deck.defs)
-            .chain(sections)
-            .collect();
-        work.reverse();
-        let mut out = Vec::new();
-        while let Some(b) = work.pop() {
-            out.push(b);
-            let branches = b.conds.iter().flat_map(|(_, c)| &c.branches);
-            let mut inner: Vec<&Block> = branches.map(|(_, body)| body).collect();
-            inner.reverse();
-            work.extend(inner);
         }
         out
     }
