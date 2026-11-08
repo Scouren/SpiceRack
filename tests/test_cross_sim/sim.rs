@@ -356,11 +356,32 @@ fn errors(log: &str) -> String {
         "unknown",
         "no such",
     ];
+    // VACASK names no error: its messages are the lines after
+    // `Simulating:` (its banner, `This is vacask unknown.`, is not one).
+    if let Some((_, run)) = log.split_once("Simulating:") {
+        let said: Vec<&str> = run
+            .lines()
+            .skip(1)
+            .map(str::trim)
+            .filter(|l| {
+                !l.is_empty()
+                    && !l.starts_with("Running analysis")
+                    && !l.starts_with("Elapsed time")
+            })
+            .take(4)
+            .collect();
+        if !said.is_empty() {
+            return said.join(" | ");
+        }
+    }
     let all: Vec<&str> = log.lines().map(str::trim).collect();
     let mut out = Vec::new();
     for (i, l) in all.iter().enumerate() {
         let low = l.to_lowercase();
-        if !CAUSES.iter().any(|c| low.contains(c)) || low.contains("fatal error in ngspice") {
+        if !CAUSES.iter().any(|c| low.contains(c))
+            || low.contains("fatal error in ngspice")
+            || low.starts_with("this is vacask")
+        {
             continue;
         }
         // Xyce wraps its location ("... at" / "or near line 8", "... at or" /

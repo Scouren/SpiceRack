@@ -4,7 +4,7 @@ benchmark/c6288/vacask-nortc/runme.sim slow # quarantined: the c6288 multiplier 
 benchmark/c6288/vacask/hmax_test.sim slow # quarantined: the c6288 multiplier benchmark past the CPU budget on VACASK
 benchmark/c6288/vacask/runme.sim slow # quarantined: the c6288 multiplier benchmark past the CPU budget on VACASK
 benchmark/c6288/vacask/test_ivdd.sim slow # quarantined: the c6288 multiplier benchmark past the CPU budget on VACASK
-benchmark/graetz/vacask/debug_graetz.sim source-fails # no raw file tran1.raw: This is vacask unknown. | worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 @ (unknown) | worst residual=0.00e+00 >TOL @ (un
-demo/rpn/parser.sim source-fails # no plot: This is vacask unknown.
-demo/rpn/sipfx.sim source-fails # no plot: This is vacask unknown.
-test/test_opstore.sim source-fails # no raw file op1.raw: This is vacask unknown. | Parser syntax error, unexpected ;, expecting ] or ","
+benchmark/graetz/vacask/debug_graetz.sim source-fails # no raw file tran1.raw: worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 @ (unknown) | worst residual=0.00e+00 >TOL @ (un
+demo/rpn/parser.sim source-fails # no plot: VACASK printed no message after its banner
+demo/rpn/sipfx.sim source-fails # no plot: VACASK printed no message after its banner
+test/test_opstore.sim source-fails # no raw file op1.raw: Parser syntax error, unexpected ;, expecting ] or ","
