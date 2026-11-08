@@ -6,9 +6,10 @@
 //!   HSPICE tokens, against `bare.scs` read by hand;
 //! - `kits_resolve`: every PDK kit and fixture read as one `syntax::resolve`
 //!   kit: its read order is the manifest's (`inputs.rs`'s walk), and every
-//!   instance master binds or carries an `R0001`; the counts are printed;
-//! - `throughput` (`--ignored`): tokenize, parse and render (as ngspice),
-//!   timed.
+//!   instance master binds or carries an `R0001`; the counts are printed.
+//!
+//! The stages' throughput is the perf suite's (`benches/perf.py`,
+//! TESTING.md "Performance").
 //!
 //! The comparisons phase 1 and 2 made here against the old reader in
 //! process (its logical lines, its number values, its IR) were retired when
@@ -32,7 +33,6 @@ use spicerack::syntax::Lang;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
 
 use std::collections::BTreeMap;
 
@@ -40,7 +40,6 @@ use spicerack::import::decode;
 use spicerack::syntax::Dialect;
 use spicerack::syntax::ast::{self, NONE, Node};
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::{Numbers, Source, render};
 use spicerack::syntax::resolve::{Binding, DefKind, FileId, Kit, LoadError, Role};
 use spicerack::syntax::token::Tag;
 use spicerack::syntax::{parse, tokenize};
@@ -260,51 +259,6 @@ fn kits_resolve() {
     for (set, c) in &counts {
         println!("{set}: {c:?}");
     }
-}
-
-/// Tokenize, parse and render (as ngspice) throughput over the gate's
-/// inputs, printed; `--ignored` runs it.
-#[test]
-#[ignore]
-fn throughput() {
-    // A deck nested deep in `.if`s renders recursively (as `golden` runs
-    // it, on a 256 MiB stack).
-    let big = std::thread::Builder::new().stack_size(256 << 20);
-    big.spawn(timed).expect("spawn").join().expect("timed");
-}
-
-fn timed() {
-    let (mut bytes, mut tokens, mut nodes) = (0usize, 0usize, 0usize);
-    let (mut lexing, mut parsing, mut rendering) = (0.0f64, 0.0f64, 0.0f64);
-    for (key, src, d) in every_input() {
-        let lex = Lang::from(d).lexicon().expect("lexicon");
-        let at = Instant::now();
-        let t = tokenize(&src, lex);
-        lexing += at.elapsed().as_secs_f64();
-        let at = Instant::now();
-        let ast = parse(&t, lex);
-        parsing += at.elapsed().as_secs_f64();
-        let at = Instant::now();
-        let file = Source {
-            ast: &ast,
-            tokens: &t,
-            lang: d.into(),
-            name: &key,
-            kit: None,
-            loads: &[],
-            numbers: Numbers::Read,
-        };
-        let _ = std::hint::black_box(render(&file, Dialect::Ngspice));
-        rendering += at.elapsed().as_secs_f64();
-        (bytes, tokens, nodes) = (bytes + src.len(), tokens + t.len(), nodes + ast.len());
-    }
-    let mb = bytes as f64 / 1e6;
-    println!(
-        "{mb:.1} MB, {tokens} tokens, {nodes} nodes: tokenize {lexing:.2} s ({:.1} MB/s), \
-         parse {parsing:.2} s ({:.1} MB/s), render {rendering:.2} s",
-        mb / lexing,
-        mb / parsing
-    );
 }
 
 /// Every golden-gate input as `(set/relpath, the text today reads, dialect)`,

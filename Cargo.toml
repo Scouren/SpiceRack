@@ -47,6 +47,12 @@ required-features = ["corpus"]
 name = "test_syntax"
 required-features = ["corpus"]
 
+# The perf suite's workloads; `benches/perf.py` gates them (TESTING.md,
+# "Performance").
+[[bench]]
+name = "perfbench"
+harness = false
+
 [[bin]]
 name = "spice2rack"
 
