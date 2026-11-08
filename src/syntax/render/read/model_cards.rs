@@ -9,8 +9,6 @@
 //! - `Rd::kit(&self) -> Option<&Kit>`
 //! - `pub(in crate::syntax::render) fn file_models<R>(kit: &Kit, file: FileId, f: impl FnMut(u32, Model) -> R) -> Vec<(u32, R)>`
 
-use std::collections::{HashMap, HashSet};
-
 use super::{Model, Rd};
 use crate::syntax::ast::{NONE, Node};
 use crate::syntax::resolve::{Binding, DefKind, FileId, Kit};
@@ -61,25 +59,7 @@ pub(in crate::syntax::render) fn file_models<R>(
     let ast = parse(&t, lex);
     assert_eq!(ast.len(), kit.node_count(file), "the kit file's tree");
     let d = kit.lang().behaviours().text_family;
-    let rd = Rd {
-        ast: &ast,
-        t: &t,
-        d,
-        b: d.behaviours(),
-        models: HashMap::new(),
-        kinds: HashMap::new(),
-        subckts: Vec::new(),
-        insts: HashMap::new(),
-        scope_of: HashMap::new(),
-        kit: Some((kit, file)),
-        masters: HashMap::new(),
-        unlifted: Default::default(),
-        fixes: HashMap::new(),
-        target: None,
-        nums: Vec::new(),
-        global_params: HashSet::new(),
-        promoted: HashSet::new(),
-    };
+    let rd = Rd::new(&ast, &t, d, Some((kit, file)));
     let mut out = Vec::new();
     for def in kit.definitions() {
         if def.file == file && matches!(def.kind, DefKind::Model { .. }) && !rd.named() {

@@ -17,6 +17,7 @@
 
 use std::collections::HashSet;
 
+use super::named_bench::nums;
 use super::named_elements::unquoted;
 use super::{Ana, BenchCard, DcAxis, DcSweep, Opt, Rd, Sweep};
 use crate::syntax::ast::{NONE, Node, Tag};
@@ -475,11 +476,4 @@ fn save_items(text: &str) -> Option<Vec<String>> {
         items.push(cur);
     }
     (depth == 0).then_some(items)
-}
-
-/// Numbered node values as [`BenchCard::NodeVals`] holds them.
-fn nums(v: Vec<(String, f64)>) -> Vec<(String, super::Val)> {
-    v.into_iter()
-        .map(|(n, x)| (n, super::Val::Num(x)))
-        .collect()
 }

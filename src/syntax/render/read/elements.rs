@@ -4,8 +4,10 @@
 //! the old SPICE grammar reads (a card that fails it was `Raw_element`,
 //! kept raw; one with no field after its name was `Unparsed`). In a kit, an
 //! R/C/L card's model word is the one `syntax::resolve` finds among its
-//! values. Two-terminal and linear controlled elements here; POLY, `B`,
-//! semiconductors and `X` in `devices`, V and I in `sources`.
+//! values. `Rd::component` is the per-letter dispatch (one arm per
+//! [`Element`], none left to `_`): R, C, L, K, S, W and T read here, E, F, G
+//! and H in `controlled`, POLY, `B`, semiconductors and `X` in `devices`, V
+//! and I in `sources`. A new letter's reading is a new arm and its function.
 //!
 //! Cites: the old lowering's element rules; the old SPICE grammar's §3.1 element rules (`R` … `X`,
 //! `inst`, `nodes`, `spec`, `wargs`, `Poly`, `behave`, `B`).
@@ -13,7 +15,8 @@
 //! Contents:
 //! - `pub(in crate::syntax::render) enum Card`
 //! - `Rd::element(&mut self, n: u32, here: &mut Block)`
-//! - `Rd::card_view(&self, n: u32) -> Card`, `Rd::letter(&self, n: u32) -> char`
+//! - `Rd::card_view(&self, n: u32) -> Card`, `Rd::letter(&self, n: u32) -> char`,
+//!   `Rd::node_text(&self, items: &[u32], i: usize) -> Option<String>`
 
 use super::{Block, Comp, Rd, Val, Wave};
 use crate::syntax::ast::{NONE, Node, Tag};
@@ -141,6 +144,44 @@ impl<'a> Rd<'a> {
     /// An element card onto `here`: a typed card, a subcircuit instance, or
     /// a raw line.
     pub(super) fn element(&mut self, n: u32, here: &mut Block) {
+        assert_eq!(self.tag(n), Tag::Instance, "an element card");
+        let before = here.comps.len() + here.insts.len() + here.raw.len();
+        self.place_element(n, here);
+        let after = here.comps.len() + here.insts.len() + here.raw.len();
+        assert_eq!(after, before + 1, "an element placed once");
+    }
+
+    /// The view of an element [`Rd::element`] placed as a typed card or an
+    /// instance.
+    ///
+    /// # Panics
+    /// When `n` is no such element.
+    pub(in crate::syntax::render) fn card_view(&self, n: u32) -> Card {
+        self.try_card(n).expect("an element the reader typed")
+    }
+
+    /// The card's element letter, uppercased (as the old IR kept it).
+    pub(super) fn letter(&self, n: u32) -> char {
+        let first = self.t.text(self.main(n)).chars().next();
+        first.expect("an element name").to_ascii_uppercase()
+    }
+
+    /// Item `i` of an element's `items` as a node name, when it is a word.
+    pub(super) fn node_text(&self, items: &[u32], i: usize) -> Option<String> {
+        items
+            .get(i)
+            .copied()
+            .filter(|&k| self.is_word(k))
+            .map(|k| self.text(k))
+    }
+}
+
+// ---- private ----
+
+impl<'a> Rd<'a> {
+    /// Element `n` onto `here`; the one place a typed element's [`Card`]
+    /// is first built (`try_card`), where a table of views would be filled.
+    fn place_element(&mut self, n: u32, here: &mut Block) {
         if !self
             .t
             .text(self.main(n))
@@ -160,25 +201,6 @@ impl<'a> Rd<'a> {
         }
     }
 
-    /// The view of an element [`Rd::element`] placed as a typed card or an
-    /// instance.
-    ///
-    /// # Panics
-    /// When `n` is no such element.
-    pub(in crate::syntax::render) fn card_view(&self, n: u32) -> Card {
-        self.try_card(n).expect("an element the reader typed")
-    }
-
-    /// The card's element letter, uppercased (as the old IR kept it).
-    pub(super) fn letter(&self, n: u32) -> char {
-        let first = self.t.text(self.main(n)).chars().next();
-        first.expect("an element name").to_ascii_uppercase()
-    }
-}
-
-// ---- private ----
-
-impl<'a> Rd<'a> {
     /// What the old reader typed element `n` as; `None` for a raw one.
     fn try_card(&self, n: u32) -> Option<Card> {
         if self.named() {
@@ -242,172 +264,132 @@ impl<'a> Rd<'a> {
         {
             return None;
         }
-        let node = |i: usize| {
-            items
-                .get(i)
-                .copied()
-                .filter(|&k| self.is_word(k))
-                .map(|k| self.text(k))
-        };
-        Some(match e {
+        let node = |i: usize| self.node_text(items, i);
+        match e {
             Element::Resistor | Element::Capacitor | Element::Inductor => {
-                self.rcl(n, e, name, node(0)?, node(1)?, &items[2..])?
+                self.rcl(n, e, name, node(0)?, node(1)?, &items[2..])
             }
-            Element::Coupling => {
-                let (k, ls) = items.split_last()?;
-                // ngspice's `K` couples two inductors (manual, coupled
-                // inductors); Xyce's and LTspice's any number.
-                let many = matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice);
-                if ls.len() < 2 || (ls.len() > 2 && !many) {
-                    return None;
-                }
-                if !ls.iter().chain([k]).all(|&x| self.is_word(x)) {
-                    return None;
-                }
-                let refs: Vec<String> = ls.iter().map(|&x| self.text(x)).collect();
-                // Past two, each an inductor's name, once (Xyce also reads
-                // `K1 L1 L2 0.75 K2 L1 L3 0.8`, two cards on a line).
-                let named = |r: &String| r.starts_with(['l', 'L']);
-                if refs.len() > 2
-                    && (!refs.iter().all(named)
-                        || refs
-                            .iter()
-                            .enumerate()
-                            .any(|(i, r)| refs[..i].iter().any(|q| q.eq_ignore_ascii_case(r))))
-                {
-                    return None;
-                }
-                Card::Coupling {
-                    name,
-                    ls: refs
-                        .iter()
-                        .map(|r| r.get(1..).map(str::to_string))
-                        .collect::<Option<_>>()?,
-                    refs,
-                    k: self.number(*k)?,
-                }
-            }
-            Element::VoltageSource | Element::CurrentSource => self.source(n, e, name)?,
+            Element::Coupling => self.coupling(name, items),
+            Element::VoltageSource | Element::CurrentSource => self.source(n, e, name),
             Element::Vcvs | Element::Vccs | Element::Cccs | Element::Ccvs => {
-                if let Some(p) = self.poly(n, name.clone()) {
-                    return p;
-                }
-                let (np, nm) = (node(0)?, node(1)?);
-                let letter = self.letter(n);
-                match e {
-                    Element::Vcvs | Element::Vccs => {
-                        if let [_, _, a, mods @ ..] = items
-                            && self.tag(*a) == Tag::Assign
-                        {
-                            let key = self.key(*a).to_ascii_lowercase();
-                            let v = self.ast.rhs(Node(*a));
-                            if !matches!(key.as_str(), "value" | "vol" | "cur") || !self.val_ok(v) {
-                                return None;
-                            }
-                            return Some(Card::Behavioural {
-                                current: e == Element::Vccs,
-                                name,
-                                np,
-                                nm,
-                                expr: self.modified(self.body_text(v), mods)?,
-                                value: v,
-                            });
-                        }
-                        let (items, m) = self.multiplier(e, items)?;
-                        let [_, _, c, d, g] = items else { return None };
-                        if ![c, d, g].iter().all(|&&k| self.is_word(k)) {
-                            return None;
-                        }
-                        Card::Linear {
-                            letter,
-                            name,
-                            nodes: vec![np, nm, self.text(*c), self.text(*d)],
-                            gain: self.number(*g)? * m,
-                        }
-                    }
-                    _ => {
-                        let (items, m) = self.multiplier(e, items)?;
-                        let [_, _, v, g] = items else { return None };
-                        if !self.is_word(*v) || !self.is_word(*g) {
-                            return None;
-                        }
-                        Card::Linear {
-                            letter,
-                            name,
-                            nodes: vec![np, nm, self.text(*v)],
-                            gain: self.number(*g)? * m,
-                        }
-                    }
-                }
+                self.controlled(n, e, name, items)
             }
-            Element::Behavioural => self.behavioural(n, name)?,
+            Element::Behavioural => self.behavioural(n, name),
             Element::Diode | Element::Bjt | Element::Mosfet | Element::Jfet | Element::Mesfet => {
-                self.semiconductor(n, e, name)?
+                self.semiconductor(n, e, name)
             }
             // Xyce's and LTspice's `O` (four nodes, an LTRA model) is
             // ngspice's (manual §6.3, Xyce RG lossy transmission line).
             Element::LossyLine
                 if matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice) =>
             {
-                self.semiconductor(n, e, name)?
+                self.semiconductor(n, e, name)
             }
-            Element::VoltageSwitch | Element::CurrentSwitch => {
-                let want = if e == Element::VoltageSwitch { 5 } else { 4 };
-                if items.len() != want || !items.iter().all(|&k| self.is_word(k)) {
-                    return None;
-                }
-                let (nodes, m) = items.split_at(want - 1);
-                Card::Switch {
-                    letter: self.letter(n),
-                    name,
-                    nodes: nodes.iter().map(|&k| self.text(k)).collect(),
-                    model: self.text(m[0]),
-                }
-            }
-            Element::TransmissionLine => {
-                if items.len() < 4 || !items[..4].iter().all(|&k| self.is_word(k)) {
-                    return None;
-                }
-                let pairs = &items[4..];
-                if !pairs.iter().all(|&p| self.pair_ok(p)) {
-                    return None;
-                }
-                let get = |key: &str| {
-                    pairs
-                        .iter()
-                        .find(|&&p| self.key(p).eq_ignore_ascii_case(key))
-                        .and_then(|&p| self.number(self.ast.rhs(Node(p))))
-                };
-                let known = ["z0", "td", "f", "nl"];
-                if !pairs
-                    .iter()
-                    .all(|&p| known.iter().any(|k| self.key(p).eq_ignore_ascii_case(k)))
-                {
-                    return None;
-                }
-                // The delay, or a frequency at which the line is `nl`
-                // wavelengths long (default a quarter): td = nl / f
-                // (ngspice manual and Xyce RG, lossless transmission line `T`).
-                let td = match (get("td"), get("f")) {
-                    (Some(td), None) if pairs.len() == 2 => td,
-                    (None, Some(f)) if f > 0.0 && pairs.len() <= 3 => get("nl").unwrap_or(0.25) / f,
-                    _ => return None,
-                };
-                Card::Line {
-                    name,
-                    nodes: items[..4].iter().map(|&k| self.text(k)).collect(),
-                    z0: get("z0")?,
-                    td,
-                }
-            }
-            // else: the ngspice letters the old reader had no rule for.
+            Element::VoltageSwitch | Element::CurrentSwitch => self.switch(n, e, name, items),
+            Element::TransmissionLine => self.tline(name, items),
+            // else: the ngspice letters the old reader had no rule for; a
+            // new element's reading fills its own arm here.
             Element::Subckt
             | Element::LossyLine
             | Element::RcLine
             | Element::Txl
             | Element::CoupledLines
             | Element::CodeModel
-            | Element::Osdi => return None,
+            | Element::Osdi => None,
+        }
+    }
+
+    /// `K1 L1 L2 … k` (`items` after the name): ngspice couples two
+    /// inductors (manual, coupled inductors), Xyce and LTspice any number.
+    fn coupling(&self, name: String, items: &[u32]) -> Option<Card> {
+        let (k, ls) = items.split_last()?;
+        let many = matches!(self.b.card_rules, CardRules::Xyce | CardRules::Ltspice);
+        if ls.len() < 2 || (ls.len() > 2 && !many) {
+            return None;
+        }
+        if !ls.iter().chain([k]).all(|&x| self.is_word(x)) {
+            return None;
+        }
+        let refs: Vec<String> = ls.iter().map(|&x| self.text(x)).collect();
+        // Past two, each an inductor's name, once (Xyce also reads
+        // `K1 L1 L2 0.75 K2 L1 L3 0.8`, two cards on a line).
+        let named = |r: &String| r.starts_with(['l', 'L']);
+        if refs.len() > 2
+            && (!refs.iter().all(named)
+                || refs
+                    .iter()
+                    .enumerate()
+                    .any(|(i, r)| refs[..i].iter().any(|q| q.eq_ignore_ascii_case(r))))
+        {
+            return None;
+        }
+        let ls: Vec<String> = refs
+            .iter()
+            .map(|r| r.get(1..).map(str::to_string))
+            .collect::<Option<_>>()?;
+        assert_eq!(ls.len(), refs.len(), "one inductor per reference");
+        assert!(ls.len() >= 2, "a coupling couples two or more");
+        Some(Card::Coupling {
+            name,
+            ls,
+            refs,
+            k: self.number(*k)?,
+        })
+    }
+
+    /// `S` (four nodes and a model) or `W` (two nodes, a controlling
+    /// source and a model): `items` after the name.
+    fn switch(&self, n: u32, e: Element, name: String, items: &[u32]) -> Option<Card> {
+        assert!(matches!(e, Element::VoltageSwitch | Element::CurrentSwitch));
+        let want = if e == Element::VoltageSwitch { 5 } else { 4 };
+        if items.len() != want || !items.iter().all(|&k| self.is_word(k)) {
+            return None;
+        }
+        let (nodes, m) = items.split_at(want - 1);
+        assert_eq!(m.len(), 1, "the model last");
+        Some(Card::Switch {
+            letter: self.letter(n),
+            name,
+            nodes: nodes.iter().map(|&k| self.text(k)).collect(),
+            model: self.text(m[0]),
+        })
+    }
+
+    /// `T a b c d Z0= TD=` or `F= [NL=]` (`items` after the name).
+    fn tline(&self, name: String, items: &[u32]) -> Option<Card> {
+        if items.len() < 4 || !items[..4].iter().all(|&k| self.is_word(k)) {
+            return None;
+        }
+        let pairs = &items[4..];
+        if !pairs.iter().all(|&p| self.pair_ok(p)) {
+            return None;
+        }
+        let get = |key: &str| {
+            pairs
+                .iter()
+                .find(|&&p| self.key(p).eq_ignore_ascii_case(key))
+                .and_then(|&p| self.number(self.ast.rhs(Node(p))))
+        };
+        let known = ["z0", "td", "f", "nl"];
+        if !pairs
+            .iter()
+            .all(|&p| known.iter().any(|k| self.key(p).eq_ignore_ascii_case(k)))
+        {
+            return None;
+        }
+        // The delay, or a frequency at which the line is `nl`
+        // wavelengths long (default a quarter): td = nl / f
+        // (ngspice manual and Xyce RG, lossless transmission line `T`).
+        let td = match (get("td"), get("f")) {
+            (Some(td), None) if pairs.len() == 2 => td,
+            (None, Some(f)) if f > 0.0 && pairs.len() <= 3 => get("nl").unwrap_or(0.25) / f,
+            _ => return None,
+        };
+        Some(Card::Line {
+            name,
+            nodes: items[..4].iter().map(|&k| self.text(k)).collect(),
+            z0: get("z0")?,
+            td,
         })
     }
 
@@ -427,43 +409,6 @@ impl<'a> Rd<'a> {
             .params
             .iter()
             .all(|(k, _)| SAME.iter().any(|s| k.eq_ignore_ascii_case(s)))
-    }
-
-    /// HSPICE's E/G output modifiers after `VALUE=` (HSPICE UG, E and G
-    /// elements: `SCALE` multiplies the value, `MAX` and `MIN` clamp it)
-    /// applied to `expr`; `None` for any other trailing item.
-    fn modified(&self, expr: String, mods: &[u32]) -> Option<String> {
-        let mut e = expr;
-        for &m in mods {
-            if self.b.card_rules != CardRules::Hspice || self.tag(m) != Tag::Assign {
-                return None;
-            }
-            let v = self.body_text(self.ast.rhs(Node(m)));
-            e = match self.key(m).to_ascii_lowercase().as_str() {
-                "scale" => format!("({e})*({v})"),
-                "max" => format!("min({e}, {v})"),
-                "min" => format!("max({e}, {v})"),
-                _ => return None,
-            };
-        }
-        Some(e)
-    }
-
-    /// A linear controlled source's items less a trailing `M=` and its
-    /// value (1 without one): `M` parallel copies of a current-output source
-    /// (G, F) is the gain times `M` (Xyce RG and ngspice manual, the
-    /// controlled sources' `m=`); `None` for an `M=` on E or H, or one not a number.
-    fn multiplier<'i>(&self, e: Element, items: &'i [u32]) -> Option<(&'i [u32], f64)> {
-        match items.split_last() {
-            Some((&a, rest))
-                if self.tag(a) == Tag::Assign && self.key(a).eq_ignore_ascii_case("m") =>
-            {
-                let current = matches!(e, Element::Vccs | Element::Cccs);
-                current.then_some(())?;
-                Some((rest, self.number(self.ast.rhs(Node(a)))?))
-            }
-            _ => Some((items, 1.0)),
-        }
     }
 
     /// An R, C or L card's value, model and parameters.

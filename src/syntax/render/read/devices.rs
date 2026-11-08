@@ -195,7 +195,8 @@ impl<'a> Rd<'a> {
         {
             return Some(self.inner(v).trim().to_string());
         }
-        if self.ttag(first) == T::LBrace && self.brace_close(first) == Some(last) {
+        if self.ttag(first) == T::LBrace && self.close_of(first, T::LBrace, T::RBrace) == Some(last)
+        {
             return Some(self.span(first + 1, last - 1).trim().to_string());
         }
         Some(self.span(first, last).trim().to_string())
@@ -275,28 +276,5 @@ impl<'a> Rd<'a> {
             master: self.master_name(n),
             params: self.params_of(&pairs, false),
         })
-    }
-}
-
-// ---- private ----
-
-impl<'a> Rd<'a> {
-    /// The `}` matching the `{` at `open`, on its statement.
-    fn brace_close(&self, open: u32) -> Option<u32> {
-        let last = self.line_last(open);
-        let mut depth = 0i32;
-        for k in open..=last {
-            match self.ttag(k) {
-                T::LBrace => depth += 1,
-                T::RBrace => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Some(k);
-                    }
-                }
-                _ => {}
-            }
-        }
-        None
     }
 }

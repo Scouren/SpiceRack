@@ -189,7 +189,9 @@ impl Rd<'_> {
             .find(|&k| k != NONE && self.first(k) == start && self.last(k) == last);
         Some(if expr.is_some_and(|e| self.expr_ok(e)) {
             Body::Expr(expr.expect("checked"))
-        } else if self.ttag(start) == T::LBrace && self.brace_close_at(start) == Some(last) {
+        } else if self.ttag(start) == T::LBrace
+            && self.close_of(start, T::LBrace, T::RBrace) == Some(last)
+        {
             Body::Span(start + 1, last - 1)
         } else {
             Body::Span(start, last)
@@ -204,18 +206,5 @@ impl Rd<'_> {
         let e = a.lhs(Node(n));
         let string = e != NONE && self.tag(e) == Tag::Str && self.ttag(open) == T::LBrace;
         (!string && close > open + 1).then(|| (open + 1, close - 1))
-    }
-
-    fn brace_close_at(&self, open: u32) -> Option<u32> {
-        let last = self.line_last(open);
-        let mut depth = 0i32;
-        (open..=last).find(|&k| {
-            match self.ttag(k) {
-                T::LBrace => depth += 1,
-                T::RBrace => depth -= 1,
-                _ => {}
-            }
-            depth == 0
-        })
     }
 }

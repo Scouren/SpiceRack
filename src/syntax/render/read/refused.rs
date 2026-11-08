@@ -292,8 +292,9 @@ impl Rd<'_> {
             };
         }
         let w = self.t.text(tok).to_ascii_lowercase();
-        if self.text_behaviours(tok).card_rules == CardRules::Hspice {
-            return match w.as_str() {
+        // One arm per dialect family: a dialect's own words fill its arm.
+        match self.text_behaviours(tok).card_rules {
+            CardRules::Hspice => match w.as_str() {
                 // HSPICE's StatEye, digital vector files, timing checks and
                 // power report (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`,
                 // `.POWER`): no other simulator has them.
@@ -309,19 +310,22 @@ impl Rd<'_> {
                 // `FSmodel`, `Smodel`), a lossy multi-conductor line.
                 w if w.starts_with('w') && self.w_line(tok) => Construct::HspiceWLine,
                 _ => Construct::ForeignText,
-            };
-        }
-        if self.text_behaviours(tok).card_rules != CardRules::Xyce {
-            return Construct::ForeignText;
-        }
-        let private = match w.strip_prefix('y') {
-            Some(ty) => XY_DEVICES.contains(&ty),
-            None => XY_CARDS.contains(&w.as_str()),
-        };
-        match w.as_str() {
-            _ if private => Construct::PrivateText,
-            ".sens" => Construct::XyceSens,
-            _ => Construct::ForeignText,
+            },
+            CardRules::Xyce => {
+                let private = match w.strip_prefix('y') {
+                    Some(ty) => XY_DEVICES.contains(&ty),
+                    None => XY_CARDS.contains(&w.as_str()),
+                };
+                match w.as_str() {
+                    _ if private => Construct::PrivateText,
+                    ".sens" => Construct::XyceSens,
+                    _ => Construct::ForeignText,
+                }
+            }
+            // No LTspice text is its own construct yet: LTspice's private
+            // words get their construct in this arm.
+            CardRules::Ltspice => Construct::ForeignText,
+            CardRules::Spice | CardRules::Ngspice => Construct::ForeignText,
         }
     }
 }

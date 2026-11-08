@@ -45,9 +45,9 @@ impl<'a> Rd<'a> {
         }
         self.only_commas_between(n, items)
             && items.iter().all(|&k| {
-                self.wordw(k)
+                self.is_word(k)
                     || self.tag(k) == Tag::Assign
-                        && self.wordw(self.ast.lhs(Node(k)))
+                        && self.is_word(self.ast.lhs(Node(k)))
                         && self.val_ok(self.ast.rhs(Node(k)))
             })
     }
@@ -113,7 +113,7 @@ impl<'a> Rd<'a> {
         let mut out = Vec::new();
         let mut i = 0;
         let numberish = |k: u32| {
-            self.wordw(k)
+            self.is_word(k)
                 && self
                     .text(k)
                     .starts_with(|c: char| c.is_ascii_digit() || "+-.".contains(c))
@@ -121,7 +121,7 @@ impl<'a> Rd<'a> {
         while i < rest.len() {
             let k = rest[i];
             let (key, v) = match self.tag(k) {
-                Tag::Assign if self.wordw(self.ast.lhs(Node(k))) => {
+                Tag::Assign if self.is_word(self.ast.lhs(Node(k))) => {
                     (self.key(k), self.ast.rhs(Node(k)))
                 }
                 Tag::Word
@@ -152,7 +152,7 @@ impl<'a> Rd<'a> {
             let mut prev = v;
             let mut more = false;
             while let Some(&x) = rest.get(i + 1)
-                && self.wordw(x)
+                && self.is_word(x)
                 && (self.comma_between(prev, x) || numberish(x))
             {
                 text.push_str(if self.comma_between(prev, x) {
@@ -178,6 +178,6 @@ impl<'a> Rd<'a> {
 
     /// the old Xyce grammar's `Pkg`: a first word that is no `key=`.
     fn xyce_pkg(&self, n: u32) -> Option<u32> {
-        self.fields(n).first().copied().filter(|&k| self.wordw(k))
+        self.fields(n).first().copied().filter(|&k| self.is_word(k))
     }
 }

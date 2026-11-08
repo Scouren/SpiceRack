@@ -11,16 +11,17 @@
 //!
 //! Contents:
 //! - `pub(in crate::syntax::render) enum BenchCard`, `enum Ana`, `struct Sweep`; `pub(super) enum Card`
+//!   (an analysis card's [`Ana`] is `analyses`')
+//! - `pub(super) const SWEEPS`, `fn keyword(w: &str, set: &[&'static str]) -> Option<&'static str>`
 //! - `Rd::testbench_peg(&self, n: u32) -> bool`, `Rd::testbench_ok(&self, n: u32) -> bool`
 //! - `Rd::bench_card(&self, n: u32) -> Option<BenchCard>`
 //! - `Rd::tran_startup(&self, bench: &[Bench]) -> Option<u32>`
 //! - `Rd::head_kind(&self, n: u32) -> String`
 //! - `Rd::numw(&self, k: u32) -> bool`
-//! - `Rd::wordw(&self, k: u32) -> bool`, `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
+//! - `Rd::spaced(&self, n: u32, items: &[u32]) -> bool`
 
 use super::options::Opt;
 use super::outputs::print_kind;
-use super::sweeps::DcSweep;
 use super::{Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::CardRules;
@@ -124,7 +125,10 @@ pub(in crate::syntax::render) struct Sweep {
     pub(in crate::syntax::render) stop: f64,
 }
 
-/// A testbench card's parts, as its grammar rule reads them.
+/// A testbench card's parts, as its grammar rule reads them. A new card
+/// is a variant here, its reading an arm of `read_card`, and an arm of
+/// `analysis` (an analysis) or of `Rd::bench_card` (anything else): both
+/// matches name every variant, so the compiler lists the two sites.
 pub(super) enum Card {
     Op,
     /// `.dc`: the sweeps' `[source, start, stop, step]` items.
@@ -163,7 +167,7 @@ pub(super) enum Card {
 }
 
 /// The sweep keywords (`Sweep` in the IR).
-const SWEEPS: &[&str] = &["dec", "oct", "lin", "log"];
+pub(super) const SWEEPS: &[&str] = &["dec", "oct", "lin", "log"];
 
 impl<'a> Rd<'a> {
     /// Whether the card's rule in the dialect's grammar reads it.
@@ -226,7 +230,19 @@ impl<'a> Rd<'a> {
                     line
                 })
             }
-            _ => return None,
+            // An analysis card `analysis` did not read (a number that is
+            // none): the IR holds nothing of it.
+            Card::Op
+            | Card::Dc(_)
+            | Card::DcAxes(_)
+            | Card::Freq(..)
+            | Card::Tran(..)
+            | Card::Noise(..)
+            | Card::Tf(..)
+            | Card::Sens(..)
+            | Card::Pz(_)
+            | Card::PzNodes(..)
+            | Card::Four(..) => return None,
         })
     }
 
@@ -248,12 +264,9 @@ impl<'a> Rd<'a> {
         w.strip_prefix('.').unwrap_or(&w).to_string()
     }
 
+    /// Whether item `k` is a word that reads as a number.
     pub(super) fn numw(&self, k: u32) -> bool {
         self.tag(k) == Tag::Word && self.number(k).is_some()
-    }
-
-    pub(super) fn wordw(&self, k: u32) -> bool {
-        self.tag(k) == Tag::Word
     }
 
     /// quirk: whether every item follows the one before it (or the head) after
@@ -269,6 +282,11 @@ impl<'a> Rd<'a> {
         }
         true
     }
+}
+
+/// `w` as the keyword of `set` it names in any case.
+pub(super) fn keyword(w: &str, set: &[&'static str]) -> Option<&'static str> {
+    set.iter().copied().find(|k| k.eq_ignore_ascii_case(w))
 }
 
 // ---- private ----
@@ -309,7 +327,7 @@ impl<'a> Rd<'a> {
                 }
                 items
                     .chunks(2)
-                    .map(|p| (self.wordw(p[0]) && self.val_ok(p[1])).then_some((p[0], p[1])))
+                    .map(|p| (self.is_word(p[0]) && self.val_ok(p[1])).then_some((p[0], p[1])))
                     .collect::<Option<Vec<_>>>()
                     .map(Card::NodeVals)
             }
@@ -326,14 +344,14 @@ impl<'a> Rd<'a> {
                         && self.val_ok(v);
                     let inside = if ok { self.group_items(g) } else { &[] };
                     match inside {
-                        [node] if self.wordw(*node) => Some((*node, v)),
+                        [node] if self.is_word(*node) => Some((*node, v)),
                         _ => None,
                     }
                 })
                 .collect::<Option<Vec<_>>>()
                 .map(Card::NodeVals),
             Tag::Save if kind == "probe" => self.probe_outs(n).map(Card::Probe),
-            Tag::Save => self.outs_after(n, 0).map(Card::Save),
+            Tag::Save => self.outs_text(&self.rest_text(n)).map(Card::Save),
             Tag::Print => {
                 let rest = self.rest_text(n);
                 let (pk, after) = print_kind(&rest);
@@ -363,7 +381,7 @@ impl<'a> Rd<'a> {
                 {
                     let r = |k: u32| self.ast.rhs(Node(k));
                     let s = [*v, r(*a), r(*b), r(*c)];
-                    (self.wordw(s[0]) && s[1..].iter().all(|&k| self.number(k).is_some()))
+                    (self.is_word(s[0]) && s[1..].iter().all(|&k| self.number(k).is_some()))
                         .then(|| Card::Dc(vec![s]))
                 }
                 "dc" => {
@@ -375,13 +393,13 @@ impl<'a> Rd<'a> {
                         items.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect();
                     sweeps
                         .iter()
-                        .all(|s| self.wordw(s[0]) && s[1..].iter().all(|&k| self.numw(k)))
+                        .all(|s| self.is_word(s[0]) && s[1..].iter().all(|&k| self.numw(k)))
                         .then_some(Card::Dc(sweeps))
                 }
                 "ac" | "sp" => match items {
                     [v, a, b, c]
                         if self.spaced(n, items)
-                            && self.wordw(*v)
+                            && self.is_word(*v)
                             && [a, b, c].iter().all(|&&k| self.numw(k)) =>
                     {
                         Some(Card::Freq(kind == "sp", [*v, *a, *b, *c]))
@@ -404,7 +422,7 @@ impl<'a> Rd<'a> {
                 "pz" if hspice => self.hspice_pz(n),
                 "pz" => match items {
                     [a, b, c, d, e, f]
-                        if self.spaced(n, items) && items.iter().all(|&k| self.wordw(k)) =>
+                        if self.spaced(n, items) && items.iter().all(|&k| self.is_word(k)) =>
                     {
                         Some(Card::Pz([*a, *b, *c, *d, *e, *f]))
                     }
@@ -430,7 +448,7 @@ impl<'a> Rd<'a> {
         // LTspice's `startup` (LTspice help, `.TRAN`).
         let (mut body, mut uic, mut startup) = (items, false, false);
         while let Some((&u, rest)) = body.split_last()
-            && self.wordw(u)
+            && self.is_word(u)
         {
             let w = self.text(u).to_ascii_lowercase();
             match w.as_str() {
@@ -475,7 +493,7 @@ impl<'a> Rd<'a> {
             return None;
         }
         if start.is_some_and(|p| {
-            !self.wordw(self.ast.lhs(Node(p))) || !self.val_ok(self.ast.rhs(Node(p)))
+            !self.is_word(self.ast.lhs(Node(p))) || !self.val_ok(self.ast.rhs(Node(p)))
         }) {
             return None;
         }
@@ -496,118 +514,11 @@ impl<'a> Rd<'a> {
                 let items = self.fields(n);
                 let tail = &items[items.len().checked_sub(4)?..];
                 (tail.iter().skip(1).all(|&k| self.numw(k))
-                    && self.wordw(tail[0])
+                    && self.is_word(tail[0])
                     && words.len() == 5)
                     .then(|| Card::Sens(out, Some([tail[0], tail[1], tail[2], tail[3]])))
             }
             _ => None,
         }
     }
-
-    /// An analysis card's view (the old lowering's `analysis`).
-    fn analysis(&self, card: &Card) -> Option<Ana> {
-        let num = |k: u32| self.number(k);
-        let sweep = |f: &[u32; 4]| -> Option<Sweep> {
-            Some(Sweep {
-                variation: keyword(&self.text(f[0]), SWEEPS)?,
-                points: self.count(f[1])?,
-                start: num(f[2])?,
-                stop: num(f[3])?,
-            })
-        };
-        Some(match card {
-            Card::Op => Ana::Op,
-            Card::Dc(sweeps) => Ana::Dc(
-                sweeps
-                    .iter()
-                    .map(|s| Some((self.text(s[0]), num(s[1])?, num(s[2])?, num(s[3])?)))
-                    .collect::<Option<_>>()?,
-            ),
-            // Xyce's `.DC LIN src a b c` is the plain linear sweep.
-            Card::DcAxes(axes) => match axes
-                .iter()
-                .map(|a| match a.sweep {
-                    DcSweep::Lin(x, y, z) => Some((a.src.clone(), x, y, z)),
-                    _ => None,
-                })
-                .collect::<Option<Vec<_>>>()
-            {
-                Some(lin) => Ana::Dc(lin),
-                None => Ana::DcAxes(axes.clone()),
-            },
-            Card::Freq(false, f) => Ana::Ac(sweep(f)?),
-            Card::Freq(true, f) => Ana::Sp(sweep(f)?),
-            Card::Tran(nums, pair, uic, startup) => {
-                let p: Vec<f64> = nums.iter().map(|&k| num(k)).collect::<Option<_>>()?;
-                let start = match pair {
-                    Some(pr) if self.key(*pr).eq_ignore_ascii_case("start") => {
-                        Some(num(self.ast.rhs(Node(*pr)))?)
-                    }
-                    Some(_) => return None,
-                    None => None,
-                };
-                let (uic, startup) = (*uic, *startup);
-                match p.as_slice() {
-                    [stop] => Ana::Tran {
-                        step: 0.0,
-                        stop: *stop,
-                        start: None,
-                        max_step: None,
-                        uic,
-                        startup,
-                    },
-                    [step, stop] if start.is_some() => Ana::Tran {
-                        step: *step,
-                        stop: *stop,
-                        start,
-                        max_step: None,
-                        uic,
-                        startup,
-                    },
-                    [step, stop, rest @ ..] if rest.len() <= 2 => Ana::Tran {
-                        step: *step,
-                        stop: *stop,
-                        start: rest.first().copied(),
-                        max_step: rest.get(1).copied(),
-                        uic,
-                        startup,
-                    },
-                    _ => return None,
-                }
-            }
-            Card::Noise(nodes, src, f, pps) => Ana::Noise {
-                output: nodes.first()?.clone(),
-                reference: nodes.get(1).cloned().unwrap_or_else(|| "0".into()),
-                source: self.text(*src),
-                sweep: sweep(f)?,
-                pps: pps.and_then(|k| self.text(k).parse().ok()),
-            },
-            Card::Tf(out, src) => Ana::Tf(out.clone(), src.clone()),
-            Card::Sens(out, ac) => Ana::Sens(
-                out.clone(),
-                match ac {
-                    Some(f) => Some(sweep(f)?),
-                    None => None,
-                },
-            ),
-            Card::Pz(w) => Ana::Pz(
-                [
-                    self.text(w[0]),
-                    self.text(w[1]),
-                    self.text(w[2]),
-                    self.text(w[3]),
-                ],
-                keyword(&self.text(w[4]), &["vol", "cur"])?,
-                keyword(&self.text(w[5]), &["pol", "zer", "pz"])?,
-            ),
-            Card::PzNodes(nodes, tf) => Ana::Pz(nodes.clone(), tf, "pz"),
-            Card::Four(f, outs) => Ana::Four(num(*f)?, outs.clone()),
-            _ => return None,
-        })
-    }
-}
-
-/// `w` as the keyword of `set` it names in any case.
-fn keyword(w: &str, set: &[&'static str]) -> Option<&'static str> {
-    set.iter().copied().find(|k| k.eq_ignore_ascii_case(w))
 }

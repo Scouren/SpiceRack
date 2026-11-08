@@ -78,7 +78,7 @@ impl Rd<'_> {
         if self.b.card_rules == CardRules::Hspice {
             return self.dc_axes_hspice(items);
         }
-        let word = |k: u32| self.wordw(k).then(|| self.text(k).to_ascii_lowercase());
+        let word = |k: u32| self.is_word(k).then(|| self.text(k).to_ascii_lowercase());
         let (mut axes, mut i, mut lin_kw) = (Vec::new(), 0, false);
         // Each axis takes at least two items, so the loop ends by the card's length.
         while i < items.len() {
@@ -89,7 +89,7 @@ impl Rd<'_> {
                 i += 1;
             }
             let &src = items.get(i)?;
-            if !self.wordw(src) || self.numw(src) {
+            if !self.is_word(src) || self.numw(src) {
                 return None;
             }
             i += 1;
@@ -140,7 +140,7 @@ impl Rd<'_> {
     /// A `.step` card's list sweep: its name (`temp`, a parameter, a
     /// device parameter) and values; `None` for another form.
     pub(in crate::syntax::render) fn step_list(&self, items: &[u32]) -> Option<(String, Vec<f64>)> {
-        let is = |k: u32, w: &str| self.wordw(k) && self.text(k).eq_ignore_ascii_case(w);
+        let is = |k: u32, w: &str| self.is_word(k) && self.text(k).eq_ignore_ascii_case(w);
         let mut it = items;
         // LTspice names a parameter after `param`, and `temp` bare.
         if self.b.card_rules == CardRules::Ltspice {
@@ -153,7 +153,7 @@ impl Rd<'_> {
         let [name, list, values @ ..] = it else {
             return None;
         };
-        if !self.wordw(*name) || self.numw(*name) || !is(*list, "list") || values.is_empty() {
+        if !self.is_word(*name) || self.numw(*name) || !is(*list, "list") || values.is_empty() {
             return None;
         }
         let v: Vec<f64> = values
@@ -191,7 +191,7 @@ impl Rd<'_> {
             .copied()
             .find(|&s| self.tag(s) == Tag::Analysis && self.head_kind(s) == "ac")?;
         match self.fields(ac) {
-            &[v, a, b, c] if self.wordw(v) && [a, b, c].iter().all(|&k| self.numw(k)) => {
+            &[v, a, b, c] if self.is_word(v) && [a, b, c].iter().all(|&k| self.numw(k)) => {
                 Some([v, a, b, c])
             }
             _ => None,
@@ -226,11 +226,11 @@ impl Rd<'_> {
             return None;
         }
         let nodes = self.group_items(*g);
-        if nodes.is_empty() || nodes.len() > 2 || !nodes.iter().all(|&k| self.wordw(k)) {
+        if nodes.is_empty() || nodes.len() > 2 || !nodes.iter().all(|&k| self.is_word(k)) {
             return None;
         }
-        if !self.wordw(*src)
-            || !self.wordw(*var)
+        if !self.is_word(*src)
+            || !self.is_word(*var)
             || ![a, b, c].iter().all(|&&k| self.numw(k))
             || rest.iter().any(|&k| !self.numw(k))
         {
@@ -289,12 +289,12 @@ impl Rd<'_> {
     /// LIN np start stop` axes (HSPICE `.DC`, the `type np` form), beside
     /// linear `src start stop step` ones.
     fn dc_axes_hspice(&self, items: &[u32]) -> Option<Vec<DcAxis>> {
-        let word = |k: u32| self.wordw(k).then(|| self.text(k).to_ascii_lowercase());
+        let word = |k: u32| self.is_word(k).then(|| self.text(k).to_ascii_lowercase());
         let (mut axes, mut i) = (Vec::new(), 0);
         // Each axis takes at least three items, so the loop ends by the card's length.
         while i < items.len() {
             let &src = items.get(i)?;
-            if !self.wordw(src) || self.numw(src) {
+            if !self.is_word(src) || self.numw(src) {
                 return None;
             }
             let kw = word(*items.get(i + 1)?)
@@ -362,7 +362,7 @@ impl Rd<'_> {
             Some(&k)
                 if kinds
                     .iter()
-                    .any(|w| self.wordw(k) && self.text(k).eq_ignore_ascii_case(w)) =>
+                    .any(|w| self.is_word(k) && self.text(k).eq_ignore_ascii_case(w)) =>
             {
                 it = &it[1..];
                 Some(k)
@@ -371,7 +371,7 @@ impl Rd<'_> {
         };
         if self.b.card_rules == CardRules::Ltspice {
             let (&p, rest) = it.split_first()?;
-            if !(self.wordw(p) && self.text(p).eq_ignore_ascii_case("param")) {
+            if !(self.is_word(p) && self.text(p).eq_ignore_ascii_case("param")) {
                 return None;
             }
             it = rest;
@@ -379,7 +379,7 @@ impl Rd<'_> {
         match it {
             [name, a, b, c]
                 if self.spaced(n, items)
-                    && self.wordw(*name)
+                    && self.is_word(*name)
                     && [a, b, c].iter().all(|&&k| self.numw(k)) =>
             {
                 Some(Card::Step(kind, *name, [*a, *b, *c]))

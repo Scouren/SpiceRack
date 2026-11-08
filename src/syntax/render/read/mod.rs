@@ -18,7 +18,8 @@
 //! line stage did, `refused` sorts what the old grammar refused, `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
-//! the model card an instance uses); `walk` steps a
+//! the model card an instance uses), `control` a `.control` block's lines
+//! (`controlled` is E/F/G/H); `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
 //!
 //! Cites: the old lowering
@@ -44,8 +45,11 @@ use crate::syntax::resolve::{FileId, Kit, Role, Split};
 use crate::syntax::token::{Tag as T, Tokens};
 use blocks::Opened;
 
+mod analyses;
 mod blocks;
 mod cards;
+mod control;
+mod controlled;
 mod devices;
 mod elements;
 mod funcs;
@@ -222,7 +226,9 @@ pub(in crate::syntax::render) enum Comp {
 /// One entry of a block's element order ([`Block::elements`]).
 #[derive(Clone, Copy)]
 pub(in crate::syntax::render) enum Elem {
+    /// A typed card or a raw element line.
     Comp(Comp),
+    /// An `X` card's node.
     Inst(u32),
     /// The index of the block's conditional.
     Cond(usize),
@@ -335,25 +341,7 @@ pub(in crate::syntax::render) fn read<'a>(
     if let Some((k, f)) = kit {
         assert_eq!(ast.len(), k.node_count(f), "read: the kit file's tree");
     }
-    let mut rd = Rd {
-        ast,
-        t,
-        d,
-        b: d.behaviours(),
-        models: HashMap::new(),
-        kinds: HashMap::new(),
-        subckts: Vec::new(),
-        insts: HashMap::new(),
-        scope_of: HashMap::new(),
-        kit,
-        masters: HashMap::new(),
-        unlifted: unlift::Unlift::default(),
-        fixes: HashMap::new(),
-        target: None,
-        nums: Vec::new(),
-        global_params: HashSet::new(),
-        promoted: HashSet::new(),
-    };
+    let mut rd = Rd::new(ast, t, d, kit);
     let top_stmts = ast.fields(ast.root()).to_vec();
     if rd.named() {
         rd.promoted = rd.vacask_promoted(&top_stmts);
@@ -384,6 +372,8 @@ pub(in crate::syntax::render) fn read<'a>(
         numbers: super::Numbers::Read,
     };
     rd.unlift(&mut deck);
+    assert_eq!(deck.top.name, name, "the top under its name");
+    assert_eq!(deck.top.node, NONE, "the top is no subcircuit");
     (rd, deck)
 }
 
@@ -404,26 +394,36 @@ impl<'a> Rd<'a> {
         }
     }
 
+    /// Whether the file is Spectre or VACASK (statements by name), not SPICE.
     pub(in crate::syntax::render) fn named(&self) -> bool {
         self.b.named_rules != NamedRules::None
     }
 
+    /// Node `n`'s tag.
     pub(in crate::syntax::render) fn tag(&self, n: u32) -> Tag {
         self.ast.tag(Node(n))
     }
 
+    /// Node `n`'s main token: a statement's first, an item's anchor.
     pub(in crate::syntax::render) fn main(&self, n: u32) -> u32 {
         self.ast.main_token(Node(n))
     }
 
+    /// Statement `n`'s items after its head, borrowed from the tree.
     pub(in crate::syntax::render) fn fields(&self, n: u32) -> &'a [u32] {
         self.ast.fields(Node(n))
     }
 
+    /// Block `n`'s statements (empty for a flat statement), borrowed from
+    /// the tree.
     pub(in crate::syntax::render) fn body(&self, n: u32) -> &'a [u32] {
         self.ast.body(Node(n))
     }
 
+    /// Token `k`'s tag.
+    ///
+    /// # Panics
+    /// When `k` is past the last token.
     pub(in crate::syntax::render) fn ttag(&self, k: u32) -> T {
         self.t.tags()[k as usize]
     }
@@ -480,6 +480,11 @@ impl Block {
             out.push(Elem::Comp(c));
         }
         out.extend(placed.map(|(_, e)| e));
+        assert_eq!(
+            out.len(),
+            n + self.insts.len() + self.conds.len(),
+            "every element once"
+        );
         out
     }
 }
@@ -505,6 +510,30 @@ pub(in crate::syntax::render) fn unwrapped(t: &str) -> String {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// A reader of `ast` (the parse of `t`) in text family `d`, every
+    /// deck-wide table empty: the one place a new table is added.
+    fn new(ast: &'a Ast<'a>, t: &'a Tokens<'a>, d: Lang, kit: Option<(&'a Kit, FileId)>) -> Rd<'a> {
+        Rd {
+            ast,
+            t,
+            d,
+            b: d.behaviours(),
+            models: HashMap::new(),
+            kinds: HashMap::new(),
+            subckts: Vec::new(),
+            insts: HashMap::new(),
+            scope_of: HashMap::new(),
+            kit,
+            masters: HashMap::new(),
+            unlifted: unlift::Unlift::default(),
+            fixes: HashMap::new(),
+            target: None,
+            nums: Vec::new(),
+            global_params: HashSet::new(),
+            promoted: HashSet::new(),
+        }
+    }
+
     /// A card kept as text (the old lowering's `raw`): a block one raw line
     /// per line, a SPICE element in its place among the elements.
     fn raw(&mut self, n: u32, here: &mut Block, block: bool) {
@@ -528,6 +557,7 @@ impl<'a> Rd<'a> {
         here.raw.push(Raw::Line(n));
     }
 
+    /// A card the old reader could not lower, kept as `k` says.
     fn keep(&mut self, n: u32, here: &mut Block, k: Kept) {
         match k {
             Kept::Raw => self.raw(n, here, false),
@@ -593,31 +623,7 @@ impl<'a> Rd<'a> {
                 false => self.raw(n, here, true),
             },
             Tag::Data => self.raw(n, here, true),
-            Tag::Control => {
-                for &c in self.body(n) {
-                    let head = self.main(c);
-                    let last = self.line_last(head);
-                    if self.tag(c) == Tag::Analysis && self.testbench_peg(c) {
-                        acc.bench.push(Bench::Card(c));
-                    } else if scope == Scope::Top
-                        && self.t.text(head).eq_ignore_ascii_case("pre_osdi")
-                        && head < last
-                    {
-                        // ngspice manual, `pre_osdi file`: an OSDI load
-                        // before the circuit is parsed.
-                        let p = self.span(head + 1, last);
-                        acc.control_loads
-                            .push(p.trim().trim_matches('"').to_string());
-                    } else {
-                        // The script's other lines are not read.
-                        acc.notes.push(Diag::new(
-                            crate::syntax::diag::Code::W0025,
-                            self.main(c),
-                            0,
-                        ));
-                    }
-                }
-            }
+            Tag::Control => self.control(n, scope, acc),
             Tag::Instance => self.element(n, here),
             _ => self.dot_card(n, here, scope, inside, acc),
         }
@@ -627,6 +633,7 @@ impl<'a> Rd<'a> {
     /// `.lib name` … `.endl`: its cards read as at the top, into the
     /// section's own body and definitions (the old lowering's `section`).
     fn section(&mut self, n: u32, library: Option<String>, acc: &mut Acc) -> Section {
+        assert_eq!(self.tag(n), Tag::Section, "a section");
         let name_item = self.fields(n)[0];
         let mut body = Block {
             name: self.name_of(name_item),
@@ -635,6 +642,7 @@ impl<'a> Rd<'a> {
         let (first, first_f) = (acc.defs.len(), acc.funcs.len());
         let stmts = self.body(n).to_vec();
         self.cards(&stmts, &mut body, Scope::Section, acc);
+        assert!(acc.defs.len() >= first, "a section's definitions follow");
         Section {
             node: n,
             library,
@@ -651,7 +659,7 @@ impl<'a> Rd<'a> {
         let last = self.line_last(first);
         first < last
             && self.ttag(first + 1) == T::LParen
-            && self.paren_close(first + 1) == Some(last)
+            && self.close_of(first + 1, T::LParen, T::RParen) == Some(last)
     }
 
     /// Whether a card in a section would reach past it (the old lowering's
@@ -664,14 +672,17 @@ impl<'a> Rd<'a> {
         }
     }
 
-    /// The `)` matching the `(` at token `open`, on its statement.
-    fn paren_close(&self, open: u32) -> Option<u32> {
+    /// The closer matching the opener at token `open` (`T::LParen` and
+    /// `T::RParen`, `T::LBrace` and `T::RBrace`), on its statement.
+    fn close_of(&self, open: u32, opener: T, closer: T) -> Option<u32> {
+        assert_eq!(self.ttag(open), opener, "an opener at `open`");
         let last = self.line_last(open);
         let mut depth = 0i32;
+        // Bounded by the statement: one pass per token.
         for k in open..=last {
             match self.ttag(k) {
-                T::LParen => depth += 1,
-                T::RParen => {
+                t if t == opener => depth += 1,
+                t if t == closer => {
                     depth -= 1;
                     if depth == 0 {
                         return Some(k);

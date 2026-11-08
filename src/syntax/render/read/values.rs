@@ -30,8 +30,11 @@ use crate::syntax::token::Tag as T;
 /// (without its delimiters), or text kept as written.
 #[derive(Clone, PartialEq, Debug)]
 pub(in crate::syntax::render) enum Val {
+    /// A number the dialect's `Num` rule reads whole.
     Num(f64),
+    /// An expression, its delimiters dropped.
     Expr(String),
+    /// Text kept as written (a word no rule reads as either).
     Raw(String),
 }
 
@@ -48,6 +51,8 @@ impl Rd<'_> {
         }
     }
 
+    /// The count item `n` is: a [`Rd::number`] that is a whole number
+    /// `>= 0` (saturating at `u32::MAX`); `None` for anything else.
     pub(in crate::syntax::render) fn count(&self, n: u32) -> Option<u32> {
         self.number(n)
             .filter(|v| *v >= 0.0 && v.fract() == 0.0)
@@ -84,6 +89,8 @@ impl Rd<'_> {
         }
     }
 
+    /// A waveform value: [`Rd::value`] as a number or an expression; `None`
+    /// for text kept raw.
     pub(in crate::syntax::render) fn irnum(&self, n: u32) -> Option<Num> {
         match self.value(n) {
             Val::Num(value) => Some(Num::Num(value)),

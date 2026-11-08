@@ -52,28 +52,9 @@ impl Rd<'_> {
         // quirk: the old overlays' `dialect` rule (the old LTspice grammar's
         // `Raw_lt`, the old Xyce grammar's `Raw_xy`) is tried before the
         // shared dot cards.
-        let word = self.head_word(n);
-        // LTspice's `.backanno` names port currents for its viewer and
-        // changes no number (LTspice help): left out, noted.
-        if self.b.card_rules == CardRules::Ltspice
-            && word == "backanno"
-            && self.fields(n).is_empty()
-        {
-            let token = self.main(n);
-            acc.notes.push(crate::syntax::diag::Diag::new(
-                crate::syntax::diag::Code::W0036,
-                token,
-                0,
-            ));
+        let word = self.head_kind(n);
+        if self.dialect_card(n, &word, scope, acc) {
             return;
-        }
-        // Xyce's `.LIN` (S parameters over the `.AC` sweep) is an analysis.
-        if self.b.card_rules == CardRules::Xyce
-            && word == "lin"
-            && scope == Scope::Top
-            && self.testbench_peg(n)
-        {
-            return acc.bench.push(super::Bench::Card(n));
         }
         if self.dialect_raw(&word) {
             return self.keep(n, here, Kept::Raw);
@@ -223,7 +204,7 @@ impl Rd<'_> {
         }
         let items = self.fields(n);
         let first = items[0];
-        if self.b.card_rules == CardRules::Xyce && self.head_word(n) == "incl" {
+        if self.b.card_rules == CardRules::Xyce && self.head_kind(n) == "incl" {
             // quirk: the old Xyce grammar's `Path_xy`: a quoted path alone,
             // else all of the rest of the card.
             match items {
@@ -290,10 +271,39 @@ impl Rd<'_> {
         self.tag(n) == Tag::Word && self.text(n).eq_ignore_ascii_case("params:")
     }
 
-    /// The card's head keyword, lowercased, without its dot.
-    fn head_word(&self, n: u32) -> String {
-        let w = self.t.text(self.main(n)).to_ascii_lowercase();
-        w.strip_prefix('.').unwrap_or(&w).to_string()
+    /// A dot card only its dialect reads, ahead of the shared dot cards
+    /// (word `word`, at `scope`): `true` when this placed it. One arm per
+    /// dialect: a dialect's next card of its own is an arm here.
+    fn dialect_card(&self, n: u32, word: &str, scope: Scope, acc: &mut Acc) -> bool {
+        let (bench, notes) = (acc.bench.len(), acc.notes.len());
+        let placed = match self.b.card_rules {
+            // LTspice's `.backanno` names port currents for its viewer and
+            // changes no number (LTspice help): left out, noted.
+            CardRules::Ltspice if word == "backanno" && self.fields(n).is_empty() => {
+                let token = self.main(n);
+                acc.notes.push(crate::syntax::diag::Diag::new(
+                    crate::syntax::diag::Code::W0036,
+                    token,
+                    0,
+                ));
+                true
+            }
+            // Xyce's `.LIN` (S parameters over the `.AC` sweep) is an analysis.
+            CardRules::Xyce if word == "lin" && scope == Scope::Top && self.testbench_peg(n) => {
+                acc.bench.push(super::Bench::Card(n));
+                true
+            }
+            CardRules::Spice
+            | CardRules::Ngspice
+            | CardRules::Hspice
+            | CardRules::Ltspice
+            | CardRules::Xyce => false,
+        };
+        assert_eq!(
+            placed,
+            acc.bench.len() + acc.notes.len() == bench + notes + 1
+        );
+        placed
     }
 
     /// The text of card `n` from its first field to the line's end, a path
@@ -392,7 +402,7 @@ impl Rd<'_> {
         }
         let items = self.fields(n).to_vec();
         let ngspice = self.b.card_rules == CardRules::Ngspice;
-        let lt_params = self.b.card_rules == CardRules::Ltspice && self.head_word(n) == "params";
+        let lt_params = self.b.card_rules == CardRules::Ltspice && self.head_kind(n) == "params";
         let mut assigns = Vec::new();
         for (k, &it) in items.iter().enumerate() {
             let plus = ngspice
@@ -436,7 +446,7 @@ impl Rd<'_> {
             } else if inside {
                 here.locals.push(a);
             } else {
-                if self.b.card_rules == CardRules::Xyce && self.head_word(n) == "global_param" {
+                if self.b.card_rules == CardRules::Xyce && self.head_kind(n) == "global_param" {
                     self.global_params.insert(a);
                 }
                 here.params.push(a);

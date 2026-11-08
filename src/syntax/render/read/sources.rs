@@ -9,7 +9,7 @@
 //!
 //! Contents:
 //! - `pub(in crate::syntax::render) enum Num`, `struct Wave`, `enum WaveKind`
-//! - `Num::num(&self) -> Option<f64>`, `Wave::at_zero(&self) -> Val`
+//! - `Num::num(&self) -> Option<f64>`, `WaveKind::held(self) -> Option<usize>`, `Wave::at_zero(&self) -> Val`
 //! - `Rd::source(&self, n: u32, e: Element, name: String) -> Option<Card>`
 
 use super::{Card, Rd, Val};
@@ -20,7 +20,9 @@ use crate::syntax::device::Primitive as Element;
 /// A waveform value: a number or an expression (without delimiters).
 #[derive(Clone, PartialEq, Debug)]
 pub(in crate::syntax::render) enum Num {
+    /// A number.
     Num(f64),
+    /// An expression, its delimiters dropped.
     Expr(String),
 }
 
@@ -144,34 +146,7 @@ impl<'a> Rd<'a> {
                     }
                 }
                 Spec::Wave(w, vals) => {
-                    // ngspice-45 also reads PWL's `r=`/`td=` inside the
-                    // parentheses (`pwl(0 0 1m 1 r=0 td=0.5m)`: run, v(2.25
-                    // ms) = 0.75 V, as `pwl(0 0 1m 1) r=0 td=0.5m`); their
-                    // `=` is no item, so `r 0 td 0.5m` follow the points.
-                    let key =
-                        |k: u32, w: &str| self.is_word(k) && self.text(k).eq_ignore_ascii_case(w);
-                    let at = vals.iter().position(|&k| key(k, "r") || key(k, "td"));
-                    let vals = match at {
-                        Some(i)
-                            if self.b.source_rules == SourceRules::Ngspice
-                                && w == WaveKind::Pwl =>
-                        {
-                            let tail = &vals[i..];
-                            if !tail.len().is_multiple_of(2) {
-                                return None;
-                            }
-                            for kv in tail.chunks(2) {
-                                let v = self.irnum(kv[1])?;
-                                match () {
-                                    _ if key(kv[0], "r") && repeat.is_none() => repeat = Some(v),
-                                    _ if key(kv[0], "td") && delay.is_none() => delay = Some(v),
-                                    _ => return None,
-                                }
-                            }
-                            vals[..i].to_vec()
-                        }
-                        _ => vals,
-                    };
+                    let vals = self.pwl_inner_keys(w, vals, &mut repeat, &mut delay)?;
                     wf = Some(self.waveform(w, &vals)?)
                 }
             }
@@ -254,6 +229,20 @@ impl Num {
     }
 }
 
+impl WaveKind {
+    /// How many values a wave of this kind holds ([`Wave::args`]): one row
+    /// per kind; a card's values past it are cut ([`Wave::cut`]). `None`:
+    /// every value (PWL's pairs).
+    pub(in crate::syntax::render) const fn held(self) -> Option<usize> {
+        match self {
+            WaveKind::Sin | WaveKind::Exp => Some(6),
+            WaveKind::Pulse | WaveKind::Trnoise => Some(7),
+            WaveKind::Sffm | WaveKind::Am | WaveKind::Trrandom => Some(5),
+            WaveKind::Pwl => None,
+        }
+    }
+}
+
 impl Wave {
     /// The source's value at time zero when the card gives no DC value.
     pub(in crate::syntax::render) fn at_zero(&self) -> Val {
@@ -274,6 +263,41 @@ impl Wave {
 // ---- private ----
 
 impl<'a> Rd<'a> {
+    /// ngspice-45 also reads PWL's `r=`/`td=` inside the parentheses
+    /// (`pwl(0 0 1m 1 r=0 td=0.5m)`: run, v(2.25 ms) = 0.75 V, as `pwl(0
+    /// 0 1m 1) r=0 td=0.5m`); their `=` is no item, so `r 0 td 0.5m` follow
+    /// the points. Waveform `w`'s values `vals` less those keys, each set
+    /// once into `repeat` or `delay`; `None` when one does not read. Which
+    /// dialects read the keys there is this function's guard alone.
+    fn pwl_inner_keys(
+        &self,
+        w: WaveKind,
+        vals: Vec<u32>,
+        repeat: &mut Option<Num>,
+        delay: &mut Option<Num>,
+    ) -> Option<Vec<u32>> {
+        let key = |k: u32, w: &str| self.is_word(k) && self.text(k).eq_ignore_ascii_case(w);
+        let at = vals.iter().position(|&k| key(k, "r") || key(k, "td"));
+        let i = match at {
+            Some(i) if self.b.source_rules == SourceRules::Ngspice && w == WaveKind::Pwl => i,
+            _ => return Some(vals),
+        };
+        let tail = &vals[i..];
+        if !tail.len().is_multiple_of(2) {
+            return None;
+        }
+        for kv in tail.chunks(2) {
+            let v = self.irnum(kv[1])?;
+            match () {
+                _ if key(kv[0], "r") && repeat.is_none() => *repeat = Some(v),
+                _ if key(kv[0], "td") && delay.is_none() => *delay = Some(v),
+                _ => return None,
+            }
+        }
+        assert!(i < vals.len(), "a key inside the parentheses");
+        Some(vals[..i].to_vec())
+    }
+
     /// The `spec` starting at item `j`, and the item after it.
     fn spec(&self, items: &[u32], j: usize) -> Option<(Spec, usize)> {
         let it = items[j];
@@ -434,8 +458,13 @@ impl<'a> Rd<'a> {
         if w == WaveKind::Am {
             return self.am(a);
         }
+        // SFFM's values past its five (ngspice's TD and phases) read only
+        // as zeros.
+        let sffm_held = WaveKind::Sffm.held().expect("SFFM holds a count");
         if matches!(w, WaveKind::Sffm | WaveKind::Am)
-            && a[a.len().min(5)..].iter().any(|x| *x != Num::Num(0.0))
+            && a[a.len().min(sffm_held)..]
+                .iter()
+                .any(|x| *x != Num::Num(0.0))
         {
             return None;
         }
@@ -444,16 +473,8 @@ impl<'a> Rd<'a> {
                 .map(|i| a.get(i).cloned().unwrap_or(Num::Num(0.0)))
                 .collect()
         };
-        let held = match w {
-            WaveKind::Sin | WaveKind::Exp => 6,
-            WaveKind::Pulse | WaveKind::Trnoise => 7,
-            WaveKind::Sffm | WaveKind::Am | WaveKind::Trrandom => 5,
-            WaveKind::Pwl => a.len(),
-        };
+        let held = w.held().unwrap_or(a.len());
         let args = match w {
-            WaveKind::Sin | WaveKind::Exp => padded(6),
-            WaveKind::Pulse | WaveKind::Trnoise => padded(7),
-            WaveKind::Sffm | WaveKind::Am => padded(5),
             WaveKind::Pwl if a.len().is_multiple_of(2) => a.clone(),
             WaveKind::Pwl => return None,
             WaveKind::Trrandom => {
@@ -461,13 +482,20 @@ impl<'a> Rd<'a> {
                     .first()?
                     .num()
                     .filter(|t| t.fract() == 0.0 && (1.0..=4.0).contains(t))?;
-                let mut args = padded(5);
+                let mut args = padded(held);
                 args[0] = Num::Num(kind);
                 args[1] = a.get(1)?.clone();
                 args[3] = a.get(3).cloned().unwrap_or(Num::Num(1.0));
                 args
             }
+            WaveKind::Sin
+            | WaveKind::Exp
+            | WaveKind::Pulse
+            | WaveKind::Trnoise
+            | WaveKind::Sffm
+            | WaveKind::Am => padded(held),
         };
+        assert_eq!(args.len(), held, "a kind holds its own count");
         Some(Wave {
             kind: w,
             args,
