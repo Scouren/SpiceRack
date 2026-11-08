@@ -303,51 +303,88 @@ pub fn spice_bare(v: &str) -> bool {
 // ---- private ----
 
 fn spell(v: f64) -> String {
+    use std::fmt::Write;
+    // ponytail: the candidates in the reference's order, each tried as it is
+    // written into one of two reused buffers, so the first match is the
+    // reference's and the search stops there.
+    let (mut sci, mut cand, mut digs) = (String::new(), String::new(), String::new());
     for digits in 1..=17 {
-        let sci = format!("{:.*e}", digits - 1, v);
+        sci.clear();
+        write!(sci, "{:.*e}", digits - 1, v).expect("a String takes any write");
         let Ok(x) = sci.parse::<f64>() else { break };
         let (m, e) = sci.split_once('e').unwrap_or((&sci, "0"));
         let e: i32 = e.parse().unwrap_or(0);
-        let mut found = vec![plain(m, e), sci.clone()];
+        if !m.ends_with('0') || digits == 1 {
+            let s = format_spice_number(x);
+            if ngspice_value(&s) == Some(v) {
+                return s;
+            }
+        }
+        let (negative, body) = m.strip_prefix('-').map_or((false, m), |r| (true, r));
+        plain_into(
+            &mut cand,
+            negative,
+            body.bytes().filter(u8::is_ascii_digit),
+            e,
+        );
+        if ngspice_value(&cand) == Some(v) {
+            return cand;
+        }
+        if ngspice_value(&sci) == Some(v) {
+            return sci;
+        }
         // Past 2^53 ngspice's mantissa rounds as it accumulates, so the
         // spelling that lands on `v` may be a neighbour of `v`'s own digits.
         if digits >= 17 {
-            let (sign, body) = m.strip_prefix('-').map_or(("", m), |r| ("-", r));
-            let int: i128 = body.replace('.', "").parse().unwrap_or(0);
+            // `body` without its point, as an integer; 0 when it is no
+            // number (`inf`, `NaN`).
+            let int = if body.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                && body.bytes().any(|b| b.is_ascii_digit())
+            {
+                body.bytes()
+                    .filter(u8::is_ascii_digit)
+                    .fold(0i128, |a, b| a * 10 + i128::from(b - b'0'))
+            } else {
+                0
+            };
             for delta in (1..=64).flat_map(|k| [-k, k]) {
-                let digs = (int + delta).to_string();
+                digs.clear();
+                write!(digs, "{}", int + delta).expect("a String takes any write");
                 if digs.len() == digits {
-                    found.push(plain(&format!("{sign}{}.{}", &digs[..1], &digs[1..]), e));
+                    plain_into(&mut cand, negative, digs.bytes(), e);
+                    if ngspice_value(&cand) == Some(v) {
+                        return cand;
+                    }
                 }
             }
-        }
-        if !m.ends_with('0') || digits == 1 {
-            found.insert(0, format_spice_number(x));
-        }
-        if let Some(s) = found.into_iter().find(|s| ngspice_value(s) == Some(v)) {
-            return s;
         }
     }
     format_spice_number(v)
 }
 
-/// The mantissa `m` (`-3.30`) times `10^e` as plain decimal, every digit kept.
-fn plain(m: &str, e: i32) -> String {
-    let (sign, m) = m.strip_prefix('-').map_or(("", m), |r| ("-", r));
-    let digits: String = m.chars().filter(|c| c.is_ascii_digit()).collect();
+/// The digits `digits` (`-` before them when `negative`) as a mantissa
+/// `d.ddd` times `10^e`, in plain decimal with every digit kept, into `out`.
+fn plain_into(out: &mut String, negative: bool, digits: impl Iterator<Item = u8> + Clone, e: i32) {
+    out.clear();
+    if negative {
+        out.push('-');
+    }
+    let n = digits.clone().count();
     let point = 1 + e; // digits before the decimal point
-    let body = if point <= 0 {
-        format!("0.{}{digits}", "0".repeat((-point) as usize))
-    } else if point as usize >= digits.len() {
-        format!("{digits}{}", "0".repeat(point as usize - digits.len()))
+    let zeros = |out: &mut String, k: usize| out.extend(std::iter::repeat_n('0', k));
+    if point <= 0 {
+        out.push_str("0.");
+        zeros(out, (-point) as usize);
+        out.extend(digits.map(char::from));
+    } else if point as usize >= n {
+        out.extend(digits.map(char::from));
+        zeros(out, point as usize - n);
     } else {
-        format!(
-            "{}.{}",
-            &digits[..point as usize],
-            &digits[point as usize..]
-        )
-    };
-    format!("{sign}{body}")
+        let mut d = digits.map(char::from);
+        out.extend(d.by_ref().take(point as usize));
+        out.push('.');
+        out.extend(d);
+    }
 }
 
 /// Moves the decimal point of `v`'s shortest exact spelling by `mult`'s
@@ -395,6 +432,55 @@ mod ngspice_numbers {
     }
 
     #[test]
+    fn spell_equals_its_reference() {
+        // splitmix64: random bit patterns (every exponent, subnormals, NaN
+        // payloads) and short decimals times a power of ten (the values
+        // decks hold), half each.
+        let mut state = 0x5eed_u64;
+        let mut next = || {
+            state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+            let mut z = state;
+            z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+            z ^ (z >> 31)
+        };
+        let mut edges = vec![0.0, -0.0, f64::INFINITY, f64::NEG_INFINITY, f64::NAN];
+        edges.extend([
+            f64::MIN_POSITIVE,
+            5e-324,
+            -5e-324,
+            f64::MAX,
+            f64::MIN,
+            2f64.powi(53),
+        ]);
+        // The unit boundaries: each scale, an ulp either side of it.
+        for &(_, m) in SPICE_SCALES {
+            for x in [m, -m, 999.0 * m, 1000.0 * m] {
+                edges.extend([
+                    x,
+                    f64::from_bits(x.to_bits() + 1),
+                    f64::from_bits(x.to_bits() - 1),
+                ]);
+            }
+        }
+        // 2·10⁴ in the merge tier; `SPELL_CASES=1000000 cargo test --release
+        // spell_equals` for the 10⁶ run a change to `spell` cites.
+        let n = std::env::var("SPELL_CASES").map_or(20_000, |n| n.parse().expect("a count"));
+        let random = (0..n).map(|k| {
+            let bits = next();
+            if k % 2 == 0 {
+                f64::from_bits(bits)
+            } else {
+                let digits = (bits % 10_000_000) as f64 * if bits >> 63 == 1 { -1.0 } else { 1.0 };
+                digits * 10f64.powi((bits >> 32) as i32 % 40 - 25)
+            }
+        });
+        for v in edges.into_iter().chain(random) {
+            assert_eq!(spell(v), spell_reference(v), "{v:e} ({:#x})", v.to_bits());
+        }
+    }
+
+    #[test]
     fn spice_number_prefix() {
         assert_eq!(parse_spice_number("108f"), Some((1.08e-13, 3, "f")));
         assert_eq!(parse_spice_number("1MEGohm"), Some((1e6, 1, "meg")));
@@ -408,5 +494,58 @@ mod ngspice_numbers {
         );
         assert_eq!(parse_spice_number("-1"), None, "the sign is the caller's");
         assert_eq!(parse_spice_number("."), None);
+    }
+
+    /// `spell` as it was, building every candidate of a digit count first:
+    /// the reference the lazy search is held to.
+    fn spell_reference(v: f64) -> String {
+        for digits in 1..=17 {
+            let sci = format!("{:.*e}", digits - 1, v);
+            let Ok(x) = sci.parse::<f64>() else { break };
+            let (m, e) = sci.split_once('e').unwrap_or((&sci, "0"));
+            let e: i32 = e.parse().unwrap_or(0);
+            let mut found = vec![plain_reference(m, e), sci.clone()];
+            // Past 2^53 ngspice's mantissa rounds as it accumulates, so the
+            // spelling that lands on `v` may be a neighbour of `v`'s own digits.
+            if digits >= 17 {
+                let (sign, body) = m.strip_prefix('-').map_or(("", m), |r| ("-", r));
+                let int: i128 = body.replace('.', "").parse().unwrap_or(0);
+                for delta in (1..=64).flat_map(|k| [-k, k]) {
+                    let digs = (int + delta).to_string();
+                    if digs.len() == digits {
+                        found.push(plain_reference(
+                            &format!("{sign}{}.{}", &digs[..1], &digs[1..]),
+                            e,
+                        ));
+                    }
+                }
+            }
+            if !m.ends_with('0') || digits == 1 {
+                found.insert(0, format_spice_number(x));
+            }
+            if let Some(s) = found.into_iter().find(|s| ngspice_value(s) == Some(v)) {
+                return s;
+            }
+        }
+        format_spice_number(v)
+    }
+
+    /// The mantissa `m` (`-3.30`) times `10^e` as plain decimal, every digit kept.
+    fn plain_reference(m: &str, e: i32) -> String {
+        let (sign, m) = m.strip_prefix('-').map_or(("", m), |r| ("-", r));
+        let digits: String = m.chars().filter(|c| c.is_ascii_digit()).collect();
+        let point = 1 + e; // digits before the decimal point
+        let body = if point <= 0 {
+            format!("0.{}{digits}", "0".repeat((-point) as usize))
+        } else if point as usize >= digits.len() {
+            format!("{digits}{}", "0".repeat(point as usize - digits.len()))
+        } else {
+            format!(
+                "{}.{}",
+                &digits[..point as usize],
+                &digits[point as usize..]
+            )
+        };
+        format!("{sign}{body}")
     }
 }
