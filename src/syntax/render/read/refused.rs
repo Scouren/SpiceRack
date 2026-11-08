@@ -8,7 +8,7 @@
 //! Contents:
 //! - `Rd::refused(&self, n: u32) -> Kept`
 //! - `Rd::dialect_raw(&self, w: &str) -> bool`
-//! - `Rd::kept_construct(&self, tok: u32) -> Construct`
+//! - `Rd::kept_construct(&self, tok: u32) -> Construct` (by `Behaviours::kept_words`)
 //! - `Rd::global_swept(&self, n: u32) -> bool`
 
 use super::{Kept, Rd};
@@ -248,42 +248,11 @@ impl Rd<'_> {
     }
 
     /// What the statement kept as text from another dialect at token `tok`
-    /// is to a writer: one only its own simulator has (Xyce's multi-time,
-    /// model-order-reduction and uncertainty analyses, RG analysis
-    /// commands `.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`, `.RESULT`;
-    /// its netlist rewrites `.PREPROCESS`; its own `Y` devices, RG `Y`
-    /// devices: neuron, synapse, reduced-order model, reaction network,
-    /// general external, accelerometer, power grid, PDE (TCAD), none of
-    /// which ngspice, HSPICE, LTspice, Spectre or VACASK has); Xyce's
-    /// `.SENS` (an objective's sensitivity to listed parameters over the
-    /// deck's `.dc`, `.tran` or `.ac`, RG `.SENS`); HSPICE's StatEye (its
-    /// own) and its RF, transient-noise and loop-stability analyses; else
-    /// foreign text.
+    /// is to a writer: a VACASK script line or `elaborate`, else the
+    /// construct its language's `kept_word` rows give its first word
+    /// (`Behaviours::kept_words`: HSPICE's own analyses and W line, Xyce's
+    /// own analyses and `Y` devices, …), else foreign text.
     pub(in crate::syntax::render) fn kept_construct(&self, tok: u32) -> Construct {
-        const XY_CARDS: [&str; 6] = [
-            ".mpde",
-            ".mor",
-            ".pce",
-            ".embeddedsampling",
-            ".result",
-            ".preprocess",
-        ];
-        const XY_DEVICES: [&str; 14] = [
-            "neuron",
-            "synapse",
-            "rom",
-            "rxn",
-            "genext",
-            "acc",
-            "pde",
-            "pgbr",
-            "pgbs",
-            "pggb",
-            "pgtr",
-            "powergridbranch",
-            "powergridbusshunt",
-            "powergridtransformer",
-        ];
         if self.text_behaviours(tok).named_rules == NamedRules::Vacask {
             return match (self.vacask_script(tok), self.t.text(tok)) {
                 (true, _) => Construct::VacaskScript,
@@ -292,40 +261,17 @@ impl Rd<'_> {
             };
         }
         let w = self.t.text(tok).to_ascii_lowercase();
-        // One arm per dialect family: a dialect's own words fill its arm.
-        match self.text_behaviours(tok).card_rules {
-            CardRules::Hspice => match w.as_str() {
-                // HSPICE's StatEye, digital vector files, timing checks and
-                // power report (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`,
-                // `.POWER`): no other simulator has them.
-                ".stateye" | ".vec" | ".check" | ".power" => Construct::PrivateText,
-                // HSPICE RF shooting-Newton (`.SN`, `.SNAC`, `.SNNOISE`,
-                // `.SNXF`), periodic time-dependent noise (`.PTDNOISE`),
-                // sampling noise (`.SAMPLE`), transient noise, loop
-                // stability (HSPICE UG): no SPICE target has these analyses.
-                ".sn" | ".snac" | ".snnoise" | ".snxf" | ".ptdnoise" | ".sample" | ".trannoise"
-                | ".lstb" => Construct::HspiceAnalysis,
-                // HSPICE UG, W element: `Wxxx in… ref out… ref N=n
-                // RLGCmodel=…` (or `RLGCfile`, `TABLEmodel`, `Umodel`,
-                // `FSmodel`, `Smodel`), a lossy multi-conductor line.
-                w if w.starts_with('w') && self.w_line(tok) => Construct::HspiceWLine,
-                _ => Construct::ForeignText,
-            },
-            CardRules::Xyce => {
-                let private = match w.strip_prefix('y') {
-                    Some(ty) => XY_DEVICES.contains(&ty),
-                    None => XY_CARDS.contains(&w.as_str()),
-                };
-                match w.as_str() {
-                    _ if private => Construct::PrivateText,
-                    ".sens" => Construct::XyceSens,
-                    _ => Construct::ForeignText,
-                }
-            }
-            // No LTspice text is its own construct yet: LTspice's private
-            // words get their construct in this arm.
-            CardRules::Ltspice => Construct::ForeignText,
-            CardRules::Spice | CardRules::Ngspice => Construct::ForeignText,
+        let words = self.text_behaviours(tok).kept_words;
+        // A whole word's row, else its letter's (an element line), whose
+        // construct adds its own shape check.
+        let whole = words.iter().find(|(k, _)| k.len() > 1 && *k == w);
+        let letter = words
+            .iter()
+            .find(|(k, _)| k.len() == 1 && w.starts_with(*k));
+        match (whole, letter) {
+            (Some(&(_, c)), _) => c,
+            (None, Some(&(_, c))) if self.kept_shape(c, tok) => c,
+            (None, _) => Construct::ForeignText,
         }
     }
 }
@@ -333,6 +279,17 @@ impl Rd<'_> {
 // ---- private ----
 
 impl Rd<'_> {
+    /// Whether the element line at `tok` has the shape construct `c` needs
+    /// when a one-letter `kept_word` row matched it (rung 4: one arm per
+    /// construct that checks one).
+    fn kept_shape(&self, c: Construct, tok: u32) -> bool {
+        match c {
+            Construct::HspiceWLine => self.w_line(tok),
+            // else: a construct with no shape of its own takes every line.
+            _ => true,
+        }
+    }
+
     /// Whether the HSPICE text at `tok` is a W element's line: one of its
     /// model keys on the card (HSPICE UG, W element).
     fn w_line(&self, tok: u32) -> bool {

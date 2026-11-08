@@ -24,7 +24,7 @@ use super::options::Opt;
 use super::outputs::print_kind;
 use super::{Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::CardRules;
+use crate::syntax::behaviour::{CardRules, DotRule};
 use crate::syntax::token::Tag as T;
 
 /// What one testbench card adds to the deck's testbench (the old
@@ -300,7 +300,7 @@ impl<'a> Rd<'a> {
         let hspice = self.b.card_rules == CardRules::Hspice;
         let lt = self.b.card_rules == CardRules::Ltspice;
         match self.tag(n) {
-            _ if self.b.card_rules == CardRules::Xyce && kind == "lin" => self.xyce_lin(n),
+            _ if self.dot_rule(&kind) == Some(DotRule::SParams) => self.xyce_lin(n),
             Tag::Options => self.options_ok(n).then_some(Card::Options),
             Tag::Temp => match items {
                 [v] if self.val_ok(*v) && self.tag(*v) != Tag::Seq => Some(Card::Temp(*v)),

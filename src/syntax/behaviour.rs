@@ -18,10 +18,13 @@
 //!   `pub enum CardRules`, `pub enum NamedRules`, `pub enum OptionsForm`, `pub enum LoadForm`,
 //!   `pub enum ControlBlock`, `pub enum AnalysisForm`, `pub enum EndRule`, `pub enum ValueQuoting`,
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
-//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`, `pub enum OptionTo`
+//!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`, `pub enum OptionTo`,
+//!   `pub enum DotRule`
 //! - `pub struct ModelMaster`, `Behaviours::model_master(&self, kind: &str, level: u32) -> MasterAnswer`, `pub enum MasterAnswer`
 
 use crate::syntax::Lang;
+use crate::syntax::diag::Code;
+use crate::syntax::render::capability::Construct;
 
 /// A language's behaviours.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -110,6 +113,18 @@ pub struct Behaviours {
     /// equations); a type not here is a master of the target's own,
     /// written as it is (Spectre `bsim4`, a module a VACASK deck loads).
     pub spice_model_types: &'static [&'static str],
+    /// Read: the words whose line, kept as this language's text, is a
+    /// construct of the language's own (HSPICE `.stateye`, Xyce `yneuron`),
+    /// each lowercased with its construct (`Rd::kept_construct`); any other
+    /// kept line is `Construct::ForeignText`. A one-letter key matches every
+    /// element line of that letter, and the reader adds the construct's own
+    /// shape check there (`Construct::HspiceWLine`: a W model key on the
+    /// card; any other construct: none, so `"a"` matches every A line).
+    pub kept_words: &'static [(&'static str, Construct)],
+    /// Read: the dot cards this language reads its own way ahead of the
+    /// shared dot cards, by word (lowercased, without its dot), each with
+    /// its rule (`Rd::dialect_card`).
+    pub dot_rules: &'static [(&'static str, DotRule)],
 }
 
 /// A SPICE `.model` type's master at some LEVELs (`Behaviours::model_masters`).
@@ -148,6 +163,18 @@ pub enum OptionTo {
     /// Changes no number in the result (bookkeeping, printing): left out,
     /// noted W0024.
     Cosmetic,
+}
+
+/// How the reader takes one of a language's own dot cards
+/// ([`Behaviours::dot_rules`]).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DotRule {
+    /// A card with no fields is left out, with this note (a `Kind::Note`
+    /// code; `register` refuses another: LTspice `.backanno`, W0036).
+    Note(Code),
+    /// The S-parameter analysis over the deck's `.ac`, when the card's
+    /// testbench rule reads it (Xyce `.LIN`: ngspice's `.sp` of that sweep).
+    SParams,
 }
 
 /// The writer layout.
@@ -390,6 +417,8 @@ impl Behaviours {
         option_map: &[],
         model_masters: &[],
         spice_model_types: &[],
+        kept_words: &[],
+        dot_rules: &[],
     };
 
     /// The master SPICE `.model` type `kind` (lowercase) gets at `level`.

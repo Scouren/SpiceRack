@@ -1035,3 +1035,12 @@ Taken from the user's defaults and this doc's recommendations (team lead,
   a type at a LEVEL with a row is that master (`type=` its value), a
   SPICE type with none is refused (W0104), any other word is a master of
   the target's own, written as it is.
+- **Stream C3 (the reader cleanup)**: `kept_word(word, construct)` (the
+  words whose kept line is a construct of the dialect's own: HSPICE's
+  `.stateye` … and W line, Xyce's analysis commands, `Y` devices and
+  `.sens`; a one-letter word every element line of that letter, with the
+  construct's own shape check) and `dot_rule(word, DotRule)` (a dot card
+  the reader takes its own way: LTspice `.backanno` `Note(W0036)`, Xyce
+  `.lin` `SParams`; `register` refuses a `Note` whose code is no note,
+  `RegisterError::DotRuleKind`), both in `def/tables.rs`: the reader's
+  `kept_construct` and `dialect_card` read them, no `match` on the dialect.

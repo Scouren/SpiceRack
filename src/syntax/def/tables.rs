@@ -1,7 +1,8 @@
 //! The definition's list rows ([`DialectDef`]): the Spectre analyses a
 //! target has, the language's temperature word, builtin constants and
 //! built-in device names, the SPICE options it maps, the master a SPICE
-//! `.model` type gets, each appended by one call.
+//! `.model` type gets, the reader's own words (kept constructs, dot
+//! rules), each appended by one call.
 //!
 //! Cites: none (each definition cites its manual where it declares a row).
 //!
@@ -13,9 +14,11 @@
 //!   `DialectDef::option_cosmetic(self, spice: &str) -> Self`
 //! - `DialectDef::model_master(self, kind: &str, levels: &[u32], master: &str, type_: Option<&str>) -> Self`,
 //!   `DialectDef::spice_model_type(self, kind: &str) -> Self`
+//! - `DialectDef::kept_word(self, word: &str, c: Construct) -> Self`, `DialectDef::dot_rule(self, word: &str, r: DotRule) -> Self`
 
 use super::{DialectDef, leak, put};
-use crate::syntax::behaviour::{ModelMaster, OptionTo};
+use crate::syntax::behaviour::{DotRule, ModelMaster, OptionTo};
+use crate::syntax::render::capability::Construct;
 
 impl DialectDef {
     /// The expression word for the circuit temperature.
@@ -130,6 +133,34 @@ impl DialectDef {
             v.push(leak(&kind));
         }
         self.b.spice_model_types = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// A line kept as this language's text whose first word is `word` is
+    /// construct `c` ([`Behaviours::kept_words`](crate::syntax::behaviour::Behaviours::kept_words)):
+    /// `word` lowercased, a dot card's with its dot (`.stateye`), an
+    /// element's whole (`yneuron`). A one-letter key matches every element
+    /// line of that letter; the reader adds the construct's own shape check
+    /// (HSPICE's W line: a W model key), none for any other construct (`"a"`
+    /// matches every A line). A key held is replaced in place.
+    pub fn kept_word(mut self, word: &str, c: Construct) -> Self {
+        let mut v = self.b.kept_words.to_vec();
+        put(&mut v, leak(&word.to_ascii_lowercase()), c);
+        self.b.kept_words = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// Dot card `word` is read by rule `r`; the key is `word` lowercased
+    /// with a leading dot dropped, so `.LIN` and `lin` are one key. It is
+    /// read ahead of the shared dot cards ([`Behaviours::dot_rules`](crate::syntax::behaviour::Behaviours::dot_rules)).
+    /// A key held is replaced in place; `register` refuses a `Note` whose
+    /// code is no note.
+    pub fn dot_rule(mut self, word: &str, r: DotRule) -> Self {
+        let word = word.to_ascii_lowercase();
+        let word = word.strip_prefix('.').unwrap_or(&word);
+        let mut v = self.b.dot_rules.to_vec();
+        put(&mut v, leak(word), r);
+        self.b.dot_rules = Box::leak(v.into_boxed_slice());
         self
     }
 }

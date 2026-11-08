@@ -13,7 +13,7 @@
 //! - `pub(super) fn ltspice() -> DialectDef`
 
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, Coupling, ExprEval, LoadForm, NetlistRules, Parasitics,
+    AnalysisForm, CardRules, Coupling, DotRule, ExprEval, LoadForm, NetlistRules, Parasitics,
 };
 use crate::syntax::def::{Devices, DialectDef, Keywords};
 use crate::syntax::diag::Code;
@@ -145,6 +145,9 @@ pub(super) fn ltspice() -> DialectDef {
         .spectre_analysis("sweep")
         // The circuit temperature in an expression (help, temp).
         .temp_name("temp")
+        // The dot rules: `.backanno` names port currents for LTspice's
+        // viewer and changes no number (LTspice help): left out, noted.
+        .dot_rule("backanno", DotRule::Note(Code::W0036))
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)

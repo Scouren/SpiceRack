@@ -17,11 +17,12 @@
 //! - `Rd::subckt_head(&self, n: u32) -> Option<Head>`, `Rd::model_head(&self, n: u32) -> Option<Node>`
 //! - `Rd::model_view(&self, n: u32) -> Model`, `Rd::include_path(&self, n: u32) -> String`,
 //!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::param_view(&self, a: u32) -> (String, String)`,
-//!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::is_word_item(&self, n: u32) -> bool`
+//!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::dot_rule(&self, word: &str) -> Option<DotRule>`,
+//!   `Rd::is_word_item(&self, n: u32) -> bool`
 
 use super::{Acc, Block, Func, Kept, Rd, Scope};
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::CardRules;
+use crate::syntax::behaviour::{CardRules, DotRule};
 use crate::syntax::token::Tag as T;
 
 /// A `.subckt` head as the old grammar read it: its ports and parameter
@@ -258,6 +259,12 @@ impl Rd<'_> {
         )
     }
 
+    /// The reader's rule for the file's own dot card `word` (lowercased,
+    /// without its dot), when its language declares one.
+    pub(super) fn dot_rule(&self, word: &str) -> Option<DotRule> {
+        self.b.dot_rules.iter().find(|r| r.0 == word).map(|r| r.1)
+    }
+
     /// Whether `n` is one word.
     pub(super) fn is_word_item(&self, n: u32) -> bool {
         n != NONE && self.tag(n) == Tag::Word
@@ -271,33 +278,22 @@ impl Rd<'_> {
         self.tag(n) == Tag::Word && self.text(n).eq_ignore_ascii_case("params:")
     }
 
-    /// A dot card only its dialect reads, ahead of the shared dot cards
-    /// (word `word`, at `scope`): `true` when this placed it. One arm per
-    /// dialect: a dialect's next card of its own is an arm here.
+    /// A dot card its language reads its own way, ahead of the shared dot
+    /// cards (word `word`, at `scope`), by its `dot_rule` row
+    /// (`Behaviours::dot_rules`): `true` when this placed it.
     fn dialect_card(&self, n: u32, word: &str, scope: Scope, acc: &mut Acc) -> bool {
         let (bench, notes) = (acc.bench.len(), acc.notes.len());
-        let placed = match self.b.card_rules {
-            // LTspice's `.backanno` names port currents for its viewer and
-            // changes no number (LTspice help): left out, noted.
-            CardRules::Ltspice if word == "backanno" && self.fields(n).is_empty() => {
-                let token = self.main(n);
-                acc.notes.push(crate::syntax::diag::Diag::new(
-                    crate::syntax::diag::Code::W0036,
-                    token,
-                    0,
-                ));
+        let placed = match self.dot_rule(word) {
+            Some(DotRule::Note(code)) if self.fields(n).is_empty() => {
+                acc.notes
+                    .push(crate::syntax::diag::Diag::new(code, self.main(n), 0));
                 true
             }
-            // Xyce's `.LIN` (S parameters over the `.AC` sweep) is an analysis.
-            CardRules::Xyce if word == "lin" && scope == Scope::Top && self.testbench_peg(n) => {
+            Some(DotRule::SParams) if scope == Scope::Top && self.testbench_peg(n) => {
                 acc.bench.push(super::Bench::Card(n));
                 true
             }
-            CardRules::Spice
-            | CardRules::Ngspice
-            | CardRules::Hspice
-            | CardRules::Ltspice
-            | CardRules::Xyce => false,
+            Some(DotRule::Note(_) | DotRule::SParams) | None => false,
         };
         assert_eq!(
             placed,
