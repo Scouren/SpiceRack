@@ -366,7 +366,6 @@ Certification_Tests/BUG_983_SON/nsoi4.cir target-fails # no raw file .cross_sim_
 Certification_Tests/BUG_986_SON/bug986A.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_986_SON/bug986B.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_988_SON/bug988.cir mismatch # tran VDDDEV#branch: -0.00177123610662972 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
-Certification_Tests/ISSUE_160/baseline3.cir mismatch # tran V(1): -0.000000000000000489856094056107 leaves the tube at t=0.002 (tol 1.000e-2)
 Certification_Tests/ISSUE_229/GlobalInExpressionBug.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v_v1 | Not enough parameters
 Certification_Tests/ISSUE_239/bsim3_test2.cir mismatch # tran: stop time Some(6.000000000000001e-8) -> Some(1.1175000000000001e-10)
 Certification_Tests/ISSUE_239/bsim3_test2Ref.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)

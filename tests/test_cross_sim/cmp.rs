@@ -196,10 +196,26 @@ fn plot(k: &str, a: &RawData, b: &RawData) -> Result<(), String> {
             let tol = TRAN * swing + 2.0 * floor;
             let (ra, rb) = (a.re(i), b.re(j));
             let dx = tube() * xa.last().copied().unwrap_or(0.0);
-            if let Some(p) = leaves_tube(&xa, &ra, &xb, &rb, dx, tol) {
+            // Only the time both runs cover is compared: a TSTART that one
+            // simulator prints from and the other does not (ISSUE_160).
+            let lo = xa
+                .first()
+                .copied()
+                .unwrap_or(0.0)
+                .max(xb.first().copied().unwrap_or(0.0));
+            let hi = xa
+                .last()
+                .copied()
+                .unwrap_or(0.0)
+                .min(xb.last().copied().unwrap_or(0.0));
+            let keep: Vec<usize> = (0..xa.len())
+                .filter(|&p| xa[p] >= lo && xa[p] <= hi)
+                .collect();
+            let (ta, va): (Vec<f64>, Vec<f64>) = keep.iter().map(|&p| (xa[p], ra[p])).unzip();
+            if let Some(p) = leaves_tube(&ta, &va, &xb, &rb, dx, tol) {
                 return Err(format!(
                     "tran {}: {} leaves the tube at t={} (tol {tol:.3e})",
-                    v.name, ra[p], xa[p]
+                    v.name, va[p], ta[p]
                 ));
             }
         } else {
