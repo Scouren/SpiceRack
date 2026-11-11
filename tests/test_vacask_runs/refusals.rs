@@ -1,5 +1,5 @@
-//! What VACASK cannot do (measures, a PWL repeat, behavioural sources, switches,
-//! transmission lines, XSPICE, ...) -> a refusal code, never a broken deck.
+//! What the VACASK writer does not write -> a refusal code, never a broken
+//! deck. A card leaves the lists below with the row that translates it.
 //!
 //! Cites: real VACASK, for what it refuses or runs wrong.
 //!
@@ -27,10 +27,9 @@ fn refusals_are_errors_not_broken_decks() {
         "PWL r= must refuse"
     );
 
-    // No behavioural sources, switches, transmission lines or XSPICE; a SIN
-    // phase VACASK accepts and then ignores.
+    // Elements the VACASK writer refuses today (a card leaves this list
+    // with the row that translates it: ZERO-LEDGER P4-002 took the B source).
     for card in [
-        "B1 a 0 V=v(b)*2",
         "S1 a 0 c 0 sw\n.model sw SW",
         "T1 a 0 b 0 Z0=50 TD=1n",
         "A1 a d_and\n.model d_and d_and",

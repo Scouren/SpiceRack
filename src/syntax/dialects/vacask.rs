@@ -334,7 +334,9 @@ pub(super) fn vacask() -> DialectDef {
         .native(Construct::LibSection)
         .refuse(Construct::RclModel, Code::W0006)
         .refuse(Construct::ChargeCapacitor, Code::W0105)
-        .refuse(Construct::BehaviouralSource, Code::W0102)
+        // `<name> (p n) v=<expr>` / `i=<expr>`, no master
+        // (`docs/dev-builtin-behavioral.md` at 36be560; ZERO-LEDGER P4-002).
+        .native(Construct::BehaviouralSource)
         .refuse(Construct::Laplace, Code::W0011)
         .refuse(Construct::RfPort, Code::W0007)
         .refuse(Construct::PwlRepeatV, Code::W0008)

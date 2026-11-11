@@ -1333,7 +1333,7 @@ def vacask(d):
         .native(Construct.LibSection)
         .refuse(Construct.RclModel, Code.W0006)
         .refuse(Construct.ChargeCapacitor, Code.W0105)
-        .refuse(Construct.BehaviouralSource, Code.W0102)
+        .native(Construct.BehaviouralSource)
         .refuse(Construct.Laplace, Code.W0011)
         .refuse(Construct.RfPort, Code.W0007)
         .refuse(Construct.PwlRepeatV, Code.W0008)

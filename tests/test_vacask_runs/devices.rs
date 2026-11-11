@@ -184,3 +184,72 @@ fn ltspice_parasitics_are_elements() {
     let want = jw * 2e-3 / (1e3 + jw * 2e-3);
     assert!((l - want).norm() <= 1e-9 * want.norm(), "{l} vs {want}");
 }
+
+/// ZERO-LEDGER P4-002. Oracle: ngspice-45 on this same deck, every node at
+/// t = 2 ms to 15 digits (research/impl/evidence/P4-002/ngspice.run.log);
+/// each is a closed form too: b = 3*2-1, c = -(1m*2*2)*1k, d = 2 ln 3 +
+/// log10 3 (ngspice's `log` is natural), e = 2*|-2|^3, g = -(2/1k)*1k,
+/// m = 2m*1e3, p = 2*(2-5), r = 2+5+2+sqrt 3+e^2+2+3. `ln` and `sqrt` take
+/// `v(a)+1`: VACASK's first Newton iterate is 0 V, where `ln(0)` stops it
+/// (measured: the simulator's limit, not the written text's).
+#[test]
+fn p4_002_a_behavioural_source_runs_on_vacask() {
+    let deck = "t\n.param G=2\nV1 a 0 dc 2\nR1 a 0 1k\n\
+        B1 b 0 V=3*v(a)-1\nRb b 0 1k\n\
+        B2 c 0 I=1m*v(a)*v(a)\nRc c 0 1k\n\
+        B3 d 0 V=ln(v(a)+1)+log(v(a)+1)+log10(v(a)+1)\n\
+        B4 e 0 V=pow(-2,3)+(-2)**3\n\
+        B5 f 0 V=v(a)>1 ? 7 : 9\n\
+        B6 g 0 V=i(V1)*1k\n\
+        B7 h 0 V=temper\n\
+        B8 k 0 V=pi\n\
+        B9 m 0 V=time*1e3\n\
+        B10 n 0 V=!(v(a)-2)\n\
+        B11 p 0 V=G*v(a,b)\n\
+        B12 q 0 V=(v(a)>1)&&(v(b)>9)\n\
+        B13 r 0 V=min(v(a),v(b))+max(v(a),v(b))+abs(-v(a))+sqrt(v(a)+1)+exp(v(a))+floor(2.5)+ceil(2.5)\n\
+        B14 s 0 V=(v(a)>3)||(v(b)>1)\n\
+        B15 u 0 V=-v(a)+1Meg*1u\n\
+        .tran 1m 2m\n.end\n";
+    let raw = run(deck);
+    let last = |node: &str| *col(&raw, node).last().expect("a point");
+    for (node, want) in [
+        ("b", 5.0),
+        ("c", -4.0),
+        ("d", 2.674345832055882),
+        ("e", 16.0),
+        ("f", 7.0),
+        ("g", -2.0),
+        ("h", 27.0),
+        ("k", std::f64::consts::PI),
+        ("m", 2.0),
+        ("n", 1.0),
+        ("p", -6.0),
+        ("r", 23.12110690649953),
+        ("s", 1.0),
+        ("u", -1.0),
+    ] {
+        close(last(node), want, 1e-9);
+    }
+    // `close` is relative: the one zero (`&&` false) is compared exactly.
+    assert_eq!(last("q"), 0.0);
+}
+
+/// ZERO-LEDGER P4-002, a Spectre deck's `bsource`: `$time` is VACASK's
+/// `$abstime`, `temp` its `$temp`, a parameter name lowercase as the VACASK
+/// deck declares it. Oracle: the closed form at t = 2 ms and 27 C,
+/// 2*2 + 2m*1k + 27 = 33.
+#[test]
+fn p4_002_a_spectre_bsource_runs_on_vacask() {
+    let deck = "// t\nsimulator lang=spectre\nparameters Gain=2\nv1 (a 0) vsource dc=2\n\
+        r1 (a 0) resistor r=1k\nb1 (b 0) bsource v=Gain*v(a)+$time*1k+temp\n\
+        rb (b 0) resistor r=1k\ntran1 tran step=1m stop=2m\n";
+    let netlist = emit_from(
+        deck,
+        Dialect::Spectre,
+        Lang::SPECTRE.lexicon().expect("a reader"),
+    )
+    .expect("written");
+    let raw = run_text(&netlist);
+    close(*col(&raw, "b").last().expect("a point"), 33.0, 1e-9);
+}

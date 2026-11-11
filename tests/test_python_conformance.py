@@ -231,10 +231,10 @@ EXPECTED = {
     'polezero': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
-    # The van der Pol bench's cell is a B source, which the VACASK writer
-    # refuses too (W0102).
-    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001+W0102', OK, OK),
-    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001+W0102', OK, OK),
+    # The van der Pol bench's cell is a B source: VACASK's `i=` line since
+    # ZERO-LEDGER P4-002, so only the analysis is left (W0001).
+    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
     # Xyce: P ports and `.LIN` (D's a5f2c0a); HSPICE has `.LIN`: writer B (FINDINGS-python.md).
     's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0001', OK, OK),
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
@@ -299,7 +299,7 @@ EXPECTED = {
     'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'BV_BI': (OK, OK, OK, OK, OK, OK, 'W0102', OK, OK),
+    'BV_BI': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'POLY': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),

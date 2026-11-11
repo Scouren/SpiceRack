@@ -1,9 +1,10 @@
-//! A behavioural source's expression tree → its Spectre `bsource`
-//! expression (`b1 (p n) bsource v=expr`), written from the tree
+//! A behavioural source's expression tree → the target's behavioural
+//! expression: Spectre's `bsource` (`b1 (p n) bsource v=expr`) or VACASK's
+//! source line (`b1 (p n) v=expr`, no master), written from the tree
 //! post-order on a heap stack, every compound operand parenthesised so
-//! Spectre's precedence and associativity (`**` right-associative, unary
-//! minus above it) cannot regroup it. A form Spectre has no spelling for
-//! with the same meaning is `None`, refused W0102.
+//! the target's precedence and associativity (`**` right-associative, unary
+//! minus above it) cannot regroup it. A form the target has no spelling
+//! for with the same meaning is `None`, refused W0102.
 //!
 //! What maps, and its oracle:
 //! - `v(a)`, `v(a,b)` as written; `i(V1)` is `i("v1:0")`, the source's
@@ -19,20 +20,34 @@
 //!   base), nor Xyce's `log` (its base not checked).
 //! - A call of one of the deck's own functions as written (`real f()`).
 //!
+//! VACASK (`docs/dev-builtin-behavioral.md`, `docs/expr-operators.md`;
+//! each row measured against ngspice-45, ZERO-LEDGER P4-002) takes the
+//! same tree with these spellings its own:
+//! - `time` (a Spectre deck's `$time`) is `$abstime`, the temperature is
+//!   `$temp` (Celsius); `M_PI` is its constant too.
+//! - `i(V1)` is `i(v1)`, a voltage source's branch current with ngspice's
+//!   sign; a device with no branch (a resistor) has none to read.
+//! - A number, a node and a parameter name as the rest of the VACASK deck
+//!   spells them (`vacask::num`, `vacask::q`, lowercase unless the deck is
+//!   VACASK's own).
+//! - Its `log` is the natural logarithm, as Spectre's; the operators and
+//!   the functions above are the same.
+//!
 //! Depth: the parser caps an expression's nesting at `DEPTH_MAX` (P0006);
 //! the walk is a heap stack regardless.
 //!
 //! Cites: Spectre Reference 5.0 `[CMP]` pp.856-860 (bsource), pp.864
 //! (constants), pp.867-870 (expressions, functions); ngspice manual §5.1
-//! (B source functions).
+//! (B source functions); VACASK 36be560 `docs/dev-builtin-behavioral.md`.
 //!
 //! Contents:
 //! - `W::bsource_card(&mut self, tok, own, current, nodes, expr, value) -> Option<String>`
 //! - `W::bsource_expr(&self, value: u32) -> Option<String>`
 
 use super::W;
+use super::vacask::{num, q};
 use crate::syntax::ast::{NONE, Name, Node, Tag};
-use crate::syntax::behaviour::{CardRules, ModelSemantics};
+use crate::syntax::behaviour::{CardRules, ModelSemantics, NamedRules};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 
@@ -51,11 +66,13 @@ enum Step {
 }
 
 impl W<'_, '_> {
-    /// Value tree `value` as a Spectre bsource expression; `None` when a
-    /// form in it has no Spectre spelling with its meaning.
+    /// Value tree `value` as the target's behavioural expression (Spectre's
+    /// `bsource`, VACASK's `v=`/`i=`); `None` when a form in it has no
+    /// spelling there with its meaning.
     pub(super) fn bsource_expr(&self, value: u32) -> Option<String> {
         let a = self.rd.ast;
         let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
+        let vacask = self.b.named_rules == NamedRules::Vacask;
         let own: Vec<String> = self
             .deck
             .funcs
@@ -76,15 +93,26 @@ impl W<'_, '_> {
                     match a.tag(node) {
                         Tag::Num => {
                             let v = self.rd.t.value(a.main_token(node));
-                            vals.push((self.num(v), false));
+                            // VACASK's number spelling is its deck's
+                            // (`meg`, never Spectre's `M`): `vacask::num`.
+                            let s = if vacask { num(v) } else { self.num(v) };
+                            vals.push((s, false));
                         }
                         Tag::Ident | Tag::Word => {
                             let name = self.rd.text(n);
                             let s = match name.to_ascii_lowercase().as_str() {
+                                "time" | "$time" if vacask => "$abstime".to_string(),
                                 "time" => "$time".to_string(),
-                                "temper" => "temp".to_string(),
+                                // Spectre's `temp`, VACASK's `$temp`: Celsius.
+                                "temper" => self.b.temp_name.to_string(),
+                                t if vacask && t == self.rd.b.temp_name => {
+                                    self.b.temp_name.to_string()
+                                }
                                 "pi" => "M_PI".to_string(),
                                 "hertz" => return None,
+                                // VACASK's names are case-sensitive and the
+                                // deck's are written lowercase (`W::expr`).
+                                low if vacask && !self.keep_case => low.trim().to_string(),
                                 _ => name.trim().to_string(),
                             };
                             vals.push((s, false));
@@ -171,8 +199,9 @@ impl W<'_, '_> {
         vals.pop().map(|v| v.0)
     }
 
-    /// Behavioural card `tok`'s `bsource` statement (`own` its name after
-    /// the letter); `None` when it is refused.
+    /// Behavioural card `tok`'s statement, Spectre's `bsource` or VACASK's
+    /// source line (`own` its name after the letter); `None` when it is
+    /// refused.
     pub(super) fn bsource_card(
         &mut self,
         tok: u32,
@@ -198,11 +227,17 @@ impl W<'_, '_> {
         };
         // `[CMP]` p.859: `i = g * v`, `v = i * r`: a positive `i=`
         // flows from the first node through the source to the
-        // second, as SPICE's.
+        // second, as SPICE's; so does VACASK's (measured, P4-002).
         let key = if current { "i" } else { "v" };
         // The letter as written (`E1 … value=` is `e1`), as a
         // reference `i(E1)` spells it.
         let letter = self.rd.t.text(tok)[..1].to_ascii_lowercase();
+        // VACASK: no master after the terminals is what makes the line a
+        // behavioural source (`docs/dev-builtin-behavioral.md`, "Syntax").
+        if self.b.named_rules == NamedRules::Vacask {
+            let (p, n) = (q(nodes[0]), q(nodes[1]));
+            return Some(format!("{letter}{} ({p} {n}) {key}={e}", q(own)));
+        }
         Some(format!(
             "{letter}{} ({} {}) bsource {key}={e}",
             self.dev(own),
@@ -232,7 +267,8 @@ impl W<'_, '_> {
     }
 
     /// `v(a)`, `v(a,b)` with its nodes, `i(dev)` as Spectre's
-    /// `i("dev:0")`; `None` for any other shape.
+    /// `i("dev:0")` or VACASK's `i(dev)` of a voltage source; `None` for
+    /// any other shape.
     fn probe(&self, fname: &str, args: &[u32]) -> Option<String> {
         let a = self.rd.ast;
         let word = |&k: &u32| {
@@ -240,9 +276,17 @@ impl W<'_, '_> {
                 .then(|| self.rd.text(k).trim().to_string())
         };
         let words: Vec<String> = args.iter().map(word).collect::<Option<_>>()?;
+        let vacask = self.b.named_rules == NamedRules::Vacask;
+        let node = |x: &str| if vacask { q(x) } else { self.node(x) };
         match (fname, words.as_slice()) {
-            ("v", [x]) => Some(format!("v({})", self.node(x))),
-            ("v", [x, y]) => Some(format!("v({},{})", self.node(x), self.node(y))),
+            ("v", [x]) => Some(format!("v({})", node(x))),
+            ("v", [x, y]) => Some(format!("v({},{})", node(x), node(y))),
+            // VACASK reads a branch current only of an instance that has a
+            // branch: `i(r1)` stops it ("Initial sparsity pattern creation
+            // … failed"), `i(v1)` has ngspice's sign (both measured).
+            // ponytail: a V source alone; L, E, H and a `v=` source carry a
+            // branch too (`i(l1)` runs): add each with its run when needed.
+            ("i", [d]) if vacask => d.starts_with(['v', 'V']).then(|| format!("i({})", q(d))),
             ("i", [d]) => Some(format!("i(\"{}:0\")", self.dev(d))),
             _ => None,
         }

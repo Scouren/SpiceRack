@@ -210,10 +210,16 @@ impl W<'_, '_> {
                 self.ask(Construct::ChargeCapacitor, tok);
                 return None;
             }
-            Card::Behavioural { .. } => {
-                self.ask(Construct::BehaviouralSource, tok);
-                return None;
-            }
+            // VACASK's source line, `b1 (p n) v=<expr>`: the tree through
+            // `bsource.rs` (`docs/dev-builtin-behavioral.md`).
+            Card::Behavioural {
+                current,
+                np,
+                nm,
+                expr,
+                value,
+                ..
+            } => self.bsource_card(tok, own, current, [&np, &nm], &expr, value)?,
             Card::Table { .. } => {
                 self.ask(Construct::TableSource, tok);
                 return None;
