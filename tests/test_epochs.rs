@@ -9,7 +9,9 @@
 //! ngspice running the source script itself. On Xyce, LTspice and HSPICE
 //! the states are one table the deck runs over (`.DATA`, an index step,
 //! `.ALTER` blocks): the oracle is each state's closed form, met by Xyce
-//! and by ESPice reading the HSPICE text.
+//! and by ESPice reading the HSPICE text. A `.dc` axis by decade, octave
+//! or list is a `foreach` loop on ngspice too: the oracle is the closed
+//! form at every point Xyce ran, in its order.
 //!
 //! Unsupported fails, never skips: without `vacask`, `ngspice`, `Xyce`
 //! and `espice` on PATH every run fails; run the tests in
@@ -17,7 +19,8 @@
 //!
 //! Cites: DESIGN-control-epochs §5 (O1, O2), ZERO-LEDGER P5-001; VACASK
 //! 36be560 `docs/cmd-alter.md`; ngspice manual §13.5.5 (`alterparam`),
-//! §13.5.65 (`reset`), §13.6.4 (`foreach`); Xyce RG 7.10 §2.1.36 (`.STEP`).
+//! §13.5.65 (`reset`), §13.6.4 (`foreach`); Xyce RG 7.10 §2.1.36 (`.STEP`),
+//! `.DC` (`DEC`, `OCT`, `LIST`).
 //!
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
@@ -523,4 +526,128 @@ fn p5_001_s5_circuit_states_are_one_table_the_deck_runs_over() {
     // ESPice runs one circuit a deck: its cell refuses.
     let codes = oracle::refusal(&cases[0].0, Dialect::Ngspice, Dialect::Espice);
     assert!(codes.contains(&Code::W0130), "{codes:?}");
+}
+
+/// ZERO-LEDGER P5-001 step 6 (DESIGN-control-epochs §6 commit 6). Oracle:
+/// the closed form v(out) = (V1 + V2) / 2 at every point of the sweep, in
+/// the order Xyce 7.10 ran the same cards by hand (the first axis
+/// innermost, a list as written: research/impl/evidence/P5-001-s6/
+/// RESULTS.txt §1; ngspice-45's loops §2), then the `.op` after the
+/// loops: the sources stand at their own values again (5 V). Every plot
+/// is read through the backend, which writes each one. Tolerance: a
+/// linear solve of four elements, RELTOL class.
+#[test]
+fn p5_001_s6_a_log_or_list_dc_axis_runs_as_ngspice_foreach_loops() {
+    /// v(out) over the two axes' points, the first axis innermost.
+    fn grid(v1: &[f64], v2: &[f64]) -> Vec<f64> {
+        let mut out = Vec::with_capacity(v1.len() * v2.len());
+        for b in v2 {
+            out.extend(v1.iter().map(|a| (a + b) / 2.0));
+        }
+        out
+    }
+    /// `n` points from 1, `per` a decade.
+    fn dec(n: u32, per: f64) -> Vec<f64> {
+        (0..n).map(|k| 10f64.powf(f64::from(k) / per)).collect()
+    }
+    const DIVIDER: &str = "* dc axes\nV1 in 0 7\nV2 b 0 3\nR1 in out 1k\nR2 out b 1k\n";
+    let list = [-17.0, 12.0, 188.0, 5.0];
+    // The source, its `.dc` card with what follows it, v(out) point by point.
+    let cases = [
+        (
+            Dialect::Xyce,
+            ".DC DEC V1 1 100 2\n.op\n",
+            [grid(&dec(5, 2.0), &[3.0]), vec![5.0]].concat(),
+        ),
+        (
+            Dialect::Hspice,
+            ".dc v1 dec 2 1 100\n",
+            grid(&dec(5, 2.0), &[3.0]),
+        ),
+        (
+            Dialect::Xyce,
+            ".DC V1 LIST -17 12 188 5\n",
+            grid(&list, &[3.0]),
+        ),
+        // A list outside a linear axis: a pass is the `dc`'s own sweep.
+        (
+            Dialect::Xyce,
+            ".DC V1 0 2 1 V2 LIST -17 12 188 5\n",
+            grid(&[0.0, 1.0, 2.0], &list),
+        ),
+        // Two looped axes, the decade inside.
+        (
+            Dialect::Xyce,
+            ".DC DEC V1 1 10 5 V2 LIST 0 1\n",
+            grid(&dec(6, 5.0), &[0.0, 1.0]),
+        ),
+        // A list inside a linear axis, which is unrolled: the order holds.
+        (
+            Dialect::Xyce,
+            ".DC LIST V1 1 20 40 LIN V2 2 5 3\n",
+            grid(&[1.0, 20.0, 40.0], &[2.0, 5.0]),
+        ),
+    ];
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    for (from, cards, want) in &cases {
+        let deck = format!("{DIVIDER}{cards}.end\n");
+        let text = oracle::write(&deck, *from, Dialect::Ngspice);
+        let plots = Dialect::Ngspice
+            .run_all(&text)
+            .unwrap_or_else(|e| panic!("ngspice: {e}\n{text}"));
+        let mut got: Vec<f64> = Vec::new();
+        for p in &plots {
+            let at = p
+                .variables
+                .iter()
+                .position(|v| v.name.eq_ignore_ascii_case("v(out)"));
+            let at = at.unwrap_or_else(|| panic!("no v(out) in '{}'\n{text}", p.plot_name));
+            got.extend(&p.real_data[at]);
+        }
+        assert_eq!(got.len(), want.len(), "{cards}: {got:?}\n{text}");
+        for (g, w) in got.iter().zip(want) {
+            assert!(
+                tol.within(*g, *w),
+                "{cards}: {got:?}, want {want:?}\n{text}"
+            );
+        }
+    }
+    // The loops themselves: the linear axis is the `dc`'s own range, the
+    // list a `foreach` around it, at one value a pass.
+    let deck = format!("{DIVIDER}{}.end\n", cases[3].1);
+    let text = oracle::write(&deck, Dialect::Xyce, Dialect::Ngspice);
+    let script: Vec<&str> = text.lines().skip_while(|l| *l != ".control").collect();
+    assert_eq!(
+        script,
+        [
+            ".control",
+            "foreach d2 -17 12 188 5",
+            "dc V1 0 2 1 V2 $d2 $d2 1",
+            "end",
+            ".endc",
+            ".end",
+        ],
+        "{text}"
+    );
+    // What the script has no run for stays refused (W0038): an axis over a
+    // parameter (`dc` sweeps a source, a resistor or `temp`), a decade
+    // grid that runs down, a `.meas dc` (ngspice would evaluate it at
+    // every pass, not over the sweep); and every such axis on ESPice,
+    // which runs no `.control` command. The legal neighbours are the
+    // cases above.
+    for cards in [
+        ".param mval=5\n.DC mval LIST 2.5 5 7.5\n",
+        ".DC DEC V1 100 1 4\n",
+        ".DC V1 0 2 1 V2 LIST 1 3\n.measure dc top max v(out)\n",
+    ] {
+        let deck = format!("{DIVIDER}{cards}.end\n");
+        let codes = oracle::refusal(&deck, Dialect::Xyce, Dialect::Ngspice);
+        assert!(codes.contains(&Code::W0038), "{cards}: {codes:?}");
+    }
+    let deck = format!("{DIVIDER}.DC DEC V1 1 100 2\n.end\n");
+    let codes = oracle::refusal(&deck, Dialect::Xyce, Dialect::Espice);
+    assert!(codes.contains(&Code::W0038), "{codes:?}");
 }

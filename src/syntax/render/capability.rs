@@ -209,7 +209,8 @@ pub enum Alt {
     SpiceRegion,
     /// One `.control` script running every analysis, with `alterparam` and
     /// `reset` before the first run of each later circuit state (ngspice
-    /// manual §13.5.5, §13.5.65).
+    /// manual §13.5.5, §13.5.65); a `.step` and a log or list `.dc` axis
+    /// are that script's `foreach` loops (§13.6.4).
     ControlScript,
     /// The circuit states as the rows of a `.DATA` table the deck steps
     /// over, `.STEP DATA=<table>` (Xyce RG 7.10 §2.1.2, §2.1.36.5).

@@ -87,7 +87,7 @@ cell.AmWave Native
 cell.Step Spell(ControlScript)
 cell.StepList Spell(ControlScript)
 cell.TranStartup Lift(StartupRamp)
-cell.DcLogList Refuse(W0038)
+cell.DcLogList Spell(ControlScript)
 cell.Tf Native
 cell.Sens Native
 cell.SensAc Native

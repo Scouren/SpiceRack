@@ -231,7 +231,10 @@ pub(super) fn ngspice() -> DialectDef {
         .spell(Construct::Step, Alt::ControlScript)
         .spell(Construct::StepList, Alt::ControlScript)
         .lift(Construct::TranStartup, Rule::StartupRamp)
-        .refuse(Construct::DcLogList, Code::W0038)
+        // A `.dc` axis by decade, octave or list is a `foreach` loop of
+        // the control script around one `dc` (manual §13.6.4; ngspice-45
+        // run, ZERO-LEDGER P5-001 step 6).
+        .spell(Construct::DcLogList, Alt::ControlScript)
         .native(Construct::Tf)
         .native(Construct::Sens)
         .native(Construct::SensAc)

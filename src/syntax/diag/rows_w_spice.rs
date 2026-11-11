@@ -240,11 +240,11 @@ macro_rules! rows_w_spice {
                 cite: "LTspice help (`.TRAN` modifier `startup`: the operating point with the independent sources off, each ramped on over the first 20 µs); ngspice manual, transient options (`RAMPTIME`, a ramp of given length whose shape LTspice does not state); HSPICE, Xyce RG `.TRAN`, Spectre, VACASK: no start-up ramp",
                 explain: "The transient starts from an operating point with every independent source at zero and ramps them on over its first 20 µs. A target with no such start gets each top-level DC source as a PWL from zero to its value over 20 µs. This source's DC value is neither a number nor an expression, so no ramp is written for it; without one the run starts from the full-source operating point, another answer for a circuit that latches or soft-starts. Write the value as a number or a braced expression, or ramp the source in the deck (a PWL from zero) and drop `startup`.",
             }
-            /// A `.dc` axis by decade, octave or list on a target whose `.dc` is linear only.
+            /// A `.dc` axis by decade, octave or list on a target whose `.dc` is linear only and that has no loop for it.
             W0038 Refusal {
                 title: "a log or list DC sweep the target lacks",
-                cite: "ngspice manual, `.dc` (`.dc srcnam vstart vstop vincr [src2 …]`: linear only); Xyce RG `.DC` (`DEC`, `OCT`, `LIST`)",
-                explain: "A `.dc` axis sweeps by decade, by octave or over a list of values, and the target's `.dc` steps linearly only. Sweep the values another way (a `.control` loop of `alter` and `op`, a linear sweep covering them) or run the deck on a simulator with log sweeps.",
+                cite: "ngspice manual, `.dc` (`.dc srcnam vstart vstop vincr [src2 …]`: linear only, two sources), §13.6.4 (`foreach`); Xyce RG `.DC` (`DEC`, `OCT`, `LIST`); ESPice 0.3.0 (runs no `.control` command)",
+                explain: "A `.dc` axis sweeps by decade, by octave or over a list of values, and the target's `.dc` steps linearly only. ngspice runs such an axis as a `foreach` loop of its control script around one `dc`; it is refused there when the script has no such run: a third axis, an axis over a parameter (ngspice's `dc` sweeps a source, a resistor or `temp`), a decade or octave grid that does not run up from a positive start to its stop, more than 4096 values, or a `.meas dc` in the deck (ngspice would evaluate it at every pass of the loop, not over the sweep). Sweep the values another way (a linear sweep covering them) or run the deck on a simulator with log sweeps.",
             }
             /// A statement only its own simulator has (Xyce's own analyses and `Y` devices).
             W0039 Refusal {

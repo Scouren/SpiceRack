@@ -209,7 +209,7 @@ def ngspice(d):
         .spell(Construct.Step, Alt.ControlScript)
         .spell(Construct.StepList, Alt.ControlScript)
         .lift(Construct.TranStartup, Rule.StartupRamp)
-        .refuse(Construct.DcLogList, Code.W0038)
+        .spell(Construct.DcLogList, Alt.ControlScript)
         .native(Construct.Tf)
         .native(Construct.Sens)
         .native(Construct.SensAc)
@@ -253,7 +253,8 @@ def espice(d):
         .spell(Construct.AmWave, Alt.AmNoOffset)
         .refuse(Construct.Epochs, Code.W0130)
         .refuse(Construct.Step, Code.W0016)
-        .refuse(Construct.StepList, Code.W0016))
+        .refuse(Construct.StepList, Code.W0016)
+        .refuse(Construct.DcLogList, Code.W0038))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,

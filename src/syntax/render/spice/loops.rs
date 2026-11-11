@@ -4,7 +4,11 @@
 //! (`alterparam`, then one `reset`), the temperature (`option temp=`), a
 //! top-level R, C, L, V or I (`alter`). `reset` reads the deck again: it
 //! keeps an `alterparam` and undoes an `option` and an `alter`, so the
-//! parameters come first.
+//! parameters come first. A `.dc` axis by decade, octave or list is a
+//! loop of the same script: one `foreach` an axis around the one `dc`,
+//! which holds the looped axis at the loop's value (`dc src $d $d 1`: a
+//! sweep of one point; ngspice-45 puts the source back after it, run in
+//! `research/impl/evidence/P5-001-s6/`).
 //!
 //! Cites: ngspice manual §12.14.4.3 (a loop of analyses), §13.6.4
 //! (`foreach`), §13.5.5 (`alterparam`, `reset`), §13.5.3 (`alter`); Xyce
@@ -21,7 +25,9 @@
 //! - `pub(super) struct Loop`
 //! - `W::loops(&mut self, tb: &Tb) -> Vec<Loop>`,
 //!   `W::loop_open(&mut self, loops: &[Loop])`,
-//!   `W::loop_close(&mut self, loops: &[Loop])`
+//!   `W::loop_close(&mut self, loops: &[Loop])`,
+//!   `W::dc_looped(&mut self, tb: &Tb) -> bool`,
+//!   `W::dc_loops(&self, axes: &[DcAxis]) -> Option<String>`
 
 use super::W;
 use super::bench::Tb;
@@ -30,6 +36,7 @@ use crate::syntax::behaviour::CardRules;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
+use crate::syntax::render::read::{Ana, DcAxis, DcSweep};
 
 /// One `.step` as a loop of the control script: what each value sets and
 /// the values, in run order. Its variable is `s<k>`, `k` its place among
@@ -143,6 +150,73 @@ impl W<'_, '_> {
         for _ in loops {
             self.o.token("end", Space::Line);
         }
+    }
+
+    /// Whether a `.dc` of the plan runs as loops of the control script (a
+    /// log or list axis where the `DcLogList` cell is
+    /// `Spell(Alt::ControlScript)`): the deck's analyses then run from
+    /// the block. Beside a `.meas dc`, which would read one pass of the
+    /// loops and not the sweep, each such `.dc` the script could run is
+    /// refused (W0038).
+    pub(super) fn dc_looped(&mut self, tb: &Tb) -> bool {
+        if self.cells[Construct::DcLogList as usize] != Action::Spell(Alt::ControlScript) {
+            return false;
+        }
+        let measured = tb.measures_dc();
+        let mut looped = false;
+        for (a, tok) in tb.plan.runs.iter().zip(&tb.plan.run_tok) {
+            let Ana::DcAxes(axes) = a else { continue };
+            looped = true;
+            if measured && self.dc_loops(axes).is_some() {
+                self.refuse(Code::W0038, *tok);
+            }
+        }
+        looped
+    }
+
+    /// A `.dc` with a log or list axis as the control script runs it:
+    /// that axis and every axis outside it is a `foreach` over its values
+    /// (`DcSweep::values`; a linear one unrolled by [`points`]), the last
+    /// axis outermost, around one `dc` in which a looped axis stands at
+    /// the loop's value (`src $d<k> $d<k> 1`: one point, and ngspice puts
+    /// the source back after the run); a linear axis inside keeps its
+    /// range. The points come in the sweep's own order, one plot a pass.
+    /// `None` where the script has no such run: more than two axes
+    /// (ngspice's `dc` takes two sources), a looped axis of no value or
+    /// more than [`STEP_POINTS_MAX`], or one over a parameter of the
+    /// deck's top (`dc` sweeps a source, a resistor or `temp`).
+    pub(super) fn dc_loops(&self, axes: &[DcAxis]) -> Option<String> {
+        assert!(!axes.is_empty(), "dc_loops: an axis");
+        if axes.len() > 2 {
+            return None;
+        }
+        let num = |v: f64| self.sp.number(v, self.x);
+        let (mut open, mut dc) = (Vec::new(), String::from("dc"));
+        for (k, ax) in axes.iter().enumerate() {
+            let values = match ax.sweep {
+                DcSweep::Lin(a, b, c) if open.is_empty() => {
+                    dc.push_str(&format!(" {} {} {} {}", ax.src, num(a), num(b), num(c)));
+                    continue;
+                }
+                DcSweep::Lin(a, b, c) => points(None, [a, b, c], false),
+                DcSweep::Log(_) | DcSweep::List(_) => ax.sweep.values(),
+            };
+            let values = values.filter(|v| !v.is_empty() && v.len() <= STEP_POINTS_MAX)?;
+            if matches!(self.step_set(&ax.src, true), Some(Set::Param(_))) {
+                return None;
+            }
+            let d = k + 1;
+            let vals: Vec<String> = values.iter().map(|v| self.sp.decimal(*v, self.x)).collect();
+            open.push(format!("foreach d{d} {}", vals.join(" ")));
+            dc.push_str(&format!(" {} $d{d} $d{d} 1", ax.src));
+        }
+        // Paired with the reader: an all-linear `.dc` is `Ana::Dc`.
+        assert!(!open.is_empty(), "dc_loops: a log or list axis");
+        let ends = open.len();
+        open.reverse();
+        open.push(dc);
+        open.extend(std::iter::repeat_n("end".to_string(), ends));
+        Some(open.join("\n"))
     }
 }
 

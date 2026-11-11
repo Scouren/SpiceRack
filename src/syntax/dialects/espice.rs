@@ -58,5 +58,8 @@ pub(super) fn espice() -> DialectDef {
         // its own `.step` card is written (ZERO-LEDGER P4-029).
         .refuse(Construct::Step, Code::W0016)
         .refuse(Construct::StepList, Code::W0016)
+        // Nor is a log or list `.dc` axis: refused until ESPice's own
+        // `dec`/`poi` card is written (ZERO-LEDGER P4-099).
+        .refuse(Construct::DcLogList, Code::W0038)
     // --- S3
 }
