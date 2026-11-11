@@ -1836,8 +1836,6 @@ ngspice/examples/inductive-systems/positive-definite-2.sp simulator-fails # no r
 ngspice/examples/inductive-systems/positive-definite-3.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: KinducUnknownInductor
 ngspice/examples/measure/func_cap.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
 ngspice/examples/measure/inv-meas-tran-auto.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # plots ["op"] became ["tran"]
-ngspice/examples/mos/nmos_pmos_BSIM330.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc: sweep grid changed (186 -> 186 points)
-ngspice/examples/mos/nmos_pmos_BSIM482.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc: sweep grid changed (186 -> 186 points)
 ngspice/examples/mos/ro-meas.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(xro.n2): 0.7617871250767438 leaves the tube at t=0.0000000008145599999999978 (tol 1.576e-2)
 ngspice/examples/optran/F5TurboV2thermal-optran.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars

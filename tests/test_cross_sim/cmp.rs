@@ -3,6 +3,8 @@
 //! simulator names and orders its plots its own way), vectors by a name
 //! every simulator spells alike once normalized (`v(x)`, `X`, `x` are one
 //! node; `i(v1)`, `V1#branch`, `v1:flow(br)` one branch current).
+//! Plots of one kind pair by the grid of their swept vector, two over one
+//! grid by their values (`compare`).
 //!
 //! The tolerance is each simulator's own accuracy, summed over the two
 //! runs: ngspice and Xyce both converge Newton to RELTOL = 1e-3 of the
@@ -64,7 +66,7 @@ const GMIN: f64 = 1e-12;
 const TRAN: f64 = 1e-2;
 
 /// `b`'s plots against the reference `a`'s: the same count of each kind,
-/// paired in order, and every vector they share within the tolerance. An op
+/// paired by grid, and every vector they share within the tolerance. An op
 /// plot `b` has where `a` has none passes: Xyce's `.op` beside another
 /// analysis only prints the operating point (Xyce Reference Guide 7.10,
 /// `.OP`), where ngspice runs it as an analysis of its own. So does an ac
@@ -91,18 +93,30 @@ pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String> {
     for k in ["op", "dc", "ac", "tran", "noise", "total"] {
         let pa: Vec<&RawData> = a.iter().filter(|p| kind(p) == k).collect();
         let mut pb: Vec<&RawData> = b.iter().filter(|p| kind(p) == k).collect();
-        // Plots of one kind pair by their grid, then in order: ngspice
+        // Plots of one kind pair by the grid of their swept vector: ngspice
         // prepends each analysis job (`cktnewan.c:34-35`), so three `.dc`
-        // cards run in reverse deck order.
+        // cards run in reverse deck order. Two cards over one grid
+        // (`.dc vgs 0 1.5 50m vbs …` and `.dc vgs 0 1.5 50m temp …`) pair
+        // by their values: the first candidate whose vectors hold, else
+        // the first.
+        // ponytail: first fit, not a matching. A plot within tolerance of
+        // two candidates can take the other's partner and fail the gate
+        // (never pass it); a bipartite matching when a deck does.
         for x in pa {
             let near = |u: f64, v: f64| (u - v).abs() <= 1e-9 * u.abs().max(v.abs()).max(1e-30);
             let same = |p: &RawData, q: &RawData| {
-                let (s, t) = (p.re(0), q.re(0));
+                let (s, t) = (p.re(0), q.re(swept(q)));
                 s.len() == t.len()
                     && s.first().zip(t.first()).is_some_and(|(&u, &v)| near(u, v))
                     && s.last().zip(t.last()).is_some_and(|(&u, &v)| near(u, v))
             };
-            let j = pb.iter().position(|y| same(x, y)).unwrap_or(0);
+            let hits: Vec<usize> = (0..pb.len()).filter(|&j| same(x, pb[j])).collect();
+            let j = hits
+                .iter()
+                .copied()
+                .find(|&j| hits.len() > 1 && plot(k, x, pb[j], tol).is_ok())
+                .or(hits.first().copied())
+                .unwrap_or(0);
             if j < pb.len() {
                 plot(k, x, pb.remove(j), tol)?;
             }
@@ -187,6 +201,18 @@ fn kind(p: &RawData) -> &'static str {
         _ if named("frequency") => "ac",
         _ => "dc",
     }
+}
+
+/// The vector a plot's points run along: VACASK writes a nested sweep's
+/// vectors outer first, and the deck written for it names the inner one
+/// `vsweep` (`render/named/vacask_bench.rs`), which is among the first four
+/// as in `plot`; any other plot's is its first.
+fn swept(p: &RawData) -> usize {
+    p.variables
+        .iter()
+        .take(4)
+        .position(|v| v.name.eq_ignore_ascii_case("vsweep"))
+        .unwrap_or(0)
 }
 
 /// The time tube's half-width as a fraction of the stop time: 1%, or
@@ -434,6 +460,51 @@ fn oscillates_alike(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use spicerack::result::VarInfo;
+
+    /// A real plot named `plot_name` of `rows`: each vector's name, type and
+    /// points.
+    fn real(plot_name: &str, rows: &[(&str, VarType, [f64; 4])]) -> RawData {
+        RawData {
+            plot_name: plot_name.into(),
+            variables: rows
+                .iter()
+                .enumerate()
+                .map(|(index, &(name, var_type, _))| VarInfo {
+                    index,
+                    name: name.into(),
+                    var_type,
+                })
+                .collect(),
+            real_data: rows.iter().map(|r| r.2.to_vec()).collect(),
+            ..Default::default()
+        }
+    }
+
+    /// One nested `.dc` card as ngspice and ESPice write it: the inner sweep
+    /// is the scale.
+    fn ngspice(sweep: [f64; 4], out: [f64; 4]) -> RawData {
+        real(
+            "DC transfer characteristic",
+            &[
+                ("v(v-sweep)", VarType::Voltage, sweep),
+                ("v(out)", VarType::Voltage, out),
+            ],
+        )
+    }
+
+    /// The same card as VACASK writes it from the deck written for it: the
+    /// outer sweep first.
+    fn vacask(outer: [f64; 4], sweep: [f64; 4], out: [f64; 4]) -> RawData {
+        real(
+            "Operating Point",
+            &[
+                ("sweep1", VarType::Other, outer),
+                ("vsweep", VarType::Other, sweep),
+                ("out", VarType::Other, out),
+            ],
+        )
+    }
 
     #[test]
     fn every_simulators_spelling_of_one_vector_is_one_name() {
@@ -444,5 +515,39 @@ mod tests {
             assert_eq!(normal(n), "v1#branch");
         }
         assert_eq!(normal("X1:N2"), "x1.n2");
+    }
+
+    #[test]
+    fn p3_065_nested_dc_plots_pair_by_the_swept_vector() {
+        // Two nested cards as ngspice-45 and VACASK wrote
+        // `ngspice/examples/mos/nmos_pmos_drainresistor.sp`: ngspice the
+        // last card first, VACASK in deck order with `sweep1` first.
+        let (to1, to2) = ([0.0, 1.0, 0.0, 1.0], [0.0, 2.0, 0.0, 2.0]);
+        let (low, high) = ([0.0, 1.0, 0.0, 2.0], [0.0, 6.0, 0.0, 8.0]);
+        let outer = [0.0, 0.0, 5.0, 5.0];
+        let a = [ngspice(to2, high), ngspice(to1, low)];
+        let b = [vacask(outer, to1, low), vacask(outer, to2, high)];
+        assert_eq!(compare(&a, &b, Tol::of(&[])), Ok(()));
+        // A card whose values differ still fails.
+        let off = [vacask(outer, to1, low), vacask(outer, to2, low)];
+        assert!(compare(&a, &off, Tol::of(&[])).is_err());
+    }
+
+    #[test]
+    fn p3_065_two_cards_over_one_grid_pair_by_their_values() {
+        // `.dc vgsn 0 1.5 0.05 vbsn …` and `.dc vgsn 0 1.5 0.05 temp …`
+        // (`nmos_pmos_BSIM330.sp`): one grid, ngspice the last card first,
+        // ESPice in deck order.
+        let grid = [0.0, 1.0, 0.0, 1.0];
+        let (low, high) = ([0.0, 1.0, 0.0, 2.0], [0.0, 3.0, 0.0, 5.0]);
+        let a = [ngspice(grid, high), ngspice(grid, low)];
+        let b = [ngspice(grid, low), ngspice(grid, high)];
+        assert_eq!(compare(&a, &b, Tol::of(&[])), Ok(()));
+        // No candidate holds: the difference stands. A candidate is one
+        // card's only: two equal reference plots need two.
+        let off = [ngspice(grid, low), ngspice(grid, [0.0, 3.0, 0.0, 9.0])];
+        assert!(compare(&a, &off, Tol::of(&[])).is_err());
+        let twice = [ngspice(grid, low), ngspice(grid, low)];
+        assert!(compare(&twice, &b, Tol::of(&[])).is_err());
     }
 }

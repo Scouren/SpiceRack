@@ -22,10 +22,6 @@ circuitsim90/MOS3/jge.sp target-fails # no raw file tran1.raw: convergence not a
 circuitsim90/MOS3/mike2.sp mismatch # tran i(vpulse): -0.0020017239627740935 leaves the tube at t=0.0000000010047600892638032 (tol 2.311e-5)
 circuitsim90/MOS3/rich3.sp target-fails # no raw file tran1.raw: worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 >TOL @ (unknown) | NR solver failed to converge. | Leaving core NR loop in
 ngspice/examples/measure/rc-meas-ac-control.sp target-fails # no raw file ac1.raw: Refactorization failed, size=5, rank=4. | Factorization failed, size=5, rank=4, zero pivot @ node 'mid1'. | Leaving core NR loop in iterati
-ngspice/examples/mos/nmos_pmos_BSIM330.sp mismatch # dc: sweep grid changed (186 -> 186 points)
-ngspice/examples/mos/nmos_pmos_BSIM482.sp mismatch # dc: sweep grid changed (186 -> 186 points)
-ngspice/examples/mos/nmos_pmos_drainresistor.sp mismatch # dc: sweep grid changed (246 -> 186 points)
-ngspice/examples/mos/nmos_pmos_plotting.sp mismatch # dc: sweep grid changed (246 -> 456 points)
 ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/noise/resdiv.sp mismatch # plots ["noise", "noise", "noise", "total", "total", "total"] became ["noise", "noise", "noise"]
 ngspice/examples/snapshot/adder_mos.sp target-fails # no plot: Parser syntax error, unexpected newline, expecting (
@@ -36,8 +32,6 @@ ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@
 ngspice/examples/various/roessler-attractor.sp target-fails # Parameter 'ic' not found: `c1 (x 0) capacitor c=1e0 ic=1` (a C card's `ic=` under `uic`; not this row's card)
 ngspice/examples/various/todo-temper-3.sp target-fails # no raw file dc1.raw: Variable or constant 'temper' not defined. | model dplain sp_diode (is=temper >= 25 ? 1e-10 : (temper+1)*1e-11) | ^ | 9:27 (0x66) in .cross
 ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/paranoia/various/nmos_pmos_BSIM330.sp mismatch # dc: sweep grid changed (246 -> 186 points)
-ngspice/paranoia/various/nmos_pmos_plotting.sp mismatch # dc: sweep grid changed (246 -> 186 points)
 ngspice/paranoia/vdmos/IXTP6N100D2-cap.sp target-fails # no raw file tran1.raw: Factorization failed, size=16, rank=15, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 ste
 ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp target-fails # no raw file dc1.raw: Factorization failed, size=24, rank=22, zero pivot @ node 'vs2:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step
 ngspice/paranoia/vdmos/VDMOS-DIO-AC.sp target-fails # no raw file ac1.raw: Factorization failed, size=20, rank=19, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step(
