@@ -2,11 +2,11 @@
 //! a deck spells, `FromStr` reads it in any case where the text enters
 //! (anything else fails, naming the choices).
 //!
-//! Cites: ngspice manual §11.3.6 (`.pz` types), §4.1.8 (TRRANDOM types);
+//! Cites: ngspice manual §3.3.15 (a switch's `ON`/`OFF`), §11.3.6 (`.pz` types), §4.1.8 (TRRANDOM types);
 //! Spectre Reference 19.1 `[REF]` (sweep `log`, the analysis keywords).
 //!
 //! Contents:
-//! - keyword enums `Sweep`, `PzTransfer`, `PzKind`, `SpectreAnalysis`, `RandomKind`, each with
+//! - keyword enums `Sweep`, `PzTransfer`, `PzKind`, `SpectreAnalysis`, `RandomKind`, `SwitchState`, each with
 //!   `::ALL: &[Self]`, `::name(self) -> &'static str`, `FromStr`
 
 /// A closed set of deck keywords: `name()` is the keyword, `FromStr` reads
@@ -98,6 +98,15 @@ keywords! {
         Gaussian = "gaussian",
         Exponential = "exponential",
         Poisson = "poisson",
+    }
+}
+
+keywords! {
+    /// A switch's state when its control starts inside the hysteresis
+    /// band: the word after its model (ngspice manual §3.3.15).
+    SwitchState, "switch state" {
+        On = "ON",
+        Off = "OFF",
     }
 }
 

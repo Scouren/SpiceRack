@@ -211,6 +211,8 @@ PARITY = {
     "POLY": (FEATURES["POLY"], tw_elem(["E1 x 0 POLY(1) out 0 0 1 2", "Rx x 0 1e3"]), "ng §3 POLY", None),
     "S": (FEATURES["S"], tw_elem([".model sw sw", "S1 out 0 in 0 sw"]), "ng §3 S", None),
     "W": (FEATURES["W"], tw_elem(["Vs in z 0", "Rz z 0 1e3", ".model cs csw", "W1 out 0 Vs cs"]), "ng §3 W", None),
+    "S_initial_state": (FEATURES["S_initial_state"], tw_elem([".model sw sw", "S1 out 0 in 0 sw ON"]), "ng §3.3.15 (SXXXXXXX N+ N- NC+ NC- MODEL <ON><OFF>); ngspice-45 run (evidence/P8-045/ng/s_ON.log)", "P8-045"),
+    "W_initial_state": (FEATURES["W_initial_state"], tw_elem(["Vs in z 0", "Rz z 0 1e3", ".model cs csw", "W1 out 0 Vs cs OFF"]), "ng §3.3.15 (WYYYYYYY N+ N- VNAM MODEL <ON><OFF>)", "P8-045"),
     "T": (FEATURES["T"], tw_elem(["T1 out 0 x 0 Z0=50 TD=1e-9", "Rx x 0 50"]), "ng §3 T", None),
     "A": (FEATURES["A"], tw_elem([".model amp gain (gain=2.0)", "A1 out x amp", "Rx x 0 1e3"]), "ng §8.1 A (XSPICE)", None),
     "parameter": (FEATURES["parameter"], tw_elem([".param k=2"]), "ng §2.3 .param", None),

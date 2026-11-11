@@ -983,6 +983,42 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     assert 0.75e-3 < rms < 1.06e-3, rms
 
 
+@pytest.mark.parametrize(
+    "backend",
+    [
+        "ngspice",
+        # ESPICE-SWITCH-ON: ESPice 0.3.0 reads the word and leaves the
+        # switch off (research/impl/evidence/P8-045/es/e_ON.raw). The marker
+        # goes when ESPice holds the state: until then a pass fails.
+        pytest.param("espice", marks=pytest.mark.xfail(strict=True, reason="ESPICE-SWITCH-ON")),
+    ],
+)
+def test_p8_045_a_switch_inside_its_hysteresis_band_starts_in_its_initial_state(backend):
+    """ngspice-45 manual §3.3.15: "ON or OFF determine the initial state of
+    the switch" when the control starts inside the hysteresis loop. The
+    control is 0.5 V on vt=0.5, vh=0.2; the switch (1 Ohm on, 1 MOhm off)
+    is the lower leg of a divider under 1 kOhm and 1 V: 1/1001 V on,
+    1e6/1.001e6 V off (closed form). ngspice-45 prints 9.990010e-04 and
+    9.990010e-01 on the hand decks (research/impl/evidence/P8-045/ng/)."""
+    import spicerack as ps
+
+    def out(state):
+        d = ps.Subcircuit("sw", ["s", "c", "out"])
+        d.model("sw", "sw", vt=0.5, vh=0.2, ron=1, roff=1e6)
+        d.R("1", "s", "out", 1e3)
+        d.S("1", "out", d.gnd, control_positive="c", control_negative=d.gnd, model="sw", initial_state=state)
+        tb = ps.Testbench(d)
+        tb.with_backend(backend)
+        tb.V("s", "s", "0", 1.0)
+        tb.V("c", "c", "0", 0.5)
+        return tb.operating_point()["out"]
+
+    # A linear DC solve once the state is chosen: exact to rounding.
+    assert out("off") == pytest.approx(1e6 / 1.001e6, rel=1e-9)
+    assert out(None) == pytest.approx(1e6 / 1.001e6, rel=1e-9)
+    assert out("on") == pytest.approx(1 / 1001, rel=1e-9)
+
+
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
 def test_p8_014_each_instance_holds_the_branch_its_parameter_selects(backend):
     """ngspice-45 manual §2.13: the block of the first true condition is

@@ -48,8 +48,8 @@ nodes are positional; everything after `*` is keyword-only.
 | `Q` / `BJT` | `(name, collector, base, emitter, *, model, substrate=None, thermal=None, **params)` |
 | `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): VACASK writes it on its `sp_vdmos`, Spectre refuses it (`W0105`) |
 | `J`, `Z` | `(name, drain, gate, source, *, model, **params)` |
-| `S` | `(name, positive, negative, *, control_positive, control_negative, model)` |
-| `W` | `(name, positive, negative, *, vcontrol, model)` |
+| `S` | `(name, positive, negative, *, control_positive, control_negative, model, initial_state=None)` |
+| `W` | `(name, positive, negative, *, vcontrol, model, initial_state=None)`; on both, `initial_state` is `"on"` or `"off"`: the switch's state when its control starts inside the hysteresis band (the card's `ON`/`OFF`). The card is then written for ngspice and ESPice and refused elsewhere (`W0001`). ngspice-45 holds the state of an `S`; ESPice 0.3.0 reads the word and ignores it |
 | `T` | `(name, input_positive, input_negative, output_positive, output_negative, *, Z0, TD)` |
 | `X` | `(name, subcircuit_name, *nodes, **params)` |
 | `instance` | `(subckt, name, *nodes, **params)`: like `X`, from the object |

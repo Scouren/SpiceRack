@@ -28,6 +28,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `ac=`, `ac_phase=` on `V`, `I` and the waveform sources, and a waveform source's `dc=`, take an expression (`ac="{amp}"`).
 - python: `Block()` and `conditional(branches, otherwise=None)` on `Subcircuit`, `Circuit` and `Block` write `.if` / `.elseif` / `.else` / `.endif`; a stored subcircuit keeps a conditional whole (`from_source` dropped its branches).
 - python: `harmonic_balance` / `add_harmonic_balance` take `num_harmonics` as one count or one per tone, and refuse a list that does not match the tones (it was written as given) and an empty tone list.
+- python: `S` and `W` take `initial_state="on"` or `"off"`, the switch's state when its control starts inside the hysteresis band (the card's `ON`/`OFF`; ngspice and ESPice only).
 
 ## 0.2.0 (2026-11-03)
 

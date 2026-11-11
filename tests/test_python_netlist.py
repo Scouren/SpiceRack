@@ -406,6 +406,29 @@ class TestSwitchesAndTLines:
         assert "Z0=50" in netlist
         assert "TD=" in netlist
 
+    def test_p8_045_a_switch_takes_its_initial_state(self):
+        c = ps().Circuit("t")
+        c.S("1", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1", initial_state="on")
+        c.W("1", "out", c.gnd, vcontrol="Vctrl", model="csw1", initial_state="OFF")
+        c.S("2", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1")
+        cards = c.to_source().splitlines()
+        # ngspice-45 manual §3.3.15: `SXXXXXXX N+ N- NC+ NC- MODEL <ON><OFF>`,
+        # `WYYYYYYY N+ N- VNAM MODEL <ON><OFF>`. Read in any case, written
+        # as the manual spells it.
+        assert "S1 out 0 cp cm sw1 ON" in cards
+        assert "W1 out 0 Vctrl csw1 OFF" in cards
+        # No state given: the card as before.
+        assert "S2 out 0 cp cm sw1" in cards
+
+    def test_p8_045_a_state_that_is_neither_word_is_refused(self):
+        c = ps().Circuit("t")
+        with pytest.raises(ValueError, match=r"unknown switch state 'open' \(expected ON or OFF\)"):
+            c.S("1", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1", initial_state="open")
+        with pytest.raises(ValueError, match="unknown switch state"):
+            c.W("1", "out", c.gnd, vcontrol="Vctrl", model="csw1", initial_state="closed")
+        # Nothing was kept.
+        assert "S1" not in str(c) and "W1" not in str(c)
+
 
 # ======================================================================
 # Waveform sources

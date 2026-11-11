@@ -78,7 +78,7 @@ Every element takes its name and nodes first; the rest are keywords.
 | `Q` (`BJT`) | bipolar | `collector, base, emitter, model=` |
 | `M` (`MOSFET`) | MOSFET | `drain, gate, source, bulk, model=`, then `W=`, `L=`, ... |
 | `J`, `Z` | JFET, MESFET | `drain, gate, source, model=` |
-| `S`, `W` | switches | `control_positive=, control_negative=, model=` / `vcontrol=, model=` |
+| `S`, `W` | switches | `control_positive=, control_negative=, model=` / `vcontrol=, model=`; `initial_state="on"` or `"off"` |
 | `T` | transmission line | four nodes, `Z0=, TD=` |
 | `X` | subcircuit instance by name | `"subckt_name", *nodes, **params` |
 | `A` | XSPICE code model | `name=, connections=[...], model=` (all keywords) |

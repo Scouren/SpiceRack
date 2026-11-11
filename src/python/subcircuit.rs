@@ -315,16 +315,20 @@ impl PySubcircuit {
         Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, model))]
-    fn S(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, model: &str) {
+    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, model, initial_state=None))]
+    fn S(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, model: &str, initial_state: Option<&str>) -> PyResult<()> {
         let nets = self.nets(&[positive, negative, control_positive, control_negative]);
-        self.push(name, format!("S{name} {nets} {model}"));
+        let state = super::args::switch_state(initial_state).map_err(PyValueError::new_err)?;
+        self.push(name, format!("S{name} {nets} {model}{state}"));
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, vcontrol, model))]
-    fn W(&mut self, name: &str, positive: &str, negative: &str, vcontrol: &str, model: &str) {
+    #[pyo3(signature = (name, positive, negative, *, vcontrol, model, initial_state=None))]
+    fn W(&mut self, name: &str, positive: &str, negative: &str, vcontrol: &str, model: &str, initial_state: Option<&str>) -> PyResult<()> {
         let nets = self.nets(&[positive, negative]);
-        self.push(name, format!("W{name} {nets} {vcontrol} {model}"));
+        let state = super::args::switch_state(initial_state).map_err(PyValueError::new_err)?;
+        self.push(name, format!("W{name} {nets} {vcontrol} {model}{state}"));
+        Ok(())
     }
 
     #[pyo3(signature = (name, input_positive, input_negative, output_positive, output_negative, *, Z0, TD))]

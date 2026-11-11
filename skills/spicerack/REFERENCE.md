@@ -31,8 +31,8 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `initial_condition`, `node_set` | `.ic`, `.nodeset` | `(**nodes)` on `Testbench`/`CircuitSimulator` (top level) and on `Subcircuit`/`Circuit` (inside its `.subckt`); a value is a number or an expression (`out="{vdd/2}"`), an instance's node is `**{"x1.n": 0.5}`. Inside a subcircuit it nets for ngspice/ESPice only (`W0001` elsewhere) |
 | `NonLinearVoltageSource` / `NonLinearCurrentSource` | `E` / `G` | `(name, positive, negative, expression=...)` — `E<name> n+ n- value={expr}`: `BV` / `BI` under the E/G letter (PySpice's names); give an E and a G different names |
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |
-| `S` | `S` | `(name, positive, negative, control_positive, control_negative, model)` |
-| `W` | `W` | `(name, positive, negative, vcontrol, model)` |
+| `S` | `S` | `(name, positive, negative, control_positive, control_negative, model, initial_state=None)` |
+| `W` | `W` | `(name, positive, negative, vcontrol, model, initial_state=None)`; `initial_state="on"`/`"off"` writes the card's `ON`/`OFF` (ngspice and ESPice only, `W0001` elsewhere; ESPice 0.3.0 ignores it) |
 | `A` | `A` | `(name, connections, model)` — `connections` is a `list[str]`; an XSPICE code model: ngspice, ESPice (written), every other target refuses it (`W0001`) |
 | `X` | `X` | `X(name, subcircuit_name, *nodes, **params)` — name and nodes positional; `params` become `k=v` on the card |
 

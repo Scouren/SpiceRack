@@ -311,6 +311,8 @@ FEATURES = {
     "POLY": elem(lambda d: (d.POLY("1", "E", "x", "0", ["out", "0"], [0, 1, 2]), d.R("x", "x", "0", 1e3))),
     "S": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw"))),
     "W": elem(lambda d: (d.V("s", "in", "z", 0), d.R("z", "z", "0", 1e3), d.model("cs", "csw"), d.W("1", "out", "0", vcontrol="Vs", model="cs"))),
+    "S_initial_state": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw", initial_state="on"))),
+    "W_initial_state": elem(lambda d: (d.V("s", "in", "z", 0), d.R("z", "z", "0", 1e3), d.model("cs", "csw"), d.W("1", "out", "0", vcontrol="Vs", model="cs", initial_state="off"))),
     "T": elem(lambda d: (d.T("1", "out", "0", "x", "0", Z0=50, TD=1e-9), d.R("x", "x", "0", 50))),
     "A": elem(lambda d: (d.model("amp", "gain", gain=2.0), d.A(name="1", connections=["out", "x"], model="amp"), d.R("x", "x", "0", 1e3))),
     "parameter": elem(lambda d: d.parameter("k", "2")),
@@ -462,6 +464,9 @@ EXPECTED = {
     'POLY': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
+    # A switch's initial state: kept as ngspice's card, W0001 elsewhere (P5-042 reads it).
+    'S_initial_state': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001+W0104', 'W0001+W0104', OK, OK),
+    'W_initial_state': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001+W0104', 'W0001+W0104', OK, OK),
     'T': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'A': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
