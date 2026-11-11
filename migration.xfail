@@ -3668,3 +3668,11 @@ xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir espice 
 xyce/XDM/HSPICE/OTHER_PARSING/curly_braces_for_simple_function_calls.cir ngspice written differently: Xyce's `sqrt`/`acosh`/`atanh` domain spelled, 1 line (P3-016)
 xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir espice written differently: Xyce's `sqrt`/`acosh`/`atanh` domain spelled, 1 line (P3-016)
 xyce/XDM/HSPICE/OTHER_PARSING/solution_dependent_resistors.cir ngspice written differently: Xyce's `sqrt`/`acosh`/`atanh` domain spelled, 1 line (P3-016)
+
+# S1: P3-084: a brace group inside an expression is written in parentheses for ngspice and ESPice
+# (ngspice-45's B-source reader drops the braces: `{bletch-foobie}*I(V1)` is 2.01 for Xyce's -0.01).
+# Oracle: ngspice-45, Xyce 7.10, LTspice 26.1.1, research/impl/evidence/P3-084.
+ltspice/ltspice_examples/Fc.net espice written differently: brace groups in two B expressions are parenthesised (P3-084)
+ltspice/ltspice_examples/Fc.net ngspice written differently: brace groups in two B expressions are parenthesised (P3-084)
+xyce/Certification_Tests/BUG_2039/bug_2039.cir espice written differently: `{bletch-foobie}*I(V1)` is `(bletch-foobie)*I(V1)` (P3-084)
+xyce/Certification_Tests/BUG_2039/bug_2039.cir ngspice written differently: `{bletch-foobie}*I(V1)` is `(bletch-foobie)*I(V1)` (P3-084)

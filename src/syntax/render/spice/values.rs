@@ -20,7 +20,7 @@ use super::powers::{Grouping, Law, group_powers};
 use super::ternary::{
     Read, nominal, parenthesize, rename_call, rename_word, spell_clamp, spell_if, spell_nint,
 };
-use super::ternary::{ngspice_power_calls, xyce_domains, xyce_power_calls};
+use super::ternary::{brace_groups, ngspice_power_calls, xyce_domains, xyce_power_calls};
 use crate::syntax::behaviour::{ExprEval, ParamForm, ValueQuoting};
 
 /// One expression rewrite: `apply` where `holds`.
@@ -39,6 +39,12 @@ const REWRITES: &[Rewrite] = &[
     Rewrite {
         holds: |w| w.pair.spell_if,
         apply: |_, e| spell_if(e),
+    },
+    // A brace group inside an expression, which ngspice's B-source
+    // reader drops the braces of: parentheses.
+    Rewrite {
+        holds: |w| w.pair.brace_groups,
+        apply: |_, e| brace_groups(e),
     },
     // `log` is base 10 on Xyce, natural on ngspice, HSPICE, LTspice.
     Rewrite {

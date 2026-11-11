@@ -19,6 +19,33 @@ use spicerack::backend::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-084: a brace group inside an expression is a parenthesised
+/// group on ngspice. Xyce 7.10 reads `{{bletch-foobie}*I(V1)}` as
+/// (2-1)·I = -0.01 and `{{bletch-foobie}*3}` as 3; LTspice 26.1.1 reads
+/// `2**{1+m}` as 2^3 = 8 (run by hand, `evidence/P3-084/lt.cir`).
+/// ngspice-45's B-source reader drops the braces (2 - 1·I = 2.01;
+/// 2**1+m = 4) and its `.param` refuses the nested group. Oracles: Xyce
+/// on the source deck against ngspice on the written one; LTspice's
+/// recorded run (not in `.#testing`) as a closed form on ngspice.
+#[test]
+fn p3_084_a_brace_group_inside_an_expression_is_a_group_on_ngspice() {
+    let tol = oracle::Tol {
+        rel: 1e-9,
+        floor: 0.0,
+    };
+    let at = oracle::At::First;
+    let head = "t\n.param foobie=1\n.param bletch=2\nV1 1 0 5\nR0 1 0 500\n";
+    let deck = format!("{head}B1 a 0 V={{{{bletch-foobie}}*I(V1)}}\nRa a 0 1\n.op\n.end\n");
+    let (xy, _) = oracle::sim_pair(Dialect::Xyce, &deck, Dialect::Ngspice, "a", at, tol);
+    assert!(tol.within(xy, -0.01), "Xyce 7.10: {xy}");
+    let deck =
+        format!("{head}.param p={{{{bletch-foobie}}*3}}\nV2 c 0 {{p}}\nR2 c 0 1\n.op\n.end\n");
+    let (xy, _) = oracle::sim_pair(Dialect::Xyce, &deck, Dialect::Ngspice, "c", at, tol);
+    assert!(tol.within(xy, 3.0), "Xyce 7.10: {xy}");
+    let lt = "t\n.param m=2\nB1 b 0 V=2**{1+m}\nR1 b 0 1\n.op\n.end\n";
+    oracle::closed_form(Dialect::Ltspice, lt, &[Dialect::Ngspice], "b", at, 8.0, tol);
+}
+
 /// Ledger P3-016: a Xyce call outside its real domain keeps Xyce's value
 /// on ngspice. Xyce 7.10 keeps the real part of the complex result
 /// (`sqrt(-2.5)` is 0, `acosh(-2.5)` acosh(2.5), `acosh(0.5)` 0,

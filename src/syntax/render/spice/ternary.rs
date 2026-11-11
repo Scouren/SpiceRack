@@ -30,6 +30,7 @@
 //! - `pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String`
 //! - `pub(super) fn nominal(e: &str) -> String`
 //! - `pub(super) fn spell_clamp(e: &str) -> String`
+//! - `pub(super) fn brace_groups(e: &str) -> String`
 //! - `pub(super) fn xyce_domains(e: &str) -> String`
 //! - `pub(super) fn xyce_power_calls(e: &str) -> String`
 //! - `pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String`
@@ -309,6 +310,25 @@ pub(super) fn xyce_domains(e: &str) -> String {
     map_calls(&e, "atanh", &atanh, 0)
 }
 
+/// `e` with each `{…}` group inside it in parentheses, which every
+/// dialect reads as the group; the braces that hold all of `e` (a value's
+/// delimiters) stay. Xyce 7.10 and LTspice 26.1.1 read `{a-b}*i(v1)` as
+/// `(a-b)*i(v1)`; ngspice-45's B-source reader drops the braces
+/// (`a-b*i(v1)`) and its `.param` refuses `{{a-b}*3}` (run by hand,
+/// `research/impl/evidence/P3-084`). A value with a string in it is
+/// copied: a brace there is text.
+pub(super) fn brace_groups(e: &str) -> String {
+    let t = e.trim();
+    let whole = t.starts_with('{') && close(t.as_bytes(), 0) == Some(t.len() - 1);
+    let parens = |s: &str| s.replace('{', "(").replace('}', ")");
+    match whole {
+        _ if e.contains('"') => e.to_string(),
+        true if t[1..].contains('{') => format!("{{{}}}", parens(&t[1..t.len() - 1])),
+        true => e.to_string(),
+        false => parens(e),
+    }
+}
+
 // ---- private ----
 
 /// Whether `x` reads a parameter or a probe: a name that is no call's, or
@@ -521,6 +541,20 @@ mod tests {
             assert_eq!(d(folded), folded);
         }
         assert_eq!(d("sqrt(sqrt(x))"), "sqrt(max(sqrt(max(x,0)),0))");
+    }
+
+    /// ngspice-45 gives each spelling the value Xyce 7.10 gives the
+    /// braced text (`research/impl/evidence/P3-084/cases.txt`).
+    #[test]
+    fn a_brace_group_inside_an_expression_is_parenthesized() {
+        let g = super::brace_groups;
+        assert_eq!(g("{bletch-foobie}*I(V1)"), "(bletch-foobie)*I(V1)");
+        assert_eq!(g("{{bletch-foobie}*3}"), "{(bletch-foobie)*3}");
+        assert_eq!(g("2**{1+m}"), "2**(1+m)");
+        // A value's own braces, and text with none, stay.
+        for kept in ["{a*2}", " {a} ", "a+b", "\"x{y}\""] {
+            assert_eq!(g(kept), kept);
+        }
     }
 
     #[test]

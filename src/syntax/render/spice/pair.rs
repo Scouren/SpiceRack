@@ -63,6 +63,11 @@ pub(super) struct Pair {
     pub(super) r_model_multiplies: bool,
     /// ngspice has no `if()` (Xyce's, LTspice's): a ternary.
     pub(super) spell_if: bool,
+    /// Xyce and LTspice read a `{…}` group inside an expression as a
+    /// parenthesised one; ngspice-45's B-source reader drops the braces
+    /// (`{a-b}*i(v1)` is `a-b*i(v1)`: 2.01 for -0.01) and its `.param`
+    /// refuses a nested one: parentheses (`ternary::brace_groups`).
+    pub(super) brace_groups: bool,
     /// `log` is natural in the source, base 10 on Xyce (RG §2.3): `ln`.
     pub(super) log_to_ln: bool,
     /// Xyce's `log` (base 10) where the target's is natural: `log10`.
@@ -173,6 +178,7 @@ impl Pair {
             xyce_m_rename: xy(nf) && ng(nt) && to.subckt_multiplicity,
             r_model_multiplies: xy(nt) && !xy(nf),
             spell_if: foreign && et == ExprEval::Ngspice,
+            brace_groups: foreign && et == ExprEval::Ngspice,
             log_to_ln: foreign && natural(ef) && et == ExprEval::Xyce,
             log_to_log10: foreign && ef == ExprEval::Xyce && natural(et),
             spell_clamp: foreign
@@ -252,6 +258,7 @@ mod tests {
             ("sffm_swap", to_ng.sffm_swap),
             ("sffm_as_b", to_ng.sffm_as_b),
             ("foreign_measures", to_ng.foreign_measures),
+            ("brace_groups", to_ng.brace_groups),
             ("xyce_domains", to_ng.xyce_domains),
             ("abs_power_in", to_ng.abs_power_in),
             ("xyce_power", to_ng.xyce_power),
