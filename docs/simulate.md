@@ -216,6 +216,58 @@ for backend in ps.CircuitSimulator.available_backends():
         print(backend, b.operating_point()["vout"])
 ```
 
+### Your own simulator
+
+A simulator SpiceRack does not ship is one descriptor: the dialect its decks
+are written in, the command that runs one, how its results are read, and what
+it declares it can run.
+
+```python
+mysim = ps.Simulator(
+    "mysim",
+    dialect="ngspice",                                  # any dialect name, a plugin's too
+    command=["mysim", "-b", "-r", "{raw}", "{deck}"],   # the argument list; no shell
+    output="ngspice-raw",
+    analyses=["op", "dc", "ac", "tran"],
+    features=["measures"],
+)
+print(ps.register_simulator(mysim))    # mysim
+print(ps.simulators())                 # the built-ins, then mysim
+mine = ps.Testbench(rc)
+mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
+```
+
+- `command` is one word per entry and is run as written, with no shell. `{deck}`, `{raw}` and `{dir}` become
+  absolute paths: the deck file, the file the results are read from, and the run's scratch directory, which
+  holds both and is deleted after the read. The first word is the program, found on `PATH`; one word holds
+  `{deck}`.
+- `output` says how the results are read: `ngspice-raw`, `ngspice-ascii` or `nutascii` (one raw file at
+  `{raw}`), `raw-dir` (every `*.raw` the command leaves in `{dir}`, where it then runs, as VACASK does), or
+  `ltspice-raw` (`{raw}` and the `.log` beside it).
+- `analyses` are the kinds it runs: `op`, `dc`, `ac`, `tran`, `noise`, `tf`, `sens`, `sens_ac`, `pz`, `disto`,
+  `pss`, `hb`, `sp`, `stb`, `trannoise`, `pac`, `pnoise`, `pxf`, `pstb`. `features` are what a deck may need
+  of it: `xspice`, `osdi`, `measures`, `step`, `control`, `laplace`, `verilog`; `verilog=True` and
+  `verilog_a=True` declare `verilog` and `osdi`.
+- The descriptor is checked when it is built: a bad field raises `ValueError` with code `R0040` and the
+  field's name. Registering an equal `Simulator` again changes nothing; a different one under a held name
+  is refused. A process holds at most 32 simulators (`R0042`), the five built-ins among them.
+- `mysim.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog` and `.verilog_a`
+  read the descriptor back.
+
+A registered simulator is routed like a built-in. It is a candidate for every analysis it declares, after
+the built-ins, in registration order, and it is held to what it declares. A run that cannot be routed
+raises `RuntimeError` opening with its code, and `exc.diagnostic` holds the same as data:
+
+| code | when | `exc.diagnostic` |
+| --- | --- | --- |
+| `W0180` | the simulator chosen does not declare an analysis of the deck | `{"code": "W0180", "stage": "route", "missing": {"analyses": ["tran"], "features": []}}` |
+| `W0181` | it does not declare a feature the deck needs | `{"code": "W0181", "stage": "route", "missing": {"analyses": [], "features": ["measures"]}}` |
+| `W0182` | no simulator runs every analysis of the deck | `{"code": "W0182", "stage": "route", "missing": {"analyses": ["hb"], "features": []}}` |
+| `R0041` | the simulator's program is not on `PATH` | `{"code": "R0041", "stage": "run", "missing": None}` |
+
+`netlist(name)` and `check_backend(name)`'s writer line take a dialect's name: a registered simulator's
+deck is `mine.netlist(mysim.dialect)`.
+
 ## Linting
 
 Catch problems before a run fails:

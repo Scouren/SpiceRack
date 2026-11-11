@@ -18,6 +18,8 @@ nodes are positional; everything after `*` is keyword-only.
 | `read_raw(path)` | every plot of a `.raw` file, as `RawData` |
 | `unit` | unit constants, used as `10 @ u_kOhm` |
 | `Dialect(name)`, `register_dialect(obj)` | a dialect plugin's base class and its registration ([Dialect plugins](dialects.md)); returns its `def_.Lang` |
+| `Simulator(name, dialect=, command=, output=, analyses=, features=, verilog=, verilog_a=)` | a simulator's descriptor, checked when built ([Your own simulator](simulate.md#your-own-simulator)); `.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog`, `.verilog_a` |
+| `register_simulator(sim)`, `simulators()` | registers a `Simulator` and returns the name `with_backend()` takes (an equal one twice is one); every simulator's name in route order |
 | `dialects` | the built-ins as base classes: `NGSPICE`, `ESPICE`, `HSPICE`, `XYCE`, `LTSPICE`, `SPECTRE`, `VACASK`, `CDL`, `VERILOG` |
 | `def_` | the definition API: `DialectDef(name)` (one method per Rust call, each returning the definition), `register(d)`, `Lang`, `Card`, `Answer`, and the vocabulary enums (`Tag`/`Keyword`, `Construct`, `Alt`, `Rule`, `Code`, `Kind`, `Scale`, ...) |
 

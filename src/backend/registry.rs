@@ -20,7 +20,8 @@
 //!   `Sim::row(self) -> &'static SimDef`, `Sim::name(self) -> &'static str`,
 //!   `Sim::family(self) -> Dialect`, `Sim::installed(self) -> bool`,
 //!   `Sim::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
-//! - `pub struct SimDef`, `pub enum Runner` (`BuiltIn`, `Command`), `pub enum Installed` (`Fn`,
+//! - `pub struct SimDef`, `SimDef::check(&self) -> Result<(), SimRegisterError>`,
+//!   `pub enum Runner` (`BuiltIn`, `Command`), `pub enum Installed` (`Fn`,
 //!   `OnPath`), `pub enum SimRegisterError`, `SimRegisterError::code(&self) -> Code`
 //! - `pub fn register_simulator(def: SimDef) -> Result<Sim, SimRegisterError>`
 //! - `pub fn simulators() -> impl Iterator<Item = (Sim, &'static SimDef)>`
@@ -212,6 +213,46 @@ impl Sim {
     }
 }
 
+impl SimDef {
+    /// The edge checks of the definition's own fields, as
+    /// [`register_simulator`] runs them first: what can be refused before
+    /// the registry is asked.
+    ///
+    /// # Errors
+    /// `Unnamed`; `Redefined` for a name that is one of `Dialect::ALIASES`;
+    /// `Features`; `Analyses`; `Command` for a command with no word or no
+    /// `{deck}`.
+    pub fn check(&self) -> Result<(), SimRegisterError> {
+        if self.name.is_empty() {
+            return Err(SimRegisterError::Unnamed);
+        }
+        if Dialect::ALIASES.iter().any(|a| a.0 == self.name) {
+            return Err(SimRegisterError::Redefined(self.name.clone()));
+        }
+        if self.features & !feature::ALL != 0 {
+            return Err(SimRegisterError::Features(self.features));
+        }
+        let past = self
+            .analyses
+            .checked_shr(Kind::ALL.len() as u32)
+            .unwrap_or(0);
+        if self.analyses == 0 || past != 0 {
+            return Err(SimRegisterError::Analyses(self.analyses));
+        }
+        if let Runner::Command { argv, .. } = &self.runner {
+            if argv.is_empty() {
+                return Err(SimRegisterError::Command("it has no program".into()));
+            }
+            if !argv.iter().flatten().any(|p| *p == Piece::Deck) {
+                return Err(SimRegisterError::Command(
+                    "no word holds {deck}: the simulator is never given the deck".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl SimRegisterError {
     /// Its catalogue code: `R0042` for a full registry, `R0040` (a
     /// descriptor that does not validate) for every field's refusal.
@@ -262,7 +303,7 @@ impl PartialEq for Installed {
 /// no `{deck}` word; the registry is full. Nothing is registered then.
 pub fn register_simulator(def: SimDef) -> Result<Sim, SimRegisterError> {
     builtins();
-    check(&def)?;
+    def.check()?;
     append(def)
 }
 
@@ -318,37 +359,6 @@ fn routed(d: Dialect) -> u32 {
         .fold(0u32, |m, &k| m | (1 << k as u32));
     assert!(bits != 0, "every built-in runs some analysis");
     bits
-}
-
-/// The edge checks of a definition's own fields.
-fn check(def: &SimDef) -> Result<(), SimRegisterError> {
-    if def.name.is_empty() {
-        return Err(SimRegisterError::Unnamed);
-    }
-    if Dialect::ALIASES.iter().any(|a| a.0 == def.name) {
-        return Err(SimRegisterError::Redefined(def.name.clone()));
-    }
-    if def.features & !feature::ALL != 0 {
-        return Err(SimRegisterError::Features(def.features));
-    }
-    let past = def
-        .analyses
-        .checked_shr(Kind::ALL.len() as u32)
-        .unwrap_or(0);
-    if def.analyses == 0 || past != 0 {
-        return Err(SimRegisterError::Analyses(def.analyses));
-    }
-    if let Runner::Command { argv, .. } = &def.runner {
-        if argv.is_empty() {
-            return Err(SimRegisterError::Command("it has no program".into()));
-        }
-        if !argv.iter().flatten().any(|p| *p == Piece::Deck) {
-            return Err(SimRegisterError::Command(
-                "no word holds {deck}: the simulator is never given the deck".into(),
-            ));
-        }
-    }
-    Ok(())
 }
 
 /// Publishes `def` in the next slot, under the registry's lock; the held

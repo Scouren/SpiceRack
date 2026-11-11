@@ -171,12 +171,12 @@ impl Deck {
 
 /// Refuse a backend name at selection time rather than at the first run.
 pub(super) fn check_backend_name(name: &str) -> PyResult<()> {
-    if crate::backend::parse(name).is_some() || super::def_::plugin(name).is_some() {
+    if crate::backend::by_name(name).is_some() || super::def_::plugin(name).is_some() {
         return Ok(());
     }
-    let names = crate::backend::RUNNABLE
-        .map(Dialect::name)
-        .into_iter()
+    // Every registered simulator (the built-ins first), then the aliases.
+    let names = crate::backend::simulators()
+        .map(|(_, r)| r.name.as_str())
         .chain(Dialect::ALIASES.map(|a| a.0));
     Err(PyValueError::new_err(format!(
         "unknown backend {name:?}; expected one of {}",

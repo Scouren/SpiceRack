@@ -221,6 +221,15 @@ The `u_Ω` family is registered with U+03A9 and does work.
 | `def_.Card`, `def_.Answer` | a hook's card (`head`, `words`, `params`, `text`) and answer (`Answer.Text(s)`, `Answer.Refuse(id)`) |
 | enums | the Rust enums by name: `Tag` (= `Keyword`), `Construct`, `Alt` (`Alt.Omit(Code.W0030)`), `Rule`, `Code`, `Kind`, `Scale` (`Scale.Exp(6)`, `Scale.Mil`), `Simulator`, the behaviour enums; `None` variants are `None_` |
 
+## Custom simulators
+
+| Name | What it is |
+|---|---|
+| `ps.Simulator(name, dialect=, command=, output=, analyses=, features=None, verilog=False, verilog_a=False)` | a descriptor, checked when built (`ValueError` `R0040 ...: <field>: ...`); getters of the same names; `==` compares descriptors |
+| `ps.register_simulator(sim)` | registers it, returns its name; an equal `Simulator` twice is one; a different one under a held name (any case) is `R0040`, a 33rd simulator `R0042` |
+| `ps.simulators()` | every simulator's name in route order: `ngspice`, `ltspice`, `vacask`, `spectre`, `espice`, then the registered ones |
+| `exc.diagnostic` | on a `RuntimeError` with code `W0180`/`W0181`/`W0182` (`stage: "route"`, `missing: {"analyses": [...], "features": [...]}`) or `R0041` (`stage: "run"`, `missing: None`) |
+
 ## Backend capabilities
 
 Declared in `src/backend/mod.rs`; these gate automatic backend selection, and so does the writer: a run never lands on a backend whose writer refuses the deck.
