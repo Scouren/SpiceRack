@@ -150,7 +150,26 @@ fn tol_reproduces_each_migrated_form_exactly() {
 }
 
 #[test]
-#[should_panic(expected = "request one from remote-oracle")]
-fn a_missing_pin_says_who_records_it() {
+#[should_panic(expected = "no recorded pin")]
+fn p1_043_a_missing_pin_names_the_d43_oracles() {
+    // ZERO D43: no Spectre run can be recorded any more, so the message
+    // names what is left (the manual page, another simulator, the marker).
     oracle::pinned(Dialect::Spectre, "* no such deck\n.end\n", "out", At::First);
+}
+
+#[test]
+fn p1_043_a_recorded_spectre_run_checks_the_written_deck() {
+    // The divider swept to 2 V: out = 2/3 at the last point (by hand).
+    // ngspice runs the source; Spectre's number is the pin of the deck the
+    // writer writes from it, which Spectre 25.1 ran unchanged on iccad4
+    // (settle-remote "Spectre writer check", p_dc_sweep: 0.6666667, seven
+    // digits recorded, hence 1e-6). A writer change that moves one byte
+    // of the deck loses the pin and fails here with the D43 message.
+    let deck = "a dc sweep\nv1 in 0 0\nr1 in out 2k\nr2 out 0 1k\n.dc v1 0 2 0.5\n.end\n";
+    let tol = Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let on = [Dialect::Ngspice, Dialect::Spectre];
+    oracle::closed_form(Dialect::Ngspice, deck, &on, "out", At::Last, 2.0 / 3.0, tol);
 }

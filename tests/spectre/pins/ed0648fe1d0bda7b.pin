@@ -1,0 +1,2 @@
+provenance: Spectre 25.1.0.470.isr13, iccad4, 2026-11-07 (research/settle-remote.md "Spectre writer check": tests/spectre/p_dc_sweep.scs ran unchanged, out 0.6666667)
+out last 0.6666667

@@ -24,8 +24,10 @@
 //! Only the private `harness` below calls into it (`sim::run`), so a change
 //! to its signature breaks one function here. LTspice runs through the
 //! backend (the harness has no LTspice). Spectre has no local binary: its
-//! numbers are the iccad4 runs `remote-oracle` records as pins ([`pinned`],
-//! ledger P1-043). `Dialect::Hspice` runs the HSPICE text on ESPice
+//! numbers are the iccad4 runs recorded before 2026-11-08 as pins
+//! ([`pinned`], ledger P1-043); none can be added (ZERO D43), so a deck
+//! with no pin takes the manual page or another simulator as its oracle.
+//! `Dialect::Hspice` runs the HSPICE text on ESPice
 //! `--tokenizer=hspice` (the ledger's "ESP" oracle); a real HSPICE number is
 //! `pinned(Dialect::Hspice, …)`.
 //!
@@ -199,16 +201,17 @@ pub fn op(on: Dialect, text: &str, node: &str) -> f64 {
 }
 
 /// `v(node)` at `at` from the pin of the deck `text` on real `on` (Spectre
-/// or HSPICE on iccad4, recorded by `remote-oracle`; ledger P1-043). The pin
+/// or HSPICE on iccad4, recorded before 2026-11-08; ledger P1-043). The pin
 /// is `tests/<spectre|hspice>/pins/<key>.pin`, `<key>` the deck's FNV-1a 64
-/// hash in 16 hex digits, so a writer change that moves one byte needs a new
-/// run. Its first line is `provenance: <tool version, host, date>`; each
-/// other line `<vector> <first|last|t=<time>> <value>`.
+/// hash in 16 hex digits, so a writer change that moves one byte loses the
+/// pin: no run can replace it (ZERO D43). Its first line is `provenance:
+/// <tool version, host, date>`; each other line `<vector>
+/// <first|last|t=<time>> <value>`.
 ///
 /// # Panics
-/// For a dialect with a local simulator, on a missing pin ("request one
-/// from remote-oracle via the ledger"), or when the pin lacks the value.
-// P1-043: the pin layout is this file's until P1-043 lands its reader.
+/// For a dialect with a local simulator, on a missing pin ("no recorded
+/// pin": take the manual page or another simulator as the oracle, or list
+/// the line under `UNRUN_SPECTRE_HSPICE`), or when the pin lacks the value.
 pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64 {
     let dir = match on {
         Dialect::Spectre => "spectre",
@@ -223,7 +226,7 @@ pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64 {
         .join(format!("{key}.pin"));
     let pin = std::fs::read_to_string(&path).unwrap_or_else(|_| {
         panic!(
-            "no pin {}: request one from remote-oracle via the ledger (P1-043)\n{text}",
+            "no recorded pin {}: use the manual-page or other-simulator oracle (D43), or list the line in UNRUN_SPECTRE_HSPICE\n{text}",
             path.display()
         )
     });
