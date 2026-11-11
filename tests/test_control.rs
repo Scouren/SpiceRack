@@ -39,8 +39,8 @@ fn outs(on: Dialect, text: &str) -> Vec<f64> {
 
 /// ZERO-LEDGER P5-088 (DESIGN-control-epochs §4, §8 D1). Oracle: ngspice-45
 /// running the source script itself, a plot a run (the harness writes
-/// every plot of a `.control` run), and the closed form v(out) = rr / (1k
-/// + rr) at each state; each script was run by hand first
+/// every plot of a `.control` run), and the closed form
+/// v(out) = rr / (1k + rr) at each state; each script was run by hand first
 /// (research/impl/evidence/P5-088/RESULTS.txt §1). The deck written from
 /// the unrolled script runs on ngspice and, one table row a state, on
 /// Xyce 7.10 (§3). Tolerance: a linear solve of three elements, RELTOL
