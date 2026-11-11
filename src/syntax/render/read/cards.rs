@@ -177,8 +177,9 @@ impl Rd<'_> {
         ok.then_some(Node(*name))
     }
 
-    /// A `.model` card's view (Xyce's BSIM3 level 8 or 9 read as 49), or
-    /// a Spectre or VACASK model's, its bin `bin`'s (`NONE`: none).
+    /// A `.model` card's view (an `ako:` card as the model it derives,
+    /// `Rd::derived`; Xyce's BSIM3 level 8 or 9 read as 49), or a Spectre
+    /// or VACASK model's, its bin `bin`'s (`NONE`: none).
     pub(in crate::syntax::render) fn model_view(&self, n: u32, bin: u32) -> Model {
         if self.named() {
             return self.named_model_view(n, bin);
@@ -189,6 +190,7 @@ impl Rd<'_> {
             kind: self.text(items[1]),
             params: self.params_of(&items[2..], true),
         };
+        self.derived(&mut m);
         if self.b.card_rules == CardRules::Xyce
             && matches!(m.kind.to_ascii_lowercase().as_str(), "nmos" | "pmos")
         {
@@ -429,6 +431,67 @@ impl Rd<'_> {
         };
         here.models.push((n, NONE));
         Ok(())
+    }
+
+    /// `m` with an `ako:` card resolved. PSpice's and LTspice's
+    /// `.model new ako:base type (k=v …)` ("a kind of"; LTspice also
+    /// `ako: base`) is the model `base` with the listed parameters
+    /// changed: the base card's type and parameters, each card's own over
+    /// them along a chain of `ako:` cards (ngspice-45 in its PSPICE mode
+    /// and LTspice 26.1.1 give the card and the model written out the same
+    /// operating point). Left as read, for the writer to refuse (W0142),
+    /// when no card of this file is the base, the chain is a circle, or
+    /// the card's first word is no `k=v` and not the base's type.
+    fn derived(&self, m: &mut Model) {
+        // An `ako:` card's base name, lowercased, and where its own words
+        // start: `ako:base` (0), `ako: base` (1, the base the first word).
+        let ako = |kind: &str, params: &[(String, String)]| -> Option<(String, usize)> {
+            let (head, base) = kind.split_at_checked(4)?;
+            if !head.eq_ignore_ascii_case("ako:") {
+                return None;
+            }
+            if !base.is_empty() {
+                return Some((base.to_ascii_lowercase(), 0));
+            }
+            let (word, v) = params.first()?;
+            v.is_empty().then(|| (word.to_ascii_lowercase(), 1))
+        };
+        if ako(&m.kind, &m.params).is_none() {
+            return;
+        }
+        let (mut kind, mut params) = (m.kind.clone(), m.params.clone());
+        // Each card's own words, from this one up to the model the chain
+        // derives; a circle of `ako:` cards ends at the bound.
+        let mut own: Vec<Vec<(String, String)>> = Vec::new();
+        while let Some((base, at)) = ako(&kind, &params) {
+            let card = self.models.get(&base);
+            let Some(&card) = card.filter(|_| own.len() < self.models.len()) else {
+                return;
+            };
+            own.push(params.split_off(at));
+            let items = self.fields(card);
+            (kind, params) = (self.text(items[1]), self.params_of(&items[2..], true));
+        }
+        assert!(!own.is_empty(), "an ako card has its base");
+        assert!(own.len() <= self.models.len(), "a chain holds a card once");
+        // The base's parameters, each card's own over them, the nearest
+        // card's last. A card's first word that is no `k=v` is its type:
+        // the base's.
+        for mut over in own.into_iter().rev() {
+            if over.first().is_some_and(|(_, v)| v.is_empty()) {
+                if !over[0].0.eq_ignore_ascii_case(&kind) {
+                    return;
+                }
+                over.remove(0);
+            }
+            for (k, v) in over {
+                match params.iter_mut().find(|(b, _)| b.eq_ignore_ascii_case(&k)) {
+                    Some(p) => p.1 = v,
+                    None => params.push((k, v)),
+                }
+            }
+        }
+        (m.kind, m.params) = (kind, params);
     }
 
     /// quirk: whether `a` is a `.param` function definition the old reader

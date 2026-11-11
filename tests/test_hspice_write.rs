@@ -18,7 +18,7 @@
 #[path = "common/oracle.rs"]
 mod oracle;
 
-use oracle::{At, Tol, closed_form, sim_pair, spec_example};
+use oracle::{At, Tol, closed_form, sim_pair, spec_example, spec_refusal};
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
 
@@ -122,4 +122,59 @@ fn p3_085_hspice_writes_a_dotted_version_bare() {
         At::First,
         tol,
     );
+}
+
+/// Ledger P3-086. PSpice's and LTspice's `.model new ako:base type (…)`
+/// ("a kind of") is the base model with the listed parameters changed
+/// (LTspice help, `.model`: "identical to the diode model NORMAL except
+/// for the tt parameter"), and HSPICE has no such card (Elements and
+/// Device Models manual E-2010.12). The deck is written with the model
+/// in full: the base's IS, the card's BF over the base's, its VA added.
+/// LTspice reads the `ako:` card itself, so its operating point is the
+/// oracle for the written decks: on ESPice's HSPICE reading, and on plain
+/// ngspice, which reads no `ako:` outside its PSPICE mode. By hand the
+/// two are 2.4e-7 and 1.5e-6 from LTspice (the simulators' constants),
+/// bounded here at 1e-5; the base model alone gives 0.70 V for the 1.54.
+#[test]
+fn p3_086_an_ako_model_is_written_as_its_base_with_its_own_parameters() {
+    let models = ".model QP350 PNP(IS=1.4E-15 BF=70)\n.model QP AKO:QP350 PNP(BF=150 VA=100)";
+    let deck = format!("t\nVcc e 0 5\nQ1 c b e QP\nRb b 0 430k\nRc c 0 1k\n{models}\n.op\n.end\n");
+    let cite =
+        "LTspice help, `.model`: `.model <modname> ako: <modname> [<type>] [(<parameter list>)]`";
+    let want = ".model QP PNP (IS=1.4E-15 BF=150 VA=100)";
+    let lt = oracle::op(Dialect::Ltspice, &deck, "c");
+    let tol = Tol {
+        rel: 1e-5,
+        floor: 0.0,
+    };
+    for to in [Dialect::Hspice, Dialect::Ngspice] {
+        let text = spec_example(cite, &deck, Dialect::Ngspice, to, &[want]);
+        let got = oracle::op(to, &text, "c");
+        assert!(
+            tol.within(got, lt),
+            "{to:?} v(c) = {got}, LTspice {lt}\n{text}"
+        );
+    }
+}
+
+/// Ledger P3-086. An `ako:` card the reader cannot resolve is refused
+/// (W0142), by a SPICE target and by a named one: no card of the file is
+/// its base (ngspice-45 in its PSPICE mode: "no model found for .model qp
+/// ako:qp350"; LTspice 26.1.1: "Undefined model"), or its type word is
+/// not the base's (ngspice: "Original (pnp) and new (npn) type for AKO
+/// model disagree"; LTspice help: "it must match the type of the source
+/// model if present").
+#[test]
+fn p3_086_an_ako_model_with_no_base_or_another_type_is_refused() {
+    let cite = "HSPICE Elements and Device Models manual E-2010.12: no `ako:` model type";
+    let head = "t\nV1 a 0 1\nR1 a 0 1k\n";
+    let no_base = format!("{head}.model QP AKO:QP350 PNP(BF=150)\n.op\n.end\n");
+    let models = ".model QP350 PNP(BF=70)\n.model QP AKO:QP350 NPN(BF=150)";
+    let other_type = format!("{head}{models}\n.op\n.end\n");
+    let ng = Dialect::Ngspice;
+    for deck in [&no_base, &other_type] {
+        spec_refusal(cite, deck, ng, Dialect::Hspice, &[Code::W0142]);
+        let named = oracle::refusal(deck, ng, Dialect::Spectre);
+        assert!(named.contains(&Code::W0142), "{named:?}\n{deck}");
+    }
 }
