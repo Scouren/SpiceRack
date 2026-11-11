@@ -35,6 +35,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: every result lists its `nodes`, `branches`, `measures` and `params` in name order; they came in a hash map's order, another on each result object (`result::Results::nodes` and `branches` are `BTreeMap`s) (ZERO-LEDGER P8-318).
 - tools: `spice2rack --to <dialect>` writes that dialect alone (any of the nine), prints the written deck's absolute path on stdout and exits 1 when the dialect refuses the deck (2 on a usage error; an unknown option was read as a deck); `--kit` also writes every file the deck reaches, each `.include`/`.lib` path the absolute path of the written copy under `-o`; `nix build .#spice2rack` builds the converter alone, with no default features (ZERO-LEDGER P1-062).
 - python: the distributed lines have builders on `Subcircuit` and `Circuit`: `O` (LTRA), `Y` (TXL), `P` (CPL) and `U` (URC), each the ngspice card with its model (`model(m, "ltra", ...)`); written for ngspice and ESPice only.
+- nix: `.#testing` provides `espice-hspice`, ESPice at `5f0b8fd` from a flake input of its own with the revision in its URL (`nix flake update` never moves it). Every test that runs HSPICE text runs it (the cross-sim HSPICE cells and their control, `test_dialects`, `test_spice_write`, `test_sections_pdk`), so `espice` can move past ESPice's removal of its HSPICE reader (ZERO-LEDGER P1-063).
 
 ## 0.2.0 (2026-11-03)
 

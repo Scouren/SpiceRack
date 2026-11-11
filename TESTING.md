@@ -85,7 +85,7 @@ old writer only (the golden gate), no oracle of correctness yet.
 
 | src \ tgt | ngspice | ESPice | HSPICE | Xyce | LTspice | Spectre | VACASK | CDL | Verilog |
 |---|---|---|---|---|---|---|---|---|---|
-| ngspice | sim (import suite) | sim | sim (ESPice `--tokenizer=hspice`, ngspice `hsa`) | sim | pending | pending, T-S/T-M decks | sim | netgen LVS | iverilog |
+| ngspice | sim (import suite) | sim | sim (`espice-hspice --tokenizer=hspice`, ngspice `hsa`) | sim | pending | pending, T-S/T-M decks | sim | netgen LVS | iverilog |
 | HSPICE | sim (original on ESPice) | G | fixpoint | G | G | G | G | G | G |
 | Xyce | sim | G | G | fixpoint | G | G | G | G | G |
 | LTspice | G | G | G | G | fixpoint | G | G | G | G |
@@ -277,7 +277,9 @@ match a run pinned to the P-cores (`taskset -c 0-15`) within 0.2%.
 (ngspice, VACASK, ESPice built from source, the spice-bench suite, the
 corpora, and the sky130 `8afc834` and gf180mcu `1e35547` PDKs as `PDK_ROOT`,
 pinned by content hash in `flake.nix`'s `pdks`); outside it those tests fail, they
-never skip.
+never skip. HSPICE text runs on `espice-hspice`: ESPice at `5f0b8fd` (0.3.0),
+a revision with its HSPICE reader (`flake.nix`'s `espice-hspice` input, the
+revision in its URL), whatever revision `espice` is locked at.
 
 `nix develop .#testing-ltspice` is `.#testing` plus LTspice 26.1.1 as
 `ltspice` (Wine, headless), from the vendor MSI pinned by sha256 with

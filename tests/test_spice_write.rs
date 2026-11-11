@@ -36,7 +36,12 @@ fn scratch(name: &str, text: &str) -> std::path::PathBuf {
 
 /// Real ESPice reading `deck` as `tokenizer`: each `.meas` result by name.
 fn espice_measures(deck: &str, tokenizer: &str) -> impl Fn(&str) -> f64 {
-    let bin = std::env::var("ESPICE").unwrap_or_else(|_| "espice".into());
+    // HSPICE text is read by the pinned ESPice (`espice-hspice`, flake.nix:
+    // ZERO-LEDGER P1-063); `$ESPICE` names the program for the others.
+    let bin = match tokenizer {
+        "hspice" => "espice-hspice".to_string(),
+        _ => std::env::var("ESPICE").unwrap_or_else(|_| "espice".into()),
+    };
     let path = scratch("espice.sp", deck);
     let out = std::process::Command::new(&bin)
         .arg(format!("--tokenizer={tokenizer}"))

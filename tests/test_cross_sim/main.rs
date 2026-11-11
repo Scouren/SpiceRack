@@ -170,7 +170,7 @@ const SPICE_BENCH: Corpus = Corpus {
             cell: "ngspice-hspice-espice",
             dialect: Dialect::Hspice,
             sim: Sim::EspiceHspice,
-            control: Some(Sim::Espice),
+            control: Some(Sim::EspicePinned),
         },
         Target {
             cell: "ngspice-hspice-hsa",

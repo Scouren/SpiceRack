@@ -486,19 +486,20 @@ fn split_params(s: &str) -> usize {
         - s.matches(">=").count()
 }
 
-/// ESPice reading `deck` as HSPICE (`--tokenizer=hspice`) and its run.
+/// ESPice reading `deck` as HSPICE (`espice-hspice --tokenizer=hspice`,
+/// the revision `flake.nix` pins for its HSPICE reader) and its run.
 fn espice_hspice(deck: &str) -> spicerack::result::RawData {
     let dir = tempfile::tempdir().unwrap();
     let (path, raw) = (dir.path().join("deck.sp"), dir.path().join("out.raw"));
     std::fs::write(&path, deck).unwrap();
-    let out = std::process::Command::new("espice")
+    let out = std::process::Command::new("espice-hspice")
         .arg("--tokenizer=hspice")
         .arg(&path)
         .arg("--rawfile")
         .arg(&raw)
         .arg("--format=binary")
         .output()
-        .expect("espice not on PATH: run the tests in `nix develop .#testing`");
+        .expect("espice-hspice not on PATH: run the tests in `nix develop .#testing`");
     assert!(
         out.status.success(),
         "{}\n{deck}",

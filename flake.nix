@@ -9,13 +9,22 @@
     # tests run.
     espice.url = "git+https://github.com/OpenFAT/ESPice.git?shallow=1";
     espice.inputs.conformance.follows = "conformance";
+    # ESPice at a revision that reads HSPICE: 5f0b8fd (0.3.0), the one every
+    # recorded HSPICE result and proof ran on. ESPice is deleting its HSPICE
+    # reader (9578555f, the merge of its #263, still has it), and the tests
+    # that run HSPICE text run it on ESPice (`espice-hspice
+    # --tokenizer=hspice`: tests/test_cross_sim/sim.rs, ZERO-LEDGER P1-063).
+    # The revision is in the URL, so `nix flake update` moves `espice` and
+    # never this.
+    espice-hspice.url = "git+https://github.com/OpenFAT/ESPice.git?shallow=1&rev=5f0b8fda3948d2ad003c87dd4b6710ae89e2dc44";
+    espice-hspice.inputs.conformance.follows = "conformance";
     # The VAMS conformance suite: its HSPICE decks and spice-bench's fetch.sh.
     conformance.url = "github:OpenFAT/VAMS-Conformance-Suite";
     conformance.inputs.nixpkgs.follows = "nixpkgs";
     conformance.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, espice, conformance }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, espice, espice-hspice, conformance }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [
@@ -417,6 +426,12 @@
             xvfb-run -a wine ${app}/LTspice.exe "''${args[@]}"
           '';
         };
+        # The pinned ESPice's `espice` under its own name, `espice-hspice`
+        # (ZERO-LEDGER P1-063): the tests that run HSPICE text keep their
+        # oracle when `espice` moves past the HSPICE reader's removal.
+        espiceHspice = pkgs.writeShellScriptBin "espice-hspice" ''
+          exec ${espice-hspice.packages.${system}.espice}/bin/espice "$@"
+        '';
         # Build and unit-test shell. No simulators: SpiceRack emits netlists and
         # runs whatever simulator the user has installed; it never ships one.
         dev = pkgs.mkShell {
@@ -452,6 +467,7 @@
             openvafAlias
             vacask
             espice.packages.${system}.espice
+            espiceHspice
             # tests/test_cross_sim/: the Xyce corpus on its own simulator and
             # the decks written for Xyce (`xyce` above, pinned by flake.lock);
             # cmake builds its Verilog-A plugins (tests/test_backends.rs p1_039).

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Repro for ESPice: its HSPICE reader (--tokenizer=hspice) runs a sky130 `tt`
 # NMOS to 5.1% more drain current than ngspice reading the same HSPICE text.
+# The reader is `espice-hspice`, ESPice at the revision flake.nix pins for it.
 #
 # The HSPICE text is sky130's combined library (libs.tech/combined, 194
 # files) as SpiceRack writes it for HSPICE; ngspice (HSPICE mode, -D
@@ -27,7 +28,7 @@ Vg g 0 1.2
 DECK
 echo "ngspice (hsa):"
 ngspice -D ngbehavior=hsa -b "$out/nmos.sp" 2>/dev/null | grep -i "vd#branch  "
-echo "espice --tokenizer=hspice:"
-espice --tokenizer=hspice "$out/nmos.sp" --rawfile "$out/nmos.raw" --format=ascii >/dev/null
+echo "espice-hspice --tokenizer=hspice:"
+espice-hspice --tokenizer=hspice "$out/nmos.sp" --rawfile "$out/nmos.raw" --format=ascii >/dev/null
 grep -i -A6 "^Values" "$out/nmos.raw" || cat "$out/nmos.raw" | tail -8
 echo "deck and tree: $out"
