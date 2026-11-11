@@ -378,16 +378,19 @@ impl W<'_, '_> {
         super::sources::assert_held(w);
         let a: Vec<String> = w.args.iter().map(|x| self.vacask_num(x)).collect();
         Some(match w.kind {
+            // `tdphase` is the sine's initial phase in degrees, SPICE's
+            // PHASE (`docs/dev-builtin-src.md`, "Sine"; equal to ngspice's
+            // closed form to 1e-15 before and after the delay, ZERO-LEDGER
+            // P4-011); `phase` is the AC phase.
             WaveKind::Sin => {
-                // VACASK accepts a phase and ignores it.
-                if w.args[5] != Num::Num(0.0) {
-                    self.refuse(Code::W0108, tok);
-                    return None;
-                }
-                format!(
+                let mut s = format!(
                     "type=\"sine\" sinedc={} ampl={} freq={} delay={} theta={}",
                     a[0], a[1], a[2], a[3], a[4]
-                )
+                );
+                if w.args[5] != Num::Num(0.0) {
+                    s.push_str(&format!(" tdphase={}", a[5]));
+                }
+                s
             }
             WaveKind::Pulse => {
                 // A period no longer than the pulse is no repeat (period 0).

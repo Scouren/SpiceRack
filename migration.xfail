@@ -452,3 +452,12 @@ xyce/Output/SPARAMS/zparams-ts2.cir vacask now written: an RF port is a source b
 xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir vacask now written: an RF port is a source behind its series resistor, `.sp`/`.LIN` is `acsp` (P4-007)
 xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir vacask now written: an RF port is a source behind its series resistor, `.sp`/`.LIN` is `acsp` (P4-007)
 xyce/YLIN/ylin-5port-linAnalysis.cir vacask now written: an RF port is a source behind its series resistor, `.sp`/`.LIN` is `acsp` (P4-007)
+
+# S1: P4-011: VACASK's sine has `tdphase` (docs/dev-builtin-src.md at 36be560): a SIN with PHASE is written.
+# Oracle: ngspice's SIN closed form at every point (tests/test_vacask_runs/waveforms.rs::p4_011_a_sine_phase_is_vacasks_tdphase).
+ltspice/ltspice_demos/LT6110_1A_1Hz_Load.net vacask now written: a SIN phase is VACASK's `tdphase=` (P4-011)
+xyce/Certification_Tests/BUG_1299_SON/bug1299son.cir vacask now written: a SIN phase is VACASK's `tdphase=` (P4-011)
+xyce/SENS/dummy_devLevelParams_isin.cir vacask now written: a SIN phase is VACASK's `tdphase=` (P4-011)
+xyce/SENS/dummy_isin.cir vacask now written: a SIN phase is VACASK's `tdphase=` (P4-011)
+xyce/VSIN/bug1679.cir vacask now written: a SIN phase is VACASK's `tdphase=` (P4-011)
+xyce/VSIN/bug510.cir vacask now written: a SIN phase is VACASK's `tdphase=` (P4-011)

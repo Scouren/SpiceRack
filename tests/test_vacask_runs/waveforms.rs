@@ -150,3 +150,22 @@ fn a_vacask_am_source_runs_on_ngspice_from_its_time_zero_value() {
         );
     }
 }
+
+/// ZERO-LEDGER P4-011. Oracle: ngspice's SIN with PHASE (ngspice-45
+/// `vsrcload.c`; its run of this card gave 1.5 at t = 0 and at 0.1 ms,
+/// research/impl/evidence/P4-011/ngspice.run.log): VO + VA * sin(PHASE) up
+/// to TD, then VO + VA * exp(-(t - TD) * THETA) * sin(2 pi FREQ (t - TD) +
+/// PHASE), checked at every saved point.
+#[test]
+fn p4_011_a_sine_phase_is_vacasks_tdphase() {
+    let raw = run("sine\nV1 a 0 SIN(0.5 1 1k 0.2m 300 90)\nR1 a 0 1k\n.tran 10u 1m 0 10u\n.end\n");
+    let t = col(&raw, "time");
+    let v = col(&raw, "a");
+    assert!(t.len() >= 100, "{} points", t.len());
+    for (&t, &v) in t.iter().zip(&v) {
+        let x = (t - 0.2e-3).max(0.0);
+        let phase = std::f64::consts::TAU * 1e3 * x + std::f64::consts::FRAC_PI_2;
+        let want = 0.5 + (-300.0 * x).exp() * phase.sin();
+        assert!((v - want).abs() < 1e-9, "t {t:e}: got {v}, want {want}");
+    }
+}

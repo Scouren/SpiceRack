@@ -32,7 +32,6 @@ fn refusals_are_errors_not_broken_decks() {
     for card in [
         "S1 a 0 c 0 sw\n.model sw SW",
         "A1 a d_and\n.model d_and d_and",
-        "V1 a 0 0 SIN(0 1 1k 0 0 90)",
     ] {
         assert!(refuses(&with(card)), "{card} must refuse");
     }
