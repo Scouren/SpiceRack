@@ -20,7 +20,8 @@
 //! - `pub(in crate::syntax::render) struct Plan`, `impl Default for Plan`
 //! - `pub(in crate::syntax::render) fn plan(cards: Vec<(BenchCard, u32)>) -> Plan`
 //! - `Plan::check(&self)`, `Plan::single_epoch(&self) -> bool`,
-//!   `Plan::delta(&self, i: usize) -> std::ops::Range<usize>`
+//!   `Plan::delta(&self, i: usize) -> std::ops::Range<usize>`,
+//!   `Plan::keep_first_epoch(&mut self)`
 
 use super::testbench::{Ana, BenchCard};
 
@@ -166,6 +167,22 @@ impl Plan {
         assert!(rows.end <= self.alter_key.len(), "delta: rows of the plan");
         rows
     }
+
+    /// Cuts the plan to its first epoch's runs and no alter: what a
+    /// writer runs once per circuit state, after it has taken every
+    /// epoch's alters for its own table of states (`spice/states.rs`).
+    pub(in crate::syntax::render) fn keep_first_epoch(&mut self) {
+        let runs = self.run_epoch.iter().take_while(|&&e| e == 0).count();
+        self.runs.truncate(runs);
+        self.run_tok.truncate(runs);
+        self.run_epoch.truncate(runs);
+        self.epoch_alters = vec![0, 0];
+        self.alter_key.clear();
+        self.alter_value.clear();
+        self.alter_tok.clear();
+        assert!(self.single_epoch(), "keep_first_epoch: one epoch");
+        self.check();
+    }
 }
 
 #[cfg(test)]
@@ -244,6 +261,25 @@ mod tests {
         assert!(!p.single_epoch());
         let none = plan(vec![(alter("a", 2.0), 1)]);
         assert!(none.single_epoch() && none.alter_key.is_empty());
+    }
+
+    #[test]
+    fn the_first_epoch_alone_is_a_plan_of_one_epoch() {
+        // a=1 | op tf | a=2 | op: the oracle is the split by hand.
+        let cards = vec![
+            (alter("a", 1.0), 1),
+            (BenchCard::Ana(Ana::Op), 2),
+            (BenchCard::Ana(Ana::Tf("v(o)".into(), "v1".into())), 3),
+            (alter("a", 2.0), 4),
+            (BenchCard::Ana(Ana::Op), 5),
+        ];
+        let mut p = plan(cards);
+        assert_eq!(p.run_epoch, [0, 0, 1]);
+        p.keep_first_epoch();
+        assert_eq!(p.run_tok, [2, 3]);
+        assert_eq!(p.run_epoch, [0, 0]);
+        assert_eq!(p.epoch_alters, [0, 0]);
+        assert!(p.single_epoch() && p.alter_tok.is_empty());
     }
 
     #[test]

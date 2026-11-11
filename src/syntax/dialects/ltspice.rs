@@ -200,9 +200,11 @@ pub(super) fn ltspice() -> DialectDef {
         // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
         // --- S1
         // --- S2
-        // Every analysis of a deck runs on one circuit (help `.step`
-        // steps them all); parameter states become its points with
-        // ZERO-LEDGER P5-001 step 5.
-        .refuse(Construct::Epochs, Code::W0130)
+        // The circuit states are the points of an index step, each state
+        // parameter a `table()` of the index: a list step is sorted and
+        // loses its repeats (help `.STEP`; run, ZERO-LEDGER P5-001 step
+        // 5); a plan no table of states holds is W0130
+        // (`render/spice/states.rs`).
+        .spell(Construct::Epochs, Alt::StatesTable)
     // --- S3
 }

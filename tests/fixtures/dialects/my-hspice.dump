@@ -100,6 +100,6 @@ cell.Statistics Lift(StatisticsDraws)
 cell.Measure Native
 cell.HspiceWLine Native
 cell.VacaskElaborate Refuse(W0122)
-cell.Epochs Refuse(W0130)
+cell.Epochs Spell(AlterBlocks)
 behaviours Behaviours { writer: Cards, text_family: my-hspice, caret_power: true, hier_sep: '.', numbers: Decimal, model_semantics: Other, source_rules: Spice, card_rules: Hspice, named_rules: None, options_form: Spice, load_form: Hspice, control_block: None, analysis_form: Hspice, end_rule: WhenRuns, value_quoting: Hspice, coupling: Pairs, param_form: Plain, include_scope: Local, named_params: None, analysis_masters: None, expr_eval: Hspice, parasitics: Elements, netlist_rules: Hspice, subckt_multiplicity: true, spectre_analyses: ["pz", "sens", "sp", "hb", "sweep", "montecarlo"], temp_name: "temper", builtin_constants: [], builtin_devices: [], vacask_analyses: ["hb", "hbac", "hbnoise"], option_map: [], model_masters: [], spice_model_types: [], kept_words: [(".stateye", PrivateText), (".vec", PrivateText), (".check", PrivateText), (".power", PrivateText), (".sn", HspiceAnalysis), (".snac", HspiceAnalysis), (".snnoise", HspiceAnalysis), (".snxf", HspiceAnalysis), (".ptdnoise", HspiceAnalysis), (".sample", HspiceAnalysis), (".trannoise", HspiceAnalysis), (".lstb", HspiceAnalysis), (".op", HspiceAnalysis), ("w", HspiceWLine)], dot_rules: [] }
 code MY001 Refusal "our HSPICE build has no .step"

@@ -198,8 +198,10 @@ impl W<'_, '_> {
         self.measures(&tb);
         self.steps(&tb);
         self.step_lists(&tb);
+        self.state_steps();
         self.vacask_lines(&tb.extra);
         self.run_analyses(&tb, control);
+        self.alter_blocks();
     }
 
     /// VACASK control statements the reader kept as text: a script line

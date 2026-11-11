@@ -211,6 +211,16 @@ pub enum Alt {
     /// `reset` before the first run of each later circuit state (ngspice
     /// manual §13.5.5, §13.5.65).
     ControlScript,
+    /// The circuit states as the rows of a `.DATA` table the deck steps
+    /// over, `.STEP DATA=<table>` (Xyce RG 7.10 §2.1.2, §2.1.36.5).
+    StatesData,
+    /// The circuit states as the points of an index step, each state
+    /// parameter a `table()` of the index (LTspice help `.STEP`,
+    /// `.PARAM`).
+    StatesTable,
+    /// One `.ALTER` block per later circuit state, each setting every
+    /// state parameter (HSPICE UG E-2010.12 pp.107-108).
+    AlterBlocks,
 }
 
 /// A rewrite rule.

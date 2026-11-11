@@ -14,7 +14,8 @@
 //! Xyce's spellings of another dialect's cards, `xyce_models` its model cards,
 //! `ngspice_models` a Xyce model card's level elsewhere,
 //! `prints` the `.print` cards, `epochs` the script lines of a circuit
-//! changed between analyses, `loops` a `.step` as that script's loops),
+//! changed between analyses, `loops` a `.step` as that script's loops,
+//! `states` the circuit states as one table the deck runs over),
 //! `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
@@ -62,6 +63,7 @@ mod pair;
 pub(in crate::syntax::render) mod parasitics;
 mod powers;
 mod prints;
+mod states;
 mod sweeps;
 mod table;
 mod ternary;
@@ -135,6 +137,10 @@ struct W<'a, 'r> {
     /// its file (`None`: this one) and card; and the kit files judged.
     xyce_verdicts: HashMap<(Option<FileId>, u32), (Option<Code>, xyce_models::Shape)>,
     xyce_files: HashSet<FileId>,
+    /// The circuit states the target runs as one table (`states.rs`),
+    /// once the plan is cut to its first state's runs; `None` for a deck
+    /// of one state and for a target that answers a second one otherwise.
+    states: Option<states::States>,
 }
 
 /// The deck `rd` read, written for `target`, and its diagnostics: the
@@ -186,9 +192,13 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         device_ics: Vec::new(),
         xyce_verdicts: HashMap::new(),
         xyce_files: HashSet::new(),
+        states: None,
     };
     // The testbench, folded once: every step below reads it.
-    let tb = w.fold();
+    let mut tb = w.fold();
+    // A second circuit state the target runs as a table of states: the
+    // plan is cut to the first state's runs before any step reads it.
+    w.states = w.take_states(&mut tb);
     w.dcop_ic = w.pair.device_ic_in_op && !tb.tran_uic();
     w.nominal = w.pair.stat_nominal && !tb.monte_carlo();
     // Verilog evaluates nothing, so no deck-wide check refuses it.

@@ -6,10 +6,14 @@
 //! script's `foreach` loops on ngspice: the oracle is the closed form at
 //! the points Xyce and LTspice stepped through. An ngspice `.control`
 //! script's `alterparam` and `reset` is the same plan: the oracle is
-//! ngspice running the source script itself.
+//! ngspice running the source script itself. On Xyce, LTspice and HSPICE
+//! the states are one table the deck runs over (`.DATA`, an index step,
+//! `.ALTER` blocks): the oracle is each state's closed form, met by Xyce
+//! and by ESPice reading the HSPICE text.
 //!
-//! Unsupported fails, never skips: without `vacask` and `ngspice` on PATH
-//! every run fails; run the tests in `nix develop .#testing`.
+//! Unsupported fails, never skips: without `vacask`, `ngspice`, `Xyce`
+//! and `espice` on PATH every run fails; run the tests in
+//! `nix develop .#testing`.
 //!
 //! Cites: DESIGN-control-epochs §5 (O1, O2), ZERO-LEDGER P5-001; VACASK
 //! 36be560 `docs/cmd-alter.md`; ngspice manual §13.5.5 (`alterparam`),
@@ -116,17 +120,19 @@ fn p5_001_s2_a_vacask_top_parameter_alter_runs_as_an_ngspice_control_script() {
     assert_eq!(own.matches("alter instance").count(), 3, "{own}");
 }
 
-/// ZERO-LEDGER P5-001 step 2: a target whose deck is one circuit refuses
-/// the second state by its cell (W0130), not as foreign text (W0001).
+/// ZERO-LEDGER P5-001 steps 2 and 5: a target whose deck is one circuit
+/// refuses the second state (W0130), not as foreign text (W0001).
 /// Oracle: each target's own rule. ESPice 0.3.0 ignores `.control`
-/// commands (run, evidence/P5-001-s2/espice.log); Xyce RG `.STEP` and
-/// LTspice help `.step` step every analysis; HSPICE `.ALTER` is not
-/// written yet (step 5).
+/// commands (run, evidence/P5-001-s2/espice.log); Xyce RG `.STEP`,
+/// LTspice help `.step` and HSPICE UG `.ALTER` (pp.107-108) run every
+/// analysis of the deck at every state, and here the second state runs
+/// two analyses where the first runs one.
 #[test]
 fn p5_001_s2_a_second_circuit_state_is_refused_where_a_deck_is_one_circuit() {
     let deck = "t\nground 0\nload \"spice/resistor.osdi\"\nmodel resistor sp_resistor\n\
         model isource isource\nparameters a=1\ni1 (0 2) isource dc=1m\nr1 (2 0) resistor r=a*1k\n\
-        control\n  analysis op1 op\n  alter instance(\"__topinst__\") a=2\n  analysis op2 op\nendc\n";
+        control\n  analysis op1 op\n  alter instance(\"__topinst__\") a=2\n  analysis op2 op\n  \
+        analysis op3 op\nendc\n";
     for target in [
         Dialect::Espice,
         Dialect::Hspice,
@@ -387,10 +393,12 @@ fn p5_001_s4_an_unread_script_line_that_changes_the_circuit_is_refused() {
         let codes = oracle::refusal(&deck, Dialect::Ngspice, Dialect::Ngspice);
         assert!(codes.contains(&Code::W0160), "{codes:?}\n{deck}");
     }
-    // The state that is read: one circuit a deck refuses by its cell;
-    // the named targets keep the line as text until their `alter` is
-    // written from the plan (ZERO-LEDGER P5-050).
-    let deck = format!("{SCRIPTED}op\nalterparam rr = 2k\nreset\nop\n.endc\n.end\n");
+    // The state that is read, running two analyses where the first runs
+    // one: ESPice's cell refuses it and no table of states holds it on
+    // HSPICE, Xyce or LTspice (step 5); the named targets keep the line
+    // as text until their `alter` is written from the plan (ZERO-LEDGER
+    // P5-050).
+    let deck = format!("{SCRIPTED}op\nalterparam rr = 2k\nreset\nop\nop\n.endc\n.end\n");
     for (targets, code) in [
         (
             &[
@@ -417,4 +425,102 @@ fn p5_001_s4_an_unread_script_line_that_changes_the_circuit_is_refused() {
     let notes = oracle::notes(&w);
     let left_out = notes.iter().filter(|c| **c == Code::W0025).count();
     assert_eq!(left_out, 4, "{notes:?}");
+}
+
+/// ZERO-LEDGER P5-001 step 5 (DESIGN-control-epochs §3 `StepStates`, §7).
+/// Oracle: the divider's closed form at each circuit state, v(out) = R2 /
+/// (1k + R2), which ngspice-45 gave on the source scripts and Xyce 7.10
+/// (one plot a `.DATA` row), ESPice 0.3.0 reading HSPICE (one plot an
+/// `.ALTER` block) and LTspice 26.1.1 gave on the written forms, each by
+/// hand (research/impl/evidence/P5-001-s5/RESULTS.txt). LTspice is not in
+/// `.#testing`: its lines are those of the deck that was run (§3).
+/// Tolerance: a linear solve of three elements, RELTOL class.
+#[test]
+fn p5_001_s5_circuit_states_are_one_table_the_deck_runs_over() {
+    // rr = 1k, 2k, 3k, 2k: out of order, a value repeated.
+    const ONE: &str = "op\nalterparam rr=2k\nreset\nop\nalterparam rr=3k\nreset\nop\n\
+        alterparam rr=2k\nreset\nop\n";
+    // (a, b) = (1, 0), (2, 0), (2, 1), (1, 0), and R2 = a · 1k + b · 2k.
+    const TWO: &str = "op\nalterparam a=2\nreset\nop\nalterparam b=1\nreset\nop\n\
+        alterparam a=1\nalterparam b=0\nreset\nop\n";
+    let two = SCRIPTED
+        .replace(".param rr=1k", ".param a=1\n.param b=0")
+        .replace("{rr}", "{a*1k+b*2k}");
+    let cases = [
+        (
+            format!("{SCRIPTED}{ONE}.endc\n.end\n"),
+            [0.5, 2.0 / 3.0, 0.75, 2.0 / 3.0],
+        ),
+        (
+            format!("{two}{TWO}.endc\n.end\n"),
+            [0.5, 2.0 / 3.0, 0.8, 0.5],
+        ),
+    ];
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    for (deck, want) in &cases {
+        for target in [Dialect::Xyce, Dialect::Hspice] {
+            let text = oracle::write(deck, Dialect::Ngspice, target);
+            let plots = oracle::run(target, &text);
+            assert_eq!(
+                plots.len(),
+                want.len(),
+                "{target:?}: a plot a state\n{text}"
+            );
+            for (k, w) in want.iter().enumerate() {
+                let got = oracle::value(&plots[k..k + 1], "out", oracle::At::First);
+                assert!(
+                    tol.within(got, *w),
+                    "{target:?} state {k}: v(out) = {got}, want {w}\n{text}"
+                );
+            }
+        }
+    }
+    // The table itself: Xyce's rows in state order, HSPICE's blocks each
+    // setting every state parameter, LTspice's index and its tables.
+    let text = oracle::write(&cases[0].0, Dialect::Ngspice, Dialect::Xyce);
+    let table = "\n.param rr=1000\n";
+    assert!(text.contains(table), "{text}");
+    let table = "\n.data spicerack_states\n+ rr\n+ 1000\n+ 2000\n+ 3000\n+ 2000\n.enddata\n\
+        .step data=spicerack_states\n";
+    assert!(text.contains(table), "{text}");
+    let text = oracle::write(&cases[1].0, Dialect::Ngspice, Dialect::Hspice);
+    let blocks = "\n.alter\n.param a=2 b=0\n.alter\n.param a=2 b=1\n.alter\n.param a=1 b=0\n.end";
+    assert!(text.contains(blocks), "{text}");
+    let text = oracle::write(&cases[1].0, Dialect::Ngspice, Dialect::Ltspice);
+    for line in [
+        ".param a=table(spicerack_state,0,1,1,2,2,2,3,1)",
+        ".param b=table(spicerack_state,0,0,1,0,2,1,3,0)",
+        ".step param spicerack_state 0 3 1",
+    ] {
+        assert!(text.lines().any(|l| l == line), "no `{line}`\n{text}");
+    }
+    // An alter before the first run is the one state's own value: no step.
+    let deck = format!("{SCRIPTED}alterparam rr=3k\nreset\nop\n.endc\n.end\n");
+    let text = oracle::write(&deck, Dialect::Ngspice, Dialect::Xyce);
+    assert!(text.contains("\n.param rr=3000\n"), "{text}");
+    assert!(!text.contains(".step") && !text.contains(".data"), "{text}");
+    let got = oracle::op(Dialect::Xyce, &text, "out");
+    assert!(tol.within(got, 0.75), "v(out) = {got}\n{text}");
+    // What no table holds is refused where the states are a table
+    // (W0130): a parameter whose card is an expression, and on HSPICE a
+    // conditional block beside the blocks (ESPice keeps its first branch:
+    // RESULTS.txt §2). The legal neighbour: the same deck with one state.
+    let expr = cases[0].0.replace(".param rr=1k", ".param rr={2*500}");
+    for target in [Dialect::Xyce, Dialect::Hspice, Dialect::Ltspice] {
+        let codes = oracle::refusal(&expr, Dialect::Ngspice, target);
+        assert!(codes.contains(&Code::W0130), "{target:?}: {codes:?}");
+    }
+    let branches = ".if (rr > 1500)\nR2 out 0 {rr}\n.else\nR2 out 0 1k\n.endif\n";
+    let cond = cases[0].0.replace("R2 out 0 {rr}\n", branches);
+    let codes = oracle::refusal(&cond, Dialect::Ngspice, Dialect::Hspice);
+    assert!(codes.contains(&Code::W0130), "{codes:?}");
+    let one = cond.replace(ONE, "op\n");
+    let one = oracle::write(&one, Dialect::Ngspice, Dialect::Hspice);
+    assert!(one.contains(".if") && !one.contains(".alter"), "{one}");
+    // ESPice runs one circuit a deck: its cell refuses.
+    let codes = oracle::refusal(&cases[0].0, Dialect::Ngspice, Dialect::Espice);
+    assert!(codes.contains(&Code::W0130), "{codes:?}");
 }

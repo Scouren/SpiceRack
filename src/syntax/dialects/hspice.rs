@@ -227,8 +227,10 @@ pub(super) fn hspice() -> DialectDef {
         // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
         // --- S1
         // --- S2
-        // Until `.alter` blocks are written (DESIGN-control-epochs §7;
-        // ZERO-LEDGER P5-001 step 5).
-        .refuse(Construct::Epochs, Code::W0130)
+        // One `.alter` block per later circuit state, each setting every
+        // state parameter (UG E-2010.12 pp.107-108; ESPice 0.3.0 run,
+        // ZERO-LEDGER P5-001 step 5); a plan no table of states holds is
+        // W0130 (`render/spice/states.rs`).
+        .spell(Construct::Epochs, Alt::AlterBlocks)
     // --- S3
 }

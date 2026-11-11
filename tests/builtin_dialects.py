@@ -428,7 +428,7 @@ def hspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .refuse(Construct.Epochs, Code.W0130))
+        .spell(Construct.Epochs, Alt.AlterBlocks))
 
 
 XYCE_UNPROTECTED = Quoting(escapes=False,
@@ -625,7 +625,7 @@ def xyce(d):
         .refuse(Construct.UnmappedOption, Code.W0017)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .refuse(Construct.Epochs, Code.W0130))
+        .spell(Construct.Epochs, Alt.StatesData))
 
 
 LTSPICE_OPERATORS = [
@@ -782,7 +782,7 @@ def ltspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .refuse(Construct.Epochs, Code.W0130))
+        .spell(Construct.Epochs, Alt.StatesTable))
 
 
 SPECTRE_SCALES = [
