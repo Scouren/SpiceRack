@@ -66,9 +66,10 @@ pub fn is_source(path: &str) -> bool {
 /// The tool runs: OpenVAF, Icarus and Yosys, only with the `backend` feature.
 #[cfg(feature = "backend")]
 mod run {
-    use std::ffi::OsStr;
+    use std::ffi::OsString;
     use std::path::{Path, PathBuf};
     use std::process::Command;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     use super::is_source;
     use super::{VerilogBlock, VerilogConnection, VerilogMode};
@@ -80,7 +81,10 @@ mod run {
 
     /// An existing `.{ext}` file (made absolute, so a deck written to a temp dir
     /// still finds it), or inline source written to a temp file named by its
-    /// hash, so the same text always maps to the same file.
+    /// hash, so the same text always maps to the same file. That file is
+    /// rewritten only when it holds other text (its outputs stay newer),
+    /// and through `private`: another process lowering the same block never
+    /// reads it half written.
     fn resolve_ext(source_or_path: &str, ext: &str) -> Result<PathBuf, String> {
         let trimmed = source_or_path.trim();
         if trimmed.ends_with(&format!(".{ext}")) && !trimmed.contains('\n') {
@@ -103,18 +107,38 @@ mod run {
             h.finish()
         };
         let file = dir.join(format!("inline_{:016x}.{ext}", hash));
-        std::fs::write(&file, trimmed)
-            .map_err(|e| format!("Failed to write temp .{ext} file: {}", e))?;
+        if std::fs::read(&file).ok().as_deref() != Some(trimmed.as_bytes()) {
+            let tmp = private(&file);
+            std::fs::write(&tmp, trimmed)
+                .and_then(|()| std::fs::rename(&tmp, &file))
+                .map_err(|e| format!("Failed to write temp .{ext} file: {}", e))?;
+        }
         Ok(file)
     }
 
-    /// Run `tool args` to make `out` from `src`, skipped when `out` is newer.
+    /// A path beside `p`, same extension, that no other writer uses (this
+    /// process, this call): written there and renamed over `p`, a file is
+    /// whole whenever another process opens it.
+    fn private(p: &Path) -> PathBuf {
+        static CALLS: AtomicU32 = AtomicU32::new(0);
+        let n = CALLS.fetch_add(1, Ordering::Relaxed);
+        let ext = p.extension().map(|e| e.to_string_lossy().into_owned());
+        p.with_extension(format!(
+            "{}-{n}.{}",
+            std::process::id(),
+            ext.unwrap_or_default()
+        ))
+    }
+
+    /// Run `tool args(o)` to make `out` from `src`, skipped when `out` is
+    /// newer: the tool writes `o` (`private`), renamed over `out` once it
+    /// succeeds.
     fn run_tool(
         src: &Path,
         out: &Path,
         tool: &str,
         install: &str,
-        args: &[&OsStr],
+        args: impl Fn(&Path) -> Vec<OsString>,
     ) -> Result<String, String> {
         let mtime = |p: &Path| p.metadata().and_then(|m| m.modified());
         let done = out.to_string_lossy().into_owned();
@@ -123,14 +147,16 @@ mod run {
         {
             return Ok(done);
         }
+        let tmp = private(out);
         let output = Command::new(tool)
-            .args(args)
+            .args(args(&tmp))
             .output()
             .map_err(|e| match e.kind() {
                 std::io::ErrorKind::NotFound => format!("{tool} not found on $PATH. {install}"),
                 _ => format!("Failed to run {tool}: {e}"),
             })?;
         if !output.status.success() {
+            let _ = std::fs::remove_file(&tmp);
             return Err(format!(
                 "{tool} failed (exit {}):\n{}\n{}",
                 output.status,
@@ -138,6 +164,7 @@ mod run {
                 String::from_utf8_lossy(&output.stdout)
             ));
         }
+        std::fs::rename(&tmp, out).map_err(|e| format!("{tool}: {}: {e}", out.display()))?;
         Ok(done)
     }
 
@@ -146,13 +173,9 @@ mod run {
         let osdi = va.with_extension("osdi");
         let install =
             "Install OpenVAF to compile Verilog-A models.\nSee: https://openvaf.semimod.de";
-        run_tool(
-            va,
-            &osdi,
-            "openvaf",
-            install,
-            &[va.as_os_str(), "-o".as_ref(), osdi.as_os_str()],
-        )
+        run_tool(va, &osdi, "openvaf", install, |o| {
+            vec![va.into(), "-o".into(), o.into()]
+        })
     }
 
     /// A load list with every Verilog-A source replaced by its compiled `.osdi`,
@@ -205,13 +228,9 @@ mod run {
             let vvp = v.with_extension("vvp");
             let install = "Install Icarus Verilog for co-simulation.\n\
                  Install: sudo apt install iverilog (Debian/Ubuntu) or brew install icarus-verilog (macOS)";
-            let vvp = run_tool(
-                &v,
-                &vvp,
-                "iverilog",
-                install,
-                &["-o".as_ref(), vvp.as_os_str(), v.as_os_str()],
-            )?;
+            let vvp = run_tool(&v, &vvp, "iverilog", install, |o| {
+                vec!["-o".into(), o.into(), v.clone().into()]
+            })?;
             let ports = vb
                 .connections
                 .values()
@@ -240,20 +259,18 @@ mod run {
         let top = module_name(&text)
             .ok_or("Could not extract module name from Verilog source. Ensure source contains `module <name>`.")?;
         let synth = v.with_extension("synth.v");
-        let script = format!(
-            "read_verilog {}; synth -top {top}; dfflibmap -liberty {liberty}; abc -liberty {liberty}; write_verilog {}",
-            v.display(),
-            synth.display()
-        );
+        let script = |o: &Path| {
+            format!(
+                "read_verilog {}; synth -top {top}; dfflibmap -liberty {liberty}; abc -liberty {liberty}; write_verilog {}",
+                v.display(),
+                o.display()
+            )
+        };
         let install = "Install Yosys for Verilog synthesis.\n\
              Install: sudo apt install yosys (Debian/Ubuntu) or brew install yosys (macOS)";
-        let synth = run_tool(
-            &v,
-            &synth,
-            "yosys",
-            install,
-            &["-p".as_ref(), script.as_ref()],
-        )?;
+        let synth = run_tool(&v, &synth, "yosys", install, |o| {
+            vec!["-p".into(), script(o).into()]
+        })?;
         let netlist = std::fs::read_to_string(&synth)
             .map_err(|e| format!("Failed to read synthesized netlist: {}", e))?;
 
@@ -465,6 +482,47 @@ mod tests {
         let a = resolve(src).unwrap();
         assert_eq!(a, resolve(src).unwrap());
         assert_eq!(std::fs::read_to_string(&a).unwrap(), src);
+    }
+
+    /// Oracle: each caller's own result. Processes (pytest -n, nextest)
+    /// lowering one inline block at once each get its `.vvp`; before the
+    /// write-then-rename one could compile another's half-written source
+    /// (batch-14, the `[espice]` twin's `verilog` cell; 16 callers failed
+    /// in the second round of eight, 200 rounds pass).
+    #[cfg(feature = "backend")]
+    #[test]
+    fn one_inline_block_lowered_at_once_compiles_for_every_caller() {
+        let clock = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+        let stamp = clock.unwrap().as_nanos();
+        for round in 0..8 {
+            let block = VerilogBlock {
+                source: format!(
+                    "// {stamp} {round}\nmodule inv(input a, output y); assign y = ~a; endmodule\n"
+                ),
+                mode: VerilogMode::Simulate,
+                instance_name: "u1".into(),
+                connections: [("a".into(), VerilogConnection::Single("in".into()))].into(),
+                pdk: None,
+                liberty: None,
+                spice_models: None,
+            };
+            let barrier = std::sync::Barrier::new(16);
+            std::thread::scope(|s| {
+                let runs: Vec<_> = (0..16)
+                    .map(|_| {
+                        s.spawn(|| {
+                            barrier.wait();
+                            lower(&block)
+                        })
+                    })
+                    .collect();
+                for run in runs {
+                    if let Err(e) = run.join().unwrap() {
+                        panic!("round {round}: {e}");
+                    }
+                }
+            });
+        }
     }
 
     #[cfg(feature = "backend")]
