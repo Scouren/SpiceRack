@@ -376,3 +376,39 @@ fn p3_007_an_ngspice_b4soi_is_xyce_level_70() {
     let w = write(&deck(58));
     assert!(w.contains("level=70"), "{w}");
 }
+
+/// ngspice-45 `mos6set.c:93-97`: a level-6 MOSFET's λ is `lambda0`, by
+/// default `lambda`. Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` reads LAMBDA
+/// only when LAMBDA0 is given too: both written with ngspice's value.
+/// Saturation, 1 mA·(1 + λ·Vds) through 1k from 5 V: v(d) = 4/(1 + λ)
+/// (ngspice-45: 3.333333, 3.333333, 3.809524; Xyce 7.10 on the copied
+/// cards: 4.0, 4.0, 3.3333). Ledger P3-073; spice-bench
+/// `ngspice/tests/mos6/simpleinv.sp` (`LAMBDA0=` alone).
+#[test]
+fn p3_073_an_ngspice_level_6_lambda_holds_on_xyce() {
+    let cards = [
+        ("lambda=0.2", 0.2),
+        ("lambda0=0.2", 0.2),
+        ("lambda=0.2 lambda0=0.05", 0.05),
+    ];
+    for (lambdas, lambda) in cards {
+        let deck = format!(
+            "* t\nvd dd 0 5\nrd dd d 1k\nvg g 0 3\nm1 d g 0 0 nm l=1u w=10u\n\
+             .model nm nmos level=6 vto=1 {lambdas}\n.op\n.end\n"
+        );
+        let on = [Dialect::Ngspice, Dialect::Xyce];
+        let tol = Tol {
+            rel: 1e-6,
+            floor: 0.0,
+        };
+        closed_form(
+            Dialect::Ngspice,
+            &deck,
+            &on,
+            "d",
+            At::First,
+            4.0 / (1.0 + lambda),
+            tol,
+        );
+    }
+}

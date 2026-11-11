@@ -80,7 +80,8 @@ const HSPICE: &[Levels] = &[
 /// The card of a Xyce `.model x <kind>` with `params` as ngspice and
 /// ESPice read it, or as HSPICE does (`hspice`): `Ok(None)` unchanged (no
 /// `level`, the same number, or a kind with no row), `Ok(Some(..))` its
-/// level the target's.
+/// level the target's, a level-6 MOSFET's `lambda0` the λ Xyce computes
+/// with.
 ///
 /// # Errors
 /// W0104: a level the target has no device of the same equations for, or
@@ -103,6 +104,7 @@ pub(super) fn ngspice_model(
     debug_assert!(!row.same.is_empty(), "{kind}: a family with no level");
     let mut out = params.to_vec();
     let mut changed = false;
+    let mut mos6 = false;
     for (k, v) in &mut out {
         if !k.eq_ignore_ascii_case("level") {
             continue;
@@ -118,8 +120,12 @@ pub(super) fn ngspice_model(
             *v = to.to_string();
             changed = true;
         }
+        mos6 = !hspice && to == 6 && row.kinds.contains(&"nmos");
     }
-    debug_assert_eq!(out.len(), params.len());
+    if mos6 {
+        changed |= xyce_lambda0(&mut out);
+    }
+    debug_assert!(out.len() >= params.len(), "a card only gains `lambda0`");
     Ok(changed.then_some(out))
 }
 
@@ -178,6 +184,27 @@ fn take(params: &mut Vec<(String, String)>, name: &str) -> Option<String> {
     Some(params.remove(i).1)
 }
 
+/// A Xyce level-6 MOSFET card's channel-length modulation as ngspice's
+/// `lambda0`: Xyce computes with `LAMBDA` when `LAMBDA0` is given too,
+/// else with 0 (`N_DEV_MOSFET6.C:3055-3062`: the test of ngspice-45
+/// `mos6set.c:93-97` inverted; Xyce 7.10 with `lambda=0.2` alone: v(d)
+/// 4.0, ngspice-45 3.3333). ngspice reads `lambda` only as `lambda0`'s
+/// default, so it stays. Whether `params` changed.
+fn xyce_lambda0(params: &mut Vec<(String, String)>) -> bool {
+    let at = |n: &str| params.iter().position(|(k, _)| k.eq_ignore_ascii_case(n));
+    let (lambda, lambda0) = (at("lambda"), at("lambda0"));
+    let value = match (lambda, lambda0) {
+        (None, None) => return false,
+        (Some(l), Some(_)) => params[l].1.clone(),
+        _ => "0".to_string(),
+    };
+    match lambda0 {
+        Some(i) => params[i].1 = value,
+        None => params.push(("lambda0".to_string(), value)),
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +260,26 @@ mod tests {
         assert_eq!(ngspice_model(false, "D", &knee("1e-3")), Err(Code::W0114));
         assert_eq!(ngspice_model(true, "d", &knee("{ik}")), Err(Code::W0114));
         assert_eq!(ngspice_model(false, "d", &knee("0")), Ok(None));
+        // Xyce 7.10 runs (`research/impl/evidence/P3-073`): LAMBDA alone
+        // and LAMBDA0 alone compute 0; both, LAMBDA.
+        let mos6 = |rest: &[(&str, &str)]| -> Vec<(String, String)> {
+            let head = [("level", "6")];
+            let all = head.iter().chain(rest);
+            all.map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        };
+        let both = mos6(&[("lambda", "0.2"), ("lambda0", "0.05")]);
+        let as_xyce = mos6(&[("lambda", "0.2"), ("lambda0", "0.2")]);
+        assert_eq!(ngspice_model(false, "nmos", &both), Ok(Some(as_xyce)));
+        let alone = mos6(&[("lambda", "0.2")]);
+        let off = mos6(&[("lambda", "0.2"), ("lambda0", "0")]);
+        assert_eq!(ngspice_model(false, "nmos", &alone), Ok(Some(off)));
+        let alone0 = mos6(&[("LAMBDA0", "0.2")]);
+        let off0 = mos6(&[("LAMBDA0", "0")]);
+        assert_eq!(ngspice_model(false, "pmos", &alone0), Ok(Some(off0)));
+        assert_eq!(
+            ngspice_model(false, "nmos", &mos6(&[("vto", "1")])),
+            Ok(None)
+        );
         assert_eq!(ngspice_model(false, "npn", &[]), Ok(None));
     }
 

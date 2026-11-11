@@ -440,3 +440,42 @@ fn p3_067_o_dev_params_instance_model() {
     assert!(w.contains("ic=2,3") && !w.contains("ic1"), "{w}");
     oracle::spec_refusal(cite, &mos("shmod=1"), xy, ng, &[Code::W0114]);
 }
+
+// ── a level-6 MOSFET's lambda on Xyce and ngspice (ledger P3-073) ──
+
+/// Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` (`if(lambda0Given)`, the test of
+/// ngspice-45 `mos6set.c:93-97` inverted): λ is LAMBDA when LAMBDA0 is
+/// given too, else 0; ngspice's is `lambda0`, by default `lambda`.
+/// Saturation, Id = KC·(W/L)·(Vgs − VTO)^NC·(1 + λ·Vds) = 1 mA·(1 + λ·Vds)
+/// (the defaults KC 5e-5, NC 1) through 1k from 5 V: v(d) = 4/(1 + λ).
+/// Xyce 7.10: 4 V with `lambda=0.2` alone and with `lambda0=0.2` alone,
+/// 3.3333 V with `lambda=0.2 lambda0=0.05`; ngspice-45 on the copied
+/// cards: 3.3333, 3.3333, 3.8095. XYCE_CORPUS `MOS6/invert_mos6.cir`.
+#[test]
+fn p3_073_xyce_mos_level_xyce_drops() {
+    let cards = [
+        ("lambda=0.2", 0.0),
+        ("lambda0=0.2", 0.0),
+        ("lambda=0.2 lambda0=0.05", 0.2),
+    ];
+    for (lambdas, lambda) in cards {
+        let deck = format!(
+            "* t\nvd dd 0 5\nrd dd d 1k\nvg g 0 3\nm1 d g 0 0 nm l=1u w=10u\n\
+             .model nm nmos level=6 vto=1 {lambdas}\n.op\n.end\n"
+        );
+        let (on, at) = ([Dialect::Xyce, Dialect::Ngspice], oracle::At::First);
+        let tol = oracle::Tol {
+            rel: 1e-6,
+            floor: 0.0,
+        };
+        oracle::closed_form(
+            Dialect::Xyce,
+            &deck,
+            &on,
+            "d",
+            at,
+            4.0 / (1.0 + lambda),
+            tol,
+        );
+    }
+}
