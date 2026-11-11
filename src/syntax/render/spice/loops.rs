@@ -175,7 +175,9 @@ impl W<'_, '_> {
 /// the stop value follows a grid that misses it, a downward range steps
 /// down by `|by|`, and its points ascend. `None` when the numbers are no
 /// grid (a zero step, a logarithmic range not above zero or of no point)
-/// or the grid has [`STEP_POINTS_MAX`] steps or more.
+/// or the grid has [`STEP_POINTS_MAX`] steps or more. A point is its 15
+/// significant digits: `1e-8 + 2 · 1e-8` is 3.0000000000000004e-8 in
+/// doubles, which the script would spell out.
 fn points(sweep: Option<&str>, [start, stop, by]: [f64; 3], closed: bool) -> Option<Vec<f64>> {
     // A logarithmic range's steps: `by` of them a factor `base`.
     let log =
@@ -205,7 +207,8 @@ fn points(sweep: Option<&str>, [start, stop, by]: [f64; 3], closed: bool) -> Opt
         None => start + d * i,
         Some(r) => start * r.powf(i),
     };
-    let mut out: Vec<f64> = (0..=steps as u32).map(|i| at(f64::from(i))).collect();
+    let snap = |v: f64| -> f64 { format!("{v:.14e}").parse().unwrap_or(v) };
+    let mut out: Vec<f64> = (0..=steps as u32).map(|i| snap(at(f64::from(i)))).collect();
     if closed && span - steps > GRID_SLACK {
         out.push(stop);
     }
@@ -262,6 +265,10 @@ mod tests {
         // Five points from 1k to 100k.
         let log = [1e3, 3.16227766e3, 1e4, 3.16227766e4, 1e5];
         near(points(Some("log"), [1e3, 1e5, 5.0], false), &log);
+        // A point is the decimal the grid means, not the doubles' sum
+        // (Xyce BUG_806_SON/transLine_baseline.cir: `.step cap 1e-8 3e-8 1e-8`).
+        let caps = points(None, [1e-8, 3e-8, 1e-8], false);
+        assert_eq!(caps, Some(vec![1e-8, 2e-8, 3e-8]));
         // No grid.
         assert_eq!(points(None, [0.0, 1.0, 0.0], false), None);
         assert_eq!(points(Some("dec"), [0.0, 1.0, 2.0], false), None);

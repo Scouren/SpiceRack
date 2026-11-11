@@ -407,7 +407,9 @@ pub fn available() -> &'static [Dialect] {
 /// A named simulator, built-in or registered, lacking a `needs` bit is
 /// refused: run anyway, it would quietly do less than the deck asks (a
 /// `.step` on ngspice runs one pass). The last resort in the body lands on
-/// a built-in only, never on a registered simulator.
+/// a built-in only, never on a registered simulator, and takes no deck
+/// that steps: ngspice writes one as loops of its control script, and its
+/// run reads one pass back.
 ///
 /// # Errors
 /// `NoSimulator`: no simulator runs every kind (the first kind that
@@ -472,15 +474,9 @@ pub fn select(
     // ponytail: universal analyses (every route led by ngspice), no
     // simulator matches the features: run on the first built-in that
     // writes the deck and let the simulator report what it cannot do.
-    let universal = kinds.iter().all(|k| k.spec().route[0] == Dialect::Ngspice);
-    // A stepped deck never lands where a run hands back the first pass
-    // alone: ngspice writes a `.step` as a loop of its control script
-    // (ZERO-LEDGER P5-001 step 3; P5-021 reads the passes).
-    let stepped = |s: Sim| needs & STEP_PARAMS & !s.row().features == 0;
-    let last = ready
-        .iter()
-        .find(|s| universal && s.builtin().is_some() && stepped(**s));
-    if let Some(&s) = last {
+    let universal =
+        needs & STEP_PARAMS == 0 && kinds.iter().all(|k| k.spec().route[0] == Dialect::Ngspice);
+    if let Some(&s) = ready.iter().find(|s| universal && s.builtin().is_some()) {
         return Ok(s);
     }
     let names: Vec<&str> = installed.iter().map(|s| s.name()).collect();

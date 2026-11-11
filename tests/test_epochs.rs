@@ -38,9 +38,9 @@ const STEPPED: &str = "* steps\n.param rr=1k\nV1 in 0 1\nR1 in out 1k\nR2 out 0 
 /// ZERO-LEDGER P5-001 step 2 (DESIGN-control-epochs O1, O2). Oracle: the
 /// closed form of each circuit state, v(2) = i1 · R, which VACASK 36be560
 /// and ngspice-45 both gave by hand (research/impl/evidence/P5-001-s2/).
-/// The harness keeps a `.control` deck's last plot only, so each state is
-/// read from the deck cut after its analysis (the epoch split: a run of
-/// the multi-state deck equals that state's own run). Tolerance: the two
+/// Each state is read from the deck cut after its analysis, as the last
+/// plot of that run (the epoch split: a run of the multi-state deck
+/// equals that state's own run). Tolerance: the two
 /// simulators' linear solves of a two-element circuit, RELTOL class.
 #[test]
 fn p5_001_s2_a_vacask_top_parameter_alter_runs_as_an_ngspice_control_script() {
@@ -140,9 +140,10 @@ fn p5_001_s2_a_second_circuit_state_is_refused_where_a_deck_is_one_circuit() {
 }
 
 /// ZERO-LEDGER P5-001 step 3 (DESIGN-control-epochs §6 commits 3 and 6).
-/// Oracle: the divider's closed form at the last point of each `.step`
-/// (the harness keeps a `.control` deck's last plot), the points being
-/// those Xyce 7.10 and LTspice 26.1.1 stepped through by hand
+/// Oracle: the divider's closed form at the last point of each `.step`,
+/// and for the three nested steps at every point in order (the harness
+/// reads a plot a pass), the points being those Xyce 7.10 and LTspice
+/// 26.1.1 stepped through by hand
 /// (research/impl/evidence/P5-001-s3/RESULTS.txt): Xyce ends at its grid's
 /// last point, LTspice adds the stop value. Xyce 7.10 itself crashes on
 /// two `.step` lines beside `.op`, so only ngspice runs here. Tolerance: a
@@ -192,7 +193,9 @@ fn p5_001_s3_a_step_runs_as_ngspice_foreach_loops() {
     }
     // The loops themselves: the first `.step` innermost (Xyce RG `.STEP`;
     // the eight points came in Xyce's order), the parameter before
-    // `reset`, which would undo the temperature and the `alter`.
+    // `reset`, which would undo the temperature and the `alter`; after
+    // it each loop's line in loop order (ngspice-45 gave the same eight
+    // values with the two in either order: RESULTS.txt §4).
     let (from, rest, _) = CASES[5];
     let deck = format!("{STEPPED}{rest}.op\n.end\n");
     let text = oracle::write(&deck, from, Dialect::Ngspice);
@@ -206,8 +209,8 @@ fn p5_001_s3_a_step_runs_as_ngspice_foreach_loops() {
             "foreach s1 1000 2000",
             "alterparam rr=$s1",
             "reset",
-            "option temp=$s3",
             "alter V1=$s2",
+            "option temp=$s3",
             "op",
             "end",
             "end",
@@ -217,6 +220,42 @@ fn p5_001_s3_a_step_runs_as_ngspice_foreach_loops() {
         ],
         "{text}"
     );
+    // Every pass is a plot, in Xyce's order (RESULTS.txt §4): rr the
+    // innermost, then V1, then the temperature.
+    let plots = oracle::run(Dialect::Ngspice, &text);
+    let want = [
+        0.5,
+        2.0 / 3.0,
+        1.0,
+        4.0 / 3.0,
+        2.0 / 3.0,
+        0.8,
+        4.0 / 3.0,
+        1.6,
+    ];
+    assert_eq!(plots.len(), want.len(), "a plot a pass\n{text}");
+    for (k, w) in want.iter().enumerate() {
+        let got = oracle::value(&plots[k..k + 1], "out", oracle::At::First);
+        assert!(
+            tol.within(got, *w),
+            "pass {k}: v(out) = {got}, want {w}\n{text}"
+        );
+    }
+    // A run with no simulator named never lands a stepped deck on
+    // ngspice, whose run reads one pass back: `select`'s last resort
+    // leaves a deck that steps out (it takes any other deck ngspice
+    // writes).
+    {
+        use spicerack::backend::{BackendError, Kind, Sim, feature, select};
+        let ngspice = |s: Sim| s == Sim::NGSPICE;
+        let plain = select(&[Kind::Op], None, 0, ngspice);
+        assert_eq!(plain.ok(), Some(Sim::NGSPICE));
+        let stepped = select(&[Kind::Op], None, feature::STEP_PARAMS, ngspice);
+        assert!(
+            matches!(stepped, Err(BackendError::UnsupportedFeature { .. })),
+            "{stepped:?}"
+        );
+    }
     // What the script has no command for stays refused (W0016): a device
     // parameter, a name the deck's top does not declare; and every step on
     // ESPice, which runs no `.control` command.
