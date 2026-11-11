@@ -108,9 +108,17 @@ impl PySubcircuit {
         self.two('R', name, positive, negative, &value, kwargs)
     }
 
-    #[pyo3(signature = (name, positive, negative, value, **kwargs))]
-    fn C(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
-        self.two('C', name, positive, negative, &value.value(), kwargs)
+    /// `charge` gives the capacitor by its charge, an expression of its
+    /// voltage (`charge="1n*v(a,b)"`: ngspice manual §3.3.9, `Q = 'expr'`),
+    /// in place of `value`; exactly one of the two.
+    #[pyo3(signature = (name, positive, negative, value=None, *, charge=None, **kwargs))]
+    fn C(&mut self, name: &str, positive: &str, negative: &str, value: Option<PyValueArg>, charge: Option<&str>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let value = match (value, charge) {
+            (Some(v), None) => v.value(),
+            (None, Some(q)) => Value::Raw(format!("q={}", PyValueArg::Expr(q.into()).value().text())),
+            _ => return Err(PyValueError::new_err("C: give `value` or `charge=`, exactly one")),
+        };
+        self.two('C', name, positive, negative, &value, kwargs)
     }
 
     #[pyo3(signature = (name, positive, negative, value, **kwargs))]

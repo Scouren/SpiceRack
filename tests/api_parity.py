@@ -181,6 +181,7 @@ PARITY = {
     "rf_port": (FEATURES["rf_port"], tw_source(["Vin in 0 0 portnum 1 z0 50"]), "ng portnum (RF port)", None),
     # ── Elements and directives ──
     "L_K": (FEATURES["L_K"], tw_elem(["L1 in 0 1e-6", "L2 out 0 1e-6", "K1 LL1 LL2 0.5"]), "ng §3 L, K", None),
+    "C_charge": (FEATURES["C_charge"], tw_elem(["C2 out 0 q={1n*v(out)}"]), "ng §3.3.9 C (Q = 'expression')", "P8-015"),
     "D": (FEATURES["D"], tw_elem([".model dn d", "D1 out 0 dn"]), "ng §3 D", None),
     "Q": (FEATURES["Q"], tw_elem([".model qn npn", "Q1 out in 0 qn"]), "ng §3 Q", None),
     "M": (FEATURES["M"], tw_elem([".model nm nmos", "M1 out in 0 0 nm W=1e-06 L=1e-06"]), "ng §3 M", None),

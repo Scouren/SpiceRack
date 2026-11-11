@@ -64,6 +64,7 @@ Every element takes its name and nodes first; the rest are keywords.
 | Method | Element | Arguments after `name, nodes...` |
 | --- | --- | --- |
 | `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`) |
+| `C` | a capacitor given by its charge | `charge="1n*v(a,b)"` in place of `value` |
 | `K` | inductor coupling | `inductor1, inductor2, coupling=` |
 | `V`, `I` | DC sources | `value, ac=, ac_phase=` |
 | `E`, `G` | voltage-controlled sources | `control_positive=, control_negative=, voltage_gain=` / `transconductance=` |

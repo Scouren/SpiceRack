@@ -193,6 +193,7 @@ FEATURES = {
     "rf_port": source(lambda tb: tb.V("in", "in", "0", 0.0, portnum=1)),
     # Elements and directives.
     "L_K": elem(lambda d: (d.L("1", "in", "0", 1e-6), d.L("2", "out", "0", 1e-6), d.K("1", "L1", "L2", coupling=0.5))),
+    "C_charge": elem(lambda d: d.C("2", "out", d.gnd, charge="1n*v(out)")),
     "D": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn"))),
     "Q": elem(lambda d: (d.model("qn", "npn"), d.Q("1", "out", "in", "0", model="qn"))),
     "M": elem(lambda d: (d.model("nm", "nmos"), d.M("1", "out", "in", "0", "0", model="nm", W=1e-6, L=1e-6))),
@@ -307,6 +308,8 @@ EXPECTED = {
     # Xyce's P port (D's a5f2c0a); HSPICE has a `P` port: writer B (FINDINGS-python.md).
     'rf_port': (OK, OK, 'W0007', OK, 'W0007', OK, 'W0007', OK, OK),
     'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # VACASK has no charge-formulated capacitor (`Construct::ChargeCapacitor`: W0105).
+    'C_charge': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

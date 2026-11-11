@@ -12,6 +12,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: a refusal is its diagnostic codes and messages (`<deck>:<line>:<col>: W0004 …`), not free text; `nominal_temperature` reaches Spectre in the `options` statement; a `.tran` step cap with no start writes Spectre `start=0` and HSPICE `START=0`; `add_fourier`'s `num_harmonics` is ngspice's `.options nfreqs=` (one count per deck, DC its first frequency), LTspice's `.four` count and Spectre's `harms`, and refused on Xyce and HSPICE, whose `.four` has none.
 - verilog: structural Verilog (one module per subcircuit, instances by port name) replaces the old layout's IR `Debug` lines; every other element is a `// W0029` comment.
 - python: `Subcircuit.subcircuit(child)` defines `child` inside the subcircuit (a nested `.subckt`, local to it); every target writes it as a top-level `<parent>__<child>`. `Subcircuit.from_source` read a nested definition back as its first line only; it keeps the block.
+- python: `C(name, n1, n2, charge="expr")` builds a capacitor given by its charge (ngspice `Q='expr'`); every target writes its own form, VACASK refuses it (`W0105`).
 
 ## 0.2.0 (2026-11-03)
 

@@ -13,6 +13,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
 | `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |
+| `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither); refused on VACASK (`W0105`) |
 | `L` | `L` | `(name, positive, negative, value)` |
 | `K` | `K` | `(name, inductor1, inductor2, coupling)` |
 | `D` | `D` | `(name, anode, cathode, model)` |

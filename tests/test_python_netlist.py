@@ -1055,3 +1055,29 @@ class TestNestedSubcircuit:
         with pytest.raises(ValueError, match="verilog"):
             wrap.subcircuit(bad)
         assert wrap.to_source() == text  # nothing of `bad` was kept
+
+
+# ======================================================================
+# A capacitor given by its charge (P8-015; ngspice manual §3.3.9)
+# ======================================================================
+
+class TestChargeCapacitor:
+    def test_p8_015_charge_is_the_q_card(self):
+        c = ps().Circuit("q")
+        c.C("1", "a", c.gnd, charge="1n*v(a)")
+        # The manual's form, as the ngspice writer spells a charge capacitor
+        # (`render/spice/cards.rs::charge_card`: `Q='…'`).
+        assert "C1 a 0 Q='1n*v(a)'" in str(c).splitlines()
+
+    def test_p8_015_one_pair_of_braces_is_dropped(self):
+        c = ps().Circuit("q")
+        c.C("1", "a", c.gnd, charge="{1n*v(a)}")
+        assert "C1 a 0 Q='1n*v(a)'" in str(c).splitlines()
+
+    def test_p8_015_value_and_charge_exclude_each_other(self):
+        c = ps().Circuit("q")
+        with pytest.raises(ValueError, match="exactly one"):
+            c.C("1", "a", c.gnd, 1e-9, charge="1n*v(a)")
+        with pytest.raises(ValueError, match="exactly one"):
+            c.C("1", "a", c.gnd)
+        assert "C1" not in str(c)
