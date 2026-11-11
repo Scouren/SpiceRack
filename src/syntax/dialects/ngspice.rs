@@ -228,7 +228,7 @@ pub(super) fn ngspice() -> DialectDef {
         .native(Construct::AmWave)
         .refuse(Construct::Step, Code::W0016)
         .refuse(Construct::StepList, Code::W0016)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .refuse(Construct::DcLogList, Code::W0038)
         .native(Construct::Tf)
         .native(Construct::Sens)

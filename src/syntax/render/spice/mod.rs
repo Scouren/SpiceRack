@@ -138,6 +138,13 @@ struct W<'a, 'r> {
 pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
     let (sp, cells, b) = (lang.spelling(), lang.cells(), lang.behaviours());
     let mut diags = Vec::new();
+    // LTspice's `.tran … startup` on a target with no such start: the
+    // top's DC sources are read with its ramp from here on.
+    if lang.action(Construct::TranStartup) == Action::Lift(Rule::StartupRamp)
+        && let Some(tok) = rd.ramp_startup(deck)
+    {
+        diags.push(Diag::new(Code::W0037, tok, 0));
+    }
     let draws = match lang.action(Construct::Statistics) {
         Action::Lift(Rule::StatisticsDraws) => {
             draws::lift(rd, deck, Layers::Two).unwrap_or_else(|d| {

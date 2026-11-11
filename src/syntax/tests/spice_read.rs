@@ -12,11 +12,15 @@ use crate::syntax::render::render_text;
 // ---- private ----
 
 #[test]
-fn an_ltspice_startup_transient_is_ltspices_and_refused_elsewhere() {
+fn an_ltspice_startup_transient_is_ltspices_and_a_ramp_elsewhere() {
     // LTspice help, `.TRAN`: `.tran <Tstop> [modifiers]`, the modifier
     // `startup` (sources ramped on over the first 20 µs) and `uic` in any
-    // order. LTspice writes its own card (`Tstep` 0: LTspice's default);
-    // every other simulator has no such ramp (W0037). Checks: 1 + 6.
+    // order. LTspice writes its own card (`Tstep` 0: LTspice's default)
+    // and the source as it stands. Every other target has no such start:
+    // the DC source carries the ramp LTspice 26.1.1 ran (linear, 0 to its
+    // value at 20 µs) beside its DC value, in the target manual's PWL
+    // form, and the card loses the flag. Checks: 2 + 2 per target, 6
+    // targets.
     let text = "t\nR1 a 0 1k\nV1 a 0 1\n.tran 750u startup uic\n.end\n";
     let lt = render_text(text, Dialect::Ltspice, "t", Dialect::Ltspice).expect("written");
     assert!(
@@ -24,19 +28,28 @@ fn an_ltspice_startup_transient_is_ltspices_and_refused_elsewhere() {
         "{}",
         lt.text
     );
-    for d in [
-        Dialect::Ngspice,
-        Dialect::Espice,
-        Dialect::Hspice,
-        Dialect::Xyce,
-        Dialect::Spectre,
-        Dialect::Vacask,
+    assert!(lt.text.lines().any(|l| l == "V1 a 0 1"), "{}", lt.text);
+    let cards = "V1 a 0 1 PWL(0 0 0.00002 1)";
+    for (d, source) in [
+        (Dialect::Ngspice, cards),
+        (Dialect::Espice, cards),
+        (Dialect::Hspice, cards),
+        (Dialect::Xyce, cards),
+        (
+            Dialect::Spectre,
+            "v1 (a 0) vsource dc=1 type=pwl wave=[0 0 20u 1]",
+        ),
+        (
+            Dialect::Vacask,
+            "v1 (a 0) vsource dc=1e0 type=\"pwl\" wave=[0, 0, 2e-5, 1e0]",
+        ),
     ] {
-        let e = render_text(text, Dialect::Ltspice, "t", d).expect_err("refused");
+        let w = render_text(text, Dialect::Ltspice, "t", d).expect("written");
+        assert!(w.text.lines().any(|l| l == source), "{d:?}: {}", w.text);
         assert!(
-            e.diags.iter().any(|g| g.code == Code::W0037),
+            !w.text.to_ascii_lowercase().contains("startup"),
             "{d:?}: {}",
-            e.messages
+            w.text
         );
     }
 }

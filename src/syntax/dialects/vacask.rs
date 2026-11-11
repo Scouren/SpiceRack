@@ -351,7 +351,7 @@ pub(super) fn vacask() -> DialectDef {
         .native(Construct::AmWave)
         .native(Construct::Step)
         .native(Construct::StepList)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .native(Construct::DcLogList)
         .native(Construct::Tf)
         .refuse(Construct::Sens, Code::W0015)

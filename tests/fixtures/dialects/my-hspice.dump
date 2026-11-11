@@ -84,7 +84,7 @@ cell.LossyLine Refuse(W0105)
 cell.AmWave Spell(HspiceAm)
 cell.Step Refuse(W0201) MY001
 cell.StepList Spell(TempList)
-cell.TranStartup Refuse(W0037)
+cell.TranStartup Lift(StartupRamp)
 cell.DcLogList Spell(DcType)
 cell.Tf Native
 cell.Sens Native

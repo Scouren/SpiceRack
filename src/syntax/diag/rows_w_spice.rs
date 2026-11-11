@@ -233,11 +233,11 @@ macro_rules! rows_w_spice {
                 cite: "LTspice help (`.BACKANNO`: annotate the subcircuit pin names onto the port currents)",
                 explain: "LTspice adds `.backanno` to a netlist it writes from a schematic, so that the waveform viewer names a subcircuit's port currents by its pins. It changes no number of the run, and no other simulator has it, so the reader leaves it out on every target.",
             }
-            /// LTspice's `.tran … startup` on a target with no such ramp.
+            /// LTspice's `.tran … startup` over a source whose DC value no ramp is written for.
             W0037 Refusal {
                 title: "a transient start-up ramp the target lacks",
                 cite: "LTspice help (`.TRAN` modifier `startup`: the operating point with the independent sources off, each ramped on over the first 20 µs); ngspice manual, transient options (`RAMPTIME`, a ramp of given length whose shape LTspice does not state); HSPICE, Xyce RG `.TRAN`, Spectre, VACASK: no start-up ramp",
-                explain: "The transient starts from an operating point with every independent source at zero and ramps them on over its first 20 µs. The target has no such start: without it the run starts from the full-source operating point, another answer for a circuit that latches or soft-starts. Ramp the sources in the deck (a PWL from zero) and drop `startup`.",
+                explain: "The transient starts from an operating point with every independent source at zero and ramps them on over its first 20 µs. A target with no such start gets each top-level DC source as a PWL from zero to its value over 20 µs. This source's DC value is neither a number nor an expression, so no ramp is written for it; without one the run starts from the full-source operating point, another answer for a circuit that latches or soft-starts. Write the value as a number or a braced expression, or ramp the source in the deck (a PWL from zero) and drop `startup`.",
             }
             /// A `.dc` axis by decade, octave or list on a target whose `.dc` is linear only.
             W0038 Refusal {

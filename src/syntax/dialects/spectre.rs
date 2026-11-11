@@ -322,7 +322,7 @@ pub(super) fn spectre() -> DialectDef {
         .refuse(Construct::AmWave, Code::W0108)
         .native(Construct::Step)
         .native(Construct::StepList)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .native(Construct::DcLogList)
         .native(Construct::Tf)
         .native(Construct::Sens)

@@ -84,7 +84,7 @@ cell.LossyLine Native
 cell.AmWave Native
 cell.Step Refuse(W0016)
 cell.StepList Refuse(W0016)
-cell.TranStartup Refuse(W0037)
+cell.TranStartup Lift(StartupRamp)
 cell.DcLogList Refuse(W0038)
 cell.Tf Native
 cell.Sens Native

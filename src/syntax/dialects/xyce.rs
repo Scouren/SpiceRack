@@ -236,7 +236,7 @@ pub(super) fn xyce() -> DialectDef {
         .refuse(Construct::AmWave, Code::W0108)
         .native(Construct::Step)
         .native(Construct::StepList)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .native(Construct::DcLogList)
         .refuse(Construct::Tf, Code::W0015)
         .refuse(Construct::Sens, Code::W0015)

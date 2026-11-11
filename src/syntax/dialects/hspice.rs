@@ -208,7 +208,7 @@ pub(super) fn hspice() -> DialectDef {
         .spell(Construct::AmWave, Alt::HspiceAm)
         .refuse(Construct::Step, Code::W0016)
         .spell(Construct::StepList, Alt::TempList)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .spell(Construct::DcLogList, Alt::DcType)
         .native(Construct::Tf)
         .native(Construct::Sens)

@@ -135,6 +135,7 @@ py_units!(
         StatisticsDraws,
         RackVars,
         VacaskCalls,
+        StartupRamp,
     ]
 );
 py_units!(PyFuncForm, "FuncForm", FuncForm, [Func, Param, Real, None]);

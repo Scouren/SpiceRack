@@ -133,6 +133,9 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// VACASK: the subcircuits the control block's one `elaborate` makes
     /// toplevel circuits, read as the top (`Rd::vacask_promoted`).
     promoted: HashSet<String>,
+    /// The top's DC sources read with LTspice's start-up ramp, once a
+    /// writer whose target has no such start asks ([`Rd::ramp_startup`]).
+    ramped: HashSet<u32>,
 }
 
 /// What the reader made of a file: every block and the deck-wide lists, in
@@ -535,6 +538,7 @@ impl<'a> Rd<'a> {
             nums: Vec::new(),
             global_params: HashSet::new(),
             promoted: HashSet::new(),
+            ramped: HashSet::new(),
         }
     }
 }

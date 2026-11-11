@@ -11,8 +11,9 @@
 //! - `pub(in crate::syntax::render) enum Num`, `struct Wave`, `enum WaveKind`
 //! - `Num::num(&self) -> Option<f64>`, `WaveKind::held(self) -> Option<usize>`, `Wave::at_zero(&self) -> Val`
 //! - `Rd::source(&self, n: u32, e: Element, name: String) -> Option<Card>`
+//! - `Rd::ramp_startup(&mut self, deck: &Deck) -> Option<u32>`
 
-use super::{Card, Rd, Val};
+use super::{Card, Comp, Deck, Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::{CardRules, SourceRules};
 use crate::syntax::device::Primitive as Element;
@@ -58,6 +59,11 @@ pub(in crate::syntax::render) enum WaveKind {
     Trnoise,
     Trrandom,
 }
+
+/// The length of LTspice's start-up ramp, seconds (LTspice help, `.TRAN`:
+/// `startup` ramps the sources on "in first 20u"; LTspice 26.1.1 ran it
+/// linear).
+const STARTUP_RAMP_S: f64 = 20e-6;
 
 /// One `spec` of a V or I card, the items it holds.
 enum Spec {
@@ -161,6 +167,10 @@ impl<'a> Rd<'a> {
             }
             (w.repeat, w.delay) = (repeat, delay);
         }
+        if self.ramped.contains(&n) {
+            assert!(wf.is_none(), "source: a ramped source is DC only");
+            wf = Some(startup_ramp(&value));
+        }
         let port = match (portnum, z0) {
             (Some(num), z0) => Some((num, z0.unwrap_or(50.0))),
             (None, None) => None,
@@ -185,6 +195,45 @@ impl<'a> Rd<'a> {
             port,
             parasitics,
         })
+    }
+
+    /// LTspice's `.tran … startup` for a target with no such start
+    /// (`Rule::StartupRamp`): when `deck` runs one, every V and I card at
+    /// the top whose value is DC only (with or without `AC`) and not the
+    /// number 0 is read from here on with the ramp LTspice 26.1.1 ran,
+    /// `PWL(0 0 20u X)` beside its DC value `X`, which `.op`, `.dc` and
+    /// `.ac` keep. A waveform source and a subcircuit's source are not
+    /// ramped (LTspice help, `.TRAN`). Returns the token of the first
+    /// such card whose DC value is kept as raw text: it gets no ramp, so
+    /// the writer refuses the deck there.
+    ///
+    /// # Panics
+    /// When called twice on one read, or with a block that is not the top.
+    pub(in crate::syntax::render) fn ramp_startup(&mut self, deck: &Deck) -> Option<u32> {
+        assert!(self.ramped.is_empty(), "ramp_startup: once a read");
+        assert_eq!(deck.top.node, NONE, "ramp_startup: the deck's top");
+        self.tran_startup(&deck.bench)?;
+        let mut unramped = None;
+        for &c in &deck.top.comps {
+            let Comp::Card(n) = c else { continue };
+            let Card::Source {
+                value,
+                wave: None,
+                port: None,
+                ..
+            } = self.card_view(n)
+            else {
+                continue;
+            };
+            match value {
+                Val::Num(v) if v == 0.0 => {}
+                Val::Num(_) | Val::Expr(_) => {
+                    self.ramped.insert(n);
+                }
+                Val::Raw(_) => unramped = unramped.or(Some(self.main(n))),
+            }
+        }
+        unramped
     }
 
     /// Xyce's `P n+ n- port=n [z0=z]` (Xyce RG, port device: z0 50 when
@@ -503,5 +552,26 @@ impl<'a> Rd<'a> {
             delay: None,
             cut: a.len() > held,
         })
+    }
+}
+
+/// LTspice's start-up ramp of a source whose DC value is `full`:
+/// `PWL(0 0 20u full)`.
+///
+/// # Panics
+/// For a value kept as raw text ([`Rd::ramp_startup`] ramps none).
+fn startup_ramp(full: &Val) -> Wave {
+    let full = match full {
+        Val::Num(v) => Num::Num(*v),
+        Val::Expr(e) => Num::Expr(e.clone()),
+        Val::Raw(_) => unreachable!("ramp_startup ramps a number or an expression"),
+    };
+    let zero = || Num::Num(0.0);
+    Wave {
+        kind: WaveKind::Pwl,
+        args: vec![zero(), zero(), Num::Num(STARTUP_RAMP_S), full],
+        repeat: None,
+        delay: None,
+        cut: false,
     }
 }

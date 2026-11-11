@@ -227,6 +227,11 @@ pub enum Rule {
     /// `aunif` ternary, Xyce's clamp → `min(max())`, a two-argument
     /// `agauss` its sigma 1 (VACASK `docs/cmd-analysis-mc.md`).
     VacaskCalls,
+    /// LTspice's `.tran … startup` → `PWL(0 0 20u X)` beside the DC value
+    /// `X` of each DC-only V and I at the top (LTspice help, `.TRAN`;
+    /// LTspice 26.1.1 ran the ramp linear, waveform and subcircuit
+    /// sources unramped).
+    StartupRamp,
 }
 
 #[cfg(test)]
