@@ -45,9 +45,12 @@ pub(super) fn espice() -> DialectDef {
         // ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
         // offset" (run).
         .spell(Construct::AmWave, Alt::AmNoOffset)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // ESPice 0.3.0 runs no `.control` command ("command 'alterparam'
+        // ignored", run): one circuit a deck.
+        .refuse(Construct::Epochs, Code::W0130)
     // --- S3
 }

@@ -363,9 +363,12 @@ pub(super) fn vacask() -> DialectDef {
         .refuse(Construct::UnmappedOption, Code::W0017)
         .lift(Construct::Statistics, Rule::StatisticsDraws)
         .refuse(Construct::Measure, Code::W0109)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // `alter` in the control block (`docs/cmd-alter.md`): the
+        // statement is copied where it stood.
+        .native(Construct::Epochs)
     // --- S3
 }

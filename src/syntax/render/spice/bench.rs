@@ -347,10 +347,16 @@ impl W<'_, '_> {
         if control.is_some() {
             assert_eq!(self.b.control_block, ControlBlock::Ngspice);
         }
-        // Paired with `plan`'s own check. No reader opens a second epoch
-        // yet: every run is on the netlist as written.
+        // Paired with `plan`'s own check.
         tb.plan.check();
-        assert!(tb.plan.single_epoch(), "a second epoch has no writer yet");
+        // A second circuit state is the target's `Construct::Epochs` cell:
+        // ngspice's control script, which then runs every analysis (in
+        // the block `control_run` asked for, or one of its own).
+        let scripted = !tb.plan.single_epoch() && self.scripted(&tb.plan);
+        let control = match control {
+            None if scripted => Some(&[] as &[String]),
+            given => given,
+        };
         let each = || tb.plan.runs.iter().zip(&tb.plan.run_tok);
         match control {
             Some(fourier) => {
@@ -363,6 +369,9 @@ impl W<'_, '_> {
                     .position(|a| matches!(a, Ana::Tran { .. }));
                 self.o.token(".control", Space::Line);
                 for (i, (a, tok)) in each().enumerate() {
+                    if scripted {
+                        self.alter_lines(&tb.plan, i);
+                    }
                     // As a command, `.four` would run the transient again.
                     if !matches!(a, Ana::Four(..)) {
                         let card = self.analysis(a, *tok);
@@ -403,11 +412,17 @@ impl W<'_, '_> {
         tb.prints.iter_mut().for_each(|(_, outs, _)| refs(outs));
     }
 
-    /// One testbench card into `tb`; a plan card (an analysis) onto
-    /// `script`, with its token.
+    /// One testbench card into `tb`; a plan card (an analysis, an alter)
+    /// onto `script`, with its token.
     fn fold_one(&self, tb: &mut Tb, script: &mut Vec<(BenchCard, u32)>, card: BenchCard, tok: u32) {
         match card {
             c @ BenchCard::Ana(_) => script.push((c, tok)),
+            // A plan card at its own statement's token: a control block's
+            // cards share the block's.
+            BenchCard::Alter { key, value, node } => {
+                let tok = self.rd.main(node);
+                script.push((BenchCard::Alter { key, value, node }, tok));
+            }
             BenchCard::Options(opts) => {
                 for o in opts {
                     match o {

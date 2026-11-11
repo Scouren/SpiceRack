@@ -71,9 +71,11 @@ pub(super) fn cdl() -> DialectDef {
         .native(Construct::UnmappedOption)
         .native(Construct::Statistics)
         .native(Construct::Measure)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // CDL writes no analysis, so no state between two of them.
+        .omit(Construct::Epochs, Code::W0028)
     // --- S3
 }

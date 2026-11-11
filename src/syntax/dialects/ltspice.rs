@@ -193,9 +193,13 @@ pub(super) fn ltspice() -> DialectDef {
         .native(Construct::UnmappedOption)
         .lift(Construct::Statistics, Rule::StatisticsDraws)
         .native(Construct::Measure)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // Every analysis of a deck runs on one circuit (help `.step`
+        // steps them all); parameter states become its points with
+        // ZERO-LEDGER P5-001 step 5.
+        .refuse(Construct::Epochs, Code::W0130)
     // --- S3
 }

@@ -356,6 +356,15 @@ impl W<'_, '_> {
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
                     BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
+                    // A VACASK `alter`: kept as its statement, once (it
+                    // gives one card per parameter). VACASK's own writer
+                    // copies it; Spectre's has no `alter` yet (W0001
+                    // through `kept_construct`; ZERO-LEDGER P5-050).
+                    BenchCard::Alter { node, .. } => {
+                        if tb.extra.last().is_none_or(|e| e.0 != node) {
+                            tb.extra.push((node, script.len()));
+                        }
+                    }
                     // A VACASK `save` is a save list (VACASK's own writer
                     // copies the statement).
                     BenchCard::Extra(n) => match self.rd.vacask_saves(n) {

@@ -277,10 +277,12 @@ py_enum!(PyAlt, "Alt", Alt, units = &[
     Alt::FuncParam, Alt::Hdl, Alt::PreOsdi, Alt::Probe, Alt::DcType, Alt::Include,
     Alt::BsourceCharge, Alt::Bsource, Alt::PwlPeriod, Alt::NgBehaviorLine, Alt::SpiceRegion,
     Alt::PwlValue, Alt::XycePort, Alt::XyceLin, Alt::HspiceAm, Alt::AmNoOffset, Alt::HspicePz, Alt::TempList,
+    Alt::ControlScript,
 ], covers = [
     ChargeQuoted, ChargeBraced, ChargeBare, VolCur, BracedBehaviour, FuncParam, Hdl, PreOsdi,
     Probe, DcType, Include, BsourceCharge, Bsource, PwlPeriod, NgBehaviorLine, SpiceRegion,
-    PwlValue, XycePort, XyceLin, HspiceAm, AmNoOffset, HspicePz, TempList
+    PwlValue, XycePort, XyceLin, HspiceAm, AmNoOffset, HspicePz, TempList,
+    ControlScript
 ] | Alt::Omit(_) | Alt::Copy(_), data = ["Omit", "Copy"] {
     #[staticmethod]
     #[pyo3(name = "Omit")]

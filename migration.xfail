@@ -418,3 +418,6 @@ xyce/XDM/TSPICE/CONTROLLED_SOURCES/e_sources.cir vacask now written: an E/F/G/H 
 xyce/XDM/TSPICE/CONTROLLED_SOURCES/f_sources.cir vacask now written: an E/F/G/H `POLY(n)` is a behavioural `v=`/`i=` polynomial (P4-004)
 xyce/XDM/TSPICE/CONTROLLED_SOURCES/g_sources.cir vacask now written: an E/F/G/H `POLY(n)` is a behavioural `v=`/`i=` polynomial (P4-004)
 xyce/XDM/TSPICE/CONTROLLED_SOURCES/h_sources.cir vacask now written: an E/F/G/H `POLY(n)` is a behavioural `v=`/`i=` polynomial (P4-004)
+
+# S2: P5-001-s2: a VACASK top-parameter `alter` between analyses is ngspice's `.control` script (`alterparam` + `reset`); the deck was refused W0001
+vacask/test/test_cblock.sim ngspice now written: the five `alter instance("__topinst__") …` lines are `alterparam` + `reset` in one `.control` script (P5-001 step 2; ngspice-45 by hand gives the deck's exactvec 1000, 2000, 500, 4000, 250, 2000)
