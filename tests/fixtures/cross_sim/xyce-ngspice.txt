@@ -242,9 +242,6 @@ Certification_Tests/BUG_39_SON/bug39_sign.cir target-fails # no raw file .cross_
 Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir mismatch # dc VIN#branch: -0.005851007426488897+0i vs -0.0038310272757229313+0i at 0.76 (tol 1.502e-3)
 Certification_Tests/BUG_440_SON/bug440.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [id] | Undefined parameter [ig] | Undefined parameter [is] | Undefined parameter [ib]
 Certification_Tests/BUG_440_SON/bug440a.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [i]
-Certification_Tests/BUG_456/converter_baseline.cir mismatch # tran L1#branch: -0.055021595136728337 leaves the tube at t=0.000050557598769850295 (tol 9.015e-3)
-Certification_Tests/BUG_456/converter_baseline_output.cir mismatch # tran L1#branch: -0.055021595136728337 leaves the tube at t=0.000050557598769850295 (tol 9.015e-3)
-Certification_Tests/BUG_456/converter_baseline_unpacked.cir mismatch # tran L1#branch: -0.055020100328997665 leaves the tube at t=0.00005055757346547127 (tol 9.015e-3)
 Certification_Tests/BUG_456/emitter_baseline.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran OUT: -4.795814010713303 leaves the tube at t=0.000016264878205155748 (tol 4.801e-2)
 Certification_Tests/BUG_456/emitter_baseline_gear.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran OUT: -4.7957548631109495 leaves the tube at t=0.00001626492389864572 (tol 4.800e-2)
 Certification_Tests/BUG_479_SON/bug_479.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [max_currentir1] | Undefined parameter [min_currentir3] | Undefined parameter [time] | Undefined parameter [

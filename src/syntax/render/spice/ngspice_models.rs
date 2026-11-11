@@ -9,7 +9,11 @@
 //! Adding a level: one `(Xyce, target)` pair in the kind's row of the
 //! target's table, with the run that shows the two devices agree. A kind
 //! with no row is copied. An instance line's parameters the targets'
-//! devices lack are [`ngspice_instance`]'s.
+//! devices lack are [`ngspice_instance`]'s. A diode's knee current is
+//! refused: Xyce's law is PSpice's, id·√(IKF/(IKF+id))
+//! (`N_DEV_Diode.C:2396-2401`), the targets' id/(1+√(id/IKF)) (ngspice-45
+//! `dio/dioload.c:382-386`; HSPICE Elements and Device Models D-2010.12,
+//! Diodes, "Forward Bias"), 22 % apart at 0.75 V (run).
 //!
 //! Cites: ngspice-45 `spicelib/parser/inpdomod.c` (the level switch; its
 //! own lists at L73-75 and L383-385), `inpfindl.c:51-57`; Xyce RG 7.10 `M`
@@ -80,7 +84,7 @@ const HSPICE: &[Levels] = &[
 ///
 /// # Errors
 /// W0104: a level the target has no device of the same equations for, or
-/// one that is not a number.
+/// one that is not a number. W0114: a diode's `IKF` other than 0.
 pub(super) fn ngspice_model(
     hspice: bool,
     kind: &str,
@@ -88,6 +92,11 @@ pub(super) fn ngspice_model(
 ) -> Result<Option<Vec<(String, String)>>, Code> {
     let table = if hspice { HSPICE } else { NGSPICE };
     let kind = kind.to_ascii_lowercase();
+    // The diode's knee current: two laws, no IKF maps one onto the other.
+    let knee = |(k, v): &(String, String)| k.eq_ignore_ascii_case("ikf") && fold(v) != Some(0.0);
+    if kind == "d" && params.iter().any(knee) {
+        return Err(Code::W0114);
+    }
     let Some(row) = table.iter().find(|r| r.kinds.contains(&kind.as_str())) else {
         return Ok(None);
     };
@@ -220,6 +229,10 @@ mod tests {
         );
         assert_eq!(ngspice_model(true, "nmos", &card("6")), Err(Code::W0104));
         assert_eq!(ngspice_model(false, "d", &card("200")), Ok(None));
+        let knee = |v: &str| vec![("IKF".to_string(), v.to_string())];
+        assert_eq!(ngspice_model(false, "D", &knee("1e-3")), Err(Code::W0114));
+        assert_eq!(ngspice_model(true, "d", &knee("{ik}")), Err(Code::W0114));
+        assert_eq!(ngspice_model(false, "d", &knee("0")), Ok(None));
         assert_eq!(ngspice_model(false, "npn", &[]), Ok(None));
     }
 

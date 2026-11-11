@@ -682,3 +682,34 @@ fn p3_007_xyce_nmos_level_written_level() {
         oracle::spec_refusal(cite, deck, Dialect::Xyce, to, &[Code::W0104]);
     }
 }
+
+/// Xyce `N_DEV_Diode.C:2396-2401`: id·√(IKF/(IKF+id)); ngspice-45
+/// `dio/dioload.c:382-386`: id/(1+√(id/IKF)), HSPICE's law too (Elements
+/// and Device Models, Diodes, "Forward Bias"). This card at 0.75 V: Xyce
+/// 7.10 1.98154 mA, ngspice-45 1.62690 mA. Refused; `ikf=0` is the knee
+/// off in both (v(b) 0.683450 and 0.683463: their kT/q). Ledger P3-069;
+/// XYCE_CORPUS `Certification_Tests/BUG_456/converter_baseline.cir`.
+#[test]
+fn p3_069_xyce_diode_ikf_is_refused_on_ngspice() {
+    let deck = |ikf: &str| {
+        format!(
+            "* t\nv1 a 0 0.75\nr1 a b 100\nd1 b 0 dk\n             .model dk d (is=1e-14 n=1.05 rs=10 ikf={ikf})\n.op\n.end\n"
+        )
+    };
+    let cite = "Xyce N_DEV_Diode.C:2396-2401; ngspice-45 dio/dioload.c:382-386";
+    for to in [Dialect::Ngspice, Dialect::Espice, Dialect::Hspice] {
+        oracle::spec_refusal(cite, &deck("1e-3"), Dialect::Xyce, to, &[Code::W0114]);
+    }
+    let tol = oracle::Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    oracle::sim_pair(
+        Dialect::Xyce,
+        &deck("0"),
+        Dialect::Ngspice,
+        "b",
+        oracle::At::First,
+        tol,
+    );
+}

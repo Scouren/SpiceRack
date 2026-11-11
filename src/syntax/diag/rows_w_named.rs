@@ -95,7 +95,7 @@ macro_rules! rows_w_named {
             /// A model or element parameter no parameter of the target computes the same way.
             W0114 Refusal {
                 title: "a parameter with no form in the target",
-                cite: "`render::models` (each row's ngspice-45 and Spectre Reference 5.0 clause); `render::spice::ngspice_models` (Xyce RG 7.10 `C` AGE, BSIM-SOI instance `shmod`; ngspice-45 `cap.c`, `b4soi.c` instance tables)",
+                cite: "`render::models` (each row's ngspice-45 and Spectre Reference 5.0 clause); `render::spice::ngspice_models` (Xyce RG 7.10 `C` AGE, BSIM-SOI instance `shmod`; ngspice-45 `cap.c`, `b4soi.c` instance tables; the diode knee: Xyce `N_DEV_Diode.C:2396-2401` id·sqrt(IKF/(IKF+id)) against ngspice-45 `dio/dioload.c:382-386` id/(1+sqrt(id/IKF)))",
                 explain: "The parameter at this position has no parameter in the target with ngspice's equation (a tunnelling current, an exponential temperature coefficient, a knee current Spectre reads only with `hcomp=1`), or ngspice and the target rank it against another one in opposite orders. Set it to its off value, or model the effect another way.",
             }
             /// A Spectre `montecarlo` whose `variations` leaves out a scope the deck draws in, on a target that varies every call (VACASK's `mc`).
