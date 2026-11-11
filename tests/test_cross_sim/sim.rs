@@ -257,6 +257,9 @@ fn run_in(
                 .filter(|p| !p.plot_name.eq_ignore_ascii_case("constants")),
         );
     }
+    if matches!(sim, Sim::Ngspice | Sim::NgspiceHsa) && dc_loop(&text) {
+        plots = join_dc_passes(plots);
+    }
     if sim == Sim::Xyce
         && let Some(n) = xyce_noise(&dir.join(format!("{DECK}.{ext}_noise.dat")))
     {
@@ -267,6 +270,49 @@ fn run_in(
         return Ok(Ran::Failed(format!("no plot: {}", said())));
     }
     Ok(Ran::Plots(plots))
+}
+
+/// A `.control` `dc` at a loop's value (`dc v1 $d1 $d1 1`): the `.dc`
+/// axis by decade, octave or list that `render/spice/loops.rs` writes as
+/// `foreach` passes, a plot a pass.
+fn dc_loop(text: &str) -> bool {
+    text.lines().any(|l| {
+        let l = l.trim_start().to_ascii_lowercase();
+        l.starts_with("dc ") && l.contains('$')
+    })
+}
+
+/// Consecutive real DC plots over the same vectors as one, their points
+/// appended in run order: a `.dc` loop's passes as the source's one `.dc`
+/// plot (the first axis innermost, as the loops run).
+// ponytail: a second `.dc` card beside the loop, over the same vectors,
+// joins it too; split by the loop's pass count when a deck has both.
+fn join_dc_passes(plots: Vec<RawData>) -> Vec<RawData> {
+    let dc = |p: &RawData| {
+        !p.is_complex
+            && p.plot_name
+                .eq_ignore_ascii_case("dc transfer characteristic")
+    };
+    let mut out: Vec<RawData> = Vec::with_capacity(plots.len());
+    for p in plots {
+        match out.last_mut() {
+            Some(last) if dc(last) && dc(&p) && same_vectors(last, &p) => {
+                for (col, more) in last.real_data.iter_mut().zip(p.real_data) {
+                    col.extend(more);
+                }
+            }
+            _ => out.push(p),
+        }
+    }
+    out
+}
+
+fn same_vectors(a: &RawData, b: &RawData) -> bool {
+    a.variables.len() == b.variables.len()
+        && a.variables
+            .iter()
+            .zip(&b.variables)
+            .all(|(x, y)| x.name.eq_ignore_ascii_case(&y.name))
 }
 
 /// A run directory or process the harness itself cannot make (a full
