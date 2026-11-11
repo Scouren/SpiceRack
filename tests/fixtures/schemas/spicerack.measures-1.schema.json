@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "spicerack.measures/1",
+  "title": "spicerack.measures/1",
+  "description": "The sidecar of a raw file spicerack.export wrote: its analyses and their .meas results.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "spicerack", "backend", "raw", "analyses", "measures"],
+  "properties": {
+    "schema": {"const": "spicerack.measures/1"},
+    "spicerack": {"type": "string", "description": "The version of spicerack that wrote the file."},
+    "backend": {
+      "type": ["string", "null"],
+      "description": "The simulator family that wrote every plot; null when they differ or are read from a file."
+    },
+    "raw": {"type": "string", "description": "The raw file's name, beside this file."},
+    "analyses": {
+      "type": "array",
+      "description": "One entry per analysis, in the raw file's order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "kind", "plot", "steps"],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of its first plot in the raw file, from 0; the plots of its steps follow it."
+          },
+          "kind": {
+            "type": ["string", "null"],
+            "description": "op, dc, ac, tran, noise, tf, sens, pz, disto, pss, sp, hb, stb or trannoise; null for a plot read from a file."
+          },
+          "plot": {"type": "string", "description": "The Plotname of its first plot."},
+          "steps": {
+            "type": ["array", "null"],
+            "description": "null when the analysis is not stepped; else each step's parameters, in step order.",
+            "items": {"type": "object", "additionalProperties": {"type": "number"}}
+          }
+        }
+      }
+    },
+    "measures": {
+      "type": "array",
+      "description": "The .meas results, ordered by analysis, step, then the deck's order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "analysis", "step", "value", "status"],
+        "properties": {
+          "name": {"type": "string"},
+          "analysis": {"type": "integer", "minimum": 0, "description": "Its analysis: a place in analyses, from 0."},
+          "step": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Its step: a place in its analysis's steps; null when the analysis is not stepped."
+          },
+          "value": {"type": ["number", "null"]},
+          "status": {"enum": ["ok", "failed"]},
+          "reason": {"type": "string", "description": "Why a measure that printed a value has none here."}
+        },
+        "oneOf": [
+          {"properties": {"status": {"const": "ok"}, "value": {"type": "number"}}},
+          {"properties": {"status": {"const": "failed"}, "value": {"type": "null"}}}
+        ]
+      }
+    }
+  }
+}

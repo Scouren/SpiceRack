@@ -27,6 +27,8 @@ SpiceRack builds a **deck** (SPICE netlist text), hands it to a simulator, and p
 
 Read the deck with `tb.netlist(backend)` before running. It is plain text, and it is the ground truth for what the simulator will do. Whatever the target does not get as written (an output request, an option, an integrated noise) comes back as a `UserWarning` naming its code (`spicerack t:4:1: W0023 an output request not written`), on a registered dialect too (its own notes are `W0202`); the deck is still written.
 
+Hand results to another tool with `raw, meas = ps.export(tb.run(), "out/bench")`: `out/bench.raw` is one ngspice raw file (every vector under the name you index a result by: `out`, `i(vin)`, `time`, whichever simulator ran), `out/bench.meas.json` the `.meas` values with their status and the steps' parameters (`spicerack.measures/1`; REFERENCE.md, "Exporting results"). The directory must exist.
+
 ## Traps
 
 Each of these returns a plausible wrong number rather than an error.

@@ -99,3 +99,39 @@ def test_several_analyses_each_run_alone():
     assert op["out"] == pytest.approx(0.5, rel=1e-6)
     assert ac.magnitude("out") == pytest.approx([0.5] * len(ac.frequency), rel=1e-6)
     assert tran["out"] == pytest.approx([0.5] * len(tran.time), rel=1e-6)
+
+
+def test_p8_100_a_stepped_run_exports_a_plot_and_a_point_per_step(tmp_path):
+    """Oracle: the divider's closed form, 1k / (r + 1k), at each step, read
+    back from the exported file, and what LTspice 26.1.1's own log of this
+    deck says (research/impl/evidence/P8-102/lt-e2e.log): three steps, r =
+    1000, 2000, 3000; a `Measurement: vmax` row a step; `tnever` FAIL'ed."""
+    if pending_mirror():
+        return
+    import json
+
+    mod = ps()
+    tb = divider(mod)
+    tb.step("r", 1e3, 3e3, 1e3)
+    tb.measure("tran", "vmax", "max", "v(out)")
+    tb.measure("tran", "tnever", "when", "v(out)=2")
+    runs = tb.transient(step_time=1e-6, end_time=1e-5)
+    raw_path, meas_path = mod.export([runs], tmp_path / "steps")
+    with open(meas_path) as f:
+        doc = json.load(f)
+    gains = [0.5, 1 / 3, 0.25]
+    # One analysis, stepped: its three plots follow each other in the file.
+    assert doc["backend"] == "ltspice"
+    assert doc["analyses"] == [{"index": 0, "kind": "tran", "plot": "Transient Analysis",
+                                "steps": [{"r": 1e3}, {"r": 2e3}, {"r": 3e3}]}]
+    plots = mod.read_raw(raw_path)
+    assert len(plots) == 3
+    for plot, gain in zip(plots, gains):
+        assert plot["out"] == pytest.approx([gain] * len(plot["time"]), rel=1e-6)
+    # By step, then the deck's order.
+    assert [(m["name"], m["analysis"], m["step"], m["status"]) for m in doc["measures"]] == [
+        ("vmax", 0, 0, "ok"), ("tnever", 0, 0, "failed"),
+        ("vmax", 0, 1, "ok"), ("tnever", 0, 1, "failed"),
+        ("vmax", 0, 2, "ok"), ("tnever", 0, 2, "failed")]
+    assert [m["value"] for m in doc["measures"][0::2]] == pytest.approx(gains, rel=1e-6)
+    assert [m["value"] for m in doc["measures"][1::2]] == [None, None, None]

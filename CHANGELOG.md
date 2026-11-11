@@ -21,6 +21,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `Testbench.add_spectre_analysis(kind, name=None, nodes=(), **params)` writes any Spectre analysis as its statement (`dcmm3 (out 0) dcmatch mth=0.001`), checked against the analyses Spectre names; a target with no such analysis refuses it (`W0015`).
 - python: `Section(name)` builds a library section (`.lib name` … `.endl name`) from `parameter`, `model`, `include`, `lib` and `subcircuit` lines, and `Circuit.section(s)` adds it to a library file a deck's `lib(path, name)` selects from.
 - build: pyo3 0.24.2 → 0.27.2, so the extension builds for Python 3.14 (`Python::attach`, `Py<PyAny>` and the two-lifetime `FromPyObject` replace their 0.24 forms); `flake.nix`'s vendor hash follows the lock again; the release workflow builds a 3.14 wheel (ZERO-LEDGER P8-160).
+- python: `spicerack.export(results, stem, *, raw_format="binary")` writes a run's results as `<stem>.raw` (one ngspice raw file, every vector under its canonical name) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar: analyses, steps, `.meas` values with their status) and returns the two paths (ZERO-LEDGER P8-100).
 
 ## 0.2.0 (2026-11-03)
 
