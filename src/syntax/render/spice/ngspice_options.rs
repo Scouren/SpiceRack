@@ -9,6 +9,8 @@
 //! (a conductance from every node to ground) is RSHUNT, its inverse
 //! (ngspice manual §11.1.2); GMINDC has no ngspice option (ngspice reads
 //! and ignores it: `gmindc.sp` gives 1.01e-12 A for 1e-3), refused W0017.
+//! The other way, a deck's one GMIN is HSPICE's GMIN (transient) and
+//! GMINDC (DC) both (cmdref `.OPTION GMIN`, `.OPTION GMINDC`).
 //!
 //! Contents:
 //! - `W::hspice_defaults(&self, tb: &mut Tb, runs: bool)`, `W::options_line(&mut self, tb: &Tb) -> Option<String>`
@@ -66,6 +68,13 @@ impl W<'_, '_> {
                     true => opts.push(format!("rshunt={}", self.sp.number(1.0 / g, self.x))),
                     false => self.refuse(Code::W0017, *tok),
                 }
+                continue;
+            }
+            // HSPICE's GMIN is the conductance on a junction in a transient
+            // and GMINDC the one in DC (cmdref `.OPTION GMIN`, `.OPTION
+            // GMINDC`); the other dialects' GMIN is both.
+            if self.pair.hspice_from_other && lower == "gmin" && !v.is_empty() {
+                opts.push(format!("{k}={v} gmindc={v}"));
                 continue;
             }
             opts.push(if v.is_empty() {

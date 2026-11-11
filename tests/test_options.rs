@@ -21,6 +21,38 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-012. Xyce RG Table 2-2: DEVICE GMIN is the minimum conductance,
+/// ngspice's GMIN (manual p.317). 1 V through 1 MΩ into a reverse diode
+/// (IS = 1e-14) whose GMIN is 1e-6 S: (1 − v)/R = GMIN·v + IS, so
+/// v(a) = (1e-6 − 1e-14)/2e-6. Xyce 7.10, ngspice-45 and ESPice are each
+/// within 2e-12 of it by hand; ngspice at its default GMIN gives 1.0.
+/// HSPICE's GMIN is the transient's and GMINDC the DC one (cmdref
+/// `.OPTION GMIN`, `.OPTION GMINDC`): both written.
+#[test]
+fn p3_012_xyce_device_gmin_is_gmin() {
+    let deck = "t\nV1 in 0 1\nR1 in a 1meg\nD1 0 a dm\n.model dm D(IS=1e-14)\n\
+        .options device gmin=1e-6\n.op\n.end\n";
+    closed_form(
+        Dialect::Xyce,
+        deck,
+        &[Dialect::Xyce, Dialect::Ngspice, Dialect::Hspice],
+        "a",
+        At::First,
+        (1e-6 - 1e-14) / 2e-6,
+        Tol {
+            rel: 1e-9,
+            floor: 0.0,
+        },
+    );
+    oracle::spec_example(
+        "HSPICE cmdref .OPTION GMIN (transient), .OPTION GMINDC (DC)",
+        deck,
+        Dialect::Xyce,
+        Dialect::Hspice,
+        &[".options gmin=1e-6 gmindc=1e-6"],
+    );
+}
+
 /// Ledger P3-004. Xyce RG Table 2-5 (TIMEINT): `METHOD=gear` or 8 is the
 /// Gear method, MAXORD the highest order tried. ngspice manual p.318:
 /// `METHOD=name` (Gear), `MAXORD=x` (2 to 6 for Gear). VACASK

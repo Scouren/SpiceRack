@@ -69,6 +69,9 @@ impl<'a> Rd<'a> {
                     out.push(match (pkg.as_str(), k.to_ascii_lowercase().as_str(), x) {
                         ("device", "temp", Some(x)) => Opt::Temp(x),
                         ("device", "tnom", Some(x)) => Opt::Tnom(x),
+                        // RG Table 2-2 (DEVICE) GMIN: the minimum
+                        // conductance, SPICE's GMIN.
+                        ("device", "gmin", Some(_)) => Opt::Portable("gmin".into(), v),
                         // RG Table 2-5: METHOD `gear` or 8 is the Gear
                         // method and MAXORD the highest order tried,
                         // SPICE's `method=gear` and `maxord`.
