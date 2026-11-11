@@ -27,12 +27,14 @@
 //! - `pub fn available() -> &'static [Dialect]`
 //! - `pub use registry::{Installed, Runner, SIMS_MAX, Sim, SimDef, SimRegisterError, by_name,
 //!   register_simulator, simulators}` (`registry.rs`: the simulator registry)
+//! - `pub use command::{Arg, Output, Piece, parse_arg}` (`command.rs`: a simulator run as a command)
 //! - `pub use kind::Kind`, `pub(crate) use kind::Plot` (`kind.rs`: the analysis kinds)
 //! - `pub fn select(kinds: &[Kind], override_backend: Option<&str>, needs: u8, writes: impl Fn(Sim) -> bool) -> Result<Sim, BackendError>`
 //! - `pub struct Issue`, `pub enum IssueSeverity`,
 //!   `pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue>`
 //! - `pub mod espice`, `ltspice`, `ngspice`, `spectre`, `vacask`
 
+mod command;
 mod kind;
 mod registry;
 
@@ -48,6 +50,7 @@ use std::sync::OnceLock;
 
 use feature::*;
 
+pub use command::{Arg, Output, Piece, parse_arg};
 pub use kind::Kind;
 pub(crate) use kind::Plot;
 pub use registry::{
@@ -111,6 +114,10 @@ pub enum BackendError {
         none of those that run {others}"
     )]
     NoSimulator { analysis: String, others: String },
+
+    /// A command simulator's program is not on `$PATH`.
+    #[error("Simulator '{simulator}' is not installed: its command is not on $PATH")]
+    NotInstalled { simulator: String },
 
     #[error("Simulation failed: {0}")]
     SimulationError(String),

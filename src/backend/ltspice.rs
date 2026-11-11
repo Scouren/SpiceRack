@@ -7,6 +7,7 @@
 //!
 //! Contents:
 //! - `pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError>`
+//! - `pub(super) fn read(raw: &Path, stdout: String) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn find() -> Option<(PathBuf, bool)>`
 
 use std::path::{Path, PathBuf};
@@ -34,8 +35,18 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
     let mut cmd = command(&exe, wine, &cir);
     // LTspice reports simulation errors (and `.meas` results) in the log.
     let stdout = exec(&mut cmd, "LTspice", Some(&cir.with_extension("log")))?;
-    let log = std::fs::read_to_string(cir.with_extension("log")).unwrap_or_default();
-    let mut plots = read_results(&cir.with_extension("raw"), stdout)?;
+    read(&cir.with_extension("raw"), stdout)
+}
+
+/// LTspice's result pair: the raw file at `raw` and the `.log` beside it
+/// (its `.meas` results and `.step` points), every plot carrying the log.
+///
+/// # Errors
+/// As `read_results`, and `SimulationError` when the log's steps are not
+/// one per plot.
+pub(super) fn read(raw: &Path, stdout: String) -> Result<Vec<RawData>, BackendError> {
+    let log = std::fs::read_to_string(raw.with_extension("log")).unwrap_or_default();
+    let mut plots = read_results(raw, stdout)?;
     log_steps(&log, &mut plots)?;
     plots
         .iter_mut()

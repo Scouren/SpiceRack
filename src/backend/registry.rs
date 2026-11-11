@@ -20,7 +20,8 @@
 //!   `Sim::row(self) -> &'static SimDef`, `Sim::name(self) -> &'static str`,
 //!   `Sim::family(self) -> Dialect`, `Sim::installed(self) -> bool`,
 //!   `Sim::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
-//! - `pub struct SimDef`, `pub enum Runner`, `pub enum Installed`, `pub enum SimRegisterError`
+//! - `pub struct SimDef`, `pub enum Runner` (`BuiltIn`, `Command`), `pub enum Installed` (`Fn`,
+//!   `OnPath`), `pub enum SimRegisterError`
 //! - `pub fn register_simulator(def: SimDef) -> Result<Sim, SimRegisterError>`
 //! - `pub fn simulators() -> impl Iterator<Item = (Sim, &'static SimDef)>`
 //! - `pub fn by_name(name: &str) -> Option<Sim>`
@@ -28,7 +29,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, Once, OnceLock};
 
-use super::{BACKENDS, BackendError, Kind, RUNNABLE, feature};
+use super::command::{self, Arg, Output, Piece};
+use super::{BACKENDS, BackendError, Kind, RUNNABLE, feature, is_on_path};
 use crate::result::RawData;
 use crate::syntax::{Dialect, Lang};
 
@@ -65,6 +67,15 @@ pub enum Runner {
     /// A function of the calling crate (the five built-ins' `run`):
     /// netlist text in, every plot of the run out.
     BuiltIn(fn(&str) -> Result<Vec<RawData>, BackendError>),
+    /// A command (`command.rs`): `argv`'s words with `{deck}`, `{raw}` and
+    /// `{dir}` filled in, run with no shell; the results read as `output`
+    /// says. Some word holds `{deck}`.
+    Command {
+        /// The program, then its arguments.
+        argv: Vec<Arg>,
+        /// How the results are read back.
+        output: Output,
+    },
 }
 
 /// How a simulator is found installed.
@@ -72,6 +83,8 @@ pub enum Runner {
 pub enum Installed {
     /// A function says (the built-ins' probes).
     Fn(fn() -> bool),
+    /// This program is on `$PATH` (a command's first word).
+    OnPath(String),
 }
 
 /// Why [`register_simulator`] refused a definition. Each message opens
@@ -91,6 +104,10 @@ pub enum SimRegisterError {
     /// `analyses` is empty, or has a bit past the last `Kind`.
     #[error("analyses: {0:#x} is empty or has a bit past the last analysis kind")]
     Analyses(u32),
+    /// A command is empty, has no `{deck}` word, or a word holds a
+    /// placeholder that is none of `{deck}`, `{raw}`, `{dir}`.
+    #[error("command: {0}")]
+    Command(String),
     /// Every slot is taken.
     #[error("the simulator registry is full ({} simulators)", SIMS_MAX)]
     Full,
@@ -167,6 +184,7 @@ impl Sim {
     pub fn installed(self) -> bool {
         match &self.row().installed {
             Installed::Fn(probe) => probe(),
+            Installed::OnPath(program) => is_on_path(program),
         }
     }
 
@@ -174,10 +192,19 @@ impl Sim {
     /// the run, in file order.
     ///
     /// # Errors
-    /// Whatever the run returns.
+    /// Whatever the run returns; `NotInstalled` for a command simulator
+    /// whose probe says it is absent (asked before anything is spawned).
     pub fn run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError> {
         let plots = match &self.row().runner {
             Runner::BuiltIn(run) => run(netlist)?,
+            Runner::Command { argv, output } => {
+                if !self.installed() {
+                    return Err(BackendError::NotInstalled {
+                        simulator: self.name().to_string(),
+                    });
+                }
+                command::run(argv, *output, self.family(), netlist)?
+            }
         };
         assert!(!plots.is_empty(), "a raw file read holds at least one plot");
         Ok(plots)
@@ -189,6 +216,10 @@ impl PartialEq for Runner {
     fn eq(&self, other: &Runner) -> bool {
         match (self, other) {
             (Runner::BuiltIn(a), Runner::BuiltIn(b)) => std::ptr::fn_addr_eq(*a, *b),
+            (Runner::Command { argv: a, output: x }, Runner::Command { argv: b, output: y }) => {
+                a == b && x == y
+            }
+            _ => false,
         }
     }
 }
@@ -198,6 +229,8 @@ impl PartialEq for Installed {
     fn eq(&self, other: &Installed) -> bool {
         match (self, other) {
             (Installed::Fn(a), Installed::Fn(b)) => std::ptr::fn_addr_eq(*a, *b),
+            (Installed::OnPath(a), Installed::OnPath(b)) => a == b,
+            _ => false,
         }
     }
 }
@@ -209,8 +242,8 @@ impl PartialEq for Installed {
 /// # Errors
 /// [`SimRegisterError`], each naming the field: the name is empty, an
 /// alias, or held by a different definition; a `features` or `analyses`
-/// bit names nothing, or `analyses` is empty; the registry is full.
-/// Nothing is registered then.
+/// bit names nothing, or `analyses` is empty; a command is empty or has
+/// no `{deck}` word; the registry is full. Nothing is registered then.
 pub fn register_simulator(def: SimDef) -> Result<Sim, SimRegisterError> {
     builtins();
     check(&def)?;
@@ -288,6 +321,16 @@ fn check(def: &SimDef) -> Result<(), SimRegisterError> {
         .unwrap_or(0);
     if def.analyses == 0 || past != 0 {
         return Err(SimRegisterError::Analyses(def.analyses));
+    }
+    if let Runner::Command { argv, .. } = &def.runner {
+        if argv.is_empty() {
+            return Err(SimRegisterError::Command("it has no program".into()));
+        }
+        if !argv.iter().flatten().any(|p| *p == Piece::Deck) {
+            return Err(SimRegisterError::Command(
+                "no word holds {deck}: the simulator is never given the deck".into(),
+            ));
+        }
     }
     Ok(())
 }
