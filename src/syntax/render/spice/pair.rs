@@ -120,6 +120,11 @@ pub(super) struct Pair {
     /// An ngspice deck's model cards on Xyce: each judged by Xyce's device
     /// (`xyce_cards::xyce_instance`).
     pub(super) xyce_from_ngspice: bool,
+    /// Xyce evaluates a function on complex numbers and keeps the real
+    /// part, and clamps `atanh` (7.10: `sqrt(-4)` is 0, `acosh(-2.5)`
+    /// 1.5668, `atanh(-2.5)` -14.1621), where ngspice-45 fails the
+    /// analysis: the domain spelled (`ternary::xyce_domains`).
+    pub(super) xyce_domains: bool,
     /// ngspice's `**` and `^` take the base's magnitude (ngspice-45:
     /// `(-2)**3` is 8 in `{}` and in a B source; manual §5.1), the
     /// target's keep a negative base's sign: `abs(x)**y`
@@ -190,6 +195,7 @@ impl Pair {
             xyce_from_other: to.param_form == ParamForm::Xyce && from.param_form != ParamForm::Xyce,
             xyce_from_ngspice: to.param_form == ParamForm::Xyce
                 && from.model_semantics == ModelSemantics::Ngspice,
+            xyce_domains: foreign && ef == ExprEval::Xyce && et == ExprEval::Ngspice,
             abs_power_out: foreign && ef == ExprEval::Ngspice && et != ExprEval::Ngspice,
             abs_power_in: foreign && ef != ExprEval::Ngspice && et == ExprEval::Ngspice,
             xyce_power: foreign && ef == ExprEval::Xyce && et == ExprEval::Ngspice,
@@ -246,6 +252,7 @@ mod tests {
             ("sffm_swap", to_ng.sffm_swap),
             ("sffm_as_b", to_ng.sffm_as_b),
             ("foreign_measures", to_ng.foreign_measures),
+            ("xyce_domains", to_ng.xyce_domains),
             ("abs_power_in", to_ng.abs_power_in),
             ("xyce_power", to_ng.xyce_power),
         ] {

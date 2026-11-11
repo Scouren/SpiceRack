@@ -30,6 +30,7 @@
 //! - `pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String`
 //! - `pub(super) fn nominal(e: &str) -> String`
 //! - `pub(super) fn spell_clamp(e: &str) -> String`
+//! - `pub(super) fn xyce_domains(e: &str) -> String`
 //! - `pub(super) fn xyce_power_calls(e: &str) -> String`
 //! - `pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String`
 //! - `pub(super) fn close(b: &[u8], i: usize) -> Option<usize>`
@@ -281,7 +282,49 @@ pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String {
     }
 }
 
+/// `e` with Xyce's value of a call outside its real domain spelled for
+/// ngspice, which fails the analysis there. Xyce keeps the real part of
+/// the complex result: `sqrt(x)` is 0 under x < 0 (`sqrt(max(x,0))`),
+/// `acosh(x)` is `acosh(|x|)` and 0 inside (-1, 1)
+/// (`acosh(max(abs(x),1))`). Its `atanh` clamps an argument that reads a
+/// parameter or a probe to ±(1 - 1e-12) (`atanh(-2.5)` is -14.1621); an
+/// argument of numbers alone stands: Xyce folds it with no clamp
+/// (`atanh(2)` is 0.5493) and ngspice refuses the NaN. Xyce 7.10 and
+/// ngspice-45 by hand (`research/impl/evidence/P3-016`).
+pub(super) fn xyce_domains(e: &str) -> String {
+    let sqrt = |a: &[String]| match a {
+        [x] => Some(format!("sqrt(max({x},0))")),
+        _ => None,
+    };
+    let acosh = |a: &[String]| match a {
+        [x] => Some(format!("acosh(max(abs({x}),1))")),
+        _ => None,
+    };
+    let atanh = |a: &[String]| match a {
+        [x] if reads(x) => Some(format!("atanh(min(max({x},-1+1e-12),1-1e-12))")),
+        _ => None,
+    };
+    let e = map_calls(e, "sqrt", &sqrt, 0);
+    let e = map_calls(&e, "acosh", &acosh, 0);
+    map_calls(&e, "atanh", &atanh, 0)
+}
+
 // ---- private ----
+
+/// Whether `x` reads a parameter or a probe: a name that is no call's, or
+/// a `v(…)` or `i(…)`. A number's suffix or exponent (`2k`, `1e-3`) is no
+/// name, and a call of numbers (`exp(1)`) reads nothing.
+fn reads(x: &str) -> bool {
+    let b = x.as_bytes();
+    let word = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    (0..b.len()).any(|i| {
+        let start = (b[i].is_ascii_alphabetic() || b[i] == b'_')
+            && (i == 0 || !(word(b[i - 1]) || b[i - 1] == b'.'));
+        let end = i + b[i..].iter().take_while(|&&c| word(c)).count();
+        let probe = end == i + 1 && matches!(b[i], b'v' | b'V' | b'i' | b'I');
+        start && (probe || b.get(end) != Some(&b'('))
+    })
+}
 
 /// `s` with its ternaries spelled, at nesting `depth`.
 fn fix(s: &str, m: Mode, depth: u32) -> String {
@@ -459,6 +502,25 @@ mod tests {
         assert_eq!(ng("pow(v(n),3)", true), "((v(n))**(3))");
         assert_eq!(ng("pwr(v(n),2)", true), "(sgn(v(n))*((v(n))**(2)))");
         assert_eq!(ng("pow(n,3)+pwr(n,2)", false), "pow(n,3)+((n)**(2))");
+    }
+
+    /// Each spelling's value on ngspice-45 is Xyce 7.10's of the call
+    /// (`research/impl/evidence/P3-016/cases.txt`).
+    #[test]
+    fn a_xyce_domain_is_spelled_for_ngspice() {
+        let d = super::xyce_domains;
+        assert_eq!(d("5V*SQRT(V(1,0))"), "5V*sqrt(max(V(1,0),0))");
+        assert_eq!(
+            d("acosh(V(3))+asqrt(x)"),
+            "acosh(max(abs(V(3)),1))+asqrt(x)"
+        );
+        assert_eq!(d("ATANH(V(4))"), "atanh(min(max(V(4),-1+1e-12),1-1e-12))");
+        assert_eq!(d("atanh(k)"), "atanh(min(max(k,-1+1e-12),1-1e-12))");
+        // Numbers alone: Xyce folds the call with no clamp.
+        for folded in ["atanh(2)", "atanh(exp(1))", "atanh(2k)", "atanh(1e-3)"] {
+            assert_eq!(d(folded), folded);
+        }
+        assert_eq!(d("sqrt(sqrt(x))"), "sqrt(max(sqrt(max(x,0)),0))");
     }
 
     #[test]

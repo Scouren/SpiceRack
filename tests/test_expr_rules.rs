@@ -19,6 +19,39 @@ use spicerack::backend::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-016: a Xyce call outside its real domain keeps Xyce's value
+/// on ngspice. Xyce 7.10 keeps the real part of the complex result
+/// (`sqrt(-2.5)` is 0, `acosh(-2.5)` acosh(2.5), `acosh(0.5)` 0,
+/// `(-2.5)**2.1` 2.5^2.1·cos(2.1π) = 6.5145) and clamps `atanh`'s
+/// argument to ±(1 - 1e-12); ngspice-45 fails the operating point on each
+/// call and gives the power as 2.5^2.1 = 6.8497. Oracle: Xyce on the
+/// source deck, ngspice on the written one.
+#[test]
+fn p3_016_a_xyce_call_outside_its_domain_keeps_its_value_on_ngspice() {
+    // A zero has no relative error; the power differs by 7e-12 between
+    // the two evaluators.
+    let tol = oracle::Tol {
+        rel: 1e-9,
+        floor: 1e-12,
+    };
+    for (call, x, want) in [
+        ("sqrt(v(x))", -2.5, 0.0),
+        ("atanh(v(x))", -2.5, -(1.0 - 1e-12_f64).atanh()),
+        ("acosh(v(x))", -2.5, 2.5_f64.acosh()),
+        ("acosh(v(x))", 0.5, 0.0),
+        (
+            "v(x)**2.1",
+            -2.5,
+            2.5_f64.powf(2.1) * (2.1 * std::f64::consts::PI).cos(),
+        ),
+    ] {
+        let deck = format!("t\nVx x 0 {x}\nRx x 0 1\nB1 o 0 V={{{call}}}\nR1 o 0 1\n.op\n.end\n");
+        let at = oracle::At::First;
+        let (xy, _) = oracle::sim_pair(Dialect::Xyce, &deck, Dialect::Ngspice, "o", at, tol);
+        assert!(tol.within(xy, want), "Xyce 7.10 {call} at {x}: {xy}");
+    }
+}
+
 /// Ledger P3-078: a negative base under an odd whole exponent keeps its
 /// sign on ngspice. Xyce 7.10 gives `v(n)**3`, `pow(v(n),3)` and `{n**3}`
 /// -8 for n = -2 (RG §2.3); ngspice-45 reads each as |n|^3 = 8 (manual

@@ -20,7 +20,7 @@ use super::powers::{Grouping, Law, group_powers};
 use super::ternary::{
     Read, nominal, parenthesize, rename_call, rename_word, spell_clamp, spell_if, spell_nint,
 };
-use super::ternary::{ngspice_power_calls, xyce_power_calls};
+use super::ternary::{ngspice_power_calls, xyce_domains, xyce_power_calls};
 use crate::syntax::behaviour::{ExprEval, ParamForm, ValueQuoting};
 
 /// One expression rewrite: `apply` where `holds`.
@@ -70,6 +70,12 @@ const REWRITES: &[Rewrite] = &[
     Rewrite {
         holds: |w| w.pair.nint_to_ngspice,
         apply: |_, e| spell_nint(e, false),
+    },
+    // Xyce's value of a call outside its real domain, where ngspice
+    // fails the analysis.
+    Rewrite {
+        holds: |w| w.pair.xyce_domains,
+        apply: |_, e| xyce_domains(e),
     },
     // Xyce's `pow`, `pwr`, `pwrs` as powers, for the power row.
     Rewrite {
