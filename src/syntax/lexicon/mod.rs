@@ -32,8 +32,9 @@ use crate::syntax::token::Tag;
 /// Built only from a definition's calls, by `lexicon()` in `def/freeze.rs`
 /// (`syntax::def::register`). Adding a field (a fact a dialect differs on) is these
 /// sites, each a line or a row: the field here, with the default the
-/// built-ins keep; in `def/mod.rs`, the `Lex` field, its `set!` call (the
-/// definition call) and the header's Contents; `Lex::of` (`def/copy.rs`);
+/// built-ins keep; the `Lex` field (`def/mod.rs`); its `set!` call (the
+/// definition call) and the header's Contents (`def/lex.rs`); `Lex::of`
+/// (`def/copy.rs`);
 /// `lexicon()` (`def/freeze.rs`); a `line(...)` in `dump` (`def/dump.rs`)
 /// and the two `tests/fixtures/dialects/*.dump` it changes; the Python
 /// binding's method list (`src/python/def_.rs`) and its mirror
