@@ -26,9 +26,9 @@ pub(in crate::syntax::render) enum Opt {
     /// Xyce's own: `pkg.key` (`pkg.` alone for a bare package; a key with
     /// no package when the card names none) and its value.
     Xyce(String, String),
-    /// Xyce `.options device temp=`.
+    /// Xyce `.options device temp=`, or `.options temp=` with no package.
     Temp(f64),
-    /// Xyce `.options device tnom=`.
+    /// Xyce `.options device tnom=`, or `.options tnom=` with no package.
     Tnom(f64),
     /// VACASK's own `options k=v`, its value as written.
     Vacask(String, String),
@@ -90,11 +90,28 @@ impl<'a> Rd<'a> {
                 }
                 out
             }
-            (OptionsForm::XycePackages, None) => self
-                .params_of(items, false)
-                .into_iter()
-                .map(|(k, v)| Opt::Xyce(k, v))
-                .collect(),
+            // No package word: Xyce reads `temp=` and `tnom=` as DEVICE's
+            // (7.10 by hand: `.options temp=100`, `.option Temp=100.0C` and
+            // `.options device temp=100` give one answer).
+            (OptionsForm::XycePackages, None) => {
+                let pairs = self.params_of(items, false);
+                assert_eq!(pairs.len(), items.len(), "options_ok: words and `k=v` only");
+                let num = |i: u32| match self.tag(i) {
+                    Tag::Assign => self.number(self.ast.rhs(Node(i))),
+                    _ => None,
+                };
+                pairs
+                    .into_iter()
+                    .zip(items)
+                    .map(
+                        |((k, v), &i)| match (k.to_ascii_lowercase().as_str(), num(i)) {
+                            ("temp", Some(x)) => Opt::Temp(x),
+                            ("tnom", Some(x)) => Opt::Tnom(x),
+                            _ => Opt::Xyce(k, v),
+                        },
+                    )
+                    .collect()
+            }
             _ => self
                 .params_of(items, false)
                 .into_iter()

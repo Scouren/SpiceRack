@@ -21,6 +21,37 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-015. Xyce 7.10 reads `.options temp=100` and `.option
+/// Temp=100.0C`, with no package word, as `.options device temp=100` (one
+/// answer by hand): ngspice's `.temp 100` (manual §11.1.1 TEMP). 1 V
+/// through 1 kΩ into a diode (IS = 1e-14): its drop is 0.5011 V at 100 °C
+/// and 0.6294 V at 27 °C in both simulators, which differ by 4e-5 (their
+/// kT/q, TESTING.md), so 1e-3.
+#[test]
+fn p3_015_xyce_options_temp_without_a_package_is_the_temperature() {
+    let deck = "t\nV1 in 0 1\nR1 in a 1k\nD1 a 0 dm\n.model dm D(IS=1e-14)\n\
+        .options temp=100\n.op\n.end\n";
+    let (xyce, _) = oracle::sim_pair(
+        Dialect::Xyce,
+        deck,
+        Dialect::Ngspice,
+        "a",
+        At::First,
+        Tol {
+            rel: 1e-3,
+            floor: 0.0,
+        },
+    );
+    assert!((xyce - 0.5011).abs() < 1e-3, "Xyce at 100 °C: {xyce}");
+    oracle::spec_example(
+        "ngspice manual §11.1.1 (TEMP); Xyce 7.10: `.option Temp=100.0C` is 100 °C",
+        &deck.replace(".options temp=100", ".option Temp=100.0C"),
+        Dialect::Xyce,
+        Dialect::Ngspice,
+        &[".temp 100"],
+    );
+}
+
 /// Ledger P3-008. Xyce RG `.OPTIONS PARSER` SCALE scales every L and W,
 /// as ngspice's SCALE (manual p.318), HSPICE's and VACASK's `scale`. A
 /// level-1 NMOS (VTO 1, KP 1e-4, LD 0.2u) at `L=1 W=10` and SCALE 1e-6,
