@@ -18,7 +18,8 @@
 //! - `args.rs`: Python arguments → card fields
 //! - `model.rs`: the cards and the blocks that hold them
 //! - `source.rs`: `V`/`I` cards and the waveform-source method table
-//! - `analysis.rs`: the analyses, their ngspice cards and Spectre statements
+//! - `analysis.rs`, `analysis_region.rs`: the analyses, their ngspice cards, and
+//!   what a dialect region says (Spectre statements, a Fourier harmonic count)
 //! - `card.rs`: analysis arguments → `Analysis`
 //! - `deck.rs`: the blocks → ngspice source → a backend's netlist or a run's `RawData`
 //! - `verilog.rs`: `verilog(...)` blocks and their lowering
@@ -41,6 +42,7 @@ mod source;
 mod spectre;
 
 mod analysis;
+mod analysis_region;
 mod args;
 mod card;
 mod circuit;
