@@ -657,3 +657,32 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     v = res["out"]
     rms = math.sqrt(sum(x * x for x in v) / len(v))
     assert 0.75e-3 < rms < 1.06e-3, rms
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p8_013_nested_definitions_run_to_the_closed_form(backend):
+    """ngspice-45 manual §2.6.1: a definition inside a definition is local to
+    it. Two parents each hold their own `leaf` (1 kOhm in `one`, 3 kOhm in
+    `two`); in series under 1 V the midpoint is 3/(1+3) = 0.75 V (closed
+    form). One shared `leaf` would give 0.5 V."""
+    import spicerack as ps
+
+    def wrapped(name, ohms):
+        leaf = ps.Subcircuit("leaf", ["p", "q"])
+        leaf.R("1", "p", "q", ohms)
+        wrap = ps.Subcircuit(name, ["a", "b"])
+        wrap.subcircuit(leaf)
+        wrap.X("1", "leaf", "a", "b")
+        return wrap
+
+    one, two = wrapped("one", 1e3), wrapped("two", 3e3)
+    d = ps.Subcircuit("div", ["in", "out"])
+    d.instance(one, "1", "in", "out")
+    d.instance(two, "2", "out", "0")
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.add_subcircuit(one)
+    tb.add_subcircuit(two)
+    tb.V("in", "in", "0", 1.0)
+    # A linear DC solve: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(0.75, rel=1e-9)

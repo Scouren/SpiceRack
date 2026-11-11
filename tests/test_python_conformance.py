@@ -114,6 +114,19 @@ def _with_child(mod):
     return tb
 
 
+def _with_nested(mod):
+    """`buf` defined inside `wrap` (a nested `.subckt`), `wrap` placed in the DUT."""
+    wrap = mod.Subcircuit("wrap", ["a", "b"])
+    wrap.subcircuit(_child(mod))
+    wrap.X("1", "buf", "a", "b")
+    d = dut(mod)
+    d.instance(wrap, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(wrap)
+    tb.add_operating_point()
+    return tb
+
+
 FEATURES = {
     # Analyses.
     "op": analysis(lambda tb: tb.add_operating_point()),
@@ -165,6 +178,7 @@ FEATURES = {
     "use_pdk": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.lib", corner="tt", spectre="/sp/m.scs"))),
     "use_pdk_include": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.inc"))),
     "subcircuit": _with_child,
+    "subcircuit_nested": _with_nested,
     # Sources.
     "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
     "pulse": source(lambda tb: tb.PulseVoltageSource("in", "in", "0")),
@@ -276,6 +290,8 @@ EXPECTED = {
     'use_pdk': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'use_pdk_include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'subcircuit': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # Every target writes the nested definition hoisted, as `wrap__buf`.
+    'subcircuit_nested': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pulse': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -369,6 +385,7 @@ COVERED = {
         "global_nodes", "extra_line", "use_pdk", "save_currents",
     },
     "Subcircuit": {
+        "subcircuit",
         "R", "C", "L", "K", "D", "Q", "BJT", "M", "MOSFET", "J", "Z", "E", "G", "F", "H",
         "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",
         "include", "lib", "raw_spice", "osdi", "veriloga", "verilog",

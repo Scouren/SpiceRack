@@ -148,6 +148,17 @@ Keyword arguments to `X` and `instance` become instance parameters
 (`dut.X("m1", "sky130_fd_pr__nfet_01v8", "d", "g", "s", "b", W=1, L=0.15)`).
 `dut.name` and `dut.ports` read a block back.
 
+A definition that one block alone uses can live inside it:
+`parent.subcircuit(child)` writes `child` as a nested `.subckt`, which only
+`parent`'s instances see, so two blocks can each hold their own `half`. Every
+target writes it as a top-level definition named `<parent>__<child>`.
+
+```python
+cell = ps.Subcircuit("cell", ["a", "y"])
+cell.subcircuit(inv)                              # `half`, defined inside `cell`
+cell.instance(inv, "u1", "a", "y")
+```
+
 ## Saving circuits
 
 A subcircuit is saved as its source text: the ngspice deck that defines it,

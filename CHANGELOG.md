@@ -11,6 +11,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: a Spectre `montecarlo` (`add_spectre_monte_carlo`) over one analysis is read from the deck's `spectre` region as an analysis: Spectre writes it as before (now among the analyses), VACASK as an `mc … endmc` loop around the deck's analysis of its inner type (`lh=0`, the seed carried), refused (`W0115`, new) where its `variations` leaves out a scope the deck draws in; SPICE targets refuse it `W0015` (was `W0001`). The VACASK backend reads an `mc` loop's per-sample raw files. The pinned VACASK (`bcd48e2`) has no `mc`.
 - python: a refusal is its diagnostic codes and messages (`<deck>:<line>:<col>: W0004 …`), not free text; `nominal_temperature` reaches Spectre in the `options` statement; a `.tran` step cap with no start writes Spectre `start=0` and HSPICE `START=0`; `add_fourier`'s `num_harmonics` is ngspice's `.options nfreqs=` (one count per deck, DC its first frequency), LTspice's `.four` count and Spectre's `harms`, and refused on Xyce and HSPICE, whose `.four` has none.
 - verilog: structural Verilog (one module per subcircuit, instances by port name) replaces the old layout's IR `Debug` lines; every other element is a `// W0029` comment.
+- python: `Subcircuit.subcircuit(child)` defines `child` inside the subcircuit (a nested `.subckt`, local to it); every target writes it as a top-level `<parent>__<child>`. `Subcircuit.from_source` read a nested definition back as its first line only; it keeps the block.
 
 ## 0.2.0 (2026-11-03)
 

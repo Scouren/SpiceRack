@@ -65,6 +65,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | --- | --- |
 | `model(name, kind, **params)` | `.model` |
 | `include(path)` | `.include` |
+| `subcircuit(subckt)` | on a `Subcircuit`: `subckt` defined inside it (a nested `.subckt`), seen by its own instances only; each target writes it as a top-level definition named `<parent>__<name>`. `ValueError` when `subckt` holds a `verilog()` block |
 | `lib(path, section)` | `.lib` |
 | `parameter(name, value)` | `.param` |
 | `raw_spice(line)` | the line as written |

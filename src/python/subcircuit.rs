@@ -18,6 +18,7 @@ use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
 use super::args::{Num, PyValueArg, kw_params};
+use super::circuit::hoisted;
 use super::deck::runtime_err;
 use super::model::{Body, Card, Value, dec, need, num, params};
 use super::source::{Wave, either, source, wave_source};
@@ -318,6 +319,20 @@ impl PySubcircuit {
         let ps = super::model::params(&kw_params(params)?);
         text.push_str(&format!(" {subcircuit_name}{ps}"));
         self.inner.instances.push(Card::element(name, text));
+        Ok(())
+    }
+
+    /// Defines `subckt` inside this subcircuit: a nested `.subckt`, which
+    /// only this subcircuit's instances see (ngspice-45 manual §2.6.1). Its
+    /// `include`, `lib` and `osdi` files move up to this body, as
+    /// `Circuit.subcircuit` moves them to the top. `ValueError` when
+    /// `subckt` holds a `verilog()` block, which has no source form.
+    fn subcircuit(&mut self, subckt: &PySubcircuit) -> PyResult<()> {
+        // Fallible work before the commit: on an error this body is as it was.
+        let mut body = self.inner.clone();
+        let def = hoisted(&mut body, &subckt.inner);
+        body.raw.push(super::store::definition(&def).map_err(PyValueError::new_err)?);
+        self.inner = body;
         Ok(())
     }
 

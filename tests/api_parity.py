@@ -166,6 +166,7 @@ PARITY = {
     "use_pdk": (FEATURES["use_pdk"], tw_setting([], top=["* spicerack-library /ng/m.lib corner=tt spectre=/sp/m.scs", ".lib /ng/m.lib tt"]), "store.rs library_marker", None),
     "use_pdk_include": (FEATURES["use_pdk_include"], tw_setting([], top=["* spicerack-library /ng/m.inc", ".include /ng/m.inc"]), "store.rs library_marker", None),
     "subcircuit": (FEATURES["subcircuit"], deck(subckts=[[".subckt buf a b", "R1 a b 1e3", ".ends buf"]], top=RC + ["X1 out 0 buf"], bench=[VIN, ".op"]), "ng §2.4 .subckt", None),
+    "subcircuit_nested": (FEATURES["subcircuit_nested"], deck(subckts=[[".subckt wrap a b", ".subckt buf a b", "R1 a b 1e3", ".ends buf", "X1 a b buf", ".ends wrap"]], top=RC + ["X1 out 0 wrap"], bench=[VIN, ".op"]), "ng §2.6.1 .subckt (a definition inside a definition, local to it)", "P8-013"),
     # ── Sources ──
     "sin": (FEATURES["sin"], tw_source(["Vin in 0 0 SIN(0 1 1000 0 0 0)"]), "ng §4.1.1 SIN", None),
     "pulse": (FEATURES["pulse"], tw_source(["Vin in 0 0 PULSE(0 1 0 1e-9 1e-9 50e-9 100e-9)"]), "ng §4.1.2 PULSE", None),
