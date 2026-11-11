@@ -69,6 +69,15 @@ impl W<'_, '_> {
     pub(super) fn wave(&mut self, letter: char, w: &Wave, tok: u32) -> Option<String> {
         assert_held(w);
         assert!(matches!(letter, 'V' | 'I'), "a source's letter");
+        // Spectre's pulse has no count (`[CMP]` p.684): a counted PULSE
+        // as the PWL of its pulses.
+        if w.counted() {
+            let Some(pwl) = w.pulses() else {
+                self.refuse(Code::W0108, tok);
+                return None;
+            };
+            return self.wave(letter, &pwl, tok);
+        }
         let a: Vec<String> = w.args.iter().map(|x| self.wave_num(x)).collect();
         let zero = |x: &Num| *x == Num::Num(0.0);
         Some(match w.kind {
@@ -144,14 +153,15 @@ impl W<'_, '_> {
 }
 
 /// Asserts that `w` holds its kind's value count, as the readers build it
-/// (`read::Wave::args`): SIN and EXP 6, PULSE and TRNOISE 7, SFFM and
+/// (`read::Wave::args`): SIN and EXP 6, PULSE 8, TRNOISE 7, SFFM and
 /// TRRANDOM 5, AM 8, PWL its pairs. The writers index the values by
 /// position.
 pub(super) fn assert_held(w: &Wave) {
     let n = w.args.len();
     let held = match w.kind {
         WaveKind::Sin | WaveKind::Exp => 6,
-        WaveKind::Pulse | WaveKind::Trnoise => 7,
+        WaveKind::Pulse => 8,
+        WaveKind::Trnoise => 7,
         WaveKind::Sffm | WaveKind::Trrandom => 5,
         WaveKind::Am => 8,
         WaveKind::Pwl => {

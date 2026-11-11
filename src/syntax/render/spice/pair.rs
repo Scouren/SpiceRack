@@ -81,6 +81,13 @@ pub(super) struct Pair {
     /// An ngspice SFFM is (VO VA FM MDI FC), SPICE3's, HSPICE's, Xyce's
     /// and LTspice's (VO VA FC MDI FS) (`vsrcload.c`): the two swapped.
     pub(super) sffm_swap: bool,
+    /// A PULSE's cycle count (ngspice's NP, manual §4.1.1; LTspice's
+    /// Ncycles) where the target's PULSE has seven values (Xyce 7.10
+    /// ignores an eighth, run: 1 V at 12 µs where ngspice-45 and LTspice
+    /// give V1; HSPICE UG, PULSE): the pulses as a PWL (`Wave::pulses`).
+    /// ESPice runs NP as ngspice does (0.3.0, run); CDL's cards are
+    /// ngspice's.
+    pub(super) pulse_as_pwl: bool,
     /// Another dialect's `.print` on ngspice's `.print`: each output spelled as
     /// ngspice's `.print` reads it (`prints`).
     pub(super) foreign_prints: bool,
@@ -122,6 +129,7 @@ impl Pair {
         let (nf, nt) = (from.netlist_rules, to.netlist_rules);
         let (ef, et) = (from.expr_eval, to.expr_eval);
         let foreign = from.text_family != to.text_family;
+        let counts = |r: NetlistRules| matches!(r, NetlistRules::Ngspice | NetlistRules::Ltspice);
         let natural =
             |x: ExprEval| matches!(x, ExprEval::Ngspice | ExprEval::Hspice | ExprEval::Ltspice);
         let pair = Pair {
@@ -145,6 +153,7 @@ impl Pair {
             lt_parasitics: from.card_rules == CardRules::Ltspice
                 && to.parasitics == Parasitics::Elements,
             sffm_swap: ng(nf) != (ng(nt) || to.writer == Writer::Cdl),
+            pulse_as_pwl: counts(nf) && !(counts(nt) || to.writer == Writer::Cdl),
             foreign_prints: !ng(nf) && to.analysis_form == AnalysisForm::Ngspice,
             foreign_measures: !ng(nf) && ng(nt),
             caret_reread: from.caret_power != to.caret_power,
@@ -216,6 +225,7 @@ mod tests {
             ("xyce_from_ngspice", to_xy.xyce_from_ngspice),
             ("xyce_from_other", to_xy.xyce_from_other),
             ("sffm_swap", to_xy.sffm_swap),
+            ("pulse_as_pwl", to_xy.pulse_as_pwl),
         ] {
             assert!(holds, "ngspice -> xyce: {rule}");
         }

@@ -293,6 +293,18 @@ impl W<'_, '_> {
         else {
             unreachable!("a source card")
         };
+        // A counted PULSE where the target's PULSE has no count: the PWL
+        // of its pulses, refused where they are none (`Wave::pulses`).
+        let wave = match wave {
+            Some(w) if self.pair.pulse_as_pwl && w.counted() => match w.pulses() {
+                Some(pwl) => Some(pwl),
+                None => {
+                    self.refuse(crate::syntax::diag::Code::W0108, tok);
+                    Some(w)
+                }
+            },
+            w => w,
+        };
         if let Some(w) = &wave {
             self.wave_ok(letter, w, tok);
         }

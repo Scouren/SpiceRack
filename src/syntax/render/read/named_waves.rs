@@ -55,6 +55,7 @@ impl<'a> Rd<'a> {
                     f("fall")?,
                     f("width")?,
                     f("period")?,
+                    Num::Num(0.0),
                 ],
                 repeat: None,
                 delay: None,

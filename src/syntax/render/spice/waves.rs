@@ -74,6 +74,8 @@ impl W<'_, '_> {
             args = self.am_args(w);
         }
         match w.kind {
+            // A PULSE's cycle count is written only when given (0 is none).
+            WaveKind::Pulse if !w.counted() => args.truncate(7),
             // The RTS fields are left off when all zero, as the manual's
             // white and 1/f examples write the card.
             WaveKind::Trnoise if w.args[4..].iter().all(|a| a.num() == Some(0.0)) => {

@@ -353,6 +353,8 @@ impl W<'_, '_> {
             };
             let kind = match w.kind {
                 WaveKind::Sin => "sine",
+                // A counted PULSE is written as a PWL (`vacask_wave`).
+                WaveKind::Pulse if w.counted() => "pwl",
                 WaveKind::Pulse => "pulse",
                 WaveKind::Exp => "exp",
                 WaveKind::Sffm => "fm",
@@ -376,6 +378,15 @@ impl W<'_, '_> {
     /// `w` as `type="…"` parameters; `None` when it is refused.
     fn vacask_wave(&mut self, w: &Wave, tok: u32) -> Option<String> {
         super::sources::assert_held(w);
+        // VACASK's pulse has no count (`lib/devvisrc.cpp`): a counted
+        // PULSE as the PWL of its pulses.
+        if w.counted() {
+            let Some(pwl) = w.pulses() else {
+                self.refuse(Code::W0108, tok);
+                return None;
+            };
+            return self.vacask_wave(&pwl, tok);
+        }
         let a: Vec<String> = w.args.iter().map(|x| self.vacask_num(x)).collect();
         Some(match w.kind {
             // `tdphase` is the sine's initial phase in degrees, SPICE's

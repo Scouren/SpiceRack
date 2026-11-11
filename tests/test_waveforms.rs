@@ -47,6 +47,30 @@ fn ltspice_on_ngspice(deck: &str, t: f64, want: f64, tol: Tol) {
 // A row's test goes below this line (other helpers: `oracle::…` by path).
 
 #[test]
+fn p3_011_pulse_cycle_count_is_kept() {
+    // Ledger P3-011. A PULSE's eighth value is its cycle count: LTspice's
+    // Ncycles (help, Current Source), ngspice's NP (manual §4.1.1); V1
+    // after the last pulse. LTspice 26.1.1 on this deck: 1 V at 7 us (the
+    // second pulse), 0 V at 12 us (research/impl/evidence/P3-011/lt.cir);
+    // ngspice-45 and ESPice 0.3.0 run `PULSE(… 2)` alike. Xyce 7.10
+    // ignores an eighth value (1 V at 12 us), so Xyce, HSPICE (its text on
+    // ESPice) and VACASK get the PWL of the two pulses. Corpus:
+    // ltspice_demos/LT1158_F18.net. Tolerance: both points are on a flat
+    // segment, so only the simulators' rounding is left.
+    let deck = "p3-011\nV1 a 0 PULSE(0 1 1u 1n 1n 2u 5u 2)\nR1 a 0 1k\n.tran 10n 20u\n.end\n";
+    let tol = Tol {
+        rel: 1e-6,
+        floor: 1.0,
+    };
+    ltspice_on_ngspice(deck, 7e-6, 1.0, tol);
+    ltspice_on_ngspice(deck, 12e-6, 0.0, tol);
+    let pwl = [Dialect::Xyce, Dialect::Hspice, Dialect::Vacask];
+    for (t, want) in [(7e-6, 1.0), (12e-6, 0.0)] {
+        closed_form(Dialect::Ltspice, deck, &pwl, "a", At::Time(t), want, tol);
+    }
+}
+
+#[test]
 fn p3_005_ltspice_pwl_relative_time_is_absolute() {
     // Ledger P3-005. LTspice help, Voltage Source: a PWL time written `+t`
     // counts from the point before it, so this PWL is (0,0) (1u,1) (2u,2)
