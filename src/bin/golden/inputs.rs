@@ -7,6 +7,9 @@
 //! the way Interop's `pdk-models` walks one, and the read order goes into the
 //! manifest. Each corpus deck, kit file and fixture is read in its
 //! `syntax::resolve::Kit` (phase 3), a corpus deck with the files it includes.
+//! A PDK kit is built here, once, and shared by its files; a corpus deck's or
+//! a fixture's own kit is loaded by the worker that records it
+//! ([`InputKit::Own`]), so the walk itself reads only the PDK kits.
 //!
 //! Cites: `tests/test_import_suite/main.rs` (`files`, `decks`, the corpus
 //! filters); Interop `src/pdk_models.rs` (`references`, `convert`: the walk
@@ -14,7 +17,8 @@
 //!
 //! Contents:
 //! - `pub(super) enum Form { Deck, Library }`
-//! - `pub(super) struct Input { pub(super) set: &'static str, pub(super) rel: String, pub(super) path: PathBuf, pub(super) dialect: Dialect, pub(super) form: Form, pub(super) kit: Option<(Arc<resolve::Kit>, FileId)> }`
+//! - `pub(super) enum InputKit { Shared(Arc<resolve::Kit>, FileId), Own(PathBuf) }`
+//! - `pub(super) struct Input { pub(super) set: &'static str, pub(super) rel: String, pub(super) path: PathBuf, pub(super) dialect: Dialect, pub(super) form: Form, pub(super) kit: InputKit }`
 //! - `pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input>`
 //! - `pub(super) fn source(text: &str, form: Form, path: &Path) -> (String, String)`
 
@@ -37,6 +41,17 @@ pub(super) enum Form {
     Library,
 }
 
+/// The kit an input is read in (`syntax::resolve`).
+pub(super) enum InputKit {
+    /// A PDK kit's, built once by the walk and shared by its files: the
+    /// kit and the input's file in it.
+    Shared(Arc<resolve::Kit>, FileId),
+    /// Its own (it and the files it includes under this root, the input
+    /// its `FileId(0)`), loaded by the worker that records it: a corpus
+    /// deck or a fixture.
+    Own(PathBuf),
+}
+
 /// One file to record.
 pub(super) struct Input {
     /// The input set: a corpus, a kit or `fixtures`.
@@ -46,10 +61,7 @@ pub(super) struct Input {
     pub(super) path: PathBuf,
     pub(super) dialect: Dialect,
     pub(super) form: Form,
-    /// The kit it is read in (`syntax::resolve`): its kit's for a PDK file,
-    /// its own (it and what it includes) for a fixture; `None` for a corpus
-    /// deck, read alone.
-    pub(super) kit: Option<(Arc<resolve::Kit>, FileId)>,
+    pub(super) kit: InputKit,
 }
 
 /// A corpus: every `*.<ext>` under `$<var>` whose full path passes `keep`.
@@ -196,21 +208,16 @@ pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
         all.extend(found.into_iter().map(|path| {
             let rel = rel(&root, &path);
             let dialect = (c.own)(&rel).unwrap_or(c.dialect);
-            // With the files it includes, so a master they declare is
-            // bound (VACASK c6288 and its includes: only `elaborate` stays).
-            let kit = spicerack::import::kit(
-                std::slice::from_ref(&path),
-                resolve::Form::Deck,
-                dialect,
-                &root,
-            );
             Input {
                 set: c.set,
                 dialect,
                 rel,
                 path,
                 form: Form::Deck,
-                kit: Some((Arc::new(kit), FileId(0))),
+                // With the files it includes, so a master they declare is
+                // bound (VACASK c6288 and its includes: only `elaborate`
+                // stays).
+                kit: InputKit::Own(root.clone()),
             }
         }));
     }
@@ -232,19 +239,13 @@ pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
             true => Dialect::Ltspice,
             false => by_ext,
         };
-        let kit = spicerack::import::kit(
-            std::slice::from_ref(&path),
-            resolve::Form::Deck,
-            dialect,
-            &tests,
-        );
         Some(Input {
             set: "fixtures",
             rel: rel(repo, &path),
             path,
             dialect,
             form: Form::Deck,
-            kit: Some((Arc::new(kit), FileId(0))),
+            kit: InputKit::Own(tests),
         })
     }));
     manifest.push(format!(
@@ -356,7 +357,8 @@ fn kit(k: &Kit, root: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
         .iter()
         .map(|e| (normalize(&root.join(e)), false))
         .collect();
-    let (mut seen, mut out) = (BTreeSet::new(), Vec::new());
+    // The files read, each with its path under the root.
+    let (mut seen, mut read) = (BTreeSet::new(), Vec::new());
     while let Some((p, verilog_a)) = todo.pop_front() {
         if !seen.insert(p.clone()) {
             continue;
@@ -389,14 +391,7 @@ fn kit(k: &Kit, root: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
                 todo.push_back((normalize(&dir.join(f)), va));
             }
         }
-        out.push(Input {
-            set: k.set,
-            rel: shown,
-            path: p,
-            dialect: k.dialect,
-            form: Form::Library,
-            kit: None,
-        });
+        read.push((shown, p));
     }
     // The kit `syntax::resolve` reads from the same entries: every file
     // above is one of its files (it also follows includes this walk skips,
@@ -408,11 +403,22 @@ fn kit(k: &Kit, root: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
         k.dialect,
         root,
     ));
-    for input in &mut out {
-        let f = kit.files().iter().position(|f| f.path == input.path);
-        let f = f.expect("the kit reads every file the walk reads");
-        input.kit = Some((Arc::clone(&kit), FileId(f as u32)));
-    }
+    let out: Vec<Input> = read
+        .into_iter()
+        .map(|(shown, path)| {
+            let f = kit.files().iter().position(|f| f.path == path);
+            let f = f.expect("the kit reads every file the walk reads");
+            Input {
+                set: k.set,
+                rel: shown,
+                path,
+                dialect: k.dialect,
+                form: Form::Library,
+                kit: InputKit::Shared(Arc::clone(&kit), FileId(f as u32)),
+            }
+        })
+        .collect();
+    assert!(out.len() <= seen.len(), "an input a file the walk saw");
     out
 }
 
