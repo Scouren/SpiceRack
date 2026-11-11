@@ -21,7 +21,7 @@
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
 //! the model card an instance uses), `control` a `.control` block's lines
-//! (`controlled` is E/F/G/H), `epochs` the run plan; `walk` steps a
+//! (`unroll` its loops; `controlled` is E/F/G/H), `epochs` the run plan; `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
 //!
 //! Cites: the old lowering
@@ -76,6 +76,7 @@ mod tables;
 mod testbench;
 mod text;
 mod unlift;
+mod unroll;
 mod values;
 mod walk;
 mod wave_rules;
@@ -174,6 +175,9 @@ pub(in crate::syntax::render) struct Deck {
 pub(in crate::syntax::render) enum Bench {
     /// A SPICE testbench card (`BenchCard`).
     Card(u32),
+    /// A `.control` `alterparam` line a pass of a loop ran, and the value
+    /// its variable gave it in that pass (`Rd::alterparam_as`).
+    Set(u32, f64),
     /// A `.meas` line of a Spectre `simulator lang=spice` region.
     Meas(u32),
     /// Spectre/VACASK `save`.

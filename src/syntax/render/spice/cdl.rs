@@ -188,6 +188,7 @@ impl W<'_, '_> {
                 // Its VACASK control text is written.
                 Bench::Control(_) => {}
                 Bench::Card(n)
+                | Bench::Set(n, _)
                 | Bench::Meas(n)
                 | Bench::Save(n)
                 | Bench::Analysis(n)

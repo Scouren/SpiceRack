@@ -30,6 +30,26 @@ mod tests {
     }
 
     #[test]
+    fn dollar_in_a_control_block_is_a_script_variable() {
+        // ngspice-45 `frontend/inpcom.c` (`inp_stripcomments_line`, `cs`):
+        // in a `.control` section `$` starts a comment only before a
+        // blank; after the `.endc` the netlist's rule is back (§1.5).
+        let w = words(
+            "t\n.control\nalterparam r = $v $ c\nif $v < 2\nend\n.endc\nR1 a b 1k $c\n",
+            lex(Lang::NGSPICE),
+        );
+        let want = [
+            ".control",
+            "alterparam r = $v",
+            "if $v < 2",
+            "end",
+            ".endc",
+            "R1 a b 1k",
+        ];
+        assert_eq!(w, want);
+    }
+
+    #[test]
     fn plus_reads_past_star_lines_but_not_semicolon_lines() {
         // §1.6 (`l_skip_cont`): `*`, `#`, `$` and blank lines; a `;` line
         // ends the statement, and the `+` after it continues nothing.

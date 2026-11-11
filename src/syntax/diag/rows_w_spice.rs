@@ -165,7 +165,7 @@ macro_rules! rows_w_spice {
             W0025 Note {
                 title: "a control-block line not written",
                 cite: "ngspice manual ch.13 (the control language is a script, not a netlist)",
-                explain: "Of an ngspice `.control` block the analyses and the top-level parameter changes (`alterparam` then `reset`) are read. A line that shows, writes or post-processes results (`let`, `print`, `write`, `plot`, `set filetype=` …) changes no run and is left out, as is an `alterparam` no `reset` follows. (A line that changes the circuit is W0160; a VACASK control block's script lines are W0120.)",
+                explain: "Of an ngspice `.control` block the analyses and the top-level parameter changes (`alterparam` then `reset`) are read, each once a pass of the loops around it (a loop or an `if` over constants is unrolled). A line that shows, writes or post-processes results (`let`, `print`, `write`, `plot`, `set filetype=` …) changes no run and is left out, as is an `alterparam` no `reset` follows; it is noted once however many passes run it. (A line that changes the circuit is W0160; a VACASK control block's script lines are W0120.)",
             }
             /// A waveform's arguments past the count the target's form takes.
             W0026 Note {

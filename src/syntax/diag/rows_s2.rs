@@ -1,5 +1,5 @@
-//! The catalogue's W0160–W0179 rows, stream S2's (none yet: a
-//! `// slot <CODE>` marker each). A block of `catalogue!`'s list
+//! The catalogue's W0160–W0179 rows, stream S2's (a `// slot <CODE>`
+//! marker for each code not yet given). A block of `catalogue!`'s list
 //! (`mod.rs` chains every block, in code order).
 //!
 //! Cites: each row's `cite` names its own clause.
@@ -17,9 +17,14 @@ macro_rules! rows_s2 {
             W0160 Refusal {
                 title: "a control-script line that changes the circuit is not read",
                 cite: "ngspice-45 manual §13.5.3 `alter`, §13.5.4 `altermod`, §13.5.5 `alterparam` (the subcircuit form), §13.5.55 `option`, §13.5.69 `run`, §13.5.73 `set`, §13.6 (the control structures); each run on ngspice-45: the line changes the next analysis's result",
-                explain: "The `.control` script changes what its later analyses run on in a way the reader does not read: a command other than `alterparam name = number` followed by `reset` (`alter`, `altermod`, `option`, a `set` of a simulator variable such as `temp`, a loop or an `if`, `source` …), an `alterparam` of a subcircuit's parameter or to an expression, or a parameter change in a deck whose dot-card analyses run too (a card before the block, or `run`: ngspice runs those after the script, on the state it left). Leaving the line out would give other numbers, so the deck is refused. Fold the change into the netlist (one deck per state), or keep to `alterparam name = number` and `reset` between the script's own analysis commands.",
+                explain: "The `.control` script changes what its later analyses run on in a way the reader does not read: a command other than `alterparam name = number` followed by `reset` (`alter`, `altermod`, `option`, a `set` of a simulator variable such as `temp`, `source` …), an `alterparam` of a subcircuit's parameter or to an expression, a loop or an `if` the script alone does not decide (a `while` over a run's result, a `foreach` over a `set` variable or over a name ngspice reads such as `temp`, a `repeat` with no plain count, `break`, `continue`, `goto`, a block no `end` closes), an analysis command that holds a `$` variable, or a parameter change in a deck whose dot-card analyses run too (a card before the block, or `run`: ngspice runs those after the script, on the state it left). Leaving the line out would give other numbers, so the deck is refused. Fold the change into the netlist (one deck per state), or keep to `alterparam name = number` and `reset` between the script's own analysis commands, in loops over constants: `foreach` words, a `repeat` count, a `let` counter set before the first analysis (`alterparam name = $word` and `= $&counter` are read).",
             }
-            // slot W0161
+            /// A `.control` script that runs more lines than the reader unrolls.
+            W0161 Refusal {
+                title: "a control script runs more lines than are unrolled",
+                cite: "ngspice-45 manual §13.6 (`while`, `repeat`, `foreach`: no bound of their own); DESIGN-control-epochs §4 (the bounded unroller), §8 D1; the bound is `UNROLL_MAX` in `render/read/unroll.rs`",
+                explain: "The `.control` script's loops are unrolled into the lines they run, and this script runs more than 16384 of them: a loop that never ends, or a sweep of many thousand passes. Each pass that runs an analysis is a result of the written deck, so the reader stops there and refuses the deck. Run fewer passes a deck, or write the sweep as a `.step` or a `.dc` axis, which a target writes as its own sweep.",
+            }
             // slot W0162
             // slot W0163
             // slot W0164

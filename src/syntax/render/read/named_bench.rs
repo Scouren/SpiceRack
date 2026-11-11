@@ -83,6 +83,7 @@ impl<'a> Rd<'a> {
     pub(in crate::syntax::render) fn bench_cards(&self, b: Bench) -> Vec<BenchCard> {
         match b {
             Bench::Card(n) => self.bench_card(n).into_iter().collect(),
+            Bench::Set(n, value) => vec![self.alterparam_as(n, value)],
             Bench::Meas(k) => vec![BenchCard::Meas(self.line(k))],
             Bench::Save(n) => {
                 let outs = self.saves(n).expect("a save the reader placed");

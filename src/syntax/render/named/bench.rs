@@ -299,6 +299,7 @@ impl W<'_, '_> {
         for &b in &self.deck.bench {
             let tok = match b {
                 Bench::Card(n)
+                | Bench::Set(n, _)
                 | Bench::Meas(n)
                 | Bench::Save(n)
                 | Bench::Analysis(n)
