@@ -36,6 +36,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - tools: `spice2rack --to <dialect>` writes that dialect alone (any of the nine), prints the written deck's absolute path on stdout and exits 1 when the dialect refuses the deck (2 on a usage error; an unknown option was read as a deck); `--kit` also writes every file the deck reaches, each `.include`/`.lib` path the absolute path of the written copy under `-o`; `nix build .#spice2rack` builds the converter alone, with no default features (ZERO-LEDGER P1-062).
 - python: the distributed lines have builders on `Subcircuit` and `Circuit`: `O` (LTRA), `Y` (TXL), `P` (CPL) and `U` (URC), each the ngspice card with its model (`model(m, "ltra", ...)`); written for ngspice and ESPice only.
 - results: a run's measures are the ones its deck names. The line `Stack = 0 bytes.` of ngspice's footer was read as a measure `Stack = 0` in every ngspice result with no `.meas` (and written to `export`'s `.meas.json`), and a `print` of a `.control` block as one too; a `meas` command of a `.control` block is still a measure (ZERO-LEDGER P8-320).
+- python: `parameter(name, value)` (`Subcircuit`, `Circuit`, `Section`) takes a number or a `UnitValue` as well as a string, and refuses `None`, a `bool` and an empty string (`ValueError`); the new `Testbench.parameter(name, value)` sets a top-level `.param`, replacing the DUT's parameter of that name (ZERO-LEDGER P8-124).
 
 ## 0.2.0 (2026-11-03)
 

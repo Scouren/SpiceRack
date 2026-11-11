@@ -221,6 +221,8 @@ PARITY = {
     "U": (FEATURES["U"], tw_elem([".model umod urc (rperl=1000000.0 cperl=1e-12 fmax=1000000000.0)", "U1 out x 0 umod l=0.001 n=6", "Rx x 0 1e3"]), "ng §6.3 (UXXXXXXX n1 n2 n3 mname l=len <n=lumps>); ngspice-45 run (evidence/P8-049/ng/u.log)", "P8-053"),
     "A": (FEATURES["A"], tw_elem([".model amp gain (gain=2.0)", "A1 out x amp", "Rx x 0 1e3"]), "ng §8.1 A (XSPICE)", None),
     "parameter": (FEATURES["parameter"], tw_elem([".param k=2"]), "ng §2.3 .param", None),
+    "parameter_number": (FEATURES["parameter_number"], tw_elem([".param k=2.5"]), "ng §2.3 .param (a number)", "P8-124"),
+    "testbench_parameter": (FEATURES["testbench_parameter"], deck(top=[".param r=2000.0", "R1 in out {r}", "C1 out 0 1e-9"], bench=[VIN, ".tran 1e-6 1e-5"]), "ng §2.3 .param (the DUT's `r`, set by the bench)", "P8-124"),
     "include": (FEATURES["include"], tw_elem([".include /m/x.inc"]), "ng §2.6 .include", None),
     "lib": (FEATURES["lib"], tw_elem([".lib /m/x.lib tt"]), "ng §2.7 .lib", None),
     "section": (FEATURES["section"], deck(title="corners", top=[".lib tt", ".param rsh=3k", ".endl tt"]), "ng §2.10 .LIB (a library's statements between .LIB libname and .ENDL)", "P8-009"),

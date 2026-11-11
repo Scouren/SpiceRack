@@ -14,7 +14,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use super::args::kw_params;
+use super::args::{kw_params, param_text};
 use super::model::model_card;
 use super::subcircuit::PySubcircuit;
 
@@ -64,9 +64,9 @@ impl PySection {
         &self.name
     }
 
-    /// `.param name=value` (the value a string, as `Subcircuit.parameter`).
-    fn parameter(&mut self, name: &str, value: &str) {
-        self.lines.push(format!(".param {name}={value}"));
+    /// `.param name=value` (the value as `Subcircuit.parameter` takes it).
+    fn parameter(&mut self, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
+        param_text(name, value).map(|text| self.lines.push(format!(".param {name}={text}")))
     }
 
     /// A `.model` card, as `Subcircuit.model`.

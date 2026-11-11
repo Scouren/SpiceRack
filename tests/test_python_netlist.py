@@ -1811,3 +1811,69 @@ class TestSection:
         again = ps().Testbench.from_source(tb.to_source())
         assert again.netlist("ngspice") == tb.netlist("ngspice")
         assert again.netlist("spectre") == tb.netlist("spectre")
+
+
+def _p8_124_divider():
+    """in -r- out -3k- 0 under 1 V, `r` the DUT's parameter (1k): v(out) = 3k / (r + 3k)."""
+    dut = ps().Subcircuit("div", ["in", "out"], r="1k")
+    dut.R("1", "in", "out", "{r}")
+    dut.R("2", "out", dut.gnd, 3e3)
+    tb = ps().Testbench(dut)
+    tb.V("in", "in", "0", 1.0)
+    return dut, tb
+
+
+def test_p8_124_a_parameter_is_a_number_a_unit_value_or_a_string():
+    """ZERO-LEDGER P8-124 (F15). Oracle: the cards, written by hand: a float as Python prints it, a
+    `UnitValue` as its SI value (`1 @ u_kOhm` is 1000 ohms; `1kOhm` reads as something else in every
+    SPICE), a string as given. They are the cards today's strings give
+    (research/impl/evidence/P8-124/probe.out), which ngspice, Xyce and Spectre's writer take."""
+    from spicerack import unit as u
+
+    dut, tb = _p8_124_divider()
+    dut.parameter("x", 2.5)
+    dut.parameter("y", 1 @ u.u_kOhm)
+    dut.parameter("z", "x*2")
+    lines = ps().Testbench(dut).netlist("ngspice").splitlines()
+    assert lines[1:5] == [".param r=1k", ".param x=2.5", ".param y=1e3", ".param z=x*2"]
+    s = ps().Section("tt")
+    s.parameter("rsh", 3e3)
+    s.parameter("w", 1 @ u.u_kOhm)
+    lib = ps().Circuit("corners")
+    lib.section(s)
+    lines = str(lib).splitlines()
+    at = lines.index(".lib tt")
+    assert lines[at:at + 4] == [".lib tt", ".param rsh=3000.0", ".param w=1e3", ".endl tt"]
+
+
+@pytest.mark.parametrize("value", [None, True, False, "", "  ", [1, 2]])
+def test_p8_124_a_parameter_with_no_value_is_refused(value):
+    """A parameter has a value: `None`, a `bool`, an empty string and a list are a `ValueError` that
+    names the parameter, on each class, and the deck is as it was. Oracle: the row (F15: "`None` is
+    an error") and the deck's text before the call."""
+    dut, tb = _p8_124_divider()
+    section = ps().Section("tt")
+    before = tb.netlist("ngspice")
+    for target in (dut, tb, section):
+        with pytest.raises(ValueError, match="parameter: `k` is given"):
+            target.parameter("k", value)
+    assert tb.netlist("ngspice") == before
+    assert ps().Testbench(dut).netlist("ngspice") == before
+
+
+@pytest.mark.needs("ngspice")
+def test_p8_124_a_testbench_parameter_sets_the_top_parameter():
+    """`Testbench.parameter` sets a top-level `.param`; the DUT's own parameter of that name takes
+    the new value (one card per name, any case), and a new name is a new card. Oracle: the divider's
+    closed form on ngspice, v(out) = 3k / (r + 3k): 0.75 at the DUT's 1k, 0.5 at 3k, 0.6 at 2k."""
+    _, tb = _p8_124_divider()
+    tb.with_backend("ngspice")
+    assert tb.operating_point()["out"] == pytest.approx(0.75, abs=1e-9)
+    tb.parameter("r", 3e3)
+    assert [l for l in tb.netlist("ngspice").splitlines() if l.startswith(".param")] == [".param r=3000.0"]
+    assert tb.operating_point()["out"] == pytest.approx(0.5, abs=1e-9)
+    tb.parameter("R", "2k")
+    tb.parameter("k", 2)
+    assert [l for l in tb.netlist("ngspice").splitlines() if l.startswith(".param")] == [".param r=2k", ".param k=2"]
+    assert "parameters r=2k k=2" in tb.netlist("spectre").splitlines()
+    assert tb.operating_point()["out"] == pytest.approx(0.6, abs=1e-9)

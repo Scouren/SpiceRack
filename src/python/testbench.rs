@@ -12,7 +12,7 @@ use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
 use super::analysis::{Analysis, PssBase};
-use super::args::{Num, PyValueArg, kw_params};
+use super::args::{Num, PyValueArg, kw_params, param_text};
 use super::card::{self, dc_sweeps};
 use super::circuit::hoisted;
 use super::deck::{Deck, check_backend_name};
@@ -51,6 +51,20 @@ impl PyTestbench {
     /// Attach a PDK model library. Codegen resolves the per-backend path and corner.
     fn use_pdk(mut slf: PyRefMut<'_, Self>, pdk: &PyModelLibrary) {
         slf.as_super().deck.libraries.push(pdk.inner.clone());
+    }
+
+    /// A `.param name=value` at the top of the deck, the value as
+    /// `Subcircuit.parameter` takes it. A parameter the deck has by that
+    /// name (the DUT's own, or an earlier call's) takes the new value: a
+    /// deck holds one card per name, in the place of the first.
+    fn parameter(mut slf: PyRefMut<'_, Self>, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
+        let text = param_text(name, value)?;
+        let params = &mut slf.as_super().deck.top.params;
+        match params.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
+            Some(slot) => slot.1 = text,
+            None => params.push((name.into(), text)),
+        }
+        Ok(())
     }
 
     // ── Stimulus ──

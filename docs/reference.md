@@ -86,7 +86,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `subcircuit(subckt)` | on a `Subcircuit`: `subckt` defined inside it (a nested `.subckt`), seen by its own instances only; each target writes it as a top-level definition named `<parent>__<name>`. `ValueError` when `subckt` holds a `verilog()` block |
 | `lib(path, section)` | `.lib` |
 | `conditional(branches, otherwise=None)` | `.if (c)` … `.elseif (c)` … `.else` … `.endif`: `branches` is a list of `(condition, Block)`, the circuit holds the block of the first true condition, `otherwise` when none is. A condition is an expression of parameters (`"r > 500"`, equality `==`). A block holds elements, instances, models and conditionals of its own; a parameter, an include, a lib, a model load, a nested definition or a function in one raises `ValueError` (ngspice does not select those with the condition). Xyce and LTspice have no conditional (`W0013`) |
-| `parameter(name, value)` | `.param` |
+| `parameter(name, value)` | `.param name=value`; `value` is a number, a `UnitValue` (written as its SI value) or a string (an expression, as given); `None`, a `bool`, an empty string or any other object is a `ValueError` |
 | `raw_spice(line)` | the line as written |
 | `veriloga(source_or_path)` | a Verilog-A model, compiled per backend; returns the `.va` path |
 | `osdi(path)` | a compiled OSDI model |
@@ -110,6 +110,7 @@ none (ngspice refuses one outside a library file).
 | `V`, `I`, `R`, `C`, waveform sources | stimulus (no other elements) |
 | `add_subcircuit(subckt)` | registers a child definition |
 | `use_pdk(lib)` | attaches a `ModelLibrary` |
+| `parameter(name, value)` | a top-level `.param`, the value as a `Subcircuit`'s; a parameter the deck already has by that name (the DUT's own) takes the new value. A `.param` the deck holds as text (a `raw_spice` line, every card of a testbench read by `from_source`) is not replaced: it is written after this one, and ngspice takes the last |
 | `with_backend(name)` | pins the simulator |
 | `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `spicerack.Error` (a `RuntimeError`) naming its code, with the diagnostics as data (`.diagnostics`); each note on the written deck (an output or option the target does not get, e.g. `W0023`) is a `UserWarning` `spicerack <deck>:<line>:<col>: <code> <title>`, on a built-in or a registered dialect alike (a plugin's `omit_code` note is `W0202 <dialect>:<id> <message>`) |
 | `netlist_with_notes(dialect)` | `(text, notes)`: the deck `netlist(dialect)` writes and its notes as a list of `Diagnostic`, with no warning |

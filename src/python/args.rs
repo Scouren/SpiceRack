@@ -7,13 +7,14 @@
 //! - `pub(super) struct Num`, `impl FromPyObject for Num`, `Num::of(v: f64) -> Num`, `Num::text(&self) -> String`,
 //!   `Num::zero(&self) -> bool`, `Num::value(&self) -> Value`
 //! - `pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
+//! - `pub(super) fn param_text(name: &str, value: &Bound<'_, PyAny>) -> PyResult<String>`
 //! - `pub(super) fn switch_state(state: Option<&str>) -> Result<String, String>`
 //! - `pub(super) fn kw_options(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 //! - `pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyBool, PyDict};
 
 use super::keywords::SwitchState;
 use super::model::{Value, dec};
@@ -49,6 +50,26 @@ pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(Stri
         }
     }
     Ok(out)
+}
+
+/// The value of `parameter(name, value)` as its `.param` card writes it,
+/// per [`param_value`]: a number as Python prints it, a `UnitValue` as its
+/// SI value, a string (an expression) as given. A parameter has a value:
+/// `None`, a `bool`, an empty string and any other object are a
+/// `ValueError`.
+pub(super) fn param_text(name: &str, value: &Bound<'_, PyAny>) -> PyResult<String> {
+    let typed = !value.is_instance_of::<PyBool>() && value.extract::<PyValueArg>().is_ok();
+    let text = match typed {
+        true => param_value(value)?.filter(|text| !text.trim().is_empty()),
+        false => None,
+    };
+    match text {
+        Some(text) => Ok(text),
+        None => Err(PyValueError::new_err(format!(
+            "parameter: `{name}` is given {}; its value is a number, a UnitValue or a string",
+            value.repr()?
+        ))),
+    }
 }
 
 /// `options(**kw)` as ordered `.options` pairs (D17). Every key is a

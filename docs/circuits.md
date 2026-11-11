@@ -123,7 +123,7 @@ tb.PieceWiseLinearVoltageSource("ramp", "vramp", "0", values=[(0, 0.0), (1e-6, 1
 dut.model("D1N4148", "D", IS=2.52e-9, N=1.752)    # .model
 dut.include("models.lib")                         # .include
 dut.lib("sky130.lib.spice", "tt")                 # .lib file section
-dut.parameter("vbias", "0.9")                     # .param (value is a string)
+dut.parameter("vbias", 0.9)                       # .param (a number, a UnitValue or a string)
 dut.raw_spice("* anything the builder does not cover")
 ```
 

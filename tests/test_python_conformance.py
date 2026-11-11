@@ -321,6 +321,8 @@ FEATURES = {
     "U": elem(lambda d: (d.model("umod", "urc", rperl=1e6, cperl=1e-12, fmax=1e9), d.U("1", "out", "x", "0", model="umod", length=1e-3, lumps=6), d.R("x", "x", "0", 1e3))),
     "A": elem(lambda d: (d.model("amp", "gain", gain=2.0), d.A(name="1", connections=["out", "x"], model="amp"), d.R("x", "x", "0", 1e3))),
     "parameter": elem(lambda d: d.parameter("k", "2")),
+    "parameter_number": elem(lambda d: d.parameter("k", 2.5)),
+    "testbench_parameter": setting(lambda tb: tb.parameter("r", 2e3)),
     "include": elem(lambda d: d.include("/m/x.inc")),
     "lib": elem(lambda d: d.lib("/m/x.lib", "tt")),
     "section": _with_section,
@@ -483,6 +485,8 @@ EXPECTED = {
     'U': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001+W0104', 'W0001', OK, OK),
     'A': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'parameter_number': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'testbench_parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'lib': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # A library section: LTspice reads a library as a whole file (`Construct::LibSection`: W0012).
@@ -546,7 +550,7 @@ COVERED = {
         "add_spectre_pac", "add_spectre_pnoise", "add_spectre_pxf", "add_spectre_pstb",
         "options", "temperature", "nominal_temperature", "initial_condition", "node_set",
         "measure", "add_print", "step", "step_sweep", "ngbehavior", "add_function",
-        "global_nodes", "extra_line", "use_pdk", "save_currents",
+        "global_nodes", "extra_line", "use_pdk", "save_currents", "parameter",
     },
     "Subcircuit": {
         "add_function",

@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
-use super::args::{Num, PyValueArg, kw_params, kw_volts};
+use super::args::{Num, PyValueArg, kw_params, kw_volts, param_text};
 use super::block::PyBlock;
 use super::circuit::hoisted;
 use super::deck::runtime_err;
@@ -464,8 +464,8 @@ impl PySubcircuit {
         self.inner.osdi.push(path.to_string());
     }
 
-    fn parameter(&mut self, name: &str, value: &str) {
-        self.inner.params.push((name.into(), value.into()));
+    fn parameter(&mut self, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
+        param_text(name, value).map(|text| self.inner.params.push((name.into(), text)))
     }
 
     /// A `.func` of this subcircuit, as `Testbench.add_function` writes one

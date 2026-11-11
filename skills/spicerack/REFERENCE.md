@@ -89,6 +89,10 @@ injection, propagation delay and pedestal all track them.
 `Circuit` / `Subcircuit` only: `model(name, kind, **params)`, `include(path)`,
 `lib(path, section)`, `parameter(name, value)`, `raw_spice(line)`, `veriloga(...)`,
 `osdi(...)`, `verilog(...)`. `temp(value)` and `options(**kw)` are `Circuit` only.
+`parameter(name, value)` takes a number, a `UnitValue` (written as its SI value) or a string (an
+expression); `None`, a `bool` or an empty string is a `ValueError`. `tb.parameter(name, value)` is
+the top-level `.param` of a `Testbench`: the DUT's parameter of that name takes the new value (a
+`.param` held as text, as in a testbench read by `from_source`, is not replaced and wins).
 
 A corner library is a `Circuit` of sections: `s = ps.Section("tt")`, then `s.parameter(...)`, `s.model(...)`, `s.include(...)`, `s.lib(...)`, `s.subcircuit(sub)`, then `circuit.section(s)`. `str(circuit)` is the library file (`.lib tt` … `.endl tt`); a deck selects a section with `lib(path, "tt")`. `Testbench(circuit).netlist(target)` writes the library in another dialect (LTspice refuses sections, `W0012`). `Testbench` has no `section`: a deck that runs holds none.
 

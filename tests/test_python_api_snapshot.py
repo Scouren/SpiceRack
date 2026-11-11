@@ -24,6 +24,9 @@ ROOTS = [
     "spicerack.load_simulator",
     "spicerack.def_.DialectDef.runs_on",
     "spicerack.def_.Lang.runs_on",
+    "spicerack.Subcircuit.parameter",
+    "spicerack.Section.parameter",
+    "spicerack.Testbench.parameter",
 ]
 # Note 12 §5: the hooks and the view they are handed, as `spicerack.provisional` names them.
 PROVISIONAL = {"Simulator.read", "Dialect.emit", "View"}
