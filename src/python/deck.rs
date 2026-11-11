@@ -78,7 +78,7 @@ impl Deck {
             .lowered()?
             .write_to(d)
             .map_err(PyRuntimeError::new_err)?;
-        Python::with_gil(|py| -> PyResult<()> {
+        Python::attach(|py| -> PyResult<()> {
             let category = py.get_type::<pyo3::exceptions::PyUserWarning>();
             for line in written.notes.messages.lines().filter(|l| !l.is_empty()) {
                 let msg = std::ffi::CString::new(format!("spicerack {line}"))

@@ -22,7 +22,7 @@ pub(super) fn verilog_block(
     source: &str,
     mode: &str,
     instance_name: &str,
-    connections: &HashMap<String, pyo3::PyObject>,
+    connections: &HashMap<String, Py<PyAny>>,
     pdk: Option<&str>,
     liberty: Option<&str>,
     spice_models: Option<&str>,

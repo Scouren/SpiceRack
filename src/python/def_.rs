@@ -134,7 +134,7 @@ pub(super) fn render(src: &Source, lang: Lang) -> Result<render::Written, String
     let p = render::render_pending(src, lang).map_err(messages)?;
     let answers = match p.requests.is_empty() {
         true => Vec::new(),
-        false => Python::with_gil(|py| answers(py, &p, lang))?,
+        false => Python::attach(|py| answers(py, &p, lang))?,
     };
     render::splice(src, p, &answers).map_err(messages)
 }

@@ -11,6 +11,26 @@
 // ---- private ----
 
 #[test]
+fn p8_160_bump_pyo3_maturin_python_support() {
+    // PyO3 CHANGELOG: 0.25.0 "Support Python 3.14.0b1" (#4811), 0.27.0
+    // "Test against Python 3.14 final release" (#5499); 0.24 builds for no
+    // Python past 3.13. A wheel is built from the lock, so the pin is read
+    // there. Checks: 1.
+    let lock = include_str!("../Cargo.lock");
+    let at = lock
+        .find("name = \"pyo3\"\nversion = \"")
+        .expect("pyo3 is locked");
+    let version = lock[at..].lines().nth(1).expect("its version line");
+    let mut parts = version.trim_start_matches("version = \"").split('.');
+    let mut next = || parts.next().and_then(|p| p.parse::<u32>().ok());
+    let (major, minor) = (next().expect("a major"), next().expect("a minor"));
+    assert!(
+        (major, minor) >= (0, 27),
+        "pyo3 {version}: Python 3.14 needs 0.27 or later"
+    );
+}
+
+#[test]
 fn test_rawfile_utf16_detection() {
     // Standard UTF-8 ngspice raw file should NOT be detected as UTF-16
     let raw_content = b"Title: test\nPlotname: Operating Point\n";
