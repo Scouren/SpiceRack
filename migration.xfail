@@ -105,3 +105,7 @@ ltspice/ltspice_examples/LTZ1000A.net vacask now written: numdgt, measdgt, plotw
 # P4-011: the SIN's phase is VACASK's tdphase (positional: these decks name the damping {phase} and the phase {theta}).
 xyce/SENS/fddevLevelParams_isin2.cir vacask now written: a SIN with PHASE is written with tdphase (P4-011)
 xyce/SENS/fdisin2.cir vacask now written: a SIN with PHASE is written with tdphase (P4-011)
+
+# S1: P4-019: VACASK takes no `td2` that is not above 0 ("Parameter td2 of exponential transient must be greater than 0."
+# at 36be560): an EXP whose TD2 is not above TD1 is refused, never written as `td2=0`.
+xyce/Message/Device/Core_SourceData_TranData.cir vacask now refused: W0108 for an EXP whose TD2 is not above TD1; VACASK rejects `td2=0` (P4-019)
