@@ -642,3 +642,20 @@ fn a_vacask_builtin_constant_is_its_value_off_vacask() {
     assert!((node(&v, "2") - exact).abs() < 1e-9, "VACASK");
     assert!((node(&n, "2") - exact).abs() < 1e-9, "ngspice\n{ng}");
 }
+
+/// ZERO-LEDGER P4-106. Oracle: VACASK 36be560's own analysis list
+/// (`docs/cmd-analysis-acstb.md`; `demo/stb/osc.sim` runs `analysis stb1
+/// acstb probe="vp" …`, research/impl/evidence/P4-106/run.log): the target
+/// has a stability analysis, so Spectre's `stb` is kept text (W0001), never
+/// "an analysis the target lacks" (W0015).
+#[test]
+fn p4_106_a_spectre_stb_is_kept_text_on_vacask() {
+    let deck = "// t\nv1 (a 0) vsource dc=0 mag=1\nr1 (a 0) resistor r=1k\nstb1 stb start=1 stop=1M dec=10 probe=v1\n";
+    oracle::spec_refusal(
+        "VACASK 36be560 docs/cmd-analysis-acstb.md: `analysis name acstb` exists",
+        deck,
+        Dialect::Spectre,
+        Dialect::Vacask,
+        &[Code::W0001],
+    );
+}

@@ -1277,6 +1277,8 @@ def vacask(d):
         .spectre_analysis("pnoise")
         .spectre_analysis("hbac")
         .spectre_analysis("hbnoise")
+        .spectre_analysis("stb")
+        .spectre_analysis("sp")
         # The circuit temperature in an expression (docs/expr-special.md).
         .temp_name("$temp")
         # docs/expr-constants.md: the builtin constants and their values.
@@ -1331,7 +1333,7 @@ def vacask(d):
         .native(Construct.LibSection)
         .refuse(Construct.RclModel, Code.W0006)
         .refuse(Construct.ChargeCapacitor, Code.W0105)
-        .refuse(Construct.BehaviouralSource, Code.W0102)
+        .native(Construct.BehaviouralSource)
         .refuse(Construct.Laplace, Code.W0011)
         .refuse(Construct.RfPort, Code.W0007)
         .refuse(Construct.PwlRepeatV, Code.W0008)

@@ -260,3 +260,25 @@ fn a_number_keeps_the_digits_the_source_wrote() {
     let time = col(&run_text(&w.text), "time");
     close(*time.last().unwrap(), 2.25e-3, 1e-12);
 }
+
+/// ZERO-LEDGER P4-006. Oracle: the closed form of an RC step, tau = 1 ms,
+/// out(t) = 1 - exp(-t/tau), integrated from 0 and saved from TSTART =
+/// 0.5 ms: the first saved point is at 0.5 ms (ngspice-45 saves from the
+/// first step past it, 0.50258 ms) with out = 0.3935, the last at 1 ms
+/// with 0.6321 (research/impl/evidence/P4-006/).
+#[test]
+fn p4_006_a_tran_start_is_vacasks_start() {
+    let deck = "rc_tran\nR1 vin out 1k\nC1 out 0 1u\nV1 vin 0 0 PULSE(0 1 0 1n 1n 1 0)\n\
+        .tran 10u 1m 0.5m 10u UIC\n.end\n";
+    let raw = run(deck);
+    let t = col(&raw, "time");
+    let out = col(&raw, "out");
+    assert!(
+        t[0] >= 0.5e-3 * (1.0 - 1e-9) && t[0] <= 0.51e-3,
+        "first saved point at {:e}",
+        t[0]
+    );
+    close(out[0], 1.0 - (-t[0] / 1e-3).exp(), 5e-3);
+    close(*t.last().unwrap(), 1e-3, 1e-9);
+    close(*out.last().unwrap(), 1.0 - (-1.0f64).exp(), 5e-3);
+}

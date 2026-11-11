@@ -1,5 +1,5 @@
-//! What VACASK cannot do (measures, a PWL repeat, behavioural sources, switches,
-//! transmission lines, XSPICE, ...) -> a refusal code, never a broken deck.
+//! What the VACASK writer does not write -> a refusal code, never a broken
+//! deck. A card leaves the lists below with the row that translates it.
 //!
 //! Cites: real VACASK, for what it refuses or runs wrong.
 //!
@@ -27,12 +27,10 @@ fn refusals_are_errors_not_broken_decks() {
         "PWL r= must refuse"
     );
 
-    // No behavioural sources, switches, transmission lines or XSPICE; a SIN
-    // phase VACASK accepts and then ignores.
+    // Elements the VACASK writer refuses today (a card leaves this list
+    // with the row that translates it: ZERO-LEDGER P4-002 took the B source).
     for card in [
-        "B1 a 0 V=v(b)*2",
         "S1 a 0 c 0 sw\n.model sw SW",
-        "T1 a 0 b 0 Z0=50 TD=1n",
         "A1 a d_and\n.model d_and d_and",
         "V1 a 0 0 SIN(0 1 1k 0 0 90)",
     ] {
@@ -43,4 +41,15 @@ fn refusals_are_errors_not_broken_decks() {
     for card in [".pz a 0 b 0 vol pz", ".disto dec 10 1 1k", ".sens V(out)"] {
         assert!(refuses(&rc(card)), "{card} must refuse");
     }
+}
+
+/// ZERO-LEDGER P4-107. Oracle: VACASK 36be560's own analysis list
+/// (`docs/cmd-analysis-acsp.md`: `analysis name acsp`; `demo/sp/amp.sim`
+/// runs `analysis sp1 acsp ports=[…]`, research/impl/evidence/P4-107/run.log):
+/// the target has an S-parameter analysis, so `.sp` is W0001 (has it, not
+/// written yet), never W0015 (lacks it).
+#[test]
+fn p4_107_an_sp_card_is_kept_text_on_vacask() {
+    let deck = "t\nV1 a 0 dc 0 ac 1\nR1 a 0 50\n.sp dec 2 1k 10k\n.end\n";
+    assert_eq!(emit(deck).unwrap_err(), [Code::W0001]);
 }

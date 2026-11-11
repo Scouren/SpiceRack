@@ -266,16 +266,20 @@ pub(super) fn vacask() -> DialectDef {
         // VACASK page for hbac/hbnoise, run-confirmed). Kept untranslated
         // (W0001), not refused as absent (W0015); the writer still has no
         // `Ana` arm for them (`render/named/vacask_bench.rs`), only the
-        // generic `Ana::Spectre` fallback. `stb` is not here: it stays
-        // W0015 (`src/syntax/tests/render.rs`
-        // `a_region_spectre_analysis_is_written_by_spectre_and_refused_by_cause`
-        // pins it, citing a stale `docs/analysis_types.md`; that pin is
-        // outside this row's owner files — reported to team-lead).
+        // generic `Ana::Spectre` fallback.
         .spectre_analysis("pss")
         .spectre_analysis("pac")
         .spectre_analysis("pnoise")
         .spectre_analysis("hbac")
         .spectre_analysis("hbnoise")
+        // Spectre's `stb` is VACASK's `acstb` (`docs/cmd-analysis-acstb.md`;
+        // `demo/stb/osc.sim` runs it at 36be560; ZERO-LEDGER P4-106): the
+        // target has it, so W0001 until P4-008 writes the `acstb` line.
+        .spectre_analysis("stb")
+        // SPICE's `.sp` (Spectre `sp`) is VACASK's `acsp`
+        // (`docs/cmd-analysis-acsp.md`; `demo/sp/amp.sim` runs it at 36be560;
+        // ZERO-LEDGER P4-107, VS dossier §3 M4).
+        .spectre_analysis("sp")
         // The circuit temperature in an expression (docs/expr-special.md).
         .temp_name("$temp")
         // docs/expr-constants.md: the builtin constants and their values.
@@ -330,7 +334,9 @@ pub(super) fn vacask() -> DialectDef {
         .native(Construct::LibSection)
         .refuse(Construct::RclModel, Code::W0006)
         .refuse(Construct::ChargeCapacitor, Code::W0105)
-        .refuse(Construct::BehaviouralSource, Code::W0102)
+        // `<name> (p n) v=<expr>` / `i=<expr>`, no master
+        // (`docs/dev-builtin-behavioral.md` at 36be560; ZERO-LEDGER P4-002).
+        .native(Construct::BehaviouralSource)
         .refuse(Construct::Laplace, Code::W0011)
         .refuse(Construct::RfPort, Code::W0007)
         .refuse(Construct::PwlRepeatV, Code::W0008)

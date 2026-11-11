@@ -723,12 +723,14 @@ class TestDialectText:
         assert "C1 out 0 1n" in tb.netlist("cdl").splitlines()
 
     def test_check_backend_names_the_writers_refusal(self):
-        # VACASK has no `sp` analysis (W0015): the run would be refused.
+        # VACASK has `sp` (its `acsp`, 36be560 docs/cmd-analysis-acsp.md) but
+        # the writer does not write it yet (W0001, ZERO-LEDGER P4-107): the
+        # run would be refused; ngspice writes its own `.sp`.
         ps = import_spicerack()
         tb = self._tb(ps)
         tb.add_s_param()
-        assert any("W0015" in issue for issue in tb.check_backend("vacask"))
-        assert not any("W0015" in issue for issue in tb.check_backend("ngspice"))
+        assert any("W0001" in issue for issue in tb.check_backend("vacask"))
+        assert not any("W0001" in issue for issue in tb.check_backend("ngspice"))
 
     def test_a_spectre_analysis_is_spectre_text_in_a_region(self):
         # Spectre Reference 19.1 p.174: `montecarlo numruns= seed= { … }`;

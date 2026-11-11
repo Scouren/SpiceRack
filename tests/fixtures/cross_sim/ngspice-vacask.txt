@@ -33,6 +33,7 @@ ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.x1.net.1)
 ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])
 ngspice/examples/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@d1[gd]", "@d1[cd]", "@d1[qd]"] vs ["1", "d1:a_int", "d1:implicit_equation_0", "v1:flow(br)"])
+ngspice/examples/various/roessler-attractor.sp target-fails # Parameter 'ic' not found: `c1 (x 0) capacitor c=1e0 ic=1` (a C card's `ic=` under `uic`; not this row's card)
 ngspice/examples/various/todo-temper-3.sp target-fails # no raw file dc1.raw: Variable or constant 'temper' not defined. | model dplain sp_diode (is=temper >= 25 ? 1e-10 : (temper+1)*1e-11) | ^ | 9:27 (0x66) in .cross
 ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/paranoia/various/nmos_pmos_BSIM330.sp mismatch # dc: sweep grid changed (246 -> 186 points)
@@ -58,6 +59,7 @@ ngspice/tests/regression/lib-processing/ex3a.sp target-fails # no raw file op1.r
 ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["1", "v1:flow(br)"])
 ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file op1.raw: Circuit has no unknowns.
 ngspice/tests/regression/misc/if-elseif.sp target-fails # no raw file op1.raw: Parser syntax error, unexpected =
+ngspice/tests/regression/misc/log-functions-1.sp target-fails # no raw file op1.raw: Inf found in vector, row node 'bb1:flow(br)' (ln of a node at the first iterate's 0 V)
 ngspice/tests/regression/misc/test-noise-2.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/tests/regression/misc/test-noise-3.sp mismatch # plots ["noise", "noise", "total", "total"] became ["noise", "noise"]
 ngspice/tests/regression/model/binning-1.sp target-fails # no raw file op1.raw: Master 'nmos_tst' not found. | mx2 (2 2 0 0) nmos_tst l=5u w=5u | ^ | 16:1 (0x1c7) in .cross_sim_deck.sp

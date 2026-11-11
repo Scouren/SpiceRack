@@ -219,8 +219,8 @@ EXPECTED = {
     'ac_oct': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'ac_log': ('W0040', 'W0040', 'W0040', 'W0040', 'W0040', OK, 'W0040', OK, OK),
     'tran': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # VACASK refuses `.tran … uic` (W0015): its `tran` has `icmode`; writer C (FINDINGS-python.md).
-    'tran_full': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
+    # VACASK's `tran` has `start=` and `icmode="uic"` (docs/cmd-analysis-tran.md; ZERO-LEDGER P4-006).
+    'tran_full': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # ngspice's points-per-summary: LTspice notes W0033 (writer B); Spectre, VACASK drop it with no note (writer C; FINDINGS-python.md).
     'noise_summary': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -231,16 +231,17 @@ EXPECTED = {
     'polezero': (OK, OK, OK, 'W0015', 'W0015', OK, 'W0015', OK, OK),
     # G: ngspice-only `.disto`; W0015 would name the cause better than W0001 (writers B/C).
     'distortion': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
-    # The van der Pol bench's cell is a B source, which the VACASK writer
-    # refuses too (W0102).
-    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001+W0102', OK, OK),
-    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001+W0102', OK, OK),
+    # The van der Pol bench's cell is a B source: VACASK's `i=` line since
+    # ZERO-LEDGER P4-002, so only the analysis is left (W0001).
+    'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
+    'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
     # Xyce: P ports and `.LIN` (D's a5f2c0a); HSPICE has `.LIN`: writer B (FINDINGS-python.md).
-    's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0015', OK, OK),
+    's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0001', OK, OK),
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
-    'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # VACASK has `acstb` (36be560 docs/cmd-analysis-acstb.md; ZERO-LEDGER P4-106): W0001 until P4-008 writes it.
+    'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
     'transient_noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'fourier': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
     'fourier_count': (OK, OK, 'W0040', 'W0040', OK, OK, 'W0015', OK, OK),
@@ -298,11 +299,11 @@ EXPECTED = {
     'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'BV_BI': (OK, OK, OK, OK, OK, OK, 'W0102', OK, OK),
+    'BV_BI': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'POLY': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
-    'T': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    'T': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'A': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
