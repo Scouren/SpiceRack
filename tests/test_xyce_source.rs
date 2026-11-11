@@ -26,6 +26,51 @@ const LINEAR: Tol = Tol {
 
 // ---- private ----
 
+// Ledger P3-070. Xyce's E/G `TABLE` is straight lines between its points,
+// the ends held (RG 7.10 `E`; 7.10 run), so each value below is the
+// table's own arithmetic: E over (-1,1) (1,-1) (2,0.5), G over (0,1) (1,2)
+// into 1 Ω (v(3) = -I). ngspice's and ESPice's native `TABLE` round the
+// corners (0.95 for 1.0 at -1, run), so neither deck carries it: ngspice
+// takes `pwl()`, ESPice the segments as ternaries while its B source
+// compiles them (64 operations: six points over one probe pass, seven
+// stop with "TooManyOps", run), W0102 past that. LINEAR: every deck is
+// one linear solve.
+#[test]
+fn p3_070_a_xyce_table_keeps_its_corners() {
+    let on = [Dialect::Xyce, Dialect::Ngspice, Dialect::Espice];
+    for (v1, e, g) in [
+        (-1.0, 1.0, -1.0),
+        (0.5, -0.5, -1.5),
+        (2.0, 0.5, -2.0),
+        (3.0, 0.5, -2.0),
+    ] {
+        let deck = format!(
+            "* t\nV1 1 0 {v1}\nE1 2 0 TABLE {{V(1)}} = (-1,1) (1,-1) (2,0.5)\nR2 2 0 1k\n\
+             G1 3 0 TABLE {{V(1)}} = (0,1) (1,2)\nR3 3 0 1\n.op\n.end\n"
+        );
+        oracle::closed_form(Dialect::Xyce, &deck, &on, "2", At::First, e, LINEAR);
+        oracle::closed_form(Dialect::Xyce, &deck, &on, "3", At::First, g, LINEAR);
+    }
+    // Six points (five segments) at the corner (3,5): Xyce and ESPice.
+    let six = "* t\nV1 1 0 3\nE1 2 0 TABLE {V(1)} = (0,1) (1,3) (2,2) (3,5) (4,4) (5,7)\n\
+               R2 2 0 1k\n.op\n.end\n";
+    sim_pair(Dialect::Xyce, six, Dialect::Espice, "2", At::First, LINEAR);
+    // Seven points, or a control that is no single probe: past the B source.
+    let w0102 = [spicerack::syntax::diag::Code::W0102];
+    let seven = six.replace("(5,7)", "(5,7) (6,6)");
+    assert_eq!(
+        oracle::refusal(&seven, Dialect::Xyce, Dialect::Espice),
+        w0102
+    );
+    let product = six.replace("{V(1)}", "{2*V(1)}");
+    assert_eq!(
+        oracle::refusal(&product, Dialect::Xyce, Dialect::Espice),
+        w0102
+    );
+    // ngspice's `pwl()` has no such bound.
+    assert!(oracle::write(&seven, Dialect::Xyce, Dialect::Ngspice).contains("value={pwl("));
+}
+
 // Ledger P3-081. Xyce sets a parameter an `X` line passes even where the
 // `.subckt` line does not declare it, over the top-level `.param` of that
 // name (7.10: XYCE_CORPUS `Certification_Tests/BUG_1558/bug_1558_3.cir`,

@@ -19,6 +19,7 @@
 use super::W;
 use super::laplace::{self, Laplace};
 use super::parasitics;
+use super::table;
 use super::ternary::Read;
 use super::xyce_cards::xyce_shape;
 use crate::syntax::behaviour::{Coupling, NetlistRules, Parasitics};
@@ -383,7 +384,8 @@ impl W<'_, '_> {
         (s, Space::None)
     }
 
-    /// An E/G `TABLE`: ngspice's `pwl()` value, or the native `TABLE`.
+    /// An E/G `TABLE`: ngspice's `pwl()` value, ESPice's chain of ternaries
+    /// (`table`), or the native `TABLE`.
     fn table_card(&mut self, n: u32, card: Card) -> String {
         let tok = self.rd.main(n);
         let decl = self.names.decl(n).to_string();
@@ -397,9 +399,19 @@ impl W<'_, '_> {
         else {
             unreachable!("a table card")
         };
-        let act = self.ask(Construct::TableSource, tok);
+        let mut act = self.ask(Construct::TableSource, tok);
+        // The ternary spelling holds one probe and five segments
+        // (`table::fits`); a larger table is refused.
+        if act == Action::Spell(Alt::TernaryValue) && !table::fits(&expr, &points) {
+            self.refuse(Code::W0102, tok);
+            act = Action::Native;
+        }
         let n = |v: f64| self.sp.number(v, self.x);
         match act {
+            Action::Spell(Alt::TernaryValue) => format!(
+                "{decl} {np} {nm} value={{{}}}",
+                table::ternary_chain(&expr, &points, n)
+            ),
             // ngspice manual, `pwl(x, x1, y1, …)` in an E/G value
             // (straight on past the ends, so a flat point is added
             // each side; ngspice-45 ran it equal to Xyce's TABLE).

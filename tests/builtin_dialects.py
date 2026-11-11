@@ -245,7 +245,9 @@ def espice(d):
         .lift(Construct.Laplace, Rule.LaplaceTable)
         .native(Construct.PwlRepeatI)
         .refuse(Construct.NoiseWave, Code.W0009)
-        .refuse(Construct.TableSource, Code.W0102)
+        # No `pwl()` in a B source, and its own `TABLE` rounds the corners
+        # (0.95 where Xyce gives 1.0, run): the segments as ternaries.
+        .spell(Construct.TableSource, Alt.TernaryValue)
         # ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
         # offset" (run).
         .spell(Construct.AmWave, Alt.AmNoOffset)

@@ -168,6 +168,11 @@ pub enum Alt {
     DcType,
     /// An E/G `value={pwl(expr, x, y, …)}` (ngspice).
     PwlValue,
+    /// An E/G `value={x < x1 ? y1 : x < x2 ? … : yn}`: a table's segments
+    /// as ternaries, for one probe and up to five segments (ESPice, whose
+    /// B source compiles 64 operations and has no `pwl()`); a larger
+    /// table is refused (W0102).
+    TernaryValue,
     /// `P n+ n- port=n z0=z` (Xyce).
     XycePort,
     /// `AM(SA OC FM FC TD)` (HSPICE).

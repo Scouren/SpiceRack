@@ -22,8 +22,8 @@ macro_rules! rows_w_named {
             /// A behavioural source whose SPICE expression the target's grammar cannot be trusted to read.
             W0102 Refusal {
                 title: "a behavioural source the target cannot spell",
-                cite: "Spectre Reference 5.0 pp.856-860 (bsource), pp.867-870 (operators, functions); VACASK 36be560 docs/dev-builtin-behavioral.md (`v=`/`i=`, its function table)",
-                explain: "The expression holds a form the target's behavioural source (Spectre's bsource, VACASK's `v=`/`i=` line) has no spelling for with the same meaning (`hertz`, a function such as `u()` or a statistical call, another dialect's `**`/`pow` whose negative-base rule is not checked, on VACASK the current of a device that is no voltage source). Rewrite the expression with the functions both define, or model the element as Verilog-A.",
+                cite: "Spectre Reference 5.0 pp.856-860 (bsource), pp.867-870 (operators, functions); VACASK 36be560 docs/dev-builtin-behavioral.md (`v=`/`i=`, its function table); ESPice 0.3.0 (its B source compiles 64 operations, 32 constants, stack depth 16, 8 probed nets and currents: the error's own text; no `pwl()` or `table()` in it)",
+                explain: "The expression holds a form the target's behavioural source (Spectre's bsource, VACASK's `v=`/`i=` line) has no spelling for with the same meaning (`hertz`, a function such as `u()` or a statistical call, another dialect's `**`/`pow` whose negative-base rule is not checked, on VACASK the current of a device that is no voltage source). Rewrite the expression with the functions both define, or model the element as Verilog-A. On ESPice a table source (Xyce's E/G `TABLE`) is written as a chain of ternaries over its segments, which the B source compiles for one probe and up to five segments (64 operations); a larger table, or one over an expression, is refused: write it with fewer points, or as two sources summed.",
             }
             /// A charge expression reading a branch current, a braced value, `time`, `temper` or `hertz`.
             W0103 Refusal {

@@ -17,7 +17,7 @@
 //! changed between analyses), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
-//! target reads it,
+//! target reads it, `table` an E/G `TABLE` as a chain of ternaries,
 //! `cdl` CDL's layout; the `statistics` lift (`render::draws`) and the name
 //! map (`render::names`) are shared with the named writer.
 //!
@@ -61,6 +61,7 @@ pub(in crate::syntax::render) mod parasitics;
 mod powers;
 mod prints;
 mod sweeps;
+mod table;
 mod ternary;
 mod tstep;
 mod values;
