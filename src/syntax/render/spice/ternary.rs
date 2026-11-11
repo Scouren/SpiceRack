@@ -30,6 +30,7 @@
 //! - `pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String`
 //! - `pub(super) fn nominal(e: &str) -> String`
 //! - `pub(super) fn spell_clamp(e: &str) -> String`
+//! - `pub(super) fn close(b: &[u8], i: usize) -> Option<usize>`
 
 use std::cell::Cell;
 
@@ -209,6 +210,35 @@ pub(super) fn rename_call(e: &str, from: &str, to: &str) -> String {
     out
 }
 
+/// The index closing the group `b[i]` opens; `None` when `b[i]` opens
+/// none or the group is unclosed. Quotes nest nothing.
+pub(super) fn close(b: &[u8], i: usize) -> Option<usize> {
+    let shut = |c: u8| match c {
+        b'(' => Some(b')'),
+        b'[' => Some(b']'),
+        b'{' => Some(b'}'),
+        b'\'' | b'"' => Some(c),
+        _ => None,
+    };
+    let mut want = vec![shut(b[i])?];
+    let mut j = i + 1;
+    while j < b.len() {
+        let top = want[want.len() - 1];
+        if b[j] == top {
+            want.pop();
+            if want.is_empty() {
+                return Some(j);
+            }
+        } else if !matches!(top, b'\'' | b'"')
+            && let Some(s) = shut(b[j])
+        {
+            want.push(s);
+        }
+        j += 1;
+    }
+    None
+}
+
 // ---- private ----
 
 /// `s` with its ternaries spelled, at nesting `depth`.
@@ -363,35 +393,6 @@ fn commas(s: &str) -> Vec<&str> {
     }
     out.push(&s[from..]);
     out
-}
-
-/// The index closing the group `b[i]` opens; `None` when `b[i]` opens
-/// none or the group is unclosed. Quotes nest nothing.
-fn close(b: &[u8], i: usize) -> Option<usize> {
-    let shut = |c: u8| match c {
-        b'(' => Some(b')'),
-        b'[' => Some(b']'),
-        b'{' => Some(b'}'),
-        b'\'' | b'"' => Some(c),
-        _ => None,
-    };
-    let mut want = vec![shut(b[i])?];
-    let mut j = i + 1;
-    while j < b.len() {
-        let top = want[want.len() - 1];
-        if b[j] == top {
-            want.pop();
-            if want.is_empty() {
-                return Some(j);
-            }
-        } else if !matches!(top, b'\'' | b'"')
-            && let Some(s) = shut(b[j])
-        {
-            want.push(s);
-        }
-        j += 1;
-    }
-    None
 }
 
 #[cfg(test)]

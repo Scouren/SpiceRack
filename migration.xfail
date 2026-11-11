@@ -1177,14 +1177,14 @@ xyce/TEMPCAP/tempcap_instance.cir hspice written differently: TIMEINT RELTOL wri
 xyce/TEMPCAP/tempcap_instance.cir ngspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolation_gear.cir espice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolation_gear.cir hspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
-xyce/TIA/Interpolation_TIA/interpolation_gear.cir ltspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
+xyce/TIA/Interpolation_TIA/interpolation_gear.cir ltspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003); written differently: `-(TIME - 7e-3)**2` is `-((TIME - 7e-3)**2)` (P3-077)
 xyce/TIA/Interpolation_TIA/interpolation_gear.cir ngspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolation_gear.cir spectre written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolation_gear.cir vacask written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolation_gear.cir xyce written differently: TIMEINT RELTOL moves to the head of the options lines, a portable option now (P3-003)
 xyce/TIA/Interpolation_TIA/interpolationtrap.cir espice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolationtrap.cir hspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
-xyce/TIA/Interpolation_TIA/interpolationtrap.cir ltspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
+xyce/TIA/Interpolation_TIA/interpolationtrap.cir ltspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003); written differently: `-(TIME - 7e-3)**2` is `-((TIME - 7e-3)**2)` (P3-077)
 xyce/TIA/Interpolation_TIA/interpolationtrap.cir ngspice written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolationtrap.cir spectre written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
 xyce/TIA/Interpolation_TIA/interpolationtrap.cir vacask written differently: TIMEINT RELTOL written as the target's reltol option (P3-003)
@@ -3594,3 +3594,9 @@ xyce/XDM/HSPICE/INDEPENDENT_SOURCES/i_sources_sffm.cir ngspice written different
 xyce/XDM/HSPICE/INDEPENDENT_SOURCES/v_sources_sffm.cir cdl written differently: the SFFM as a behavioural source in series with (V) or across (I) the card (ngspice limits MDI to FC/FM and is 0 at time zero) (P3-083)
 xyce/XDM/HSPICE/INDEPENDENT_SOURCES/v_sources_sffm.cir espice written differently: the SFFM as a behavioural source in series with (V) or across (I) the card (ngspice limits MDI to FC/FM and is 0 at time zero) (P3-083)
 xyce/XDM/HSPICE/INDEPENDENT_SOURCES/v_sources_sffm.cir ngspice written differently: the SFFM as a behavioural source in series with (V) or across (I) the card (ngspice limits MDI to FC/FM and is 0 at time zero) (P3-083)
+
+# S1: P3-077: a power under a unary sign is written `-(a**b)` for LTspice, which reads `-a**b` as
+# `(-a)**b` (LTspice 26.1.1: `-2**2` = 4; ngspice-45, Xyce 7.10: -4). Oracle: the three simulators,
+# research/impl/evidence/P3-077.
+spice-bench/ngspice/tests/regression/misc/bugs-1.sp ltspice written differently: `-aux1003**2` is `-(aux1003**2)` (P3-077)
+xyce/ABM_POW/abmpow1.cir ltspice written differently: `-V(1)**2` is `-(V(1)**2)` (P3-077)

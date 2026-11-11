@@ -16,6 +16,7 @@
 //! - `pub(super) fn r_value(kind: &str, params: &[(String, String)]) -> Option<String>`
 
 use super::W;
+use super::powers::{Grouping, group_powers};
 use super::ternary::{
     Read, nominal, parenthesize, rename_call, rename_word, spell_clamp, spell_if, spell_nint,
 };
@@ -68,6 +69,16 @@ const REWRITES: &[Rewrite] = &[
     Rewrite {
         holds: |w| w.pair.nint_to_ngspice,
         apply: |_, e| spell_nint(e, false),
+    },
+    // A power chain, a power under a unary sign: the source's grouping in
+    // parentheses where the target groups another way (`powers`). Last:
+    // a row that spells a call as a power goes before it.
+    Rewrite {
+        holds: |w| Grouping::of(&w.rd.t.lexicon_at(0).ops) != Grouping::of(&w.sp.lexicon.ops),
+        apply: |w, e| {
+            let src = Grouping::of(&w.rd.t.lexicon_at(0).ops);
+            group_powers(e, src, Grouping::of(&w.sp.lexicon.ops), w.rd.b.caret_power)
+        },
     },
 ];
 

@@ -56,6 +56,7 @@ mod model_cards;
 mod ngspice_options;
 mod pair;
 pub(in crate::syntax::render) mod parasitics;
+mod powers;
 mod prints;
 mod sweeps;
 mod ternary;
