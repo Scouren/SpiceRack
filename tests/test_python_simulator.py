@@ -680,6 +680,32 @@ def test_run_returns_one_result_per_queued_analysis_in_queue_order(backend):
     _check_queued(tran, op, ac)
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p3_096_api_operatingpoint_has_no_nodes(backend):
+    """ZERO-LEDGER P3-096: an OperatingPoint lists its nodes and branches and
+    reads a vector by the simulator's spelling too. Oracle: closed form, 9 V
+    over 2k + 1k: vout = 9 * 1k/3k = 3 V, the source's branch current
+    -9/3k = -3 mA."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("divider", ["vin", "vout"])
+    dut.R(name="top", positive="vin", negative="vout", value=2e3)
+    dut.R(name="bot", positive="vout", negative="0", value=1e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="supply", positive="vin", negative="0", value=9.0)
+    op = tb.operating_point()
+    for key in ["v(vout)", "V(VOUT)", "vout"]:
+        assert op[key] == pytest.approx(3.0, rel=1e-9), key
+    for key in ["i(vsupply)", "I(Vsupply)", "vsupply#branch"]:
+        assert op[key] == pytest.approx(-3e-3, rel=1e-9), key
+    assert op.nodes == ["vin", "vout"]
+    assert op.branches == ["i(vsupply)"]
+    assert op.vout == pytest.approx(3.0, rel=1e-9)
+    with pytest.raises(KeyError, match="No node 'v\\(nope\\)'"):
+        op["v(nope)"]
+
+
 def test_run_with_a_measure_runs_every_analysis_from_the_control_block():
     """A `.meas` moves ngspice's analyses into a `.control` block, which runs
     them in card order; the results still land on their own analyses."""

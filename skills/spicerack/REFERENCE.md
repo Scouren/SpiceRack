@@ -133,8 +133,8 @@ uic=)` on Spectre is `W0040` (no such `pss` fields).
 
 ## Results
 
-Every result type has `result[node]`, `result.measures`.
-`DcAnalysis` additionally has `.nodes` and `.branches`.
+Every result type has `result[node]`, `result.measures`, and `.nodes` and
+`.branches` (the names it holds). `op["v(out)"]` and `op["out"]` are one node.
 
 | Type | Axis | Extra |
 |---|---|---|

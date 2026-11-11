@@ -312,16 +312,32 @@ impl PyOperatingPoint {
     fn params(&self) -> HashMap<String, f64> {
         self.inner.raw.params.iter().cloned().collect()
     }
+
+    /// The nodes the point holds, by canonical name (`out`, `x1.mid`),
+    /// sorted.
+    #[getter]
+    fn nodes(&self) -> Vec<String> {
+        sorted(&self.inner.nodes)
+    }
+
+    /// The branch currents the point holds (`i(vin)`), sorted.
+    #[getter]
+    fn branches(&self) -> Vec<String> {
+        sorted(&self.inner.branches)
+    }
 }
 
 impl PyOperatingPoint {
     /// The one point's value; `missing` for no such node, a `ValueError`
     /// for a run that wrote several points (a `.step` around the operating
-    /// point), whose values one float cannot hold.
+    /// point), whose values one float cannot hold. `name` is a canonical
+    /// name or a simulator's spelling of one: `v(out)` is `out`, `I(Vin)`
+    /// and `vin#branch` are `i(vin)` (`normalize::canonical`).
     fn value(&self, name: &str, missing: fn(String) -> PyErr) -> PyResult<f64> {
+        let key = crate::normalize::canonical(name, None).0;
         let col = self
             .inner
-            .get(name)
+            .get(&key)
             .ok_or_else(|| missing(format!("No node '{name}'")))?;
         match *col {
             [v] => Ok(v),
@@ -331,6 +347,14 @@ impl PyOperatingPoint {
             ))),
         }
     }
+}
+
+/// The names of `map` (a result's nodes, or its branches), sorted: a hash
+/// map's own order changes from run to run.
+fn sorted(map: &HashMap<String, usize>) -> Vec<String> {
+    let mut names: Vec<String> = map.keys().cloned().collect();
+    names.sort();
+    names
 }
 
 /// Convert MeasureResult vec to a Python-friendly dict
