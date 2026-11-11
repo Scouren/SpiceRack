@@ -512,6 +512,18 @@ impl<'a> Rd<'a> {
                     params,
                 });
             }
+            // Xyce 7.10 runs a resistor with nothing after its nodes at
+            // 1000 ohms ("Expected value field for device R2, continuing
+            // with value of 0", then "Resistance is set to 0, setting to
+            // the default, 1000 ohms"; Xyce_Regression
+            // RESISTOR/DefaultValueWarning.cir). A capacitor or an inductor
+            // with no value it rejects.
+            None if e == Element::Resistor
+                && self.b.card_rules == CardRules::Xyce
+                && inst.is_empty() =>
+            {
+                Val::Num(1000.0)
+            }
             None => {
                 let key = match e {
                     Element::Resistor => "r",

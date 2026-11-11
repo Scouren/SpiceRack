@@ -486,3 +486,114 @@ fn p1_059_a_measure_with_no_partner_for_a_delimiter_is_a_xyce_reject() {
         }
     }
 }
+
+#[test]
+fn p1_056_s2_a_cut_rcl_key_a_lone_y_or_u_name_and_a_stray_y_comma_are_xyce_rejects() {
+    // Oracle: Xyce 7.10 `-norun` on the deck below holding each line alone
+    // (V9, R9, L2, L3, `.model DM D`, `.model RM R`, `.param rv`; a Y line
+    // with its `.MODEL PDEBJT ZOD` card). It stops on every `rejected`
+    // line and every `stray` list with the message above it and reads
+    // every `legal` one, its neighbour (the corpus decks: Xyce_Regression
+    // Message/Device/DeviceBlock_extractInstanceParam.cir lines 27 to 73,
+    // Message/Input/CircuitBlock_handleLinePass1_1.cir lines 4 and 5). A
+    // rejected line is left out with P0010, so no target refuses its text
+    // (W0001, W0032); a legal one carries no P0010. Checks: 3 per rejected
+    // line and 1 per legal line, on 2 targets.
+    let ypde = |list: &str| {
+        format!(
+            "YPDE BJT1 5 3 7 PDEBJT\n+ node = {list}\n+ sgplotlevel=0 tecplotlevel=0\n+ l=2.0e-3  w=1.0e-3\n+ nx=30     ny=15\n+ mobmodel=carr\n.MODEL PDEBJT ZOD level=2"
+        )
+    };
+    let rejected = [
+        // Y device line specified with only one token: YAND. Need at least two.
+        "YAND",
+        // U device line specified with only one token: UAND1. Need at least two.
+        "UAND1",
+        // Unexpectedly reached end of line while looking for parameters for device
+        "R1 a 0 1 TC",
+        "R1 a 0 1 TC=",
+        "R1 a 0 1 TC=0,",
+        "R1 a 0 1 TEMP",
+        "R1 a 0 1 TEMP=",
+        "R1 a 0 1k M",
+        "R1 a 0 RM L=",
+        "C1 a 0 1p IC",
+        "L4 a 0 1m IC=",
+        "L4 a 0 1m TEMP",
+        // Unrecognized parameter , for device
+        "R1 a 0 1k,",
+        "C1 a 0 1p IC=1,",
+    ];
+    // Invalid syntax (likely spurious comma) for composite parameter NODE
+    let stray = [
+        "{name = collector, base, ,, emitter}",
+        "{name = collector, base, ,emitter}",
+        "{name = collector, base, emitter,}",
+        "{name = ,collector, base, emitter}",
+    ];
+    let legal = [
+        "R1 a 0 1k RM".to_string(),
+        "R1 a 0 1k TC=1,2".to_string(),
+        "R1 a 0".to_string(),
+        "R1 a 0 TC1=0.5".to_string(),
+        // The key's word names a model of the deck: the model.
+        "R1 a 0 1k M\n.model M R (RSH=1)".to_string(),
+        ypde("{name = collector, base, emitter}"),
+    ];
+    let rejected: Vec<String> = rejected
+        .map(String::from)
+        .into_iter()
+        .chain(stray.map(ypde))
+        .collect();
+    let codes = |l: &str, d: Dialect| -> Vec<Code> {
+        let deck = format!(
+            "t\nV9 a 0 1\nR9 a 0 1\nL2 1 0 1u\nL3 1 0 1u\n.model DM D\n.model RM R (RSH=1)\n.param rv=1k\n{l}\n.tran 1n 1u\n.print tran v(a)\n.end\n"
+        );
+        match render_text(&deck, Dialect::Xyce, "t", d) {
+            Ok(w) => w.notes.diags.iter().map(|g| g.code).collect(),
+            Err(e) => e.diags.iter().map(|g| g.code).collect(),
+        }
+    };
+    for d in [Dialect::Ngspice, Dialect::Xyce] {
+        for l in &rejected {
+            let c = codes(l, d);
+            assert!(c.contains(&Code::P0010), "{d:?} {l}: {c:?}");
+            assert!(!c.contains(&Code::W0001), "{d:?} {l}: {c:?}");
+            assert!(!c.contains(&Code::W0032), "{d:?} {l}: {c:?}");
+        }
+        for l in &legal {
+            let c = codes(l, d);
+            assert!(!c.contains(&Code::P0010), "{d:?} {l}: {c:?}");
+        }
+    }
+}
+
+#[test]
+fn p1_056_s2_a_xyce_resistor_with_no_value_is_1k() {
+    // Oracle: Xyce 7.10 runs this deck to V(2) = 5.00000000e-01, the
+    // divider of two equal resistors, so R2 is R3's 1k ("Expected value
+    // field for device R2, continuing with value of 0", then "Resistance
+    // is set to 0, setting to the default, 1000 ohms"; the corpus deck:
+    // Xyce_Regression RESISTOR/DefaultValueWarning.cir, V(1A) = 0.5). The
+    // card is written with that value, by hand `R2 1 2 1k`, and is no kept
+    // text (W0001 elsewhere, W0027 on Xyce). ngspice-45 has no such
+    // default: read as ngspice the line gets no value. Checks: 3 on 2
+    // targets, and 1.
+    let deck = "t\nV1 1 0 1\nR2 1 2\nR3 2 0 1k\n.dc V1 1 1 1\n.print dc v(2)\n.end\n";
+    for d in [Dialect::Ngspice, Dialect::Xyce] {
+        let w = render_text(deck, Dialect::Xyce, "t", d).expect("a deck Xyce runs");
+        let codes: Vec<Code> = w.notes.diags.iter().map(|g| g.code).collect();
+        assert!(
+            w.text.lines().any(|l| l == "R2 1 2 1k"),
+            "{d:?}: {}",
+            w.text
+        );
+        assert!(!codes.contains(&Code::W0001), "{d:?}: {codes:?}");
+        assert!(!codes.contains(&Code::W0027), "{d:?}: {codes:?}");
+    }
+    let own = render_text(deck, Dialect::Ngspice, "t", Dialect::Ngspice);
+    assert!(
+        !own.is_ok_and(|w| w.text.lines().any(|l| l == "R2 1 2 1k")),
+        "ngspice's `R2 1 2` has no default value"
+    );
+}
