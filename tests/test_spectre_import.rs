@@ -151,6 +151,29 @@ fn a_spectre_parameter_sweep_is_a_step_on_xyce() {
     assert_eq!(refusals(ng), vec![Code::W0016]);
 }
 
+// ZERO-LEDGER P3-098. Oracle: Spectre Reference 19.1 p.43 (`lin`, `log`:
+// the number of steps; `dec`: points per decade): a count that is no whole
+// number from 1 is no sweep, so the statement stays Spectre's text. VACASK
+// 36be560 on `points=-3`: "Number of intervals … must be nonnegative".
+#[test]
+fn p3_098_a_sweep_count_out_of_range_is_no_sweep() {
+    let head = "simulator lang=spectre\nv1 (in 0) vsource dc=1 mag=1\nr1 (in 0) resistor r=1k\n";
+    for count in ["lin=-3", "lin=0", "lin=2.5", "lin=1e10", "dec=-1"] {
+        let deck = format!("{head}ac1 ac start=1 stop=2 {count}\n");
+        let ng = written(&deck, Dialect::Spectre, Dialect::Ngspice);
+        assert_eq!(refusals(ng), vec![Code::W0001], "{count}");
+    }
+    let head = "t\nground 0\nload \"spice/resistor.osdi\"\nmodel resistor sp_resistor\n\
+                model vsource vsource\nv1 (in 0) vsource dc=1 mag=1\nr1 (in 0) resistor r=1k\n";
+    for points in ["-3", "1e10"] {
+        let deck = format!(
+            "{head}control\n  analysis ac1 ac from=1 to=2 mode=\"lin\" points={points}\nendc\n"
+        );
+        let ng = written(&deck, Dialect::Vacask, Dialect::Ngspice);
+        assert!(refusals(ng).contains(&Code::W0001), "points={points}");
+    }
+}
+
 // ZERO-LEDGER P3-022. Oracle: Spectre Reference 19.1 pp.43-44 (`ac`): the
 // sweep's limits are `start`/`stop` or `center`/`span`; with `dev=` and
 // `param=` the statement sweeps that parameter at the frequency `freq=`.

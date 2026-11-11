@@ -128,7 +128,10 @@ impl<'a> Rd<'a> {
             }
             let (variation, n) = ["dec", "lin", "log"]
                 .into_iter()
-                .find_map(|v| num(v).map(|x| (v, x as u32)))?;
+                .find_map(|v| self.get(&p, v).map(|x| (v, self.count(x))))?;
+            // A count is a whole number from 1: `lin=-3` cast to a count
+            // is 0 steps, a sweep the deck never wrote; it stays text.
+            let n = n.filter(|n| *n >= 1)?;
             let (start, stop) = match (num("start"), num("stop"), num("center"), num("span")) {
                 (Some(a), Some(b), None, None) => (a, b),
                 (None, None, Some(c), Some(w)) => (c - w / 2.0, c + w / 2.0),
@@ -136,7 +139,7 @@ impl<'a> Rd<'a> {
             };
             Some(Sweep {
                 variation,
-                points: n.saturating_add(u32::from(variation != "dec")),
+                points: n.checked_add(u32::from(variation != "dec"))?,
                 start,
                 stop,
             })
