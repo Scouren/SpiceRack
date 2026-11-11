@@ -372,7 +372,8 @@ pub enum NetlistRules {
     Xyce,
     /// HSPICE: TNOM and TEMP 25 °C; GSHUNT, GMINDC, SEARCH options.
     Hspice,
-    /// LTspice: TSTEP 0 the simulator's choice.
+    /// LTspice: TSTEP 0 the simulator's choice; a capacitor's IC in the
+    /// operating point (26.1.1, run: `ic=1` is 1 V at t = 0 with no UIC).
     Ltspice,
 }
 

@@ -232,3 +232,78 @@ fn p4_009_mapped_options_are_vacasks_own() {
         close(col(&run(&deck), "b")[0], want, 1e-9);
     }
 }
+
+/// ZERO-LEDGER P4-110. Oracle: each capacitor's discharge from its IC
+/// under UIC, IC * exp(-t/RC), at every saved point: C1 floats across R1
+/// (1 ms), C2 sits on ground across R3 (0.5 ms); ngspice-45 on the same
+/// deck gives 0.3678794 and 0.2706699 at 1 ms
+/// (research/impl/evidence/P4-110/ngspice.run.log). VACASK's module has no
+/// `ic` ("Parameter 'ic' not found.", `vacask.spec-base.log`).
+#[test]
+fn p4_110_a_capacitors_ic_is_the_transients_ic_list() {
+    let deck = "cic\nC1 a b 1u ic=1\nR1 a b 1k\nR2 b 0 1k\nC2 c 0 1u ic=2\nR3 c 0 500\n.tran 2u 2m uic\n.end\n";
+    let raw = run(deck);
+    let (t, a, b, c) = (
+        col(&raw, "time"),
+        col(&raw, "a"),
+        col(&raw, "b"),
+        col(&raw, "c"),
+    );
+    assert!(t.len() >= 100, "{} points", t.len());
+    for (((&t, &a), &b), &c) in t.iter().zip(&a).zip(&b).zip(&c) {
+        let (d, w1, w2) = (a - b, (-t / 1e-3).exp(), 2.0 * (-t / 0.5e-3).exp());
+        assert!((d - w1).abs() < 2e-5, "t {t:e}: a-b {d}, want {w1}");
+        assert!((c - w2).abs() < 2e-5, "t {t:e}: c {c}, want {w2}");
+    }
+}
+
+/// ZERO-LEDGER P4-110. Oracle: Xyce on the same deck holds the capacitor
+/// at its IC in the operating point (`xy/deck.cir.prn`: V(A) = 1 at t = 0
+/// with no UIC; LTspice 26.1.1 the same, `lt/deck.log`), then
+/// exp(-t/RC); VACASK's `icmode="op"` forces the node to 1e-5.
+#[test]
+fn p4_110_a_xyce_capacitors_ic_holds_the_operating_point() {
+    let deck = "xic\nC1 a 0 1u IC=1\nR1 a 0 1k\n.tran 10u 2m\n.print tran v(a)\n.end\n";
+    let xyce = Lang::XYCE.lexicon().expect("a reader");
+    let raw = run_text(&emit_from(deck, Dialect::Xyce, xyce).expect("written"));
+    for (&t, &v) in col(&raw, "time").iter().zip(&col(&raw, "a")) {
+        assert!((v - (-t / 1e-3).exp()).abs() < 1e-4, "t {t:e}: got {v}");
+    }
+}
+
+/// ZERO-LEDGER P4-110. Oracle: VACASK 36be560 itself: `sp_inductor` has
+/// no `ic` ("Parameter 'ic' not found.", `vacask.l.log`), an `ic` list
+/// holds node voltages (`docs/cmd-analysis-tran.md`), and `icmode="op"`
+/// moves a floating pair's common mode (`vacask.op.tran1.raw`: a = 0, b =
+/// -1 at t = 0 where Xyce gives 1 and 0).
+#[test]
+fn p4_110_an_ic_with_no_vacask_form_is_refused() {
+    let inductor = "lic\nI1 0 a 0\nL1 a 0 1m ic=1m\nR1 a 0 1k\n.tran 10n 5u uic\n.end\n";
+    assert_eq!(emit(inductor).unwrap_err(), [Code::W0129]);
+    let floating = "xic\nC1 a b 1u IC=1\nR1 a b 1k\nR2 b 0 1k\n.tran 10u 2m\n.end\n";
+    let xyce = Lang::XYCE.lexicon().expect("a reader");
+    assert_eq!(
+        emit_from(floating, Dialect::Xyce, xyce).unwrap_err(),
+        [Code::W0129]
+    );
+}
+
+/// ZERO-LEDGER P4-110. Oracle: ngspice-45 on the same deck: `.ic` leaves
+/// an `.op` free (v(b) = 1, `ngspice.icop.log`) and starts the transient
+/// at 0.25. VACASK's `op` has no `ic` ("Parameter 'ic' not found.", the
+/// analysis skipped: `vacask.icop.spec-base.log`).
+#[test]
+fn p4_110_an_ic_card_is_the_transients_alone() {
+    let deck = "icop\nV1 a 0 1\nR1 a b 1k\nC1 b 0 1u\n.ic v(b)=0.25\n.op\n.tran 10u 1m\n.end\n";
+    let netlist = emit(deck).expect("emit vacask deck");
+    assert!(
+        have_vacask(),
+        "vacask not on PATH: run the tests in `nix develop .#testing`"
+    );
+    let plots = Dialect::Vacask
+        .run_all(&netlist)
+        .unwrap_or_else(|e| panic!("{e}\n{netlist}"));
+    assert_eq!(plots.len(), 2, "{netlist}");
+    close(col(&plots[0], "b")[0], 1.0, 1e-9);
+    close(col(&plots[1], "b")[0], 0.25, 1e-3);
+}

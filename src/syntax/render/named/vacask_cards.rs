@@ -59,6 +59,22 @@ impl W<'_, '_> {
                     ));
                 }
                 let mut params = self.tran_ic(letter, params, n);
+                // `sp_capacitor` and `sp_inductor` have no `ic` ("Parameter
+                // 'ic' not found."): a top capacitor's is the transients'
+                // `ic` on its node pair (`W::cap_ics`, written by
+                // `control`); an inductor's current, or a capacitor's in a
+                // subcircuit, has no form (ZERO-LEDGER P4-110).
+                let ic = params
+                    .iter()
+                    .position(|(k, _)| k.eq_ignore_ascii_case("ic"));
+                if let Some(at) = ic {
+                    let top = &self.deck.top.comps;
+                    if letter != 'C' || !top.iter().any(|c| matches!(c, Comp::Card(m) if *m == n)) {
+                        self.refuse(Code::W0129, tok);
+                        return None;
+                    }
+                    params.remove(at);
+                }
                 let extra = self.parasitics(letter, n, &n1, &n2, &mut params);
                 let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let (l, m) = match letter {
