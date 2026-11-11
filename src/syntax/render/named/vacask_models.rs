@@ -1,26 +1,31 @@
 //! The VACASK `model` lines: an ngspice `.model` kind and LEVEL → the
 //! `sp_<module>` VACASK builds from ngspice's device code, or a module in
 //! a file of its own (`Behaviours::model_load`: Xyce's VBIC 1.3 is
-//! `vbic13`), each parameter checked against the names the module declares
-//! (VACASK stops on another: "Parameter 'utra' not found.") and those
-//! ngspice-45 reads on the same device's card (ngspice ignores another:
-//! "unrecognized parameter - ignored"). Both name tables are generated,
-//! one line per module (`<module> <name> <name> …`, lowercase):
-//! `vacask_params.txt` from VACASK 36be560 `devices/spice/<module>.va`
-//! (`parameter` and `aliasparam` names) and `devices/vbic/vbic_1p3.va`
-//! (its model parameters), `ngspice_params.txt` from ngspice-45
+//! `vbic13`, PSP 103 `psp103va`), each parameter checked against the names
+//! the module declares (VACASK stops on another: "Parameter 'utra' not
+//! found.") and those ngspice-45 reads on the same device's card (ngspice
+//! ignores another: "unrecognized parameter - ignored"). Both name tables
+//! are generated, one line per module (`<module> <name> <name> …`,
+//! lowercase): `vacask_params.txt` from VACASK 36be560
+//! `devices/spice/<module>.va` (`parameter` and `aliasparam` names),
+//! `devices/vbic/vbic_1p3.va` (its model parameters) and the OSDI
+//! descriptors of `psp103v4.osdi` and `vbic_1p3*.osdi` (`psp103va`'s model
+//! parameters; a `<module>.inst` row, the instance parameters of a module
+//! in a file of its own), `ngspice_params.txt` from ngspice-45
 //! `src/spicelib/devices/<dev>/*.c` (the `IOP*`/`IP*` rows; `OP` rows are
 //! outputs).
 //!
 //! Cites: VACASK 36be560 `devices/spice/*.va`, `devices/vbic/vbic_1p3.va`
-//! L194-L229 (its three modules), `devices/CMakeLists.txt` L10-L12; Xyce
-//! RG 7.10 §2.3.17 (`Q` levels 11 and 12); ngspice-45
+//! L194-L229 (its three modules), `devices/psp103v4/psp103.va` L46
+//! (`PSP103VA`), `devices/CMakeLists.txt` L10-L13; Xyce RG 7.10 §2.3.17
+//! (`Q` levels 11 and 12), §2.3.20.12 (`M` level 103); ngspice-45
 //! `parser/inpgmod.c`, `parser/inpdomod.c` L271-L314 (BSIM versions),
 //! `devices/*/*.c` parameter tables.
 //!
 //! Contents:
 //! - `W::module_of(&self, n: u32, model: &str) -> Option<&'static str>`
 //! - `W::model_lines(&mut self, b: &Block, loads: &mut BTreeSet<String>) -> Vec<String>`
+//! - `W::module_card(&self, n: u32, model: &str, nodes: usize, params: &[(String, String)]) -> Option<Code>`
 //! - `W::is_vdmos(&self, n: u32, model: &str) -> bool`
 
 use std::collections::BTreeSet;
@@ -86,6 +91,41 @@ impl W<'_, '_> {
         out
     }
 
+    /// The refusal of a card of `nodes` nodes and `params` on instance
+    /// `n`'s model `model`, when that is a module in a file of its own
+    /// (`Behaviours::model_load`): such a module takes the terminals and
+    /// the instance parameters it declares (`m` aside, the writer's
+    /// `$mfactor`), and VACASK stops on another ("Parameter 'dta' not
+    /// found.": Xyce and ESPice read an instance `DTA` on a PSP 103 card,
+    /// `psp103va` has the model's alone). `None`: written.
+    // ponytail: one model view a card, as `W::is_vdmos`: a table of the
+    // block's models with a load row when `benches/perf.py` shows it.
+    pub(super) fn module_card(
+        &self,
+        n: u32,
+        model: &str,
+        nodes: usize,
+        params: &[(String, String)],
+    ) -> Option<Code> {
+        let module = self.module_of(n, model)?;
+        // An `sp_` module is ngspice's device: its card is ngspice's.
+        self.b.model_load(module)?;
+        // Xyce's level 11 card may name a fourth node, the thermal `dt`
+        // (RG 7.10 §2.3.17.2); `vbic13` keeps it inside (`vbic_1p3.va`
+        // L196-L200), and VACASK stops on the card: "Too many terminals
+        // specified at instantiation."
+        if module == "vbic13" && nodes > 3 {
+            return Some(Code::W0105);
+        }
+        let rows = format!("{module}.inst");
+        debug_assert!(VACASK.lines().any(|l| l.starts_with(&rows)), "{rows}");
+        let lacks = |(k, _): &(String, String)| {
+            let k = k.to_ascii_lowercase();
+            k != "m" && !has(VACASK, &rows, &k)
+        };
+        params.iter().any(lacks).then_some(Code::W0129)
+    }
+
     /// Whether instance `n`'s model `model` is this file's `vdmos` card
     /// (ngspice's and LTspice's power MOSFET: `d g s` and an optional bulk).
     // ponytail: one model view per M card, and a card in another kit file
@@ -108,11 +148,14 @@ impl W<'_, '_> {
     /// Model `m`'s `k=v` rows for VACASK's `sp_<module>`, lowercased and
     /// without `level`: a name the module declares is written; one an
     /// ngspice card sets that ngspice does not read either is left out
-    /// (W0112); a BSIM `version` is the module's (ngspice-45 `inpdomod.c`
-    /// L271-L314: `3.3…` is BSIM3, `4.8…` BSIM4, each the module VACASK
-    /// builds; `bsim4v8.va` L164 takes it as a string). `None`: another
-    /// version, no module (the caller's W0104); `Some(None)`: a name the
-    /// source reads and the module lacks, refused (W0129).
+    /// (W0112) when the module is ngspice's device code (a module in a
+    /// file of its own has no ngspice device behind it: a `level=1040`
+    /// card is ESPice's, and ngspice-45 runs it as level 1); a BSIM
+    /// `version` is the module's (ngspice-45 `inpdomod.c` L271-L314:
+    /// `3.3…` is BSIM3, `4.8…` BSIM4, each the module VACASK builds;
+    /// `bsim4v8.va` L164 takes it as a string). `None`: another version,
+    /// no module (the caller's W0104); `Some(None)`: a name the source
+    /// reads and the module lacks, refused (W0129).
     fn osdi_rows(
         &mut self,
         m: &Model,
@@ -164,6 +207,7 @@ impl W<'_, '_> {
             if vacask_has(module, &k) {
                 rows.push((k, v.clone()));
             } else if self.rd.b.model_semantics == ModelSemantics::Ngspice
+                && self.b.model_load(module).is_none()
                 && !ngspice_reads(module, &k)
             {
                 self.note(Code::W0112, tok);
@@ -319,6 +363,24 @@ mod tests {
         for module in ["vbic13", "vbic13_5t"] {
             assert!(vacask_has(module, "rth") && vacask_has(module, "gmin"));
             assert!(!vacask_has(module, "sw_et") && !vacask_has(module, "type"));
+        }
+    }
+
+    /// The descriptor of `psp103v4.osdi` (VACASK 36be560
+    /// `lib/vacask/mod/`): `type` is the line's own, `dta` a model
+    /// parameter and no instance one, `nf` an instance one; `vbic_1p3.osdi`
+    /// has `trise` and its aliases. Every master with a load row has both
+    /// of its rows.
+    #[test]
+    fn a_module_in_its_own_file_has_its_instance_names() {
+        assert!(vacask_has("psp103va", "toxo") && vacask_has("psp103va", "dta"));
+        assert!(!vacask_has("psp103va", "type") && !vacask_has("psp103va", "nf"));
+        assert!(has(VACASK, "psp103va.inst", "nf") && !has(VACASK, "psp103va.inst", "dta"));
+        assert!(has(VACASK, "vbic13.inst", "sw_et") && has(VACASK, "vbic13_5t.inst", "dtemp"));
+        for (master, _) in crate::syntax::Lang::VACASK.behaviours().model_loads {
+            for row in [format!("{master} "), format!("{master}.inst ")] {
+                assert!(VACASK.lines().any(|l| l.starts_with(&row)), "no row {row}");
+            }
         }
     }
 }

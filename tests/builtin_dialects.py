@@ -1302,6 +1302,10 @@ def vacask(d):
         .model_master("pnp", [12], "vbic13_5t", "-1")
         .model_load("vbic13", "vbic_1p3.osdi")
         .model_load("vbic13_5t", "vbic_1p3_5t.osdi")
+        # PSP 103 (Xyce's `M` level 103, ESPice's level 1040): a module in a file of its own.
+        .model_master("nmos", [103, 1040], "psp103va", "1")
+        .model_master("pmos", [103, 1040], "psp103va", "-1")
+        .model_load("psp103va", "psp103v4.osdi")
         .spice_model_type("nmos")
         .spice_model_type("pmos")
         .spice_model_type("npn")

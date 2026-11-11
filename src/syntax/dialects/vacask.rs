@@ -284,6 +284,17 @@ pub(super) fn vacask() -> DialectDef {
         .model_master("pnp", &[12], "vbic13_5t", Some("-1"))
         .model_load("vbic13", "vbic_1p3.osdi")
         .model_load("vbic13_5t", "vbic_1p3_5t.osdi")
+        // PSP 103 (the CMC source, version 103.4): Xyce's `M` level 103
+        // (RG 7.10 §2.3.20.12) and ESPice's level 1040 (its CMC QA decks,
+        // read as ngspice text: ESPice 0.3.0 gives their PSP 103
+        // references) are `psp103va` of `psp103v4.osdi` (36be560
+        // `devices/psp103v4/psp103.va` L46, `devices/CMakeLists.txt` L13).
+        // Each of the two simulators stops on the other's number. Xyce's
+        // level 1031 is the self-heating build (`psp103t.va`, five
+        // terminals), which VACASK does not ship: no row.
+        .model_master("nmos", &[103, 1040], "psp103va", Some("1"))
+        .model_master("pmos", &[103, 1040], "psp103va", Some("-1"))
+        .model_load("psp103va", "psp103v4.osdi")
         .spice_model_type("nmos")
         .spice_model_type("pmos")
         .spice_model_type("npn")
