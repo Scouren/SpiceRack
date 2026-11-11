@@ -79,8 +79,15 @@ res = tb.transient(step_time=1e-8, end_time=5e-6, max_time=1e-8)
 print(res.measures["vmax"])
 ```
 
-An option or parameter given as `True` is a bare flag (`tb.options(KLU=True)` writes
-`.options KLU`); `False` and `None` write nothing.
+`options()` takes portable keys only: the names of ngspice's `.options`
+(its manual, §11.1: `reltol`, `abstol`, `vntol`, `gmin`, `method`, `seed`, ...),
+in any letter case. Each target writes its own spelling of a key; a target with
+none refuses the deck (`W0017`) or notes that it dropped the key (`W0024`).
+`True` sets a flag (`tb.options(KLU=True)` writes `.options KLU`); `None` and
+`False` are a `ValueError` (on an element's `**params` `True` is a bare flag too,
+and `False` and `None` write nothing). Any other key is a `ValueError`: another
+simulator's own option (a Xyce package, VACASK's `tran_method`) is a line of
+that simulator's text, `tb.extra_line(line, dialect="xyce")`.
 
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
 emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.

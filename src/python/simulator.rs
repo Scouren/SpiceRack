@@ -14,7 +14,7 @@ use pyo3::types::PyDict;
 
 // `PssBase`, `PyRawData`: names `pymethods_with_spectre!` resolves here.
 use super::analysis::{Analysis, PssBase};
-use super::args::{kw_params, kw_volts};
+use super::args::{kw_options, kw_volts};
 use super::card::{self, dc_sweeps};
 use super::deck::Deck;
 use super::model::{Bench, Card, Step};
@@ -60,7 +60,7 @@ impl PySimulator {
 
     #[pyo3(signature = (**kwargs))]
     fn options(&mut self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
-        self.tb().options.extend(kw_params(kwargs)?);
+        self.tb().options.extend(kw_options(kwargs)?);
         Ok(())
     }
 

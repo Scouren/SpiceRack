@@ -86,6 +86,7 @@ pub(in crate::syntax::render) use model_cards::file_models;
 pub(in crate::syntax::render) use named_bench::{spectre_refusal, vacask_refusal};
 pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
+pub use options::portable_option;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
 pub(in crate::syntax::render) use sweeps::{DcAxis, DcSweep};
 pub(in crate::syntax::render) use testbench::{Ana, BenchCard, Sweep};

@@ -38,7 +38,7 @@ Current-controlled sources (`F`, `H`) sense through a named voltage source; add 
 `**kwargs` values (`M`, `X`, `model`, `Subcircuit(..., **params)`, `options`): a
 `UnitValue` is written as its SI number (`1 @ u_MOhm` -> `1e6`); `True` is a bare flag
 (`D(..., off=True)` -> `off`, `options(KLU=True)` -> `.options KLU`); `False` and `None`
-write nothing; anything else is its
+write nothing (in `options` they raise `ValueError`); anything else is its
 `str()`, so pass expressions as `"{w*2}"`. A PDK device that is a subcircuit (all sky130
 and gf180 FETs) is an `X` with parameters:
 
@@ -83,6 +83,12 @@ injection, propagation delay and pedestal all track them.
 `Testbench`: `extra_line(text)`, `options(**kw)`, `temperature`, `nominal_temperature`,
 `initial_condition(**nodes)`, `node_set(**nodes)`, `save(*signals)`, `use_pdk(...)`,
 `add_subcircuit(sub)`. `tb.temperature` / `tb.nominal_temperature` are write-only.
+`options(**kw)` (`Testbench`, `CircuitSimulator`, `Circuit`) takes portable keys only: the
+names of ngspice's `.options` (manual §11.1: `reltol`, `abstol`, `vntol`, `gmin`, `method`,
+`seed`, ...), any letter case. `klu=True` writes the bare flag `.options klu`; `None`, `False`
+and any other key (a Xyce package, VACASK's `tran_method`, a typo) raise `ValueError`: write
+another simulator's own option with `extra_line(line, dialect=...)`. A target with no
+spelling for a key refuses the deck (`W0017`) or drops it with a note (`W0024`).
 `tb.ngbehavior = "hsa"` (read/write, `None` clears) is ngspice's compatibility mode,
 passed as `ngspice -D ngbehavior=hsa`; lowercase letters only (`ValueError` otherwise),
 a mode ngspice does not know fails the run, other backends ignore it. ngspice always

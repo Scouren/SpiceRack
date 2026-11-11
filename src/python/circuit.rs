@@ -10,7 +10,7 @@ use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use super::args::kw_params;
+use super::args::kw_options;
 use super::deck::{Deck, check_backend_name};
 use super::model::{Bench, Body};
 use super::simulator::PySimulator;
@@ -74,7 +74,7 @@ impl PyCircuit {
 
     #[pyo3(signature = (**kwargs))]
     fn options(&mut self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
-        self.tb.options.extend(kw_params(kwargs)?);
+        self.tb.options.extend(kw_options(kwargs)?);
         Ok(())
     }
 

@@ -13,6 +13,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - verilog: structural Verilog (one module per subcircuit, instances by port name) replaces the old layout's IR `Debug` lines; every other element is a `// W0029` comment.
 - python: `Subcircuit.subcircuit(child)` defines `child` inside the subcircuit (a nested `.subckt`, local to it); every target writes it as a top-level `<parent>__<child>`. `Subcircuit.from_source` read a nested definition back as its first line only; it keeps the block.
 - python: `C(name, n1, n2, charge="expr")` builds a capacitor given by its charge (ngspice `Q='expr'`); every target writes its own form, VACASK refuses it (`W0105`).
+- python: `options()` takes portable keys only (the names of ngspice's `.options`, manual §11.1); `True` writes a bare flag (`klu=True` is `.options klu`, was `klu=True`); `None`, `False` and another simulator's own key raise `ValueError` (were written as text).
 
 ## 0.2.0 (2026-11-03)
 

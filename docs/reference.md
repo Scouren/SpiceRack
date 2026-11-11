@@ -102,6 +102,9 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 `step_sweep(param, start, stop, n, kind)`; attributes `temperature`,
 `nominal_temperature`, `ngbehavior` (ngspice's compatibility mode, e.g.
 `"hsa"`; other simulators ignore it), and `save_currents` (`CircuitSimulator`).
+`options` (here and on `Circuit`) takes portable keys only, the names of
+ngspice's `.options` (manual §11.1) in any letter case; `True` is a bare flag;
+`None`, `False` and any other key raise `ValueError`.
 
 ## Analyses (`Testbench`, `CircuitSimulator`)
 

@@ -7,13 +7,16 @@
 //! - `pub(super) struct Num`, `impl FromPyObject for Num`, `Num::of(v: f64) -> Num`, `Num::text(&self) -> String`,
 //!   `Num::zero(&self) -> bool`, `Num::value(&self) -> Value`
 //! - `pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
+//! - `pub(super) fn kw_options(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 //! - `pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, f64)>>`
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::model::{Value, dec};
 use super::unit::PyUnitValue;
+use crate::syntax::render::portable_option;
 
 /// A value argument (`R(..., value)`, `V(..., value)`): tried as a number,
 /// then a `UnitValue`, then a string.
@@ -42,6 +45,33 @@ pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(Stri
                 out.push((k.extract::<String>()?, text));
             }
         }
+    }
+    Ok(out)
+}
+
+/// `options(**kw)` as ordered `.options` pairs (D17). Every key is a
+/// portable option (`render::portable_option`), written as given; a value
+/// is per [`param_value`] (`True` a bare flag). A key of one simulator's
+/// own, and `None` or `False` (which set nothing), are a `ValueError`,
+/// raised before any pair is kept, so the caller's bench is unchanged.
+pub(super) fn kw_options(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>> {
+    let mut out = vec![];
+    if let Some(dict) = kwargs {
+        for (k, v) in dict.iter() {
+            let k = k.extract::<String>()?;
+            if !portable_option(&k) {
+                return Err(PyValueError::new_err(format!(
+                    "options: `{k}` is not a portable option (the `.options` names of the ngspice manual, §11.1); another simulator's own option is a line of its text: extra_line(line, dialect=...)"
+                )));
+            }
+            let Some(text) = param_value(&v)? else {
+                return Err(PyValueError::new_err(format!(
+                    "options: `{k}` is given None or False, which sets nothing; a flag is `{k}=True`, a value is a number or a string"
+                )));
+            };
+            out.push((k, text));
+        }
+        assert_eq!(out.len(), dict.len(), "one pair per keyword");
     }
     Ok(out)
 }

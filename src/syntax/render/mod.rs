@@ -28,6 +28,7 @@
 //! - `pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
 //! - `pub fn render_text(text: &str, d: impl Into<Lang>, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
 //! - `pub enum Reference`, `pub fn references(src: &Source) -> Vec<Reference>`
+//! - `pub fn portable_option(key: &str) -> bool` (re-exported from `read::options`)
 //! - `pub fn writes(target: Dialect) -> bool`
 
 pub mod capability;
@@ -43,6 +44,7 @@ pub mod spelling;
 mod spice;
 
 pub use def_pass::{Pending, Request, card_fields};
+pub use read::portable_option;
 
 use crate::syntax::ast::Ast;
 use crate::syntax::behaviour::Writer;

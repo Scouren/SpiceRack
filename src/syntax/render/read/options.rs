@@ -12,6 +12,7 @@
 //! - `pub(in crate::syntax::render) enum Opt`
 //! - `Rd::options_ok(&self, n: u32) -> bool`
 //! - `Rd::options_view(&self, n: u32) -> Vec<Opt>`
+//! - `pub fn portable_option(key: &str) -> bool` (ngspice manual §11.1: the names of its `.options`)
 
 use super::Rd;
 use crate::syntax::ast::{NONE, Node, Tag};
@@ -39,6 +40,31 @@ pub(in crate::syntax::render) enum Opt {
     /// reads only before the deck (its `-D ngbehavior=`), so no card of
     /// any dialect sets it (`Construct::NgBehavior`).
     NgBehavior(String),
+}
+
+/// The portable option keys, lowercase: the names ngspice's `.options`
+/// defines, one line per section of its manual (ngspice-45 §11.1.1
+/// general, §11.1.2 OP and DC with §11.1.2.1's `rseries` and `cshunt`,
+/// §11.1.3 AC, §11.1.4 transient, §11.1.5 element, §11.1.6 transmission
+/// lines). ngspice is the dialect a built deck is given in; each target
+/// writes its own spelling of a key, refuses it (W0017) or notes it
+/// dropped (W0024).
+const PORTABLE_OPTIONS: &str = "\
+    sparse klu acct noacct noinit list nomod nopage node norefvalue opts seed seedinfo temp tnom warn maxwarns savecurrents \
+    abstol gmin gminsteps itl1 itl2 keepopinfo noopiter pivrel pivtol reltol rshunt vntol rseries cshunt \
+    noopac \
+    autostop chgtol convstep convabsstep interp itl3 itl4 itl5 itl6 maxevtiter maxopalter maxord method noopalter ramptime srcsteps trtol xmu \
+    diode_cj0 diode_rser badmos3 defad defas defl defw scale \
+    trytocompact";
+
+/// Whether `key` is a portable option (`PORTABLE_OPTIONS`), in any letter
+/// case. Any other key is one simulator's own (a Xyce package, VACASK's
+/// `tran_method`, LTspice's `cshuntintern`), which only a deck in that
+/// simulator's text holds.
+pub fn portable_option(key: &str) -> bool {
+    PORTABLE_OPTIONS
+        .split_ascii_whitespace()
+        .any(|p| p.eq_ignore_ascii_case(key))
 }
 
 impl<'a> Rd<'a> {

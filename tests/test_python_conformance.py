@@ -160,7 +160,7 @@ FEATURES = {
     "spectre_pxf": analysis(lambda tb: tb.add_spectre_pxf(1e6, 1e-5, "out", "Vin")),
     "spectre_pstb": analysis(lambda tb: tb.add_spectre_pstb(1e6, 1e-5, "Vin")),
     # Settings.
-    "options": setting(lambda tb: tb.options(RELTOL=1e-4)),
+    "options": setting(lambda tb: tb.options(RELTOL=1e-4, noacct=True)),
     "temperature": setting(lambda tb: (setattr(tb, "temperature", 85.0), setattr(tb, "nominal_temperature", 27.0))),
     "initial_condition": setting(lambda tb: tb.initial_condition(out=0.0)),
     "node_set": setting(lambda tb: tb.node_set(out=0.0)),

@@ -1105,7 +1105,7 @@ def test_p3_041_api_python_values_written_text():
     tb = ps.Testbench(dut)
     tb.with_backend("ngspice")
     tb.V("1", "a", "0", 1.0)
-    tb.options(KLU=True, NOACCT=False, MAXORD=None, RELTOL=1e-4)
+    tb.options(KLU=True, RELTOL=1e-4)
     lines = tb.netlist("ngspice").splitlines()
     for card in ("D1 0 a dn off", "D2 0 a dn", "R2 out 0 1k tc=1e-3", "R3 a 0 1meg tc=1e-3", "R5 a 0 1meg",
                  ".options KLU RELTOL=0.0001"):
@@ -1115,3 +1115,78 @@ def test_p3_041_api_python_values_written_text():
     assert not any("True" in l or "False" in l or "None" in l for l in lines), lines
     # 1e-6: gmin and the reverse diodes shift the divider by less than 1e-9.
     assert tb.operating_point()["out"] == pytest.approx(0.5, rel=1e-6)
+
+
+# ======================================================================
+# Portable options (P8-004, D17)
+# ======================================================================
+
+# Oracle of the option table: the headwords of ngspice-45 manual §11.1.1-
+# §11.1.6 (`.options`), lowercased, one line per section; `rseries` and
+# `cshunt` are §11.1.2.1's. Copied from the manual, not from the code.
+NGSPICE_OPTIONS = """
+sparse klu acct noacct noinit list nomod nopage node norefvalue opts seed seedinfo temp tnom warn maxwarns savecurrents
+abstol gmin gminsteps itl1 itl2 keepopinfo noopiter pivrel pivtol reltol rshunt vntol rseries cshunt
+noopac
+autostop chgtol convstep convabsstep interp itl3 itl4 itl5 itl6 maxevtiter maxopalter maxord method noopalter ramptime srcsteps trtol xmu
+diode_cj0 diode_rser badmos3 defad defas defl defw scale
+trytocompact
+""".split()
+
+# One simulator's own option each (api-parity Q3-Q5): a Xyce package (RG
+# `.OPTIONS TIMEINT`), VACASK's `tran_method`, LTspice's `cshuntintern`
+# (its `.OPTIONS` help page), HSPICE's `POST`, Spectre's `vabstol` (Spectre
+# Reference 19.1 `options` #3); then the names SpiceRack uses that are no
+# `.options` name of ngspice, and a misspelling.
+NOT_PORTABLE = [
+    "timeint", "tran_method", "cshuntintern", "post", "vabstol",
+    "max_iterations", "ngbehavior", "nfreqs", "reltoll",
+]
+
+
+def option_bench():
+    dut = ps().Subcircuit("test")
+    dut.R(name="1", positive="a", negative="b", value=100.0)
+    return ps().Testbench(dut)
+
+
+def option_lines(tb):
+    return [l for l in tb.netlist("ngspice").splitlines() if l.lower().startswith(".option")]
+
+
+class TestPortableOptions:
+    def test_p8_004_true_is_a_bare_flag(self):
+        tb = option_bench()
+        tb.options(reltol="1e-6", klu=True)
+        assert option_lines(tb) == [".options reltol=1e-6 klu"]
+
+    def test_p8_004_every_ngspice_option_is_portable_in_any_case(self):
+        tb = option_bench()
+        for key in NGSPICE_OPTIONS:
+            tb.options(**{key: 1})
+            tb.options(**{key.upper(): 1})
+
+    @pytest.mark.parametrize("key", NOT_PORTABLE)
+    def test_p8_004_another_simulators_option_raises(self, key):
+        tb = option_bench()
+        with pytest.raises(ValueError, match="not a portable option"):
+            tb.options(reltol=1e-4, **{key: 1})
+        # Fallible work before the commit: `reltol` was not kept either.
+        assert option_lines(tb) == []
+
+    @pytest.mark.parametrize("value", [None, False])
+    def test_p8_004_none_and_false_set_nothing(self, value):
+        tb = option_bench()
+        with pytest.raises(ValueError, match="klu"):
+            tb.options(klu=value)
+        assert option_lines(tb) == []
+
+    def test_p8_004_circuit_and_its_simulator_share_the_rule(self):
+        c = ps().Circuit("shared")
+        c.R(name="1", positive="a", negative=c.gnd, value=100.0)
+        c.options(noacct=True)
+        assert ".options noacct" in str(c).splitlines()
+        with pytest.raises(ValueError, match="not a portable option"):
+            c.options(tran_method="trap")
+        with pytest.raises(ValueError, match="not a portable option"):
+            c.simulator().options(tran_method="trap")
