@@ -271,8 +271,6 @@ Certification_Tests/BUG_805/colpitts_osc3.cir mismatch # tran V(1): -0.030116656
 Certification_Tests/BUG_805_SON/bug805_all.cir simulator-differs:closed-form reason=S-NONPASSIVE-K proof=s-nonpassive-k.md # tran: stop time Some(0.025) -> Some(2.9536882726817453e-5)
 Certification_Tests/BUG_805_SON/bug805_top.cir simulator-differs:closed-form reason=S-NONPASSIVE-K proof=s-nonpassive-k.md # tran: stop time Some(0.025) -> Some(2.9536882726817453e-5)
 Certification_Tests/BUG_805_SON/bug805_top2.cir simulator-differs:closed-form reason=S-NONPASSIVE-K proof=s-nonpassive-k.md # tran: stop time Some(0.025) -> Some(2.9536882726817087e-5)
-Certification_Tests/BUG_806_SON/dc_baseline.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "r1:r" is not in the circuit | doAnalyses: 
-Certification_Tests/BUG_806_SON/dc_baselineGP.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "r1:r" is not in the circuit | doAnalyses: 
 Certification_Tests/BUG_807_SON/inverter_transient_xyce.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VIN1#branch: 0.00000003844520562446684 leaves the tube at t=0.00000015003125 (tol 3.919e-10)
 Certification_Tests/BUG_822/ring51.cir mismatch # dc BUF: 1.6464304145475324+0i vs 1.6501261214668441+0i at 1.8 (tol 3.461e-3)
 Certification_Tests/BUG_822/ring51_loca.cir mismatch # op BUF: 1.7293965531019873+0i vs 0.9988820194240572+0i at 0 (tol 3.461e-3)
@@ -501,7 +499,6 @@ PARAMS1/params_a0.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2
 PARAMS1/params_a1.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2.000e-1)
 PARAMS2/Params_B3.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r1] | Undefined parameter [r1]
 PARAMS2/Params_B4.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r1]
-PARAM_REFACTOR/paramDc1.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "testnorm" is not in the circuit | doAnalys
 PARAM_REFACTOR/paramDep5.cir target-fails # Unexpected format: Unexpected EOF in header
 PARAM_REFACTOR/paramHomotopy.cir mismatch # op V(1): 833.3333333333334+0i vs 874.9999999999999+0i at 0 (tol 1.667e0)
 PARSER/nakedAlgebra.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 15
@@ -539,14 +536,9 @@ SANDLER28/sandler28.cir simulator-differs:self-inconsistency reason=XYCE-GLOBAL-
 SAVE_AND_LOAD/bjt_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 SAVE_AND_LOAD/bjt_default_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 SAVE_AND_LOAD/bjt_sub_default_type_level_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-SENS/ampSensFD.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "vccvalue" is not in the circuit | doAnalys
-SENS/ampSensFDa.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "vccvalue" is not in the circuit | doAnalys
-SENS/ampSensFDb.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "vccvalue" is not in the circuit | doAnalys
-SENS/ampSensFDc.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "vccvalue" is not in the circuit | doAnalys
 SENS/bsim4_issue694_FD.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VIN1#branch: -0.00002333098631699986 leaves the tube at t=0.00000000016744933418562767 (tol 2.333e-7)
 SENS/fddevLevelParams_ipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e2)
 SENS/fdipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e2)
-SENS/twoObjFD.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "vccvalue" is not in the circuit | doAnalys
 SOURCES/ebh.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: b4a: unknown controlling source v_e3 | doAnalyses: no such parameter on this device or parameter is missing
 SOURCES/ebh_sub.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: b.xsub.b4a: unknown controlling source v.xsub.v_e3 | doAnalyses: no such parameter on this device or parameter is m
 SOURCES/sources.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 25

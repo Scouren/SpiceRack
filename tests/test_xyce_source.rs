@@ -16,6 +16,7 @@ mod oracle;
 
 use oracle::{At, Tol, sim_pair};
 use spicerack::syntax::Dialect;
+use spicerack::syntax::diag::Code;
 
 /// Two direct solves of one linear deck: both simulators give the closed
 /// form to rounding (their RELTOL, 1e-3, bounds no iteration here).
@@ -178,4 +179,36 @@ fn p3_099_a_global_that_heads_another_keeps_its_own_node() {
     let w = oracle::write(deck, Dialect::Xyce, Dialect::Ngspice);
     assert!(w.lines().any(|l| l == ".global G_A G_AB_1"), "{w}");
     assert!(w.lines().any(|l| l.starts_with("R1 G_AB_1 0 ")), "{w}");
+}
+
+/// ZERO-LEDGER P3-056 (`O-TF-NAME`: "DC Transfer Function" is ngspice's
+/// name for `.dc`). Xyce RG §2.1.3: `.DC` sweeps a device parameter
+/// (`R1:R`) and a `.param`; ngspice manual §11.3.2: a source, a resistor
+/// or `temp`. Xyce_Regression `Certification_Tests/BUG_806_SON/
+/// dc_baseline.cir` and `PARAM_REFACTOR/paramDc1.cir`: ngspice-45 "named
+/// "r1:r" is not in the circuit" before. The resistor is swept by its
+/// name; a parameter is refused for ngspice, which would sweep a source
+/// of the parameter's name where Xyce and ESPice sweep the parameter.
+#[test]
+fn p3_056_o_tf_name_tf_naming() {
+    let (xy, ng, es) = (Dialect::Xyce, Dialect::Ngspice, Dialect::Espice);
+    // Linear dividers: the simulators agree to their printed digits.
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let deck = "* t\nVT1 4 0 10\nR1 4 5 10\nR2 5 0 5\n.DC R1:R 20 40 20\n.print dc v(5)\n.end\n";
+    // 10 V · 5 / (R1 + 5): 2 V at R1 = 20, 10/9 V at 40 (3.33 V unswept).
+    let last = 10.0 / 9.0;
+    oracle::closed_form(xy, deck, &[xy, ng, es], "5", oracle::At::First, 2.0, tol);
+    oracle::closed_form(xy, deck, &[xy, ng, es], "5", oracle::At::Last, last, tol);
+    let cite = "ngspice manual §11.3.2: srcnam is a source, a resistor or temp";
+    let param = "* t\n.param v1=5\nV1 a 0 1\nR1 a 0 1k\nV2 b 0 {v1}\nR2 b 0 1k\n\
+        .dc V1 1 3 1\n.print dc v(a) v(b)\n.end\n";
+    oracle::spec_refusal(cite, param, xy, ng, &[Code::W0015]);
+    // The parameter is swept, not the source V1: v(b) = 3 V at the last
+    // point (5 V with the source swept, as ngspice-45 does).
+    oracle::closed_form(xy, param, &[xy, es], "b", oracle::At::Last, 3.0, tol);
+    let cap = "* t\nV1 a 0 1\nC1 a 0 1p\n.dc C1:C 1p 2p 1p\n.end\n";
+    oracle::spec_refusal(cite, cap, xy, ng, &[Code::W0015]);
 }

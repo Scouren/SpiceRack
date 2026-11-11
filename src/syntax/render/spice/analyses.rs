@@ -47,6 +47,9 @@ impl W<'_, '_> {
             Ana::Dc(sweeps) => {
                 let mut s = String::from(".dc");
                 for (src, a, b, c) in sweeps {
+                    let Some(src) = self.dc_source(src, tok) else {
+                        return String::new();
+                    };
                     s.push_str(&format!(
                         " {src} {} {} {}",
                         num(self, *a),
@@ -255,5 +258,36 @@ impl W<'_, '_> {
             let across = np.eq_ignore_ascii_case(a) && nm.eq_ignore_ascii_case(b);
             (letter == want && across).then(|| self.names.decl(n).to_string())
         })
+    }
+
+    /// A Xyce deck's `.dc` sweep variable `src` as an ngspice or ESPice
+    /// target reads it; any other pair writes it as read. Xyce sweeps a
+    /// device parameter (`R1:R`) and a `.param`, which wins over a source
+    /// of its name (Xyce RG §2.1.3); ngspice sweeps a source, a resistor
+    /// by its name or `temp` (ngspice manual §11.3.2); ESPice sweeps a
+    /// parameter as Xyce does. A top resistor's `:R` is the resistor;
+    /// another device parameter, and a parameter for ngspice, is an
+    /// analysis the target lacks (W0015): `None`.
+    fn dc_source(&mut self, src: &str, tok: u32) -> Option<String> {
+        let to = self.b.analysis_form;
+        let family = matches!(to, AnalysisForm::Ngspice | AnalysisForm::Espice);
+        if self.rd.b.analysis_form != AnalysisForm::Xyce || !family {
+            return Some(src.to_string());
+        }
+        let top = crate::syntax::ast::NONE;
+        let named = |a: &u32| self.rd.param_view(*a).0.eq_ignore_ascii_case(src);
+        let param = self.deck.top.params.iter().any(named);
+        let found = match src.split_once(':') {
+            Some((dev, p)) if p.eq_ignore_ascii_case("r") => {
+                self.names.reference(top, dev, 'R').map(str::to_string)
+            }
+            Some(_) => None,
+            None if param && to == AnalysisForm::Ngspice => None,
+            None => Some(src.to_string()),
+        };
+        if found.is_none() {
+            self.refuse(Code::W0015, tok);
+        }
+        found
     }
 }
