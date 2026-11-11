@@ -7,7 +7,10 @@
 //! Cites: the simulators' command lines: ngspice manual §16.4.1 (`-b`, `-r`,
 //! `-D ngbehavior=`), Xyce Users' Guide 7.10 §2.1.2 (`-r <file>`), VACASK
 //! `vacask -h` (`-se`, `-sp`), ESPice `espice --help` (`--rawfile`,
-//! `--format`, `--tokenizer`).
+//! `--format`, `--tokenizer`), LTspice 26.1.1 help: Command Line Switches
+//! (`-b`: "will leave the data in file deck.raw") and `.OPTIONS`
+//! (`plotwinsize=0`: no waveform compression; `numdgt` above 6: "double
+//! precision is used for dependent variable data").
 //!
 //! Contents:
 //! - `pub enum Sim`, `Sim::name(self) -> &'static str`, `Sim::on_path(self) -> bool`
@@ -31,6 +34,8 @@ pub enum Sim {
     Espice,
     /// ESPice reading HSPICE text (`--tokenizer=hspice`).
     EspiceHspice,
+    /// LTspice 26.1.1 under Wine (`ltspice`, `nix develop .#testing-ltspice`).
+    Ltspice,
 }
 
 /// What one run gave.
@@ -61,22 +66,22 @@ impl Sim {
             Sim::Vacask => "vacask",
             Sim::Espice => "espice",
             Sim::EspiceHspice => "espice-hspice",
+            Sim::Ltspice => "ltspice",
         }
     }
 
-    /// Whether the simulator's program answers on `PATH`.
+    /// Whether the simulator's program is on `PATH` (looked up, not run:
+    /// LTspice started with no deck opens its window and never returns).
     pub fn on_path(self) -> bool {
-        let (program, arg) = self.program();
-        Command::new(program).arg(arg).output().is_ok()
-    }
-
-    fn program(self) -> (&'static str, &'static str) {
-        match self {
-            Sim::Ngspice | Sim::NgspiceHsa => ("ngspice", "--version"),
-            Sim::Xyce => ("Xyce", "-v"),
-            Sim::Vacask => ("vacask", "-h"),
-            Sim::Espice | Sim::EspiceHspice => ("espice", "--help"),
-        }
+        let program = match self {
+            Sim::Ngspice | Sim::NgspiceHsa => "ngspice",
+            Sim::Xyce => "Xyce",
+            Sim::Vacask => "vacask",
+            Sim::Espice | Sim::EspiceHspice => "espice",
+            Sim::Ltspice => "ltspice",
+        };
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        std::env::split_paths(&path).any(|d| d.join(program).is_file())
     }
 }
 
@@ -99,7 +104,12 @@ pub fn refined(sim: Sim, text: &str, n: f64) -> Option<String> {
     if sim == Sim::Vacask {
         return None;
     }
-    Some(text.lines().map(|l| tmax(l, n) + "\n").collect())
+    // LTspice's `.tran <Tstop>` in the four-number order first.
+    let line = |l: &str| match sim {
+        Sim::Ltspice => tmax(&ltspice_tran(l), n),
+        _ => tmax(l, n),
+    };
+    Some(text.lines().map(|l| line(l) + "\n").collect())
 }
 
 // ---- private ----
@@ -148,6 +158,12 @@ fn run_in(
     let raw = dir.join(".cross_sim_out.raw");
     let text = match sim {
         Sim::Ngspice | Sim::NgspiceHsa => ngspice_text(text, &raw),
+        // No waveform compression and double-precision vectors, as
+        // `backend::ltspice` runs a deck; line 1 is the title.
+        Sim::Ltspice => {
+            let (title, body) = text.split_once('\n').unwrap_or((text, ""));
+            format!("{title}\n.options plotwinsize=0\n.options numdgt=15\n{body}")
+        }
         _ => text.to_string(),
     };
     if matches!(sim, Sim::Ngspice | Sim::NgspiceHsa) {
@@ -176,6 +192,9 @@ fn run_in(
         }
         Sim::Vacask => {
             c.args(["vacask", "-se", "-sp"]);
+        }
+        Sim::Ltspice => {
+            c.args(["ltspice", "-b"]);
         }
         Sim::Espice | Sim::EspiceHspice => {
             c.arg("espice")
@@ -208,15 +227,27 @@ fn run_in(
     }
     let raws = match sim {
         Sim::Vacask => vacask_raws(dir, &text),
+        // LTspice writes `<deck>.raw` beside the deck.
+        Sim::Ltspice => vec![file.with_extension("raw")],
         _ => vec![raw],
     };
+    // LTspice says why a run failed in `<deck>.log`, nothing on stdout.
+    let said = || match sim {
+        Sim::Ltspice => ltspice_said(&file.with_extension("log")),
+        _ => errors(&log),
+    };
+    // It leaves a raw file behind a failed run too (an over-defined
+    // matrix): its exit status says the run failed.
+    if sim == Sim::Ltspice && !out.status.success() {
+        return Ok(Ran::Failed(said()));
+    }
     let mut plots = Vec::new();
     for r in &raws {
         let Ok(bytes) = std::fs::read(r) else {
             return Ok(Ran::Failed(format!(
                 "no raw file {}: {}",
                 r.file_name().unwrap_or_default().to_string_lossy(),
-                errors(&log)
+                said()
             )));
         };
         let all = spicerack::rawfile::parse_raw_all(&bytes).map_err(|e| e.to_string())?;
@@ -233,7 +264,7 @@ fn run_in(
         plots.push(n);
     }
     if plots.is_empty() {
-        return Ok(Ran::Failed(format!("no plot: {}", errors(&log))));
+        return Ok(Ran::Failed(format!("no plot: {}", said())));
     }
     Ok(Ran::Plots(plots))
 }
@@ -403,6 +434,38 @@ fn errors(log: &str) -> String {
     out.join(" | ")
 }
 
+/// Why an LTspice run failed: its log's lines after `Start Time:`, less
+/// the settings it lists (`solver = Normal`, `Maximum thread count: 32`,
+/// `Total elapsed time: …`) and each line's Windows path, the first four.
+fn ltspice_said(log: &Path) -> String {
+    let text = std::fs::read_to_string(log).unwrap_or_default();
+    let run = text.split_once("Start Time:").map_or("", |(_, r)| r);
+    let setting =
+        |l: &str| l.contains(" = ") || l.starts_with("Maximum thread") || l.starts_with("Total ");
+    let said: Vec<&str> = run
+        .lines()
+        .skip(1)
+        .map(|l| l.rsplit('\\').next().unwrap_or(l).trim())
+        .filter(|l| !l.is_empty() && !setting(l))
+        .take(4)
+        .collect();
+    said.join(" | ")
+}
+
+/// An LTspice `.tran <Tstop> [modifiers]` line as `.tran 0 <Tstop>
+/// [modifiers]`, the order `tmax` reads (LTspice 26.1.1 help, `.TRAN`:
+/// one number is the stop time; the other form is `.TRAN <Tstep> <Tstop>
+/// [Tstart [dTmax]] [modifiers]`); any other line as it is.
+fn ltspice_tran(line: &str) -> String {
+    let w: Vec<&str> = line.split_whitespace().collect();
+    let tran = w.first().is_some_and(|c| c.eq_ignore_ascii_case(".tran"));
+    let numbers = w.iter().skip(1).map_while(|x| number(x)).count();
+    if !tran || numbers != 1 {
+        return line.to_string();
+    }
+    format!("{} 0 {}", w[0], w[1..].join(" "))
+}
+
 /// Whether a `.control` block in `text` issues a run command; ngspice then
 /// ignores `-r`, so the block itself writes the raw file.
 fn has_control(text: &str) -> bool {
@@ -486,6 +549,7 @@ fn number(word: &str) -> Option<f64> {
         ("k", 1e3),
         ("m", 1e-3),
         ("u", 1e-6),
+        ("µ", 1e-6),
         ("n", 1e-9),
         ("p", 1e-12),
         ("f", 1e-15),
