@@ -67,7 +67,8 @@ Owners: `import` reads files, `syntax` reads text into the AST and writes it in 
 - Every build runs inside `nix develop -c …`; `nix develop .#testing` adds ngspice, Xyce,
   OpenVAF, VACASK, ESPice and the sky130/gf180 PDKs the integration tests run against.
 - Rust: `cargo test` (`--test <file>` while iterating). Python: a venv with
-  `--system-site-packages`, `maturin develop`, `python3 -m pytest`.
+  `--system-site-packages`, `maturin develop --target-dir target/py` (its own target dir,
+  as rust-analyzer has: it builds another crate type for another Python), `python3 -m pytest`.
 - Flags live in `.cargo/config.toml`, never a one-off `RUSTFLAGS`.
 - One cargo process per agent; don't build while `free -g` shows under 6 GB available or
   `df -h /` under 30 GB free.
