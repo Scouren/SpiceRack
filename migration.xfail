@@ -2733,3 +2733,23 @@ xyce/SENS/psp_asym_pmos_idvg0_SENS.cir vacask refused differently: the W0104 on 
 xyce/VANOISE/gain-stage1_psp.cir vacask now written: a PSP 103 card is VACASK's `psp103va` (P4-013)
 xyce/Verilog_LEAD_CURRENTS/lead_psp_nmos_gear.cir vacask refused differently: the W0104 on the PSP 103 card goes; its W0109 stays (P4-013)
 xyce/Verilog_LEAD_CURRENTS/lead_psp_pmos_gear.cir vacask refused differently: the W0104 on the PSP 103 card goes; its W0109 stays (P4-013)
+# S2: P6-014: Xyce's `.PREPROCESS` is applied as the deck is read (RG 7.10 §2.1.28-30): REMOVEUNUSED leaves out
+# the listed kinds' devices on one node; ADDRESISTORS is left out with W0023 (Xyce's own run adds no resistor);
+# REPLACEGROUND TRUE stays W0039. Oracle: Xyce 7.10 runs (research/impl/evidence/P6-014/).
+xyce/REDUND_REMOVE/just_redund.cir ngspice P6-014: REMOVEUNUSED applied at read, now written
+xyce/REDUND_REMOVE/just_redund.cir espice P6-014: REMOVEUNUSED applied at read, now written
+xyce/REDUND_REMOVE/just_redund.cir hspice P6-014: REMOVEUNUSED applied at read, now written
+xyce/REDUND_REMOVE/just_redund.cir ltspice P6-014: REMOVEUNUSED applied at read, now written
+xyce/REDUND_REMOVE/just_redund.cir spectre P6-014: REMOVEUNUSED applied at read, now written
+xyce/REDUND_REMOVE/just_redund.cir vacask P6-014: REMOVEUNUSED applied at read, now written
+xyce/REDUND_REMOVE/just_redund.cir xyce P6-014: the card and its 18 devices left out
+xyce/REDUND_REMOVE/just_redund.cir cdl P6-014: the card and its 18 devices left out
+xyce/PREPROC_ADDRES/nodcpath.cir hspice P6-014: ADDRESISTORS left out (W0023), now written
+xyce/PREPROC_ADDRES/nodcpath.cir ltspice P6-014: ADDRESISTORS left out (W0023), now written
+xyce/PREPROC_ADDRES/nodcpath.cir spectre P6-014: ADDRESISTORS left out (W0023), now written
+xyce/PREPROC_ADDRES/nodcpath.cir xyce P6-014: ADDRESISTORS left out (W0023)
+xyce/PREPROC_ADDRES/oneterm.cir hspice P6-014: ADDRESISTORS left out (W0023), now written
+xyce/PREPROC_ADDRES/oneterm.cir ltspice P6-014: ADDRESISTORS left out (W0023), now written
+xyce/PREPROC_ADDRES/oneterm.cir spectre P6-014: ADDRESISTORS left out (W0023), now written
+xyce/PREPROC_ADDRES/oneterm.cir xyce P6-014: ADDRESISTORS left out (W0023)
+xyce/REDUND_REMOVE/gnd_and_redund_addres.cir xyce P6-014: ADDRESISTORS left out (W0023)

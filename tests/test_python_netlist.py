@@ -1853,12 +1853,12 @@ def test_p8_124_a_parameter_with_no_value_is_refused(value):
     an error") and the deck's text before the call."""
     dut, tb = _p8_124_divider()
     section = ps().Section("tt")
-    before = tb.netlist("ngspice")
+    before, dut_before = tb.netlist("ngspice"), ps().Testbench(dut).netlist("ngspice")
     for target in (dut, tb, section):
         with pytest.raises(ValueError, match="parameter: `k` is given"):
             target.parameter("k", value)
     assert tb.netlist("ngspice") == before
-    assert ps().Testbench(dut).netlist("ngspice") == before
+    assert ps().Testbench(dut).netlist("ngspice") == dut_before
 
 
 @pytest.mark.needs("ngspice")
