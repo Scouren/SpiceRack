@@ -26,6 +26,49 @@ const LINEAR: Tol = Tol {
 
 // ---- private ----
 
+// Ledger P3-081. Xyce sets a parameter an `X` line passes even where the
+// `.subckt` line does not declare it, over the top-level `.param` of that
+// name (7.10: XYCE_CORPUS `Certification_Tests/BUG_1558/bug_1558_3.cir`,
+// I(V1) = -5e-5; here v(2) = 2.5, the 100k/100k divider, where the
+// `.param`'s 1k would give 0.0495); ngspice-45 stops on the line
+// ("Mismatch: 0 formal but 1 actual params"), so the head declares it.
+// A `.param` of the body is a declaration on both (the second deck, after
+// XYCE_CORPUS `BUGS_ISSUE_54/multiSubcktPar.cir`: X1 computes with 1, X3
+// with the body's 10: 10/11 V). An `X` line with no parameter after one
+// that passed an undeclared one computes on Xyce with that line's value
+// (7.10: 100k, not the `.param`'s 1k): no head default says that (W0140).
+#[test]
+fn p3_081_an_x_line_parameter_the_subckt_does_not_declare() {
+    let deck = "* t\n.param R=1k\nV1 1 0 5\nR0 1 2 100k\nX1 2 0 simple PARAMS: R=100k\n\
+                .subckt simple a b\nR1 a b {R}\n.ends\n.op\n.end\n";
+    let (xyce, _) = sim_pair(
+        Dialect::Xyce,
+        deck,
+        Dialect::Ngspice,
+        "2",
+        At::First,
+        LINEAR,
+    );
+    assert!(LINEAR.within(xyce, 2.5), "Xyce v(2) = {xyce}");
+    let local = "* t\nV1 1 0 1\nX1 1 2 sub1 rvalue=1.0\nX3 2 0 sub1 bogus=3\n\
+                 .subckt sub1 a b\n.param rvalue=10.0 bogus=1.0\nR1 a b {rvalue}\n.ends\n\
+                 .op\n.end\n";
+    let (xyce, _) = sim_pair(
+        Dialect::Xyce,
+        local,
+        Dialect::Ngspice,
+        "2",
+        At::First,
+        LINEAR,
+    );
+    assert!(LINEAR.within(xyce, 10.0 / 11.0), "Xyce v(2) = {xyce}");
+    let stale = deck.replace("PARAMS: R=100k\n", "PARAMS: R=100k\nX4 2 0 simple\n");
+    assert_eq!(
+        oracle::refusal(&stale, Dialect::Xyce, Dialect::Ngspice),
+        [spicerack::syntax::diag::Code::W0140]
+    );
+}
+
 // Ledger P3-080. Xyce holds a BSIM3 instance's `IC=Vds,Vgs` in its DCOP
 // (RG 7.10 `M`, `IC`; Xyce 7.10: V(3) = 0.5, V(2) = 1.2 at t = 0, and
 // 1.96126 / 2.0 with the IC removed); ngspice reads a MOS `ic=` only under

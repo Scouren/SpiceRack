@@ -57,6 +57,11 @@ pub(super) struct Pair {
     /// declares `m`, ngspice's only where it does not (RG `X`;
     /// ISSUE_267/test_a3.cir): the declared `m` is renamed.
     pub(super) xyce_m_rename: bool,
+    /// Xyce sets a parameter an `X` line passes even where the `.subckt`
+    /// line does not declare it (7.10 runs of BUG_1558/bug_1558_3.cir),
+    /// ngspice stops on the line ("0 formal but 1 actual params"): the
+    /// head declares it (`values::W::undeclared`).
+    pub(super) xyce_undeclared: bool,
     /// Xyce's R model `R` multiplies the instance's 1k (RG 7.10 resistor),
     /// the source's is the resistance (ngspice manual §3.3.2): the instance
     /// takes it, the model card drops it.
@@ -182,6 +187,7 @@ impl Pair {
             first_param: xy(nf) && !xy(nt),
             quoted_expr: ef == ExprEval::Hspice && et != ExprEval::Hspice,
             xyce_m_rename: xy(nf) && ng(nt) && to.subckt_multiplicity,
+            xyce_undeclared: xy(nf) && ng(nt),
             r_model_multiplies: xy(nt) && !xy(nf),
             spell_if: foreign && et == ExprEval::Ngspice,
             brace_groups: foreign && et == ExprEval::Ngspice,
@@ -258,6 +264,7 @@ mod tests {
             ("xyce_globals", to_ng.xyce_globals),
             ("first_param", to_ng.first_param),
             ("xyce_m_rename", to_ng.xyce_m_rename),
+            ("xyce_undeclared", to_ng.xyce_undeclared),
             ("log_to_log10", to_ng.log_to_log10),
             ("nint_to_ngspice", to_ng.nint_to_ngspice),
             ("spell_clamp", to_ng.spell_clamp),

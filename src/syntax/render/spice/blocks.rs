@@ -77,10 +77,13 @@ impl W<'_, '_> {
         assert_eq!(self.scope, crate::syntax::ast::NONE, "no subcircuit open");
         assert!(self.m_param.is_none(), "no subcircuit's M renamed");
         self.scope = sc.node;
-        let head = self
+        let mut head = self
             .rd
             .subckt_head(sc.node)
             .expect("the reader read the head");
+        // A Xyce `X` line's parameter the head lacks (`W::undeclared`).
+        let passed = self.undeclared(sc, &head.params);
+        head.params.extend(passed);
         let mut line = format!(".subckt {}", sc.name);
         for p in &head.ports {
             line.push(' ');
