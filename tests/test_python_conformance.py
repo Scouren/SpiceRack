@@ -114,6 +114,20 @@ def _with_child(mod):
     return tb
 
 
+def _with_local_function(mod):
+    """`cell` holds a `.func` over its own parameter `k`: the subcircuit's
+    (`Construct::LocalFunc`), not a top-level function."""
+    cell = mod.Subcircuit("cell", ["a", "b"], k="2")
+    cell.add_function("scaled", ["x"], "x*k")
+    cell.R("1", "a", "b", "{scaled(500)}")
+    d = dut(mod)
+    d.instance(cell, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(cell)
+    tb.add_operating_point()
+    return tb
+
+
 def _with_nested(mod):
     """`buf` defined inside `wrap` (a nested `.subckt`), `wrap` placed in the DUT."""
     wrap = mod.Subcircuit("wrap", ["a", "b"])
@@ -172,6 +186,7 @@ FEATURES = {
     "step_log": setting(lambda tb: tb.step_sweep("r", 1e3, 1e5, 5, "log")),
     "ngbehavior": setting(lambda tb: setattr(tb, "ngbehavior", "hsa")),
     "function": setting(lambda tb: tb.add_function("f", ["x"], "x*2")),
+    "function_local": _with_local_function,
     "global_nodes": setting(lambda tb: tb.global_nodes("vdd")),
     "extra_line": setting(lambda tb: tb.extra_line(".options noacct")),
     "extra_line_spectre": setting(lambda tb: tb.extra_line("parameters k=2", dialect="spectre")),
@@ -285,6 +300,9 @@ EXPECTED = {
     'step_log': ('W0016', 'W0016', 'W0016', 'W0016', 'W0016', OK, 'W0016', OK, OK),
     'ngbehavior': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'function': (OK, OK, OK, OK, OK, OK, 'W0106', OK, OK),
+    # A function of a subcircuit (it reads the subcircuit's parameter): LTspice, Spectre
+    # and VACASK define functions at the top only (`Construct::LocalFunc`: W0106).
+    'function_local': (OK, OK, OK, OK, 'W0106', 'W0106', 'W0106', OK, OK),
     'global_nodes': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'extra_line': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'extra_line_spectre': ('W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
@@ -388,6 +406,7 @@ COVERED = {
         "global_nodes", "extra_line", "use_pdk", "save_currents",
     },
     "Subcircuit": {
+        "add_function",
         "subcircuit",
         "R", "C", "L", "K", "D", "Q", "BJT", "M", "MOSFET", "J", "Z", "E", "G", "F", "H",
         "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",

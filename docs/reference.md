@@ -66,6 +66,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | --- | --- |
 | `model(name, kind, **params)` | `.model` |
 | `include(path)` | `.include` |
+| `add_function(name, args, body)` | `.func name(args) {body}` in the subcircuit (`cell.add_function("scaled", ["x"], "x*k")`). One that reads a parameter of the subcircuit is local to it: LTspice, Spectre and VACASK refuse it (`W0106`) |
 | `subcircuit(subckt)` | on a `Subcircuit`: `subckt` defined inside it (a nested `.subckt`), seen by its own instances only; each target writes it as a top-level definition named `<parent>__<name>`. `ValueError` when `subckt` holds a `verilog()` block |
 | `lib(path, section)` | `.lib` |
 | `parameter(name, value)` | `.param` |

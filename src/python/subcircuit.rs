@@ -395,6 +395,16 @@ impl PySubcircuit {
         self.inner.params.push((name.into(), value.into()));
     }
 
+    /// A `.func` of this subcircuit, as `Testbench.add_function` writes one
+    /// at the top: `add_function("scaled", ["x"], "x*k")` (ngspice-45 manual
+    /// §2.12). One reading a parameter of the subcircuit stays local to it;
+    /// LTspice, Spectre and VACASK define functions at the top only and
+    /// refuse it (`W0106`).
+    #[pyo3(signature = (name, args, body))]
+    fn add_function(&mut self, name: &str, args: Vec<String>, body: &str) {
+        self.inner.raw.push(format!(".func {name}({}) {{{body}}}", args.join(", ")));
+    }
+
     /// Load a Verilog-A model (file path or inline source). The `.va` is
     /// recorded, not compiled: the target's writer compiles it with OpenVAF
     /// for ngspice/VACASK, includes it for Spectre, and hands it to ESPice as

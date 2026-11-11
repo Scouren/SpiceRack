@@ -759,3 +759,26 @@ def test_p8_013_nested_definitions_run_to_the_closed_form(backend):
     tb.V("in", "in", "0", 1.0)
     # A linear DC solve: exact to rounding.
     assert tb.operating_point()["out"] == pytest.approx(0.75, rel=1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_012_a_subcircuit_function_reads_the_instances_parameter(backend):
+    """ngspice-45 manual §2.12 (`.func`), §2.11.3 (subcircuit parameters): the
+    cell's resistor is scaled(500) = 500*k ohms, k = 6 on the instance, so
+    3 kOhm under 1 kOhm and 1 V: 3/(1+3) = 0.75 V (closed form). With the
+    cell's default k = 2 it would be 0.5 V. ngspice-45 and ESPice 0.3.0 on the
+    hand deck: 7.5e-01 (research/impl/evidence/P8-012)."""
+    import spicerack as ps
+
+    cell = ps.Subcircuit("cell", ["a", "b"], k="2")
+    cell.add_function("scaled", ["x"], "x*k")
+    cell.R("1", "a", "b", "{scaled(500)}")
+    d = ps.Subcircuit("div", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    d.instance(cell, "1", "out", "0", k=6)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.add_subcircuit(cell)
+    tb.V("in", "in", "0", 1.0)
+    # A linear DC solve: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(0.75, rel=1e-9)

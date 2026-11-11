@@ -160,6 +160,7 @@ PARITY = {
     "step_log": (FEATURES["step_log"], tw_setting([".step log r 1e3 1e5 5"]), "LTspice/Xyce family .step list/log", None),
     "ngbehavior": (FEATURES["ngbehavior"], tw_setting([".options ngbehavior=hsa"]), "ng ngbehavior (sky130 compatibility)", None),
     "function": (FEATURES["function"], tw_setting([], functions=[".func f(x) {x*2}"]), "ng §8 .func", None),
+    "function_local": (FEATURES["function_local"], deck(subckts=[[".subckt cell a b k=2", ".func scaled(x) {x*k}", "R1 a b {scaled(500)}", ".ends cell"]], top=RC + ["X1 out 0 cell"], bench=[VIN, ".op"]), "ng §2.12 .func, §2.11.3 .subckt with parameters (a function inside a definition)", "P8-012"),
     "global_nodes": (FEATURES["global_nodes"], tw_setting([], globals=["vdd"]), "ng §2.5 .global", None),
     "extra_line": (FEATURES["extra_line"], tw_setting(["simulator lang=ngspice", ".options noacct", "simulator lang=spice"]), "deck.rs:495 extra_line (own-dialect region)", None),
     "extra_line_spectre": (FEATURES["extra_line_spectre"], tw_setting(["simulator lang=spectre", "parameters k=2", "simulator lang=spice"]), "deck.rs:495 extra_line (foreign region)", None),

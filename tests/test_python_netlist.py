@@ -1217,3 +1217,37 @@ class TestCouplingNames:
         with pytest.raises(ValueError, match="^K1: "):
             c.K("1", *names, coupling=0.5)
         assert not any(l.startswith("K") for l in str(c).splitlines())
+
+
+# ======================================================================
+# A function inside a subcircuit (P8-012; ngspice-45 manual §2.12)
+# ======================================================================
+
+def scaling_cell():
+    cell = ps().Subcircuit("cell", ["a", "b"], k="2")
+    cell.add_function("scaled", ["x"], "x*k")
+    cell.R("1", "a", "b", "{scaled(500)}")
+    return cell
+
+
+class TestSubcircuitFunction:
+    def test_p8_012_a_function_over_a_subcircuit_parameter_stays_in_it(self):
+        c = ps().Circuit("f")
+        c.subcircuit(scaling_cell())
+        c.X("1", "cell", "in", c.gnd)
+        lines = str(c).splitlines()
+        # The ngspice writer's definition: head, functions, cards (golden
+        # record xyce/PARAMS2/Params_A8.cir: `.subckt ResSub 1 2 PARAMS:
+        # RES=5k`, `.func frobnitz(x) {5*x}`, `R1 1 2 {frobnitz(RES)}`).
+        at = lines.index(".subckt cell a b PARAMS: k=2")
+        assert lines[at + 1:at + 4] == [".func scaled(x) {x*k}", "R1 a b {scaled(500)}", ".ends cell"]
+        assert sum(l.startswith(".func") for l in lines) == 1
+
+    def test_p8_012_several_arguments(self):
+        cell = ps().Subcircuit("cell", ["a"])
+        cell.add_function("par", ["x", "y"], "x*y/(x+y)")
+        assert ".func par(x, y) {x*y/(x+y)}" in cell.to_source().splitlines()
+
+    def test_p8_012_the_store_keeps_the_function(self):
+        text = scaling_cell().to_source()
+        assert ps().Subcircuit.from_source(text).to_source() == text

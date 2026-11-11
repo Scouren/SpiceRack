@@ -80,6 +80,8 @@ injection, propagation delay and pedestal all track them.
 `lib(path, section)`, `parameter(name, value)`, `raw_spice(line)`, `veriloga(...)`,
 `osdi(...)`, `verilog(...)`. `temp(value)` and `options(**kw)` are `Circuit` only.
 
+`Subcircuit.add_function(name, args, body)` is a `.func` inside the subcircuit (`cell.add_function("scaled", ["x"], "x*k")`; `tb.add_function` is the top-level one). A function reading a parameter of its subcircuit stays local to it, which LTspice, Spectre and VACASK refuse (`W0106`: functions at the top only).
+
 `Testbench`: `extra_line(text)`, `options(**kw)`, `temperature`, `nominal_temperature`,
 `initial_condition(**nodes)`, `node_set(**nodes)`, `save(*signals)`, `use_pdk(...)`,
 `add_subcircuit(sub)`. `tb.temperature` / `tb.nominal_temperature` are write-only.
