@@ -19,7 +19,7 @@ use super::vacask::{num, q, respell};
 use crate::syntax::behaviour::{NamedRules, OptionTo};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
-use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val};
+use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val, step_points};
 
 impl W<'_, '_> {
     /// The `control` block: options, then per analysis the stepped sweeps
@@ -398,10 +398,21 @@ impl W<'_, '_> {
     }
 
     /// A `.step`'s `sweep` line; `None` when it is refused (VACASK sweeps
-    /// lin, dec or oct).
+    /// lin, dec or oct). A grid that ends short of its stop value is
+    /// `values=[…]`, its points: VACASK spreads a `dec` or `oct` sweep
+    /// evenly from `from` to `to` and fails on a range that steps away
+    /// from `to` (36be560, run: `research/impl/evidence/P5-099/`).
     fn step_sweep(&mut self, (sweep, param, [start, stop, step], tok): &Step) -> Option<String> {
         let name = param.to_ascii_lowercase();
         let scale = format!("step_{}", sanitize(&name));
+        if *sweep == Some("log") {
+            self.refuse(Code::W0016, *tok);
+            return None;
+        }
+        if let Some((points, true)) = step_points(*sweep, [*start, *stop, *step]) {
+            let list = values(&points);
+            return Some(format!("sweep {scale} variable=\"{name}\" {list}"));
+        }
         Some(match sweep {
             Some(mode @ ("dec" | "oct")) => format!(
                 "sweep {scale} variable=\"{name}\" from={} to={} mode=\"{mode}\" points={}",
@@ -409,10 +420,6 @@ impl W<'_, '_> {
                 num(*stop),
                 *step as u64
             ),
-            Some("log") => {
-                self.refuse(Code::W0016, *tok);
-                return None;
-            }
             _ => format!(
                 "sweep {scale} variable=\"{name}\" from={} to={} step={}",
                 num(*start),

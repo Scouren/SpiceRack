@@ -11,7 +11,7 @@
 //! marker says it is absent
 //! (`tests/test_backends.rs::p1_018_ltspice_wine_pinned_into_testing`).
 //!
-//! Cites: ZERO-LEDGER P5-100, P5-101; Spectre Reference 19.1 `[REF]`
+//! Cites: ZERO-LEDGER P5-099, P5-100, P5-101; Spectre Reference 19.1 `[REF]`
 //! pp.406-408 (`sweep`: nesting; `log`, "Number of steps, log sweep");
 //! `python/keywords.rs` `Sweep::Log` (N points in total); Xyce RG 7.10
 //! §2.1.36 (`.STEP`: "the first .STEP line … will be the innermost
@@ -155,4 +155,108 @@ fn p5_100_the_first_step_is_the_innermost_loop_on_every_target() {
             assert!(held, "no `{head}`\n{spectre}");
         }
     }
+}
+
+/// ZERO-LEDGER P5-099. Oracle: the source's own simulator running the
+/// source deck (LTspice 26.1.1, again here unless CI's
+/// `LTSPICE_CI_PENDING_MIRROR` marker says it is absent; Xyce 7.10), each
+/// point the divider's closed form v(out) = rr / (1k + rr). LTspice ends
+/// a range on its stop value and reads the bounds in either order; Xyce
+/// ends a grid at its last point (RG 7.10 §2.1.36). By hand:
+/// research/impl/evidence/P5-099/RESULTS.txt. The written deck runs on
+/// ngspice, VACASK, Xyce and, from Xyce, on LTspice; Spectre has no
+/// binary here: where its manual does not say how a grid that misses
+/// its stop ends (Reference 19.1 pp.406-408), its text is the points
+/// themselves. Tolerance: a linear solve of three elements; LTspice's
+/// raw file holds single floats (6e-8).
+#[test]
+fn p5_099_a_ranged_step_runs_the_sources_points_on_every_target() {
+    // 1k · 10^(1/2) and 10k · 10^(1/2), the points two a decade.
+    const HALF: f64 = 3_162.277_660_168_38;
+    let out = |points: &[f64]| -> Vec<f64> { points.iter().map(|r| r / (1e3 + r)).collect() };
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let meets = |on: Dialect, text: &str, want: &[f64]| {
+        let got = outs(on, text);
+        let near = got.len() == want.len() && got.iter().zip(want).all(|(g, w)| tol.within(*g, *w));
+        assert!(near, "{on:?}: v(out) = {got:?}, want {want:?}\n{text}");
+    };
+    let ltspice = std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_none();
+    // The source, its card, and the values of rr its simulator steps
+    // through (la, lb, lc, xa, xb of RESULTS.txt).
+    let cases: [(Dialect, &str, &[f64]); 5] = [
+        (
+            Dialect::Ltspice,
+            ".step param rr 1k 10k 4k",
+            &[1e3, 5e3, 9e3, 1e4],
+        ),
+        (
+            Dialect::Ltspice,
+            ".step dec param rr 1k 50k 2",
+            &[1e3, HALF, 1e4, 10.0 * HALF, 5e4],
+        ),
+        (
+            Dialect::Ltspice,
+            ".step param rr 3k 1k 0.8k",
+            &[1e3, 1.8e3, 2.6e3, 3e3],
+        ),
+        (Dialect::Xyce, ".step rr 1k 10k 4k", &[1e3, 5e3, 9e3]),
+        (
+            Dialect::Xyce,
+            ".step dec rr 1k 50k 2",
+            &[1e3, HALF, 1e4, 10.0 * HALF],
+        ),
+    ];
+    for (from, card, points) in cases {
+        let deck = format!("{DIVIDER}{card}\n.op\n.end\n");
+        let want = out(points);
+        if from != Dialect::Ltspice || ltspice {
+            meets(from, &deck, &want);
+        }
+        for to in [Dialect::Ngspice, Dialect::Vacask, Dialect::Xyce] {
+            let text = oracle::write(&deck, from, to);
+            meets(to, &text, &want);
+        }
+        // LTspice runs a list as written: the points Xyce stopped at.
+        let text = oracle::write(&deck, from, Dialect::Ltspice);
+        if from == Dialect::Xyce && ltspice {
+            meets(Dialect::Ltspice, &text, &want);
+        }
+        let listed = text.lines().any(|l| l.starts_with(".step param rr list "));
+        assert!(listed, "{from:?} `{card}`\n{text}");
+    }
+    // Spectre: the points, where `step=` would leave the grid's end to it.
+    for (from, card, head) in [
+        (
+            Dialect::Ltspice,
+            ".step param rr 1k 10k 4k",
+            "sweep1_rr sweep param=rr values=[1k 5k 9k 10k] {",
+        ),
+        (
+            Dialect::Xyce,
+            ".step rr 1k 10k 4k",
+            "sweep1_rr sweep param=rr values=[1k 5k 9k] {",
+        ),
+        // A grid that reaches its stop value stays a range on every target.
+        (
+            Dialect::Xyce,
+            ".step rr 1k 9k 4k",
+            "sweep1_rr sweep param=rr start=1k stop=9k step=4k {",
+        ),
+    ] {
+        let deck = format!("{DIVIDER}{card}\n.op\n.end\n");
+        oracle::spec_example(
+            "Spectre Reference 19.1 pp.406-408: sweep, values=[...]",
+            &deck,
+            from,
+            Dialect::Spectre,
+            &[head],
+        );
+    }
+    let deck = format!("{DIVIDER}.step rr 1k 9k 4k\n.op\n.end\n");
+    let text = oracle::write(&deck, Dialect::Xyce, Dialect::Ltspice);
+    let range = text.lines().any(|l| l == ".step param rr 1000 9000 4000");
+    assert!(range, "{text}");
 }

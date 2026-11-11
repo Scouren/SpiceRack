@@ -25,7 +25,7 @@ use crate::syntax::behaviour::{ModelSemantics, OptionTo, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::epochs::{Plan, plan};
-use crate::syntax::render::read::{Bench, BenchCard, Opt, Val};
+use crate::syntax::render::read::{Bench, BenchCard, Opt, Val, step_points};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
@@ -454,7 +454,11 @@ impl W<'_, '_> {
     /// `sweep<k>_<name> sweep param=p start= stop= step= {` for `.step`
     /// `idx`; `None` when it is refused. A `log` step counts its points
     /// in all (`python/keywords.rs` `Sweep::Log`) and Spectre's `log=` its
-    /// steps (`[REF]` p.407: "Number of steps, log sweep"), one fewer.
+    /// steps (`[REF]` p.407: "Number of steps, log sweep"), one fewer. A
+    /// grid that ends short of its stop value is `values=[…]`, its points
+    /// (`read::step_points`: Xyce's, which VACASK and the ngspice loops
+    /// run): `[REF]` pp.406-408 do not say where `step=` and `dec=` end
+    /// such a grid.
     fn sweep_head(
         &mut self,
         idx: usize,
@@ -471,6 +475,11 @@ impl W<'_, '_> {
             }
             _ => ("step", *step),
         };
+        if let Some((points, true)) = step_points(*sweep, [*start, *stop, *step]) {
+            let values = self.values(&points);
+            let k = idx + 1;
+            return Some(format!("sweep{k}_{suffix} sweep param={param} {values} {{"));
+        }
         Some(format!(
             "sweep{}_{suffix} sweep param={param} start={} stop={} {by}={} {{",
             idx + 1,

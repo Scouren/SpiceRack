@@ -102,7 +102,10 @@ emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not
 (`netlist("ngspice")` writes the sweep as `foreach` loops of a `.control`
 script; a run still goes to a backend that returns one result per step).
 Several steps nest, the first one called the innermost loop on every target
-(Xyce's and LTspice's `.step` order).
+(Xyce's and LTspice's `.step` order). A range ends at its last point not past
+`stop` on every target (Xyce's rule): where a simulator would run on to `stop`
+itself (LTspice) or its manual does not say (Spectre), the points are written
+as a list.
 On LTspice a stepped run returns a list, one result per step in step order, and
 each result's `params` names its step (`{"r": 2000.0}`; `{}` when nothing steps),
 so `[op.params["r"] for op in tb.operating_point()]` lists the step values

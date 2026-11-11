@@ -89,7 +89,7 @@ pub(in crate::syntax::render) use named_blocks::{Stats, Vary};
 pub(in crate::syntax::render) use options::Opt;
 pub use options::portable_option;
 pub(in crate::syntax::render) use sources::{Num, Wave, WaveKind};
-pub(in crate::syntax::render) use sweeps::{DcAxis, DcSweep};
+pub(in crate::syntax::render) use sweeps::{DcAxis, DcSweep, STEP_POINTS_MAX, step_points};
 pub(in crate::syntax::render) use testbench::{Ana, BenchCard, Sweep};
 pub(in crate::syntax::render) use unlift::{Lift, Step};
 pub(in crate::syntax::render) use values::Val;
