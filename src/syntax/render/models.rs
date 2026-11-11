@@ -323,10 +323,11 @@ pub const DIODE3: Kind = Kind {
         ("fcs", Implied::Text("0.5")),
         ("xom", Implied::Text("10000")),
         ("xoi", Implied::Text("10000")),
-        // What ngspice does not do: drop a series resistance below `minr`
-        // (default 0.1), linearize below 0.1*iabstol, limit the current
-        // to `jmax*area` (default 1 A).
-        ("minr", Implied::Text("0")),
+        // What ngspice does not do: linearize below 0.1*iabstol, limit the
+        // current to `jmax*area` (default 1 A). Spectre also drops a series
+        // resistance below `minr` (default 0.1 ohm), which ngspice keeps:
+        // `minr` is not written, Spectre 25.1 stops on `minr=0` (CMI-2049,
+        // "should be greater than zero").
         ("dskip", Implied::Text("no")),
         ("jmax", Implied::Text("1e+20")),
     ],

@@ -215,3 +215,20 @@ fn ltspice_parasitics_are_spectre_elements() {
         assert!(w.text.contains(l), "{l}\n{}", w.text);
     }
 }
+
+/// Ledger P3-088: Spectre 25.1 stops on a diode model's `minr=0`
+/// ("CMI-2049: Value of `minr' should be greater than zero") and runs the
+/// same deck without it (research/settle-remote.md, "Spectre writer check",
+/// `t_m3_diodes`, iccad4 2026-11-07). `[CMP]` p.306 #48 `minr=0.1`: the
+/// default is positive. What ngspice does not do stays written (`dskip`,
+/// `jmax`: `[CMP]` p.307 #68, #69).
+#[test]
+fn p3_088_spectre_writer_emits_minr_diode() {
+    let text = spectre("t\n.model dj d level=3 is=1e-14 rs=10\nD1 a 0 dj\n.op\n.end\n").unwrap();
+    let model = text
+        .lines()
+        .find(|l| l.starts_with("model dj diode "))
+        .unwrap_or_else(|| panic!("no diode model in\n{text}"));
+    assert!(!model.contains("minr"), "{model}");
+    assert!(model.contains(" dskip=no jmax="), "{model}");
+}

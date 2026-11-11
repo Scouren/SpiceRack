@@ -704,3 +704,18 @@ hspice/hspice/op_times.sp vacask now refused: W0015, a timed `.op` no target but
 # S1: P3-100: a `.tran` whose step the simulator chooses (TSTEP 0) over an empty or reversed span is refused with W0141 on ngspice and ESPice; it was written with the negative step span/50, which ngspice rejects
 xyce/Message/Input/TRAN_setAnalysisParams.cir ngspice now refused: W0141, a chosen step with no span (was `.tran -20m 0 1`) (P3-100)
 xyce/Message/Input/TRAN_setAnalysisParams.cir espice now refused: W0141, a chosen step with no span (was `.tran -20m 0 1`) (P3-100)
+
+# S1: P3-088: a level-3 diode model is written for Spectre without `minr=0`, which Spectre 25.1 rejects
+# (CMI-2049, settle-remote t_m3_diodes); the pinned deck tests/spectre/t_m3_diodes.scs changes with it.
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__diode_pd2nw_11v0.model.spice spectre written differently: no minr=0 on the diode model (P3-088)
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__diode_pd2nw_11v0_no_rs.model.spice spectre written differently: no minr=0 on the diode model (P3-088)
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__diode_pw2nd_11v0.model.spice spectre written differently: no minr=0 on the diode model (P3-088)
+pdk-sky130A/libs.ref/sky130_fd_pr/spice/sky130_fd_pr__diode_pw2nd_11v0_no_rs.model.spice spectre written differently: no minr=0 on the diode model (P3-088)
+pdk-sky130A/libs.tech/combined/continuous/models_diodes.spice spectre written differently: no minr=0 on the diode models (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs manifest the pinned deck's new content: no minr=0 (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs cdl written differently: the input has no minr=0 (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs espice written differently: the input has no minr=0 (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs hspice written differently: the input has no minr=0 (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs ltspice written differently: the input has no minr=0 (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs ngspice written differently: the input has no minr=0 (P3-088)
+fixtures/tests/spectre/t_m3_diodes.scs xyce written differently: the input has no minr=0 (P3-088)

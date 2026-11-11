@@ -286,7 +286,7 @@ fn spectre_maps_each_parameter_onto_its_equation() {
         " pta=1m ptp=1m ",
         " tnom=30 ",
         " tbv1=1m ",
-        " eg=1.11 nz=1.05 fcs=500m minr=0 dskip=no jmax=",
+        " eg=1.11 nz=1.05 fcs=500m dskip=no jmax=",
         "d1 (2 0) dj area=500m perim=3",
     ] {
         assert!(d.contains(want), "no `{want}` in\n{d}");
