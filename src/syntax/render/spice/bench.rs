@@ -229,7 +229,7 @@ impl W<'_, '_> {
 
 impl W<'_, '_> {
     /// The options card(s) (Xyce's per package, `xyce_options`; the others'
-    /// one `.options`, `ngspice_options`), then `.temp` and `.options tnom`.
+    /// one `.options`, `ngspice_options`), then `.options tnom` and `.temp`.
     fn options_cards(&mut self, tb: &Tb) {
         if self.b.options_form == OptionsForm::XycePackages {
             self.xyce_drops(tb);
@@ -247,13 +247,17 @@ impl W<'_, '_> {
                     .step_lists
                     .iter()
                     .any(|(p, ..)| p.eq_ignore_ascii_case("temp"));
-            if let Some(t) = tb.temp.filter(|_| !listed) {
-                let t = self.sp.decimal(t, self.x);
-                self.o.token(&format!(".temp {t}"), Space::Line);
-            }
+            // The nominal temperature stands above `.temp`, where a deck's
+            // own `.options` card stands: an HSPICE deck's two cards are
+            // written back in the order they are written in (the store's
+            // fixpoint).
             if let Some(t) = tb.tnom {
                 let t = self.sp.decimal(t, self.x);
                 self.o.token(&format!(".options tnom={t}"), Space::Line);
+            }
+            if let Some(t) = tb.temp.filter(|_| !listed) {
+                let t = self.sp.decimal(t, self.x);
+                self.o.token(&format!(".temp {t}"), Space::Line);
             }
         }
     }
