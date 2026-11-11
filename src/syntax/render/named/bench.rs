@@ -68,6 +68,8 @@ pub(super) struct Tb {
     pub(super) extra: Vec<(u32, usize)>,
     /// Each VACASK `save` naming a module's output variable (not written).
     pub(super) unsaved: Vec<u32>,
+    /// HSPICE's `.option delmax=` (`Opt::MaxStep`), the last given.
+    step_cap: Option<f64>,
 }
 
 /// A `.step`: its sweep keyword, parameter, start, stop and step, and its
@@ -331,6 +333,7 @@ impl W<'_, '_> {
                                 }
                                 Opt::Temp(t) => tb.temp = Some(t),
                                 Opt::Tnom(t) => tb.tnom = Some(t),
+                                Opt::MaxStep(x) => tb.step_cap = Some(x),
                                 Opt::Vacask(k, v) => tb.vacask.push((k, v, tok)),
                                 Opt::NgBehavior(_) => tb.ngbehavior.push(tok),
                                 Opt::Xyce(..) => {
@@ -380,6 +383,10 @@ impl W<'_, '_> {
             }
         }
         tb.plan = plan(script);
+        // The cap is every transient's, wherever its card stands.
+        if let Some(cap) = tb.step_cap {
+            tb.plan.runs.iter_mut().for_each(|a| a.cap_step(cap));
+        }
         tb
     }
 }

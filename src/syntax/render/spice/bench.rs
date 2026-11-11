@@ -65,6 +65,8 @@ pub(super) struct Tb {
     unsaved: Vec<u32>,
     /// `ngbehavior=`'s mode, with its statement's first token.
     pub(super) ngbehavior: Option<(String, u32)>,
+    /// HSPICE's `.option delmax=` (`Opt::MaxStep`), the last given.
+    step_cap: Option<f64>,
 }
 
 /// Control commands that start an analysis: a `.control` block issuing one
@@ -167,6 +169,10 @@ impl W<'_, '_> {
             }
         }
         tb.plan = plan(script);
+        // The cap is every transient's, wherever its card stands.
+        if let Some(cap) = tb.step_cap {
+            tb.plan.runs.iter_mut().for_each(|a| a.cap_step(cap));
+        }
         tb
     }
 
@@ -450,6 +456,7 @@ impl W<'_, '_> {
                         }
                         Opt::Temp(t) => tb.temp = Some(t),
                         Opt::Tnom(t) => tb.tnom = Some(t),
+                        Opt::MaxStep(x) => tb.step_cap = Some(x),
                         Opt::Vacask(..) => {
                             if !tb.dropped.contains(&tok) {
                                 tb.dropped.push(tok);

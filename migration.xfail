@@ -2331,3 +2331,14 @@ xyce/POWER/power_bsim4_trap.cir espice now refused: DEVICE MINRES/MINCAP has no 
 xyce/POWER/power_bsim4_trap.cir hspice now refused: DEVICE MINRES/MINCAP has no counterpart, W0017 (P3-059)
 xyce/POWER/power_bsim4_trap.cir ltspice now refused: DEVICE MINRES/MINCAP has no counterpart, W0017 (P3-059)
 xyce/POWER/power_bsim4_trap.cir ngspice now refused: DEVICE MINRES/MINCAP has no counterpart, W0017 (P3-059)
+
+# S1: P3-106: an HSPICE `.option delmax=` is each transient's step cap (`.tran`'s fourth field, `maxstep=`, HSPICE's `.option delmax=` before its `.tran`), no longer an option card
+hspice/hspice/cshunt_delmax.sp ngspice written differently: delmax is `.tran 1u 8u 0 50n`, not `.options delmax=50n` (P3-106)
+hspice/hspice/cshunt_delmax.sp espice written differently: delmax is `.tran 1u 8u 0 50n`, not `.options delmax=50n` (P3-106)
+hspice/hspice/cshunt_delmax.sp ltspice written differently: delmax is `.tran 1u 8u 0 50n`, not `.options delmax=50n` (P3-106)
+hspice/hspice/cshunt_delmax.sp hspice written differently: `.option delmax=50n` on the line before `.tran`, not on the options card (P3-106)
+hspice/hspice/cshunt_delmax.sp spectre written differently: the tran gains `maxstep=50n` (P3-106)
+hspice/hspice/power.sp hspice written differently: `.option delmax=1n` on the line before `.tran`, not on the options card (P3-106)
+hspice/hspice/meas_events.sp hspice written differently: `.option delmax=2n` on the line before `.tran`, not on the options card (P3-106)
+hspice/hspice/meas_events.sp ltspice written differently: delmax is `.tran 1n 3u 0 2n`, not `.options delmax=2n` (P3-106)
+hspice/hspice/meas_events.sp spectre written differently: the tran gains `maxstep=2n` (P3-106)

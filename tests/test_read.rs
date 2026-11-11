@@ -73,6 +73,36 @@ fn a_control_pre_osdi_is_a_load_ltspice_refuses() {
     assert!(refusal(deck, Dialect::Ngspice, Dialect::Ltspice).contains(&Code::W0004));
 }
 
+// ZERO-LEDGER P3-106: HSPICE `.option delmax=` is the largest step of the
+// deck's transients (HSPICE Reference Manual: Commands and Control Options
+// E-2010.12 p.443); ngspice's is `.tran`'s fourth number (manual §11.3.10,
+// TMAX), and ngspice-45 reads `.options delmax=` without a word. Oracle:
+// ngspice's own count of time points on this deck, 1021 with the 1 µs cap
+// and 129 without (Xyce 7.10: 1028 and 168).
+#[test]
+fn p3_106_hspice_delmax_is_tran_max_step() {
+    let deck = "t\nV1 in 0 PULSE(0 1 0 1u 1u 0.5m 1m)\nR1 in out 1k\nC1 out 0 100n\n\
+                .option delmax=1u\n.tran 10u 1m\n.end\n";
+    let out = write(deck, Dialect::Hspice, Dialect::Ngspice);
+    let plots = oracle::run(Dialect::Ngspice, &out);
+    let points = plots
+        .iter()
+        .filter_map(|p| p.real_data.first())
+        .map(Vec::len)
+        .max();
+    assert!(
+        points > Some(1000),
+        "{points:?} time points under a 1 µs cap\n{out}"
+    );
+    // HSPICE's own writer spells the cap back, on the line before its
+    // `.tran` (`spice/analyses.rs`): written twice, the text is the same.
+    let back = write(deck, Dialect::Hspice, Dialect::Hspice);
+    let lines: Vec<String> = back.lines().map(str::to_ascii_lowercase).collect();
+    let capped = |w: &[String]| w[0].starts_with(".option delmax=") && w[1].starts_with(".tran ");
+    assert!(lines.windows(2).any(capped), "{back}");
+    assert_eq!(write(&back, Dialect::Hspice, Dialect::Hspice), back);
+}
+
 #[test]
 fn p1_057_a_rejected_lines_fragment_is_no_unparsed_text() {
     // Xyce 7.10 `-norun` stops on `.FOUR {` (".FOUR line needs at least 3

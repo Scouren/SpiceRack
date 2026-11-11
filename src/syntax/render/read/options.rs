@@ -15,7 +15,7 @@
 
 use super::Rd;
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::OptionsForm;
+use crate::syntax::behaviour::{AnalysisForm, OptionsForm};
 use crate::syntax::token::Tag as T;
 
 /// One option a `.options` card sets.
@@ -30,6 +30,9 @@ pub(in crate::syntax::render) enum Opt {
     Temp(f64),
     /// Xyce `.options device tnom=`, or `.options tnom=` with no package.
     Tnom(f64),
+    /// HSPICE `.option delmax=`: the largest step, in seconds (> 0), of
+    /// every transient of the deck (cmdref `.OPTION DELMAX`).
+    MaxStep(f64),
     /// VACASK's own `options k=v`, its value as written.
     Vacask(String, String),
     /// `ngbehavior=<mode>`: ngspice's compatibility mode, which ngspice
@@ -112,14 +115,25 @@ impl<'a> Rd<'a> {
                     )
                     .collect()
             }
-            _ => self
-                .params_of(items, false)
-                .into_iter()
-                .map(|(k, v)| match k.eq_ignore_ascii_case("ngbehavior") {
-                    true => Opt::NgBehavior(v),
-                    false => Opt::Portable(k, v),
-                })
-                .collect(),
+            _ => {
+                // HSPICE's `.OPTION DELMAX` (cmdref p.443) is the step cap its
+                // writer spells that way (`spice/analyses.rs`); ngspice-45
+                // has no such option and reads the card without a word. A
+                // value that is no positive number stays an option.
+                let hspice = self.b.analysis_form == AnalysisForm::Hspice;
+                let lex = self.t.lexicon_at(self.main(n));
+                self.params_of(items, false)
+                    .into_iter()
+                    .map(|(k, v)| match k.to_ascii_lowercase().as_str() {
+                        "ngbehavior" => Opt::NgBehavior(v),
+                        "delmax" if hspice => match self.number_text(&v, lex) {
+                            Some(x) if x > 0.0 => Opt::MaxStep(x),
+                            _ => Opt::Portable(k, v),
+                        },
+                        _ => Opt::Portable(k, v),
+                    })
+                    .collect()
+            }
         }
     }
 }

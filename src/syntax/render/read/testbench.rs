@@ -12,6 +12,7 @@
 //! Contents:
 //! - `pub(in crate::syntax::render) enum BenchCard`, `enum Ana`, `struct Sweep`; `pub(super) enum Card`
 //!   (an analysis card's [`Ana`] is `analyses`')
+//! - `Ana::cap_step(&mut self, cap: f64)`
 //! - `pub(super) const SWEEPS`, `fn keyword(w: &str, set: &[&'static str]) -> Option<&'static str>`
 //! - `Rd::testbench_peg(&self, n: u32) -> bool`, `Rd::testbench_ok(&self, n: u32) -> bool`
 //! - `Rd::bench_card(&self, n: u32) -> Option<BenchCard>`
@@ -177,6 +178,22 @@ pub(super) enum Card {
 
 /// The sweep keywords (`Sweep` in the IR).
 pub(super) const SWEEPS: &[&str] = &["dec", "oct", "lin", "log"];
+
+impl Ana {
+    /// Caps a transient's largest step at `cap` seconds: the smaller of
+    /// `cap` and the analysis's own cap. Any other analysis is unchanged.
+    ///
+    /// # Panics
+    /// When `cap` is not positive (`Rd::options_view` reads no other).
+    pub(in crate::syntax::render) fn cap_step(&mut self, cap: f64) {
+        assert!(cap > 0.0, "a step cap is a positive time: {cap}");
+        if let Ana::Tran { max_step, .. } = self {
+            let capped = max_step.map_or(cap, |own| own.min(cap));
+            assert!(capped <= cap, "{capped} over the cap {cap}");
+            *max_step = Some(capped);
+        }
+    }
+}
 
 impl<'a> Rd<'a> {
     /// Whether the card's rule in the dialect's grammar reads it.
