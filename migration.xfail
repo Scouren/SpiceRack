@@ -109,3 +109,8 @@ xyce/SENS/fdisin2.cir vacask now written: a SIN with PHASE is written with tdpha
 # S1: P4-019: VACASK takes no `td2` that is not above 0 ("Parameter td2 of exponential transient must be greater than 0."
 # at 36be560): an EXP whose TD2 is not above TD1 is refused, never written as `td2=0`.
 xyce/Message/Device/Core_SourceData_TranData.cir vacask now refused: W0108 for an EXP whose TD2 is not above TD1; VACASK rejects `td2=0` (P4-019)
+
+# S1: P4-018: VACASK's `noise` takes a node pair (docs/cmd-analysis-noise.md at 36be560): `.noise V(P,N)` is written.
+# Oracle: 4kT(R2 || (R1 + R3)) and ngspice-45 (tests/test_vacask_runs/analyses.rs::p4_018_a_differential_noise_output_is_a_node_pair).
+ltspice/ltspice_demos/LTC6400-20_Noise.net vacask now written: a differential `.noise` output is VACASK's `out=["p", "n"]` (P4-018)
+ltspice/ltspice_demos/LTC6404-1_SE_RBal.net vacask now written: a differential `.noise` output is VACASK's `out=["p", "n"]` (P4-018)

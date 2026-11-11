@@ -320,3 +320,20 @@ fn p4_108_an_rf_port_keeps_its_z0_in_the_operating_point() {
     close(col(&raw, "in")[0], vin, 1e-9);
     close(col(&raw, "out")[0], vin * 75.0 / 175.0, 1e-9);
 }
+
+/// ZERO-LEDGER P4-018. Oracle: the thermal noise across R2 seen between
+/// its nodes, 4kT(R2 || (R1 + R3)) = 4kT * 1k at 27 C, flat with
+/// frequency, and ngspice-45 on the same deck (onoise_spectrum 4.071372e-9
+/// V/sqrt(Hz), its square 1.65761e-17 V^2/Hz;
+/// research/impl/evidence/P4-018/ngspice.run.log). `op` to ground would be
+/// 4kT * 750. The gain is the divider's, (R2/(R1 + R2 + R3))^2.
+#[test]
+fn p4_018_a_differential_noise_output_is_a_node_pair() {
+    let deck = "dnoise\nV1 vin 0 0 AC 1\nR1 vin op 1k\nR2 op om 2k\nR3 om 0 1k\n.temp 27\n.noise V(op,om) V1 dec 5 1k 100k\n.end\n";
+    let raw = run(deck);
+    let onoise = col(&raw, "onoise");
+    let want = 4.0 * 1.380649e-23 * (27.0 + 273.15) * 1000.0;
+    close(onoise[0], want, 1e-5);
+    close(*onoise.last().unwrap(), want, 1e-5);
+    close(col(&raw, "gain")[0], 0.25, 1e-9);
+}

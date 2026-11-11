@@ -255,7 +255,9 @@ impl W<'_, '_> {
                 });
                 out.push(s);
             }
-            // `out=` names one node: a non-ground reference has no form.
+            // `out=` is a node to ground or a node pair
+            // (`docs/cmd-analysis-noise.md`: "a two-element vector
+            // specifies a node pair"; ZERO-LEDGER P4-018).
             Ana::Noise {
                 output,
                 reference,
@@ -263,17 +265,19 @@ impl W<'_, '_> {
                 sweep,
                 ..
             } => {
-                let f = freq_sweep(sweep);
-                if !reference.is_empty() && reference != "0" || f.is_none() {
+                let Some(f) = freq_sweep(sweep) else {
                     self.refuse(Code::W0015, tok);
                     return vec![];
-                }
+                };
+                let node = bare_node(output).to_ascii_lowercase();
+                let pair = match reference.as_str() {
+                    "" | "0" => format!("\"{node}\""),
+                    r => format!("[\"{node}\", \"{}\"]", r.to_ascii_lowercase()),
+                };
                 out.push(format!(
-                    "analysis {} noise out=\"{}\" in=\"{}\" {}",
+                    "analysis {} noise out={pair} in=\"{}\" {f}",
                     name("noise"),
-                    bare_node(output).to_ascii_lowercase(),
-                    source.to_ascii_lowercase(),
-                    f.expect("checked")
+                    source.to_ascii_lowercase()
                 ));
             }
             Ana::Tf(output, _) => out.push(format!(
