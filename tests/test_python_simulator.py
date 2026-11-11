@@ -983,6 +983,37 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     assert 0.75e-3 < rms < 1.06e-3, rms
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p8_014_each_instance_holds_the_branch_its_parameter_selects(backend):
+    """ngspice-45 manual §2.13: the block of the first true condition is
+    the one in the circuit. `cell` is r in series, then 5 kOhm to ground
+    when r > 1500, 6 kOhm when r > 500, else 7 kOhm; under 1 V its three
+    instances (r = 2k, 1k, 100) divide to 5/7, 6/7 and 7/7.1 V (closed
+    form). ngspice-45, ESPice 0.3.0 and VACASK print those on the hand
+    decks (research/impl/evidence/P8-014/ng/sub.log, x/)."""
+    import spicerack as ps
+
+    def load(ohms):
+        b = ps.Block()
+        b.R("9", "out", b.gnd, ohms)
+        return b
+
+    cell = ps.Subcircuit("cell", ["in", "out"], r="1k")
+    cell.R("1", "in", "out", "{r}")
+    cell.conditional([("r > 1500", load(5e3)), ("r > 500", load(6e3))], otherwise=load(7e3))
+    d = ps.Subcircuit("three", ["in", "a", "b", "c"])
+    for node, r in (("a", "2k"), ("b", "1k"), ("c", "100")):
+        d.instance(cell, node, "in", node, r=r)
+    tb = ps.Testbench(d)
+    tb.add_subcircuit(cell)
+    tb.with_backend(backend)
+    tb.V("in", "in", "0", 1.0)
+    op = tb.operating_point()
+    for node, want in (("a", 5 / 7), ("b", 6 / 7), ("c", 7 / 7.1)):
+        # A linear DC solve: exact to rounding.
+        assert op[node] == pytest.approx(want, rel=1e-9), node
+
+
 @pytest.mark.parametrize("backend", ["ngspice", "espice"])
 def test_p3_093_api_ngspice_integrated_noise_plot(backend):
     """ZERO-LEDGER P3-093: a noise result keeps the simulator's "Integrated

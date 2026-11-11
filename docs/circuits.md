@@ -177,6 +177,25 @@ cell.subcircuit(inv)                              # `half`, defined inside `cell
 cell.instance(inv, "u1", "a", "y")
 ```
 
+A part of a block can depend on a parameter. `conditional` takes a list of
+`(condition, Block)` and an optional `otherwise`; each `Block` takes the same
+element, instance and `model` calls as a `Subcircuit`, and the circuit holds
+the block of the first true condition (`.if` / `.elseif` / `.else` / `.endif`).
+Parameters, includes and definitions stay outside the blocks. Xyce and LTspice
+have no conditional (`W0013`).
+
+```python
+def load(ohms):
+    b = ps.Block()
+    b.R("9", "out", b.gnd, ohms)
+    return b
+
+sel = ps.Subcircuit("sel", ["in", "out"], r="1k")
+sel.R("1", "in", "out", "{r}")
+sel.conditional([("r > 1500", load(5e3)), ("r > 500", load(6e3))], otherwise=load(7e3))
+print(sel.to_source())                            # ... .if (r > 1500) / R9 out 0 5k / .elseif (r > 500) ...
+```
+
 ## Saving circuits
 
 A subcircuit is saved as its source text: the ngspice deck that defines it,

@@ -53,6 +53,8 @@ dut.X("MN1", "sky130_fd_pr__nfet_01v8", "d", "g", "s", "b", W=1, L=0.15, nf=2)
 
 `Subcircuit.instance(subckt, name, *nodes, **params)` is the same card from the object. `subckt.name` and `subckt.ports` (declaration order) read a DUT back, e.g. to wrap it: `harness.instance(dut, "dut", *dut.ports)`.
 
+A conditional part: `b = ps.Block()` takes the element, `X`/`instance` and `model` calls of a `Subcircuit`; `sub.conditional([("r > 1500", b1), ("r > 500", b2)], otherwise=b3)` writes `.if (r > 1500)` … `.elseif (r > 500)` … `.else` … `.endif` in `sub` (a `Circuit` and a `Block` take it too, so conditionals nest). Conditions are expressions of parameters, equality is `==`. A block with a parameter, an include, a lib, a model load, a nested definition or a function raises `ValueError`. Xyce and LTspice refuse a conditional (`W0013`).
+
 `Subcircuit.subcircuit(child)` defines `child` inside that subcircuit (a nested `.subckt`: only its own instances see it, two parents can each hold a `buf`); every target writes it as a top-level `<parent>__<child>`. A definition every block shares goes to the top: `tb.add_subcircuit(child)` / `Circuit.subcircuit(child)`.
 
 Waveform sources, all **TB**:

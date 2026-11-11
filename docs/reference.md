@@ -10,6 +10,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `Circuit(title)` | flat circuit; `str(circuit)` is its netlist |
 | `Subcircuit(name, ports=None, **params)` | a block with ports |
 | `Testbench(dut)` | stimulus and analyses around a `Subcircuit` |
+| `Block()` | one branch of a conditional: no name and no ports, and the element, instance (`X`, `instance`) and `model` calls of a `Subcircuit`; `conditional(...)` on a `Subcircuit`, a `Circuit` or another `Block` places it |
 | `Section(name)` | a library section, `.lib name` … `.endl name`, holding `parameter(name, value)`, `model(name, kind, **params)`, `include(path)`, `lib(path, section)` and `subcircuit(subckt)` lines; `Circuit.section(s)` adds it to a library file |
 | `CircuitSimulator` | what `Circuit.simulator()` returns; `CircuitSimulator.available_backends()` lists installed simulators |
 | `ModelLibrary(path, corner=None, setup_includes=None, **backend_paths)` | a PDK model file and corner; `.name`, `.path`, `.corner` |
@@ -77,6 +78,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `add_function(name, args, body)` | `.func name(args) {body}` in the subcircuit (`cell.add_function("scaled", ["x"], "x*k")`). One that reads a parameter of the subcircuit is local to it: LTspice, Spectre and VACASK refuse it (`W0106`) |
 | `subcircuit(subckt)` | on a `Subcircuit`: `subckt` defined inside it (a nested `.subckt`), seen by its own instances only; each target writes it as a top-level definition named `<parent>__<name>`. `ValueError` when `subckt` holds a `verilog()` block |
 | `lib(path, section)` | `.lib` |
+| `conditional(branches, otherwise=None)` | `.if (c)` … `.elseif (c)` … `.else` … `.endif`: `branches` is a list of `(condition, Block)`, the circuit holds the block of the first true condition, `otherwise` when none is. A condition is an expression of parameters (`"r > 500"`, equality `==`). A block holds elements, instances, models and conditionals of its own; a parameter, an include, a lib, a model load, a nested definition or a function in one raises `ValueError` (ngspice does not select those with the condition). Xyce and LTspice have no conditional (`W0013`) |
 | `parameter(name, value)` | `.param` |
 | `raw_spice(line)` | the line as written |
 | `veriloga(source_or_path)` | a Verilog-A model, compiled per backend; returns the `.va` path |

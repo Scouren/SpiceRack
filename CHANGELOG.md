@@ -26,6 +26,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `initial_condition`/`node_set` take an expression value (`out="{vdd/2}"`), and `Subcircuit`/`Circuit` have both, written inside the `.subckt`.
 - python: `I`, `G`, `F`, `BV` and `BI` take instance parameters (`m=2`; on a B source also `tc1`, `tc2`, `temp`, `dtemp`), written last on the card.
 - python: `ac=`, `ac_phase=` on `V`, `I` and the waveform sources, and a waveform source's `dc=`, take an expression (`ac="{amp}"`).
+- python: `Block()` and `conditional(branches, otherwise=None)` on `Subcircuit`, `Circuit` and `Block` write `.if` / `.elseif` / `.else` / `.endif`; a stored subcircuit keeps a conditional whole (`from_source` dropped its branches).
 
 ## 0.2.0 (2026-11-03)
 

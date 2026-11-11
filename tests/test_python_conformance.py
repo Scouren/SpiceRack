@@ -128,6 +128,40 @@ def _with_ic(mod):
     return tb
 
 
+def _branch(mod, name, a, b, ohms):
+    """A block holding one resistor."""
+    blk = mod.Block()
+    blk.R(name, a, b, ohms)
+    return blk
+
+
+def _with_conditional(mod):
+    """The DUT's load chosen by its parameter `r`: `.if` / `.elseif` /
+    `.else` at the deck's top (a `Testbench` inlines its DUT)."""
+    d = dut(mod)
+    arms = [(c, _branch(mod, "9", "out", "0", ohms)) for c, ohms in (("r > 1500", 5e3), ("r > 500", 6e3))]
+    d.conditional(arms, otherwise=_branch(mod, "9", "out", "0", 7e3))
+    tb = bench(mod, d)
+    tb.add_operating_point()
+    return tb
+
+
+def _with_conditional_in_child(mod):
+    """`buf`'s second resistor chosen by its own parameter `k`, inside its
+    `.subckt`; the `.else` branch holds a conditional of its own."""
+    inner = mod.Block()
+    inner.conditional([("k > 0", _branch(mod, "2", "a", "b", 3e3))])
+    c = mod.Subcircuit("buf", ["a", "b"], k="1")
+    c.R("1", "a", "b", 1e3)
+    c.conditional([("k > 1", _branch(mod, "2", "a", "b", 2e3))], otherwise=inner)
+    d = dut(mod)
+    d.instance(c, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(c)
+    tb.add_operating_point()
+    return tb
+
+
 def _child(mod):
     c = mod.Subcircuit("buf", ["a", "b"])
     c.R("1", "a", "b", 1e3)
@@ -236,6 +270,8 @@ FEATURES = {
     "use_pdk": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.lib", corner="tt", spectre="/sp/m.scs"))),
     "use_pdk_include": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.inc"))),
     "subcircuit": _with_child,
+    "conditional": _with_conditional,
+    "conditional_in_subcircuit": _with_conditional_in_child,
     "subcircuit_nested": _with_nested,
     # Sources.
     "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
@@ -370,6 +406,9 @@ EXPECTED = {
     'use_pdk': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'use_pdk_include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'subcircuit': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # `.if` … `.endif`: Xyce and LTspice have no conditional block (W0013).
+    'conditional': (OK, OK, OK, 'W0013', 'W0013', OK, OK, OK, OK),
+    'conditional_in_subcircuit': (OK, OK, OK, 'W0013', 'W0013', OK, OK, OK, OK),
     # Every target writes the nested definition hoisted, as `wrap__buf`.
     'subcircuit_nested': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -495,6 +534,7 @@ COVERED = {
         "initial_condition", "node_set",
         "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",
         "include", "lib", "raw_spice", "osdi", "veriloga", "verilog",
+        "conditional",
     },
 }
 

@@ -170,6 +170,8 @@ PARITY = {
     "use_pdk": (FEATURES["use_pdk"], tw_setting([], top=["* spicerack-library /ng/m.lib corner=tt spectre=/sp/m.scs", ".lib /ng/m.lib tt"]), "store.rs library_marker", None),
     "use_pdk_include": (FEATURES["use_pdk_include"], tw_setting([], top=["* spicerack-library /ng/m.inc", ".include /ng/m.inc"]), "store.rs library_marker", None),
     "subcircuit": (FEATURES["subcircuit"], deck(subckts=[[".subckt buf a b", "R1 a b 1e3", ".ends buf"]], top=RC + ["X1 out 0 buf"], bench=[VIN, ".op"]), "ng §2.4 .subckt", None),
+    "conditional": (FEATURES["conditional"], tw_elem([".if (r > 1500)", "R9 out 0 5e3", ".elseif (r > 500)", "R9 out 0 6e3", ".else", "R9 out 0 7e3", ".endif"]), "ng §2.13 .IF (.if / .elseif / .else / .endif); ngspice-45 run per branch (evidence/P8-014/ng/top.log, top0.log)", "P8-014"),
+    "conditional_in_subcircuit": (FEATURES["conditional_in_subcircuit"], deck(subckts=[[".subckt buf a b k=1", "R1 a b 1e3", ".if (k > 1)", "R2 a b 2e3", ".else", ".if (k > 0)", "R2 a b 3e3", ".endif", ".endif", ".ends buf"]], top=RC + ["X1 out 0 buf"], bench=[VIN, ".op"]), "ng §2.13 .IF (nesting; inside a .subckt on its parameter); ngspice-45 runs (evidence/P8-014/ng/sub.log, nest.log)", "P8-014"),
     "subcircuit_nested": (FEATURES["subcircuit_nested"], deck(subckts=[[".subckt wrap a b", ".subckt buf a b", "R1 a b 1e3", ".ends buf", "X1 a b buf", ".ends wrap"]], top=RC + ["X1 out 0 wrap"], bench=[VIN, ".op"]), "ng §2.6.1 .subckt (a definition inside a definition, local to it)", "P8-013"),
     # ── Sources ──
     "sin": (FEATURES["sin"], tw_source(["Vin in 0 0 SIN(0 1 1000 0 0 0)"]), "ng §4.1.1 SIN", None),

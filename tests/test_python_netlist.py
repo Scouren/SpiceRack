@@ -848,6 +848,89 @@ class TestSourceExpressions:
 
 
 # ======================================================================
+# Conditionals (P8-014; ngspice-45 manual §2.13)
+# ======================================================================
+
+def load(ohms):
+    b = ps().Block()
+    b.R("9", "out", b.gnd, ohms)
+    return b
+
+
+def selected():
+    d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+    d.R("1", "in", "out", "{r}")
+    d.conditional([("r > 1500", load(5e3)), ("r > 500", load(6e3))], otherwise=load(7e3))
+    return d
+
+
+class TestConditional:
+    def test_p8_014_branches_are_written_between_if_and_endif(self):
+        # The lines ngspice-45, ESPice 0.3.0 and VACASK give 5/7, 6/7 and
+        # 7/7.1 V for (research/impl/evidence/P8-014/ng/sub.cir).
+        want = [".if (r > 1500)", "R9 out 0 5k", ".elseif (r > 500)", "R9 out 0 6k",
+                ".else", "R9 out 0 7k", ".endif", ".ends rc"]
+        lines = selected().to_source().splitlines()
+        at = lines.index(".if (r > 1500)")
+        assert lines[at:at + len(want)] == want
+
+    def test_p8_014_a_block_holds_models_instances_and_its_own_conditional(self):
+        inner = ps().Block()
+        inner.model("dn", "d")
+        inner.D("9", "out", inner.gnd, model="dn")
+        inner.X("8", "buf", "out", "0")
+        outer = ps().Block()
+        outer.conditional([("r > 800", inner)])
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        d.conditional([("r > 500", outer)], otherwise=load(6e3))
+        want = [".if (r > 500)", ".if (r > 800)", ".model dn d", "D9 out 0 dn", "X8 out 0 buf", ".endif",
+                ".else", "R9 out 0 6k", ".endif"]
+        lines = d.to_source().splitlines()
+        at = lines.index(".if (r > 500)")
+        assert lines[at:at + len(want)] == want
+
+    def test_p8_014_a_stored_subcircuit_keeps_its_conditional(self):
+        # `from_source` kept `.if (r > 1500)` and dropped the rest
+        # (research/impl/evidence/P8-014/t9.out).
+        text = selected().to_source()
+        assert ps().Subcircuit.from_source(text).to_source() == text
+
+    @pytest.mark.parametrize("spoil, named", [
+        (lambda b: b.parameter("g", "5k"), "a parameter"),
+        (lambda b: b.include("/m/x.inc"), "an include or a lib"),
+        (lambda b: b.lib("/m/x.lib", "tt"), "an include or a lib"),
+        (lambda b: b.osdi("/m/x.osdi"), "a model load"),
+        (lambda b: b.subcircuit(ps().Subcircuit("buf", ["a", "b"])), ".subckt buf a b"),
+        (lambda b: b.add_function("f", ["x"], "2*x"), ".func f(x) {2*x}"),
+    ])
+    def test_p8_014_what_ngspice_does_not_select_is_refused(self, spoil, named):
+        # ngspice-45 holds a `.param` and a `.subckt` of a branch whatever
+        # the condition is (research/impl/evidence/P8-014/ng/parm*.log,
+        # subdef*.log): no wrong number is written.
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        before = d.to_source()
+        b = load(5e3)
+        spoil(b)
+        with pytest.raises(ValueError, match="^conditional: ") as refused:
+            d.conditional([("r > 500", load(6e3))], otherwise=b)
+        assert f"; {named} goes on the body" in str(refused.value)
+        assert d.to_source() == before
+
+    @pytest.mark.parametrize("conditions", [[], [""], [" \n"], ["r > 1\n&& r < 2"]])
+    def test_p8_014_a_conditional_needs_a_branch_and_a_one_line_condition(self, conditions):
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        before = d.to_source()
+        with pytest.raises(ValueError, match="^conditional: "):
+            d.conditional([(c, load(5e3)) for c in conditions])
+        assert d.to_source() == before
+
+    def test_p8_014_a_branch_is_a_block(self):
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        with pytest.raises(TypeError):
+            d.conditional([("r > 500", ps().Subcircuit("x", ["a"]))])
+
+
+# ======================================================================
 # Ground node aliasing
 # ======================================================================
 
