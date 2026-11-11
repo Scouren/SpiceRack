@@ -87,6 +87,14 @@ impl PyCircuit {
         slf.defs.push(def);
     }
 
+    /// Adds a library section (`Section`), `.lib name` … `.endl name`, at
+    /// this circuit's top: the circuit is then a library file
+    /// (`str(circuit)`), and another deck's `lib(path, name)` selects the
+    /// section (ngspice-45 manual §2.10). LTspice has no sections (`W0012`).
+    fn section(mut slf: PyRefMut<'_, Self>, section: &super::section::PySection) {
+        slf.as_super().inner.raw.push(section.text());
+    }
+
     /// The card of the first component or instance called `name` (without its letter).
     fn __getitem__(slf: PyRef<'_, Self>, name: &str) -> PyResult<String> {
         Deck::card(&slf.as_super().inner, name)

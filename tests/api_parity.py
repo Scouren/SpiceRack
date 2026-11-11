@@ -202,6 +202,7 @@ PARITY = {
     "parameter": (FEATURES["parameter"], tw_elem([".param k=2"]), "ng §2.3 .param", None),
     "include": (FEATURES["include"], tw_elem([".include /m/x.inc"]), "ng §2.6 .include", None),
     "lib": (FEATURES["lib"], tw_elem([".lib /m/x.lib tt"]), "ng §2.7 .lib", None),
+    "section": (FEATURES["section"], deck(title="corners", top=[".lib tt", ".param rsh=3k", ".endl tt"]), "ng §2.10 .LIB (a library's statements between .LIB libname and .ENDL)", "P8-009"),
     "raw_spice": (FEATURES["raw_spice"], tw_elem(["Rr out 0 1meg"]), "ng §3 R (given as text)", None),
     "osdi": (FEATURES["osdi"], tw_elem([], loads=["/m/x.osdi"]), "ng §16 pre_osdi", None),
     "veriloga": (FEATURES["veriloga"], tw_elem([], loads=[str(VA)]), "ng §16 pre_osdi (compiled Verilog-A)", None),

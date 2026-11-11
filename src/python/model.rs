@@ -17,7 +17,8 @@
 //!   `ModelLibrary::path_for(&self, d: Dialect) -> &str`, `pub(super) struct Func`
 //! - `pub(super) enum Value`, `Value::text(&self) -> String`
 //! - `pub(super) fn num(v: f64) -> String`, `pub(super) fn dec(v: f64) -> String`,
-//!   `pub(super) fn params(ps: &[(String, String)]) -> String`
+//!   `pub(super) fn params(ps: &[(String, String)]) -> String`,
+//!   `pub(super) fn model_card(name: &str, kind: &str, ps: &[(String, String)]) -> String`
 //! - `pub(super) mod need`: the feature bits a card adds (`crate::backend::feature`)
 
 use crate::syntax::Dialect;
@@ -212,6 +213,16 @@ pub(super) fn params(ps: &[(String, String)]) -> String {
         }
     }
     s
+}
+
+/// A `.model` card, `.model name kind (k=v …)`; no parentheses with no
+/// parameter. The space before `(` is needed: ngspice-45 drops an OSDI
+/// model's parameters written `vres(r=3k)`; `vres (r=3k)` applies them.
+pub(super) fn model_card(name: &str, kind: &str, ps: &[(String, String)]) -> String {
+    match ps.is_empty() {
+        true => format!(".model {name} {kind}"),
+        false => format!(".model {name} {kind} ({})", params(ps).trim_start()),
+    }
 }
 
 #[cfg(test)]

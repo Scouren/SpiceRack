@@ -24,6 +24,7 @@
 //! - `deck.rs`: the blocks → ngspice source → a backend's netlist or a run's `RawData`
 //! - `verilog.rs`: `verilog(...)` blocks and their lowering
 //! - `subcircuit.rs`, `circuit.rs`: `Subcircuit`, `Circuit`
+//! - `section.rs`: `Section`, a library section of a `Circuit`
 //! - `store.rs`: a subcircuit's source text and stored file (`to_source`, `save`)
 //! - `simulator.rs`, `spectre.rs`: `CircuitSimulator` and its Spectre-only analyses
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
@@ -54,6 +55,7 @@ mod def_tag;
 mod keywords;
 mod model;
 mod results;
+mod section;
 mod simulator;
 mod store;
 mod subcircuit;
@@ -80,6 +82,7 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubcircuit>()?;
     m.add_class::<PyTestbench>()?;
     m.add_class::<PyModelLibrary>()?;
+    m.add_class::<section::PySection>()?;
 
     // Module-level functions
     m.add_function(wrap_pyfunction!(lint, m)?)?;

@@ -81,6 +81,8 @@ injection, propagation delay and pedestal all track them.
 `lib(path, section)`, `parameter(name, value)`, `raw_spice(line)`, `veriloga(...)`,
 `osdi(...)`, `verilog(...)`. `temp(value)` and `options(**kw)` are `Circuit` only.
 
+A corner library is a `Circuit` of sections: `s = ps.Section("tt")`, then `s.parameter(...)`, `s.model(...)`, `s.include(...)`, `s.lib(...)`, `s.subcircuit(sub)`, then `circuit.section(s)`. `str(circuit)` is the library file (`.lib tt` … `.endl tt`); a deck selects a section with `lib(path, "tt")`. `Testbench(circuit).netlist(target)` writes the library in another dialect (LTspice refuses sections, `W0012`). `Testbench` has no `section`: a deck that runs holds none.
+
 `Subcircuit.add_function(name, args, body)` is a `.func` inside the subcircuit (`cell.add_function("scaled", ["x"], "x*k")`; `tb.add_function` is the top-level one). A function reading a parameter of its subcircuit stays local to it, which LTspice, Spectre and VACASK refuse (`W0106`: functions at the top only).
 
 `Testbench`: `extra_line(text)`, `options(**kw)`, `temperature`, `nominal_temperature`,

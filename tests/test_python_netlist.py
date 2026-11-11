@@ -1359,3 +1359,83 @@ class TestSpectreAnalysis:
         again = ps().Testbench.from_source(tb.to_source())
         assert again.netlist("spectre") == tb.netlist("spectre")
         assert "dcmm3 (out 0) dcmatch mth=0.001" in again.netlist("spectre").splitlines()
+
+
+# ======================================================================
+# Library sections (P8-009; ngspice-45 manual §2.10)
+# ======================================================================
+
+def corner(name, rsh):
+    s = ps().Section(name)
+    s.parameter("rsh", rsh)
+    return s
+
+
+class TestSection:
+    def test_p8_009_a_circuit_of_sections_is_a_library_file(self):
+        # The file ngspice-45 and ESPice 0.3.0 read a corner from
+        # (research/impl/evidence/P8-009/corners.lib).
+        lib = ps().Circuit("corners")
+        lib.section(corner("tt", "3k"))
+        lib.section(corner("ff", "1k"))
+        lines = str(lib).splitlines()
+        assert lines[0] == ".title corners"
+        for name, rsh in (("tt", "3k"), ("ff", "1k")):
+            at = lines.index(f".lib {name}")
+            assert lines[at:at + 3] == [f".lib {name}", f".param rsh={rsh}", f".endl {name}"]
+
+    def test_p8_009_a_section_holds_files_params_models_and_definitions(self):
+        cell = ps().Subcircuit("cell", ["a", "b"])
+        cell.R("1", "a", "b", "{rsh}")
+        s = ps().Section("tt")
+        assert (s.name, repr(s)) == ("tt", "Section('tt')")
+        s.include("/m/common.inc")
+        s.lib("/m/res.lib", "res_tt")
+        s.parameter("rsh", "3k")
+        s.model("dn", "d", **{"is": 1e-14})
+        s.subcircuit(cell)
+        lib = ps().Circuit("corners")
+        lib.section(s)
+        # The deck's own source: the section's lines in call order.
+        src = ps().Testbench(lib).to_source().splitlines()
+        at = src.index(".lib tt")
+        assert src[at:at + 9] == [
+            ".lib tt", ".include /m/common.inc", ".lib /m/res.lib res_tt", ".param rsh=3k",
+            ".model dn d (is=1e-14)", ".subckt cell a b", "R1 a b {rsh}", ".ends cell", ".endl tt",
+        ]
+
+    def test_p8_009_the_library_in_other_dialects(self):
+        # Spectre Reference 19.1 p.498 (`section` … `endsection`); LTspice
+        # reads a library as a whole file (W0012).
+        lib = ps().Circuit("corners")
+        lib.section(corner("tt", "3k"))
+        tb = ps().Testbench(lib)
+        spectre = tb.netlist("spectre").splitlines()
+        assert spectre.index("section tt") < spectre.index("endsection tt")
+        assert any(l.startswith("section tt") for l in tb.netlist("vacask").splitlines())
+        with pytest.raises(RuntimeError, match="W0012"):
+            tb.netlist("ltspice")
+
+    def test_p8_009_a_bad_section_is_refused_at_the_call(self):
+        for name in ("", "t t", "tt\n"):
+            with pytest.raises(ValueError, match="is no section name"):
+                ps().Section(name)
+        loaded = ps().Subcircuit("dev", ["p"])
+        loaded.osdi("/m/dev.osdi")
+        s = corner("tt", "3k")
+        with pytest.raises(ValueError, match="dev: a section carries no model load"):
+            s.subcircuit(loaded)
+        lib = ps().Circuit("corners")
+        lib.section(s)
+        # The refused definition left nothing behind.
+        assert "dev" not in str(lib)
+        with pytest.raises(TypeError):
+            lib.section("tt")
+
+    def test_p8_009_the_store_keeps_a_section(self):
+        lib = ps().Circuit("corners")
+        lib.section(corner("tt", "3k"))
+        tb = ps().Testbench(lib)
+        again = ps().Testbench.from_source(tb.to_source())
+        assert again.netlist("ngspice") == tb.netlist("ngspice")
+        assert again.netlist("spectre") == tb.netlist("spectre")
