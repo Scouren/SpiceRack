@@ -240,7 +240,8 @@ EXPECTED = {
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
-    'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # VACASK has `acstb` (36be560 docs/cmd-analysis-acstb.md; ZERO-LEDGER P4-106): W0001 until P4-008 writes it.
+    'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
     'transient_noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'fourier': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
     'fourier_count': (OK, OK, 'W0040', 'W0040', OK, OK, 'W0015', OK, OK),

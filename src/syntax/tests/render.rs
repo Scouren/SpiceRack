@@ -202,8 +202,9 @@ fn a_region_spectre_analysis_is_written_by_spectre_and_refused_by_cause() {
     // with no such analysis refuses it `W0015` (ngspice ch.15 has no
     // stability, harmonic balance or periodic small-signal analysis;
     // ngspice-45 runs no `.pss`), one with it untranslated `W0001` (Xyce
-    // RG `.HB`); VACASK has no `stb` (`docs/analysis_types.md`). A
-    // region `sp` over every port is ngspice's `.sp` ([CMP] p.826).
+    // RG `.HB`; VACASK `acstb`, 36be560 `docs/cmd-analysis-acstb.md`,
+    // ZERO-LEDGER P4-106). A region `sp` over every port is ngspice's
+    // `.sp` ([CMP] p.826).
     let deck = |a: &str| {
         format!(
             "t\nV1 a 0 dc 0 ac 1\nR1 a 0 1k\nsimulator lang=spectre\n{a}\nsimulator lang=spice\n.end\n"
@@ -217,12 +218,17 @@ fn a_region_spectre_analysis_is_written_by_spectre_and_refused_by_cause() {
             .any(|l| l == "stb1 stb start=1 stop=1M dec=10 probe=v1"),
         "{spectre}"
     );
-    for t in [Dialect::Ngspice, Dialect::Vacask, Dialect::Ltspice] {
+    for t in [Dialect::Ngspice, Dialect::Ltspice] {
         assert!(
             given(&stb, t).expect_err("refused").contains("W0015"),
             "{t:?}"
         );
     }
+    assert!(
+        given(&stb, Dialect::Vacask)
+            .expect_err("refused")
+            .contains("W0001")
+    );
     let pac = deck(
         "pss1 pss fund=1M tstab=0 harms=5\npac1 pac start=1 stop=1M dec=10 sweeptype=relative",
     );

@@ -1277,6 +1277,7 @@ def vacask(d):
         .spectre_analysis("pnoise")
         .spectre_analysis("hbac")
         .spectre_analysis("hbnoise")
+        .spectre_analysis("stb")
         # The circuit temperature in an expression (docs/expr-special.md).
         .temp_name("$temp")
         # docs/expr-constants.md: the builtin constants and their values.
