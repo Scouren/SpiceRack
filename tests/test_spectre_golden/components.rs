@@ -216,6 +216,29 @@ fn ltspice_parasitics_are_spectre_elements() {
     }
 }
 
+/// Ledger P3-039: Spectre names are case-sensitive (`[CMP]` front matter,
+/// "Names are case sensitive"), and a MOSFET's instance parameters are `w`
+/// and `l` (`[CMP]` p.408 `nch1 (1 2 0 0) nchmod1 l=2u w=15u ad=60p …`).
+/// Spectre 25.1 on `m2 … W=10u L=1u`: "SFE-102 Parameter `W' … ignored",
+/// the default size, Id 4.225e-5 for 4.225e-4 (research/settle-remote.md,
+/// recheck P3-039, iccad4 2026-11-07). A SPICE card's names are
+/// case-blind, so they are written lowercase.
+#[test]
+fn p3_039_api_spectre_mos_instance_params() {
+    for (card, want) in [
+        (
+            "M1 out in 0 0 nm W=10u L=1u",
+            "m1 (out in 0 0) nm w=10u l=1u",
+        ),
+        (
+            "M2 d g s b pm w=2u L=1u AD=1p",
+            "m2 (d g s b) pm w=2u l=1u ad=1p",
+        ),
+    ] {
+        assert_eq!(component(card), want, "{card}");
+    }
+}
+
 /// Ledger P3-088: Spectre 25.1 stops on a diode model's `minr=0`
 /// ("CMI-2049: Value of `minr' should be greater than zero") and runs the
 /// same deck without it (research/settle-remote.md, "Spectre writer check",

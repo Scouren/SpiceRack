@@ -427,6 +427,16 @@ def h(f):
     return 0.75 / complex(1.0, 2 * math.pi * f * 750.0 * 1e-9)
 
 
+def test_p3_039_api_spectre_mos_instance_params():
+    """Ledger P3-039: the API's `M(..., W=, L=)` on Spectre. Spectre names are case-sensitive (Spectre
+    Reference 5.0 front matter) and a MOSFET's instance parameters are `w`, `l` (p.408). Spectre 25.1
+    on `W=10u L=1u`: "SFE-102 Parameter `W' ... ignored" and the default size, Id 4.225e-5 for 4.225e-4
+    (iccad4, 2026-11-07; research/settle-remote.md, recheck P3-039)."""
+    text = FEATURES["M"](ps()).netlist("spectre")
+    cards = [line.strip() for line in text.splitlines() if line.strip().startswith("m1 ")]
+    assert cards == ["m1 (out in 0 0) nm w=1u l=1u"], text
+
+
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
 def test_written_decks_meet_the_closed_form(backend):
     if shutil.which(backend) is None:
