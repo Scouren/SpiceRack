@@ -20,7 +20,8 @@
 //! leaves out a line its own simulator rejects (P0010, P0011), `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
-//! the model card an instance uses), `control` a `.control` block's lines
+//! the model card an instance uses, `preprocess` Xyce's `.PREPROCESS`),
+//! `control` a `.control` block's lines
 //! (`unroll` its loops; `controlled` is E/F/G/H), `epochs` the run plan; `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
 //!
@@ -67,6 +68,7 @@ mod named_waves;
 mod options;
 mod outputs;
 mod parallel;
+mod preprocess;
 mod refused;
 mod rejects;
 mod shapes;

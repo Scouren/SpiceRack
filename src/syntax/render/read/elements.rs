@@ -183,24 +183,6 @@ impl<'a> Rd<'a> {
 // ---- private ----
 
 impl<'a> Rd<'a> {
-    /// Whether Xyce's `.PREPROCESS REMOVEUNUSED` removes element `n` (RG
-    /// 7.10 §2.1.29): its letter is listed (`Rd::removed`) and its
-    /// terminals, a MOSFET's and a BJT's first three and any other's two,
-    /// are one node (Xyce compares names without case: 7.10 run).
-    fn unused(&self, n: u32) -> bool {
-        let letter = self.letter(n);
-        if !self.removed.contains(letter) {
-            return false;
-        }
-        let items = self.items(n);
-        let terminals = if matches!(letter, 'M' | 'Q') { 3 } else { 2 };
-        let node = |i: usize| self.node_text(&items, i);
-        (1..terminals).all(|i| match (node(0), node(i)) {
-            (Some(a), Some(b)) => a.eq_ignore_ascii_case(&b),
-            _ => false,
-        })
-    }
-
     /// Element `n` onto `here`; the one place a typed element's [`Card`]
     /// is first built (`try_card`), where a table of views would be filled.
     fn place_element(&mut self, n: u32, here: &mut Block) {
