@@ -21,6 +21,7 @@ mod acme;
 use std::sync::atomic::Ordering;
 
 use acme::{NOISE_CALLS, NOISE_CARDS, acme_as};
+use spicerack::syntax::behaviour::DotRule;
 use spicerack::syntax::def::{Answer, DialectDef, RegisterError, register};
 use spicerack::syntax::diag::{Code, Kind};
 use spicerack::syntax::lexicon::Scale;
@@ -325,6 +326,10 @@ fn registration_rules() {
         (
             e("kind").refuse(Construct::Step, Code::W0030),
             RegisterError::WrongKind("kind".into(), Construct::Step, Code::W0030, Kind::Refusal),
+        ),
+        (
+            e("dotkind").dot_rule("x", DotRule::Note(Code::W0001)),
+            RegisterError::DotRuleKind("dotkind".into(), "x".into(), Code::W0001),
         ),
         (
             e("undeclared").refuse_code(Construct::Step, "X1"),

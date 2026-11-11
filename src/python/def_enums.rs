@@ -19,9 +19,9 @@ use pyo3::types::PyType;
 
 use crate::syntax::Dialect;
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope, LoadForm,
-    ModelSemantics, NamedParams, NamedRules, NetlistRules, NumberReading, OptionsForm, ParamForm,
-    Parasitics, SourceRules, ValueQuoting, Writer,
+    AnalysisForm, CardRules, ControlBlock, Coupling, DotRule, EndRule, ExprEval, IncludeScope,
+    LoadForm, ModelSemantics, NamedParams, NamedRules, NetlistRules, NumberReading, OptionsForm,
+    ParamForm, Parasitics, SourceRules, ValueQuoting, Writer,
 };
 use crate::syntax::def::{Devices, Keywords, Operators};
 use crate::syntax::diag::{Code, Kind};
@@ -406,6 +406,15 @@ py_enum!(PyAlt, "Alt", Alt, units = &[
     }
 });
 
+py_enum!(PyDotRule, "DotRule", DotRule, units = &[DotRule::SParams], covers = [SParams]
+    | DotRule::Note(_), data = ["Note"] {
+    #[staticmethod]
+    #[pyo3(name = "Note")]
+    fn note(code: PyCode) -> Self {
+        Self(DotRule::Note(code.0))
+    }
+});
+
 py_enum!(PyStatement, "Statement", Statement, units = &[Statement::Options], covers = [Options]
     | Statement::Analysis(_) | Statement::Command(_), data = ["Analysis", "Command"] {
     #[staticmethod]
@@ -465,6 +474,7 @@ pub(super) fn add_enums(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add(m, PyQuote::UNITS, PyQuote)?;
     add(m, PyTail::UNITS, PyTail)?;
     add(m, PyAlt::UNITS, PyAlt)?;
+    add(m, PyDotRule::UNITS, PyDotRule)?;
     add(m, PyStatement::UNITS, PyStatement)
 }
 

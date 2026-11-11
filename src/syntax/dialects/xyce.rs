@@ -14,8 +14,8 @@
 //! - `pub(super) fn xyce() -> DialectDef`
 
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, Coupling, ExprEval, IncludeScope, LoadForm, NetlistRules, OptionsForm,
-    ParamForm,
+    AnalysisForm, CardRules, Coupling, DotRule, ExprEval, IncludeScope, LoadForm, NetlistRules,
+    OptionsForm, ParamForm,
 };
 use crate::syntax::def::{Devices, DialectDef, Keywords, Operators};
 use crate::syntax::diag::Code;
@@ -170,6 +170,39 @@ pub(super) fn xyce() -> DialectDef {
         .temp_name("temp")
         // The VACASK analyses it has (Xyce RG .HB).
         .vacask_analysis("hb")
+        // The kept words: Xyce's multi-time, model-order-reduction and
+        // uncertainty analyses (RG analysis commands `.MPDE`, `.MOR`, `.PCE`,
+        // `.EMBEDDEDSAMPLING`, `.RESULT`), its netlist rewrites
+        // (`.PREPROCESS`), its own `Y` devices (RG `Y` devices: neuron,
+        // synapse, reduced-order model, reaction network, general external,
+        // accelerometer, PDE (TCAD), power grid), none of which ngspice,
+        // HSPICE, LTspice, Spectre or VACASK has; and `.SENS`, an objective's
+        // sensitivity to listed parameters over the deck's `.dc`, `.tran` or
+        // `.ac` (RG `.SENS`).
+        .kept_word(".mpde", Construct::PrivateText)
+        .kept_word(".mor", Construct::PrivateText)
+        .kept_word(".pce", Construct::PrivateText)
+        .kept_word(".embeddedsampling", Construct::PrivateText)
+        .kept_word(".result", Construct::PrivateText)
+        .kept_word(".preprocess", Construct::PrivateText)
+        .kept_word("yneuron", Construct::PrivateText)
+        .kept_word("ysynapse", Construct::PrivateText)
+        .kept_word("yrom", Construct::PrivateText)
+        .kept_word("yrxn", Construct::PrivateText)
+        .kept_word("ygenext", Construct::PrivateText)
+        .kept_word("yacc", Construct::PrivateText)
+        .kept_word("ypde", Construct::PrivateText)
+        .kept_word("ypgbr", Construct::PrivateText)
+        .kept_word("ypgbs", Construct::PrivateText)
+        .kept_word("ypggb", Construct::PrivateText)
+        .kept_word("ypgtr", Construct::PrivateText)
+        .kept_word("ypowergridbranch", Construct::PrivateText)
+        .kept_word("ypowergridbusshunt", Construct::PrivateText)
+        .kept_word("ypowergridtransformer", Construct::PrivateText)
+        .kept_word(".sens", Construct::XyceSens)
+        // The dot rules: `.LIN` (RG `.LIN`) is the S-parameter analysis over
+        // the deck's `.AC` sweep.
+        .dot_rule("lin", DotRule::SParams)
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)

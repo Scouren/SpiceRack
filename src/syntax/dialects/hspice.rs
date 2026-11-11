@@ -153,6 +153,28 @@ pub(super) fn hspice() -> DialectDef {
         .vacask_analysis("hb")
         .vacask_analysis("hbac")
         .vacask_analysis("hbnoise")
+        // The kept words: HSPICE's StatEye, digital vector files, timing
+        // checks and power report (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`,
+        // `.POWER`), which no other simulator has; its RF shooting-Newton
+        // (`.SN`, `.SNAC`, `.SNNOISE`, `.SNXF`), periodic time-dependent
+        // noise (`.PTDNOISE`), sampling noise (`.SAMPLE`), transient noise
+        // and loop stability analyses (HSPICE UG), which no SPICE target
+        // has; and the W element's lossy multi-conductor line (HSPICE UG, W
+        // element: `RLGCmodel=`, `RLGCfile=`, `TABLEmodel=`, `Umodel=`,
+        // `FSmodel=`, `Smodel=`).
+        .kept_word(".stateye", Construct::PrivateText)
+        .kept_word(".vec", Construct::PrivateText)
+        .kept_word(".check", Construct::PrivateText)
+        .kept_word(".power", Construct::PrivateText)
+        .kept_word(".sn", Construct::HspiceAnalysis)
+        .kept_word(".snac", Construct::HspiceAnalysis)
+        .kept_word(".snnoise", Construct::HspiceAnalysis)
+        .kept_word(".snxf", Construct::HspiceAnalysis)
+        .kept_word(".ptdnoise", Construct::HspiceAnalysis)
+        .kept_word(".sample", Construct::HspiceAnalysis)
+        .kept_word(".trannoise", Construct::HspiceAnalysis)
+        .kept_word(".lstb", Construct::HspiceAnalysis)
+        .kept_word("w", Construct::HspiceWLine)
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)

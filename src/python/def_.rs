@@ -239,6 +239,8 @@ calls! {
     option_method(spice: &str);
     option_cosmetic(spice: &str);
     spice_model_type(kind: &str);
+    kept_word(word: &str, c: PyConstruct);
+    dot_rule(word: &str, r: PyDotRule);
     code(id: &str, kind: PyKind, message: &str);
     refuse_code(c: PyConstruct, id: &str);
     omit_code(c: PyConstruct, id: &str);

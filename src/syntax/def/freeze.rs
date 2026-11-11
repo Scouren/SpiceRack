@@ -9,6 +9,7 @@
 //! - `pub fn register(def: DialectDef) -> Result<Lang, RegisterError>`, `pub enum RegisterError`
 
 use super::{DialectDef, Lex, leak};
+use crate::syntax::behaviour::DotRule;
 use crate::syntax::diag::{self, Code, Kind};
 use crate::syntax::lang::{self, CONSTRUCTS, Cells, Row};
 use crate::syntax::lexicon::{
@@ -38,6 +39,9 @@ pub enum RegisterError {
     /// with no code of its own (`refuse`, `omit`).
     #[error("'{0}': {1:?} names no declared {3:?} code '{2}'")]
     UnknownCode(String, Construct, String, Kind),
+    /// A `dot_rule`'s `DotRule::Note` names a code that is no note.
+    #[error("'{0}': dot_rule '{1}' notes {2:?}, not a Note code")]
+    DotRuleKind(String, String, diag::Code),
     /// A region names a language with no lexicon.
     #[error("'{0}': region '{1}' names a language with no reader")]
     Readerless(String, String),
@@ -57,7 +61,8 @@ pub enum RegisterError {
 /// # Errors
 /// [`RegisterError`]: the name is empty or registered with another
 /// definition, a construct has no cell, a cell's code is of the wrong kind
-/// or undeclared, a region names a language with no lexicon, `runs_on`
+/// or undeclared, a `dot_rule` notes with a code that is no note, a region
+/// names a language with no lexicon, `runs_on`
 /// names a simulator outside the `extends` chain, or the registry is full.
 /// Nothing is registered then.
 pub fn register(def: DialectDef) -> Result<Lang, RegisterError> {
@@ -66,6 +71,14 @@ pub fn register(def: DialectDef) -> Result<Lang, RegisterError> {
         return Err(RegisterError::Unnamed);
     }
     let cells = cells(&def)?;
+    if let Some(&(w, DotRule::Note(code))) = def
+        .b
+        .dot_rules
+        .iter()
+        .find(|r| matches!(r.1, DotRule::Note(c) if diag::info(c).kind != Kind::Note))
+    {
+        return Err(RegisterError::DotRuleKind(name, w.into(), code));
+    }
     if let Some(l) = &def.lex
         && let Some(r) = l.regions.iter().find(|r| r.1.lexicon().is_none())
     {

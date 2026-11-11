@@ -10,7 +10,7 @@ Each function takes the `DialectDef` a `Dialect` subclass's `define` is
 given and returns it.
 """
 from spicerack.def_ import (Alt, Analysis, AnalysisForm, Arithmetic, Backslash, CardRules, Caret,
-                            Code, Command, Construct, ControlBlock, Coupling, Devices, Dollar, End,
+                            Code, Command, Construct, ControlBlock, Coupling, Devices, Dollar, DotRule, End,
                             EndRule, ExprEval, FuncForm, IncludeScope, Join, Keywords, Lang, NetlistRules,
                             LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading,
                             Operators, OptionsForm, ParamForm, Parasitics, Quote, Quoting, Rule,
@@ -361,6 +361,20 @@ def hspice(d):
         .vacask_analysis("hb")
         .vacask_analysis("hbac")
         .vacask_analysis("hbnoise")
+        # The kept words (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`, `.POWER`, RF and noise analyses, W element).
+        .kept_word(".stateye", Construct.PrivateText)
+        .kept_word(".vec", Construct.PrivateText)
+        .kept_word(".check", Construct.PrivateText)
+        .kept_word(".power", Construct.PrivateText)
+        .kept_word(".sn", Construct.HspiceAnalysis)
+        .kept_word(".snac", Construct.HspiceAnalysis)
+        .kept_word(".snnoise", Construct.HspiceAnalysis)
+        .kept_word(".snxf", Construct.HspiceAnalysis)
+        .kept_word(".ptdnoise", Construct.HspiceAnalysis)
+        .kept_word(".sample", Construct.HspiceAnalysis)
+        .kept_word(".trannoise", Construct.HspiceAnalysis)
+        .kept_word(".lstb", Construct.HspiceAnalysis)
+        .kept_word("w", Construct.HspiceWLine)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
@@ -534,6 +548,30 @@ def xyce(d):
         .temp_name("temp")
         # The VACASK analyses it has (Xyce RG .HB).
         .vacask_analysis("hb")
+        # The kept words (RG analysis commands, `.PREPROCESS`, `Y` devices, `.SENS`).
+        .kept_word(".mpde", Construct.PrivateText)
+        .kept_word(".mor", Construct.PrivateText)
+        .kept_word(".pce", Construct.PrivateText)
+        .kept_word(".embeddedsampling", Construct.PrivateText)
+        .kept_word(".result", Construct.PrivateText)
+        .kept_word(".preprocess", Construct.PrivateText)
+        .kept_word("yneuron", Construct.PrivateText)
+        .kept_word("ysynapse", Construct.PrivateText)
+        .kept_word("yrom", Construct.PrivateText)
+        .kept_word("yrxn", Construct.PrivateText)
+        .kept_word("ygenext", Construct.PrivateText)
+        .kept_word("yacc", Construct.PrivateText)
+        .kept_word("ypde", Construct.PrivateText)
+        .kept_word("ypgbr", Construct.PrivateText)
+        .kept_word("ypgbs", Construct.PrivateText)
+        .kept_word("ypggb", Construct.PrivateText)
+        .kept_word("ypgtr", Construct.PrivateText)
+        .kept_word("ypowergridbranch", Construct.PrivateText)
+        .kept_word("ypowergridbusshunt", Construct.PrivateText)
+        .kept_word("ypowergridtransformer", Construct.PrivateText)
+        .kept_word(".sens", Construct.XyceSens)
+        # The dot rules (RG `.LIN`).
+        .dot_rule("lin", DotRule.SParams)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
@@ -687,6 +725,8 @@ def ltspice(d):
         .spectre_analysis("sweep")
         # The circuit temperature in an expression (help, temp).
         .temp_name("temp")
+        # The dot rules (LTspice help, `.backanno`).
+        .dot_rule("backanno", DotRule.Note(Code.W0036))
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
