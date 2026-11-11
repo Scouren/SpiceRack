@@ -3,8 +3,8 @@
 //! expression grammar of decision D16, one syntax with one meaning that
 //! every target's writer lowers. It narrows what it extends. A number ends
 //! at its scale (`f p n u m k meg g t`, case-blind: no `mil`, no atto, no
-//! unit). The levels, loosest first: `?:`, `||`, `&&`, `== !=`, `< <= >
-//! >=`, `+ -`, `* / %`, the sign, `**`. `**` groups to the right and binds
+//! unit). The levels, loosest first: `?:`, `||`, `&&`, `== !=`,
+//! `< <= > >=`, `+ -`, `* / %`, the sign, `**`. `**` groups to the right and binds
 //! tighter than the sign (`-2**2` is -4, `2**-1` is 0.5); the two
 //! comparison levels do not associate; a ternary nests in parentheses or
 //! in the else branch; `<>` and `\` are no operators, and `^` is read as
