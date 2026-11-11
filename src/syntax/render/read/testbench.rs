@@ -56,7 +56,8 @@ pub(in crate::syntax::render) enum BenchCard {
     /// A `.meas` card's line.
     Meas(String),
     /// A top-level parameter set between two analyses (VACASK `alter
-    /// instance("__topinst__") k=v`, `docs/cmd-alter.md`): from here on
+    /// instance("__topinst__") k=v`, `docs/cmd-alter.md`; ngspice
+    /// `alterparam k = v` at its `reset`, manual §13.5.5): from here on
     /// the deck's parameter `key` is `value`. `node` is the statement, which
     /// a writer of the source's own language copies as it stands.
     Alter {
@@ -210,6 +211,10 @@ impl<'a> Rd<'a> {
     /// What the card adds to the testbench; `None` when the IR cannot hold
     /// it (the old lowering's `testbench_card`).
     pub(in crate::syntax::render) fn bench_card(&self, n: u32) -> Option<BenchCard> {
+        // A `.control` script line the reader placed (`control::Rd::control`).
+        if self.tag(n) == Tag::Line {
+            return self.alterparam(n);
+        }
         let card = self.read_card(n)?;
         if let Some(a) = self.analysis(&card) {
             return Some(BenchCard::Ana(a));

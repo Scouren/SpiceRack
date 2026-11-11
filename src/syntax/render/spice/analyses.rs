@@ -63,6 +63,16 @@ impl W<'_, '_> {
                 let hspice = match self.ask(Construct::DcLogList, tok) {
                     Action::Native => false,
                     Action::Spell(Alt::DcType) => true,
+                    // Loops of ngspice's control script around one `dc`
+                    // (`loops.rs`; `run_analyses` runs them from the
+                    // block); a `.dc` the script has no run for is refused.
+                    Action::Spell(Alt::ControlScript) => {
+                        let script = self.dc_loops(axes);
+                        if script.is_none() {
+                            self.refuse(Code::W0038, tok);
+                        }
+                        return script.unwrap_or_default();
+                    }
                     _ => return String::new(),
                 };
                 let mut s = String::from(".dc");

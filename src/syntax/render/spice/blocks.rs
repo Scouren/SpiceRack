@@ -261,7 +261,9 @@ impl W<'_, '_> {
             if let Some(d) = self.draws.value(a) {
                 v = d.to_string();
             }
-            let v = self.spelled(&v);
+            // A circuit state's parameter holds the first state's value,
+            // LTspice's its table over the state index (`states.rs`).
+            let v = self.state_value(a).unwrap_or_else(|| self.spelled(&v));
             let kw = match self.b.param_form == ParamForm::Xyce && self.rd.global_param(a) {
                 true => ".global_param",
                 false => ".param",

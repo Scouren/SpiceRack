@@ -13,7 +13,8 @@
 //!
 //! Contents:
 //! - `fn is_four(line: &str) -> bool`, `fn is_continuation(line: &str) -> bool`
-//! - `pub(super) struct Tb`, `Tb::runs(&self) -> bool`, `Tb::tran_uic(&self) -> bool`, `Tb::monte_carlo(&self) -> bool`
+//! - `pub(super) struct Tb`, `Tb::runs(&self) -> bool`, `Tb::tran_uic(&self) -> bool`, `Tb::monte_carlo(&self) -> bool`,
+//!   `Tb::measures_dc(&self) -> bool`
 //! - `W::fold(&self) -> Tb`, `W::control_run(&self, tb: &Tb) -> Option<Vec<String>>`,
 //!   `W::bench(&mut self, mut tb: Tb, control: Option<&[String]>)`
 //! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
@@ -55,9 +56,9 @@ pub(super) struct Tb {
     /// Each measure's statement's first token.
     meas_toks: Vec<u32>,
     /// Each `.step`'s sweep, name, numbers and first token.
-    steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
+    pub(super) steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
     /// Each list `.step`'s name, values and first token.
-    step_lists: Vec<(String, Vec<f64>, u32)>,
+    pub(super) step_lists: Vec<(String, Vec<f64>, u32)>,
     /// VACASK control statements kept as text: none is written
     /// (`W::vacask_lines`).
     pub(super) extra: Vec<u32>,
@@ -93,6 +94,13 @@ impl Tb {
             .runs
             .iter()
             .any(|a| matches!(a, Ana::MonteCarlo { .. }))
+    }
+
+    /// Whether a measure of the deck reads a DC sweep (`.meas dc`).
+    pub(super) fn measures_dc(&self) -> bool {
+        self.measures
+            .iter()
+            .any(|m| measure_kind(m).eq_ignore_ascii_case("dc"))
     }
 }
 
@@ -198,8 +206,10 @@ impl W<'_, '_> {
         self.measures(&tb);
         self.steps(&tb);
         self.step_lists(&tb);
+        self.state_steps();
         self.vacask_lines(&tb.extra);
         self.run_analyses(&tb, control);
+        self.alter_blocks();
     }
 
     /// VACASK control statements the reader kept as text: a script line
@@ -370,8 +380,13 @@ impl W<'_, '_> {
         // ngspice's control script, which then runs every analysis (in
         // the block `control_run` asked for, or one of its own).
         let scripted = !tb.plan.single_epoch() && self.scripted(&tb.plan);
+        // The `.step`s the target's cells spell as loops of that script
+        // (`loops.rs`): they too run every analysis from the block, and so
+        // does a `.dc` whose log or list axis is such a loop.
+        let loops = self.loops(tb);
+        let dc_looped = self.dc_looped(tb);
         let control = match control {
-            None if scripted => Some(&[] as &[String]),
+            None if scripted || !loops.is_empty() || dc_looped => Some(&[] as &[String]),
             given => given,
         };
         let each = || tb.plan.runs.iter().zip(&tb.plan.run_tok);
@@ -385,6 +400,7 @@ impl W<'_, '_> {
                     .iter()
                     .position(|a| matches!(a, Ana::Tran { .. }));
                 self.o.token(".control", Space::Line);
+                self.loop_open(&loops);
                 for (i, (a, tok)) in each().enumerate() {
                     if scripted {
                         self.alter_lines(&tb.plan, i);
@@ -401,6 +417,7 @@ impl W<'_, '_> {
                 if at.is_none() {
                     fourier.iter().for_each(|f| self.o.token(f, Space::Line));
                 }
+                self.loop_close(&loops);
                 self.o.token(".endc", Space::Line);
             }
             None => {
@@ -603,20 +620,26 @@ fn fourier_commands<'a>(lines: impl Iterator<Item = &'a str>) -> Vec<String> {
     out
 }
 
-/// Whether ngspice-45's `.meas` reads measure `m`: an analysis it
-/// measures (manual §15.4: `.meas {DC|AC|TRAN|SP}`; `.meas noise` is
-/// "unrecognized analysis type 'noise'", run by hand) and no Xyce-only
-/// qualifier (`RFC_LEVEL`, Xyce RG `.MEASURE`).
-fn ngspice_measures(m: &str) -> bool {
+/// The analysis measure `m` reads: the word after `.meas`/`.measure` when
+/// `m` is a whole card, else its first word; empty when it has none.
+fn measure_kind(m: &str) -> &str {
     let mut words = m.split_whitespace();
     let first = words.next().unwrap_or("");
-    let kind = match first
+    match first
         .get(..5)
         .is_some_and(|p| p.eq_ignore_ascii_case(".meas"))
     {
         true => words.next().unwrap_or(""),
         false => first,
-    };
+    }
+}
+
+/// Whether ngspice-45's `.meas` reads measure `m`: an analysis it
+/// measures (manual §15.4: `.meas {DC|AC|TRAN|SP}`; `.meas noise` is
+/// "unrecognized analysis type 'noise'", run by hand) and no Xyce-only
+/// qualifier (`RFC_LEVEL`, Xyce RG `.MEASURE`).
+fn ngspice_measures(m: &str) -> bool {
+    let kind = measure_kind(m);
     let known = ["tran", "ac", "dc", "sp"]
         .iter()
         .any(|k| kind.eq_ignore_ascii_case(k));

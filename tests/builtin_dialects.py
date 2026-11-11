@@ -206,10 +206,10 @@ def ngspice(d):
         .spell(Construct.TableSource, Alt.PwlValue)
         .native(Construct.LossyLine)
         .native(Construct.AmWave)
-        .refuse(Construct.Step, Code.W0016)
-        .refuse(Construct.StepList, Code.W0016)
+        .spell(Construct.Step, Alt.ControlScript)
+        .spell(Construct.StepList, Alt.ControlScript)
         .lift(Construct.TranStartup, Rule.StartupRamp)
-        .refuse(Construct.DcLogList, Code.W0038)
+        .spell(Construct.DcLogList, Alt.ControlScript)
         .native(Construct.Tf)
         .native(Construct.Sens)
         .native(Construct.SensAc)
@@ -251,7 +251,10 @@ def espice(d):
         # ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
         # offset" (run).
         .spell(Construct.AmWave, Alt.AmNoOffset)
-        .refuse(Construct.Epochs, Code.W0130))
+        .refuse(Construct.Epochs, Code.W0130)
+        .refuse(Construct.Step, Code.W0016)
+        .refuse(Construct.StepList, Code.W0016)
+        .refuse(Construct.DcLogList, Code.W0038))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,
@@ -426,7 +429,7 @@ def hspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .refuse(Construct.Epochs, Code.W0130))
+        .spell(Construct.Epochs, Alt.AlterBlocks))
 
 
 XYCE_UNPROTECTED = Quoting(escapes=False,
@@ -626,7 +629,7 @@ def xyce(d):
         .refuse(Construct.UnmappedOption, Code.W0017)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .refuse(Construct.Epochs, Code.W0130))
+        .spell(Construct.Epochs, Alt.StatesData))
 
 
 LTSPICE_OPERATORS = [
@@ -783,7 +786,7 @@ def ltspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .refuse(Construct.Epochs, Code.W0130))
+        .spell(Construct.Epochs, Alt.StatesTable))
 
 
 SPECTRE_SCALES = [

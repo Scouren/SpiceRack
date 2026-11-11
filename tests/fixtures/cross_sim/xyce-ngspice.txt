@@ -396,6 +396,10 @@ LTRA/ltra3.cir simulator-differs:third-simulator reason=S-LTRA3-LADDER proof=ltr
 LTRA/square-wave-gen-resistor-compact.cir slow # quarantined
 LTRA/square-wave-gen-resistor.cir slow # quarantined
 LUMPEDLINE/baselineLumpedLine.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 both agree (worst 0.654 of the tolerance) since the written deck carries method=gear (P3-004); was: tran VSIGGEN#branch: -0.00038369065280601157 leaves the tube at t=0.0000002881999999999999 (tol 7.271e-5)
+L_UTSOI/asym_nmos_idvg0_allsw0_T27.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1): Xyce's level 10240 (L-UTSOI) has no ngspice model and the deck names it as written; ZERO-LEDGER P3-124 refuses the level, and this line goes with that row
+L_UTSOI/asym_pmos_idvg0_allsw0_T27.cir target-fails # as asym_nmos (level=10240): goes with ZERO-LEDGER P3-124
+L_UTSOI/sym_nmos_idvg0_allsw0_T27.cir target-fails # as asym_nmos (level=10240): goes with ZERO-LEDGER P3-124
+L_UTSOI/sym_pmos_idvg0_allsw0_T27.cir target-fails # as asym_nmos (level=10240): goes with ZERO-LEDGER P3-124
 MCNC_BJT_LATCH/latch.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VREF#branch: 0.0018988876953777145 leaves the tube at t=0.000000021 (tol 1.899e-5)
 MCNC_BJT_OPAMPAL/opampal.cir mismatch # tran VVIN#branch: -0.00000016134418585703294 leaves the tube at t=0.000011000000000000001 (tol 1.877e-9)
 MEASURE/DefaultValOption.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v]

@@ -68,9 +68,10 @@ fn step_keeps_the_param_keyword_in_every_form() {
     }
 }
 
-/// ngspice has no `.step`: a stepped LTspice deck is refused (`W0016`, whose
-/// citation names `.dc` sweeps), never written commented out, which would
-/// run once.
+/// ngspice has no `.step`, and its control-script loop sets a parameter
+/// the deck declares: a step of one it never declares is refused (`W0016`,
+/// whose citation names `.dc` sweeps), never written commented out, which
+/// would run once.
 #[test]
 fn ngspice_refuses_step_instead_of_commenting_it_out() {
     let e = ng()

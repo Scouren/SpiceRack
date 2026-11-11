@@ -261,9 +261,10 @@ pub(super) fn xyce() -> DialectDef {
         // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
         // --- S1
         // --- S2
-        // Every analysis of a deck runs on one circuit (RG `.STEP` steps
-        // them all); parameter states become its points with ZERO-LEDGER
-        // P5-001 step 5.
-        .refuse(Construct::Epochs, Code::W0130)
+        // The circuit states are the rows of a `.DATA` table the deck
+        // steps over (RG 7.10 §2.1.2, §2.1.36.5; run, ZERO-LEDGER P5-001
+        // step 5); a plan no table of states holds is W0130
+        // (`render/spice/states.rs`).
+        .spell(Construct::Epochs, Alt::StatesData)
     // --- S3
 }

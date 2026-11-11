@@ -488,7 +488,12 @@ fn has_control(text: &str) -> bool {
 
 /// `text` with a pinned seed (gf180's `agauss` draws a fresh value each run
 /// otherwise) and, when a `.control` block runs the analyses, a `write` of
-/// the current plot at the end of the last block.
+/// every plot but `const` at the end of the last block, appended to the
+/// one raw file in run order (`$plots` lists the plots oldest first: run
+/// on ngspice-45). A script that runs an analysis once a pass of a loop,
+/// or once a circuit state, gives a plot each, as a `.step` does on Xyce;
+/// a bare `write` kept the last one (ngspice manual §13.5.107 `write`,
+/// `appendwrite`; §13.5.92 `strcmp`).
 fn ngspice_text(text: &str, raw: &Path) -> String {
     let (title, body) = text.split_once('\n').unwrap_or((text, ""));
     let body = match std::env::var("CROSS_SIM_TMAX")
@@ -502,7 +507,12 @@ fn ngspice_text(text: &str, raw: &Path) -> String {
     if has_control(text)
         && let Some(at) = out.to_ascii_lowercase().rfind("\n.endc")
     {
-        out.insert_str(at, &format!("\nwrite {}", raw.display()));
+        let write = format!(
+            "\nset appendwrite\nforeach p $plots\nstrcmp _sr_const $p const\n\
+             if $_sr_const ne 0\nsetplot $p\nwrite {}\nend\nend",
+            raw.display()
+        );
+        out.insert_str(at, &write);
     }
     out
 }
