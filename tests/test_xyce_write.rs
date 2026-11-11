@@ -412,3 +412,58 @@ fn p3_073_an_ngspice_level_6_lambda_holds_on_xyce() {
         );
     }
 }
+
+/// ngspice-45 `bjttemp.c`: `tbf1` or `tbf2` given, at 0 too, computes
+/// BF·(1 + tbf1·dT + tbf2·dT²) in place of the XTB law (L236-239); NE is
+/// times 1 + tne1·dT + tne2·dT² (L126); `iss` is the substrate diode
+/// (L181). Xyce 7.10's level-1 `Q` has none of the five (`Xyce -param Q
+/// 1`; it runs the card with "No model parameter TBF1 found"). The cards'
+/// TNOM is 50 K below the circuit. 10 uA into the base, BF(T)·Ib through
+/// 1k from 5 V: ngspice-45 v(c) 3.8 (`tbf1=4e-3`), 3.75 (`tbf2=1e-4`), 4.0
+/// (`xtb=1.5 tbf1=0`); Xyce 7.10 on the same cards 4.0, 4.0, 3.6857. 1 uA
+/// into a leaking base: 0.45836 V (`tne1=5e-4`, `tne2=1e-5`), Xyce
+/// 0.45376. 10 uA into the substrate: 1.5317 V (`iss=1e-14`), Xyce 10 V.
+/// Refused (W0050); `tne1`, `tne2`, `iss` at 0 are left out and the two
+/// agree (ledger P3-091; the gf180 `vnpn`/`vpnp` cards).
+#[test]
+fn p3_091_refuses_gf180_bjt_temperature_names() {
+    let beta = |card: &str| {
+        format!(
+            "* t\n.model qn npn is=1e-16 bf=100 tnom=-23 {card}\nvcc cc 0 5\nrc cc c 1k\n\
+             i1 0 b 10u\nq1 c b 0 qn\n.op\n.end\n"
+        )
+    };
+    let leak = |card: &str| {
+        format!(
+            "* t\n.model qn npn is=1e-16 bf=100 ise=1e-12 ne=2 tnom=-23 {card}\nvc c 0 2\n\
+             i1 0 b 1u\nq1 c b 0 qn\n.op\n.end\n"
+        )
+    };
+    let sub = |card: &str| {
+        format!(
+            "* t\n.model qn npn is=1e-16 bf=100 {card}\nvc c 0 1\nvb b 0 0.6\ni1 0 s 10u\n\
+             rs s 0 1meg\nq1 c b 0 s qn\n.op\n.end\n"
+        )
+    };
+    let refused = [
+        beta("tbf1=4e-3"),
+        beta("tbf2=1e-4"),
+        beta("xtb=1.5 tbf1=0"),
+        leak("tne1=5e-4"),
+        leak("tne2=1e-5"),
+        sub("iss=1e-14"),
+    ];
+    for deck in refused {
+        assert_eq!(refusal(&deck), [Code::W0053, Code::W0050], "{deck}");
+    }
+    let off = [
+        (leak("tne1=0 tne2=0"), "b"),
+        (sub("iss=0"), "s"),
+        (beta("xtb=1.5"), "c"),
+    ];
+    for (deck, node) in off {
+        let w = write(&deck);
+        assert!(!w.contains("tne1") && !w.contains("iss="), "{w}");
+        same_op(&deck, node);
+    }
+}

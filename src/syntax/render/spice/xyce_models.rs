@@ -167,6 +167,10 @@ const BJT: Device = Device {
         ("tvje", Off::At(0.0)),
         ("tvjc", Off::At(0.0)),
         ("tvjs", Off::At(0.0)),
+        // NE·(1 + tne1·dT + tne2·dT²) (`bjttemp.c:126`). `tbf1`, `tbf2`
+        // have no row: given, at 0 too, they replace the XTB law (L236).
+        ("tne1", Off::At(0.0)),
+        ("tne2", Off::At(0.0)),
         ("iss", Off::At(0.0)),
         ("ns", Off::At(1.0)),
         ("ibe", Off::At(0.0)),
