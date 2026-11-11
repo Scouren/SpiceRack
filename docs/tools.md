@@ -18,6 +18,36 @@ kept or left out is printed beside it.
 | --- | --- |
 | `--check` | check each deck is a fixpoint: written in its own dialect and read back, it writes the same text |
 | `--dialect hspice` | read HSPICE decks (default: ngspice; also ltspice, xyce, spectre, vacask) |
+| `--to espice` | write that dialect alone (`ngspice`, `hspice`, `ltspice`, `spectre`, `vacask`, `espice`, `xyce`, `cdl` or `verilog`) and print the written deck's absolute path on stdout; a deck the dialect refuses is not written and the exit code is 1 |
+| `--kit` | with `--to`: also write every file the deck reaches through `.include` and `.lib`, all or none |
+
+### One dialect, and a deck with its model files
+
+```bash
+spice2rack --dialect spectre --to espice --kit -o out/ tb/top.scs
+```
+
+writes `out/top.espice.sp` and prints that path, alone, on stdout (one line a
+deck). Notes and refusals go to stderr with their codes. The exit code is 0,
+1 when a deck was refused or could not be read, and 2 on a usage error.
+
+With `--kit` the files the deck reaches are written too. A file under the
+deck's directory keeps its path from there (`tb/models/nch.scs` is written to
+`out/models/nch.scs`); a file anywhere else (a PDK's absolute path,
+`../shared/x.lib`) goes by its whole path under `out/_root/`. Every
+`.include` and `.lib` path in the written files is the absolute path of the
+written copy, so the deck runs from any working directory and never picks up
+an unconverted file of the same name. A Verilog-A source is left where it is
+and named by its absolute path. If a file is refused or missing, or a copy
+would land on a file the deck reads, nothing is written and the exit code
+is 1. A file the deck names in another way (a PWL `file=`) is not part of the
+kit: its path is written as it was.
+
+The converter builds on its own, without Python or a simulator:
+
+```bash
+nix build github:OpenFAT/SpiceRack#spice2rack   # result/bin/spice2rack
+```
 
 A PDK model file converts the same way. Its library sections (SPICE
 `.lib tt` ... `.endl tt`, Spectre and VACASK `section tt` ... `endsection`,

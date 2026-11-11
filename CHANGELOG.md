@@ -33,6 +33,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: every failure of a netlist, a run or a compile raises `spicerack.Error`, a `RuntimeError` with `.status` (`"refused"`: the deck is not written for the target or no simulator is routed; `"failed"`) and `.diagnostics`, a list of `Diagnostic` (`code`, `kind`, `title`, `cite`, `message`, `line`, `column`, `statement`, `element`); `Testbench.netlist_with_notes(dialect)` returns the deck and its notes as `Diagnostic`s. Texts are unchanged, and `ValueError` stays for a bad argument (ZERO-LEDGER P8-105).
 - python: `AmplitudeModulatedVoltageSource`/`CurrentSource` take `signal_phase=` and `carrier_phase=` (degrees; ngspice and ESPice only).
 - python: every result lists its `nodes`, `branches`, `measures` and `params` in name order; they came in a hash map's order, another on each result object (`result::Results::nodes` and `branches` are `BTreeMap`s) (ZERO-LEDGER P8-318).
+- tools: `spice2rack --to <dialect>` writes that dialect alone (any of the nine), prints the written deck's absolute path on stdout and exits 1 when the dialect refuses the deck (2 on a usage error; an unknown option was read as a deck); `--kit` also writes every file the deck reaches, each `.include`/`.lib` path the absolute path of the written copy under `-o`; `nix build .#spice2rack` builds the converter alone, with no default features (ZERO-LEDGER P1-062).
 
 ## 0.2.0 (2026-11-03)
 

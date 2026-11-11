@@ -1,7 +1,9 @@
 //! A corpus deck and the files it includes -> each written for one target,
-//! as a user converts a deck and its model files (`spice2rack` on each):
-//! the deck's `.lib "sm141064.ngspice" typical` then reaches the model file
-//! in the target's dialect, under the name the deck gives it.
+//! as a user converts a deck and its model files (`spice2rack --kit`): the
+//! deck's `.lib "sm141064.ngspice" typical` then reaches the model file in
+//! the target's dialect, under the name the deck gives it. The run
+//! directory's names are this file's; the paths are rewritten to them by
+//! the library (`render::relink`), as the CLI rewrites them to its own.
 //!
 //! Cites: none (the kit walk is `spicerack::import::kit`).
 //!
@@ -16,7 +18,7 @@ use std::sync::{LazyLock, Mutex};
 
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
-use spicerack::syntax::render::render_kit;
+use spicerack::syntax::render::{relink, render_kit};
 use spicerack::syntax::resolve::{FileId, Kit, Role};
 
 /// The deck written, each included file written (by its name beside the
@@ -55,7 +57,7 @@ pub fn write(kit: &Kit, deck: &Path, target: Dialect) -> Result<Files, String> {
             None => {
                 let base = f.path.file_name().unwrap_or_default().to_string_lossy();
                 let name = format!("{INC}/{i}-{base}");
-                moved.insert(lexical(&f.path), name.clone());
+                moved.insert(f.path.clone(), name.clone());
                 name
             }
         };
@@ -96,132 +98,176 @@ pub fn codes(messages: &str) -> String {
     c.join(" ")
 }
 
-// ---- private ----
-
-/// `text` (a file read from `base`) with each path that names a moved
-/// file, resolved from `base`, replaced by its name in the run directory:
-/// a quoted span anywhere (the HSPICE, VACASK and Spectre writers quote an
-/// include's path) and an include card's bare path ([`bare`]: the ngspice,
-/// ESPice, Xyce and LTspice writers do not).
-fn relink(text: &str, base: &Path, moved: &HashMap<PathBuf, String>) -> String {
-    if moved.is_empty() {
-        return text.to_string();
-    }
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(open) = rest.find(['"', '\'']) {
-        let q = &rest[open..=open];
-        let Some(len) = rest[open + 1..]
-            .find(q)
-            .filter(|&n| !rest[open + 1..open + 1 + n].contains('\n'))
-        else {
-            out.push_str(&rest[..=open]);
-            rest = &rest[open + 1..];
-            continue;
-        };
-        let span = &rest[open + 1..open + 1 + len];
-        out.push_str(&rest[..=open]);
-        out.push_str(
-            moved
-                .get(&lexical(&base.join(span)))
-                .map_or(span, String::as_str),
-        );
-        out.push_str(q);
-        rest = &rest[open + 2 + len..];
-    }
-    out.push_str(rest);
-    bare(&out, base, moved)
-}
-
-/// `text` with the bare path of each `.include`, `.inc` or `.lib` card
-/// that names a moved file, resolved from `base`, replaced by its name in
-/// the run directory. The path is the card's second word; a quoted one is
-/// [`relink`]'s and names no moved file here.
-fn bare(text: &str, base: &Path, moved: &HashMap<PathBuf, String>) -> String {
-    assert!(!moved.is_empty(), "relink returns early with nothing moved");
-    let cards = [".include", ".inc", ".lib"];
-    let mut out = String::with_capacity(text.len());
-    for line in text.split_inclusive('\n') {
-        let mut words = line.split_whitespace();
-        let first = words.next();
-        let card = first.filter(|w| cards.iter().any(|c| w.eq_ignore_ascii_case(c)));
-        let path = card.and(words.next());
-        let name = path.and_then(|p| moved.get(&lexical(&base.join(p))));
-        match (card, path, name) {
-            (Some(card), Some(path), Some(name)) => {
-                // The card is the line's first text, the path the first
-                // match after it.
-                let at = line.find(card).map_or(0, |i| i + card.len());
-                out.push_str(&line[..at]);
-                out.push_str(&line[at..].replacen(path, name, 1));
-            }
-            _ => out.push_str(line),
-        }
-    }
-    assert_eq!(
-        out.lines().count(),
-        text.lines().count(),
-        "a relinked path holds no line break"
-    );
-    out
-}
-
-/// `p` with `.` and `..` resolved lexically, as the kit joins an include.
-fn lexical(p: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for c in p.components() {
-        match c {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                out.pop();
-            }
-            c => out.push(c),
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use spicerack::syntax::resolve::Form;
+    use std::process::Command;
+
+    /// The path an include card of a SPICE target names, its quotes off:
+    /// `.include p`, `.inc p`, `.lib p section` (a `.lib name` alone opens
+    /// a section).
+    fn include_path(line: &str) -> Option<&str> {
+        let w: Vec<&str> = line.split_whitespace().collect();
+        let card = w.first()?.to_ascii_lowercase();
+        let names = matches!(
+            (card.as_str(), w.len()),
+            (".include" | ".inc", 2..) | (".lib", 3..)
+        );
+        names.then(|| w[1].trim_matches(['"', '\'']))
+    }
+
+    /// `deck` (read as `source`) through `spice2rack --to <target> --kit`
+    /// and through [`write`]: the same texts, the CLI's naming each file by
+    /// the absolute path of its copy. `suffix` is the target's file-name
+    /// suffix.
+    fn cli_kit_is_the_harness_kit(deck: &Path, source: Dialect, target: Dialect, suffix: &str) {
+        let ctx = format!("{} for {}", deck.display(), target.name());
+        let root = Path::new("/");
+        let kit = spicerack::import::kit(&[deck.to_path_buf()], Form::Deck, source, root);
+        let (top, files, _) = write(&kit, deck, target).unwrap_or_else(|c| panic!("{ctx}: {c}"));
+        let tmp = tempfile::TempDir::new().expect("a temp dir");
+        let out = tmp.path();
+        let run = Command::new(env!("CARGO_BIN_EXE_spice2rack"))
+            .args(["--dialect", source.name(), "--to", target.name()])
+            .args(["--kit", "-o"])
+            .arg(out)
+            .arg(deck)
+            .output()
+            .expect("spice2rack runs");
+        let stderr = String::from_utf8_lossy(&run.stderr);
+        assert_eq!(run.status.code(), Some(0), "{ctx}: {stderr}");
+        // The layout, restated: the entry by its stem and the target's
+        // suffix; a file under the deck's directory at its path from
+        // there, another by its whole path under `_root`.
+        let dir = deck.parent().expect("a deck in a directory");
+        let stem = deck.file_stem().expect("a stem").to_string_lossy();
+        let entry = out.join(format!("{stem}.{suffix}"));
+        let place = |p: &Path| match p.strip_prefix(dir) {
+            Ok(rel) => out.join(rel),
+            Err(_) => out
+                .join("_root")
+                .join(p.strip_prefix(root).expect("an absolute path")),
+        };
+        let stdout = String::from_utf8_lossy(&run.stdout);
+        assert_eq!(stdout, format!("{}\n", entry.display()), "{ctx}: stdout");
+        // (the CLI's path, the harness's name) of each library, in the
+        // kit's order. No path here is the start of another.
+        let libs = kit.files()[1..].iter();
+        let libs = libs.filter(|f| matches!(f.role, Role::Deck | Role::Library));
+        let libs: Vec<&PathBuf> = libs.map(|f| &f.path).collect();
+        assert_eq!(libs.len(), files.len(), "{ctx}: a harness file a library");
+        let names: Vec<(PathBuf, &str)> = libs
+            .iter()
+            .zip(&files)
+            .map(|(p, (name, _))| (place(p), name.as_str()))
+            .collect();
+        let read = |at: &Path| {
+            std::fs::read_to_string(at).unwrap_or_else(|e| panic!("{ctx}: {}: {e}", at.display()))
+        };
+        // A text's lines with the harness's names for the CLI's, less the
+        // title (the name each caller gave the file).
+        let body = |text: &str| -> Vec<String> {
+            let named = names.iter().fold(text.to_string(), |t, (at, name)| {
+                t.replace(&*at.to_string_lossy(), name)
+            });
+            named.lines().skip(1).map(str::to_string).collect()
+        };
+        assert_eq!(body(&read(&entry)), body(&top), "{ctx}: the deck");
+        for ((at, name), (_, text)) in names.iter().zip(&files) {
+            assert_eq!(body(&read(at)), body(text), "{ctx}: {name}");
+        }
+        // espice-c9's guard: every include path is absolute, lies under
+        // the output directory and names a file written there.
+        let mut paths = 0;
+        for at in std::iter::once(&entry).chain(names.iter().map(|n| &n.0)) {
+            for (line, path) in read(at).lines().filter_map(|l| Some((l, include_path(l)?))) {
+                let p = Path::new(path);
+                let under = p.is_absolute() && p.starts_with(out) && p.is_file();
+                assert!(under, "{ctx}: {}: {line}", at.display());
+                paths += 1;
+            }
+        }
+        assert!(paths > 0, "{ctx}: a kit names a file");
+    }
 
     #[test]
-    fn p1_058_a_bare_include_path_is_relinked() {
-        // The ngspice, ESPice, Xyce and LTspice writers leave an include's
-        // path bare (golden record fx17, spice-bench
-        // ngspice/tests/regression/lib-processing/ex2a.sp: `.lib
-        // /nix/store/.../ex2.lib MOS` in ngspice.txt, quoted in
-        // hspice.txt). The run directory holds the written library under
-        // `.cross_sim_inc/`, and the deck has to name it there, quoted or
-        // not; a path beside the deck and a word of another card stay.
-        // Oracle: each line's expected text written out by hand. Checks: 7.
-        let base = Path::new("/corpus/deck");
-        let moved: HashMap<PathBuf, String> = [
-            ("/corpus/assets/ex2.lib", ".cross_sim_inc/1-ex2.lib"),
-            ("/corpus/deck/sub1/inc1", ".cross_sim_inc/2-inc1"),
-            ("/corpus/mos.inc", ".cross_sim_inc/3-mos.inc"),
-        ]
-        .into_iter()
-        .map(|(p, n)| (PathBuf::from(p), n.to_string()))
-        .collect();
-        for (line, want) in [
-            (
-                ".lib /corpus/assets/ex2.lib MOS",
-                ".lib .cross_sim_inc/1-ex2.lib MOS",
-            ),
-            (
-                ".lib '/corpus/assets/ex2.lib' MOS",
-                ".lib '.cross_sim_inc/1-ex2.lib' MOS",
-            ),
-            (".INCLUDE sub1/inc1", ".INCLUDE .cross_sim_inc/2-inc1"),
-            ("  .inc ../mos.inc", "  .inc .cross_sim_inc/3-mos.inc"),
-            (".include ./beside.inc", ".include ./beside.inc"),
-            ("R1 a 0 sub1/inc1", "R1 a 0 sub1/inc1"),
-            (".lib sub1/inc1x MOS", ".lib sub1/inc1x MOS"),
+    fn p1_062_the_cli_writes_the_harness_kit_under_absolute_paths() {
+        // Oracle: the cross-simulator harness's own files (`write`), which
+        // the cells run on the target's simulator: a round trip, the CLI's
+        // absolute paths mapped back to the run directory's names. Three
+        // kits (ZERO-LEDGER P1-062): gf180's cmcqa deck (two libraries
+        // beside it by their bare names, `sm141064.ngspice` calling its
+        // own sections); a deck naming a library in another tree by its
+        // absolute path, the library calling itself by a relative one; an
+        // LTspice deck with a `.lib` file in a folder under it and an
+        // `.include` beside its parent, written here.
+        let bench = std::env::var("SPICE_BENCH")
+            .expect("SPICE_BENCH not set: run the tests in `nix develop .#testing`");
+        let bench = Path::new(&bench);
+        let lt = tempfile::TempDir::new().expect("a temp dir");
+        let top: &[&str] = &[
+            "* an LTspice deck and its libraries",
+            "V1 in 0 1",
+            "X1 in out lowpass",
+            "D1 out 0 clamp",
+            ".lib sub/filters.lib",
+            ".include ../shared/diodes.mod",
+            ".op",
+            ".end",
+        ];
+        let filters: &[&str] = &[
+            "* an RC low-pass",
+            ".subckt lowpass a b",
+            "R1 a b 1k",
+            "C1 b 0 1u",
+            ".ends lowpass",
+        ];
+        let diodes: &[&str] = &["* a clamp diode", ".model clamp D(Is=1e-14 N=1)"];
+        for (at, lines) in [
+            ("tb/top.net", top),
+            ("tb/sub/filters.lib", filters),
+            ("shared/diodes.mod", diodes),
         ] {
-            let text = format!("t\n{line}\nV1 a 0 1\n");
-            let want = format!("t\n{want}\nV1 a 0 1\n");
-            assert_eq!(relink(&text, base, &moved), want, "{line}");
+            let at = lt.path().join(at);
+            std::fs::create_dir_all(at.parent().expect("in a folder")).expect("a folder");
+            std::fs::write(&at, lines.join("\n") + "\n").expect("a file written");
+        }
+        let (ng, lts) = (Dialect::Ngspice, Dialect::Ltspice);
+        for (deck, source, target, suffix) in [
+            (
+                bench.join("cmcqa/gf180/gf180_cv_cgc_nmos_3p3_0.sp"),
+                ng,
+                Dialect::Espice,
+                "espice.sp",
+            ),
+            (
+                bench.join("cmcqa/gf180/gf180_cv_cgc_nmos_3p3_0.sp"),
+                ng,
+                Dialect::Hspice,
+                "hspice.sp",
+            ),
+            (
+                bench.join("ngspice/tests/regression/lib-processing/ex2a.sp"),
+                ng,
+                Dialect::Espice,
+                "espice.sp",
+            ),
+            (
+                bench.join("ngspice/tests/regression/lib-processing/ex2a.sp"),
+                ng,
+                Dialect::Hspice,
+                "hspice.sp",
+            ),
+            (lt.path().join("tb/top.net"), lts, ng, "ngspice.sp"),
+            (
+                lt.path().join("tb/top.net"),
+                lts,
+                Dialect::Espice,
+                "espice.sp",
+            ),
+        ] {
+            cli_kit_is_the_harness_kit(&deck, source, target, suffix);
         }
     }
 }

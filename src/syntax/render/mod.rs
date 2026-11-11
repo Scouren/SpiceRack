@@ -27,6 +27,8 @@
 //!   `pub fn splice(src: &Source, p: Pending, answers: &[Answer]) -> Result<Written, Diags>`
 //! - `pub fn render_kit(kit: &Kit, file: FileId, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
 //! - `pub fn render_text(text: &str, d: impl Into<Lang>, name: &str, target: impl Into<Lang>) -> Result<Written, Diags>`
+//! - `pub fn relink(text: &str, base: &Path, moved: &HashMap<PathBuf, String>) -> String` (re-exported from `relink`):
+//!   a written kit file's include paths renamed to where the caller put the files
 //! - `pub enum Reference`, `pub fn references(src: &Source) -> Vec<Reference>`
 //! - `pub fn portable_option(key: &str) -> bool` (re-exported from `read::options`)
 //! - `pub fn writes(target: Dialect) -> bool`
@@ -39,12 +41,14 @@ mod named;
 mod names;
 mod out;
 mod read;
+mod relink;
 mod role;
 pub mod spelling;
 mod spice;
 
 pub use def_pass::{Pending, Request, card_fields};
 pub use read::portable_option;
+pub use relink::relink;
 
 use crate::syntax::ast::Ast;
 use crate::syntax::behaviour::Writer;

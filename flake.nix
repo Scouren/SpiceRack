@@ -347,6 +347,26 @@
 
           pythonImportsCheck = [ "spicerack" ];
         };
+        # `nix build .#spice2rack` (ZERO D55): the converter alone, the crate
+        # with no default features (the transpiler: no Python binding, no
+        # simulator backend), on the dev shell's toolchain. ESPice calls it
+        # to read every dialect but ngspice's, so it takes nothing from the
+        # `espice` input: only the testing shells do. The crates come from
+        # `Cargo.lock`'s own checksums, so there is no vendor hash to follow.
+        spice2rack = (pkgs.makeRustPlatform {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        }).buildRustPackage {
+          pname = "spice2rack";
+          version = (pkgs.lib.importTOML ./Cargo.toml).package.version;
+          src = srcFiltered;
+          cargoLock.lockFile = ./Cargo.lock;
+          buildNoDefaultFeatures = true;
+          cargoBuildFlags = [ "--bin" "spice2rack" ];
+          # The suites run in `.#testing`: they need the simulators.
+          doCheck = false;
+          meta.mainProgram = "spice2rack";
+        };
         # LTspice 26.1.1 (`.#testing-ltspice` only): the MSI unpacked by
         # msitools, run as `ltspice -b deck.cir` under Wine in a headless X
         # server, in a Wine prefix of its own; a `/path` argument goes in as
@@ -473,6 +493,7 @@
         };
 
         packages.default = spicerackRs;
+        packages.spice2rack = spice2rack;
       }
     );
 }

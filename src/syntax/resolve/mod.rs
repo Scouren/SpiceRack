@@ -44,7 +44,7 @@
 //!   `Kit::node_count(&self, file: FileId) -> usize`
 //! - `Def::base(&self) -> &str`
 //! - `pub fn role(t: &Tokens, ast: &Ast) -> Role`
-//! - `pub(super) fn key(name: &str, fold: bool) -> String`
+//! - `pub(super) fn key(name: &str, fold: bool) -> String`, `pub(super) fn normalize(p: &Path) -> PathBuf`
 
 use crate::syntax::Lang;
 
@@ -96,8 +96,8 @@ pub struct DefId(pub u32);
 /// One file the kit reached.
 #[derive(Debug)]
 pub struct File {
-    /// The path, as the includer joined it to its directory (`.` and `..`
-    /// resolved lexically); an entry's as given.
+    /// The path, as the includer joined it to its directory, `.` and `..`
+    /// resolved lexically; an entry's as given, resolved the same way.
     pub path: PathBuf,
     pub role: Role,
     /// The text the kit parsed: the loaded text, behind one empty title
@@ -543,6 +543,22 @@ pub(super) fn key(name: &str, fold: bool) -> String {
     }
 }
 
+/// `p` with `.` and `..` resolved lexically, as the kit joins an include
+/// to its includer's directory: the form of every [`File::path`].
+pub(super) fn normalize(p: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 // ---- private ----
 
 impl Kit {
@@ -623,21 +639,6 @@ fn targets(
         out.push((r.node, Target { file, section }));
     }
     out.sort_by_key(|e| e.0);
-    out
-}
-
-/// `p` with `.` and `..` resolved lexically.
-fn normalize(p: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for c in p.components() {
-        match c {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                out.pop();
-            }
-            c => out.push(c),
-        }
-    }
     out
 }
 

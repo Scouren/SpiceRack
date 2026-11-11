@@ -39,6 +39,13 @@ jobs:
       - name: House style
         run: nix develop --command python3 .github/scripts/check_style.py src tests
 
+      - name: spice2rack package
+        # The converter alone (ZERO D55): no default features, no simulator;
+        # then one fixture kit through it.
+        run: |
+          nix build .#spice2rack
+          ./result/bin/spice2rack --to espice --kit -o "$RUNNER_TEMP/kit" tests/fixtures/pdk_sections/models.lib
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
