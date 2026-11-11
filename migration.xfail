@@ -644,3 +644,9 @@ xyce/Certification_Tests/BUG_1041_SON/mos6_invert_scale2.cir espice written diff
 xyce/Certification_Tests/BUG_1041_SON/mos6_invert_scale2.cir ngspice written differently: the level-6 card's lambda0 as Xyce computes it (P3-073)
 xyce/Certification_Tests/ISSUE_239/mos6_test2.cir espice written differently: the level-6 card's lambda0 as Xyce computes it (P3-073)
 xyce/Certification_Tests/ISSUE_239/mos6_test2.cir ngspice written differently: the level-6 card's lambda0 as Xyce computes it (P3-073)
+
+# S1: P3-080: a top-level BSIM3/BSIM4 instance's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (transient-only decks); was W0049
+xyce/INIT_CONDS/comparatorIC.cir ngspice now written: M2's IC=0,5 is .ic V(Anot)=0 and .ic V(A)=5 (P3-080)
+xyce/INIT_CONDS/comparatorIC.cir espice now written: M2's IC=0,5 is .ic V(Anot)=0 and .ic V(A)=5 (P3-080)
+xyce/IC_AND_NODESET/comp_baseline.cir ngspice refused differently: M2's IC=0,5 is .ic V(Anot)=0 and .ic V(A)=5, W0049 leaves; W0017 stays (P3-080)
+xyce/IC_AND_NODESET/comp_baseline.cir espice refused differently: M2's IC=0,5 is .ic V(Anot)=0 and .ic V(A)=5, W0049 leaves; W0017 stays (P3-080)

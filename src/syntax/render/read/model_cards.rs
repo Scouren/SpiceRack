@@ -7,6 +7,7 @@
 //! Contents:
 //! - `Rd::instance_model(&self, n: u32, master: &str) -> Option<(Option<FileId>, u32)>`
 //! - `Rd::kit(&self) -> Option<&Kit>`
+//! - `Rd::instance_params(&self, n: u32, master: &str) -> Option<Vec<(String, String)>>`
 //! - `pub(in crate::syntax::render) fn file_models<R>(kit: &Kit, file: FileId, f: impl FnMut(u32, Model) -> R) -> Vec<(u32, R)>`
 
 use super::{Model, Rd};
@@ -42,6 +43,27 @@ impl<'a> Rd<'a> {
     /// The kit this file was read in.
     pub(in crate::syntax::render) fn kit(&self) -> Option<&'a Kit> {
         self.kit.map(|(k, _)| k)
+    }
+
+    /// The parameters of the `.model` card instance `n` (master word
+    /// `master`) uses, read in this file or in the kit file that declares
+    /// it (as [`Rd::model_view`] reads a card); `None` as
+    /// [`Rd::instance_model`].
+    pub(in crate::syntax::render) fn instance_params(
+        &self,
+        n: u32,
+        master: &str,
+    ) -> Option<Vec<(String, String)>> {
+        match self.instance_model(n, master)? {
+            (None, card) => Some(self.model_view(card, NONE).params),
+            // ponytail: the kit file is parsed again per call (a handful of
+            // lines a deck ask); share `spice/xyce_cards`' per-file table
+            // when a deck asks for thousands.
+            (Some(file), card) => file_models(self.kit()?, file, |_, m| m.params)
+                .into_iter()
+                .find(|(c, _)| *c == card)
+                .map(|(_, params)| params),
+        }
     }
 }
 

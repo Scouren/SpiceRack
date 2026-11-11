@@ -510,7 +510,9 @@ impl W<'_, '_> {
         // An OSDI module's instance (ngspice manual §13); a module
         // named directly takes a model of its own, its parameters.
         let nodes_ref: Vec<&String> = nodes.iter().collect();
-        self.device_ic(letter, &nodes_ref, &params, tok);
+        if !self.mos_ic(n, letter, &model, &nodes_ref, &params) {
+            self.device_ic(letter, &nodes_ref, &params, tok);
+        }
         let ps = self.params(&params);
         match self.rd.va_module(n) {
             Some(m) if ps.is_empty() => format!(
