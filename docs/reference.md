@@ -32,9 +32,11 @@ nodes are positional; everything after `*` is keyword-only.
 | `R` | `(name, positive, negative, value, *, raw_spice=None, **params)`; `raw_spice` is the text after the nodes (`"1k tc=0.01"`); when it opens with a parameter (`"tc=1e-3"`) or is empty, `value` is written before it. In every `**params`: `True` is a bare flag (`off`), `False` and `None` are left out |
 | `C`, `L` | `(name, positive, negative, value, **params)`; on `R`, `C` and `L`, `model="rm"` is the card's model word, written after the value (`R1 a b 1k rm`), not a parameter |
 | `C` by its charge | `(name, positive, negative, *, charge="expr", **params)`: the charge as an expression of the capacitor's voltage (`charge="1n*v(a,b)"`), in place of `value` |
-| `K` | `(name, *inductors, coupling)`: two inductors of the same body by their full names (`K("1", "L1", "L2", coupling=0.9)`), each added before the `K`; any other name or count raises `ValueError` |
+| `K` | `(name, *inductors, coupling)`: two or more inductors of the same body by their full names (`K("1", "L1", "L2", coupling=0.9)`), each added before the `K`; one `K` over three or more couples every pair. `coupling` is a number or an expression (`"{k}"`). Any other name, one named twice, or fewer than two raises `ValueError`. Three or more inductors, and an expression, are written for ngspice and ESPice and refused elsewhere (`W0001`) |
 | `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None)`; `distof1=(mag, phase)` makes the source a `distortion` input at F1, `distof2=` at F2 (ngspice's `DISTOF1`/`DISTOF2`, the phase in degrees; ngspice and ESPice write the words, other targets refuse the card, `W0001`); `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
 | `BV`, `BI` | `(name, positive, negative, *, expression)` |
+| `ac`, `ac_phase`, `dc` as expressions | on `V`, `I` and every waveform source, `ac=` and `ac_phase=` take a number or an expression of parameters (`ac="{amp}"`), and so does a waveform source's `dc=`. A `dc` expression is written on every target; an `ac`/`ac_phase` expression is written for ngspice and ESPice and refused elsewhere (`W0001`) |
+| `I`, `G`, `F`, `BV`, `BI` parameters | `**params` after the arguments above, written last on the card: `m=2` (ngspice multiplies the current of `I`, `G`, `F` and `BI`, and the voltage of `BV`), and on `BV`/`BI` `tc1=`, `tc2=`, `temp=`, `dtemp=`. `G` and `F` fold `m` into the gain on every target; `I … m=` and a B source with parameters are written for ngspice and ESPice and refused elsewhere (`W0001`). `V`, `E` and `H` take none: ngspice has no `m` on them |
 | `NonLinearVoltageSource`, `NonLinearCurrentSource` | `(name, positive, negative, *, expression)`: the E and G cards `E<name> n+ n- value={expression}`, the same behavioural source as `BV` / `BI` under the E/G letter |
 | `E` | `(name, positive, negative, *, control_positive, control_negative, voltage_gain)` |
 | `G` | `(name, positive, negative, *, control_positive, control_negative, transconductance)` |
@@ -119,6 +121,12 @@ none (ngspice refuses one outside a library file).
 `options` (here and on `Circuit`) takes portable keys only, the names of
 ngspice's `.options` (manual §11.1) in any letter case; `True` is a bare flag;
 `None`, `False` and any other key raise `ValueError`.
+
+`initial_condition(**v)` and `node_set(**v)` take a number or an expression per node
+(`out=0.5`, `out="{vdd/2}"`); a node of an instance is a keyword given through a dict
+(`**{"x1.n": 0.5}`). `Subcircuit` and `Circuit` have the same two methods: they write the
+`.ic`/`.nodeset` inside the body's `.subckt`, where ngspice applies it to every instance; such a
+card is written for ngspice and ESPice and refused elsewhere (`W0001`).
 
 ## Analyses (`Testbench`, `CircuitSimulator`)
 

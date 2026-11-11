@@ -77,6 +77,7 @@ tb.temperature = 85.0                         # .temp
 tb.nominal_temperature = 27.0                 # tnom
 tb.initial_condition(vout=0.0)                # .ic (use with use_initial_condition=True)
 tb.node_set(vout=0.5)                         # .nodeset, helps a stuck .op converge
+tb.initial_condition(vout="{1/2}")            # a value may be an expression (of .param names too)
 tb.save("V(vout)", "I(Vin)")                  # only these vectors
 tb.measure("tran", "vmax", "max", "v(vout)")  # .meas, lands in result.measures
 res = tb.transient(step_time=1e-8, end_time=5e-6, max_time=1e-8)

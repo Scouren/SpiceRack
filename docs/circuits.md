@@ -65,12 +65,14 @@ Every element takes its name and nodes first; the rest are keywords.
 | --- | --- | --- |
 | `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`); `model="rm"` names a `.model` card (`R1 a b 1k rm`) |
 | `C` | a capacitor given by its charge | `charge="1n*v(a,b)"` in place of `value` |
-| `K` | inductor coupling | the two inductors' full names (`"L1", "L2"`), added first; `coupling=` |
+| `K` | inductor coupling | the inductors' full names (`"L1", "L2"`, or more: every pair is coupled), added first; `coupling=` a number or an expression |
 | `V`, `I` | DC sources | `value, ac=, ac_phase=, distof1=, distof2=` |
 | `E`, `G` | voltage-controlled sources | `control_positive=, control_negative=, voltage_gain=` / `transconductance=` |
 | `F`, `H` | current-controlled sources | `vsense=` (a V source name), `current_gain=` / `transresistance=` |
 | `POLY` | polynomial E/G/F/H | `kind, positive, negative, controls, coefficients` |
 | `BV`, `BI` | behavioural sources | `expression="..."` |
+| `V`, `I`, waveform sources | AC and DC as expressions | `ac="{amp}"`, `ac_phase="{ph}"`; on a waveform source also `dc="{vdd/2}"` |
+| `I`, `G`, `F`, `BV`, `BI` | instance parameters | `m=2` after the other arguments; on `BV`/`BI` also `tc1=`, `tc2=`, `temp=`, `dtemp=` |
 | `NonLinearVoltageSource`, `NonLinearCurrentSource` | the same, as E and G cards (`E1 a b value={...}`) | `expression="..."` |
 | `D` | diode | `anode, cathode, model=` |
 | `Q` (`BJT`) | bipolar | `collector, base, emitter, model=` |

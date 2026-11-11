@@ -111,6 +111,23 @@ def two_port(build):
     return f
 
 
+def _with_ic(mod):
+    """A child whose internal node `n` holds an `.ic` and a `.nodeset`
+    inside its own `.subckt` (ngspice applies them to every instance)."""
+    c = mod.Subcircuit("buf", ["a", "b"])
+    c.R("1", "a", "n", 1e3)
+    c.R("2", "n", "b", 1e3)
+    c.C("1", "n", c.gnd, 1e-9)
+    c.initial_condition(n=0.5)
+    c.node_set(n=0.25)
+    d = dut(mod)
+    d.instance(c, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(c)
+    tb.add_transient(1e-6, 1e-5)
+    return tb
+
+
 def _child(mod):
     c = mod.Subcircuit("buf", ["a", "b"])
     c.R("1", "a", "b", 1e3)
@@ -202,6 +219,8 @@ FEATURES = {
     "temperature": setting(lambda tb: (setattr(tb, "temperature", 85.0), setattr(tb, "nominal_temperature", 27.0))),
     "initial_condition": setting(lambda tb: tb.initial_condition(out=0.0)),
     "node_set": setting(lambda tb: tb.node_set(out=0.0)),
+    "ic_expression": setting(lambda tb: (tb.initial_condition(out="{r/2000}"), tb.node_set(out="{r/2000}"))),
+    "ic_in_subcircuit": _with_ic,
     "save": setting(lambda tb: tb.save("V(out)")),
     "measure": setting(lambda tb: tb.measure("tran", "vmax", "max", "v(out)")),
     "print": setting(lambda tb: tb.add_print("tran", "v(out)")),
@@ -220,6 +239,9 @@ FEATURES = {
     "subcircuit_nested": _with_nested,
     # Sources.
     "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
+    "ac_expression": source(lambda tb: tb.V("in", "in", "0", 1.0, ac="{r/500}", ac_phase="{r/100}")),
+    "sin_dc_expression": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3, dc="{r/1000}")),
+    "distortion_inputs": source(lambda tb: tb.V("in", "in", "0", 0.0, distof1=(1, 0), distof2=(0.5, 90))),
     "pulse": source(lambda tb: tb.PulseVoltageSource("in", "in", "0")),
     "pwl": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)])),
     "pwl_repeat": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)], repeat_time=0.0)),
@@ -232,8 +254,11 @@ FEATURES = {
     "rf_port": source(lambda tb: tb.V("in", "in", "0", 0.0, portnum=1)),
     # Elements and directives.
     "L_K": elem(lambda d: (d.L("1", "in", "0", 1e-6), d.L("2", "out", "0", 1e-6), d.K("1", "L1", "L2", coupling=0.5))),
+    "K_three": elem(lambda d: (d.L("1", "in", "a", 1e-6), d.L("2", "out", "b", 1e-6), d.L("3", "out", "c", 1e-6), d.K("1", "L1", "L2", "L3", coupling=0.5))),
+    "K_expr": elem(lambda d: (d.parameter("k", "0.5"), d.L("1", "in", "a", 1e-6), d.L("2", "out", "b", 1e-6), d.K("1", "L1", "L2", coupling="{k}"))),
     "C_charge": elem(lambda d: d.C("2", "out", d.gnd, charge="1n*v(out)")),
     "D": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn"))),
+    "D_off": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn", off=True))),
     "Q": elem(lambda d: (d.model("qn", "npn"), d.Q("1", "out", "in", "0", model="qn"))),
     "M": elem(lambda d: (d.model("nm", "nmos"), d.M("1", "out", "in", "0", "0", model="nm", W=1e-6, L=1e-6))),
     "M_three_node": elem(lambda d: (d.model("vd", "vdmos"), d.M("1", "out", "in", "0", model="vd"))),
@@ -242,6 +267,9 @@ FEATURES = {
     "E_G": elem(lambda d: (d.E("1", "x", "0", control_positive="out", control_negative="0", voltage_gain=2), d.G("1", "y", "0", control_positive="out", control_negative="0", transconductance=1e-3), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "F_H": elem(lambda d: (d.V("s", "out", "z", 0), d.R("z", "z", "0", 1e3), d.F("1", "x", "0", vsense="Vs", current_gain=2), d.H("1", "y", "0", vsense="Vs", transresistance=10), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "BV_BI": elem(lambda d: (d.BV("1", "x", "0", expression="V(out)*2"), d.BI("1", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
+    "I_m": elem(lambda d: (d.I("2", "0", "y", 1.0, m=2), d.R("y", "y", "0", 1e3))),
+    "G_F_m": elem(lambda d: (d.V("s", "out", "z", 0), d.R("z", "z", "0", 1e3), d.G("2", "0", "x", control_positive="out", control_negative="0", transconductance=1e-3, m=2), d.F("2", "0", "w", vsense="Vs", current_gain=2, m=2), d.R("x", "x", "0", 1e3), d.R("w", "w", "0", 1e3))),
+    "B_params": elem(lambda d: (d.BV("2", "x", "0", expression="V(out)*2", tc1=1e-3, tc2=1e-6), d.BI("3", "0", "y", expression="V(out)*1m", m=2), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "NonLinear": elem(lambda d: (d.NonLinearVoltageSource("x", "x", "0", expression="V(out)*2"), d.NonLinearCurrentSource("y", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "POLY": elem(lambda d: (d.POLY("1", "E", "x", "0", ["out", "0"], [0, 1, 2]), d.R("x", "x", "0", 1e3))),
     "S": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw"))),
@@ -322,6 +350,9 @@ EXPECTED = {
     'temperature': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'initial_condition': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'node_set': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'ic_expression': (OK,) * 9,
+    # `.ic`/`.nodeset` inside a `.subckt` are kept as ngspice's cards: its own family writes them, W0001 elsewhere (P5-025 reads them).
+    'ic_in_subcircuit': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'save': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'measure': (OK, OK, OK, OK, OK, OK, 'W0109', OK, OK),
     'print': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -342,6 +373,11 @@ EXPECTED = {
     # Every target writes the nested definition hoisted, as `wrap__buf`.
     'subcircuit_nested': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # `distof1`/`distof2` are ngspice's words: the card is kept as its text, W0001 elsewhere (P4-071).
+    'distortion_inputs': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    # An AC magnitude or phase given as an expression: kept as ngspice's card, W0001 elsewhere (P5-014 reads it).
+    'ac_expression': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    'sin_dc_expression': (OK,) * 9,
     'pulse': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
@@ -356,9 +392,15 @@ EXPECTED = {
     # Xyce's P port (D's a5f2c0a); HSPICE has a `P` port: writer B (FINDINGS-python.md).
     'rf_port': (OK, OK, 'W0007', OK, 'W0007', OK, OK, OK, OK),
     'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # A `K` over three inductors is kept as ngspice's card: its own family writes it, W0001 elsewhere (P5-074 reads it).
+    'K_three': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    # A coupling given as an expression: kept as ngspice's card, as `K_three` (P5-030 reads it).
+    'K_expr': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     # VACASK has no charge element: the source line `c2 (out 0) i=ddt(1e-9*v(out))` (P4-017).
     'C_charge': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # The `off` flag: Spectre's `region=off`; VACASK has no spelling for it (W0101).
+    'D_off': (OK, OK, OK, OK, OK, OK, 'W0101', OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M_three_node': (OK, OK, OK, 'W0050+W0053', OK, 'W0104+W0105', OK, OK, OK),
@@ -369,6 +411,12 @@ EXPECTED = {
     'NonLinear': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'BV_BI': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # `I … m=2` is kept as ngspice's card: its own family writes it, W0001 elsewhere (P5-066 reads it).
+    'I_m': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    # A G or F multiplier is folded into the gain on every target.
+    'G_F_m': (OK,) * 9,
+    # A B source's `tc1`/`tc2`/`m`: kept as ngspice's card, as `I_m` (P5-067, P5-066 read them).
+    'B_params': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'POLY': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
@@ -444,6 +492,7 @@ COVERED = {
         "add_function",
         "subcircuit",
         "R", "C", "L", "K", "D", "Q", "BJT", "M", "MOSFET", "J", "Z", "E", "G", "F", "H",
+        "initial_condition", "node_set",
         "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",
         "include", "lib", "raw_spice", "osdi", "veriloga", "verilog",
     },

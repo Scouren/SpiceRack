@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
-use super::args::{Num, PyValueArg, kw_params};
+use super::args::{Num, PyValueArg, kw_params, kw_volts};
 use super::circuit::hoisted;
 use super::deck::runtime_err;
 use super::model::{Body, Card, Value, dec, need, num, params};
@@ -131,18 +131,28 @@ impl PySubcircuit {
         self.two('L', name, positive, negative, &value.value(), kwargs)
     }
 
-    /// Couples two inductors of this body, each by its card name (`"L1"`,
-    /// in any case) and added before the call (ngspice manual §3.3.12:
-    /// `KXXXXXXX LYYYYYYY LZZZZZZZ value`). `ValueError` for a name that is
-    /// no `L` here (ngspice: "coupling to non-existent inductor") and for
-    /// any count but two (three or more: P8-008).
+    /// Couples two or more inductors of this body, each by its card name
+    /// (`"L1"`, in any case) and added before the call (ngspice manual
+    /// §3.3.12: `KXXXXXXX LYYYYYYY LZZZZZZZ value`; ngspice-45 takes further
+    /// inductors before the value and couples every pair with it).
+    /// `coupling` is a number or an expression (`"{k}"`). `ValueError` for
+    /// a name that is no `L` here (ngspice: "coupling to non-existent
+    /// inductor"), for one named twice, and for fewer than two.
     #[pyo3(signature = (name, *inductors, coupling))]
-    fn K(&mut self, name: &str, inductors: Vec<String>, coupling: f64) -> PyResult<()> {
-        let [l1, l2] = inductors.as_slice() else {
-            return Err(PyValueError::new_err(format!("K{name}: couples two inductors, {} given", inductors.len())));
+    fn K(&mut self, name: &str, inductors: Vec<String>, coupling: PyValueArg) -> PyResult<()> {
+        if inductors.len() < 2 {
+            return Err(PyValueError::new_err(format!("K{name}: couples two or more inductors, {} given", inductors.len())));
+        }
+        let ls = inductors.iter().map(|l| self.inductor(name, l)).collect::<PyResult<Vec<_>>>()?;
+        let twice = ls.iter().enumerate().find_map(|(i, l)| ls[..i].iter().any(|m| m.eq_ignore_ascii_case(l)).then_some(l));
+        if let Some(l) = twice {
+            return Err(PyValueError::new_err(format!("K{name}: '{l}' is named twice")));
+        }
+        let k = match coupling.value() {
+            Value::Num(v) => dec(v),
+            v => v.text(),
         };
-        let (l1, l2) = (self.inductor(name, l1)?, self.inductor(name, l2)?);
-        self.push(name, format!("K{name} {l1} {l2} {}", dec(coupling)));
+        self.push(name, format!("K{name} {} {k}", ls.join(" ")));
         Ok(())
     }
 
@@ -153,27 +163,37 @@ impl PySubcircuit {
     /// `distof2=` at F2 (ngspice's `DISTOF1`/`DISTOF2`, the phase in
     /// degrees); with neither on any source every distortion vector is 0.
     #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None))]
-    fn V(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+    fn V(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<Num>, ac_phase: Option<Num>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
         let port = portnum.map(|n| (n, z0));
         let c = source(false, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], port, None);
         self.inner.elements.push(c);
     }
 
-    /// `distof1`, `distof2`: as `V`'s.
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None))]
-    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+    /// `distof1`, `distof2`: as `V`'s. `**kwargs` are instance parameters,
+    /// written last on the card (`m=2`: ngspice multiplies the current).
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None, **kwargs))]
+    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<Num>, ac_phase: Option<Num>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
         let c = source(true, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None);
-        self.inner.elements.push(c);
+        self.inner.elements.push(c.with_params(&ps));
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, expression))]
-    fn BV(&mut self, name: &str, positive: &str, negative: &str, expression: &str) {
-        self.behavioral('V', name, positive, negative, expression);
+    /// `**kwargs` are instance parameters, written after the expression
+    /// (ngspice: `tc1=`, `tc2=`, `temp=`, `dtemp=`, and `m=`).
+    #[pyo3(signature = (name, positive, negative, *, expression, **kwargs))]
+    fn BV(&mut self, name: &str, positive: &str, negative: &str, expression: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
+        self.behavioral('V', name, positive, negative, expression, &ps);
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, expression))]
-    fn BI(&mut self, name: &str, positive: &str, negative: &str, expression: &str) {
-        self.behavioral('I', name, positive, negative, expression);
+    /// `**kwargs`: as `BV`'s.
+    #[pyo3(signature = (name, positive, negative, *, expression, **kwargs))]
+    fn BI(&mut self, name: &str, positive: &str, negative: &str, expression: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
+        self.behavioral('I', name, positive, negative, expression, &ps);
+        Ok(())
     }
 
     /// A voltage source given by an expression of node voltages and branch
@@ -197,16 +217,22 @@ impl PySubcircuit {
         self.push(name, format!("E{name} {nets} {}", dec(voltage_gain)));
     }
 
-    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, transconductance))]
-    fn G(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, transconductance: f64) {
+    /// `**kwargs` are instance parameters (`m=2`), as on `I`.
+    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, transconductance, **kwargs))]
+    fn G(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, transconductance: f64, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
         let nets = self.nets(&[positive, negative, control_positive, control_negative]);
-        self.push(name, format!("G{name} {nets} {}", dec(transconductance)));
+        self.push(name, format!("G{name} {nets} {}{ps}", dec(transconductance)));
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, vsense, current_gain))]
-    fn F(&mut self, name: &str, positive: &str, negative: &str, vsense: &str, current_gain: f64) {
+    /// `**kwargs` are instance parameters (`m=2`), as on `I`.
+    #[pyo3(signature = (name, positive, negative, *, vsense, current_gain, **kwargs))]
+    fn F(&mut self, name: &str, positive: &str, negative: &str, vsense: &str, current_gain: f64, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
         let nets = self.nets(&[positive, negative]);
-        self.push(name, format!("F{name} {nets} {vsense} {}", dec(current_gain)));
+        self.push(name, format!("F{name} {nets} {vsense} {}{ps}", dec(current_gain)));
+        Ok(())
     }
 
     #[pyo3(signature = (name, positive, negative, *, vsense, transresistance))]
@@ -386,6 +412,21 @@ impl PySubcircuit {
         Ok(())
     }
 
+    /// Initial node voltages inside this body: one `.ic V(node)=value` per
+    /// keyword (ngspice manual §11.2), a value a number or an expression
+    /// (`n="{vdd/2}"`). ngspice applies the card to every instance.
+    #[pyo3(signature = (**kwargs))]
+    fn initial_condition(&mut self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        self.volts(".ic", kwargs)
+    }
+
+    /// As `initial_condition`, a `.nodeset`: a first guess for the
+    /// operating point, not a held value.
+    #[pyo3(signature = (**kwargs))]
+    fn node_set(&mut self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        self.volts(".nodeset", kwargs)
+    }
+
     fn raw_spice(&mut self, line: &str) {
         self.inner.raw.push(line.to_string());
     }
@@ -534,6 +575,15 @@ impl PySubcircuit {
         ns.iter().map(|n| self.net(n)).collect::<Vec<_>>().join(" ")
     }
 
+    /// One `<card> V(node)=value` line of the body's text per keyword
+    /// (`card` is `.ic` or `.nodeset`), written after its instances.
+    fn volts(&mut self, card: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        for (n, v) in kw_volts(kwargs)? {
+            self.inner.raw.push(format!("{card} V({n})={v}"));
+        }
+        Ok(())
+    }
+
     fn push(&mut self, name: &str, text: String) {
         self.inner.elements.push(Card::element(name, text));
     }
@@ -584,11 +634,12 @@ impl PySubcircuit {
         Ok(())
     }
 
-    /// A B source: `B<name> np nm V=expr` (`I=` with `of` `I`); a Laplace
-    /// expression needs a simulator that has one.
-    fn behavioral(&mut self, of: char, name: &str, p: &str, n: &str, expression: &str) {
+    /// A B source: `B<name> np nm V=expr` (`I=` with `of` `I`), then `ps`
+    /// ([`params`]' text); a Laplace expression needs a simulator that has
+    /// one.
+    fn behavioral(&mut self, of: char, name: &str, p: &str, n: &str, expression: &str, ps: &str) {
         let nets = self.nets(&[p, n]);
-        let mut c = Card::element(name, format!("B{name} {nets} {of}={expression}"));
+        let mut c = Card::element(name, format!("B{name} {nets} {of}={expression}{ps}"));
         if is_laplace(expression) {
             c.needs = need::LAPLACE;
         }
@@ -617,9 +668,9 @@ impl PySubcircuit {
         p: &str,
         n: &str,
         wf: Wave,
-        dc: Option<f64>,
-        ac: Option<f64>,
-        ac_phase: Option<f64>,
+        dc: Option<Num>,
+        ac: Option<Num>,
+        ac_phase: Option<Num>,
     ) {
         let c = wave_source(current, name, slf.net(p), slf.net(n), wf, dc, ac, ac_phase);
         slf.inner.elements.push(c);

@@ -741,6 +741,113 @@ class TestElementAccess:
 
 
 # ======================================================================
+# Initial conditions: an expression value, and inside a subcircuit (P8-006)
+# ======================================================================
+
+class TestInitialConditions:
+    def test_p8_006_a_value_is_a_number_or_an_expression(self):
+        mod = ps()
+        d = mod.Subcircuit("rc", ["in", "out"], r="1k")
+        d.R("1", "in", "out", "{r}")
+        d.C("1", "out", d.gnd, 1e-9)
+        tb = mod.Testbench(d)
+        tb.V("in", "in", "0", 1.0)
+        tb.initial_condition(out="{r/2000}")
+        tb.node_set(out=0.25)
+        tb.add_transient(1e-6, 1e-5)
+        lines = tb.netlist("ngspice").splitlines()
+        # The cards ngspice-45 ran (evidence/P8-006/ng/topexpr.cir, top.cir).
+        assert ".ic V(out)={r/2000}" in lines
+        assert ".nodeset V(out)=0.25" in lines
+        # Spectre's statement (Spectre Reference, `ic`): the bare expression.
+        assert "ic out=r/2000" in tb.netlist("spectre").splitlines()
+
+    def test_p8_006_a_subcircuit_holds_its_own_initial_conditions(self):
+        c = ps().Subcircuit("buf", ["a", "b"])
+        c.R("1", "a", "n", 1e3)
+        c.C("1", "n", c.gnd, 1e-9)
+        c.initial_condition(n=0.5)
+        c.node_set(n="vdd/2")
+        lines = c.to_source().splitlines()
+        # Inside the `.subckt`, where ngspice-45 applies them to each
+        # instance (evidence/P8-006/ng/sub.cir).
+        assert lines.index(".subckt buf a b") < lines.index(".ic V(n)=0.5") < lines.index(".ends buf")
+        assert ".nodeset V(n)={vdd/2}" in lines
+
+    def test_p8_006_a_value_that_is_no_number_or_string_adds_nothing(self):
+        c = ps().Subcircuit("buf", ["a", "b"])
+        with pytest.raises(TypeError):
+            c.initial_condition(n=0.5, m=[1.0])
+        assert ".ic" not in c.to_source()
+
+
+# ======================================================================
+# Instance parameters on I, G, F, BV, BI (P8-019, P8-020)
+# ======================================================================
+
+class TestSourceParameters:
+    def test_p8_019_i_g_f_take_instance_parameters(self):
+        c = ps().Circuit("m")
+        c.V("s", "a", "z", 0)
+        c.I("1", c.gnd, "y", 1.0, m=2)
+        c.G("1", c.gnd, "x", control_positive="a", control_negative=c.gnd, transconductance=1e-3, m=2)
+        c.F("1", c.gnd, "w", vsense="Vs", current_gain=2, m=2)
+        cards = c.to_source().splitlines()
+        # The cards ngspice-45 ran (evidence/P8-019/ng/{im,gm,fm}.cir): the
+        # parameters last, after the value or gain.
+        assert "I1 0 y 1 m=2" in cards
+        assert "G1 0 x a 0 0.001 m=2" in cards
+        assert "F1 0 w Vs 2 m=2" in cards
+
+    def test_p8_019_a_value_set_again_keeps_the_parameters(self):
+        c = ps().Circuit("m")
+        c.I("1", c.gnd, "y", 1.0, m=2)
+        c.set_source_value("1", 2.0)
+        assert c["1"] == "I1 0 y 2 m=2"
+
+    def test_p8_019_a_parameter_given_none_or_false_is_left_out(self):
+        c = ps().Circuit("m")
+        c.I("1", c.gnd, "y", 1.0, m=None)
+        assert c["1"] == "I1 0 y 1"
+
+    def test_p8_020_b_sources_take_instance_parameters(self):
+        c = ps().Circuit("b")
+        c.BV("1", "x", c.gnd, expression="V(a)*2", tc1=1e-3, tc2=1e-6)
+        c.BI("2", c.gnd, "y", expression="V(a)*1m", dtemp=5, m=2)
+        cards = c.to_source().splitlines()
+        # evidence/P8-019/ng/{btc,bdtemp,bm}.cir.
+        assert "B1 x 0 V=V(a)*2 tc1=0.001 tc2=1e-06" in cards
+        assert "B2 0 y I=V(a)*1m dtemp=5 m=2" in cards
+
+
+# ======================================================================
+# AC and DC arguments as expressions (P8-018)
+# ======================================================================
+
+class TestSourceExpressions:
+    def test_p8_018_ac_magnitude_and_phase_take_an_expression(self):
+        c = ps().Circuit("ac")
+        c.V("1", "a", c.gnd, 1.0, ac="{amp}", ac_phase="ph")
+        c.I("1", c.gnd, "a", 1.0, ac=2.0, ac_phase=90.0)
+        cards = c.to_source().splitlines()
+        # The card ngspice-45 ran (evidence/P8-018/ng/expr2.cir); one pair of
+        # braces whether the caller wrote them or not.
+        assert "V1 a 0 1 AC {amp} {ph}" in cards
+        # A number keeps its spelling.
+        assert "I1 0 a 1 AC 2 90" in cards
+
+    def test_p8_018_a_waveform_source_takes_dc_and_ac_expressions(self):
+        c = ps().Circuit("ac")
+        c.SinusoidalVoltageSource("1", "a", c.gnd, amplitude=1.0, frequency=1e3, dc="{vdd/2}", ac="{amp}")
+        assert "V1 a 0 {vdd/2} AC {amp} SIN(0 1 1000 0 0 0)" in c.to_source().splitlines()
+
+    def test_p8_018_dc_and_its_old_spelling_still_exclude_each_other(self):
+        c = ps().Circuit("ac")
+        with pytest.raises(TypeError, match="not both"):
+            c.SinusoidalVoltageSource("1", "a", c.gnd, dc="{vdd}", dc_offset=1.0)
+
+
+# ======================================================================
 # Ground node aliasing
 # ======================================================================
 
@@ -1266,12 +1373,29 @@ class TestCouplingNames:
         c.K("1", "L1", "L2", coupling=0.95)
         assert "K1 L1 L2 0.95" in str(c).splitlines()
 
+    def test_p8_008_k_couples_three_or_more_inductors(self):
+        c = coupled()
+        c.L("3", "e", "f", 1e-6)
+        c.K("1", "L1", "L2", "L3", coupling=0.5)
+        # One card for every pair: ngspice-45 gives it the numbers of the
+        # three pairwise K (evidence/P8-008/ng/k3one.log, k3pairs.log).
+        assert "K1 L1 L2 L3 0.5" in c.to_source().splitlines()
+
+    @pytest.mark.parametrize("coupling", ["k", "{k}"])
+    def test_p8_008_k_coupling_is_an_expression(self, coupling):
+        c = coupled()
+        c.parameter("k", "0.5")
+        c.K("1", "L1", "L2", coupling=coupling)
+        # One pair of braces, whether the caller wrote them or not
+        # (evidence/P8-008/ng/kx.cir is the card ngspice-45 ran).
+        assert "K1 L1 L2 {k}" in c.to_source().splitlines()
+
     @pytest.mark.parametrize("names", [
         ("1", "2"),          # the old spelling: the names without their letter
         ("L1", "L9"),        # no such inductor
         ("L1", "R1"),        # an element, but no inductor
         ("L1",),             # one
-        ("L1", "L2", "L1"),  # three (P8-008)
+        ("L1", "L2", "L1"),  # one inductor named twice
     ])
     def test_p8_017_k_refuses_what_is_no_pair_of_its_inductors(self, names):
         c = coupled()
