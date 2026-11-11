@@ -350,9 +350,9 @@ impl Rd<'_> {
         }
         // ngspice has no `.step`, so one in a deck read as ngspice is the
         // given deck's (`Lang::NGSPICE_GIVEN`): Xyce's form (RG p.155),
-        // whose `lin|dec|oct` LTspice shares, and Spectre's total-count
-        // `log` (Reference 19.1 p.406-410 `sweep`), which Python's
-        // `step_sweep` names.
+        // whose `lin|dec|oct` LTspice shares, and a total-count `log`,
+        // which Python's `step_sweep` names (Spectre's `sweep … log=`,
+        // Reference 19.1 p.407, counts its steps: one fewer).
         let kinds: &[&str] = match self.b.card_rules {
             CardRules::Ngspice => &["lin", "dec", "oct", "log"],
             _ => &["lin", "dec", "oct"],

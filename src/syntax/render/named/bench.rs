@@ -456,28 +456,31 @@ impl W<'_, '_> {
     }
 
     /// `sweep<k>_<name> sweep param=p start= stop= step= {` for `.step`
-    /// `idx`; `None` when it is refused.
+    /// `idx`; `None` when it is refused. A `log` step counts its points
+    /// in all (`python/keywords.rs` `Sweep::Log`) and Spectre's `log=` its
+    /// steps (`[REF]` p.407: "Number of steps, log sweep"), one fewer.
     fn sweep_head(
         &mut self,
         idx: usize,
         (sweep, param, [start, stop, step], tok): &Step,
     ) -> Option<String> {
         let suffix = suffix(param);
-        let by = match sweep {
-            Some("dec") => "dec",
-            Some("log") => "log",
-            Some("oct") => {
+        let (by, count) = match sweep {
+            Some("dec") => ("dec", *step),
+            Some("log") if *step >= 2.0 && step.fract() == 0.0 => ("log", *step - 1.0),
+            // ponytail: a `log` of one point is refused, not `values=[start]`.
+            Some("log" | "oct") => {
                 self.refuse(Code::W0016, *tok);
                 return None;
             }
-            _ => "step",
+            _ => ("step", *step),
         };
         Some(format!(
             "sweep{}_{suffix} sweep param={param} start={} stop={} {by}={} {{",
             idx + 1,
             self.num(*start),
             self.num(*stop),
-            self.num(*step)
+            self.num(count)
         ))
     }
 }

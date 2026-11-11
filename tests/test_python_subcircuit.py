@@ -788,13 +788,13 @@ class TestDialectText:
 
 
     def test_a_log_step_is_spectres_sweep_and_refused_elsewhere(self):
-        # Spectre Reference 19.1 p.406-410 (`sweep … log=N`); Xyce RG p.155,
-        # LTspice's `.step` and VACASK's `sweep` have no total-count log
-        # sweep (W0016).
+        # Spectre Reference 19.1 p.406-410 (`sweep … log=N`: N steps, so
+        # five points are `log=4`); Xyce RG p.155, LTspice's `.step` and
+        # VACASK's `sweep` have no total-count log sweep (W0016).
         ps = import_spicerack()
         tb = self._tb(ps)
         tb.step_sweep("g", 1.0, 100.0, 5, "log")
-        head = "sweep1_g sweep param=g start=1 stop=100 log=5 {"
+        head = "sweep1_g sweep param=g start=1 stop=100 log=4 {"
         assert head in tb.netlist("spectre").splitlines()
         for other in ("xyce", "ltspice", "vacask"):
             with pytest.raises(RuntimeError, match="W0016"):
