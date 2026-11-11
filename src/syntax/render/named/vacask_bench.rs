@@ -94,12 +94,13 @@ impl W<'_, '_> {
             tb.extra.is_sorted_by_key(|e| e.1),
             "kept lines in read order"
         );
-        assert!(tb.extra.iter().all(|e| e.1 <= tb.analyses.len()));
+        assert!(tb.extra.iter().all(|e| e.1 <= tb.plan.runs.len()));
         let mut extra = tb.extra.iter().copied().peekable();
         let swept: Vec<String> = tb
-            .analyses
+            .plan
+            .runs
             .iter()
-            .flat_map(|(a, _)| match a {
+            .flat_map(|a| match a {
                 Ana::Dc(sw) => sw.iter().map(|s| s.0.clone()).collect(),
                 Ana::DcAxes(axes) => axes.iter().map(|x| x.src.clone()).collect(),
                 _ => vec![],
@@ -107,7 +108,11 @@ impl W<'_, '_> {
             .collect();
         let alters = self.dc_alters(&swept);
         let mut dc_types = false;
-        for (idx, (a, tok)) in tb.analyses.iter().enumerate() {
+        // Paired with `plan`'s own check. No reader opens a second epoch
+        // yet: every run is on the netlist as written.
+        tb.plan.check();
+        assert!(tb.plan.single_epoch(), "a second epoch has no writer yet");
+        for (idx, (a, tok)) in tb.plan.runs.iter().zip(&tb.plan.run_tok).enumerate() {
             while let Some((n, _)) = extra.next_if(|&(_, before)| before <= idx) {
                 let l = self.rd.line(n);
                 self.line(&format!("  {l}"));
@@ -321,10 +326,11 @@ impl W<'_, '_> {
             return vec![];
         }
         let inner = tb
-            .analyses
+            .plan
+            .runs
             .iter()
-            .find(|(x, _)| spectre_kind(x) == Some(kind.to_ascii_lowercase().as_str()));
-        let Some((inner, _)) = inner else {
+            .find(|x| spectre_kind(x) == Some(kind.to_ascii_lowercase().as_str()));
+        let Some(inner) = inner else {
             self.refuse(Code::W0015, tok);
             return vec![];
         };

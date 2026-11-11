@@ -105,9 +105,10 @@ impl W<'_, '_> {
         };
         let tb = self.fold();
         let uic = tb
-            .analyses
+            .plan
+            .runs
             .iter()
-            .any(|(a, _)| matches!(a, Ana::Tran { uic: true, .. }));
+            .any(|a| matches!(a, Ana::Tran { uic: true, .. }));
         if !uic {
             params.remove(at);
             self.note(Code::W0112, self.rd.main(node));

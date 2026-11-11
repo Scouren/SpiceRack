@@ -21,7 +21,7 @@
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
 //! the model card an instance uses), `control` a `.control` block's lines
-//! (`controlled` is E/F/G/H); `walk` steps a
+//! (`controlled` is E/F/G/H), `epochs` the run plan; `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
 //!
 //! Cites: the old lowering
@@ -54,6 +54,7 @@ mod controlled;
 mod devices;
 mod dispatch;
 mod elements;
+pub(in crate::syntax::render) mod epochs;
 mod funcs;
 mod model_cards;
 mod named;
