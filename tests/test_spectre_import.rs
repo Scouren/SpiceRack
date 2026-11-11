@@ -150,3 +150,21 @@ fn a_spectre_parameter_sweep_is_a_step_on_xyce() {
     let ng = written(deck, Dialect::Spectre, Dialect::Ngspice);
     assert_eq!(refusals(ng), vec![Code::W0016]);
 }
+
+// ZERO-LEDGER P3-022. Oracle: Spectre Reference 19.1 pp.43-44 (`ac`): the
+// sweep's limits are `start`/`stop` or `center`/`span`; with `dev=` and
+// `param=` the statement sweeps that parameter at the frequency `freq=`.
+#[test]
+fn p3_022_spectre_source_ac_param_dev() {
+    let head = "simulator lang=spectre\nv1 (in 0) vsource dc=1 mag=1\n\
+                r1 (in out) resistor r=1k\nc1 (out 0) capacitor c=1u\n";
+    // Centre 150 Hz, span 100 Hz, 10 steps: 11 points from 100 Hz to 200 Hz.
+    let deck = format!("{head}ac1 ac center=150 span=100 lin=10\n");
+    let ng = written(&deck, Dialect::Spectre, Dialect::Ngspice).expect("written");
+    assert!(ng.lines().any(|l| l == ".ac lin 11 100 200"), "{ng}");
+    // v1's dc from 0 V to 1 V at 1 kHz is no frequency sweep from 0 Hz to
+    // 1 Hz: the statement stays Spectre's text.
+    let deck = format!("{head}ac1 ac dev=v1 param=dc start=0 stop=1 lin=4 freq=1k\n");
+    let ng = written(&deck, Dialect::Spectre, Dialect::Ngspice);
+    assert_eq!(refusals(ng), vec![Code::W0001]);
+}
