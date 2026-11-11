@@ -1,11 +1,13 @@
 //! The `catalogue!` macro: [`Code`](super::Code), `Code::ALL` and
-//! [`info`](super::info) from one list of rows (`mod.rs`), so a code cannot
-//! lack its row nor be missing from `ALL`.
+//! [`info`](super::info) from one list of rows (the `rows_*.rs` blocks,
+//! chained in `mod.rs`), so a code cannot lack its row nor be missing from
+//! `ALL`; `catalogue_end!` ends that chain.
 //!
 //! Cites: none.
 //!
 //! Contents:
 //! - `macro_rules! catalogue`
+//! - `macro_rules! catalogue_end`
 
 /// Defines [`Code`], [`Code::ALL`] and [`info`] from one list of rows, so
 /// a code cannot lack its row nor be missing from `ALL`.
@@ -40,5 +42,13 @@ macro_rules! catalogue {
                 },)*
             }
         }
+    };
+}
+
+/// The last link of the rows chain (`rows_lp!` … `rows_w_def!`): every
+/// block's rows, accumulated after the `;`, become one `catalogue!` list.
+macro_rules! catalogue_end {
+    ( ; $($acc:tt)*) => {
+        catalogue! { $($acc)* }
     };
 }
