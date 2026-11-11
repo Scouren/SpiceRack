@@ -11,7 +11,8 @@
 //! Contents:
 //! - `pub(super) struct Card`, `Card::element(name: &str, text: String) -> Card`,
 //!   `Card::source(name: &str, head: String, value: &Value, tail: String) -> Card`,
-//!   `Card::set_value(&mut self, v: f64) -> bool`
+//!   `Card::set_value(&mut self, v: f64) -> bool`,
+//!   `Card::with_params(self, ps: &str) -> Card`
 //! - `pub(super) struct Body`, `pub(super) struct Bench`, `pub(super) struct Step`,
 //!   `pub(super) struct ModelLibrary`, `ModelLibrary::line(&self, path: &str) -> String`,
 //!   `ModelLibrary::path_for(&self, d: Dialect) -> &str`, `pub(super) struct Func`
@@ -162,6 +163,19 @@ impl Card {
         self.text = format!("{head} {}{tail}", num(v));
         true
     }
+
+    /// The card with instance parameters after everything else on it:
+    /// `ps` is [`params`]' text (empty, or starting with a blank). A
+    /// source keeps them when its value is set again.
+    pub(super) fn with_params(mut self, ps: &str) -> Card {
+        assert!(ps.is_empty() || ps.starts_with(' '), "params' text: {ps:?}");
+        self.text.push_str(ps);
+        if let Some((_, tail)) = &mut self.source {
+            tail.push_str(ps);
+        }
+        debug_assert!(self.text.ends_with(ps), "the parameters end the card");
+        self
+    }
 }
 
 impl ModelLibrary {
@@ -255,5 +269,17 @@ mod tests {
         let mut r = Card::element("1", "R1 a b 1k".into());
         assert!(!r.set_value(1.0));
         assert_eq!(r.text, "R1 a b 1k");
+    }
+
+    #[test]
+    fn p8_019_parameters_stay_when_a_source_value_is_set_again() {
+        let c = Card::source("1", "I1 0 y".into(), &Value::Num(1.0), String::new());
+        let mut c = c.with_params(" m=2");
+        assert_eq!(c.text, "I1 0 y 1 m=2");
+        assert!(c.set_value(2.0));
+        assert_eq!(c.text, "I1 0 y 2 m=2");
+        let g = Card::element("1", "G1 a 0 b 0 0.001".into()).with_params(" m=2");
+        assert_eq!(g.text, "G1 a 0 b 0 0.001 m=2");
+        assert_eq!(g.with_params("").text, "G1 a 0 b 0 0.001 m=2");
     }
 }

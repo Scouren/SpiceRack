@@ -12,11 +12,11 @@ use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
 use super::analysis::{Analysis, PssBase};
-use super::args::{Num, PyValueArg};
+use super::args::{Num, PyValueArg, kw_params};
 use super::card::{self, dc_sweeps};
 use super::circuit::hoisted;
 use super::deck::{Deck, check_backend_name};
-use super::model::{Card, Func, ModelLibrary, Value};
+use super::model::{Card, Func, ModelLibrary, Value, params};
 use super::results::typed_result;
 use super::simulator::PySimulator;
 use super::source::{Wave, either, source, wave_source};
@@ -65,9 +65,12 @@ impl PyTestbench {
     }
 
     /// `distof1`, `distof2`: as `V`'s.
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None))]
-    fn I(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
-        slf.as_super().stim(source(true, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None));
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None, **kwargs))]
+    fn I(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
+        let c = source(true, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None);
+        slf.as_super().stim(c.with_params(&ps));
+        Ok(())
     }
 
     #[pyo3(signature = (name, positive, negative, value))]

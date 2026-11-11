@@ -782,6 +782,45 @@ class TestInitialConditions:
 
 
 # ======================================================================
+# Instance parameters on I, G, F, BV, BI (P8-019, P8-020)
+# ======================================================================
+
+class TestSourceParameters:
+    def test_p8_019_i_g_f_take_instance_parameters(self):
+        c = ps().Circuit("m")
+        c.V("s", "a", "z", 0)
+        c.I("1", c.gnd, "y", 1.0, m=2)
+        c.G("1", c.gnd, "x", control_positive="a", control_negative=c.gnd, transconductance=1e-3, m=2)
+        c.F("1", c.gnd, "w", vsense="Vs", current_gain=2, m=2)
+        cards = c.to_source().splitlines()
+        # The cards ngspice-45 ran (evidence/P8-019/ng/{im,gm,fm}.cir): the
+        # parameters last, after the value or gain.
+        assert "I1 0 y 1 m=2" in cards
+        assert "G1 0 x a 0 0.001 m=2" in cards
+        assert "F1 0 w Vs 2 m=2" in cards
+
+    def test_p8_019_a_value_set_again_keeps_the_parameters(self):
+        c = ps().Circuit("m")
+        c.I("1", c.gnd, "y", 1.0, m=2)
+        c.set_source_value("1", 2.0)
+        assert c["1"] == "I1 0 y 2 m=2"
+
+    def test_p8_019_a_parameter_given_none_or_false_is_left_out(self):
+        c = ps().Circuit("m")
+        c.I("1", c.gnd, "y", 1.0, m=None)
+        assert c["1"] == "I1 0 y 1"
+
+    def test_p8_020_b_sources_take_instance_parameters(self):
+        c = ps().Circuit("b")
+        c.BV("1", "x", c.gnd, expression="V(a)*2", tc1=1e-3, tc2=1e-6)
+        c.BI("2", c.gnd, "y", expression="V(a)*1m", dtemp=5, m=2)
+        cards = c.to_source().splitlines()
+        # evidence/P8-019/ng/{btc,bdtemp,bm}.cir.
+        assert "B1 x 0 V=V(a)*2 tc1=0.001 tc2=1e-06" in cards
+        assert "B2 0 y I=V(a)*1m dtemp=5 m=2" in cards
+
+
+# ======================================================================
 # Ground node aliasing
 # ======================================================================
 

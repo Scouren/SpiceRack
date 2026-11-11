@@ -24,6 +24,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `spicerack.export(results, stem, *, raw_format="binary")` writes a run's results as `<stem>.raw` (one ngspice raw file, every vector under its canonical name) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar: analyses, steps, `.meas` values with their status) and returns the two paths (ZERO-LEDGER P8-100).
 - python: `K` couples two or more inductors (one card, every pair), and `coupling` may be an expression (`"{k}"`).
 - python: `initial_condition`/`node_set` take an expression value (`out="{vdd/2}"`), and `Subcircuit`/`Circuit` have both, written inside the `.subckt`.
+- python: `I`, `G`, `F`, `BV` and `BI` take instance parameters (`m=2`; on a B source also `tc1`, `tc2`, `temp`, `dtemp`), written last on the card.
 
 ## 0.2.0 (2026-11-03)
 

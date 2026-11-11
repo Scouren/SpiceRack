@@ -252,6 +252,9 @@ FEATURES = {
     "E_G": elem(lambda d: (d.E("1", "x", "0", control_positive="out", control_negative="0", voltage_gain=2), d.G("1", "y", "0", control_positive="out", control_negative="0", transconductance=1e-3), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "F_H": elem(lambda d: (d.V("s", "out", "z", 0), d.R("z", "z", "0", 1e3), d.F("1", "x", "0", vsense="Vs", current_gain=2), d.H("1", "y", "0", vsense="Vs", transresistance=10), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "BV_BI": elem(lambda d: (d.BV("1", "x", "0", expression="V(out)*2"), d.BI("1", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
+    "I_m": elem(lambda d: (d.I("2", "0", "y", 1.0, m=2), d.R("y", "y", "0", 1e3))),
+    "G_F_m": elem(lambda d: (d.V("s", "out", "z", 0), d.R("z", "z", "0", 1e3), d.G("2", "0", "x", control_positive="out", control_negative="0", transconductance=1e-3, m=2), d.F("2", "0", "w", vsense="Vs", current_gain=2, m=2), d.R("x", "x", "0", 1e3), d.R("w", "w", "0", 1e3))),
+    "B_params": elem(lambda d: (d.BV("2", "x", "0", expression="V(out)*2", tc1=1e-3, tc2=1e-6), d.BI("3", "0", "y", expression="V(out)*1m", m=2), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "NonLinear": elem(lambda d: (d.NonLinearVoltageSource("x", "x", "0", expression="V(out)*2"), d.NonLinearCurrentSource("y", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "POLY": elem(lambda d: (d.POLY("1", "E", "x", "0", ["out", "0"], [0, 1, 2]), d.R("x", "x", "0", 1e3))),
     "S": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw"))),
@@ -389,6 +392,12 @@ EXPECTED = {
     'NonLinear': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'BV_BI': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # `I … m=2` is kept as ngspice's card: its own family writes it, W0001 elsewhere (P5-066 reads it).
+    'I_m': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    # A G or F multiplier is folded into the gain on every target.
+    'G_F_m': (OK,) * 9,
+    # A B source's `tc1`/`tc2`/`m`: kept as ngspice's card, as `I_m` (P5-067, P5-066 read them).
+    'B_params': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'POLY': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),

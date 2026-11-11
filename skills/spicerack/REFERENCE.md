@@ -26,6 +26,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `F` | `F` | `(name, positive, negative, vsense, current_gain)` — `vsense` names a V source |
 | `H` | `H` | `(name, positive, negative, vsense, transresistance)` |
 | `BV` / `BI` | `B` | `(name, positive, negative, expression)` |
+| `I`, `G`, `F`, `BV`, `BI` parameters | — | `**params` last on the card: `m=2` (the current, on `BV` the voltage, times 2), on `BV`/`BI` also `tc1`, `tc2`, `temp`, `dtemp`. `G`/`F` fold `m` into the gain everywhere; `I … m=` and a B source with parameters net for ngspice/ESPice only (`W0001` elsewhere). Not on `V`, `E`, `H` |
 | `initial_condition`, `node_set` | `.ic`, `.nodeset` | `(**nodes)` on `Testbench`/`CircuitSimulator` (top level) and on `Subcircuit`/`Circuit` (inside its `.subckt`); a value is a number or an expression (`out="{vdd/2}"`), an instance's node is `**{"x1.n": 0.5}`. Inside a subcircuit it nets for ngspice/ESPice only (`W0001` elsewhere) |
 | `NonLinearVoltageSource` / `NonLinearCurrentSource` | `E` / `G` | `(name, positive, negative, expression=...)` — `E<name> n+ n- value={expr}`: `BV` / `BI` under the E/G letter (PySpice's names); give an E and a G different names |
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |

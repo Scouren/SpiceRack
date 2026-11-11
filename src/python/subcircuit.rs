@@ -169,21 +169,31 @@ impl PySubcircuit {
         self.inner.elements.push(c);
     }
 
-    /// `distof1`, `distof2`: as `V`'s.
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None))]
-    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+    /// `distof1`, `distof2`: as `V`'s. `**kwargs` are instance parameters,
+    /// written last on the card (`m=2`: ngspice multiplies the current).
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None, **kwargs))]
+    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
         let c = source(true, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None);
-        self.inner.elements.push(c);
+        self.inner.elements.push(c.with_params(&ps));
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, expression))]
-    fn BV(&mut self, name: &str, positive: &str, negative: &str, expression: &str) {
-        self.behavioral('V', name, positive, negative, expression);
+    /// `**kwargs` are instance parameters, written after the expression
+    /// (ngspice: `tc1=`, `tc2=`, `temp=`, `dtemp=`, and `m=`).
+    #[pyo3(signature = (name, positive, negative, *, expression, **kwargs))]
+    fn BV(&mut self, name: &str, positive: &str, negative: &str, expression: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
+        self.behavioral('V', name, positive, negative, expression, &ps);
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, expression))]
-    fn BI(&mut self, name: &str, positive: &str, negative: &str, expression: &str) {
-        self.behavioral('I', name, positive, negative, expression);
+    /// `**kwargs`: as `BV`'s.
+    #[pyo3(signature = (name, positive, negative, *, expression, **kwargs))]
+    fn BI(&mut self, name: &str, positive: &str, negative: &str, expression: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
+        self.behavioral('I', name, positive, negative, expression, &ps);
+        Ok(())
     }
 
     /// A voltage source given by an expression of node voltages and branch
@@ -207,16 +217,22 @@ impl PySubcircuit {
         self.push(name, format!("E{name} {nets} {}", dec(voltage_gain)));
     }
 
-    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, transconductance))]
-    fn G(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, transconductance: f64) {
+    /// `**kwargs` are instance parameters (`m=2`), as on `I`.
+    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, transconductance, **kwargs))]
+    fn G(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, transconductance: f64, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
         let nets = self.nets(&[positive, negative, control_positive, control_negative]);
-        self.push(name, format!("G{name} {nets} {}", dec(transconductance)));
+        self.push(name, format!("G{name} {nets} {}{ps}", dec(transconductance)));
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, vsense, current_gain))]
-    fn F(&mut self, name: &str, positive: &str, negative: &str, vsense: &str, current_gain: f64) {
+    /// `**kwargs` are instance parameters (`m=2`), as on `I`.
+    #[pyo3(signature = (name, positive, negative, *, vsense, current_gain, **kwargs))]
+    fn F(&mut self, name: &str, positive: &str, negative: &str, vsense: &str, current_gain: f64, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let ps = params(&kw_params(kwargs)?);
         let nets = self.nets(&[positive, negative]);
-        self.push(name, format!("F{name} {nets} {vsense} {}", dec(current_gain)));
+        self.push(name, format!("F{name} {nets} {vsense} {}{ps}", dec(current_gain)));
+        Ok(())
     }
 
     #[pyo3(signature = (name, positive, negative, *, vsense, transresistance))]
@@ -618,11 +634,12 @@ impl PySubcircuit {
         Ok(())
     }
 
-    /// A B source: `B<name> np nm V=expr` (`I=` with `of` `I`); a Laplace
-    /// expression needs a simulator that has one.
-    fn behavioral(&mut self, of: char, name: &str, p: &str, n: &str, expression: &str) {
+    /// A B source: `B<name> np nm V=expr` (`I=` with `of` `I`), then `ps`
+    /// ([`params`]' text); a Laplace expression needs a simulator that has
+    /// one.
+    fn behavioral(&mut self, of: char, name: &str, p: &str, n: &str, expression: &str, ps: &str) {
         let nets = self.nets(&[p, n]);
-        let mut c = Card::element(name, format!("B{name} {nets} {of}={expression}"));
+        let mut c = Card::element(name, format!("B{name} {nets} {of}={expression}{ps}"));
         if is_laplace(expression) {
             c.needs = need::LAPLACE;
         }
