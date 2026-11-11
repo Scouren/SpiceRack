@@ -1197,7 +1197,7 @@ def vacask(d):
         .named_params(NamedParams.Vacask)
         .analysis_masters(Lang.SPECTRE)
         # `.options KEY=VALUE` whose VACASK spelling is the same word and
-        # the same quantity (`itl1`, `maxord` are rejected there). `scale`
+        # the same quantity (`itl1` is `op_itl`, a row below). `scale`
         # is the `$simparam("scale")` VACASK's `sp_*` modules read where
         # ngspice's code reads `CKTscale` (`devices/spice/*.va` headers;
         # `lib/osdidevice.cpp` `simParamNames`).
@@ -1226,6 +1226,17 @@ def vacask(d):
         .option_cosmetic("sparse")
         .option_cosmetic("savecurrents")
         .option_cosmetic("numdgt")
+        .option_cosmetic("warn")
+        .option_cosmetic("maxwarns")
+        .option_cosmetic("measdgt")
+        .option_cosmetic("plotwinsize")
+        .option_cosmetic("noinit")
+        .option_to("itl1", "op_itl")
+        .option_to("itl4", "tran_itl")
+        .option_to("gminsteps", "homotopy_gminsteps")
+        .option_to("srcsteps", "homotopy_srcsteps")
+        .option_spell("rshunt", "gshunt=1/({})")
+        .option_spell("noopiter", "op_skipinitial=1")
         # The module a SPICE `.model` type gets at a LEVEL (VACASK 36be560
         # `devices/spice/*.va`: `sp_<module>`, `type=±1`; ngspice-45
         # `inpdomod.c` LEVEL per type): `.model x NPN (LEVEL=4)` is VBIC, other
@@ -1341,7 +1352,7 @@ def vacask(d):
         .refuse(Construct.ChargeCapacitor, Code.W0105)
         .native(Construct.BehaviouralSource)
         .refuse(Construct.Laplace, Code.W0011)
-        .refuse(Construct.RfPort, Code.W0007)
+        .native(Construct.RfPort)
         .refuse(Construct.PwlRepeatV, Code.W0008)
         .refuse(Construct.PwlRepeatI, Code.W0008)
         .refuse(Construct.NoiseWave, Code.W0009)
@@ -1360,7 +1371,7 @@ def vacask(d):
         .refuse(Construct.Sens, Code.W0015)
         .refuse(Construct.SensAc, Code.W0015)
         .refuse(Construct.PoleZero, Code.W0015)
-        .refuse(Construct.SParameter, Code.W0015)
+        .native(Construct.SParameter)
         .native(Construct.Print)
         .omit(Construct.Save, Code.W0023)
         .refuse(Construct.UnmappedOption, Code.W0017)

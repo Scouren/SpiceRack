@@ -210,3 +210,25 @@ fn p4_001_vacask_cells_were_written_against() {
     let raw = run(deck);
     assert!(col(&raw, "drain")[0] < 5.0);
 }
+
+/// ZERO-LEDGER P4-009. Oracle: ngspice-45 on the same three decks
+/// (research/impl/evidence/P4-009/ngspice.src{1,2,3}.log: v(b) = 0.75,
+/// 0.75, 0.4285714) and the divider's closed form: RSHUNT=1k is a 1k
+/// resistor from `b` to ground beside R2, 0.75k/(1k + 0.75k) = 3/7; the
+/// other keys change no operating point. VACASK refuses an option it does
+/// not have ("Parameter 'itl1' not found", `vacask.unknown-option.log`), so
+/// a run is the proof each written word is one of its options.
+#[test]
+fn p4_009_mapped_options_are_vacasks_own() {
+    for (options, want) in [
+        (
+            "itl1=500 itl4=10 gminsteps=0 srcsteps=0 warn=1 maxwarns=2 noinit measdgt=10 plotwinsize=0",
+            0.75,
+        ),
+        ("noopiter", 0.75),
+        ("rshunt=1e3", 3.0 / 7.0),
+    ] {
+        let deck = format!("opts\nV1 a 0 1\nR1 a b 1k\nR2 b 0 3k\n.options {options}\n.op\n.end\n");
+        close(col(&run(&deck), "b")[0], want, 1e-9);
+    }
+}

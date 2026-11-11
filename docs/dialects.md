@@ -144,7 +144,7 @@ numbers (`exponent`, `scale`, `tail`, `arithmetic`), elements (`devices`,
 `device`, `master`, `analysis`, `region`), spelling (`comment`,
 `path_quote`, `expr`, `func`, `subckt_params`, `write_head`,
 `write_master`, `option`), the named writers' maps (`option_to`,
-`option_method`, `option_cosmetic`: what a SPICE `.options` key is on a
+`option_spell`, `option_method`, `option_cosmetic`: what a SPICE `.options` key is on a
 Spectre or VACASK target; `model_master(kind, levels, master, type_)` and
 `spice_model_type(kind)`: the master a SPICE `.model` type gets at a
 LEVEL, `levels` a list), the capability cells (`native`, `spell`,

@@ -15,8 +15,9 @@ use super::W;
 use super::vacask::{num, q};
 use crate::syntax::behaviour::{ModelSemantics, NamedRules};
 use crate::syntax::diag::Code;
-use crate::syntax::render::capability::Construct;
+use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Card, Comp, Num, Val, Wave, WaveKind};
+use crate::syntax::render::spice::parasitics::parts;
 
 impl W<'_, '_> {
     /// Element `n`'s statement, with no line end; `None` when it is
@@ -106,11 +107,31 @@ impl W<'_, '_> {
                 port,
                 mut parasitics,
             } => {
-                if port.is_some() {
-                    self.ask(Construct::RfPort, tok);
-                    return None;
-                }
-                let extra = self.parasitics(letter, n, &np, &nm, &mut parasitics);
+                // ngspice's RF port (manual §4.1.11: "a VSRC with Z0 Ohm in
+                // series", in every analysis; ngspice-45's op, ac and `.sp`
+                // measured, ZERO-LEDGER P4-007): the source behind an
+                // internal node and its series resistor, the pair `acsp`
+                // names (`docs/cmd-analysis-acsp.md`, "Port definition"),
+                // named as a source's LTspice `Rser` is (`r<decl>_ser`,
+                // `<decl>_s1`).
+                let extra = match port {
+                    Some((_, z0)) => {
+                        assert_eq!(letter, 'V', "an RF port is a voltage source");
+                        // A port's impedance is positive (Xyce 7.10 stops on
+                        // another, `Output/SPARAMS/NegativeZ0.cir`); a zero
+                        // one would leave `acsp` no resistor to name.
+                        if z0 <= 0.0 {
+                            self.refuse(Code::W0007, tok);
+                            return None;
+                        }
+                        if !matches!(self.ask(Construct::RfPort, tok), Action::Native) {
+                            return None;
+                        }
+                        let decl = self.names.decl(n).to_ascii_lowercase();
+                        parts(&decl, &np, &nm, &mut vec![("rser".to_string(), num(z0))])
+                    }
+                    None => self.parasitics(letter, n, &np, &nm, &mut parasitics),
+                };
                 let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
                 let (l, m) = match letter {
                     'V' => ('v', "vsource"),
@@ -138,6 +159,13 @@ impl W<'_, '_> {
                     s.push_str(&w);
                 }
                 s.push_str(&self.part_lines(extra));
+                // The port's resistor is the statement's last line.
+                // ngspice-45's adds no noise (`.noise` over a port and a
+                // noiseless load: 0, measured); Spectre's port does
+                // (`[CMP]` p.606 #42).
+                if port.is_some() && self.rd.b.named_rules != NamedRules::Spectre {
+                    s.push_str(" noisy=0");
+                }
                 s
             }
             Card::Linear {
@@ -350,16 +378,19 @@ impl W<'_, '_> {
         super::sources::assert_held(w);
         let a: Vec<String> = w.args.iter().map(|x| self.vacask_num(x)).collect();
         Some(match w.kind {
+            // `tdphase` is the sine's initial phase in degrees, SPICE's
+            // PHASE (`docs/dev-builtin-src.md`, "Sine"; equal to ngspice's
+            // closed form to 1e-15 before and after the delay, ZERO-LEDGER
+            // P4-011); `phase` is the AC phase.
             WaveKind::Sin => {
-                // VACASK accepts a phase and ignores it.
-                if w.args[5] != Num::Num(0.0) {
-                    self.refuse(Code::W0108, tok);
-                    return None;
-                }
-                format!(
+                let mut s = format!(
                     "type=\"sine\" sinedc={} ampl={} freq={} delay={} theta={}",
                     a[0], a[1], a[2], a[3], a[4]
-                )
+                );
+                if w.args[5] != Num::Num(0.0) {
+                    s.push_str(&format!(" tdphase={}", a[5]));
+                }
+                s
             }
             WaveKind::Pulse => {
                 // A period no longer than the pulse is no repeat (period 0).

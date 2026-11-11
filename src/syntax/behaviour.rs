@@ -111,7 +111,7 @@ pub struct Behaviours {
     /// any other is one it lacks (W0015).
     pub vacask_analyses: &'static [&'static str],
     /// Write: a SPICE `.options` key (lowercase) → its answer on the
-    /// target (`DialectDef::option_to`, `option_method`,
+    /// target (`DialectDef::option_to`, `option_spell`, `option_method`,
     /// `option_cosmetic`); a key not here is unmapped (Spectre notes it
     /// W0024, VACASK asks `Construct::UnmappedOption`).
     pub option_map: &'static [(&'static str, OptionTo)],
@@ -168,6 +168,11 @@ pub enum MasterAnswer {
 pub enum OptionTo {
     /// The target's option of the same quantity, its value respelled.
     Name(&'static str),
+    /// The target's own text for the key, `{}` in it standing for the
+    /// value respelled (VACASK `gshunt=1/({})` for `rshunt`); a text
+    /// with no `{}` is written whatever the value (`op_skipinitial=1` for
+    /// the flag `noopiter`).
+    Spell(&'static str),
     /// The integration method (`method=trap|gear`): the writer spells the
     /// value (VACASK `tran_method="gear2"`).
     Method,

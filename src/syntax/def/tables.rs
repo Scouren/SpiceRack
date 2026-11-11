@@ -10,7 +10,8 @@
 //! - `DialectDef::temp_name(self, word: &str) -> Self`, `DialectDef::builtin_constant(self, name: &str, value: &str) -> Self`
 //! - `DialectDef::builtin_device(self, name: &str) -> Self`, `DialectDef::spectre_analysis(self, kind: &str) -> Self`
 //! - `DialectDef::vacask_analysis(self, kind: &str) -> Self`
-//! - `DialectDef::option_to(self, spice: &str, own: &str) -> Self`, `DialectDef::option_method(self, spice: &str) -> Self`,
+//! - `DialectDef::option_to(self, spice: &str, own: &str) -> Self`,
+//!   `DialectDef::option_spell(self, spice: &str, text: &str) -> Self`, `DialectDef::option_method(self, spice: &str) -> Self`,
 //!   `DialectDef::option_cosmetic(self, spice: &str) -> Self`
 //! - `DialectDef::model_master(self, kind: &str, levels: &[u32], master: &str, type_: Option<&str>) -> Self`,
 //!   `DialectDef::spice_model_type(self, kind: &str) -> Self`
@@ -70,6 +71,15 @@ impl DialectDef {
     /// quantity: `.options VNTOL=1u` is Spectre `vabstol=1u`.
     pub fn option_to(self, spice: &str, own: &str) -> Self {
         self.option_row(spice, OptionTo::Name(leak(own)))
+    }
+
+    /// SPICE option `spice` is the target's `text`, `{}` in it standing
+    /// for the value: with `"gshunt=1/({})"`, `.options rshunt=1k` is
+    /// VACASK `gshunt=1/(1e3)`; with `"op_skipinitial=1"` the flag
+    /// `noopiter` is that text. A text with `{}` on a card with no value
+    /// is refused as an unmapped option.
+    pub fn option_spell(self, spice: &str, text: &str) -> Self {
+        self.option_row(spice, OptionTo::Spell(leak(text)))
     }
 
     /// SPICE option `spice` is the integration method, its value spelled

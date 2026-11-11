@@ -384,12 +384,7 @@ fn rf_ports_are_refused_where_no_dialect_form_exists() {
         spectre.contains("v1 (in 0) port num=1 r=50 dc=0 mag=500m"),
         "{spectre}"
     );
-    for d in [
-        Dialect::Ltspice,
-        Dialect::Hspice,
-        Dialect::Xyce,
-        Dialect::Vacask,
-    ] {
+    for d in [Dialect::Ltspice, Dialect::Hspice, Dialect::Xyce] {
         let e = render_text(&deck, Dialect::Ngspice, "p", d).expect_err("refused");
         assert!(
             e.diags.iter().any(|x| x.code == Code::W0007),
