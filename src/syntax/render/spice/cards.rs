@@ -306,20 +306,15 @@ impl W<'_, '_> {
             w => w,
         };
         // A wave the target's own form would run otherwise is written as
-        // a behavioural source (`wave_as_b`) and the card stays as a 0
-        // source; refused when the card's DC value is not the wave's at
-        // time zero (the behavioural source gives the operating point the
-        // wave's).
+        // a behavioural source (`wave_as_b`); the card stays as a 0
+        // source, or as what is left of its DC value (`beside_b`).
         let behav = match &wave {
             Some(w) => self.wave_as_b(w, tok),
             None => None,
         };
-        if behav.is_some() && wave.as_ref().is_some_and(|w| value != w.at_zero()) {
-            self.refuse(crate::syntax::diag::Code::W0108, tok);
-        }
-        let (wave, value) = match behav {
-            Some(_) => (None, Val::Num(0.0)),
-            None => (wave, value),
+        let (wave, value) = match (&behav, wave) {
+            (Some(_), Some(w)) => self.beside_b(&w, value, tok),
+            (_, wave) => (wave, value),
         };
         if let Some(w) = &wave {
             self.wave_ok(letter, w, tok);

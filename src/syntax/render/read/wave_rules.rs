@@ -1,7 +1,8 @@
 //! Waveform rules past a card's plain values, over the [`Num`]s and the
 //! `Wave` view every writer takes: LTspice's PWL time relative to the
 //! point before it; a PULSE with a cycle count as the PWL of its pulses;
-//! LTspice's SINE with a cycle count as an expression of time.
+//! LTspice's SINE with a cycle count, and an SFFM ngspice's own form runs
+//! otherwise, as expressions of time.
 //!
 //! Cites: ngspice manual §4.1.1 (PULSE's table; NP); LTspice help, Current
 //! Source (PULSE's Ncycles); LTspice help, Voltage Source (PWL: a time
@@ -13,6 +14,8 @@
 //! - `Rd::pwl_relative(&self, vals: &[u32]) -> Option<Vec<Num>>`
 //! - `Wave::counted(&self) -> bool`, `Wave::pulses(&self) -> Option<Wave>`
 //! - `Wave::cycled(&self) -> bool`, `Wave::sin_cycles(&self, t: &str) -> Option<String>`
+//! - `Wave::ngspice_sffm(&self) -> bool`,
+//!   `Wave::sffm_of(&self, t: &str, num: impl Fn(&Num) -> String) -> String`
 
 use super::{Num, Rd, Wave, WaveKind};
 use crate::syntax::behaviour::CardRules;
@@ -63,6 +66,49 @@ impl Wave {
         Some(format!(
             "{t}<{td} ? {first} : ({t}<{td}+{n}/{f} ? {run} : {held})"
         ))
+    }
+
+    /// Whether ngspice's SFFM runs this wave, held in SPICE3's order (VO VA
+    /// FC MDI FS: Xyce's, HSPICE's, LTspice's), as SPICE3 defines it.
+    /// ngspice-45 (`vsrcload.c:228-277`) is 0 up to time zero, a
+    /// transient's operating point, where SPICE3 is VO (`:272`); limits
+    /// MDI to FC/FS and to 0 from below (`:256`, "MDI limited to FC/FM");
+    /// and takes an FC of 0 as 500/TSTOP (`:242`). By run: `SFFM(0 1 20k
+    /// 10 5k)` is -0.6488 V at 30 µs on Xyce 7.10, +0.6587 V as ngspice's
+    /// `SFFM(0 1 5k 10 20k)`. False also when one of the four is an
+    /// expression.
+    ///
+    /// # Panics
+    /// When the wave is not an SFFM.
+    pub(in crate::syntax::render) fn ngspice_sffm(&self) -> bool {
+        assert_eq!(self.kind, WaveKind::Sffm, "an SFFM wave");
+        assert_eq!(self.args.len(), 5, "an SFFM holds five values");
+        let [Some(vo), Some(fc), Some(mdi), Some(fs)] = [0, 2, 3, 4].map(|i| self.args[i].num())
+        else {
+            return false;
+        };
+        vo == 0.0 && fc != 0.0 && (0.0..=fc / fs).contains(&mdi)
+    }
+
+    /// SPICE3's `SFFM(VO VA FC MDI FS)` as an expression of the target's
+    /// time variable `t`: VO + VA·sin(2π·FC·t + MDI·sin(2π·FS·t)) (Xyce RG
+    /// "SFFM"; HSPICE SH98 p.5-17; LTspice help), each value spelled by
+    /// `num` and put in parentheses.
+    ///
+    /// # Panics
+    /// When the wave is not an SFFM.
+    pub(in crate::syntax::render) fn sffm_of(
+        &self,
+        t: &str,
+        num: impl Fn(&Num) -> String,
+    ) -> String {
+        assert_eq!(self.kind, WaveKind::Sffm, "an SFFM wave");
+        assert!(!t.is_empty(), "a time variable");
+        let x: Vec<String> = self.args.iter().map(|a| format!("({})", num(a))).collect();
+        let [vo, va, fc, mdi, fs] = &x[..] else {
+            unreachable!("an SFFM holds five values")
+        };
+        format!("{vo}+{va}*sin(2*{PI}*{fc}*{t}+{mdi}*sin(2*{PI}*{fs}*{t}))")
     }
 
     /// Whether this is a PULSE with a cycle count (its eighth value:

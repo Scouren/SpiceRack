@@ -81,6 +81,11 @@ pub(super) struct Pair {
     /// An ngspice SFFM is (VO VA FM MDI FC), SPICE3's, HSPICE's, Xyce's
     /// and LTspice's (VO VA FC MDI FS) (`vsrcload.c`): the two swapped.
     pub(super) sffm_swap: bool,
+    /// SPICE3's SFFM on ngspice's cards (ngspice, ESPice, CDL), whose SFFM
+    /// limits MDI to FC/FM and is 0 at time zero (ngspice-45
+    /// `vsrcload.c:256,272`): a wave past that is a behavioural source of
+    /// time (`Wave::ngspice_sffm`, `waves::wave_as_b`).
+    pub(super) sffm_as_b: bool,
     /// LTspice's SINE cycle count (help, Current Source: the sine holds
     /// its value after Ncycles/Freq) where the target's SIN never stops
     /// (ngspice manual §4.1.2; Xyce RG; HSPICE UG): a behavioural source
@@ -158,6 +163,7 @@ impl Pair {
             lt_parasitics: from.card_rules == CardRules::Ltspice
                 && to.parasitics == Parasitics::Elements,
             sffm_swap: ng(nf) != (ng(nt) || to.writer == Writer::Cdl),
+            sffm_as_b: !ng(nf) && (ng(nt) || to.writer == Writer::Cdl),
             sin_cycles_as_b: nf == NetlistRules::Ltspice && nt != NetlistRules::Ltspice,
             pulse_as_pwl: counts(nf) && !(counts(nt) || to.writer == Writer::Cdl),
             foreign_prints: !ng(nf) && to.analysis_form == AnalysisForm::Ngspice,
@@ -218,6 +224,7 @@ mod tests {
             ("spell_clamp", to_ng.spell_clamp),
             ("stat_nominal", to_ng.stat_nominal),
             ("sffm_swap", to_ng.sffm_swap),
+            ("sffm_as_b", to_ng.sffm_as_b),
             ("foreign_measures", to_ng.foreign_measures),
         ] {
             assert!(holds, "xyce -> ngspice: {rule}");

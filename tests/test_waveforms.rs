@@ -47,6 +47,57 @@ fn ltspice_on_ngspice(deck: &str, t: f64, want: f64, tol: Tol) {
 // A row's test goes below this line (other helpers: `oracle::…` by path).
 
 #[test]
+fn p3_083_sffm_past_ngspice_limits_is_a_behavioural_source() {
+    // Ledger P3-083. SPICE3's SFFM(VO VA FC MDI FS) is VO + VA·sin(2π·FC·t
+    // + MDI·sin(2π·FS·t)) (Xyce RG; HSPICE SH98 p.5-17). ngspice-45 limits
+    // MDI to FC/FS and is 0 at time zero (vsrcload.c:256,272), so such a
+    // wave is a behavioural source there and on ESPice. Corpus:
+    // XDM/HSPICE/INDEPENDENT_SOURCES/v_sources_sffm.cir. Tolerance: 1e-3 V,
+    // what Xyce's own steps leave on a 70 kHz wave (-0.64891 here).
+    let tol = Tol {
+        rel: 1e-3,
+        floor: 1.0,
+    };
+    let on = [Dialect::Xyce, Dialect::Ngspice, Dialect::Espice];
+    // MDI 10 past FC/FS = 4. By hand at 30 us: sin(2π·0.6 + 10·sin(2π·0.15))
+    // = sin(3.76991 + 8.09017) = -0.64902 (with MDI 4: +0.66148).
+    let deck = "p3-083\nV1 a 0 SFFM(0 1 20k 10 5k)\nR1 a 0 1\n.tran 50n 300u\n.end\n";
+    closed_form(
+        Dialect::Xyce,
+        deck,
+        &on,
+        "a",
+        At::Time(30e-6),
+        -0.64902,
+        tol,
+    );
+    // An offset: the RC starts at VO = 1 V. RK4 of it to 5 us gives 1.18534
+    // (research/impl/evidence/P3-083/rk4.py); from ngspice's 0 V, 0.57881.
+    let deck = "p3-083\nV1 a 0 SFFM(1 1 20k 2 5k)\nR1 a b 1k\nC1 b 0 10n\n.tran 50n 100u\n.end\n";
+    closed_form(Dialect::Xyce, deck, &on, "b", At::Time(5e-6), 1.18534, tol);
+    // A DC value beside the wave (the corpus decks): it at a DC analysis,
+    // the wave through a transient (Xyce 7.10, run).
+    let op = "p3-083\nV1 a 0 DC 3 SFFM(0 1 20k 10 5k)\nR1 a 0 1\n.op\n.end\n";
+    closed_form(Dialect::Xyce, op, &on, "a", At::First, 3.0, tol);
+    let tran = op.replace(".op", ".tran 50n 300u");
+    closed_form(Dialect::Xyce, &tran, &on, "a", At::First, 0.0, tol);
+    closed_form(
+        Dialect::Xyce,
+        &tran,
+        &on,
+        "a",
+        At::Time(30e-6),
+        -0.64902,
+        tol,
+    );
+    // Inside the limits the card is ngspice's own SFFM, its frequencies
+    // swapped (`Pair::sffm_swap`).
+    let own = "p3-083\nV1 a 0 SFFM(0 1 20k 4 5k)\nR1 a 0 1\n.tran 50n 300u\n.end\n";
+    let ng = oracle::write(own, Dialect::Xyce, Dialect::Ngspice);
+    assert!(ng.contains("SFFM(0 1 5000 4 20000)"), "{ng}");
+}
+
+#[test]
 fn p3_020_ltspice_sine_cycle_count_holds_after_its_cycles() {
     // Ledger P3-020. LTspice help, Current Source: SINE(Ioffset Iamp Freq
     // Td Theta Phi Ncycles) runs Ncycles cycles and then holds. By hand:

@@ -9,6 +9,7 @@
 //! - `W::wave_num(&self, n: &Num) -> String`, `W::wave_ok(&mut self, letter: char, w: &Wave, tok: u32)`,
 //!   `W::wave(&self, w: &Wave) -> String`
 //! - `W::wave_as_b(&mut self, w: &Wave, tok: u32) -> Option<String>`,
+//!   `W::beside_b(&mut self, w: &Wave, value: Val, tok: u32) -> (Option<Wave>, Val)`,
 //!   `W::wave_b(&mut self, decl: &str, nodes: [&str; 2], current: bool, expr: &str, tok: u32) -> String`,
 //!   `W::b_line(&mut self, decl: &str, nodes: [&str; 2], current: bool, expr: &str, tok: u32) -> String`
 
@@ -118,18 +119,57 @@ impl W<'_, '_> {
 
     /// The behavioural expression of `time` a source is written with in
     /// place of wave `w`, where the target's own form would run another
-    /// wave: LTspice's SINE with a cycle count ([`Wave::sin_cycles`]).
+    /// wave: LTspice's SINE with a cycle count ([`Wave::sin_cycles`]),
+    /// SPICE3's SFFM where ngspice's is not it ([`Wave::ngspice_sffm`]).
     /// `None`: `w` is written in its own form, or it has no such
     /// expression and is refused (W0108).
     pub(super) fn wave_as_b(&mut self, w: &Wave, tok: u32) -> Option<String> {
         let expr = match w.kind {
             WaveKind::Sin if self.pair.sin_cycles_as_b && w.cycled() => w.sin_cycles("time"),
+            WaveKind::Sffm if self.pair.sffm_as_b && !w.ngspice_sffm() => {
+                Some(w.sffm_of("time", |a| match a {
+                    Num::Num(v) => self.sp.decimal(*v, self.x),
+                    // Bare, as a B source reads a parameter (ESPice 0.3.0
+                    // cannot read `{v0}` there).
+                    Num::Expr(e) => self.ternaries(e),
+                }))
+            }
             _ => return None,
         };
         if expr.is_none() {
             self.refuse(crate::syntax::diag::Code::W0108, tok);
         }
         expr
+    }
+
+    /// What a source card is left as beside the behavioural source that
+    /// carries its wave `w` ([`W::wave_as_b`]): its wave and its value. A
+    /// card whose `value` is the wave's at time zero (it gave no DC
+    /// value) is a 0 source. An SFFM is at its offset at time zero, so a
+    /// card with a DC value keeps the rest of it, which the analyses that
+    /// solve at DC read, and is 0 in a transient: `PWL(0 0)` (ngspice-45
+    /// `vsrcload.c:74`; ngspice-45 and ESPice 0.3.0, run: `V1 a V1_w 3
+    /// PWL(0 0)` is 3 V at `.op` and 0 V through a `.tran`, as Xyce 7.10
+    /// runs `DC 3 SFFM(0 …)`). Any other DC value is refused (W0108): the
+    /// behavioural source would give the operating point the wave's.
+    pub(super) fn beside_b(&mut self, w: &Wave, value: Val, tok: u32) -> (Option<Wave>, Val) {
+        match (&value, w.at_zero()) {
+            (v, zero) if *v == zero => (None, Val::Num(0.0)),
+            (Val::Num(dc), Val::Num(zero)) if w.kind == WaveKind::Sffm => {
+                let hold = Wave {
+                    kind: WaveKind::Pwl,
+                    args: vec![Num::Num(0.0); 2],
+                    repeat: None,
+                    delay: None,
+                    cut: false,
+                };
+                (Some(hold), Val::Num(dc - zero))
+            }
+            _ => {
+                self.refuse(crate::syntax::diag::Code::W0108, tok);
+                (None, Val::Num(0.0))
+            }
+        }
     }
 
     /// The behavioural source that carries card `decl`'s wave, expression
