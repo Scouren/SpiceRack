@@ -182,6 +182,17 @@ first plot that has it (or `plot=`).
 Sample a transient for `sndr` with a max step well under `1/fs` (or ngspice
 `.options interp`): interpolating uneven time points adds distortion.
 
+## Exporting results
+
+`raw, meas = ps.export(results, stem, raw_format="binary")` writes `<stem>.raw` and `<stem>.meas.json` and returns both paths. `results` is a sequence: `tb.run()`'s list, `[tran]`, `[stepped_list]`, or `ps.read_raw(...)`; a `None` item is left out. `ValueError`: a `raw_format` other than `"binary"`/`"ascii"`, no plot among the results; `TypeError`: an item that is no result.
+
+| File | Holds |
+|---|---|
+| `<stem>.raw` | one ngspice raw file: the plots in the order given, a stepped analysis's one after the other; every vector under its canonical name (`out`, `i(vin)`, `time`) whichever simulator ran |
+| `<stem>.meas.json` | `spicerack.measures/1`: `schema`, `spicerack`, `backend`, `raw`, `analyses[{index, kind, plot, steps}]`, `measures[{name, analysis, step, value, status, reason?}]` |
+
+`analyses[].index` is the number of its first plot in the raw file; `kind` is `tran`, `ac`, ... (`null` for a plot read from a file); `steps` is `null` or one `{param: value}` per step. `measures[].analysis` is a place in `analyses`, `step` a place in its `steps` (or `null`); `value` is `null` exactly when `status` is `"failed"`. Order: analysis, step, the deck's `.meas` order.
+
 ## Units
 
 `from spicerack.unit import u_V, u_kOhm, ...` then `10 @ u_V`.

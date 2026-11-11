@@ -11,6 +11,7 @@
 //!   `PyHarmonicBalanceAnalysis`, `PyStabilityAnalysis`, `PyTransientNoiseAnalysis`:
 //!   `pub(super) struct`s from `analysis_class!`
 //! - `pub(super) fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()>`
+//! - `pub(super) fn plot_of(ob: &Bound<'_, PyAny>) -> Option<(Option<Kind>, RawData)>`
 //! - `pub(super) fn typed_result(py: Python<'_>, a: &Analysis, plots: Vec<RawData>) -> PyResult<Py<PyAny>>`
 
 use std::collections::HashMap;
@@ -20,6 +21,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 use super::analysis::Analysis;
+use crate::backend::Kind;
 use crate::result::{RawData, Results};
 
 /// Raw simulation data wrapper -- returned by spectre_sweep and spectre_montecarlo.
@@ -91,10 +93,12 @@ macro_rules! analysis_class {
     };
 }
 
-/// The analysis classes and [`add_classes`], which registers them: a new
-/// result class is one row here.
+/// The analysis classes, [`add_classes`], which registers them, and
+/// [`plot_of`], which reads one back: a new result class is one row here
+/// (the class, its Python name, the kind of analysis it is the result of,
+/// its axis getter).
 macro_rules! analysis_classes {
-    ($(($ty:ident, $name:literal $(, $axis:ident)?)),* $(,)?) => {
+    ($(($ty:ident, $name:literal, $kind:ident $(, $axis:ident)?)),* $(,)?) => {
         $(analysis_class!($ty, $name $(, $axis)?);)*
 
         /// Adds `OperatingPoint`, every analysis class and `RawData` to
@@ -104,23 +108,42 @@ macro_rules! analysis_classes {
             $(m.add_class::<$ty>()?;)*
             m.add_class::<PyRawData>()
         }
+
+        /// A copy of the plot a Python result object holds, and the kind
+        /// of analysis its class is the result of (`None`: a `RawData`,
+        /// whose class names none); `None` for an object of no result
+        /// class.
+        pub(super) fn plot_of(ob: &Bound<'_, PyAny>) -> Option<(Option<Kind>, RawData)> {
+            if let Ok(r) = ob.cast::<PyRawData>() {
+                return Some((None, r.borrow().inner.clone()));
+            }
+            if let Ok(r) = ob.cast::<PyOperatingPoint>() {
+                return Some((Some(Kind::Op), r.borrow().inner.raw.clone()));
+            }
+            $(
+                if let Ok(r) = ob.cast::<$ty>() {
+                    return Some((Some(Kind::$kind), r.borrow().inner.raw.clone()));
+                }
+            )*
+            None
+        }
     };
 }
 
 analysis_classes! {
-    (PyDcAnalysis, "DcAnalysis", sweep),
-    (PyAcAnalysis, "AcAnalysis", frequency),
-    (PyTransientAnalysis, "TransientAnalysis", time),
-    (PyNoiseAnalysis, "NoiseAnalysis", frequency),
-    (PyTransferFunctionAnalysis, "TransferFunctionAnalysis"),
-    (PySensitivityAnalysis, "SensitivityAnalysis"),
-    (PyPoleZeroAnalysis, "PoleZeroAnalysis"),
-    (PyDistortionAnalysis, "DistortionAnalysis", frequency),
-    (PyPssAnalysis, "PssAnalysis", time),
-    (PySParamAnalysis, "SParamAnalysis", frequency),
-    (PyHarmonicBalanceAnalysis, "HarmonicBalanceAnalysis", frequency),
-    (PyStabilityAnalysis, "StabilityAnalysis", frequency),
-    (PyTransientNoiseAnalysis, "TransientNoiseAnalysis", time),
+    (PyDcAnalysis, "DcAnalysis", Dc, sweep),
+    (PyAcAnalysis, "AcAnalysis", Ac, frequency),
+    (PyTransientAnalysis, "TransientAnalysis", Tran, time),
+    (PyNoiseAnalysis, "NoiseAnalysis", Noise, frequency),
+    (PyTransferFunctionAnalysis, "TransferFunctionAnalysis", Tf),
+    (PySensitivityAnalysis, "SensitivityAnalysis", Sens),
+    (PyPoleZeroAnalysis, "PoleZeroAnalysis", Pz),
+    (PyDistortionAnalysis, "DistortionAnalysis", Disto, frequency),
+    (PyPssAnalysis, "PssAnalysis", Pss, time),
+    (PySParamAnalysis, "SParamAnalysis", Sp, frequency),
+    (PyHarmonicBalanceAnalysis, "HarmonicBalanceAnalysis", Hb, frequency),
+    (PyStabilityAnalysis, "StabilityAnalysis", Stb, frequency),
+    (PyTransientNoiseAnalysis, "TransientNoiseAnalysis", TranNoise, time),
 }
 
 /// `plots`, analysis `a`'s run, as its single-analysis method returns it:

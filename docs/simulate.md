@@ -302,6 +302,64 @@ print(report["errors"], report["warnings"])
 `lint` flags missing models, floating nodes and constructs the target cannot
 take; each warning names the other backends it affects.
 
+## Exporting results
+
+`ps.export(results, stem)` hands a run's results to another tool as two files
+and returns their paths.
+
+```python
+raw, meas = ps.export(both.run(), "bench")    # ("bench.raw", "bench.meas.json")
+print(ps.read_raw(raw)[0].variable_names)     # ['time', 'vin', 'vout', 'i(vin)']
+```
+
+`results` is a sequence: what `tb.run()` returns, single-analysis results in a
+list (`[tran]`, or `[tb.transient(...)]` for a stepped run), or `read_raw()`'s
+plots. A `None` in it (a Fourier's place) is left out. The stem's directory
+must exist.
+
+`bench.raw` is one ngspice raw file (`raw_format="binary"`, the default, or
+`"ascii"`): the plots in the order given, a stepped analysis's one after the
+other. Whichever simulator ran, every vector has its canonical name, the one a
+result is indexed by: `vout`, `i(vin)`, `time`. ngspice's `load` reads the
+file, and its `v(vout)` finds `vout`. A result whose vectors are not all one
+length is written as one plot per length.
+
+`bench.meas.json` is the `spicerack.measures/1` sidecar, what a raw file has no
+place for:
+
+```json
+{
+  "schema": "spicerack.measures/1",
+  "spicerack": "0.2.0",
+  "backend": "ngspice",
+  "raw": "bench.raw",
+  "analyses": [
+    {"index": 0, "kind": "tran", "plot": "Transient Analysis", "steps": null},
+    {"index": 1, "kind": "op", "plot": "Operating Point", "steps": null}
+  ],
+  "measures": [
+    {"name": "vmax", "analysis": 0, "step": null, "value": 0.993, "status": "ok"},
+    {"name": "tdel", "analysis": 0, "step": null, "value": null, "status": "failed"}
+  ]
+}
+```
+
+- `backend`: the simulator family that wrote every plot; `null` when they
+  differ or were read from a file.
+- `analyses[].index`: the number of the analysis's first plot in the raw file,
+  from 0. `kind`: `op`, `dc`, `ac`, `tran`, `noise`, `tf`, `sens`, `pz`,
+  `disto`, `pss`, `sp`, `hb`, `stb` or `trannoise`, by the result's class;
+  `null` for a plot read from a file. `steps`: `null`, or one
+  `{parameter: value}` per step in step order (step `k` is plot `index + k`).
+- `measures[]`: ordered by analysis, step, then the deck's `.meas` order.
+  `analysis` is a place in `analyses`, `step` a place in its `steps` (`null`
+  when it is not stepped). `value` is `null` exactly when `status` is
+  `"failed"`; NaN is never written, and a value JSON cannot hold (an infinity)
+  is `failed` with a `reason`. A measure of an analysis that is not exported
+  is listed once, under the first analysis of its run.
+
+The same results give the same bytes: no dates, a fixed order.
+
 ## Raw files
 
 `ps.read_raw("out.raw")` reads a simulator's `.raw` file you already have

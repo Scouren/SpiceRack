@@ -16,6 +16,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `lint(netlist, backend=None)` | `{"errors": [...], "warnings": [...]}` |
 | `compile_veriloga(source_or_path)` | compiles Verilog-A with OpenVAF, returns the `.osdi` path |
 | `read_raw(path)` | every plot of a `.raw` file, as `RawData` |
+| `export(results, stem, *, raw_format="binary")` | writes `<stem>.raw` (one ngspice raw file: the plots of every result, vectors under their canonical names) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar) and returns the two paths ([Exporting results](simulate.md#exporting-results)) |
 | `unit` | unit constants, used as `10 @ u_kOhm` |
 | `Dialect(name)`, `register_dialect(obj)` | a dialect plugin's base class and its registration ([Dialect plugins](dialects.md)); returns its `def_.Lang` |
 | `Simulator(name, dialect=, command=, output=, analyses=, features=, verilog=, verilog_a=)` | a simulator's descriptor, checked when built ([Your own simulator](simulate.md#your-own-simulator)); `.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog`, `.verilog_a` |

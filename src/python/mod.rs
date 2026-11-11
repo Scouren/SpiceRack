@@ -31,6 +31,7 @@
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
 //! - `def_.rs`, `def_enums.rs`, `def_tag.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
+//! - `export.rs`: `_export`, the native half of `spicerack.export` (results → a raw file's bytes and its sidecar's rows)
 //!
 //! Contents:
 //! - `pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()>` (`#[pymodule]` `_native`)
@@ -53,6 +54,7 @@ mod circuit;
 mod deck;
 mod def_;
 mod def_tag;
+mod export;
 mod keywords;
 mod model;
 mod results;
@@ -89,6 +91,7 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Module-level functions
     m.add_function(wrap_pyfunction!(lint, m)?)?;
     m.add_function(wrap_pyfunction!(read_raw, m)?)?;
+    export::add(m)?;
     m.add_function(wrap_pyfunction!(compile_veriloga, m)?)?;
     sims::add(m)?;
 
