@@ -10,8 +10,11 @@
 //! Cites: none.
 //!
 //! Contents:
+//! - `macro_rules! py_enum`, `macro_rules! py_units`, `macro_rules! py_all` (scoped to `python`
+//!   by `#[macro_use]`: `def_tag.rs` declares `Tag`'s class with them)
 //! - one `pub(super) struct Py<Enum>(pub(super) <Enum>)` per enum, `From<Py<Enum>> for <Enum>`,
-//!   `Py<Enum>::UNITS`; `pub(super) struct PyQuoting`, `pub(super) struct PyEnd`, `From<PyQuoting> for Quoting`
+//!   `Py<Enum>::UNITS` (`PyTag`: `def_tag.rs`, re-exported here); `pub(super) struct PyQuoting`,
+//!   `pub(super) struct PyEnd`, `From<PyQuoting> for Quoting`
 //! - `pub(super) fn add_enums(m: &Bound<'_, PyModule>) -> PyResult<()>`
 
 use pyo3::prelude::*;
@@ -32,7 +35,8 @@ use crate::syntax::lexicon::{
 use crate::syntax::render::capability::{Alt, Construct, Rule};
 use crate::syntax::render::spelling::FuncForm;
 use crate::syntax::statement::{Analysis, Command, Statement};
-use crate::syntax::token::Tag;
+
+pub(super) use super::def_tag::PyTag;
 
 /// `Quoting { escapes, protects, across_breaks }`.
 #[pyclass(name = "Quoting", module = "spicerack.def_", eq, frozen)]
@@ -102,121 +106,6 @@ macro_rules! py_all {
     };
 }
 
-py_units!(
-    PyTag,
-    "Tag",
-    Tag,
-    [
-        Title,
-        EndOfStatement,
-        LangSpice,
-        LangSpectre,
-        Invalid,
-        Ident,
-        Number,
-        String,
-        Directive,
-        KwParam,
-        KwFunc,
-        KwSubckt,
-        KwEnds,
-        KwModel,
-        KwInclude,
-        KwLib,
-        KwEndl,
-        KwEnd,
-        KwGlobal,
-        KwOptions,
-        KwTemp,
-        KwIc,
-        KwNodeset,
-        KwSave,
-        KwPrint,
-        KwProbe,
-        KwMeas,
-        KwOp,
-        KwDc,
-        KwAc,
-        KwTran,
-        KwNoise,
-        KwTf,
-        KwSens,
-        KwPz,
-        KwFour,
-        KwSp,
-        KwStep,
-        KwData,
-        KwEnddata,
-        KwVariation,
-        KwEndVariation,
-        KwControl,
-        KwEndc,
-        KwIf,
-        KwElseif,
-        KwElse,
-        KwEndif,
-        KwSimulator,
-        KwAhdlInclude,
-        KwLibrary,
-        KwEndlibrary,
-        KwSection,
-        KwEndsection,
-        KwInline,
-        KwStatistics,
-        KwProcess,
-        KwMismatch,
-        KwVary,
-        KwCorrelate,
-        KwTruncate,
-        KwReal,
-        KwReturn,
-        KwLoad,
-        KwEmbed,
-        KwGround,
-        KwAnalysis,
-        KwSweep,
-        LParen,
-        RParen,
-        LBracket,
-        RBracket,
-        LBrace,
-        RBrace,
-        Comma,
-        Equal,
-        Quote,
-        DoubleQuote,
-        Colon,
-        Semicolon,
-        Question,
-        Plus,
-        Minus,
-        Star,
-        StarStar,
-        Slash,
-        Backslash,
-        Percent,
-        Caret,
-        Bang,
-        BangEqual,
-        EqualEqual,
-        LessGreater,
-        Less,
-        LessEqual,
-        LessLess,
-        Greater,
-        GreaterEqual,
-        GreaterGreater,
-        Amp,
-        AmpAmp,
-        Pipe,
-        PipePipe,
-        Tilde,
-        Dot,
-        At,
-        Hash,
-        Backtick,
-    ]
-);
 py_units!(PyJoin, "Join", Join, [None, Brackets, Parens]);
 py_units!(PyDollar, "Dollar", Dollar, [Text, AfterBlank, Hspice]);
 py_units!(

@@ -27,7 +27,7 @@
 //! - `store.rs`: a subcircuit's source text and stored file (`to_source`, `save`)
 //! - `simulator.rs`, `spectre.rs`: `CircuitSimulator` and its Spectre-only analyses
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
-//! - `def_.rs`, `def_enums.rs`: the dialect-definition API (`spicerack.def_`)
+//! - `def_.rs`, `def_enums.rs`, `def_tag.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
 //!
 //! Contents:
@@ -40,6 +40,8 @@ use pyo3::prelude::*;
 mod source;
 #[macro_use]
 mod spectre;
+#[macro_use]
+mod def_enums;
 
 mod analysis;
 mod analysis_region;
@@ -48,7 +50,7 @@ mod card;
 mod circuit;
 mod deck;
 mod def_;
-mod def_enums;
+mod def_tag;
 mod keywords;
 mod model;
 mod results;
