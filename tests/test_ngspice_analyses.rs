@@ -104,6 +104,37 @@ fn pz_finds_the_rc_pole_at_minus_one_over_rc() {
     assert!(pole.im.abs() < 1e-6, "real pole expected, got {pole}");
 }
 
+// ── .dc, two sources ──
+
+#[test]
+fn p3_094_a_two_source_dc_keeps_its_outer_sweep() {
+    // Oracle: the simulator's own node voltages (`v(a)` is V1, `v(b)` is
+    // V2) and the closed form of the resistor star, out = (V1 + V2) / 3.
+    use spicerack::backend::Kind;
+    let deck = "* dc2\nV1 a 0 0\nV2 b 0 0\nR1 a out 1k\nR2 b out 1k\nR3 out 0 1k\n\
+                .dc V1 0 1 0.5 V2 0 2 1\n.end\n";
+    let each = spicerack::simulation::run_each(Dialect::Ngspice, deck, &[Kind::Dc]).expect("runs");
+    let raw = &each[0][0];
+    let (inner, outer) = (column(raw, "v-sweep"), column(raw, "sweep1"));
+    assert_eq!(
+        inner,
+        column(raw, "a"),
+        "the inner source's own node voltage"
+    );
+    assert_eq!(
+        outer,
+        column(raw, "b"),
+        "the outer source's own node voltage"
+    );
+    assert_eq!(outer, [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0]);
+    for ((x, y), out) in inner.iter().zip(outer).zip(column(raw, "out")) {
+        assert!(
+            (out - (x + y) / 3.0).abs() < 1e-12,
+            "({x} + {y}) / 3 is not {out}"
+        );
+    }
+}
+
 // ── .four ──
 
 #[test]

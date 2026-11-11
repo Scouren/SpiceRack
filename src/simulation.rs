@@ -15,7 +15,7 @@
 //! - `pub fn run_each(sim: Dialect, deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError>`
 
 use crate::backend::{BackendError, Dialect, Kind, Plot};
-use crate::result::RawData;
+use crate::result::{RawData, VarInfo, VarType};
 use crate::syntax::render::LTSPICE_EACH;
 
 /// Runs `deck`, written in `sim`'s dialect, on `sim`, tagging the result
@@ -63,6 +63,10 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
 /// one per analysis. A lone analysis takes the first plot, as [`run`], or
 /// every step.
 ///
+/// A two-source `.dc` on ngspice or ESPice, whose plot holds the inner
+/// sweep alone, gets its outer sweep as the column `sweep1`, VACASK's
+/// name for it (`outer_sweeps`).
+///
 /// # Errors
 /// As [`run_all`], and `SimulationError` when an analysis's plot is not
 /// among those the run wrote, or it is an analysis whose plot is not
@@ -79,12 +83,18 @@ pub fn run_each(
     let mut plots: Vec<Option<RawData>> = run_all(sim, deck)?.into_iter().map(Some).collect();
     assert!(!plots.is_empty(), "a run returns at least one plot");
     let stepped = plots.iter().flatten().any(|p| !p.params.is_empty());
+    // ngspice and ESPice write a nested `.dc`'s inner sweep alone.
+    let inner_only = matches!(sim, Dialect::Ngspice | Dialect::Espice);
     if analyses.len() <= 1 {
         if !stepped {
             let second = analyses.first().is_some_and(|&a| also(a, plots.get(1)));
             plots.truncate(1 + usize::from(second));
         }
-        return Ok(vec![plots.into_iter().flatten().collect()]);
+        let mut each = vec![plots.into_iter().flatten().collect()];
+        if inner_only {
+            outer_sweeps(deck, analyses, &mut each);
+        }
+        return Ok(each);
     }
     let missing = |what: &str| {
         BackendError::SimulationError(format!("no {what} plot among those the run wrote"))
@@ -138,6 +148,9 @@ pub fn run_each(
         out.push(own);
     }
     assert_eq!(out.len(), analyses.len());
+    if inner_only {
+        outer_sweeps(deck, analyses, &mut out);
+    }
     Ok(out)
 }
 
@@ -232,4 +245,118 @@ fn commands_run(deck: &str) -> bool {
 fn is_card(line: &str, word: &str) -> bool {
     let first = line.split_whitespace().next().unwrap_or("");
     first.eq_ignore_ascii_case(word)
+}
+
+/// Gives each two-source `.dc`'s plot its outer sweep as a last column,
+/// `sweep1` (the name the VACASK writer gives its outer `sweep`): ngspice
+/// and ESPice write the inner sweep alone (`v(v-sweep)`, once per outer
+/// value). `each` is one entry per analysis of `analyses`; the k-th dc
+/// analysis is the deck's k-th `.dc` card (a `dc` command inside a
+/// `.control` block). The values are the card's, `start2 + k * step2`,
+/// added only to a plot that agrees with its card: its points are the
+/// outer count times the inner sweep, which is back at its first value at
+/// each multiple. A card whose outer fields are not plain numbers adds
+/// none.
+fn outer_sweeps(deck: &str, analyses: &[Kind], each: &mut [Vec<RawData>]) {
+    assert!(each.len() >= analyses.len(), "one entry per analysis");
+    let mut inside = false;
+    let cards = deck.lines().filter(|line| {
+        inside = (inside || is_card(line, ".control")) && !is_card(line, ".endc");
+        is_card(line, ".dc") || (inside && is_card(line, "dc"))
+    });
+    let dcs = analyses.iter().zip(each).filter(|(a, _)| **a == Kind::Dc);
+    for ((_, plots), card) in dcs.zip(cards) {
+        // `.dc src1 start1 stop1 step1 src2 start2 stop2 step2`
+        let outer: Vec<f64> = card.split_whitespace().skip(6).map_while(number).collect();
+        let &[start, stop, step] = outer.as_slice() else {
+            continue;
+        };
+        let count = (((stop - start) / step + 1e-9).floor() + 1.0) as usize;
+        let real = |p: &&mut RawData| p.real_data.len() == p.variables.len();
+        for p in plots.iter_mut().filter(real) {
+            let points = p.real_data.first().map_or(0, Vec::len);
+            if count == 0 || points == 0 || !points.is_multiple_of(count) {
+                continue;
+            }
+            let (inner, axis) = (points / count, &p.real_data[0]);
+            if !(0..points).step_by(inner).all(|i| axis[i] == axis[0]) {
+                continue;
+            }
+            let column = (0..points)
+                .map(|i| start + (i / inner) as f64 * step)
+                .collect();
+            p.variables.push(VarInfo {
+                index: p.variables.len(),
+                name: "sweep1".to_string(),
+                var_type: VarType::Other,
+            });
+            p.real_data.push(column);
+            assert_eq!(p.real_data.len(), p.variables.len());
+        }
+    }
+}
+
+/// A `.dc` card's field as a number (`-0.5`, `1k`, `2V`); `None` for one
+/// that is none (a parameter, an expression).
+fn number(field: &str) -> Option<f64> {
+    let (sign, digits) = match field.strip_prefix('-') {
+        Some(rest) => (-1.0, rest),
+        None => (1.0, field.strip_prefix('+').unwrap_or(field)),
+    };
+    let (value, len, scale) = crate::unit::parse_spice_number(digits)?;
+    let unit = &digits[len + scale.len()..];
+    unit.chars()
+        .all(|c| c.is_ascii_alphabetic())
+        .then_some(sign * value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The outer column `outer_sweeps` gives a 2-column dc plot (`axis`,
+    /// then V2's node `b`) under the deck lines `cards`, if any.
+    fn outer(cards: &str, axis: &[f64], b: &[f64]) -> Option<Vec<f64>> {
+        let var = |index, name: &str| VarInfo {
+            index,
+            name: name.to_string(),
+            var_type: VarType::Voltage,
+        };
+        let plot = RawData {
+            plot_name: "DC transfer characteristic".to_string(),
+            variables: vec![var(0, "v(v-sweep)"), var(1, "v(b)")],
+            real_data: vec![axis.to_vec(), b.to_vec()],
+            ..RawData::default()
+        };
+        let mut each = vec![vec![plot]];
+        outer_sweeps(&format!("* t\n{cards}\n.end\n"), &[Kind::Dc], &mut each);
+        each[0][0].real_data.get(2).cloned()
+    }
+
+    #[test]
+    fn p3_094_the_outer_sweep_is_the_cards_where_the_plot_agrees() {
+        // Oracle: ngspice-45's own `v(b)` (V2's node voltage) and
+        // `v(v-sweep)` for each card (research/impl/evidence/P3-094).
+        let a9 = [0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0];
+        let b9 = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0];
+        assert_eq!(
+            outer(".dc V1 0 1 0.5 V2 0 2 1", &a9, &b9),
+            Some(b9.to_vec())
+        );
+        // The ngspice writer's `.control` shape, a scaled number.
+        let command = ".control\ndc V1 0 1 500m V2 0 2000m 1\n.endc";
+        assert_eq!(outer(command, &a9, &b9), Some(b9.to_vec()));
+        // A one-point inner sweep, the outer one descending.
+        let down = [2.0, 1.0, 0.0];
+        assert_eq!(
+            outer(".dc V1 1 1 1 V2 2 0 -1", &[1.0; 3], &down),
+            Some(down.to_vec())
+        );
+        // One source: no outer sweep. A card that is not this plot's (four
+        // outer values, nine points) or not plain numbers: none made up.
+        assert_eq!(outer(".dc V1 0 1 0.5", &a9, &b9), None);
+        assert_eq!(outer(".dc V1 0 1 0.5 V2 0 3 1", &a9, &b9), None);
+        assert_eq!(outer(".dc V1 0 1 0.5 V2 0 {top} 1", &a9, &b9), None);
+        assert_eq!(outer("dc V1 0 1 0.5 V2 0 2 1", &a9, &b9), None);
+    }
 }

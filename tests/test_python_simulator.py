@@ -690,6 +690,30 @@ def test_run_with_a_measure_runs_every_analysis_from_the_control_block():
     assert tran.measures["vend"] == pytest.approx(1.0 - math.exp(-2.0), abs=2e-3)
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p3_094_api_two_sweep_dc_has(backend):
+    """ZERO-LEDGER P3-094: a two-source dc returns both sweeps: the inner one
+    is the axis (`dc.sweep`), the outer one the vector `sweep1`, on every
+    backend. Oracle: the simulator's own node voltages (`a` is V1, `b` is
+    V2) and the closed form of the resistor star, out = (V1 + V2) / 3."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("star", ["a", "b", "out"])
+    dut.R(name="1", positive="a", negative="out", value=1e3)
+    dut.R(name="2", positive="b", negative="out", value=1e3)
+    dut.R(name="3", positive="out", negative="0", value=1e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="1", positive="a", negative="0", value=0.0)
+    tb.V(name="2", positive="b", negative="0", value=0.0)
+    dc = tb.dc(V1=slice(0.0, 1.0, 0.5), V2=slice(0.0, 2.0, 1.0))
+    assert dc.sweep == pytest.approx([0.0, 0.5, 1.0] * 3)
+    assert dc.sweep == pytest.approx(dc["a"])
+    assert dc["sweep1"] == pytest.approx([0.0] * 3 + [1.0] * 3 + [2.0] * 3)
+    assert dc["sweep1"] == pytest.approx(dc["b"])
+    assert dc["out"] == pytest.approx([(x + y) / 3 for x, y in zip(dc.sweep, dc["sweep1"])])
+
+
 def test_run_gives_none_for_a_fourier_and_refuses_an_empty_queue():
     """`.four` prints its table to stdout and writes no plot."""
     import spicerack as ps

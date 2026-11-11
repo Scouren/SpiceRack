@@ -98,7 +98,7 @@ queued beside others raise instead.
 | Run method | Queue method | Signature | Result |
 |---|---|---|---|
 | `operating_point()` | `add_operating_point()` | — | `OperatingPoint` |
-| `dc(**sweeps)` | `add_dc(**sweeps)` | `Vin=slice(start, stop, step)` | `DcAnalysis` |
+| `dc(**sweeps)` | `add_dc(**sweeps)` | `Vin=slice(start, stop, step)`; a second keyword is an outer sweep, read as `dc["sweep1"]` | `DcAnalysis` |
 | `ac(...)` | `add_ac(...)` | `(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(...)` | `add_transient(...)` | `(step_time, end_time, start_time=, max_time=)` | `TransientAnalysis` |
 | `noise(...)` | `add_noise(...)` | `(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)`; the two nodes by name (`"out"`, or `"v(out)"`), else `ValueError` | `NoiseAnalysis` |
