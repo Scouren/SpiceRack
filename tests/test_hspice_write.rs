@@ -60,21 +60,21 @@ fn p3_064_an_ngspice_device_vector_is_no_hspice_probe() {
 fn p3_064_hspices_tran_leaves_a_zero_start_to_the_default() {
     let rc = "t\nV1 1 0 pulse(0 1 0 1n 1n 1 2)\nR1 1 2 1k\nC1 2 0 1u\n";
     let cite = "HSPICE cmdref E-2010.12 `.TRAN` (p.312): tstep1 tstop1 [START=val] [UIC]";
-    let deck = format!("{rc}.tran 10u 5m 0 10u\n.end\n");
+    let deck = format!("{rc}.tran 1u 5m 0 10u\n.end\n");
     spec_example(
         cite,
         &deck,
         Dialect::Ngspice,
         Dialect::Hspice,
-        &[".tran 10u 5m"],
+        &[".tran 1u 5m"],
     );
-    let late = format!("{rc}.tran 10u 5m 1m\n.end\n");
+    let late = format!("{rc}.tran 1u 5m 1m\n.end\n");
     spec_example(
         cite,
         &late,
         Dialect::Ngspice,
         Dialect::Hspice,
-        &[".tran 10u 5m START=1m"],
+        &[".tran 1u 5m START=1m"],
     );
     let tol = Tol {
         rel: 1e-3,

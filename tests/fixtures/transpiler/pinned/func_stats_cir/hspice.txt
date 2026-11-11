@@ -2,5 +2,7 @@
 .param c(x)='limit(x, 0, 2) + agauss(x, 1)'
 V1 a 0 1
 R1 a 0 'c(3)*1k'
+.options tnom=27
+.temp 27
 .op
 .end
