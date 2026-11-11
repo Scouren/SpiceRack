@@ -1,7 +1,8 @@
 //! VACASK: run `vacask` on a native deck, read back every per-analysis `.raw`.
 //!
 //! Cites: VACASK's CLI; `docs/cmd-analysis-mc.md` ("Output": an `mc` loop's
-//! raw file names).
+//! raw file names); `lib/dfllexer.l` L159 (a netlist's first line is its
+//! title, whatever it says: `syntax/dialects/vacask.rs` cites the same).
 //!
 //! Contents:
 //! - `pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError>`
@@ -74,13 +75,20 @@ pub(super) fn read(dir: &Path, netlist: &str, stdout: &str) -> Result<Vec<RawDat
 
 // ---- private ----
 
+/// The lines of a deck that can hold a statement: every line but the
+/// first, which VACASK reads as the title whatever it says (`analysis of
+/// a divider` is a title, not an analysis named `of`).
+fn statements(netlist: &str) -> impl Iterator<Item = &str> {
+    netlist.lines().skip(1)
+}
+
 /// The raw file stems a deck's analyses write, in order: `analysis <name>
 /// <kind> ...` writes `<name>`; inside `mc <loop> samples=<n>` … `endmc`,
 /// `<loop>.<i>.<name>` for each sample `i` from 1 to `n`.
 fn analysis_names(netlist: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut mc: Option<(&str, u32)> = None;
-    for l in netlist.lines() {
+    for l in statements(netlist) {
         let mut w = l.split_whitespace();
         match (w.next(), w.next()) {
             (Some("mc"), Some(name)) => {
@@ -108,7 +116,7 @@ fn analysis_names(netlist: &str) -> Vec<String> {
 fn outer_sweeps(netlist: &str) -> Vec<usize> {
     let mut out = Vec::new();
     let (mut sweeps, mut mc) = (0, 1);
-    for l in netlist.lines() {
+    for l in statements(netlist) {
         let mut w = l.split_whitespace();
         match w.next() {
             Some("sweep") => sweeps += 1,
@@ -241,8 +249,16 @@ mod tests {
         let deck = "x\ncontrol\n  analysis op1 op\n  sweep s instance=\"v1\" parameter=\"dc\"\n    analysis dc1 op\nendc\n";
         assert_eq!(analysis_names(deck), ["op1", "dc1"]);
         // `docs/cmd-analysis-mc.md` "Output": `mc1.<i>.op1.raw` per sample.
-        let mc = "control\n  mc mc1 samples=2 seed=1 lh=0\n    analysis op2 op\n  endmc\nendc\n";
+        let mc = "x\ncontrol\n  mc mc1 samples=2 seed=1 lh=0\n    analysis op2 op\n  endmc\nendc\n";
         assert_eq!(analysis_names(mc), ["mc1.1.op2", "mc1.2.op2"]);
+        // ZERO-LEDGER P8-319. Line 1 is the title, whatever it says: under
+        // titles opening with these words VACASK wrote `tran1.raw` alone,
+        // its time vector first (research/impl/evidence/P8-319/title2.out).
+        let titled = |t: &str| format!("{t}\ncontrol\n  analysis tran1 tran stop=1u\nendc\n");
+        for title in ["analysis of x", "sweep of x", "mc of x"] {
+            assert_eq!(analysis_names(&titled(title)), ["tran1"], "{title}");
+            assert_eq!(outer_sweeps(&titled(title)), [0], "{title}");
+        }
     }
 
     #[test]
@@ -252,7 +268,7 @@ mod tests {
         // `step_r frequency …`, `step_r …`, `step_r vsweep …`.
         let deck = "control\n  sweep step_r variable=\"r\"\n  analysis ac1 ac\n  sweep step_r variable=\"r\"\n  analysis op2 op\n  sweep step_r variable=\"r\"\n  sweep vsweep instance=\"vin\"\n    analysis dc3 op\n  analysis tr4 tran\nendc\n";
         assert_eq!(outer_sweeps(deck), [1, 0, 1, 0]);
-        let mc = "  mc mc1 samples=2\n    analysis op2 op\n  endmc\n";
+        let mc = "x\n  mc mc1 samples=2\n    analysis op2 op\n  endmc\n";
         assert_eq!(outer_sweeps(mc), [0, 0]);
         let var = |n: &str, i| crate::result::VarInfo {
             index: i,
@@ -286,7 +302,7 @@ mod tests {
             std::fs::write(dir.path().join(f), "").unwrap();
         }
         assert_eq!(
-            names(raw_files_for(dir.path(), "analysis tr1 tran\nanalysis op1 op\n").unwrap()),
+            names(raw_files_for(dir.path(), "x\nanalysis tr1 tran\nanalysis op1 op\n").unwrap()),
             ["tr1.raw", "op1.raw"]
         );
         assert_eq!(
@@ -294,7 +310,7 @@ mod tests {
             ["op1.raw", "tr1.raw", "zz.raw"]
         );
         assert_eq!(
-            raw_files_for(dir.path(), "analysis op1 op\nanalysis ac1 ac\n"),
+            raw_files_for(dir.path(), "x\nanalysis op1 op\nanalysis ac1 ac\n"),
             Err("ac1.raw".into())
         );
         let empty = tempfile::TempDir::new().unwrap();

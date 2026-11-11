@@ -1278,3 +1278,30 @@ def test_p8_009_a_lib_call_selects_the_section_a_circuit_wrote(backend, tmp_path
         tb.V("in", "in", "0", 1.0)
         # A linear DC solve: exact to rounding.
         assert tb.operating_point()["out"] == pytest.approx(want, rel=1e-9), name
+
+
+@pytest.mark.needs("vacask")
+@pytest.mark.parametrize("title", ["div", "analysis of a divider", "sweep of a divider", "mc of a divider"])
+def test_p8_319_a_vacask_decks_title_is_never_read_as_a_statement(title):
+    """ZERO-LEDGER P8-319: the built-in reads a VACASK run by the deck's `analysis`, `sweep` and
+    `mc` lines; line 1 is the title, which VACASK runs whatever it says. Read as a statement,
+    `analysis of ...` failed the run ("vacask wrote no of.raw") and `sweep of ...` moved the
+    time vector behind the nodes with no error. Oracle: closed form, 1 V over 1k + 3k is
+    0.75 V at every point, and a transient to 1 us starts at 0 s and ends at 1 us."""
+    import spicerack as ps
+
+    def bench():
+        c = ps.Circuit(title)
+        c.V("in", "in", "0", 1.0)
+        c.R("1", "in", "out", 1e3)
+        c.C("1", "out", "0", 1e-9)
+        c.R("2", "out", "0", 3e3)
+        tb = ps.Testbench(c)
+        tb.with_backend("vacask")
+        return tb
+
+    assert bench().operating_point()["out"] == pytest.approx(0.75, rel=1e-9)
+    tran = bench().transient(step_time=1e-7, end_time=1e-6)
+    assert (tran.time[0], tran.time[-1]) == (0.0, pytest.approx(1e-6, rel=1e-9))
+    assert all(t0 < t1 for t0, t1 in zip(tran.time, tran.time[1:]))
+    assert tran["out"] == pytest.approx([0.75] * len(tran.time), rel=1e-6)
