@@ -3,7 +3,13 @@
 //! operators and how tight they bind, which group to the right, the prefix
 //! operators and how far their operand reaches, the probe names. Blanks are
 //! gaps between tokens and mean nothing here; where an expression ends is
-//! the first token that is no operator or operand.
+//! the first token that is no operator or operand. A strict lexicon's rules
+//! are noted where the climb decides a grouping, and the tree is read on:
+//! a second operator of a level that does not associate ([`Ops::nonassoc`],
+//! `P0022`), a ternary as a then-branch ([`Nesting::Explicit`], `P0021`), a
+//! `^` the dialect refuses ([`Caret::Refused`], `P0023`), an operand that
+//! is no number of a lexicon whose numbers take no tail ([`Tail::None`],
+//! `P0020`).
 //!
 //! The climb recurses once per nesting level and stops at
 //! [`DEPTH_MAX`](crate::syntax::parse::DEPTH_MAX) with a `P0006`.
@@ -21,7 +27,7 @@
 
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::diag::Code;
-use crate::syntax::lexicon::{Ops, Quote};
+use crate::syntax::lexicon::{Caret, Nesting, Ops, Quote, Tail};
 use crate::syntax::parse::{DEPTH_MAX, Parser};
 use crate::syntax::token::Tag as T;
 
@@ -134,6 +140,11 @@ impl Parser<'_, '_> {
         match tag {
             T::Number => {
                 self.i += 1;
+                // A lexicon whose numbers take no tail: `1kohm` as an
+                // operand is no number.
+                if lex.numbers.tail == Tail::None && self.t.value(at).is_nan() {
+                    self.ast.diag(Code::P0020, at);
+                }
                 Ok(self.ast.push(Tag::Num, at, NONE, NONE))
             }
             T::String => {
@@ -270,6 +281,11 @@ impl Parser<'_, '_> {
                 }
                 self.i += 1;
                 let b = self.expr_bp(Ops::TERNARY)?;
+                // `a ? b ? c : d : e`: ngspice-45 numparam and C group it
+                // differently; the else branch (`b` here) nests as written.
+                if ops.ternary == Nesting::Explicit && self.ast.tag(a) == Tag::Ternary {
+                    self.ast.diag(Code::P0021, self.ast.main_token(a));
+                }
                 let at = self.ast.push_extra(&[a.0, b.0]);
                 left = self.ast.push(Tag::Ternary, q, left.0, at);
                 continue;
@@ -286,6 +302,17 @@ impl Parser<'_, '_> {
             self.i += 1;
             let next = if ops.right.contains(&tag) { bp } else { bp + 1 };
             let r = self.expr_bp(next)?;
+            if tag == T::Caret && self.t.lexicon_at(op).caret == Caret::Refused {
+                self.ast.diag(Code::P0023, op);
+            }
+            // `a == b == c`: the operator after this one's operands is of
+            // its own level, and the level does not associate.
+            if ops.nonassoc.contains(&tag)
+                && let Some(after) = self.peek()
+                && ops.infix.contains(&(after, bp))
+            {
+                self.ast.diag(Code::P0022, self.i);
+            }
             left = self.ast.push(Tag::Binary, op, left.0, r.0);
         }
         Ok(left)

@@ -30,7 +30,7 @@ use crate::syntax::def::{Devices, Keywords, Operators};
 use crate::syntax::diag::{Code, Kind};
 use crate::syntax::lang::CONSTRUCTS;
 use crate::syntax::lexicon::{
-    Arithmetic, Backslash, Caret, Dollar, End, Join, Quote, Quoting, Scale, Tail,
+    Arithmetic, Backslash, Caret, Dollar, End, Join, Nesting, Quote, Quoting, Scale, Tail,
 };
 use crate::syntax::render::capability::{Alt, Construct, Rule};
 use crate::syntax::render::spelling::FuncForm;
@@ -114,7 +114,8 @@ py_units!(
     Backslash,
     [None, Glue, Hspice, Join, Tight]
 );
-py_units!(PyCaret, "Caret", Caret, [Pow, Xor, None]);
+py_units!(PyCaret, "Caret", Caret, [Pow, Xor, None, Refused]);
+py_units!(PyNesting, "Nesting", Nesting, [Free, Explicit]);
 py_units!(PyArithmetic, "Arithmetic", Arithmetic, [Ngspice, Decimal]);
 py_units!(PyKeywords, "Keywords", Keywords, [Spice]);
 py_units!(PyOperators, "Operators", Operators, [Spice]);
@@ -258,7 +259,7 @@ py_enum!(PyQuote, "Quote", Quote, units = &[Quote::Plain, Quote::Name], covers =
     }
 });
 
-py_enum!(PyTail, "Tail", Tail, units = &[Tail::Ltspice], covers = [Ltspice]
+py_enum!(PyTail, "Tail", Tail, units = &[Tail::Ltspice, Tail::None], covers = [Ltspice, None]
     | Tail::Spice { .. } | Tail::Letters { .. }, data = ["Spice", "Letters"] {
     #[staticmethod]
     #[pyo3(name = "Spice")]
@@ -331,6 +332,7 @@ pub(super) fn add_enums(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add(m, PyDollar::UNITS, PyDollar)?;
     add(m, PyBackslash::UNITS, PyBackslash)?;
     add(m, PyCaret::UNITS, PyCaret)?;
+    add(m, PyNesting::UNITS, PyNesting)?;
     add(m, PyArithmetic::UNITS, PyArithmetic)?;
     add(m, PyKeywords::UNITS, PyKeywords)?;
     add(m, PyOperators::UNITS, PyOperators)?;

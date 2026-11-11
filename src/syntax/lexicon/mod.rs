@@ -17,7 +17,8 @@
 //!   `Lexicon::master(&self, word: &str) -> Option<Statement>`,
 //!   `Lexicon::analysis(&self, word: &str) -> Option<Analysis>`
 //! - `pub enum Join`, `pub enum Dollar`, `pub enum Backslash`, `pub struct End`, `pub enum Quote`,
-//!   `pub struct Quoting`, `pub enum Caret`, `pub struct Ops`, `Ops::TERNARY: u8`
+//!   `pub struct Quoting`, `pub enum Caret`, `pub enum Nesting`, `pub struct Ops`,
+//!   `Ops::TERNARY: u8`
 //! - `pub struct Numbers`, `pub enum Scale`, `pub enum Tail`, `pub enum Arithmetic`
 //! - `pub(crate) const SPICE_KEYWORDS`, `pub(crate) const SPICE_OPERATORS: &[(&str, Tag)]`
 
@@ -232,6 +233,21 @@ pub enum Caret {
     Xor,
     /// No operator.
     None,
+    /// No operator of the dialect, which spells power `**` only. Where an
+    /// operator row still reads it (so the rest of the expression is
+    /// checked) it is noted `P0023`.
+    Refused,
+}
+
+/// Where a `?:` may hold another with no parentheses around it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Nesting {
+    /// Anywhere: `a ? b ? c : d : e` reads as the dialect groups it.
+    #[default]
+    Free,
+    /// In the else branch only (`a ? b : c ? d : e`). As the then branch
+    /// it is a `P0021`: ngspice groups that one differently from C.
+    Explicit,
 }
 
 /// A dialect's expression operators, for the parser's precedence climb.
@@ -242,6 +258,12 @@ pub struct Ops {
     pub infix: &'static [(Tag, u8)],
     /// The binary operators that group to the right (`**` in Spectre).
     pub right: &'static [Tag],
+    /// The binary operators that do not associate: a second operator of
+    /// the same binding power right after one's operands is a `P0022`
+    /// (`a == b == c`).
+    pub nonassoc: &'static [Tag],
+    /// Where a `?:` may hold another unparenthesized.
+    pub ternary: Nesting,
     /// The prefix operators.
     pub prefix: &'static [Tag],
     /// A prefix operator's operand takes the infix operators that bind
@@ -293,6 +315,9 @@ pub enum Tail {
     /// `after_exponent`: a scale may follow an exponent (`1e3k`); `hex`:
     /// `0x…` is a number this does not decode.
     Letters { after_exponent: bool, hex: bool },
+    /// Nothing: a number ends at its scale. `1kohm` is no number (a word
+    /// where a name may stand), and as an expression operand a `P0020`.
+    None,
 }
 
 /// How a number's digits become an `f64`.

@@ -195,7 +195,7 @@ The `u_Ω` family is registered with U+03A9 and does work.
 | `ps.Dialect(name)` | base class; override `define(self, d) -> DialectDef` |
 | `ps.register_dialect(obj)` | `DialectDef(obj.name)`, one-argument class attributes as calls, `obj.define(d)`, register; returns `Lang` |
 | `ps.dialects.NGSPICE` ... `VERILOG` | the built-ins as base classes (`define` is `d.extends(Lang.X)`) |
-| `def_.DialectDef(name)` | the Rust calls 1:1, chained: `extends`, `renamed`, `comment_line`, `keyword`, `scale`, `write_head`, `option`, `option_to`, `model_master`, `spell`, `refuse`, `code`, `refuse_code`, `hook`, `runs_on`, `kept_word(word, Construct)`, `dot_rule(word, DotRule.Note(Code) \| DotRule.SParams)`, ... |
+| `def_.DialectDef(name)` | the Rust calls 1:1, chained: `extends`, `renamed`, `comment_line`, `keyword`, `scale`, `write_head`, `option`, `option_to`, `model_master`, `spell`, `refuse`, `code`, `refuse_code`, `hook`, `runs_on`, `kept_word(word, Construct)`, `dot_rule(word, DotRule.Note(Code) \| DotRule.SParams)`, `no_infix(tag)`, `no_scale(text)`, `nonassoc(tag)`, `ternary_nesting(Nesting.Explicit)`, ... |
 | `def_.register(d)` | registers a `DialectDef`; `ValueError` names the rule it breaks |
 | `def_.Lang` | `Lang.NGSPICE` ... `Lang.VERILOG`, `Lang.from_name(n)`, `.name()`, `.dump()`, `.runs_on()` |
 | `def_.Card`, `def_.Answer` | a hook's card (`head`, `words`, `params`, `text`) and answer (`Answer.Text(s)`, `Answer.Refuse(id)`) |

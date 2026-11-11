@@ -15,9 +15,10 @@
 //!   Python mirror `tests/builtin_dialects.py` (the function named for the
 //!   dialect, same order): `tests/test_dialect_def.py` compares the two
 //!   rows' dumps, so a missed mirror fails pytest.
-//! - `espice.rs` and `ngspice_given.rs` extend ngspice: a construct they do
-//!   not answer takes ngspice's cell. A cell changed in `ngspice.rs` is
-//!   ESPice's too unless `espice.rs` answers it.
+//! - `espice.rs` and `ngspice_given.rs` extend ngspice (and `spicerack.rs`
+//!   ngspice-given): a construct they do not answer takes ngspice's cell.
+//!   A cell changed in `ngspice.rs` is ESPice's too unless `espice.rs`
+//!   answers it.
 //! - A new construct (a `Construct` variant, `render::capability`) needs a
 //!   cell in each file that does not extend another (cdl, hspice, ltspice,
 //!   ngspice, spectre, vacask, verilog, xyce) and in each mirror; a
@@ -43,6 +44,7 @@ mod ltspice;
 mod ngspice;
 mod ngspice_given;
 mod spectre;
+mod spicerack;
 mod vacask;
 mod verilog;
 mod xyce;
@@ -83,4 +85,6 @@ pub(crate) fn register_builtins() {
     }
     let given = register(ngspice_given::ngspice_given()).expect("ngspice-given registers");
     assert_eq!(given, Lang::NGSPICE_GIVEN);
+    let neutral = register(spicerack::spicerack()).expect("spicerack registers");
+    assert_eq!(neutral, Lang::SPICERACK);
 }

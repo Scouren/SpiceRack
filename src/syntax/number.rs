@@ -88,6 +88,12 @@ fn decode(text: &str, n: &Numbers, fold: bool) -> Option<f64> {
                 return None;
             }
         }
+        Tail::None => {
+            if !after.is_empty() {
+                return None;
+            }
+            None
+        }
         Tail::Letters { .. } => {
             let letters = after.bytes().all(|c| c.is_ascii_alphabetic() || c == b'_');
             if !(rest.is_empty() || (scale.is_some() && letters)) {

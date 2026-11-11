@@ -40,6 +40,8 @@ mod espice;
 mod hspice;
 #[path = "../src/syntax/dialects/ltspice.rs"]
 mod ltspice;
+#[path = "../src/syntax/dialects/spicerack.rs"]
+mod neutral;
 #[path = "../src/syntax/dialects/ngspice.rs"]
 mod ngspice;
 #[path = "../src/syntax/dialects/ngspice_given.rs"]
@@ -95,6 +97,7 @@ fn builtins() -> [(Lang, fn() -> DialectDef); Lang::BUILTIN_COUNT] {
         (Lang::CDL, cdl::cdl),
         (Lang::VERILOG, verilog::verilog),
         (Lang::NGSPICE_GIVEN, ngspice_given::ngspice_given),
+        (Lang::SPICERACK, neutral::spicerack),
     ]
 }
 

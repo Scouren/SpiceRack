@@ -12,15 +12,16 @@
 //!   `cont_skip`, `comment_tail`, `block_comment`, `long_strings`, `dollar`, `plus`, `backslash`,
 //!   `end`, `stop`, `join`, `quote`, `string`, `string_expr`, `name_escape`, `ident_start`,
 //!   `ident_continue`, `directive`, `head_words`, `head_after`, `operators`, `operator`,
-//!   `expr_braces`, `caret`, `infix`, `right`, `prefix`, `prefix_bp`, `probe`, `index`,
-//!   `lib_sections`, `exponent`, `scale`, `tail`, `arithmetic`, `keywords`, `keyword`, `named`,
+//!   `expr_braces`, `caret`, `infix`, `no_infix`, `right`, `nonassoc`, `ternary_nesting`, `prefix`,
+//!   `prefix_bp`, `probe`, `index`, `lib_sections`, `exponent`, `scale`, `no_scale`, `tail`,
+//!   `arithmetic`, `keywords`, `keyword`, `named`,
 //!   `devices`, `device`, `master`, `analysis`, `region`
 
 use super::{Devices, DialectDef, Keywords, Operators, add, push_new, put};
 use crate::syntax::Lang;
 use crate::syntax::device;
 use crate::syntax::lexicon::{
-    self, Arithmetic, Backslash, Caret, Dollar, End, Join, Quote, Quoting, Scale, Tail,
+    self, Arithmetic, Backslash, Caret, Dollar, End, Join, Nesting, Quote, Quoting, Scale, Tail,
 };
 use crate::syntax::statement::{Analysis, Statement};
 use crate::syntax::token::Tag;
@@ -173,6 +174,29 @@ impl DialectDef {
         self
     }
 
+    /// `t` is no binary operator: the row the extended language gave it
+    /// is taken out.
+    pub fn no_infix(mut self, t: Tag) -> Self {
+        self.lex().infix.retain(|r| r.0 != t);
+        self
+    }
+
+    /// Binary operator `t` does not associate: a second operator of its
+    /// binding power after its operands, with no parentheses, is a `P0022`.
+    pub fn nonassoc(mut self, t: Tag) -> Self {
+        let l = self.lex();
+        if !l.nonassoc.contains(&t) {
+            l.nonassoc.push(t);
+        }
+        self
+    }
+
+    /// Where a `?:` may hold another with no parentheses around it.
+    pub fn ternary_nesting(mut self, v: Nesting) -> Self {
+        self.lex().ternary = v;
+        self
+    }
+
     /// `t` is a prefix operator.
     pub fn prefix(mut self, t: Tag) -> Self {
         let l = self.lex();
@@ -197,6 +221,13 @@ impl DialectDef {
     /// `text` after a mantissa scales it by `s`.
     pub fn scale(mut self, text: &str, s: Scale) -> Self {
         put(&mut self.lex().scales, text.to_string(), s);
+        self
+    }
+
+    /// `text` is no scale suffix: the row the extended language gave it is
+    /// taken out.
+    pub fn no_scale(mut self, text: &str) -> Self {
+        self.lex().scales.retain(|r| r.0 != text);
         self
     }
 

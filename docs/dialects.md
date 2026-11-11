@@ -140,7 +140,12 @@ returning the definition: identity (`extends`, `renamed`), lines (`title`,
 `dollar`, `plus`, `backslash`, `end`, `stop`, `join`, ...), words
 (`quote`, `string`, `ident_start`, `directive`, `keywords`, `keyword`,
 ...), expressions (`operator`, `infix`, `prefix`, `caret`, `probe`),
-numbers (`exponent`, `scale`, `tail`, `arithmetic`), elements (`devices`,
+numbers (`exponent`, `scale`, `tail`, `arithmetic`), the calls that narrow
+an extended dialect (`no_infix(tag)` and `no_scale(text)` take out an
+operator or a scale suffix the base declared; `nonassoc(tag)`: a second
+comparison of the level, `a == b == c`, is noted `P0022`;
+`ternary_nesting(Nesting.Explicit)`: a ternary nests only in parentheses or
+in the else branch, else `P0021`), elements (`devices`,
 `device`, `master`, `analysis`, `region`), spelling (`comment`,
 `path_quote`, `expr`, `func`, `subckt_params`, `write_head`,
 `write_master`, `option`), the named writers' maps (`option_to`,

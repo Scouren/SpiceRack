@@ -24,6 +24,7 @@ mod heads;
 mod render;
 mod spice_read;
 mod spice_read_sources;
+mod spicerack;
 
 // ---- private ----
 

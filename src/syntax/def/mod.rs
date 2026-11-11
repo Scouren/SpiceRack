@@ -22,8 +22,9 @@
 //!   `cont_skip`, `comment_tail`, `block_comment`, `long_strings`, `dollar`, `plus`, `backslash`,
 //!   `end`, `stop`, `join`, `quote`, `string`, `string_expr`, `name_escape`, `ident_start`,
 //!   `ident_continue`, `directive`, `head_words`, `head_after`, `operators`, `operator`,
-//!   `expr_braces`, `caret`, `infix`, `right`, `prefix`, `prefix_bp`, `probe`, `index`,
-//!   `lib_sections`, `exponent`, `scale`, `tail`, `arithmetic`, `keywords`, `keyword`, `named`,
+//!   `expr_braces`, `caret`, `infix`, `no_infix`, `right`, `nonassoc`, `ternary_nesting`, `prefix`,
+//!   `prefix_bp`, `probe`, `index`, `lib_sections`, `exponent`, `scale`, `no_scale`, `tail`,
+//!   `arithmetic`, `keywords`, `keyword`, `named`,
 //!   `devices`, `device`, `master`, `analysis`, `region`
 //! - the spelling calls: `comment`, `path_quote`, `expr`, `func`, `subckt_params`,
 //!   `ngspice_numbers`, `write_lexicon`
@@ -57,7 +58,7 @@ use crate::syntax::device::Device;
 use crate::syntax::diag::{Code, Kind};
 use crate::syntax::lang::CONSTRUCT_COUNT;
 use crate::syntax::lexicon::{
-    Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Quote, Quoting, Scale, Tail,
+    Arithmetic, Backslash, Caret, Dollar, End, Join, Lexicon, Nesting, Quote, Quoting, Scale, Tail,
 };
 use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::spelling::FuncForm;
@@ -159,6 +160,8 @@ struct Lex {
     caret: Option<Caret>,
     infix: Vec<(Tag, u8)>,
     right: Vec<Tag>,
+    nonassoc: Vec<Tag>,
+    ternary: Nesting,
     prefix: Vec<Tag>,
     prefix_bp: u8,
     probes: Vec<String>,

@@ -12,7 +12,7 @@ given and returns it.
 from spicerack.def_ import (Alt, Analysis, AnalysisForm, Arithmetic, Backslash, CardRules, Caret,
                             Code, Command, Construct, ControlBlock, Coupling, Devices, Dollar, DotRule, End,
                             EndRule, ExprEval, FuncForm, IncludeScope, Join, Keywords, Lang, NetlistRules,
-                            LoadForm, ModelSemantics, NamedParams, NamedRules, NumberReading,
+                            LoadForm, ModelSemantics, NamedParams, NamedRules, Nesting, NumberReading,
                             Operators, OptionsForm, ParamForm, Parasitics, Quote, Quoting, Rule,
                             Scale, SourceRules, Statement, Tag, Tail, ValueQuoting, Writer)
 
@@ -1504,6 +1504,46 @@ def ngspice_given(d):
         .regions_registered(True))
 
 
+def spicerack(d):
+    return (d
+        .extends(Lang.NGSPICE_GIVEN)
+        # Numbers: a mantissa, an exponent, one scale, nothing after it.
+        .no_scale("mil")
+        .no_scale("a")
+        .tail(Tail.None_)
+        # Levels 2 to 7; `?:` is level 1 (`Ops::TERNARY`).
+        .no_infix(Tag.LessGreater)
+        .no_infix(Tag.Backslash)
+        .infix(Tag.PipePipe, 2)
+        .infix(Tag.AmpAmp, 3)
+        .infix(Tag.EqualEqual, 4)
+        .infix(Tag.BangEqual, 4)
+        .infix(Tag.Less, 5)
+        .infix(Tag.LessEqual, 5)
+        .infix(Tag.Greater, 5)
+        .infix(Tag.GreaterEqual, 5)
+        .infix(Tag.Plus, 6)
+        .infix(Tag.Minus, 6)
+        .infix(Tag.Star, 7)
+        .infix(Tag.Slash, 7)
+        .infix(Tag.Percent, 7)
+        # Level 8 is the sign: its operand takes only level 9.
+        .prefix_bp(8)
+        .infix(Tag.StarStar, 9)
+        .right(Tag.StarStar)
+        # `^` reads as `**` and is noted, so the rest is checked.
+        .infix(Tag.Caret, 9)
+        .right(Tag.Caret)
+        .caret(Caret.Refused)
+        .nonassoc(Tag.EqualEqual)
+        .nonassoc(Tag.BangEqual)
+        .nonassoc(Tag.Less)
+        .nonassoc(Tag.LessEqual)
+        .nonassoc(Tag.Greater)
+        .nonassoc(Tag.GreaterEqual)
+        .ternary_nesting(Nesting.Explicit))
+
+
 # Each built-in: its function here and its registered Rust row.
 BUILTINS = {
     "NGSPICE": (ngspice, Lang.NGSPICE),
@@ -1516,4 +1556,5 @@ BUILTINS = {
     "CDL": (cdl, Lang.CDL),
     "VERILOG": (verilog, Lang.VERILOG),
     "NGSPICE_GIVEN": (ngspice_given, Lang.NGSPICE_GIVEN),
+    "SPICERACK": (spicerack, Lang.SPICERACK),
 }

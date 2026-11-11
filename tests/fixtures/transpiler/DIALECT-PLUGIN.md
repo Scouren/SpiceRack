@@ -322,8 +322,8 @@ members are its variants.
 | Identity | `new(name)`, `extends(Lang)`, `family(Family)` | registry row; `Family::{Spice, Named}` picks the reader and writer spine |
 | Lines | `title`, `fold_case`, `comment_line`, `comment_col1`, `blank_led_comment`, `cont_skip`, `comment_tail`, `block_comment`, `long_strings`, `dollar`, `plus`, `backslash`, `end`, `stop`, `join` | `Lexicon` |
 | Words | `quote`, `string`, `string_expr`, `name_escape`, `ident_start`, `ident_continue`, `directive`, `head_words`, `head_after`, `keywords(Keywords)`, `keyword(word, Keyword)`, `lib_sections` | `Lexicon` |
-| Expressions | `operator(text, Op)`, `infix(Op, bp)`, `right(Op)`, `prefix(Op)`, `prefix_bp`, `caret`, `probe`, `index`, `expr_braces` | `Lexicon.ops` |
-| Numbers | `exponent`, `scale(text, Scale)`, `tail`, `arithmetic` | `Lexicon.numbers`, `Spelling.ngspice_numbers` (one fact) |
+| Expressions | `operator(text, Op)`, `infix(Op, bp)`, `right(Op)`, `prefix(Op)`, `prefix_bp`, `caret`, `probe`, `index`, `expr_braces`, `no_infix(Op)`, `nonassoc(Op)`, `ternary_nesting(Nesting)` | `Lexicon.ops` |
+| Numbers | `exponent`, `scale(text, Scale)`, `no_scale(text)`, `tail`, `arithmetic` | `Lexicon.numbers`, `Spelling.ngspice_numbers` (one fact) |
 | Elements | `devices(Devices)`, `device(word, like)` (a row shaped as the base's row `like`), `master(word, Statement)`, `analysis(word, Analysis)`, `region(name, Lang)` | `Lexicon` |
 | Spelling | `comment`, `path_quote`, `expr(open, close)`, `func`, `subckt_params`, `write_head(Keyword, text)`, `write_master(word, text)`, `option(spice, own)` | `Spelling`, the head, master and option maps |
 | Capability | `native(c)`, `spell(c, Alt)`, `lift(c, Rule)`, `refuse(c, code)`, `omit(c, code)`, `copy(c, code)` | the capability column |

@@ -113,6 +113,8 @@ fn lexicon(l: &Lexicon, line: &mut impl FnMut(&str, String)) {
     line("lex.caret", format!("{:?}", l.caret));
     line("lex.infix", format!("{:?}", l.ops.infix));
     line("lex.right", format!("{:?}", l.ops.right));
+    line("lex.nonassoc", format!("{:?}", l.ops.nonassoc));
+    line("lex.ternary", format!("{:?}", l.ops.ternary));
     line("lex.prefix", format!("{:?}", l.ops.prefix));
     line("lex.prefix_bp", format!("{:?}", l.ops.prefix_bp));
     line("lex.probes", format!("{:?}", l.ops.probes));

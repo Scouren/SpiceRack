@@ -31,6 +31,8 @@ lex.expr_braces true
 lex.caret Pow
 lex.infix [(PipePipe, 2), (AmpAmp, 3), (EqualEqual, 4), (BangEqual, 4), (LessGreater, 4), (LessEqual, 4), (GreaterEqual, 4), (Less, 4), (Greater, 4), (Plus, 5), (Minus, 5), (Star, 6), (Slash, 6), (Percent, 6), (Backslash, 6), (Caret, 7), (StarStar, 7)]
 lex.right []
+lex.nonassoc []
+lex.ternary Free
 lex.prefix [Plus, Minus, Bang]
 lex.prefix_bp 6
 lex.probes ["v", "i"]
