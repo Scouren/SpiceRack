@@ -9,7 +9,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 
 | Method | Emits | Signature |
 |---|---|---|
-| `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; elsewhere `W0007`) |
+| `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; VACASK a source behind a series resistor; elsewhere `W0007`) |
 | `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
 | `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |

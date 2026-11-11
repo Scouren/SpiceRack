@@ -13,11 +13,11 @@
 use super::W;
 use super::bench::{Step, Tb, bare_node};
 use super::lift::draw_scopes;
-use super::vacask::{num, respell};
+use super::vacask::{num, q, respell};
 use crate::syntax::behaviour::{NamedRules, OptionTo};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
-use crate::syntax::render::read::{Ana, DcSweep, Sweep, Val};
+use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val};
 
 impl W<'_, '_> {
     /// The `control` block: options, then per analysis the stepped sweeps
@@ -272,13 +272,19 @@ impl W<'_, '_> {
             Ana::Sens(..) | Ana::Pz(..) | Ana::Four(..) => {
                 self.refuse(Code::W0015, tok);
             }
-            // `.sp` is VACASK's `acsp` (`docs/cmd-analysis-acsp.md`): the
-            // analysis list answers, W0001 while no `acsp` line is written.
-            Ana::Sp(..) => {
-                self.refuse(
-                    crate::syntax::render::read::spectre_refusal(self.b, "sp"),
-                    tok,
-                );
+            // `.sp` is VACASK's `acsp` over every port
+            // (`docs/cmd-analysis-acsp.md`; equal to ngspice-45's `.sp` to
+            // 12 digits on a 50/75 ohm two-port, ZERO-LEDGER P4-007).
+            Ana::Sp(sw) => {
+                if !matches!(self.ask(Construct::SParameter, tok), Action::Native) {
+                    return vec![];
+                }
+                let Some(f) = freq_sweep(sw) else {
+                    self.refuse(Code::W0015, tok);
+                    return vec![];
+                };
+                let ports = self.acsp_ports().join(", ");
+                out.push(format!("analysis {} acsp ports=[{ports}] {f}", name("sp")));
             }
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
             Ana::Spectre { kind, .. } => {
@@ -381,6 +387,33 @@ impl W<'_, '_> {
             .map(|(n, v)| format!("\"{}\", {}", n.to_ascii_lowercase(), self.vval(v)))
             .collect();
         format!(" {key}={{{}}}", body.join(", "))
+    }
+
+    /// The top's RF ports in `portnum` order, each the pair `acsp` names
+    /// (`docs/cmd-analysis-acsp.md`, "Port definition"): its source and
+    /// the series resistor `vacask_card` writes for it (`r<decl>_ser`).
+    // ponytail: the top's ports only; a port inside a subcircuit has no
+    // name here (ngspice numbers the flattened deck's).
+    fn acsp_ports(&self) -> Vec<String> {
+        let mut ports: Vec<(u32, String)> = Vec::new();
+        for &c in &self.deck.top.comps {
+            let Comp::Card(n) = c else { continue };
+            let Card::Source {
+                port: Some((k, _)), ..
+            } = self.rd.card_view(n)
+            else {
+                continue;
+            };
+            let decl = self.names.decl(n);
+            assert!(
+                decl.starts_with(['V', 'v']),
+                "an RF port is a voltage source"
+            );
+            let r = q(&format!("{decl}_ser"));
+            ports.push((k, format!("\"v{}\", \"r{r}\"", q(&decl[1..]))));
+        }
+        ports.sort();
+        ports.into_iter().map(|(_, p)| p).collect()
     }
 }
 

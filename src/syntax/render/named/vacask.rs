@@ -322,6 +322,10 @@ impl<'r> W<'_, 'r> {
             if let Comp::Card(n) = c {
                 let card = self.rd.card_view(n);
                 out.extend(need(&card));
+                // An RF port's series resistor (`vacask_card`).
+                if matches!(card, Card::Source { port: Some(_), .. }) {
+                    out.insert(Need::Sp("resistor"));
+                }
                 if self.rd.b.card_rules == CardRules::Ltspice {
                     out.extend(parasitic_needs(&card));
                 }

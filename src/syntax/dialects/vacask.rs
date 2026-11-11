@@ -338,7 +338,7 @@ pub(super) fn vacask() -> DialectDef {
         // (`docs/dev-builtin-behavioral.md` at 36be560; ZERO-LEDGER P4-002).
         .native(Construct::BehaviouralSource)
         .refuse(Construct::Laplace, Code::W0011)
-        .refuse(Construct::RfPort, Code::W0007)
+        .native(Construct::RfPort)
         .refuse(Construct::PwlRepeatV, Code::W0008)
         .refuse(Construct::PwlRepeatI, Code::W0008)
         .refuse(Construct::NoiseWave, Code::W0009)
@@ -357,7 +357,7 @@ pub(super) fn vacask() -> DialectDef {
         .refuse(Construct::Sens, Code::W0015)
         .refuse(Construct::SensAc, Code::W0015)
         .refuse(Construct::PoleZero, Code::W0015)
-        .refuse(Construct::SParameter, Code::W0015)
+        .native(Construct::SParameter)
         .native(Construct::Print)
         .omit(Construct::Save, Code::W0023)
         .refuse(Construct::UnmappedOption, Code::W0017)

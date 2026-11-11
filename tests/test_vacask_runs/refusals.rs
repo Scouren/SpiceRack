@@ -43,13 +43,17 @@ fn refusals_are_errors_not_broken_decks() {
     }
 }
 
-/// ZERO-LEDGER P4-107. Oracle: VACASK 36be560's own analysis list
-/// (`docs/cmd-analysis-acsp.md`: `analysis name acsp`; `demo/sp/amp.sim`
-/// runs `analysis sp1 acsp ports=[…]`, research/impl/evidence/P4-107/run.log):
-/// the target has an S-parameter analysis, so `.sp` is W0001 (has it, not
-/// written yet), never W0015 (lacks it).
+/// ZERO-LEDGER P4-007. Oracle: a port's impedance is positive: Xyce 7.10
+/// stops on another ("The negative impedance -50 for port 1 is not
+/// supported for .LIN analysis", `Netlists/Output/SPARAMS/NegativeZ0.cir.sh`),
+/// and VACASK's `acsp` takes Z0 from a series resistor
+/// (`docs/cmd-analysis-acsp.md`), which a zero leaves out. The `.sp` itself
+/// is written (`acsp`), so the port is the only refusal.
 #[test]
-fn p4_107_an_sp_card_is_kept_text_on_vacask() {
-    let deck = "t\nV1 a 0 dc 0 ac 1\nR1 a 0 50\n.sp dec 2 1k 10k\n.end\n";
-    assert_eq!(emit(deck).unwrap_err(), [Code::W0001]);
+fn p4_007_a_port_without_a_positive_z0_is_refused() {
+    for z0 in ["-50", "0"] {
+        let deck =
+            format!("t\nV1 a 0 dc 0 ac 1 portnum 1 z0 {z0}\nR1 a 0 50\n.sp dec 2 1k 10k\n.end\n");
+        assert_eq!(emit(&deck).unwrap_err(), [Code::W0007], "z0 {z0}");
+    }
 }

@@ -282,3 +282,41 @@ fn p4_006_a_tran_start_is_vacasks_start() {
     close(*t.last().unwrap(), 1e-3, 1e-9);
     close(*out.last().unwrap(), 1.0 - (-1.0f64).exp(), 5e-3);
 }
+
+/// ZERO-LEDGER P4-007. Oracle: ngspice-45's `.sp` on this deck, ports of
+/// 50 and 75 ohm, its last point (100 MHz) as printed with 13 digits
+/// (research/impl/evidence/P4-007/ngspice.run.log); VACASK's `acsp` on the
+/// text this writes gave the same 12 digits (`vacask.sp1.raw`).
+#[test]
+fn p4_007_an_s_parameter_sweep_matches_ngspice() {
+    let deck = "sp\nV1 in 0 dc 2 ac 1 portnum 1 z0 50\nV2 out 0 dc 0 ac 0 portnum 2 z0 75\n\
+        R1 in out 100\nC1 out 0 10p\nL1 in mid 100n\nR2 mid 0 150\n.sp dec 2 1meg 100meg\n.end\n";
+    let raw = run(deck);
+    for (name, re, im) in [
+        ("s(1,1)", 2.606801622966e-01, 5.172611391933e-02),
+        ("s(1,2)", 4.158652538394e-01, -9.38835643325e-02),
+        ("s(2,1)", 4.158652538394e-01, -9.38835643325e-02),
+        ("s(2,2)", 1.930252841478e-01, -3.54109501255e-01),
+    ] {
+        let z = cplx(&raw, name);
+        assert_eq!(z.len(), 5, "{name}: 2 points a decade over 2 decades");
+        close(z[4].re, re, 1e-9);
+        close(z[4].im, im, 1e-9);
+    }
+}
+
+/// ZERO-LEDGER P4-108. Oracle: ngspice manual §4.1.11 ("a VSRC with Z0 Ohm
+/// in series. This extra resistor affects all simulations") and the
+/// divider's closed form: 2 V behind 50 ohm into 175 || 150 ohm (port 2's
+/// 75 ohm ends R1), so in = 2 * 80.769 / 130.769 and out = in * 75 / 175;
+/// ngspice-45 printed 1.235294117647 and 0.5294117647059 (same log).
+#[test]
+fn p4_108_an_rf_port_keeps_its_z0_in_the_operating_point() {
+    let deck = "sp\nV1 in 0 dc 2 ac 1 portnum 1 z0 50\nV2 out 0 dc 0 ac 0 portnum 2 z0 75\n\
+        R1 in out 100\nC1 out 0 10p\nL1 in mid 100n\nR2 mid 0 150\n.op\n.end\n";
+    let raw = run(deck);
+    let load = 175.0 * 150.0 / 325.0;
+    let vin = 2.0 * load / (50.0 + load);
+    close(col(&raw, "in")[0], vin, 1e-9);
+    close(col(&raw, "out")[0], vin * 75.0 / 175.0, 1e-9);
+}
