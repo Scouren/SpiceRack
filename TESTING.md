@@ -161,11 +161,13 @@ restarted empty. `baseline-013421d-fx15.PROVENANCE`, beside the record
 the IHP-Open-PDK commit (`5e6d592`), the `flake.lock` hash and the tool
 versions; 1 job and N jobs recorded it identically. Against the merge record before it, it lacks
 only VACASK's 3 `benchmark/*/gnucap/runme.sim` inputs (P1-025).
-`baseline-9c7a7e0-fx16` is the current gate: the record of `p7-integrate`
+`baseline-9c7a7e0-fx16` was the gate after it: the record of `p7-integrate`
 9c7a7e0 taken by the batch-4 gate (D47), with the same inputs as fx15; the
 17,172 lines `migration.xfail` held against fx15 (batches A to 4) became
 baseline and the list restarted empty. `baseline-9c7a7e0-fx16.PROVENANCE`
-names the same facts as fx15's.
+names the same facts as fx15's. `baseline-1298f0b-fx17` is the current gate: the
+record of `p7-integrate` 1298f0b (batches 5 to 7), the same inputs; the list restarted
+empty again.
 
 Inputs (the `MANIFEST` of each record lists them, with content hashes):
 
