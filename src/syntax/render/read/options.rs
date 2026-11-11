@@ -29,7 +29,8 @@ pub(in crate::syntax::render) enum Opt {
     Xyce(String, String),
     /// Xyce `.options device temp=`, or `.options temp=` with no package.
     Temp(f64),
-    /// Xyce `.options device tnom=`, or `.options tnom=` with no package.
+    /// Xyce `.options device tnom=`, or `.options tnom=` with no package; a
+    /// SPICE `.options tnom=` whose value is a number.
     Tnom(f64),
     /// HSPICE `.option delmax=`: the largest step, in seconds (> 0), of
     /// every transient of the deck (cmdref `.OPTION DELMAX`).
@@ -155,6 +156,14 @@ impl<'a> Rd<'a> {
                         "delmax" if hspice => match self.number_text(&v, lex) {
                             Some(x) if x > 0.0 => Opt::MaxStep(x),
                             _ => Opt::Portable(k, v),
+                        },
+                        // The nominal temperature, as Xyce's `device tnom`
+                        // above: each writer has one place for it (Spectre's
+                        // `mytnom options tnom=`). An expression stays an
+                        // option.
+                        "tnom" => match self.number_text(&v, lex) {
+                            Some(x) => Opt::Tnom(x),
+                            None => Opt::Portable(k, v),
                         },
                         _ => Opt::Portable(k, v),
                     })

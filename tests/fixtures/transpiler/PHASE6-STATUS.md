@@ -86,9 +86,10 @@ Every deck pytest builds was logged on every target through both paths
 - A `.tran` step cap with no start: SPICE's placeholder start `0` is read
   as a start, so Spectre writes `start=0` and HSPICE `START=0` (the same
   run).
-- `nominal_temperature` is a `.options tnom=`: merged into the options
-  card on SPICE targets, `myopts options … tnom=` on Spectre (was `mytnom
-  options tnom=`), after `temp` on VACASK.
+- `nominal_temperature` is a `.options tnom=` card: a card of its own on
+  SPICE targets (below the options card, above `.temp`), `mytnom options
+  tnom=` on Spectre, after `temp` on VACASK and Xyce (ledger P3-001: the
+  reader's `Opt::Tnom`).
 - `.measure` cards reach Spectre spelled `.meas`.
 - A refusal is its codes and messages (`<deck>:1:1: W0004 a Verilog-A load
   the target cannot spell`), not the old free text.

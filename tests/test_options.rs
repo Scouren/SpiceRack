@@ -21,6 +21,61 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-001. HSPICE's TNOM and TEMP default to 25 °C (cmdref
+/// `.OPTION TNOM`, `.TEMP`), ngspice's to 27 (manual §11.1.1): a deck
+/// that leaves both to ngspice says 27 once it is written for HSPICE.
+/// 1 mA into a diode (IS = 1e-14, N = 1): v(a) = kT/q · ln(I/IS + 1) is
+/// 0.655118 V at 300.15 K and 0.650753 V at 298.15 K; ngspice-45 gives the
+/// first on the source, ESPice's HSPICE reading the second on the deck
+/// written without the two cards and the first with them (1e-16 apart:
+/// one device code, so 1e-6). The cards are the ones an HSPICE deck's own
+/// read and write gives back, also by way of ngspice (the store's detour).
+#[test]
+fn p3_001_a_deck_written_for_hspice_runs_at_the_sources_27c() {
+    let deck = "t\nI1 0 a 1m\nD1 a 0 dmod\n.model dmod d (is=1e-14 n=1)\n.op\n.end\n";
+    let (ng, _) = oracle::sim_pair(
+        Dialect::Ngspice,
+        deck,
+        Dialect::Hspice,
+        "a",
+        At::First,
+        Tol {
+            rel: 1e-6,
+            floor: 0.0,
+        },
+    );
+    assert!((ng - 0.655118).abs() < 1e-6, "ngspice at 27 °C: {ng}");
+    let cards = "\n.options tnom=27\n.temp 27\n";
+    let hs = oracle::write(deck, Dialect::Ngspice, Dialect::Hspice);
+    assert!(hs.contains(cards), "{hs}");
+    let again = oracle::write(&hs, Dialect::Hspice, Dialect::Hspice);
+    assert!(again.contains(cards), "{again}");
+    let detour = oracle::write(&hs, Dialect::Hspice, Dialect::Ngspice);
+    let back = oracle::write(&detour, Dialect::Ngspice, Dialect::Hspice);
+    assert!(back.contains(cards), "{back}");
+    // A deck that sets both keeps its own.
+    let own = deck.replace(".op\n", ".temp 50\n.options tnom=30\n.op\n");
+    let hs = oracle::write(&own, Dialect::Ngspice, Dialect::Hspice);
+    assert!(hs.contains("\n.options tnom=30\n.temp 50\n"), "{hs}");
+    assert!(!hs.contains("27"), "{hs}");
+}
+
+/// Ledger P3-001 (ruling: one place per writer for the nominal
+/// temperature). Spectre Reference 19.1 p.187: `tnom` is an `options`
+/// parameter (#7). A deck's `.options tnom=30` is the statement the writer
+/// has for it, `mytnom options tnom=30`, as a Spectre deck's own `tnom`
+/// is; it no longer rides in `myopts`.
+#[test]
+fn p3_001_a_spice_tnom_option_is_spectres_tnom_statement() {
+    oracle::spec_example(
+        "Spectre Reference 19.1 p.187: options tnom (#7)",
+        "t\nV1 a 0 1\nR1 a 0 1k\n.options reltol=1e-4 tnom=30\n.op\n.end\n",
+        Dialect::Ngspice,
+        Dialect::Spectre,
+        &["myopts options reltol=100u", "mytnom options tnom=30"],
+    );
+}
+
 /// Ledger P3-059. Xyce RG Table 2-2 (DEVICE): MINRES and MINCAP stand in
 /// for a model's default-zero internal resistance and capacitance; ngspice
 /// has no such option (manual §11.1). Xyce 7.10 by hand on this deck:

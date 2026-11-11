@@ -97,6 +97,11 @@ and `False` and `None` write nothing). Any other key is a `ValueError`: another
 simulator's own option (a Xyce package, VACASK's `tran_method`) is a line of
 that simulator's text, `tb.extra_line(line, dialect="xyce")`.
 
+A temperature you do not set is the simulator's default: 27 °C on ngspice,
+LTspice, Xyce, VACASK and Spectre, 25 °C on HSPICE. A deck written for HSPICE
+therefore says `.options tnom=27` and `.temp 27` where you set neither, and
+runs at the temperature every other target runs it at.
+
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
 emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
 On LTspice a stepped run returns a list, one result per step in step order, and

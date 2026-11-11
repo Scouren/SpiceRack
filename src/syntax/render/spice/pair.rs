@@ -157,7 +157,9 @@ pub(super) struct Pair {
     /// has none and takes every L and W as written) (`ngspice_options`).
     pub(super) ltspice_from_other: bool,
     /// Another dialect's deck on HSPICE: its one GMIN written as GMIN (the
-    /// transient's) and GMINDC (the DC one) (`ngspice_options`).
+    /// transient's) and GMINDC (the DC one), and the 27 °C TNOM and TEMP its
+    /// own simulator defaults to written, HSPICE's being 25
+    /// (`ngspice_options`).
     pub(super) hspice_from_other: bool,
 }
 
@@ -219,6 +221,7 @@ impl Pair {
         };
         // The two directions of one rule never hold together.
         assert!(!(pair.log_to_ln && pair.log_to_log10));
+        assert!(!(pair.hspice_elsewhere && pair.hspice_from_other));
         assert!(!(pair.nint_to_xyce && pair.nint_to_ngspice));
         assert!(!(pair.abs_power_out && pair.abs_power_in));
         assert!(!pair.xyce_power || pair.abs_power_in);
