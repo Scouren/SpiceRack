@@ -30,8 +30,8 @@
 //!   `ngspice_numbers`, `write_lexicon`
 //! - the capability calls: `native`, `spell`, `lift`, `refuse`, `omit`, `copy`
 //! - the behaviour calls: `writer`, `text_family`, `caret_power`, `hier_sep`, `number_reading`,
-//!   `model_semantics`, `source_rules`, `card_rules`, `named_rules`, `options_form`, `load_form`,
-//!   `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
+//!   `model_semantics`, `level_alias`, `source_rules`, `card_rules`, `named_rules`, `options_form`,
+//!   `load_form`, `control_block`, `analysis_form`, `end_rule`, `value_quoting`, `coupling`, `param_form`,
 //!   `named_params`, `analysis_masters`, `expr_eval`, `parasitics`, `netlist_rules`,
 //!   `subckt_multiplicity`, `spectre_analysis`, `temp_name`, `builtin_constant`, `builtin_device`,
 //!   `vacask_analysis`, `option_to`, `option_spell`, `option_method`, `option_cosmetic`, `model_master`,

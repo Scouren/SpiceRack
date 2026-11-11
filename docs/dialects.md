@@ -168,7 +168,11 @@ in the else branch, else `P0021`), elements (`devices`,
 `option_spell`, `option_method`, `option_cosmetic`: what a SPICE `.options` key is on a
 Spectre or VACASK target; `model_master(kind, levels, master, type_)` and
 `spice_model_type(kind)`: the master a SPICE `.model` type gets at a
-LEVEL, `levels` a list), the capability cells (`native`, `spell`,
+LEVEL, `levels` a list; `level_alias(kind, source_level, neutral_level)`:
+this dialect's own LEVEL of a `.model` type is ngspice's `neutral_level`,
+or with `None` a model ngspice has no level for, whose card is refused
+(W0104) for every dialect that numbers otherwise), the capability cells
+(`native`, `spell`,
 `lift`, `refuse`, `omit`, `copy`, `refuse_code`, `omit_code`), the
 behaviours (`writer`, `card_rules`, `control_block`, ...), the reader's
 own words (`kept_word(word, construct)`: a line kept as this dialect's text

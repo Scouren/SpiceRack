@@ -3,8 +3,8 @@
 //! as ngspice, ESPice or HSPICE read it, `ngspice_models`; ngspice's
 //! built-in device names).
 //!
-//! Cites: Xyce RG Table 2-36 (BSIM3 level 49), resistor model `R`; ngspice
-//! manual §2.3 (`.model`).
+//! Cites: Xyce RG Table 2-36 (BSIM3 level 49), resistor model `R`, §2.3.19
+//! (`J`: level 2 is Xyce's own); ngspice manual §2.3 (`.model`), §7.4.5.
 //!
 //! Contents:
 //! - `W::models(&mut self, b: &Block)`, `W::model(&mut self, n: u32, bin: u32) -> bool`
@@ -31,9 +31,15 @@ impl W<'_, '_> {
     /// as that device reads it (`ngspice_models`; a level the target has no
     /// device for is refused, W0104). The parameter list is separated from the
     /// type by a space: ngspice-45 drops the parameters of an OSDI model
-    /// written `vres(r=3k)`.
+    /// written `vres(r=3k)`. A level the target numbers otherwise than
+    /// the source is refused (W0104, `Behaviours::same_level`): the copied
+    /// number names another model there.
     pub(super) fn model(&mut self, n: u32, bin: u32) -> bool {
         let mut m = self.rd.model_view(n, bin);
+        let kind = m.kind.to_ascii_lowercase();
+        if !self.b.same_level(self.rd.b, &kind, m.level()) {
+            self.refuse(Code::W0104, self.rd.main(n));
+        }
         if self.b.param_form == ParamForm::Xyce {
             let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
             match xyce_models::xyce_model(ngspice, &m.kind, &m.params) {

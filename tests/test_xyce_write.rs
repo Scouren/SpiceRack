@@ -467,3 +467,43 @@ fn p3_091_refuses_gf180_bjt_temperature_names() {
         same_op(&deck, node);
     }
 }
+
+/// ZERO-LEDGER P4-015. RG 7.10 §2.3.19 (`J`; Table 2-87: THETA and DELTA
+/// are level 2's, the "Shockley JFET model"); ngspice-45 manual §7.4.5
+/// (level 2 is Parker-Skellern). Oracle: real Xyce and real ngspice on one
+/// card. At level 1 they agree (v(d) 9.04114621 and 9.041146,
+/// research/impl/evidence/P4-015), at level 2 they do not (14.6006213 and
+/// 9.052192; VACASK's `sp_jfet2` and ESPice give ngspice's number), so a
+/// `level=2` copied between the two is another model: refused both ways,
+/// kept within each.
+#[test]
+fn p4_015_a_jfet_level_2_is_each_simulators_own_model() {
+    let deck = |level: u32| {
+        format!(
+            "* t\nVdd vdd 0 15\nRd vdd d 1k\nJ1 d 0 0 jn\n\
+             .model jn NJF (LEVEL={level} BETA=3.79e-4 VTO=-3.76 LAMBDA=0.0124)\n.op\n.end\n"
+        )
+    };
+    let on = |d: Dialect, level: u32| oracle::op(d, &deck(level), "d");
+    let (x1, n1) = (on(Dialect::Xyce, 1), on(Dialect::Ngspice, 1));
+    assert!((x1 - n1).abs() < 1e-3, "level 1: Xyce {x1}, ngspice {n1}");
+    let (x2, n2) = (on(Dialect::Xyce, 2), on(Dialect::Ngspice, 2));
+    assert!((x2 - n2).abs() > 1.0, "level 2: Xyce {x2}, ngspice {n2}");
+    for to in [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Hspice,
+        Dialect::Ltspice,
+        Dialect::Vacask,
+    ] {
+        let codes = oracle::refusal(&deck(2), Dialect::Xyce, to);
+        assert_eq!(codes, [Code::W0104], "Xyce level 2 for {to:?}");
+        assert!(!oracle::write(&deck(1), Dialect::Xyce, to).is_empty());
+    }
+    let codes = oracle::refusal(&deck(2), Dialect::Ngspice, Dialect::Xyce);
+    assert_eq!(codes, [Code::W0104], "ngspice level 2 for Xyce");
+    let own = oracle::write(&deck(2), Dialect::Xyce, Dialect::Xyce);
+    assert!(own.contains("LEVEL=2"), "{own}");
+    let va = oracle::write(&deck(2), Dialect::Ngspice, Dialect::Vacask);
+    assert!(va.contains("model jn sp_jfet2 (type=1"), "{va}");
+}

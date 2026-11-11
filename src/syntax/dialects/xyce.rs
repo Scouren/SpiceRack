@@ -8,7 +8,8 @@
 //! and braces included); §2.1.39.3 (`+` continuation); §2.1.6 (`.END`);
 //! §3.1 p.837 and Table 6-2 p.852 (scale factors, `X` mega, no atto); §2.2
 //! p.164 (`{expr}` and `'expr'`); Table 2-32 (operators); p.165 (`:` in
-//! names).
+//! names); RG 7.10 §2.3.19 Table 2-87 (the JFET's THETA and DELTA are
+//! level 2's).
 //!
 //! Contents:
 //! - `pub(super) fn xyce() -> DialectDef`
@@ -203,6 +204,14 @@ pub(super) fn xyce() -> DialectDef {
         // The dot rules: `.LIN` (RG `.LIN`) is the S-parameter analysis over
         // the deck's `.AC` sweep.
         .dot_rule("lin", DotRule::SParams)
+        // The `.model` levels Xyce numbers its own way. Its JFET level 2
+        // is the Shockley model with THETA and DELTA (RG 7.10 §2.3.19,
+        // Table 2-87); ngspice's level 2 is Parker-Skellern (manual
+        // §7.4.5). One card (BETA=3.79e-4 VTO=-3.76 LAMBDA=0.0124) at
+        // Vds 15 V, Vgs 0: Xyce 7.10 0.401 mA, ngspice-45 6.353 mA; at
+        // level 1 both 6.355 mA.
+        .level_alias("njf", 2, None)
+        .level_alias("pjf", 2, None)
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)

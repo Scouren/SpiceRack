@@ -261,7 +261,6 @@ Certification_Tests/BUG_681_SON/bsim4_681_3.cir simulator-differs:self-inconsist
 Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
 Certification_Tests/BUG_746_SON/raw_file_f_sources.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
 Certification_Tests/BUG_746_SON/raw_file_g_sources.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-Certification_Tests/BUG_746_SON/raw_file_jfet.cir mismatch # tran VDS#branch: -0.0003685826464666361 leaves the tube at t=0.0000005 (tol 3.827e-6)
 Certification_Tests/BUG_746_SON/raw_file_mesfet.cir mismatch # tran VDS#branch: -0.0026910218597955204 leaves the tube at t=0.0000015 (tol 5.940e-4)
 Certification_Tests/BUG_791_SON/bug791_expr.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_sin' at line 3
 Certification_Tests/BUG_794_SON/test2.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'table' at line 4
@@ -288,7 +287,6 @@ Certification_Tests/BUG_966_SON/tran-homotopy.cir simulator-differs:third-simula
 Certification_Tests/BUG_966_SON/tran-nohomotopy.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Certification_Tests/BUG_981_SON/bug981A.cir mismatch # tran V(1): 5.160602794142788 leaves the tube at t=0.001 (tol 6.967e-2)
 Certification_Tests/BUG_981_SON/bug981B.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
-Certification_Tests/BUG_983_SON/jfet.cir mismatch # tran VDS1#branch: 338.9491718773294 leaves the tube at t=0.0000000010000006103515626 (tol 3.741e0)
 Certification_Tests/BUG_983_SON/mesfet.cir simulator-differs:third-simulator reason=O-NG-STOPS proof=bug983-mesfet.md # tran: stop time Some(9.999999999999999e-6) -> Some(1.0000014699384472e-9)
 Certification_Tests/BUG_983_SON/mosfet.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.00177123610662972 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
 Certification_Tests/BUG_983_SON/nsoi4.cir target-fails # no raw file .cross_sim_out.raw: Error on line 12 or its substitute:: mn1 nda ng ns ne nb cmosn l=0.258u w=19.585u | Simulation interrupted due to error! | Error
@@ -470,7 +468,6 @@ MOSFET_ParamAliases/invert6_alt.cir mismatch # tran VDDDEV#branch: 0.00055193726
 MPDE/RC/simpleRC.cir simulator-differs:closed-form reason=SIMPLERC-XYCE-STEP proof=simplerc-closed-form.md # v(2): Xyce 3.8e-5 V off the closed form, ngspice 2.1e-6
 MPDE/invert1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.0006431086562039317 leaves the tube at t=0.0000015840152576371445 (tol 6.446e-6)
 Message/Topology/Supernode_Warning.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
-NJFET_DC/njfet-2109.cir mismatch # dc VDS#branch: -0.0001649032985970153+0i vs -0.001912651242304979+0i at 1 (tol 8.281e-7)
 Nonlinear/ConvergenceTests/NLStrategy2.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762875070434149 leaves the tube at t=0.000000010954772022827602 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/NLStrategy5.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762862707533511 leaves the tube at t=0.000000010954800834658948 (tol 2.277e-2)
 Nonlinear/ConvergenceTests/NLStrategy6.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762850999920565 leaves the tube at t=0.000000010954828121258379 (tol 2.277e-2)
@@ -505,7 +502,6 @@ PARSER/nakedAlgebra.cir target-fails # no raw file .cross_sim_out.raw: Error: no
 PARSER/nakedAlgebraBaseline.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 9
 PARSER/nakedAlgebraGlobal.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 15
 PARSER/separator3Ref.cir target-fails # Unexpected format: Unexpected EOF in header
-PJFET_DC/pjfet-2108.cir mismatch # dc VDS#branch: 0.001251215633007422+0i vs 0.011866725998281823+0i at -15 (tol 2.502e-6)
 POWER/power_bsim3_gear.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3942896175760929 leaves the tube at t=0.000000005631484877982981 (tol 2.272e-2)
 POWER/power_bsim3_trap.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.39612363759098895 leaves the tube at t=0.000000005629268545495938 (tol 2.279e-2)
 POWER/power_bsim4_gear.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): 1.1166378443622005 leaves the tube at t=0.000000020214387052506347 (tol 1.124e-2)
