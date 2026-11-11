@@ -36,6 +36,7 @@
 //! - `def_.rs`, `def_enums.rs`, `def_tag.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
 //! - `export.rs`: `_export`, the native half of `spicerack.export` (results → a raw file's bytes and its sidecar's rows)
+//! - `stage.rs`: `_written`, `_route`, the native half of `spicerack.diagnostics` (a deck written beside its source, the simulator a run picks)
 //!
 //! Contents:
 //! - `pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()>` (`#[pymodule]` `_native`)
@@ -70,6 +71,7 @@ mod section;
 mod sims;
 mod sims_read;
 mod simulator;
+mod stage;
 mod store;
 mod subcircuit;
 mod testbench;
@@ -103,6 +105,7 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(read_raw, m)?)?;
     error::add(m)?;
     export::add(m)?;
+    stage::add(m)?;
     m.add_function(wrap_pyfunction!(compile_veriloga, m)?)?;
     sims::add(m)?;
 

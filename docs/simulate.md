@@ -252,6 +252,87 @@ diagnostic whose `line`, `column`, `statement` and `element` are `None`: a routi
 analysis's statement). A bad argument is a `ValueError`, a name that is not there a `KeyError`, a
 file that does not open an `OSError` and a removed method a `NotImplementedError`, as before.
 
+### The diagnostics file
+
+`ps.diagnostics.netlist(tb, dialect, out_dir, variant)` writes the deck as `netlist()` does, and
+`ps.diagnostics.run(tb, out_dir, variant)` runs it as `run()` does. Neither raises
+`spicerack.Error`: each returns the status and leaves `<variant>.diag.json` in `out_dir` (a
+directory that exists), whatever happened to the deck. A tool that reads the file never has to
+take a missing one for success.
+
+```python
+import json
+from pathlib import Path
+
+Path("out").mkdir(exist_ok=True)
+status, text = ps.diagnostics.netlist(noted, "vacask", "out", "rc")
+print(status, text)                                   # refused None
+doc = json.loads(Path("out/rc.diag.json").read_text())
+print([(d["code"], d["file"], d["line"]) for d in doc["diagnostics"]])
+# [('W0023', 'rc.source.cir', 5), ('W0109', 'rc.source.cir', 6)]
+```
+
+`netlist` returns `(status, text)`: `"written"` and the deck; or `"refused"` and `None`
+(`"failed"` when a dialect's hook raised). `run` returns `(status, text, results)`: `"ok"`, the
+deck that ran and what `run()` returns; or `"refused"` or `"failed"`, with `None` for the results
+and for a deck that was not written. The deck itself is returned, not written to a file. A bad
+argument is a `ValueError`, before any file is written.
+
+`rc.diag.json` is the `spicerack.diagnostics/1` file:
+
+```json
+{
+  "schema": "spicerack.diagnostics/1",
+  "spicerack": "0.2.0",
+  "variant": "rc",
+  "stage": "netlist",
+  "dialect": "vacask",
+  "status": "refused",
+  "source": "rc.source.cir",
+  "diagnostics": [
+    {"code": "W0023", "kind": "note", "title": "an output request not written", "cite": "…",
+     "message": "rc:5:1: W0023 an output request not written",
+     "file": "rc.source.cir", "line": 5, "column": 1, "statement": ".save v(vout)", "element": null},
+    {"code": "W0109", "kind": "refusal", "title": "a measurement the target has no statement for", "cite": "…",
+     "message": "rc:6:1: W0109 a measurement the target has no statement for",
+     "file": "rc.source.cir", "line": 6, "column": 1, "statement": ".meas tran vmax max v(vout)", "element": null}
+  ],
+  "simulator": null
+}
+```
+
+- `stage` is how far the deck got. From `netlist` it is `"netlist"`. From `run` it is `"route"` (no
+  simulator was picked), `"netlist"` (the writer of the picked simulator's language refused the
+  deck) or `"run"`.
+- `status` is `"written"` (from `netlist`) or `"ok"` (from `run`); `"refused"` when nothing was
+  run; `"failed"` when something that ran failed.
+- `dialect` is the language the deck is written in: from `run`, the picked simulator's. It is
+  `null` when no simulator was picked and the refusal is about none.
+- `source` names the file, beside this one, of the deck's own ngspice text, the title first. A
+  diagnostic's `line` and `column` (from 1) count in it, never in the written deck. A deck with no
+  source (a `W0040` refusal) has `null` here and no source file.
+- `diagnostics` holds every `Diagnostic` of the deck, the notes of a written deck among them; a
+  deck with none has `[]`. `file` is `source`. At no statement, `file`, `line`, `column`,
+  `statement` and `element` are `null`. `element` is the element's name as the deck holds it
+  (`"Vin"`), so a tool maps it back to its own object by name.
+- `simulator` is `null` unless the stage is `"route"` or the status is `"failed"`.
+
+```json
+"simulator": {"backend": "mysim", "dialect": "ngspice", "exit_status": 1, "log": "rc.log",
+              "message": "mysim exited with exit status: 1", "missing": null}
+```
+
+`backend` and `dialect` are the simulator picked, or the one a routing refusal is about; both are
+`null` when there is none (a dialect's hook that raised keeps `dialect`). For a simulator that
+exited nonzero, `exit_status` is its status, `log` names the file, beside this one, of everything
+it printed (stdout, stderr, then the log file it wrote), and `message` is the first of those lines
+that mentions an error, or `<program> exited with <status>` when none does. For any other failure
+`exit_status` and `log` are `null` and `message` is the first line of the failure's text. For a
+refusal `message` is `null`. `missing` is what a routing refusal (`W0180` to `W0182`) found
+missing, `{"analyses": ["tran"], "features": []}`; else `null`.
+
+The same deck gives the same bytes.
+
 ## Choosing a simulator
 
 ```python

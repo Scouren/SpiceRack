@@ -19,6 +19,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `read_raw(path)` | every plot of a `.raw` file, as `RawData` |
 | `Error` | every failure of a netlist, a run or a compile; a `RuntimeError`: `.status` (`"refused"`: nothing was run; `"failed"`) and `.diagnostics`, a list of `Diagnostic` ([Refusals and notes](simulate.md#refusals-and-notes)) |
 | `Diagnostic` | one diagnostic: `.code`, `.kind` (`"refusal"`, `"note"`), `.title`, `.cite`, `.message`, `.file`, `.line`, `.column`, `.statement`, `.element` (the last five `None` at no statement) |
+| `diagnostics.netlist(testbench, dialect, out_dir, variant)`, `diagnostics.run(testbench, out_dir, variant)` | `netlist()` and `run()` that raise no `Error`: they return `(status, text)` and `(status, text, results)` and leave `<variant>.diag.json` in `out_dir`, the `spicerack.diagnostics/1` file, with `<variant>.source.cir` and, for a simulator that exited nonzero, `<variant>.log` ([The diagnostics file](simulate.md#the-diagnostics-file)); `diagnostics.SCHEMA` is the schema's name |
 | `export(results, stem, *, raw_format="binary")` | writes `<stem>.raw` (one ngspice raw file: the plots of every result, vectors under their canonical names) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar) and returns the two paths ([Exporting results](simulate.md#exporting-results)) |
 | `unit` | unit constants, used as `10 @ u_kOhm` |
 | `Dialect(name)`, `register_dialect(obj)` | a dialect plugin's base class and its registration ([Dialect plugins](dialects.md)); returns its `def_.Lang` |

@@ -135,8 +135,8 @@ pub fn parse_arg(template: &str) -> Result<Arg, SimRegisterError> {
 /// family `family`) and reads the results `output` names.
 ///
 /// # Errors
-/// `SimulationError`: the program is not found, exits nonzero, or wrote no
-/// result file; `RawParseError`: a result file does not read.
+/// `Exited`: the program exits nonzero. `SimulationError`: it is not found,
+/// or wrote no result file; `RawParseError`: a result file does not read.
 ///
 /// # Panics
 /// When `argv` is empty (registration refuses it).

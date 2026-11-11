@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "spicerack.diagnostics/1",
+  "title": "spicerack.diagnostics/1",
+  "description": "What became of one deck, written or run: how far it got, its status, its diagnostics located in its source, and the simulator's failure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "spicerack", "variant", "stage", "dialect", "status", "source", "diagnostics", "simulator"],
+  "properties": {
+    "schema": {"const": "spicerack.diagnostics/1"},
+    "spicerack": {"type": "string", "description": "The version of spicerack that wrote the file."},
+    "variant": {"type": "string", "description": "The deck's id: the stem of this file and of the files it names."},
+    "stage": {
+      "enum": ["netlist", "route", "run"],
+      "description": "How far the deck got: netlist (written, or not, for a dialect), route (a run that picked no simulator), run."
+    },
+    "dialect": {
+      "type": ["string", "null"],
+      "description": "The language the deck is written in; null when a run picked no simulator and its refusal is about none."
+    },
+    "status": {
+      "enum": ["written", "refused", "ok", "failed"],
+      "description": "written (netlist) or ok (run); refused: nothing was run; failed: something that ran failed."
+    },
+    "source": {
+      "type": ["string", "null"],
+      "description": "The file, beside this one, of the deck's source: the text the diagnostics' lines count in. null: the deck has none."
+    },
+    "diagnostics": {
+      "type": "array",
+      "description": "Every diagnostic of the deck, the notes of a written one among them, in the writer's order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "kind", "title", "cite", "message", "file", "line", "column", "statement", "element"],
+        "properties": {
+          "code": {"type": "string"},
+          "kind": {"enum": ["refusal", "note"]},
+          "title": {"type": "string", "description": "The code's fixed title."},
+          "cite": {"type": "string", "description": "The code's fixed citation."},
+          "message": {"type": "string", "description": "The line SpiceRack prints for it."},
+          "file": {"type": ["string", "null"], "description": "source, when the diagnostic is at a statement."},
+          "line": {"type": ["integer", "null"], "minimum": 1, "description": "Its line in the source, from 1."},
+          "column": {"type": ["integer", "null"], "minimum": 1, "description": "Its column in that line, from 1."},
+          "statement": {"type": ["string", "null"], "description": "The text of the statement it is at."},
+          "element": {"type": ["string", "null"], "description": "The element's name, when the statement is one."}
+        }
+      }
+    },
+    "simulator": {
+      "type": ["object", "null"],
+      "description": "null unless the stage is route or the status failed.",
+      "additionalProperties": false,
+      "required": ["backend", "dialect", "exit_status", "log", "message", "missing"],
+      "properties": {
+        "backend": {"type": ["string", "null"], "description": "The simulator picked, or the one a routing refusal is about."},
+        "dialect": {"type": ["string", "null"], "description": "The language of its decks."},
+        "exit_status": {"type": ["integer", "null"], "description": "Of a simulator that exited nonzero."},
+        "log": {"type": ["string", "null"], "description": "The file, beside this one, of everything that simulator printed."},
+        "message": {"type": ["string", "null"], "description": "The failure in one line; null for a refusal."},
+        "missing": {
+          "type": ["object", "null"],
+          "description": "What a routing refusal (W0180 to W0182) found missing.",
+          "additionalProperties": false,
+          "required": ["analyses", "features"],
+          "properties": {
+            "analyses": {"type": "array", "items": {"type": "string"}},
+            "features": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}

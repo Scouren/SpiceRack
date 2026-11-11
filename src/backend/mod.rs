@@ -121,6 +121,19 @@ pub enum BackendError {
     #[error("Simulator '{simulator}' is not installed: its command is not on $PATH")]
     NotInstalled { simulator: String },
 
+    /// A simulator that ran and did not exit with 0. `status` is its exit
+    /// status (`None`: a signal ended it); `text` is the failure as it is
+    /// printed; `message` is the first line of its output that mentions an
+    /// error, or `<program> exited with <status>` when none does; `output`
+    /// is everything it printed: stdout, stderr, then the log file it wrote.
+    #[error("Simulation failed: {text}")]
+    Exited {
+        status: Option<i32>,
+        text: String,
+        message: String,
+        output: String,
+    },
+
     #[error("Simulation failed: {0}")]
     SimulationError(String),
 
@@ -309,6 +322,7 @@ impl BackendError {
             BackendError::NoSimulator { .. } => Some(Code::W0182),
             BackendError::NotInstalled { .. } => Some(Code::R0041),
             BackendError::NoBackend
+            | BackendError::Exited { .. }
             | BackendError::SimulationError(_)
             | BackendError::RawParseError(_)
             | BackendError::Io(_) => None,
@@ -596,9 +610,10 @@ fn scratch(netlist: &str, file_name: &str) -> Result<(tempfile::TempDir, PathBuf
     Ok((dir, deck))
 }
 
-/// Run `cmd` and return its stdout. A nonzero exit becomes an error carrying
-/// the lines that mention an error (from stdout, stderr and the `log` file
-/// the simulator wrote), or the output tails when none do.
+/// Run `cmd` and return its stdout. A nonzero exit is `Exited`: its text
+/// carries the lines that mention an error (from stdout, stderr and the
+/// `log` file the simulator wrote), or the output tails when none do; its
+/// `output` is the whole of the three.
 fn exec(cmd: &mut Command, program: &str, log: Option<&Path>) -> Result<String, BackendError> {
     let out = cmd.output().map_err(|e| match e.kind() {
         std::io::ErrorKind::NotFound => {
@@ -630,10 +645,13 @@ fn exec(cmd: &mut Command, program: &str, log: Option<&Path>) -> Result<String, 
     } else {
         errors.join("\n")
     };
-    Err(BackendError::SimulationError(format!(
-        "{program} exited with {}\n{detail}",
-        out.status
-    )))
+    let exited = format!("{program} exited with {}", out.status);
+    Err(BackendError::Exited {
+        status: out.status.code(),
+        text: format!("{exited}\n{detail}"),
+        message: errors.first().map_or(exited, |line| (*line).to_string()),
+        output: format!("{stdout}{stderr}{log}"),
+    })
 }
 
 fn tail(s: &str) -> &str {

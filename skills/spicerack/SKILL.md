@@ -29,6 +29,8 @@ Read the deck with `tb.netlist(backend)` before running. It is plain text, and i
 
 Hand results to another tool with `raw, meas = ps.export(tb.run(), "out/bench")`: `out/bench.raw` is one ngspice raw file (every vector under the name you index a result by: `out`, `i(vin)`, `time`, whichever simulator ran), `out/bench.meas.json` the `.meas` values with their status and the steps' parameters (`spicerack.measures/1`; REFERENCE.md, "Exporting results"). The directory must exist.
 
+For a tool that reads files: `status, text = ps.diagnostics.netlist(tb, dialect, out_dir, variant)` and `status, text, results = ps.diagnostics.run(tb, out_dir, variant)` never raise `ps.Error`. Each leaves `<variant>.diag.json` in `out_dir` (the `spicerack.diagnostics/1` file: `stage`, `status`, `dialect`, `source`, `diagnostics`, `simulator`) whatever happened, so a missing file means a crash, never success. `status` is `"written"` or `"ok"`, `"refused"` or `"failed"`. Each diagnostic's `line` and `column` count in `<variant>.source.cir`, written beside it; a simulator that exited nonzero leaves `<variant>.log`.
+
 ## Traps
 
 Each of these returns a plausible wrong number rather than an error.

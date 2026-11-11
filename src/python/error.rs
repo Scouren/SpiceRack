@@ -7,7 +7,8 @@
 //! `status` is `"refused"` when nothing was run: the writer does not write
 //! the deck for the target, or no simulator is routed for it (`W0180` to
 //! `W0182`). It is `"failed"` for everything else: a simulator, a compiler
-//! or a hook that ran and failed.
+//! or a hook that ran and failed. A backend's error ([`backend`]) also
+//! carries what the `spicerack.diagnostics/1` file says of the simulator.
 //!
 //! Cites: none (a `Diagnostic`'s fields are those of one entry of the
 //! `spicerack.diagnostics/1` file, ZERO D14).
@@ -18,14 +19,17 @@
 //! - `pub(super) struct Wrote`
 //! - `pub(super) fn locate(diags: &Diags, src: &Source) -> Vec<PyDiagnostic>`
 //! - `pub(super) fn refused(diags: &Diags, src: &Source) -> PyErr`, `pub(super) fn failed(e: impl Display) -> PyErr`,
-//!   `pub(super) fn coded(status: &'static str, code: Code, text: String) -> PyErr`
+//!   `pub(super) fn coded(status: &'static str, code: Code, text: String) -> PyErr`,
+//!   `pub(super) fn backend(e: BackendError) -> PyErr`
 //! - `pub(super) fn add(m: &Bound<'_, PyModule>) -> PyResult<()>`
 
 use std::fmt::Display;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
+use crate::backend::{BackendError, Sim, by_name};
 use crate::syntax::ast::{Node, Tag};
 use crate::syntax::diag::{Code, Kind, info, messages};
 use crate::syntax::render::{Diags, Source};
@@ -67,6 +71,16 @@ pub(super) struct Wrote {
     pub(super) text: String,
     pub(super) notes: Vec<PyDiagnostic>,
 }
+
+/// What a backend error says of a simulator ([`simulator`]): the
+/// `_simulator` attribute of its `spicerack.Error`.
+type Simulator = (
+    Option<&'static str>,
+    Option<&'static str>,
+    Option<i32>,
+    Option<String>,
+    Option<String>,
+);
 
 /// `diags` (one file's: `src`'s) as Python reads them, in their order:
 /// each with its message (`diag::messages`), its line and column in the
@@ -134,6 +148,59 @@ pub(super) fn coded(status: &'static str, code: Code, text: String) -> PyErr {
     raise(status, text, found)
 }
 
+/// A backend error as `spicerack.Error`. One with a catalogue code
+/// (`BackendError::code`: a routing refusal `W0180`–`W0182`, a command not
+/// installed `R0041`) opens with `<code> <title>: `, holds that code as
+/// its one diagnostic (status `"refused"` for a routing refusal: nothing
+/// was run; `"failed"` for `R0041`) and carries a
+/// `diagnostic` attribute, `{"code": str, "stage": "route" | "run",
+/// "missing": {"analyses": [str], "features": [str]} | None}`. One with no
+/// code carries its text: status `"failed"`, no diagnostics. Each carries
+/// `_simulator` ([`simulator`]). The `spicerack.diagnostics/1` writer
+/// copies `missing` and `_simulator` into its `simulator` object.
+pub(super) fn backend(e: BackendError) -> PyErr {
+    let err = match e.code() {
+        None => failed(&e),
+        Some(code) => {
+            let title = info(code).title;
+            // A routing refusal names what is missing, and nothing was run.
+            let status = match e.missing() {
+                Some(_) => "refused",
+                None => "failed",
+            };
+            coded(status, code, format!("{code:?} {title}: {e}"))
+        }
+    };
+    let attached = Python::attach(|py| -> PyResult<()> {
+        let value = err.value(py);
+        value.setattr("_simulator", simulator(&e))?;
+        let Some(code) = e.code() else {
+            return Ok(());
+        };
+        let d = PyDict::new(py);
+        d.set_item("code", format!("{code:?}"))?;
+        match e.missing() {
+            Some((analyses, features)) => {
+                let missing = PyDict::new(py);
+                missing.set_item("analyses", analyses)?;
+                missing.set_item("features", features)?;
+                d.set_item("stage", "route")?;
+                d.set_item("missing", missing)?;
+            }
+            None => {
+                d.set_item("stage", "run")?;
+                d.set_item("missing", py.None())?;
+            }
+        }
+        value.setattr("diagnostic", d)
+    });
+    // A failure to attach is raised in the error's place, never dropped.
+    match attached {
+        Ok(()) => err,
+        Err(failed) => failed,
+    }
+}
+
 /// Adds `Error` and `Diagnostic` to module `m`.
 pub(super) fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("Error", m.py().get_type::<Error>())?;
@@ -162,6 +229,35 @@ impl PyDiagnostic {
             statement: None,
             element: None,
         }
+    }
+}
+
+/// What `e` says of a simulator beyond its text. The name and the
+/// language of the simulator a routing refusal is about, when it is about
+/// one (the run named it, or one is installed); then, of a simulator that
+/// exited nonzero, its exit status (`None`: a signal ended it), its first
+/// error line and everything it printed.
+fn simulator(e: &BackendError) -> Simulator {
+    use BackendError::{Exited, UnsupportedAnalysis, UnsupportedFeature};
+    let about = match e {
+        UnsupportedAnalysis { backend, .. } | UnsupportedFeature { backend, .. } => {
+            by_name(backend)
+        }
+        _ => None,
+    };
+    let name = about.map(Sim::name);
+    let lang = about.map(|s| s.row().dialect.name());
+    match e {
+        Exited {
+            status,
+            message,
+            output,
+            ..
+        } => {
+            let (message, output) = (message.clone(), output.clone());
+            (name, lang, *status, Some(message), Some(output))
+        }
+        _ => (name, lang, None, None, None),
     }
 }
 
