@@ -78,9 +78,11 @@ impl Rd<'_> {
     /// fields (an analysis's count, `.FFT`'s and `.MEASURE`'s words, a
     /// `.MEASURE`'s delimiter with no partner or key with no value,
     /// `.SENS`'s vectors), an element's (a letter Xyce has no device for,
-    /// too few nodes, values past the device's, a PWL or PAT wave), or a
-    /// spelling no Xyce line reads (an unclosed brace, `{POLY` with no
-    /// count, an exponent in braces, a lead current of two names).
+    /// too few nodes, values past the device's, an R, L or C key the line
+    /// ends after, a Y or U name alone, a Y list's stray comma, a PWL or
+    /// PAT wave), or a spelling no Xyce line reads (an unclosed brace,
+    /// `{POLY` with no count, an exponent in braces, a lead current of two
+    /// names).
     fn xyce_rejects(&self, first: u32, last: u32) -> bool {
         let head = self.t.text(first).to_ascii_lowercase();
         let p = self.pieces(first, last);
@@ -115,7 +117,20 @@ impl Rd<'_> {
             b'#' | b'A' | b'N' => true,
             b'R' | b'L' | b'C' => {
                 let rest = pos.get(2..).unwrap_or_default();
-                pos.len() < 2 || rest.len() > 2 || (rest.len() == 2 && rest.iter().all(bare))
+                // "Unexpectedly reached end of line while looking for
+                // parameters", "Unrecognized parameter ,": a key the line
+                // ends after (`TC=`, `TC=0,`, a bare `TC` after the value).
+                // A word that names a model of the deck is the model
+                // (`R1 a 0 1k M` with `.model M R`: Xyce reads it).
+                let key = |q: &(u32, u32)| {
+                    let word = self.t.text(q.0).to_ascii_lowercase();
+                    q.0 == q.1
+                        && ["tc", "temp", "m", "ic"].contains(&word.as_str())
+                        && !self.models.contains_key(&word)
+                };
+                let cut = matches!(self.ttag(last), T::Equal | T::Comma)
+                    || matches!(rest, [v, k] if bare(v) && key(k));
+                pos.len() < 2 || rest.len() > 2 || (rest.len() == 2 && rest.iter().all(bare)) || cut
             }
             // "Model is required for device".
             b'D' => self.words(first, last) < 4,
@@ -135,6 +150,19 @@ impl Rd<'_> {
                 });
                 // "Not enough fields on input line": the name and two nodes.
                 self.words(first, last) < 3 || pwl || self.pat_rejected(first, last)
+            }
+            // "U device line specified with only one token".
+            b'U' => p.is_empty(),
+            // "Y device line specified with only one token"; a composite
+            // parameter's stray comma, after `=` or before a comma or the
+            // closing brace ("Invalid syntax (likely spurious comma)").
+            b'Y' => {
+                p.is_empty()
+                    || (first + 1..last).any(|k| {
+                        self.ttag(k) == T::Comma
+                            && (matches!(self.ttag(k + 1), T::Comma | T::RBrace)
+                                || self.ttag(k - 1) == T::Equal)
+                    })
             }
             _ => false,
         }

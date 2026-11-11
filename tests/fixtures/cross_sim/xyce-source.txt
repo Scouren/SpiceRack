@@ -521,3 +521,6 @@ Output/MPDE/startup_printline_for_mpde-probe-fallback-defaults-to-prn.cir source
 Output/MPDE/startup_printline_for_mpde-raw-defaults-to-prn.cir source-fails # Xyce 7.10 stops on the original: line 7: .TRAN line has an unexpected number of fields
 Output/MPDE/startup_printline_for_mpde-raw-fallback-defaults-to-prn.cir source-fails # Xyce 7.10 stops on the original: line 7: .TRAN line has an unexpected number of fields
 MEASURE/bad_dot_measure_line1.cir source-fails # Xyce 7.10 stops on the original: line 21: Illegal name in .MEASURE line.
+Message/Device/DeviceBlock_extractInstanceParam.cir source-fails # Xyce 7.10 stops on the original: line 27: Unexpectedly reached end of line while looking for parameters for device R2
+Certification_Tests/BUG_1037_SON/specials_in_subckt_dot_param.cir source-fails # Xyce 7.10 stops on the original: There was 1 undefined symbol in .PRINT command: device X:RSUB:R
+Certification_Tests/ISSUE_61/issue61.cir source-fails # Xyce 7.10 stops on the original: line 7: Device instance B2: Problem with value for B1 in B2
