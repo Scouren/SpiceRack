@@ -7,7 +7,8 @@
 //! and ESPice's `Plotname` lines.
 //!
 //! Contents:
-//! - `pub enum Kind`, `Kind::name(self) -> &'static str`, `Kind::spec(self) -> Spec`
+//! - `pub enum Kind`, `Kind::ALL: [Kind; 22]`, `Kind::name(self) -> &'static str`,
+//!   `Kind::spec(self) -> Spec`
 //! - `pub(crate) struct Spec`, `pub(crate) enum Plot`
 
 use super::RUNNABLE;
@@ -68,7 +69,44 @@ pub(crate) enum Plot {
     Unmatched(&'static str),
 }
 
+// `ALL` holds each kind at its own discriminant, so `1 << k as u32` is
+// one distinct bit per kind (`registry`'s `analyses` mask).
+const _: () = {
+    let mut i = 0;
+    while i < Kind::ALL.len() {
+        assert!(Kind::ALL[i] as usize == i);
+        i += 1;
+    }
+};
+
 impl Kind {
+    /// Every kind, in declaration order (`ALL[k as usize] == k`). A kind
+    /// added to the enum is appended here.
+    pub const ALL: [Kind; 22] = [
+        Kind::Op,
+        Kind::Dc,
+        Kind::Ac,
+        Kind::Tran,
+        Kind::Noise,
+        Kind::Tf,
+        Kind::Sens,
+        Kind::SensAc,
+        Kind::Pz,
+        Kind::Disto,
+        Kind::Pss,
+        Kind::Hb,
+        Kind::Sp,
+        Kind::Stb,
+        Kind::TranNoise,
+        Kind::Fourier,
+        Kind::SpectreSweep,
+        Kind::SpectreMonteCarlo,
+        Kind::Pac,
+        Kind::Pnoise,
+        Kind::Pxf,
+        Kind::Pstb,
+    ];
+
     /// The analysis's short name, as errors and `check` name it.
     pub fn name(self) -> &'static str {
         self.spec().name

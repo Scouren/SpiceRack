@@ -1,5 +1,7 @@
 //! Simulator backends: the [`RUNNABLE`] dialects, one row each in
 //! `BACKENDS`, and the analysis kinds, one row each in `Kind::spec`.
+//! Every simulator is a row of the registry (`registry.rs`, a [`Sim`]
+//! handle each): `BACKENDS` is the five built-ins it registers first.
 //!
 //! A backend executes netlist text verbatim, in its own [`Dialect`]. Turning
 //! a deck into that text is `syntax::render`'s job. Netlist text in, [`RawData`] plots
@@ -23,6 +25,8 @@
 //! - `Dialect::capabilities(self) -> u8`, `Dialect::run(self, netlist: &str) -> Result<RawData, BackendError>`,
 //!   `Dialect::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn available() -> &'static [Dialect]`
+//! - `pub use registry::{Installed, Runner, SIMS_MAX, Sim, SimDef, SimRegisterError, by_name,
+//!   register_simulator, simulators}` (`registry.rs`: the simulator registry)
 //! - `pub use kind::Kind`, `pub(crate) use kind::{Plot, Spec}` (`kind.rs`: the analysis kinds)
 //! - `pub fn select(kind: Kind, override_backend: Option<&str>, needs: u8, writes: impl Fn(Dialect) -> bool) -> Result<Dialect, BackendError>`
 //! - `pub struct Issue`, `pub enum IssueSeverity`,
@@ -30,6 +34,7 @@
 //! - `pub mod espice`, `ltspice`, `ngspice`, `spectre`, `vacask`
 
 mod kind;
+mod registry;
 
 pub mod espice;
 pub mod ltspice;
@@ -45,6 +50,10 @@ use feature::*;
 
 pub use kind::Kind;
 pub(crate) use kind::{Plot, Spec};
+pub use registry::{
+    Installed, Runner, SIMS_MAX, Sim, SimDef, SimRegisterError, by_name, register_simulator,
+    simulators,
+};
 
 use crate::rawfile;
 use crate::result::RawData;
@@ -265,7 +274,7 @@ impl Dialect {
     /// What this dialect's simulator can do, as `feature` bits; nothing
     /// for a dialect no simulator here runs.
     pub fn capabilities(self) -> u8 {
-        backend(self).map_or(0, |b| b.caps)
+        Sim::of(self).map_or(0, |s| s.row().features)
     }
 
     /// Executes `netlist` (already in this dialect) and reads the results.
@@ -287,15 +296,13 @@ impl Dialect {
     /// # Errors
     /// As [`Self::run`].
     pub fn run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError> {
-        let Some(b) = backend(self) else {
+        let Some(sim) = Sim::of(self) else {
             return Err(BackendError::SimulationError(format!(
                 "no {} simulator is driven by SpiceRack",
                 self.name()
             )));
         };
-        let plots = (b.run)(netlist)?;
-        assert!(!plots.is_empty(), "a raw file read holds at least one plot");
-        Ok(plots)
+        sim.run_all(netlist)
     }
 }
 
@@ -303,10 +310,9 @@ impl Dialect {
 pub fn available() -> &'static [Dialect] {
     static CACHE: OnceLock<Vec<Dialect>> = OnceLock::new();
     CACHE.get_or_init(|| {
-        let found: Vec<Dialect> = BACKENDS
-            .iter()
-            .filter(|b| (b.installed)())
-            .map(|b| b.dialect)
+        let found: Vec<Dialect> = RUNNABLE
+            .into_iter()
+            .filter(|&d| Sim::of(d).is_some_and(Sim::installed))
             .collect();
         assert!(found.len() <= RUNNABLE.len());
         found
@@ -397,11 +403,6 @@ pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue> {
 }
 
 // ---- private ----
-
-/// The [`BACKENDS`] row of `d`; `None` for a dialect no simulator here runs.
-fn backend(d: Dialect) -> Option<&'static Backend> {
-    BACKENDS.iter().find(|b| b.dialect == d)
-}
 
 fn unsupported(
     analysis: &str,
