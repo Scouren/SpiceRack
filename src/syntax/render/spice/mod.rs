@@ -13,7 +13,8 @@
 //! options, `ngspice_options` the others' and HSPICE's defaults, `xyce_cards`
 //! Xyce's spellings of another dialect's cards, `xyce_models` its model cards,
 //! `ngspice_models` a Xyce model card's level elsewhere,
-//! `prints` the `.print` cards, `epochs` the script lines of a circuit
+//! `prints` the `.print` cards, `steps` the `.step` cards in read order,
+//! `epochs` the script lines of a circuit
 //! changed between analyses, `loops` a `.step` and a log or list `.dc`
 //! axis as that script's loops,
 //! `states` the circuit states as one table the deck runs over),
@@ -65,6 +66,7 @@ pub(in crate::syntax::render) mod parasitics;
 mod powers;
 mod prints;
 mod states;
+mod steps;
 mod sweeps;
 mod table;
 mod ternary;

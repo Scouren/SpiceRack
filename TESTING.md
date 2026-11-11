@@ -312,3 +312,11 @@ and fail once it runs, so the marker goes when the MSI is mirrored.
 - ESPice reads back only the HSPICE deck in `test_dialects.rs`: the ngspice
   and ESPice decks spell Laplace as an XSPICE `s_xfer`, which ESPice cannot
   read, and the renderer refuses the B source for Spectre.
+- Xyce 7.10 crashes on a deck with two `.step` lines beside `.op`
+  ("Analysis mode 4 is not available", exit 139); beside a `.dc` the same
+  cards run. No gate test runs that shape: a two-step deck's Xyce text is
+  held to its card order (`test_steps.rs` `p5_100`, `test_epochs.rs`
+  `p5_001_s3`).
+- ngspice-45 aborts on `set gmin=<value>` in a `.control` script ("it's a
+  US_SIMVAR!", `free(): invalid pointer`, exit 134). No gate test runs
+  that line; the reader refuses it (W0160).

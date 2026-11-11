@@ -1,7 +1,7 @@
 //! The testbench → SPICE-family cards: the deck's testbench statements
 //! folded in read order (options merged into one card, the last `.temp`
 //! winning), then options, temperature, initial conditions, saves, prints,
-//! measures, `.step`s and the analyses (`analyses.rs`), which an ngspice deck with a
+//! measures, `.step`s (`steps.rs`) and the analyses (`analyses.rs`), which an ngspice deck with a
 //! `.meas` or `.four` runs from one `.control` block.
 //!
 //! Cites: ngspice manual §11.1-§11.3 (analyses), §15.4.3 (`.save`), §15.6
@@ -205,8 +205,7 @@ impl W<'_, '_> {
         self.saves(&tb);
         self.prints(&tb.prints, &tb.plan.runs);
         self.measures(&tb);
-        self.steps(&tb);
-        self.step_lists(&tb);
+        self.step_cards(&tb);
         self.state_steps();
         self.vacask_lines(&tb.extra);
         self.run_analyses(&tb, control);
@@ -306,61 +305,6 @@ impl W<'_, '_> {
             let line = format!("{}{m}", if card { "" } else { ".meas " });
             let line = self.xyce_measure(line);
             self.o.token(&line, Space::Line);
-        }
-    }
-
-    /// The `.step` sweeps (Xyce's `.step <param>`, the others' `.step
-    /// param`); Spectre's total-count `log` refused (W0016).
-    fn steps(&mut self, tb: &Tb) {
-        for (sweep, param, [a, b, c], tok) in &tb.steps {
-            if self.ask(Construct::Step, *tok) != Action::Native {
-                continue;
-            }
-            // Spectre's total-count `log`: Xyce's `.step` sweeps lin, dec,
-            // oct or a list (RG p.155), LTspice's lin, oct, dec or a list.
-            if *sweep == Some("log") {
-                self.refuse(Code::W0016, *tok);
-                continue;
-            }
-            let line = match (self.b.analysis_form, sweep) {
-                (AnalysisForm::Xyce, Some(s)) => format!(".step {s} {param} {a} {b} {c}"),
-                (AnalysisForm::Xyce, None) => format!(".step {param} {a} {b} {c}"),
-                (_, Some(s)) => format!(".step {s} param {param} {a} {b} {c}"),
-                (_, None) => format!(".step param {param} {a} {b} {c}"),
-            };
-            self.o.token(&line, Space::Line);
-        }
-    }
-
-    /// The list `.step`s; HSPICE's temperature list as `.temp t1 t2 …`.
-    fn step_lists(&mut self, tb: &Tb) {
-        for (param, values, tok) in &tb.step_lists {
-            let act = self.ask(Construct::StepList, *tok);
-            let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
-            let temp = param.eq_ignore_ascii_case("temp");
-            // HSPICE UG `.TEMP t1 t2 …`: the analyses at each temperature.
-            if act == Action::Spell(Alt::TempList) {
-                match temp {
-                    true => self
-                        .o
-                        .token(&format!(".temp {}", vals.join(" ")), Space::Line),
-                    false => self.refuse(Code::W0016, *tok),
-                }
-                continue;
-            }
-            if act != Action::Native {
-                continue;
-            }
-            // Xyce RG `.STEP <name> LIST`; LTspice help `.step
-            // param <name> list`, `temp` bare.
-            let name = match (self.b.analysis_form, param.eq_ignore_ascii_case("temp")) {
-                (AnalysisForm::Ltspice, false) => format!("param {param}"),
-                _ => param.clone(),
-            };
-            self.o.token(
-                &format!(".step {name} list {}", vals.join(" ")),
-                Space::Line,
-            );
         }
     }
 

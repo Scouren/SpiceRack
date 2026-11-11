@@ -2,7 +2,8 @@
 //! read order (options merged, the last temperature winning), then
 //! `options`, `ic`, `nodeset`, `save` (a `.save`'s and a `.print`'s
 //! signals), the measures in a `simulator lang=spice` region, and the
-//! analyses (`analyses.rs`), each `.step` a `sweep` block around them.
+//! analyses (`analyses.rs`), each `.step` a `sweep` block around them,
+//! the first `.step` the innermost.
 //!
 //! Cites: Spectre Reference 19.1 `[REF]` pp.187-236 (`options`: `reltol`
 //! #1, `vabstol` #3, `iabstol` #4, `temp` #6, `tnom` #7, `dcmaxiters` #56),
@@ -202,33 +203,28 @@ impl W<'_, '_> {
                 block.extend(s.split('\n').map(str::to_string));
             }
         }
-        // One `sweep` block per step parameter, the first outermost; a
-        // list `.step` is `sweep param=p values=[…]` (`[REF]` pp.406-409),
-        // inside the others.
-        let lists = tb
-            .step_lists
-            .iter()
-            .enumerate()
-            .rev()
-            .map(|(i, (p, v, _))| {
-                let k = tb.steps.len() + i + 1;
-                format!(
-                    "sweep{k}_{} sweep param={p} {} {{",
-                    suffix(p),
-                    self.values(v)
-                )
-            });
-        let lists: Vec<String> = lists.collect();
-        for head in lists {
-            let mut wrapped = vec![head];
-            wrapped.extend(block.into_iter().map(|l| format!("  {l}")));
-            wrapped.push("}".into());
-            block = wrapped;
+        // One `sweep` block per `.step`, in read order from the inside
+        // out: the first `.step` is the innermost loop (Xyce RG 7.10
+        // §2.1.36; LTspice 26.1.1, run) and the last the outermost. A
+        // list `.step` is `sweep param=p values=[…]` (`[REF]` pp.406-409).
+        let mut heads: Vec<(u32, String)> = Vec::new();
+        for (i, (p, v, tok)) in tb.step_lists.iter().enumerate() {
+            let k = tb.steps.len() + i + 1;
+            let head = format!(
+                "sweep{k}_{} sweep param={p} {} {{",
+                suffix(p),
+                self.values(v)
+            );
+            heads.push((*tok, head));
         }
-        for (idx, step) in tb.steps.iter().enumerate().rev() {
-            let Some(head) = self.sweep_head(idx, step) else {
-                continue;
-            };
+        for (idx, step) in tb.steps.iter().enumerate() {
+            if let Some(head) = self.sweep_head(idx, step) {
+                heads.push((step.3, head));
+            }
+        }
+        // Read order: a token's index grows along the deck.
+        heads.sort_by_key(|h| h.0);
+        for (_, head) in heads {
             let mut wrapped = vec![head];
             wrapped.extend(block.into_iter().map(|l| format!("  {l}")));
             wrapped.push("}".into());

@@ -1,5 +1,6 @@
 //! The testbench → VACASK's `control` block: one `options` line, the
-//! stepped parameters as control variables swept ahead of each analysis,
+//! stepped parameters as control variables swept ahead of each analysis
+//! (the first `.step` nearest it: the innermost loop),
 //! and the analyses, initial conditions on each transient's line and
 //! nodesets on every `analysis` line; a Spectre `montecarlo` as an `mc`
 //! loop around its inner analysis.
@@ -82,10 +83,16 @@ impl W<'_, '_> {
         for (_, p, [start, ..], _) in &tb.steps {
             self.line(&format!("  var {}={}", p.to_ascii_lowercase(), num(*start)));
         }
-        let mut sweeps: Vec<String> = tb.steps.iter().filter_map(|s| self.step_sweep(s)).collect();
+        // Each `.step`'s `sweep` line, with its first token.
+        let mut sweeps: Vec<(u32, String)> = Vec::new();
+        for s in &tb.steps {
+            if let Some(line) = self.step_sweep(s) {
+                sweeps.push((s.3, line));
+            }
+        }
         // A list `.step` is a `sweep … values=[…]` (`lib/answeep.cpp`
         // `setupValueSweep`); `temp` is the `temp` option's.
-        for (p, v, _) in &tb.step_lists {
+        for (p, v, tok) in &tb.step_lists {
             let name = p.to_ascii_lowercase();
             let what = match name.as_str() {
                 "temp" => "option=\"temp\"".to_string(),
@@ -94,12 +101,14 @@ impl W<'_, '_> {
                     format!("variable=\"{name}\"")
                 }
             };
-            sweeps.push(format!(
-                "sweep step_{} {what} {}",
-                sanitize(&name),
-                values(v)
-            ));
+            let line = format!("sweep step_{} {what} {}", sanitize(&name), values(v));
+            sweeps.push((*tok, line));
         }
+        // The `sweep` line nearest its `analysis` is the innermost loop
+        // (VACASK 36be560, run: `research/impl/evidence/P5-100/`): the
+        // first `.step`, the source's innermost (Xyce RG 7.10 §2.1.36;
+        // LTspice 26.1.1, run), is written last.
+        sweeps.sort_by_key(|s| std::cmp::Reverse(s.0));
         // `.ic` and a capacitor's `ic=` are a transient's: ngspice forces
         // them in a transient's operating point only (`.ic` beside `.op`
         // leaves the node free, run) and VACASK's `op` has no `ic`
@@ -153,7 +162,7 @@ impl W<'_, '_> {
             }
             // A `sweep` binds to the next `analysis`: the stepped sweeps
             // are repeated ahead of each.
-            for s in &sweeps {
+            for (_, s) in &sweeps {
                 self.line(&format!("  {s}"));
             }
             let lines = match a {
