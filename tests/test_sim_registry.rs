@@ -1,8 +1,9 @@
 //! The simulator registry (ZERO D38) -> `spicerack::backend::{Sim, SimDef,
-//! register_simulator, simulators, by_name}`: the five built-ins hold the
-//! rows the tree held before the registry, and a caller's simulator
-//! registers, reads back and runs. (`test_backends.rs` is at the file-size
-//! cap: the registry's tests live here.)
+//! register_simulator, simulators, by_name, select}`: the five built-ins
+//! hold the rows the tree held before the registry, and a caller's
+//! simulator registers, reads back, runs, and is routed for what it
+//! declares. (`test_backends.rs` is at the file-size cap: the registry's
+//! tests live here.)
 //!
 //! Cites: ZERO D38 (`research/DESIGN-custom-simulators.md`).
 //!
@@ -158,4 +159,84 @@ fn p8_201_the_registry_holds_the_built_ins_and_what_is_registered() {
     for refused in ["p8-201-a", "p8-201-b", "p8-201-c", "P8-201-Fixed"] {
         assert_eq!(by_name(refused), None, "nothing refused is registered");
     }
+}
+
+/// Oracle: the route written out by hand. A registered simulator that
+/// declares op and dc with `measures` comes after the built-ins in those
+/// two routes and in no other, is picked by name for what it declares and
+/// refused for the rest, and is the route's pick when the writer's verdict
+/// (`writes`) leaves it alone (the stand-in for "no built-in installed").
+#[cfg(feature = "backend")]
+#[test]
+fn p8_202_a_registered_simulator_is_routed_for_what_it_declares() {
+    use spicerack::backend::feature::{MEASURES, STEP_PARAMS};
+    use spicerack::backend::{
+        BackendError, Installed, Kind, Runner, Sim, SimDef, register_simulator, select,
+    };
+    use spicerack::result::RawData;
+    use spicerack::syntax::{Dialect, Lang};
+
+    fn fixed(netlist: &str) -> Result<Vec<RawData>, BackendError> {
+        Ok(vec![RawData {
+            title: netlist.to_string(),
+            ..RawData::default()
+        }])
+    }
+    fn present() -> bool {
+        true
+    }
+    let name = "p8-202-fixed";
+    let sim = register_simulator(SimDef {
+        name: name.into(),
+        dialect: Lang::NGSPICE,
+        runner: Runner::BuiltIn(fixed),
+        features: MEASURES,
+        analyses: (1 << Kind::Op as u32) | (1 << Kind::Dc as u32),
+        installed: Installed::Fn(present),
+    })
+    .expect("registers");
+    let only = |s: Sim| s == sim;
+    let all = |_: Sim| true;
+
+    // By name: what it declares, and nothing else.
+    let both = [Kind::Dc, Kind::Op];
+    assert_eq!(select(&both, Some(name), MEASURES, all).unwrap(), sim);
+    assert!(matches!(
+        select(&[Kind::Op, Kind::Tran], Some(name), 0, all),
+        Err(BackendError::UnsupportedAnalysis { analysis, backend, required, .. })
+            if analysis == "tran" && backend == name && required == "ngspice"
+    ));
+    assert!(matches!(
+        select(&[Kind::Op], Some(name), MEASURES | STEP_PARAMS, all),
+        Err(BackendError::UnsupportedFeature { feature, backend, .. })
+            if feature == "step" && backend == name
+    ));
+    assert!(matches!(
+        select(&[Kind::Pz, Kind::Hb], Some(name), 0, all),
+        Err(BackendError::NoSimulator { analysis, .. }) if analysis == "hb"
+    ));
+    assert!(matches!(
+        select(&[Kind::Op], Some("p8-202-nobody"), 0, all),
+        Err(BackendError::SimulationError(m)) if m == "Unknown backend: p8-202-nobody"
+    ));
+
+    // Routed: after the built-ins (ngspice is installed in `.#testing` and
+    // leads every universal route), first when only it writes the deck.
+    assert_eq!(select(&[Kind::Op], None, 0, all).unwrap(), Sim::NGSPICE);
+    assert_eq!(select(&[], None, 0, only).unwrap(), sim);
+    assert_eq!(select(&both, None, MEASURES, only).unwrap(), sim);
+    // No last resort onto a registered simulator: its declaration holds.
+    assert!(matches!(
+        select(&[Kind::Op], None, STEP_PARAMS, only),
+        Err(BackendError::UnsupportedFeature { feature, .. }) if feature == "step"
+    ));
+    assert!(matches!(
+        select(&[Kind::Tran], None, 0, only),
+        Err(BackendError::UnsupportedAnalysis { analysis, .. }) if analysis == "tran"
+    ));
+
+    // A run through `simulation`: read by its family's rules (ngspice's).
+    let raw = spicerack::simulation::run(sim, "* p8-202\n").expect("runs");
+    assert_eq!(raw.title, "* p8-202\n");
+    assert_eq!(raw.backend_hint, Some(Dialect::Ngspice));
 }

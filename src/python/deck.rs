@@ -43,7 +43,7 @@ use pyo3::prelude::*;
 use super::analysis::{Analysis, nfreqs};
 use super::model::{Bench, Body, Func, ModelLibrary, dec, params};
 use super::verilog::lower_verilog;
-use crate::backend::{Dialect, Kind, feature};
+use crate::backend::{Dialect, Kind, Sim, feature};
 use crate::result::RawData;
 use crate::syntax::render;
 
@@ -91,7 +91,7 @@ impl Deck {
     }
 
     /// Runs the deck on `backend` (`None`: the best installed one for its
-    /// first analysis and its features); the first plot.
+    /// every analysis and its features); the first plot.
     pub(super) fn run(&self, backend: Option<&str>) -> PyResult<RawData> {
         let (sim, text) = self.for_run(backend)?;
         crate::simulation::run(sim, &text).map_err(runtime_err)
@@ -216,25 +216,36 @@ pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr {
 // ---- private ----
 
 impl Deck {
-    /// The simulator a run picks and the deck written for it.
-    fn for_run(&self, backend: Option<&str>) -> PyResult<(Dialect, String)> {
+    /// The simulator a run picks (by every analysis of the deck) and the
+    /// deck written for it, in that simulator's language.
+    fn for_run(&self, backend: Option<&str>) -> PyResult<(Sim, String)> {
         let deck = self.lowered()?;
-        if let Some(lang) = backend.and_then(super::def_::plugin) {
-            // A plugin runs where its definition says (`runs_on`), as written.
-            let sim = lang.runs_on().ok_or_else(|| {
+        // A plugin language's name that is no simulator's: it runs where
+        // its definition says (`runs_on`), as written.
+        let plugin = backend
+            .filter(|n| crate::backend::by_name(n).is_none())
+            .and_then(super::def_::plugin);
+        if let Some(lang) = plugin {
+            let d = lang.runs_on().ok_or_else(|| {
                 runtime_err(format!(
                     "no simulator runs '{}': it is netlist only (its definition declares no runs_on)",
                     lang.name()
                 ))
             })?;
+            let sim = Sim::of(d).ok_or_else(|| {
+                runtime_err(crate::backend::BackendError::SimulationError(format!(
+                    "no {} simulator is driven by SpiceRack",
+                    d.name()
+                )))
+            })?;
             return Ok((sim, deck.write_to(lang).map_err(runtime_err)?.text));
         }
-        let first = deck.analyses().first().map_or(Kind::Op, Analysis::kind);
-        let writes = |d| deck.write(d).is_ok();
+        let kinds: Vec<Kind> = deck.analyses().iter().map(Analysis::kind).collect();
+        let writes = |s: Sim| deck.write_to(s.row().dialect).is_ok();
         let sim =
-            crate::backend::select(first, backend, deck.needs(), writes).map_err(runtime_err)?;
-        let text = deck.write(sim).map_err(runtime_err)?;
-        Ok((sim, text))
+            crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(runtime_err)?;
+        let written = deck.write_to(sim.row().dialect).map_err(runtime_err)?;
+        Ok((sim, written.text))
     }
 
     /// A copy with every Verilog block expanded into what simulates it.
@@ -909,10 +920,11 @@ mod tests {
                 .elements
                 .push(Card::element("in", "Vin in 0 1 AC 1".into()));
             let kind = d.analyses()[0].kind();
-            let writes = |t| d.write(t).is_ok();
-            if let Ok(sim) = crate::backend::select(kind, None, d.needs(), writes) {
+            // `write`, never `write_to`: this binary links no interpreter.
+            let writes = |s: Sim| d.write(s.family()).is_ok();
+            if let Ok(sim) = crate::backend::select(&[kind], None, d.needs(), writes) {
                 assert!(
-                    d.write(sim).is_ok(),
+                    d.write(sim.family()).is_ok(),
                     "{name} routed to {sim:?}, which refuses it"
                 );
             }

@@ -379,7 +379,8 @@ fn the_run_pipeline_emits_and_runs_the_translated_source() {
     c.raw_spice(".ac lin 1 1000 1000");
     require_ngspice();
     let deck = netlist(&ngspice(), &c).unwrap();
-    let raw = spicerack::simulation::run(Dialect::Ngspice, &deck).expect("Laplace deck must run");
+    let sim = spicerack::backend::Sim::NGSPICE;
+    let raw = spicerack::simulation::run(sim, &deck).expect("Laplace deck must run");
     let (mag, phase) = ac(&raw, "out", 0);
     assert!(
         (mag - std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-4,

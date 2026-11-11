@@ -7,40 +7,43 @@
 //! Cites: none (plot names are ngspice's and ESPice's `Plotname` lines).
 //!
 //! Contents:
-//! - `pub fn run(sim: Dialect, deck: &str) -> Result<RawData, BackendError>`
-//! - `pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError>`
-//! - `pub fn run_each(sim: Dialect, deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError>`
+//! - `pub fn run(sim: Sim, deck: &str) -> Result<RawData, BackendError>`
+//! - `pub fn run_all(sim: Sim, deck: &str) -> Result<Vec<RawData>, BackendError>`
+//! - `pub fn run_each(sim: Sim, deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError>`
 
-use crate::backend::{BackendError, Dialect, Kind, Plot};
+use crate::backend::{BackendError, Dialect, Kind, Plot, Sim};
 use crate::result::RawData;
 use crate::syntax::render::LTSPICE_EACH;
 
 /// Runs `deck`, written in `sim`'s dialect, on `sim`, tagging the result
 /// with the backend and its parsed `.meas` values. The first plot:
 /// [`run_all`] returns them all.
-pub fn run(sim: Dialect, deck: &str) -> Result<RawData, BackendError> {
+pub fn run(sim: Sim, deck: &str) -> Result<RawData, BackendError> {
     let first = run_all(sim, deck)?.into_iter().next();
     Ok(first.expect("a raw file read holds at least one plot"))
 }
 
 /// [`run`], returning every plot the run wrote (ngspice: one per analysis,
 /// in run order), each tagged with the backend and the run's `.meas` values.
-pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
+pub fn run_all(sim: Sim, deck: &str) -> Result<Vec<RawData>, BackendError> {
     let mut plots = sim.run_all(deck)?;
+    // The built-in dialect the simulator's decks are a kind of: its
+    // `.meas` lines and vector names are that family's.
+    let family = sim.family();
     // LTspice writes `.meas` results to its log, everyone else to stdout;
     // every plot carries the same run's text.
     let p = &plots[0];
-    let text = if sim == Dialect::Ltspice && !p.log_content.is_empty() {
+    let text = if family == Dialect::Ltspice && !p.log_content.is_empty() {
         &p.log_content
     } else {
         &p.stdout
     };
     // In the deck's order, a measure with no value a row too; of a stepped
     // run (one plot a step, ZERO D42) each plot carries its step's rows.
-    let printed = crate::measure_parse::parse_measures(text, Some(sim));
-    let measures = crate::measure_parse::in_deck_order(deck, printed, sim);
+    let printed = crate::measure_parse::parse_measures(text, Some(family));
+    let measures = crate::measure_parse::in_deck_order(deck, printed, family);
     for (k, p) in plots.iter_mut().enumerate() {
-        p.backend_hint = Some(sim);
+        p.backend_hint = Some(family);
         p.measures = crate::measure_parse::at_step(&measures, k);
     }
     Ok(plots)
@@ -60,12 +63,12 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
 /// matched here (`pss`, `hb`, `stb`, the Spectre-only
 /// ones) run beside others.
 pub fn run_each(
-    sim: Dialect,
+    sim: Sim,
     deck: &str,
     analyses: &[Kind],
 ) -> Result<Vec<Vec<RawData>>, BackendError> {
-    if sim == Dialect::Ltspice && analyses.len() > 1 {
-        return ltspice_each(deck, analyses);
+    if sim.family() == Dialect::Ltspice && analyses.len() > 1 {
+        return ltspice_each(sim, deck, analyses);
     }
     let mut plots: Vec<Option<RawData>> = run_all(sim, deck)?.into_iter().map(Some).collect();
     assert!(!plots.is_empty(), "a run returns at least one plot");
@@ -85,7 +88,7 @@ pub fn run_each(
         // backend writes one.
         return Err(missing("per-analysis stepped"));
     }
-    if sim == Dialect::Vacask {
+    if sim.family() == Dialect::Vacask {
         if plots.len() != analyses.len() {
             return Err(missing(&format!(
                 "one-per-analysis ({} plots, {} analyses)",
@@ -126,7 +129,11 @@ pub fn run_each(
 /// # Errors
 /// As [`run_all`], and `SimulationError` when the deck's analysis cards
 /// are not one per analysis.
-fn ltspice_each(deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError> {
+fn ltspice_each(
+    sim: Sim,
+    deck: &str,
+    analyses: &[Kind],
+) -> Result<Vec<Vec<RawData>>, BackendError> {
     let mismatch = || {
         BackendError::SimulationError(format!(
             "LTspice: the deck's analysis cards after `{LTSPICE_EACH}` are not its {} analyses",
@@ -158,7 +165,7 @@ fn ltspice_each(deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, Back
             String::new()
         };
         let one = format!("{head}{card}\n{with_four}\n{}\n", tail.join("\n"));
-        let plots = run_all(Dialect::Ltspice, &one)?;
+        let plots = run_all(sim, &one)?;
         let stepped = plots.iter().any(|p| !p.params.is_empty());
         out.push(match stepped {
             true => plots,

@@ -20,15 +20,15 @@
 //! - `pub use crate::syntax::Dialect`
 //! - `pub mod feature`: `XSPICE`, `OSDI`, `MEASURES`, `STEP_PARAMS`, `CONTROL_BLOCKS`,
 //!   `LAPLACE`, `VERILOG_COSIM`, `ALL` (`u8` bits)
-//! - `pub(crate) fn runs(d: Dialect, needs: u8) -> bool`
+//! - `pub fn features() -> impl Iterator<Item = (&'static str, u8)>`
 //! - `pub fn parse(name: &str) -> Option<Dialect>`
 //! - `Dialect::capabilities(self) -> u8`, `Dialect::run(self, netlist: &str) -> Result<RawData, BackendError>`,
 //!   `Dialect::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn available() -> &'static [Dialect]`
 //! - `pub use registry::{Installed, Runner, SIMS_MAX, Sim, SimDef, SimRegisterError, by_name,
 //!   register_simulator, simulators}` (`registry.rs`: the simulator registry)
-//! - `pub use kind::Kind`, `pub(crate) use kind::{Plot, Spec}` (`kind.rs`: the analysis kinds)
-//! - `pub fn select(kind: Kind, override_backend: Option<&str>, needs: u8, writes: impl Fn(Dialect) -> bool) -> Result<Dialect, BackendError>`
+//! - `pub use kind::Kind`, `pub(crate) use kind::Plot` (`kind.rs`: the analysis kinds)
+//! - `pub fn select(kinds: &[Kind], override_backend: Option<&str>, needs: u8, writes: impl Fn(Sim) -> bool) -> Result<Sim, BackendError>`
 //! - `pub struct Issue`, `pub enum IssueSeverity`,
 //!   `pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue>`
 //! - `pub mod espice`, `ltspice`, `ngspice`, `spectre`, `vacask`
@@ -49,7 +49,7 @@ use std::sync::OnceLock;
 use feature::*;
 
 pub use kind::Kind;
-pub(crate) use kind::{Plot, Spec};
+pub(crate) use kind::Plot;
 pub use registry::{
     Installed, Runner, SIMS_MAX, Sim, SimDef, SimRegisterError, by_name, register_simulator,
     simulators,
@@ -91,6 +91,26 @@ pub enum BackendError {
         required: String,
         alternative: String,
     },
+
+    /// The deck needs a feature (`feature`, by its `features()` name) that
+    /// `backend` does not declare; `required` names who does.
+    #[error(
+        "Feature '{feature}' not supported by {backend}.\n\n\
+        The deck needs it. Declared by: {required}"
+    )]
+    UnsupportedFeature {
+        feature: String,
+        backend: String,
+        required: String,
+    },
+
+    /// No simulator runs every analysis of the deck: `analysis` runs on
+    /// none of those that run `others` (the kinds before it).
+    #[error(
+        "No simulator runs every analysis of the deck: '{analysis}' runs on \
+        none of those that run {others}"
+    )]
+    NoSimulator { analysis: String, others: String },
 
     #[error("Simulation failed: {0}")]
     SimulationError(String),
@@ -202,42 +222,51 @@ const _: () = {
 // Seven features, one distinct bit each, inside the `u8`.
 const _: () = assert!(feature::ALL.count_ones() == 7);
 
-/// Each feature a backend may lack, how bad that is, and what to say
-/// (`{}` is the backend).
-const MISSING: &[(u8, IssueSeverity, &str)] = &[
+/// Each feature a backend may lack: its bit, how bad lacking it is, its
+/// short name (`features()`: what an `UnsupportedFeature` error and a
+/// simulator's declared `features` call it), and what to say (`{}` is the
+/// backend).
+const MISSING: &[(u8, IssueSeverity, &str, &str)] = &[
     (
         XSPICE,
         IssueSeverity::Error,
+        "xspice",
         "Backend '{}' does not support XSPICE A-elements (only ngspice does)",
     ),
     (
         OSDI,
         IssueSeverity::Error,
+        "osdi",
         "Backend '{}' does not support OSDI/Verilog-A model loading",
     ),
     (
         MEASURES,
         IssueSeverity::Error,
+        "measures",
         "Backend '{}' does not support .meas directives",
     ),
     (
         STEP_PARAMS,
         IssueSeverity::Error,
+        "step",
         "Backend '{}' does not support .step param sweeps",
     ),
     (
         CONTROL_BLOCKS,
         IssueSeverity::Error,
+        "control",
         "Backend '{}' does not support .control blocks (ngspice only)",
     ),
     (
         LAPLACE,
         IssueSeverity::Warning,
+        "laplace",
         "Backend '{}' does not support Laplace-domain B-sources",
     ),
     (
         VERILOG_COSIM,
         IssueSeverity::Error,
+        "verilog",
         "Backend '{}' does not support Verilog co-simulation",
     ),
 ];
@@ -258,10 +287,11 @@ const _: () = {
     assert!(seen == ALL, "a feature has no MISSING row");
 };
 
-/// True when `d`'s simulator has every feature in `needs` (`feature`
-/// bits); [`check`] reports each bit this finds missing.
-pub(crate) fn runs(d: Dialect, needs: u8) -> bool {
-    needs & !d.capabilities() == 0
+/// Every feature by its short name, with its `feature` bit, in bit order:
+/// the names a simulator's descriptor declares its `features` by and an
+/// `UnsupportedFeature` error reports.
+pub fn features() -> impl Iterator<Item = (&'static str, u8)> {
+    MISSING.iter().map(|r| (r.2, r.0))
 }
 
 /// A user-facing backend name (a [`RUNNABLE`] dialect's name or one of
@@ -319,81 +349,118 @@ pub fn available() -> &'static [Dialect] {
     })
 }
 
-/// Pick the backend for an analysis of `kind`. An explicit name (argument,
-/// else `$SPICERACK_BACKEND`) wins if it can run the analysis; otherwise
-/// the first installed backend, in `route` order, that has every `needs`
-/// bit (`feature`) and whose writer writes the deck (`writes`: the
-/// renderer's verdict, so a run never lands where the deck is refused).
+/// Pick the simulator for a deck holding analyses of `kinds` (none: an
+/// operating point). The candidates are the first kind's route
+/// (`Kind::spec`'s built-ins, then each registered simulator that declares
+/// the kind, in registration order), kept where every other kind's route
+/// has them. An explicit name (argument, else `$SPICERACK_BACKEND`) wins
+/// if it runs every kind; otherwise the first installed candidate that has
+/// every `needs` bit (`feature`) and whose writer writes the deck
+/// (`writes`: the renderer's verdict, so a run never lands where the deck
+/// is refused).
+///
+/// A registered simulator is picked only for what it declares: one named
+/// while lacking a `needs` bit is refused, and the last resort in the body
+/// never lands on one. A built-in keeps its latitude (named: no feature
+/// check).
+///
+/// # Errors
+/// `NoSimulator`: no simulator runs every kind (the first kind that
+/// leaves none is named). `SimulationError`: the name is no simulator's.
+/// `UnsupportedAnalysis`: the named simulator lacks a kind (that kind is
+/// named), or no candidate is installed and writes the deck.
+/// `UnsupportedFeature`: a named registered simulator, or every installed
+/// candidate, lacks a `needs` bit. `NoBackend`: no simulator is installed.
 pub fn select(
-    kind: Kind,
+    kinds: &[Kind],
     override_backend: Option<&str>,
     needs: u8,
-    writes: impl Fn(Dialect) -> bool,
-) -> Result<Dialect, BackendError> {
-    let Spec {
-        name: analysis,
-        route: dialects,
-        alternative,
-        ..
-    } = kind.spec();
-    assert!(!dialects.is_empty(), "every kind runs somewhere");
+    writes: impl Fn(Sim) -> bool,
+) -> Result<Sim, BackendError> {
+    let kinds: &[Kind] = if kinds.is_empty() { &[Kind::Op] } else { kinds };
+    let mut candidates = route(kinds[0]);
+    for (i, &k) in kinds.iter().enumerate().skip(1) {
+        let also = route(k);
+        candidates.retain(|s| also.contains(s));
+        if candidates.is_empty() {
+            let others: Vec<&str> = kinds[..i].iter().map(|k| k.name()).collect();
+            return Err(BackendError::NoSimulator {
+                analysis: k.name().to_string(),
+                others: others.join(", "),
+            });
+        }
+    }
+    assert!(!candidates.is_empty(), "every kind runs somewhere");
     let env = std::env::var("SPICERACK_BACKEND")
         .ok()
         .filter(|s| !s.is_empty());
     if let Some(name) = override_backend.or(env.as_deref()) {
-        let kind = parse(name)
+        let sim = by_name(name)
             .ok_or_else(|| BackendError::SimulationError(format!("Unknown backend: {name}")))?;
-        if !dialects.contains(&kind) {
-            return Err(unsupported(analysis, name, dialects[0], alternative));
+        if let Some(&k) = kinds.iter().find(|&&k| !declares(sim, k)) {
+            return Err(unsupported(k, name, candidates[0]));
         }
-        return Ok(kind);
+        let lacks = needs & !sim.row().features;
+        if sim.builtin().is_none() && lacks != 0 {
+            return Err(unfeatured(lacks, name, &candidates));
+        }
+        return Ok(sim);
     }
 
-    let available = available();
-    if available.is_empty() {
+    // ponytail: a registered simulator's probe runs once per call (one
+    // `which`); cache it per process, as `available` does, if it shows.
+    let installed: Vec<Sim> = simulators()
+        .map(|(s, _)| s)
+        .filter(|&s| is_installed(s))
+        .collect();
+    if installed.is_empty() {
         return Err(BackendError::NoBackend);
     }
-    let installed = |d: &&Dialect| available.contains(d) && writes(**d);
-    if let Some(&d) = dialects.iter().filter(installed).find(|d| runs(**d, needs)) {
-        return Ok(d);
+    let ready: Vec<Sim> = candidates
+        .iter()
+        .copied()
+        .filter(|s| installed.contains(s) && writes(*s))
+        .collect();
+    if let Some(&s) = ready.iter().find(|s| needs & !s.row().features == 0) {
+        return Ok(s);
     }
-    // ponytail: universal analysis, no backend matches the features — run on
-    // the first one that writes the deck and let the simulator report what
-    // it cannot do.
-    match dialects.iter().find(installed) {
-        Some(&d) if dialects[0] == Dialect::Ngspice => Ok(d),
-        _ => {
-            let names: Vec<_> = available.iter().map(|k| k.name()).collect();
-            Err(unsupported(
-                analysis,
-                &names.join(", "),
-                dialects[0],
-                alternative,
-            ))
-        }
+    // ponytail: universal analyses (every route led by ngspice), no
+    // simulator matches the features: run on the first built-in that
+    // writes the deck and let the simulator report what it cannot do.
+    let universal = kinds.iter().all(|k| k.spec().route[0] == Dialect::Ngspice);
+    if let Some(&s) = ready.iter().find(|s| universal && s.builtin().is_some()) {
+        return Ok(s);
     }
+    let names: Vec<&str> = installed.iter().map(|s| s.name()).collect();
+    if ready.is_empty() {
+        let runs = |k: &Kind| installed.iter().any(|&s| declares(s, *k));
+        let k = kinds.iter().copied().find(|k| !runs(k)).unwrap_or(kinds[0]);
+        return Err(unsupported(k, &names.join(", "), candidates[0]));
+    }
+    let lacks = ready.iter().fold(0, |m, s| m | (needs & !s.row().features));
+    Err(unfeatured(lacks, &names.join(", "), &candidates))
 }
 
 /// The issues `backend` raises against a deck that needs the `needs` bits
 /// (`feature`) and holds `elements` element and instance cards: each
 /// feature it lacks, and a large deck on ngspice. Pure: nothing runs.
 pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue> {
-    let Some(kind) = parse(backend) else {
+    let Some(sim) = by_name(backend) else {
         return vec![Issue {
             severity: IssueSeverity::Error,
             message: format!("Unknown backend '{backend}'"),
         }];
     };
-    let missing = needs & !kind.capabilities();
+    let missing = needs & !sim.row().features;
     let mut issues: Vec<Issue> = MISSING
         .iter()
-        .filter(|(f, _, _)| missing & f != 0)
-        .map(|&(_, severity, message)| Issue {
+        .filter(|(f, _, _, _)| missing & f != 0)
+        .map(|&(_, severity, _, message)| Issue {
             severity,
             message: message.replace("{}", backend),
         })
         .collect();
-    if elements > 10_000 && kind == Dialect::Ngspice {
+    if elements > 10_000 && sim == Sim::NGSPICE {
         issues.push(Issue {
             severity: IssueSeverity::Warning,
             message: format!("Large circuit ({elements} elements) may be slow on '{backend}'"),
@@ -404,18 +471,62 @@ pub fn check(needs: u8, elements: usize, backend: &str) -> Vec<Issue> {
 
 // ---- private ----
 
-fn unsupported(
-    analysis: &str,
-    backend: &str,
-    required: Dialect,
-    alternative: &str,
-) -> BackendError {
-    let required = required.name().to_string();
+/// Whether `sim` declares analysis `kind` (a built-in: `Kind::spec` routes
+/// the kind to it).
+fn declares(sim: Sim, kind: Kind) -> bool {
+    assert!((kind as usize) < Kind::ALL.len(), "a kind of Kind::ALL");
+    (sim.row().analyses >> kind as u32) & 1 == 1
+}
+
+/// The simulators that run `kind`, in preference order: its built-in
+/// route (`Kind::spec`), then each registered simulator that declares it,
+/// in registration order.
+fn route(kind: Kind) -> Vec<Sim> {
+    let builtin = kind.spec().route.iter().filter_map(|&d| Sim::of(d));
+    let registered = simulators()
+        .skip(RUNNABLE.len())
+        .map(|(s, _)| s)
+        .filter(|&s| declares(s, kind));
+    let out: Vec<Sim> = builtin.chain(registered).collect();
+    assert!(!out.is_empty(), "every kind runs somewhere");
+    out
+}
+
+/// Whether `sim` is installed: a built-in's verdict is [`available`]'s
+/// (cached), a registered simulator is asked now.
+fn is_installed(sim: Sim) -> bool {
+    match sim.builtin() {
+        Some(d) => available().contains(&d),
+        None => sim.installed(),
+    }
+}
+
+/// `kind` does not run on `backend` (a name, or the installed names);
+/// `required` runs the deck's analyses.
+fn unsupported(kind: Kind, backend: &str, required: Sim) -> BackendError {
     BackendError::UnsupportedAnalysis {
-        analysis: analysis.to_string(),
+        analysis: kind.name().to_string(),
         backend: backend.to_string(),
-        required,
-        alternative: alternative.to_string(),
+        required: required.name().to_string(),
+        alternative: kind.spec().alternative.to_string(),
+    }
+}
+
+/// `backend` lacks the `lacks` bits a deck needs: their `MISSING` names,
+/// and the `candidates` that declare them all.
+fn unfeatured(lacks: u8, backend: &str, candidates: &[Sim]) -> BackendError {
+    assert!(lacks != 0, "a missing feature");
+    assert!(lacks & !ALL == 0, "feature bits only");
+    let named = MISSING.iter().filter(|r| lacks & r.0 != 0).map(|r| r.2);
+    let has = candidates.iter().filter(|s| lacks & !s.row().features == 0);
+    let has: Vec<&str> = has.map(|s| s.name()).collect();
+    BackendError::UnsupportedFeature {
+        feature: named.collect::<Vec<_>>().join(", "),
+        backend: backend.to_string(),
+        required: match has.is_empty() {
+            true => "no simulator that runs the deck's analyses".to_string(),
+            false => has.join(", "),
+        },
     }
 }
 
@@ -525,6 +636,7 @@ mod tests {
 
     #[test]
     fn capability_table_filters_by_feature() {
+        let runs = |d: Dialect, needs: u8| needs & !d.capabilities() == 0;
         assert!(runs(Dialect::Ngspice, XSPICE));
         assert!(!runs(Dialect::Vacask, XSPICE));
         assert!(!runs(Dialect::Spectre, XSPICE));
@@ -556,21 +668,52 @@ mod tests {
     #[test]
     fn explicit_backend_must_run_the_analysis() {
         assert_eq!(
-            select(Kind::Pz, Some("ngspice"), 0, |_| true).unwrap(),
-            Dialect::Ngspice
+            select(&[Kind::Pz], Some("ngspice"), 0, |_| true).unwrap(),
+            Sim::NGSPICE
         );
         assert_eq!(
-            select(Kind::Dc, Some("vacask-shared"), 0, |_| true).unwrap(),
-            Dialect::Vacask
+            select(&[Kind::Dc], Some("vacask-shared"), 0, |_| true).unwrap(),
+            Sim::VACASK
         );
         assert!(
-            matches!(select(Kind::Pz, Some("ltspice"), 0, |_| true), Err(BackendError::UnsupportedAnalysis { analysis, .. }) if analysis == "pz")
+            matches!(select(&[Kind::Pz], Some("ltspice"), 0, |_| true), Err(BackendError::UnsupportedAnalysis { analysis, .. }) if analysis == "pz")
         );
         assert!(matches!(
-            select(Kind::Hb, Some("ngspice"), 0, |_| true),
+            select(&[Kind::Hb], Some("ngspice"), 0, |_| true),
             Err(BackendError::UnsupportedAnalysis { .. })
         ));
-        assert!(select(Kind::Op, Some("xyce"), 0, |_| true).is_err());
+        assert!(select(&[Kind::Op], Some("xyce"), 0, |_| true).is_err());
+    }
+
+    /// Oracle: the routes written out by hand (`routes_match_the_analysis`
+    /// pins them): tran runs everywhere, pz on ngspice alone, hb on VACASK
+    /// and Spectre, so tran + pz leaves ngspice and pz + hb leaves nobody.
+    #[test]
+    fn p8_202_a_deck_is_routed_by_every_analysis_it_holds() {
+        let by = |kinds: &[Kind], name| select(kinds, Some(name), 0, |_| true);
+        assert_eq!(by(&[], "vacask").unwrap(), Sim::VACASK, "none: an op");
+        let both = [Kind::Tran, Kind::Pz];
+        assert_eq!(by(&both, "ngspice").unwrap(), Sim::NGSPICE);
+        // Routed by tran alone (the first analysis), espice was accepted.
+        assert!(matches!(
+            by(&both, "espice"),
+            Err(BackendError::UnsupportedAnalysis { analysis, required, .. })
+                if analysis == "pz" && required == "ngspice"
+        ));
+        assert!(matches!(
+            by(&[Kind::Pz, Kind::Tran, Kind::Hb], "ngspice"),
+            Err(BackendError::NoSimulator { analysis, others })
+                if analysis == "hb" && others == "pz, tran"
+        ));
+        // A built-in named outright keeps its latitude on features.
+        assert_eq!(
+            select(&[Kind::Op], Some("ngspice"), STEP_PARAMS, |_| true).unwrap(),
+            Sim::NGSPICE
+        );
+        let names: Vec<&str> = features().map(|f| f.0).collect();
+        let want = "xspice osdi measures step control laplace verilog";
+        assert_eq!(names.join(" "), want);
+        assert_eq!(features().fold(0, |m, f| m | f.1), ALL);
     }
 
     #[test]

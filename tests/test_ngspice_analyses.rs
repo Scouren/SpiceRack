@@ -281,7 +281,7 @@ fn every_analysis_of_a_measured_testbench_reaches_the_result() {
         deck.contains(".control\nop\ntran 1u 1m 0 1u\n.endc\n"),
         "every analysis runs in the block:\n{deck}"
     );
-    let plots = spicerack::simulation::run_all(Dialect::Ngspice, &deck)
+    let plots = spicerack::simulation::run_all(spicerack::backend::Sim::NGSPICE, &deck)
         .unwrap_or_else(|e| panic!("{e}\n{deck}"));
     let names: Vec<&str> = plots.iter().map(|p| p.plot_name.as_str()).collect();
     assert_eq!(names, ["Operating Point", "Transient Analysis"]);

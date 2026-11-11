@@ -278,7 +278,8 @@ fn p1_007_ltspice_runs_one_analysis_per_deck() {
         "{deck}"
     );
     let kinds = [Kind::Op, Kind::Ac, Kind::Tran, Kind::Fourier];
-    let each = spicerack::simulation::run_each(Dialect::Ltspice, &deck, &kinds).expect("runs");
+    let ltspice = spicerack::backend::Sim::LTSPICE;
+    let each = spicerack::simulation::run_each(ltspice, &deck, &kinds).expect("runs");
     assert_eq!(each.len(), 4);
     assert!(each[3].is_empty(), "a .four writes no plot");
     for (k, plots) in kinds.iter().zip(&each).take(3) {

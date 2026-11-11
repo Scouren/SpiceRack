@@ -15,6 +15,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `C(name, n1, n2, charge="expr")` builds a capacitor given by its charge (ngspice `Q='expr'`); every target writes its own form, VACASK refuses it (`W0105`).
 - python: `options()` takes portable keys only (the names of ngspice's `.options`, manual §11.1); `True` writes a bare flag (`klu=True` is `.options klu`, was `klu=True`); `None`, `False` and another simulator's own key raise `ValueError` (were written as text).
 - python: `K(name, *inductors, coupling)` takes the two inductors' full names (`K("1", "L1", "L2", coupling=0.9)`); the `inductor1=`/`inductor2=` keywords and the short names (`"1"` for `L1`) are gone (D18).
+- backend: a run is routed by every analysis of the deck (was: the first), to a simulator (`backend::Sim`; `select(kinds, …) -> Sim`); a refusal names its cause (the analysis, the feature, or that no simulator runs them all).
 
 ## 0.2.0 (2026-11-03)
 
