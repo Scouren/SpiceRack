@@ -81,7 +81,7 @@ def pending(deck, want, raw):
     """A pending.json deck: each `"<analysis>:<vector>"` value against the last
     point of that analysis's psfascii file (`op1`, `tran1`, `dc1`), or a
     `measure:<name>` against the `.measure` output Spectre writes."""
-    if want["status"] != "pending-real-run":
+    if want["status"].startswith("refused"):
         print(f"SKIP {deck}: {want['status']}")
         return True
     if "--raw" not in sys.argv:
@@ -92,6 +92,13 @@ def pending(deck, want, raw):
             for k, xs in values(os.path.join(root, name)).items():
                 prefix = "measure" if name.endswith((".measure", ".mt0")) else name.split(".")[0]
                 last[f"{prefix}:{k}"] = xs[-1]
+    # Spectre writes `.measure`/`.mt0` into the working directory, not the
+    # raw one (Spectre 25.1, settle-remote 2026-11-07).
+    stem = os.path.splitext(os.path.basename(deck))[0]
+    for ext in (".measure", ".mt0"):
+        if os.path.exists(stem + ext):
+            for k, xs in values(stem + ext).items():
+                last[f"measure:{k}"] = xs[-1]
     ok = True
     for key, value in want["values"].items():
         got = last.get(key)

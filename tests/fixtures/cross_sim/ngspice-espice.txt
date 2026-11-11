@@ -1851,6 +1851,11 @@ ngspice/examples/probe/Dual-NMOS-amp.sp simulator-fails # no raw file .cross_sim
 ngspice/examples/probe/F5TurboV2-Probe.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/probe/mos-test.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran: no vector in common (["i(mp1:s)", "i(mn1:s)", "v(in)", "v(out)", "v(vd_mn1:d:s)", "v(vd_mp1:d_mn1:d)"] vs ["@mn1[id]"])
 ngspice/examples/probe/switches-manual-p92.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(30): 0.00019998000199980003 leaves the tube at t=0 (tol 1.000e-2)
+ngspice/examples/pss/colpitt_osc_pss.sp simulator-fails # ESPice 0.3.0 rejects the source deck's .pss card too (InvalidAnalysisArguments): .pss 3.1e6 500e-6 3 256 10 50 5e-3
+ngspice/examples/pss/compl_cross_quad_osc_pss.sp simulator-fails # ESPice 0.3.0 rejects the source deck's .pss card too (InvalidAnalysisArguments): .pss 500e6 1u 1 1024 10 10 5e-3 uic
+ngspice/examples/pss/hartley_osc_pss.sp simulator-fails # ESPice 0.3.0 rejects the source deck's .pss card too (InvalidAnalysisArguments): .pss 50 200e-3 2 1024 11 10 5e-3 uic
+ngspice/examples/pss/ring_osc_pss.sp simulator-fails # ESPice 0.3.0 rejects the source deck's .pss card too (InvalidAnalysisArguments): .pss 624e6 500n 1 1024 10 5 5e-3 uic
+ngspice/examples/pss/vackar_osc_pss.sp simulator-fails # ESPice 0.3.0 rejects the source deck's .pss card too (InvalidAnalysisArguments): .pss 1e6 10e-6 4 1024 10 50 5e-3 uic
 ngspice/examples/snapshot/adder_mos.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran i(vcc): 0.000028800403292145605 leaves the tube at t=0.000000000010000000000000001 (tol 2.756e-6)
 ngspice/examples/snapshot/adder_mos_circ.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(x1.x1.x1.7): 3.3408752682771654 leaves the tube at t=0.00000000428 (tol 3.396e-2)
 ngspice/examples/soa/bjt-soa.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc v(b): -0.000000000000000005618573551780987+0i vs 192730461.46672505+0i at 0 (tol 1.201e-3)
@@ -1943,7 +1948,6 @@ ngspice/paranoia/vdmos/vdmosp-out.sp simulator-fails # no raw file .cross_sim_ou
 ngspice/paranoia/vdmos/vdmosp-out.sp.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: model 'p1' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/tests/bsim1/test.sp simulator-fails # no raw file .cross_sim_out.raw: error: mn1: unknown instance parameter 'ad' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/tests/bsim3soidd/RampVg2.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
-ngspice/tests/bsim3soidd/ring51.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xdum.mn1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/tests/bsim3soidd/t4.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc i(vb): -0.000000000021243858257111632+0i vs 0+0i at 0 (tol 2.042e-12)
 ngspice/tests/bsim3soifd/RampVg2.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/tests/bsim3soifd/ring51.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xdum.mn1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter

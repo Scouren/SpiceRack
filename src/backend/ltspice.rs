@@ -36,6 +36,7 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
     let stdout = exec(&mut cmd, "LTspice", Some(&cir.with_extension("log")))?;
     let log = std::fs::read_to_string(cir.with_extension("log")).unwrap_or_default();
     let mut plots = read_results(&cir.with_extension("raw"), stdout)?;
+    log_steps(&log, &mut plots)?;
     plots
         .iter_mut()
         .for_each(|p| p.log_content.clone_from(&log));
@@ -98,6 +99,42 @@ fn command(exe: &Path, wine: bool, cir: &Path) -> Command {
     }
 }
 
+/// A stepped run's `.step r=1000 c=1e-9` log lines, one per step in run
+/// order, as its plots' params (`rawfile` reads one plot per step). A
+/// stepped operating point's plots carry theirs already, and its log names
+/// none.
+///
+/// # Errors
+/// `SimulationError` when the log's steps are not one per plot.
+fn log_steps(log: &str, plots: &mut [RawData]) -> Result<(), BackendError> {
+    let steps: Vec<Vec<(String, f64)>> = log
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix(".step "))
+        .map(|s| {
+            s.split_whitespace()
+                .filter_map(|kv| {
+                    let (k, v) = kv.split_once('=')?;
+                    Some((k.to_string(), v.parse().ok()?))
+                })
+                .collect()
+        })
+        .collect();
+    if steps.is_empty() || plots.iter().all(|p| !p.params.is_empty()) {
+        return Ok(());
+    }
+    if steps.len() != plots.len() {
+        return Err(BackendError::SimulationError(format!(
+            "LTspice: {} .step lines in the log, {} stepped plots in the raw file",
+            steps.len(),
+            plots.len()
+        )));
+    }
+    for (p, s) in plots.iter_mut().zip(steps) {
+        p.params = s;
+    }
+    Ok(())
+}
+
 /// `SPICERACK_LTSPICE`'s executable: a `.exe` off Windows runs under Wine.
 fn knob(exe: PathBuf) -> (PathBuf, bool) {
     let wine = !cfg!(windows)
@@ -158,5 +195,30 @@ mod tests {
             wine_installs("/w", "u")[1],
             "/w/drive_c/Program Files/ADI/LTspice/LTspice.exe"
         );
+    }
+
+    #[test]
+    fn p1_002_a_stepped_transient_takes_its_steps_from_the_log() {
+        // tests/fixtures/raw/p1-002-tran.*: LTspice 26.1.1's stepped
+        // transient (r = 1k 2k 3k) and its log's `.step r=1000` lines.
+        let fx = |f: &str| {
+            format!(
+                "{}/tests/fixtures/raw/p1-002-tran.{f}",
+                env!("CARGO_MANIFEST_DIR")
+            )
+        };
+        let raw = std::fs::read(fx("raw")).expect("raw");
+        let log = std::fs::read_to_string(fx("log")).expect("log");
+        let mut plots = crate::rawfile::parse_raw_all(&raw).expect("parsed");
+        log_steps(&log, &mut plots).expect("one step a plot");
+        let r: Vec<_> = plots.iter().map(|p| p.params.clone()).collect();
+        assert_eq!(r, [1e3, 2e3, 3e3].map(|v| vec![("r".to_string(), v)]));
+        assert!(
+            log_steps(&log, &mut plots[..2].to_vec()).is_ok(),
+            "params already set"
+        );
+        let mut two = plots[..2].to_vec();
+        two.iter_mut().for_each(|p| p.params.clear());
+        assert!(log_steps(&log, &mut two).is_err(), "3 steps, 2 plots");
     }
 }

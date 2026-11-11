@@ -66,7 +66,7 @@
   "t_m4_dependent.scs": {
     "test": "T-M4",
     "nominal": { "a": 1.1111111111e+00 },
-    "rel_tol": 1e-6,
-    "why": "r={1k*(1+0.1*abs(v(a)))} with 1 mA: v = 1/0.9 (DEPENDENT); ngspice runs it as a B source, its model and w, l, dtemp unread"
+    "rel_tol": 2e-3,
+    "why": "r={1k*(1+0.1*abs(v(a)))} with 1 mA: v = 1/0.9 (DEPENDENT); ngspice runs it as a B source, its model and w, l, dtemp unread. The tolerance is Spectre's: its default reltol=1e-3 stops the Newton loop at 1.11 (rel 1.0e-3; with options reltol=1e-9, 1.11111111111), Spectre 25.1 on iccad4, settle-remote 2026-11-07"
   }
 }

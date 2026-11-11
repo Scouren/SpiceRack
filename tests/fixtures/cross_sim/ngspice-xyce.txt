@@ -188,7 +188,6 @@ ngspice/paranoia/vbic/vbic_ac_par.sp target-fails # no raw file .cross_sim_out.r
 ngspice/tests/bsim1/test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/tests/bsim2/test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/tests/bsim3soidd/inv2.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/bsim3soidd/ring51.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/tests/bsim3soidd/lib.h
 ngspice/tests/bsim3soidd/t3.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/bsim3soidd/t4.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/bsim3soidd/t5.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err

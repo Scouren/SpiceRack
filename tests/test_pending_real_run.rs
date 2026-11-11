@@ -44,6 +44,45 @@ struct Deck {
     hand_only: bool,
 }
 
+/// Spectre 25.1.0.470.isr13's runs of the written decks on iccad4
+/// (research/settle-remote.md, "Spectre writer check", 2026-11-07): the
+/// deck's FNV-1a 64 as it ran, and what the run gave. No more will come
+/// (ZERO D43): a deck the writer now writes otherwise is unrun, and its
+/// status says `UNRUN_SPECTRE_HSPICE`.
+const SPECTRE_RUNS: [(&str, u64, &str); 11] = [
+    (
+        "p_elements",
+        0x2a89_9253_9f38_da91,
+        "pass: out 0.6666667, n2 1, e 1.3333333, g 0.6666667, f -2e-3, h -0.0666667",
+    ),
+    ("p_func", 0x4727_0a6a_3c07_50f2, "pass: out 1.0"),
+    ("p_conditional", 0x4445_f0e2_afa1_8cae, "pass: out 1.0"),
+    (
+        "p_behavioural",
+        0xfe33_8474_222b_cd8b,
+        "pass: b 1.333333333",
+    ),
+    ("p_tf", 0xfb18_5413_824b_b606, "pass: xf1:v1 0.3333333"),
+    ("p_branch_param", 0x21a0_20c9_9b3d_cdb6, "pass: out 1.0"),
+    (
+        "p_charge_capacitor",
+        0xbacf_959a_4c5a_35bf,
+        "pass: q 0.9999995",
+    ),
+    ("p_pwl_repeat", 0xe56d_bd63_4c17_9c76, "pass: a 0.25"),
+    ("p_dc_sweep", 0xcd88_78cb_5b24_2e03, "pass: out 0.6666667"),
+    (
+        "p_models",
+        0x4903_9b22_6b13_a169,
+        "pass: a 0.6294241, coll 4.0877187, drain 4.5098039",
+    ),
+    (
+        "p_measure_save",
+        0x20a1_b4a4_2923_1856,
+        "fail: vmax 0.99821, the tran has no maxstep (Spectre's default interval/50 undersamples the peak); 1.000000 with maxstep=1u",
+    ),
+];
+
 const DECKS: &[Deck] = &[
     // 2 V over 2k/1k: out = 2/3. 1 mA through l1 into 1k: n1 = n2 = 1.
     // e = 2*out; g: 1 mS * out into 1k; i(v1) = -2/3 mA, so f = 3*i(v1)*1
@@ -338,11 +377,25 @@ fn ngspice(dir: &Path, src: &str, analysis: &str, vector: &str) -> f64 {
     panic!("ngspice wrote no {vector}");
 }
 
+/// Deck `stem`'s Spectre status: its recorded run while `deck` is the text
+/// that ran ([`SPECTRE_RUNS`]), else unrun.
+fn spectre_run(stem: &str, deck: &str) -> String {
+    let fnv = deck.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    match SPECTRE_RUNS.iter().find(|(s, _, _)| *s == stem) {
+        Some((_, ran, outcome)) if *ran == fnv => {
+            format!("spectre 25.1 iccad4 2026-11-07 (settle-remote) {outcome}")
+        }
+        _ => "UNRUN_SPECTRE_HSPICE: no Spectre run of this text (D43)".into(),
+    }
+}
+
 /// `pending.json` for `target`: each deck's file, rows, status and values.
 fn pending(ext: &str, target: Dialect) -> String {
     let mut out = String::from("{\n");
     out.push_str(&format!(
-        "  \"_provenance\": \"Written by tests/test_pending_real_run.rs from its SPICE sources; the values are the closed forms there, which ngspice-45 meets on the source (hand_only: ngspice cannot run it). status pending-real-run: no {} run has checked these decks yet.\",\n",
+        "  \"_provenance\": \"Written by tests/test_pending_real_run.rs from its SPICE sources; the values are the closed forms there, which ngspice-45 meets on the source (hand_only: ngspice cannot run it). status pending-real-run: no {} run has checked the deck yet; a recorded run's outcome when one has (Spectre: settle-remote, 2026-11-07; D43).\",\n",
         target.name()
     ));
     for (i, d) in DECKS.iter().enumerate() {
@@ -350,6 +403,7 @@ fn pending(ext: &str, target: Dialect) -> String {
         let deck = written(d.src, target);
         let status = match deck.strip_prefix("refused ") {
             Some(codes) => format!("refused {}", codes.trim()),
+            None if target == Dialect::Spectre => spectre_run(d.stem, &deck),
             None => "pending-real-run".into(),
         };
         // Spectre's `xf` gives transfer functions only, no impedance
@@ -358,7 +412,12 @@ fn pending(ext: &str, target: Dialect) -> String {
             .want
             .iter()
             .filter(|(_, v, _)| !(target == Dialect::Spectre && v.contains("impedance")))
-            .map(|(a, v, x)| format!("\"{a}:{v}\": {x:e}"))
+            .map(|&(a, v, x)| match (target, a, v) {
+                // Spectre's `xf` writes plot `xf1`, one vector per source,
+                // named after it (settle-remote; p_tf's source is `v1`).
+                (Dialect::Spectre, "tf1", "transfer_function") => format!("\"xf1:v1\": {x:e}"),
+                _ => format!("\"{a}:{v}\": {x:e}"),
+            })
             .collect();
         out.push_str(&format!(
             "  \"{file}\": {{ \"rows\": \"{}\", \"status\": \"{status}\", \"rel_tol\": {:e}, \"values\": {{ {} }} }}{}\n",

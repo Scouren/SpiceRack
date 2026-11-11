@@ -81,10 +81,16 @@ print(res.measures["vmax"])
 
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
 emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
-A stepped result holds every step's points one after another on the analysis's
-own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a vector beside
-them (`dc["step_r"]` on VACASK); an `OperatingPoint` holds one point, so reading
-a stepped one raises `ValueError`.
+On LTspice a stepped run returns a list, one result per step in step order, and
+each result's `params` names its step (`{"r": 2000.0}`; `{}` when nothing steps),
+so `[op.params["r"] for op in tb.operating_point()]` lists the step values
+(`tests/test_ltspice_backend.py` runs it).
+
+On VACASK a stepped result holds every step's points one after another on the
+analysis's own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a
+vector beside them (`dc["step_r"]`); an `OperatingPoint` holds one point, so
+reading a stepped one raises `ValueError`. LTspice runs one analysis a deck, so
+`tb.run()` on LTspice runs each queued analysis in a deck of its own.
 
 ### ngspice compatibility mode
 

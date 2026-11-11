@@ -60,6 +60,8 @@ jobs:
         run: nix develop .#testing --command cargo test
 
       - name: Python tests
+        env:
+          LTSPICE_CI_PENDING_MIRROR: "1"
         run: |
           nix develop .#testing --command bash -c '
             python3 -m venv .venv --system-site-packages

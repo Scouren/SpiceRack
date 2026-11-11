@@ -1,5 +1,5 @@
 {
-  "_provenance": "Written by tests/test_pending_real_run.rs from its SPICE sources; the values are the closed forms there, which ngspice-45 meets on the source (hand_only: ngspice cannot run it). status pending-real-run: no ltspice run has checked these decks yet.",
+  "_provenance": "Written by tests/test_pending_real_run.rs from its SPICE sources; the values are the closed forms there, which ngspice-45 meets on the source (hand_only: ngspice cannot run it). status pending-real-run: no ltspice run has checked the deck yet; a recorded run's outcome when one has (Spectre: settle-remote, 2026-11-07; D43).",
   "p_elements.cir": { "rows": "R C L V I E F G H; .op", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:out": 6.666666666666666e-1, "op1:n2": 1e0, "op1:e": 1.3333333333333333e0, "op1:g": 6.666666666666666e-1, "op1:f": -2e-3, "op1:h": -6.666666666666667e-2 } },
   "p_func.cir": { "rows": "Func", "status": "pending-real-run", "rel_tol": 1e-9, "values": { "op1:out": 1e0 } },
   "p_conditional.cir": { "rows": "Conditional", "status": "refused W0013", "rel_tol": 1e-9, "values": { "op1:out": 1e0 } },

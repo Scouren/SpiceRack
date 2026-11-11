@@ -363,6 +363,16 @@ impl W<'_, '_> {
                 self.o.token(".endc", Space::Line);
             }
             None => {
+                // LTspice runs one analysis a deck: the cards follow the
+                // line `simulation::run_each` splits at (ZERO P1-007).
+                let runs = tb
+                    .analyses
+                    .iter()
+                    .filter(|(a, _)| !matches!(a, Ana::Four(..)));
+                if self.b.analysis_form == AnalysisForm::Ltspice && runs.count() > 1 {
+                    self.o
+                        .token(crate::syntax::render::LTSPICE_EACH, Space::Line);
+                }
                 for (a, tok) in &tb.analyses {
                     let card = self.analysis(a, *tok);
                     self.o.token(&card, Space::Line);

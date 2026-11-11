@@ -2554,7 +2554,6 @@ ngspice/paranoia/vdmos/vdmosp-out.sp.sp simulator-fails # no raw file .cross_sim
 ngspice/tests/bsim1/test.sp simulator-fails # no raw file .cross_sim_out.raw: error: mn1: unknown instance parameter 'ad' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/tests/bsim3soidd/RampVg2.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/tests/bsim3soidd/inv2.sp mismatch # dc v(out): 1.341767194591811+0i vs 1.3509008241232403+0i at 1.2500000000000009 (tol 5.002e-3)
-ngspice/tests/bsim3soidd/ring51.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xdum.mn1: unknown instance parameter 'debug' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/tests/bsim3soidd/t3.sp mismatch # dc i(vs): 0.0024644873528504667+0i vs 0.0024817310965769+0i at 1.280000000000001 (tol 1.593e-5)
 ngspice/tests/bsim3soidd/t4.sp mismatch # dc i(vb): -0.000000000021243858257111632+0i vs 0+0i at 0 (tol 2.042e-12)
 ngspice/tests/bsim3soidd/t5.sp mismatch # dc i(vs): 0.0000969591938176943+0i vs 0.00009747954085733858+0i at 0.8700000000000006 (tol 5.146e-7)

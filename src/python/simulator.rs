@@ -159,17 +159,13 @@ impl PySimulator {
 
     // ── Analyses ──
 
-    fn operating_point(&self) -> PyResult<PyOperatingPoint> {
-        Ok(PyOperatingPoint {
-            inner: Results::from_raw(self.run(Analysis::Op)?),
-        })
+    fn operating_point(&self) -> PyResult<Py<PyAny>> {
+        self.typed(Analysis::Op)
     }
 
     #[pyo3(signature = (**kwargs))]
-    fn dc(&self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<PyDcAnalysis> {
-        Ok(PyDcAnalysis {
-            inner: Results::from_raw(self.run(dc_sweeps(kwargs)?)?),
-        })
+    fn dc(&self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Py<PyAny>> {
+        self.typed(dc_sweeps(kwargs)?)
     }
 
     #[pyo3(signature = (variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e9))]
@@ -179,11 +175,9 @@ impl PySimulator {
         number_of_points: u32,
         start_frequency: f64,
         stop_frequency: f64,
-    ) -> PyResult<PyAcAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::ac(variation, number_of_points, start_frequency, stop_frequency)?;
-        Ok(PyAcAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (step_time, end_time, start_time=None, max_time=None, use_initial_condition=false))]
@@ -194,7 +188,7 @@ impl PySimulator {
         start_time: Option<f64>,
         max_time: Option<f64>,
         use_initial_condition: bool,
-    ) -> PyResult<PyTransientAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::transient(
             step_time,
             end_time,
@@ -202,9 +196,7 @@ impl PySimulator {
             max_time,
             use_initial_condition,
         );
-        Ok(PyTransientAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (output_node, ref_node, src, variation="dec", points=10, start_frequency=1e3, stop_frequency=1e8, points_per_summary=None))]
@@ -218,7 +210,7 @@ impl PySimulator {
         start_frequency: f64,
         stop_frequency: f64,
         points_per_summary: Option<u32>,
-    ) -> PyResult<PyNoiseAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::noise(
             output_node,
             ref_node,
@@ -229,29 +221,23 @@ impl PySimulator {
             stop_frequency,
             points_per_summary,
         )?;
-        Ok(PyNoiseAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (outvar, insrc))]
-    fn transfer_function(&self, outvar: &str, insrc: &str) -> PyResult<PyTransferFunctionAnalysis> {
-        Ok(PyTransferFunctionAnalysis {
-            inner: Results::from_raw(self.run(card::tf(outvar, insrc))?),
-        })
+    fn transfer_function(&self, outvar: &str, insrc: &str) -> PyResult<Py<PyAny>> {
+        self.typed(card::tf(outvar, insrc))
     }
 
     #[pyo3(signature = (outvar, insrc))]
-    fn tf(&self, outvar: &str, insrc: &str) -> PyResult<PyTransferFunctionAnalysis> {
+    fn tf(&self, outvar: &str, insrc: &str) -> PyResult<Py<PyAny>> {
         self.transfer_function(outvar, insrc)
     }
 
     #[pyo3(signature = (output_variable))]
-    fn dc_sensitivity(&self, output_variable: &str) -> PyResult<PySensitivityAnalysis> {
+    fn dc_sensitivity(&self, output_variable: &str) -> PyResult<Py<PyAny>> {
         let a = card::sensitivity(output_variable, None);
-        Ok(PySensitivityAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (output_variable, variation="dec", number_of_points=10, start_frequency=100.0, stop_frequency=1e5))]
@@ -262,7 +248,7 @@ impl PySimulator {
         number_of_points: u32,
         start_frequency: f64,
         stop_frequency: f64,
-    ) -> PyResult<PySensitivityAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::sensitivity(
             output_variable,
             Some(card::sweep(
@@ -272,9 +258,7 @@ impl PySimulator {
                 stop_frequency,
             )?),
         );
-        Ok(PySensitivityAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (node1, node2, node3, node4, tf_type, pz_type))]
@@ -286,11 +270,9 @@ impl PySimulator {
         node4: &str,
         tf_type: &str,
         pz_type: &str,
-    ) -> PyResult<PyPoleZeroAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::polezero([node1, node2, node3, node4], tf_type, pz_type)?;
-        Ok(PyPoleZeroAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None))]
@@ -301,11 +283,9 @@ impl PySimulator {
         start_frequency: f64,
         stop_frequency: f64,
         f2overf1: Option<f64>,
-    ) -> PyResult<PyDistortionAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::distortion(variation, points, start_frequency, stop_frequency, f2overf1)?;
-        Ok(PyDistortionAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     /// `sc_iter`, `steady_coeff`, `uic`: ngspice's shooting controls
@@ -321,11 +301,9 @@ impl PySimulator {
         sc_iter: Option<u32>,
         steady_coeff: Option<f64>,
         uic: bool,
-    ) -> PyResult<PyPssAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::pss(fundamental_frequency, stabilization_time, observe_node, points_per_period, harmonics, sc_iter, steady_coeff, uic);
-        Ok(PyPssAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10))]
@@ -335,11 +313,9 @@ impl PySimulator {
         number_of_points: u32,
         start_frequency: f64,
         stop_frequency: f64,
-    ) -> PyResult<PySParamAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::s_param(variation, number_of_points, start_frequency, stop_frequency)?;
-        Ok(PySParamAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     /// LTspice `.net` network-parameter analysis over an AC sweep.
@@ -370,11 +346,9 @@ impl PySimulator {
         &self,
         fundamental_frequencies: Vec<f64>,
         num_harmonics: Option<Vec<u32>>,
-    ) -> PyResult<PyHarmonicBalanceAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::harmonic_balance(fundamental_frequencies, num_harmonics);
-        Ok(PyHarmonicBalanceAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (probe, variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e10))]
@@ -385,19 +359,15 @@ impl PySimulator {
         number_of_points: u32,
         start_frequency: f64,
         stop_frequency: f64,
-    ) -> PyResult<PyStabilityAnalysis> {
+    ) -> PyResult<Py<PyAny>> {
         let a = card::stability(probe, variation, number_of_points, start_frequency, stop_frequency)?;
-        Ok(PyStabilityAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
     #[pyo3(signature = (step_time, end_time))]
-    fn transient_noise(&self, step_time: f64, end_time: f64) -> PyResult<PyTransientNoiseAnalysis> {
+    fn transient_noise(&self, step_time: f64, end_time: f64) -> PyResult<Py<PyAny>> {
         let a = Analysis::TransientNoise { step: step_time, stop: end_time };
-        Ok(PyTransientNoiseAnalysis {
-            inner: Results::from_raw(self.run(a)?),
-        })
+        self.typed(a)
     }
 
 
@@ -429,8 +399,16 @@ impl PySimulator {
         deck
     }
 
-    fn run(&self, analysis: Analysis) -> PyResult<RawData> {
-        self.deck(analysis).run(self.backend.as_deref())
+    /// `analysis` run alone, as its result class (`typed_result`): one
+    /// result, or for a run read one plot per `.step` a list of one per
+    /// step, in step order (ZERO D42).
+    fn typed(&self, analysis: Analysis) -> PyResult<Py<PyAny>> {
+        let mut plots = self
+            .deck(analysis.clone())
+            .run_each(self.backend.as_deref())?;
+        assert_eq!(plots.len(), 1, "one analysis, one entry");
+        let plots = plots.pop().expect("one entry");
+        Python::with_gil(|py| typed_result(py, &analysis, plots))
     }
 
     /// Spectre-only analyses always run on Spectre.

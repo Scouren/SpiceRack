@@ -1,0 +1,8 @@
+* p1-002 stepped divider, op
+V1 in 0 1
+R1 in out {r}
+R2 out 0 1k
+.param r=1k
+.step param r list 1k 2k 3k
+.op
+.end

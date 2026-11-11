@@ -207,3 +207,113 @@ fn p1_039_xyce_verilog_plugin_toolchain_pinned() {
         .unwrap_or_else(|| panic!("{prn}"));
     assert!((v - 1.0).abs() <= 1e-9, "{v}");
 }
+
+#[test]
+fn p1_002_ltspice_stepped_raw_float32_read() {
+    // LTspice 26.1.1 on tests/fixtures/raw/p1-002-<a>.cir.txt (README): 1 V
+    // over R1 = {r}, stepped 1k 2k 3k, and R2 = 1k. A stepped raw holds
+    // every step in one plot (`Flags: ... stepped`); read, it is one plot
+    // per step (ZERO D42). Closed form V(out)/V(in) = 1k/(r + 1k): 0.5,
+    // 1/3, 0.25, to float32's 2^-24.
+    let read = |a: &str| {
+        let p = format!(
+            "{}/tests/fixtures/raw/p1-002-{a}.raw",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        spicerack::rawfile::parse_raw_all(&std::fs::read(p).expect("fixture"))
+            .unwrap_or_else(|e| panic!("{a}: {e}"))
+    };
+    let col = |r: &spicerack::result::RawData, n: &str| {
+        let i = r.variables.iter().position(|v| v.name == n).expect(n);
+        r.re(i).into_owned()
+    };
+    let gains = [0.5, 1.0 / 3.0, 0.25];
+    // An operating point stepped: one point a step, column 0 the parameter.
+    let op = read("op");
+    assert_eq!(op.len(), 3);
+    for ((p, g), r) in op.iter().zip(gains).zip([1e3, 2e3, 3e3]) {
+        assert_eq!(p.params, [("r".to_string(), r)]);
+        let v = col(p, "V(out)");
+        assert_eq!(v.len(), 1);
+        assert!((v[0] - g).abs() <= g * 2f64.powi(-24), "{v:?} vs {g}");
+    }
+    // A transient stepped: time restarts at 0 for each step; the step
+    // values are in the log, which the backend reads (params empty here).
+    let tran = read("tran");
+    assert_eq!(tran.len(), 3);
+    for (p, g) in tran.iter().zip(gains) {
+        assert!(p.params.is_empty());
+        let (t, vin, vout) = (col(p, "time"), col(p, "V(in)"), col(p, "V(out)"));
+        assert_eq!(t[0], 0.0);
+        assert!((t.last().expect("points") - 3e-6).abs() < 1e-12);
+        for (i, o) in vin.iter().zip(&vout).filter(|(i, _)| **i > 0.1) {
+            assert!((o / i - g).abs() <= 1e-6, "{o}/{i} vs {g}");
+        }
+    }
+}
+
+#[cfg(feature = "backend")]
+#[test]
+fn p1_007_ltspice_runs_one_analysis_per_deck() {
+    // LTspice runs one analysis a deck ("More than one analysis
+    // specified"); written for it, a deck of several holds them after
+    // render::LTSPICE_EACH and run_each runs each alone. In
+    // `nix develop .#testing-ltspice`: 1 V (AC 1) over 1k/1k, closed form
+    // V(out) = 0.5 in the op, the ac and the transient (the .four rides
+    // with the .tran and writes no plot).
+    if std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_some() {
+        return;
+    }
+    use spicerack::backend::Kind;
+    use spicerack::syntax::Dialect;
+    let src = "* each\nV1 in 0 DC 1 AC 1\nR1 in out 1k\nR2 out 0 1k\n.op\n.ac dec 2 1k 10k\n\
+               .tran 1u 10u\n.four 100k V(out)\n.end\n";
+    let deck =
+        spicerack::syntax::render::render_text(src, Dialect::Ngspice, "each", Dialect::Ltspice)
+            .expect("written")
+            .text;
+    assert!(
+        deck.contains(spicerack::syntax::render::LTSPICE_EACH),
+        "{deck}"
+    );
+    let kinds = [Kind::Op, Kind::Ac, Kind::Tran, Kind::Fourier];
+    let each = spicerack::simulation::run_each(Dialect::Ltspice, &deck, &kinds).expect("runs");
+    assert_eq!(each.len(), 4);
+    assert!(each[3].is_empty(), "a .four writes no plot");
+    for (k, plots) in kinds.iter().zip(&each).take(3) {
+        assert_eq!(plots.len(), 1, "{k:?}");
+        let p = &plots[0];
+        let i = p
+            .variables
+            .iter()
+            .position(|v| v.name == "V(out)")
+            .expect("V(out)");
+        p.re(i)
+            .iter()
+            .for_each(|&v| assert!((v - 0.5).abs() < 1e-6, "{k:?}: {v}"));
+    }
+}
+
+#[test]
+fn p1_040_p1_047_spectre_nutascii_and_nutbin_read() {
+    // tests/fixtures/raw/p1-040-spectre.nutascii and p1-047-spectre.nutbin
+    // (README): Spectre 25.1's op plot as settle-remote recorded it (ZERO
+    // D43), its nutbin big-endian IEEE f64. Both read to the recorded names
+    // and values, the binary twin exactly equal to the text one.
+    let read = |f: &str| {
+        let p = format!("{}/tests/fixtures/raw/{f}", env!("CARGO_MANIFEST_DIR"));
+        spicerack::rawfile::parse_raw(&std::fs::read(p).expect("fixture")).expect(f)
+    };
+    let (text, bin) = (
+        read("p1-040-spectre.nutascii"),
+        read("p1-047-spectre.nutbin"),
+    );
+    for r in [&text, &bin] {
+        assert_eq!(r.plot_name, "DC Analysis `op1'");
+        let names: Vec<&str> = r.variables.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(names, ["dummy", "in", "out", "v1:p"]);
+        let vals: Vec<f64> = (0..4).map(|i| r.re(i)[0]).collect();
+        assert_eq!(vals, [0.0, 2.0, 0.6666667, -6.667e-4]);
+    }
+    assert_eq!(text.real_data, bin.real_data);
+}

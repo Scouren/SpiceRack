@@ -124,6 +124,7 @@ Certification_Tests/BUG_877_SON/agauss.cir source-fails # no raw file .cross_sim
 Certification_Tests/BUG_899/bug899.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 28
 Certification_Tests/BUG_907_SON/rlc.cir source-fails # no raw file .cross_sim_out.raw: Netlist error in file rlc.lib at or near line 6: Recursive inclusion of same file results in infinite loop | Simulation aborted 
 Certification_Tests/BUG_920_SON/bug920.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
+Certification_Tests/BUG_967/bug_967.cir slow # Xyce 7.10 37 s alone, past the 60 s CPU budget under load
 Certification_Tests/BUG_971_SON/invalid_parameter.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: There were 8 undefined symbols in .PRINT command: C1:BLEEM, | Simulation aborted due to error.  There are 0 MSG_F
 Certification_Tests/BUG_981_SON/bug981.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 Certification_Tests/BUG_986_SON/bug986.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 

@@ -11,7 +11,7 @@
 //!   `PyHarmonicBalanceAnalysis`, `PyStabilityAnalysis`, `PyTransientNoiseAnalysis`:
 //!   `pub(super) struct`s from `analysis_class!`
 //! - `pub(super) fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()>`
-//! - `pub(super) fn typed_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py<PyAny>>`
+//! - `pub(super) fn typed_result(py: Python<'_>, a: &Analysis, plots: Vec<RawData>) -> PyResult<Py<PyAny>>`
 
 use std::collections::HashMap;
 
@@ -61,6 +61,11 @@ macro_rules! analysis_class {
 
             #[getter]
             fn measures(&self) -> HashMap<String, f64> { measures_to_dict(&self.inner.raw.measures) }
+
+            /// The `.step` point this result is: {parameter: value}, empty
+            /// when nothing steps.
+            #[getter]
+            fn params(&self) -> HashMap<String, f64> { self.inner.raw.params.iter().cloned().collect() }
 
             #[getter]
             fn nodes(&self) -> Vec<String> { self.inner.nodes.keys().cloned().collect() }
@@ -118,13 +123,29 @@ analysis_classes! {
     (PyTransientNoiseAnalysis, "TransientNoiseAnalysis", time),
 }
 
-/// `raw` as the result class `a`'s single-analysis method returns; `None`
-/// (a Fourier's missing plot) as Python's `None`.
+/// `plots`, analysis `a`'s run, as its single-analysis method returns it:
+/// the first plot as `a`'s result class, `None` for none (a Fourier's); for
+/// a run read one plot per step (their `params` set: LTspice), a list of
+/// one result per step, in step order (ZERO D42).
 pub(super) fn typed_result(
     py: Python<'_>,
     a: &Analysis,
-    raw: Option<RawData>,
+    plots: Vec<RawData>,
 ) -> PyResult<Py<PyAny>> {
+    if plots.iter().all(|p| p.params.is_empty()) {
+        return one_result(py, a, plots.into_iter().next());
+    }
+    let each: Vec<Py<PyAny>> = plots
+        .into_iter()
+        .map(|p| one_result(py, a, Some(p)))
+        .collect::<PyResult<_>>()?;
+    Ok(PyList::new(py, each)?.into_any().unbind())
+}
+
+// ---- private ----
+
+/// `raw` as `a`'s result class; `None` as Python's `None`.
+fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py<PyAny>> {
     let Some(raw) = raw else { return Ok(py.None()) };
     let r = || Results::from_raw(raw);
     Ok(match a {
@@ -161,8 +182,6 @@ pub(super) fn typed_result(
         }
     })
 }
-
-// ---- private ----
 
 #[pymethods]
 impl PyRawData {
@@ -210,6 +229,11 @@ impl PyRawData {
     fn measures(&self) -> HashMap<String, f64> {
         measures_to_dict(&self.inner.measures)
     }
+    /// The `.step` point: {parameter: value}, empty when nothing steps.
+    #[getter]
+    fn params(&self) -> HashMap<String, f64> {
+        self.inner.params.iter().cloned().collect()
+    }
 }
 
 impl PyRawData {
@@ -237,6 +261,12 @@ impl PyOperatingPoint {
     #[getter]
     fn measures(&self) -> HashMap<String, f64> {
         measures_to_dict(&self.inner.raw.measures)
+    }
+
+    /// The `.step` point: {parameter: value}, empty when nothing steps.
+    #[getter]
+    fn params(&self) -> HashMap<String, f64> {
+        self.inner.raw.params.iter().cloned().collect()
     }
 }
 
