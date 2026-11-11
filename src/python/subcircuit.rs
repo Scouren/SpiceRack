@@ -382,14 +382,7 @@ impl PySubcircuit {
 
     #[pyo3(signature = (name, kind, **kwargs))]
     fn model(&mut self, name: &str, kind: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
-        let ps = kw_params(kwargs)?;
-        // ngspice-45 drops an OSDI model's parameters written `vres(r=3k)`;
-        // `vres (r=3k)` applies them.
-        let card = match ps.is_empty() {
-            true => format!(".model {name} {kind}"),
-            false => format!(".model {name} {kind} ({})", params(&ps).trim_start()),
-        };
-        self.inner.models.push(card);
+        self.inner.models.push(super::model::model_card(name, kind, &kw_params(kwargs)?));
         Ok(())
     }
 
@@ -456,7 +449,7 @@ impl PySubcircuit {
         source: &str,
         mode: &str,
         instance_name: &str,
-        connections: HashMap<String, pyo3::PyObject>,
+        connections: HashMap<String, Py<PyAny>>,
         pdk: Option<&str>,
         liberty: Option<&str>,
         spice_models: Option<&str>,

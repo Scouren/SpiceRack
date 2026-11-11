@@ -4,3 +4,4 @@ from ._native import *
 from . import dialects
 from .def_ import Answer, Card
 from .dialects import Dialect, register_dialect
+from .simulator_file import load_simulator

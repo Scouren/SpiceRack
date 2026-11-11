@@ -329,7 +329,7 @@
 
           cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
             name = "spicerack-vendor";
-            hash = "sha256-v/ULmZ8HRut7EoEJLARkwNJcpURIuao5w7HTO8L2VKg=";
+            hash = "sha256-qFU/ZV+pq5eGHmRtg7gTFSQF93T3IAHHH63DZzeO01k=";
             src = srcFiltered;
           };
 

@@ -126,6 +126,20 @@ dut.raw_spice("* anything the builder does not cover")
 and `set_source_value(name, value)`. For model libraries with corners, see
 [Models and PDKs](models.md).
 
+A library file with corners is a `Circuit` of sections. Each `Section` holds
+`parameter`, `model`, `include`, `lib` and `subcircuit` lines between `.lib name`
+and `.endl name`; a deck then selects one with `lib(path, name)`:
+
+```python
+corners = ps.Circuit("corners")
+for name, rsh in (("tt", "3k"), ("ff", "1k")):
+    s = ps.Section(name)
+    s.parameter("rsh", rsh)
+    corners.section(s)
+print(corners)                                    # .lib tt / .param rsh=3k / .endl tt / .lib ff ...
+print(ps.Testbench(corners).netlist("spectre"))   # section tt ... endsection tt
+```
+
 ## Hierarchy
 
 Build a child `Subcircuit`, place it with `instance` (or `X` by name), and

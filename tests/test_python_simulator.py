@@ -1093,3 +1093,31 @@ def test_p8_010_nonlinear_sources_run_to_the_closed_form(backend):
     # A DC solve of a linear network: exact to rounding.
     assert op["x"] == pytest.approx(2.0, rel=1e-9)
     assert op["y"] == pytest.approx(-1.0, rel=1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_009_a_lib_call_selects_the_section_a_circuit_wrote(backend, tmp_path):
+    """ngspice-45 manual §2.10: `.lib file tt` reads the lines between
+    `.lib tt` and `.endl` of `file`. The divider's lower resistor is the
+    section's `rsh`: 3 kOhm in `tt`, 1 kOhm in `ff`, under 1 kOhm and 1 V:
+    0.75 V and 0.5 V (closed form). ngspice-45 and ESPice 0.3.0 on the hand
+    decks print 7.5e-01 and 5e-01 (research/impl/evidence/P8-009)."""
+    import spicerack as ps
+
+    lib = ps.Circuit("corners")
+    for name, rsh in (("tt", "3k"), ("ff", "1k")):
+        s = ps.Section(name)
+        s.parameter("rsh", rsh)
+        lib.section(s)
+    path = tmp_path / "corners.lib"
+    path.write_text(str(lib))
+    for name, want in (("tt", 0.75), ("ff", 0.5)):
+        d = ps.Subcircuit("div", ["in", "out"])
+        d.lib(str(path), name)
+        d.R("1", "in", "out", 1e3)
+        d.R("2", "out", d.gnd, "{rsh}")
+        tb = ps.Testbench(d)
+        tb.with_backend(backend)
+        tb.V("in", "in", "0", 1.0)
+        # A linear DC solve: exact to rounding.
+        assert tb.operating_point()["out"] == pytest.approx(want, rel=1e-9), name

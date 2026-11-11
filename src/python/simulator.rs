@@ -421,7 +421,7 @@ impl PySimulator {
             .run_each(self.backend.as_deref())?;
         assert_eq!(plots.len(), 1, "one analysis, one entry");
         let plots = plots.pop().expect("one entry");
-        Python::with_gil(|py| typed_result(py, &analysis, plots))
+        Python::attach(|py| typed_result(py, &analysis, plots))
     }
 
     /// Spectre-only analyses always run on Spectre.

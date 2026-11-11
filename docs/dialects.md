@@ -116,10 +116,15 @@ assert my.dump().count("MY001") == 2              # the code and its cell
 ## Running a plugin's deck
 
 A plugin is netlist-only: `run()` with `with_backend("acme-doc")` raises
-naming that no simulator runs it. `runs_on(Simulator.X)` claims that
-simulator reads the dialect's text; registration allows it only when
-`X`'s own dialect is in the `extends` chain. The deck is then written in
-the plugin's dialect and run there:
+naming that no simulator runs it. `runs_on(sim)` claims that simulator
+reads the dialect's text. `sim` is a built-in (`Simulator.X`) or a
+simulator of your own ([Your own simulator](simulate.md#your-own-simulator)):
+the `ps.Simulator`, or the name it is registered under, registered before
+the dialect. Registration allows it only when the simulator's dialect is
+in the `extends` chain. The deck is then written in the plugin's dialect
+and run there, routed as that simulator's (an analysis it does not declare
+is `W0180`); `Lang.runs_on()` is the simulator's name. A simulator whose
+own `dialect=` is the plugin needs no `runs_on`: name the simulator.
 
 ```python
 from spicerack.def_ import Simulator
@@ -129,6 +134,17 @@ class MyNgspice(ps.dialects.NGSPICE):
         return super().define(d).runs_on(Simulator.Ngspice)
 
 ps.register_dialect(MyNgspice("my-ngspice-doc"))
+
+ps.register_simulator(ps.Simulator(
+    "mysim-doc", dialect="ngspice", command=["mysim", "{deck}"],
+    output="ngspice-raw", analyses=["op"],
+))
+
+class OnMine(ps.dialects.NGSPICE):
+    def define(self, d):
+        return super().define(d).runs_on("mysim-doc")
+
+print(ps.register_dialect(OnMine("on-mysim-doc")).runs_on())   # mysim-doc
 ```
 
 ## The calls

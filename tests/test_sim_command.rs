@@ -105,3 +105,126 @@ fn p8_203_a_command_simulator_runs_the_deck_and_reads_its_results() {
     ));
     assert_eq!(spicerack::backend::by_name("p8-203-bad"), None);
 }
+
+/// Oracle: note 12 §4's table (code, kind of refusal, title, cause),
+/// copied by hand: each cause of a refused route or registration is one
+/// error with its one code.
+#[cfg(feature = "backend")]
+#[test]
+fn p8_206_each_refusal_cause_has_its_code() {
+    use spicerack::backend::feature::MEASURES;
+    use spicerack::backend::{
+        BackendError, Installed, Kind, Output, Runner, Sim, SimDef, SimRegisterError, parse_arg,
+        register_simulator, select,
+    };
+    use spicerack::syntax::Lang;
+    use spicerack::syntax::diag::{Code, Kind as Stays, info};
+
+    let table = [
+        (
+            Code::W0180,
+            Stays::Refusal,
+            "an analysis the chosen simulator does not declare",
+        ),
+        (
+            Code::W0181,
+            Stays::Refusal,
+            "a feature the chosen simulator does not declare",
+        ),
+        (
+            Code::W0182,
+            Stays::Refusal,
+            "no simulator runs every analysis of the deck",
+        ),
+        (
+            Code::R0040,
+            Stays::Note,
+            "a simulator descriptor that does not validate",
+        ),
+        (
+            Code::R0041,
+            Stays::Note,
+            "the simulator's command is not installed",
+        ),
+        (Code::R0042, Stays::Note, "the simulator registry is full"),
+    ];
+    for (code, kind, title) in table {
+        assert_eq!(info(code).title, title);
+        assert!(info(code).kind == kind, "{code:?}");
+    }
+
+    let def = |name: &str, program: &str| SimDef {
+        name: name.into(),
+        dialect: Lang::NGSPICE,
+        runner: Runner::Command {
+            argv: vec![
+                parse_arg(program).expect("a word"),
+                parse_arg("{deck}").expect("a word"),
+            ],
+            output: Output::NgspiceRaw,
+        },
+        features: 0,
+        analyses: 1 << Kind::Op as u32,
+        installed: Installed::OnPath(program.into()),
+    };
+    let ghost = register_simulator(def("p8-206-ghost", "p8-206-no-such-program")).expect("ok");
+    let refused = |r: Result<Sim, BackendError>| r.expect_err("refused");
+    let all = |_: Sim| true;
+
+    // W0180: the named simulator lacks an analysis of the deck.
+    let e = refused(select(
+        &[Kind::Op, Kind::Tran],
+        Some("p8-206-ghost"),
+        0,
+        all,
+    ));
+    assert_eq!(e.code(), Some(Code::W0180));
+    assert_eq!(e.missing(), Some((vec!["tran"], vec![])));
+    // W0181: it lacks a feature the deck needs.
+    let e = refused(select(&[Kind::Op], Some("p8-206-ghost"), MEASURES, all));
+    assert_eq!(e.code(), Some(Code::W0181));
+    assert_eq!(e.missing(), Some((vec![], vec!["measures"])));
+    // W0182: no simulator runs both (pz: ngspice; hb: VACASK, Spectre),
+    // named or not.
+    for name in [None, Some("p8-206-ghost"), Some("ngspice")] {
+        let e = refused(select(&[Kind::Pz, Kind::Hb], name, 0, all));
+        assert_eq!(e.code(), Some(Code::W0182), "{name:?}");
+        assert_eq!(e.missing(), Some((vec!["hb"], vec![])));
+    }
+    // R0041: named, declared, and not installed: refused at the run.
+    assert_eq!(
+        select(&[Kind::Op], Some("p8-206-ghost"), 0, all).ok(),
+        Some(ghost)
+    );
+    let e = spicerack::simulation::run_all(ghost, "* deck\n").expect_err("not installed");
+    assert_eq!(e.code(), Some(Code::R0041));
+    assert_eq!(e.missing(), None);
+    // No code: a name that is no simulator's.
+    let e = refused(select(&[Kind::Op], Some("p8-206-nobody"), 0, all));
+    assert_eq!(e.code(), None);
+
+    // R0040 for every field's refusal, R0042 for the capacity.
+    let bad = |d: SimDef| register_simulator(d).expect_err("refused").code();
+    let ok = || def("p8-206-bad", "cp");
+    assert_eq!(bad(def("", "cp")), Code::R0040);
+    assert_eq!(bad(def("p8-206-ghost", "cp")), Code::R0040, "redefined");
+    let features = SimDef {
+        features: 1 << 7,
+        ..ok()
+    };
+    assert_eq!(bad(features), Code::R0040);
+    let analyses = SimDef {
+        analyses: 0,
+        ..ok()
+    };
+    assert_eq!(bad(analyses), Code::R0040);
+    let command = SimDef {
+        runner: Runner::Command {
+            argv: Vec::new(),
+            output: Output::NgspiceRaw,
+        },
+        ..ok()
+    };
+    assert_eq!(bad(command), Code::R0040);
+    assert_eq!(SimRegisterError::Full.code(), Code::R0042);
+}

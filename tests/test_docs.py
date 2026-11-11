@@ -8,6 +8,8 @@ and the values the prose promises (`# 3.0`, `# 0.25`) are asserted below.
 """
 import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -75,12 +77,12 @@ def test_promised_values():
 
 def test_skill_names_every_backend_name():
     """Regression: the skill listed the ngspice aliases but not `vacask-shared`.
-    Oracle: the module's own refusal, which names every accepted backend."""
-    import spicerack as ps
-
-    with pytest.raises(ValueError) as e:
-        ps.Circuit("t").simulator(simulator="nope")
-    names = str(e.value).split("expected one of ", 1)[1].split(", ")
+    Oracle: the module's own refusal, which names every accepted backend,
+    asked in a fresh interpreter: a simulator a docs example registered in
+    this process (`mysim`) is the example's, not one the skill must name."""
+    code = "import spicerack as ps\ntry: ps.Circuit('t').simulator(simulator='nope')\nexcept ValueError as e: print(e)"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout
+    names = out.strip().split("expected one of ", 1)[1].split(", ")
     skill = (ROOT / "skills" / "spicerack" / "SKILL.md").read_text()
     assert [n for n in names if f"`{n}`" not in skill] == []
 

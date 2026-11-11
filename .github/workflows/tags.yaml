@@ -71,13 +71,14 @@ jobs:
             3.11
             3.12
             3.13
+            3.14
 
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
         with:
           target: ${{ matrix.target }}
-          # One wheel per interpreter: the extension is not abi3. 3.14 needs pyo3 >= 0.25.
-          args: --release --out dist --interpreter 3.10 3.11 3.12 3.13
+          # One wheel per interpreter: the extension is not abi3.
+          args: --release --out dist --interpreter 3.10 3.11 3.12 3.13 3.14
           manylinux: auto
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

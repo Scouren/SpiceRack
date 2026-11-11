@@ -21,7 +21,8 @@ pub(crate) fn dump(r: &Row) -> String {
     let mut line = |k: &str, v: String| writeln!(o, "{k} {v}").expect("a String takes writes");
     line("name", r.name.into());
     line("base", r.base.map_or("-".into(), |b| b.name().into()));
-    line("runs_on", format!("{:?}", r.runs_on));
+    let on = r.runs_on.map(|on| format!("Some({})", on.sim));
+    line("runs_on", on.unwrap_or("None".into()));
     match r.lexicon {
         Some(l) => lexicon(l, &mut line),
         None => line("lexicon", "-".into()),

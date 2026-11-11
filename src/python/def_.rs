@@ -134,7 +134,7 @@ pub(super) fn render(src: &Source, lang: Lang) -> Result<render::Written, String
     let p = render::render_pending(src, lang).map_err(messages)?;
     let answers = match p.requests.is_empty() {
         true => Vec::new(),
-        false => Python::with_gil(|py| answers(py, &p, lang))?,
+        false => Python::attach(|py| answers(py, &p, lang))?,
     };
     render::splice(src, p, &answers).map_err(messages)
 }
@@ -252,7 +252,6 @@ calls! {
     write_head(t: PyTag, text: &str);
     write_master(word: &str, text: &str);
     option(spice: &str, own: &str);
-    runs_on(sim: PySimulator);
     regions_registered(v: bool);
     @extra {
         #[new]
@@ -275,6 +274,19 @@ calls! {
             slf.def = d.extends(base.into());
             slf.hooks.clear();
             slf
+        }
+
+        /// `DialectDef::runs_on`: a built-in (`def_.Simulator.X`), a
+        /// registered `spicerack.Simulator`, or a registered name.
+        ///
+        /// # Errors
+        /// `ValueError`: no simulator is registered under the name.
+        /// `TypeError`: `sim` is none of the three.
+        fn runs_on<'py>(mut slf: PyRefMut<'py, Self>, sim: &Bound<'py, PyAny>) -> PyResult<PyRefMut<'py, Self>> {
+            let on = super::sims::runs_on(sim)?;
+            let d = std::mem::replace(&mut slf.def, DialectDef::new(""));
+            slf.def = d.runs_on(on);
+            Ok(slf)
         }
 
         /// `DialectDef::model_master`: `levels` a list of LEVELs.
@@ -391,9 +403,10 @@ impl PyLang {
         self.0.dump()
     }
 
-    /// The simulator that reads its text, `None` for netlist only.
-    fn runs_on(&self) -> Option<PySimulator> {
-        self.0.runs_on().map(PySimulator)
+    /// The name of the simulator that reads its text (what
+    /// `with_backend` takes), `None` for netlist only.
+    fn runs_on(&self) -> Option<&'static str> {
+        self.0.runs_on()
     }
 
     fn __repr__(&self) -> String {

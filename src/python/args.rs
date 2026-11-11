@@ -105,8 +105,10 @@ impl PyValueArg {
     }
 }
 
-impl<'py> FromPyObject<'py> for Num {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for Num {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         Ok(Num(ob.extract::<PyValueArg>()?.value()))
     }
 }

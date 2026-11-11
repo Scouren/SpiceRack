@@ -127,6 +127,16 @@ def _with_child(mod):
     return tb
 
 
+def _with_section(mod):
+    """A library file: a `Circuit` holding one section, netlisted through
+    the class that has `netlist` (`Testbench(circuit)` takes its top)."""
+    s = mod.Section("tt")
+    s.parameter("rsh", "3k")
+    lib = mod.Circuit("corners")
+    lib.section(s)
+    return mod.Testbench(lib)
+
+
 def _with_local_function(mod):
     """`cell` holds a `.func` over its own parameter `k`: the subcircuit's
     (`Construct::LocalFunc`), not a top-level function."""
@@ -241,6 +251,7 @@ FEATURES = {
     "parameter": elem(lambda d: d.parameter("k", "2")),
     "include": elem(lambda d: d.include("/m/x.inc")),
     "lib": elem(lambda d: d.lib("/m/x.lib", "tt")),
+    "section": _with_section,
     "raw_spice": elem(lambda d: d.raw_spice("Rr out 0 1meg")),
     "osdi": elem(lambda d: d.osdi("/m/x.osdi")),
     "veriloga": elem(lambda d: d.veriloga(str(VA))),
@@ -366,6 +377,8 @@ EXPECTED = {
     'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'lib': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # A library section: LTspice reads a library as a whole file (`Construct::LibSection`: W0012).
+    'section': (OK, OK, OK, OK, 'W0012', OK, OK, OK, OK),
     'raw_spice': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # LTspice has no Verilog-A or OSDI loader (W0004, writer B's 53199ba);
     # Spectre's ahdl_include compiles Verilog-A source, no OSDI binary.

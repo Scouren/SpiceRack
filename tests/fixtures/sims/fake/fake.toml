@@ -1,0 +1,11 @@
+# The fake simulator's descriptor (D38 note 12, O1). `fake.py`, beside this file, is run as a
+# module: a test puts this directory on PYTHONPATH. A command word is literal text and
+# placeholders, and a placeholder is a path inside the run's scratch directory, so no word
+# can point at a file beside the descriptor.
+schema = "spicerack.simulator/1"
+name = "fake"
+dialect = "ngspice"
+command = ["python3", "-m", "fake", "{deck}", "{raw}", "{dir}/fake.log"]
+output = "ngspice-ascii"
+analyses = ["op", "dc"]
+features = []

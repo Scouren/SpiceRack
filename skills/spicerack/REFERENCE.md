@@ -81,6 +81,8 @@ injection, propagation delay and pedestal all track them.
 `lib(path, section)`, `parameter(name, value)`, `raw_spice(line)`, `veriloga(...)`,
 `osdi(...)`, `verilog(...)`. `temp(value)` and `options(**kw)` are `Circuit` only.
 
+A corner library is a `Circuit` of sections: `s = ps.Section("tt")`, then `s.parameter(...)`, `s.model(...)`, `s.include(...)`, `s.lib(...)`, `s.subcircuit(sub)`, then `circuit.section(s)`. `str(circuit)` is the library file (`.lib tt` … `.endl tt`); a deck selects a section with `lib(path, "tt")`. `Testbench(circuit).netlist(target)` writes the library in another dialect (LTspice refuses sections, `W0012`). `Testbench` has no `section`: a deck that runs holds none.
+
 `Subcircuit.add_function(name, args, body)` is a `.func` inside the subcircuit (`cell.add_function("scaled", ["x"], "x*k")`; `tb.add_function` is the top-level one). A function reading a parameter of its subcircuit stays local to it, which LTspice, Spectre and VACASK refuse (`W0106`: functions at the top only).
 
 `Testbench`: `extra_line(text)`, `options(**kw)`, `temperature`, `nominal_temperature`,
@@ -223,9 +225,19 @@ The `u_Ω` family is registered with U+03A9 and does work.
 | `ps.dialects.NGSPICE` ... `VERILOG` | the built-ins as base classes (`define` is `d.extends(Lang.X)`) |
 | `def_.DialectDef(name)` | the Rust calls 1:1, chained: `extends`, `renamed`, `comment_line`, `keyword`, `scale`, `write_head`, `option`, `option_to`, `model_master`, `spell`, `refuse`, `code`, `refuse_code`, `hook`, `runs_on`, `kept_word(word, Construct)`, `dot_rule(word, DotRule.Note(Code) \| DotRule.SParams)`, `no_infix(tag)`, `no_scale(text)`, `nonassoc(tag)`, `ternary_nesting(Nesting.Explicit)`, ... |
 | `def_.register(d)` | registers a `DialectDef`; `ValueError` names the rule it breaks |
-| `def_.Lang` | `Lang.NGSPICE` ... `Lang.VERILOG`, `Lang.from_name(n)`, `.name()`, `.dump()`, `.runs_on()` |
+| `def_.Lang` | `Lang.NGSPICE` ... `Lang.VERILOG`, `Lang.from_name(n)`, `.name()`, `.dump()`, `.runs_on()` (the simulator's name, what `with_backend()` takes; `None`: netlist only) |
 | `def_.Card`, `def_.Answer` | a hook's card (`head`, `words`, `params`, `text`) and answer (`Answer.Text(s)`, `Answer.Refuse(id)`) |
 | enums | the Rust enums by name: `Tag` (= `Keyword`), `Construct`, `Alt` (`Alt.Omit(Code.W0030)`), `Rule`, `Code`, `Kind`, `Scale` (`Scale.Exp(6)`, `Scale.Mil`), `Simulator`, the behaviour enums; `None` variants are `None_` |
+
+## Custom simulators
+
+| Name | What it is |
+|---|---|
+| `ps.Simulator(name, dialect=, command=, output=, analyses=, features=None, verilog=False, verilog_a=False)` | a descriptor, checked when built (`ValueError` `R0040 ...: <field>: ...`); getters of the same names; `==` compares descriptors |
+| `ps.register_simulator(sim)` | registers it, returns its name; an equal `Simulator` twice is one; a different one under a held name (any case) is `R0040`, a 33rd simulator `R0042` |
+| `ps.simulators()` | every simulator's name in route order: `ngspice`, `ltspice`, `vacask`, `spectre`, `espice`, then the registered ones |
+| `ps.load_simulator(path)` | a `spicerack.simulator/1` TOML file (`schema = "spicerack.simulator/1"` required, then `Simulator`'s arguments as keys; an unknown key is `R0040`) as a `Simulator`, not registered; Python 3.11+ |
+| `exc.diagnostic` | on a `RuntimeError` with code `W0180`/`W0181`/`W0182` (`stage: "route"`, `missing: {"analyses": [...], "features": [...]}`) or `R0041` (`stage: "run"`, `missing: None`) |
 
 ## Backend capabilities
 

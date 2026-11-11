@@ -9,15 +9,16 @@
 //! Cites: none.
 //!
 //! Contents:
-//! - `pub type WriteHook`, `pub enum Hook`, `pub struct Card<'a>`, `pub enum Answer`
+//! - `pub type WriteHook`, `pub enum Hook`, `pub struct Card<'a>`, `pub enum Answer`,
+//!   `pub struct RunsOn`, `From<Dialect> for RunsOn`
 //! - `DialectDef::{code, refuse_code, omit_code, write_head, write_master, option, hook,
 //!   external_hook, runs_on, regions_registered}`
 
 use super::{DialectDef, put};
-use crate::syntax::Dialect;
 use crate::syntax::diag::{Code, Kind};
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::token::Tag;
+use crate::syntax::{Dialect, Lang};
 
 /// Writes the cards of one hooked head of a deck, as the definition's
 /// writer wrote them, in output order: one answer per card, pushed onto
@@ -55,6 +56,29 @@ pub enum Answer {
     Text(String),
     /// The deck is refused with the definition's code `id` (`W0201`).
     Refuse(&'static str),
+}
+
+/// The simulator a definition's `runs_on` names: the name it is registered
+/// under and the language it reads. A built-in is `Dialect::into`; a
+/// registered simulator is `backend::Sim::into` (the registry is
+/// `backend`'s, which `syntax` does not see). No invariant ties the
+/// fields here: `backend` gives the pair its registry holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RunsOn {
+    /// The name the simulator is registered under (`backend::by_name`).
+    pub sim: &'static str,
+    /// The language the simulator's decks are written in.
+    pub dialect: Lang,
+}
+
+impl From<Dialect> for RunsOn {
+    /// The built-in simulator of `d`: named as the dialect, reading it.
+    fn from(d: Dialect) -> RunsOn {
+        RunsOn {
+            sim: d.name(),
+            dialect: d.into(),
+        }
+    }
 }
 
 impl DialectDef {
@@ -115,10 +139,13 @@ impl DialectDef {
     }
 
     /// Simulator `sim` reads this language's text (the author's claim):
-    /// a deck in it can be run there. Registration allows it only when
-    /// `sim`'s own language is in the `extends` chain.
-    pub fn runs_on(mut self, sim: Dialect) -> Self {
-        self.runs_on = Some(sim);
+    /// a deck in it can be run there. `sim` is a built-in (`Dialect`) or a
+    /// registered simulator (`backend::Sim`; by name:
+    /// `backend::by_name(name)`), so the simulator is registered before the
+    /// language that runs on it. Registration allows it only when the
+    /// simulator's language is in the `extends` chain.
+    pub fn runs_on(mut self, sim: impl Into<RunsOn>) -> Self {
+        self.runs_on = Some(sim.into());
         self
     }
 

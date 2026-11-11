@@ -31,7 +31,8 @@
 //!   `Deck::card(body: &Body, name: &str) -> PyResult<String>`
 //! - `pub(super) fn check_backend_name(name: &str) -> PyResult<()>`
 //! - `pub(super) fn region_dialect(name: &str) -> Result<Lang, String>`
-//! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`
+//! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`,
+//!   `pub(super) fn backend_err(e: BackendError) -> PyErr`
 
 use crate::syntax::Lang;
 
@@ -44,7 +45,7 @@ use pyo3::prelude::*;
 use super::analysis::{Analysis, nfreqs};
 use super::model::{Bench, Body, Func, ModelLibrary, dec, params};
 use super::verilog::lower_verilog;
-use crate::backend::{Dialect, Kind, Sim, feature};
+use crate::backend::{BackendError, Dialect, Kind, Sim, feature};
 use crate::result::RawData;
 use crate::syntax::render;
 
@@ -79,7 +80,7 @@ impl Deck {
             .lowered()?
             .write_to(d)
             .map_err(PyRuntimeError::new_err)?;
-        Python::with_gil(|py| -> PyResult<()> {
+        Python::attach(|py| -> PyResult<()> {
             let category = py.get_type::<pyo3::exceptions::PyUserWarning>();
             for line in written.notes.messages.lines().filter(|l| !l.is_empty()) {
                 let msg = std::ffi::CString::new(format!("spicerack {line}"))
@@ -95,7 +96,7 @@ impl Deck {
     /// every analysis and its features); the first plot.
     pub(super) fn run(&self, backend: Option<&str>) -> PyResult<RawData> {
         let (sim, text) = self.for_run(backend)?;
-        crate::simulation::run(sim, &text).map_err(runtime_err)
+        crate::simulation::run(sim, &text).map_err(backend_err)
     }
 
     /// Runs the deck once; each queued analysis's plots (one, one per
@@ -103,7 +104,7 @@ impl Deck {
     pub(super) fn run_each(&self, backend: Option<&str>) -> PyResult<Vec<Vec<RawData>>> {
         let (sim, text) = self.for_run(backend)?;
         let kinds: Vec<Kind> = self.analyses().iter().map(Analysis::kind).collect();
-        crate::simulation::run_each(sim, &text, &kinds).map_err(runtime_err)
+        crate::simulation::run_each(sim, &text, &kinds).map_err(backend_err)
     }
 
     /// The deck's stored source (`store::with_loads`): its ngspice text,
@@ -184,12 +185,12 @@ impl Deck {
 
 /// Refuse a backend name at selection time rather than at the first run.
 pub(super) fn check_backend_name(name: &str) -> PyResult<()> {
-    if crate::backend::parse(name).is_some() || super::def_::plugin(name).is_some() {
+    if crate::backend::by_name(name).is_some() || super::def_::plugin(name).is_some() {
         return Ok(());
     }
-    let names = crate::backend::RUNNABLE
-        .map(Dialect::name)
-        .into_iter()
+    // Every registered simulator (the built-ins first), then the aliases.
+    let names = crate::backend::simulators()
+        .map(|(_, r)| r.name.as_str())
         .chain(Dialect::ALIASES.map(|a| a.0));
     Err(PyValueError::new_err(format!(
         "unknown backend {name:?}; expected one of {}",
@@ -227,6 +228,44 @@ pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr {
     PyRuntimeError::new_err(e.to_string())
 }
 
+/// A backend error as a Python `RuntimeError`. One with a catalogue code
+/// (`BackendError::code`: a routing refusal `W0180`–`W0182`, a command not
+/// installed `R0041`) opens with `<code> <title>: ` and carries a
+/// `diagnostic` attribute, `{"code": str, "stage": "route" | "run",
+/// "missing": {"analyses": [str], "features": [str]} | None}`: what the
+/// `spicerack.diagnostics/1` writer copies into `stage` and
+/// `simulator.missing`.
+pub(super) fn backend_err(e: BackendError) -> PyErr {
+    let Some(code) = e.code() else {
+        return runtime_err(e);
+    };
+    let title = crate::syntax::diag::info(code).title;
+    let err = PyRuntimeError::new_err(format!("{code:?} {title}: {e}"));
+    let attached = Python::attach(|py| -> PyResult<()> {
+        let d = pyo3::types::PyDict::new(py);
+        d.set_item("code", format!("{code:?}"))?;
+        match e.missing() {
+            Some((analyses, features)) => {
+                let missing = pyo3::types::PyDict::new(py);
+                missing.set_item("analyses", analyses)?;
+                missing.set_item("features", features)?;
+                d.set_item("stage", "route")?;
+                d.set_item("missing", missing)?;
+            }
+            None => {
+                d.set_item("stage", "run")?;
+                d.set_item("missing", py.None())?;
+            }
+        }
+        err.value(py).setattr("diagnostic", d)
+    });
+    // A failure to attach is raised in the error's place, never dropped.
+    match attached {
+        Ok(()) => err,
+        Err(failed) => failed,
+    }
+}
+
 // ---- private ----
 
 impl Deck {
@@ -234,30 +273,32 @@ impl Deck {
     /// deck written for it, in that simulator's language.
     fn for_run(&self, backend: Option<&str>) -> PyResult<(Sim, String)> {
         let deck = self.lowered()?;
-        // A plugin language's name that is no simulator's: it runs where
-        // its definition says (`runs_on`), as written.
+        let kinds: Vec<Kind> = deck.analyses().iter().map(Analysis::kind).collect();
+        // A plugin language's name that is no simulator's: it runs on the
+        // simulator its definition names (`runs_on`), routed by that name
+        // (so held to what the simulator declares), written as the plugin.
         let plugin = backend
             .filter(|n| crate::backend::by_name(n).is_none())
             .and_then(super::def_::plugin);
         if let Some(lang) = plugin {
-            let d = lang.runs_on().ok_or_else(|| {
+            let name = lang.runs_on().ok_or_else(|| {
                 runtime_err(format!(
                     "no simulator runs '{}': it is netlist only (its definition declares no runs_on)",
                     lang.name()
                 ))
             })?;
-            let sim = Sim::of(d).ok_or_else(|| {
-                runtime_err(crate::backend::BackendError::SimulationError(format!(
-                    "no {} simulator is driven by SpiceRack",
-                    d.name()
-                )))
-            })?;
+            if crate::backend::by_name(name).is_none() {
+                return Err(runtime_err(BackendError::SimulationError(format!(
+                    "no {name} simulator is driven by SpiceRack"
+                ))));
+            }
+            let sim = crate::backend::select(&kinds, Some(name), deck.needs(), |_| true)
+                .map_err(backend_err)?;
             return Ok((sim, deck.write_to(lang).map_err(runtime_err)?.text));
         }
-        let kinds: Vec<Kind> = deck.analyses().iter().map(Analysis::kind).collect();
         let writes = |s: Sim| deck.write_to(s.row().dialect).is_ok();
         let sim =
-            crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(runtime_err)?;
+            crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(backend_err)?;
         let written = deck.write_to(sim.row().dialect).map_err(runtime_err)?;
         Ok((sim, written.text))
     }
@@ -338,10 +379,18 @@ impl Deck {
         render: impl Fn(&render::Source, Lang) -> Result<T, String>,
     ) -> Result<T, String> {
         let name = self.top.name.as_str();
-        let source = self.source(super::def_::builtin_of(lang))?;
+        let (source, rows, ast) = self.build(super::def_::builtin_of(lang))?.finish();
         let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
-        let tokens = crate::syntax::tokenize(&source, lex);
-        let ast = crate::syntax::parse(&tokens, lex);
+        let tokens = crate::syntax::token::Tokens::from_rows(&source, lex, rows);
+        // The second writer's guards (DESIGN-python-ast-builders §3), in a
+        // debug build: every row keeps its tag's layout, and the deck is,
+        // row for row, the parse of its own text.
+        debug_assert_eq!(ast.check(&tokens), Ok(()), "a built tree's layouts");
+        debug_assert_eq!(
+            crate::syntax::build::unlike_parse(&tokens, &ast),
+            None,
+            "a built deck is its own text, read"
+        );
         let src = render::Source {
             ast: &ast,
             tokens: &tokens,
@@ -352,6 +401,18 @@ impl Deck {
             numbers: render::Numbers::Given,
         };
         render(&src, lang)
+    }
+
+    /// The deck for target `d` as a `Build`: its title line, then every
+    /// line after it ([`Self::source`]) as the reader reads it, the rows
+    /// moved in beside the text.
+    fn build(&self, d: Dialect) -> Result<crate::syntax::build::Build, String> {
+        let source = self.source(d)?;
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
+        let (title, rest) = source.split_once('\n').unwrap_or((source.as_str(), ""));
+        let mut b = crate::syntax::build::Build::new(title, lex);
+        b.text(rest);
+        Ok(b)
     }
 
     /// The deck as ngspice text, for target `d`: a model library's path
@@ -582,6 +643,23 @@ mod tests {
             }),
             ..Deck::default()
         }
+    }
+
+    #[test]
+    fn p8_140_a_deck_is_built_as_the_reader_reads_its_text() {
+        // DESIGN-python-ast-builders §3, the differential: the rows a deck
+        // is built as are the tokenizer's and parser's of the text it
+        // wrote. Oracle: the reader over `source`. Checks: 3.
+        let mut d = deck(vec![]);
+        d.top
+            .elements
+            .push(Card::element("in", "Vin in 0 1 AC 1".into()));
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
+        let (src, rows, ast) = d.build(Dialect::Ngspice).expect("built").finish();
+        assert_eq!(src, d.source(Dialect::Ngspice).expect("source"));
+        let tokens = crate::syntax::token::Tokens::from_rows(&src, lex, rows);
+        assert_eq!(ast.check(&tokens), Ok(()));
+        assert_eq!(crate::syntax::build::unlike_parse(&tokens, &ast), None);
     }
 
     #[test]

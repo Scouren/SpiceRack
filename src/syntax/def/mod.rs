@@ -38,7 +38,7 @@
 //!   `spice_model_type`, `kept_word`, `dot_rule`
 //! - the plugin calls (`plugin`): `code`, `refuse_code`, `omit_code`, `write_head`, `write_master`,
 //!   `option`, `hook`, `external_hook`, `runs_on`, `regions_registered`; `pub type WriteHook`,
-//!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`
+//!   `pub enum Hook`, `pub struct Card`, `pub enum Answer`, `pub struct RunsOn`
 //! - `pub fn register(def: DialectDef) -> Result<Lang, RegisterError>`, `pub enum RegisterError`
 
 mod copy;
@@ -49,6 +49,7 @@ mod lex;
 mod plugin;
 mod tables;
 
+use crate::syntax::Lang;
 use crate::syntax::behaviour::{
     AnalysisForm, Behaviours, CardRules, ControlBlock, Coupling, EndRule, ExprEval, IncludeScope,
     LoadForm, ModelSemantics, NamedParams, NamedRules, NetlistRules, NumberReading, OptionsForm,
@@ -64,11 +65,10 @@ use crate::syntax::render::capability::{Action, Alt, Construct, Rule};
 use crate::syntax::render::spelling::FuncForm;
 use crate::syntax::statement::{Analysis, Statement};
 use crate::syntax::token::Tag;
-use crate::syntax::{Dialect, Lang};
 
 pub(crate) use dump::dump;
 pub use freeze::{RegisterError, register};
-pub use plugin::{Answer, Card, Hook, WriteHook};
+pub use plugin::{Answer, Card, Hook, RunsOn, WriteHook};
 
 /// A language being declared.
 #[derive(Clone)]
@@ -92,7 +92,7 @@ pub struct DialectDef {
     write_masters: Vec<(String, String)>,
     options: Vec<(String, String)>,
     hooks: Vec<(String, Hook)>,
-    runs_on: Option<Dialect>,
+    runs_on: Option<RunsOn>,
     /// The language it extends.
     base: Option<Lang>,
 }

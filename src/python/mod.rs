@@ -24,8 +24,10 @@
 //! - `deck.rs`: the blocks → ngspice source → a backend's netlist or a run's `RawData`
 //! - `verilog.rs`: `verilog(...)` blocks and their lowering
 //! - `subcircuit.rs`, `circuit.rs`: `Subcircuit`, `Circuit`
+//! - `section.rs`: `Section`, a library section of a `Circuit`
 //! - `store.rs`: a subcircuit's source text and stored file (`to_source`, `save`)
 //! - `simulator.rs`, `spectre.rs`: `CircuitSimulator` and its Spectre-only analyses
+//! - `sims.rs`: `Simulator`, `register_simulator`, `simulators` (the simulator registry)
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
 //! - `def_.rs`, `def_enums.rs`, `def_tag.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
@@ -54,6 +56,8 @@ mod def_tag;
 mod keywords;
 mod model;
 mod results;
+mod section;
+mod sims;
 mod simulator;
 mod store;
 mod subcircuit;
@@ -80,11 +84,13 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubcircuit>()?;
     m.add_class::<PyTestbench>()?;
     m.add_class::<PyModelLibrary>()?;
+    m.add_class::<section::PySection>()?;
 
     // Module-level functions
     m.add_function(wrap_pyfunction!(lint, m)?)?;
     m.add_function(wrap_pyfunction!(read_raw, m)?)?;
     m.add_function(wrap_pyfunction!(compile_veriloga, m)?)?;
+    sims::add(m)?;
 
     create_unit_module(m)?;
     def_::create_def_module(m)?;

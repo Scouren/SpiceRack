@@ -351,7 +351,8 @@ fn words(line: &str) -> Vec<String> {
 }
 
 /// `text` as ngspice text: its [`HEADER`] line left out, read in `d` (or
-/// the header's dialect, or ngspice), another dialect's written as ngspice.
+/// the header's dialect, or ngspice), another dialect's written as ngspice
+/// under its own title ([`title`]).
 fn ngspice_text(text: &str, d: Option<Lang>) -> Result<Cow<'_, str>, String> {
     let (named, body) = match text.strip_prefix(HEADER) {
         Some(rest) => {
@@ -367,7 +368,10 @@ fn ngspice_text(text: &str, d: Option<Lang>) -> Result<Cow<'_, str>, String> {
     if d.lexicon().is_none() {
         return Err(format!("no {} reader", d.name()));
     }
-    let w = crate::syntax::render::render_text(body, d, "source", Lang::NGSPICE);
+    // The deck keeps its own title: the ngspice writer puts it on line 1,
+    // where `read_deck` reads it.
+    let name = title(body, d.spelling().comment);
+    let w = crate::syntax::render::render_text(body, d, name, Lang::NGSPICE);
     Ok(Cow::Owned(w.map_err(|e| e.messages)?.text))
 }
 
@@ -483,6 +487,22 @@ mod tests {
         // title's own (`with_loads` wrote the name as it was).
         let stored = with_loads("* rc\nR1 a 0 1k\n.end\n", &[]);
         assert_eq!(name(&stored), "* rc");
+    }
+
+    #[test]
+    fn p8_316_a_foreign_deck_is_read_under_its_own_title() {
+        // Spectre UG 5.1.41 ("The first line is taken to be the title");
+        // ngspice manual §2.1 and HSPICE the same; VACASK's first line is
+        // the title, bare (`render/named/vacask.rs` writes it so). The
+        // three decks are what each writer gives a one-resistor `amp` with
+        // an operating point (ROUNDTRIP-TRIAGE K1 a). Checks: 3.
+        let name = |text: &str, d: Lang| read_deck(text, Some(d)).unwrap().name;
+        let hspice = "* amp\nR1 a 0 1k\n.op\n.end\n";
+        assert_eq!(name(hspice, Lang::HSPICE), "amp");
+        let spectre = "// amp\n\nsimulator lang=spectre\n\n\nr1 (a 0) resistor r=1k\n\nop1 dc\n";
+        assert_eq!(name(spectre, Lang::SPECTRE), "amp");
+        let vacask = "amp\n\nground 0\n\nload \"spice/resistor.osdi\"\n\nmodel resistor sp_resistor\n\nr1 (a 0) resistor r=1e3\n\ncontrol\n  options rawfile=\"binary\"\n  analysis op1 op\nendc\n";
+        assert_eq!(name(vacask, Lang::VACASK), "amp");
     }
 
     #[test]
