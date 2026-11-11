@@ -1,7 +1,8 @@
 //! Raw files -> `spicerack::rawfile::parse_raw`: a truncated header is an
 //! error, not a panic; a complete ngspice ASCII raw file reads back its
 //! title, variables and values. LTspice itself runs a closed-form deck in
-//! `nix develop .#testing-ltspice`.
+//! `nix develop .#testing-ltspice`. `rawfile::write_raw` gives the bytes
+//! ngspice's `load` read, and every recorded raw file reads back from it.
 //!
 //! Cites: the ngspice raw file format (manual §17.6), as a spec example.
 //!
@@ -316,6 +317,238 @@ fn p1_040_p1_047_spectre_nutascii_and_nutbin_read() {
         assert_eq!(vals, [0.0, 2.0, 0.6666667, -6.667e-4]);
     }
     assert_eq!(text.real_data, bin.real_data);
+}
+
+/// What a raw file holds of each plot, every value as its bits.
+fn p8_101_key(plots: &[spicerack::result::RawData]) -> Vec<String> {
+    let bits = |c: &Vec<f64>| c.iter().map(|x| x.to_bits()).collect::<Vec<u64>>();
+    plots
+        .iter()
+        .map(|p| {
+            let vars: Vec<String> = p
+                .variables
+                .iter()
+                .map(|v| format!("{} {} {:?}", v.index, v.name, v.var_type))
+                .collect();
+            let real: Vec<Vec<u64>> = p.real_data.iter().map(bits).collect();
+            let complex: Vec<Vec<[u64; 2]>> = p
+                .complex_data
+                .iter()
+                .map(|c| c.iter().map(|x| [x.re.to_bits(), x.im.to_bits()]).collect())
+                .collect();
+            format!(
+                "{:?} {:?} complex={} {vars:?} {real:?} {complex:?}",
+                p.title, p.plot_name, p.is_complex
+            )
+        })
+        .collect()
+}
+
+/// The four plots of `tests/fixtures/raw/p8-101-hand*.raw`, value for value
+/// as `research/impl/evidence/P8-101/mkraw.py` lists them.
+fn p8_101_hand_plots() -> Vec<spicerack::result::RawData> {
+    use num_complex::Complex64 as C;
+    use spicerack::result::{RawData, VarInfo, VarType};
+    let var = |index: usize, name: &str, var_type: VarType| VarInfo {
+        index,
+        name: name.to_string(),
+        var_type,
+    };
+    vec![
+        RawData {
+            title: "p8-101 hand".into(),
+            plot_name: "Operating Point".into(),
+            variables: vec![
+                var(0, "v(in)", VarType::Voltage),
+                var(1, "v(out)", VarType::Voltage),
+                var(2, "i(v1)", VarType::Current),
+            ],
+            real_data: vec![vec![2.0], vec![4.0 / 3.0], vec![-6.666666666666668e-4]],
+            ..RawData::default()
+        },
+        RawData {
+            title: "p8-101 hand".into(),
+            plot_name: "Transient Analysis".into(),
+            variables: vec![
+                var(0, "time", VarType::Time),
+                var(1, "v(out)", VarType::Voltage),
+                var(2, "i(v1)", VarType::Current),
+            ],
+            real_data: vec![
+                vec![0.0, 1e-11, 2.5e-9, 1e-6],
+                vec![0.1, 1.9999700004499943e-7, -0.0, f64::MAX],
+                vec![5e-324, -1.25, 0.30000000000000004, 123456789.12345679],
+            ],
+            ..RawData::default()
+        },
+        RawData {
+            title: "p8-101 hand".into(),
+            plot_name: "AC Analysis".into(),
+            variables: vec![
+                var(0, "frequency", VarType::Frequency),
+                var(1, "v(out)", VarType::Voltage),
+            ],
+            complex_data: vec![
+                vec![C::new(1e3, 0.0), C::new(3.1622776601683795e3, 0.0)],
+                vec![
+                    C::new(0.6666549695629838, -2.792477806477596e-3),
+                    C::new(0.1, -0.2),
+                ],
+            ],
+            is_complex: true,
+            ..RawData::default()
+        },
+        RawData {
+            plot_name: "DC Analysis `op1'".into(),
+            variables: vec![
+                var(0, "r", VarType::Param),
+                var(1, "out", VarType::Voltage),
+                var(2, "gain", VarType::Other),
+            ],
+            real_data: vec![
+                vec![1000.0, 2000.0],
+                vec![0.6666667, 0.5],
+                vec![0.25, 1.0 / 3.0],
+            ],
+            ..RawData::default()
+        },
+    ]
+}
+
+#[test]
+fn p8_101_writer_gives_the_bytes_ngspice_loaded() {
+    // Oracle: ngspice-45's own `load`. The two fixtures were assembled by
+    // a Python script, not by this crate; ngspice loaded both and wrote
+    // every one of their 25 values back bit for bit (tests/fixtures/raw/
+    // README; research/impl/evidence/P8-101). The writer must give exactly
+    // those bytes for the same plots. Checks: 2 files, byte for byte.
+    use spicerack::rawfile::{RawFormat, write_raw};
+    let plots = p8_101_hand_plots();
+    for (format, file) in [
+        (RawFormat::Binary, "p8-101-hand.raw"),
+        (RawFormat::Ascii, "p8-101-hand-ascii.raw"),
+    ] {
+        let p = format!("{}/tests/fixtures/raw/{file}", env!("CARGO_MANIFEST_DIR"));
+        let want = std::fs::read(p).expect("fixture");
+        let got = write_raw(&plots, format);
+        assert!(
+            got == want,
+            "{file}: not the bytes ngspice loaded; the writer gave\n{}",
+            String::from_utf8_lossy(&got)
+        );
+    }
+}
+
+#[test]
+fn p8_101_written_raws_read_back_bit_for_bit() {
+    // Oracle: the round trip. Every recorded raw file (README), read,
+    // written in both formats and read again, holds the same plots bit for
+    // bit: ngspice's, Xyce's, LTspice's (float32 widened, a stepped run one
+    // plot a step), Spectre's nutascii and big-endian nutbin (written
+    // little-endian under the same plot name), and the two hand-assembled
+    // files. A recording added to the folder is covered with no edit here.
+    use spicerack::rawfile::{RawFormat, parse_raw_all, write_raw};
+    use spicerack::result::{RawData, VarInfo, VarType};
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/raw");
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .expect("the fixtures")
+        .map(|e| {
+            e.expect("an entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .filter(|n| {
+            [".raw", ".nutbin", ".nutascii"]
+                .iter()
+                .any(|x| n.ends_with(*x))
+        })
+        .collect();
+    names.sort();
+    for known in [
+        "p1-001.raw",
+        "p1-002-op.raw",
+        "p1-002-tran.raw",
+        "p1-006-ac.raw",
+        "p1-006-dc.raw",
+        "p1-006-noise.raw",
+        "p1-006-op.raw",
+        "p1-006-tf.raw",
+        "p1-006-tran.raw",
+        "p1-040-spectre.nutascii",
+        "p1-047-spectre.nutbin",
+        "p8-101-hand-ascii.raw",
+        "p8-101-hand.raw",
+        "p8-101.raw",
+    ] {
+        assert!(names.contains(&known.to_string()), "{known} is recorded");
+    }
+    let both = [RawFormat::Binary, RawFormat::Ascii];
+    for name in &names {
+        let data = std::fs::read(format!("{dir}/{name}")).expect("fixture");
+        let read = parse_raw_all(&data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        for format in both {
+            let back = parse_raw_all(&write_raw(&read, format))
+                .unwrap_or_else(|e| panic!("{name} {format:?}: {e}"));
+            assert_eq!(p8_101_key(&back), p8_101_key(&read), "{name} {format:?}");
+        }
+    }
+
+    // What no recording holds: a plot with no points before another plot, a
+    // plot with no variables, the infinities.
+    let var = |name: &str| VarInfo {
+        index: 0,
+        name: name.to_string(),
+        var_type: VarType::Voltage,
+    };
+    let edges = vec![
+        RawData {
+            plot_name: "no points".into(),
+            variables: vec![var("a")],
+            real_data: vec![Vec::new()],
+            ..RawData::default()
+        },
+        RawData {
+            plot_name: "no variables".into(),
+            ..RawData::default()
+        },
+        RawData {
+            title: "t".into(),
+            plot_name: "infinite".into(),
+            variables: vec![var("a")],
+            real_data: vec![vec![f64::INFINITY, f64::NEG_INFINITY, f64::MIN_POSITIVE]],
+            ..RawData::default()
+        },
+    ];
+    for format in both {
+        let back = parse_raw_all(&write_raw(&edges, format)).expect("reads back");
+        assert_eq!(p8_101_key(&back), p8_101_key(&edges), "{format:?}");
+    }
+
+    // A complex plot's real-valued column reads back complex, imaginary
+    // part 0; a NaN reads back as a NaN in both formats.
+    let mixed = RawData {
+        plot_name: "mixed".into(),
+        variables: vec![var("a")],
+        real_data: vec![vec![1.5, f64::NAN]],
+        is_complex: true,
+        ..RawData::default()
+    };
+    for format in both {
+        let back = parse_raw_all(&write_raw(std::slice::from_ref(&mixed), format)).expect("reads");
+        let col = back[0].complex(0).expect("a complex column");
+        assert!(
+            back[0].is_complex && back[0].real_data.is_empty(),
+            "{format:?}"
+        );
+        assert_eq!(
+            (col[0].re, col[0].im, col.len()),
+            (1.5, 0.0, 2),
+            "{format:?}"
+        );
+        assert!(col[1].re.is_nan() && col[1].im == 0.0, "{format:?}");
+    }
+    assert!(write_raw(&[], RawFormat::Binary).is_empty());
 }
 
 #[cfg(feature = "backend")]

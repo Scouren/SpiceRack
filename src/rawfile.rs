@@ -1,19 +1,24 @@
-//! Parser for nutmeg-format `.raw` files (ngspice, VACASK, LTspice, Spectre nutbin and nutascii):
+//! Reader and writer for nutmeg-format `.raw` files (ngspice, VACASK, LTspice, Spectre nutbin and nutascii):
 //! `key: value` header lines, a `Variables:` block, then `Binary:` or `Values:` and the data.
 //! [`parse_raw`] reads the first plot; [`parse_raw_all`] reads every plot
-//! (ngspice writes one per analysis, not in card order).
+//! (ngspice writes one per analysis, not in card order); [`write_raw`]
+//! writes plots as one ngspice raw file.
 //!
-//! Raw-file bytes in, [`RawData`] plots out.
+//! Raw-file bytes in, [`RawData`] plots out, and back.
 //!
-//! Cites: none (the nutmeg raw format as ngspice, VACASK and LTspice write it).
+//! Cites: none (the nutmeg raw format as ngspice, VACASK and LTspice write
+//! it; ngspice-45's `load` of what [`write_raw`] writes is recorded in
+//! `tests/fixtures/raw/README`).
 //!
 //! Contents:
-//! - `pub enum RawFileError`
+//! - `pub enum RawFileError`, `pub enum RawFormat`
 //! - `pub fn parse_raw(data: &[u8]) -> Result<RawData, RawFileError>`
 //! - `pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError>`
+//! - `pub fn write_raw(plots: &[RawData], format: RawFormat) -> Vec<u8>`
 
 use crate::result::{RawData, VarInfo, VarType};
 use num_complex::Complex64;
+use std::fmt::Write as _;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RawFileError {
@@ -21,6 +26,16 @@ pub enum RawFileError {
     Parse(String),
     #[error("Unexpected format: {0}")]
     Format(String),
+}
+
+/// How [`write_raw`] lays out a plot's values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawFormat {
+    /// `Binary:`, then each value a little-endian f64 (ngspice's default).
+    Binary,
+    /// `Values:`, then each value as text, the shortest that reads back to
+    /// the same f64 (the layout of ngspice's `set filetype=ascii`).
+    Ascii,
 }
 
 /// Parse a .raw file from bytes. Handles UTF-8 and LTspice's UTF-16-LE headers.
@@ -59,6 +74,31 @@ pub fn parse_raw_all(data: &[u8]) -> Result<Vec<RawData>, RawFileError> {
         used += n;
     }
     Ok(plots)
+}
+
+/// `plots` as one ngspice raw file, plot after plot in the order given.
+/// [`parse_raw_all`] reads it back with every title, plot name, variable
+/// and value the same bit for bit (`Ascii`: a NaN reads back as a NaN, its
+/// payload not kept), and ngspice's `load` reads it. A plot's points are
+/// column 0's; a complex plot's real-valued column is written with a zero
+/// imaginary part; a type [`VarType`] has no word for is `notype`. What a
+/// raw file has no place for is not written: `params`, `stdout`,
+/// `log_content`, `measures`, `backend_hint`. No `Date:` line: the same
+/// plots give the same bytes.
+///
+/// # Panics
+/// On a plot no raw file can hold: columns of different lengths,
+/// `variables[i].index != i`, a variable name that is empty or holds
+/// whitespace, a line break in the title or the plot name.
+pub fn write_raw(plots: &[RawData], format: RawFormat) -> Vec<u8> {
+    let mut out = Vec::new();
+    for plot in plots {
+        let before = out.len();
+        write_plot(&mut out, plot, format);
+        assert!(out.len() > before, "a plot is at least its header");
+    }
+    assert!(plots.is_empty() == out.is_empty());
+    out
 }
 
 // ---- private ----
@@ -100,7 +140,7 @@ fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize, bool), RawF
     let mut raw = RawData::default();
     let (mut num_vars, mut num_points) = (0usize, 0usize);
     let (mut in_variables, mut fast_access, mut double) = (false, false, !ltspice);
-    let mut stepped = false;
+    let (mut stepped, mut padded) = (false, false);
     let mut pos = 0;
 
     let is_binary = loop {
@@ -141,6 +181,9 @@ fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize, bool), RawF
                             fast_access = flags.contains("fastaccess");
                             double |= flags.contains("double");
                             stepped = flags.contains("stepped");
+                            // ngspice's own flag (`padded`, `unpadded`),
+                            // which `write_raw` always writes.
+                            padded = flags.contains("padded");
                         }
                         "No. Variables" => num_vars = value.parse().map_err(bad("num_vars"))?,
                         "No. Points" => num_points = value.parse().map_err(bad("num_points"))?,
@@ -168,14 +211,28 @@ fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize, bool), RawF
 
     let body = &data[pos..];
     let used = if is_binary {
-        parse_binary(body, &mut raw, num_vars, num_points, fast_access, double)?
+        // Spectre's nutbin by its plot name, unless the flags are ngspice's.
+        let big = !padded && big_endian(&raw.plot_name);
+        parse_binary(
+            body,
+            &mut raw,
+            num_vars,
+            num_points,
+            fast_access,
+            double,
+            big,
+        )?
     } else {
-        // The values end where the next plot's header begins.
-        let end = [&b"\nTitle:"[..], b"\nPlotname:"]
-            .iter()
-            .filter_map(|h| body.windows(h.len()).position(|w| w == *h))
-            .min()
-            .map_or(body.len(), |i| i + 1);
+        // The values end where the next plot's header begins; a plot with
+        // no points has none, and the next header may start right here.
+        let end = match num_points {
+            0 => 0,
+            _ => [&b"\nTitle:"[..], b"\nPlotname:"]
+                .iter()
+                .filter_map(|h| body.windows(h.len()).position(|w| w == *h))
+                .min()
+                .map_or(body.len(), |i| i + 1),
+        };
         parse_ascii(&body[..end], &mut raw, num_vars, num_points)?;
         end
     };
@@ -222,8 +279,8 @@ fn split_steps(raw: RawData) -> Vec<RawData> {
         .collect()
 }
 
-/// Little-endian values (Spectre's nutbin: big-endian, [`big_endian`]),
-/// point-major (`p*nv + v`) or, with FastAccess,
+/// Little-endian values (`big`: big-endian, Spectre's nutbin,
+/// [`big_endian`]), point-major (`p*nv + v`) or, with FastAccess,
 /// variable-major: f64 each, or, unless `double` (an LTspice raw without
 /// its `double` flag), the scale (variable 0) f64 and the rest float32; a
 /// complex plot's pairs are f64 always (settle-api row 15, measured).
@@ -235,6 +292,7 @@ fn parse_binary(
     np: usize,
     fast_access: bool,
     double: bool,
+    big: bool,
 ) -> Result<usize, RawFileError> {
     if !raw.is_complex && !double {
         return parse_f32(body, raw, nv, np);
@@ -247,7 +305,6 @@ fn parse_binary(
             body.len()
         )));
     }
-    let big = big_endian(&raw.plot_name);
     let f = |j: usize| {
         let b: [u8; 8] = body[j * 8..j * 8 + 8].try_into().expect("8-byte slice");
         match big {
@@ -275,7 +332,8 @@ fn parse_binary(
 /// Whether a binary plot is Spectre's: Spectre names a plot after its
 /// analysis instance in `` `name' `` quotes (``DC Analysis `op1'``) and
 /// writes nutbin big-endian IEEE f64 (settle-remote P1-040, Spectre 25.1);
-/// ngspice, VACASK, Xyce and LTspice write little-endian.
+/// ngspice, VACASK, Xyce and LTspice write little-endian, and so does
+/// [`write_raw`], whose `padded` flag overrides the name (`parse_utf8`).
 fn big_endian(plot_name: &str) -> bool {
     plot_name.contains('`')
 }
@@ -340,6 +398,101 @@ fn parse_ascii(body: &[u8], raw: &mut RawData, nv: usize, np: usize) -> Result<(
         }
     }
     Ok(())
+}
+
+/// One plot appended to `out`: its header, then its values in `format`
+/// ([`write_raw`], whose contract the assertions are).
+fn write_plot(out: &mut Vec<u8>, plot: &RawData, format: RawFormat) {
+    // A column's points: its complex values, else its real ones (the
+    // order `RawData::re` reads a column in).
+    let len = |v: usize| match plot.complex(v) {
+        Some(c) => c.len(),
+        None => plot.real_data.get(v).map_or(0, Vec::len),
+    };
+    let nv = plot.variables.len();
+    let np = if nv == 0 { 0 } else { len(0) };
+    assert!(
+        !plot.title.contains('\n') && !plot.plot_name.contains('\n'),
+        "a raw header line holds no line break"
+    );
+    assert!(
+        (0..nv).all(|v| len(v) == np),
+        "every column of `{}` holds {np} points",
+        plot.plot_name
+    );
+    let kind = if plot.is_complex { "complex" } else { "real" };
+    // `padded` is ngspice's flag for this layout (every column `np` long).
+    // No Spectre nutbin carries it, so the reader takes a file with it as
+    // little-endian whatever its plots are named (`parse_utf8`).
+    let mut head = format!(
+        "Title: {}\nPlotname: {}\nFlags: {kind} padded\nNo. Variables: {nv}\nNo. Points: {np}\nVariables:\n",
+        plot.title, plot.plot_name
+    );
+    for (i, v) in plot.variables.iter().enumerate() {
+        assert!(v.index == i, "variable `{}` is column {i}", v.name);
+        assert!(
+            !v.name.is_empty() && !v.name.contains(char::is_whitespace),
+            "a variable's name is one word: `{}`",
+            v.name
+        );
+        writeln!(head, "\t{i}\t{}\t{}", v.name, type_word(v.var_type))
+            .expect("a String takes any write");
+    }
+    out.extend_from_slice(head.as_bytes());
+    // ponytail: a column lookup per value, as `parse_binary`'s `slot`; one
+    // kernel for the reader and the writer when P9-016 lands.
+    let at = |v: usize, p: usize| match plot.complex(v) {
+        Some(c) => c[p],
+        None => Complex64::new(plot.real_data[v][p], 0.0),
+    };
+    match format {
+        RawFormat::Binary => {
+            out.extend_from_slice(b"Binary:\n");
+            let start = out.len();
+            for p in 0..np {
+                for v in 0..nv {
+                    let x = at(v, p);
+                    out.extend_from_slice(&x.re.to_le_bytes());
+                    if plot.is_complex {
+                        out.extend_from_slice(&x.im.to_le_bytes());
+                    }
+                }
+            }
+            let width = if plot.is_complex { 16 } else { 8 };
+            assert!(out.len() - start == nv * np * width);
+        }
+        RawFormat::Ascii => {
+            // ` <point>`, a line per variable, a blank line after the
+            // point; `{:e}` is the shortest text that reads back the same.
+            let mut text = String::from("Values:\n");
+            for p in 0..np {
+                write!(text, " {p}").expect("a String takes any write");
+                for v in 0..nv {
+                    let x = at(v, p);
+                    match plot.is_complex {
+                        true => writeln!(text, "\t{:e},{:e}", x.re, x.im),
+                        false => writeln!(text, "\t{:e}", x.re),
+                    }
+                    .expect("a String takes any write");
+                }
+                text.push('\n');
+            }
+            out.extend_from_slice(text.as_bytes());
+        }
+    }
+}
+
+/// The type word [`VarType::parse`] reads back as `t`: ngspice's `notype`
+/// for [`VarType::Other`], whose word as read is not kept.
+fn type_word(t: VarType) -> &'static str {
+    match t {
+        VarType::Voltage => "voltage",
+        VarType::Current => "current",
+        VarType::Time => "time",
+        VarType::Frequency => "frequency",
+        VarType::Param => "param",
+        VarType::Other => "notype",
+    }
 }
 
 #[cfg(test)]
@@ -435,6 +588,21 @@ mod tests {
         assert_eq!(plots[0].real_data, vec![Vec::<f64>::new(); 2]);
         assert!(plots[1].real_data.is_empty());
         assert_eq!(plots[2].real_data, vec![vec![7.0]]);
+    }
+
+    #[test]
+    fn p8_101_an_empty_ascii_plot_keeps_the_next_plots_header() {
+        // A plot with no points has no values: the next plot's `Title:`
+        // follows `Values:` directly (the layout `write_raw` gives it).
+        // Oracle: the header the test wrote. Checks: 4.
+        let mut buf = header("real", &["v(a)"], 0, "Values:\n");
+        buf.extend(header("real", &["v(a)"], 1, "Values:\n"));
+        buf.extend_from_slice(b" 0\t7\n\n");
+        let plots = parse_raw_all(&buf).unwrap();
+        assert_eq!(plots.len(), 2);
+        assert_eq!(plots[0].real_data, vec![Vec::<f64>::new()]);
+        assert_eq!(plots[1].title, "t");
+        assert_eq!(plots[1].real_data, vec![vec![7.0]]);
     }
 
     #[test]

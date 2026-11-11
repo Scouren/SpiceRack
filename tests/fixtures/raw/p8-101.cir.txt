@@ -1,0 +1,13 @@
+p8-101 rc divider
+V1 in 0 dc 2 ac 1 pulse(0 2 0 1n 1n 5u 10u)
+R1 in out 1k
+C1 out 0 1n
+R2 out 0 2k
+.control
+op
+tran 1u 4u
+ac dec 2 1k 100k
+set filetype=binary
+write p8-101.raw op1.all tran1.all ac1.all
+.endc
+.end
