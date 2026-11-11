@@ -1,6 +1,8 @@
-ltspice_examples/IGBT.net target-fails # no raw file .cross_sim_out.raw: Unknown model type nigbt - ignored | Error on line 4 or its substitute: z1 n001 n002 0 nigbt
-ltspice_examples/Vswitch.net mismatch # tran V(out): the written switch never opens (ngspice 0.0033 V throughout; LTspice swings 0.0034 to 3.2967 V): Vh=-.4
+ltspice_examples/Cohn.net mismatch # ac: sweep grid changed (1139 -> 1139 points)
+ltspice_examples/IGBT.net target-fails # no raw file .cross_sim_out.raw: Unknown model type nigbt - ignored | Error on line 4 or its substitute:: z1 n001 n002 0 nigbt | Simulation interrupted due to er
+ltspice_examples/Vswitch.net mismatch # tran V(in): 0.953125 leaves the tube at t=0.0005234375 (tol 1.000e-2)
 ltspice_examples/butter.net mismatch # ac: sweep grid changed (413 -> 412 points)
-ltspice_examples/elip_grd.net target-fails # no raw file .cross_sim_out.raw: Formula() error. | Undefined parameter [pi]
-ltspice_examples/gr_del.net target-fails # no raw file .cross_sim_out.raw: Formula() error. | Undefined parameter [pi]
-ltspice_examples/qztst.net target-fails # no raw file .cross_sim_out.raw: Formula() error. | Undefined parameter [ls]
+ltspice_examples/elip_grd.net target-fails # no raw file .cross_sim_out.raw: Undefined parameter [pi] | Formula() error. | Undefined parameter [pi] | Formula() error.
+ltspice_examples/gr_del.net target-fails # no raw file .cross_sim_out.raw: Undefined parameter [pi] | Formula() error. | Undefined parameter [pi] | Formula() error.
+ltspice_examples/notch.net mismatch # ac: sweep grid changed (3323 -> 3323 points)
+ltspice_examples/qztst.net target-fails # no raw file .cross_sim_out.raw: Undefined parameter [pi] | Formula() error. | Undefined parameter [ls]
