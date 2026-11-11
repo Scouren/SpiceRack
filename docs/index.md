@@ -21,7 +21,7 @@ writes netlists.
 | `openvaf` | Verilog-A models on ngspice, VACASK and Spectre |
 | `iverilog`, `yosys` | Digital Verilog: co-simulation, or synthesis to gates |
 
-From source: `pip install maturin && maturin develop` in a clone (needs Rust).
+From source: `pip install maturin && maturin develop --target-dir target/py` in a clone (needs Rust).
 With Nix, `nix develop .#testing` gives the build tools plus ngspice, OpenVAF,
 VACASK and the sky130/gf180 PDKs.
 

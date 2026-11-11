@@ -62,7 +62,7 @@ print(step_response(ps, rc, period=4e-6).measure()["settle_rise_0p1pct_s"])
 
 ```bash
 nix develop .#testing          # Rust, maturin, ngspice, OpenVAF, VACASK, PDKs
-maturin develop && python3 -m pytest && cargo test
+maturin develop --target-dir target/py && python3 -m pytest && cargo test
 ```
 
 Pre-1.0: pin a version, as the API can change between minor releases.

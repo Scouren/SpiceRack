@@ -8,7 +8,7 @@ trusts. The rules behind it are in `AGENTS.md` (Testing).
 | Tier | Runs | Command | Where |
 |---|---|---|---|
 | pre-commit | format, lints, house style | `cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && python3 .github/scripts/check_style.py src tests` | local; the same three run as the `lint` job in `.github/workflows/test.yaml` on every PR |
-| merge | both suites in the testing shell (locally `.#testing-ltspice`, below); the converter alone as a package (`packages.spice2rack`: no default features, no `espice` input), run on a fixture kit | `nix develop .#testing -c cargo test`, then `maturin develop && python3 -m pytest` in a `--system-site-packages` venv; `nix build .#spice2rack && ./result/bin/spice2rack --to espice --kit -o <dir> tests/fixtures/pdk_sections/models.lib` | `.github/workflows/test.yaml`, every PR and every push to `main` |
+| merge | both suites in the testing shell (locally `.#testing-ltspice`, below); the converter alone as a package (`packages.spice2rack`: no default features, no `espice` input), run on a fixture kit | `nix develop .#testing -c cargo test`, then `maturin develop --target-dir target/py && python3 -m pytest` in a `--system-site-packages` venv; `nix build .#spice2rack && ./result/bin/spice2rack --to espice --kit -o <dir> tests/fixtures/pdk_sections/models.lib` | `.github/workflows/test.yaml`, every PR and every push to `main` |
 | docs | the site builds strictly; every Python example in it runs | `nix develop .#docs -c mkdocs build --strict`; `tests/test_docs.py` | `.github/workflows/docs.yaml`; pytest |
 | release | tag matches `Cargo.toml` and `pyproject.toml`, wheels for every target, sdist | `.github/scripts/bump_version.py`, then the release workflow | `.github/workflows/tags.yaml`, `publish.yaml` |
 | nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
@@ -256,7 +256,7 @@ the parent commit, then measure the change.
 | Tier | Workloads |
 |---|---|
 | `pre-commit` | render `fixtures`, `hspice`, `vacask`, `pdk-vacask` to every target |
-| `merge` | tokenize, and tokenize + parse, every input (MB/s printed); render `xyce` and `pdk-sky130A` to every target; raw binary 200 × 100k and ASCII 50 × 20k; Python: 10k `Subcircuit.R`, `netlist` per target, `from_source`, `read_raw` and 199 columns into numpy (`maturin develop --release` first) |
+| `merge` | tokenize, and tokenize + parse, every input (MB/s printed); render `xyce` and `pdk-sky130A` to every target; raw binary 200 × 100k and ASCII 50 × 20k; Python: 10k `Subcircuit.R`, `netlist` per target, `from_source`, `read_raw` and 199 columns into numpy (`maturin develop --release --target-dir target/py` first) |
 | `nightly` | render `spice-bench`, one target at a time |
 
 ```sh

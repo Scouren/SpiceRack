@@ -73,6 +73,6 @@ jobs:
           nix develop .#testing --command bash -c '
             python3 -m venv .venv --system-site-packages
             source .venv/bin/activate
-            maturin develop
+            maturin develop --target-dir target/py
             python3 -m pytest -v
           '

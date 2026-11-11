@@ -401,9 +401,10 @@
             export WINEPREFIX="''${XDG_CACHE_HOME:-$HOME/.cache}/spicerack-ltspice"
             export WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
             unset WAYLAND_DISPLAY
-            # One run at a time: `xvfb-run -a` gives two runs started together
-            # the same display, and the first to end kills it under the other.
-            # ponytail: serialized (a run is about 2 s); a display per run if
+            # One run at a time in the one Wine prefix: its first run sets it
+            # up, and the `wineserver -k` that ends a run would end another's
+            # server. (Each run has a display of its own: `xvfb-run -d`.)
+            # ponytail: serialized (a run is about 2 s); a prefix per run if
             # the tests ever run many LTspice decks.
             mkdir -p "$WINEPREFIX"
             exec 9> "$WINEPREFIX.lock"
@@ -423,7 +424,14 @@
                 *) args+=("$a") ;;
               esac
             done
-            xvfb-run -a wine ${app}/LTspice.exe "''${args[@]}"
+            # `-d`: Xvfb picks a free display and reports it once it listens,
+            # so there is nothing to wait for (`-w 0`; `-a` waited 3 s).
+            rc=0
+            xvfb-run -d -w 0 wine ${app}/LTspice.exe "''${args[@]}" || rc=$?
+            # The Wine server outlives its last client by 3 s and holds fd 9, so the
+            # next run would wait for it: end it while this run still has the lock.
+            wineserver -k || true
+            exit "$rc"
           '';
         };
         # The pinned ESPice's `espice` under its own name, `espice-hspice`
