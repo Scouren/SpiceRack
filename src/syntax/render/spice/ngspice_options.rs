@@ -58,6 +58,12 @@ impl W<'_, '_> {
                 self.refuse(Code::W0017, *tok);
                 continue;
             }
+            // LTspice has no SCALE (26.1.1: `.options scale=1u` is a syntax
+            // error) and takes every L and W as written.
+            if self.pair.ltspice_from_other && lower == "scale" {
+                self.refuse(Code::W0017, *tok);
+                continue;
+            }
             if hspice && lower == "gmindc" {
                 self.refuse(Code::W0017, *tok);
                 continue;

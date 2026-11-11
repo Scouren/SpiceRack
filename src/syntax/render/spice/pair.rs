@@ -103,6 +103,9 @@ pub(super) struct Pair {
     /// An ngspice deck's model cards on Xyce: each judged by Xyce's device
     /// (`xyce_cards::xyce_instance`).
     pub(super) xyce_from_ngspice: bool,
+    /// Another dialect's deck on LTspice: its SCALE option refused (LTspice
+    /// has none and takes every L and W as written) (`ngspice_options`).
+    pub(super) ltspice_from_other: bool,
     /// Another dialect's deck on HSPICE: its one GMIN written as GMIN (the
     /// transient's) and GMINDC (the DC one) (`ngspice_options`).
     pub(super) hspice_from_other: bool,
@@ -115,6 +118,7 @@ impl Pair {
         let ng = |r: NetlistRules| r == NetlistRules::Ngspice;
         let xy = |r: NetlistRules| r == NetlistRules::Xyce;
         let hs = |r: NetlistRules| r == NetlistRules::Hspice;
+        let lt = |r: NetlistRules| r == NetlistRules::Ltspice;
         let (nf, nt) = (from.netlist_rules, to.netlist_rules);
         let (ef, et) = (from.expr_eval, to.expr_eval);
         let foreign = from.text_family != to.text_family;
@@ -150,6 +154,7 @@ impl Pair {
             xyce_from_other: to.param_form == ParamForm::Xyce && from.param_form != ParamForm::Xyce,
             xyce_from_ngspice: to.param_form == ParamForm::Xyce
                 && from.model_semantics == ModelSemantics::Ngspice,
+            ltspice_from_other: !lt(nf) && lt(nt),
             hspice_from_other: !hs(nf) && hs(nt),
         };
         // The two directions of one rule never hold together.

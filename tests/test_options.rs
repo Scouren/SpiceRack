@@ -21,6 +21,42 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-008. Xyce RG `.OPTIONS PARSER` SCALE scales every L and W,
+/// as ngspice's SCALE (manual p.318), HSPICE's and VACASK's `scale`. A
+/// level-1 NMOS (VTO 1, KP 1e-4, LD 0.2u) at `L=1 W=10` and SCALE 1e-6,
+/// gate at 2 V, drain through 1 kΩ from 5 V, saturated:
+/// Id = KP/2 · W/(L − 2·LD) · (Vgs − VTO)² = 0.5e-4 · 10/0.6, so
+/// v(d) = 5 − 1000·Id = 4.1667 (the junctions' GMIN moves it 4e-9; without
+/// the scale v(d) = 4.5). LTspice 26.1.1 has no SCALE (`.options
+/// scale=1u`: "syntax error"): refused.
+#[test]
+fn p3_008_xyce_parser_scale_is_scale() {
+    let deck = "t\nVdd dd 0 5\nVg g 0 2\nRd dd d 1k\nM1 d g 0 0 nm L=1 W=10\n\
+        .model nm NMOS(LEVEL=1 VTO=1 KP=1e-4 LD=0.2u)\n.options parser scale=1u\n.op\n.end\n";
+    closed_form(
+        Dialect::Xyce,
+        deck,
+        &[
+            Dialect::Xyce,
+            Dialect::Ngspice,
+            Dialect::Hspice,
+            Dialect::Vacask,
+        ],
+        "d",
+        At::First,
+        5.0 - 1e3 * 0.5e-4 * 10.0 / 0.6,
+        Tol {
+            rel: 1e-8,
+            floor: 0.0,
+        },
+    );
+    let codes = oracle::refusal(deck, Dialect::Xyce, Dialect::Ltspice);
+    assert!(
+        codes.contains(&spicerack::syntax::diag::Code::W0017),
+        "{codes:?}"
+    );
+}
+
 /// Ledger P3-012. Xyce RG Table 2-2: DEVICE GMIN is the minimum conductance,
 /// ngspice's GMIN (manual p.317). 1 V through 1 MΩ into a reverse diode
 /// (IS = 1e-14) whose GMIN is 1e-6 S: (1 − v)/R = GMIN·v + IS, so

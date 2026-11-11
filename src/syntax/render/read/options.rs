@@ -69,6 +69,9 @@ impl<'a> Rd<'a> {
                     out.push(match (pkg.as_str(), k.to_ascii_lowercase().as_str(), x) {
                         ("device", "temp", Some(x)) => Opt::Temp(x),
                         ("device", "tnom", Some(x)) => Opt::Tnom(x),
+                        // RG `.OPTIONS PARSER` SCALE: the scale of every
+                        // L and W, SPICE's SCALE.
+                        ("parser", "scale", Some(_)) => Opt::Portable("scale".into(), v),
                         // RG Table 2-2 (DEVICE) GMIN: the minimum
                         // conductance, SPICE's GMIN.
                         ("device", "gmin", Some(_)) => Opt::Portable("gmin".into(), v),

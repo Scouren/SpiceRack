@@ -372,7 +372,8 @@ pub enum NetlistRules {
     Xyce,
     /// HSPICE: TNOM and TEMP 25 °C; GSHUNT, GMINDC, SEARCH options.
     Hspice,
-    /// LTspice: TSTEP 0 the simulator's choice.
+    /// LTspice: TSTEP 0 the simulator's choice; no SCALE option
+    /// (`.options scale=1u` is a syntax error in LTspice 26.1.1).
     Ltspice,
 }
 
