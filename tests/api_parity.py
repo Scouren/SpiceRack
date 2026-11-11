@@ -297,26 +297,21 @@ def test_build_equals_text(name, target):
 # existing 85 `FEATURES` rows hit it today; a future row fills it in).
 STORE_GAP = {}
 
-# A bug `test_store_round_trip` found (python-api §2, "state outside the
-# AST"), now ledger row P8-312 (owner `src/python/store.rs::read_deck`):
-# it keeps the title line's leading `* ` as part of `Body.name` instead
-# of stripping it, so netlisting a testbench a *second* time (after a
-# round trip) doubles the comment marker (`* * rc`). It reaches every
-# cell that writes (not refuses) on ngspice, since the title line is
-# universal. Found here, not fixed here (outside this row's owner
-# files); remove this marker and its names when P8-312 lands.
-STORE_TITLE_P8_312 = (
-    "A", "ac", "ac_oct", "ac_sensitivity", "am", "BV_BI", "current_source", "D",
-    "dc", "dc_sensitivity", "dc_temp", "distortion", "E_G", "exp", "extra_line",
-    "F_H", "fourier", "fourier_count", "function", "global_nodes", "I", "include",
-    "initial_condition", "J", "lib", "L_K", "M", "measure", "M_three_node",
-    "ngbehavior", "node_set", "noise", "noise_summary", "op", "options",
-    "osdi", "parameter", "polezero", "POLY", "print", "pss", "pss_controls",
-    "pulse", "pwl", "pwl_repeat", "Q", "raw_spice", "rf_port", "S", "save",
-    "sffm", "sin", "s_param", "subcircuit", "T", "temperature", "tf", "tran",
-    "tran_full", "transient_noise", "trnoise", "trrandom", "use_pdk",
-    "use_pdk_include", "veriloga", "W", "X", "Z",
-)
+# What the doubled title (P8-312, fixed) hid on the two same-family
+# targets: `(name, target)` -> the ledger row that owns the cause. Each
+# fails on an unexpected pass; P8-313 removes the marker when it is empty.
+STORE_HIDDEN = {
+    # ROUNDTRIP-TRIAGE K3: the ngspice writer runs `.four` as a `fourier`
+    # line of its `.control` block, which the ngspice reader drops (W0025).
+    ("fourier", "ngspice"): "P4-109",
+    ("fourier_count", "ngspice"): "P4-109",
+    # ESPice's Verilog-A load is `.hdl "<file>"`, which the reader keeps as
+    # text: it is written back below the elements, not as the top's load.
+    ("veriloga", "espice"): "P5-097",
+    # The ngspice writer's `*spicerack ngbehavior=<mode>` line (the backend
+    # lifts it) is a comment to the ngspice reader: the mode is lost.
+    ("ngbehavior", "ngspice"): "P8-313",
+}
 
 
 # Every `(name, target)` the round trip actually runs on: every written
@@ -348,9 +343,10 @@ def test_store_round_trip(name, target):
     if gap is not None:
         assert got != built, f"{name} on {target}: STORE_GAP {gap} passed unexpectedly; remove the marker"
         pytest.xfail(f"STORE_GAP: {gap}")
-    if name in STORE_TITLE_P8_312:
-        assert got != built, f"{name} on {target}: P8-312 passed unexpectedly; remove it from STORE_TITLE_P8_312"
-        pytest.xfail("P8-312: store.rs::read_deck doubles the title's '* ' on a second round trip")
+    hidden = STORE_HIDDEN.get((name, target))
+    if hidden is not None:
+        assert got != built, f"{name} on {target}: {hidden} passed unexpectedly; remove it from STORE_HIDDEN"
+        pytest.xfail(f"STORE_HIDDEN: {hidden}")
     assert got == built
 
 

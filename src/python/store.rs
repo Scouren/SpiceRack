@@ -140,7 +140,8 @@ pub(super) fn with_loads(text: &str, loads: &[String]) -> String {
     out
 }
 
-/// The deck stored `text` holds, as a top block: its title the name, a
+/// The deck stored `text` holds, as a top block: its title the name
+/// (`title`: without the comment leader a writer put before it), a
 /// top-level `.control` block of `pre_osdi` lines alone its loads, and
 /// every other statement but `.end` a line given as text, its bytes as
 /// written (comments and blank lines after it included), so [`with_loads`]
@@ -150,7 +151,20 @@ pub(super) fn with_loads(text: &str, loads: &[String]) -> String {
 /// A dialect with no reader; text the renderer refuses to write as
 /// ngspice; a [`HEADER`] naming no dialect.
 pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String> {
+    // The title line as the deck's own dialect writes it: behind that
+    // dialect's comment leader, or bare in the store's own text
+    // (`with_loads`: a `HEADER` line first).
+    let given = match text.starts_with(HEADER) {
+        true => "",
+        false => d.unwrap_or(Lang::NGSPICE).spelling().comment,
+    };
     let text = ngspice_text(text, d)?;
+    // Another dialect's text was written as ngspice just above: the title
+    // is behind the ngspice writer's leader.
+    let leader = match &text {
+        Cow::Borrowed(_) => given,
+        Cow::Owned(_) => Lang::NGSPICE.spelling().comment,
+    };
     let t = tokenize(&text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let a = parse(&t, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let top = a.fields(a.root());
@@ -161,7 +175,7 @@ pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String> {
     let starts: Vec<usize> = top.iter().map(|&n| line_start(n)).collect();
     assert!(starts.is_sorted(), "the top statements are in source order");
     let mut b = Body {
-        name: text.lines().next().unwrap_or_default().trim().to_string(),
+        name: title(&text, leader).to_string(),
         ..Body::default()
     };
     for (i, &n) in top.iter().enumerate() {
@@ -246,6 +260,15 @@ pub(super) fn libraries(text: &str) -> Vec<ModelLibrary> {
 
 fn w(s: &mut String, args: std::fmt::Arguments<'_>) {
     s.write_fmt(args).expect("a String takes any write");
+}
+
+/// A deck's title: line 1 of `text` without `leader`, the comment leader
+/// its dialect's writers put before the title (`Spelling::comment`: `*`,
+/// `//`, nothing for VACASK), so the deck written again has the same line.
+/// One leader only: a writer adds one.
+fn title<'a>(text: &'a str, leader: &str) -> &'a str {
+    let line = text.lines().next().unwrap_or_default().trim();
+    line.strip_prefix(leader).map_or(line, str::trim_start)
 }
 
 /// Statement `n`'s text: its first token to its last, continuation lines
@@ -390,6 +413,26 @@ mod tests {
         );
         let raw: String = b.raw.iter().map(|l| format!("{l}\n")).collect();
         assert_eq!(with_loads(&format!("tb\n{raw}.end\n"), &b.osdi), text);
+    }
+
+    #[test]
+    fn p8_312_a_written_decks_title_reads_back_without_its_comment_leader() {
+        // ngspice manual §2.1 (line 1 is the title, whatever it holds); the
+        // ngspice writer puts `* ` before the name it is given
+        // (`render/spice/mod.rs`: `"{comment} {name}"`), so the name a
+        // written deck is read under is line 1 without that leader, and
+        // writing it again gives the same line (ROUNDTRIP-TRIAGE K1 b).
+        // Checks: 4.
+        let name = |text: &str| read_deck(text, None).unwrap().name;
+        assert_eq!(name("* rc\nR1 a 0 1k\n.end\n"), "rc");
+        // One leader only: the writer adds one.
+        assert_eq!(name("* * rc\nR1 a 0 1k\n.end\n"), "* rc");
+        // A bare title is the title.
+        assert_eq!(name("rc\nR1 a 0 1k\n.end\n"), "rc");
+        // The store's own text holds the title bare: a leading `*` is the
+        // title's own (`with_loads` wrote the name as it was).
+        let stored = with_loads("* rc\nR1 a 0 1k\n.end\n", &[]);
+        assert_eq!(name(&stored), "* rc");
     }
 
     #[test]
