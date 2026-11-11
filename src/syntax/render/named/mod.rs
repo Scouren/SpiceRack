@@ -91,6 +91,13 @@ struct W<'a, 'r> {
 /// For a target outside the named family (Spectre, VACASK).
 pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
     let mut refused = Vec::new();
+    // LTspice's `.tran … startup` on a target with no such start: the
+    // top's DC sources are read with its ramp from here on.
+    if lang.action(Construct::TranStartup) == Action::Lift(Rule::StartupRamp)
+        && let Some(tok) = rd.ramp_startup(deck)
+    {
+        refused.push(Diag::new(Code::W0037, tok, 0));
+    }
     let lifted = match lang.action(Construct::StatisticalCall) {
         Action::Lift(Rule::RackVars) => lift::lift(rd, deck, &mut refused),
         Action::Lift(Rule::VacaskCalls) => {

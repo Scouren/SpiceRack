@@ -228,7 +228,7 @@ pub(super) fn ngspice() -> DialectDef {
         .native(Construct::AmWave)
         .refuse(Construct::Step, Code::W0016)
         .refuse(Construct::StepList, Code::W0016)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .refuse(Construct::DcLogList, Code::W0038)
         .native(Construct::Tf)
         .native(Construct::Sens)
@@ -240,9 +240,13 @@ pub(super) fn ngspice() -> DialectDef {
         .native(Construct::UnmappedOption)
         .lift(Construct::Statistics, Rule::StatisticsDraws)
         .native(Construct::Measure)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // A circuit changed between analyses runs from one `.control`
+        // script: `alterparam` then `reset` (manual §13.5.5; ngspice-45
+        // run, ZERO-LEDGER P5-001 step 2).
+        .spell(Construct::Epochs, Alt::ControlScript)
     // --- S3
 }

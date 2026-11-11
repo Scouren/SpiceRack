@@ -23,13 +23,15 @@ use super::W;
 use crate::syntax::behaviour::{ModelSemantics, OptionTo, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
-use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val};
+use crate::syntax::render::read::epochs::{Plan, plan};
+use crate::syntax::render::read::{Bench, BenchCard, Opt, Val};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
 pub(super) struct Tb {
-    /// Each analysis, with its statement's first token.
-    pub(super) analyses: Vec<(Ana, u32)>,
+    /// The run plan: each analysis in run order, with its statement's
+    /// first token and its epoch (`read::epochs`).
+    pub(super) plan: Plan,
     /// The portable options, with their statement's first token.
     pub(super) options: Vec<(String, String, u32)>,
     /// VACASK's own options, values as written, with their statement's
@@ -188,8 +190,12 @@ impl W<'_, '_> {
             }
         }
         self.line("");
+        // Paired with `plan`'s own check. No reader opens a second epoch
+        // yet: every run is on the netlist as written.
+        tb.plan.check();
+        assert!(tb.plan.single_epoch(), "a second epoch has no writer yet");
         let mut block: Vec<String> = Vec::new();
-        for (a, tok) in &tb.analyses {
+        for (a, tok) in tb.plan.runs.iter().zip(&tb.plan.run_tok) {
             if let Some(s) = self.analysis(a, *tok) {
                 block.extend(s.split('\n').map(str::to_string));
             }
@@ -285,6 +291,9 @@ impl W<'_, '_> {
     /// The deck's testbench items, folded in read order.
     pub(super) fn fold(&self) -> Tb {
         let mut tb = Tb::default();
+        // The plan's cards (the analyses) in read order: `plan` builds
+        // from them.
+        let mut script: Vec<(BenchCard, u32)> = Vec::new();
         for &b in &self.deck.bench {
             let tok = match b {
                 Bench::Card(n)
@@ -297,7 +306,7 @@ impl W<'_, '_> {
             };
             for card in self.rd.bench_cards(b) {
                 match card {
-                    BenchCard::Ana(a) => tb.analyses.push((a, tok)),
+                    c @ BenchCard::Ana(_) => script.push((c, tok)),
                     BenchCard::Options(opts) => {
                         for o in opts {
                             match o {
@@ -347,6 +356,15 @@ impl W<'_, '_> {
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
                     BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
+                    // A VACASK `alter`: kept as its statement, once (it
+                    // gives one card per parameter). VACASK's own writer
+                    // copies it; Spectre's has no `alter` yet (W0001
+                    // through `kept_construct`; ZERO-LEDGER P5-050).
+                    BenchCard::Alter { node, .. } => {
+                        if tb.extra.last().is_none_or(|e| e.0 != node) {
+                            tb.extra.push((node, script.len()));
+                        }
+                    }
                     // A VACASK `save` is a save list (VACASK's own writer
                     // copies the statement).
                     BenchCard::Extra(n) => match self.rd.vacask_saves(n) {
@@ -355,11 +373,13 @@ impl W<'_, '_> {
                             tb.saves.extend(s);
                             tb.unsaved.extend(dropped.then(|| self.rd.main(n)));
                         }
-                        _ => tb.extra.push((n, tb.analyses.len())),
+                        // Every plan card so far is an analysis.
+                        _ => tb.extra.push((n, script.len())),
                     },
                 }
             }
         }
+        tb.plan = plan(script);
         tb
     }
 }

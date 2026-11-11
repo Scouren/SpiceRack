@@ -9,7 +9,7 @@
 //! ngspice's (`ngspice_output`); the other targets get the card as read.
 //!
 //! Contents:
-//! - `W::prints(&mut self, prints: &[(String, Vec<String>, u32)], analyses: &[(Ana, u32)])`
+//! - `W::prints(&mut self, prints: &[(String, Vec<String>, u32)], analyses: &[Ana])`
 
 use super::W;
 use crate::syntax::behaviour::AnalysisForm;
@@ -33,11 +33,7 @@ const DEPTH: u32 = 64;
 impl W<'_, '_> {
     /// Each `.print` the target takes (`Construct::Print`), spelled for
     /// ngspice as the module says.
-    pub(super) fn prints(
-        &mut self,
-        prints: &[(String, Vec<String>, u32)],
-        analyses: &[(Ana, u32)],
-    ) {
+    pub(super) fn prints(&mut self, prints: &[(String, Vec<String>, u32)], analyses: &[Ana]) {
         for (kind, outs, tok) in prints {
             if self.ask(Construct::Print, *tok) != Action::Native {
                 continue;
@@ -50,7 +46,7 @@ impl W<'_, '_> {
                     Some((k, rest)) if kind.is_empty() && word(k) => (k.as_str(), rest),
                     _ => (kind.as_str(), outs.as_slice()),
                 };
-                let runs = kind.is_empty() || analyses.iter().any(|(a, _)| runs(a, kind));
+                let runs = kind.is_empty() || analyses.iter().any(|a| runs(a, kind));
                 let mut kept: Vec<String> = Vec::with_capacity(outs.len());
                 let (mut format, mut gone) = (false, !runs);
                 // An ngspice deck's outputs are ngspice's own.

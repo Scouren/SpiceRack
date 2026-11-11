@@ -543,3 +543,83 @@ fn a_hoisted_subcircuit_takes_the_models_around_it() {
     let v = oracle::op(Dialect::Ngspice, &w, "out");
     assert!((v - 1000.0 / 1001.0).abs() < 1e-6, "{v}\n{w}");
 }
+
+// ── LTspice's start-up ramp ──
+
+/// Ledger P5-005. LTspice help, `.TRAN`: `startup` solves the operating
+/// point with the sources off and ramps them on in the first 20 µs.
+/// LTspice 26.1.1 ran this deck (`research/impl/evidence/P5-005`): each
+/// top-level V and I whose value is DC only (`V2`'s `AC` beside it) is
+/// X·t/20 µs, then X; the SINE and the subcircuit's source are not
+/// ramped. The closed forms are that ramp's, checked on LTspice to 1e-7,
+/// so each simulator runs the rewrite against a number the writer does
+/// not compute. HSPICE and Spectre run nowhere here: their card is the
+/// manual's form of the one the four simulators ran.
+#[test]
+fn p5_005_an_ltspice_startup_ramps_the_top_dc_sources_on_every_target() {
+    let deck = "t\nV1 a 0 5\nR1 a b 1k\nC1 b 0 1n\nI1 0 i 1m\nR2 i 0 1k\n\
+        V2 q 0 2 AC 1\nR3 q 0 1k\nV3 s 0 SINE(1 1 10k)\nR4 s 0 1k\nV4 z 0 0\nR5 z 0 1k\n\
+        X1 c sub\n.subckt sub o\nV1 o 0 3\nR1 o 0 1k\n.ends\n\
+        .tran 0 40u 0 0.1u startup\n.end\n";
+    // A source's own value is exact at a time point and linear between
+    // two: the simulators' roundoff.
+    let exact = oracle::Tol {
+        rel: 1e-6,
+        floor: 1e-6,
+    };
+    // A node the integrator or the time grid shapes: RELTOL (1e-3).
+    let stepped = oracle::Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    let at = oracle::At::Time;
+    let cases = [
+        // V1 = 5 V: off at t = 0, half way at 10 µs, full after 20 µs.
+        ("a", oracle::At::First, 0.0, exact),
+        ("a", at(10e-6), 2.5, exact),
+        ("a", at(30e-6), 5.0, exact),
+        // I1 = 1 mA into 1 kΩ: 1 V · 10/20.
+        ("i", at(10e-6), 0.5, exact),
+        // V2 = DC 2 AC 1: the AC beside it does not stop the ramp, 2 V · 5/20.
+        ("q", at(5e-6), 0.5, exact),
+        // The subcircuit's 3 V source is not ramped.
+        ("c", oracle::At::First, 3.0, exact),
+        ("c", at(10e-6), 3.0, exact),
+        // The SINE is not ramped: 1 + sin(2π · 10 kHz · 10 µs) = 1.5877853.
+        ("s", at(10e-6), 1.587_785_3, stepped),
+        // The RC (τ = 1 kΩ · 1 nF = 1 µs) on the ramp k·t, k = 5 V / 20 µs:
+        // k (t − τ (1 − e^(−t/τ))) = 2.5e5 · 9.0000454e-6 = 2.2500114.
+        ("b", at(10e-6), 2.250_011_4, stepped),
+    ];
+    for d in [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Xyce,
+        Dialect::Vacask,
+    ] {
+        let text = write(deck, Dialect::Ltspice, d);
+        let plots = oracle::run(d, &text);
+        for (node, at, want, tol) in cases {
+            let got = oracle::value(&plots, node, at);
+            assert!(
+                tol.within(got, want),
+                "{d:?}: v({node}) = {got} at {at:?}, want {want}\n{text}"
+            );
+        }
+    }
+    // HSPICE `Vxxx n+ n- [[DC=] dcval] [tranfun]` (the tranfun's value at
+    // time zero overrides the DC value in a transient); Spectre Reference,
+    // `vsource`: `dc` for the DC analyses, `type=pwl` + `wave` in time.
+    let hs = write(deck, Dialect::Ltspice, Dialect::Hspice);
+    assert!(
+        hs.lines().any(|l| l == "V1 a 0 5 PWL(0 0 0.00002 5)"),
+        "{hs}"
+    );
+    assert!(hs.lines().any(|l| l == "V4 z 0 0"), "{hs}");
+    let sp = write(deck, Dialect::Ltspice, Dialect::Spectre);
+    assert!(
+        sp.lines()
+            .any(|l| l == "v1 (a 0) vsource dc=5 type=pwl wave=[0 0 20u 5]"),
+        "{sp}"
+    );
+}

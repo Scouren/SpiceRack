@@ -208,7 +208,7 @@ pub(super) fn hspice() -> DialectDef {
         .spell(Construct::AmWave, Alt::HspiceAm)
         .refuse(Construct::Step, Code::W0016)
         .spell(Construct::StepList, Alt::TempList)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .spell(Construct::DcLogList, Alt::DcType)
         .native(Construct::Tf)
         .native(Construct::Sens)
@@ -221,9 +221,12 @@ pub(super) fn hspice() -> DialectDef {
         .native(Construct::UnmappedOption)
         .lift(Construct::Statistics, Rule::StatisticsDraws)
         .native(Construct::Measure)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // Until `.alter` blocks are written (DESIGN-control-epochs §7;
+        // ZERO-LEDGER P5-001 step 5).
+        .refuse(Construct::Epochs, Code::W0130)
     // --- S3
 }

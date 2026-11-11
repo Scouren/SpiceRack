@@ -23,13 +23,15 @@ use crate::syntax::behaviour::{AnalysisForm, ControlBlock, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
+use crate::syntax::render::read::epochs::{Plan, plan};
 use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
 pub(super) struct Tb {
-    /// Each analysis, with its statement's first token.
-    pub(super) analyses: Vec<(Ana, u32)>,
+    /// The run plan: each analysis in run order, with its statement's
+    /// first token and its epoch (`read::epochs`).
+    pub(super) plan: Plan,
     /// The portable options, with their statement's first token.
     pub(super) portable: Vec<(String, String, u32)>,
     pub(super) xyce: Vec<(String, String)>,
@@ -68,21 +70,23 @@ const RUN_COMMANDS: [&str; 5] = ["run", "op", "ac", "tran", "dc"];
 impl Tb {
     /// Whether the deck runs an analysis.
     pub(super) fn runs(&self) -> bool {
-        !self.analyses.is_empty()
+        !self.plan.runs.is_empty()
     }
 
     /// Whether a transient of the deck has UIC.
     pub(super) fn tran_uic(&self) -> bool {
-        self.analyses
+        self.plan
+            .runs
             .iter()
-            .any(|(a, _)| matches!(a, Ana::Tran { uic: true, .. }))
+            .any(|a| matches!(a, Ana::Tran { uic: true, .. }))
     }
 
     /// Whether the deck runs a Monte Carlo analysis.
     pub(super) fn monte_carlo(&self) -> bool {
-        self.analyses
+        self.plan
+            .runs
             .iter()
-            .any(|(a, _)| matches!(a, Ana::MonteCarlo { .. }))
+            .any(|a| matches!(a, Ana::MonteCarlo { .. }))
     }
 }
 
@@ -118,7 +122,7 @@ impl W<'_, '_> {
         }
         let raw = || lines.iter().map(String::as_str);
         let mut fourier = fourier_commands(raw());
-        for (a, _) in &tb.analyses {
+        for a in &tb.plan.runs {
             if let Ana::Four(f, outs) = a {
                 let mut cmd = format!("fourier {}", self.sp.number(*f, self.x));
                 outs.iter().for_each(|o| cmd.push_str(&format!(" {o}")));
@@ -130,9 +134,10 @@ impl W<'_, '_> {
         {
             return None;
         }
-        tb.analyses
+        tb.plan
+            .runs
             .iter()
-            .any(|(a, _)| matches!(a, Ana::Ac(_) | Ana::Tran { .. } | Ana::Dc(_)))
+            .any(|a| matches!(a, Ana::Ac(_) | Ana::Tran { .. } | Ana::Dc(_)))
             .then_some(fourier)
     }
 
@@ -140,6 +145,9 @@ impl W<'_, '_> {
     /// deck, by the spine (`spice::write`), which hands it to every step.
     pub(super) fn fold(&self) -> Tb {
         let mut tb = Tb::default();
+        // The plan's cards (the analyses) in read order: `plan` builds
+        // from them.
+        let mut script: Vec<(BenchCard, u32)> = Vec::new();
         for &b in &self.deck.bench {
             let tok = match b {
                 Bench::Card(n)
@@ -151,9 +159,10 @@ impl W<'_, '_> {
                 | Bench::Control(n) => self.rd.main(n),
             };
             for card in self.rd.bench_cards(b) {
-                self.fold_one(&mut tb, card, tok);
+                self.fold_one(&mut tb, &mut script, card, tok);
             }
         }
+        tb.plan = plan(script);
         tb
     }
 
@@ -172,7 +181,7 @@ impl W<'_, '_> {
         self.options_cards(&tb);
         self.node_values(&tb);
         self.saves(&tb);
-        self.prints(&tb.prints, &tb.analyses);
+        self.prints(&tb.prints, &tb.plan.runs);
         self.measures(&tb);
         self.steps(&tb);
         self.step_lists(&tb);
@@ -338,16 +347,31 @@ impl W<'_, '_> {
         if control.is_some() {
             assert_eq!(self.b.control_block, ControlBlock::Ngspice);
         }
+        // Paired with `plan`'s own check.
+        tb.plan.check();
+        // A second circuit state is the target's `Construct::Epochs` cell:
+        // ngspice's control script, which then runs every analysis (in
+        // the block `control_run` asked for, or one of its own).
+        let scripted = !tb.plan.single_epoch() && self.scripted(&tb.plan);
+        let control = match control {
+            None if scripted => Some(&[] as &[String]),
+            given => given,
+        };
+        let each = || tb.plan.runs.iter().zip(&tb.plan.run_tok);
         match control {
             Some(fourier) => {
                 // `fourier` reads the current plot: it follows the first
                 // transient (at the end of the block when there is none).
                 let at = tb
-                    .analyses
+                    .plan
+                    .runs
                     .iter()
-                    .position(|(a, _)| matches!(a, Ana::Tran { .. }));
+                    .position(|a| matches!(a, Ana::Tran { .. }));
                 self.o.token(".control", Space::Line);
-                for (i, (a, tok)) in tb.analyses.iter().enumerate() {
+                for (i, (a, tok)) in each().enumerate() {
+                    if scripted {
+                        self.alter_lines(&tb.plan, i);
+                    }
                     // As a command, `.four` would run the transient again.
                     if !matches!(a, Ana::Four(..)) {
                         let card = self.analysis(a, *tok);
@@ -365,15 +389,12 @@ impl W<'_, '_> {
             None => {
                 // LTspice runs one analysis a deck: the cards follow the
                 // line `simulation::run_each` splits at (ZERO P1-007).
-                let runs = tb
-                    .analyses
-                    .iter()
-                    .filter(|(a, _)| !matches!(a, Ana::Four(..)));
+                let runs = tb.plan.runs.iter().filter(|a| !matches!(a, Ana::Four(..)));
                 if self.b.analysis_form == AnalysisForm::Ltspice && runs.count() > 1 {
                     self.o
                         .token(crate::syntax::render::LTSPICE_EACH, Space::Line);
                 }
-                for (a, tok) in &tb.analyses {
+                for (a, tok) in each() {
                     let card = self.analysis(a, *tok);
                     self.o.token(&card, Space::Line);
                 }
@@ -391,10 +412,17 @@ impl W<'_, '_> {
         tb.prints.iter_mut().for_each(|(_, outs, _)| refs(outs));
     }
 
-    /// One testbench card into `tb`.
-    fn fold_one(&self, tb: &mut Tb, card: BenchCard, tok: u32) {
+    /// One testbench card into `tb`; a plan card (an analysis, an alter)
+    /// onto `script`, with its token.
+    fn fold_one(&self, tb: &mut Tb, script: &mut Vec<(BenchCard, u32)>, card: BenchCard, tok: u32) {
         match card {
-            BenchCard::Ana(a) => tb.analyses.push((a, tok)),
+            c @ BenchCard::Ana(_) => script.push((c, tok)),
+            // A plan card at its own statement's token: a control block's
+            // cards share the block's.
+            BenchCard::Alter { key, value, node } => {
+                let tok = self.rd.main(node);
+                script.push((BenchCard::Alter { key, value, node }, tok));
+            }
             BenchCard::Options(opts) => {
                 for o in opts {
                     match o {
@@ -451,10 +479,7 @@ impl W<'_, '_> {
     /// simulator state; `.probe` selects outputs. Xyce's rawfile holds
     /// every vector.
     fn saves(&mut self, tb: &Tb) {
-        let noise = tb
-            .analyses
-            .iter()
-            .any(|(a, _)| matches!(a, Ana::Noise { .. }));
+        let noise = tb.plan.runs.iter().any(|a| matches!(a, Ana::Noise { .. }));
         let ngspice = matches!(
             self.b.analysis_form,
             AnalysisForm::Ngspice | AnalysisForm::Espice

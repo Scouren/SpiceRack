@@ -322,7 +322,7 @@ pub(super) fn spectre() -> DialectDef {
         .refuse(Construct::AmWave, Code::W0108)
         .native(Construct::Step)
         .native(Construct::StepList)
-        .refuse(Construct::TranStartup, Code::W0037)
+        .lift(Construct::TranStartup, Rule::StartupRamp)
         .native(Construct::DcLogList)
         .native(Construct::Tf)
         .native(Construct::Sens)
@@ -334,9 +334,13 @@ pub(super) fn spectre() -> DialectDef {
         .native(Construct::UnmappedOption)
         .native(Construct::Statistics)
         .spell(Construct::Measure, Alt::SpiceRegion)
-    // A new construct's cell is appended below its stream's marker
-    // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
-    // --- S1
-    // --- S2
+        // A new construct's cell is appended below its stream's marker
+        // (`dialects/mod.rs`), with its mirror in `tests/builtin_dialects.py`.
+        // --- S1
+        // --- S2
+        // `alter` between analyses (Spectre Reference 19.1 p.54). The
+        // named writer asks once it writes one (ZERO-LEDGER P5-050);
+        // until then the statement is kept text (W0001).
+        .native(Construct::Epochs)
     // --- S3
 }

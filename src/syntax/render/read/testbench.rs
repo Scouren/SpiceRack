@@ -54,6 +54,15 @@ pub(in crate::syntax::render) enum BenchCard {
     Print(String, Vec<String>),
     /// A `.meas` card's line.
     Meas(String),
+    /// A top-level parameter set between two analyses (VACASK `alter
+    /// instance("__topinst__") k=v`, `docs/cmd-alter.md`): from here on
+    /// the deck's parameter `key` is `value`. `node` is the statement, which
+    /// a writer of the source's own language copies as it stands.
+    Alter {
+        key: String,
+        value: f64,
+        node: u32,
+    },
     /// A VACASK `control` statement the IR has no field for, kept as
     /// text: VACASK copies it; another target asks its
     /// `Rd::kept_construct` (a script line is left out with a note, any

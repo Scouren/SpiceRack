@@ -124,6 +124,9 @@ pub enum Construct {
     /// A VACASK `elaborate` the reader does not read as the top (a second
     /// circuit of one run, `Rd::vacask_promoted`).
     VacaskElaborate,
+    /// Analyses on more than one circuit state: a parameter changed
+    /// between two of them (`read::epochs::Plan`; VACASK `alter`).
+    Epochs,
 }
 
 /// What a writer does with a construct.
@@ -199,6 +202,10 @@ pub enum Alt {
     /// SPICE text fenced by `simulator lang=spice` / `lang=spectre`
     /// (`[KUN]` B.2; Spectre Reference 19.1 p.17: Spectre reads `.measure`).
     SpiceRegion,
+    /// One `.control` script running every analysis, with `alterparam` and
+    /// `reset` before the first run of each later circuit state (ngspice
+    /// manual §13.5.5, §13.5.65).
+    ControlScript,
 }
 
 /// A rewrite rule.
@@ -220,6 +227,11 @@ pub enum Rule {
     /// `aunif` ternary, Xyce's clamp → `min(max())`, a two-argument
     /// `agauss` its sigma 1 (VACASK `docs/cmd-analysis-mc.md`).
     VacaskCalls,
+    /// LTspice's `.tran … startup` → `PWL(0 0 20u X)` beside the DC value
+    /// `X` of each DC-only V and I at the top (LTspice help, `.TRAN`;
+    /// LTspice 26.1.1 ran the ramp linear, waveform and subcircuit
+    /// sources unramped).
+    StartupRamp,
 }
 
 #[cfg(test)]
@@ -301,6 +313,7 @@ mod tests {
                 "Measure",
                 "HspiceWLine",
                 "VacaskElaborate",
+                "Epochs",
             ]
         );
         for (i, c) in crate::syntax::lang::CONSTRUCTS.into_iter().enumerate() {
@@ -384,7 +397,7 @@ mod tests {
         }
     }
 
-    const CONSTRUCTS: [Construct; 44] = [
+    const CONSTRUCTS: [Construct; 45] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -429,5 +442,6 @@ mod tests {
         Construct::Statistics,
         Construct::Measure,
         Construct::HspiceWLine,
+        Construct::Epochs,
     ];
 }

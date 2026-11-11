@@ -208,7 +208,7 @@ def ngspice(d):
         .native(Construct.AmWave)
         .refuse(Construct.Step, Code.W0016)
         .refuse(Construct.StepList, Code.W0016)
-        .refuse(Construct.TranStartup, Code.W0037)
+        .lift(Construct.TranStartup, Rule.StartupRamp)
         .refuse(Construct.DcLogList, Code.W0038)
         .native(Construct.Tf)
         .native(Construct.Sens)
@@ -219,7 +219,8 @@ def ngspice(d):
         .native(Construct.Save)
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
-        .native(Construct.Measure))
+        .native(Construct.Measure)
+        .spell(Construct.Epochs, Alt.ControlScript))
 
 
 def espice(d):
@@ -247,7 +248,8 @@ def espice(d):
         .refuse(Construct.TableSource, Code.W0102)
         # ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
         # offset" (run).
-        .spell(Construct.AmWave, Alt.AmNoOffset))
+        .spell(Construct.AmWave, Alt.AmNoOffset)
+        .refuse(Construct.Epochs, Code.W0130))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,
@@ -408,7 +410,7 @@ def hspice(d):
         .spell(Construct.AmWave, Alt.HspiceAm)
         .refuse(Construct.Step, Code.W0016)
         .spell(Construct.StepList, Alt.TempList)
-        .refuse(Construct.TranStartup, Code.W0037)
+        .lift(Construct.TranStartup, Rule.StartupRamp)
         .spell(Construct.DcLogList, Alt.DcType)
         .native(Construct.Tf)
         .native(Construct.Sens)
@@ -420,7 +422,8 @@ def hspice(d):
         .spell(Construct.Save, Alt.Probe)
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
-        .native(Construct.Measure))
+        .native(Construct.Measure)
+        .refuse(Construct.Epochs, Code.W0130))
 
 
 XYCE_UNPROTECTED = Quoting(escapes=False,
@@ -605,7 +608,7 @@ def xyce(d):
         .refuse(Construct.AmWave, Code.W0108)
         .native(Construct.Step)
         .native(Construct.StepList)
-        .refuse(Construct.TranStartup, Code.W0037)
+        .lift(Construct.TranStartup, Rule.StartupRamp)
         .native(Construct.DcLogList)
         .refuse(Construct.Tf, Code.W0015)
         .refuse(Construct.Sens, Code.W0015)
@@ -616,7 +619,8 @@ def xyce(d):
         .omit(Construct.Save, Code.W0023)
         .refuse(Construct.UnmappedOption, Code.W0017)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
-        .native(Construct.Measure))
+        .native(Construct.Measure)
+        .refuse(Construct.Epochs, Code.W0130))
 
 
 LTSPICE_OPERATORS = [
@@ -771,7 +775,8 @@ def ltspice(d):
         .native(Construct.Save)
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
-        .native(Construct.Measure))
+        .native(Construct.Measure)
+        .refuse(Construct.Epochs, Code.W0130))
 
 
 SPECTRE_SCALES = [
@@ -1044,7 +1049,7 @@ def spectre(d):
         .refuse(Construct.AmWave, Code.W0108)
         .native(Construct.Step)
         .native(Construct.StepList)
-        .refuse(Construct.TranStartup, Code.W0037)
+        .lift(Construct.TranStartup, Rule.StartupRamp)
         .native(Construct.DcLogList)
         .native(Construct.Tf)
         .native(Construct.Sens)
@@ -1055,7 +1060,8 @@ def spectre(d):
         .native(Construct.Save)
         .native(Construct.UnmappedOption)
         .native(Construct.Statistics)
-        .spell(Construct.Measure, Alt.SpiceRegion))
+        .spell(Construct.Measure, Alt.SpiceRegion)
+        .native(Construct.Epochs))
 
 
 VACASK_SCALES = [
@@ -1348,7 +1354,7 @@ def vacask(d):
         .native(Construct.AmWave)
         .native(Construct.Step)
         .native(Construct.StepList)
-        .refuse(Construct.TranStartup, Code.W0037)
+        .lift(Construct.TranStartup, Rule.StartupRamp)
         .native(Construct.DcLogList)
         .native(Construct.Tf)
         .refuse(Construct.Sens, Code.W0015)
@@ -1359,7 +1365,8 @@ def vacask(d):
         .omit(Construct.Save, Code.W0023)
         .refuse(Construct.UnmappedOption, Code.W0017)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
-        .refuse(Construct.Measure, Code.W0109))
+        .refuse(Construct.Measure, Code.W0109)
+        .native(Construct.Epochs))
 
 
 def cdl(d):
@@ -1418,7 +1425,8 @@ def cdl(d):
         .native(Construct.Save)
         .native(Construct.UnmappedOption)
         .native(Construct.Statistics)
-        .native(Construct.Measure))
+        .native(Construct.Measure)
+        .omit(Construct.Epochs, Code.W0028))
 
 
 def verilog(d):
@@ -1477,7 +1485,8 @@ def verilog(d):
         .native(Construct.Save)
         .native(Construct.UnmappedOption)
         .native(Construct.Statistics)
-        .native(Construct.Measure))
+        .native(Construct.Measure)
+        .omit(Construct.Epochs, Code.W0029))
 
 
 def ngspice_given(d):

@@ -12,7 +12,8 @@
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
 //! options, `ngspice_options` the others' and HSPICE's defaults, `xyce_cards`
 //! Xyce's spellings of another dialect's cards, `xyce_models` its model cards,
-//! `prints` the `.print` cards), `checks` the deck-wide
+//! `prints` the `.print` cards, `epochs` the script lines of a circuit
+//! changed between analyses), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
 //! target reads it,
@@ -47,6 +48,7 @@ mod cards;
 pub(in crate::syntax::render) use cards::{pair_suffix, pairs};
 mod cdl;
 mod checks;
+mod epochs;
 mod globals;
 mod initial;
 mod laplace;
@@ -136,6 +138,13 @@ struct W<'a, 'r> {
 pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>) {
     let (sp, cells, b) = (lang.spelling(), lang.cells(), lang.behaviours());
     let mut diags = Vec::new();
+    // LTspice's `.tran … startup` on a target with no such start: the
+    // top's DC sources are read with its ramp from here on.
+    if lang.action(Construct::TranStartup) == Action::Lift(Rule::StartupRamp)
+        && let Some(tok) = rd.ramp_startup(deck)
+    {
+        diags.push(Diag::new(Code::W0037, tok, 0));
+    }
     let draws = match lang.action(Construct::Statistics) {
         Action::Lift(Rule::StatisticsDraws) => {
             draws::lift(rd, deck, Layers::Two).unwrap_or_else(|d| {
@@ -184,6 +193,9 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     }
     w.checks();
     if b.writer == Writer::Cdl {
+        if !tb.plan.single_epoch() {
+            w.scripted(&tb.plan);
+        }
         w.cdl(&tb.extra);
         w.unparsed();
         return (w.o.finish(), w.diags);

@@ -1,6 +1,7 @@
 //! A VACASK `control` block → [`BenchCard`] views: its options (those
 //! SPICE names alike portable), its analyses with the sweeps before them,
-//! its `save`s as SPICE output names, and which of its statements only
+//! its `save`s as SPICE output names, its `alter`s of a top-level
+//! parameter (`BenchCard::Alter`), and which of its statements only
 //! steer a VACASK run (`Rd::vacask_script`); every other statement is kept
 //! as `BenchCard::Extra`.
 //!
@@ -61,6 +62,10 @@ impl<'a> Rd<'a> {
                 extra(&mut out, s);
             }
             sweeps.clear();
+            if let Some(alters) = self.vacask_alter(st) {
+                out.extend(alters);
+                continue;
+            }
             match self.vacask_options(st) {
                 Some(o) => out.push(BenchCard::Options(o)),
                 None => extra(&mut out, st),
@@ -215,6 +220,38 @@ impl<'a> Rd<'a> {
             }
         }
         false
+    }
+
+    /// `alter instance("__topinst__") k=v …` (`docs/cmd-alter.md`; the
+    /// default toplevel instance, `cmd-elaboration.md`): one card per
+    /// top-level parameter it sets, when every value is a number. `None`
+    /// for any other statement, kept as text: an alter of another instance
+    /// or of a model (VACASK drops it when a later parameter change
+    /// rebuilds the circuit: ZERO-LEDGER P5-050), an expression value.
+    fn vacask_alter(&self, st: u32) -> Option<Vec<BenchCard>> {
+        let line = self.line(st);
+        let target = line.strip_prefix("alter")?.trim_start();
+        let target = target.strip_prefix("instance")?.trim_start();
+        let (names, _) = target.strip_prefix('(')?.split_once(')')?;
+        if unquoted(names.trim()).as_deref() != Some("__topinst__") {
+            return None;
+        }
+        // The fields after `alter`: the word `instance`, its one name
+        // (a string), then `k=v` items only.
+        let sets = self.pairs(st);
+        let others = self.fields(st).len() - sets.len();
+        if sets.is_empty() || others != 2 {
+            return None;
+        }
+        let cards = sets.into_iter().map(|(key, v)| {
+            let value = self.number(v)?;
+            Some(BenchCard::Alter {
+                key,
+                value,
+                node: st,
+            })
+        });
+        cards.collect()
     }
 
     /// A VACASK `options` statement in a `control` block (the old

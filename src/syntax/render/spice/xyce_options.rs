@@ -55,9 +55,9 @@ impl W<'_, '_> {
     /// beside another analysis, each `.noise`'s integrated noise, a saved
     /// or printed ngspice `@dev[param]` (W0052).
     pub(super) fn xyce_drops(&mut self, tb: &Tb) {
-        for (a, tok) in &tb.analyses {
+        for (a, tok) in tb.plan.runs.iter().zip(&tb.plan.run_tok) {
             match a {
-                Ana::Op if tb.analyses.len() > 1 => self.note(Code::W0052, *tok),
+                Ana::Op if tb.plan.runs.len() > 1 => self.note(Code::W0052, *tok),
                 Ana::Noise { .. } => self.note(Code::W0052, *tok),
                 _ => {}
             }
