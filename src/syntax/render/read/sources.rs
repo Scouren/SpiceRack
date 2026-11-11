@@ -503,7 +503,11 @@ impl<'a> Rd<'a> {
 
     /// A waveform's values → its view (the old lowering's `waveform`).
     fn waveform(&self, w: WaveKind, vals: &[u32]) -> Option<Wave> {
-        let a: Vec<Num> = vals.iter().map(|&v| self.irnum(v)).collect::<Option<_>>()?;
+        let a: Vec<Num> = if w == WaveKind::Pwl && self.b.card_rules == CardRules::Ltspice {
+            self.pwl_relative(vals)?
+        } else {
+            vals.iter().map(|&v| self.irnum(v)).collect::<Option<_>>()?
+        };
         if w == WaveKind::Am {
             return self.am(a);
         }
