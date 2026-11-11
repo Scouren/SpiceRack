@@ -53,7 +53,9 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
 /// [`run_all`], one entry per analysis of the deck, `analyses` in its
 /// order: that analysis's plots, one, or with `.step` one per step in step
 /// order (ZERO D42), or none for a `Fourier`, which prints its table and
-/// writes none. ngspice runs a deck's analyses in its own order, so a plot
+/// writes none; a noise run's are its spectra and, behind them, the
+/// "Integrated Noise" plot ngspice and ESPice write (its totals, one
+/// point). ngspice runs a deck's analyses in its own order, so a plot
 /// is matched by its `Plotname` (ngspice's and ESPice's), not by position;
 /// two analyses of one kind are told apart by run order: ngspice runs the
 /// dot cards of a kind last first, the commands of a `.control` block
@@ -79,7 +81,8 @@ pub fn run_each(
     let stepped = plots.iter().flatten().any(|p| !p.params.is_empty());
     if analyses.len() <= 1 {
         if !stepped {
-            plots.truncate(1);
+            let second = analyses.first().is_some_and(|&a| also(a, plots.get(1)));
+            plots.truncate(1 + usize::from(second));
         }
         return Ok(vec![plots.into_iter().flatten().collect()]);
     }
@@ -115,7 +118,7 @@ pub fn run_each(
                 out.push(Vec::new());
                 continue;
             }
-            Plot::Named(name) => name,
+            Plot::Named(name) | Plot::NamedWith(name, _) => name,
             Plot::Unmatched(py_name) => {
                 return Err(missing(&format!("matchable {py_name}")));
             }
@@ -128,13 +131,28 @@ pub fn run_each(
             false => plots.iter().position(named),
         }
         .ok_or_else(|| missing(name))?;
-        out.push(plots[i].take().into_iter().collect());
+        let mut own: Vec<RawData> = plots[i].take().into_iter().collect();
+        if also(a, plots.get(i + 1)) {
+            own.extend(plots[i + 1].take());
+        }
+        out.push(own);
     }
     assert_eq!(out.len(), analyses.len());
     Ok(out)
 }
 
 // ---- private ----
+
+/// Whether `next`, the plot a run wrote right after analysis `a`'s own, is
+/// `a`'s too: the one its `Plot::NamedWith` names second (a noise run's
+/// "Integrated Noise"). `None` and a plot already taken are not.
+fn also(a: Kind, next: Option<&Option<RawData>>) -> bool {
+    let Plot::NamedWith(_, then) = a.spec().plot else {
+        return false;
+    };
+    next.and_then(Option::as_ref)
+        .is_some_and(|p| p.plot_name.starts_with(then))
+}
 
 /// [`run_each`] on LTspice, which runs one analysis a deck: each analysis
 /// card after the writer's [`LTSPICE_EACH`] line run alone in the deck, a

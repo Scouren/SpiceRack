@@ -142,7 +142,7 @@ Every result type has `result[node]`, `result.measures`.
 | `DcAnalysis` | `.sweep` | `.nodes`, `.branches` |
 | `AcAnalysis` | `.frequency` | `.magnitude(n)`, `.magnitude_db(n)`, `.phase(n)` |
 | `TransientAnalysis` | `.time` | |
-| `NoiseAnalysis` | `.frequency` | `inoise_spectrum`, `onoise_spectrum` |
+| `NoiseAnalysis` | `.frequency` | `inoise_spectrum`, `onoise_spectrum`; `inoise_total`, `onoise_total` (V rms over the band, one-element lists; ngspice and ESPice) |
 
 `ac[node]` is the real part. Use `.magnitude()` for `|H|`.
 

@@ -59,6 +59,7 @@ mag = ac.magnitude_db("vout")     # AC results are complex:
 ph = ac.phase("vout")             # degrees, wrapped to (-180, 180]
 lin = ac.magnitude("vout")        # ac["vout"] alone is only the real part
 density = nz["onoise_spectrum"]   # V/sqrt(Hz)
+total = nz["onoise_total"][0]     # V rms over the band (ngspice, ESPice)
 ```
 
 Branch currents are not saved unless you ask: `tb.save("I(Vin)")`, or

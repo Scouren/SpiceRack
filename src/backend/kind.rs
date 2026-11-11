@@ -59,9 +59,15 @@ pub(crate) struct Spec {
 /// How `simulation::run_each` finds an analysis's plot among a run's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Plot {
-    /// The first plot whose `Plotname` starts with this (ngspice's and
-    /// ESPice's names).
+    /// A plot whose `Plotname` starts with this (ngspice's and ESPice's
+    /// names); of several, the one the analysis's place among those of
+    /// its kind picks.
     Named(&'static str),
+    /// As `Named`, and the plot the run wrote right after it when that
+    /// one's `Plotname` starts with the second name: both are the
+    /// analysis's (ngspice's and ESPice's `Integrated Noise`, one point
+    /// behind a noise run's spectra).
+    NamedWith(&'static str, &'static str),
     /// A table on stdout, no plot (`.four`).
     Table,
     /// Not matched beside other analyses; the name the Python API gives it.
@@ -106,7 +112,7 @@ impl Kind {
             Kind::Tran => row("tran", Plot::Named("Transient Analysis"), &RUNNABLE, "N/A"),
             Kind::Noise => row(
                 "noise",
-                Plot::Named("Noise Spectral Density Curves"),
+                Plot::NamedWith("Noise Spectral Density Curves", "Integrated Noise"),
                 &RUNNABLE,
                 "N/A",
             ),

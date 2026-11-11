@@ -46,6 +46,38 @@ fn noise_returns_the_spectra_plot_and_matches_sqrt_4ktr() {
     }
 }
 
+#[test]
+fn p3_093_a_noise_run_keeps_its_integrated_plot() {
+    // Oracle: closed form. The output noise of R into C over [f1, f2] is
+    // sqrt(4kTR * fc * (atan(f2/fc) - atan(f1/fc))), fc = 1/(2 pi R C):
+    // 6.4245e-8 V over [1, 1e8] Hz and 3.8254e-8 V over [1, 100] Hz at
+    // 300.15 K. ngspice-45 integrates its 10 points/decade grid 0.11 % low
+    // (6.4174e-8 and 3.8227e-8: research/impl/evidence/P3-093), hence 5e-3.
+    use spicerack::backend::Kind;
+    let deck = "* noise totals\nVin in 0 0 AC 1\nR1 in out 1k\nC1 out 0 1u\n.op\n\
+                .noise v(out) Vin dec 10 1 1e8\n.noise v(out) Vin dec 10 1 100\n.end\n";
+    let kinds = [Kind::Op, Kind::Noise, Kind::Noise];
+    let each = spicerack::simulation::run_each(Dialect::Ngspice, deck, &kinds).expect("runs");
+    assert_eq!(each.len(), 3);
+    let fc = 1.0 / (2.0 * std::f64::consts::PI * 1e3 * 1e-6);
+    let ktr4 = 4.0 * 1.380649e-23 * 300.15 * 1e3;
+    for (plots, stop) in each[1..].iter().zip([1e8f64, 100.0]) {
+        let names: Vec<&str> = plots.iter().map(|p| p.plot_name.as_str()).collect();
+        assert_eq!(names, ["Noise Spectral Density Curves", "Integrated Noise"]);
+        let last = *column(&plots[0], "frequency").last().expect("points");
+        assert!(
+            close(last, stop, 1e-9),
+            "the band stops at {last}, want {stop}"
+        );
+        let want = (ktr4 * fc * ((stop / fc).atan() - (1.0 / fc).atan())).sqrt();
+        let total = scalar(&plots[1], "onoise_total");
+        assert!(
+            close(total, want, 5e-3),
+            "onoise_total {total}, want {want}"
+        );
+    }
+}
+
 // ── .disto ──
 
 #[test]

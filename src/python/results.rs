@@ -124,7 +124,9 @@ analysis_classes! {
 }
 
 /// `plots`, analysis `a`'s run, as its single-analysis method returns it:
-/// the first plot as `a`'s result class, `None` for none (a Fourier's); for
+/// the first plot as `a`'s result class, with the vectors of a plot behind
+/// it (a noise run's "Integrated Noise": `onoise_total`, `inoise_total`,
+/// one point each) as further vectors, `None` for none (a Fourier's); for
 /// a run read one plot per step (their `params` set: LTspice), a list of
 /// one result per step, in step order (ZERO D42).
 pub(super) fn typed_result(
@@ -133,7 +135,7 @@ pub(super) fn typed_result(
     plots: Vec<RawData>,
 ) -> PyResult<Py<PyAny>> {
     if plots.iter().all(|p| p.params.is_empty()) {
-        return one_result(py, a, plots.into_iter().next());
+        return one_result(py, a, joined(plots));
     }
     let each: Vec<Py<PyAny>> = plots
         .into_iter()
@@ -143,6 +145,26 @@ pub(super) fn typed_result(
 }
 
 // ---- private ----
+
+/// An unstepped analysis's plots as one: the first, with every vector of
+/// the plots behind it as further columns (a noise run's "Integrated
+/// Noise": `onoise_total` and `inoise_total`, one point each beside the
+/// spectra's many). `None` for no plot.
+fn joined(plots: Vec<RawData>) -> Option<RawData> {
+    let mut plots = plots.into_iter();
+    let mut first = plots.next()?;
+    for more in plots {
+        // A column's index is its place in `real_data`: real plots both.
+        assert_eq!(first.real_data.len(), first.variables.len(), "a real plot");
+        assert_eq!(more.real_data.len(), more.variables.len(), "a real plot");
+        for (v, column) in more.variables.into_iter().zip(more.real_data) {
+            let index = first.variables.len();
+            first.variables.push(crate::result::VarInfo { index, ..v });
+            first.real_data.push(column);
+        }
+    }
+    Some(first)
+}
 
 /// `raw` as `a`'s result class; `None` as Python's `None`.
 fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py<PyAny>> {

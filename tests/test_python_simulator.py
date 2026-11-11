@@ -826,6 +826,41 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     assert 0.75e-3 < rms < 1.06e-3, rms
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p3_093_api_ngspice_integrated_noise_plot(backend):
+    """ZERO-LEDGER P3-093: a noise result keeps the simulator's "Integrated
+    Noise" plot: `onoise_total` is a one-point vector beside the spectra.
+    Oracle: closed form. The output noise of R into C over [f1, f2] is
+    sqrt(4kTR*fc*(atan(f2/fc) - atan(f1/fc))), fc = 1/(2*pi*R*C): 6.4245e-8 V
+    over [1, 1e8] Hz, 3.8254e-8 V over [1, 100] Hz at 300.15 K. ngspice-45
+    and ESPice 0.3.0 integrate their 10 points/decade grid 0.11 % low
+    (6.4174e-8, 3.8227e-8), hence rel=5e-3."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("rc", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="in", positive="in", negative="0", value=0.0, ac=1.0)
+    band = dict(output_node="out", ref_node="0", src="Vin", variation="dec", points=10, start_frequency=1.0)
+    fc = 1 / (2 * math.pi * 1e3 * 1e-6)
+
+    def total(stop):
+        return math.sqrt(4 * 1.380649e-23 * 300.15 * 1e3 * fc * (math.atan(stop / fc) - math.atan(1 / fc)))
+
+    alone = tb.noise(stop_frequency=1e8, **band)
+    assert alone["onoise_total"] == pytest.approx([total(1e8)], rel=5e-3)
+    assert len(alone["onoise_spectrum"]) == len(alone.frequency) == 81
+    tb.add_operating_point()
+    tb.add_noise(stop_frequency=1e8, **band)
+    tb.add_noise(stop_frequency=100.0, **band)
+    _, wide, narrow = tb.run()
+    assert wide["onoise_total"] == pytest.approx([total(1e8)], rel=5e-3)
+    assert narrow["onoise_total"] == pytest.approx([total(100.0)], rel=5e-3)
+    assert narrow.frequency[-1] == pytest.approx(100.0)
+
+
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
 def test_p8_013_nested_definitions_run_to_the_closed_form(backend):
     """ngspice-45 manual §2.6.1: a definition inside a definition is local to
