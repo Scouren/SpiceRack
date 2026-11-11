@@ -96,3 +96,12 @@ spice-bench/ngspice/tests/bsim3soipd/t3.sp vacask now written: the `.options` ke
 spice-bench/ngspice/tests/bsim3soipd/t5.sp vacask now written: the `.options` keys are VACASK options under their own words or change no number (P4-009)
 spice-bench/postlayout/c7552_ihp.sp vacask now written: the `.options` keys are VACASK options under their own words or change no number (P4-009)
 spice-bench/postlayout/c7552_sky130.sp vacask now written: the `.options` keys are VACASK options under their own words or change no number (P4-009)
+
+# Batch-5 stacking (team-lead): keys the specs predicted from batch-A2, where another refusal hid them.
+# P4-009 after P5-005: the LTspice deck's last refusal was its `.options` (W0017); P5-005 cleared W0037.
+ltspice/ltspice_demos/LTC3765_LTC3766_DC1739A.net vacask now written: GminSteps=0 is homotopy_gminsteps=0 (P4-009 after P5-005)
+ltspice/ltspice_demos/LTC3765_LTC3766_DC1739A_.net vacask now written: GminSteps=0 is homotopy_gminsteps=0 (P4-009 after P5-005)
+ltspice/ltspice_examples/LTZ1000A.net vacask now written: numdgt, measdgt, plotwinsize change no number, noted W0024 (P4-009 after P5-005)
+# P4-011: the SIN's phase is VACASK's tdphase (positional: these decks name the damping {phase} and the phase {theta}).
+xyce/SENS/fddevLevelParams_isin2.cir vacask now written: a SIN with PHASE is written with tdphase (P4-011)
+xyce/SENS/fdisin2.cir vacask now written: a SIN with PHASE is written with tdphase (P4-011)
