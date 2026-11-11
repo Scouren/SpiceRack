@@ -23,5 +23,7 @@ R1 a b 1k
 X1 in out cell
 X2 out 0 plain
 V0 in 0 1
+.options tnom=27
+.temp 27
 .op
 .end

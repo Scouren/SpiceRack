@@ -9,5 +9,7 @@
 .param c=c__mc
 R1 x 0 'a+b+c'
 I1 0 x 1m
+.options tnom=27
+.temp 27
 .op
 .end

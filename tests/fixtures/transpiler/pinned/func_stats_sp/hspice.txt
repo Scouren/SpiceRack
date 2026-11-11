@@ -14,5 +14,7 @@ R1 a b 'f(1k) + F( 2k )'
 R2 b 0 'g(1, h(3)) + f(f(1))'
 R3 b c 'd(aunif(1k, 10))'
 X1 c s
+.options tnom=27
+.temp 27
 .op
 .end
