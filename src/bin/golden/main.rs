@@ -263,17 +263,21 @@ fn hash(bytes: &[u8]) -> String {
 }
 
 /// Records twice into a temp dir, each in its own process (a `HashMap`'s
-/// seed is per process), and diffs the two trees with no xfail list (both
-/// come from one reader, so any listed line would XPASS). Removes them on
-/// success.
+/// seed is per process) and both at once, and diffs the two trees with no
+/// xfail list (both come from one reader, so any listed line would XPASS).
+/// Removes them on success.
 fn check_determinism() -> std::io::Result<bool> {
     let base = std::env::temp_dir().join(format!("golden-determinism-{}", std::process::id()));
     let exe = std::env::current_exe()?;
-    for run in ["a", "b"] {
-        let status = std::process::Command::new(&exe)
+    let record = |run: &str| {
+        std::process::Command::new(&exe)
             .arg("record")
             .arg(base.join(run))
-            .status()?;
+            .spawn()
+    };
+    let children = [("a", record("a")?), ("b", record("b")?)];
+    for (run, mut child) in children {
+        let status = child.wait()?;
         if !status.success() {
             return Err(std::io::Error::other(format!(
                 "record {run} failed: {status}"

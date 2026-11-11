@@ -58,3 +58,8 @@ name = "spice2rack"
 # The transpiler rewrite's golden gate (TESTING.md, "Golden gate").
 [[bin]]
 name = "golden"
+
+# Tests and clippy keep line tables only: a backtrace still names file and
+# line, the target directory is smaller and test binaries link faster.
+[profile.dev]
+debug = "line-tables-only"

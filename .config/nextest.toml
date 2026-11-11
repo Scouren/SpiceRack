@@ -1,0 +1,6 @@
+# `cargo nextest run`: every test binary's tests share one pool, where
+# `cargo test` runs the binaries one after another. Doctests are not run
+# by nextest: the gate runs `cargo test --doc` beside it (TESTING.md).
+[profile.default]
+fail-fast = false
+slow-timeout = { period = "120s" }

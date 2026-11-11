@@ -38,6 +38,8 @@
         pythonEnv = pkgs.python312.withPackages (ps: with ps; [
           numpy
           pytest
+          # `pytest -n <N>`: the suite's files run in N processes.
+          pytest-xdist
         ]);
         mkOpenvaf = { rev, hash }: pkgs.rustPlatform.buildRustPackage rec {
           pname = "openvaf-r";
@@ -401,6 +403,9 @@
           packages = [
             rustToolchain
             pkgs.maturin
+            # `cargo nextest run`: every test binary's tests in one pool, not
+            # one binary after another (.config/nextest.toml).
+            pkgs.cargo-nextest
             pythonEnv
             pkgs.pkg-config
           ];
