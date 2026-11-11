@@ -100,21 +100,23 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
     {
         refused.push(Diag::new(Code::W0037, tok, 0));
     }
+    // The scope every `montecarlo` of the deck leaves out: VACASK's `mc`
+    // would draw it, so its draws are written at their nominal.
+    let left_out = lift::left_out(rd, deck);
     let lifted = match lang.action(Construct::StatisticalCall) {
         Action::Lift(Rule::RackVars) => lift::lift(rd, deck, &mut refused),
         Action::Lift(Rule::VacaskCalls) => {
-            lift::vacask_calls(rd, deck, &mut refused);
+            lift::vacask_calls(rd, deck, left_out, &mut refused);
             Lifted::default()
         }
         _ => Lifted::default(),
     };
     let draws = match lang.action(Construct::Statistics) {
-        Action::Lift(Rule::StatisticsDraws) => {
-            draws::lift(rd, deck, Layers::One).unwrap_or_else(|d| {
+        Action::Lift(Rule::StatisticsDraws) => draws::lift(rd, deck, Layers::One, left_out)
+            .unwrap_or_else(|d| {
                 refused.push(d);
                 Draws::default()
-            })
-        }
+            }),
         _ => Draws::default(),
     };
     let mut w = W {

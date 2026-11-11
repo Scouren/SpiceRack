@@ -342,9 +342,10 @@ impl W<'_, '_> {
     /// (`docs/cmd-analysis-mc.md` lines 7-23), `lh=0`: Spectre's default
     /// `sampling=standard` draws plainly (Reference 19.1 pp.165-174), and
     /// `seed` carries the seed, not Spectre's draws. Refused (`W0015`) with
-    /// no analysis of that kind, and (`W0115`) where `variations` (default
-    /// `process`, p.166) leaves out a scope the deck draws in, as `mc`
-    /// varies every call.
+    /// no analysis of that kind. The scope `variations` (default `process`,
+    /// p.166) leaves out is written at its nominal (`lift::left_out`), as
+    /// `mc` varies every call; refused (`W0115`) where two `montecarlo`s
+    /// leave out different scopes and this one's is drawn in.
     fn vacask_mc(&mut self, idx: usize, a: &Ana, tok: u32, tb: &Tb) -> Vec<String> {
         let Ana::MonteCarlo {
             name,

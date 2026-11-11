@@ -26,7 +26,7 @@
 //!
 //! Contents:
 //! - `pub(super) struct Draws`, `pub(super) enum Layers`
-//! - `fn lift(rd: &mut Rd, deck: &Deck, layers: Layers) -> Result<Draws, Diag>`
+//! - `fn lift(rd: &mut Rd, deck: &Deck, layers: Layers, left_out: Option<bool>) -> Result<Draws, Diag>`
 //! - `Draws::before(&self, a: u32) -> &[(String, String)]`, `Draws::value(&self, a: u32) -> Option<&str>`,
 //!   `Draws::locals(&self, sc: u32) -> &[(String, String)]`, `Draws::texts(&self) -> impl Iterator<Item = &str>`
 
@@ -67,8 +67,15 @@ struct P {
 }
 
 /// The rule's fixups for `deck`; the first refusal when a block has no SPICE
-/// form. Each renamed reference is recorded in `rd`.
-pub(super) fn lift(rd: &mut Rd, deck: &Deck, layers: Layers) -> Result<Draws, Diag> {
+/// form. Each renamed reference is recorded in `rd`. The scope `left_out`
+/// names (`Some(true)`: `mismatch`, `Some(false)`: `process`;
+/// `named::lift::left_out`) is not drawn: its parameters keep their values.
+pub(super) fn lift(
+    rd: &mut Rd,
+    deck: &Deck,
+    layers: Layers,
+    left_out: Option<bool>,
+) -> Result<Draws, Diag> {
     let mut out = Draws::default();
     let mut mismatch: Vec<(String, String)> = Vec::new(); // (param, draw around it)
     let bodies = std::iter::once(&deck.top).chain(deck.sections.iter().map(|s| &s.body));
@@ -90,7 +97,16 @@ pub(super) fn lift(rd: &mut Rd, deck: &Deck, layers: Layers) -> Result<Draws, Di
             .collect();
         for &st in &body.statistics {
             let tok = rd.main(st);
-            let s = rd.statistics(st);
+            let mut s = rd.statistics(st);
+            // A `correlate` over devices stays, to be refused below.
+            match left_out {
+                Some(true) => s.mismatch.clear(),
+                Some(false) => {
+                    s.process.clear();
+                    s.correlations.retain(|c| !c.1.is_empty());
+                }
+                None => {}
+            }
             truncation(&s).map_err(|c| diag(c, tok))?;
             let correlated = correlate(&mut ps, &s, layers).map_err(|c| diag(c, tok))?;
             for v in s.process.iter().filter(|v| !correlated.contains(&v.param)) {

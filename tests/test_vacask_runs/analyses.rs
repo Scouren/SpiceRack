@@ -337,3 +337,52 @@ fn p4_018_a_differential_noise_output_is_a_node_pair() {
     close(*onoise.last().unwrap(), want, 1e-5);
     close(col(&raw, "gain")[0], 0.25, 1e-9);
 }
+
+/// ZERO-LEDGER P4-020. Spectre's `montecarlo variations=` (Reference 19.1
+/// p.166, default `process`) leaves a scope's draws out; VACASK's `mc`
+/// draws at every call site (`docs/cmd-analysis-mc.md`), so that scope is
+/// written at its nominal. Oracle: relations that hold in every sample on
+/// real VACASK, for a statistical call and for a `statistics` block's
+/// `vary`. `p` hangs off the top's draw alone and o1, o2 off one subcircuit
+/// draw each: with `process` left out `p` is the divider's 0.5 while o1 and
+/// o2 part; with `mismatch` left out o1 is o2 while `p` moves.
+#[test]
+fn p4_020_a_montecarlos_left_out_scope_is_nominal() {
+    let calls = "mc\n.param g={agauss(0, 100, 1)}\n.subckt s a b\nR1 a b {agauss(1k, 100, 1)}\n\
+                 R2 b 0 1k\n.ends\nV1 in 0 1\nX1 in o1 s\nX2 in o2 s\nR3 in p {1k+g}\nR4 p 0 1k\n\
+                 .op\nsimulator lang=spectre\nmc1 montecarlo numruns=20 seed=1 VARY {\ndcmc dc\n}\n\
+                 simulator lang=spice\n.end\n";
+    let block = "simulator lang=spectre\nparameters g=0 rl=1k\nstatistics {\nprocess {\n\
+                 vary g dist=gauss std=100\n}\nmismatch {\nvary rl dist=gauss std=100\n}\n}\n\
+                 subckt s (a b)\nr1 (a b) resistor r=rl\nr2 (b 0) resistor r=1k\nends s\n\
+                 v1 (in 0) vsource dc=1\nx1 (in o1) s\nx2 (in o2) s\nr3 (in p) resistor r=1k+g\n\
+                 r4 (p 0) resistor r=1k\nop1 dc\nmc1 montecarlo numruns=20 seed=1 VARY {\ndcmc dc\n}\n";
+    let spectre = Lang::SPECTRE.lexicon().expect("a reader");
+    // Each sample's (o1, o2, p): the plots after the deck's own `op`.
+    let samples = |text: Result<String, Vec<Code>>| -> Vec<[f64; 3]> {
+        let text = text.expect("emit vacask deck");
+        let plots = Dialect::Vacask
+            .run_all(&text)
+            .unwrap_or_else(|e| panic!("{e}\n{text}"));
+        assert_eq!(plots.len(), 21, "{text}");
+        let at = |p: &RawData, n: &str| col(p, n)[0];
+        let sample = |p: &RawData| [at(p, "o1"), at(p, "o2"), at(p, "p")];
+        plots[1..].iter().map(sample).collect()
+    };
+    let from = |deck: String| emit_from(&deck, Dialect::Spectre, spectre);
+    let only = "variations=mismatch";
+    for s in [
+        samples(emit(&calls.replace("VARY", only))),
+        samples(from(block.replace("VARY", only))),
+    ] {
+        assert!(s.iter().all(|x| (x[2] - 0.5).abs() < 1e-12), "{s:?}");
+        assert!(s.iter().any(|x| (x[0] - x[1]).abs() > 1e-3), "{s:?}");
+    }
+    for s in [
+        samples(emit(&calls.replace(" VARY", ""))),
+        samples(from(block.replace(" VARY", ""))),
+    ] {
+        assert!(s.iter().all(|x| (x[0] - x[1]).abs() < 1e-12), "{s:?}");
+        assert!(s.iter().any(|x| (x[2] - 0.5).abs() > 1e-3), "{s:?}");
+    }
+}

@@ -15,7 +15,7 @@
 //!
 //! Cites: VACASK `docs/input-identifiers.md` (quoting),
 //! `lib/dfllexer.l` L536-L557 (`section`), P462-P509 (`@if`), P848-855
-//! (`parameters`), `docs/cmd-analysis-mc.md`.
+//! (`parameters`), `docs/cmd-analysis-mc.md`, `docs/cir-loading.md` (`load`).
 //!
 //! Contents:
 //! - `W::vacask(&mut self)`, `W::expr(&self, s: &str) -> String`, `W::vval(&self, v: &Val) -> String`,
@@ -26,7 +26,7 @@ use std::collections::BTreeSet;
 
 use super::W;
 use crate::syntax::ast::NONE;
-use crate::syntax::behaviour::{CardRules, NamedRules};
+use crate::syntax::behaviour::CardRules;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::Func;
@@ -122,21 +122,18 @@ impl W<'_, '_> {
             true => self.block_needs(&deck.top),
             false => needs.clone(),
         };
-        // A VACASK deck's own `load`s are VACASK's (it compiles a `.va`
-        // itself); a SPICE-origin Verilog-A load goes through OpenVAF.
+        // VACASK compiles a `.va` itself (`docs/cir-loading.md`): a load
+        // the deck reads is written as read, whatever its dialect
+        // (Spectre's `ahdl_include "x.va"`). One given beside the text (the
+        // API's `veriloga()`) goes through OpenVAF, which compiles it once
+        // beside its source; VACASK would compile it again in every run's
+        // directory.
         let read = deck.top.loads.iter().chain(&deck.top.own_loads);
-        let read = read.map(|&n| self.rd.unquote(self.rd.fields(n)[0]));
-        let paths: Vec<String> = read.chain(deck.given_loads.iter().cloned()).collect();
+        loads.extend(read.map(|&n| self.rd.unquote(self.rd.fields(n)[0])));
         self.unwritten_loads();
-        match self.rd.b.named_rules == NamedRules::Vacask {
-            true => loads.extend(paths),
-            false => match crate::veriloga::osdi_loads(&paths) {
-                Ok(l) => loads.extend(l),
-                Err(_) => {
-                    let tok = deck.top.loads.first().map_or(0, |&n| self.rd.main(n));
-                    self.refuse(Code::W0004, tok);
-                }
-            },
+        match crate::veriloga::osdi_loads(&deck.given_loads) {
+            Ok(l) => loads.extend(l),
+            Err(_) => self.refuse(Code::W0004, 0),
         }
 
         let title = deck.top.name.replace(['\n', '\r'], " ");

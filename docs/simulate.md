@@ -167,8 +167,9 @@ which plot is theirs. On the Spectre backend `hb` is written (`netlist()`) but
 not run: Spectre has no nutmeg output for it and its PSF output is not read, so
 `run()` raises before Spectre starts. A Spectre `montecarlo` (`add_spectre_monte_carlo`) is also
 written for VACASK, as an `mc` loop around the deck's analysis of its inner
-type, unless its `variations` (Spectre's default, `process`) leaves out draws
-the deck makes inside a subcircuit (`W0115`).
+type. VACASK's `mc` draws everywhere, so the draws its `variations` (Spectre's
+default, `process`) leaves out are written at their nominal values; two
+montecarlos of one deck that leave out different scopes are refused (`W0115`).
 
 ```python
 both = ps.Testbench(rc)

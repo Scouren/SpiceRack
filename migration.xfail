@@ -1709,3 +1709,8 @@ xyce/INIT_CONDS/ring_osc_bsim3.cir ngspice now written: a top-level MOSFET's IC=
 xyce/Certification_Tests/BUG_1455/bug_1455_neq.cir espice now refused W0104: Xyce's `LEVEL 1` with no `=` loses its number in the model view (P3-006; P3-127 reads it)
 xyce/Certification_Tests/BUG_1455/bug_1455_neq.cir hspice now refused W0104: Xyce's `LEVEL 1` with no `=` loses its number in the model view (P3-006; P3-127 reads it)
 xyce/Certification_Tests/BUG_1455/bug_1455_neq.cir ngspice now refused W0104: Xyce's `LEVEL 1` with no `=` loses its number in the model view (P3-006; P3-127 reads it)
+
+# S1: P4-020: VACASK's `mc` draws at every call site (docs/cmd-analysis-mc.md at 36be560), so the scope a Spectre
+# `montecarlo variations=` leaves out is written at its nominal. Oracle: tests/spectre/expected.json T-S3 and
+# tests/test_vacask_runs/analyses.rs::p4_020_a_montecarlos_left_out_scope_is_nominal.
+fixtures/tests/spectre/t_s3_mismatch.scs vacask now written: the scope a `montecarlo` leaves out is written at its nominal (P4-020)
