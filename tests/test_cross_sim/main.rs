@@ -10,6 +10,7 @@
 //! | spice-bench | ngspice | HSPICE | ESPice `--tokenizer=hspice`, ngspice `hsa` |
 //! | VACASK corpus | VACASK | ngspice | ngspice |
 //! | HSPICE corpus | ESPice `--tokenizer=hspice` | ngspice | ngspice |
+//! | LTspice corpus, self-contained decks (`ltspice.rs`) | LTspice (`.#testing-ltspice`, nightly only) | ngspice | ngspice |
 //!
 //!   nix develop .#testing -c cargo test --release --test test_cross_sim                       # merge: a sample
 //!   nix develop .#testing -c cargo test --release --features corpus --test test_cross_sim     # nightly: every deck
@@ -62,6 +63,7 @@ use spicerack::syntax::resolve::Form;
 mod cmp;
 mod kit;
 mod lists;
+mod ltspice;
 mod sim;
 #[path = "../test_import_suite/tube.rs"]
 mod tube;

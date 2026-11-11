@@ -32,4 +32,7 @@ jobs:
         run: nix develop .#testing --command cargo test --no-default-features --features corpus --release --test test_import_suite -- --nocapture
 
       - name: Every corpus deck across simulators
+        # No LTspice MSI in CI until it is mirrored (TESTING.md, Known gaps).
+        env:
+          LTSPICE_CI_PENDING_MIRROR: "1"
         run: nix develop .#testing --command cargo test --no-default-features --features corpus --release --test test_cross_sim -- --nocapture

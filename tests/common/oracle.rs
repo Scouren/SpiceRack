@@ -23,7 +23,7 @@
 //! `spicerack::backend`, so the oracle shares no code with what it checks.
 //! Only the private `harness` below calls into it (`sim::run`), so a change
 //! to its signature breaks one function here. LTspice runs through the
-//! backend (the harness has no LTspice). Spectre has no local binary: its
+//! backend (the harness's own LTspice is the cross-sim cell's). Spectre has no local binary: its
 //! numbers are the iccad4 runs recorded before 2026-11-08 as pins
 //! ([`pinned`], ledger P1-043); none can be added (ZERO D43), so a deck
 //! with no pin takes the manual page or another simulator as its oracle.
@@ -516,8 +516,8 @@ fn pin_dir(on: Dialect) -> &'static str {
     }
 }
 
-/// `text` on LTspice, through `spicerack::backend` (the harness has no
-/// LTspice): every plot.
+/// `text` on LTspice, through `spicerack::backend`, as a user's run goes
+/// (the harness's own LTspice is the cross-sim cell's): every plot.
 #[cfg(feature = "backend")]
 fn ltspice(text: &str) -> Vec<RawData> {
     Dialect::Ltspice
