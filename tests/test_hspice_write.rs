@@ -18,7 +18,7 @@
 #[path = "common/oracle.rs"]
 mod oracle;
 
-use oracle::{At, Tol, closed_form, spec_example};
+use oracle::{At, Tol, closed_form, sim_pair, spec_example};
 use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
 
@@ -88,6 +88,38 @@ fn p3_064_hspices_tran_leaves_a_zero_start_to_the_default() {
         "2",
         At::Last,
         0.9932620530009145,
+        tol,
+    );
+}
+
+/// Ledger P3-085. A model's dotted VERSION is one word to HSPICE (MOSFET
+/// Models manual D-2010.12, p.420: "The recommended BSIM3v3 model
+/// specification is LEVEL=49, VERSION=3.3.0"; Table 117 lists `3.3.0` and
+/// `3.2.4`). In quotes it is an expression, which `3.3.0` is not:
+/// ngspice's `hsa` reading stops on `version='3.3.0'` ("Misplaced
+/// operator", 24 spice-bench decks of the hsa cell). The writer leaves the
+/// word bare, and the deck runs to the source's operating point: one
+/// BSIM3v3.3.0 card on two implementations, 1.4e-11 apart by hand (the
+/// solvers' rounding), bounded here at 1e-6.
+#[test]
+fn p3_085_hspice_writes_a_dotted_version_bare() {
+    let model = ".model n1 nmos level=49 version=3.3.0 tox=3.5n nch=2.4e17 nsub=5e16 vth0=0.15";
+    let deck = format!(
+        "t\nVdd dd 0 2\nVg g 0 1.5\nR1 dd d 1k\nM1 d g 0 0 n1 W=1u L=0.35u\n{model}\n.op\n.end\n"
+    );
+    let want = ".model n1 nmos (level=49 version=3.3.0 tox=3.5n nch=2.4e17 nsub=5e16 vth0=0.15)";
+    let cite = "HSPICE MOSFET Models manual D-2010.12, p.420 and Table 117: VERSION=3.3.0";
+    spec_example(cite, &deck, Dialect::Ngspice, Dialect::Hspice, &[want]);
+    let tol = Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    sim_pair(
+        Dialect::Ngspice,
+        &deck,
+        Dialect::Hspice,
+        "d",
+        At::First,
         tol,
     );
 }

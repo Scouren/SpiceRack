@@ -111,9 +111,10 @@ const REWRITES: &[Rewrite] = &[
 impl W<'_, '_> {
     /// A value kept as SPICE text, as the target reads it: as written, but
     /// for HSPICE, which reads braces as name bytes and an unquoted value
-    /// as one word starting with a letter, or a number: any other
-    /// expression is quoted (`{a*2}` is `'a*2'`, `{a} + b` is `'(a) + b'`);
-    /// a run of numbers (a matrix) is not. A ternary is
+    /// as one word starting with a letter, a number, or a dotted version
+    /// (`3.3.0`): any other expression is quoted (`{a*2}` is `'a*2'`,
+    /// `{a} + b` is `'(a) + b'`); a run of numbers (a matrix) is not. A
+    /// ternary is
     /// spelled for the target ([`W::ternaries`]).
     pub(super) fn spelled(&self, v: &str) -> String {
         // HSPICE reads a double-quoted value as an expression too
@@ -375,6 +376,10 @@ fn hspice_value(v: &str) -> String {
             .is_some_and(|(_, end, _)| m[end..].bytes().all(|c| c.is_ascii_alphabetic()))
     };
     let word = |s: &str| s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_');
+    // A dotted version (`3.3.0`: digits and dots, no number) is one word
+    // to HSPICE (MOSFET Models manual, Table 117: `VERSION=3.3.0`), and
+    // no expression: quoted, the deck does not read.
+    let version = |s: &str| s.bytes().all(|c| c.is_ascii_digit() || c == b'.');
     let quoted = (t.starts_with('\'') || t.starts_with('"')) && t.len() > 1;
     // Words split at blanks outside parentheses (`unif(1k, 0.1)` is one); a
     // run of numbers is a vector (a CPL model's matrix), not an expression.
@@ -387,7 +392,7 @@ fn hspice_value(v: &str) -> String {
         .filter(|w| !w.is_empty())
         .collect();
     let plain = match words[..] {
-        [w] => number(w) || word(w),
+        [w] => number(w) || word(w) || version(w),
         _ => words.iter().all(|w| number(w)),
     };
     if !t.contains('{') && (quoted || plain) {
