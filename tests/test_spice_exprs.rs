@@ -409,3 +409,34 @@ fn a_resistor_tc_pair_is_tc1_and_tc2_on_ngspice() {
     let i = raw.real_data[i.expect("i(v1)")][0];
     assert!((i + 1e-3).abs() < 1e-9, "{i}\n{w}");
 }
+
+// ── Xyce instance parameters ngspice's devices lack (ledger P3-067) ──
+
+/// Xyce RG 7.10 `C` ("If AGE is given, then the capacitance is
+/// C[1 − D log(AGE)]"; Xyce 7.10: v(a) 0.677124 with `age=87600`, 0.632197
+/// without or at `age=0`), `M` ("IC1 and IC2 may therefore be specified
+/// compactly as IC=<ic1>,<ic2>"), BSIM-SOI's instance `shmod` (Xyce:
+/// 0.563876 against 0.383470). ngspice-45: "unknown parameter (age)",
+/// "(ic1)", "(shmod)" (`cap.c`, `b4soi.c` instance tables; manual ch.11:
+/// an M's `ic=vds,vgs,vbs`). An aging C and an instance `shmod` are
+/// refused; `age=0` leaves with its `d`; `IC1`/`IC2` are the `ic=` vector.
+/// XYCE_CORPUS `AGECAP/agecap.cir`, `INIT_CONDS/comparatorICnonVector.cir`,
+/// `B4SOI_461/test1_shmod1.cir`.
+#[test]
+fn p3_067_o_dev_params_instance_model() {
+    let cite = "ngspice-45 cap.c, b4soi.c (instance tables): no age, no shmod";
+    let rc = |c: &str| format!("* t\nv1 1 0 1\nr1 1 a 1k\n{c}\n.tran 10u 4m uic\n.end\n");
+    let (xy, ng) = (Dialect::Xyce, Dialect::Ngspice);
+    oracle::spec_refusal(cite, &rc("c1 a 0 4u age=87600"), xy, ng, &[Code::W0114]);
+    let w = write(&rc("c1 a 0 4u age=0 d=0.05"), xy, ng).to_ascii_lowercase();
+    assert!(!w.contains("age") && !w.contains("d=0.05"), "{w}");
+    let mos = |p: &str| {
+        format!(
+            "* t\nvd d 0 1\nvg g 0 3\nm1 d g 0 0 nm w=10u l=1u {p}\n\
+             .model nm nmos level=1 vto=1 kp=2e-5\n.tran 1n 10n uic\n.end\n"
+        )
+    };
+    let w = write(&mos("ic1=2 ic2=3"), xy, ng).to_ascii_lowercase();
+    assert!(w.contains("ic=2,3") && !w.contains("ic1"), "{w}");
+    oracle::spec_refusal(cite, &mos("shmod=1"), xy, ng, &[Code::W0114]);
+}

@@ -161,6 +161,12 @@ impl W<'_, '_> {
             self.ask(Construct::RclModel, tok);
             self.xyce_instance(n, m, tok);
         }
+        // A Xyce C's aging has no form here (`ngspice_models`).
+        if self.pair.xyce_models_on_ngspice
+            && let Err(code) = super::ngspice_models::ngspice_instance(letter, &mut params)
+        {
+            self.refuse(code, tok);
+        }
         self.device_ic(letter, &[&n1, &n2], &params, tok);
         // `TC=a,b` (Xyce, PSpice) is `tc1=a tc2=b` on ngspice
         // (manual §3.3.1: "unknown parameter (0)" for `tc=0,0`).
@@ -491,6 +497,13 @@ impl W<'_, '_> {
         let asked = [('O', Construct::LossyLine), ('N', Construct::OsdiInstance)];
         if let Some(&(_, c)) = asked.iter().find(|(l, _)| *l == letter) {
             self.ask(c, tok);
+        }
+        // Xyce's `IC1=`…`IC3=` as the `ic=` vector, its instance `shmod`
+        // (`ngspice_models`).
+        if self.pair.xyce_models_on_ngspice
+            && let Err(code) = super::ngspice_models::ngspice_instance(letter, &mut params)
+        {
+            self.refuse(code, tok);
         }
         let shape = self.xyce_instance(n, &model, tok);
         xyce_shape(shape, &decl, &mut nodes, &mut params);

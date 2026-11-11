@@ -8,7 +8,8 @@
 //!
 //! Adding a level: one `(Xyce, target)` pair in the kind's row of the
 //! target's table, with the run that shows the two devices agree. A kind
-//! with no row is copied.
+//! with no row is copied. An instance line's parameters the targets'
+//! devices lack are [`ngspice_instance`]'s.
 //!
 //! Cites: ngspice-45 `spicelib/parser/inpdomod.c` (the level switch; its
 //! own lists at L73-75 and L383-385), `inpfindl.c:51-57`; Xyce RG 7.10 `M`
@@ -17,6 +18,7 @@
 //!
 //! Contents:
 //! - `pub(super) fn ngspice_model(hspice: bool, kind: &str, params: &[(String, String)]) -> Result<Option<Vec<(String, String)>>, Code>`
+//! - `pub(super) fn ngspice_instance(letter: char, params: &mut Vec<(String, String)>) -> Result<(), Code>`
 
 use crate::syntax::diag::Code;
 use crate::syntax::render::models::fold;
@@ -112,6 +114,61 @@ pub(super) fn ngspice_model(
     Ok(changed.then_some(out))
 }
 
+/// A Xyce instance line's parameters (element `letter`) as ngspice's,
+/// ESPice's and HSPICE's device reads them: an M's or Q's `IC1=`, `IC2=`,
+/// `IC3=` are the elements of its `IC=` vector (Xyce RG 7.10 `M`: "IC1
+/// and IC2 may therefore be specified compactly as IC=<ic1>,<ic2>"), the
+/// one form the targets read; a C's `AGE=0` (no aging) leaves with its
+/// `D=`.
+///
+/// # Errors
+/// W0114: a C that ages (Xyce RG `C`: C·(1 − D·log(AGE)); ngspice-45
+/// `cap.c` has no such parameter), an M's instance `shmod` (ngspice-45
+/// `b4soi.c` reads it on the model only).
+pub(super) fn ngspice_instance(
+    letter: char,
+    params: &mut Vec<(String, String)>,
+) -> Result<(), Code> {
+    let before = params.len();
+    match letter {
+        'C' => {
+            let age = take(params, "age");
+            take(params, "d");
+            if age.is_some_and(|a| fold(&a) != Some(0.0)) {
+                return Err(Code::W0114);
+            }
+        }
+        'M' | 'Q' => {
+            let ics = ["ic1", "ic2", "ic3"].map(|k| take(params, k));
+            let shmod = letter == 'M' && take(params, "shmod").is_some();
+            // A gap before a given element is Xyce's default, 0.
+            if let Some(last) = ics.iter().rposition(Option::is_some) {
+                let v: Vec<&str> = ics[..=last]
+                    .iter()
+                    .map(|x| x.as_deref().unwrap_or("0"))
+                    .collect();
+                params.push(("ic".to_string(), v.join(",")));
+            }
+            if shmod {
+                return Err(Code::W0114);
+            }
+        }
+        _ => {}
+    }
+    debug_assert!(params.len() <= before, "parameters leave or join");
+    Ok(())
+}
+
+// ---- private ----
+
+/// `params` without its parameter `name` (any case): the value it had.
+fn take(params: &mut Vec<(String, String)>, name: &str) -> Option<String> {
+    let i = params
+        .iter()
+        .position(|(k, _)| k.eq_ignore_ascii_case(name))?;
+    Some(params.remove(i).1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +221,30 @@ mod tests {
         assert_eq!(ngspice_model(true, "nmos", &card("6")), Err(Code::W0104));
         assert_eq!(ngspice_model(false, "d", &card("200")), Ok(None));
         assert_eq!(ngspice_model(false, "npn", &[]), Ok(None));
+    }
+
+    // Oracle: Xyce RG 7.10 `M` ("IC1 and IC2 … compactly as
+    // IC=<ic1>,<ic2>"), `C` (AGE's default 0: no aging); ngspice-45
+    // "unknown parameter (age)", "(shmod)" (`research/impl/evidence/P3-067`).
+    #[test]
+    fn an_instance_parameter_is_the_targets_or_refused() {
+        let p = |s: &[(&str, &str)]| -> Vec<(String, String)> {
+            s.iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let mut ic = p(&[("w", "1u"), ("IC2", "5")]);
+        assert_eq!(ngspice_instance('M', &mut ic), Ok(()));
+        assert_eq!(ic, p(&[("w", "1u"), ("ic", "0,5")]));
+        let mut off = p(&[("AGE", "0"), ("d", "0.05"), ("tc1", "1m")]);
+        assert_eq!(ngspice_instance('C', &mut off), Ok(()));
+        assert_eq!(off, p(&[("tc1", "1m")]));
+        let mut aged = p(&[("age", "1e4")]);
+        assert_eq!(ngspice_instance('C', &mut aged), Err(Code::W0114));
+        let mut heated = p(&[("shmod", "1")]);
+        assert_eq!(ngspice_instance('M', &mut heated), Err(Code::W0114));
+        let mut r = p(&[("age", "1e4")]);
+        assert_eq!(ngspice_instance('R', &mut r), Ok(()));
+        assert_eq!(r.len(), 1);
     }
 }

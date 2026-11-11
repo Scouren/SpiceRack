@@ -38,13 +38,11 @@ ACtests/bsim3soi/gain-stagesoi.cir mismatch # ac V(2): 0.023723918180052133-0.04
 ACtests/bsim4/gstage.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # ac V(3): -0.0006604390925003782+0.0000000005860174824115544i vs -0.0006643169744167735+0.0000000005895033723511711i at 100 (tol 3.321e-6)
 ACtests/bsim4/opamp.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # ac V(8): 0.997741591823423-0.000033139985729015444i vs 0.8589942159944693-0.012376025906705848i at 100 (tol 2.006e-3)
 ACtests/mos/gain-stage6.cir mismatch # ac V(2): 0.09999946945255755-0.00023033554385911846i vs 0.1+0i at 3981071.705534983 (tol 2.020e-4)
-AGECAP/agecap.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: cold 3 0 4u age=87600 | unknown parameter (age) | Simulation interrupted due to error! | Err
 AMPMOD/amp_mod.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(30): 13.005517297239802 leaves the tube at t=0.0002243761517194102 (tol 2.000e-1)
 B4SOI_450/invert_b4soi_4.5.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mn1 v
 B4SOI_450/inverter_tr.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: mn0 vs gate o
 B4SOI_450/ring_osc.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.xinv1
 B4SOI_450/test1.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test1_shmod1.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
 B4SOI_450/test2.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
 B4SOI_450/test3.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
 B4SOI_450/test4.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
@@ -55,7 +53,6 @@ B4SOI_450/test8.cir target-fails # ngspice swapped the model: Level must be < 99
 B4SOI_461/invert_b4soi.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: m.xinv1.mn1 vout in 0 0 0 cmosn w=4u l=0.15u as=6p ad=6p ps=7u pd=7u | Simulation interrupte
 B4SOI_461/inverter_tr.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: mn0 vs gate out vs nmos1 w=10u l=0.18u | Simulation interrupted due to error! | Error: circu
 B4SOI_461/ring_osc.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: m.xinv1.xinv1.xinv1.mn1 xinv1.xinv1.1 in ss sub nmos1 w=4u l=0.15u as=6p ad=6p ps=7u pd=7u p
-B4SOI_461/test1_shmod1.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soimod=0 shmod=1 | Simulation interrupted
 BINARYOPS/binary_funcs.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'pwrs' at line 9
 BJT_OFF/bjt_off.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # op V(5): -12.467844528187145+0i vs -0.0003901058347318711+0i at 0 (tol 2.494e-2)
 BREAK/break.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [if]
@@ -395,7 +392,6 @@ IC_AND_NODESET/nodeset_bjt.cir mismatch # tran XN15:VB3: 0.000000013920704224356
 IC_AND_NODESET/nodeset_bjt2.cir mismatch # tran XN15:VB3: 0.000000013920704224356513 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 IC_AND_NODESET/ring_osc_bsim3_ic.cir mismatch # tran V(10): -0.055918291679567834 leaves the tube at t=0.0000000012702714319605303 (tol 2.082e-2)
 IC_AND_NODESET/ring_osc_bsim4_ic.cir mismatch # tran V(3): 1.461509824680592 leaves the tube at t=0.000000007397678658186048 (tol 1.943e-2)
-INIT_CONDS/comparatorICnonVector.cir target-fails # no raw file .cross_sim_out.raw: Error on line 6 or its substitute:: m2 anot a 0 0 nmos w=1.8u l=1.2u ic1=0 ic2=5 | unknown parameter (ic1) | Simulation interrup
 INVALID_CHARS/valid_chars_device_node_names.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v$ | Not enough parameters
 INVALID_CHARS/valid_chars_expressions.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v$ | Not enough parameters
 INVERT1/invert1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.001771236106629716 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
@@ -554,7 +550,6 @@ SENS/bsim4_issue694_FD.cir simulator-differs:refinement reason=S-NUMERIC-CONVERG
 SENS/fddevLevelParams_ipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e2)
 SENS/fdipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e2)
 SENS/twoObjFD.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: DC Transfer Function: Voltage source, current source, or resistor named "vccvalue" is not in the circuit | doAnalys
-SOLN_DEP_CAP/ageTempDep.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: c1 1a 0 40u age=1e4 | unknown parameter (age) | Simulation interrupted due to error! | Error
 SOURCES/ebh.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: b4a: unknown controlling source v_e3 | doAnalyses: no such parameter on this device or parameter is missing
 SOURCES/ebh_sub.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: b.xsub.b4a: unknown controlling source v.xsub.v_e3 | doAnalyses: no such parameter on this device or parameter is m
 SOURCES/sources.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 25
