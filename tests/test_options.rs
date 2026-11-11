@@ -193,7 +193,7 @@ fn p3_004_xyce_timeint_gear_is_method_gear() {
 /// default 1e-3 (the tolerance: three times the first, far from the last).
 #[test]
 fn p3_003_xyce_timeint_reltol_is_reltol() {
-    let deck = "t\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 1u\n        .options timeint reltol=1e-6\n.tran 1m 20.25m\n.end\n";
+    let deck = "t\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 1u\n.options timeint reltol=1e-6\n.tran 1m 20.25m\n.end\n";
     let pi = std::f64::consts::PI;
     closed_form(
         Dialect::Xyce,

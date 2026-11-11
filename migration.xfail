@@ -2342,3 +2342,12 @@ hspice/hspice/power.sp hspice written differently: `.option delmax=1n` on the li
 hspice/hspice/meas_events.sp hspice written differently: `.option delmax=2n` on the line before `.tran`, not on the options card (P3-106)
 hspice/hspice/meas_events.sp ltspice written differently: delmax is `.tran 1n 3u 0 2n`, not `.options delmax=2n` (P3-106)
 hspice/hspice/meas_events.sp spectre written differently: the tran gains `maxstep=2n` (P3-106)
+
+# Batch-6 stacking (team-lead): VACASK writes these Xyce decks' options since P4-009 (batch-5);
+# P3-003 adds the TIMEINT RELTOL, P3-004 the TIMEINT METHOD=gear.
+xyce/ABM_ATAN_TAN/atan_tan.cir vacask written differently: TIMEINT RELTOL written as the target's reltol option (P3-003 after P4-009)
+xyce/SANDLER2/sandler2.cir vacask written differently: TIMEINT RELTOL written as the target's reltol option (P3-003 after P4-009)
+xyce/POWER/power_b_gear.cir vacask written differently: TIMEINT METHOD=gear written as tran_method gear2 (P3-004 after P4-009)
+xyce/POWER/power_f_gear.cir vacask written differently: TIMEINT METHOD=gear written as tran_method gear2 (P3-004 after P4-009)
+xyce/POWER/power_h_gear.cir vacask written differently: TIMEINT METHOD=gear written as tran_method gear2 (P3-004 after P4-009)
+xyce/POWER/power_tra_gear.cir vacask written differently: TIMEINT METHOD=gear written as tran_method gear2 (P3-004 after P4-009)

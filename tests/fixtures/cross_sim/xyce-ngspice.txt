@@ -100,7 +100,6 @@ BSIM4_rbodymod2/test8.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-
 BSIM4_rbodymod2/test9.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: 0.0004570215678821272+0i vs 0.00045241179241321594+0i at -0.1 (tol 4.413e-6)
 BSIM4_v4p82/test1.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VB#branch: 0.0000000003897007659907384+0i vs 0.00000000039463253725172804+0i at 0 (tol 3.038e-12)
 BSIM4_v4p82/test10.cir mismatch # dc VD#branch: 0.000004902537151799217+0i vs 0.0000006787565130319457+0i at -0.54 (tol 4.197e-6)
-BSIM4_v4p82/test13.cir mismatch # dc VB#branch: -0.000000000000863163618384237+0i vs -0.00000000000601262815415615+0i at -0.9400000000000001 (tol 4.379e-12)
 BSIM4_v4p82/test14.cir mismatch # dc VB#branch: -0.000000000010741322246667632+0i vs -0.0000000000019144600400381225+0i at -0.86 (tol 8.800e-12)
 BSIM4_v4p82/test2.cir mismatch # dc VD#branch: -0.000006502855519505791+0i vs -0.00003662113752685598+0i at 0.02 (tol 1.455e-5)
 BSIM4_v4p82/test3.cir mismatch # dc VD#branch: -0.000013933958316252117+0i vs -0.0000018735974903101735+0i at 0.3 (tol 1.198e-5)
@@ -415,7 +414,6 @@ CircuitSim90/MOS3/mike2.cir simulator-differs:refinement reason=S-NUMERIC-CONVER
 CircuitSim90/MOS3/todd3.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VAMP#branch: 0.0031028311738562466 leaves the tube at t=0.0000000010915028442609008 (tol 3.103e-5)
 DIAGNOSTIC/DC_GStep.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # dc V(5): -12.467531657381851+0i vs -0.0003898518551960948+0i at 0 (tol 2.686e-2)
 DIAGNOSTIC/DC_Ring51.cir slow # quarantined
-DIODE_ANALYTIC/forward_model.cir mismatch # tran V(2): 0 leaves the tube at t=0 (tol 1.997e-3)
 DIODE_CMC/DiodeClipper.cir mismatch # tran V(2): -0.05854424949055976 leaves the tube at t=0.0005880074733127265 (tol 7.541e-2)
 DIODE_CMC/DiodeClipper_DC.cir mismatch # dc V(2): -0.26943701771561274+0i vs -0.7007822720752727+0i at -10 (tol 2.014e-2)
 EKV26/inverter_transient_ekv26.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1)
@@ -446,7 +444,6 @@ HICUM/noise_npn_full_sh_ac.cir target-fails # ngspice swapped the model: Level m
 HOMOTOPY/arclengthSimple.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
 HOMOTOPY/continuation1.cir mismatch # tran: stop time Some(1e-6) -> Some(1.0145176436221071e-10)
 HOMOTOPY/continuation2.cir mismatch # tran: stop time Some(1e-6) -> Some(1.0145176436221071e-10)
-HOMOTOPY/continuation3.cir mismatch # tran: stop time Some(1e-6) -> Some(1.0145176436221071e-10)
 HOMOTOPY/continuation4.cir mismatch # tran: stop time Some(1e-6) -> Some(1.0145176436221071e-10)
 HOMOTOPY/schmidt.cir mismatch # op V(1): 10+0i vs 0+0i at 0 (tol 2.000e-2)
 IC_AND_NODESET/bjt_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
