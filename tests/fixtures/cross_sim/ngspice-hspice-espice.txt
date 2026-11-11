@@ -2468,8 +2468,6 @@ ngspice/examples/soi/Inv_chain.sp simulator-fails # no raw file .cross_sim_out.r
 ngspice/examples/soi/inv_dc.sp simulator-fails # no raw file .cross_sim_out.raw: warning: mn0: ./models/bsimsoi.va:3458: error: Fatal: NGATE_i = 0.000000e+00 is non-positive. | Error: .cross_sim_deck.sp: Devic
 ngspice/examples/soi/inv_tr.sp simulator-fails # no raw file .cross_sim_out.raw: warning: mn0: ./models/bsimsoi.va:3458: error: Fatal: NGATE_i = 0.000000e+00 is non-positive. | Error: .cross_sim_deck.sp: Devic
 ngspice/examples/soi/ring51_40.sp simulator-fails # no raw file .cross_sim_out.raw: warning: m.xinv1.xinv1.xinv1.mn1: ./models/bsimsoi.va:3458: error: Fatal: NGATE_i = 0.000000e+00 is non-positive. | Error: .cros
-ngspice/examples/various/bjt_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @q1[gm]: q1 has no variable 'gm'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
-ngspice/examples/various/diode_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @d1[gd]: d1 has no variable 'gd'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/various/roessler-attractor.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(x): 6.2592552217138575 leaves the tube at t=153.61596000036945 (tol 1.143e-1)
 ngspice/examples/various/tmp-noise.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
 ngspice/examples/various/todo-temper-3.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
@@ -2477,10 +2475,9 @@ ngspice/examples/vbic/npn_gum.sp simulator-fails # no raw file .cross_sim_out.ra
 ngspice/examples/vbic/npn_out.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/examples/vbic/vbic99_dc.sp simulator-fails # no raw file .cross_sim_out.raw: error: q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/examples/vbic/vbic99_tran.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # op v(t): 1.58743 vs 0 at 0 (tol 3.177e-03)
-ngspice/examples/vbic/vbic_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @q1[gm]: q1 has no variable 'gm'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/examples/vdmos/IXTP6N100D2-cap.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran i(vs): 0.14234721187834873 leaves the tube at t=0.10028000000000008 (tol 3.412e-2)
 ngspice/examples/vdmos/IXTP6N100D2-n-weak-inv.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc: sweep grid changed (5400 -> 505 points)
-ngspice/examples/vdmos/VDMOS-DIO.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @d1[id]: d1 has no variable 'id'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
+ngspice/examples/vdmos/VDMOS-DIO.sp simulator-differs:closed-form reason=S-ESPICE-VDMOS-DIODE proof=s-espice-vdmos-diode.md # ac i(vs): 0.12273 vs 0.0505135 at 1 (tol 3.477e-04)
 ngspice/examples/vdmos/crss_coss_ciss.sp simulator-fails # no raw file .cross_sim_out.raw: error: m3: model 'irfp9240' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/vdmos/inv_vdmos.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xinv.mp1: model 'p1' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/vdmos/ro_11_vdmos.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xinv1.mp1: model 'p1' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
@@ -2504,14 +2501,13 @@ ngspice/paranoia/vbic/npn_gum.sp simulator-fails # no raw file .cross_sim_out.ra
 ngspice/paranoia/vbic/npn_out.sp simulator-fails # no raw file .cross_sim_out.raw: error: q.xq1.q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/paranoia/vbic/vbic99_dc.sp simulator-fails # no raw file .cross_sim_out.raw: error: q1: unknown instance parameter 'area' | Error: .cross_sim_deck.sp: UnknownParameter
 ngspice/paranoia/vbic/vbic99_tran.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # op v(t): 1.44086 vs 0 at 0 (tol 2.884e-03)
-ngspice/paranoia/vbic/vbic_ac_par.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @q1[gm]: q1 has no variable 'gm'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/paranoia/vdmos/IXTP6N100D2-cap.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran i(vs): 0.14234721187834873 leaves the tube at t=0.10028000000000008 (tol 3.412e-2)
 ngspice/paranoia/vdmos/IXTP6N100D2-cap.sp.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran i(vs): 0.14234721187834873 leaves the tube at t=0.10028000000000008 (tol 3.412e-2)
 ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc: sweep grid changed (5400 -> 505 points)
 ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # dc: sweep grid changed (5400 -> 505 points)
 ngspice/paranoia/vdmos/VDMOS-DIO-AC.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # ac i(vs): 0.12273 vs 0.0505135 at 1 (tol 3.477e-04)
 ngspice/paranoia/vdmos/VDMOS-DIO.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran i(vs): -0.0032473668002581486 leaves the tube at t=2.4827999999999912 (tol 4.967e-5)
-ngspice/paranoia/vdmos/VDMOS-DIO.sp.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @d1[id]: d1 has no variable 'id'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
+ngspice/paranoia/vdmos/VDMOS-DIO.sp.sp simulator-differs:closed-form reason=S-ESPICE-VDMOS-DIODE proof=s-espice-vdmos-diode.md # ac i(vs): 0.12273 vs 0.0505135 at 1 (tol 3.477e-04)
 ngspice/paranoia/vdmos/crss_coss_ciss.sp simulator-fails # no raw file .cross_sim_out.raw: error: m3: model 'irfp9240' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/paranoia/vdmos/inv_vdmos.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xinv.mp1: model 'p1' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/paranoia/vdmos/inv_vdmos.sp.sp simulator-fails # no raw file .cross_sim_out.raw: error: m.xinv.mp1: model 'p1' (vdmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
@@ -2548,7 +2544,6 @@ ngspice/tests/regression/lib-processing/ex2a.sp simulator-fails reason=ESPICE-NE
 ngspice/tests/regression/lib-processing/ex3a.sp simulator-fails reason=ESPICE-NESTED-LIB proof=espice-nested-lib-work-dir.md # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound
 ngspice/tests/regression/misc/ac-zero.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .ac lin 1 0 0: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
 ngspice/tests/regression/misc/asrc-tc-2.sp simulator-fails reason=ESPICE-HSPICE-READER proof=espice-hspice-r-node-voltage.md # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
-ngspice/tests/regression/misc/bugs-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @v1[dc]: v1 has no variable 'dc'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard
 ngspice/tests/regression/misc/empty-1.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: DeliveryFailed | Output error: DataLengthMismatch
 ngspice/tests/regression/misc/log-functions-1.sp target-fails # no raw file .cross_sim_out.raw: error: B-source 'eb2': the v= expression is not supported (UnsupportedFunction); the limits are i() of branch cards only, no unk
 ngspice/tests/regression/misc/test-noise-2.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # noise onoise_spectrum: 0.002263714702364253+0i vs 0.000000004057784401557085+0i at 1000 (tol 6.527e-6)

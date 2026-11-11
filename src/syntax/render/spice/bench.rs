@@ -500,7 +500,8 @@ impl W<'_, '_> {
     /// The save list. A noise run produces `onoise_spectrum`, not node
     /// voltages, so a node list can never name it: ngspice then saves all
     /// (and the names beside it), the others none. HSPICE's `.save` saves
-    /// simulator state; `.probe` selects outputs. Xyce's rawfile holds
+    /// simulator state; `.probe` selects outputs, of which ngspice's
+    /// `@dev[param]` is none (left out, W0052). Xyce's rawfile holds
     /// every vector.
     fn saves(&mut self, tb: &Tb) {
         let noise = tb.plan.runs.iter().any(|a| matches!(a, Ana::Noise { .. }));
@@ -513,12 +514,21 @@ impl W<'_, '_> {
         let written = match self.cells[Construct::Save as usize] {
             Action::Spell(Alt::Omit(_)) => tb.saves.is_empty(),
             Action::Spell(Alt::Probe) if !noise => {
-                for s in &tb.saves {
+                // ngspice's `@dev[param]` (manual §15.6) is no HSPICE
+                // output variable (cmdref `.PROBE`: a voltage, a current,
+                // an element template). `@` leads it: a node may hold one
+                // (Xyce's `1@`).
+                for s in tb.saves.iter().filter(|s| !s.starts_with('@')) {
                     let line = match s.as_str() {
                         "all" => ".option post".to_string(),
                         s => format!(".probe {s}"),
                     };
                     self.o.token(&line, Space::Line);
+                }
+                if let Some(tok) = tb.save_tok
+                    && tb.saves.iter().any(|s| s.starts_with('@'))
+                {
+                    self.note(Code::W0052, tok);
                 }
                 true
             }
