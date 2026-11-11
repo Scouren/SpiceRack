@@ -821,6 +821,33 @@ class TestSourceParameters:
 
 
 # ======================================================================
+# AC and DC arguments as expressions (P8-018)
+# ======================================================================
+
+class TestSourceExpressions:
+    def test_p8_018_ac_magnitude_and_phase_take_an_expression(self):
+        c = ps().Circuit("ac")
+        c.V("1", "a", c.gnd, 1.0, ac="{amp}", ac_phase="ph")
+        c.I("1", c.gnd, "a", 1.0, ac=2.0, ac_phase=90.0)
+        cards = c.to_source().splitlines()
+        # The card ngspice-45 ran (evidence/P8-018/ng/expr2.cir); one pair of
+        # braces whether the caller wrote them or not.
+        assert "V1 a 0 1 AC {amp} {ph}" in cards
+        # A number keeps its spelling.
+        assert "I1 0 a 1 AC 2 90" in cards
+
+    def test_p8_018_a_waveform_source_takes_dc_and_ac_expressions(self):
+        c = ps().Circuit("ac")
+        c.SinusoidalVoltageSource("1", "a", c.gnd, amplitude=1.0, frequency=1e3, dc="{vdd/2}", ac="{amp}")
+        assert "V1 a 0 {vdd/2} AC {amp} SIN(0 1 1000 0 0 0)" in c.to_source().splitlines()
+
+    def test_p8_018_dc_and_its_old_spelling_still_exclude_each_other(self):
+        c = ps().Circuit("ac")
+        with pytest.raises(TypeError, match="not both"):
+            c.SinusoidalVoltageSource("1", "a", c.gnd, dc="{vdd}", dc_offset=1.0)
+
+
+# ======================================================================
 # Ground node aliasing
 # ======================================================================
 

@@ -9,7 +9,7 @@
 //!   `Wave::pwl(values: &[(Num, Num)], repeat: Option<&Num>, delay: Option<&Num>) -> Wave`
 //! - `pub(super) fn source(current, name, np, nm, value, ac, ac_phase, disto, port, wave) -> Card`
 //! - `pub(super) fn wave_source(current, name, np, nm, wave, dc, ac, ac_phase) -> Card`
-//! - `pub(super) fn either(a: Option<f64>, b: Option<f64>, an: &str, bn: &str) -> PyResult<Option<f64>>`
+//! - `pub(super) fn either<T>(a: Option<T>, b: Option<T>, an: &str, bn: &str) -> PyResult<Option<T>>`
 
 use pyo3::prelude::*;
 
@@ -47,7 +47,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, offset=Num::of(0.0), amplitude=Num::of(1.0), frequency=Num::of(1000.0), delay=Num::of(0.0), damping_factor=Num::of(0.0), phase=Num::of(0.0), dc_offset=None, ac_magnitude=None, dc=None, ac=None, ac_phase=None))]
             fn $sin(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                offset: Num, amplitude: Num, frequency: Num, delay: Num, damping_factor: Num, phase: Num, dc_offset: Option<f64>, ac_magnitude: Option<f64>, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                offset: Num, amplitude: Num, frequency: Num, delay: Num, damping_factor: Num, phase: Num, dc_offset: Option<Num>, ac_magnitude: Option<Num>, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 let wf = Wave::new("SIN", &[&offset, &amplitude, &frequency, &delay, &damping_factor, &phase], offset.value());
                 Self::place_wave(slf, $current, name, positive, negative, wf, either(dc, dc_offset, "dc", "dc_offset")?, either(ac, ac_magnitude, "ac", "ac_magnitude")?, ac_phase);
@@ -57,7 +57,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, initial_value=Num::of(0.0), pulsed_value=Num::of(1.0), delay=Num::of(0.0), pulse_width=Num::of(50e-9), period=Num::of(100e-9), rise_time=Num::of(1e-9), fall_time=Num::of(1e-9), delay_time=None, dc_offset=None, dc=None, ac=None, ac_phase=None))]
             fn $pulse(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                initial_value: Num, pulsed_value: Num, delay: Num, pulse_width: Num, period: Num, rise_time: Num, fall_time: Num, delay_time: Option<Num>, dc_offset: Option<f64>, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                initial_value: Num, pulsed_value: Num, delay: Num, pulse_width: Num, period: Num, rise_time: Num, fall_time: Num, delay_time: Option<Num>, dc_offset: Option<Num>, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 let delay = delay_time.unwrap_or(delay);
                 let wf = Wave::new("PULSE", &[&initial_value, &pulsed_value, &delay, &rise_time, &fall_time, &pulse_width, &period], initial_value.value());
@@ -69,7 +69,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, values, repeat_time=None, delay_time=None, dc=None, ac=None, ac_phase=None))]
             fn $pwl(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                values: Vec<(Num, Num)>, repeat_time: Option<Num>, delay_time: Option<Num>, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                values: Vec<(Num, Num)>, repeat_time: Option<Num>, delay_time: Option<Num>, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 let wf = Wave::pwl(&values, repeat_time.as_ref(), delay_time.as_ref());
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);
@@ -79,7 +79,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, initial_value, pulsed_value, rise_time_constant, fall_delay_time, fall_time_constant, rise_delay_time=Num::of(0.0), dc=None, ac=None, ac_phase=None))]
             fn $exp(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                initial_value: Num, pulsed_value: Num, rise_time_constant: Num, fall_delay_time: Num, fall_time_constant: Num, rise_delay_time: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                initial_value: Num, pulsed_value: Num, rise_time_constant: Num, fall_delay_time: Num, fall_time_constant: Num, rise_delay_time: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 let wf = Wave::new("EXP", &[&initial_value, &pulsed_value, &rise_delay_time, &rise_time_constant, &fall_delay_time, &fall_time_constant], initial_value.value());
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);
@@ -89,7 +89,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, offset, amplitude, carrier_frequency, modulation_index, signal_frequency, dc=None, ac=None, ac_phase=None))]
             fn $sffm(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                offset: Num, amplitude: Num, carrier_frequency: Num, modulation_index: Num, signal_frequency: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                offset: Num, amplitude: Num, carrier_frequency: Num, modulation_index: Num, signal_frequency: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 let wf = Wave::new("SFFM", &[&offset, &amplitude, &carrier_frequency, &modulation_index, &signal_frequency], offset.value());
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);
@@ -99,7 +99,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, offset, amplitude, modulating_frequency, carrier_frequency, signal_delay=Num::of(0.0), dc=None, ac=None, ac_phase=None))]
             fn $am(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                offset: Num, amplitude: Num, modulating_frequency: Num, carrier_frequency: Num, signal_delay: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                offset: Num, amplitude: Num, modulating_frequency: Num, carrier_frequency: Num, signal_delay: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 // PySpice's `amplitude·(offset + sin(2π fm t'))·sin(2π fc t')`
                 // in ngspice-45's `AM(VO VMO VMA FM FC TD)` (`vsrcload.c`):
@@ -123,7 +123,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, noise_rms, time_step, flicker_exponent=Num::of(0.0), flicker_rms=Num::of(0.0), rts_amplitude=Num::of(0.0), rts_capture_time=Num::of(0.0), rts_emission_time=Num::of(0.0), dc=None, ac=None, ac_phase=None))]
             fn $noise(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                noise_rms: Num, time_step: Num, flicker_exponent: Num, flicker_rms: Num, rts_amplitude: Num, rts_capture_time: Num, rts_emission_time: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                noise_rms: Num, time_step: Num, flicker_exponent: Num, flicker_rms: Num, rts_amplitude: Num, rts_capture_time: Num, rts_emission_time: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 // The RTS fields are left off when all zero, as the manual's white
                 // and 1/f examples write the card.
@@ -139,7 +139,7 @@ macro_rules! pymethods_with_waves {
             #[pyo3(signature = (name, positive, negative, *, random_type, duration, time_delay=Num::of(0.0), parameter1=Num::of(1.0), parameter2=Num::of(0.0), dc=None, ac=None, ac_phase=None))]
             fn $random(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                random_type: &str, duration: Num, time_delay: Num, parameter1: Num, parameter2: Num, dc: Option<f64>, ac: Option<f64>, ac_phase: Option<f64>,
+                random_type: &str, duration: Num, time_delay: Num, parameter1: Num, parameter2: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
                 let kind: super::keywords::RandomKind = random_type.parse().map_err(PyValueError::new_err)?;
                 let ty = Num::of((kind as u8 + 1).into());
@@ -192,8 +192,8 @@ pub(super) fn source(
     np: String,
     nm: String,
     value: Value,
-    ac: Option<f64>,
-    ac_phase: Option<f64>,
+    ac: Option<Num>,
+    ac_phase: Option<Num>,
     disto: [Option<(f64, f64)>; 2],
     port: Option<(u32, f64)>,
     wave: Option<&Wave>,
@@ -201,9 +201,9 @@ pub(super) fn source(
     let letter = if current { 'I' } else { 'V' };
     let mut tail = String::new();
     if let Some(mag) = ac {
-        tail.push_str(&format!(" AC {}", dec(mag)));
+        tail.push_str(&format!(" AC {}", mag.text()));
         if let Some(phase) = ac_phase {
-            tail.push_str(&format!(" {}", dec(phase)));
+            tail.push_str(&format!(" {}", phase.text()));
         }
     }
     for (word, input) in ["distof1", "distof2"].into_iter().zip(disto) {
@@ -227,11 +227,11 @@ pub(super) fn wave_source(
     np: String,
     nm: String,
     wave: Wave,
-    dc: Option<f64>,
-    ac: Option<f64>,
-    ac_phase: Option<f64>,
+    dc: Option<Num>,
+    ac: Option<Num>,
+    ac_phase: Option<Num>,
 ) -> Card {
-    let value = dc.map_or_else(|| wave.zero.clone(), Value::Num);
+    let value = dc.map_or_else(|| wave.zero.clone(), |d| d.value());
     source(
         current,
         name,
@@ -247,11 +247,11 @@ pub(super) fn wave_source(
 }
 
 /// One of two spellings of the same argument (`dc`/`dc_offset`), never both.
-pub(super) fn either(a: Option<f64>, b: Option<f64>, an: &str, bn: &str) -> PyResult<Option<f64>> {
+pub(super) fn either<T>(a: Option<T>, b: Option<T>, an: &str, bn: &str) -> PyResult<Option<T>> {
     match (a, b) {
         (Some(_), Some(_)) => Err(pyo3::exceptions::PyTypeError::new_err(format!(
             "pass {an} or {bn}, not both"
         ))),
-        _ => Ok(a.or(b)),
+        (a, b) => Ok(a.or(b)),
     }
 }

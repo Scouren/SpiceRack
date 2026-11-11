@@ -71,6 +71,7 @@ Every element takes its name and nodes first; the rest are keywords.
 | `F`, `H` | current-controlled sources | `vsense=` (a V source name), `current_gain=` / `transresistance=` |
 | `POLY` | polynomial E/G/F/H | `kind, positive, negative, controls, coefficients` |
 | `BV`, `BI` | behavioural sources | `expression="..."` |
+| `V`, `I`, waveform sources | AC and DC as expressions | `ac="{amp}"`, `ac_phase="{ph}"`; on a waveform source also `dc="{vdd/2}"` |
 | `I`, `G`, `F`, `BV`, `BI` | instance parameters | `m=2` after the other arguments; on `BV`/`BI` also `tc1=`, `tc2=`, `temp=`, `dtemp=` |
 | `NonLinearVoltageSource`, `NonLinearCurrentSource` | the same, as E and G cards (`E1 a b value={...}`) | `expression="..."` |
 | `D` | diode | `anode, cathode, model=` |

@@ -58,7 +58,7 @@ impl PyTestbench {
     /// `distof1=(mag, phase)`, `distof2=`: the source's `distortion` input
     /// at F1 and F2, as `Subcircuit.V`'s.
     #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None))]
-    fn V(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+    fn V(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<Num>, ac_phase: Option<Num>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
         let port = portnum.map(|n| (n, z0));
         let v = source(false, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, [distof1, distof2], port, None);
         slf.as_super().stim(v);
@@ -66,7 +66,7 @@ impl PyTestbench {
 
     /// `distof1`, `distof2`: as `V`'s.
     #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None, **kwargs))]
-    fn I(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+    fn I(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<Num>, ac_phase: Option<Num>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
         let ps = params(&kw_params(kwargs)?);
         let c = source(true, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None);
         slf.as_super().stim(c.with_params(&ps));
@@ -396,9 +396,9 @@ impl PyTestbench {
         p: &str,
         n: &str,
         wf: Wave,
-        dc: Option<f64>,
-        ac: Option<f64>,
-        ac_phase: Option<f64>,
+        dc: Option<Num>,
+        ac: Option<Num>,
+        ac_phase: Option<Num>,
     ) {
         slf.as_super().stim(wave_source(
             current,

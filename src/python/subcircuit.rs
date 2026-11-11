@@ -163,7 +163,7 @@ impl PySubcircuit {
     /// `distof2=` at F2 (ngspice's `DISTOF1`/`DISTOF2`, the phase in
     /// degrees); with neither on any source every distortion vector is 0.
     #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None))]
-    fn V(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+    fn V(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<Num>, ac_phase: Option<Num>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
         let port = portnum.map(|n| (n, z0));
         let c = source(false, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], port, None);
         self.inner.elements.push(c);
@@ -172,7 +172,7 @@ impl PySubcircuit {
     /// `distof1`, `distof2`: as `V`'s. `**kwargs` are instance parameters,
     /// written last on the card (`m=2`: ngspice multiplies the current).
     #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None, **kwargs))]
-    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<Num>, ac_phase: Option<Num>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
         let ps = params(&kw_params(kwargs)?);
         let c = source(true, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None);
         self.inner.elements.push(c.with_params(&ps));
@@ -668,9 +668,9 @@ impl PySubcircuit {
         p: &str,
         n: &str,
         wf: Wave,
-        dc: Option<f64>,
-        ac: Option<f64>,
-        ac_phase: Option<f64>,
+        dc: Option<Num>,
+        ac: Option<Num>,
+        ac_phase: Option<Num>,
     ) {
         let c = wave_source(current, name, slf.net(p), slf.net(n), wf, dc, ac, ac_phase);
         slf.inner.elements.push(c);

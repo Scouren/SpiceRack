@@ -226,6 +226,8 @@ FEATURES = {
     "subcircuit_nested": _with_nested,
     # Sources.
     "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
+    "ac_expression": source(lambda tb: tb.V("in", "in", "0", 1.0, ac="{r/500}", ac_phase="{r/100}")),
+    "sin_dc_expression": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3, dc="{r/1000}")),
     "distortion_inputs": source(lambda tb: tb.V("in", "in", "0", 0.0, distof1=(1, 0), distof2=(0.5, 90))),
     "pulse": source(lambda tb: tb.PulseVoltageSource("in", "in", "0")),
     "pwl": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)])),
@@ -359,6 +361,9 @@ EXPECTED = {
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # `distof1`/`distof2` are ngspice's words: the card is kept as its text, W0001 elsewhere (P4-071).
     'distortion_inputs': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    # An AC magnitude or phase given as an expression: kept as ngspice's card, W0001 elsewhere (P5-014 reads it).
+    'ac_expression': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    'sin_dc_expression': (OK,) * 9,
     'pulse': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
