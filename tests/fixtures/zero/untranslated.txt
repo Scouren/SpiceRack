@@ -4274,6 +4274,7 @@ spice-bench/ngspice/examples/soa/diode-soa-simple.sp ltspice
 spice-bench/ngspice/examples/soa/diode-soa-simple.sp spectre
 spice-bench/ngspice/examples/soa/diode-soa-simple.sp vacask
 spice-bench/ngspice/examples/soa/diode-soa-simple.sp xyce
+spice-bench/ngspice/examples/sp/Tschebyschef-LP.sp vacask
 spice-bench/ngspice/examples/sp/filter.sp hspice
 spice-bench/ngspice/examples/sp/filter.sp ltspice
 spice-bench/ngspice/examples/sp/filter.sp spectre
@@ -4399,6 +4400,7 @@ spice-bench/ngspice/paranoia/pton/switch-oscillators.sp ltspice
 spice-bench/ngspice/paranoia/pton/switch-oscillators.sp spectre
 spice-bench/ngspice/paranoia/pton/switch-oscillators.sp vacask
 spice-bench/ngspice/paranoia/pton/switch-oscillators.sp xyce
+spice-bench/ngspice/paranoia/various/Tschebyschef-LP.sp vacask
 spice-bench/ngspice/paranoia/various/probe-i-dev.sp hspice
 spice-bench/ngspice/paranoia/various/probe-i-dev.sp ltspice
 spice-bench/ngspice/paranoia/various/probe-i-dev.sp spectre
@@ -7374,6 +7376,7 @@ xyce/MEASURE_AC/AvgTestAC.cir ltspice
 xyce/MEASURE_AC/AvgTestAC.cir ngspice
 xyce/MEASURE_AC/AvgTestAC.cir spectre
 xyce/MEASURE_AC/AvgTestAC.cir vacask
+xyce/MEASURE_AC/RFParamsOps.cir vacask
 xyce/MEASURE_DC/AvgTest1DC.cir espice
 xyce/MEASURE_DC/AvgTest1DC.cir hspice
 xyce/MEASURE_DC/AvgTest1DC.cir ltspice
@@ -8056,6 +8059,7 @@ xyce/Message/Input/AC_doInit1.cir ltspice
 xyce/Message/Input/AC_doInit1.cir ngspice
 xyce/Message/Input/AC_doInit1.cir spectre
 xyce/Message/Input/AC_doInit1.cir vacask
+xyce/Message/Input/AC_doInit2.cir vacask
 xyce/Message/Input/AC_extractACData2.cir espice
 xyce/Message/Input/AC_extractACData2.cir hspice
 xyce/Message/Input/AC_extractACData2.cir ltspice
@@ -8346,6 +8350,7 @@ xyce/Output/Dasho/printLine_for_hb_td.cir ltspice
 xyce/Output/Dasho/printLine_for_hb_td.cir ngspice
 xyce/Output/Dasho/printLine_for_hb_td.cir spectre
 xyce/Output/Dasho/printLine_for_hb_td.cir vacask
+xyce/Output/Dasho/sparam.cir vacask
 xyce/Output/Dasho/tran-stepnum-col.cir espice
 xyce/Output/Dasho/tran-stepnum-col.cir hspice
 xyce/Output/Dasho/tran-stepnum-col.cir ltspice
@@ -8565,6 +8570,13 @@ xyce/Output/Other/printFilename.cir ltspice
 xyce/Output/Other/printFilename.cir ngspice
 xyce/Output/Other/printFilename.cir spectre
 xyce/Output/Other/printFilename.cir vacask
+xyce/Output/SPARAMS/InvalidDotLinParams1.cir vacask
+xyce/Output/SPARAMS/InvalidDotLinParams2.cir vacask
+xyce/Output/SPARAMS/InvalidRFParamOp.cir vacask
+xyce/Output/SPARAMS/InvalidRFParamOp1.cir vacask
+xyce/Output/SPARAMS/NegativeZ0.cir vacask
+xyce/Output/SPARAMS/RCladderSP1.cir vacask
+xyce/Output/SPARAMS/RCladderSP1_step.cir vacask
 xyce/Output/SPARAMS/RCladderSPdc.cir cdl
 xyce/Output/SPARAMS/RCladderSPdc.cir espice
 xyce/Output/SPARAMS/RCladderSPdc.cir hspice
@@ -8586,6 +8598,22 @@ xyce/Output/SPARAMS/ac.cir ltspice
 xyce/Output/SPARAMS/ac.cir ngspice
 xyce/Output/SPARAMS/ac.cir spectre
 xyce/Output/SPARAMS/ac.cir vacask
+xyce/Output/SPARAMS/dashRNotSupported.cir vacask
+xyce/Output/SPARAMS/multi-parameter.cir vacask
+xyce/Output/SPARAMS/sparams-phase-in-radians.cir vacask
+xyce/Output/SPARAMS/sparams-ts1-1port.cir vacask
+xyce/Output/SPARAMS/sparams-ts1-3port.cir vacask
+xyce/Output/SPARAMS/sparams-ts1-4port.cir vacask
+xyce/Output/SPARAMS/sparams-ts1-5port.cir vacask
+xyce/Output/SPARAMS/sparams-ts1-dataFormat.cir vacask
+xyce/Output/SPARAMS/sparams-ts2-dataFormat.cir vacask
+xyce/Output/SPARAMS/sparams-ts2.cir vacask
+xyce/Output/SPARAMS/yparams-ts1-1port.cir vacask
+xyce/Output/SPARAMS/yparams-ts1-2port.cir vacask
+xyce/Output/SPARAMS/yparams-ts2.cir vacask
+xyce/Output/SPARAMS/zparams-ts1-1port.cir vacask
+xyce/Output/SPARAMS/zparams-ts1-2port.cir vacask
+xyce/Output/SPARAMS/zparams-ts2.cir vacask
 xyce/PARAM_REFACTOR/paramDep1.cir espice
 xyce/PARAM_REFACTOR/paramDep1.cir hspice
 xyce/PARAM_REFACTOR/paramDep1.cir ltspice
@@ -9546,6 +9574,8 @@ xyce/XDM/HSPICE/NODESET/nodeset_global_node_warning.cir ltspice
 xyce/XDM/HSPICE/NODESET/nodeset_global_node_warning.cir ngspice
 xyce/XDM/HSPICE/NODESET/nodeset_global_node_warning.cir spectre
 xyce/XDM/HSPICE/NODESET/nodeset_global_node_warning.cir vacask
+xyce/XDM/HSPICE/SPARAMS/p_element_bandpass_filter.cir vacask
+xyce/XDM/HSPICE/SPARAMS/telegrapher_line.cir vacask
 xyce/XDM/HSPICE/TEMPERATURE/multi_temperature_statement.cir espice
 xyce/XDM/HSPICE/TEMPERATURE/multi_temperature_statement.cir hspice
 xyce/XDM/HSPICE/TEMPERATURE/multi_temperature_statement.cir ltspice
@@ -9931,6 +9961,7 @@ xyce/YLIN/ylin-5port-hbAnalysis.cir ltspice
 xyce/YLIN/ylin-5port-hbAnalysis.cir ngspice
 xyce/YLIN/ylin-5port-hbAnalysis.cir spectre
 xyce/YLIN/ylin-5port-hbAnalysis.cir vacask
+xyce/YLIN/ylin-5port-linAnalysis.cir vacask
 xyce/YLIN/ylin-5port-yparam-cw.cir cdl
 xyce/YLIN/ylin-5port-yparam-cw.cir espice
 xyce/YLIN/ylin-5port-yparam-cw.cir hspice
