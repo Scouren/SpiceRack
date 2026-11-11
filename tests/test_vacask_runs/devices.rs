@@ -309,7 +309,8 @@ fn p4_004_a_poly_source_runs_on_vacask() {
 /// so the same card read as Xyce is refused.
 #[test]
 fn p3_069_diode_knee_current_ngspice_ik() {
-    let deck = "knee\n.model dk D (IS=1e-14 N=1.05 RS=10 IKF=1e-3)\nV1 a 0 0.75\nD1 a 0 dk\n                .op\n.end\n";
+    let deck =
+        "knee\n.model dk D (IS=1e-14 N=1.05 RS=10 IKF=1e-3)\nV1 a 0 0.75\nD1 a 0 dk\n.op\n.end\n";
     close(col(&run(deck), "v1:flow(br)")[0], -1.62690e-3, 1e-3);
     let xyce = spicerack::syntax::render::render_text(deck, Dialect::Xyce, "t", Dialect::Vacask);
     let codes: Vec<Code> = xyce

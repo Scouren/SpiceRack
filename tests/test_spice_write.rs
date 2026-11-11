@@ -693,7 +693,7 @@ fn p3_007_xyce_nmos_level_written_level() {
 fn p3_069_xyce_diode_ikf_is_refused_on_ngspice() {
     let deck = |ikf: &str| {
         format!(
-            "* t\nv1 a 0 0.75\nr1 a b 100\nd1 b 0 dk\n             .model dk d (is=1e-14 n=1.05 rs=10 ikf={ikf})\n.op\n.end\n"
+            "* t\nv1 a 0 0.75\nr1 a b 100\nd1 b 0 dk\n.model dk d (is=1e-14 n=1.05 rs=10 ikf={ikf})\n.op\n.end\n"
         )
     };
     let cite = "Xyce N_DEV_Diode.C:2396-2401; ngspice-45 dio/dioload.c:382-386";
