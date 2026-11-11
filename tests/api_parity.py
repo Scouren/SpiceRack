@@ -356,6 +356,66 @@ def test_store_round_trip(name, target):
     assert got == built
 
 
+# The five targets the store reads through a translation step
+# (`store.rs::ngspice_text`: the text written as ngspice, then read).
+_FOREIGN = ("hspice", "xyce", "ltspice", "spectre", "vacask")
+
+# The foreign round trips that stop before a second netlist exists
+# (ROUNDTRIP-TRIAGE K11, K12, K13): `(name, target)` -> the ledger row
+# that removes the cause. Each fails on an unexpected pass.
+STORE_DETOUR = {(name, t): row for name, t, row in [
+    # K11: ngspice has no statement for the construct, so the detour
+    # refuses the deck; gone with the detour.
+    ("ac_log", "spectre", "P8-151"), ("fourier", "spectre", "P8-151"),
+    ("fourier_count", "spectre", "P8-151"), ("harmonic_balance", "spectre", "P8-151"),
+    ("pss", "spectre", "P8-151"), ("spectre_monte_carlo", "spectre", "P8-151"),
+    ("spectre_pac", "spectre", "P8-151"), ("spectre_pnoise", "spectre", "P8-151"),
+    ("spectre_pstb", "spectre", "P8-151"), ("spectre_pxf", "spectre", "P8-151"),
+    ("spectre_sweep", "spectre", "P8-151"), ("stability", "spectre", "P8-151"),
+    ("step", "ltspice", "P8-151"), ("step", "spectre", "P8-151"), ("step", "xyce", "P8-151"),
+    ("step_dec", "ltspice", "P8-151"), ("step_dec", "spectre", "P8-151"),
+    ("step_dec", "xyce", "P8-151"), ("step_log", "spectre", "P8-151"),
+    ("tf", "spectre", "P8-151"), ("veriloga", "spectre", "P8-151"),
+    # K12: the reader keeps its own writer's statement as text, which the
+    # detour cannot write as ngspice; gone with the detour, or with the
+    # reader row named beside each.
+    ("veriloga", "hspice", "P8-151"),           # P5-097 (`.hdl`)
+    ("network_params", "ltspice", "P8-151"),    # P5-033 (`.net`)
+    ("ac_oct", "spectre", "P8-151"),            # P5-084 (`ac values=`)
+    ("ac_sensitivity", "spectre", "P8-151"),    # P5-084 (`sens`)
+    ("dc_sensitivity", "spectre", "P8-151"),    # P5-084 (`sens`)
+    ("pwl", "vacask", "P8-151"),                # P5-086 (`pwl wave=`)
+    ("step", "vacask", "P8-151"),               # P5-001 (`var`/`sweep`)
+    ("step_dec", "vacask", "P8-151"),           # P5-001 (`var`/`sweep`)
+    ("spectre_monte_carlo", "vacask", "P8-151"),  # P5-008 (`mc`)
+    # K13: VACASK `dcxf` is read to ngspice as `.tf out`, no input source.
+    ("tf", "vacask", "P5-053"),
+]}
+
+FOREIGN_CASES = sorted(
+    (name, t) for name in PARITY for t in _FOREIGN if WRITES.get((name, t))
+)
+
+
+@pytest.mark.parametrize("name,target", FOREIGN_CASES)
+def test_p8_316_a_foreign_decks_title_survives_the_store(name, target):
+    """Line 1 of a deck read back from its own netlist and written again
+    is the build's line 1: the store keeps the deck's title, not a name
+    of its own (Spectre UG 5.1.41: "The first line is taken to be the
+    title"; ngspice manual §2.1; VACASK's title line is bare). Line 1
+    only: what else the store's ngspice detour changes belongs to the
+    rows P8-313 lists."""
+    mod = ps_()
+    text = FEATURES[name](mod).netlist(target)
+    row = STORE_DETOUR.get((name, target))
+    if row is not None:
+        with pytest.raises((ValueError, RuntimeError)):
+            mod.Testbench.from_source(text, target).netlist(target)
+        pytest.xfail(f"STORE_DETOUR: {row}")
+    again = mod.Testbench.from_source(text, target).netlist(target)
+    assert again.splitlines()[0] == text.splitlines()[0]
+
+
 @pytest.mark.parametrize("name", sorted(PARITY))
 def test_text_twin_is_deterministic(name):
     """Determinism (AGENTS "Testing"): reading and netlisting a twin gives
