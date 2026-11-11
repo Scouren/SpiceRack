@@ -363,9 +363,6 @@ xyce/XDM/PSPICE/LOSSLESS_TRANSLINE/lossless_transline.cir vacask now written: a 
 
 # S1: P4-006: VACASK's `tran` has `start=` (docs/cmd-analysis-tran.md at 36be560): a `.tran` with TSTART is written.
 # Oracle: closed-form RC step saved from 0.5 ms (tests/test_vacask_runs/analyses.rs::p4_006_a_tran_start_is_vacasks_start).
-hspice/tran_noise/hspice_samples.sp vacask now written: `.tran` TSTART is VACASK's `start=` (P4-006)
-hspice/tran_noise/hspice_sde_flicker.sp vacask now written: `.tran` TSTART is VACASK's `start=` (P4-006)
-hspice/tran_noise/hspice_sde_rc.sp vacask now written: `.tran` TSTART is VACASK's `start=` (P4-006)
 ltspice/ltspice_demos/LTC6090_LTC2054_DN513_F02.net vacask now written: `.tran` TSTART is VACASK's `start=` (P4-006)
 ltspice/ltspice_demos/LTC6090_LTC2054_DN513_F02_.net vacask now written: `.tran` TSTART is VACASK's `start=` (P4-006)
 ltspice/ltspice_examples/2875.net vacask now written: `.tran` TSTART is VACASK's `start=` (P4-006)
