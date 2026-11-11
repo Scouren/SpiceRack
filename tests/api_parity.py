@@ -173,6 +173,7 @@ PARITY = {
     "subcircuit_nested": (FEATURES["subcircuit_nested"], deck(subckts=[[".subckt wrap a b", ".subckt buf a b", "R1 a b 1e3", ".ends buf", "X1 a b buf", ".ends wrap"]], top=RC + ["X1 out 0 wrap"], bench=[VIN, ".op"]), "ng §2.6.1 .subckt (a definition inside a definition, local to it)", "P8-013"),
     # ── Sources ──
     "sin": (FEATURES["sin"], tw_source(["Vin in 0 0 SIN(0 1 1000 0 0 0)"]), "ng §4.1.1 SIN", None),
+    "distortion_inputs": (FEATURES["distortion_inputs"], tw_source(["Vin in 0 0 distof1 1 0 distof2 0.5 90"]), "ng §4.1 independent sources (DISTOF1 <F1MAG <F1PHASE>>, DISTOF2 …)", "P8-022"),
     "pulse": (FEATURES["pulse"], tw_source(["Vin in 0 0 PULSE(0 1 0 1e-9 1e-9 50e-9 100e-9)"]), "ng §4.1.2 PULSE", None),
     "pwl": (FEATURES["pwl"], tw_source(["Vin in 0 0 PWL(0 0 1e-6 1)"]), "ng §4.1.3 PWL", None),
     "pwl_repeat": (FEATURES["pwl_repeat"], tw_source(["Vin in 0 0 PWL(0 0 1e-6 1) r=0"]), "ng §4.1.4 PWL repeat", None),

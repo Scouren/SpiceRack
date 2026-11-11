@@ -226,6 +226,7 @@ FEATURES = {
     "subcircuit_nested": _with_nested,
     # Sources.
     "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
+    "distortion_inputs": source(lambda tb: tb.V("in", "in", "0", 0.0, distof1=(1, 0), distof2=(0.5, 90))),
     "pulse": source(lambda tb: tb.PulseVoltageSource("in", "in", "0")),
     "pwl": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)])),
     "pwl_repeat": source(lambda tb: tb.PieceWiseLinearVoltageSource("in", "in", "0", values=[(0, 0), (1e-6, 1)], repeat_time=0.0)),
@@ -353,6 +354,8 @@ EXPECTED = {
     # Every target writes the nested definition hoisted, as `wrap__buf`.
     'subcircuit_nested': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # `distof1`/`distof2` are ngspice's words: the card is kept as its text, W0001 elsewhere (P4-071).
+    'distortion_inputs': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'pulse': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'pwl_repeat': (OK, OK, 'W0008', 'W0008', 'W0008', 'W0008', 'W0108', OK, OK),
