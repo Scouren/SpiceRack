@@ -169,9 +169,12 @@ only VACASK's 3 `benchmark/*/gnucap/runme.sim` inputs (P1-025).
 9c7a7e0 taken by the batch-4 gate (D47), with the same inputs as fx15; the
 17,172 lines `migration.xfail` held against fx15 (batches A to 4) became
 baseline and the list restarted empty. `baseline-9c7a7e0-fx16.PROVENANCE`
-names the same facts as fx15's. `baseline-1298f0b-fx17` is the current gate: the
+names the same facts as fx15's. `baseline-1298f0b-fx17` followed: the
 record of `p7-integrate` 1298f0b (batches 5 to 7), the same inputs; the list restarted
-empty again.
+empty again. `baseline-ccc7930-fx18` is the current gate: the record of batch-11b
+ccc7930 (`p7-integrate` 94743c7, batches 8 to 11b, P3-001's 27 °C among them), the
+same inputs; the 19,770 lines the list held against fx17 became baseline and it
+restarted empty.
 
 Inputs (the `MANIFEST` of each record lists them, with content hashes):
 
