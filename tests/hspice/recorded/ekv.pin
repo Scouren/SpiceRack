@@ -1,0 +1,3 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, section "Third oracle", EKV 2.6)
+deck: Xyce's EKV26 card (Netlists/EKV26/test_ekv26_nmos.cir) as level 55 (EKV 2.6 R11); Id at vg = 2, vd = 0.1
+id_vg2_vd0.1 8.875e-5

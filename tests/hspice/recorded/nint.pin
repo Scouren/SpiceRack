@@ -1,0 +1,12 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, rows P5-075 hs and P5-024 hs)
+deck: nint.sp: nint, round and int of ties as parameters; `vh h 0 ac='hertz/1000'` (rejected with a warning, value 0) and `r='1k*(1+hertz/1e3)'` under 1 mA AC at 1, 2 and 3 kHz
+nint(1.5) 2
+nint(2.5) 3
+nint(-0.5) -1
+nint(-2.5) -3
+round(2.5) 3
+int(-2.5) -2
+hertz_ac_source_value 0
+hertz_r_v_1k 2
+hertz_r_v_2k 3
+hertz_r_v_3k 4

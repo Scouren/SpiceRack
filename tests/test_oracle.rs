@@ -10,6 +10,8 @@
 #[path = "common/oracle.rs"]
 mod oracle;
 
+use std::path::Path;
+
 use oracle::{At, Tol, value};
 use spicerack::result::{RawData, VarInfo, VarType};
 use spicerack::syntax::Dialect;
@@ -172,4 +174,75 @@ fn p1_043_a_recorded_spectre_run_checks_the_written_deck() {
     };
     let on = [Dialect::Ngspice, Dialect::Spectre];
     oracle::closed_form(Dialect::Ngspice, deck, &on, "out", At::Last, 2.0 / 3.0, tol);
+}
+
+#[test]
+fn p1_050_hspice_pins_are_the_recorded_runs_by_name() {
+    // research/settle-remote.md and REMOTE-ORACLE.md: the HSPICE
+    // Y-2026.03-SP2-1 runs remote-oracle made on iccad4, 2026-11-07. No
+    // other run exists and none can be added (ZERO D43), so the names are
+    // compared, never counted. Checks: 1 + 2 per pin.
+    let want = [
+        "bsim1", "bsim2", "disto", "divider", "ekv", "gaas", "gates", "hb", "hbosc", "lstb",
+        "mextram", "nint", "opamp", "sn", "u", "vccap", "w",
+    ];
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/hspice/recorded");
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .map(|e| e.expect("a directory entry").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "pin"))
+        .map(|p| {
+            p.file_stem()
+                .expect("a stem")
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    names.sort();
+    assert_eq!(names, want);
+    for n in want {
+        let text = std::fs::read_to_string(dir.join(format!("{n}.pin"))).expect("listed above");
+        let tool = "provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/";
+        assert!(text.starts_with(tool), "{n}: {text}");
+        assert!(
+            text.lines().nth(1).is_some_and(|l| l.starts_with("deck: ")),
+            "{n}: {text}"
+        );
+    }
+}
+
+#[test]
+fn p1_050_recorded_reads_a_key_of_a_named_run() {
+    // settle-remote, row P6-002: `.disto rl 1` on the diode stage gave
+    // hd2 = 23.01, hd3 = 391.5, im2d = 46.02 in the .lis. Checks: 3.
+    assert_eq!(oracle::recorded(Dialect::Hspice, "disto", "hd2"), 23.01);
+    assert_eq!(oracle::recorded(Dialect::Hspice, "disto", "hd3"), 391.5);
+    assert_eq!(
+        oracle::recorded(Dialect::Hspice, "nint", "nint(-2.5)"),
+        -3.0
+    );
+}
+
+#[test]
+#[should_panic(expected = "no recorded run")]
+fn p1_050_a_missing_recorded_run_names_the_d43_oracles() {
+    oracle::recorded(Dialect::Hspice, "no_such_run", "x");
+}
+
+#[test]
+fn p1_050_the_hspice_writer_meets_the_recorded_divider() {
+    // REMOTE-ORACLE.md's smoke test: 3 V across 1k + 2k is V(b) = 2.0000
+    // on HSPICE 2026.03 (five digits recorded, hence 5e-5). The deck that
+    // ran was not kept, so the writer's HSPICE text for the same circuit
+    // runs on the simulator here that reads HSPICE (ESPice
+    // `--tokenizer=hspice`, ZERO D43 tier c) and must give the number real
+    // HSPICE recorded; ngspice on the source vouches for the circuit.
+    let deck = "t\nv1 a 0 3\nr1 a b 1k\nr2 b 0 2k\n.op\n.end\n";
+    let want = oracle::recorded(Dialect::Hspice, "divider", "v(b)");
+    let tol = Tol {
+        rel: 5e-5,
+        floor: 0.0,
+    };
+    let on = [Dialect::Ngspice, Dialect::Hspice];
+    oracle::closed_form(Dialect::Ngspice, deck, &on, "b", At::First, want, tol);
 }

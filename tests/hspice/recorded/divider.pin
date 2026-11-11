@@ -1,0 +1,3 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/REMOTE-ORACLE.md, smoke test)
+deck: a 3 V source across 1k + 2k, .op; V(b) read from the .lis operating point table
+v(b) 2.0000

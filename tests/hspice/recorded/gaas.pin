@@ -1,0 +1,8 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, section "Third oracle", GaAs Statz charge)
+deck: the P4-024 MESFET card as NJF level 3 `sat=2 capop=1`; Cin and Cout in F at vgs -1.6, -1.0 and -0.3, vds 3
+cin_vgs-1.6 0.2548e-12
+cout_vgs-1.6 0.1996e-12
+cin_vgs-1.0 0.8009e-12
+cout_vgs-1.0 0.2328e-12
+cin_vgs-0.3 0.9559e-12
+cout_vgs-0.3 0.3108e-12

@@ -1,0 +1,5 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P6-002)
+deck: disto.sp: a diode stage with Rl = 10k at 25 C, `.disto rl 1`, `.ac dec 1 1k 10k`; the measures printed in the .lis
+hd2 23.01
+hd3 391.5
+im2d 46.02

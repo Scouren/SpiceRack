@@ -1,0 +1,8 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P4-008, PA 50, P5-060)
+deck: settle-api's loop with `rr (o1 b) 20k` (bilateral) and without it (unilateral), .LSTB; the loop gain at 1 kHz and 1 MHz
+bilateral_1k_re -7.518711207
+bilateral_1k_im 0.02539672247
+bilateral_1meg_re -0.6058879359
+bilateral_1meg_im 2.0465698618
+unilateral_1k_re -31.24947
+unilateral_1k_im 0.128852

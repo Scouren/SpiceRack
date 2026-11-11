@@ -1,0 +1,6 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, section "BSIM2 third oracle")
+deck: ngspice tests/bsim2/test.cir card verbatim as `level=39 spice3=1`, L=10u W=50u, vg 0 to 5 step 0.25 at vds 0.05, 2.5 and 5, 27 C
+id_vg3_vds2.5 -1.1357e-3
+max_rel_vs_ngspice_vds0.05 2.5e-4
+max_rel_vs_ngspice_vds2.5 4.2e-5
+max_rel_vs_ngspice_vds5 4.2e-5

@@ -54,6 +54,7 @@
 //! - `pub fn value(plots: &[RawData], node: &str, at: At) -> f64`
 //! - `pub fn op(on: Dialect, text: &str, node: &str) -> f64`
 //! - `pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64`
+//! - `pub fn recorded(on: Dialect, name: &str, key: &str) -> f64`
 //! - `pub fn measure(on: Dialect, text: &str, node: &str, at: At) -> f64`
 //! - `pub fn sim_pair(from: Dialect, deck: &str, to: Dialect, node: &str, at: At, tol: Tol) -> (f64, f64)`
 //! - `pub fn closed_form(from: Dialect, deck: &str, on: &[Dialect], node: &str, at: At, want: f64, tol: Tol)`
@@ -213,15 +214,10 @@ pub fn op(on: Dialect, text: &str, node: &str) -> f64 {
 /// pin": take the manual page or another simulator as the oracle, or list
 /// the line under `UNRUN_SPECTRE_HSPICE`), or when the pin lacks the value.
 pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64 {
-    let dir = match on {
-        Dialect::Spectre => "spectre",
-        Dialect::Hspice => "hspice",
-        _ => panic!("{on:?} runs here: `run` it, a pin is for Spectre and HSPICE"),
-    };
     let key = format!("{:016x}", fnv1a(text.as_bytes()));
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
-        .join(dir)
+        .join(pin_dir(on))
         .join("pins")
         .join(format!("{key}.pin"));
     let pin = std::fs::read_to_string(&path).unwrap_or_else(|_| {
@@ -258,6 +254,59 @@ pub fn pinned(on: Dialect, text: &str, node: &str, at: At) -> f64 {
         }
     }
     panic!("{}: no {want} at {at:?}", path.display())
+}
+
+/// The number `key` of the run named `name` that real `on` made on iccad4
+/// before 2026-11-08 (Spectre or HSPICE; ZERO D43, tier a) of a deck whose
+/// text was not kept, so no FNV names it: the pin
+/// `tests/<spectre|hspice>/recorded/<name>.pin`. Its first line is
+/// `provenance: <tool version, host, date, where the record is>`, its
+/// second `deck: <what ran, as the record describes it>`; each other line
+/// is `<key> <value>` or a `#` comment.
+///
+/// ```ignore
+/// // Ledger P6-002: HSPICE's `.DISTO` HD2 of the recorded diode stage.
+/// let hd2 = recorded(Dialect::Hspice, "disto", "hd2");
+/// ```
+///
+/// # Panics
+/// For a dialect with a local simulator, on a missing pin, or when the
+/// pin lacks its provenance, its deck or the key.
+pub fn recorded(on: Dialect, name: &str, key: &str) -> f64 {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join(pin_dir(on))
+        .join("recorded")
+        .join(format!("{name}.pin"));
+    let pin = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!(
+            "no recorded run {}: use the manual-page or other-simulator oracle (D43), or list the line in UNRUN_SPECTRE_HSPICE",
+            path.display()
+        )
+    });
+    let mut lines = pin.lines();
+    for head in ["provenance: ", "deck: "] {
+        let said = lines.next().and_then(|l| l.strip_prefix(head));
+        assert!(
+            said.is_some_and(|s| !s.trim().is_empty()),
+            "{}: a line `{head}…` is missing",
+            path.display()
+        );
+    }
+    for l in lines.filter(|l| !l.starts_with('#') && !l.trim().is_empty()) {
+        let f: Vec<&str> = l.split_whitespace().collect();
+        assert!(
+            f.len() == 2,
+            "{}: `{l}` is not `<key> <value>`",
+            path.display()
+        );
+        if f[0] == key {
+            return f[1]
+                .parse()
+                .unwrap_or_else(|e| panic!("{}: `{l}`: {e}", path.display()));
+        }
+    }
+    panic!("{}: no {key}", path.display())
 }
 
 /// `v(node)` at `at` of the deck `text` on `on`: a run where one is local,
@@ -455,6 +504,16 @@ fn fnv1a(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| {
         (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
     })
+}
+
+/// The directory under `tests/` of `on`'s pins: Spectre's or HSPICE's, the
+/// two simulators with no binary here.
+fn pin_dir(on: Dialect) -> &'static str {
+    match on {
+        Dialect::Spectre => "spectre",
+        Dialect::Hspice => "hspice",
+        _ => panic!("{on:?} runs here: `run` it, a pin is for Spectre and HSPICE"),
+    }
 }
 
 /// `text` on LTspice, through `spicerack::backend` (the harness has no

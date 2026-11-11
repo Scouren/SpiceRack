@@ -1,0 +1,8 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, section "P5-037")
+deck: two van der Pol LC tanks (L=1u, C=1n): A, VACASK's test_pssosc1, with PROBENODE=x,0,1; B, settle-api's bench, with PROBENODE=x,0,2; `.HBOSC TONE=5e6 NHARMS=10`; frequency in Hz, |H1| and |H3| in V
+a_freq 5.001744e6
+a_h1 1.15560
+a_h3 0.045428
+b_freq 5.032607e6
+b_h1 2.000016
+b_h3 0.0079053

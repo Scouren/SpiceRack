@@ -1,0 +1,4 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, section "Third oracle", BSIM1)
+deck: ngspice tests/bsim1 card as level 13 (toxm in um, vfb0/phi0/eta0/u00/dl0/dw0/nb0/nd0/tref/vddm); Id over vgs at vds 0.05, 2.5 and 5
+id_vg3_vd2.5 5.2747e-4
+max_rel_vs_spectre 3.1e-6

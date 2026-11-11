@@ -1,0 +1,3 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P4-039)
+deck: sn.sp: RC + sine, `.sn tres=1u period=1m`; the largest distance of the waveform from the analytic steady state
+max_error_vs_analytic 1.8e-3

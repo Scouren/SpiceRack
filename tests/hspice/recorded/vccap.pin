@@ -1,0 +1,7 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P5-078 H6)
+deck: vccap.sp: a VCCAP with (1) the output held at 1 V and the control ramped 2 to 2.5 V, (2) a self-controlled ramp, (3) the control fixed and the output ramped 1 V/us across 3 pF
+# (1): |i| <= 1.3e-18
+i_output_held 0
+# (2) at t = 0.24 us: C(v)*dv/dt, not (C + v*dC/dv)*dv/dt
+i_self_controlled -0.976e-6
+i_output_ramped -3.000e-6

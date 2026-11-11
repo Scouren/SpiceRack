@@ -1,0 +1,6 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P5-078 H8 / P6-012)
+deck: opamp.sp: E OPAMP (and level=1) driven by +-1 V with no feedback, the same element in an inverting stage of gain 2, and a TRANSFORMER k=3
+opamp_gain 1.000e14
+inverting_stage_gain -2.000000000
+transformer_k3_vout 0.6667
+transformer_k3_iin 2.222e-4

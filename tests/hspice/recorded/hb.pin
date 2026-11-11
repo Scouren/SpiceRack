@@ -1,0 +1,6 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P5-060 / P5-007 hs, sp)
+deck: hb.sp, hbt.sp: a linear RC (wRC = 1) driven by a 1 V sine, .HB; the first harmonic of the output with `HB 1 -90 1 1` on the source (or .option tranforhb=1), and with a plain SIN source
+h1_re -0.5
+h1_im -0.5
+# a SIN source with no HB spec and no tranforhb=1 is ignored by .HB
+h1_abs_plain_sin 0

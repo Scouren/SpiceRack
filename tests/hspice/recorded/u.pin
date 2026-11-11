@@ -1,0 +1,28 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, sections "P5-020 rerun" and "P5-020 sub-cases")
+deck: `U1 in 0 out 0 um L=0.5 [LUMPS=n]`, `.model um U LEVEL=3 ELEV=2 PLEV=1 NL=1 LLEV=0 CR1=100p GR1=1e-4 L11=250n R11=0.5 [RRR=0.2]`, 50 ohm source, 100 ohm load, AC at 1 MHz to 1 GHz; each value the largest error of the ladder named, or the lump count that fits
+# LUMPS=1, 2: uniform T-sections; LUMPS=3, 5: T-sections with half-length end lumps
+lumps1_error 6.9e-9
+lumps2_error 6.1e-9
+lumps3_error 6.1e-9
+lumps5_error 6.0e-9
+# the default count against RISETIME (TDeff = 2.5 ns): min(20, floor(4 + 20*TDeff/RISETIME))
+lumps_risetime_1000n 4
+lumps_risetime_300n 4
+lumps_risetime_200n 4
+lumps_risetime_100n 4
+lumps_risetime_50n 5
+lumps_risetime_30n 5
+lumps_risetime_20n 6
+lumps_risetime_10n 9
+lumps_risetime_5n 14
+lumps_risetime_3n 20
+lumps_risetime_2n 20
+lumps_risetime_1n 20
+lumps_no_risetime 20
+# RRR=0.2: the reference conductor as its own T-chain
+rrr_lumps1_error 6.9e-9
+rrr_lumps2_error 6.1e-9
+# NL=2 (coupled) and LLEV=1 (with CEXT=10p)
+nl2_lumps1_error 5.1e-9
+nl2_lumps3_error 4.4e-9
+llev1_error 1.1e-8

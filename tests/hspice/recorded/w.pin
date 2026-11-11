@@ -1,0 +1,7 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P5-019 / P4-084)
+deck: w.sp: a W element, 0.5 m, Ro=0.5 Lo=250n Go=1e-4 Co=100p Rs=2e-4 Gd=1e-12, 50 ohm source and 100 ohm load; AC against the exact RLGC line at 1 MHz to 1 GHz, and a step against Spectre's mtline
+out_1g_re -0.635240
+out_1g_im 0.020083
+ac_error_vs_exact_1meg 1.4e-11
+ac_error_vs_exact_1g 4.1e-11
+tran_max_diff_vs_mtline 1.5e-4

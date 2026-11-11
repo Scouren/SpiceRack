@@ -1,0 +1,7 @@
+provenance: HSPICE Y-2026.03-SP2-1, iccad4, 2026-11-07 (research/settle-remote.md, row P5-078 H8 / P6-012)
+deck: gates.sp: E AND(2) and OR(2) with PWL 0,0 1,1 on inputs 0.3 V and 0.7 V, at the default DELTA and at DELTA=1e-6; NAND(2) with PWL 0,1 1,0
+and2 0.2994987
+or2 0.7005013
+and2_delta_1e-6 0.2999998
+or2_delta_1e-6 0.7000002
+nand2_inverting_pwl 0.7005
