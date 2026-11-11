@@ -16,10 +16,11 @@
 //! - `pub(super) fn r_value(kind: &str, params: &[(String, String)]) -> Option<String>`
 
 use super::W;
-use super::powers::{Grouping, group_powers};
+use super::powers::{Grouping, Law, group_powers};
 use super::ternary::{
     Read, nominal, parenthesize, rename_call, rename_word, spell_clamp, spell_if, spell_nint,
 };
+use super::ternary::{ngspice_power_calls, xyce_power_calls};
 use crate::syntax::behaviour::{ExprEval, ParamForm, ValueQuoting};
 
 /// One expression rewrite: `apply` where `holds`.
@@ -70,14 +71,24 @@ const REWRITES: &[Rewrite] = &[
         holds: |w| w.pair.nint_to_ngspice,
         apply: |_, e| spell_nint(e, false),
     },
+    // Xyce's `pow`, `pwr`, `pwrs` as powers, for the power row.
+    Rewrite {
+        holds: |w| w.pair.xyce_power,
+        apply: |_, e| xyce_power_calls(e),
+    },
     // A power chain, a power under a unary sign: the source's grouping in
-    // parentheses where the target groups another way (`powers`). Last:
+    // parentheses where the target groups another way; a power the target
+    // gives another value: respelled by the pair's law (`powers`). Last:
     // a row that spells a call as a power goes before it.
     Rewrite {
-        holds: |w| Grouping::of(&w.rd.t.lexicon_at(0).ops) != Grouping::of(&w.sp.lexicon.ops),
+        holds: |w| {
+            power_law(w) != Law::Keep
+                || Grouping::of(&w.rd.t.lexicon_at(0).ops) != Grouping::of(&w.sp.lexicon.ops)
+        },
         apply: |w, e| {
             let src = Grouping::of(&w.rd.t.lexicon_at(0).ops);
-            group_powers(e, src, Grouping::of(&w.sp.lexicon.ops), w.rd.b.caret_power)
+            let tgt = Grouping::of(&w.sp.lexicon.ops);
+            group_powers(e, src, tgt, w.rd.b.caret_power, power_law(w))
         },
     },
 ];
@@ -222,6 +233,14 @@ impl W<'_, '_> {
             return e.to_string();
         }
         let mut e = e.to_string();
+        // ngspice's power calls differ between its B-source evaluator and
+        // its `{}` one: spelled as powers here, where the evaluator is
+        // known. The B-source one reads a B source (`read` is C's for an
+        // ngspice deck there only, `cards::behavioural_card`) and every
+        // expression with a probe (a behavioural R, C or L).
+        if self.pair.abs_power_out {
+            e = ngspice_power_calls(&e, read == Read::C || has_probe(&e));
+        }
         for r in REWRITES.iter().filter(|r| (r.holds)(self)) {
             e = (r.apply)(self, &e);
         }
@@ -241,6 +260,30 @@ pub(super) fn r_value(kind: &str, params: &[(String, String)]) -> Option<String>
 }
 
 // ---- private ----
+
+/// The law a power is respelled by between `w`'s source and target
+/// (each `Pair` field carries its evidence).
+fn power_law(w: &W<'_, '_>) -> Law {
+    let p = &w.pair;
+    match (p.abs_power_out, p.abs_power_in, p.xyce_power) {
+        (true, _, _) => Law::Abs,
+        (_, true, true) => Law::Real,
+        (_, true, false) => Law::Signed,
+        _ => Law::Keep,
+    }
+}
+
+/// Whether `e` reads a node voltage or a branch current (`v(a)`,
+/// `i(v1)`): ngspice's `{}` evaluator has neither, so its B-source
+/// evaluator reads such an expression wherever it stands.
+fn has_probe(e: &str) -> bool {
+    let b = e.as_bytes();
+    (1..b.len()).any(|i| {
+        b[i] == b'('
+            && matches!(b[i - 1], b'v' | b'V' | b'i' | b'I')
+            && (i == 1 || !(b[i - 2].is_ascii_alphanumeric() || b[i - 2] == b'_'))
+    })
+}
 
 /// [`W::spelled`] for HSPICE.
 fn hspice_value(v: &str) -> String {

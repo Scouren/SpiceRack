@@ -19,6 +19,47 @@ use spicerack::backend::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-078: a negative base under an odd whole exponent keeps its
+/// sign on ngspice. Xyce 7.10 gives `v(n)**3`, `pow(v(n),3)` and `{n**3}`
+/// -8 for n = -2 (RG §2.3); ngspice-45 reads each as |n|^3 = 8 (manual
+/// §5.1), so each is written `(sgn(x)*abs(x)**3)`. Oracle: Xyce on the
+/// source deck, ngspice on the written one.
+#[test]
+fn p3_078_an_odd_power_of_a_negative_base_keeps_its_sign_on_ngspice() {
+    let tol = oracle::Tol {
+        rel: 1e-9,
+        floor: 0.0,
+    };
+    let deck = "t\n.param n=-2\nVn n 0 -2\nRn n 0 1\nB1 p 0 V={v(n)**3}\nR1 p 0 1\n\
+                B2 q 0 V={pow(v(n),3)}\nR2 q 0 1\nV3 r 0 {n**3}\nR3 r 0 1\n.op\n.end\n";
+    for node in ["p", "q", "r"] {
+        let at = oracle::At::First;
+        let (xy, _) = oracle::sim_pair(Dialect::Xyce, deck, Dialect::Ngspice, node, at, tol);
+        assert!(tol.within(xy, -8.0), "Xyce 7.10 v({node}): {xy}");
+    }
+}
+
+/// Ledger P3-029: ngspice's power takes the base's magnitude. ngspice-45
+/// gives `v(n)**3` and `pow(v(n),3)` |n|^3 = 8 in a B source and
+/// `pwr(v(n),2)` sgn(n)*|n|^2 = -4 for n = -2 (manual §5.1); Xyce 7.10
+/// reads them as -8, -8 and 4 (RG §2.3), so the base is written `abs()`
+/// and `pwr` with its sign. Oracle: ngspice on the source deck, Xyce on
+/// the written one.
+#[test]
+fn p3_029_an_ngspice_power_takes_the_magnitude_of_its_base_on_xyce() {
+    let tol = oracle::Tol {
+        rel: 1e-9,
+        floor: 0.0,
+    };
+    let deck = "t\nVn n 0 -2\nRn n 0 1\nB1 p 0 V=v(n)**3\nR1 p 0 1\n\
+                B2 q 0 V=pow(v(n),3)\nR2 q 0 1\nB3 r 0 V=pwr(v(n),2)\nR3 r 0 1\n.op\n.end\n";
+    for (node, want) in [("p", 8.0), ("q", 8.0), ("r", -4.0)] {
+        let at = oracle::At::First;
+        let (ng, _) = oracle::sim_pair(Dialect::Ngspice, deck, Dialect::Xyce, node, at, tol);
+        assert!(tol.within(ng, want), "ngspice-45 v({node}): {ng}");
+    }
+}
+
 /// Ledger P3-077: a power keeps the source's grouping. ngspice-45 reads
 /// `a**b**c` as (2**3)**2 = 64 (manual §2.8.5), Xyce 7.10 as 2**(3**2) =
 /// 512: each deck written for the other gives the source's value. LTspice

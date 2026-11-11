@@ -30,6 +30,8 @@
 //! - `pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String`
 //! - `pub(super) fn nominal(e: &str) -> String`
 //! - `pub(super) fn spell_clamp(e: &str) -> String`
+//! - `pub(super) fn xyce_power_calls(e: &str) -> String`
+//! - `pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String`
 //! - `pub(super) fn close(b: &[u8], i: usize) -> Option<usize>`
 
 use std::cell::Cell;
@@ -239,6 +241,46 @@ pub(super) fn close(b: &[u8], i: usize) -> Option<usize> {
     None
 }
 
+/// `e` with Xyce's `pow(x, y)` and `pwr(x, y)` spelled `((x)**(y))` (both
+/// are its `**`: RG 7.10 §2.3; 7.10 by hand: `pwr(-2,3)` -8,
+/// `pwr(-2.5,2.1)` 6.5145) and `pwrs(x, y)` `(sgn(x)*abs(x)**(y))` (its
+/// definition; ngspice-45 has no `pwrs`), for the power rewrite to give
+/// each the source's value on ngspice (`powers`).
+pub(super) fn xyce_power_calls(e: &str) -> String {
+    let power = |a: &[String]| match a {
+        [x, y] => Some(format!("(({x})**({y}))")),
+        _ => None,
+    };
+    let signed = |a: &[String]| match a {
+        [x, y] => Some(format!("(sgn({x})*abs({x})**({y}))")),
+        _ => None,
+    };
+    let e = map_calls(e, "pow", &power, 0);
+    let e = map_calls(&e, "pwr", &power, 0);
+    map_calls(&e, "pwrs", &signed, 0)
+}
+
+/// `e` with ngspice's power calls spelled as its `**`, which has one
+/// meaning in both of its evaluators (ngspice-45 by hand, n = -2). In a B
+/// source (`b_source`) `pow(n,3)` is `|n|^3` = 8: `((x)**(y))`, and
+/// `pwr(n,3)` `sgn(n)*|n|^3` = -8: `(sgn(x)*((x)**(y)))`. In a `{}` value
+/// `pwr(n,3)` is `|n|^3` = 8: `((x)**(y))`; `pow(n,3)` is C's (-8) and
+/// stands.
+pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String {
+    let power = |a: &[String]| match a {
+        [x, y] => Some(format!("(({x})**({y}))")),
+        _ => None,
+    };
+    let signed = |a: &[String]| match a {
+        [x, y] => Some(format!("(sgn({x})*(({x})**({y})))")),
+        _ => None,
+    };
+    match b_source {
+        true => map_calls(&map_calls(e, "pow", &power, 0), "pwr", &signed, 0),
+        false => map_calls(e, "pwr", &power, 0),
+    }
+}
+
 // ---- private ----
 
 /// `s` with its ternaries spelled, at nesting `depth`.
@@ -401,6 +443,23 @@ mod tests {
         Nest, Read, ngspice_nest, nominal, parenthesize, rename_call, rename_word, spell_clamp,
         spell_if, spell_nint,
     };
+
+    /// Each spelling's value on ngspice-45 is the call's on its own
+    /// simulator (Xyce 7.10, ngspice-45: `research/impl/evidence/P3-078`).
+    #[test]
+    fn power_calls_are_spelled_as_powers() {
+        let xy = super::xyce_power_calls;
+        assert_eq!(xy("pwr(V(1),v(2))"), "((V(1))**(v(2)))");
+        assert_eq!(
+            xy("POW(a, 3)+pwrs(-b,c)"),
+            "((a)**(3))+(sgn(-b)*abs(-b)**(c))"
+        );
+        assert_eq!(xy("pow(a)"), "pow(a)");
+        let ng = super::ngspice_power_calls;
+        assert_eq!(ng("pow(v(n),3)", true), "((v(n))**(3))");
+        assert_eq!(ng("pwr(v(n),2)", true), "(sgn(v(n))*((v(n))**(2)))");
+        assert_eq!(ng("pow(n,3)+pwr(n,2)", false), "pow(n,3)+((n)**(2))");
+    }
 
     #[test]
     fn a_c_then_branch_ternary_is_parenthesized() {
