@@ -1,6 +1,7 @@
 //! The testbench → VACASK's `control` block: one `options` line, each
 //! `.step` as a `sweep` ahead of each analysis (of a control variable, the
-//! `temp` option or a source's own `dc`: `W::step_what`),
+//! `temp` option or a source's own `dc`: `W::step_what`; the first `.step`
+//! nearest it: the innermost loop),
 //! and the analyses, initial conditions on each transient's line and
 //! nodesets on every `analysis` line; a Spectre `montecarlo` as an `mc`
 //! loop around its inner analysis.
@@ -21,7 +22,7 @@ use super::vacask::{num, q, respell};
 use crate::syntax::behaviour::{NamedRules, OptionTo};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
-use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val};
+use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val, step_points};
 
 impl W<'_, '_> {
     /// The `control` block: options, then per analysis the stepped sweeps
@@ -82,16 +83,27 @@ impl W<'_, '_> {
         if let Some((_, tok)) = tb.measures.first() {
             self.ask(Construct::Measure, *tok);
         }
-        let mut sweeps: Vec<String> = tb.steps.iter().filter_map(|s| self.step_sweep(s)).collect();
+        // Each `.step`'s `sweep` line, with its first token.
+        let mut sweeps: Vec<(u32, String)> = Vec::new();
+        for s in &tb.steps {
+            if let Some(line) = self.step_sweep(s) {
+                sweeps.push((s.3, line));
+            }
+        }
         // A list `.step` is a `sweep … values=[…]` (`lib/answeep.cpp`
         // `setupValueSweep`) of what a ranged one sets (`W::step_what`).
         for (p, v, tok) in &tb.step_lists {
             let first = v.first().copied().unwrap_or(0.0);
             if let Some(what) = self.step_what(p, first, *tok) {
                 let name = sanitize(&p.to_ascii_lowercase());
-                sweeps.push(format!("sweep step_{name} {what} {}", values(v)));
+                sweeps.push((*tok, format!("sweep step_{name} {what} {}", values(v))));
             }
         }
+        // The `sweep` line nearest its `analysis` is the innermost loop
+        // (VACASK 36be560, run: `research/impl/evidence/P5-100/`): the
+        // first `.step`, the source's innermost (Xyce RG 7.10 §2.1.36;
+        // LTspice 26.1.1, run), is written last.
+        sweeps.sort_by_key(|s| std::cmp::Reverse(s.0));
         // `.ic` and a capacitor's `ic=` are a transient's: ngspice forces
         // them in a transient's operating point only (`.ic` beside `.op`
         // leaves the node free, run) and VACASK's `op` has no `ic`
@@ -149,7 +161,7 @@ impl W<'_, '_> {
             }
             // A `sweep` binds to the next `analysis`: the stepped sweeps
             // are repeated ahead of each.
-            for s in &sweeps {
+            for (_, s) in &sweeps {
                 self.line(&format!("  {s}"));
             }
             let lines = match a {
@@ -385,10 +397,20 @@ impl W<'_, '_> {
     }
 
     /// A `.step`'s `sweep` line; `None` when it is refused (VACASK sweeps
-    /// lin, dec or oct).
+    /// lin, dec or oct). A grid that ends short of its stop value is
+    /// `values=[…]`, its points: VACASK spreads a `dec` or `oct` sweep
+    /// evenly from `from` to `to` and fails on a range that steps away
+    /// from `to` (36be560, run: `research/impl/evidence/P5-099/`).
     fn step_sweep(&mut self, (sweep, param, [start, stop, step], tok): &Step) -> Option<String> {
+        if *sweep == Some("log") {
+            self.refuse(Code::W0016, *tok);
+            return None;
+        }
         let what = self.step_what(param, *start, *tok)?;
         let scale = format!("step_{}", sanitize(&param.to_ascii_lowercase()));
+        if let Some((points, true)) = step_points(*sweep, [*start, *stop, *step]) {
+            return Some(format!("sweep {scale} {what} {}", values(&points)));
+        }
         Some(match sweep {
             Some(mode @ ("dec" | "oct")) => format!(
                 "sweep {scale} {what} from={} to={} mode=\"{mode}\" points={}",
@@ -396,10 +418,6 @@ impl W<'_, '_> {
                 num(*stop),
                 *step as u64
             ),
-            Some("log") => {
-                self.refuse(Code::W0016, *tok);
-                return None;
-            }
             _ => format!(
                 "sweep {scale} {what} from={} to={} step={}",
                 num(*start),

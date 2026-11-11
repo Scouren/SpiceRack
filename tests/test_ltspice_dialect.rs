@@ -61,8 +61,10 @@ impl Cg {
 /// rejects). ngspice has no `.step`, so the cards are LTspice's own.
 #[test]
 fn step_keeps_the_param_keyword_in_every_form() {
-    for sweep in ["lin", "oct", "dec"] {
-        let card = format!(".step {sweep} param rval 1000 10000 10");
+    // Each range ends on its stop value; one whose grid misses it is
+    // written as the list of its points (ZERO-LEDGER P5-099).
+    for (sweep, stop) in [("lin", 10000), ("oct", 8000), ("dec", 10000)] {
+        let card = format!(".step {sweep} param rval 1000 {stop} 10");
         let emitted = lt().body(&card, Dialect::Ltspice).unwrap();
         assert_eq!(emitted, card);
     }

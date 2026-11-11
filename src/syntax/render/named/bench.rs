@@ -2,7 +2,8 @@
 //! read order (options merged, the last temperature winning), then
 //! `options`, `ic`, `nodeset`, `save` (a `.save`'s and a `.print`'s
 //! signals), the measures in a `simulator lang=spice` region, and the
-//! analyses (`analyses.rs`), each `.step` a `sweep` block around them.
+//! analyses (`analyses.rs`), each `.step` a `sweep` block around them,
+//! the first `.step` the innermost.
 //!
 //! Cites: Spectre Reference 19.1 `[REF]` pp.187-236 (`options`: `reltol`
 //! #1, `vabstol` #3, `iabstol` #4, `temp` #6, `tnom` #7, `dcmaxiters` #56),
@@ -24,7 +25,7 @@ use crate::syntax::behaviour::{ModelSemantics, OptionTo, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::epochs::{Plan, plan};
-use crate::syntax::render::read::{Bench, BenchCard, Opt, Val};
+use crate::syntax::render::read::{Bench, BenchCard, Opt, Val, step_points};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
@@ -202,33 +203,28 @@ impl W<'_, '_> {
                 block.extend(s.split('\n').map(str::to_string));
             }
         }
-        // One `sweep` block per step parameter, the first outermost; a
-        // list `.step` is `sweep param=p values=[…]` (`[REF]` pp.406-409),
-        // inside the others.
-        let lists = tb
-            .step_lists
-            .iter()
-            .enumerate()
-            .rev()
-            .map(|(i, (p, v, _))| {
-                let k = tb.steps.len() + i + 1;
-                format!(
-                    "sweep{k}_{} sweep param={p} {} {{",
-                    suffix(p),
-                    self.values(v)
-                )
-            });
-        let lists: Vec<String> = lists.collect();
-        for head in lists {
-            let mut wrapped = vec![head];
-            wrapped.extend(block.into_iter().map(|l| format!("  {l}")));
-            wrapped.push("}".into());
-            block = wrapped;
+        // One `sweep` block per `.step`, in read order from the inside
+        // out: the first `.step` is the innermost loop (Xyce RG 7.10
+        // §2.1.36; LTspice 26.1.1, run) and the last the outermost. A
+        // list `.step` is `sweep param=p values=[…]` (`[REF]` pp.406-409).
+        let mut heads: Vec<(u32, String)> = Vec::new();
+        for (i, (p, v, tok)) in tb.step_lists.iter().enumerate() {
+            let k = tb.steps.len() + i + 1;
+            let head = format!(
+                "sweep{k}_{} sweep param={p} {} {{",
+                suffix(p),
+                self.values(v)
+            );
+            heads.push((*tok, head));
         }
-        for (idx, step) in tb.steps.iter().enumerate().rev() {
-            let Some(head) = self.sweep_head(idx, step) else {
-                continue;
-            };
+        for (idx, step) in tb.steps.iter().enumerate() {
+            if let Some(head) = self.sweep_head(idx, step) {
+                heads.push((step.3, head));
+            }
+        }
+        // Read order: a token's index grows along the deck.
+        heads.sort_by_key(|h| h.0);
+        for (_, head) in heads {
             let mut wrapped = vec![head];
             wrapped.extend(block.into_iter().map(|l| format!("  {l}")));
             wrapped.push("}".into());
@@ -299,6 +295,7 @@ impl W<'_, '_> {
         for &b in &self.deck.bench {
             let tok = match b {
                 Bench::Card(n)
+                | Bench::Set(n, _)
                 | Bench::Meas(n)
                 | Bench::Save(n)
                 | Bench::Analysis(n)
@@ -455,28 +452,40 @@ impl W<'_, '_> {
     }
 
     /// `sweep<k>_<name> sweep param=p start= stop= step= {` for `.step`
-    /// `idx`; `None` when it is refused.
+    /// `idx`; `None` when it is refused. A `log` step counts its points
+    /// in all (`python/keywords.rs` `Sweep::Log`) and Spectre's `log=` its
+    /// steps (`[REF]` p.407: "Number of steps, log sweep"), one fewer. A
+    /// grid that ends short of its stop value is `values=[…]`, its points
+    /// (`read::step_points`: Xyce's, which VACASK and the ngspice loops
+    /// run): `[REF]` pp.406-408 do not say where `step=` and `dec=` end
+    /// such a grid.
     fn sweep_head(
         &mut self,
         idx: usize,
         (sweep, param, [start, stop, step], tok): &Step,
     ) -> Option<String> {
         let suffix = suffix(param);
-        let by = match sweep {
-            Some("dec") => "dec",
-            Some("log") => "log",
-            Some("oct") => {
+        let (by, count) = match sweep {
+            Some("dec") => ("dec", *step),
+            Some("log") if *step >= 2.0 && step.fract() == 0.0 => ("log", *step - 1.0),
+            // ponytail: a `log` of one point is refused, not `values=[start]`.
+            Some("log" | "oct") => {
                 self.refuse(Code::W0016, *tok);
                 return None;
             }
-            _ => "step",
+            _ => ("step", *step),
         };
+        if let Some((points, true)) = step_points(*sweep, [*start, *stop, *step]) {
+            let values = self.values(&points);
+            let k = idx + 1;
+            return Some(format!("sweep{k}_{suffix} sweep param={param} {values} {{"));
+        }
         Some(format!(
             "sweep{}_{suffix} sweep param={param} start={} stop={} {by}={} {{",
             idx + 1,
             self.num(*start),
             self.num(*stop),
-            self.num(*step)
+            self.num(count)
         ))
     }
 }

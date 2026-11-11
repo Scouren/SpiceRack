@@ -23,6 +23,7 @@
 
 use super::options::Opt;
 use super::outputs::print_kind;
+use super::sweeps::ltspice_step;
 use super::{Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
 use crate::syntax::behaviour::{CardRules, DotRule};
@@ -36,7 +37,9 @@ pub(in crate::syntax::render) enum BenchCard {
     Options(Vec<Opt>),
     /// Outputs to save.
     Saves(Vec<String>),
-    /// `.step [lin|dec|oct|log] name start stop step`.
+    /// `.step [lin|dec|oct|log] name start stop step`, the numbers as
+    /// Xyce reads them (`sweeps::step_points`); an LTspice range arrives
+    /// ascending and on its grid, or as a `StepList`.
     Step {
         sweep: Option<&'static str>,
         param: String,
@@ -229,10 +232,16 @@ impl<'a> Rd<'a> {
                 if nums.iter().any(|x| x.is_nan()) {
                     return None;
                 }
-                BenchCard::Step {
-                    sweep,
-                    param: self.text(name),
-                    nums,
+                // LTspice's own grid: a range that misses its stop value
+                // is the list of its points (`sweeps::ltspice_step`).
+                let (nums, listed) = match self.b.card_rules == CardRules::Ltspice {
+                    true => ltspice_step(sweep, nums),
+                    false => (nums, None),
+                };
+                let param = self.text(name);
+                match listed {
+                    Some(values) => BenchCard::StepList { param, values },
+                    None => BenchCard::Step { sweep, param, nums },
                 }
             }
             Card::StepList(param, values) => BenchCard::StepList { param, values },

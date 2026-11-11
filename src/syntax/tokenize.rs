@@ -12,7 +12,9 @@
 //! The tokenizer's two hooks (`syntax::lexicon`) are here and nowhere
 //! else: HSPICE's `$` ([`Dollar::Hspice`], in `comment_at`), and Spectre's
 //! `simulator lang=spice` switch (`switch_at`), which swaps the lexicon for
-//! the statements up to `simulator lang=spectre`.
+//! the statements up to `simulator lang=spectre`. ngspice's `$`
+//! ([`Dollar::AfterBlank`]) is a script variable inside a `.control`
+//! block, which the lexer tracks (`Lexer::script`).
 //!
 //! Cites: the old PEG grammars' line stages (the old reader, which this
 //! reproduced at the switch, phase 2b; each lexicon file cites the manual
@@ -43,6 +45,8 @@ struct Lexer<'s> {
     lex: &'static Lexicon,
     /// The file's own lexicon while a `simulator lang=spice` region is open.
     home: Option<&'static Lexicon>,
+    /// Inside a `.control` block: after its head, up to its `.endc`.
+    script: bool,
     out: Tokens<'s>,
 }
 
@@ -62,6 +66,7 @@ pub fn tokenize<'s>(source: &'s str, lexicon: &'static Lexicon) -> Tokens<'s> {
         pos: 0,
         lex: lexicon,
         home: None,
+        script: false,
         out: Tokens {
             source,
             lexicon,
@@ -276,6 +281,10 @@ impl Lexer<'_> {
             self.pos = end;
         }
         if self.out.tags.len() > first {
+            // Once a statement, not once a token: the next statement is
+            // in a `.control` block after its head and before its `.endc`.
+            let lead = self.out.tags[first];
+            self.script = (self.script || lead == Tag::KwControl) && lead != Tag::KwEndc;
             self.push(Tag::EndOfStatement, self.pos, self.pos);
         }
         if let Some((tag, to)) = switch {
@@ -444,6 +453,10 @@ impl Lexer<'_> {
         let after_sep = |q: usize, seps: &[u8]| q == piece || seps.contains(&src[q - 1]);
         let comment = match lex.dollar {
             Dollar::Text => false,
+            // ngspice `frontend/inpcom.c` (`inp_stripcomments_line`, its
+            // `cs` flag): in a `.control` section `$` names a variable and
+            // starts a comment only before a blank.
+            Dollar::AfterBlank if self.script => src.get(p + 1) == Some(&b' '),
             Dollar::AfterBlank => after_sep(p, b" \t\r,"),
             Dollar::Hspice => {
                 const SEPS: &[u8] = b" \t\r,=()'\"";

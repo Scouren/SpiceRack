@@ -167,7 +167,9 @@ pub enum Dollar {
     Text,
     /// At a statement or continuation's start, or after a blank, tab or
     /// comma; inside a name, or right after a quote, it is a name byte
-    /// (ngspice).
+    /// (ngspice). In a `.control` block it names a script variable
+    /// (`$name`, `$&vector`) and starts a comment only before a blank
+    /// (ngspice `frontend/inpcom.c`, `inp_stripcomments_line`).
     AfterBlank,
     /// HSPICE's hook: after a separator (blank, `,` `=` `(` `)`, a closing
     /// quote) or right after a number that follows one (`1k$c` is `1k`).

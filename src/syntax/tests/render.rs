@@ -122,12 +122,13 @@ fn kit_answers_reach_the_written_deck() {
 
 #[test]
 fn a_log_step_is_spectres_sweep_and_refused_where_no_step_has_one() {
-    // Spectre Reference 19.1 p.406-410: `sweep … log=N`, the analyses in
-    // its braces; Xyce RG p.155 (`.step` lin, dec, oct, list), LTspice help
+    // Spectre Reference 19.1 p.406-410: `sweep … log=N`, N steps (p.407),
+    // so the card's five points are `log=4`; the analyses in its braces.
+    // Xyce RG p.155 (`.step` lin, dec, oct, list), LTspice help
     // (`.step` lin, oct, dec, list) and VACASK `docs/cmd-sweep.md` (lin,
     // dec, oct, values) have no total-count log sweep: `W0016`. Checks: 4.
     let text = "t\nR1 a 0 1k\n.param g=1\n.step log g 1 100 5\n.op\n.end\n";
-    let head = "sweep1_g sweep param=g start=1 stop=100 log=5 {";
+    let head = "sweep1_g sweep param=g start=1 stop=100 log=4 {";
     let w = given(text, Dialect::Spectre).expect("written");
     assert!(w.lines().any(|l| l == head), "{w}");
     for d in [Dialect::Xyce, Dialect::Ltspice, Dialect::Vacask] {

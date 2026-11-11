@@ -3,18 +3,20 @@
 //! set for the runs after it (`alterparam` at its `reset`: a
 //! [`BenchCard::Alter`], the next circuit state of the run plan), a line
 //! that changes no run left out with a note (W0025), or a line that
-//! changes the circuit or the script's flow and is not read, which
-//! refuses the deck (W0160). Each line is classified once
-//! ([`ControlLine`]) and placed by one exhaustive match, so a new class of
-//! line is a variant, its test in `Rd::control_line`, and its arm in
-//! `Rd::control`.
+//! changes the circuit and is not read, which refuses the deck (W0160).
+//! The lines are those the script runs, in run order: its loops and
+//! `if`s over constants are unrolled first (`unroll.rs`), so a pass of a
+//! loop is its lines again, and a script that cannot be followed refuses
+//! the deck at the line that stops it. Each line is classified once a
+//! pass ([`ControlLine`]) and placed by one exhaustive match, so a new
+//! class of line is a variant, its test in `Rd::control_line`, and its
+//! arm in `Rd::control`.
 //!
 //! This is the file `research/DESIGN-control-epochs.md` §4 names
-//! (`render/read/control.rs`) and its §6 step 4 (ZERO-LEDGER P5-001). The
-//! rows that read more of the script each take lines out of
-//! [`ControlLine::Unread`]: `alter`, `altermod` and `option` (P5-021), the
-//! loops and the logic over constants (P5-088), a script that reads its
-//! own results (P4-096, W0131).
+//! (`render/read/control.rs`) and its §6 step 4 (ZERO-LEDGER P5-001,
+//! P5-088). The rows that read more of the script each take lines out of
+//! [`ControlLine::Unread`]: `alter`, `altermod` and `option` (P5-021), a
+//! script that reads its own results (P4-096, W0131).
 //!
 //! Cites: ngspice-45 manual ch.13 (the control language): §13.5.5
 //! `alterparam` ("a subsequent call to reset is required for the
@@ -29,8 +31,13 @@
 //! Contents:
 //! - `pub(super) enum ControlLine`
 //! - `Rd::control(&self, n: u32, scope: Scope, acc: &mut Acc)`
-//! - `Rd::alterparam(&self, c: u32) -> Option<BenchCard>`
+//! - `Rd::alterparam(&self, c: u32) -> Option<BenchCard>`,
+//!   `Rd::alter_text(&self, rest: &str, head: u32) -> Option<(String, f64)>`,
+//!   `Rd::alterparam_as(&self, c: u32, value: f64) -> BenchCard`
 
+use std::collections::HashSet;
+
+use super::unroll::Step;
 use super::{Acc, Bench, BenchCard, Rd, Scope};
 use crate::syntax::ast::Tag;
 use crate::syntax::diag::{Code, Diag};
@@ -42,7 +49,8 @@ pub(super) enum ControlLine {
     /// `pre_osdi file` at the top: the file's path.
     PreOsdi(String),
     /// `alterparam name = number`: a top-level parameter's value from the
-    /// next `reset` on ([`Rd::alterparam`]).
+    /// next `reset` on ([`Rd::alterparam`]); the number may be a
+    /// variable's value in the pass ([`Step::value`]).
     Alter,
     /// `reset`: the circuit read again, with every `alterparam` so far.
     Reset,
@@ -51,10 +59,10 @@ pub(super) enum ControlLine {
     /// card that the card grammar does not read (`meas`): left out with a
     /// note (W0025).
     Skipped,
-    /// A line that changes the circuit or the script's flow and is not
-    /// read (`alter`, `option`, `set temp=`, `foreach`, `source` …; an
-    /// `alterparam` of a subcircuit's parameter or to an expression): the
-    /// deck is refused (W0160).
+    /// A line that changes the circuit and is not read (`alter`,
+    /// `option`, `set temp=`, `source` …; an `alterparam` of a
+    /// subcircuit's parameter or to an expression; an analysis command
+    /// that holds a variable): the deck is refused (W0160).
     Unread,
 }
 
@@ -75,13 +83,23 @@ const SHOWN_VARS: &str = "appendwrite askquit brief curplottitle filetype gridst
     width wr_singlescale wr_vecnames xbrushwidth xgridwidth";
 
 impl Rd<'_> {
-    /// `.control` block `n` (at `scope`): each line's analysis onto the
-    /// testbench, its load onto the deck's loads, each `alterparam` onto
-    /// the testbench at the `reset` that applies it, any other line a
-    /// note or a refusal ([`ControlLine`]).
+    /// `.control` block `n` (at `scope`): each line the script runs
+    /// ([`Rd::unroll`]), its analysis onto the testbench, its load onto
+    /// the deck's loads, each `alterparam` onto the testbench at the
+    /// `reset` that applies it, any other line a note or a refusal
+    /// ([`ControlLine`]), once however many passes run it. A script that
+    /// cannot be followed adds its refusal and nothing else.
     pub(super) fn control(&self, n: u32, scope: Scope, acc: &mut Acc) {
         assert_eq!(self.tag(n), Tag::Control, "a .control block");
         let (bench, notes) = (acc.bench.len(), acc.notes.len());
+        // Fallible first: nothing of the block is placed before this.
+        let steps = match self.unroll(n) {
+            Ok(steps) => steps,
+            Err((code, tok)) => {
+                acc.notes.push(Diag::new(code, tok, 0));
+                return;
+            }
+        };
         // ngspice -b runs the deck's dot-card analyses after the script,
         // on the state it left, and at each `run` (run on ngspice-45):
         // beside a state change, a card read before the block or a `run`
@@ -92,30 +110,50 @@ impl Rd<'_> {
             .bench
             .iter()
             .any(|b| matches!(b, Bench::Card(k) if dotted(*k)));
-        // The `alterparam` lines waiting for their `reset`, and the first
-        // `reset` that applied one.
-        let mut pending: Vec<u32> = Vec::new();
+        // The `alterparam` lines waiting for their `reset` (each with the
+        // value a variable gave it), and the first `reset` that applied
+        // one.
+        let mut pending: Vec<(u32, Option<f64>)> = Vec::new();
         let mut applied: Option<u32> = None;
-        for &c in self.body(n) {
+        // The lines noted so far, by first token: a line is noted once.
+        let mut noted: HashSet<u32> = HashSet::new();
+        for Step { line: c, value } in steps {
             let tok = self.main(c);
-            match self.control_line(c, scope) {
+            let line = match value {
+                Some(_) => ControlLine::Alter,
+                None => self.control_line(c, scope),
+            };
+            match line {
                 ControlLine::Analysis => acc.bench.push(Bench::Card(c)),
-                ControlLine::PreOsdi(path) => acc.control_loads.push(path),
-                ControlLine::Alter => pending.push(c),
+                ControlLine::PreOsdi(path) if noted.insert(tok) => acc.control_loads.push(path),
+                ControlLine::PreOsdi(_) => {}
+                ControlLine::Alter => pending.push((c, value)),
                 ControlLine::Reset if !pending.is_empty() => {
                     applied.get_or_insert(tok);
-                    acc.bench.extend(pending.drain(..).map(Bench::Card));
+                    let set = |(c, v): (u32, Option<f64>)| match v {
+                        Some(v) => Bench::Set(c, v),
+                        None => Bench::Card(c),
+                    };
+                    acc.bench.extend(pending.drain(..).map(set));
                 }
                 ControlLine::Reset | ControlLine::Skipped => {
                     beside |= self.t.text(tok).eq_ignore_ascii_case("run");
-                    acc.notes.push(Diag::new(Code::W0025, tok, 0));
+                    if noted.insert(tok) {
+                        acc.notes.push(Diag::new(Code::W0025, tok, 0));
+                    }
                 }
-                ControlLine::Unread => acc.notes.push(Diag::new(Code::W0160, tok, 0)),
+                ControlLine::Unread => {
+                    if noted.insert(tok) {
+                        acc.notes.push(Diag::new(Code::W0160, tok, 0));
+                    }
+                }
             }
         }
         // An `alterparam` no `reset` followed changed no run.
-        for c in pending {
-            acc.notes.push(Diag::new(Code::W0025, self.main(c), 0));
+        for (c, _) in pending {
+            if noted.insert(self.main(c)) {
+                acc.notes.push(Diag::new(Code::W0025, self.main(c), 0));
+            }
         }
         if let Some(tok) = applied.filter(|_| beside) {
             acc.notes.push(Diag::new(Code::W0160, tok, 0));
@@ -136,7 +174,19 @@ impl Rd<'_> {
         if self.tag(c) != Tag::Line || head == last || !word.eq_ignore_ascii_case("alterparam") {
             return None;
         }
-        let rest = self.span(head + 1, last);
+        let (key, value) = self.alter_text(&self.span(head + 1, last), head)?;
+        Some(BenchCard::Alter {
+            key,
+            value,
+            node: c,
+        })
+    }
+
+    /// `name = number`, the text after an `alterparam` line's command (the
+    /// line's first token `head` gives the lexicon the number is in): the
+    /// name and the value. `None` for the subcircuit form and for a value
+    /// that is not one finite number.
+    pub(super) fn alter_text(&self, rest: &str, head: u32) -> Option<(String, f64)> {
         let (name, value) = rest.split_once('=')?;
         let name = name.trim();
         if name.is_empty() || name.contains(char::is_whitespace) {
@@ -145,11 +195,30 @@ impl Rd<'_> {
         let value = self
             .number_text(value.trim(), self.t.lexicon_at(head))
             .filter(|v| v.is_finite())?;
-        Some(BenchCard::Alter {
-            key: name.to_string(),
+        Some((name.to_string(), value))
+    }
+
+    /// `.control` line `c`, an `alterparam` whose value held a variable,
+    /// as the parameter it set in the pass that gave it `value`
+    /// ([`Bench::Set`]): the name is the line's own.
+    ///
+    /// # Panics
+    /// When the line has no name before an `=`, or the name holds a
+    /// variable: [`Rd::unroll`] makes no step of such a line.
+    pub(super) fn alterparam_as(&self, c: u32, value: f64) -> BenchCard {
+        let head = self.main(c);
+        let rest = self.span(head + 1, self.line_last(head));
+        let key = rest.split_once('=').map_or("", |(name, _)| name).trim();
+        assert!(
+            !key.is_empty() && !key.contains('$'),
+            "alterparam_as: a name"
+        );
+        assert!(value.is_finite(), "alterparam_as: a finite value");
+        BenchCard::Alter {
+            key: key.to_string(),
             value,
             node: c,
-        })
+        }
     }
 }
 
@@ -162,9 +231,15 @@ impl Rd<'_> {
         let last = self.line_last(head);
         assert!(head <= last, "a line has a token");
         if self.tag(c) != Tag::Line {
+            let analysis = self.tag(c) == Tag::Analysis;
+            // A variable in an analysis command (`dc v1 $a $b 1`): what
+            // it runs is not read.
+            if analysis && self.line(c).contains('$') {
+                return ControlLine::Unread;
+            }
             // A command read as its dot card: an analysis the card
             // grammar reads, else left out as before (`meas`).
-            return match self.tag(c) == Tag::Analysis && self.testbench_peg(c) {
+            return match analysis && self.testbench_peg(c) {
                 true => ControlLine::Analysis,
                 false => ControlLine::Skipped,
             };
