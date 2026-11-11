@@ -1,0 +1,4 @@
+provenance: Spectre 25.1.0.470.isr13, iccad4, 2026-11-07 (research/settle-remote.md, section "Third oracle", BSIM1)
+deck: ngspice tests/bsim1 card as `bsim1` (vfb0/phi0/eta0/u00/u10/dl0/dw0, tox in m); Id over vgs at vds 0.05, 2.5 and 5
+id_vg3_vd2.5 5.2746e-4
+max_rel_vs_hspice_l13 3.1e-6

@@ -246,3 +246,66 @@ fn p1_050_the_hspice_writer_meets_the_recorded_divider() {
     let on = [Dialect::Ngspice, Dialect::Hspice];
     oracle::closed_form(Dialect::Ngspice, deck, &on, "b", At::First, want, tol);
 }
+
+#[test]
+fn p1_052_third_oracle_proofs_quote_the_recorded_runs() {
+    // settle-remote "Third oracle": each proof under
+    // tests/fixtures/cross_sim/proof/ quotes the Spectre 25.1 and HSPICE
+    // 2026.03 numbers of its two pins (iccad4, 2026-11-07), so a proof and
+    // its pin cannot drift apart. Rows: proof, pin, key, the number as the
+    // proof prints it for Spectre and for HSPICE. Checks: 4 per row.
+    let rows = [
+        (
+            "s-bsim1-ngspice-l4",
+            "bsim1",
+            "id_vg3_vd2.5",
+            "5.2746e-4",
+            "5.2747e-4",
+        ),
+        (
+            "s-bsim2-spectre",
+            "bsim2",
+            "id_vg3_vds2.5",
+            "-1.2070e-3",
+            "-1.1357e-3",
+        ),
+        (
+            "s-ekv26-two-camps",
+            "ekv",
+            "id_vg2_vd0.1",
+            "8.874e-5",
+            "8.875e-5",
+        ),
+        (
+            "s-mextram-504-commercial",
+            "mextram",
+            "ic_vbe0.8",
+            "-3.8681e-4",
+            "-3.8714e-4",
+        ),
+        (
+            "s-gaas-statz-charge",
+            "gaas",
+            "cin_vgs-1.6",
+            "0.2522",
+            "0.2548",
+        ),
+    ];
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cross_sim/proof");
+    for (proof, pin, key, spectre, hspice) in rows {
+        let text = std::fs::read_to_string(dir.join(format!("{proof}.md")))
+            .unwrap_or_else(|e| panic!("{proof}.md: {e}"));
+        // The GaAs proof prints pF, its pins hold F.
+        let unit = if pin == "gaas" { 1e-12 } else { 1.0 };
+        for (on, quoted) in [(Dialect::Spectre, spectre), (Dialect::Hspice, hspice)] {
+            assert!(text.contains(quoted), "{proof}: no {quoted}");
+            let said: f64 = quoted.parse().expect("a number");
+            let pinned = oracle::recorded(on, pin, key);
+            let tol = Tol {
+                rel: 1e-12,
+                floor: 0.0,
+            };
+            assert!(tol.within(said * unit, pinned), "{proof} {on:?} {key}");
+        }
+    }
+}

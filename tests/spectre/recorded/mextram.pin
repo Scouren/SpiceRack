@@ -1,0 +1,3 @@
+provenance: Spectre 25.1.0.470.isr13, iccad4, 2026-11-07 (research/settle-remote.md, section "Third oracle", Mextram)
+deck: `bjt504` (SiMKit 5.8) at its default parameters, Vce = 2 V; Ic at Vbe = 0.8 V
+ic_vbe0.8 -3.8681e-4

@@ -1,0 +1,8 @@
+provenance: Spectre 25.1.0.470.isr13, iccad4, 2026-11-07 (research/settle-remote.md, section "Third oracle", GaAs Statz charge; row P4-024)
+deck: the P4-024 MESFET card as `gaas capmod=1`; Cin and Cout in F at vgs -1.6, -1.0 and -0.3, vds 3
+cin_vgs-1.6 0.2522e-12
+cout_vgs-1.6 0.2000e-12
+cin_vgs-1.0 0.7988e-12
+cout_vgs-1.0 0.2279e-12
+cin_vgs-0.3 0.9763e-12
+cout_vgs-0.3 0.2814e-12
