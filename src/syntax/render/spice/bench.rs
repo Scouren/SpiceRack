@@ -47,6 +47,10 @@ pub(super) struct Tb {
     /// The first token of each options card holding an option not
     /// written: VACASK's own, or Xyce's on another target.
     dropped: Vec<u32>,
+    /// The first token of each options card holding a Xyce option that
+    /// changes the solution (`xyce_options::changes_solution`), on a
+    /// target other than Xyce: refused.
+    refused: Vec<u32>,
     measures: Vec<String>,
     /// Each measure's statement's first token.
     meas_toks: Vec<u32>,
@@ -174,6 +178,9 @@ impl W<'_, '_> {
         self.hspice_defaults(&mut tb, runs);
         for &tok in &tb.dropped {
             self.note(Code::W0024, tok);
+        }
+        for &tok in &tb.refused {
+            self.refuse(Code::W0017, tok);
         }
         for &tok in &tb.unsaved {
             self.note(Code::W0023, tok);
@@ -428,10 +435,16 @@ impl W<'_, '_> {
                     match o {
                         Opt::Portable(k, v) => tb.portable.push((k, v, tok)),
                         Opt::Xyce(k, v) => {
-                            if self.b.options_form != OptionsForm::XycePackages
-                                && !tb.dropped.contains(&tok)
-                            {
-                                tb.dropped.push(tok);
+                            if self.b.options_form != OptionsForm::XycePackages {
+                                // One only Xyce solves with is refused, any
+                                // other left out with a note.
+                                let cards = match super::xyce_options::changes_solution(&k, &v) {
+                                    true => &mut tb.refused,
+                                    false => &mut tb.dropped,
+                                };
+                                if !cards.contains(&tok) {
+                                    cards.push(tok);
+                                }
                             }
                             tb.xyce.push((k, v));
                         }

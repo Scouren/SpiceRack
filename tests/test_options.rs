@@ -21,6 +21,30 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-058. Xyce RG Table 2-6: NONLIN CONTINUATION=1 is the
+/// natural-parameter homotopy (with the LOCA block), 2/`mos` the MOSFET
+/// one; ngspice has gmin and source stepping only (manual §11.1.2), so the
+/// deck is refused there. `continuation=gmin` is that stepping itself: left
+/// out with a note, as a lone `.options loca` is (Xyce reads it only with
+/// CONTINUATION on).
+#[test]
+fn p3_058_xyce_homotopy_is_refused_where_there_is_none() {
+    let w0017 = spicerack::syntax::diag::Code::W0017;
+    let deck = "t\nV1 a 0 1\nR1 a 0 1k\n.options nonlin continuation=1\n\
+        .options loca stepper=0\n.op\n.end\n";
+    for to in [Dialect::Ngspice, Dialect::Hspice, Dialect::Ltspice] {
+        let codes = oracle::refusal(deck, Dialect::Xyce, to);
+        assert!(codes.contains(&w0017), "{to:?}: {codes:?}");
+    }
+    let mos = deck.replace("continuation=1", "continuation=mos");
+    let codes = oracle::refusal(&mos, Dialect::Xyce, Dialect::Ngspice);
+    assert!(codes.contains(&w0017), "{codes:?}");
+    let gmin = deck.replace("continuation=1", "continuation=gmin");
+    let w = oracle::written(&gmin, Dialect::Xyce, Dialect::Ngspice);
+    assert!(!oracle::notes(&w).contains(&w0017), "{}", w.text);
+    assert_eq!(oracle::op(Dialect::Ngspice, &w.text, "a"), 1.0);
+}
+
 /// Ledger P3-015. Xyce 7.10 reads `.options temp=100` and `.option
 /// Temp=100.0C`, with no package word, as `.options device temp=100` (one
 /// answer by hand): ngspice's `.temp 100` (manual §11.1.1 TEMP). 1 V

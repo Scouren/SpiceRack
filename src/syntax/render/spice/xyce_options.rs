@@ -19,6 +19,7 @@
 //!
 //! Contents:
 //! - `W::xyce_options(&mut self, tb: &Tb) -> Vec<String>`, `W::xyce_drops(&mut self, tb: &Tb)`
+//! - `fn changes_solution(key: &str, v: &str) -> bool`
 
 use super::W;
 use super::bench::Tb;
@@ -158,5 +159,27 @@ impl W<'_, '_> {
         out.into_iter()
             .map(|(_, l)| format!(".options {l}"))
             .collect()
+    }
+}
+
+/// Whether Xyce's own option `key` (the reader's `pkg.key`) set to `v`
+/// changes which solution Xyce reports: left out, another simulator
+/// solves a different problem, so the card is refused there (W0017), not
+/// noted.
+///
+/// RG Table 2-6, NONLIN CONTINUATION: 0 is the plain Newton solve; 3/`gmin`
+/// and 34/`sourcestep`, 35/`sourcestep2` are the gmin and source stepping
+/// every SPICE does by itself (ngspice manual §11.1.2). The others (1:
+/// natural-parameter homotopy with the LOCA block; 2/`mos`) are Xyce's
+/// alone: they choose the operating point of a deck that has several, or
+/// leave the continued parameter at its end value
+/// (`PARAM_REFACTOR/paramHomotopy.cir`: 833.3 V, ngspice 875 V).
+pub(super) fn changes_solution(key: &str, v: &str) -> bool {
+    match key {
+        "nonlin.continuation" => !matches!(
+            v.to_ascii_lowercase().as_str(),
+            "0" | "3" | "gmin" | "34" | "sourcestep" | "35" | "sourcestep2"
+        ),
+        _ => false,
     }
 }
