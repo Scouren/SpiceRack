@@ -578,6 +578,9 @@ def xyce(d):
         .kept_word(".sens", Construct.XyceSens)
         # The dot rules (RG `.LIN`).
         .dot_rule("lin", DotRule.SParams)
+        # The `.model` levels Xyce numbers its own way (RG `J`: level 2).
+        .level_alias("njf", 2, None)
+        .level_alias("pjf", 2, None)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)

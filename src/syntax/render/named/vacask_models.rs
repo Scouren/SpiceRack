@@ -172,6 +172,11 @@ impl W<'_, '_> {
                 level = super::spice_num(t)?.0 as u32;
             }
         }
+        // The level is the source's number: its neutral one picks the
+        // module, and a model the source alone has (`level_alias` to no
+        // level: Xyce's JFET 2, where `sp_jfet2` is Parker-Skellern) is no
+        // module's.
+        let level = self.rd.b.neutral_level(&kind, level)?;
         // `.model x NPN (LEVEL=4)` is VBIC, `LEVEL=8` HICUM: other
         // equations under the same keyword, so no row. `sp_resistor`
         // renames the card's `r`/`tc1` to `model_r`…: a name-for-name card

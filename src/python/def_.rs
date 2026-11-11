@@ -244,6 +244,7 @@ calls! {
     option_method(spice: &str);
     option_cosmetic(spice: &str);
     spice_model_type(kind: &str);
+    level_alias(kind: &str, source_level: u32, neutral_level: Option<u32>);
     kept_word(word: &str, c: PyConstruct);
     dot_rule(word: &str, r: PyDotRule);
     code(id: &str, kind: PyKind, message: &str);

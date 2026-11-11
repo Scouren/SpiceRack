@@ -293,12 +293,7 @@ pub(super) fn spelled_flag(
 
 /// A model's `level`, 1 when it gives none or no number.
 pub(super) fn level(m: &Model) -> u32 {
-    m.params
-        .iter()
-        .rev()
-        .find(|(k, _)| k.eq_ignore_ascii_case("level"))
-        .and_then(|(_, v)| models::fold(v))
-        .map_or(1, |l| l as u32)
+    m.level()
 }
 
 // ---- private ----

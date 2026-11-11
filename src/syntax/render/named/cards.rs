@@ -385,7 +385,7 @@ impl W<'_, '_> {
                     .iter()
                     .take_while(|(m, _)| {
                         bin(m).is_some_and(|(b, _)| b == base)
-                            && spectre_master(self.b, m) == Some(master)
+                            && spectre_master(self.b, self.rd.b, m) == Some(master)
                     })
                     .count(),
                 None => 0,
@@ -449,7 +449,7 @@ impl W<'_, '_> {
     fn master(&mut self, m: &Model, tok: u32) -> Option<Master> {
         let found = match self.table_kind(m) {
             Some(k) => Some((Some(k.spectre), None)),
-            None => spectre_master(self.b, m),
+            None => spectre_master(self.b, self.rd.b, m),
         };
         if found.is_none() {
             self.refuse(Code::W0104, tok);
@@ -491,17 +491,19 @@ impl W<'_, '_> {
 }
 
 /// The Spectre master for `m` and its `type=` (`[REF]` p.498), from the
-/// target's rows (`Behaviours::model_master`); `None` when a SPICE kind
+/// target's rows (`Behaviours::model_master`) at the card's neutral level
+/// (`from`: the source's `level_alias` rows); `None` when a SPICE kind
 /// (and level) has none: written as its SPICE type it names no Spectre
 /// master, and "the nearest model" is other equations.
-fn spectre_master(b: &Behaviours, m: &Model) -> Option<Master> {
+fn spectre_master(b: &Behaviours, from: &Behaviours, m: &Model) -> Option<Master> {
+    let kind = m.kind.to_ascii_lowercase();
     let level = m
         .params
         .iter()
         .find(|(k, _)| k.eq_ignore_ascii_case("level"))
         .and_then(|(_, v)| super::spice_num(v.trim()))
         .map_or(1, |(l, _)| l as u32);
-    match b.model_master(&m.kind.to_ascii_lowercase(), level) {
+    match b.model_master(&kind, from.neutral_level(&kind, level)?) {
         MasterAnswer::Master(r) => Some((Some(r.master), r.type_)),
         MasterAnswer::AsWritten => Some((None, None)),
         MasterAnswer::Refused => None,

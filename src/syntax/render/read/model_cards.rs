@@ -1,6 +1,7 @@
 //! The `.model` card an instance uses, wherever the kit read it: this
 //! file's, or another kit file's (its text parsed again), so a writer can
-//! judge the card at the instance that elaborates it.
+//! judge the card at the instance that elaborates it; and a card's
+//! `level`, the number its source dialect gives the model.
 //!
 //! Cites: none (the kit's bindings, `resolve`).
 //!
@@ -9,6 +10,7 @@
 //! - `Rd::kit(&self) -> Option<&Kit>`
 //! - `Rd::instance_params(&self, n: u32, master: &str) -> Option<Vec<(String, String)>>`
 //! - `pub(in crate::syntax::render) fn file_models<R>(kit: &Kit, file: FileId, f: impl FnMut(u32, Model) -> R) -> Vec<(u32, R)>`
+//! - `Model::level(&self) -> u32`
 
 use super::{Model, Rd};
 use crate::syntax::ast::{NONE, Node};
@@ -64,6 +66,20 @@ impl<'a> Rd<'a> {
                 .find(|(c, _)| *c == card)
                 .map(|(_, params)| params),
         }
+    }
+}
+
+impl Model {
+    /// The card's `level` as it is written (the last one given), 1 when
+    /// it gives none or no number: the source dialect's number for the
+    /// model, the neutral one through `Behaviours::neutral_level`.
+    pub(in crate::syntax::render) fn level(&self) -> u32 {
+        self.params
+            .iter()
+            .rev()
+            .find(|(k, _)| k.eq_ignore_ascii_case("level"))
+            .and_then(|(_, v)| crate::syntax::render::models::fold(v))
+            .map_or(1, |l| l as u32)
     }
 }
 

@@ -2,7 +2,8 @@
 //! target has, the language's temperature word, builtin constants and
 //! built-in device names, the SPICE options it maps, the master a SPICE
 //! `.model` type gets, the reader's own words (kept constructs, dot
-//! rules), each appended by one call.
+//! rules), the `.model` levels it numbers its own way, each appended by
+//! one call.
 //!
 //! Cites: none (each definition cites its manual where it declares a row).
 //!
@@ -16,9 +17,10 @@
 //! - `DialectDef::model_master(self, kind: &str, levels: &[u32], master: &str, type_: Option<&str>) -> Self`,
 //!   `DialectDef::spice_model_type(self, kind: &str) -> Self`
 //! - `DialectDef::kept_word(self, word: &str, c: Construct) -> Self`, `DialectDef::dot_rule(self, word: &str, r: DotRule) -> Self`
+//! - `DialectDef::level_alias(self, kind: &str, source_level: u32, neutral_level: Option<u32>) -> Self`
 
 use super::{DialectDef, leak, put};
-use crate::syntax::behaviour::{DotRule, ModelMaster, OptionTo};
+use crate::syntax::behaviour::{DotRule, LevelAlias, ModelMaster, OptionTo};
 use crate::syntax::render::capability::Construct;
 
 impl DialectDef {
@@ -171,6 +173,38 @@ impl DialectDef {
         let mut v = self.b.dot_rules.to_vec();
         put(&mut v, leak(word), r);
         self.b.dot_rules = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// This language's own LEVEL `source_level` of `.model` type `kind` is
+    /// ngspice's `neutral_level`, the numbering every `model_master` row
+    /// is keyed by: Xyce's BSIM3 9 would be ngspice's 49. `None`: a model
+    /// ngspice has no level for (Xyce's JFET level 2, the Shockley model
+    /// with THETA and DELTA; ngspice's 2 is Parker-Skellern). A card at
+    /// such a LEVEL is written as read for a language with the same rows
+    /// and refused for any other (W0104), as is another language's card at
+    /// that number here. A (type, LEVEL) with no row is ngspice's. A row of
+    /// the same type and LEVEL is replaced in place.
+    pub fn level_alias(
+        mut self,
+        kind: &str,
+        source_level: u32,
+        neutral_level: Option<u32>,
+    ) -> Self {
+        let row = LevelAlias {
+            kind: leak(&kind.to_ascii_lowercase()),
+            source: source_level,
+            neutral: neutral_level,
+        };
+        let mut v = self.b.level_aliases.to_vec();
+        match v
+            .iter_mut()
+            .find(|a| a.kind == row.kind && a.source == row.source)
+        {
+            Some(a) => *a = row,
+            None => v.push(row),
+        }
+        self.b.level_aliases = Box::leak(v.into_boxed_slice());
         self
     }
 }

@@ -21,6 +21,8 @@
 //!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`, `pub enum OptionTo`,
 //!   `pub enum DotRule`
 //! - `pub struct ModelMaster`, `Behaviours::model_master(&self, kind: &str, level: u32) -> MasterAnswer`, `pub enum MasterAnswer`
+//! - `pub struct LevelAlias`, `Behaviours::neutral_level(&self, kind: &str, level: u32) -> Option<u32>`,
+//!   `Behaviours::same_level(&self, source: &Behaviours, kind: &str, level: u32) -> bool`
 
 use crate::syntax::Lang;
 use crate::syntax::diag::Code;
@@ -136,6 +138,10 @@ pub struct Behaviours {
     /// shared dot cards, by word (lowercased, without its dot), each with
     /// its rule (`Rd::dialect_card`).
     pub dot_rules: &'static [(&'static str, DotRule)],
+    /// Read: the `.model` LEVELs this language numbers its own way, each
+    /// with ngspice's level of the same equations or none
+    /// (`DialectDef::level_alias`); a (type, LEVEL) not here is ngspice's.
+    pub level_aliases: &'static [LevelAlias],
 }
 
 /// A SPICE `.model` type's master at some LEVELs (`Behaviours::model_masters`).
@@ -150,6 +156,19 @@ pub struct ModelMaster {
     pub master: &'static str,
     /// Its `type=` value (Spectre `n`, VACASK `-1`); `None`: none written.
     pub type_: Option<&'static str>,
+}
+
+/// A language's own LEVEL of a `.model` type in the neutral numbering,
+/// ngspice's (`Behaviours::level_aliases`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LevelAlias {
+    /// The SPICE type, lowercase.
+    pub kind: &'static str,
+    /// The LEVEL as this language numbers it.
+    pub source: u32,
+    /// ngspice's LEVEL of the same equations; `None`: ngspice has no such
+    /// model (Xyce's JFET level 2).
+    pub neutral: Option<u32>,
 }
 
 /// A target's answer for a `.model` type at a LEVEL (`Behaviours::model_master`).
@@ -439,6 +458,7 @@ impl Behaviours {
         spice_model_types: &[],
         kept_words: &[],
         dot_rules: &[],
+        level_aliases: &[],
     };
 
     /// The master SPICE `.model` type `kind` (lowercase) gets at `level`.
@@ -453,5 +473,30 @@ impl Behaviours {
             None if self.spice_model_types.contains(&kind) => MasterAnswer::Refused,
             None => MasterAnswer::AsWritten,
         }
+    }
+
+    /// The neutral LEVEL (ngspice's number) of this language's `.model`
+    /// type `kind` (lowercase) at its own `level`: the `level_aliases`
+    /// row's, `level` itself with no row. `None`: a model ngspice has no
+    /// level for.
+    pub fn neutral_level(&self, kind: &str, level: u32) -> Option<u32> {
+        debug_assert!(!kind.bytes().any(|b| b.is_ascii_uppercase()));
+        let row = self
+            .level_aliases
+            .iter()
+            .find(|a| a.kind == kind && a.source == level);
+        row.map_or(Some(level), |a| a.neutral)
+    }
+
+    /// Whether `.model` type `kind` (lowercase) at `level`, a number
+    /// `source` wrote, is the same model at that number here: the two
+    /// languages number alike (the same `level_aliases`), or both mean one
+    /// neutral LEVEL by it. A card that fails this is another model once
+    /// copied (W0104).
+    pub fn same_level(&self, source: &Behaviours, kind: &str, level: u32) -> bool {
+        debug_assert!(!kind.bytes().any(|b| b.is_ascii_uppercase()));
+        let read = source.neutral_level(kind, level);
+        self.level_aliases == source.level_aliases
+            || (read.is_some() && read == self.neutral_level(kind, level))
     }
 }
