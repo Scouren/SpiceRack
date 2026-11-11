@@ -15,7 +15,8 @@
 //! cites its own CLI.
 //!
 //! Contents:
-//! - `pub enum BackendError`
+//! - `pub enum BackendError`, `BackendError::code(&self) -> Option<Code>`,
+//!   `BackendError::missing(&self) -> Option<(Vec<&str>, Vec<&str>)>`
 //! - `pub const RUNNABLE: [Dialect; BACKENDS.len()]`
 //! - `pub use crate::syntax::Dialect`
 //! - `pub mod feature`: `XSPICE`, `OSDI`, `MEASURES`, `STEP_PARAMS`, `CONTROL_BLOCKS`,
@@ -61,6 +62,7 @@ pub use registry::{
 use crate::rawfile;
 use crate::result::RawData;
 pub use crate::syntax::Dialect;
+use crate::syntax::diag::Code;
 
 /// What a deck needs from its simulator, one bit per feature
 /// ([`Dialect::capabilities`] is the same mask: what a simulator does).
@@ -293,6 +295,42 @@ const _: () = {
     }
     assert!(seen == ALL, "a feature has no MISSING row");
 };
+
+impl BackendError {
+    /// The catalogue code of a refusal that has one: a routing refusal
+    /// (`W0180` an analysis the simulator does not declare, `W0181` a
+    /// feature, `W0182` no simulator for every analysis) or a command not
+    /// installed (`R0041`). `None`: a failure with no code (the
+    /// simulator's own error, a file that does not read, nothing installed).
+    pub fn code(&self) -> Option<Code> {
+        match self {
+            BackendError::UnsupportedAnalysis { .. } => Some(Code::W0180),
+            BackendError::UnsupportedFeature { .. } => Some(Code::W0181),
+            BackendError::NoSimulator { .. } => Some(Code::W0182),
+            BackendError::NotInstalled { .. } => Some(Code::R0041),
+            BackendError::NoBackend
+            | BackendError::SimulationError(_)
+            | BackendError::RawParseError(_)
+            | BackendError::Io(_) => None,
+        }
+    }
+
+    /// What a routing refusal (`W0180`–`W0182`) found missing: the
+    /// analyses, then the features, by name (`Kind::name`, `features()`).
+    /// `None` for every other error.
+    pub fn missing(&self) -> Option<(Vec<&str>, Vec<&str>)> {
+        match self {
+            BackendError::UnsupportedAnalysis { analysis, .. }
+            | BackendError::NoSimulator { analysis, .. } => {
+                Some((vec![analysis.as_str()], Vec::new()))
+            }
+            BackendError::UnsupportedFeature { feature, .. } => {
+                Some((Vec::new(), feature.split(", ").collect()))
+            }
+            _ => None,
+        }
+    }
+}
 
 /// Every feature by its short name, with its `feature` bit, in bit order:
 /// the names a simulator's descriptor declares its `features` by and an

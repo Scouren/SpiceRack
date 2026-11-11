@@ -21,7 +21,7 @@
 //!   `Sim::family(self) -> Dialect`, `Sim::installed(self) -> bool`,
 //!   `Sim::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub struct SimDef`, `pub enum Runner` (`BuiltIn`, `Command`), `pub enum Installed` (`Fn`,
-//!   `OnPath`), `pub enum SimRegisterError`
+//!   `OnPath`), `pub enum SimRegisterError`, `SimRegisterError::code(&self) -> Code`
 //! - `pub fn register_simulator(def: SimDef) -> Result<Sim, SimRegisterError>`
 //! - `pub fn simulators() -> impl Iterator<Item = (Sim, &'static SimDef)>`
 //! - `pub fn by_name(name: &str) -> Option<Sim>`
@@ -32,6 +32,7 @@ use std::sync::{Mutex, Once, OnceLock};
 use super::command::{self, Arg, Output, Piece};
 use super::{BACKENDS, BackendError, Kind, RUNNABLE, feature, is_on_path};
 use crate::result::RawData;
+use crate::syntax::diag::Code;
 use crate::syntax::{Dialect, Lang};
 
 /// The most simulators registered at once, the five built-ins among them.
@@ -208,6 +209,21 @@ impl Sim {
         };
         assert!(!plots.is_empty(), "a raw file read holds at least one plot");
         Ok(plots)
+    }
+}
+
+impl SimRegisterError {
+    /// Its catalogue code: `R0042` for a full registry, `R0040` (a
+    /// descriptor that does not validate) for every field's refusal.
+    pub fn code(&self) -> Code {
+        match self {
+            SimRegisterError::Full => Code::R0042,
+            SimRegisterError::Unnamed
+            | SimRegisterError::Redefined(_)
+            | SimRegisterError::Features(_)
+            | SimRegisterError::Analyses(_)
+            | SimRegisterError::Command(_) => Code::R0040,
+        }
     }
 }
 

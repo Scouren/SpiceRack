@@ -99,9 +99,25 @@ macro_rules! rows_r {
             // slot R0037
             // slot R0038
             // slot R0039
-            // slot R0040
-            // slot R0041
-            // slot R0042
+            /// A simulator descriptor (`backend::SimDef`, Python `Simulator(...)`, a
+            /// `spicerack.simulator/1` file) with a field that does not validate.
+            R0040 Note {
+                title: "a simulator descriptor that does not validate",
+                cite: "no clause: the registry's edge checks (`backend::register_simulator`, `backend::SimRegisterError`)",
+                explain: "The message opens with the field at fault (`name`, `dialect`, `command`, `output`, `analyses`, `features`, `verilog`, an unknown key) and says what it must be. Nothing is registered.",
+            }
+            /// A registered command simulator whose program is not on `$PATH` at run time.
+            R0041 Note {
+                title: "the simulator's command is not installed",
+                cite: "no clause: the simulator's `installed` probe (`backend::Installed::OnPath`)",
+                explain: "The deck was written, and the program that runs it (the command's first word) is not on `$PATH`. Install it, or name another simulator.",
+            }
+            /// A registration past the registry's capacity (`backend::SIMS_MAX`).
+            R0042 Note {
+                title: "the simulator registry is full",
+                cite: "no clause: the registry's own limit, backend::SIMS_MAX",
+                explain: "The registry holds 32 simulators, the five built-ins among them, for the life of the process. Register fewer; an equal definition registered again takes no new slot.",
+            }
             // slot R0043
             // slot R0044
             // slot R0045

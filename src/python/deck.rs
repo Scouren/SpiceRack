@@ -30,7 +30,8 @@
 //!   `Deck::card(body: &Body, name: &str) -> PyResult<String>`
 //! - `pub(super) fn check_backend_name(name: &str) -> PyResult<()>`
 //! - `pub(super) fn region_dialect(name: &str) -> Result<Lang, String>`
-//! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`
+//! - `pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr`,
+//!   `pub(super) fn backend_err(e: BackendError) -> PyErr`
 
 use crate::syntax::Lang;
 
@@ -43,7 +44,7 @@ use pyo3::prelude::*;
 use super::analysis::{Analysis, nfreqs};
 use super::model::{Bench, Body, Func, ModelLibrary, dec, params};
 use super::verilog::lower_verilog;
-use crate::backend::{Dialect, Kind, Sim, feature};
+use crate::backend::{BackendError, Dialect, Kind, Sim, feature};
 use crate::result::RawData;
 use crate::syntax::render;
 
@@ -94,7 +95,7 @@ impl Deck {
     /// every analysis and its features); the first plot.
     pub(super) fn run(&self, backend: Option<&str>) -> PyResult<RawData> {
         let (sim, text) = self.for_run(backend)?;
-        crate::simulation::run(sim, &text).map_err(runtime_err)
+        crate::simulation::run(sim, &text).map_err(backend_err)
     }
 
     /// Runs the deck once; each queued analysis's plots (one, one per
@@ -102,7 +103,7 @@ impl Deck {
     pub(super) fn run_each(&self, backend: Option<&str>) -> PyResult<Vec<Vec<RawData>>> {
         let (sim, text) = self.for_run(backend)?;
         let kinds: Vec<Kind> = self.analyses().iter().map(Analysis::kind).collect();
-        crate::simulation::run_each(sim, &text, &kinds).map_err(runtime_err)
+        crate::simulation::run_each(sim, &text, &kinds).map_err(backend_err)
     }
 
     /// The deck's stored source (`store::with_loads`): its ngspice text,
@@ -213,6 +214,44 @@ pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr {
     PyRuntimeError::new_err(e.to_string())
 }
 
+/// A backend error as a Python `RuntimeError`. One with a catalogue code
+/// (`BackendError::code`: a routing refusal `W0180`–`W0182`, a command not
+/// installed `R0041`) opens with `<code> <title>: ` and carries a
+/// `diagnostic` attribute, `{"code": str, "stage": "route" | "run",
+/// "missing": {"analyses": [str], "features": [str]} | None}`: what the
+/// `spicerack.diagnostics/1` writer copies into `stage` and
+/// `simulator.missing`.
+pub(super) fn backend_err(e: BackendError) -> PyErr {
+    let Some(code) = e.code() else {
+        return runtime_err(e);
+    };
+    let title = crate::syntax::diag::info(code).title;
+    let err = PyRuntimeError::new_err(format!("{code:?} {title}: {e}"));
+    let attached = Python::attach(|py| -> PyResult<()> {
+        let d = pyo3::types::PyDict::new(py);
+        d.set_item("code", format!("{code:?}"))?;
+        match e.missing() {
+            Some((analyses, features)) => {
+                let missing = pyo3::types::PyDict::new(py);
+                missing.set_item("analyses", analyses)?;
+                missing.set_item("features", features)?;
+                d.set_item("stage", "route")?;
+                d.set_item("missing", missing)?;
+            }
+            None => {
+                d.set_item("stage", "run")?;
+                d.set_item("missing", py.None())?;
+            }
+        }
+        err.value(py).setattr("diagnostic", d)
+    });
+    // A failure to attach is raised in the error's place, never dropped.
+    match attached {
+        Ok(()) => err,
+        Err(failed) => failed,
+    }
+}
+
 // ---- private ----
 
 impl Deck {
@@ -233,7 +272,7 @@ impl Deck {
                 ))
             })?;
             let sim = Sim::of(d).ok_or_else(|| {
-                runtime_err(crate::backend::BackendError::SimulationError(format!(
+                runtime_err(BackendError::SimulationError(format!(
                     "no {} simulator is driven by SpiceRack",
                     d.name()
                 )))
@@ -243,7 +282,7 @@ impl Deck {
         let kinds: Vec<Kind> = deck.analyses().iter().map(Analysis::kind).collect();
         let writes = |s: Sim| deck.write_to(s.row().dialect).is_ok();
         let sim =
-            crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(runtime_err)?;
+            crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(backend_err)?;
         let written = deck.write_to(sim.row().dialect).map_err(runtime_err)?;
         Ok((sim, written.text))
     }
