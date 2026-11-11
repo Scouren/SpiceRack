@@ -28,8 +28,8 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep. `temp=slice(...)` sweeps temperature |
 | `ac(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(step_time, end_time, start_time=None, max_time=None, use_initial_condition=False)` | `TransientAnalysis` |
-| `noise(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis` |
-| `tf(outvar, insrc)` | `TransferFunctionAnalysis` (gain, input and output resistance) |
+| `noise(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis`. `output_node` and `ref_node` are node names (`"out"`; `"v(out)"` names the same node); any other form raises `ValueError` |
+| `tf(outvar, insrc)` | `TransferFunctionAnalysis` (gain, input and output resistance). `outvar` is `"v(out)"`, `"v(a,b)"`, `"i(vload)"` or a node name (`"out"` is written `v(out)`); any other form raises `ValueError` |
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(n1, n2, n3, n4, tf_type, pz_type)` | `PoleZeroAnalysis` |
 | `distortion(...)` | `DistortionAnalysis` |

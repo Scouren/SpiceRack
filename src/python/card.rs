@@ -8,7 +8,7 @@
 //! - `pub(super) fn ac(variation, points, start, stop) -> PyResult<Analysis>`
 //! - `pub(super) fn transient(step, stop, start, max_step, uic) -> Analysis`
 //! - `pub(super) fn noise(output, reference, source, variation, points, start, stop, points_per_summary) -> PyResult<Analysis>`
-//! - `pub(super) fn tf(output: &str, source: &str) -> Analysis`
+//! - `pub(super) fn tf(output: &str, source: &str) -> PyResult<Analysis>`
 //! - `pub(super) fn sensitivity(output: &str, ac: Option<FreqSweep>) -> Analysis`
 //! - `pub(super) fn polezero(nodes: [&str; 4], tf_type: &str, pz_type: &str) -> PyResult<Analysis>`
 //! - `pub(super) fn distortion(variation, points, start, stop, f2overf1) -> PyResult<Analysis>`
@@ -81,7 +81,9 @@ pub(super) fn transient(
     }
 }
 
-/// `.noise`; `variation` per [`sweep`].
+/// `.noise`; `variation` per [`sweep`]. `output` and `reference` are nodes
+/// (`out`, or `v(out)` unwrapped): the card wraps them in `V(…)` itself, so
+/// any other form is a `ValueError` here.
 pub(super) fn noise(
     output: &str,
     reference: &str,
@@ -94,20 +96,34 @@ pub(super) fn noise(
 ) -> PyResult<Analysis> {
     let sweep = sweep(variation, points, start, stop)?;
     Ok(Analysis::Noise {
-        output: output.into(),
-        reference: reference.into(),
+        output: node(output)?.into(),
+        reference: match reference {
+            "" => String::new(),
+            r => node(r)?.into(),
+        },
         source: source.into(),
         sweep,
         points_per_summary,
     })
 }
 
-/// `.tf output source`.
-pub(super) fn tf(output: &str, source: &str) -> Analysis {
-    Analysis::Tf {
-        output: output.into(),
+/// `.tf output source`. `output` is the card's own signal (`v(out)`,
+/// `v(a,b)`, `i(vload)`; ngspice manual §11.3.9), kept as given, or a bare
+/// node, written `v(node)` (ngspice refuses `.tf out Vin`: "voltage or
+/// current expected"). Anything else is a `ValueError`.
+pub(super) fn tf(output: &str, source: &str) -> PyResult<Analysis> {
+    let t = output.trim();
+    let signal = inside(t, &["v(", "V(", "i(", "I("])
+        .is_some_and(|names| names.split(',').all(|n| plain(n.trim())));
+    let output = if signal {
+        t.to_string()
+    } else {
+        format!("v({})", node(t)?)
+    };
+    Ok(Analysis::Tf {
+        output,
         source: source.into(),
-    }
+    })
 }
 
 /// `.sens`: DC without `ac`, else over that AC sweep.
@@ -247,4 +263,36 @@ pub(super) fn network_params(
     z_out: f64,
 ) -> String {
     format!(".net {output_current} {input_source} Rout={z_out} Rin={z_in}")
+}
+
+// ---- private ----
+
+/// What `t` wraps when it is `<prefix>…)` for one of `prefixes`.
+fn inside<'a>(t: &'a str, prefixes: &[&str]) -> Option<&'a str> {
+    prefixes
+        .iter()
+        .find_map(|p| t.strip_prefix(*p))
+        .and_then(|r| r.strip_suffix(')'))
+}
+
+/// One node or element name as a card takes it: not empty, with no space,
+/// parenthesis, comma or `=`.
+fn plain(s: &str) -> bool {
+    !s.is_empty() && !s.contains(|c: char| c.is_whitespace() || "(),=".contains(c))
+}
+
+/// The node `output` names: `out`, or `v(out)` / `V(out)` unwrapped. A
+/// `ValueError` for anything else: wrapped again by the card it would be
+/// `V(v(a,b))`, which ngspice-45 reads as a node no element touches and
+/// reports as 0.
+fn node(output: &str) -> PyResult<&str> {
+    let t = output.trim();
+    let n = inside(t, &["v(", "V("]).map_or(t, str::trim);
+    if plain(n) {
+        Ok(n)
+    } else {
+        Err(PyValueError::new_err(format!(
+            "'{output}' is not a node: pass its name (out) or v(out)"
+        )))
+    }
 }

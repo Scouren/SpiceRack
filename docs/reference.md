@@ -111,8 +111,8 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `dc(**{source: slice(start, stop, step)})` | `DcAnalysis` (`.sweep`, `.nodes`, `.branches`) |
 | `ac(variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e9)` | `AcAnalysis` (`.frequency`) |
 | `transient(step_time, end_time, start_time=None, max_time=None, use_initial_condition=False)` | `TransientAnalysis` (`.time`) |
-| `noise(output_node, ref_node, src, variation="dec", points=10, start_frequency=1e3, stop_frequency=1e8, points_per_summary=None)` | `NoiseAnalysis` |
-| `transfer_function(outvar, insrc)` / `tf` | `TransferFunctionAnalysis` |
+| `noise(output_node, ref_node, src, variation="dec", points=10, start_frequency=1e3, stop_frequency=1e8, points_per_summary=None)` | `NoiseAnalysis`; `output_node`, `ref_node`: a node name, or `v(node)`; else `ValueError` |
+| `transfer_function(outvar, insrc)` / `tf` | `TransferFunctionAnalysis`; `outvar`: `v(out)`, `v(a,b)`, `i(vload)` or a node name; else `ValueError` |
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(node1, node2, node3, node4, tf_type, pz_type)` | `PoleZeroAnalysis` (`pz["pole(1)"]`) |
 | `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis` |

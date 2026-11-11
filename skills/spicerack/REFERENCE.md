@@ -101,10 +101,10 @@ queued beside others raise instead.
 | `dc(**sweeps)` | `add_dc(**sweeps)` | `Vin=slice(start, stop, step)` | `DcAnalysis` |
 | `ac(...)` | `add_ac(...)` | `(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(...)` | `add_transient(...)` | `(step_time, end_time, start_time=, max_time=)` | `TransientAnalysis` |
-| `noise(...)` | `add_noise(...)` | `(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis` |
+| `noise(...)` | `add_noise(...)` | `(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)`; the two nodes by name (`"out"`, or `"v(out)"`), else `ValueError` | `NoiseAnalysis` |
 | — | `add_fourier(...)` | `(fundamental_frequency, [vars], num_harmonics=)` | see note |
 | `polezero(...)` | — | — | `PoleZeroAnalysis` |
-| `transfer_function(...)` | — | — | `TransferFunctionAnalysis` |
+| `transfer_function(...)` | `add_tf(...)` | `(outvar, insrc)`; `outvar` is `"v(out)"`, `"v(a,b)"`, `"i(vload)"` or a node name, else `ValueError` | `TransferFunctionAnalysis` |
 | `distortion(...)` | — | — | `DistortionAnalysis` |
 
 `variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (N log-spaced points in total, Spectre's `log=N-1`, its steps; every other target refuses it, `W0040`), any

@@ -495,6 +495,47 @@ def test_noise_runs_when_saves_are_set():
     assert spectrum[0] == pytest.approx(expected, rel=0.02)
 
 
+@pytest.mark.needs("ngspice")
+def test_p3_033_api_add_noise_written_noise():
+    """`output_node` is a node: "out" and "v(out)" name the same one, and no
+    other form reaches the deck. Oracle (closed form): at 1 Hz the 1 uF of a
+    1k/1k divider is open (corner 318 Hz), so its output noise is the thermal
+    noise of 1k || 1k, sqrt(4kT * 500 Ohm) = 2.87889e-9 V/sqrt(Hz) at
+    ngspice's 27 C. ngspice-45 prints 2.878880e-09 for `.noise V(out)` and 0
+    for `.noise V(v(out))` (research/impl/evidence/P3-033)."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("nz", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.R(name="2", positive="out", negative="0", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.V(name="in", positive="in", negative="0", value=0.0, ac=1.0)
+    # 1e-3: the capacitor moves the 1 Hz point by 5e-6, ngspice's k by 1e-8.
+    expected = math.sqrt(4 * 1.380649e-23 * 300.15 * 500.0)
+    for form in ("out", "v(out)", "V(out)", " v( out ) "):
+        noise = tb.noise(output_node=form, ref_node="0", src="Vin", variation="dec", points=10,
+                         start_frequency=1.0, stop_frequency=1e5)
+        assert noise["onoise_spectrum"][0] == pytest.approx(expected, rel=1e-3), form
+    for bad in ("v(out", "i(Vin)", "v(in,out)", "out 0", ""):
+        with pytest.raises(ValueError, match="is not a node"):
+            tb.add_noise(bad, "0", "Vin")
+    with pytest.raises(ValueError, match="is not a node"):
+        tb.add_noise("out", "v(0", "Vin")
+    # `.tf outvar insrc` (ngspice manual 11.3.9: `v(5, 3)`, `i(VLOAD)`): the
+    # signal is kept, a node is written v(node) (ngspice-45 refuses the bare
+    # `.tf out Vin`: "voltage or current expected").
+    for form, card in (("out", ".tf v(out) Vin"), ("v(out)", ".tf v(out) Vin"), ("i(Vin)", ".tf i(Vin) Vin")):
+        bench = ps.Testbench(dut)
+        bench.V(name="in", positive="in", negative="0", value=0.0, ac=1.0)
+        bench.add_tf(form, "Vin")
+        assert card in bench.netlist("ngspice").splitlines(), form
+    for bad in ("v(out", "v(v(out))", "out 0", "db(out)", ""):
+        with pytest.raises(ValueError, match="is not a node"):
+            tb.add_tf(bad, "Vin")
+
+
 # ======================================================================
 # Testbench.run: every queued analysis in one deck
 # ======================================================================

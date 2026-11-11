@@ -141,12 +141,13 @@ impl PyTestbench {
     }
 
     #[pyo3(signature = (outvar, insrc))]
-    fn add_transfer_function(mut slf: PyRefMut<'_, Self>, outvar: &str, insrc: &str) {
-        slf.as_super().tb().analyses.push(card::tf(outvar, insrc));
+    fn add_transfer_function(mut slf: PyRefMut<'_, Self>, outvar: &str, insrc: &str) -> PyResult<()> {
+        slf.as_super().tb().analyses.push(card::tf(outvar, insrc)?);
+        Ok(())
     }
 
     #[pyo3(signature = (outvar, insrc))]
-    fn add_tf(slf: PyRefMut<'_, Self>, outvar: &str, insrc: &str) {
+    fn add_tf(slf: PyRefMut<'_, Self>, outvar: &str, insrc: &str) -> PyResult<()> {
         Self::add_transfer_function(slf, outvar, insrc)
     }
 
