@@ -11,9 +11,9 @@ trusts. The rules behind it are in `AGENTS.md` (Testing).
 | merge | both suites in the testing shell (locally `.#testing-ltspice`, below); the converter alone as a package (`packages.spice2rack`: no default features, no `espice` input), run on a fixture kit | `nix develop .#testing -c cargo test`, then `maturin develop && python3 -m pytest` in a `--system-site-packages` venv; `nix build .#spice2rack && ./result/bin/spice2rack --to espice --kit -o <dir> tests/fixtures/pdk_sections/models.lib` | `.github/workflows/test.yaml`, every PR and every push to `main` |
 | docs | the site builds strictly; every Python example in it runs | `nix develop .#docs -c mkdocs build --strict`; `tests/test_docs.py` | `.github/workflows/docs.yaml`; pytest |
 | release | tag matches `Cargo.toml` and `pyproject.toml`, wheels for every target, sdist | `.github/scripts/bump_version.py`, then the release workflow | `.github/workflows/tags.yaml`, `publish.yaml` |
-| nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
+| nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`); the golden record's determinism with one job ("Golden gate" below) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim`; `GOLDEN_JOBS=1 golden check-determinism <record>` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand; the golden check by hand, where the golden inputs are (`$IHP_PDK`) |
 | perf | instructions and allocations of the golden workload, the raw-file reader and the Python API ("Performance" below) | `python3 benches/perf.py pre-commit` (< 10 s), `merge` (≈ 2 min), `nightly` (≈ 5 min) | local, `nix develop .#testing`; every perf commit cites before and after |
-| golden | the transpiler rewrite's byte-identical gate against `9d1d6bb`, and zero gate Z1 ("Golden gate" below) | `golden record`, then `golden diff <baseline> <new> --xfail migration.xfail`; `golden zero <new> tests/fixtures/zero/untranslated.txt`; `golden check-determinism`; `cargo test --features corpus --test test_syntax` | local, before each rewrite phase lands |
+| golden | the transpiler rewrite's byte-identical gate against `9d1d6bb`, and zero gate Z1 ("Golden gate" below) | `golden record`, then `golden diff <baseline> <new> --xfail migration.xfail`; `golden zero <new> tests/fixtures/zero/untranslated.txt`; `GOLDEN_JOBS=7 golden check-determinism <new>`; `cargo test --features corpus --test test_syntax` | local, before each rewrite phase lands |
 
 `.github/scripts/check_style.py` is vendored from the `code-style` skill
 (https://github.com/OmarSiwy/NixOSConfig/tree/main/skills, sha256 `55f417592f6e7ec3…`).
@@ -120,8 +120,25 @@ G=${CARGO_TARGET_DIR:-target}/release/golden
 nix develop .#testing -c env IHP_PDK=<IHP-Open-PDK checkout> $G record <out_dir>
 $G diff <baseline> <out_dir> --xfail migration.xfail --refusal-status-only <report> --skip verilog
 $G zero <out_dir> tests/fixtures/zero/untranslated.txt
-nix develop .#testing -c env IHP_PDK=<...> $G check-determinism
+nix develop .#testing -c env IHP_PDK=<...> GOLDEN_JOBS=7 $G check-determinism <out_dir>
 ```
+
+`golden record` walks the inputs largest file first with `GOLDEN_JOBS`
+workers (4 by default). An input of 1 MB or more is read once and rendered
+as one task per target, at most three at once for one of 32 MB or more,
+and each corpus deck's and fixture's kit is loaded by the worker that
+records it. The MANIFEST's lines are sorted, so neither the order nor the
+job count changes a byte of the tree. `golden check-determinism <out_dir>`
+renders every input again in a process of its own, with its own
+`GOLDEN_JOBS` (another count than the record's) and the queue reversed,
+compares each output's bytes and then the whole MANIFEST with
+`<out_dir>`'s (so a missing or an extra file fails), and writes nothing: it
+prints `IDENTICAL`, or the first difference and exits 1. It compares the
+`.notes` and every message line too, which `golden diff` passes over. With
+no `<out_dir>` it records into a temp dir in a child process first and
+checks against that. The 1-job form, `GOLDEN_JOBS=1 golden
+check-determinism <out_dir>`, is the nightly tier's: about a record's CPU
+time on one core (447 + 18 s, `research/BUILD-TEST-SPEED.md` run `r1`).
 
 `golden zero <out_dir> <list>` is zero gate Z1: no output carries `W0001` (a
 statement kept as another dialect's text) or `W0032` (text that did not
@@ -197,9 +214,9 @@ A kit is walked like Interop's `pdk-models`: the entries, then breadth first
 through includes, `.lib` calls and Verilog-A sources. The read order is in
 the manifest (`render::references` lists each file's). Since phase 3, each
 kit file is read in its kit (`syntax::resolve::Kit`, loaded from the same
-entries; `import::kit`), still behind an empty title line as the oracle read it, and each fixture in
-its own kit (itself and the files it includes under `tests/`); a corpus deck
-is read alone. The kit also follows includes the walk skips (inside a
+entries; `import::kit`), still behind an empty title line as the oracle read it, and each corpus
+deck and fixture in its own kit (itself and the files it includes, under its
+corpus's root or `tests/`), which the worker that records it loads. The kit also follows includes the walk skips (inside a
 `.subckt` or an `.if` branch: IHP's three `*_parm.lib`), which are no inputs,
 so the manifest stays the baseline's. Every target is written for every
 input. The manifest's `skip` lines name the input dialects no set reads
@@ -213,11 +230,18 @@ Measured on a 32-thread, 31 GB development machine, 2026-11-03, at `9d1d6bb`:
 - `golden record`, all 14,938 inputs with 4 workers (`GOLDEN_JOBS`): 37.8 s
   wall, 69.7 s user, peak RSS 2.3 GB (`command time -v`, nixpkgs `time`).
   It writes 164,318 files, 3.7 GB on disk (3.1 GB apparent).
-- `check-determinism` (two records in two processes, then a diff): 1 min 46 s.
+- `check-determinism` (as it was then: two records in two processes, and a diff): 1 min 46 s.
 - The simulator-free tier, the corpus fixpoints alone:
   `nix develop .#testing -c cargo test -j 4 --no-default-features --features corpus --release --test test_import_suite -- fixpoint --test-threads=4`
   runs in 64.0 s wall, peak RSS 2.1 GB, once built. `ngspice_corpus_fixpoint`
   sets the wall time.
+
+Measured at `61beae9` with the prototype of today's record and check
+(`research/BUILD-TEST-SPEED.md` §3.1, §3.2): `golden record` with 16 jobs
+42.3 to 46.3 s wall, peak RSS 6.0 to 6.3 GB (runs `r5`, `r9`, load 14.2 to
+21.1), where the code before took 282.1 s and 5.6 GB (`r1`, load 11.6 to
+13.3); `check-determinism <tree>` with 7 jobs 86.7 s, 4.6 GB, `IDENTICAL`
+(`r6`, load 20.3 to 17.9).
 
 The PEG reader and its lowering went in phase 2b, the IR, the adapter and
 the old writers in phase 6, so the recorded `baseline-daa0ad0` is the only
