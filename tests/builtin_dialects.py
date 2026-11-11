@@ -1239,6 +1239,9 @@ def vacask(d):
         .option_cosmetic("sparse")
         .option_cosmetic("savecurrents")
         .option_cosmetic("numdgt")
+        # HSPICE's SEARCH directories: the kit read each file under the
+        # path its card names (`resolve::Kit::load`).
+        .option_cosmetic("search")
         .option_cosmetic("warn")
         .option_cosmetic("maxwarns")
         .option_cosmetic("measdgt")

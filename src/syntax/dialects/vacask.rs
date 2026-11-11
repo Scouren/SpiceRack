@@ -206,6 +206,9 @@ pub(super) fn vacask() -> DialectDef {
         .option_cosmetic("sparse")
         .option_cosmetic("savecurrents")
         .option_cosmetic("numdgt")
+        // HSPICE's SEARCH directories: the kit read each file under the
+        // path its card names (`resolve::Kit::load`).
+        .option_cosmetic("search")
         // HSPICE's and LTspice's listing and output keys (ngspice manual
         // §11.1.1 NOINIT; HSPICE WARN, MAXWARNS, MEASDGT; LTspice
         // `plotwinsize`): no number in the raw file.

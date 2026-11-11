@@ -62,11 +62,13 @@ impl W<'_, '_> {
                 k.as_str()
             };
             let lower = k.to_ascii_lowercase();
-            // HSPICE's SEARCH directories for `.include`/`.lib`: ngspice
-            // has no such option (manual §11.1), so the files would not be
-            // found (`search_lib.sp`: "Could not find include file").
+            // HSPICE's SEARCH directories for `.include`/`.lib`: the kit
+            // reads such a file under the path its card names
+            // (`resolve::Kit::load`), so the written kit holds it there and
+            // the option says nothing more (`search_lib.sp`: real ngspice
+            // on the written files gives its 0.75 V).
             if self.pair.hspice_elsewhere && lower == "search" {
-                self.refuse(Code::W0017, *tok);
+                self.note(Code::W0024, *tok);
                 continue;
             }
             // LTspice has no SCALE (26.1.1: `.options scale=1u` is a syntax

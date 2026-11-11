@@ -502,3 +502,31 @@ fn a_verilog_a_source_loaded_twice_declares_at_each_load() {
     assert_eq!(def_name(&k, bound(&k, 0, "x2")).0, "m");
     assert!(codes(&k, 0).is_empty());
 }
+
+#[test]
+fn p4_123_an_hspice_search_directory_finds_an_include() {
+    // HSPICE Command Reference E-2010.12 p.639, `.OPTION SEARCH`: `.LIB`,
+    // `.INC` and `.LOAD` look for their file in the option's directory. By
+    // hand: neither file is beside /d/t.sp, both are in /d/sd, so both are read,
+    // each under the path its card names (a written kit holds it beside
+    // the deck), and `x1` binds the include's `leaf`. ngspice has no such
+    // option (manual §11.1): read as ngspice, both are R0006. Checks: 5.
+    let deck = "* t\n.option search='sd'\n.include 'a.inc'\n.lib 'c.lib' tt\n\
+        x1 a 0 leaf\nv1 a 0 1\n.op\n.end\n";
+    let files = [
+        ("/d/t.sp", deck),
+        ("/d/sd/a.inc", "* a\n.subckt leaf p n\nr1 p n 1k\n.ends\n"),
+        ("/d/sd/c.lib", "* c\n.lib tt\nr2 a 0 3k\n.endl tt\n"),
+    ];
+    let k = kit(&files, "/d/t.sp", Form::Deck, Dialect::Hspice);
+    let paths: Vec<&Path> = k.files().iter().map(|f| f.path.as_path()).collect();
+    let want = ["/d/t.sp", "/d/a.inc", "/d/c.lib"].map(Path::new);
+    assert_eq!(paths, want);
+    let roles: Vec<Role> = k.files().iter().map(|f| f.role).collect();
+    assert_eq!(roles, [Role::Deck, Role::Library, Role::Library]);
+    assert_eq!(def_name(&k, bound(&k, 0, "x1")).0, "leaf");
+    assert!(codes(&k, 0).is_empty(), "{:?}", codes(&k, 0));
+    let ng = kit(&files, "/d/t.sp", Form::Deck, Dialect::Ngspice);
+    let lacks = codes(&ng, 0).iter().filter(|c| **c == Code::R0006).count();
+    assert_eq!(lacks, 2, "{:?}", codes(&ng, 0));
+}
