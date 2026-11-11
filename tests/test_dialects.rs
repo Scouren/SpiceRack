@@ -6,8 +6,10 @@
 //! reads neither. The HSPICE card forms follow ESPice's
 //! `tests/frontend/grammar/hspice*.peg` and `tests/conformance/tests/netlist/hspice`.
 //!
-//! The ESPice runs need `espice` on PATH (`$ESPICE` overrides): unsupported
-//! fails, never skips, so outside `nix develop .#testing` they fail.
+//! The ESPice runs need `espice` on PATH (`$ESPICE` overrides) and, for
+//! HSPICE text, `espice-hspice` (ESPice at the revision `flake.nix` pins for
+//! its HSPICE reader): unsupported fails, never skips, so outside
+//! `nix develop .#testing` they fail.
 //!
 //! Cites: real ESPice (`--tokenizer=<d>`) as the oracle for each dialect.
 //!
@@ -218,6 +220,11 @@ fn op_point(bin: &str, deck: &str, tokenizer: &str) -> Result<spicerack::result:
     let dir = tempfile::TempDir::new().unwrap();
     let (path, raw) = (dir.path().join("deck.sp"), dir.path().join("out.raw"));
     std::fs::write(&path, deck).unwrap();
+    // HSPICE text is read by the pinned ESPice (ZERO-LEDGER P1-063).
+    let bin = match tokenizer {
+        "hspice" => "espice-hspice",
+        _ => bin,
+    };
     let out = std::process::Command::new(bin)
         .arg(format!("--tokenizer={tokenizer}"))
         .arg(&path)
@@ -306,4 +313,25 @@ fn caret_meaning_refused_across_dialects() {
         e.messages
     );
     to(Dialect::Ltspice).expect("same dialect's own meaning is fine");
+}
+
+/// ZERO-LEDGER P1-063: ESPice is deleting its HSPICE reader, so HSPICE text
+/// runs on `espice-hspice`, ESPice at a revision that has the reader
+/// (`flake.nix`'s `espice-hspice` input), whatever revision `espice` is at.
+/// Oracle: the closed form of a 2 V source over a 1k/1k divider in HSPICE
+/// text (a quoted expression, a `$` comment), V(out) = 1 V. The program
+/// handed to `op_point` is one that is not there: HSPICE text never runs on
+/// it. Outside `nix develop .#testing` this fails. Checks: 2.
+#[test]
+fn p1_063_hspice_text_is_read_by_the_pinned_espice() {
+    let pinned = std::process::Command::new("espice-hspice")
+        .arg("--version")
+        .output()
+        .expect("`espice-hspice` on PATH: run in `nix develop .#testing`");
+    assert!(pinned.status.success(), "{pinned:?}");
+    let deck = "* divider\n.param rv=1k\nV1 in 0 2\nR1 in out 'rv'\nR2 out 0 'rv*1' $ the lower leg\n.op\n.end\n";
+    // A program that is not there: `op_point` must not start it.
+    let raw = op_point("no-such-espice", deck, "hspice").expect("HSPICE text read");
+    let out = node(&raw, "out");
+    assert!((out - 1.0).abs() < 1e-9, "V(out) = {out}");
 }

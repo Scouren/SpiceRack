@@ -32,8 +32,13 @@ pub enum Sim {
     Xyce,
     Vacask,
     Espice,
-    /// ESPice reading HSPICE text (`--tokenizer=hspice`).
+    /// ESPice reading HSPICE text (`espice-hspice --tokenizer=hspice`): the
+    /// revision `flake.nix` pins for its HSPICE reader (ZERO-LEDGER P1-063),
+    /// whatever revision `espice` is at.
     EspiceHspice,
+    /// That pinned ESPice reading ngspice text (`espice-hspice`): the control
+    /// of the cell [`Sim::EspiceHspice`] is the target of, the same build.
+    EspicePinned,
     /// LTspice 26.1.1 under Wine (`ltspice`, `nix develop .#testing-ltspice`).
     Ltspice,
 }
@@ -66,6 +71,7 @@ impl Sim {
             Sim::Vacask => "vacask",
             Sim::Espice => "espice",
             Sim::EspiceHspice => "espice-hspice",
+            Sim::EspicePinned => "espice-pinned",
             Sim::Ltspice => "ltspice",
         }
     }
@@ -77,7 +83,8 @@ impl Sim {
             Sim::Ngspice | Sim::NgspiceHsa => "ngspice",
             Sim::Xyce => "Xyce",
             Sim::Vacask => "vacask",
-            Sim::Espice | Sim::EspiceHspice => "espice",
+            Sim::Espice => "espice",
+            Sim::EspiceHspice | Sim::EspicePinned => "espice-hspice",
             Sim::Ltspice => "ltspice",
         };
         let path = std::env::var_os("PATH").unwrap_or_default();
@@ -196,8 +203,14 @@ fn run_in(
         Sim::Ltspice => {
             c.args(["ltspice", "-b"]);
         }
-        Sim::Espice | Sim::EspiceHspice => {
+        Sim::Espice => {
             c.arg("espice")
+                .arg("--rawfile")
+                .arg(&raw)
+                .arg("--format=binary");
+        }
+        Sim::EspiceHspice | Sim::EspicePinned => {
+            c.arg("espice-hspice")
                 .arg("--rawfile")
                 .arg(&raw)
                 .arg("--format=binary");
