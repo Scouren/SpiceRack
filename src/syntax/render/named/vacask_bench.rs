@@ -1,12 +1,15 @@
-//! The testbench → VACASK's `control` block: one `options` line, the
-//! stepped parameters as control variables swept ahead of each analysis,
+//! The testbench → VACASK's `control` block: one `options` line, each
+//! `.step` as a `sweep` ahead of each analysis (of a control variable, the
+//! `temp` option or a source's own `dc`: `W::step_what`),
 //! and the analyses, initial conditions on each transient's line and
 //! nodesets on every `analysis` line; a Spectre `montecarlo` as an `mc`
 //! loop around its inner analysis.
 //!
 //! Cites: VACASK `share/doc/vacask/demo` (`analysis`, `sweep`, `options`,
-//! `var`), `docs/cmd-analysis-mc.md` (`mc`; as the old VACASK writer
-//! probed them); Spectre Reference 19.1 pp.165-174 (`montecarlo`).
+//! `var`), `docs/cmd-sweep.md` (a sweep of an instance parameter, an
+//! option, a variable), `docs/cmd-analysis-mc.md` (`mc`; as the old VACASK
+//! writer probed them); Xyce RG 7.10 `.STEP` (a bare device name is its
+//! default parameter); Spectre Reference 19.1 pp.165-174 (`montecarlo`).
 //!
 //! Contents:
 //! - `W::control(&mut self, tb: &Tb)`
@@ -79,26 +82,15 @@ impl W<'_, '_> {
         if let Some((_, tok)) = tb.measures.first() {
             self.ask(Construct::Measure, *tok);
         }
-        for (_, p, [start, ..], _) in &tb.steps {
-            self.line(&format!("  var {}={}", p.to_ascii_lowercase(), num(*start)));
-        }
         let mut sweeps: Vec<String> = tb.steps.iter().filter_map(|s| self.step_sweep(s)).collect();
         // A list `.step` is a `sweep … values=[…]` (`lib/answeep.cpp`
-        // `setupValueSweep`); `temp` is the `temp` option's.
-        for (p, v, _) in &tb.step_lists {
-            let name = p.to_ascii_lowercase();
-            let what = match name.as_str() {
-                "temp" => "option=\"temp\"".to_string(),
-                _ => {
-                    self.line(&format!("  var {name}={}", num(v[0])));
-                    format!("variable=\"{name}\"")
-                }
-            };
-            sweeps.push(format!(
-                "sweep step_{} {what} {}",
-                sanitize(&name),
-                values(v)
-            ));
+        // `setupValueSweep`) of what a ranged one sets (`W::step_what`).
+        for (p, v, tok) in &tb.step_lists {
+            let first = v.first().copied().unwrap_or(0.0);
+            if let Some(what) = self.step_what(p, first, *tok) {
+                let name = sanitize(&p.to_ascii_lowercase());
+                sweeps.push(format!("sweep step_{name} {what} {}", values(v)));
+            }
         }
         // `.ic` and a capacitor's `ic=` are a transient's: ngspice forces
         // them in a transient's operating point only (`.ic` beside `.op`
@@ -131,6 +123,10 @@ impl W<'_, '_> {
                 _ => vec![],
             })
             .collect();
+        // A stepped source is swept too: under its waveform's `type` its
+        // `dc` is not read (VACASK gives the waveform's value at time zero
+        // on every row, Xyce the stepped value: run).
+        let swept: Vec<String> = swept.into_iter().chain(tb.stepped()).collect();
         let alters = self.dc_alters(&swept);
         let mut dc_types = false;
         // Paired with `plan`'s own check. No reader opens a second epoch
@@ -393,11 +389,11 @@ impl W<'_, '_> {
     /// A `.step`'s `sweep` line; `None` when it is refused (VACASK sweeps
     /// lin, dec or oct).
     fn step_sweep(&mut self, (sweep, param, [start, stop, step], tok): &Step) -> Option<String> {
-        let name = param.to_ascii_lowercase();
-        let scale = format!("step_{}", sanitize(&name));
+        let what = self.step_what(param, *start, *tok)?;
+        let scale = format!("step_{}", sanitize(&param.to_ascii_lowercase()));
         Some(match sweep {
             Some(mode @ ("dec" | "oct")) => format!(
-                "sweep {scale} variable=\"{name}\" from={} to={} mode=\"{mode}\" points={}",
+                "sweep {scale} {what} from={} to={} mode=\"{mode}\" points={}",
                 num(*start),
                 num(*stop),
                 *step as u64
@@ -407,12 +403,51 @@ impl W<'_, '_> {
                 return None;
             }
             _ => format!(
-                "sweep {scale} variable=\"{name}\" from={} to={} step={}",
+                "sweep {scale} {what} from={} to={} step={}",
                 num(*start),
                 num(*stop),
                 num(*step)
             ),
         })
+    }
+
+    /// What a `.step` over `name` sets, as a `sweep`'s target: the `temp`
+    /// option; where the source's `.step` names a device too (Xyce RG
+    /// `.STEP`: a bare device name is its default parameter, a parameter
+    /// of that name first, Xyce 7.10 run; LTspice's `.step param` and
+    /// Spectre's `sweep param=` name a parameter only), a top-level V or
+    /// I card's own `dc`; else a control variable, declared here at
+    /// `first`, that the netlist's parameters read. `None`: another
+    /// device, or a device's or model's parameter (`R1:TC1`), which no
+    /// variable reaches: refused (W0016).
+    // ponytail: a source in an included file is not looked at (its step
+    // stays a variable); R, C, L by their value parameter and
+    // `V1:DCV0` when a deck needs them.
+    fn step_what(&mut self, name: &str, first: f64, tok: u32) -> Option<String> {
+        assert!(!name.is_empty(), "a `.step` names what it sweeps");
+        let low = name.to_ascii_lowercase();
+        if low == "temp" {
+            return Some("option=\"temp\"".into());
+        }
+        let top = &self.deck.top.params;
+        let param = top
+            .iter()
+            .any(|&a| self.rd.param_view(a).0.eq_ignore_ascii_case(name));
+        let ltspice = self.rd.b.card_rules == crate::syntax::behaviour::CardRules::Ltspice;
+        if !(param || ltspice || self.rd.named()) {
+            let letter = low.as_bytes()[0].to_ascii_uppercase() as char;
+            let scope = crate::syntax::ast::NONE;
+            let device = self.names.reference(scope, name, letter).is_some();
+            if device && matches!(letter, 'V' | 'I') {
+                return Some(format!("instance=\"{low}\" parameter=\"dc\""));
+            }
+            if device || name.contains(':') {
+                self.refuse(Code::W0016, tok);
+                return None;
+            }
+        }
+        self.line(&format!("  var {low}={}", num(first)));
+        Some(format!("variable=\"{low}\""))
     }
 }
 

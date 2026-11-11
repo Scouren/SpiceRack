@@ -109,6 +109,11 @@ each result's `params` names its step (`{"r": 2000.0}`; `{}` when nothing steps)
 so `[op.params["r"] for op in tb.operating_point()]` lists the step values
 (`tests/test_ltspice_backend.py` runs it).
 
+On VACASK the stepped name is a parameter, `temp` (the temperature) or a
+top-level voltage or current source (`tb.step("Vdd", 1.0, 3.0, 1.0)` sweeps
+its DC value). Another device's name, or a device parameter (`R1:R`), has no
+sweep written and is refused (`W0016`).
+
 On VACASK a stepped result holds every step's points one after another on the
 analysis's own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a
 vector beside them (`dc["step_r"]`); an `OperatingPoint` holds one point, so

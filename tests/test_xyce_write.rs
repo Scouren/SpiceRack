@@ -507,3 +507,74 @@ fn p4_015_a_jfet_level_2_is_each_simulators_own_model() {
     let va = oracle::write(&deck(2), Dialect::Ngspice, Dialect::Vacask);
     assert!(va.contains("model jn sp_jfet2 (type=1"), "{va}");
 }
+
+/// ZERO-LEDGER P4-121. RG 7.10 `.STEP` (a bare device name is its default
+/// parameter, a source's DC value; `TEMP` the temperature); VACASK
+/// `docs/cmd-sweep.md` (`instance="name" parameter="p"`, `option="name"`).
+/// Oracle: real Xyce on the source (one plot a step, the first `.step`
+/// innermost) against real VACASK on the written deck (one row a step),
+/// at the first and the last step, where the two orders agree: two
+/// sources, a source with a waveform (its `dc` is read under
+/// `type="dc"`), a ranged temperature on a resistor with `TC1`.
+/// Tolerance: linear circuits, one Newton step each; 1e-6 covers the two
+/// solvers' gmin beside 1 kΩ (the worst seen is 2e-16:
+/// research/impl/evidence/P4-121). A stepped resistor, or a device
+/// parameter, has no sweep written: refused.
+#[test]
+fn p4_121_a_stepped_source_sweeps_its_own_dc_on_vacask() {
+    const BENCH: &str = "Vd d 0 0\nRd d 0 1\n.dc Vd 0 0 1\n.end\n";
+    let decks: [(&str, &[&str], &[&str]); 3] = [
+        (
+            "V_B b 0 5\nI1 0 e 1m\nR1 b c 1k\nR2 c 0 1k\nR3 e 0 1k\n\
+             .step V_B 1 3 1\n.step I1 list 2m 4m\n",
+            &[
+                "  sweep step_v_b instance=\"v_b\" parameter=\"dc\" from=1e0 to=3e0 step=1e0\n",
+                "  sweep step_i1 instance=\"i1\" parameter=\"dc\" values=[2e-3, 4e-3]\n",
+            ],
+            &["c", "e"],
+        ),
+        (
+            "V1 a 0 SIN(0 1 1k)\nR1 a 0 1k\n.step V1 1 3 1\n",
+            &[
+                "  alter instance(\"v1\") type=\"dc\"\n",
+                "  sweep step_v1 instance=\"v1\" parameter=\"dc\" from=1e0 to=3e0 step=1e0\n",
+            ],
+            &["a"],
+        ),
+        (
+            "V1 a 0 1\nR1 a b 1k TC1=0.01\nR2 b 0 1k\n.step temp 0 100 50\n",
+            &["  sweep step_temp option=\"temp\" from=0 to=1e2 step=5e1\n"],
+            &["b"],
+        ),
+    ];
+    let tol = Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    for (cards, lines, nodes) in decks {
+        let deck = format!("* t\n{cards}{BENCH}");
+        let va = oracle::write(&deck, Dialect::Xyce, Dialect::Vacask);
+        for line in lines {
+            assert!(va.contains(*line), "{line}\n{va}");
+        }
+        assert!(!va.contains("variable="), "{va}");
+        let x = oracle::run(Dialect::Xyce, &deck);
+        let v = oracle::run(Dialect::Vacask, &va);
+        for node in nodes {
+            for (at, plots) in [(At::First, &x[..1]), (At::Last, &x[x.len() - 1..])] {
+                let want = oracle::value(plots, node, at);
+                let got = oracle::value(&v, node, at);
+                assert!(
+                    tol.within(got, want),
+                    "{node} {at:?}: VACASK {got}, Xyce {want}\n{va}"
+                );
+            }
+        }
+    }
+    for step in ["R1 1k 3k 1k", "R1:R list 1k 2k"] {
+        let deck =
+            format!("* t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.step {step}\n.dc V1 1 1 1\n.end\n");
+        let codes = oracle::refusal(&deck, Dialect::Xyce, Dialect::Vacask);
+        assert_eq!(codes, [Code::W0016], ".step {step}");
+    }
+}
