@@ -19,6 +19,7 @@ import pytest
 import spicerack as ps
 
 FAKE = Path(__file__).parent / "fixtures" / "sims" / "fake" / "fake.py"
+FAKE_TOML = FAKE.with_name("fake.toml")
 BUILT_INS = ["ngspice", "ltspice", "vacask", "spectre", "espice"]
 R0040 = "R0040 a simulator descriptor that does not validate: "
 
@@ -166,3 +167,55 @@ def test_p8_206_a_refusal_carries_its_code_and_what_is_missing(monkeypatch):
     with pytest.raises(RuntimeError, match="^Simulation failed: Unknown backend: p8-206-nobody$") as e:
         divider().simulator().operating_point()
     assert not hasattr(e.value, "diagnostic")
+
+
+def test_p8_205_a_descriptor_file_is_the_same_simulator(monkeypatch):
+    before = ps.simulators()
+    sim = ps.load_simulator(FAKE_TOML)
+    assert sim == ps.Simulator(
+        "fake",
+        dialect="ngspice",
+        command=["python3", "-m", "fake", "{deck}", "{raw}", "{dir}/fake.log"],
+        output="ngspice-ascii",
+        analyses=["op", "dc"],
+        features=[],
+    )
+    assert ps.load_simulator(str(FAKE_TOML)) == sim
+    # Loaded and checked, not registered.
+    assert ps.simulators() == before
+
+    # It routes: the file's command runs `fake.py` as a module.
+    assert ps.register_simulator(sim) == "fake"
+    monkeypatch.setenv("PYTHONPATH", str(FAKE.parent))
+    run = divider().simulator(simulator="fake")
+    run.save("V(out)")
+    assert run.operating_point()["out"] == expected("out")
+
+
+def test_p8_205_a_bad_descriptor_file_names_its_key(tmp_path):
+    good = FAKE_TOML.read_text()
+
+    def load(text):
+        path = tmp_path / "sim.toml"
+        path.write_text(text)
+        return ps.load_simulator(path)
+
+    assert load(good) == ps.load_simulator(FAKE_TOML)
+    cases = [
+        ("schema", good.replace('schema = "spicerack.simulator/1"\n', "")),
+        ("schema", good.replace('"spicerack.simulator/1"', '"spicerack.simulator/2"')),
+        ("schema", good.replace('"spicerack.simulator/1"', "1")),
+        ("shell", good + "shell = true\n"),  # an unknown key: a typo drops no declaration
+        ("analyses", good.replace('["op", "dc"]', '["op", "transient"]')),
+        ("command", good.replace('"{deck}", ', "")),
+        ("verilog", good + 'verilog = "yes"\n'),
+        ("name", good.replace('name = "fake"\n', "")),
+        ("output", good.replace('output = "ngspice-ascii"\n', "")),
+    ]
+    for key, text in cases:
+        assert text != good, key
+        with pytest.raises(ValueError) as e:
+            load(text)
+        assert str(e.value).startswith(R0040 + key + ": "), (key, str(e.value))
+    with pytest.raises(OSError):
+        ps.load_simulator(tmp_path / "missing.toml")

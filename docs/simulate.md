@@ -254,6 +254,27 @@ mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
 - `mysim.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog` and `.verilog_a`
   read the descriptor back.
 
+The same descriptor as a file is `spicerack.simulator/1`: TOML whose keys are `Simulator`'s arguments, plus
+the required `schema`. An unknown key is refused (`R0040`), so a typo cannot drop a declaration.
+`load_simulator` reads and checks the file and registers nothing (Python 3.11 or later, for `tomllib`):
+
+```python
+from pathlib import Path
+
+Path("mysim.toml").write_text('''
+schema = "spicerack.simulator/1"
+name = "mysim"
+dialect = "ngspice"
+command = ["mysim", "-b", "-r", "{raw}", "{deck}"]
+output = "ngspice-raw"
+analyses = ["op", "dc", "ac", "tran"]
+features = ["measures"]
+verilog = false
+verilog_a = false
+''')
+assert ps.load_simulator("mysim.toml") == mysim
+```
+
 A registered simulator is routed like a built-in. It is a candidate for every analysis it declares, after
 the built-ins, in registration order, and it is held to what it declares. A run that cannot be routed
 raises `RuntimeError` opening with its code, and `exc.diagnostic` holds the same as data:
