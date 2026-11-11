@@ -89,6 +89,48 @@ macro_rules! rows_lp {
             // slot P0017
             // slot P0018
             // slot P0019
+            /// Letters after a neutral number's suffix (`1kohm`, `10uF`).
+            P0020 Note {
+                title: "letters after a number",
+                cite: "docs/expressions.md \"Numbers\" (D16): a number ends at its SI suffix `f p n u m k meg g t`; ngspice manual §2.1.3 and LTspice help \"General Structure and Conventions\" disagree on what trailing letters mean (`1a`, `1M`)",
+                explain: "A neutral number is a decimal, an optional exponent and at most one SI suffix (`f p n u m k meg g t`, any case; `m` is milli, `meg` mega). Nothing may follow the suffix, because the simulators read trailing letters differently. Write `1k`, not `1kohm`.",
+            }
+            /// A ternary used as another ternary's condition or true branch, bare.
+            P0021 Note {
+                title: "a nested ternary without parentheses",
+                cite: "docs/expressions.md \"Operators\" (D16); ngspice-45 numparam reads `a?b?c:d:e` as `a?c:e`, C as `a?(b?c:d):e` (`behaviour::ExprEval::Ngspice`)",
+                explain: "A ternary used as the condition or as the true branch of another ternary must be in parentheses: the simulators group the bare form differently. Write `a ? (b ? c : d) : e`. A ternary in the else branch needs none (`a ? b : c ? d : e`).",
+            }
+            /// Two comparisons of one level chained (`a==b==c`, `a<b<c`).
+            P0022 Note {
+                title: "a comparison chained without parentheses",
+                cite: "docs/expressions.md \"Operators\" (D16): `== !=` and `< <= > >=` do not associate",
+                explain: "`a==b==c` and `a<b<c` compare the 0 or 1 of the first comparison with the third operand, which is rarely what the writer of the expression meant, so the neutral syntax has no chained comparison. Write `(a==b)==c` for that reading, or `a<b && b<c` for a range.",
+            }
+            /// `^` in a neutral expression: power in some dialects, exclusive or in others.
+            P0023 Note {
+                title: "`^` in a neutral expression",
+                cite: "docs/expressions.md \"Operators\" (D16); the definitions' `caret` rows: power in ngspice (manual §2.8.5) and HSPICE, exclusive or in Xyce, LTspice and VACASK, no operator in Spectre",
+                explain: "`^` is a power in ngspice and HSPICE and an exclusive or in Xyce, LTspice and VACASK, so it has no neutral meaning. Write `**` for a power.",
+            }
+            /// A constant argument outside its operator's or function's domain.
+            P0024 Note {
+                title: "a constant outside its function's domain",
+                cite: "docs/expressions.md \"Domains\" (D16): reals only; C99 7.12.7.4 (`pow`: a domain error for a negative base and a non-integer exponent), 7.12.7.5 (`sqrt`), 7.12.6.7 (`log`)",
+                explain: "The expression has no real value whatever the circuit does: a negative constant raised to a non-integer power (`(-8)**0.5`), `sqrt` or `log` of a negative constant, `log(0)`, or a division by the constant 0. Fix the constant. An argument that depends on the circuit is checked when the deck is written (W0137).",
+            }
+            /// `ddt` where no time derivative exists: outside a B source and a charge.
+            P0025 Note {
+                title: "`ddt` outside a B source or a charge",
+                cite: "docs/expressions.md \"Functions\" (D16); ngspice manual §5.1 (`ddt` in a B source); Xyce Reference Guide 7.10 §2.2 (`ddt` in device expressions, not in `.param`)",
+                explain: "`ddt(x)` is the time derivative of a circuit quantity, so it has a value only in a behavioural source or a charge expression. A parameter, a model card or an analysis argument has no time. Move the derivative into a B source and name its output node.",
+            }
+            /// A call whose name is no neutral function and no `.func` of the deck.
+            P0026 Note {
+                title: "a function the neutral syntax does not define",
+                cite: "docs/expressions.md \"Functions\" (D16): the neutral function set (`render::spelling::Func`)",
+                explain: "The name called is none of the neutral functions and none of the deck's own `.func` definitions, so no target spelling is known for it. Spell it with the neutral set (`log` is natural, `round` rounds half away from zero, `int` truncates), or define it with `.func`.",
+            }
             // slot P0030
             // slot P0031
             // slot P0032

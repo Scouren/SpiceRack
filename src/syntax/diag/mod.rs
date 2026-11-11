@@ -184,4 +184,53 @@ mod tests {
             }
         }
     }
+
+    /// P8-149. Oracle: the design's own list (DESIGN-neutral-expressions §2, §3
+    /// with the ledger's numbers), written here by hand, never read back from
+    /// the catalogue.
+    #[test]
+    fn p8_149_neutral_expression_codes() {
+        const WANT: [(Code, Kind, &str); 8] = [
+            (Code::P0020, Kind::Note, "letters after a number"),
+            (
+                Code::P0021,
+                Kind::Note,
+                "a nested ternary without parentheses",
+            ),
+            (
+                Code::P0022,
+                Kind::Note,
+                "a comparison chained without parentheses",
+            ),
+            (Code::P0023, Kind::Note, "`^` in a neutral expression"),
+            (
+                Code::P0024,
+                Kind::Note,
+                "a constant outside its function's domain",
+            ),
+            (
+                Code::P0025,
+                Kind::Note,
+                "`ddt` outside a B source or a charge",
+            ),
+            (
+                Code::P0026,
+                Kind::Note,
+                "a function the neutral syntax does not define",
+            ),
+            (
+                Code::W0137,
+                Kind::Refusal,
+                "an expression whose domain the target evaluates differently",
+            ),
+        ];
+        for (code, kind, title) in WANT {
+            let i = info(code);
+            assert_eq!(i.kind, kind, "{code:?}");
+            assert_eq!(i.title, title, "{code:?}");
+        }
+        // W0136 is no code: ngspice-45 does not linearize `exp` in a B source
+        // outside `ngbehavior=ps` (research/impl/evidence/P8-149).
+        assert!(Code::ALL.iter().all(|c| format!("{c:?}") != "W0136"));
+    }
 }
