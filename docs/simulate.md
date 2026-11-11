@@ -58,7 +58,7 @@ t = tran.time                     # the axis: .time, .frequency or .sweep
 mag = ac.magnitude_db("vout")     # AC results are complex:
 ph = ac.phase("vout")             # degrees, wrapped to (-180, 180]
 lin = ac.magnitude("vout")        # ac["vout"] alone is only the real part
-thd = tran.fourier[0]["thd"]      # percent: a run's .four tables (add_fourier)
+four = tran.fourier               # a run's .four tables (add_fourier; [] without one)
 density = nz["onoise_spectrum"]   # V/sqrt(Hz)
 total = nz["onoise_total"][0]     # V rms over the band (ngspice, ESPice)
 ```

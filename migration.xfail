@@ -1697,3 +1697,15 @@ xyce/SENS/ampSensFDa.cir ngspice now refused: W0015, a `.dc` over the parameter 
 xyce/SENS/ampSensFDb.cir ngspice now refused: W0015, a `.dc` over the parameter `VCCvalue` (P3-056)
 xyce/SENS/ampSensFDc.cir ngspice now refused: W0015, a `.dc` over the parameter `VCCvalue` (P3-056)
 xyce/SENS/twoObjFD.cir ngspice now refused: W0015, a `.dc` over the parameter `VCCvalue` (P3-056)
+
+# S1: batch-9 (team-lead): outputs no spec predicted on fx17
+spice-bench/postlayout/tdc_sky130.sp vacask written differently: the file cards keep the deck's order (P3-045)
+xyce/IC_AND_NODESET/ring_osc_bsim3.cir espice now written: a top-level MOSFET's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (P3-080)
+xyce/IC_AND_NODESET/ring_osc_bsim3.cir ngspice now written: a top-level MOSFET's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (P3-080)
+xyce/IC_AND_NODESET/ring_osc_bsim4.cir espice now written: a top-level MOSFET's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (P3-080)
+xyce/IC_AND_NODESET/ring_osc_bsim4.cir ngspice now written: a top-level MOSFET's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (P3-080)
+xyce/INIT_CONDS/ring_osc_bsim3.cir espice now written: a top-level MOSFET's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (P3-080)
+xyce/INIT_CONDS/ring_osc_bsim3.cir ngspice now written: a top-level MOSFET's IC=Vds,Vgs with source and bulk on ground is the .ic of its drain and gate (P3-080)
+xyce/Certification_Tests/BUG_1455/bug_1455_neq.cir espice now refused W0104: Xyce's `LEVEL 1` with no `=` loses its number in the model view (P3-006; P3-127 reads it)
+xyce/Certification_Tests/BUG_1455/bug_1455_neq.cir hspice now refused W0104: Xyce's `LEVEL 1` with no `=` loses its number in the model view (P3-006; P3-127 reads it)
+xyce/Certification_Tests/BUG_1455/bug_1455_neq.cir ngspice now refused W0104: Xyce's `LEVEL 1` with no `=` loses its number in the model view (P3-006; P3-127 reads it)

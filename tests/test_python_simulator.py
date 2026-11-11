@@ -504,7 +504,7 @@ def test_p3_032_api_vacask_subcircuit_node_xu1():
     op = tb.operating_point()
     assert op["xu1.m"] == pytest.approx(1.125, rel=1e-9)
     assert op["xu1.q"] == pytest.approx(0.75, rel=1e-9)
-    assert op["i(vdd)"] == pytest.approx(-7.5e-4, rel=1e-9)
+    assert op["i(vdd)"] == pytest.approx(-1.5 / 4e3, rel=1e-9)
     with pytest.raises(KeyError):
         op["i(xu1)"]
 
