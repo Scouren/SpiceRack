@@ -80,6 +80,9 @@ Every element takes its name and nodes first; the rest are keywords.
 | `J`, `Z` | JFET, MESFET | `drain, gate, source, model=` |
 | `S`, `W` | switches | `control_positive=, control_negative=, model=` / `vcontrol=, model=`; `initial_state="on"` or `"off"` |
 | `T` | transmission line | four nodes, `Z0=, TD=` |
+| `O`, `Y` | lossy line (LTRA), single lossy line (TXL) | four nodes, `model=`; `Y` also `length=` |
+| `P` | coupled lines (CPL) | `inputs, ground_in, outputs, ground_out, model=, length=` |
+| `U` | uniform RC line (URC) | `n1, n2, n3, model=, length=, lumps=` |
 | `X` | subcircuit instance by name | `"subckt_name", *nodes, **params` |
 | `A` | XSPICE code model | `name=, connections=[...], model=` (all keywords) |
 

@@ -31,6 +31,10 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `initial_condition`, `node_set` | `.ic`, `.nodeset` | `(**nodes)` on `Testbench`/`CircuitSimulator` (top level) and on `Subcircuit`/`Circuit` (inside its `.subckt`); a value is a number or an expression (`out="{vdd/2}"`), an instance's node is `**{"x1.n": 0.5}`. Inside a subcircuit it nets for ngspice/ESPice only (`W0001` elsewhere) |
 | `NonLinearVoltageSource` / `NonLinearCurrentSource` | `E` / `G` | `(name, positive, negative, expression=...)` — `E<name> n+ n- value={expr}`: `BV` / `BI` under the E/G letter (PySpice's names); give an E and a G different names |
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |
+| `O` | `O` | `(name, input_positive, input_negative, output_positive, output_negative, model)` — a lossy line; its `r`, `l`, `c`, `len` are on the model: `model(m, "ltra", ...)` |
+| `Y` | `Y` | `(name, input_positive, input_negative, output_positive, output_negative, model, length=None)` — a `"txl"` model; `length` writes `LEN=` |
+| `P` | `P` | `(name, inputs, ground_in, outputs, ground_out, model, length=None)` — `inputs`, `outputs` are `list[str]` of one length; a `"cpl"` model |
+| `U` | `U` | `(name, n1, n2, n3, model, length, lumps=None)` — a `"urc"` model; the four line cards net for ngspice and ESPice only (`W0001` elsewhere; ESPice 0.3.0 ignores `P`'s `length`) |
 | `S` | `S` | `(name, positive, negative, control_positive, control_negative, model, initial_state=None)` |
 | `W` | `W` | `(name, positive, negative, vcontrol, model, initial_state=None)`; `initial_state="on"`/`"off"` writes the card's `ON`/`OFF` (ngspice and ESPice only, `W0001` elsewhere; ESPice 0.3.0 ignores it) |
 | `A` | `A` | `(name, connections, model)` — `connections` is a `list[str]`; an XSPICE code model: ngspice, ESPice (written), every other target refuses it (`W0001`) |

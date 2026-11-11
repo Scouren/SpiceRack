@@ -33,6 +33,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: every failure of a netlist, a run or a compile raises `spicerack.Error`, a `RuntimeError` with `.status` (`"refused"`: the deck is not written for the target or no simulator is routed; `"failed"`) and `.diagnostics`, a list of `Diagnostic` (`code`, `kind`, `title`, `cite`, `message`, `line`, `column`, `statement`, `element`); `Testbench.netlist_with_notes(dialect)` returns the deck and its notes as `Diagnostic`s. Texts are unchanged, and `ValueError` stays for a bad argument (ZERO-LEDGER P8-105).
 - python: `AmplitudeModulatedVoltageSource`/`CurrentSource` take `signal_phase=` and `carrier_phase=` (degrees; ngspice and ESPice only).
 - python: every result lists its `nodes`, `branches`, `measures` and `params` in name order; they came in a hash map's order, another on each result object (`result::Results::nodes` and `branches` are `BTreeMap`s) (ZERO-LEDGER P8-318).
+- python: the distributed lines have builders on `Subcircuit` and `Circuit`: `O` (LTRA), `Y` (TXL), `P` (CPL) and `U` (URC), each the ngspice card with its model (`model(m, "ltra", ...)`); written for ngspice and ESPice only.
 
 ## 0.2.0 (2026-11-03)
 

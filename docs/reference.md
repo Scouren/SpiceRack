@@ -54,6 +54,10 @@ nodes are positional; everything after `*` is keyword-only.
 | `S` | `(name, positive, negative, *, control_positive, control_negative, model, initial_state=None)` |
 | `W` | `(name, positive, negative, *, vcontrol, model, initial_state=None)`; on both, `initial_state` is `"on"` or `"off"`: the switch's state when its control starts inside the hysteresis band (the card's `ON`/`OFF`). The card is then written for ngspice and ESPice and refused elsewhere (`W0001`). ngspice-45 holds the state of an `S`; ESPice 0.3.0 reads the word and ignores it |
 | `T` | `(name, input_positive, input_negative, output_positive, output_negative, *, Z0, TD)` |
+| `O` | `(name, input_positive, input_negative, output_positive, output_negative, *, model)`: a lossy line (LTRA); the line is its model, `model(m, "ltra", r=, l=, c=, len=)` |
+| `Y` | `(name, input_positive, input_negative, output_positive, output_negative, *, model, length=None)`: a single lossy line (TXL, a `"txl"` model); `length` replaces the model's |
+| `P` | `(name, inputs, ground_in, outputs, ground_out, *, model, length=None)`: coupled lines (CPL, a `"cpl"` model whose `r`, `l`, `g`, `c` are matrices, each a string in the manual's order: `l="3.8e-7 8.3e-8 3.8e-7"` is L11, L12, L22 of two lines); `inputs` and `outputs` are lists of the same length |
+| `U` | `(name, n1, n2, n3, *, model, length, lumps=None)`: a uniform distributed RC line (URC, a `"urc"` model) from `n1` to `n2`, its capacitance to `n3`. The four line cards are ngspice's: written for ngspice and ESPice and refused elsewhere (`W0001`); a `length` is a number or an expression. ESPice 0.3.0 refuses a `txl` model with `r=0` and ignores a `P` card's `length` |
 | `X` | `(name, subcircuit_name, *nodes, **params)` |
 | `instance` | `(subckt, name, *nodes, **params)`: like `X`, from the object |
 | `A` | `(*, name, connections, model)`: XSPICE code model; ngspice and ESPice only, other targets refuse it (`W0001`) |
