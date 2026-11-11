@@ -29,6 +29,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `Block()` and `conditional(branches, otherwise=None)` on `Subcircuit`, `Circuit` and `Block` write `.if` / `.elseif` / `.else` / `.endif`; a stored subcircuit keeps a conditional whole (`from_source` dropped its branches).
 - python: `harmonic_balance` / `add_harmonic_balance` take `num_harmonics` as one count or one per tone, and refuse a list that does not match the tones (it was written as given) and an empty tone list.
 - python: `S` and `W` take `initial_state="on"` or `"off"`, the switch's state when its control starts inside the hysteresis band (the card's `ON`/`OFF`; ngspice and ESPice only).
+- python: your own simulator. `Simulator(name, dialect=, command=, output=, analyses=, features=, verilog=, verilog_a=)` describes one (checked when built: `R0040`), `register_simulator(sim)` puts it in every route it declares, after the built-ins, `simulators()` lists the names, `load_simulator(path)` reads the descriptor from a `spicerack.simulator/1` TOML file, and a dialect plugin `runs_on` one. A run it cannot take is refused with `W0180` (an analysis it does not declare), `W0181` (a feature), `W0182` (no simulator runs every analysis of the deck) or `R0041` (its program is not on PATH); a process holds 32 simulators (`R0042`). A registered simulator is its command only: what a built-in's run does beyond it is named in `tests/test_simulator_oracles.py::PARITY_SIM_GAP` (ZERO-LEDGER P8-201 … P8-210).
 
 ## 0.2.0 (2026-11-03)
 

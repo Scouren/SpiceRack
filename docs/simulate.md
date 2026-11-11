@@ -263,6 +263,12 @@ mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
   is refused. A process holds at most 32 simulators (`R0042`), the five built-ins among them.
 - `mysim.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog` and `.verilog_a`
   read the descriptor back.
+- A registered simulator is its command and nothing more, and a built-in's run does more than its command.
+  Registered as a command, ngspice (`ngspice -b -r {raw} {deck}`) fails on a deck with a `.measure` or a
+  Fourier analysis: SpiceRack writes that deck to run from a `.control` block, for which ngspice leaves no
+  raw file under `-r` (the built-in drops `-r` and appends a `write`). A `raw-dir` simulator's plots are
+  read in file-name order, as written: the built-in `vacask` reads them in the deck's analysis order, moves
+  a step's sweep column last and adds the noise spectra, so give a `raw-dir` simulator one analysis a deck.
 
 The same descriptor as a file is `spicerack.simulator/1`: TOML whose keys are `Simulator`'s arguments, plus
 the required `schema`. An unknown key is refused (`R0040`), so a typo cannot drop a declaration.
