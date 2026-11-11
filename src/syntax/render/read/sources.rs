@@ -226,7 +226,7 @@ impl<'a> Rd<'a> {
                 continue;
             };
             match value {
-                Val::Num(v) if v == 0.0 => {}
+                Val::Num(0.0) => {}
                 Val::Num(_) | Val::Expr(_) => {
                     self.ramped.insert(n);
                 }
