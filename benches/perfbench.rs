@@ -177,7 +177,9 @@ fn golden(stage: &str, sets: &str, target: &str) {
         .map(|i| {
             let bytes = std::fs::read(&i.path).expect("read an input");
             let (s, n) = inputs::source(&decode(&bytes), i.form, &i.path);
-            (i, s, n)
+            // Loaded here, outside the measured region, as the walk did.
+            let kit = Lang::from(i.dialect).lexicon().map(|_| i.load_kit());
+            (i, s, n, kit)
         })
         .collect();
     assert!(!srcs.is_empty(), "no input in sets `{sets}`");
@@ -189,7 +191,7 @@ fn golden(stage: &str, sets: &str, target: &str) {
     let in_bytes: usize = srcs.iter().map(|s| s.1.len()).sum();
     let statements: usize = srcs
         .iter()
-        .filter_map(|(i, s, _)| {
+        .filter_map(|(i, s, _, _)| {
             let lex = Lang::from(i.dialect).lexicon()?;
             let t = tokenize(s, lex);
             Some(
@@ -202,7 +204,7 @@ fn golden(stage: &str, sets: &str, target: &str) {
         .sum();
     let (mut tokens, mut nodes, mut out_bytes) = (0usize, 0usize, 0usize);
     let region = Region::start();
-    for (i, s, n) in &srcs {
+    for (i, s, n, kit) in &srcs {
         let Some(lex) = Lang::from(i.dialect).lexicon() else {
             continue;
         };
@@ -215,11 +217,10 @@ fn golden(stage: &str, sets: &str, target: &str) {
             }
             _ => {
                 for &d in &targets {
-                    let r =
-                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match &i.kit {
-                            Some((k, f)) => render::render_kit(k, *f, n, d),
-                            None => render::render_text(s, i.dialect, n, d),
-                        }));
+                    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match kit {
+                        Some((k, f)) => render::render_kit(k, *f, n, d),
+                        None => render::render_text(s, i.dialect, n, d),
+                    }));
                     if let Ok(Ok(w)) = r {
                         out_bytes += w.text.len();
                     }

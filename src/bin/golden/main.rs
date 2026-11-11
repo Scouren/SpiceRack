@@ -68,7 +68,7 @@ mod diff;
 mod inputs;
 mod zero;
 
-use inputs::{Form, Input, InputKit, inputs, source};
+use inputs::{Form, Input, inputs, source};
 
 const USAGE: &str = "usage: golden record <out_dir> | \
                      golden diff <a> <b> [--xfail <file>] [--refusal-status-only <report>] [--skip <target>] | \
@@ -374,7 +374,7 @@ fn tasks(sizes: &[u64]) -> Vec<Task> {
 
 /// Reads `input` once: its bytes (hashed into its `input` line) and its
 /// kit, loaded here for a corpus deck or a fixture
-/// ([`InputKit::Own`]).
+/// ([`inputs::InputKit::Own`]).
 fn read_input(input: &Input) -> std::io::Result<Read> {
     let key = format!("{}/{}", input.set, input.rel);
     let bytes = std::fs::read(&input.path)?;
@@ -389,15 +389,7 @@ fn read_input(input: &Input) -> std::io::Result<Read> {
     );
     let (src, name) = source(&decode(&bytes), input.form, &input.path);
     let readable = Lang::from(input.dialect).lexicon().is_some();
-    let kit = match &input.kit {
-        _ if !readable => None,
-        InputKit::Shared(kit, f) => Some((Arc::clone(kit), *f)),
-        InputKit::Own(root) => {
-            let paths = std::slice::from_ref(&input.path);
-            let kit = spicerack::import::kit(paths, resolve::Form::Deck, input.dialect, root);
-            Some((Arc::new(kit), FileId(0)))
-        }
-    };
+    let kit = readable.then(|| input.load_kit());
     if let Some((kit, f)) = &kit {
         assert_eq!(kit.file(*f).text, src, "the kit read this text");
     }

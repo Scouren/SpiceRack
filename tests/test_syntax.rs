@@ -131,12 +131,11 @@ fn kits_resolve() {
     // Each kit once, with its set and the root its paths are shown against.
     let mut kits: Vec<(&str, PathBuf, Arc<Kit>)> = Vec::new();
     for i in &all {
-        if let Some((k, _)) = &i.kit
-            && !kits.iter().any(|(_, _, x)| Arc::ptr_eq(x, k))
-        {
+        let (k, _) = i.load_kit();
+        if !kits.iter().any(|(_, _, x)| Arc::ptr_eq(x, &k)) {
             let path = i.path.to_string_lossy();
             let root = path.strip_suffix(&i.rel).expect("rel ends the path");
-            kits.push((i.set, PathBuf::from(root), Arc::clone(k)));
+            kits.push((i.set, PathBuf::from(root), k));
         }
     }
     let mut counts: BTreeMap<&str, BTreeMap<String, usize>> = BTreeMap::new();

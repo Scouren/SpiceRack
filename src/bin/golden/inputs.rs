@@ -19,6 +19,7 @@
 //! - `pub(super) enum Form { Deck, Library }`
 //! - `pub(super) enum InputKit { Shared(Arc<resolve::Kit>, FileId), Own(PathBuf) }`
 //! - `pub(super) struct Input { pub(super) set: &'static str, pub(super) rel: String, pub(super) path: PathBuf, pub(super) dialect: Dialect, pub(super) form: Form, pub(super) kit: InputKit }`
+//! - `pub(super) fn Input::load_kit(&self) -> (Arc<resolve::Kit>, FileId)`
 //! - `pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input>`
 //! - `pub(super) fn source(text: &str, form: Form, path: &Path) -> (String, String)`
 
@@ -185,6 +186,22 @@ const FIXTURES: [(&str, Dialect); 7] = [
     ("sim", Dialect::Vacask),
     ("net", Dialect::Ltspice),
 ];
+
+impl Input {
+    /// Its kit and its file in it: the PDK kit it shares, or its own,
+    /// loaded by this call (the caller keeps it; a second call loads it
+    /// again).
+    pub(super) fn load_kit(&self) -> (Arc<resolve::Kit>, FileId) {
+        match &self.kit {
+            InputKit::Shared(kit, f) => (Arc::clone(kit), *f),
+            InputKit::Own(root) => {
+                let paths = std::slice::from_ref(&self.path);
+                let kit = spicerack::import::kit(paths, resolve::Form::Deck, self.dialect, root);
+                (Arc::new(kit), FileId(0))
+            }
+        }
+    }
+}
 
 /// Every input, sorted by set and path. Appends the manifest's set, kit and
 /// read-order lines to `manifest`; an absent set is a line, not an error.
