@@ -28,7 +28,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `C`, `L` | `(name, positive, negative, value, **params)`; on `R`, `C` and `L`, `model="rm"` is the card's model word, written after the value (`R1 a b 1k rm`), not a parameter |
 | `C` by its charge | `(name, positive, negative, *, charge="expr", **params)`: the charge as an expression of the capacitor's voltage (`charge="1n*v(a,b)"`), in place of `value`; VACASK refuses it (`W0105`) |
 | `K` | `(name, inductor1, inductor2, *, coupling)` |
-| `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None)`; `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
+| `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None)`; `distof1=(mag, phase)` makes the source a `distortion` input at F1, `distof2=` at F2 (ngspice's `DISTOF1`/`DISTOF2`, the phase in degrees; ngspice and ESPice write the words, other targets refuse the card, `W0001`); `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
 | `BV`, `BI` | `(name, positive, negative, *, expression)` |
 | `E` | `(name, positive, negative, *, control_positive, control_negative, voltage_gain)` |
 | `G` | `(name, positive, negative, *, control_positive, control_negative, transconductance)` |
@@ -115,7 +115,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `transfer_function(outvar, insrc)` / `tf` | `TransferFunctionAnalysis`; `outvar`: `v(out)`, `v(a,b)`, `i(vload)` or a node name; else `ValueError` |
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(node1, node2, node3, node4, tf_type, pz_type)` | `PoleZeroAnalysis` (`pz["pole(1)"]`) |
-| `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis` |
+| `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis`: every node and branch at 2F1 (with `f2overf1`, at F1+F2), as complex values; all 0 unless a source has `distof1=` (and, with `f2overf1`, `distof2=`) |
 | `pss(fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=False)` | `PssAnalysis`; the last three are ngspice's `sciter`, `steadycoeff`, `uic` (Spectre's `pss` has none: `W0040`) |
 | `s_param(variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10)` | `SParamAnalysis` |
 | `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis` |

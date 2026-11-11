@@ -32,7 +32,7 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | `tf(outvar, insrc)` | `TransferFunctionAnalysis` (gain, input and output resistance). `outvar` is `"v(out)"`, `"v(a,b)"`, `"i(vload)"` or a node name (`"out"` is written `v(out)`); any other form raises `ValueError` |
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(n1, n2, n3, n4, tf_type, pz_type)` | `PoleZeroAnalysis` |
-| `distortion(...)` | `DistortionAnalysis` |
+| `distortion(...)` | `DistortionAnalysis` (ngspice; its input is the source built with `distof1=(mag, phase)`, else every vector is 0) |
 | `pss`, `s_param`, `harmonic_balance`, `stability`, `network_params` | RF and periodic analyses; each runs only where a backend supports it (see below) |
 | `transient_noise(step_time, end_time)` | ngspice's transient noise: a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources (no device noise) |
 | `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` is a deprecated alias), `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | Spectre only |

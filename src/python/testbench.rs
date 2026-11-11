@@ -55,16 +55,19 @@ impl PyTestbench {
 
     // ── Stimulus ──
 
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0))]
-    fn V(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64) {
+    /// `distof1=(mag, phase)`, `distof2=`: the source's `distortion` input
+    /// at F1 and F2, as `Subcircuit.V`'s.
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None))]
+    fn V(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
         let port = portnum.map(|n| (n, z0));
-        let v = source(false, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, port, None);
+        let v = source(false, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, [distof1, distof2], port, None);
         slf.as_super().stim(v);
     }
 
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None))]
-    fn I(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>) {
-        slf.as_super().stim(source(true, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, None, None));
+    /// `distof1`, `distof2`: as `V`'s.
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None))]
+    fn I(mut slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+        slf.as_super().stim(source(true, name, top_net(positive), top_net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None));
     }
 
     #[pyo3(signature = (name, positive, negative, value))]

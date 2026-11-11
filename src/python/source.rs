@@ -7,7 +7,7 @@
 //! - `macro_rules! pymethods_with_waves` (scoped to `python` by `#[macro_use]`)
 //! - `pub(super) struct Wave`, `Wave::new(form: &str, fields: &[&Num], zero: Value) -> Wave`,
 //!   `Wave::pwl(values: &[(Num, Num)], repeat: Option<&Num>, delay: Option<&Num>) -> Wave`
-//! - `pub(super) fn source(current, name, np, nm, value, ac, ac_phase, port, wave) -> Card`
+//! - `pub(super) fn source(current, name, np, nm, value, ac, ac_phase, disto, port, wave) -> Card`
 //! - `pub(super) fn wave_source(current, name, np, nm, wave, dc, ac, ac_phase) -> Card`
 //! - `pub(super) fn either(a: Option<f64>, b: Option<f64>, an: &str, bn: &str) -> PyResult<Option<f64>>`
 
@@ -181,7 +181,11 @@ impl Wave {
 }
 
 /// A `V` (or, with `current`, an `I`) card: `V<name> np nm value [AC mag
-/// [phase]] [portnum n z0 z] [wave]`.
+/// [phase]] [distof1 mag phase] [distof2 mag phase] [portnum n z0 z]
+/// [wave]`. `disto` is the source's `.disto` input at F1 and at F2, each a
+/// magnitude and a phase in degrees (ngspice manual §4.1, §11.3.3): a
+/// source with neither is no distortion input, and a deck with none has a
+/// `.disto` of zeros.
 pub(super) fn source(
     current: bool,
     name: &str,
@@ -190,6 +194,7 @@ pub(super) fn source(
     value: Value,
     ac: Option<f64>,
     ac_phase: Option<f64>,
+    disto: [Option<(f64, f64)>; 2],
     port: Option<(u32, f64)>,
     wave: Option<&Wave>,
 ) -> Card {
@@ -200,6 +205,10 @@ pub(super) fn source(
         if let Some(phase) = ac_phase {
             tail.push_str(&format!(" {}", dec(phase)));
         }
+    }
+    for (word, input) in ["distof1", "distof2"].into_iter().zip(disto) {
+        let Some((mag, phase)) = input else { continue };
+        tail.push_str(&format!(" {word} {} {}", dec(mag), dec(phase)));
     }
     if let Some((n, z0)) = port {
         tail.push_str(&format!(" portnum {n} z0 {}", dec(z0)));
@@ -231,6 +240,7 @@ pub(super) fn wave_source(
         value,
         ac,
         ac_phase,
+        [None; 2],
         None,
         Some(&wave),
     )

@@ -9,8 +9,8 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 
 | Method | Emits | Signature |
 |---|---|---|
-| `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; VACASK a source behind a series resistor; elsewhere `W0007`) |
-| `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
+| `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; VACASK a source behind a series resistor; elsewhere `W0007`); `distof1=(mag, phase)` / `distof2=` make it a `distortion` input at F1 / F2 (ngspice `DISTOF1`/`DISTOF2`, degrees; ngspice/ESPice, elsewhere `W0001`) |
+| `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None, distof1=None, distof2=None)`; `distof1`/`distof2` as `V`'s |
 | `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |
 | `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither); refused on VACASK (`W0105`) |
@@ -105,7 +105,7 @@ queued beside others raise instead.
 | — | `add_fourier(...)` | `(fundamental_frequency, [vars], num_harmonics=)` | see note |
 | `polezero(...)` | — | — | `PoleZeroAnalysis` |
 | `transfer_function(...)` | `add_tf(...)` | `(outvar, insrc)`; `outvar` is `"v(out)"`, `"v(a,b)"`, `"i(vload)"` or a node name, else `ValueError` | `TransferFunctionAnalysis` |
-| `distortion(...)` | — | — | `DistortionAnalysis` |
+| `distortion(...)` | — | — | `DistortionAnalysis` (2F1; all 0 unless a source has `distof1=(mag, phase)`) |
 
 `variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (N log-spaced points in total, Spectre's `log=N-1`, its steps; every other target refuses it, `W0040`), any
 case; any other name raises `ValueError` at the call, before anything runs. So

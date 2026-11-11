@@ -496,6 +496,43 @@ def test_noise_runs_when_saves_are_set():
 
 
 @pytest.mark.needs("ngspice")
+def test_p3_034_api_distortion_always_only_hd2():
+    """`distof1=(mag, phase)` on `V`/`I` is ngspice's `DISTOF1`: the source's
+    `.disto` input, without which every distortion vector is 0. Oracle
+    (closed form): a diode under 0.6 V driven by a*cos(wt) carries
+    I0*exp(a*cos(wt)/Vt), I0 = Is*exp(0.6/Vt); its 2F1 component is
+    I0*a^2/(4*Vt^2) = 0.0443646 A for a = 1, the source's the negative.
+    ngspice-45 and ESPice 0.3.0 print -4.43650e-02 on the hand deck (their
+    kT/q is 3.4e-7 off SI 2019's, 8e-6 on I0: hence rel=1e-4;
+    research/impl/evidence/P3-034). Half the input at 90 degrees is a
+    quarter of it, turned by 2*90 degrees."""
+    import spicerack as ps
+
+    vt = 1.380649e-23 * 300.15 / 1.602176634e-19
+    second = 1e-14 * math.exp(0.6 / vt) / (4 * vt**2)
+
+    def at_2f1(**disto):
+        dut = ps.Subcircuit("dd", ["a"])
+        dut.model("dn", "D", IS=1e-14)
+        dut.D("1", "a", dut.gnd, model="dn")
+        tb = ps.Testbench(dut)
+        tb.with_backend("ngspice")
+        tb.V("1", "a", "0", 0.6, **disto)
+        d = tb.distortion(variation="dec", points=1, start_frequency=1e3, stop_frequency=1e3)
+        return tb, d["i(v1)"][0]
+
+    assert at_2f1()[1] == 0.0
+    assert at_2f1(distof1=(1.0, 0.0))[1] == pytest.approx(-second, rel=1e-4)
+    tb, quarter = at_2f1(distof1=(0.5, 90.0), distof2=(0.25, 0.0))
+    assert quarter == pytest.approx(second / 4, rel=1e-4)
+    assert "V1 a 0 600m distof1 0.5 90 distof2 0.25 0" in tb.netlist("ngspice")
+    sub = ps.Subcircuit("s", ["a"])
+    sub.V("1", "a", sub.gnd, 0.0, ac=1.0, distof1=(1.0, 0.0))
+    sub.I("2", "a", sub.gnd, 0.0, distof2=(2.0, -90.0))
+    assert "V1 a 0 0 AC 1 distof1 1 0\nI2 a 0 0 distof2 2 -90\n" in sub.to_source()
+
+
+@pytest.mark.needs("ngspice")
 def test_p3_033_api_add_noise_written_noise():
     """`output_node` is a node: "out" and "v(out)" name the same one, and no
     other form reaches the deck. Oracle (closed form): at 1 Hz the 1 uF of a
