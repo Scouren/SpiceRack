@@ -590,6 +590,44 @@ def test_run_with_a_measure_runs_every_analysis_from_the_control_block():
     assert tran.measures["vend"] == pytest.approx(1.0 - math.exp(-2.0), abs=2e-3)
 
 
+def test_p8_102_a_failed_measure_reads_none():
+    """1k into 1 uF, a 0 -> 1 V step, a transient to 5 ms and an AC sweep.
+    Oracle: ngspice-45's own printout of the written deck (research/impl/
+    evidence/P8-102/bench.stdout, bench.stderr): values for vend, t50 and
+    gain1k; none for tnever, tbad and fnever, which its stderr names ("out of
+    interval ... failed!"). The three values also have closed forms."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("rc", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.PulseVoltageSource(name="in", positive="in", negative="0", initial_value=0.0, pulsed_value=1.0,
+                          delay=0.0, rise_time=1e-9, fall_time=1e-9, pulse_width=1.0, period=2.0, ac=1.0)
+    tb.add_transient(step_time=1e-5, end_time=5e-3, max_time=1e-5)
+    tb.add_ac(variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e5)
+    tb.measure("tran", "vend", "find", "v(out)", "at=5m")
+    tb.measure("tran", "t50", "when", "v(out)=0.5")
+    tb.measure("tran", "tnever", "when", "v(out)=2")
+    tb.measure("tran", "tbad", "trig", "v(out)", "val=0.1", "rise=1", "targ", "v(out)", "val=5", "rise=1")
+    tb.measure("ac", "gain1k", "find", "vdb(out)", "at=1k")
+    tb.measure("ac", "fnever", "when", "vdb(out)=10")
+    want = {
+        "vend": 1.0 - math.exp(-5.0),                             # ngspice: 9.932623e-01
+        "t50": 1e-3 * math.log(2.0),                              # ngspice: 6.93154e-04
+        "gain1k": -10.0 * math.log10(1.0 + (2.0 * math.pi) ** 2),  # ngspice: -1.607224e+01
+    }
+    results = tb.run()
+    assert len(results) == 2
+    for res in results:
+        m = res.measures
+        assert set(m) == {"vend", "t50", "tnever", "tbad", "gain1k", "fnever"}
+        assert {n for n, v in m.items() if v is None} == {"tnever", "tbad", "fnever"}
+        for name, value in want.items():
+            assert m[name] == pytest.approx(value, rel=2e-3), name
+
+
 def test_run_gives_none_for_a_fourier_and_refuses_an_empty_queue():
     """`.four` prints its table to stdout and writes no plot."""
     import spicerack as ps

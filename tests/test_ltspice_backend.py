@@ -61,6 +61,25 @@ def test_a_stepped_transient_takes_its_steps_from_the_log():
         assert t["out"] == pytest.approx([gain] * len(t.time), rel=1e-6)
 
 
+def test_p8_102_a_stepped_measure_is_each_steps_own():
+    """Oracle: the divider's closed form, 1k / (r + 1k), at each step, and
+    LTspice 26.1.1's own log of this deck (research/impl/evidence/P8-102/
+    lt-e2e.log): a `Measurement: vmax` table with one row a step, and
+    `Measurement "tnever" FAIL'ed`."""
+    if pending_mirror():
+        return
+    tb = divider(ps())
+    tb.step("r", 1e3, 3e3, 1e3)
+    tb.measure("tran", "vmax", "max", "v(out)")
+    tb.measure("tran", "tnever", "when", "v(out)=2")
+    runs = tb.transient(step_time=1e-6, end_time=1e-5)
+    assert [t.params for t in runs] == [{"r": 1e3}, {"r": 2e3}, {"r": 3e3}]
+    for t, gain in zip(runs, [0.5, 1 / 3, 0.25]):
+        assert set(t.measures) == {"vmax", "tnever"}
+        assert t.measures["vmax"] == pytest.approx(gain, rel=1e-6)
+        assert t.measures["tnever"] is None
+
+
 def test_an_unstepped_result_has_no_params():
     if pending_mirror():
         return

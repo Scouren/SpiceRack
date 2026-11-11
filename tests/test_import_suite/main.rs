@@ -209,6 +209,9 @@ fn ngspice(dir: &Path, deck: &str, secs: u64, converted: bool) -> Result<Option<
         let text = String::from_utf8_lossy(&out.stdout);
         measures = parse_measures(&text, Some(spicerack::syntax::Dialect::Ngspice))
             .into_iter()
+            // As before P8-102: only the measures with a value are compared
+            // (a NaN would pass `compare`'s tolerance test).
+            .filter(|m| m.status == spicerack::result::MeasureStatus::Ok)
             .map(|m| (m.name.to_lowercase(), m.value))
             .collect();
         measures.sort_by(|a, b| a.0.cmp(&b.0));

@@ -35,14 +35,13 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
     } else {
         &p.stdout
     };
-    let measures = if text.is_empty() {
-        vec![]
-    } else {
-        crate::measure_parse::parse_measures(text, Some(sim))
-    };
-    for p in &mut plots {
+    // In the deck's order, a measure with no value a row too; of a stepped
+    // run (one plot a step, ZERO D42) each plot carries its step's rows.
+    let printed = crate::measure_parse::parse_measures(text, Some(sim));
+    let measures = crate::measure_parse::in_deck_order(deck, printed, sim);
+    for (k, p) in plots.iter_mut().enumerate() {
         p.backend_hint = Some(sim);
-        p.measures.clone_from(&measures);
+        p.measures = crate::measure_parse::at_step(&measures, k);
     }
     Ok(plots)
 }

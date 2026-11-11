@@ -9,7 +9,9 @@
 //!   `RawData::re(&self, i: usize) -> Cow<'_, [f64]>`
 //! - `pub struct VarInfo`
 //! - `pub enum VarType`, `VarType::parse(word: &str) -> VarType`
-//! - `pub struct MeasureResult`
+//! - `pub enum MeasureStatus`, `pub struct MeasureResult`,
+//!   `MeasureResult::ok(name: &str, value: f64) -> MeasureResult`,
+//!   `MeasureResult::failed(name: &str) -> MeasureResult`
 //! - `pub struct Results`, `Results::from_raw(raw: RawData) -> Results`,
 //!   `Results::column(&self, name: &str) -> Option<usize>`,
 //!   `Results::get(&self, name: &str) -> Option<Cow<'_, [f64]>>`,
@@ -81,12 +83,33 @@ pub enum VarType {
     Other,
 }
 
-/// One `.meas` result as the simulator printed it (`measure_parse`). A
-/// measure that failed is not here: only the ones with a value are.
+/// Whether a measure gave a value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MeasureStatus {
+    /// The simulator printed its value.
+    Ok,
+    /// It has none: the simulator said so (ngspice's `failed`, LTspice's
+    /// `FAIL'ed`), or printed no value for a measure the deck declares.
+    Failed,
+}
+
+/// One `.meas` result (`measure_parse`): the value the simulator printed,
+/// or that it has none.
 #[derive(Debug, Clone)]
 pub struct MeasureResult {
+    /// Its name as the simulator printed it (ngspice: in lowercase).
     pub name: String,
+    /// NaN exactly when `status` is [`MeasureStatus::Failed`].
     pub value: f64,
+    pub status: MeasureStatus,
+    /// The `.step` point it was measured at, counted from 0 in step order
+    /// (ZERO D42: the run's plot of that step); `None` when the run does
+    /// not step, and for a row that holds at every step.
+    pub step: Option<u32>,
+    /// The analysis it is measured on: the word of its `.meas` card,
+    /// lowercase (`tran`, `ac`, `dc`, ...); empty when what was read does
+    /// not say (a printout read with no deck).
+    pub analysis: String,
 }
 
 /// Any analysis result: the plot plus normalized-name -> column lookup.
@@ -113,6 +136,29 @@ impl VarType {
             "param" => VarType::Param,
             _ => VarType::Other,
         }
+    }
+}
+
+impl MeasureResult {
+    /// The measure `name` with the value the simulator printed, of no step
+    /// and no analysis. A NaN is no value: the row is [`Self::failed`].
+    pub fn ok(name: &str, value: f64) -> MeasureResult {
+        let status = match value.is_nan() {
+            true => MeasureStatus::Failed,
+            false => MeasureStatus::Ok,
+        };
+        MeasureResult {
+            name: name.to_string(),
+            value,
+            status,
+            step: None,
+            analysis: String::new(),
+        }
+    }
+
+    /// The measure `name` with no value.
+    pub fn failed(name: &str) -> MeasureResult {
+        MeasureResult::ok(name, f64::NAN)
     }
 }
 

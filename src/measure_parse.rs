@@ -8,37 +8,57 @@
 //! fall_time        =  1.987000e-09
 //! ```
 //!
+//! A `param` measure with no value is `name = failed`. Any other measure
+//! that fails prints no line at all (ngspice names it on stderr), so a
+//! card of the deck with no line is a failed measure ([`in_deck_order`]).
+//!
 //! **LTspice** (log file):
 //! ```text
 //! Measurement: rise_time
 //!   rise_time: AVG=2.345e-09
 //! ```
-//! Or single-line: `rise_time: 2.345e-009 ...`
+//! Or single-line: `rise_time: 2.345e-009 ...`, `vmax: MAX(V(out))=0.5 FROM 0 TO 3e-06`,
+//! `thalf: V(out)=0.3 AT 6e-07` (a WHEN: the point after `AT`), `trf=6e-07 FROM 2e-07 TO 8e-07`
+//! (a TRIG/TARG), `Measurement "tnever" FAIL'ed`. With `.step`, a table per measure:
+//! ```text
+//! Measurement: thalf
+//!   step	V(out)=0.3
+//!      1	6e-07
+//!      2	failed
+//! ```
 //!
 //! Simulator text in, [`MeasureResult`] rows out.
 //!
-//! Cites: none (the formats above are the simulators' printed output).
+//! Cites: none (the formats above are the simulators' printed output:
+//! ngspice-45 and LTspice 26.1.1, recorded in the tests).
 //!
 //! Contents:
 //! - `pub fn parse_measures(text: &str, backend: Option<Dialect>) -> Vec<MeasureResult>`
+//! - `pub fn in_deck_order(deck: &str, rows: Vec<MeasureResult>, backend: Dialect) -> Vec<MeasureResult>`
+//! - `pub fn at_step(rows: &[MeasureResult], k: usize) -> Vec<MeasureResult>`
 
-use crate::result::MeasureResult;
+use crate::result::{MeasureResult, MeasureStatus};
 use crate::syntax::Dialect;
 
 /// Prefixes of the LTspice log lines that are no measure result: a line
 /// with a `:` this table does not name is read as `name: value`. A new
 /// log line LTspice writes is a row here.
-const LTSPICE_NOT_MEASURES: [&str; 6] = [
+const LTSPICE_NOT_MEASURES: [&str; 5] = [
     "Circuit:",
     "Date:",
     "Total elapsed",
     ".step",
-    "Measurement:",
     // The `.options` echo (`Options:plotwinsize=0 numdgt=15`).
     "Options:",
 ];
 
-/// Parse measure results from `backend`'s output, in its format; with no
+/// The analysis words a `.meas` card names before its measure's name
+/// (ngspice: tran, ac, dc, sp; LTspice adds op, tf, noise and lets the
+/// word go).
+const MEAS_ANALYSES: [&str; 7] = ["tran", "ac", "dc", "op", "sp", "tf", "noise"];
+
+/// Parse measure results from `backend`'s output, in its format (a measure
+/// the output says failed is a row too, [`MeasureStatus::Failed`]); with no
 /// backend (or one whose format is not known here), whichever format finds
 /// results, ngspice's first.
 pub fn parse_measures(text: &str, backend: Option<Dialect>) -> Vec<MeasureResult> {
@@ -66,13 +86,66 @@ pub fn parse_measures(text: &str, backend: Option<Dialect>) -> Vec<MeasureResult
     }
 }
 
+/// A run's measures in the order of `deck`'s `.meas` cards (`deck` is the
+/// text the simulator ran): each row of `rows` (the printout's,
+/// [`parse_measures`]) gets its card's analysis word, a stepped measure's
+/// rows staying in step order. ngspice and ESPice print a value or nothing,
+/// so on them a card with no row is a failed measure; LTspice names its
+/// failures itself. Rows of no card (a `meas` command of a `.control`
+/// block) follow, in their order. Of two cards of one name the first
+/// takes the rows.
+pub fn in_deck_order(deck: &str, rows: Vec<MeasureResult>, backend: Dialect) -> Vec<MeasureResult> {
+    let given = rows.len();
+    let silent = matches!(backend, Dialect::Ngspice | Dialect::Espice);
+    let mut rest: Vec<Option<MeasureResult>> = rows.into_iter().map(Some).collect();
+    let mut out = Vec::with_capacity(given);
+    let mut seen: Vec<&str> = Vec::new();
+    for (analysis, name) in cards(deck) {
+        if seen.iter().any(|s| s.eq_ignore_ascii_case(name)) {
+            continue;
+        }
+        seen.push(name);
+        let before = out.len();
+        for slot in &mut rest {
+            if let Some(mut row) = slot.take_if(|r| r.name.eq_ignore_ascii_case(name)) {
+                row.analysis = analysis.to_ascii_lowercase();
+                out.push(row);
+            }
+        }
+        if out.len() == before && silent {
+            // ngspice prints names in lowercase.
+            let mut row = MeasureResult::failed(&name.to_ascii_lowercase());
+            row.analysis = analysis.to_ascii_lowercase();
+            out.push(row);
+        }
+    }
+    out.extend(rest.into_iter().flatten());
+    assert!(out.len() >= given, "no row is lost");
+    assert!(
+        out.iter()
+            .all(|m| m.value.is_nan() == (m.status == MeasureStatus::Failed)),
+        "a failed measure, and only one, has no value"
+    );
+    out
+}
+
+/// The rows of `rows` that hold at step `k` of a stepped run (ZERO D42:
+/// its plot `k`): step `k`'s and those of no step. A run that does not
+/// step has only rows of no step: every plot gets them all.
+pub fn at_step(rows: &[MeasureResult], k: usize) -> Vec<MeasureResult> {
+    rows.iter()
+        .filter(|m| m.step.is_none_or(|s| s as usize == k))
+        .cloned()
+        .collect()
+}
+
 // ---- private ----
 
 /// Parse NGSpice batch-mode stdout for .meas results.
 ///
 /// Format: `name = value` (possibly with leading whitespace)
 /// Lines containing "=" that look like measure results.
-/// NGSpice also prints "failed" for measures that didn't trigger.
+/// A `param` measure with no value is `name = failed`, a row too.
 fn parse_ngspice(text: &str) -> Vec<MeasureResult> {
     // ngspice groups real results under a "Measurements for <Analysis>" header:
     //
@@ -123,7 +196,8 @@ fn parse_ngspice(text: &str) -> Vec<MeasureResult> {
     results
 }
 
-/// Parse a single `name = value [extra...]` measure line.
+/// Parse a single `name = value [extra...]` measure line, or ngspice's
+/// `name = failed`.
 fn measure_line(trimmed: &str) -> Option<MeasureResult> {
     let (name_part, value_part) = trimmed.split_once('=')?;
     let name = name_part.trim();
@@ -132,27 +206,28 @@ fn measure_line(trimmed: &str) -> Option<MeasureResult> {
     }
     let value_str = value_part.trim();
     if value_str.starts_with("failed") {
-        return None;
+        return Some(MeasureResult::failed(name));
     }
     let value = value_str.split_whitespace().next()?.parse::<f64>().ok()?;
-    Some(MeasureResult {
-        name: name.to_string(),
-        value,
-    })
+    Some(MeasureResult::ok(name, value))
 }
 
 /// Later values win: a deck that reports a measure twice should not yield
 /// duplicate entries.
 fn push_measure(results: &mut Vec<MeasureResult>, result: MeasureResult) {
     if let Some(existing) = results.iter_mut().find(|r| r.name == result.name) {
-        existing.value = result.value;
+        *existing = result;
     } else {
         results.push(result);
     }
 }
 
+/// LTspice's log: a line per measure, or with `.step` a table per measure
+/// with a row per step (the formats LTspice 26.1.1 writes, in the header).
 fn parse_ltspice(text: &str) -> Vec<MeasureResult> {
     let mut results = Vec::new();
+    // The measure whose step table the lines being read belong to.
+    let mut table: Option<&str> = None;
 
     for line in text.lines() {
         let trimmed = line.trim();
@@ -160,7 +235,52 @@ fn parse_ltspice(text: &str) -> Vec<MeasureResult> {
             continue;
         }
 
+        // `Measurement "tnever" FAIL'ed`: no value, at any step.
+        if let Some(name) = trimmed
+            .strip_prefix("Measurement \"")
+            .and_then(|r| r.strip_suffix("\" FAIL'ed"))
+        {
+            results.push(MeasureResult::failed(name));
+            table = None;
+            continue;
+        }
+        // `Measurement: vmax`, a `step MAX(V(out)) FROM TO` header, then
+        // a row per step, `<step> <value> ...` or `<step> failed`, the
+        // steps counted from 1.
+        if let Some(name) = trimmed.strip_prefix("Measurement:") {
+            table = Some(name.trim());
+            continue;
+        }
+        if let Some(name) = table {
+            let mut words = trimmed.split_whitespace();
+            let first = words.next().unwrap_or("");
+            if first == "step" {
+                continue;
+            }
+            if let (Ok(k), Some(value)) = (first.parse::<u32>(), words.next())
+                && k >= 1
+            {
+                let mut row = MeasureResult::ok(name, value.parse().unwrap_or(f64::NAN));
+                row.step = Some(k - 1);
+                results.push(row);
+                continue;
+            }
+            // Any other line ends the table and is read on its own.
+            table = None;
+        }
+
         if LTSPICE_NOT_MEASURES.iter().any(|p| trimmed.starts_with(p)) {
+            continue;
+        }
+
+        // `trf=6e-07 FROM 2e-07 TO 8e-07`: a TRIG/TARG measure, no colon.
+        if let Some((name, rest)) = trimmed.split_once('=')
+            && !name.is_empty()
+            && !name.contains([' ', ':'])
+            && rest.contains(" FROM ")
+        {
+            let value = rest.split_whitespace().next().unwrap_or("");
+            results.push(MeasureResult::ok(name, value.parse().unwrap_or(f64::NAN)));
             continue;
         }
 
@@ -178,10 +298,17 @@ fn parse_ltspice(text: &str) -> Vec<MeasureResult> {
             // Try direct numeric value: "name: 1.23e-09"
             let first_token = rest.split_whitespace().next().unwrap_or("");
             if let Ok(value) = first_token.parse::<f64>() {
-                results.push(MeasureResult {
-                    name: name.to_string(),
-                    value,
-                });
+                results.push(MeasureResult::ok(name, value));
+                continue;
+            }
+
+            // `thalf: V(out)=0.3 AT 6e-07`: a WHEN measure is the point
+            // after `AT` (a FIND ... AT writes `at`, and is the value
+            // before it).
+            if let Some((_, at)) = rest.rsplit_once(" AT ")
+                && let Ok(value) = at.trim().parse::<f64>()
+            {
+                results.push(MeasureResult::ok(name, value));
                 continue;
             }
 
@@ -190,10 +317,7 @@ fn parse_ltspice(text: &str) -> Vec<MeasureResult> {
                 if let Some((_key, val_str)) = part.split_once('=')
                     && let Ok(value) = val_str.parse::<f64>()
                 {
-                    results.push(MeasureResult {
-                        name: name.to_string(),
-                        value,
-                    });
+                    results.push(MeasureResult::ok(name, value));
                     break; // Take first parseable value
                 }
             }
@@ -203,9 +327,304 @@ fn parse_ltspice(text: &str) -> Vec<MeasureResult> {
     results
 }
 
+/// The `.meas` cards of `deck` in deck order, each its analysis word (empty
+/// when the card has none) and its measure's name, as written.
+fn cards(deck: &str) -> impl Iterator<Item = (&str, &str)> {
+    deck.lines().filter_map(|line| {
+        let mut words = line.split_whitespace();
+        // `.meas`, `.measure` and what lies between, any case (as
+        // `backend::ngspice` tells a measure card).
+        let head = words.next()?.get(..5)?;
+        if !head.eq_ignore_ascii_case(".meas") {
+            return None;
+        }
+        let first = words.next()?;
+        match MEAS_ANALYSES.iter().any(|a| first.eq_ignore_ascii_case(a)) {
+            true => Some((first, words.next()?)),
+            false => Some(("", first)),
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The deck ngspice printed [`NG_STDOUT`] for: 1k into 1 uF, a 0 to 1 V
+    /// step. `vmid` is on a dc analysis the deck does not run.
+    const NG_DECK: &str = "\
+* rc\n\
+R1 in out 1k\n\
+C1 out 0 1u\n\
+Vin in 0 0 AC 1 PULSE(0 1 0 0.000000001 0.000000001 1 2)\n\
+.meas tran vend find v(out) at=5m\n\
+.meas tran tnever when v(out)=2\n\
+.meas tran p1 param='vend*2'\n\
+.meas tran p2 param='tnever*2'\n\
+.meas tran p3 param='vend*3'\n\
+.meas ac gain1k find vdb(out) at=1k\n\
+.meas ac fnever when vdb(out)=10\n\
+.meas dc vmid find v(out) at=0.5\n\
+.control\n\
+tran 10u 5m 0 10u\n\
+ac dec 10 1 100k\n\
+.endc\n\
+.end\n\
+";
+
+    /// ngspice-45's stdout for [`NG_DECK`] (`ngspice -b -n`, 2026-11-11), from
+    /// its first measure block on, less the memory lines. Its stderr names
+    /// `tnever` and `fnever` ("Error: measure  tnever  when(WHEN) : out of
+    /// interval", then the card and "failed!").
+    const NG_STDOUT: &str = "\
+\x20 Measurements for Transient Analysis\n\
+\n\
+vend                =  9.932623e-01\n\
+p1                  =  1.98652e+00\n\
+p2                  =   failed\n\
+p3                  =  2.97979e+00\n\
+\n\
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000\n\
+\n\
+Using SPARSE 1.3 as Direct Linear Solver\n\
+\n\
+No. of Data Rows : 51\n\
+\n\
+\x20 Measurements for Transient Analysis\n\
+\n\
+gain1k              =  -1.607224e+01\n\
+\n\
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000\n\
+\n\
+Using SPARSE 1.3 as Direct Linear Solver\n\
+\n\
+\x20 Measurements for Transient Analysis\n\
+\n\
+gain1k              =  -1.607224e+01\n\
+\n\
+\n\
+Total analysis time (seconds) = 0.00147703\n\
+\n\
+Total elapsed time (seconds) = 0.006 \n\
+\n\
+Shared ngspice pages =   10.895 MB.\n\
+Text (code) pages =    6.535 MB.\n\
+Stack = 0 bytes.\n\
+Library pages =    3.137 MB.\n\
+\n\
+";
+
+    /// A 0 to 1 V pulse (1 us edges) over R1 = {r}, stepped 1k 2k 3k, into
+    /// R2 = 1k: V(out) peaks at 1k/(r + 1k) = 0.5, 1/3, 0.25.
+    const LT_DECK: &str = "\
+* p8-102 stepped divider, tran, measures\n\
+V1 in 0 PULSE(0 1 0 1u 1u 1u 4u)\n\
+R1 in out {r}\n\
+R2 out 0 1k\n\
+.param r=1k\n\
+.step param r list 1k 2k 3k\n\
+.tran 1u 3u\n\
+.meas tran vmax MAX V(out)\n\
+.meas tran vat FIND V(out) AT=1.5u\n\
+.meas tran tnever WHEN V(out)=2\n\
+.meas tran thalf WHEN V(out)=0.3\n\
+.end\n\
+";
+
+    /// LTspice 26.1.1's log (under Wine, 2026-11-11) for [`LT_DECK`], from its
+    /// `Options:` line on (the measure lines end in `\r`).
+    const LT_STEPPED: &str = "\
+Options:plotwinsize=0 numdgt=15\n\
+\n\
+.step r=1000\n\
+solver = Normal\n\
+Maximum thread count: 32\n\
+tnom = 27\n\
+temp = 27\n\
+method = trap\n\
+.OP point found by inspection.\n\
+.OP point found by inspection.\n\
+\n\
+.step r=2000\n\
+.OP point found by inspection.\n\
+.OP point found by inspection.\n\
+\n\
+.step r=3000\n\
+.OP point found by inspection.\n\
+.OP point found by inspection.\n\
+Total elapsed time: 0.085 seconds.\n\
+Total iterations: 2088\n\
+\n\
+Files loaded:\n\
+Z:\\tmp\\p8-102\\step.cir\n\
+\n\
+\r\n\
+Measurement: vmax\r\n\
+\x20 step\tMAX(V(out))\tFROM\tTO\r\n\
+\x20    1\t0.5\t0\t3e-06\r\n\
+\x20    2\t0.333333333333\t0\t3e-06\r\n\
+\x20    3\t0.25\t0\t3e-06\r\n\
+\r\n\
+Measurement: vat\r\n\
+\x20 step\tV(out)\tat\r\n\
+\x20    1\t0.5\t1.5e-06\r\n\
+\x20    2\t0.333333333333\t1.5e-06\r\n\
+\x20    3\t0.25\t1.5e-06\r\n\
+Measurement \"tnever\" FAIL'ed\r\n\
+\r\n\
+Measurement: thalf\r\n\
+\x20 step\tV(out)=0.3\r\n\
+\x20    1\t6e-07\r\n\
+\x20    2\t9e-07\r\n\
+\x20    3\tfailed\r\n\
+";
+
+    /// LTspice 26.1.1's logs for the same divider with R1 = 1k and no
+    /// `.step`: one run's log from its `Options:` line on, then the measure
+    /// lines of a second run (`.meas tran thalf WHEN V(out)=0.3`, `trf TRIG
+    /// V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.4 RISE=1`, `twice PARAM
+    /// thalf*2`, `vmax MAX V(out)`) and of a third (`vfw FIND V(in) WHEN
+    /// V(out)=0.3`, `slope DERIV V(out) AT=0.5u`, `area INTEG V(out)`, `pp
+    /// PP V(out)`, `tcross WHEN V(out)=0.3 FALL=1`).
+    const LT_ONE: &str = "\
+Options:plotwinsize=0 numdgt=15\n\
+solver = Normal\n\
+Maximum thread count: 32\n\
+tnom = 27\n\
+temp = 27\n\
+method = trap\n\
+.OP point found by inspection.\n\
+.OP point found by inspection.\n\
+Total elapsed time: 0.014 seconds.\n\
+Total iterations: 2088\n\
+\n\
+Files loaded:\n\
+Z:\\tmp\\p8-102\\one.cir\n\
+\n\
+vmax: MAX(V(out))=0.5 FROM 0 TO 3e-06\r\n\
+vat: V(out)=0.5 at 1.5e-06\r\n\
+Measurement \"tnever\" FAIL'ed\r\n\
+avg: AVG(V(out))=0.333333333333 FROM 0 TO 3e-06\r\n\
+thalf: V(out)=0.3 AT 6e-07\r\n\
+trf=6e-07 FROM 2e-07 TO 8e-07\r\n\
+twice: thalf*2=1.2e-06\r\n\
+vmax: MAX(V(out))=0.5 FROM 0 TO 3e-06\r\n\
+vfw: V(in)=0.6 at 6e-07\r\n\
+slope: V(out)=500000 at 5e-07\r\n\
+area: INTEG(V(out))=1e-06 FROM 0 TO 3e-06\r\n\
+pp: PP(V(out))=0.5 FROM 0 TO 3e-06\r\n\
+tcross: V(out)=0.3 AT 2.4e-06\r\n\
+";
+
+    /// A row as the tests compare it: name, analysis, step, and the value
+    /// (`None` when the measure failed).
+    type Row<'a> = (&'a str, &'a str, Option<u32>, Option<f64>);
+
+    fn fields(rows: &[MeasureResult]) -> Vec<Row<'_>> {
+        rows.iter()
+            .map(|m| {
+                let value = (m.status == MeasureStatus::Ok).then_some(m.value);
+                (m.name.as_str(), m.analysis.as_str(), m.step, value)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn p8_102_ngspice_printout_field_by_field() {
+        // Oracle: ngspice-45's own printout of NG_DECK (NG_STDOUT, and its
+        // stderr in research/impl/evidence/P8-102). vend, p1, p3 and gain1k
+        // have the values it printed; p2 is its `failed`; tnever and
+        // fnever are the two its stderr names; vmid is on an analysis that
+        // did not run. Its header calls the ac block "Transient Analysis"
+        // and it prints that block twice: the analysis is the card's.
+        let printed = parse_measures(NG_STDOUT, Some(Dialect::Ngspice));
+        let names: Vec<&str> = printed.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(names, ["vend", "p1", "p2", "p3", "gain1k"]);
+        let rows = in_deck_order(NG_DECK, printed, Dialect::Ngspice);
+        assert_eq!(
+            fields(&rows),
+            [
+                ("vend", "tran", None, Some(0.9932623)),
+                ("tnever", "tran", None, None),
+                ("p1", "tran", None, Some(1.98652)),
+                ("p2", "tran", None, None),
+                ("p3", "tran", None, Some(2.97979)),
+                ("gain1k", "ac", None, Some(-16.07224)),
+                ("fnever", "ac", None, None),
+                ("vmid", "dc", None, None),
+            ]
+        );
+        // Every plot of a run that does not step carries every row.
+        assert_eq!(at_step(&rows, 1).len(), rows.len());
+    }
+
+    #[test]
+    fn p8_102_ltspice_stepped_log_one_row_per_step() {
+        // Oracle: LTspice 26.1.1's own log of LT_DECK, and the closed form
+        // (the divider's peak 1k/(r + 1k); V(out) = 0.3 where the ramp is
+        // at 0.3 (r + 1k)/1k V: 0.6 us, 0.9 us, never for r = 3k).
+        let rows = in_deck_order(
+            LT_DECK,
+            parse_measures(LT_STEPPED, Some(Dialect::Ltspice)),
+            Dialect::Ltspice,
+        );
+        assert_eq!(
+            fields(&rows),
+            [
+                ("vmax", "tran", Some(0), Some(0.5)),
+                ("vmax", "tran", Some(1), Some(0.333333333333)),
+                ("vmax", "tran", Some(2), Some(0.25)),
+                ("vat", "tran", Some(0), Some(0.5)),
+                ("vat", "tran", Some(1), Some(0.333333333333)),
+                ("vat", "tran", Some(2), Some(0.25)),
+                ("tnever", "tran", None, None),
+                ("thalf", "tran", Some(0), Some(6e-7)),
+                ("thalf", "tran", Some(1), Some(9e-7)),
+                ("thalf", "tran", Some(2), None),
+            ]
+        );
+        // The plot of step 2 (r = 3k): one row a measure.
+        assert_eq!(
+            fields(&at_step(&rows, 2)),
+            [
+                ("vmax", "tran", Some(2), Some(0.25)),
+                ("vat", "tran", Some(2), Some(0.25)),
+                ("tnever", "tran", None, None),
+                ("thalf", "tran", Some(2), None),
+            ]
+        );
+    }
+
+    #[test]
+    fn p8_102_ltspice_log_lines_of_each_measure_kind() {
+        // Oracle: LTspice 26.1.1's own log lines (LT_ONE) and the closed
+        // forms for R1 = R2 = 1k: the peak 0.5; the average of the 1 us
+        // up, 1 us flat, 1 us down pulse over 3 us, 1/3; V(out) = 0.3 at
+        // 0.6 us rising and 2.4 us falling (a WHEN is its time, not its
+        // level); 0.1 to 0.4 V takes 0.6 us (a TRIG/TARG line has no
+        // colon); V(in) = 0.6 where V(out) = 0.3 (a FIND ... WHEN is its
+        // value: LTspice writes `at`, not `AT`); the edge's slope 0.5 V/us;
+        // the pulse's area 0.5 V x 2 us.
+        let rows = parse_measures(LT_ONE, Some(Dialect::Ltspice));
+        assert_eq!(
+            fields(&rows),
+            [
+                ("vmax", "", None, Some(0.5)),
+                ("vat", "", None, Some(0.5)),
+                ("tnever", "", None, None),
+                ("avg", "", None, Some(0.333333333333)),
+                ("thalf", "", None, Some(6e-7)),
+                ("trf", "", None, Some(6e-7)),
+                ("twice", "", None, Some(1.2e-6)),
+                ("vmax", "", None, Some(0.5)),
+                ("vfw", "", None, Some(0.6)),
+                ("slope", "", None, Some(500000.0)),
+                ("area", "", None, Some(1e-6)),
+                ("pp", "", None, Some(0.5)),
+                ("tcross", "", None, Some(2.4e-6)),
+            ]
+        );
+    }
 
     #[test]
     fn test_parse_ngspice_measures() {
@@ -220,7 +639,10 @@ vout_dc          =  1.650000e+00
 gain_failed      =  failed
 ";
         let results = parse_ngspice(stdout);
-        assert_eq!(results.len(), 3);
+        assert_eq!(results.len(), 4);
+        assert_eq!(results[3].name, "gain_failed");
+        assert_eq!(results[3].status, MeasureStatus::Failed);
+        assert!(results[3].value.is_nan());
         assert_eq!(results[0].name, "rise_time");
         assert!((results[0].value - 2.345e-9).abs() < 1e-20);
         assert_eq!(results[1].name, "fall_time");

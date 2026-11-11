@@ -60,7 +60,7 @@ macro_rules! analysis_class {
             )?
 
             #[getter]
-            fn measures(&self) -> HashMap<String, f64> { measures_to_dict(&self.inner.raw.measures) }
+            fn measures(&self) -> HashMap<String, Option<f64>> { measures_to_dict(&self.inner.raw.measures) }
 
             /// The `.step` point this result is: {parameter: value}, empty
             /// when nothing steps.
@@ -225,8 +225,10 @@ impl PyRawData {
             ),
         }
     }
+    /// The plot's .meas results as {name: value}, `None` the value of a
+    /// measure that failed
     #[getter]
-    fn measures(&self) -> HashMap<String, f64> {
+    fn measures(&self) -> HashMap<String, Option<f64>> {
         measures_to_dict(&self.inner.measures)
     }
     /// The `.step` point: {parameter: value}, empty when nothing steps.
@@ -257,9 +259,10 @@ impl PyOperatingPoint {
         self.value(name, PyAttributeError::new_err)
     }
 
-    /// Parsed .meas results as {name: value} dict
+    /// Parsed .meas results as {name: value} dict, `None` the value of a
+    /// measure that failed
     #[getter]
-    fn measures(&self) -> HashMap<String, f64> {
+    fn measures(&self) -> HashMap<String, Option<f64>> {
         measures_to_dict(&self.inner.raw.measures)
     }
 
@@ -289,9 +292,14 @@ impl PyOperatingPoint {
     }
 }
 
-/// Convert MeasureResult vec to a Python-friendly dict
-fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> HashMap<String, f64> {
-    measures.iter().map(|m| (m.name.clone(), m.value)).collect()
+/// A result's measures as a Python dict: {name: value}, `None` the value
+/// of a measure with none (failed).
+fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> HashMap<String, Option<f64>> {
+    let ok = crate::result::MeasureStatus::Ok;
+    measures
+        .iter()
+        .map(|m| (m.name.clone(), (m.status == ok).then_some(m.value)))
+        .collect()
 }
 
 /// A column as a Python list of floats, built from the stored slice with no

@@ -79,6 +79,9 @@ res = tb.transient(step_time=1e-8, end_time=5e-6, max_time=1e-8)
 print(res.measures["vmax"])
 ```
 
+A measure that gives no value (a `WHEN` never reached, a measure on an
+analysis that did not run) is in `res.measures` with the value `None`.
+
 `options()` takes portable keys only: the names of ngspice's `.options`
 (its manual, §11.1: `reltol`, `abstol`, `vntol`, `gmin`, `method`, `seed`, ...),
 in any letter case. Each target writes its own spelling of a key; a target with
