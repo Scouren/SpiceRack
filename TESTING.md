@@ -280,6 +280,12 @@ and fail once it runs, so the marker goes when the MSI is mirrored.
 
 - LTspice and Spectre are not installed anywhere SpiceRack is tested, so their
   decks are checked against the manuals and the pending decks only.
+- EVIDENCE-BLOCKED (ZERO-LEDGER P1-049, D43): a Spectre `hb` run is not read.
+  Spectre 25.1 stops on FATAL SPECTRE-18 under `-format nutascii` ("Output
+  for `td.pss_hb' is not supported in nutmeg format"), and no PSF file of an
+  hb run was recorded to write a reader against. The Spectre backend refuses
+  such a deck before it starts (`test_backends.rs` `p1_049`). Cleared by one
+  `spectre -format psfascii` run of an hb deck, kept as a fixture.
 - `test_cross_sim/` runs the merge tier on 48 decks per corpus (about 90 s)
   and every deck nightly (31 min on 12 workers, 5.1 CPU-hours). A deck near
   the CPU budget (60 s for an original, 120 s for a written deck) can flap

@@ -317,3 +317,30 @@ fn p1_040_p1_047_spectre_nutascii_and_nutbin_read() {
     }
     assert_eq!(text.real_data, bin.real_data);
 }
+
+#[cfg(feature = "backend")]
+#[test]
+fn p1_049_spectre_hb_format_nutascii_segfaults() {
+    // settle-remote P1-040 (Spectre 25.1.0.470.isr13, 2026-11-07): `hb`
+    // under `-format nutascii` stops on FATAL SPECTRE-18 after "Output for
+    // `td.pss_hb' is not supported in nutmeg format", and no PSF file of an
+    // hb run was kept to read against (ZERO D43: EVIDENCE-BLOCKED). So the
+    // backend refuses the deck by name before Spectre starts, the same
+    // with and without Spectre installed. `hb` as a comment's or an
+    // instance's word is no analysis: that deck gets past the refusal.
+    use spicerack::syntax::Dialect;
+    let rc = "simulator lang=spectre\n\
+              v1 (in 0) vsource type=sine ampl=1 freq=1k fundname=\"f1\"\n\
+              r1 (in out) resistor r=1k\n\
+              c1 (out 0) capacitor c=159.15494309189535n\n";
+    let deck = format!("{rc}hb1 hb funds=[\"f1\"] maxharms=[3]\n");
+    let Err(why) = Dialect::Spectre.run_all(&deck) else {
+        panic!("an hb deck is refused");
+    };
+    let why = why.to_string();
+    assert!(why.contains("`hb1`") && why.contains("SPECTRE-18"), "{why}");
+    let plain = format!("{rc}// hb1 hb\nhb (out 0) resistor r=1k\ntran1 tran stop=1m\n");
+    if let Err(e) = Dialect::Spectre.run_all(&plain) {
+        assert!(!e.to_string().contains("SPECTRE-18"), "{e}");
+    }
+}

@@ -129,7 +129,9 @@ returns (`None` for `add_fourier`, whose table goes to stdout). ngspice runs a
 deck's analyses in its own order, so results are matched to analyses by plot
 name, never by position. `pss`, `hb`, `stb` and the Spectre
 analyses run alone; queued beside others, `run()` raises rather than guess
-which plot is theirs. A Spectre `montecarlo` (`add_spectre_monte_carlo`) is also
+which plot is theirs. On the Spectre backend `hb` is written (`netlist()`) but
+not run: Spectre has no nutmeg output for it and its PSF output is not read, so
+`run()` raises before Spectre starts. A Spectre `montecarlo` (`add_spectre_monte_carlo`) is also
 written for VACASK, as an `mc` loop around the deck's analysis of its inner
 type, unless its `variations` (Spectre's default, `process`) leaves out draws
 the deck makes inside a subcircuit (`W0115`).
