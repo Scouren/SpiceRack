@@ -217,19 +217,23 @@ impl W<'_, '_> {
                 uic,
                 ..
             } => {
-                // VACASK always saves from t=0.
-                if start.unwrap_or(0.0) != 0.0 {
-                    self.refuse(Code::W0015, tok);
-                    return vec![];
-                }
+                // `start` is where the results start, SPICE's TSTART: the
+                // circuit is integrated from 0 (`docs/cmd-analysis-tran.md`;
+                // measured, first point 5e-4). SPICE's default TMAX is the
+                // smaller of TSTEP and (TSTOP-TSTART)/50 (ngspice manual,
+                // `.tran`).
+                let from = start.unwrap_or(0.0);
                 let native = self.rd.b.named_rules == NamedRules::Vacask;
-                let tmax = max_step.or((!native).then(|| step.min(stop / 50.0)));
+                let tmax = max_step.or((!native).then(|| step.min((stop - from) / 50.0)));
                 let mut s = format!(
                     "analysis {} tran step={} stop={}",
                     name("tran"),
                     num(*step),
                     num(*stop)
                 );
+                if from != 0.0 {
+                    s.push_str(&format!(" start={}", num(from)));
+                }
                 if let Some(t) = tmax {
                     s.push_str(&format!(" maxstep={}", num(t)));
                 }

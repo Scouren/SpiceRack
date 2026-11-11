@@ -219,8 +219,8 @@ EXPECTED = {
     'ac_oct': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'ac_log': ('W0040', 'W0040', 'W0040', 'W0040', 'W0040', OK, 'W0040', OK, OK),
     'tran': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # VACASK refuses `.tran … uic` (W0015): its `tran` has `icmode`; writer C (FINDINGS-python.md).
-    'tran_full': (OK, OK, OK, OK, OK, OK, 'W0015', OK, OK),
+    # VACASK's `tran` has `start=` and `icmode="uic"` (docs/cmd-analysis-tran.md; ZERO-LEDGER P4-006).
+    'tran_full': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # ngspice's points-per-summary: LTspice notes W0033 (writer B); Spectre, VACASK drop it with no note (writer C; FINDINGS-python.md).
     'noise_summary': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
