@@ -386,3 +386,27 @@ fn p4_020_a_montecarlos_left_out_scope_is_nominal() {
         assert!(s.iter().any(|x| (x[2] - 0.5).abs() > 1e-3), "{s:?}");
     }
 }
+
+/// ZERO-LEDGER P4-122. ngspice manual p.318 (`MAXORD=1` with the
+/// trapezoid is backward Euler); VACASK `docs/cmd-options-tran.md`
+/// (`tran_maxord` bounds `am` and `gear`, never `trap`). Oracle: real
+/// ngspice-45 on the source against real VACASK on the written deck. A
+/// lossless LC tank on a 1 V step rings 0 to 2 V for ever under the
+/// trapezoid and decays under backward Euler: after 16 of its 198.7 us
+/// cycles at a 1 us step the peak is 1.431 V on both, 2.000 V with the
+/// trapezoid (research/impl/evidence/P4-122). Tolerance 5e-3: the two
+/// step controls differ (measured 4.4e-4).
+#[test]
+fn p4_122_maxord_1_is_backward_euler_on_vacask() {
+    let deck = "t\nV1 in 0 PULSE(0 1 10u 1u 1u 1 2)\nL1 in a 1m\nC1 a 0 1u\n\
+        .options maxord=1\n.tran 1u 2m 0 1u\n.end\n";
+    let peak = |raw: &RawData, name: &str| {
+        let (t, a) = (col(raw, "time"), col(raw, name));
+        let late = t.iter().zip(&a).filter(|(t, _)| **t >= 1.6e-3);
+        late.fold(f64::MIN, |m, (_, a)| m.max(*a))
+    };
+    let ngspice = Dialect::Ngspice.run(deck).expect("ngspice runs the source");
+    let want = peak(&ngspice, "v(a)");
+    assert!(want > 1.3 && want < 1.6, "ngspice's peak: {want}");
+    close(peak(&run(deck), "a"), want, 5e-3);
+}

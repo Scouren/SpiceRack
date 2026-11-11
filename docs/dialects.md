@@ -166,7 +166,9 @@ in the else branch, else `P0021`), elements (`devices`,
 `path_quote`, `expr`, `func`, `subckt_params`, `write_head`,
 `write_master`, `option`), the named writers' maps (`option_to`,
 `option_spell`, `option_method`, `option_cosmetic`: what a SPICE `.options` key is on a
-Spectre or VACASK target; `model_master(kind, levels, master, type_)` and
+Spectre or VACASK target; `model_master(kind, levels, master, type_)`,
+`model_load(master, path)` (the file a VACASK target loads for a master,
+the master then the module's own name) and
 `spice_model_type(kind)`: the master a SPICE `.model` type gets at a
 LEVEL, `levels` a list; `level_alias(kind, source_level, neutral_level)`:
 this dialect's own LEVEL of a `.model` type is ngspice's `neutral_level`,

@@ -20,6 +20,7 @@
 //!   `pub enum Coupling`, `pub enum ParamForm`, `pub enum IncludeScope`, `pub enum NamedParams`,
 //!   `pub enum ExprEval`, `pub enum Parasitics`, `pub enum NetlistRules`, `pub enum OptionTo`,
 //!   `pub enum DotRule`
+//! - `Behaviours::model_load(&self, master: &str) -> Option<&'static str>`
 //! - `pub struct ModelMaster`, `Behaviours::model_master(&self, kind: &str, level: u32) -> MasterAnswer`, `pub enum MasterAnswer`
 //! - `pub struct LevelAlias`, `Behaviours::neutral_level(&self, kind: &str, level: u32) -> Option<u32>`,
 //!   `Behaviours::same_level(&self, source: &Behaviours, kind: &str, level: u32) -> bool`
@@ -120,6 +121,10 @@ pub struct Behaviours {
     /// Write: the master a SPICE `.model` type gets at a LEVEL, one row
     /// per (type, LEVELs) (`DialectDef::model_master`).
     pub model_masters: &'static [ModelMaster],
+    /// Write: the file the target loads for a master, by master
+    /// (`DialectDef::model_load`); a master not here is in the target's
+    /// default file (VACASK: `sp_<master>` of `spice/<master>.osdi`).
+    pub model_loads: &'static [(&'static str, &'static str)],
     /// Write: the `.model` types (lowercase) the target reads as SPICE's
     /// (`DialectDef::spice_model_type`): one with no `model_masters` row
     /// at its LEVEL is refused (W0104: "the nearest model" is other
@@ -455,11 +460,20 @@ impl Behaviours {
         vacask_analyses: &[],
         option_map: &[],
         model_masters: &[],
+        model_loads: &[],
         spice_model_types: &[],
         kept_words: &[],
         dot_rules: &[],
         level_aliases: &[],
     };
+
+    /// The file the target loads for master `master`, a name as its
+    /// `model_masters` row spells it; `None`: no row, the target's default
+    /// file.
+    pub fn model_load(&self, master: &str) -> Option<&'static str> {
+        let row = self.model_loads.iter().find(|r| r.0 == master);
+        row.map(|r| r.1)
+    }
 
     /// The master SPICE `.model` type `kind` (lowercase) gets at `level`.
     pub fn model_master(&self, kind: &str, level: u32) -> MasterAnswer {

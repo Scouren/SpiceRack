@@ -149,6 +149,12 @@ pub(super) fn hspice() -> DialectDef {
         .spectre_analysis("montecarlo")
         // The circuit temperature in an expression (HSPICE UG, temper).
         .temp_name("temper")
+        // The `.model` levels HSPICE numbers its own way. Its BJT
+        // `LEVEL=11` is the UCSD HBT (Elements and Device Models E-2010.12
+        // p.291); Xyce's level 11 is VBIC 1.3 (RG 7.10 §2.3.17) and
+        // ngspice-45 has none ("Unable to find definition of given model").
+        .level_alias("npn", 11, None)
+        .level_alias("pnp", 11, None)
         // The VACASK analyses it has (HSPICE RF .HB, .HBAC, .HBNOISE).
         .vacask_analysis("hb")
         .vacask_analysis("hbac")

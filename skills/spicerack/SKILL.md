@@ -37,6 +37,8 @@ Each of these returns a plausible wrong number rather than an error.
 
 **ngspice has no `.step`.** `tb.step()` then `netlist("ngspice")` raises an error (`W0016`), and a run without a forced backend auto-routes away from ngspice (to VACASK when installed). Sweep by rebuilding the testbench in a Python loop, one run per point — `run_corners` does exactly that for corners and seeds. LTspice, VACASK and Spectre support parameter sweeps natively. On LTspice a stepped run returns a list, one result per step in step order, each with `.params` (`{"r": 2000.0}`; `{}` on an unstepped result). On VACASK a stepped result still concatenates the steps on the analysis axis (with the step value as `step_<param>`), and a stepped `OperatingPoint` raises `ValueError` rather than return the first step. LTspice runs one analysis a deck, so `tb.run()` on LTspice runs each queued analysis in a deck of its own.
 
+**On VACASK `tb.step(name, …)` takes a parameter, `temp`, or a top-level V or I source** (its DC value: `tb.step("Vdd", 1.0, 3.0, 1.0)`). Any other device name, or `R1:R`, raises `W0016`: sweep it through a parameter (`value="{r}"`, then `tb.step("r", …)`).
+
 **Use ASCII micro units: `u_uF`, `u_uH`, `u_uA`, `u_uV`, `u_uW`, `u_us`.** Python normalises identifiers, so a `u_µF` spelled with U+00B5 cannot be imported. The `u_Ω` family does work.
 
 **`.nodes` and `.branches` are names, not values.** Every result type has them (and `.measures`: `{name: value}`, the value `None` when the measure failed); index the result for the numbers: `res["vout"]`. An `OperatingPoint` also takes the simulator's spelling: `op["v(vout)"]` is `op["vout"]`.

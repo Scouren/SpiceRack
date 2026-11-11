@@ -377,13 +377,17 @@ mod tests {
             "resistor",
             "vdmos",
         ];
+        // The modules in a file of their own (`lib/vacask/mod/*.osdi`,
+        // `devices/CMakeLists.txt` L10-L12; ZERO-LEDGER P4-012): a master
+        // with a `model_load` row ships as that file.
+        const FILES_36BE560: &[&str] = &["vbic_1p3.osdi", "vbic_1p3_4t.osdi", "vbic_1p3_5t.osdi"];
         let b = Lang::from(Dialect::Vacask).behaviours();
         for m in b.model_masters {
-            assert!(
-                MODULES_36BE560.contains(&m.master),
-                "{m:?}: no `spice/{}.osdi` at 36be560",
-                m.master
-            );
+            let ships = match b.model_load(m.master) {
+                Some(file) => FILES_36BE560.contains(&file),
+                None => MODULES_36BE560.contains(&m.master),
+            };
+            assert!(ships, "{m:?}: no file of that module at 36be560");
         }
         // NG dossier §4 M4: `spice/jfet2.osdi` (JFET LEVEL 2) ships but
         // had no master, so a LEVEL 2 `.model` gave W0104 "no master".
