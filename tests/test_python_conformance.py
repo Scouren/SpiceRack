@@ -218,6 +218,7 @@ FEATURES = {
     "E_G": elem(lambda d: (d.E("1", "x", "0", control_positive="out", control_negative="0", voltage_gain=2), d.G("1", "y", "0", control_positive="out", control_negative="0", transconductance=1e-3), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "F_H": elem(lambda d: (d.V("s", "out", "z", 0), d.R("z", "z", "0", 1e3), d.F("1", "x", "0", vsense="Vs", current_gain=2), d.H("1", "y", "0", vsense="Vs", transresistance=10), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "BV_BI": elem(lambda d: (d.BV("1", "x", "0", expression="V(out)*2"), d.BI("1", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
+    "NonLinear": elem(lambda d: (d.NonLinearVoltageSource("x", "x", "0", expression="V(out)*2"), d.NonLinearCurrentSource("y", "y", "0", expression="V(out)*1m"), d.R("x", "x", "0", 1e3), d.R("y", "y", "0", 1e3))),
     "POLY": elem(lambda d: (d.POLY("1", "E", "x", "0", ["out", "0"], [0, 1, 2]), d.R("x", "x", "0", 1e3))),
     "S": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw"))),
     "W": elem(lambda d: (d.V("s", "in", "z", 0), d.R("z", "z", "0", 1e3), d.model("cs", "csw"), d.W("1", "out", "0", vcontrol="Vs", model="cs"))),
@@ -335,6 +336,8 @@ EXPECTED = {
     'J': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # An E/G `value={expr}`: the behavioural source `BV_BI` is, under its own letter.
+    'NonLinear': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'BV_BI': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'POLY': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

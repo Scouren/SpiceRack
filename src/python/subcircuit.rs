@@ -172,6 +172,21 @@ impl PySubcircuit {
         self.behavioral('I', name, positive, negative, expression);
     }
 
+    /// A voltage source given by an expression of node voltages and branch
+    /// currents (PySpice's name): the card `E<name> n+ n- value={expr}`
+    /// (ngspice-45 manual §5.2.2), read as the behavioural source `BV` is.
+    #[pyo3(signature = (name, positive, negative, *, expression))]
+    fn NonLinearVoltageSource(&mut self, name: &str, positive: &str, negative: &str, expression: &str) {
+        self.nonlinear('E', name, positive, negative, expression);
+    }
+
+    /// As `NonLinearVoltageSource`, a current from `positive` through the
+    /// source to `negative`: `G<name> n+ n- value={expr}` (manual §5.3.2).
+    #[pyo3(signature = (name, positive, negative, *, expression))]
+    fn NonLinearCurrentSource(&mut self, name: &str, positive: &str, negative: &str, expression: &str) {
+        self.nonlinear('G', name, positive, negative, expression);
+    }
+
     #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, voltage_gain))]
     fn E(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, voltage_gain: f64) {
         let nets = self.nets(&[positive, negative, control_positive, control_negative]);
@@ -568,6 +583,20 @@ impl PySubcircuit {
     fn behavioral(&mut self, of: char, name: &str, p: &str, n: &str, expression: &str) {
         let nets = self.nets(&[p, n]);
         let mut c = Card::element(name, format!("B{name} {nets} {of}={expression}"));
+        if is_laplace(expression) {
+            c.needs = need::LAPLACE;
+        }
+        self.inner.elements.push(c);
+    }
+
+    /// An E (`letter` `E`) or G source given by an expression:
+    /// `E<name> np nm value={expr}`, one pair of braces whether the caller
+    /// wrote them or not; a Laplace expression needs a simulator that has
+    /// one, as in [`Self::behavioral`].
+    fn nonlinear(&mut self, letter: char, name: &str, p: &str, n: &str, expression: &str) {
+        let nets = self.nets(&[p, n]);
+        let value = PyValueArg::Expr(expression.into()).value().text();
+        let mut c = Card::element(name, format!("{letter}{name} {nets} value={value}"));
         if is_laplace(expression) {
             c.needs = need::LAPLACE;
         }

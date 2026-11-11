@@ -190,6 +190,7 @@ PARITY = {
     "J": (FEATURES["J"], tw_elem([".model jn njf", "J1 out in 0 jn"]), "ng §3 J", None),
     "Z": (FEATURES["Z"], tw_elem([".model zn nmf", "Z1 out in 0 zn"]), "ng §3 Z", None),
     "E_G": (FEATURES["E_G"], tw_elem(["E1 x 0 out 0 2", "G1 y 0 out 0 1e-3", "Rx x 0 1e3", "Ry y 0 1e3"]), "ng §3 E, G", None),
+    "NonLinear": (FEATURES["NonLinear"], tw_elem(["Ex x 0 value={V(out)*2}", "Gy y 0 value={V(out)*1m}", "Rx x 0 1e3", "Ry y 0 1e3"]), "ng §5.2.2 E value={expr}, §5.3.2 G value= (' or { } delimit)", "P8-010"),
     "F_H": (FEATURES["F_H"], tw_elem(["Vs out z 0", "Rz z 0 1e3", "F1 x 0 Vs 2", "H1 y 0 Vs 10", "Rx x 0 1e3", "Ry y 0 1e3"]), "ng §3 F, H", None),
     "BV_BI": (FEATURES["BV_BI"], tw_elem(["B1 x 0 V=V(out)*2", "B1 y 0 I=V(out)*1m", "Rx x 0 1e3", "Ry y 0 1e3"]), "ng §3 B", None),
     "POLY": (FEATURES["POLY"], tw_elem(["E1 x 0 POLY(1) out 0 0 1 2", "Rx x 0 1e3"]), "ng §3 POLY", None),

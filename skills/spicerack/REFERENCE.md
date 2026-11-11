@@ -26,6 +26,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `F` | `F` | `(name, positive, negative, vsense, current_gain)` — `vsense` names a V source |
 | `H` | `H` | `(name, positive, negative, vsense, transresistance)` |
 | `BV` / `BI` | `B` | `(name, positive, negative, expression)` |
+| `NonLinearVoltageSource` / `NonLinearCurrentSource` | `E` / `G` | `(name, positive, negative, expression=...)` — `E<name> n+ n- value={expr}`: `BV` / `BI` under the E/G letter (PySpice's names); give an E and a G different names |
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |
 | `S` | `S` | `(name, positive, negative, control_positive, control_negative, model)` |
 | `W` | `W` | `(name, positive, negative, vcontrol, model)` |

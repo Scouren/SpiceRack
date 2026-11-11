@@ -782,3 +782,28 @@ def test_p8_012_a_subcircuit_function_reads_the_instances_parameter(backend):
     tb.V("in", "in", "0", 1.0)
     # A linear DC solve: exact to rounding.
     assert tb.operating_point()["out"] == pytest.approx(0.75, rel=1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_010_nonlinear_sources_run_to_the_closed_form(backend):
+    """ngspice-45 manual §5.2.2, §5.3.2: v(x) = 2*v(out) = 2 V; the G source
+    draws 1 mA out of node y through 1 kOhm to ground, so v(y) = -1 V (the
+    current flows from `positive` through the source to `negative`, as a B
+    source's). v(out) = 1 V: no DC current in the RC. ngspice-45 and ESPice
+    0.3.0 print 2, -1 for the hand decks (research/impl/evidence/P8-010)."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("rc", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    d.C("1", "out", d.gnd, 1e-9)
+    d.NonLinearVoltageSource("x", "x", d.gnd, expression="V(out)*2")
+    d.NonLinearCurrentSource("y", "y", d.gnd, expression="V(out)*1m")
+    d.R("x", "x", d.gnd, 1e3)
+    d.R("y", "y", d.gnd, 1e3)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.V("in", "in", "0", 1.0)
+    op = tb.operating_point()
+    # A DC solve of a linear network: exact to rounding.
+    assert op["x"] == pytest.approx(2.0, rel=1e-9)
+    assert op["y"] == pytest.approx(-1.0, rel=1e-9)

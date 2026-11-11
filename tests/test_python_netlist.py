@@ -1251,3 +1251,36 @@ class TestSubcircuitFunction:
     def test_p8_012_the_store_keeps_the_function(self):
         text = scaling_cell().to_source()
         assert ps().Subcircuit.from_source(text).to_source() == text
+
+
+# ======================================================================
+# E/G sources given by an expression (P8-010; ngspice-45 manual §5.2.2, §5.3.2)
+# ======================================================================
+
+class TestNonLinearSources:
+    def test_p8_010_the_cards_are_e_and_g_value(self):
+        sub = ps().Subcircuit("s", ["a"])
+        sub.NonLinearVoltageSource("sq", "x", sub.gnd, expression="V(a)*V(a)")
+        sub.NonLinearCurrentSource("lk", "y", sub.gnd, expression="{V(a)*1m}")  # braces given
+        lines = sub.to_source().splitlines()
+        assert "Esq x 0 value={V(a)*V(a)}" in lines
+        assert "Glk y 0 value={V(a)*1m}" in lines
+
+    def test_p8_010_ngspice_gets_the_behavioural_source(self):
+        c = ps().Circuit("nl")
+        c.V("in", "in", c.gnd, 1.0)
+        c.NonLinearVoltageSource("sq", "x", c.gnd, expression="V(in)*V(in)")
+        c.NonLinearCurrentSource("lk", "y", c.gnd, expression="V(in)*1m")
+        lines = str(c).splitlines()
+        # `render/spice/cards.rs::behavioural_card`: `B<name> n+ n- V=expr` /
+        # `I=expr` (golden record xyce/POWER/power_polarity_b_e_f_g_h_trap.cir:
+        # `EV1 … value=` is written `BV1 ev1_1 0 V=5V*SQRT(V(bv1_1,0))`).
+        assert "Bsq x 0 V=V(in)*V(in)" in lines
+        assert "Blk y 0 I=V(in)*1m" in lines
+
+    def test_p8_010_expression_is_a_keyword(self):
+        sub = ps().Subcircuit("s", ["a"])
+        with pytest.raises(TypeError):
+            sub.NonLinearVoltageSource("1", "a", sub.gnd, "V(a)")
+        with pytest.raises(TypeError):
+            sub.NonLinearCurrentSource("1", "a", sub.gnd)

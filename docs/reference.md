@@ -30,6 +30,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `K` | `(name, *inductors, coupling)`: two inductors of the same body by their full names (`K("1", "L1", "L2", coupling=0.9)`), each added before the `K`; any other name or count raises `ValueError` |
 | `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None)`; `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
 | `BV`, `BI` | `(name, positive, negative, *, expression)` |
+| `NonLinearVoltageSource`, `NonLinearCurrentSource` | `(name, positive, negative, *, expression)`: the E and G cards `E<name> n+ n- value={expression}`, the same behavioural source as `BV` / `BI` under the E/G letter |
 | `E` | `(name, positive, negative, *, control_positive, control_negative, voltage_gain)` |
 | `G` | `(name, positive, negative, *, control_positive, control_negative, transconductance)` |
 | `F` | `(name, positive, negative, *, vsense, current_gain)` |

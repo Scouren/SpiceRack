@@ -17,6 +17,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `K(name, *inductors, coupling)` takes the two inductors' full names (`K("1", "L1", "L2", coupling=0.9)`); the `inductor1=`/`inductor2=` keywords and the short names (`"1"` for `L1`) are gone (D18).
 - backend: a run is routed by every analysis of the deck (was: the first), to a simulator (`backend::Sim`; `select(kinds, …) -> Sim`); a refusal names its cause (the analysis, the feature, or that no simulator runs them all).
 - python: `Subcircuit.add_function(name, args, body)` writes a `.func` inside the subcircuit; one reading a parameter of the subcircuit stays local to it (LTspice, Spectre and VACASK refuse it, `W0106`).
+- python: `NonLinearVoltageSource` / `NonLinearCurrentSource(name, positive, negative, expression=...)` build the E and G cards `value={expr}` (PySpice's names): the behavioural source of `BV` / `BI` under the E/G letter.
 
 ## 0.2.0 (2026-11-03)
 

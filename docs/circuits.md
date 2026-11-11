@@ -71,6 +71,7 @@ Every element takes its name and nodes first; the rest are keywords.
 | `F`, `H` | current-controlled sources | `vsense=` (a V source name), `current_gain=` / `transresistance=` |
 | `POLY` | polynomial E/G/F/H | `kind, positive, negative, controls, coefficients` |
 | `BV`, `BI` | behavioural sources | `expression="..."` |
+| `NonLinearVoltageSource`, `NonLinearCurrentSource` | the same, as E and G cards (`E1 a b value={...}`) | `expression="..."` |
 | `D` | diode | `anode, cathode, model=` |
 | `Q` (`BJT`) | bipolar | `collector, base, emitter, model=` |
 | `M` (`MOSFET`) | MOSFET | `drain, gate, source, bulk, model=`, then `W=`, `L=`, ... |
