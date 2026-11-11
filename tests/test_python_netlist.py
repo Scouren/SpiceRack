@@ -995,6 +995,39 @@ class TestRealisticCircuits:
         assert "Rload n100 0" in netlist
 
 
+def test_p3_047_api_add_param_no_rf():
+    """`.sp` sweeps the deck's RF ports: with none, `add_s_param` and
+    `s_param` raise at the call and queue nothing. Oracle: ngspice-45 stops
+    the port-less deck spec-base writes ("Error: No RF Port is present,
+    cannot run sp analysis", research/impl/evidence/P3-047); with the two
+    ports of the matched T pad it runs, |S21| = 0.5
+    (test_rf_ports_and_s_param_on_ngspice)."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("pad", ["in", "out"])
+    dut.R("1", "in", "mid", 50 / 3)
+    dut.R("2", "mid", "out", 50 / 3)
+    dut.R("3", "mid", "0", 200 / 3)
+    tb = ps.Testbench(dut)
+    tb.V("in", "in", "0", 0.0, ac=1.0)
+    with pytest.raises(ValueError, match="RF port"):
+        tb.add_s_param()
+    with pytest.raises(ValueError, match="RF port"):
+        tb.s_param("lin", 3, 1e3, 3e3)
+    assert ".sp" not in tb.netlist("ngspice")
+    ported = ps.Testbench(dut)
+    ported.V("1", "in", "0", 0.0, ac=1.0, portnum=1)
+    ported.V("2", "out", "0", 0.0, ac=1.0, portnum=2)
+    ported.add_s_param("lin", 3, 1e3, 3e3)
+    lines = ported.netlist("ngspice").splitlines()
+    for card in ("V1 in 0 0 AC 1 portnum 1 z0 50", "V2 out 0 0 AC 1 portnum 2 z0 50", ".sp lin 3 1000 3000"):
+        assert card in lines, (card, lines)
+    # A port inside the DUT counts too.
+    inside = ps.Subcircuit("p", ["a"])
+    inside.V("1", "a", "0", 0.0, portnum=1)
+    ps.Testbench(inside).add_s_param()
+
+
 @pytest.mark.needs("ngspice")
 def test_p3_045_api_use_pdk_two_libraries(tmp_path):
     """Libraries are written in `use_pdk` call order on every target: a file

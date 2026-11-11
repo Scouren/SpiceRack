@@ -214,7 +214,9 @@ impl PyTestbench {
 
     #[pyo3(signature = (variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10))]
     fn add_s_param(mut slf: PyRefMut<'_, Self>, variation: &str, number_of_points: u32, start_frequency: f64, stop_frequency: f64) -> PyResult<()> {
-        slf.as_super().tb().analyses.push(card::s_param(variation, number_of_points, start_frequency, stop_frequency)?);
+        let a = card::s_param(variation, number_of_points, start_frequency, stop_frequency)?;
+        let a = slf.as_super().with_port(a)?;
+        slf.as_super().tb().analyses.push(a);
         Ok(())
     }
 

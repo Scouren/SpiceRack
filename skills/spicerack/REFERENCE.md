@@ -125,7 +125,8 @@ is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
 `W0040` (their `.four` takes no count), VACASK refuses any `.four` (`W0015`).
 
 Every run method has an `add_` twin on `Testbench` with the same arguments,
-so any deck is netlisted before it runs: also `add_pss`, `add_s_param`,
+so any deck is netlisted before it runs: also `add_pss`, `add_s_param`
+(add the RF ports first, `V(..., portnum=n)`: with none it raises `ValueError`),
 `add_harmonic_balance`, `add_stability`, `add_transient_noise`,
 `add_network_params`, `add_spectre_sweep`, `add_spectre_monte_carlo`,
 `add_spectre_pac`, `add_spectre_pnoise`, `add_spectre_pxf`, `add_spectre_pstb`.

@@ -134,7 +134,7 @@ PARITY = {
     "distortion": (FEATURES["distortion"], tw_analysis([".disto dec 10 100 100meg"]), "ng §11.3.3 .disto", None),
     "pss": (FEATURES["pss"], tw_oscillator([".pss 5000000 0.00001 x 128 10"]), "ng §11.3.12 .pss", None),
     "pss_controls": (FEATURES["pss_controls"], tw_oscillator([".pss 5000000 0.00001 x 128 10 20 0.001"]), "ng §11.3.12 .pss (sciter/steadycoeff)", None),
-    "s_param": (FEATURES["s_param"], tw_analysis([".sp dec 10 1e6 1e10"]), "ng §11.3.8 .sp", None),
+    "s_param": (FEATURES["s_param"], deck(top=RC, bench=["Vp1 in 0 0 portnum 1 z0 50", "Vp2 out 0 0 portnum 2 z0 50", ".sp dec 10 1e6 1e10"]), "ng §11.3.8 .sp, §4.1.11 portnum", None),
     "harmonic_balance": (FEATURES["harmonic_balance"], tw_analysis(["simulator lang=spectre", "hb1 hb fundfreqs=[1M] maxharms=[7]", "simulator lang=spice"]), "SR p.90-91 hb", None),
     "stability": (FEATURES["stability"], tw_analysis(["simulator lang=spectre", "stb1 stb start=1 stop=10G dec=10 probe=vin", "simulator lang=spice"]), "SR p.393-394 stb", None),
     "transient_noise": (FEATURES["transient_noise"], tw_analysis([".tran 1e-9 1e-6"]), "ng §11.3.10 .tran (TransientNoise's own card)", None),

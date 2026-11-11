@@ -98,6 +98,19 @@ def source(build):
     return f
 
 
+def two_port(build):
+    """The RC between two RF ports, which `.sp` sweeps: `add_s_param` refuses
+    a deck with none, and ngspice-45 stops on fewer than two ("Only one RF
+    Port is found, we need at least two!")."""
+    def f(mod):
+        tb = mod.Testbench(dut(mod))
+        tb.V("p1", "in", "0", 0.0, portnum=1)
+        tb.V("p2", "out", "0", 0.0, portnum=2)
+        build(tb)
+        return tb
+    return f
+
+
 def _child(mod):
     c = mod.Subcircuit("buf", ["a", "b"])
     c.R("1", "a", "b", 1e3)
@@ -146,7 +159,7 @@ FEATURES = {
     "distortion": analysis(lambda tb: tb.add_distortion()),
     "pss": oscillator(lambda tb: tb.add_pss(5e6, 1e-5, "x")),
     "pss_controls": oscillator(lambda tb: tb.add_pss(5e6, 1e-5, "x", sc_iter=20)),
-    "s_param": analysis(lambda tb: tb.add_s_param()),
+    "s_param": two_port(lambda tb: tb.add_s_param()),
     "harmonic_balance": analysis(lambda tb: tb.add_harmonic_balance([1e6])),
     "stability": analysis(lambda tb: tb.add_stability("Vin")),
     "transient_noise": analysis(lambda tb: tb.add_transient_noise(1e-9, 1e-6)),
@@ -251,7 +264,8 @@ EXPECTED = {
     'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
     'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001', OK, OK),
     # Xyce: P ports and `.LIN` (D's a5f2c0a); HSPICE has `.LIN`: writer B (FINDINGS-python.md).
-    's_param': (OK, OK, 'W0015', OK, 'W0015', OK, OK, OK, OK),
+    # The bench holds the two RF ports `.sp` sweeps (P3-047): a target with no port form adds W0007.
+    's_param': (OK, OK, 'W0007+W0015', OK, 'W0007+W0015', OK, OK, OK, OK),
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
