@@ -406,6 +406,29 @@ class TestSwitchesAndTLines:
         assert "Z0=50" in netlist
         assert "TD=" in netlist
 
+    def test_p8_045_a_switch_takes_its_initial_state(self):
+        c = ps().Circuit("t")
+        c.S("1", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1", initial_state="on")
+        c.W("1", "out", c.gnd, vcontrol="Vctrl", model="csw1", initial_state="OFF")
+        c.S("2", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1")
+        cards = c.to_source().splitlines()
+        # ngspice-45 manual §3.3.15: `SXXXXXXX N+ N- NC+ NC- MODEL <ON><OFF>`,
+        # `WYYYYYYY N+ N- VNAM MODEL <ON><OFF>`. Read in any case, written
+        # as the manual spells it.
+        assert "S1 out 0 cp cm sw1 ON" in cards
+        assert "W1 out 0 Vctrl csw1 OFF" in cards
+        # No state given: the card as before.
+        assert "S2 out 0 cp cm sw1" in cards
+
+    def test_p8_045_a_state_that_is_neither_word_is_refused(self):
+        c = ps().Circuit("t")
+        with pytest.raises(ValueError, match=r"unknown switch state 'open' \(expected ON or OFF\)"):
+            c.S("1", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1", initial_state="open")
+        with pytest.raises(ValueError, match="unknown switch state"):
+            c.W("1", "out", c.gnd, vcontrol="Vctrl", model="csw1", initial_state="closed")
+        # Nothing was kept.
+        assert "S1" not in str(c) and "W1" not in str(c)
+
 
 # ======================================================================
 # Waveform sources
@@ -503,6 +526,20 @@ class TestWaveformSources:
         assert "Iw w 0 0 PWL(" in n
         with pytest.raises(TypeError):
             c.PulseVoltageSource("x", "x", c.gnd, dc=1.0, dc_offset=1.0)
+
+    def test_p8_060_an_am_source_takes_its_two_phases(self):
+        am = dict(offset=0.5, amplitude=1.0, modulating_frequency=1e3, carrier_frequency=1e4)
+        c = ps().Circuit("t")
+        c.AmplitudeModulatedVoltageSource("m", "m", c.gnd, **am, signal_phase=45.0, carrier_phase=90.0)
+        c.AmplitudeModulatedCurrentSource("c", "c", c.gnd, **am, carrier_phase="{ph}")
+        c.AmplitudeModulatedVoltageSource("n", "n", c.gnd, **am)
+        cards = c.to_source().splitlines()
+        # ngspice-45 manual §4.1.6: AM(VO VMO VMA FM FC TD PHASEM PHASEC), the
+        # phases in degrees. One given: the other is written 0.
+        assert "Vm m 0 0 AM(0 0.5 1 1000 10000 0 45 90)" in cards
+        assert "Ic c 0 0 AM(0 0.5 1 1000 10000 0 0 {ph})" in cards
+        # Neither given: the six fields as before.
+        assert "Vn n 0 0 AM(0 0.5 1 1000 10000 0)" in cards
 
     def test_testbench_builds_tf_sens_pz_disto(self):
         dut = ps().Subcircuit("d")
@@ -845,6 +882,124 @@ class TestSourceExpressions:
         c = ps().Circuit("ac")
         with pytest.raises(TypeError, match="not both"):
             c.SinusoidalVoltageSource("1", "a", c.gnd, dc="{vdd}", dc_offset=1.0)
+
+
+# ======================================================================
+# Conditionals (P8-014; ngspice-45 manual §2.13)
+# ======================================================================
+
+def load(ohms):
+    b = ps().Block()
+    b.R("9", "out", b.gnd, ohms)
+    return b
+
+
+def selected():
+    d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+    d.R("1", "in", "out", "{r}")
+    d.conditional([("r > 1500", load(5e3)), ("r > 500", load(6e3))], otherwise=load(7e3))
+    return d
+
+
+class TestConditional:
+    def test_p8_014_branches_are_written_between_if_and_endif(self):
+        # The lines ngspice-45, ESPice 0.3.0 and VACASK give 5/7, 6/7 and
+        # 7/7.1 V for (research/impl/evidence/P8-014/ng/sub.cir).
+        want = [".if (r > 1500)", "R9 out 0 5k", ".elseif (r > 500)", "R9 out 0 6k",
+                ".else", "R9 out 0 7k", ".endif", ".ends rc"]
+        lines = selected().to_source().splitlines()
+        at = lines.index(".if (r > 1500)")
+        assert lines[at:at + len(want)] == want
+
+    def test_p8_014_a_block_holds_models_instances_and_its_own_conditional(self):
+        inner = ps().Block()
+        inner.model("dn", "d")
+        inner.D("9", "out", inner.gnd, model="dn")
+        inner.X("8", "buf", "out", "0")
+        outer = ps().Block()
+        outer.conditional([("r > 800", inner)])
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        d.conditional([("r > 500", outer)], otherwise=load(6e3))
+        want = [".if (r > 500)", ".if (r > 800)", ".model dn d", "D9 out 0 dn", "X8 out 0 buf", ".endif",
+                ".else", "R9 out 0 6k", ".endif"]
+        lines = d.to_source().splitlines()
+        at = lines.index(".if (r > 500)")
+        assert lines[at:at + len(want)] == want
+
+    def test_p8_014_a_stored_subcircuit_keeps_its_conditional(self):
+        # `from_source` kept `.if (r > 1500)` and dropped the rest
+        # (research/impl/evidence/P8-014/t9.out).
+        text = selected().to_source()
+        assert ps().Subcircuit.from_source(text).to_source() == text
+
+    @pytest.mark.parametrize("spoil, named", [
+        (lambda b: b.parameter("g", "5k"), "a parameter"),
+        (lambda b: b.include("/m/x.inc"), "an include or a lib"),
+        (lambda b: b.lib("/m/x.lib", "tt"), "an include or a lib"),
+        (lambda b: b.osdi("/m/x.osdi"), "a model load"),
+        (lambda b: b.subcircuit(ps().Subcircuit("buf", ["a", "b"])), ".subckt buf a b"),
+        (lambda b: b.add_function("f", ["x"], "2*x"), ".func f(x) {2*x}"),
+    ])
+    def test_p8_014_what_ngspice_does_not_select_is_refused(self, spoil, named):
+        # ngspice-45 holds a `.param` and a `.subckt` of a branch whatever
+        # the condition is (research/impl/evidence/P8-014/ng/parm*.log,
+        # subdef*.log): no wrong number is written.
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        before = d.to_source()
+        b = load(5e3)
+        spoil(b)
+        with pytest.raises(ValueError, match="^conditional: ") as refused:
+            d.conditional([("r > 500", load(6e3))], otherwise=b)
+        assert f"; {named} goes on the body" in str(refused.value)
+        assert d.to_source() == before
+
+    @pytest.mark.parametrize("conditions", [[], [""], [" \n"], ["r > 1\n&& r < 2"]])
+    def test_p8_014_a_conditional_needs_a_branch_and_a_one_line_condition(self, conditions):
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        before = d.to_source()
+        with pytest.raises(ValueError, match="^conditional: "):
+            d.conditional([(c, load(5e3)) for c in conditions])
+        assert d.to_source() == before
+
+    def test_p8_014_a_branch_is_a_block(self):
+        d = ps().Subcircuit("rc", ["in", "out"], r="1k")
+        with pytest.raises(TypeError):
+            d.conditional([("r > 500", ps().Subcircuit("x", ["a"]))])
+
+
+# ======================================================================
+# Harmonic balance: one count per tone (P8-023; Spectre Reference 19.1 p.90-91)
+# ======================================================================
+
+def hb_statement(tones, *counts):
+    d = ps().Subcircuit("rc", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    tb = ps().Testbench(d)
+    tb.add_harmonic_balance(tones, *counts)
+    return [l for l in tb.netlist("spectre").splitlines() if l.startswith("hb1 ")]
+
+
+class TestHarmonicBalanceCounts:
+    @pytest.mark.parametrize("counts, want", [
+        ((), "[7 7]"),         # the default, for every tone
+        ((5,), "[5 5]"),       # one count, for every tone
+        (([5, 3],), "[5 3]"),  # one per tone
+    ])
+    def test_p8_023_maxharms_holds_one_count_per_tone(self, counts, want):
+        # SR p.91: `maxharms` is the "array of number of harmonics of each
+        # fundamental".
+        assert hb_statement([1e6, 1.1e6], *counts) == [f"hb1 hb fundfreqs=[1M 1.1M] maxharms={want}"]
+
+    @pytest.mark.parametrize("tones, counts", [
+        ([1e6, 1.1e6], [5]),   # was written: fundfreqs=[1M 1.1M] maxharms=[5]
+        ([1e6], [5, 3]),
+        ([], 5),               # was written: fundfreqs=[] maxharms=[]
+    ])
+    def test_p8_023_counts_that_do_not_match_the_tones_are_refused(self, tones, counts):
+        with pytest.raises(ValueError, match="num_harmonics"):
+            hb_statement(tones, counts)
+        with pytest.raises(ValueError, match="num_harmonics"):
+            ps().Circuit("c").simulator().harmonic_balance(tones, counts)
 
 
 # ======================================================================

@@ -20,7 +20,7 @@
 
 use num_complex::Complex64;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::syntax::Dialect;
 
@@ -118,10 +118,11 @@ pub struct MeasureResult {
 #[derive(Debug, Clone)]
 pub struct Results {
     pub raw: RawData,
-    /// Canonical node name → column.
-    pub nodes: HashMap<String, usize>,
-    /// Canonical branch current (`i(v1)`) → column.
-    pub branches: HashMap<String, usize>,
+    /// Canonical node name → column, in name order: every reader lists
+    /// the names the same way, on every result.
+    pub nodes: BTreeMap<String, usize>,
+    /// Canonical branch current (`i(v1)`) → column, in name order.
+    pub branches: BTreeMap<String, usize>,
 }
 
 impl VarType {
@@ -185,8 +186,8 @@ impl Results {
     /// `raw` with every column named canonically, as a node or a branch
     /// current; of two columns with one canonical name, the later wins.
     pub fn from_raw(raw: RawData) -> Self {
-        let mut nodes = HashMap::new();
-        let mut branches = HashMap::new();
+        let mut nodes = BTreeMap::new();
+        let mut branches = BTreeMap::new();
         for v in &raw.variables {
             let (name, current) = crate::normalize::canonical(&v.name, raw.backend_hint);
             let map = if v.var_type == VarType::Current || current {

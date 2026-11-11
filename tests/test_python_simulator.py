@@ -775,6 +775,48 @@ def test_p3_096_api_operatingpoint_has_no_nodes(backend):
         op["v(nope)"]
 
 
+@pytest.mark.needs("ngspice")
+def test_p8_318_every_result_lists_its_names_in_one_order():
+    """ZERO-LEDGER P8-318: `nodes`, `branches`, `measures` and `params` of a result are in name
+    order, the same on every result object (they were a hash map's: another order per
+    object). Oracle: the deck's six nodes and six measures, written out by hand in name
+    order, and Python's own `sorted` for the lists that hold the sweep's vector too."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("ladder", ["a", "f"])
+    for name, (p, n) in zip("123456", zip("abcdef", "bcdef0")):
+        dut.R(name, p, n, 1e3)
+
+    def bench():
+        tb = ps.Testbench(dut)
+        tb.with_backend("ngspice")
+        tb.V("in", "a", "0", 1.0, ac=1.0)
+        return tb
+
+    def dc():
+        return bench().dc(Vin=slice(0.0, 1.0, 0.5))
+
+    def ac():
+        return bench().ac(variation="dec", number_of_points=2, start_frequency=1.0, stop_frequency=100.0)
+
+    def tran():
+        tb = bench()
+        for node in "fedcba":  # declared last name first
+            tb.measure("tran", f"m_{node}", "max", f"v({node})")
+        return tb.transient(step_time=1e-6, end_time=1e-5)
+
+    for run in (dc, ac, tran, lambda: bench().operating_point()):
+        one, two = run(), run()
+        kind = type(one).__name__
+        assert one.nodes == two.nodes == sorted(one.nodes), kind
+        # The deck's nodes are the one-letter names; a sweep's own vector is a longer one.
+        assert [n for n in one.nodes if len(n) == 1] == list("abcdef"), kind
+        assert one.branches == two.branches == ["i(vin)"], kind
+        assert list(one.measures) == list(two.measures) == sorted(one.measures), kind
+        assert list(one.params) == sorted(one.params), kind
+    assert list(tran().measures) == ["m_a", "m_b", "m_c", "m_d", "m_e", "m_f"]
+
+
 def test_run_with_a_measure_runs_every_analysis_from_the_control_block():
     """A `.meas` moves ngspice's analyses into a `.control` block, which runs
     them in card order; the results still land on their own analyses."""
@@ -981,6 +1023,121 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     v = res["out"]
     rms = math.sqrt(sum(x * x for x in v) / len(v))
     assert 0.75e-3 < rms < 1.06e-3, rms
+
+
+def _p8_060_am_with_phases(backend):
+    """An AM source with both phases across 1 kOhm: its time and voltage
+    samples over 100 us."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("am", ["in"])
+    d.R("1", "in", d.gnd, 1e3)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0.5, amplitude=1.0, modulating_frequency=1e3,
+                                       carrier_frequency=1e4, signal_phase=45.0, carrier_phase=90.0)
+    tran = tb.transient(step_time=1e-6, end_time=1e-4, max_time=1e-6)
+    return list(tran.time), list(tran["in"])
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_060_an_am_source_with_phases_follows_its_closed_form(backend):
+    """ngspice-45 manual §4.1.6, eq. 4.4: V(t) = VO + (VMO + VMA sin(2 pi FM
+    t + PHASEM)) sin(2 pi FC t + PHASEC) for t > TD, the phases in degrees.
+    The source drives the node, so every sample after t = 0 is the closed
+    form to rounding: ngspice-45 exactly, ESPice 0.3.0 to 2e-16
+    (research/impl/evidence/P8-060/t18.out)."""
+    import math
+
+    time, v = _p8_060_am_with_phases(backend)
+    assert len(time) > 100 and time[-1] == pytest.approx(1e-4)
+    for t, got in zip(time[1:], v[1:]):
+        want = (0.5 + math.sin(2 * math.pi * 1e3 * t + math.radians(45))) * math.sin(2 * math.pi * 1e4 * t + math.radians(90))
+        assert got == pytest.approx(want, abs=1e-12), t
+
+
+@pytest.mark.parametrize(
+    "backend",
+    [
+        "ngspice",
+        # ESPICE-AM-T0: ESPice 0.3.0 gives the waveform's value at t = 0
+        # (1.2071 V here; research/impl/evidence/P8-060/t18.out). The marker
+        # goes when ESPice gives 0 there: until then a pass fails.
+        pytest.param("espice", marks=pytest.mark.xfail(strict=True, reason="ESPICE-AM-T0")),
+    ],
+)
+def test_p8_060_an_am_source_is_zero_until_its_delay(backend):
+    """ngspice-45 manual §4.1.6: "with t > TD, else V(t) = 0"
+    (`vsrcload.c:307-309`), the operating point included."""
+    time, v = _p8_060_am_with_phases(backend)
+    assert time[0] == 0.0 and v[0] == 0.0
+
+
+@pytest.mark.parametrize(
+    "backend",
+    [
+        "ngspice",
+        # ESPICE-SWITCH-ON: ESPice 0.3.0 reads the word and leaves the
+        # switch off (research/impl/evidence/P8-045/es/e_ON.raw). The marker
+        # goes when ESPice holds the state: until then a pass fails.
+        pytest.param("espice", marks=pytest.mark.xfail(strict=True, reason="ESPICE-SWITCH-ON")),
+    ],
+)
+def test_p8_045_a_switch_inside_its_hysteresis_band_starts_in_its_initial_state(backend):
+    """ngspice-45 manual §3.3.15: "ON or OFF determine the initial state of
+    the switch" when the control starts inside the hysteresis loop. The
+    control is 0.5 V on vt=0.5, vh=0.2; the switch (1 Ohm on, 1 MOhm off)
+    is the lower leg of a divider under 1 kOhm and 1 V: 1/1001 V on,
+    1e6/1.001e6 V off (closed form). ngspice-45 prints 9.990010e-04 and
+    9.990010e-01 on the hand decks (research/impl/evidence/P8-045/ng/)."""
+    import spicerack as ps
+
+    def out(state):
+        d = ps.Subcircuit("sw", ["s", "c", "out"])
+        d.model("sw", "sw", vt=0.5, vh=0.2, ron=1, roff=1e6)
+        d.R("1", "s", "out", 1e3)
+        d.S("1", "out", d.gnd, control_positive="c", control_negative=d.gnd, model="sw", initial_state=state)
+        tb = ps.Testbench(d)
+        tb.with_backend(backend)
+        tb.V("s", "s", "0", 1.0)
+        tb.V("c", "c", "0", 0.5)
+        return tb.operating_point()["out"]
+
+    # A linear DC solve once the state is chosen: exact to rounding.
+    assert out("off") == pytest.approx(1e6 / 1.001e6, rel=1e-9)
+    assert out(None) == pytest.approx(1e6 / 1.001e6, rel=1e-9)
+    assert out("on") == pytest.approx(1 / 1001, rel=1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p8_014_each_instance_holds_the_branch_its_parameter_selects(backend):
+    """ngspice-45 manual §2.13: the block of the first true condition is
+    the one in the circuit. `cell` is r in series, then 5 kOhm to ground
+    when r > 1500, 6 kOhm when r > 500, else 7 kOhm; under 1 V its three
+    instances (r = 2k, 1k, 100) divide to 5/7, 6/7 and 7/7.1 V (closed
+    form). ngspice-45, ESPice 0.3.0 and VACASK print those on the hand
+    decks (research/impl/evidence/P8-014/ng/sub.log, x/)."""
+    import spicerack as ps
+
+    def load(ohms):
+        b = ps.Block()
+        b.R("9", "out", b.gnd, ohms)
+        return b
+
+    cell = ps.Subcircuit("cell", ["in", "out"], r="1k")
+    cell.R("1", "in", "out", "{r}")
+    cell.conditional([("r > 1500", load(5e3)), ("r > 500", load(6e3))], otherwise=load(7e3))
+    d = ps.Subcircuit("three", ["in", "a", "b", "c"])
+    for node, r in (("a", "2k"), ("b", "1k"), ("c", "100")):
+        d.instance(cell, node, "in", node, r=r)
+    tb = ps.Testbench(d)
+    tb.add_subcircuit(cell)
+    tb.with_backend(backend)
+    tb.V("in", "in", "0", 1.0)
+    op = tb.operating_point()
+    for node, want in (("a", 5 / 7), ("b", 6 / 7), ("c", 7 / 7.1)):
+        # A linear DC solve: exact to rounding.
+        assert op[node] == pytest.approx(want, rel=1e-9), node
 
 
 @pytest.mark.parametrize("backend", ["ngspice", "espice"])

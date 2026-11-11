@@ -7,6 +7,7 @@
 //! - `pub(super) struct Num`, `impl FromPyObject for Num`, `Num::of(v: f64) -> Num`, `Num::text(&self) -> String`,
 //!   `Num::zero(&self) -> bool`, `Num::value(&self) -> Value`
 //! - `pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
+//! - `pub(super) fn switch_state(state: Option<&str>) -> Result<String, String>`
 //! - `pub(super) fn kw_options(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 //! - `pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 
@@ -14,6 +15,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use super::keywords::SwitchState;
 use super::model::{Value, dec};
 use super::unit::PyUnitValue;
 use crate::syntax::render::portable_option;
@@ -87,6 +89,19 @@ pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(Strin
         }
     }
     Ok(out)
+}
+
+/// A switch's `initial_state=` as the word after its model: ` ON` or
+/// ` OFF`, or nothing when it is not given.
+///
+/// # Errors
+/// A state that is neither word (the message names the two).
+pub(super) fn switch_state(state: Option<&str>) -> Result<String, String> {
+    let Some(state) = state else {
+        return Ok(String::new());
+    };
+    let state: SwitchState = state.parse()?;
+    Ok(format!(" {}", state.name()))
 }
 
 impl PyValueArg {

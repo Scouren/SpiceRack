@@ -78,7 +78,7 @@ Every element takes its name and nodes first; the rest are keywords.
 | `Q` (`BJT`) | bipolar | `collector, base, emitter, model=` |
 | `M` (`MOSFET`) | MOSFET | `drain, gate, source, bulk, model=`, then `W=`, `L=`, ... |
 | `J`, `Z` | JFET, MESFET | `drain, gate, source, model=` |
-| `S`, `W` | switches | `control_positive=, control_negative=, model=` / `vcontrol=, model=` |
+| `S`, `W` | switches | `control_positive=, control_negative=, model=` / `vcontrol=, model=`; `initial_state="on"` or `"off"` |
 | `T` | transmission line | four nodes, `Z0=, TD=` |
 | `X` | subcircuit instance by name | `"subckt_name", *nodes, **params` |
 | `A` | XSPICE code model | `name=, connections=[...], model=` (all keywords) |
@@ -101,7 +101,7 @@ Each comes as `...VoltageSource` and `...CurrentSource`, on all three objects:
 | `PieceWiseLinearVoltageSource` | `values=[(t, v), ...], repeat_time, delay_time` (ngspice `r=`, `td=`; ngspice repeats a voltage source only, ESPice both; Spectre takes `delay_time`, and `repeat_time=0` when the points start at 0 and end on their first value, as `pwlperiod`; VACASK the same, as `delay` and `period`) |
 | `ExponentialVoltageSource` | `initial_value, pulsed_value, rise_delay_time, rise_time_constant, fall_delay_time, fall_time_constant` |
 | `SingleFrequencyFMVoltageSource` | `offset, amplitude, carrier_frequency, modulation_index, signal_frequency` |
-| `AmplitudeModulatedVoltageSource` | `offset, amplitude, modulating_frequency, carrier_frequency, signal_delay` |
+| `AmplitudeModulatedVoltageSource` | `offset, amplitude, modulating_frequency, carrier_frequency, signal_delay, signal_phase, carrier_phase` |
 | `TransientNoiseVoltageSource` | `noise_rms, time_step, flicker_exponent, flicker_rms, rts_amplitude, rts_capture_time, rts_emission_time` (ngspice `TRNOISE`; ngspice only) |
 | `RandomVoltageSource` | `random_type` (`uniform`, `gaussian`, `exponential`, `poisson`), `duration, time_delay, parameter1, parameter2` (ngspice `TRRANDOM`; ngspice only) |
 
@@ -175,6 +175,25 @@ target writes it as a top-level definition named `<parent>__<child>`.
 cell = ps.Subcircuit("cell", ["a", "y"])
 cell.subcircuit(inv)                              # `half`, defined inside `cell`
 cell.instance(inv, "u1", "a", "y")
+```
+
+A part of a block can depend on a parameter. `conditional` takes a list of
+`(condition, Block)` and an optional `otherwise`; each `Block` takes the same
+element, instance and `model` calls as a `Subcircuit`, and the circuit holds
+the block of the first true condition (`.if` / `.elseif` / `.else` / `.endif`).
+Parameters, includes and definitions stay outside the blocks. Xyce and LTspice
+have no conditional (`W0013`).
+
+```python
+def load(ohms):
+    b = ps.Block()
+    b.R("9", "out", b.gnd, ohms)
+    return b
+
+sel = ps.Subcircuit("sel", ["in", "out"], r="1k")
+sel.R("1", "in", "out", "{r}")
+sel.conditional([("r > 1500", load(5e3)), ("r > 500", load(6e3))], otherwise=load(7e3))
+print(sel.to_source())                            # ... .if (r > 1500) / R9 out 0 5k / .elseif (r > 500) ...
 ```
 
 ## Saving circuits

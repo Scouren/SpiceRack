@@ -18,6 +18,7 @@ use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
 use super::args::{Num, PyValueArg, kw_params, kw_volts};
+use super::block::PyBlock;
 use super::circuit::hoisted;
 use super::deck::runtime_err;
 use super::model::{Body, Card, Value, dec, need, num, params};
@@ -314,16 +315,20 @@ impl PySubcircuit {
         Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, model))]
-    fn S(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, model: &str) {
+    #[pyo3(signature = (name, positive, negative, *, control_positive, control_negative, model, initial_state=None))]
+    fn S(&mut self, name: &str, positive: &str, negative: &str, control_positive: &str, control_negative: &str, model: &str, initial_state: Option<&str>) -> PyResult<()> {
         let nets = self.nets(&[positive, negative, control_positive, control_negative]);
-        self.push(name, format!("S{name} {nets} {model}"));
+        let state = super::args::switch_state(initial_state).map_err(PyValueError::new_err)?;
+        self.push(name, format!("S{name} {nets} {model}{state}"));
+        Ok(())
     }
 
-    #[pyo3(signature = (name, positive, negative, *, vcontrol, model))]
-    fn W(&mut self, name: &str, positive: &str, negative: &str, vcontrol: &str, model: &str) {
+    #[pyo3(signature = (name, positive, negative, *, vcontrol, model, initial_state=None))]
+    fn W(&mut self, name: &str, positive: &str, negative: &str, vcontrol: &str, model: &str, initial_state: Option<&str>) -> PyResult<()> {
         let nets = self.nets(&[positive, negative]);
-        self.push(name, format!("W{name} {nets} {vcontrol} {model}"));
+        let state = super::args::switch_state(initial_state).map_err(PyValueError::new_err)?;
+        self.push(name, format!("W{name} {nets} {vcontrol} {model}{state}"));
+        Ok(())
     }
 
     #[pyo3(signature = (name, input_positive, input_negative, output_positive, output_negative, *, Z0, TD))]
@@ -401,6 +406,21 @@ impl PySubcircuit {
         let def = hoisted(&mut body, &subckt.inner);
         body.raw.push(super::store::definition(&def).map_err(PyValueError::new_err)?);
         self.inner = body;
+        Ok(())
+    }
+
+    /// A conditional: `branches` is a list of `(condition, block)`; the
+    /// circuit holds the `Block` of the first condition that is true, and
+    /// `otherwise` when none is: `.if (c)` … `.elseif (c)` … `.else` …
+    /// `.endif` (ngspice-45 manual §2.13). A condition is an expression of
+    /// parameters, written between the parentheses as given (`"r > 500"`;
+    /// equality is `==`). A block holds elements, instances, models and
+    /// conditionals of its own. `ValueError`, and nothing added, for a
+    /// block holding anything else, for no branch and for an empty
+    /// condition. Xyce and LTspice have no conditional (`W0013`).
+    #[pyo3(signature = (branches, otherwise=None))]
+    fn conditional(&mut self, branches: Vec<(String, PyRef<'_, PyBlock>)>, otherwise: Option<PyRef<'_, PyBlock>>) -> PyResult<()> {
+        self.inner.raw.push(super::block::conditional(&branches, otherwise.as_ref())?);
         Ok(())
     }
 

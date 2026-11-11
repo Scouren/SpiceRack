@@ -58,18 +58,36 @@ fn p8_203_a_command_simulator_runs_the_deck_and_reads_its_results() {
     assert_eq!(plots[0].real_data, [[3.3], [1.0]]);
     assert_eq!(plots[0].backend_hint, Some(Dialect::Ngspice));
 
-    // `raw-dir`: the command runs in `{dir}` and every `*.raw` there is
-    // read, in name order; `{dir}` inside a longer word.
+    // `raw-dir`: the command runs in `{dir}` (`{dir}` inside a longer
+    // word) and leaves `a.raw` (4.4) and `b.raw` (3.3) there. The deck's
+    // last three lines are no part of a raw file (the reader stops at the
+    // values): they are a VACASK deck's analyses, `b` first, then `a`
+    // inside a sweep.
     let script = "cp \"$1\" b.raw && sed 's/3.3/4.4/' \"$1\" > \"$2\"";
-    let dir = def(
-        "p8-203-dir",
-        &["sh", "-c", script, "sh", "{deck}", "{dir}/a.raw"],
-        Output::RawDir,
+    let words = ["sh", "-c", script, "sh", "{deck}", "{dir}/a.raw"];
+    let deck = raw_text("two", 3.3) + "analysis b op\nsweep s\nanalysis a tran\n";
+    let read = |sim| -> Vec<Vec<Vec<f64>>> {
+        let plots = spicerack::simulation::run_all(sim, &deck).expect("runs");
+        plots.into_iter().map(|p| p.real_data).collect()
+    };
+    // A simulator of another language: every `*.raw`, in name order, as
+    // written.
+    let dir = register_simulator(def("p8-203-dir", &words, Output::RawDir)).expect("registers");
+    assert_eq!(read(dir), [[[4.4], [1.0]], [[3.3], [1.0]]], "a.raw, b.raw");
+    // P8-317. A simulator whose language is VACASK's, as the built-in
+    // reads its own run: the files in the deck's order, and the sweep's
+    // column (the first of `a.raw`) after `a`'s own.
+    let vacask = SimDef {
+        name: "p8-317-dir".into(),
+        dialect: Lang::VACASK,
+        ..def("", &words, Output::RawDir)
+    };
+    let vacask = register_simulator(vacask).expect("registers");
+    assert_eq!(
+        read(vacask),
+        [[[3.3], [1.0]], [[1.0], [4.4]]],
+        "b.raw, a.raw with its sweep column last"
     );
-    let dir = register_simulator(dir).expect("registers");
-    let plots = spicerack::simulation::run_all(dir, &raw_text("two", 3.3)).expect("runs");
-    let outs: Vec<f64> = plots.iter().map(|p| p.real_data[0][0]).collect();
-    assert_eq!(outs, [4.4, 3.3], "a.raw, then b.raw");
 
     // A program that is not installed: refused before anything is spawned.
     let ghost = def(
@@ -227,4 +245,90 @@ fn p8_206_each_refusal_cause_has_its_code() {
     };
     assert_eq!(bad(command), Code::R0040);
     assert_eq!(SimRegisterError::Full.code(), Code::R0042);
+}
+
+/// Oracle: the values the deck holds by hand (2.5 and 1.0), read back
+/// through a real process by a reader of the test's own, and the row that
+/// reader made up. The deck's `.meas` card is the trap: a run that still
+/// read the measures from stdout would give ngspice's failed `never` row
+/// in the reader's place.
+#[cfg(feature = "backend")]
+#[test]
+fn p8_209_a_hook_simulator_runs_its_command_and_keeps_what_the_hook_read() {
+    use std::path::Path;
+
+    use spicerack::backend::{
+        BackendError, Installed, Kind, Runner, SimDef, SimRegisterError, parse_arg,
+        register_simulator,
+    };
+    use spicerack::result::{MeasureResult, RawData};
+    use spicerack::syntax::{Dialect, Lang};
+
+    fn read(id: u32, dir: &Path) -> Result<Vec<RawData>, BackendError> {
+        if id == 9 {
+            return Ok(Vec::new());
+        }
+        let bytes = std::fs::read(dir.join("copy.raw"))?;
+        let mut plots = spicerack::rawfile::parse_raw_all(&bytes)?;
+        for p in &mut plots {
+            p.measures = vec![MeasureResult::ok("id", f64::from(id))];
+        }
+        Ok(plots)
+    }
+    // The raw file is the deck without its `.meas` card.
+    let script = "grep -v '^\\.meas' \"$1\" > \"$2\" && echo ran";
+    let def = |name: &str, id: u32, ws: &[&str]| SimDef {
+        name: name.into(),
+        dialect: Lang::NGSPICE,
+        runner: Runner::Hook {
+            argv: ws.iter().map(|w| parse_arg(w).expect("a word")).collect(),
+            read,
+            id,
+        },
+        features: 0,
+        analyses: 1 << Kind::Op as u32,
+        installed: Installed::OnPath(ws.first().copied().unwrap_or("").to_string()),
+    };
+    let ws = ["sh", "-c", script, "sh", "{deck}", "{dir}/copy.raw"];
+    let sim = register_simulator(def("p8-209-hook", 7, &ws)).expect("registers");
+    assert_eq!(
+        register_simulator(def("p8-209-hook", 7, &ws)),
+        Ok(sim),
+        "idempotent"
+    );
+    assert_eq!(
+        register_simulator(def("p8-209-hook", 8, &ws)),
+        Err(SimRegisterError::Redefined("p8-209-hook".into())),
+        "another hook id is another definition"
+    );
+
+    let deck = raw_text("hooked", 2.5) + ".meas op never find v(out) at=1\n";
+    let plots = spicerack::simulation::run_all(sim, &deck).expect("runs");
+    assert_eq!(plots.len(), 1);
+    assert_eq!(plots[0].title, "hooked");
+    assert_eq!(plots[0].real_data, [[2.5], [1.0]]);
+    assert_eq!(plots[0].stdout, "ran\n");
+    assert_eq!(plots[0].backend_hint, Some(Dialect::Ngspice));
+    let rows: Vec<(&str, f64)> = plots[0]
+        .measures
+        .iter()
+        .map(|m| (m.name.as_str(), m.value))
+        .collect();
+    assert_eq!(rows, [("id", 7.0)], "the hook's row, not the deck's card");
+
+    // A reader with no plot is a failed run; its command is checked as a
+    // `Command`'s and asked for before anything is spawned.
+    let none = register_simulator(def("p8-209-none", 9, &ws)).expect("registers");
+    assert!(matches!(
+        spicerack::simulation::run_all(none, &deck),
+        Err(BackendError::SimulationError(m)) if m == "read hook: it returned no plot"
+    ));
+    let undecked = register_simulator(def("p8-209-bad", 7, &["sh", "{raw}"]));
+    assert!(matches!(undecked, Err(SimRegisterError::Command(_))));
+    let ghost = def("p8-209-ghost", 7, &["p8-209-no-such-program", "{deck}"]);
+    let ghost = register_simulator(ghost).expect("registers: installed is asked at run time");
+    assert!(matches!(
+        spicerack::simulation::run_all(ghost, &deck),
+        Err(BackendError::NotInstalled { simulator }) if simulator == "p8-209-ghost"
+    ));
 }

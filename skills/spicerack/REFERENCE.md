@@ -31,8 +31,8 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `initial_condition`, `node_set` | `.ic`, `.nodeset` | `(**nodes)` on `Testbench`/`CircuitSimulator` (top level) and on `Subcircuit`/`Circuit` (inside its `.subckt`); a value is a number or an expression (`out="{vdd/2}"`), an instance's node is `**{"x1.n": 0.5}`. Inside a subcircuit it nets for ngspice/ESPice only (`W0001` elsewhere) |
 | `NonLinearVoltageSource` / `NonLinearCurrentSource` | `E` / `G` | `(name, positive, negative, expression=...)` — `E<name> n+ n- value={expr}`: `BV` / `BI` under the E/G letter (PySpice's names); give an E and a G different names |
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |
-| `S` | `S` | `(name, positive, negative, control_positive, control_negative, model)` |
-| `W` | `W` | `(name, positive, negative, vcontrol, model)` |
+| `S` | `S` | `(name, positive, negative, control_positive, control_negative, model, initial_state=None)` |
+| `W` | `W` | `(name, positive, negative, vcontrol, model, initial_state=None)`; `initial_state="on"`/`"off"` writes the card's `ON`/`OFF` (ngspice and ESPice only, `W0001` elsewhere; ESPice 0.3.0 ignores it) |
 | `A` | `A` | `(name, connections, model)` — `connections` is a `list[str]`; an XSPICE code model: ngspice, ESPice (written), every other target refuses it (`W0001`) |
 | `X` | `X` | `X(name, subcircuit_name, *nodes, **params)` — name and nodes positional; `params` become `k=v` on the card |
 
@@ -52,6 +52,8 @@ dut.X("MN1", "sky130_fd_pr__nfet_01v8", "d", "g", "s", "b", W=1, L=0.15, nf=2)
 ```
 
 `Subcircuit.instance(subckt, name, *nodes, **params)` is the same card from the object. `subckt.name` and `subckt.ports` (declaration order) read a DUT back, e.g. to wrap it: `harness.instance(dut, "dut", *dut.ports)`.
+
+A conditional part: `b = ps.Block()` takes the element, `X`/`instance` and `model` calls of a `Subcircuit`; `sub.conditional([("r > 1500", b1), ("r > 500", b2)], otherwise=b3)` writes `.if (r > 1500)` … `.elseif (r > 500)` … `.else` … `.endif` in `sub` (a `Circuit` and a `Block` take it too, so conditionals nest). Conditions are expressions of parameters, equality is `==`. A block with a parameter, an include, a lib, a model load, a nested definition or a function raises `ValueError`. Xyce and LTspice refuse a conditional (`W0013`).
 
 `Subcircuit.subcircuit(child)` defines `child` inside that subcircuit (a nested `.subckt`: only its own instances see it, two parents can each hold a `buf`); every target writes it as a top-level `<parent>__<child>`. A definition every block shares goes to the top: `tb.add_subcircuit(child)` / `Circuit.subcircuit(child)`.
 
@@ -140,6 +142,10 @@ is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
 `.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it with
 `W0040` (their `.four` takes no count), VACASK refuses any `.four` (`W0015`).
 
+`harmonic_balance(fundamental_frequencies, num_harmonics=None)` (Spectre's `hb`): `num_harmonics` is one
+count for every tone or a list with one per tone (7 each by default); a list of another length, or no
+tone, raises `ValueError`.
+
 Every run method has an `add_` twin on `Testbench` with the same arguments,
 so any deck is netlisted before it runs: also `add_pss`, `add_s_param`
 (add the RF ports first, `V(..., portnum=n)`: with none it raises `ValueError`),
@@ -158,7 +164,7 @@ uic=)` on Spectre is `W0040` (no such `pss` fields).
 ## Results
 
 Every result type has `result[node]`, `result.measures` (`{name: value}`; `None` for a failed
-measure), and `.nodes` and `.branches` (the names it holds). `op["v(out)"]` and `op["out"]` are one node.
+measure), and `.nodes` and `.branches` (the names it holds). All three are in name order on every result. `op["v(out)"]` and `op["out"]` are one node.
 
 | Type | Axis | Extra |
 |---|---|---|
@@ -203,6 +209,15 @@ Sample a transient for `sndr` with a max step well under `1/fs` (or ngspice
 | `<stem>.meas.json` | `spicerack.measures/1`: `schema`, `spicerack`, `backend`, `raw`, `analyses[{index, kind, plot, steps}]`, `measures[{name, analysis, step, value, status, reason?}]` |
 
 `analyses[].index` is the number of its first plot in the raw file; `kind` is `tran`, `ac`, ... (`null` for a plot read from a file); `steps` is `null` or one `{param: value}` per step. `measures[].analysis` is a place in `analyses`, `step` a place in its `steps` (or `null`); `value` is `null` exactly when `status` is `"failed"`. Order: analysis, step, the deck's `.meas` order.
+
+## Errors and notes
+
+| Name | What it is |
+|---|---|
+| `ps.Error` | every failure of a netlist, a run or a compile; a `RuntimeError`. `.status`: `"refused"` (the writer refused the deck, or no simulator was routed: nothing ran) or `"failed"` (a simulator, a compiler or a dialect's hook that ran failed). `.diagnostics`: a list of `Diagnostic`, empty when the failure has no code |
+| `ps.Diagnostic` | `.code` (`"W0109"`), `.kind` (`"refusal"`, `"note"`), `.title`, `.cite`, `.message` (`<deck>:<line>:<column>: <code> <title>`), `.line` and `.column` (from 1, in the deck's own ngspice text), `.statement` (its text), `.element` (`"Vin"`, or `None`), `.file` (`None` for a built deck); at no statement (a routing refusal, `W0040`) the four place fields are `None` |
+| `tb.netlist_with_notes(dialect)` | `(text, notes)`: `netlist(dialect)`'s deck and its notes as `Diagnostic`s; no `UserWarning` |
+| `ValueError`, `KeyError`, `OSError` | a bad argument (an unknown dialect, a bad descriptor), a name that is not there, a file that does not open; never `ps.Error` |
 
 ## Units
 
@@ -251,6 +266,8 @@ The `u_Ω` family is registered with U+03A9 and does work.
 | `ps.register_simulator(sim)` | registers it, returns its name; an equal `Simulator` twice is one; a different one under a held name (any case) is `R0040`, a 33rd simulator `R0042` |
 | `ps.simulators()` | every simulator's name in route order: `ngspice`, `ltspice`, `vacask`, `spectre`, `espice`, then the registered ones |
 | `ps.load_simulator(path)` | a `spicerack.simulator/1` TOML file (`schema = "spicerack.simulator/1"` required, then `Simulator`'s arguments as keys; an unknown key is `R0040`) as a `Simulator`, not registered; Python 3.11+ |
+| `ps.Simulator(..., read=fn)` (provisional) | `read` in `output`'s place (both is `R0040`): the command runs, then `fn(outdir: str) -> (raw, measures)` reads the results. `raw`: a raw file's path (relative: in `outdir`), a `RawData`, or a sequence of them. `measures`: `None`, or a `spicerack.measures/1` dict, of which `schema`, `analyses[].kind` and `measures[].{name, analysis, step, value, status}` are read; they become `result.measures`. `.read` is the function, `.output` then `None`. A failure is `RuntimeError` `Simulation failed: read hook: ...` |
+| `ps.provisional` | the names outside the 1.0 freeze: `("Simulator.read",)` |
 | `exc.diagnostic` | on a `RuntimeError` with code `W0180`/`W0181`/`W0182` (`stage: "route"`, `missing: {"analyses": [...], "features": [...]}`) or `R0041` (`stage: "run"`, `missing: None`) |
 
 ## Backend capabilities

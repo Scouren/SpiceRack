@@ -22,12 +22,15 @@
 //!   what a dialect region says (Spectre statements, a Fourier harmonic count)
 //! - `card.rs`: analysis arguments → `Analysis`
 //! - `deck.rs`: the blocks → ngspice source → a backend's netlist or a run's `RawData`
+//! - `error.rs`: `Error` and `Diagnostic`: a failure's status and its located diagnostics, a written deck's notes
 //! - `verilog.rs`: `verilog(...)` blocks and their lowering
 //! - `subcircuit.rs`, `circuit.rs`: `Subcircuit`, `Circuit`
+//! - `block.rs`: `Block`, a branch of a conditional (`Subcircuit.conditional`)
 //! - `section.rs`: `Section`, a library section of a `Circuit`
 //! - `store.rs`: a subcircuit's source text and stored file (`to_source`, `save`)
 //! - `simulator.rs`, `spectre.rs`: `CircuitSimulator` and its Spectre-only analyses
 //! - `sims.rs`: `Simulator`, `register_simulator`, `simulators` (the simulator registry)
+//! - `sims_read.rs`: a `Simulator`'s provisional `read=` function (the run's plots and measures)
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
 //! - `def_.rs`, `def_enums.rs`, `def_tag.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
@@ -49,17 +52,20 @@ mod def_enums;
 mod analysis;
 mod analysis_region;
 mod args;
+mod block;
 mod card;
 mod circuit;
 mod deck;
 mod def_;
 mod def_tag;
+mod error;
 mod export;
 mod keywords;
 mod model;
 mod results;
 mod section;
 mod sims;
+mod sims_read;
 mod simulator;
 mod store;
 mod subcircuit;
@@ -86,11 +92,13 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubcircuit>()?;
     m.add_class::<PyTestbench>()?;
     m.add_class::<PyModelLibrary>()?;
+    m.add_class::<block::PyBlock>()?;
     m.add_class::<section::PySection>()?;
 
     // Module-level functions
     m.add_function(wrap_pyfunction!(lint, m)?)?;
     m.add_function(wrap_pyfunction!(read_raw, m)?)?;
+    error::add(m)?;
     export::add(m)?;
     m.add_function(wrap_pyfunction!(compile_veriloga, m)?)?;
     sims::add(m)?;
@@ -151,7 +159,7 @@ fn lint<'py>(
 fn compile_veriloga(source_or_path: &str) -> PyResult<String> {
     crate::veriloga::resolve(source_or_path)
         .and_then(|p| crate::veriloga::compile_osdi(&p))
-        .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+        .map_err(deck::runtime_err)
 }
 
 /// Every plot of a `.raw` file, in file order (ngspice, ESPice, VACASK,

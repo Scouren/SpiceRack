@@ -1,0 +1,14 @@
+spicerack.Simulator(name=None, **fields)
+spicerack.Simulator.analyses
+spicerack.Simulator.command
+spicerack.Simulator.dialect
+spicerack.Simulator.features
+spicerack.Simulator.name
+spicerack.Simulator.output
+spicerack.Simulator.verilog
+spicerack.Simulator.verilog_a
+spicerack.register_simulator(sim)
+spicerack.simulators()
+spicerack.load_simulator(path)
+spicerack.def_.DialectDef.runs_on(self, /, sim)
+spicerack.def_.Lang.runs_on(self, /)

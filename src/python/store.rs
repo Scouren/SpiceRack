@@ -129,10 +129,13 @@ pub(super) fn from_source(text: &str, d: Option<Lang>) -> Result<Body, String> {
                     false => b.elements.push(card),
                 }
             }
-            // A definition nested in this one (`Subcircuit.subcircuit`): its
-            // lines through its `.ends`, which is where the next statement,
-            // or this subcircuit's own `.ends`, starts.
-            _ if a.tag(Node(n)) == Tag::Subckt => {
+            // A block nested in this one, a definition
+            // (`Subcircuit.subcircuit`) or a conditional
+            // (`Subcircuit.conditional`; its `.elseif` and `.else` are
+            // chained from the `.if`, not statements of this body): its
+            // lines through its `.ends` or `.endif`, which is where the
+            // next statement, or this subcircuit's own `.ends`, starts.
+            _ if matches!(a.tag(Node(n)), Tag::Subckt | Tag::If) => {
                 let next = kids.get(i + 1).copied().map(Node);
                 let to = next
                     .or_else(|| a.closer(Node(sc)))

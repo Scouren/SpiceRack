@@ -96,14 +96,15 @@ macro_rules! pymethods_with_waves {
                 Ok(())
             }
 
-            #[pyo3(signature = (name, positive, negative, *, offset, amplitude, modulating_frequency, carrier_frequency, signal_delay=Num::of(0.0), dc=None, ac=None, ac_phase=None))]
+            #[pyo3(signature = (name, positive, negative, *, offset, amplitude, modulating_frequency, carrier_frequency, signal_delay=Num::of(0.0), signal_phase=None, carrier_phase=None, dc=None, ac=None, ac_phase=None))]
             fn $am(
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
-                offset: Num, amplitude: Num, modulating_frequency: Num, carrier_frequency: Num, signal_delay: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
+                offset: Num, amplitude: Num, modulating_frequency: Num, carrier_frequency: Num, signal_delay: Num, signal_phase: Option<Num>, carrier_phase: Option<Num>, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
-                // PySpice's `amplitude·(offset + sin(2π fm t'))·sin(2π fc t')`
-                // in ngspice-45's `AM(VO VMO VMA FM FC TD)` (`vsrcload.c`):
-                // VO 0, VMO amplitude·offset, VMA amplitude.
+                // PySpice's `amplitude·(offset + sin(2π fm t' + φm))·sin(2π fc t' + φc)`
+                // in ngspice-45's `AM(VO VMO VMA FM FC TD PHASEM PHASEC)`
+                // (`vsrcload.c`): VO 0, VMO amplitude·offset, VMA amplitude; the
+                // phases (degrees) are two more fields when either is given.
                 let vmo = match (&amplitude.0, &offset.0) {
                     (Value::Num(a), Value::Num(o)) => Num::of(a * o),
                     (a, o) => {
@@ -114,7 +115,12 @@ macro_rules! pymethods_with_waves {
                         Num(Value::Expr(format!("({})*({})", bare(a), bare(o))))
                     }
                 };
-                let wf = Wave::new("AM", &[&Num::of(0.0), &vmo, &amplitude, &modulating_frequency, &carrier_frequency, &signal_delay], Value::Num(0.0));
+                let zero = Num::of(0.0);
+                let mut fields = vec![&zero, &vmo, &amplitude, &modulating_frequency, &carrier_frequency, &signal_delay];
+                if signal_phase.is_some() || carrier_phase.is_some() {
+                    fields.extend([&signal_phase, &carrier_phase].map(|p| p.as_ref().unwrap_or(&zero)));
+                }
+                let wf = Wave::new("AM", &fields, Value::Num(0.0));
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);
                 Ok(())
             }

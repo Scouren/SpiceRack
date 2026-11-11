@@ -3,7 +3,9 @@
 //! `spicerack.simulator/1` file's keys, passed as keywords) → a checked
 //! `backend::SimDef` → the registry. Every field is validated here, once,
 //! when the `Simulator` is built: a bad value is a `ValueError` opening
-//! `R0040 <title>: <field>: `.
+//! `R0040 <title>: <field>: `. `read=fn` (provisional) in `output`'s
+//! place makes the simulator a `Runner::Hook`: its command runs and the
+//! function reads the results (`sims_read.rs`).
 //!
 //! Cites: none (the fields are `backend::SimDef`'s).
 //!
@@ -17,23 +19,27 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyString};
 
 use super::def_enums::PySimulator;
+use super::sims_read;
 use crate::backend::{self, Installed, Kind, Output, Piece, Runner, SimDef, SimRegisterError};
 use crate::syntax::def::RunsOn;
 use crate::syntax::diag::{Code, info};
 
 // A simulator's descriptor, checked (`SimDef::check`) when it was built.
 #[pyclass(name = "Simulator", module = "spicerack", eq, frozen)]
-#[derive(Clone, PartialEq)]
 pub(super) struct PySim {
     def: SimDef,
+    // Its `read=` function (provisional). With one, `def.runner` is a
+    // `Runner::Hook`, `sims_read::UNREGISTERED` until it is registered.
+    read: Option<Py<PyAny>>,
 }
 
 /// The keyword fields of `Simulator(name, ...)`, as a
 /// `spicerack.simulator/1` file spells them.
-const FIELDS: [&str; 7] = [
+const FIELDS: [&str; 8] = [
     "dialect",
     "command",
     "output",
+    "read",
     "analyses",
     "features",
     "verilog",
@@ -43,6 +49,19 @@ const FIELDS: [&str; 7] = [
 /// The most names one `analyses` or `features` value is read for: more
 /// than either vocabulary holds, so an endless iterable is refused.
 const NAMES_MAX: usize = 64;
+
+impl PartialEq for PySim {
+    /// Equal descriptors: equal definitions read by the same function
+    /// (one object), or by none.
+    fn eq(&self, other: &PySim) -> bool {
+        let same = match (&self.read, &other.read) {
+            (Some(f), Some(g)) => f.as_ptr() == g.as_ptr(),
+            (None, None) => true,
+            _ => false,
+        };
+        same && self.def == other.def
+    }
+}
 
 /// Adds `Simulator`, `register_simulator` and `simulators` to `m`.
 pub(super) fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -128,10 +147,24 @@ impl PySim {
                 return Err(bad("command", why));
             }
         };
-        let output = text("output", &required("output")?)?;
-        let Some(&(_, output)) = Output::NAMES.iter().find(|n| n.0 == output) else {
-            let all = Output::NAMES.iter().map(|n| n.0);
-            return Err(bad("output", &one_of(&output, all)));
+        // `read` (provisional) reads the results in `output`'s place.
+        let read = field("read")?;
+        if read.as_ref().is_some_and(|f| !f.is_callable()) {
+            return Err(bad("read", "a function of the run's directory"));
+        }
+        let output = match (field("output")?, &read) {
+            (Some(_), Some(_)) => {
+                return Err(bad("output", "left out when `read` reads the results"));
+            }
+            (None, Some(_)) => None,
+            (given, None) => {
+                let output = text("output", &given.ok_or_else(|| bad("output", "required"))?)?;
+                let Some(&(_, named)) = Output::NAMES.iter().find(|n| n.0 == output) else {
+                    let all = Output::NAMES.iter().map(|n| n.0);
+                    return Err(bad("output", &one_of(&output, all)));
+                };
+                Some(named)
+            }
         };
         let mut analyses = 0u32;
         for n in names("analyses", &required("analyses")?)? {
@@ -166,16 +199,28 @@ impl PySim {
             }
         }
 
+        let runner = match output {
+            Some(output) => Runner::Command { argv, output },
+            None => Runner::Hook {
+                argv,
+                read: sims_read::read,
+                id: sims_read::UNREGISTERED,
+            },
+        };
         let def = SimDef {
             name,
             dialect,
-            runner: Runner::Command { argv, output },
+            runner,
             features,
             analyses,
             installed: Installed::OnPath(program),
         };
         def.check().map_err(refused)?;
-        Ok(PySim { def })
+        assert_eq!(read.is_some(), matches!(def.runner, Runner::Hook { .. }));
+        Ok(PySim {
+            def,
+            read: read.map(Bound::unbind),
+        })
     }
 
     #[getter]
@@ -204,11 +249,18 @@ impl PySim {
         words
     }
 
+    /// How the results are read; `None` when `read` reads them.
     #[getter]
-    fn output(&self) -> &'static str {
+    fn output(&self) -> Option<&'static str> {
         let (_, output) = self.parts();
-        let named = Output::NAMES.iter().find(|n| n.1 == output);
-        named.expect("every output has its name").0
+        let named = |o: Output| Output::NAMES.iter().find(|n| n.1 == o);
+        output.map(|o| named(o).expect("every output has its name").0)
+    }
+
+    /// The function that reads the results (provisional), or `None`.
+    #[getter]
+    fn read(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.read.as_ref().map(|f| f.clone_ref(py))
     }
 
     /// The declared analyses by name, in SpiceRack's order, each once.
@@ -252,10 +304,12 @@ impl PySim {
 }
 
 impl PySim {
-    /// Its argv template and result reader: Python builds commands only.
-    fn parts(&self) -> (&[backend::Arg], Output) {
+    /// Its argv template and result reader (`None`: its `read` function
+    /// reads the results): Python builds commands only.
+    fn parts(&self) -> (&[backend::Arg], Option<Output>) {
         match &self.def.runner {
-            Runner::Command { argv, output } => (argv.as_slice(), *output),
+            Runner::Command { argv, output } => (argv.as_slice(), Some(*output)),
+            Runner::Hook { argv, .. } => (argv.as_slice(), None),
             Runner::BuiltIn(_) => unreachable!("`new` builds a command"),
         }
     }
@@ -265,8 +319,12 @@ impl PySim {
 /// and `SPICERACK_BACKEND` select it by. Registering an equal `Simulator`
 /// again registers nothing and returns the same name.
 #[pyfunction]
-fn register_simulator(sim: PyRef<'_, PySim>) -> PyResult<String> {
-    let held = backend::register_simulator(sim.def.clone()).map_err(refused)?;
+fn register_simulator(py: Python<'_>, sim: PyRef<'_, PySim>) -> PyResult<String> {
+    let held = match &sim.read {
+        Some(f) => sims_read::register(py, &sim.def, f),
+        None => backend::register_simulator(sim.def.clone()),
+    };
+    let held = held.map_err(refused)?;
     assert_eq!(held.name(), sim.def.name, "registered under its own name");
     Ok(held.name().to_string())
 }

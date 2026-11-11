@@ -10,18 +10,22 @@ nodes are positional; everything after `*` is keyword-only.
 | `Circuit(title)` | flat circuit; `str(circuit)` is its netlist |
 | `Subcircuit(name, ports=None, **params)` | a block with ports |
 | `Testbench(dut)` | stimulus and analyses around a `Subcircuit` |
+| `Block()` | one branch of a conditional: no name and no ports, and the element, instance (`X`, `instance`) and `model` calls of a `Subcircuit`; `conditional(...)` on a `Subcircuit`, a `Circuit` or another `Block` places it |
 | `Section(name)` | a library section, `.lib name` … `.endl name`, holding `parameter(name, value)`, `model(name, kind, **params)`, `include(path)`, `lib(path, section)` and `subcircuit(subckt)` lines; `Circuit.section(s)` adds it to a library file |
 | `CircuitSimulator` | what `Circuit.simulator()` returns; `CircuitSimulator.available_backends()` lists installed simulators |
 | `ModelLibrary(path, corner=None, setup_includes=None, **backend_paths)` | a PDK model file and corner; `.name`, `.path`, `.corner` |
 | `lint(netlist, backend=None)` | `{"errors": [...], "warnings": [...]}` |
 | `compile_veriloga(source_or_path)` | compiles Verilog-A with OpenVAF, returns the `.osdi` path |
 | `read_raw(path)` | every plot of a `.raw` file, as `RawData` |
+| `Error` | every failure of a netlist, a run or a compile; a `RuntimeError`: `.status` (`"refused"`: nothing was run; `"failed"`) and `.diagnostics`, a list of `Diagnostic` ([Refusals and notes](simulate.md#refusals-and-notes)) |
+| `Diagnostic` | one diagnostic: `.code`, `.kind` (`"refusal"`, `"note"`), `.title`, `.cite`, `.message`, `.file`, `.line`, `.column`, `.statement`, `.element` (the last five `None` at no statement) |
 | `export(results, stem, *, raw_format="binary")` | writes `<stem>.raw` (one ngspice raw file: the plots of every result, vectors under their canonical names) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar) and returns the two paths ([Exporting results](simulate.md#exporting-results)) |
 | `unit` | unit constants, used as `10 @ u_kOhm` |
 | `Dialect(name)`, `register_dialect(obj)` | a dialect plugin's base class and its registration ([Dialect plugins](dialects.md)); returns its `def_.Lang` |
-| `Simulator(name, dialect=, command=, output=, analyses=, features=, verilog=, verilog_a=)` | a simulator's descriptor, checked when built ([Your own simulator](simulate.md#your-own-simulator)); `.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog`, `.verilog_a` |
+| `Simulator(name, dialect=, command=, output=, analyses=, features=, verilog=, verilog_a=)` | a simulator's descriptor, checked when built ([Your own simulator](simulate.md#your-own-simulator)); `.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog`, `.verilog_a`. Provisional: `read=fn` in `output`'s place (`fn(outdir) -> (raw, measures)` reads the results), `.read` |
 | `register_simulator(sim)`, `simulators()` | registers a `Simulator` and returns the name `with_backend()` takes (an equal one twice is one); every simulator's name in route order |
 | `load_simulator(path)` | the `Simulator` a `spicerack.simulator/1` TOML file describes, checked and not registered; `ValueError` `R0040` names the key at fault |
+| `provisional` | the names outside the 1.0 freeze, as a tuple (`"Simulator.read"`): each may change in a minor release |
 | `dialects` | the built-ins as base classes: `NGSPICE`, `ESPICE`, `HSPICE`, `XYCE`, `LTSPICE`, `SPECTRE`, `VACASK`, `CDL`, `VERILOG` |
 | `def_` | the definition API: `DialectDef(name)` (one method per Rust call, each returning the definition), `register(d)`, `Lang`, `Card`, `Answer`, and the vocabulary enums (`Tag`/`Keyword`, `Construct`, `Alt`, `Rule`, `Code`, `Kind`, `Scale`, ...) |
 
@@ -47,8 +51,8 @@ nodes are positional; everything after `*` is keyword-only.
 | `Q` / `BJT` | `(name, collector, base, emitter, *, model, substrate=None, thermal=None, **params)` |
 | `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): VACASK writes it on its `sp_vdmos`, Spectre refuses it (`W0105`) |
 | `J`, `Z` | `(name, drain, gate, source, *, model, **params)` |
-| `S` | `(name, positive, negative, *, control_positive, control_negative, model)` |
-| `W` | `(name, positive, negative, *, vcontrol, model)` |
+| `S` | `(name, positive, negative, *, control_positive, control_negative, model, initial_state=None)` |
+| `W` | `(name, positive, negative, *, vcontrol, model, initial_state=None)`; on both, `initial_state` is `"on"` or `"off"`: the switch's state when its control starts inside the hysteresis band (the card's `ON`/`OFF`). The card is then written for ngspice and ESPice and refused elsewhere (`W0001`). ngspice-45 holds the state of an `S`; ESPice 0.3.0 reads the word and ignores it |
 | `T` | `(name, input_positive, input_negative, output_positive, output_negative, *, Z0, TD)` |
 | `X` | `(name, subcircuit_name, *nodes, **params)` |
 | `instance` | `(subckt, name, *nodes, **params)`: like `X`, from the object |
@@ -64,7 +68,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `PieceWiseLinear` | `values=[(t, v), ...], repeat_time, delay_time` (ngspice `r=`, `td=`: ngspice and ESPice only; ngspice on a voltage source only) |
 | `Exponential` | `initial_value, pulsed_value, rise_delay_time, rise_time_constant, fall_delay_time, fall_time_constant` |
 | `SingleFrequencyFM` | `offset, amplitude, carrier_frequency, modulation_index, signal_frequency` |
-| `AmplitudeModulated` | `offset, amplitude, modulating_frequency, carrier_frequency, signal_delay` |
+| `AmplitudeModulated` | `offset, amplitude, modulating_frequency, carrier_frequency, signal_delay, signal_phase, carrier_phase`; the phases are in degrees, and a source given either is written for ngspice and ESPice only (`W0108` elsewhere) |
 | `TransientNoise` | `noise_rms, time_step, flicker_exponent=0, flicker_rms=0, rts_amplitude=0, rts_capture_time=0, rts_emission_time=0`: ngspice `TRNOISE`, added to `dc`; other dialects refuse it |
 | `Random` | `random_type, duration, time_delay=0, parameter1=1, parameter2=0`: ngspice `TRRANDOM`, `random_type` one of `uniform`, `gaussian`, `exponential`, `poisson`; added to `dc`; other dialects refuse it |
 
@@ -77,6 +81,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `add_function(name, args, body)` | `.func name(args) {body}` in the subcircuit (`cell.add_function("scaled", ["x"], "x*k")`). One that reads a parameter of the subcircuit is local to it: LTspice, Spectre and VACASK refuse it (`W0106`) |
 | `subcircuit(subckt)` | on a `Subcircuit`: `subckt` defined inside it (a nested `.subckt`), seen by its own instances only; each target writes it as a top-level definition named `<parent>__<name>`. `ValueError` when `subckt` holds a `verilog()` block |
 | `lib(path, section)` | `.lib` |
+| `conditional(branches, otherwise=None)` | `.if (c)` … `.elseif (c)` … `.else` … `.endif`: `branches` is a list of `(condition, Block)`, the circuit holds the block of the first true condition, `otherwise` when none is. A condition is an expression of parameters (`"r > 500"`, equality `==`). A block holds elements, instances, models and conditionals of its own; a parameter, an include, a lib, a model load, a nested definition or a function in one raises `ValueError` (ngspice does not select those with the condition). Xyce and LTspice have no conditional (`W0013`) |
 | `parameter(name, value)` | `.param` |
 | `raw_spice(line)` | the line as written |
 | `veriloga(source_or_path)` | a Verilog-A model, compiled per backend; returns the `.va` path |
@@ -102,7 +107,8 @@ none (ngspice refuses one outside a library file).
 | `add_subcircuit(subckt)` | registers a child definition |
 | `use_pdk(lib)` | attaches a `ModelLibrary` |
 | `with_backend(name)` | pins the simulator |
-| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `RuntimeError` naming its code; each note on the written deck (an output or option the target does not get, e.g. `W0023`) is a `UserWarning` `spicerack <deck>:<line>:<col>: <code> <title>`, on a built-in or a registered dialect alike (a plugin's `omit_code` note is `W0202 <dialect>:<id> <message>`) |
+| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `spicerack.Error` (a `RuntimeError`) naming its code, with the diagnostics as data (`.diagnostics`); each note on the written deck (an output or option the target does not get, e.g. `W0023`) is a `UserWarning` `spicerack <deck>:<line>:<col>: <code> <title>`, on a built-in or a registered dialect alike (a plugin's `omit_code` note is `W0202 <dialect>:<id> <message>`) |
+| `netlist_with_notes(dialect)` | `(text, notes)`: the deck `netlist(dialect)` writes and its notes as a list of `Diagnostic`, with no warning |
 | `to_source()`, `save_source(path)`, `Testbench.from_source(text, dialect=None)`, `Testbench.load(path)` | the store, as for `Subcircuit` (`save(*outputs)` stays the `.save` card): a deck read back writes the same netlists, a `ModelLibrary` at each target's path (a `* spicerack-library` line keeps them); its analyses are its text, and `run()` runs those queued on it |
 | `check_backend(name)` | reasons it will not run on `name`: missing features, and the writer's refusal with its code |
 | `global_nodes(*nodes)` | `.global` |
@@ -143,7 +149,7 @@ card is written for ngspice and ESPice and refused elsewhere (`W0001`).
 | `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis`: every node and branch at 2F1 (with `f2overf1`, at F1+F2), as complex values; all 0 unless a source has `distof1=` (and, with `f2overf1`, `distof2=`) |
 | `pss(fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=False)` | `PssAnalysis`; the last three are ngspice's `sciter`, `steadycoeff`, `uic` (Spectre's `pss` has none: `W0040`) |
 | `s_param(variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10)` | `SParamAnalysis`; the deck needs its RF ports first (`V(..., portnum=n)`; ngspice wants two): with none, `s_param` and `add_s_param` raise `ValueError` |
-| `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis` |
+| `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis`. `num_harmonics` is one count for every tone (`5`) or a list with one count per tone (`[5, 3]`); 7 each when left out. A list of another length, or no tone, raises `ValueError` |
 | `stability(probe, variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e10)` | `StabilityAnalysis` |
 | `transient_noise(step_time, end_time)` | `TransientNoiseAnalysis`: ngspice's transient noise, a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources |
 | `network_params(output_current, input_source, z_in=50.0, z_out=50.0, ...)` | `SParamAnalysis` (LTspice `.net`) |
@@ -159,9 +165,9 @@ LTspice's `.noise` has none, so it is left out there with a note (W0033).
 
 Every result: `res["node"]` or `res.node` (a float for `OperatingPoint`, a list
 otherwise; `op["v(node)"]` names the same node), `res.nodes` and `res.branches`
-(the names it holds), `res.measures` (`.meas` values by name, `None` for a measure
+(the names it holds, sorted), `res.measures` (`.meas` values by name, `None` for a measure
 that failed; of a stepped run, that step's values) and `res.params` (the
-`.step` point it is, `{param: value}`; `{}` when nothing steps). A run that
+`.step` point it is, `{param: value}`; `{}` when nothing steps), both in name order. A run that
 LTspice steps returns a list of results, one per step. AC-type results add
 `magnitude(name)`, `magnitude_db(name)` and `phase(name)` (degrees). `RawData`
 has `title`, `plot_name`, `is_complex`, `variable_names`, `measures`, `params`

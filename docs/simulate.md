@@ -194,6 +194,52 @@ ignores `.four` when it writes a rawfile with `-r`. Run such a deck by hand with
 `.four` and none of those three analyses is refused when it runs, rather than
 returning without its results.
 
+### Refusals and notes
+
+A target that cannot say something the deck holds refuses the whole deck: `netlist()` raises
+`spicerack.Error`, a `RuntimeError` whose text is one line per diagnostic
+(`<deck>:<line>:<column>: <code> <title>`). The same diagnostics are data on the exception:
+
+```python
+noted = ps.Testbench(rc)
+noted.V("in", "vin", "0", 1.0)
+noted.save("v(vout)")
+noted.measure("tran", "vmax", "max", "v(vout)")
+noted.add_transient(step_time=1e-8, end_time=5e-6)
+
+try:
+    noted.netlist("vacask")                 # VACASK has no statement for a measurement
+except ps.Error as e:
+    print(e.status)                         # refused
+    for d in e.diagnostics:
+        print(d.code, d.kind, d.line, d.statement)
+    # W0023 note 5 .save v(vout)
+    # W0109 refusal 6 .meas tran vmax max v(vout)
+```
+
+Each `Diagnostic` has `code`, `kind` (`"refusal"` or `"note"`), `title` and `cite` (the code's fixed
+text), `message` (its line of the exception's text), `line` and `column` (from 1, in the deck's own
+ngspice text, the title first), `statement` (the statement's text) and `element` (the element's
+name, `"Vin"`, when the statement is one; else `None`). `file` is `None` for a deck built in Python.
+
+A note is what a target does not get as written while the deck is still written (an output
+request, an option). `netlist()` raises each as a `UserWarning`; `netlist_with_notes()` returns
+them beside the text and warns of none:
+
+```python
+text, notes = noted.netlist_with_notes("xyce")
+print([(n.code, n.kind, n.statement) for n in notes])   # [('W0023', 'note', '.save v(vout)')]
+```
+
+Every failure of a netlist, a run or a compile is a `spicerack.Error`. `status` is `"refused"` when
+nothing was run: the writer refused the deck, or no simulator could be routed for it (`W0180` to
+`W0182`). It is `"failed"` when something that ran failed (a simulator, a compiler, a dialect's
+hook). A failure with no code has no diagnostics. A refusal that is at no statement has one
+diagnostic whose `line`, `column`, `statement` and `element` are `None`: a routing refusal, and
+`W0040` (an analysis argument the target has no word for, refused before the deck has the
+analysis's statement). A bad argument is a `ValueError`, a name that is not there a `KeyError`, a
+file that does not open an `OSError` and a removed method a `NotImplementedError`, as before.
+
 ## Choosing a simulator
 
 ```python
@@ -257,8 +303,11 @@ mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
   holds both and is deleted after the read. The first word is the program, found on `PATH`; one word holds
   `{deck}`.
 - `output` says how the results are read: `ngspice-raw`, `ngspice-ascii` or `nutascii` (one raw file at
-  `{raw}`), `raw-dir` (every `*.raw` the command leaves in `{dir}`, where it then runs, as VACASK does), or
-  `ltspice-raw` (`{raw}` and the `.log` beside it).
+  `{raw}`), `raw-dir` (VACASK's form: the command runs in `{dir}` and leaves one `*.raw` per analysis
+  there), or `ltspice-raw` (`{raw}` and the `.log` beside it). With `dialect="vacask"` a `raw-dir` run is
+  read as the built-in `vacask`'s: the files in the deck's analysis order, a step's sweep column after the
+  analysis's own axis, the noise spectra added. With another dialect every `*.raw` is read, in file-name
+  order.
 - `analyses` are the kinds it runs: `op`, `dc`, `ac`, `tran`, `noise`, `tf`, `sens`, `sens_ac`, `pz`, `disto`,
   `pss`, `hb`, `sp`, `stb`, `trannoise`, `pac`, `pnoise`, `pxf`, `pstb`. `features` are what a deck may need
   of it: `xspice`, `osdi`, `measures`, `step`, `control`, `laplace`, `verilog`; `verilog=True` and
@@ -268,6 +317,12 @@ mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
   is refused. A process holds at most 32 simulators (`R0042`), the five built-ins among them.
 - `mysim.name`, `.dialect`, `.command`, `.output`, `.analyses`, `.features`, `.verilog` and `.verilog_a`
   read the descriptor back.
+- A registered simulator is its command and nothing more, and a built-in's run does more than its command.
+  Registered as a command, ngspice (`ngspice -b -r {raw} {deck}`) fails on a deck with a `.measure` or a
+  Fourier analysis: SpiceRack writes that deck to run from a `.control` block, for which ngspice leaves no
+  raw file under `-r` (the built-in drops `-r` and appends a `write`). A `raw-dir` command runs in the
+  scratch directory, where a `load` or `include` path relative to your working directory is not found (the
+  built-in `vacask` makes such a path absolute first): name the file by its absolute path.
 
 The same descriptor as a file is `spicerack.simulator/1`: TOML whose keys are `Simulator`'s arguments, plus
 the required `schema`. An unknown key is refused (`R0040`), so a typo cannot drop a declaration.
@@ -290,9 +345,40 @@ verilog_a = false
 assert ps.load_simulator("mysim.toml") == mysim
 ```
 
+**Provisional** (`ps.provisional` lists the names outside the 1.0 freeze; each may change in a minor
+release): `read=fn` in `output`'s place reads the results with a function of your own. The command runs as
+above; then `fn(outdir)` is called with the run's scratch directory (`{dir}`, a `str`; deleted once the
+function returns) and returns `(raw, measures)`.
+
+```python
+def read_mysim(outdir):
+    return f"{outdir}/out.raw", None           # (raw, measures)
+
+hooked = ps.Simulator(
+    "mysim-hooked",
+    dialect="ngspice",
+    command=["mysim", "-b", "-o", "{dir}/out.raw", "{deck}"],
+    analyses=["op", "tran"],
+    read=read_mysim,                           # no output=: giving both is refused (R0040)
+)
+print(hooked.output, hooked.read is read_mysim)   # None True
+print(ps.provisional)                             # ('Simulator.read',)
+```
+
+- `raw` is a raw file's path (a relative one is inside `outdir`; any file `read_raw` reads), a `RawData`,
+  or a sequence of them, one per plot (`read_raw(path)`'s list).
+- `measures` is `None`, or a dict in the `spicerack.measures/1` shape
+  ([Exporting results](#exporting-results)). Read from it: `schema`, each of `analyses`' `kind`, and each
+  of `measures`' `name`, `analysis`, `step`, `value` and `status`. They are the run's `measures`, whether
+  or not the deck holds a `.meas` card.
+- A function that raises, or returns anything else, fails the run: `RuntimeError` opening
+  `Simulation failed: read hook: `, then the exception or the part at fault.
+- A descriptor file cannot hold a function: `load_simulator` gives `output` simulators only.
+
 A registered simulator is routed like a built-in. It is a candidate for every analysis it declares, after
 the built-ins, in registration order, and it is held to what it declares. A run that cannot be routed
-raises `RuntimeError` opening with its code, and `exc.diagnostic` holds the same as data:
+raises `spicerack.Error` opening with its code (status `"refused"`; `"failed"` for `R0041`), the code
+its one `Diagnostic`, and `exc.diagnostic` holds the route as data:
 
 | code | when | `exc.diagnostic` |
 | --- | --- | --- |

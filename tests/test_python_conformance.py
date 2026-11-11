@@ -128,6 +128,40 @@ def _with_ic(mod):
     return tb
 
 
+def _branch(mod, name, a, b, ohms):
+    """A block holding one resistor."""
+    blk = mod.Block()
+    blk.R(name, a, b, ohms)
+    return blk
+
+
+def _with_conditional(mod):
+    """The DUT's load chosen by its parameter `r`: `.if` / `.elseif` /
+    `.else` at the deck's top (a `Testbench` inlines its DUT)."""
+    d = dut(mod)
+    arms = [(c, _branch(mod, "9", "out", "0", ohms)) for c, ohms in (("r > 1500", 5e3), ("r > 500", 6e3))]
+    d.conditional(arms, otherwise=_branch(mod, "9", "out", "0", 7e3))
+    tb = bench(mod, d)
+    tb.add_operating_point()
+    return tb
+
+
+def _with_conditional_in_child(mod):
+    """`buf`'s second resistor chosen by its own parameter `k`, inside its
+    `.subckt`; the `.else` branch holds a conditional of its own."""
+    inner = mod.Block()
+    inner.conditional([("k > 0", _branch(mod, "2", "a", "b", 3e3))])
+    c = mod.Subcircuit("buf", ["a", "b"], k="1")
+    c.R("1", "a", "b", 1e3)
+    c.conditional([("k > 1", _branch(mod, "2", "a", "b", 2e3))], otherwise=inner)
+    d = dut(mod)
+    d.instance(c, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(c)
+    tb.add_operating_point()
+    return tb
+
+
 def _child(mod):
     c = mod.Subcircuit("buf", ["a", "b"])
     c.R("1", "a", "b", 1e3)
@@ -202,6 +236,7 @@ FEATURES = {
     "pss_controls": oscillator(lambda tb: tb.add_pss(5e6, 1e-5, "x", sc_iter=20)),
     "s_param": two_port(lambda tb: tb.add_s_param()),
     "harmonic_balance": analysis(lambda tb: tb.add_harmonic_balance([1e6])),
+    "harmonic_balance_tones": analysis(lambda tb: tb.add_harmonic_balance([1e6, 1.1e6], 5)),
     "stability": analysis(lambda tb: tb.add_stability("Vin")),
     "transient_noise": analysis(lambda tb: tb.add_transient_noise(1e-9, 1e-6)),
     "fourier": analysis(lambda tb: (tb.add_transient(1e-6, 1e-3), tb.add_fourier(1e3, ["V(out)"]))),
@@ -236,6 +271,8 @@ FEATURES = {
     "use_pdk": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.lib", corner="tt", spectre="/sp/m.scs"))),
     "use_pdk_include": setting(lambda tb: tb.use_pdk(ps().ModelLibrary("/ng/m.inc"))),
     "subcircuit": _with_child,
+    "conditional": _with_conditional,
+    "conditional_in_subcircuit": _with_conditional_in_child,
     "subcircuit_nested": _with_nested,
     # Sources.
     "sin": source(lambda tb: tb.SinusoidalVoltageSource("in", "in", "0", amplitude=1.0, frequency=1e3)),
@@ -248,6 +285,7 @@ FEATURES = {
     "exp": source(lambda tb: tb.ExponentialVoltageSource("in", "in", "0", initial_value=0, pulsed_value=1, rise_time_constant=1e-6, fall_delay_time=5e-6, fall_time_constant=1e-6)),
     "sffm": source(lambda tb: tb.SingleFrequencyFMVoltageSource("in", "in", "0", offset=0, amplitude=1, carrier_frequency=1e6, modulation_index=2, signal_frequency=1e4)),
     "am": source(lambda tb: tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0, amplitude=1, modulating_frequency=1e4, carrier_frequency=1e6)),
+    "am_phases": source(lambda tb: tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0, amplitude=1, modulating_frequency=1e4, carrier_frequency=1e6, carrier_phase=90)),
     "trnoise": source(lambda tb: tb.TransientNoiseVoltageSource("in", "in", "0", noise_rms=1e-3, time_step=1e-9)),
     "trrandom": source(lambda tb: tb.RandomVoltageSource("in", "in", "0", random_type="uniform", duration=1e-9)),
     "current_source": source(lambda tb: tb.I("in", "0", "in", 1e-3)),
@@ -274,6 +312,8 @@ FEATURES = {
     "POLY": elem(lambda d: (d.POLY("1", "E", "x", "0", ["out", "0"], [0, 1, 2]), d.R("x", "x", "0", 1e3))),
     "S": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw"))),
     "W": elem(lambda d: (d.V("s", "in", "z", 0), d.R("z", "z", "0", 1e3), d.model("cs", "csw"), d.W("1", "out", "0", vcontrol="Vs", model="cs"))),
+    "S_initial_state": elem(lambda d: (d.model("sw", "sw"), d.S("1", "out", "0", control_positive="in", control_negative="0", model="sw", initial_state="on"))),
+    "W_initial_state": elem(lambda d: (d.V("s", "in", "z", 0), d.R("z", "z", "0", 1e3), d.model("cs", "csw"), d.W("1", "out", "0", vcontrol="Vs", model="cs", initial_state="off"))),
     "T": elem(lambda d: (d.T("1", "out", "0", "x", "0", Z0=50, TD=1e-9), d.R("x", "x", "0", 50))),
     "A": elem(lambda d: (d.model("amp", "gain", gain=2.0), d.A(name="1", connections=["out", "x"], model="amp"), d.R("x", "x", "0", 1e3))),
     "parameter": elem(lambda d: d.parameter("k", "2")),
@@ -325,6 +365,8 @@ EXPECTED = {
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
+    # Two tones, one count for both: the same Spectre statement, the same cells.
+    'harmonic_balance_tones': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
     # VACASK has `acstb` (36be560 docs/cmd-analysis-acstb.md; ZERO-LEDGER P4-106): W0001 until P4-008 writes it.
     'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
     'transient_noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -370,6 +412,9 @@ EXPECTED = {
     'use_pdk': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'use_pdk_include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'subcircuit': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # `.if` … `.endif`: Xyce and LTspice have no conditional block (W0013).
+    'conditional': (OK, OK, OK, 'W0013', 'W0013', OK, OK, OK, OK),
+    'conditional_in_subcircuit': (OK, OK, OK, 'W0013', 'W0013', OK, OK, OK, OK),
     # Every target writes the nested definition hoisted, as `wrap__buf`.
     'subcircuit_nested': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'sin': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -386,6 +431,8 @@ EXPECTED = {
     # Xyce and LTspice have no AM source; VACASK's `type="am"` cannot hold a
     # zero carrier (`offset=0`: modindex VMA/VMO); stream D's AM order.
     'am': (OK, OK, OK, 'W0108', 'W0108', 'W0108', 'W0108', OK, OK),
+    # AM with a phase: ngspice's fields 7 and 8; HSPICE's AM has none (P5-034 writes the B form).
+    'am_phases': (OK, OK, 'W0108', 'W0108', 'W0108', 'W0108', 'W0108', OK, OK),
     'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -420,6 +467,9 @@ EXPECTED = {
     'POLY': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
+    # A switch's initial state: kept as ngspice's card, W0001 elsewhere (P5-042 reads it).
+    'S_initial_state': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001+W0104', 'W0001+W0104', OK, OK),
+    'W_initial_state': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001+W0104', 'W0001+W0104', OK, OK),
     'T': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'A': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -471,7 +521,7 @@ def test_every_cell_is_written_or_refused_with_its_code():
 # feature above, or listed here as no deck feature (it reads, runs or
 # stores a deck, or it is an alias of one that is).
 NOT_A_FEATURE = {
-    "netlist", "run", "to_source", "save_source", "from_source", "load", "save",
+    "netlist", "netlist_with_notes", "run", "to_source", "save_source", "from_source", "load", "save",
     "to_json", "from_json", "save_json", "load_json", "check_backend", "with_backend",
     "available_backends", "add_subcircuit", "name", "ports", "gnd", "instance",
 }
@@ -495,6 +545,7 @@ COVERED = {
         "initial_condition", "node_set",
         "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",
         "include", "lib", "raw_spice", "osdi", "veriloga", "verilog",
+        "conditional",
     },
 }
 

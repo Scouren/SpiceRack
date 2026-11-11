@@ -24,6 +24,7 @@
 //! Contents:
 //! - `pub(super) struct Deck`
 //! - `Deck::netlist(&self, backend: &str) -> PyResult<String>`,
+//!   `Deck::written(&self, backend: &str) -> PyResult<Wrote>`,
 //!   `Deck::run(&self, backend: Option<&str>) -> PyResult<RawData>`,
 //!   `Deck::run_each(&self, backend: Option<&str>) -> PyResult<Vec<Vec<RawData>>>`,
 //!   `Deck::to_source(&self) -> PyResult<String>`, `Deck::issues(&self, backend: &str) -> Vec<String>`,
@@ -39,10 +40,11 @@ use crate::syntax::Lang;
 use std::borrow::Cow;
 use std::fmt::Write as _;
 
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use super::analysis::{Analysis, nfreqs};
+use super::error::{self, Wrote};
 use super::model::{Bench, Body, Func, ModelLibrary, dec, params};
 use super::verilog::lower_verilog;
 use crate::backend::{BackendError, Dialect, Kind, Sim, feature};
@@ -71,25 +73,32 @@ impl Deck {
     /// `UserWarning`, its message `spicerack <deck>:<line>:<col>: <code>
     /// <title>`.
     pub(super) fn netlist(&self, backend: &str) -> PyResult<String> {
-        let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
-            .filter(|d| render::writes(*d))
-            .map(Lang::from)
-            .or_else(|| super::def_::plugin(backend))
-            .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
-        let written = self
-            .lowered()?
-            .write_to(d)
-            .map_err(PyRuntimeError::new_err)?;
+        let written = self.written(backend)?;
         Python::attach(|py| -> PyResult<()> {
             let category = py.get_type::<pyo3::exceptions::PyUserWarning>();
-            for line in written.notes.messages.lines().filter(|l| !l.is_empty()) {
-                let msg = std::ffi::CString::new(format!("spicerack {line}"))
+            for note in &written.notes {
+                let msg = std::ffi::CString::new(format!("spicerack {}", note.message))
                     .expect("a message has no NUL");
                 PyErr::warn(py, &category, &msg, 1)?;
             }
             Ok(())
         })?;
         Ok(written.text)
+    }
+
+    /// [`Self::netlist`]'s deck and its notes, located in the deck's
+    /// source; no warning is raised.
+    ///
+    /// # Errors
+    /// `ValueError`: no dialect is named `backend`. `spicerack.Error`:
+    /// the dialect does not write the deck ([`Self::write_to`]'s).
+    pub(super) fn written(&self, backend: &str) -> PyResult<Wrote> {
+        let d = Dialect::from_backend_name(&backend.to_ascii_lowercase())
+            .filter(|d| render::writes(*d))
+            .map(Lang::from)
+            .or_else(|| super::def_::plugin(backend))
+            .ok_or_else(|| PyValueError::new_err(format!("unknown backend '{backend}'")))?;
+        self.lowered()?.write_to(d)
     }
 
     /// Runs the deck on `backend` (`None`: the best installed one for its
@@ -112,9 +121,7 @@ impl Deck {
     /// every path (`store::library_marker`).
     pub(super) fn to_source(&self) -> PyResult<String> {
         let deck = self.lowered()?;
-        let text = deck
-            .source(Dialect::Ngspice)
-            .map_err(PyRuntimeError::new_err)?;
+        let text = deck.source(Dialect::Ngspice).map_err(refused_unsupported)?;
         let mut out = String::with_capacity(text.len() + 256);
         let mut fresh: Vec<&ModelLibrary> = deck.libraries.iter().filter(|l| !l.placed).collect();
         for l in text.lines() {
@@ -174,9 +181,7 @@ impl Deck {
             },
             ..Default::default()
         };
-        let deck = one
-            .write(Dialect::Ngspice)
-            .map_err(PyRuntimeError::new_err)?;
+        let deck = one.write_to(Dialect::Ngspice.into())?.text;
         // Drop the title line and `.end`.
         let lines: Vec<&str> = deck.lines().collect();
         Ok(lines[1..lines.len() - 1].join("\n"))
@@ -223,14 +228,17 @@ pub(super) fn region_dialect(name: &str) -> Result<Lang, String> {
     }
 }
 
-/// Any error as a Python `RuntimeError` carrying its `Display` text.
+/// Any failure as `spicerack.Error` (a Python `RuntimeError`) carrying
+/// its `Display` text: status `"failed"`, no diagnostics.
 pub(super) fn runtime_err(e: impl std::fmt::Display) -> PyErr {
-    PyRuntimeError::new_err(e.to_string())
+    error::failed(e)
 }
 
-/// A backend error as a Python `RuntimeError`. One with a catalogue code
+/// A backend error as `spicerack.Error`. One with a catalogue code
 /// (`BackendError::code`: a routing refusal `W0180`–`W0182`, a command not
-/// installed `R0041`) opens with `<code> <title>: ` and carries a
+/// installed `R0041`) opens with `<code> <title>: `, holds that code as
+/// its one diagnostic (status `"refused"` for a routing refusal: nothing
+/// was run; `"failed"` for `R0041`) and carries a
 /// `diagnostic` attribute, `{"code": str, "stage": "route" | "run",
 /// "missing": {"analyses": [str], "features": [str]} | None}`: what the
 /// `spicerack.diagnostics/1` writer copies into `stage` and
@@ -240,7 +248,12 @@ pub(super) fn backend_err(e: BackendError) -> PyErr {
         return runtime_err(e);
     };
     let title = crate::syntax::diag::info(code).title;
-    let err = PyRuntimeError::new_err(format!("{code:?} {title}: {e}"));
+    // A routing refusal names what is missing, and nothing was run.
+    let status = match e.missing() {
+        Some(_) => "refused",
+        None => "failed",
+    };
+    let err = error::coded(status, code, format!("{code:?} {title}: {e}"));
     let attached = Python::attach(|py| -> PyResult<()> {
         let d = pyo3::types::PyDict::new(py);
         d.set_item("code", format!("{code:?}"))?;
@@ -294,12 +307,12 @@ impl Deck {
             }
             let sim = crate::backend::select(&kinds, Some(name), deck.needs(), |_| true)
                 .map_err(backend_err)?;
-            return Ok((sim, deck.write_to(lang).map_err(runtime_err)?.text));
+            return Ok((sim, deck.write_to(lang)?.text));
         }
         let writes = |s: Sim| deck.write_to(s.row().dialect).is_ok();
         let sim =
             crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(backend_err)?;
-        let written = deck.write_to(sim.row().dialect).map_err(runtime_err)?;
+        let written = deck.write_to(sim.row().dialect)?;
         Ok((sim, written.text))
     }
 
@@ -362,21 +375,27 @@ impl Deck {
                 .map(|w| w.text)
                 .map_err(|e| e.messages.trim_end().to_string())
         };
-        self.write_with(d.into(), plain)
+        self.write_with(d.into(), plain)?
     }
 
-    /// The deck written for `lang` with its notes, a plugin's Python hooks
-    /// called.
-    fn write_to(&self, lang: Lang) -> Result<render::Written, String> {
+    /// The deck written for `lang` with its notes located in the deck's
+    /// source, a plugin's Python hooks called.
+    ///
+    /// # Errors
+    /// `spicerack.Error`: `def_::render`'s; and, status `"refused"`, the
+    /// one refusal of a deck with no source (W0040, at no statement).
+    fn write_to(&self, lang: Lang) -> PyResult<Wrote> {
         self.write_with(lang, super::def_::render)
+            .map_err(refused_unsupported)?
     }
 
-    /// The deck rendered for `lang` by `render`: its ngspice source for the
-    /// built-in in `lang`'s chain.
+    /// What `render` answers for the deck and `lang`: its ngspice source
+    /// for the built-in in `lang`'s chain. `Err` is [`Self::source`]'s: an
+    /// analysis no dialect here has a statement for.
     fn write_with<T>(
         &self,
         lang: Lang,
-        render: impl Fn(&render::Source, Lang) -> Result<T, String>,
+        render: impl Fn(&render::Source, Lang) -> T,
     ) -> Result<T, String> {
         let name = self.top.name.as_str();
         let (source, rows, ast) = self.build(super::def_::builtin_of(lang))?.finish();
@@ -400,7 +419,7 @@ impl Deck {
             loads: &self.top.osdi,
             numbers: render::Numbers::Given,
         };
-        render(&src, lang)
+        Ok(render(&src, lang))
     }
 
     /// The deck for target `d` as a `Build`: its title line, then every
@@ -620,6 +639,15 @@ fn region(out: &mut String, lang: &str, lines: &[String]) {
 fn unsupported(what: &str) -> String {
     let code = crate::syntax::diag::Code::W0040;
     format!("{code:?} {}: {what}", crate::syntax::diag::info(code).title)
+}
+
+/// [`unsupported`]'s text, the one `Err` of [`Deck::source`], as
+/// `spicerack.Error`: status `"refused"`, W0040 its one diagnostic, at no
+/// statement (the analysis is in no deck yet).
+fn refused_unsupported(text: String) -> PyErr {
+    let code = crate::syntax::diag::Code::W0040;
+    assert!(text.starts_with("W0040 "), "`unsupported`'s text: {text}");
+    error::coded("refused", code, text)
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@
 //!
 //! Contents:
 //! - `pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError>`
+//! - `pub(super) fn read(dir: &Path, netlist: &str, stdout: &str) -> Result<Vec<RawData>, BackendError>`
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -27,25 +28,42 @@ pub(super) fn run(netlist: &str) -> Result<Vec<RawData>, BackendError> {
         "vacask",
         None,
     )?;
+    read(dir.path(), netlist, &stdout)
+}
+
+/// The plots of a finished VACASK run in `dir`, whose deck was `netlist`
+/// (as written, in VACASK's language): the raw file of each analysis the
+/// deck names, in the deck's order, or every `*.raw` in file-name order
+/// when it names none. In each plot the columns of the sweeps around the
+/// analysis come after its own axis, and a noise plot gains ngspice's two
+/// spectra. `stdout` is the run's, kept on every plot. Also the reader of
+/// a registered command's `Output::RawDir` (`command.rs`).
+///
+/// # Errors
+/// `SimulationError`: an analysis of the deck left no raw file (a failed
+/// analysis can exit 0 with nothing written), or the run left none at
+/// all; the file is named, with the stdout's tail. `RawParseError`: a
+/// file does not read.
+pub(super) fn read(dir: &Path, netlist: &str, stdout: &str) -> Result<Vec<RawData>, BackendError> {
     // A failed analysis can exit 0 with nothing written, so each analysis's
     // raw file is the real success test.
-    let files = raw_files_for(dir.path(), netlist).map_err(|missing| {
+    let files = raw_files_for(dir, netlist).map_err(|missing| {
         BackendError::SimulationError(format!(
-            "vacask wrote no {missing}\nstdout: {}",
-            super::tail(&stdout)
+            "the run wrote no {missing}\nstdout: {}",
+            super::tail(stdout)
         ))
     })?;
     let outer = outer_sweeps(netlist);
     let mut plots = Vec::with_capacity(files.len());
     for (k, raw) in files.iter().enumerate() {
-        let mut read = read_results(raw, stdout.clone())?;
+        let mut one = read_results(raw, stdout.to_string())?;
         // A deck that declares no analysis this can see has no sweeps either.
         let n = outer.get(k).copied().unwrap_or(0);
-        read.iter_mut().for_each(|p| {
+        one.iter_mut().for_each(|p| {
             sweeps_last(p, n);
             noise_spectra(p);
         });
-        plots.extend(read);
+        plots.extend(one);
     }
     assert!(
         plots.len() >= files.len(),

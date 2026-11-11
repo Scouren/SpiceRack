@@ -69,6 +69,8 @@ provenance, never by re-deriving it the way the writer does.
 | `test_python_examples.py::test_20_pdk_hotswap`, `test_21_combined_hotswap` | real ngspice on the pinned sky130 and gf180mcu PDKs (`pdks` in `flake.nix`, `PDK_ROOT`): V(vout) against goldens recorded with ngspice-45 and ESPice 0.3.0, at 1e-3 relative (ngspice's default RELTOL); ESPice's sky130 inverter against ngspice's at the same tolerance; 0 < V(vout) < VDD |
 | `test_python_simulator.py::TestNgbehavior` | ngspice's own "Compatibility modes selected" note (Rust: `test_ngspice_analyses.rs`); a `.spiceinit` whose `shell touch` marks it read, in the working and home directories |
 | `test_python_*.py`, `test_design_testbenches.py` | API contract: spec examples per method |
+| `test_simulators.py`, `test_simulator_oracles.py` | a fake simulator run as a real process (`tests/fixtures/sims/fake/`): each saved node's value is a closed form of its name, and the arguments it was started with are read back; each built-in of the test shell (ngspice, ESPice, VACASK) registered again as a command against the built-in itself over every conformance deck, bit for bit, the differences named in `PARITY_SIM_GAP` |
+| `test_python_api_snapshot.py` | the public names and signatures against `tests/fixtures/api_snapshot.txt`, written by hand from the docs (D13); the provisional names are left out |
 | `test_bump_version.py` | a copy of the manifests, each bump kind and each refusal |
 
 ### Oracle matrix (source dialect -> target)

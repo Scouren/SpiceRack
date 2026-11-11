@@ -14,7 +14,7 @@
 //! - `pub fn run_all(sim: Sim, deck: &str) -> Result<Vec<RawData>, BackendError>`
 //! - `pub fn run_each(sim: Sim, deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, BackendError>`
 
-use crate::backend::{BackendError, Dialect, Kind, Plot, Sim};
+use crate::backend::{BackendError, Dialect, Kind, Plot, Runner, Sim};
 use crate::result::{RawData, VarInfo, VarType};
 use crate::syntax::render::LTSPICE_EACH;
 
@@ -27,12 +27,19 @@ pub fn run(sim: Sim, deck: &str) -> Result<RawData, BackendError> {
 }
 
 /// [`run`], returning every plot the run wrote (ngspice: one per analysis,
-/// in run order), each tagged with the backend and the run's `.meas` values.
+/// in run order), each tagged with the backend and the run's `.meas` values
+/// (a `Runner::Hook` simulator's plots keep the measures its hook read).
 pub fn run_all(sim: Sim, deck: &str) -> Result<Vec<RawData>, BackendError> {
     let mut plots = sim.run_all(deck)?;
     // The built-in dialect the simulator's decks are a kind of: its
     // `.meas` lines and vector names are that family's.
     let family = sim.family();
+    // A simulator whose results its hook reads has read the measures too:
+    // each plot keeps the rows it came with.
+    if matches!(sim.row().runner, Runner::Hook { .. }) {
+        plots.iter_mut().for_each(|p| p.backend_hint = Some(family));
+        return Ok(plots);
+    }
     // LTspice writes `.meas` results to its log, everyone else to stdout;
     // every plot carries the same run's text.
     let p = &plots[0];
