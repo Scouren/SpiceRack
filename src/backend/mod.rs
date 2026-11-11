@@ -366,17 +366,17 @@ pub fn available() -> &'static [Dialect] {
 /// (`writes`: the renderer's verdict, so a run never lands where the deck
 /// is refused).
 ///
-/// A registered simulator is picked only for what it declares: one named
-/// while lacking a `needs` bit is refused, and the last resort in the body
-/// never lands on one. A built-in keeps its latitude (named: no feature
-/// check).
+/// A named simulator, built-in or registered, lacking a `needs` bit is
+/// refused: run anyway, it would quietly do less than the deck asks (a
+/// `.step` on ngspice runs one pass). The last resort in the body lands on
+/// a built-in only, never on a registered simulator.
 ///
 /// # Errors
 /// `NoSimulator`: no simulator runs every kind (the first kind that
 /// leaves none is named). `SimulationError`: the name is no simulator's.
 /// `UnsupportedAnalysis`: the named simulator lacks a kind (that kind is
 /// named), or no candidate is installed and writes the deck.
-/// `UnsupportedFeature`: a named registered simulator, or every installed
+/// `UnsupportedFeature`: the named simulator, or every installed
 /// candidate, lacks a `needs` bit. `NoBackend`: no simulator is installed.
 pub fn select(
     kinds: &[Kind],
@@ -408,7 +408,7 @@ pub fn select(
             return Err(unsupported(k, name, candidates[0]));
         }
         let lacks = needs & !sim.row().features;
-        if sim.builtin().is_none() && lacks != 0 {
+        if lacks != 0 {
             return Err(unfeatured(lacks, name, &candidates));
         }
         return Ok(sim);
@@ -712,10 +712,17 @@ mod tests {
             Err(BackendError::NoSimulator { analysis, others })
                 if analysis == "hb" && others == "pz, tran"
         ));
-        // A built-in named outright keeps its latitude on features.
+        // A built-in named outright is held to its features, as a registered
+        // simulator is: ngspice has no `.step` (`NGSPICE_CAPS`); ltspice,
+        // vacask and spectre declare it, in the route's order (`RUNNABLE`).
+        assert!(matches!(
+            select(&[Kind::Op], Some("ngspice"), STEP_PARAMS, |_| true),
+            Err(BackendError::UnsupportedFeature { feature, backend, required })
+                if feature == "step" && backend == "ngspice" && required == "ltspice, vacask, spectre"
+        ));
         assert_eq!(
-            select(&[Kind::Op], Some("ngspice"), STEP_PARAMS, |_| true).unwrap(),
-            Sim::NGSPICE
+            select(&[Kind::Op], Some("ltspice"), STEP_PARAMS, |_| true).unwrap(),
+            Sim::LTSPICE
         );
         let names: Vec<&str> = features().map(|f| f.0).collect();
         let want = "xspice osdi measures step control laplace verilog";
