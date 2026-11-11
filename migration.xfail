@@ -1845,4 +1845,5 @@ xyce/VPAT/bad_vpat.cir ngspice now written: the line Xyce rejects left out with 
 xyce/VPAT/bad_vpat.cir spectre now written: the line Xyce rejects left out with P0010 (P1-056)
 xyce/VPAT/bad_vpat.cir vacask now written: the line Xyce rejects left out with P0010 (P1-056)
 xyce/VPAT/bad_vpat.cir xyce written differently: the line Xyce rejects left out with P0010 (P1-056)
+xyce/INVALID_CHARS/semicolon_fails.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-056)
 xyce/Message/Device/DeviceBlock_extractInstanceParam.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-056)
