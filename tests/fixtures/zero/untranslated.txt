@@ -6832,7 +6832,6 @@ xyce/FFT/fftoutOptionZero.cir ltspice
 xyce/FFT/fftoutOptionZero.cir ngspice
 xyce/FFT/fftoutOptionZero.cir spectre
 xyce/FFT/fftoutOptionZero.cir vacask
-xyce/FOURIER/bad_dot_four_line1.cir cdl
 xyce/FOURIER/bad_dot_four_line1.cir espice
 xyce/FOURIER/bad_dot_four_line1.cir hspice
 xyce/FOURIER/bad_dot_four_line1.cir ltspice
