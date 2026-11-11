@@ -276,6 +276,10 @@ pub(super) fn vacask() -> DialectDef {
         // `demo/stb/osc.sim` runs it at 36be560; ZERO-LEDGER P4-106): the
         // target has it, so W0001 until P4-008 writes the `acstb` line.
         .spectre_analysis("stb")
+        // SPICE's `.sp` (Spectre `sp`) is VACASK's `acsp`
+        // (`docs/cmd-analysis-acsp.md`; `demo/sp/amp.sim` runs it at 36be560;
+        // ZERO-LEDGER P4-107, VS dossier §3 M4).
+        .spectre_analysis("sp")
         // The circuit temperature in an expression (docs/expr-special.md).
         .temp_name("$temp")
         // docs/expr-constants.md: the builtin constants and their values.

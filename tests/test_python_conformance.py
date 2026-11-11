@@ -236,7 +236,7 @@ EXPECTED = {
     'pss': (OK, OK, 'W0001', 'W0001', 'W0001', OK, 'W0001+W0102', OK, OK),
     'pss_controls': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0040', 'W0001+W0102', OK, OK),
     # Xyce: P ports and `.LIN` (D's a5f2c0a); HSPICE has `.LIN`: writer B (FINDINGS-python.md).
-    's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0015', OK, OK),
+    's_param': (OK, OK, 'W0015', OK, 'W0015', OK, 'W0001', OK, OK),
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),

@@ -44,3 +44,14 @@ fn refusals_are_errors_not_broken_decks() {
         assert!(refuses(&rc(card)), "{card} must refuse");
     }
 }
+
+/// ZERO-LEDGER P4-107. Oracle: VACASK 36be560's own analysis list
+/// (`docs/cmd-analysis-acsp.md`: `analysis name acsp`; `demo/sp/amp.sim`
+/// runs `analysis sp1 acsp ports=[…]`, research/impl/evidence/P4-107/run.log):
+/// the target has an S-parameter analysis, so `.sp` is W0001 (has it, not
+/// written yet), never W0015 (lacks it).
+#[test]
+fn p4_107_an_sp_card_is_kept_text_on_vacask() {
+    let deck = "t\nV1 a 0 dc 0 ac 1\nR1 a 0 50\n.sp dec 2 1k 10k\n.end\n";
+    assert_eq!(emit(deck).unwrap_err(), [Code::W0001]);
+}

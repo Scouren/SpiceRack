@@ -265,8 +265,16 @@ impl W<'_, '_> {
                 name("tf"),
                 bare_node(output).to_ascii_lowercase()
             )),
-            Ana::Sens(..) | Ana::Pz(..) | Ana::Sp(..) | Ana::Four(..) => {
+            Ana::Sens(..) | Ana::Pz(..) | Ana::Four(..) => {
                 self.refuse(Code::W0015, tok);
+            }
+            // `.sp` is VACASK's `acsp` (`docs/cmd-analysis-acsp.md`): the
+            // analysis list answers, W0001 while no `acsp` line is written.
+            Ana::Sp(..) => {
+                self.refuse(
+                    crate::syntax::render::read::spectre_refusal(self.b, "sp"),
+                    tok,
+                );
             }
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
             Ana::Spectre { kind, .. } => {
