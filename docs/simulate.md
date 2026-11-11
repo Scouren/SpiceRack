@@ -291,6 +291,36 @@ verilog_a = false
 assert ps.load_simulator("mysim.toml") == mysim
 ```
 
+**Provisional** (`ps.provisional` lists the names outside the 1.0 freeze; each may change in a minor
+release): `read=fn` in `output`'s place reads the results with a function of your own. The command runs as
+above; then `fn(outdir)` is called with the run's scratch directory (`{dir}`, a `str`; deleted once the
+function returns) and returns `(raw, measures)`.
+
+```python
+def read_mysim(outdir):
+    return f"{outdir}/out.raw", None           # (raw, measures)
+
+hooked = ps.Simulator(
+    "mysim-hooked",
+    dialect="ngspice",
+    command=["mysim", "-b", "-o", "{dir}/out.raw", "{deck}"],
+    analyses=["op", "tran"],
+    read=read_mysim,                           # no output=: giving both is refused (R0040)
+)
+print(hooked.output, hooked.read is read_mysim)   # None True
+print(ps.provisional)                             # ('Simulator.read',)
+```
+
+- `raw` is a raw file's path (a relative one is inside `outdir`; any file `read_raw` reads), a `RawData`,
+  or a sequence of them, one per plot (`read_raw(path)`'s list).
+- `measures` is `None`, or a dict in the `spicerack.measures/1` shape
+  ([Exporting results](#exporting-results)). Read from it: `schema`, each of `analyses`' `kind`, and each
+  of `measures`' `name`, `analysis`, `step`, `value` and `status`. They are the run's `measures`, whether
+  or not the deck holds a `.meas` card.
+- A function that raises, or returns anything else, fails the run: `RuntimeError` opening
+  `Simulation failed: read hook: `, then the exception or the part at fault.
+- A descriptor file cannot hold a function: `load_simulator` gives `output` simulators only.
+
 A registered simulator is routed like a built-in. It is a candidate for every analysis it declares, after
 the built-ins, in registration order, and it is held to what it declares. A run that cannot be routed
 raises `RuntimeError` opening with its code, and `exc.diagnostic` holds the same as data:

@@ -22,7 +22,7 @@
 //!   `Sim::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`,
 //!   `From<Sim> for RunsOn` (a dialect definition's `runs_on`)
 //! - `pub struct SimDef`, `SimDef::check(&self) -> Result<(), SimRegisterError>`,
-//!   `pub enum Runner` (`BuiltIn`, `Command`), `pub enum Installed` (`Fn`,
+//!   `pub enum Runner` (`BuiltIn`, `Command`, `Hook`), `pub enum Installed` (`Fn`,
 //!   `OnPath`), `pub enum SimRegisterError`, `SimRegisterError::code(&self) -> Code`
 //! - `pub fn register_simulator(def: SimDef) -> Result<Sim, SimRegisterError>`
 //! - `pub fn simulators() -> impl Iterator<Item = (Sim, &'static SimDef)>`
@@ -31,7 +31,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, Once, OnceLock};
 
-use super::command::{self, Arg, Output, Piece};
+use super::command::{self, Arg, Output, Piece, ReadHook};
 use super::{BACKENDS, BackendError, Kind, RUNNABLE, feature, is_on_path};
 use crate::result::RawData;
 use crate::syntax::def::RunsOn;
@@ -79,6 +79,19 @@ pub enum Runner {
         argv: Vec<Arg>,
         /// How the results are read back.
         output: Output,
+    },
+    /// A command whose results the calling crate reads itself
+    /// (provisional, outside the 1.0 freeze): `argv` as `Command`'s, then
+    /// `read(id, dir)` answers the run's plots, their measures with them,
+    /// from the scratch directory.
+    Hook {
+        /// The program, then its arguments.
+        argv: Vec<Arg>,
+        /// The reader (a binding's one function for all its hooks).
+        read: ReadHook,
+        /// What `read` is called with: the caller's own number for the
+        /// reader (a binding's table index).
+        id: u32,
     },
 }
 
@@ -202,12 +215,12 @@ impl Sim {
         let plots = match &self.row().runner {
             Runner::BuiltIn(run) => run(netlist)?,
             Runner::Command { argv, output } => {
-                if !self.installed() {
-                    return Err(BackendError::NotInstalled {
-                        simulator: self.name().to_string(),
-                    });
-                }
+                present(self)?;
                 command::run(argv, *output, self.family(), netlist)?
+            }
+            Runner::Hook { argv, read, id } => {
+                present(self)?;
+                command::run_hook(argv, *read, *id, self.family(), netlist)?
             }
         };
         assert!(!plots.is_empty(), "a raw file read holds at least one plot");
@@ -253,15 +266,17 @@ impl SimDef {
         if self.analyses == 0 || past != 0 {
             return Err(SimRegisterError::Analyses(self.analyses));
         }
-        if let Runner::Command { argv, .. } = &self.runner {
-            if argv.is_empty() {
-                return Err(SimRegisterError::Command("it has no program".into()));
-            }
-            if !argv.iter().flatten().any(|p| *p == Piece::Deck) {
-                return Err(SimRegisterError::Command(
-                    "no word holds {deck}: the simulator is never given the deck".into(),
-                ));
-            }
+        let argv = match &self.runner {
+            Runner::BuiltIn(_) => return Ok(()),
+            Runner::Command { argv, .. } | Runner::Hook { argv, .. } => argv,
+        };
+        if argv.is_empty() {
+            return Err(SimRegisterError::Command("it has no program".into()));
+        }
+        if !argv.iter().flatten().any(|p| *p == Piece::Deck) {
+            return Err(SimRegisterError::Command(
+                "no word holds {deck}: the simulator is never given the deck".into(),
+            ));
         }
         Ok(())
     }
@@ -290,6 +305,18 @@ impl PartialEq for Runner {
             (Runner::Command { argv: a, output: x }, Runner::Command { argv: b, output: y }) => {
                 a == b && x == y
             }
+            (
+                Runner::Hook {
+                    argv: a,
+                    read: f,
+                    id: i,
+                },
+                Runner::Hook {
+                    argv: b,
+                    read: g,
+                    id: j,
+                },
+            ) => a == b && i == j && std::ptr::fn_addr_eq(*f, *g),
             _ => false,
         }
     }
@@ -340,6 +367,16 @@ pub fn by_name(name: &str) -> Option<Sim> {
 }
 
 // ---- private ----
+
+/// `NotInstalled` for a command simulator whose probe says it is absent.
+fn present(sim: Sim) -> Result<(), BackendError> {
+    match sim.installed() {
+        true => Ok(()),
+        false => Err(BackendError::NotInstalled {
+            simulator: sim.name().to_string(),
+        }),
+    }
+}
 
 /// Registers the built-ins once, before the first read: `BACKENDS`' rows,
 /// in its order, so `Sim(i)` is `RUNNABLE[i]`'s simulator.

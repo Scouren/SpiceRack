@@ -28,7 +28,7 @@
 //! - `pub fn available() -> &'static [Dialect]`
 //! - `pub use registry::{Installed, Runner, SIMS_MAX, Sim, SimDef, SimRegisterError, by_name,
 //!   register_simulator, simulators}` (`registry.rs`: the simulator registry)
-//! - `pub use command::{Arg, Output, Piece, parse_arg}` (`command.rs`: a simulator run as a command)
+//! - `pub use command::{Arg, Output, Piece, ReadHook, parse_arg}` (`command.rs`: a simulator run as a command)
 //! - `pub use kind::Kind`, `pub(crate) use kind::Plot` (`kind.rs`: the analysis kinds)
 //! - `pub fn select(kinds: &[Kind], override_backend: Option<&str>, needs: u8, writes: impl Fn(Sim) -> bool) -> Result<Sim, BackendError>`
 //! - `pub struct Issue`, `pub enum IssueSeverity`,
@@ -51,7 +51,7 @@ use std::sync::OnceLock;
 
 use feature::*;
 
-pub use command::{Arg, Output, Piece, parse_arg};
+pub use command::{Arg, Output, Piece, ReadHook, parse_arg};
 pub use kind::Kind;
 pub(crate) use kind::Plot;
 pub use registry::{

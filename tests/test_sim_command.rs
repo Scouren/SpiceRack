@@ -228,3 +228,89 @@ fn p8_206_each_refusal_cause_has_its_code() {
     assert_eq!(bad(command), Code::R0040);
     assert_eq!(SimRegisterError::Full.code(), Code::R0042);
 }
+
+/// Oracle: the values the deck holds by hand (2.5 and 1.0), read back
+/// through a real process by a reader of the test's own, and the row that
+/// reader made up. The deck's `.meas` card is the trap: a run that still
+/// read the measures from stdout would give ngspice's failed `never` row
+/// in the reader's place.
+#[cfg(feature = "backend")]
+#[test]
+fn p8_209_a_hook_simulator_runs_its_command_and_keeps_what_the_hook_read() {
+    use std::path::Path;
+
+    use spicerack::backend::{
+        BackendError, Installed, Kind, Runner, SimDef, SimRegisterError, parse_arg,
+        register_simulator,
+    };
+    use spicerack::result::{MeasureResult, RawData};
+    use spicerack::syntax::{Dialect, Lang};
+
+    fn read(id: u32, dir: &Path) -> Result<Vec<RawData>, BackendError> {
+        if id == 9 {
+            return Ok(Vec::new());
+        }
+        let bytes = std::fs::read(dir.join("copy.raw"))?;
+        let mut plots = spicerack::rawfile::parse_raw_all(&bytes)?;
+        for p in &mut plots {
+            p.measures = vec![MeasureResult::ok("id", f64::from(id))];
+        }
+        Ok(plots)
+    }
+    // The raw file is the deck without its `.meas` card.
+    let script = "grep -v '^\\.meas' \"$1\" > \"$2\" && echo ran";
+    let def = |name: &str, id: u32, ws: &[&str]| SimDef {
+        name: name.into(),
+        dialect: Lang::NGSPICE,
+        runner: Runner::Hook {
+            argv: ws.iter().map(|w| parse_arg(w).expect("a word")).collect(),
+            read,
+            id,
+        },
+        features: 0,
+        analyses: 1 << Kind::Op as u32,
+        installed: Installed::OnPath(ws.first().copied().unwrap_or("").to_string()),
+    };
+    let ws = ["sh", "-c", script, "sh", "{deck}", "{dir}/copy.raw"];
+    let sim = register_simulator(def("p8-209-hook", 7, &ws)).expect("registers");
+    assert_eq!(
+        register_simulator(def("p8-209-hook", 7, &ws)),
+        Ok(sim),
+        "idempotent"
+    );
+    assert_eq!(
+        register_simulator(def("p8-209-hook", 8, &ws)),
+        Err(SimRegisterError::Redefined("p8-209-hook".into())),
+        "another hook id is another definition"
+    );
+
+    let deck = raw_text("hooked", 2.5) + ".meas op never find v(out) at=1\n";
+    let plots = spicerack::simulation::run_all(sim, &deck).expect("runs");
+    assert_eq!(plots.len(), 1);
+    assert_eq!(plots[0].title, "hooked");
+    assert_eq!(plots[0].real_data, [[2.5], [1.0]]);
+    assert_eq!(plots[0].stdout, "ran\n");
+    assert_eq!(plots[0].backend_hint, Some(Dialect::Ngspice));
+    let rows: Vec<(&str, f64)> = plots[0]
+        .measures
+        .iter()
+        .map(|m| (m.name.as_str(), m.value))
+        .collect();
+    assert_eq!(rows, [("id", 7.0)], "the hook's row, not the deck's card");
+
+    // A reader with no plot is a failed run; its command is checked as a
+    // `Command`'s and asked for before anything is spawned.
+    let none = register_simulator(def("p8-209-none", 9, &ws)).expect("registers");
+    assert!(matches!(
+        spicerack::simulation::run_all(none, &deck),
+        Err(BackendError::SimulationError(m)) if m == "read hook: it returned no plot"
+    ));
+    let undecked = register_simulator(def("p8-209-bad", 7, &["sh", "{raw}"]));
+    assert!(matches!(undecked, Err(SimRegisterError::Command(_))));
+    let ghost = def("p8-209-ghost", 7, &["p8-209-no-such-program", "{deck}"]);
+    let ghost = register_simulator(ghost).expect("registers: installed is asked at run time");
+    assert!(matches!(
+        spicerack::simulation::run_all(ghost, &deck),
+        Err(BackendError::NotInstalled { simulator }) if simulator == "p8-209-ghost"
+    ));
+}

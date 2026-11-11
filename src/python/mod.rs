@@ -29,6 +29,7 @@
 //! - `store.rs`: a subcircuit's source text and stored file (`to_source`, `save`)
 //! - `simulator.rs`, `spectre.rs`: `CircuitSimulator` and its Spectre-only analyses
 //! - `sims.rs`: `Simulator`, `register_simulator`, `simulators` (the simulator registry)
+//! - `sims_read.rs`: a `Simulator`'s provisional `read=` function (the run's plots and measures)
 //! - `testbench.rs`: `Testbench`, `ModelLibrary`
 //! - `def_.rs`, `def_enums.rs`, `def_tag.rs`: the dialect-definition API (`spicerack.def_`)
 //! - `results.rs`: `RawData`, `OperatingPoint` and the analysis result classes
@@ -62,6 +63,7 @@ mod model;
 mod results;
 mod section;
 mod sims;
+mod sims_read;
 mod simulator;
 mod store;
 mod subcircuit;

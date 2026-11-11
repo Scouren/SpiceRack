@@ -1,16 +1,19 @@
 //! A simulator run as a command: an argv template (one [`Arg`] per word,
 //! with the `{deck}`, `{raw}` and `{dir}` placeholders) → the process, run
 //! on the deck in a scratch directory → its result files, read as an
-//! [`Output`] says. No shell: a word is one argv entry whatever its text
-//! holds, and every placeholder becomes an absolute path.
+//! [`Output`] says or by the caller's [`ReadHook`]. No shell: a word is
+//! one argv entry whatever its text holds, and every placeholder becomes
+//! an absolute path.
 //!
 //! Cites: none (the readers are `rawfile`'s; the run mechanics are the
 //! built-ins' own: `ngspice.rs`, `vacask.rs`, `ltspice.rs`).
 //!
 //! Contents:
-//! - `pub enum Piece`, `pub type Arg`, `pub enum Output`, `Output::NAMES: [(&str, Output); 5]`
+//! - `pub enum Piece`, `pub type Arg`, `pub enum Output`, `Output::NAMES: [(&str, Output); 5]`,
+//!   `pub type ReadHook`
 //! - `pub fn parse_arg(template: &str) -> Result<Arg, SimRegisterError>`
 //! - `pub(super) fn run(argv: &[Arg], output: Output, family: Dialect, netlist: &str) -> Result<Vec<RawData>, BackendError>`
+//! - `pub(super) fn run_hook(argv: &[Arg], read: ReadHook, id: u32, family: Dialect, netlist: &str) -> Result<Vec<RawData>, BackendError>`
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -57,6 +60,12 @@ pub enum Output {
     /// The nutmeg ASCII file at `{raw}` (Spectre `-format nutascii`).
     Nutascii,
 }
+
+/// Reads a finished command's results the calling crate's own way
+/// (`Runner::Hook`; provisional, outside the 1.0 freeze): the caller's
+/// hook `id` and the run's scratch directory (absolute; deleted after the
+/// call) in, every plot of the run out, each carrying its measures.
+pub type ReadHook = fn(id: u32, dir: &Path) -> Result<Vec<RawData>, BackendError>;
 
 /// A finished command: its scratch directory (deleted on drop), the
 /// result path and the captured stdout.
@@ -128,22 +137,51 @@ pub(super) fn run(
     family: Dialect,
     netlist: &str,
 ) -> Result<Vec<RawData>, BackendError> {
-    let ran = start(argv, output, family, netlist)?;
+    let ran = start(argv, output == Output::RawDir, family, netlist)?;
     let plots = read(&ran, output)?;
     assert!(!plots.is_empty(), "a raw file read holds at least one plot");
+    Ok(plots)
+}
+
+/// [`run`] for a simulator whose results the caller reads
+/// (`Runner::Hook`): the command runs the same way, in the caller's
+/// working directory; then `read(id, dir)` answers the plots from the
+/// scratch directory `dir`, which is deleted when this returns. Each plot
+/// then carries the command's stdout.
+///
+/// # Errors
+/// As [`run`] for the command; whatever `read` returns; `SimulationError`
+/// when it answers no plot.
+///
+/// # Panics
+/// When `argv` is empty (registration refuses it).
+pub(super) fn run_hook(
+    argv: &[Arg],
+    read: ReadHook,
+    id: u32,
+    family: Dialect,
+    netlist: &str,
+) -> Result<Vec<RawData>, BackendError> {
+    let ran = start(argv, false, family, netlist)?;
+    let dir = std::path::absolute(ran.dir.path())?;
+    assert!(ran.raw.starts_with(&dir), "the deck is in `dir`");
+    let mut plots = read(id, &dir)?;
+    if plots.is_empty() {
+        let none = "read hook: it returned no plot";
+        return Err(BackendError::SimulationError(none.into()));
+    }
+    for p in &mut plots {
+        p.stdout.clone_from(&ran.stdout);
+    }
     Ok(plots)
 }
 
 // ---- private ----
 
 /// Writes the deck into a fresh scratch directory and runs the command
-/// there to completion.
-fn start(
-    argv: &[Arg],
-    output: Output,
-    family: Dialect,
-    netlist: &str,
-) -> Result<Ran, BackendError> {
+/// to completion, with that directory as its working directory when
+/// `in_dir`.
+fn start(argv: &[Arg], in_dir: bool, family: Dialect, netlist: &str) -> Result<Ran, BackendError> {
     assert!(!argv.is_empty(), "a registered command has a program");
     // Spectre reads a file as its own language by the `.scs` extension.
     let file = match family {
@@ -157,7 +195,7 @@ fn start(
     let words = words(argv, &here, &deck, &raw);
     let mut cmd = Command::new(&words[0]);
     cmd.args(&words[1..]);
-    if output == Output::RawDir {
+    if in_dir {
         cmd.current_dir(&here);
     }
     let program = words[0].to_string_lossy();

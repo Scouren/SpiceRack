@@ -11,11 +11,14 @@ The registry is one per process and never shrinks: every test registers
 under its own `p8-<row>-` names and asserts by name, never by count.
 """
 import hashlib
+import json
+import os
 import sys
 from pathlib import Path
 
 import pytest
 
+import schema_check
 import spicerack as ps
 from spicerack.def_ import DialectDef, Simulator as BuiltIn
 
@@ -259,3 +262,139 @@ def test_p8_207_a_dialect_runs_on_a_registered_simulator():
         DialectDef("p8-207-early").runs_on("p8-207-later")
     with pytest.raises(TypeError, match="runs_on takes"):
         DialectDef("p8-207-early").runs_on(3)
+
+
+MEASURES = {
+    "schema": "spicerack.measures/1",
+    "spicerack": "0",
+    "backend": None,
+    "raw": "out.raw",
+    "analyses": [{"index": 0, "kind": "op", "plot": "Operating Point", "steps": None}],
+    "measures": [
+        {"name": "vout", "analysis": 0, "step": None, "value": 0.75, "status": "ok"},
+        {"name": "never", "analysis": 0, "step": None, "value": None, "status": "failed"},
+    ],
+}
+# A hook simulator's command: the fake writes where the hook then reads.
+HOOKED = dict(command=[sys.executable, str(FAKE), "{deck}", "{dir}/out.raw"], output=None)
+
+
+def test_p8_209_a_read_hook_reads_the_run_back():
+    """Oracle: the fake's closed form, and the same deck on the fake read by `output`: the hook hands
+    back the fake's own raw file, so the two runs agree bit for bit. The measures are `MEASURES`,
+    written by hand (the fake measures nothing, and the deck holds no `.meas` card)."""
+    answer = {}
+
+    def read(outdir):
+        answer["outdir"] = outdir
+        return answer["raw"](os.path.join(outdir, "out.raw")), answer["measures"]
+
+    hooked = fake("p8-209-hook", read=read, **HOOKED)
+    assert hooked.read is read and hooked.output is None
+    assert fake("p8-209-hook", read=read, **HOOKED) == hooked
+    assert fake("p8-209-hook", read=lambda outdir: None, **HOOKED) != hooked
+    assert fake("p8-209-hook") != hooked
+    assert "Simulator.read" in ps.provisional
+    assert ps.register_simulator(hooked) == "p8-209-hook"
+    # The same function again is the same simulator; another function under the name is refused.
+    assert ps.register_simulator(fake("p8-209-hook", read=read, **HOOKED)) == "p8-209-hook"
+    with pytest.raises(ValueError, match="^R0040 .*name: 'p8-209-hook' is held by a different simulator$"):
+        ps.register_simulator(fake("p8-209-hook", read=lambda outdir: None, **HOOKED))
+    ps.register_simulator(fake("p8-209-plain"))
+
+    def run(name):
+        sim = divider().simulator(simulator=name)
+        sim.save("V(out)", "V(in)")
+        return sim.operating_point()
+
+    plain = run("p8-209-plain")
+    assert plain.measures == {}
+    forms = {
+        "a path": lambda path: path,
+        "a path inside outdir": lambda path: "out.raw",
+        "a pathlib.Path": Path,
+        "a RawData": lambda path: ps.read_raw(path)[0],
+        "a list of RawData": ps.read_raw,
+        "a tuple of RawData": lambda path: tuple(ps.read_raw(path)),
+    }
+    for what, raw in forms.items():
+        answer.update(raw=raw, measures=MEASURES)
+        op = run("p8-209-hook")
+        assert (op["out"], op["in"]) == (expected("out"), expected("in")), what
+        assert (op["out"], op["in"]) == (plain["out"], plain["in"]), what
+        assert op.measures == {"vout": 0.75, "never": None}, what
+        assert os.path.isabs(answer["outdir"]) and not os.path.exists(answer["outdir"]), what
+    answer.update(measures=None)
+    assert run("p8-209-hook").measures == {}
+
+    # `MEASURES` is the documented shape: the schema `export`'s sidecar is checked against.
+    schema = Path(__file__).parent / "fixtures" / "schemas" / "spicerack.measures-1.schema.json"
+    assert schema_check.errors(MEASURES, json.loads(schema.read_text())) == []
+
+
+def test_p8_209_a_read_hook_that_fails_is_a_failed_run():
+    """Oracle: each wrong answer written out with the part of it the refusal must name."""
+    answer = {}
+    ps.register_simulator(
+        fake("p8-209-wrong", read=lambda outdir: answer["do"](os.path.join(outdir, "out.raw")), **HOOKED)
+    )
+
+    def boom(path):
+        raise KeyError("boom")
+
+    def row(**over):
+        measures = [{**MEASURES["measures"][0], **over}]
+        return lambda path: (path, {**MEASURES, "measures": measures})
+
+    def without(key):
+        doc = {k: v for k, v in MEASURES.items() if k != key}
+        return lambda path: (path, doc)
+
+    cases = [
+        (boom, "KeyError: 'boom'"),
+        (lambda path: path, "it returns a (raw, measures) tuple"),
+        (lambda path: (path, None, None), "it returns a (raw, measures) tuple"),
+        (lambda path: [path, None], "it returns a (raw, measures) tuple"),
+        (lambda path: (3, None), "raw: a path, a RawData or a sequence of RawData"),
+        (lambda path: ([path], None), "raw: a path, a RawData or a sequence of RawData"),
+        (lambda path: (path + ".missing", None), "raw: " + os.sep),
+        (lambda path: ([], None), "it returned no plot"),
+        (lambda path: (path, []), "measures: a dict or None"),
+        (lambda path: (path, {**MEASURES, "schema": "spicerack.measures/2"}), 'measures: schema: not "spicerack.measures/1"'),
+        (without("schema"), "measures: schema: missing"),
+        (without("analyses"), "measures: analyses: missing"),
+        (without("measures"), "measures: measures: missing"),
+        (lambda path: (path, {**MEASURES, "analyses": [{"kind": 3}]}), "measures: analyses: kind: a str or None"),
+        (row(analysis=1), "measures: measures[0].analysis: a place in analyses"),
+        (row(step=-1), "measures: measures[0].step: "),
+        (row(value=None), "measures: measures[0].value: "),
+        (row(value=float("inf")), "measures: measures[0].value: "),
+        (row(value="0.75"), "measures: measures[0].value: "),
+        (row(status="done"), "measures: measures[0].status: "),
+        (row(name=3), "measures: measures[0].name: a str"),
+    ]
+    for do, why in cases:
+        answer["do"] = do
+        sim = divider().simulator(simulator="p8-209-wrong")
+        sim.save("V(out)")
+        with pytest.raises(RuntimeError) as e:
+            sim.operating_point()
+        assert str(e.value).startswith("Simulation failed: read hook: "), str(e.value)
+        assert why in str(e.value), (why, str(e.value))
+    # The simulator still runs once its hook answers.
+    answer["do"] = lambda path: (path, None)
+    sim = divider().simulator(simulator="p8-209-wrong")
+    sim.save("V(out)")
+    assert sim.operating_point()["out"] == expected("out")
+
+    # The descriptor: `read` is a function, in `output`'s place.
+    refused = [
+        ("read", lambda: fake("x", read=3, **HOOKED)),
+        ("output", lambda: fake("x", read=boom)),  # both
+        ("output", lambda: fake("x", **HOOKED)),  # neither
+        ("command", lambda: fake("x", read=boom, command=["fake", "{raw}"], output=None)),
+    ]
+    for field, build in refused:
+        with pytest.raises(ValueError) as e:
+            build()
+        assert str(e.value).startswith(R0040 + field + ": "), (field, str(e.value))

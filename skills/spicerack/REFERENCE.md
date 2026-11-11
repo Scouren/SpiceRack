@@ -257,6 +257,8 @@ The `u_Ω` family is registered with U+03A9 and does work.
 | `ps.register_simulator(sim)` | registers it, returns its name; an equal `Simulator` twice is one; a different one under a held name (any case) is `R0040`, a 33rd simulator `R0042` |
 | `ps.simulators()` | every simulator's name in route order: `ngspice`, `ltspice`, `vacask`, `spectre`, `espice`, then the registered ones |
 | `ps.load_simulator(path)` | a `spicerack.simulator/1` TOML file (`schema = "spicerack.simulator/1"` required, then `Simulator`'s arguments as keys; an unknown key is `R0040`) as a `Simulator`, not registered; Python 3.11+ |
+| `ps.Simulator(..., read=fn)` (provisional) | `read` in `output`'s place (both is `R0040`): the command runs, then `fn(outdir: str) -> (raw, measures)` reads the results. `raw`: a raw file's path (relative: in `outdir`), a `RawData`, or a sequence of them. `measures`: `None`, or a `spicerack.measures/1` dict, of which `schema`, `analyses[].kind` and `measures[].{name, analysis, step, value, status}` are read; they become `result.measures`. `.read` is the function, `.output` then `None`. A failure is `RuntimeError` `Simulation failed: read hook: ...` |
+| `ps.provisional` | the names outside the 1.0 freeze: `("Simulator.read",)` |
 | `exc.diagnostic` | on a `RuntimeError` with code `W0180`/`W0181`/`W0182` (`stage: "route"`, `missing: {"analyses": [...], "features": [...]}`) or `R0041` (`stage: "run"`, `missing: None`) |
 
 ## Backend capabilities
