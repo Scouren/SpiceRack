@@ -1851,3 +1851,7 @@ xyce/MEASURE/bad_dot_measure_line1.cir espice now written: the line Xyce rejects
 xyce/MEASURE/bad_dot_measure_line1.cir hspice now written: the line Xyce rejects left out with P0010 (P1-059)
 xyce/MEASURE/bad_dot_measure_line1.cir ltspice now written: the line Xyce rejects left out with P0010 (P1-059)
 xyce/MEASURE/bad_dot_measure_line1.cir ngspice now written: the line Xyce rejects left out with P0010 (P1-059)
+xyce/MEASURE/bad_dot_measure_line2.cir espice now written: the .MEASURE lines Xyce rejects for an unpaired brace or a key with no value left out with P0010 (P1-059); its other Xyce-fatal lines (TARG with no value, AT in TARG, RISE=BOGO) are P1-056-s2
+xyce/MEASURE/bad_dot_measure_line2.cir hspice now written: the .MEASURE lines Xyce rejects for an unpaired brace or a key with no value left out with P0010 (P1-059); its other Xyce-fatal lines (TARG with no value, AT in TARG, RISE=BOGO) are P1-056-s2
+xyce/MEASURE/bad_dot_measure_line2.cir ltspice now written: the .MEASURE lines Xyce rejects for an unpaired brace or a key with no value left out with P0010 (P1-059); its other Xyce-fatal lines (TARG with no value, AT in TARG, RISE=BOGO) are P1-056-s2
+xyce/MEASURE/bad_dot_measure_line2.cir ngspice now written: the .MEASURE lines Xyce rejects for an unpaired brace or a key with no value left out with P0010 (P1-059); its other Xyce-fatal lines (TARG with no value, AT in TARG, RISE=BOGO) are P1-056-s2
