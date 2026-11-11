@@ -206,8 +206,8 @@ def ngspice(d):
         .spell(Construct.TableSource, Alt.PwlValue)
         .native(Construct.LossyLine)
         .native(Construct.AmWave)
-        .refuse(Construct.Step, Code.W0016)
-        .refuse(Construct.StepList, Code.W0016)
+        .spell(Construct.Step, Alt.ControlScript)
+        .spell(Construct.StepList, Alt.ControlScript)
         .lift(Construct.TranStartup, Rule.StartupRamp)
         .refuse(Construct.DcLogList, Code.W0038)
         .native(Construct.Tf)
@@ -251,7 +251,9 @@ def espice(d):
         # ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
         # offset" (run).
         .spell(Construct.AmWave, Alt.AmNoOffset)
-        .refuse(Construct.Epochs, Code.W0130))
+        .refuse(Construct.Epochs, Code.W0130)
+        .refuse(Construct.Step, Code.W0016)
+        .refuse(Construct.StepList, Code.W0016))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,

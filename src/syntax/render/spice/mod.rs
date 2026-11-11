@@ -14,7 +14,8 @@
 //! Xyce's spellings of another dialect's cards, `xyce_models` its model cards,
 //! `ngspice_models` a Xyce model card's level elsewhere,
 //! `prints` the `.print` cards, `epochs` the script lines of a circuit
-//! changed between analyses), `checks` the deck-wide
+//! changed between analyses, `loops` a `.step` as that script's loops),
+//! `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
 //! transfer function a Laplace lift reads, `ternary` a `?:` as the
 //! target reads it, `table` an E/G `TABLE` as a chain of ternaries,
@@ -53,6 +54,7 @@ mod epochs;
 mod globals;
 mod initial;
 mod laplace;
+mod loops;
 mod model_cards;
 mod ngspice_models;
 mod ngspice_options;

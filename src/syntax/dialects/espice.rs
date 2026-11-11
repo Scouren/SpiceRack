@@ -54,5 +54,9 @@ pub(super) fn espice() -> DialectDef {
         // ESPice 0.3.0 runs no `.control` command ("command 'alterparam'
         // ignored", run): one circuit a deck.
         .refuse(Construct::Epochs, Code::W0130)
+        // So ngspice's loop is not ESPice's: a `.step` stays refused until
+        // its own `.step` card is written (ZERO-LEDGER P4-029).
+        .refuse(Construct::Step, Code::W0016)
+        .refuse(Construct::StepList, Code::W0016)
     // --- S3
 }

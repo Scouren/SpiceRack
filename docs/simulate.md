@@ -98,7 +98,9 @@ simulator's own option (a Xyce package, VACASK's `tran_method`) is a line of
 that simulator's text, `tb.extra_line(line, dialect="xyce")`.
 
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
-emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
+emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not
+(`netlist("ngspice")` writes the sweep as `foreach` loops of a `.control`
+script; a run still goes to a backend that returns one result per step).
 On LTspice a stepped run returns a list, one result per step in step order, and
 each result's `params` names its step (`{"r": 2000.0}`; `{}` when nothing steps),
 so `[op.params["r"] for op in tb.operating_point()]` lists the step values

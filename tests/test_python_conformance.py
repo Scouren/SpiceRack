@@ -356,9 +356,10 @@ EXPECTED = {
     'save': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'measure': (OK, OK, OK, OK, OK, OK, 'W0109', OK, OK),
     'print': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'step': ('W0016', 'W0016', 'W0016', OK, OK, OK, OK, OK, OK),
-    'step_dec': ('W0016', 'W0016', 'W0016', OK, OK, OK, OK, OK, OK),
-    'step_log': ('W0016', 'W0016', 'W0016', 'W0016', 'W0016', OK, 'W0016', OK, OK),
+    # ngspice: `foreach` loops of its `.control` script (ZERO-LEDGER P5-001 step 3).
+    'step': (OK, 'W0016', 'W0016', OK, OK, OK, OK, OK, OK),
+    'step_dec': (OK, 'W0016', 'W0016', OK, OK, OK, OK, OK, OK),
+    'step_log': (OK, 'W0016', 'W0016', 'W0016', 'W0016', OK, 'W0016', OK, OK),
     'ngbehavior': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'function': (OK, OK, OK, OK, OK, OK, 'W0106', OK, OK),
     # A function of a subcircuit (it reads the subcircuit's parameter): LTspice, Spectre

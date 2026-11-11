@@ -103,11 +103,12 @@ macro_rules! rows_w_spice {
                 cite: "ngspice manual ch.11; HSPICE UG; Xyce RG Table 6-1; LTspice help",
                 explain: "The target has no analysis of this kind. Run it on a simulator that has one, or drop it from the deck.",
             }
-            /// A `.step` sweep the target has no card for (it would run once).
+            /// A `.step` sweep the target has no card for (it would run
+            /// once), or one ngspice's control script has no command for.
             W0016 Refusal {
                 title: "a `.step` the target lacks",
                 cite: "ngspice manual (no `.step`; `.dc` sweeps); HSPICE `.alter`; Xyce RG p.155",
-                explain: "The target has no `.step`, so the deck would run once. Sweep with the target's own form (`.dc` over a parameter, `.alter`, a script loop).",
+                explain: "The target has no `.step`, so the deck would run once. Sweep with the target's own form (`.dc` over a parameter, `.alter`, a script loop). ngspice runs a `.step` over the temperature, a parameter the deck's top declares or a top-level R, C, L, V, I as a loop of its `.control` script; a step over anything else (a device or model parameter, a name an included file declares) is refused.",
             }
             /// An option the target has no spelling for.
             W0017 Refusal {

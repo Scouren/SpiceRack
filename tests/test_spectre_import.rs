@@ -128,8 +128,9 @@ fn a_spectre_verilog_a_instance_is_an_ngspice_osdi_instance() {
 fn a_spectre_parameter_sweep_is_a_step_on_xyce() {
     // Spectre Reference 19.1 pp.406-409: `sweep param=p start= stop= step=
     // { analysis }` repeats the analysis over p; Xyce RG `.STEP p start
-    // stop step` (and LTspice `.step param p …`) does; ngspice has no
-    // `.step` (W0016). The divider's v(2) = 10 rl / (1k + rl).
+    // stop step` (and LTspice `.step param p …`) does; ngspice runs the
+    // points as a `foreach` loop of its control script (manual §13.6.4);
+    // ESPice has neither (W0016). The divider's v(2) = 10 rl / (1k + rl).
     let deck = "simulator lang=spectre\nparameters rl=1k\nv1 (1 0) vsource dc=10\n\
                 r1 (1 2) resistor r=1k\nr2 (2 0) resistor r=rl\n\
                 swp sweep param=rl start=1k stop=9k step=8k {\n  \
@@ -150,8 +151,12 @@ fn a_spectre_parameter_sweep_is_a_step_on_xyce() {
             .contains(".step param rl 1000 9000 8000"),
         "{lt}"
     );
-    let ng = written(deck, Dialect::Spectre, Dialect::Ngspice);
-    assert_eq!(refusals(ng), vec![Code::W0016]);
+    let ng = written(deck, Dialect::Spectre, Dialect::Ngspice).expect("written");
+    for line in ["foreach s1 1000 9000", "alterparam rl=$s1", "reset"] {
+        assert!(ng.lines().any(|l| l == line), "{line}: {ng}");
+    }
+    let es = written(deck, Dialect::Spectre, Dialect::Espice);
+    assert_eq!(refusals(es), vec![Code::W0016]);
 }
 
 // ZERO-LEDGER P3-098. Oracle: Spectre Reference 19.1 p.43 (`lin`, `log`:

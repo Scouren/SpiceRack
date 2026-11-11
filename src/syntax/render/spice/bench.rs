@@ -55,9 +55,9 @@ pub(super) struct Tb {
     /// Each measure's statement's first token.
     meas_toks: Vec<u32>,
     /// Each `.step`'s sweep, name, numbers and first token.
-    steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
+    pub(super) steps: Vec<(Option<&'static str>, String, [f64; 3], u32)>,
     /// Each list `.step`'s name, values and first token.
-    step_lists: Vec<(String, Vec<f64>, u32)>,
+    pub(super) step_lists: Vec<(String, Vec<f64>, u32)>,
     /// VACASK control statements kept as text: none is written
     /// (`W::vacask_lines`).
     pub(super) extra: Vec<u32>,
@@ -366,8 +366,11 @@ impl W<'_, '_> {
         // ngspice's control script, which then runs every analysis (in
         // the block `control_run` asked for, or one of its own).
         let scripted = !tb.plan.single_epoch() && self.scripted(&tb.plan);
+        // The `.step`s the target's cells spell as loops of that script
+        // (`loops.rs`): they too run every analysis from the block.
+        let loops = self.loops(tb);
         let control = match control {
-            None if scripted => Some(&[] as &[String]),
+            None if scripted || !loops.is_empty() => Some(&[] as &[String]),
             given => given,
         };
         let each = || tb.plan.runs.iter().zip(&tb.plan.run_tok);
@@ -381,6 +384,7 @@ impl W<'_, '_> {
                     .iter()
                     .position(|a| matches!(a, Ana::Tran { .. }));
                 self.o.token(".control", Space::Line);
+                self.loop_open(&loops);
                 for (i, (a, tok)) in each().enumerate() {
                     if scripted {
                         self.alter_lines(&tb.plan, i);
@@ -397,6 +401,7 @@ impl W<'_, '_> {
                 if at.is_none() {
                     fourier.iter().for_each(|f| self.o.token(f, Space::Line));
                 }
+                self.loop_close(&loops);
                 self.o.token(".endc", Space::Line);
             }
             None => {
