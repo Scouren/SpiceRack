@@ -22,9 +22,9 @@
 //! (a TRIG/TARG), `Measurement "tnever" FAIL'ed`. With `.step`, a table per measure:
 //! ```text
 //! Measurement: thalf
-//!   step	V(out)=0.3
-//!      1	6e-07
-//!      2	failed
+//!   step    V(out)=0.3
+//!      1    6e-07
+//!      2    failed
 //! ```
 //!
 //! Simulator text in, [`MeasureResult`] rows out.
