@@ -174,7 +174,7 @@ pub(super) fn vacask() -> DialectDef {
         .named_params(NamedParams::Vacask)
         .analysis_masters(Lang::SPECTRE)
         // `.options KEY=VALUE` whose VACASK spelling is the same word and
-        // the same quantity (`itl1`, `maxord` are rejected there). `scale`
+        // the same quantity (`itl1` is `op_itl`, a row below). `scale`
         // is the `$simparam("scale")` VACASK's `sp_*` modules read where
         // ngspice's code reads `CKTscale` (`devices/spice/*.va` headers;
         // `lib/osdidevice.cpp` `simParamNames`).
@@ -203,6 +203,32 @@ pub(super) fn vacask() -> DialectDef {
         .option_cosmetic("sparse")
         .option_cosmetic("savecurrents")
         .option_cosmetic("numdgt")
+        // HSPICE's and LTspice's listing and output keys (ngspice manual
+        // §11.1.1 NOINIT; HSPICE WARN, MAXWARNS, MEASDGT; LTspice
+        // `plotwinsize`): no number in the raw file.
+        .option_cosmetic("warn")
+        .option_cosmetic("maxwarns")
+        .option_cosmetic("measdgt")
+        .option_cosmetic("plotwinsize")
+        .option_cosmetic("noinit")
+        // The same quantity under VACASK's own word (36be560
+        // `docs/cmd-options-op.md` `op_itl`, `-tran.md` `tran_itl`,
+        // `-homotopy.md` `homotopy_gminsteps` and `homotopy_srcsteps`, a
+        // step count with 0 = off as SPICE's; ZERO-LEDGER P4-009).
+        // `maxord` is not here: `tran_maxord` bounds the variable-order
+        // methods only, and the writer's `trap` and `gear2` are fixed
+        // order 2.
+        .option_to("itl1", "op_itl")
+        .option_to("itl4", "tran_itl")
+        .option_to("gminsteps", "homotopy_gminsteps")
+        .option_to("srcsteps", "homotopy_srcsteps")
+        // RSHUNT, a resistor from every node to ground, is the inverse of
+        // `gshunt` (`docs/cmd-options-temp.md`; ngspice-45 and VACASK both
+        // give 3/7 V on a 1k/3k divider with 1k). NOOPITER, no direct
+        // solve before the stepping, is `op_skipinitial`
+        // (`docs/cmd-options-op.md`).
+        .option_spell("rshunt", "gshunt=1/({})")
+        .option_spell("noopiter", "op_skipinitial=1")
         // The module a SPICE `.model` type gets at a LEVEL (VACASK 36be560
         // `devices/spice/*.va`: `sp_<module>`, `type=±1`; ngspice-45
         // `inpdomod.c` LEVEL per type): `.model x NPN (LEVEL=4)` is VBIC, other

@@ -38,8 +38,15 @@ impl W<'_, '_> {
                         self.ask(Construct::UnmappedOption, *tok);
                     }
                 },
+                // The target's own text, `{}` the value (`rshunt=1k` is
+                // `gshunt=1/(1e3)`); a text that takes a value the card
+                // does not give is no option of the target.
+                Some(OptionTo::Spell(text)) if !text.contains("{}") || !v.is_empty() => {
+                    opts.push(' ');
+                    opts.push_str(&text.replace("{}", &respell(v)));
+                }
                 Some(OptionTo::Cosmetic) => self.note(Code::W0024, *tok),
-                None => {
+                Some(OptionTo::Spell(_)) | None => {
                     self.ask(Construct::UnmappedOption, *tok);
                 }
             }

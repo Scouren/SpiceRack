@@ -236,6 +236,7 @@ calls! {
     builtin_device(name: &str);
     vacask_analysis(kind: &str);
     option_to(spice: &str, own: &str);
+    option_spell(spice: &str, text: &str);
     option_method(spice: &str);
     option_cosmetic(spice: &str);
     spice_model_type(kind: &str);
