@@ -5,6 +5,7 @@
 //!   golden record <out_dir>
 //!   golden diff <a> <b> [--xfail migration.xfail] [--refusal-status-only <report>] [--skip <target>]
 //!   golden check-determinism
+//!   golden zero <record> [<list>]
 //!
 //! `record` reads every input `inputs.rs` finds (run it in `nix develop
 //! .#testing`, which sets the corpus and PDK variables; `$IHP_PDK` names an
@@ -29,7 +30,10 @@
 //! `MANIFEST` lists the sets, each kit's read order, each input's content
 //! hash and each output file's. `diff` prints `IDENTICAL` or every differing
 //! file and exits 1, with strict xfail (`diff.rs`). `check-determinism` runs
-//! `record` twice, in two processes, and diffs the trees.
+//! `record` twice, in two processes, and diffs the trees. `zero` prints a
+//! record's Z1 names (its outputs that carry `W0001` or `W0032`), or
+//! compares them with the checked-in list and exits 1 on any difference
+//! (`zero.rs`).
 //!
 //! Cites: the compiler-construction skill, rule 9; VerA `tools/vera.xfail`
 //! (strict xfail).
@@ -51,12 +55,14 @@ use spicerack::syntax::render::{self, Diags};
 
 mod diff;
 mod inputs;
+mod zero;
 
 use inputs::{Form, Input, inputs, source};
 
 const USAGE: &str = "usage: golden record <out_dir> | \
                      golden diff <a> <b> [--xfail <file>] [--refusal-status-only <report>] [--skip <target>] | \
-                     golden check-determinism";
+                     golden check-determinism | \
+                     golden zero <record> [<list>]";
 
 /// Input dialects no set reads, and why: the manifest's `skip` lines.
 /// Every target is written for every input that parses; none is skipped.
@@ -102,6 +108,12 @@ fn main() -> ExitCode {
         ),
         ["check-determinism"] if xfail.is_none() && report.is_none() && skip.is_none() => {
             check_determinism()
+        }
+        ["zero", tree] if xfail.is_none() && report.is_none() && skip.is_none() => {
+            zero::zero(Path::new(tree), None)
+        }
+        ["zero", tree, list] if xfail.is_none() && report.is_none() && skip.is_none() => {
+            zero::zero(Path::new(tree), Some(Path::new(list)))
         }
         _ => return usage(),
     };

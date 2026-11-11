@@ -13,7 +13,7 @@ trusts. The rules behind it are in `AGENTS.md` (Testing).
 | release | tag matches `Cargo.toml` and `pyproject.toml`, wheels for every target, sdist | `.github/scripts/bump_version.py`, then the release workflow | `.github/workflows/tags.yaml`, `publish.yaml` |
 | nightly | the spice-bench and corpus import suite, and every corpus deck across simulators (`--features corpus`) | `nix develop .#testing -c cargo test --no-default-features --features corpus --release --test test_import_suite --test test_cross_sim` | `.github/workflows/nightly.yaml`, 03:17 UTC daily and on demand |
 | perf | instructions and allocations of the golden workload, the raw-file reader and the Python API ("Performance" below) | `python3 benches/perf.py pre-commit` (< 10 s), `merge` (≈ 2 min), `nightly` (≈ 5 min) | local, `nix develop .#testing`; every perf commit cites before and after |
-| golden | the transpiler rewrite's byte-identical gate against `9d1d6bb` ("Golden gate" below) | `golden record`, then `golden diff <baseline> <new> --xfail migration.xfail`; `golden check-determinism`; `cargo test --features corpus --test test_syntax` | local, before each rewrite phase lands |
+| golden | the transpiler rewrite's byte-identical gate against `9d1d6bb`, and zero gate Z1 ("Golden gate" below) | `golden record`, then `golden diff <baseline> <new> --xfail migration.xfail`; `golden zero <new> tests/fixtures/zero/untranslated.txt`; `golden check-determinism`; `cargo test --features corpus --test test_syntax` | local, before each rewrite phase lands |
 
 `.github/scripts/check_style.py` is vendored from the `code-style` skill
 (https://github.com/OmarSiwy/NixOSConfig/tree/main/skills, sha256 `55f417592f6e7ec3…`).
@@ -50,6 +50,7 @@ provenance, never by re-deriving it the way the writer does.
 | `test_verilog_a.rs` | the made-up Spectre kit `tests/fixtures/verilog_a/` (`.inc`: no golden input), read by hand: its Verilog-A module (ports in header order, `parameter` names, no `localparam`) declared at its `ahdl_include`, every instance bound, no `R` row |
 | `test_render.rs` | the pins `tests/fixtures/transpiler/pinned/`, the old writer's bytes (the pipeline the golden baseline recorded) for decks the corpus lacks: each Spectre `statistics` table (process, mismatch, correlations, sections) and each Laplace source on the five SPICE targets (the tables on Spectre and VACASK too), or the refusal's `W` codes |
 | `src/syntax` (`#[cfg(test)]`) | one test per node tag and per header shape, each against its manual clause with the tree derived by hand (`src/syntax/tests/`); the device tables read and written back (`device.rs`); resolve, one test per answer against its clause, from an in-memory loader (`src/syntax/resolve/tests.rs`; Verilog-A module headers against IEEE 1364-2005 §12.1 in `resolve/verilog_a.rs`); every reader's every number suffix inside an expression, written for every target and read back by the target's reader as the same value (`src/syntax/tests/render.rs`); 10⁴-deep `.subckt` and `.if` decks through the parser and the renderer in Debug on a test thread's stack (`src/syntax/tests/render.rs`; the writers and the plan's drop walk branches on a heap stack, `render/read/walk.rs`); structural Verilog (`render/spice/verilog.rs`) against IEEE 1364-2005 §12; the named writer's Monte Carlo rules (`render/named/lift.rs`) against the same hand-worked text (T-G1 to T-G4, T-G9, and VACASK's calls per its `docs/cmd-analysis-mc.md`), and the `tests/spectre/` decks real Spectre 21.1 ran, written byte for byte from their SPICE sources |
+| `test_zero.rs` | the zero gates' checked-in lists. Z1 `tests/fixtures/zero/untranslated.txt` (every golden output carrying `W0001` or `W0032`, by name): in the form `golden zero` writes, a spec example (`<set>/<relpath> <target>`, sorted by bytes, each once); its content is the golden gate's (`golden zero <record> <list>`, "Golden gate"), whose reader is tested on records written by hand (`src/bin/golden/zero.rs`) |
 | `test_backends.rs`, `test_unit.rs` | spec examples |
 
 ### Python (`tests/*.py`)
@@ -109,8 +110,21 @@ cargo build -j 4 --release --no-default-features --bin golden
 G=${CARGO_TARGET_DIR:-target}/release/golden
 nix develop .#testing -c env IHP_PDK=<IHP-Open-PDK checkout> $G record <out_dir>
 $G diff <baseline> <out_dir> --xfail migration.xfail --refusal-status-only <report> --skip verilog
+$G zero <out_dir> tests/fixtures/zero/untranslated.txt
 nix develop .#testing -c env IHP_PDK=<...> $G check-determinism
 ```
+
+`golden zero <out_dir> <list>` is zero gate Z1: no output carries `W0001` (a
+statement kept as another dialect's text) or `W0032` (text that did not
+parse). It reads the record's outputs that carry either code (on the code
+line of a refusal or of a written deck's notes, or in a CDL deck's `* error:`
+comment) as names `<set>/<relpath> <target>` and compares them with
+`tests/fixtures/zero/untranslated.txt`, strict both ways: a name the list
+lacks fails (`NEW`), and so does a listed name the record no longer has
+(`CLEARED`). The list only shrinks: a change that clears a name deletes its
+line in the same commit (`golden zero <out_dir> > tests/fixtures/zero/untranslated.txt`
+rewrites the file; the diff is reviewed as removals only).
+`tests/test_zero.rs` checks the list's form in the merge tier.
 
 A refusal is its codes, sorted, on a first line (`codes: P0001 W0013`: the
 file's parse and kit notes and the writer's codes), then their messages
