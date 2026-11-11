@@ -18,7 +18,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `K` | `K` | `(name, inductor1, inductor2, coupling)` |
 | `D` | `D` | `(name, anode, cathode, model)` |
 | `Q` / `BJT` | `Q` | `(name, collector, base, emitter, model)` |
-| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), refused on Spectre and VACASK (`W0105`) |
+| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), written on VACASK (`sp_vdmos`), refused on Spectre (`W0105`) |
 | `J` | `J` | `(name, drain, gate, source, model)` |
 | `Z` | `Z` | `(name, drain, gate, source, model)` |
 | `E` | `E` | `(name, positive, negative, control_positive, control_negative, voltage_gain)` |

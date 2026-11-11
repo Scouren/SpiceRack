@@ -328,3 +328,23 @@ fn p4_017_a_charge_capacitor_is_the_charges_ddt() {
     assert_eq!(refused("q='1e-6*v(a)*hertz'"), [Code::W0103]);
     assert_eq!(refused("q='1e-6*v(a)' tc1=1e-3"), [Code::W0105]);
 }
+
+/// ZERO-LEDGER P4-016. Oracle: ngspice-45 on this deck, v(d) =
+/// 7.426614746246 and v(d2) = 4.851229595786
+/// (research/impl/evidence/P4-016/ngspice.run.log): an N-channel VDMOS on
+/// three nodes, a P-channel (`pchan`) with its bulk tied to the source.
+/// VACASK's module is distilled from ngspice's device code; on the written
+/// text it gives the two to 3e-10.
+#[test]
+fn p4_016_a_vdmos_is_sp_vdmos_on_three_terminals() {
+    let deck = "t\nVdd vdd 0 10\nR1 vdd d 2\nM1 d g 0 nm\nVg g 0 3\n\
+        R2 d2 0 2\nM2 d2 g2 vdd vdd pm\nVg2 g2 0 7\n\
+        .model nm VDMOS(kp=2.9 rs=0.1 rd=1.3 rg=1 vto=2 lambda=0.03)\n\
+        .model pm VDMOS(pchan kp=2 vto=-1.2 rs=0.1 rd=1)\n.op\n.end\n";
+    let netlist = emit(deck).expect("written");
+    assert!(netlist.contains("\nm1 (d g 0) nm\n"), "{netlist}");
+    assert!(netlist.contains("\nm2 (d2 g2 vdd) pm\n"), "{netlist}");
+    let raw = run(deck);
+    close(col(&raw, "d")[0], 7.426614746246, 1e-6);
+    close(col(&raw, "d2")[0], 4.851229595786, 1e-6);
+}

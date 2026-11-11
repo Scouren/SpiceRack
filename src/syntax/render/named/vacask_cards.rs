@@ -233,11 +233,22 @@ impl W<'_, '_> {
                 model,
                 params,
             } => {
-                if letter == 'M' && nodes.len() != 4 || letter == 'O' {
+                // A `vdmos` model's card is `d g s` (`devices/spice/vdmos.va`
+                // L102: `sp_vdmos(d, g, s, t, tc)`). A fourth node is the
+                // bulk: ngspice ignores it and LTspice wants it equal to
+                // the source (both run, ZERO-LEDGER P4-016); VACASK's fourth
+                // is the thermal node, and tying it aborts the analysis.
+                let vdmos = letter == 'M' && self.is_vdmos(n, &model);
+                let held = match vdmos {
+                    true => matches!(nodes.len(), 3 | 4),
+                    false => nodes.len() == 4,
+                };
+                if letter == 'M' && !held || letter == 'O' {
                     self.refuse(Code::W0105, tok);
                     return None;
                 }
-                let ns: Vec<String> = nodes.iter().map(|x| q(x)).collect();
+                let kept = if vdmos { 3 } else { nodes.len() };
+                let ns: Vec<String> = nodes[..kept].iter().map(|x| q(x)).collect();
                 // A loaded module's instance keeps its name as read.
                 let letter = match letter {
                     'N' => String::new(),

@@ -37,7 +37,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `POLY` | `(name, kind, positive, negative, controls, coefficients)`; `kind` is `"E"`, `"G"`, `"F"` or `"H"` |
 | `D` | `(name, anode, cathode, *, model, **params)` |
 | `Q` / `BJT` | `(name, collector, base, emitter, *, model, substrate=None, thermal=None, **params)` |
-| `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): Spectre and VACASK refuse it (`W0105`) |
+| `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): VACASK writes it on its `sp_vdmos`, Spectre refuses it (`W0105`) |
 | `J`, `Z` | `(name, drain, gate, source, *, model, **params)` |
 | `S` | `(name, positive, negative, *, control_positive, control_negative, model)` |
 | `W` | `(name, positive, negative, *, vcontrol, model)` |
