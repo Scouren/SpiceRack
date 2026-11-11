@@ -213,10 +213,11 @@ xyce/MINDUCTORS/MINDUCTORS_IC4.cir Xyce 7.10 crashes on it (signal 11 under -nor
 xyce/NEURON/Cable_UserDefined.cir Xyce 7.10 crashes on it (signal 11 under -norun)
 #
 # One line, outside P0010's classes (`render/read/rejects.rs`): `.MEASURE`
-# forms no rule sees yet (a VAL with no `=`, an unclosed PAR or quote, a
-# RISE, FALL or CROSS that is no count, a bound that names another
-# measure), and a misspelled `.SUBCKT` Xyce only warns about, so its
-# instance names no subcircuit.
+# forms no rule sees yet (fewer than three words, a VAL with no `=`, a
+# type Xyce has not, a PAR or a parenthesis with no quote inside, a bound
+# that is a bare name, a RISE, FALL or CROSS that is no count, a bound
+# that names another measure), and a misspelled `.SUBCKT` Xyce only warns
+# about, so its instance names no subcircuit.
 xyce/MEASURE/bad_dot_measure_line1.cir one line: a malformed .MEASURE
 xyce/MEASURE/bad_dot_measure_line2.cir one line: a malformed .MEASURE
 xyce/MEASURE/bad_dot_measure_line9.cir one line: a malformed .MEASURE

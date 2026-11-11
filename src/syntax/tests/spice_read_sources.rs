@@ -410,3 +410,79 @@ fn p1_042_ngspice_source_pwl_r_that() {
         assert!(!codes.contains(&Code::P0011), "{l}: {codes:?}");
     }
 }
+
+#[test]
+fn p1_059_a_measure_with_no_partner_for_a_delimiter_is_a_xyce_reject() {
+    // Oracle: Xyce 7.10 `-norun` on the deck below holding each line alone
+    // (V9, R9, L2, L3, `.param rv`). It stops on every `rejected` line
+    // with the message above it and reads every `legal` one, its
+    // neighbour (the corpus deck: Xyce_Regression
+    // MEASURE/bad_dot_measure_line1.cir, lines 34 to 53). A rejected line
+    // is left out with P0010, so no target refuses its text (W0032,
+    // W0001); a legal one carries no P0010. Checks: 3 per rejected line
+    // and 1 per legal line, on 3 targets.
+    let rejected = [
+        // Unmatched expression delimiter on .MEASURE line
+        ".measure tran m1 eqn {V(a)",
+        ".measure tran m1 param=V(a)'",
+        ".measure tran m1 eqn V(a)}",
+        ".measure tran m1 eqn 'V(a)",
+        // Invalid PAR() expression syntax on .MEASURE line
+        ".measure tran m1 max par('V(a)+V(1)'",
+        ".measure tran m1 max par('V(a)+V(1))",
+        ".measure tran m1 max par(V(a)+V(1)')",
+        // Invalid () expression syntax on .MEASURE line
+        ".measure tran m1 avg (V(a)*V(1)')",
+        ".measure tran m1 integ ('V(a)*V(1)'",
+        ".measure tran m1 pp ('V(a)+V(1)'",
+        // Incomplete .MEASURE line. TD, …, FROM, … must be followed by a value
+        ".measure tran m1 pp v(a) td=t1}",
+        ".measure tran m1 pp v(a) to={t3",
+        // Invalid Measure Line
+        ".measure tran m1 pp v(a) from=",
+        ".measure tran m1 when v(a)=0.5 rise=",
+        // Error in .MEASURE line. Could not parse measured variable
+        ".measure tran m1 max v(a",
+        // M1 has invalid MEASURE line
+        ".measure tran m1 trig v(a)=0.5 targ v(a)=",
+    ];
+    let legal = [
+        ".measure tran m1 eqn {V(a)}",
+        ".measure tran m1 param='V(a)'",
+        ".measure tran m1 param={V(a)+V(1)}",
+        ".measure tran m1 max par('V(a)+V(1)')",
+        ".measure tran m1 avg {V(a)*V(1)}",
+        ".measure tran m1 pp v(a) to={rv*1e-9}",
+        ".measure tran m1 pp v(a) from=1n",
+        ".measure tran m1 max v(a) from=0 to=1u td=1n",
+        ".measure tran m1 when v(a)=0.5 rise=1",
+        ".measure tran m1 when {v(a)-0.5}=0",
+        ".measure tran m1 trig v(a)=0.5 targ v(a)=0.6",
+        ".measure tran m1 find v(1) when v(a)=0.5",
+        ".measure tran m1 deriv v(a) at=1n",
+        ".measure tran m1 eqn {max(V(a),V(1))}",
+    ];
+    let deck = |l: &str| {
+        format!(
+            "t\nV9 a 0 1\nR9 a 0 1\nL2 1 0 1u\nL3 1 0 1u\n.model DM D\n.model RM R (RSH=1)\n.param rv=1k\n{l}\n.tran 1n 1u\n.print tran v(a)\n.end\n"
+        )
+    };
+    let codes = |l: &str, d: Dialect| -> Vec<Code> {
+        match render_text(&deck(l), Dialect::Xyce, "t", d) {
+            Ok(w) => w.notes.diags.iter().map(|g| g.code).collect(),
+            Err(e) => e.diags.iter().map(|g| g.code).collect(),
+        }
+    };
+    for d in [Dialect::Ngspice, Dialect::Hspice, Dialect::Xyce] {
+        for l in rejected {
+            let c = codes(l, d);
+            assert!(c.contains(&Code::P0010), "{d:?} {l}: {c:?}");
+            assert!(!c.contains(&Code::W0001), "{d:?} {l}: {c:?}");
+            assert!(!c.contains(&Code::W0032), "{d:?} {l}: {c:?}");
+        }
+        for l in legal {
+            let c = codes(l, d);
+            assert!(!c.contains(&Code::P0010), "{d:?} {l}: {c:?}");
+        }
+    }
+}

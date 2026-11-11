@@ -4671,10 +4671,6 @@ xyce/MEASURE/REMEASURE/RemeasureStepGnuplotData.cir ltspice
 xyce/MEASURE/REMEASURE/RemeasureStepGnuplotData.cir ngspice
 xyce/MEASURE/REMEASURE/RemeasureStepGnuplotData.cir spectre
 xyce/MEASURE/REMEASURE/RemeasureStepGnuplotData.cir vacask
-xyce/MEASURE/bad_dot_measure_line1.cir espice
-xyce/MEASURE/bad_dot_measure_line1.cir hspice
-xyce/MEASURE/bad_dot_measure_line1.cir ltspice
-xyce/MEASURE/bad_dot_measure_line1.cir ngspice
 xyce/MEASURE/bad_dot_measure_line2.cir espice
 xyce/MEASURE/bad_dot_measure_line2.cir hspice
 xyce/MEASURE/bad_dot_measure_line2.cir ltspice

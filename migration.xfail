@@ -1847,3 +1847,7 @@ xyce/VPAT/bad_vpat.cir vacask now written: the line Xyce rejects left out with P
 xyce/VPAT/bad_vpat.cir xyce written differently: the line Xyce rejects left out with P0010 (P1-056)
 xyce/INVALID_CHARS/semicolon_fails.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-056)
 xyce/Message/Device/DeviceBlock_extractInstanceParam.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-056)
+xyce/MEASURE/bad_dot_measure_line1.cir espice now written: the line Xyce rejects left out with P0010 (P1-059)
+xyce/MEASURE/bad_dot_measure_line1.cir hspice now written: the line Xyce rejects left out with P0010 (P1-059)
+xyce/MEASURE/bad_dot_measure_line1.cir ltspice now written: the line Xyce rejects left out with P0010 (P1-059)
+xyce/MEASURE/bad_dot_measure_line1.cir ngspice now written: the line Xyce rejects left out with P0010 (P1-059)

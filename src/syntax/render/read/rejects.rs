@@ -75,7 +75,8 @@ impl Pwl {
 
 impl Rd<'_> {
     /// Xyce 7.10 `-norun` rejects the line `first..=last`: a card's
-    /// fields (an analysis's count, `.FFT`'s and `.MEASURE`'s words,
+    /// fields (an analysis's count, `.FFT`'s and `.MEASURE`'s words, a
+    /// `.MEASURE`'s delimiter with no partner or key with no value,
     /// `.SENS`'s vectors), an element's (a letter Xyce has no device for,
     /// too few nodes, values past the device's, a PWL or PAT wave), or a
     /// spelling no Xyce line reads (an unclosed brace, `{POLY` with no
@@ -225,6 +226,17 @@ impl Rd<'_> {
                 let has = |w: &str| words.iter().any(|x| x == w);
                 let fft = mode.as_deref() == Some("fft");
                 let kind = kind.unwrap_or_default();
+                // A brace, parenthesis or quote with no partner ("Unmatched
+                // expression delimiter", "Invalid PAR() expression syntax",
+                // "Invalid () expression syntax", "Could not parse measured
+                // variable"), a key the line ends after ("Incomplete
+                // .MEASURE line", "Invalid Measure Line").
+                let (a, b) = (p.first().map_or(1, |f| f.0), p.last().map_or(0, |l| l.1));
+                let count = |t: T| (a..=b).filter(|&k| self.ttag(k) == t).count();
+                let unpaired = count(T::LBrace) != count(T::RBrace)
+                    || count(T::LParen) != count(T::RParen)
+                    || !count(T::Quote).is_multiple_of(2)
+                    || (a <= b && self.ttag(b) == T::Equal);
                 !is_mode(&mode)
                     || is_mode(&name)
                     || (ONE_VAR.contains(&kind.as_str()) && p.len() == 3)
@@ -235,6 +247,7 @@ impl Rd<'_> {
                             .iter()
                             .any(|t| kind == *t || kind.starts_with(&format!("{t}="))))
                     || (fft && kind == "find" && !has("at") && key("at").is_none())
+                    || unpaired
             }
             // "Possibly a missing comma in vector parameter" (braces with
             // no comma between, a list ending in `,` before the next key, a
