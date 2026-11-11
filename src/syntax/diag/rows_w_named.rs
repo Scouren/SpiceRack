@@ -25,11 +25,11 @@ macro_rules! rows_w_named {
                 cite: "Spectre Reference 5.0 pp.856-860 (bsource), pp.867-870 (operators, functions); VACASK 36be560 docs/dev-builtin-behavioral.md (`v=`/`i=`, its function table)",
                 explain: "The expression holds a form the target's behavioural source (Spectre's bsource, VACASK's `v=`/`i=` line) has no spelling for with the same meaning (`hertz`, a function such as `u()` or a statistical call, another dialect's `**`/`pow` whose negative-base rule is not checked, on VACASK the current of a device that is no voltage source). Rewrite the expression with the functions both define, or model the element as Verilog-A.",
             }
-            /// A charge expression reading a branch current, a braced value, `time`, `temper` or `hertz`.
+            /// A charge expression the target's form cannot spell (Spectre's `q=`: a branch current, a braced value, `time`, `temper`, `hertz`; VACASK's `i=ddt(q)`: what W0102 lists).
             W0103 Refusal {
                 title: "a charge expression the target cannot spell",
-                cite: "Spectre Reference 19.1 p.459 (bsource `q=`)",
-                explain: "The charge capacitor's expression reads something the target's `q=` form cannot (a branch current, `time`, `temper`, `hertz`). Model the capacitor with a behavioural current source.",
+                cite: "Spectre Reference 19.1 p.459 (bsource `q=`); VACASK 36be560 docs/dev-builtin-behavioral.md (`ddt`, its function table)",
+                explain: "The charge capacitor's expression reads something the target's form cannot: Spectre's `q=` a branch current, `time`, `temper` or `hertz`; VACASK's `i=ddt(q)` line `hertz`, a function it has no spelling for, or the current of a device that is no voltage source. Model the capacitor with a behavioural current source.",
             }
             /// A `.model` whose kind (and level) has no master in the target.
             W0104 Refusal {
@@ -37,7 +37,7 @@ macro_rules! rows_w_named {
                 cite: "Spectre Reference 19.1 p.498 (model masters); VACASK spice/*.osdi",
                 explain: "No master of the target has this model kind and level's equations; the nearest master would compute something else. Use a model the target ships, or load the model as Verilog-A.",
             }
-            /// A device the target has no master or terminal list for (a MOSFET without its bulk or with extra nodes, a current-controlled switch; in VACASK a charge capacitor, a switch, a POLY source whose term order or lone coefficient the tree does not settle).
+            /// A device the target has no master or terminal list for (a MOSFET without its bulk or with extra nodes, a current-controlled switch; in VACASK a charge capacitor with instance parameters, a switch, a POLY source whose term order or lone coefficient the tree does not settle).
             W0105 Refusal {
                 title: "a device the target has no master or terminals for",
                 cite: "Spectre Reference 5.0 (mos, relay, vsource chapters); HSPICE UG, W element (RLGC lossy lines): the ngspice manual, Xyce RG and LTspice help list no W element (ngspice's `W` is a current switch, its coupled lines `P` take other parameters)",

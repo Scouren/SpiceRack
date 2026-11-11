@@ -13,12 +13,12 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
 | `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only: the text after the nodes; `value` is written before it when it opens with a parameter (`"tc=1e-3"`) |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |
-| `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither); refused on VACASK (`W0105`) |
+| `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither) |
 | `L` | `L` | `(name, positive, negative, value)` |
 | `K` | `K` | `(name, *inductors, coupling)`: two inductors by full name, added before the `K`: `K("1", "L1", "L2", coupling=0.9)`; else `ValueError` |
 | `D` | `D` | `(name, anode, cathode, model)` |
 | `Q` / `BJT` | `Q` | `(name, collector, base, emitter, model)` |
-| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), refused on Spectre and VACASK (`W0105`) |
+| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), written on VACASK (`sp_vdmos`), refused on Spectre (`W0105`) |
 | `J` | `J` | `(name, drain, gate, source, model)` |
 | `Z` | `Z` | `(name, drain, gate, source, model)` |
 | `E` | `E` | `(name, positive, negative, control_positive, control_negative, voltage_gain)` |

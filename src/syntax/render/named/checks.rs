@@ -11,8 +11,9 @@
 //! - `W::checks(&mut self)`, `W::blocks(&self) -> Vec<&'r Block>`, `fn calls(e: &str) -> impl Iterator<Item = &str>`
 
 use super::W;
-use super::params::spelled_flag;
+use super::params::{level, spelled_flag};
 use crate::syntax::ast::NONE;
+use crate::syntax::behaviour::MasterAnswer;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Block, Card, Comp, Func, Num, Raw, Val};
@@ -145,13 +146,17 @@ impl<'r> W<'_, 'r> {
     /// The first token of block `b`'s first model or element with a flag.
     fn first_flag(&self, b: &Block) -> Option<u32> {
         for &(m, bin) in &b.models {
-            if self
-                .rd
-                .model_view(m, bin)
-                .params
-                .iter()
-                .any(|(_, v)| v.is_empty())
-            {
+            let view = self.rd.model_view(m, bin);
+            // A VDMOS card's `pchan`/`nchan` is its polarity, the master's
+            // `type` where the target has one (`vacask_models.rs`): no flag.
+            let master = self.b.model_master("vdmos", level(&view));
+            let polarity = view.kind.eq_ignore_ascii_case("vdmos")
+                && matches!(master, MasterAnswer::Master(_));
+            let flag = |(k, v): &(String, String)| {
+                let named = k.eq_ignore_ascii_case("pchan") || k.eq_ignore_ascii_case("nchan");
+                v.is_empty() && !(polarity && named)
+            };
+            if view.params.iter().any(flag) {
                 return Some(self.rd.main(m));
             }
         }

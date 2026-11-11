@@ -26,7 +26,7 @@ nodes are positional; everything after `*` is keyword-only.
 | --- | --- |
 | `R` | `(name, positive, negative, value, *, raw_spice=None, **params)`; `raw_spice` is the text after the nodes (`"1k tc=0.01"`); when it opens with a parameter (`"tc=1e-3"`) or is empty, `value` is written before it. In every `**params`: `True` is a bare flag (`off`), `False` and `None` are left out |
 | `C`, `L` | `(name, positive, negative, value, **params)` |
-| `C` by its charge | `(name, positive, negative, *, charge="expr", **params)`: the charge as an expression of the capacitor's voltage (`charge="1n*v(a,b)"`), in place of `value`; VACASK refuses it (`W0105`) |
+| `C` by its charge | `(name, positive, negative, *, charge="expr", **params)`: the charge as an expression of the capacitor's voltage (`charge="1n*v(a,b)"`), in place of `value` |
 | `K` | `(name, *inductors, coupling)`: two inductors of the same body by their full names (`K("1", "L1", "L2", coupling=0.9)`), each added before the `K`; any other name or count raises `ValueError` |
 | `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None)`; `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
 | `BV`, `BI` | `(name, positive, negative, *, expression)` |
@@ -38,7 +38,7 @@ nodes are positional; everything after `*` is keyword-only.
 | `POLY` | `(name, kind, positive, negative, controls, coefficients)`; `kind` is `"E"`, `"G"`, `"F"` or `"H"` |
 | `D` | `(name, anode, cathode, *, model, **params)` |
 | `Q` / `BJT` | `(name, collector, base, emitter, *, model, substrate=None, thermal=None, **params)` |
-| `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): Spectre and VACASK refuse it (`W0105`) |
+| `M` / `MOSFET` | `(name, drain, gate, source, bulk=None, *, model, extra_nodes=None, **params)`; `bulk=None` is a three-node device (ngspice VDMOS): VACASK writes it on its `sp_vdmos`, Spectre refuses it (`W0105`) |
 | `J`, `Z` | `(name, drain, gate, source, *, model, **params)` |
 | `S` | `(name, positive, negative, *, control_positive, control_negative, model)` |
 | `W` | `(name, positive, negative, *, vcontrol, model)` |
