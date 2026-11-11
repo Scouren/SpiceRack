@@ -58,18 +58,36 @@ fn p8_203_a_command_simulator_runs_the_deck_and_reads_its_results() {
     assert_eq!(plots[0].real_data, [[3.3], [1.0]]);
     assert_eq!(plots[0].backend_hint, Some(Dialect::Ngspice));
 
-    // `raw-dir`: the command runs in `{dir}` and every `*.raw` there is
-    // read, in name order; `{dir}` inside a longer word.
+    // `raw-dir`: the command runs in `{dir}` (`{dir}` inside a longer
+    // word) and leaves `a.raw` (4.4) and `b.raw` (3.3) there. The deck's
+    // last three lines are no part of a raw file (the reader stops at the
+    // values): they are a VACASK deck's analyses, `b` first, then `a`
+    // inside a sweep.
     let script = "cp \"$1\" b.raw && sed 's/3.3/4.4/' \"$1\" > \"$2\"";
-    let dir = def(
-        "p8-203-dir",
-        &["sh", "-c", script, "sh", "{deck}", "{dir}/a.raw"],
-        Output::RawDir,
+    let words = ["sh", "-c", script, "sh", "{deck}", "{dir}/a.raw"];
+    let deck = raw_text("two", 3.3) + "analysis b op\nsweep s\nanalysis a tran\n";
+    let read = |sim| -> Vec<Vec<Vec<f64>>> {
+        let plots = spicerack::simulation::run_all(sim, &deck).expect("runs");
+        plots.into_iter().map(|p| p.real_data).collect()
+    };
+    // A simulator of another language: every `*.raw`, in name order, as
+    // written.
+    let dir = register_simulator(def("p8-203-dir", &words, Output::RawDir)).expect("registers");
+    assert_eq!(read(dir), [[[4.4], [1.0]], [[3.3], [1.0]]], "a.raw, b.raw");
+    // P8-317. A simulator whose language is VACASK's, as the built-in
+    // reads its own run: the files in the deck's order, and the sweep's
+    // column (the first of `a.raw`) after `a`'s own.
+    let vacask = SimDef {
+        name: "p8-317-dir".into(),
+        dialect: Lang::VACASK,
+        ..def("", &words, Output::RawDir)
+    };
+    let vacask = register_simulator(vacask).expect("registers");
+    assert_eq!(
+        read(vacask),
+        [[[3.3], [1.0]], [[1.0], [4.4]]],
+        "b.raw, a.raw with its sweep column last"
     );
-    let dir = register_simulator(dir).expect("registers");
-    let plots = spicerack::simulation::run_all(dir, &raw_text("two", 3.3)).expect("runs");
-    let outs: Vec<f64> = plots.iter().map(|p| p.real_data[0][0]).collect();
-    assert_eq!(outs, [4.4, 3.3], "a.raw, then b.raw");
 
     // A program that is not installed: refused before anything is spawned.
     let ghost = def(

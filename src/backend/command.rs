@@ -19,7 +19,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::{BackendError, SimRegisterError, exec, ltspice, read_results, scratch, sorted_files};
+use super::{BackendError, SimRegisterError, exec, ltspice, read_results, scratch, vacask};
 use crate::result::RawData;
 use crate::syntax::Dialect;
 
@@ -51,8 +51,14 @@ pub enum Output {
     NgspiceRaw,
     /// The nutmeg raw file at `{raw}`, ASCII.
     NgspiceAscii,
-    /// Every `*.raw` file in `{dir}`, in file-name order; the command runs
-    /// with `{dir}` as its working directory (VACASK).
+    /// VACASK's result files: the command runs with `{dir}` as its working
+    /// directory and leaves one `*.raw` file per analysis there. They are
+    /// read as the built-in VACASK reads its own (`vacask::read`). For a
+    /// simulator whose language is VACASK's: the files the deck's
+    /// `analysis` lines name, in the deck's order, each plot's sweep
+    /// columns after its own axis. For another language: every `*.raw`,
+    /// in file-name order. Either way a plot that holds `onoise` and
+    /// `gain` (VACASK's noise plot) gains ngspice's two noise spectra.
     RawDir,
     /// The raw file at `{raw}` and the `.log` beside it (LTspice writes
     /// both next to the deck): the log's `.meas` and `.step` lines are read.
@@ -68,11 +74,14 @@ pub enum Output {
 pub type ReadHook = fn(id: u32, dir: &Path) -> Result<Vec<RawData>, BackendError>;
 
 /// A finished command: its scratch directory (deleted on drop), the
-/// result path and the captured stdout.
+/// result path, the captured stdout and the deck's text when its language
+/// is VACASK's, empty for another: a VACASK deck names its result files
+/// (`Output::RawDir`).
 struct Ran {
     dir: tempfile::TempDir,
     raw: PathBuf,
     stdout: String,
+    vacask_deck: String,
 }
 
 impl Output {
@@ -200,7 +209,18 @@ fn start(argv: &[Arg], in_dir: bool, family: Dialect, netlist: &str) -> Result<R
     }
     let program = words[0].to_string_lossy();
     let stdout = exec(&mut cmd, &program, Some(&deck.with_extension("log")))?;
-    Ok(Ran { dir, raw, stdout })
+    // Another language's line may open with the word `analysis` (a title),
+    // and is not one: only a VACASK deck is read for its result files.
+    let vacask_deck = match family {
+        Dialect::Vacask => netlist.to_string(),
+        _ => String::new(),
+    };
+    Ok(Ran {
+        dir,
+        raw,
+        stdout,
+        vacask_deck,
+    })
 }
 
 /// The argv of a run: each word's pieces joined, the placeholders as the
@@ -231,24 +251,7 @@ fn read(ran: &Ran, output: Output) -> Result<Vec<RawData>, BackendError> {
             read_results(&ran.raw, ran.stdout.clone())
         }
         Output::LtspiceRaw => ltspice::read(&ran.raw, ran.stdout.clone()),
-        Output::RawDir => {
-            let raws: Vec<PathBuf> = sorted_files(ran.dir.path())
-                .into_iter()
-                .filter(|p| p.extension().is_some_and(|e| e == "raw"))
-                .collect();
-            if raws.is_empty() {
-                return Err(BackendError::SimulationError(format!(
-                    "the command wrote no .raw file in its directory\nstdout: {}",
-                    super::tail(&ran.stdout)
-                )));
-            }
-            let mut plots = Vec::with_capacity(raws.len());
-            for raw in &raws {
-                plots.extend(read_results(raw, ran.stdout.clone())?);
-            }
-            assert!(plots.len() >= raws.len(), "a raw file holds a plot");
-            Ok(plots)
-        }
+        Output::RawDir => vacask::read(ran.dir.path(), &ran.vacask_deck, &ran.stdout),
     }
 }
 

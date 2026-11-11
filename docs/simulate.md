@@ -252,8 +252,11 @@ mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
   holds both and is deleted after the read. The first word is the program, found on `PATH`; one word holds
   `{deck}`.
 - `output` says how the results are read: `ngspice-raw`, `ngspice-ascii` or `nutascii` (one raw file at
-  `{raw}`), `raw-dir` (every `*.raw` the command leaves in `{dir}`, where it then runs, as VACASK does), or
-  `ltspice-raw` (`{raw}` and the `.log` beside it).
+  `{raw}`), `raw-dir` (VACASK's form: the command runs in `{dir}` and leaves one `*.raw` per analysis
+  there), or `ltspice-raw` (`{raw}` and the `.log` beside it). With `dialect="vacask"` a `raw-dir` run is
+  read as the built-in `vacask`'s: the files in the deck's analysis order, a step's sweep column after the
+  analysis's own axis, the noise spectra added. With another dialect every `*.raw` is read, in file-name
+  order.
 - `analyses` are the kinds it runs: `op`, `dc`, `ac`, `tran`, `noise`, `tf`, `sens`, `sens_ac`, `pz`, `disto`,
   `pss`, `hb`, `sp`, `stb`, `trannoise`, `pac`, `pnoise`, `pxf`, `pstb`. `features` are what a deck may need
   of it: `xspice`, `osdi`, `measures`, `step`, `control`, `laplace`, `verilog`; `verilog=True` and
@@ -266,9 +269,9 @@ mine.with_backend("mysim")             # or SPICERACK_BACKEND=mysim
 - A registered simulator is its command and nothing more, and a built-in's run does more than its command.
   Registered as a command, ngspice (`ngspice -b -r {raw} {deck}`) fails on a deck with a `.measure` or a
   Fourier analysis: SpiceRack writes that deck to run from a `.control` block, for which ngspice leaves no
-  raw file under `-r` (the built-in drops `-r` and appends a `write`). A `raw-dir` simulator's plots are
-  read in file-name order, as written: the built-in `vacask` reads them in the deck's analysis order, moves
-  a step's sweep column last and adds the noise spectra, so give a `raw-dir` simulator one analysis a deck.
+  raw file under `-r` (the built-in drops `-r` and appends a `write`). A `raw-dir` command runs in the
+  scratch directory, where a `load` or `include` path relative to your working directory is not found (the
+  built-in `vacask` makes such a path absolute first): name the file by its absolute path.
 
 The same descriptor as a file is `spicerack.simulator/1`: TOML whose keys are `Simulator`'s arguments, plus
 the required `schema`. An unknown key is refused (`R0040`), so a typo cannot drop a declaration.

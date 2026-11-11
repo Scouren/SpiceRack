@@ -195,20 +195,6 @@ PARITY_SIM_GAP = {
     ("ngspice2", "fourier"): "fails",
     ("ngspice2", "fourier_count"): "fails",
     ("ngspice2", "measure"): "fails",
-    # `backend/vacask.rs::noise_spectra`: the built-in adds `onoise_spectrum` and
-    # `inoise_spectrum` to VACASK's noise plot.
-    ("vacask2", "noise"): "other results",
-    ("vacask2", "noise_summary"): "other results",
-    ("vacask2", "closed_form_noise"): "other results",
-    # `backend/vacask.rs::sweeps_last`: the built-in moves a step's sweep column after the
-    # analysis's own axis.
-    ("vacask2", "step"): "other results",
-    ("vacask2", "step_dec"): "other results",
-    # `backend/vacask.rs::raw_files_for`: the built-in reads the raw files in the deck's
-    # analysis order (op1, dc2, ac3, tran4), `raw-dir` in name order (ac3, dc2, op1, tran4),
-    # and VACASK's plots are matched to the analyses by position: each analysis is handed
-    # another's plot.
-    ("vacask2", "closed_form"): "other results",
     # `backend/vacask.rs::absolutize_paths`: the built-in resolves a relative `load` or
     # `include` path against the working directory before the deck moves to the scratch
     # directory, where a `raw-dir` command runs.
