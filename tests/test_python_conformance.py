@@ -223,6 +223,7 @@ FEATURES = {
     "K_expr": elem(lambda d: (d.parameter("k", "0.5"), d.L("1", "in", "a", 1e-6), d.L("2", "out", "b", 1e-6), d.K("1", "L1", "L2", coupling="{k}"))),
     "C_charge": elem(lambda d: d.C("2", "out", d.gnd, charge="1n*v(out)")),
     "D": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn"))),
+    "D_off": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn", off=True))),
     "Q": elem(lambda d: (d.model("qn", "npn"), d.Q("1", "out", "in", "0", model="qn"))),
     "M": elem(lambda d: (d.model("nm", "nmos"), d.M("1", "out", "in", "0", "0", model="nm", W=1e-6, L=1e-6))),
     "M_three_node": elem(lambda d: (d.model("vd", "vdmos"), d.M("1", "out", "in", "0", model="vd"))),
@@ -351,6 +352,8 @@ EXPECTED = {
     # VACASK has no charge-formulated capacitor (`Construct::ChargeCapacitor`: W0105).
     'C_charge': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # The `off` flag: Spectre's `region=off`; VACASK has no spelling for it (W0101).
+    'D_off': (OK, OK, OK, OK, OK, OK, 'W0101', OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M_three_node': (OK, OK, OK, 'W0050+W0053', OK, 'W0104+W0105', 'W0105', OK, OK),

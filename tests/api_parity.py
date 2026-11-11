@@ -187,6 +187,7 @@ PARITY = {
     "K_three": (FEATURES["K_three"], tw_elem(["L1 in a 1e-6", "L2 out b 1e-6", "L3 out c 1e-6", "K1 L1 L2 L3 0.5"]), "ngspice-45 run: one K over three inductors is the three pairwise K (evidence/P8-008/ng/k3one.log, k3pairs.log)", "P8-008"),
     "K_expr": (FEATURES["K_expr"], tw_elem([".param k=0.5", "L1 in a 1e-6", "L2 out b 1e-6", "K1 L1 L2 {k}"]), "ngspice-45 run: K … {k} (evidence/P8-008/ng/k3expr.log, kx.log)", "P8-008"),
     "D": (FEATURES["D"], tw_elem([".model dn d", "D1 out 0 dn"]), "ng §3 D", None),
+    "D_off": (FEATURES["D_off"], tw_elem([".model dn d", "D1 out 0 dn off"]), "ng §7.2 D (DXXXXXXX n+ n- mname <area=val> <m=val> <pj=val> <off>)", "P8-021"),
     "Q": (FEATURES["Q"], tw_elem([".model qn npn", "Q1 out in 0 qn"]), "ng §3 Q", None),
     "M": (FEATURES["M"], tw_elem([".model nm nmos", "M1 out in 0 0 nm W=1e-06 L=1e-06"]), "ng §3 M", None),
     "M_three_node": (FEATURES["M_three_node"], tw_elem([".model vd vdmos", "M1 out in 0 vd"]), "ng §7.7 M (VDMOS, 3-node)", None),
