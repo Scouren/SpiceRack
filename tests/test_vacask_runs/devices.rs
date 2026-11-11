@@ -275,3 +275,28 @@ fn p4_005_a_lossless_line_delays_on_vacask() {
         assert!((at("b", t) - b).abs() < 1e-6, "b at {t:e}: {}", at("b", t));
     }
 }
+
+/// ZERO-LEDGER P4-004. Oracle: ngspice-45 on this deck
+/// (research/impl/evidence/P4-004/ngspice.run.log: e 608.1, g 17, f 2,
+/// h -0.5, m 7) and each polynomial's closed form in SPICE's term order
+/// (ngspice manual §5.5.1) at a = 2, b = 3, c = 0.5, i(VS) = 1 mA,
+/// i(VT) = 2 mA: e = 0.1+2+6+12+24+45+48+84+144+243, g = 1+4+12 into
+/// 1 ohm, f = 1e6*1m*2m into 1 ohm, h = 0.5+1-2, m = 1+2*a*b*c (the 15th
+/// coefficient of a POLY(3)).
+#[test]
+fn p4_004_a_poly_source_runs_on_vacask() {
+    let deck = "poly\nV1 a 0 2\nV2 b 0 3\nV3 c 0 0.5\nI1 0 s 1m\nVS s 0 0\nI2 0 t 2m\nVT t 0 0\n\
+        E1 e 0 POLY(2) a 0 b 0 0.1 1 2 3 4 5 6 7 8 9\nG1 0 g POLY(1) a 0 1 2 3\nRG g 0 1\n\
+        F1 0 f POLY(2) VS VT 0 0 0 0 1e6\nRF f 0 1\nH1 h 0 POLY(1) VS 0.5 1000 -2e6\n\
+        E3 m 0 POLY(3) a 0 b 0 c 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 2\n.op\n.end\n";
+    let raw = run(deck);
+    for (node, want) in [
+        ("e", 608.1),
+        ("g", 17.0),
+        ("f", 2.0),
+        ("h", -0.5),
+        ("m", 7.0),
+    ] {
+        close(col(&raw, node)[0], want, 1e-9);
+    }
+}

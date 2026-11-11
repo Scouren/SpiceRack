@@ -37,7 +37,7 @@ macro_rules! rows_w_named {
                 cite: "Spectre Reference 19.1 p.498 (model masters); VACASK spice/*.osdi",
                 explain: "No master of the target has this model kind and level's equations; the nearest master would compute something else. Use a model the target ships, or load the model as Verilog-A.",
             }
-            /// A device the target has no master or terminal list for (a MOSFET without its bulk or with extra nodes, a current-controlled switch; in VACASK a POLY source, a charge capacitor, a switch, a line).
+            /// A device the target has no master or terminal list for (a MOSFET without its bulk or with extra nodes, a current-controlled switch; in VACASK a charge capacitor, a switch, a POLY source whose term order or lone coefficient the tree does not settle).
             W0105 Refusal {
                 title: "a device the target has no master or terminals for",
                 cite: "Spectre Reference 5.0 (mos, relay, vsource chapters); HSPICE UG, W element (RLGC lossy lines): the ngspice manual, Xyce RG and LTspice help list no W element (ngspice's `W` is a current switch, its coupled lines `P` take other parameters)",
