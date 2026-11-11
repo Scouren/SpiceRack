@@ -33,7 +33,10 @@ pub(in crate::syntax::render) enum Num {
 #[derive(Clone, PartialEq, Debug)]
 pub(in crate::syntax::render) struct Wave {
     pub(in crate::syntax::render) kind: WaveKind,
-    /// The values: SIN 6, PULSE 7, EXP 6, SFFM 5, TRNOISE 7, TRRANDOM 5
+    /// The values: SIN 7 (the seventh LTspice's cycle count, 0 for none),
+    /// PULSE 8 (the eighth its cycle count, ngspice's
+    /// NP and LTspice's Ncycles, 0 for none), EXP 6, SFFM 5, TRNOISE 7,
+    /// TRRANDOM 5
     /// (the type first), PWL its pairs flat; AM 8 in ngspice-45's order
     /// `VO VMO VMA FM FC TD PHASEM PHASEC`, the value `VO + (VMO + VMA
     /// sin(2π FM t' + PHASEM)) sin(2π FC t' + PHASEC)`, t' = t - TD, 0
@@ -42,8 +45,9 @@ pub(in crate::syntax::render) struct Wave {
     /// PWL `r=`, `td=`.
     pub(in crate::syntax::render) repeat: Option<Num>,
     pub(in crate::syntax::render) delay: Option<Num>,
-    /// The statement gave more values than `args` holds (ngspice's PULSE
-    /// count NP): the rest are not written.
+    /// The statement gave more values than `args` holds (an eighth PULSE
+    /// value where the source's PULSE has no count): the rest are not
+    /// written.
     pub(in crate::syntax::render) cut: bool,
 }
 
@@ -284,8 +288,10 @@ impl WaveKind {
     /// every value (PWL's pairs).
     pub(in crate::syntax::render) const fn held(self) -> Option<usize> {
         match self {
-            WaveKind::Sin | WaveKind::Exp => Some(6),
-            WaveKind::Pulse | WaveKind::Trnoise => Some(7),
+            WaveKind::Sin => Some(7),
+            WaveKind::Exp => Some(6),
+            WaveKind::Pulse => Some(8),
+            WaveKind::Trnoise => Some(7),
             WaveKind::Sffm | WaveKind::Am | WaveKind::Trrandom => Some(5),
             WaveKind::Pwl => None,
         }
@@ -503,7 +509,11 @@ impl<'a> Rd<'a> {
 
     /// A waveform's values → its view (the old lowering's `waveform`).
     fn waveform(&self, w: WaveKind, vals: &[u32]) -> Option<Wave> {
-        let a: Vec<Num> = vals.iter().map(|&v| self.irnum(v)).collect::<Option<_>>()?;
+        let a: Vec<Num> = if w == WaveKind::Pwl && self.b.card_rules == CardRules::Ltspice {
+            self.pwl_relative(vals)?
+        } else {
+            vals.iter().map(|&v| self.irnum(v)).collect::<Option<_>>()?
+        };
         if w == WaveKind::Am {
             return self.am(a);
         }
@@ -517,12 +527,24 @@ impl<'a> Rd<'a> {
         {
             return None;
         }
+        let held = w.held().unwrap_or(a.len());
+        // A PULSE's eighth value is a cycle count on ngspice (NP, manual
+        // §4.1.1) and LTspice (Ncycles) only: Xyce 7.10 ignores one (run),
+        // so elsewhere the card's values past seven are cut.
+        let counts =
+            self.b.source_rules == SourceRules::Ngspice || self.b.card_rules == CardRules::Ltspice;
+        let read = match w {
+            WaveKind::Pulse if !counts => 7,
+            // A SINE's seventh value is LTspice's cycle count only.
+            WaveKind::Sin if self.b.card_rules != CardRules::Ltspice => 6,
+            _ => held,
+        };
         let padded = |k: usize| -> Vec<Num> {
             (0..k)
-                .map(|i| a.get(i).cloned().unwrap_or(Num::Num(0.0)))
+                .map(|i| a.get(i).filter(|_| i < read).cloned())
+                .map(|x| x.unwrap_or(Num::Num(0.0)))
                 .collect()
         };
-        let held = w.held().unwrap_or(a.len());
         let args = match w {
             WaveKind::Pwl if a.len().is_multiple_of(2) => a.clone(),
             WaveKind::Pwl => return None,
@@ -550,7 +572,7 @@ impl<'a> Rd<'a> {
             args,
             repeat: None,
             delay: None,
-            cut: a.len() > held,
+            cut: a.len() > read,
         })
     }
 }

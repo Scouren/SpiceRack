@@ -133,6 +133,18 @@ impl W<'_, '_> {
                     None => self.parasitics(letter, n, &np, &nm, &mut parasitics),
                 };
                 let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
+                // LTspice's SINE with a cycle count: the card a 0 source,
+                // its wave a behavioural source (`W::wave_b`).
+                let behav = match &wave {
+                    Some(w) if w.cycled() => {
+                        Some(self.wave_b(tok, n, letter, [&np, &nm], w, &value)?)
+                    }
+                    _ => None,
+                };
+                let (wave, value, nm, b_line) = match behav {
+                    Some((end, line)) => (None, Val::Num(0.0), end, Some(line)),
+                    None => (wave, value, nm, None),
+                };
                 let (l, m) = match letter {
                     'V' => ('v', "vsource"),
                     _ => ('i', "isource"),
@@ -165,6 +177,10 @@ impl W<'_, '_> {
                 // (`[CMP]` p.606 #42).
                 if port.is_some() && self.rd.b.named_rules != NamedRules::Spectre {
                     s.push_str(" noisy=0");
+                }
+                if let Some(line) = b_line {
+                    s.push('\n');
+                    s.push_str(&line);
                 }
                 s
             }
@@ -352,7 +368,10 @@ impl W<'_, '_> {
                 continue;
             };
             let kind = match w.kind {
+                WaveKind::Sin if w.cycled() => continue,
                 WaveKind::Sin => "sine",
+                // A counted PULSE is written as a PWL (`vacask_wave`).
+                WaveKind::Pulse if w.counted() => "pwl",
                 WaveKind::Pulse => "pulse",
                 WaveKind::Exp => "exp",
                 WaveKind::Sffm => "fm",
@@ -376,6 +395,15 @@ impl W<'_, '_> {
     /// `w` as `type="…"` parameters; `None` when it is refused.
     fn vacask_wave(&mut self, w: &Wave, tok: u32) -> Option<String> {
         super::sources::assert_held(w);
+        // VACASK's pulse has no count (`lib/devvisrc.cpp`): a counted
+        // PULSE as the PWL of its pulses.
+        if w.counted() {
+            let Some(pwl) = w.pulses() else {
+                self.refuse(Code::W0108, tok);
+                return None;
+            };
+            return self.vacask_wave(&pwl, tok);
+        }
         let a: Vec<String> = w.args.iter().map(|x| self.vacask_num(x)).collect();
         Some(match w.kind {
             // `tdphase` is the sine's initial phase in degrees, SPICE's

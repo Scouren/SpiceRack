@@ -692,6 +692,7 @@ def ltspice(d):
     d = d.infix(Tag.Slash, 5)
     d = d.infix(Tag.Percent, 5)
     d = d.infix(Tag.StarStar, 6)
+    d = d.right(Tag.StarStar)
     d = d.prefix(Tag.Plus)
     d = d.prefix(Tag.Minus)
     d = d.prefix(Tag.Bang)

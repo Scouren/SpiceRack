@@ -106,6 +106,9 @@ pub(super) fn ltspice() -> DialectDef {
     d = d.infix(Tag::Slash, 5);
     d = d.infix(Tag::Percent, 5);
     d = d.infix(Tag::StarStar, 6);
+    // LTspice 26.1.1, run by hand: `2**3**2` is 512 in a `.param` and in
+    // a B source (ZERO-LEDGER P3-077).
+    d = d.right(Tag::StarStar);
     d = d.prefix(Tag::Plus);
     d = d.prefix(Tag::Minus);
     d = d.prefix(Tag::Bang);

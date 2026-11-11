@@ -78,6 +78,7 @@ mod text;
 mod unlift;
 mod values;
 mod walk;
+mod wave_rules;
 
 pub(in crate::syntax::render) use cards::Model;
 pub(in crate::syntax::render) use elements::Card;

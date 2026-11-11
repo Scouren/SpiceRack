@@ -30,6 +30,11 @@
 //! - `pub(super) fn rename_word(e: &str, from: &str, to: &str) -> String`
 //! - `pub(super) fn nominal(e: &str) -> String`
 //! - `pub(super) fn spell_clamp(e: &str) -> String`
+//! - `pub(super) fn brace_groups(e: &str) -> String`
+//! - `pub(super) fn xyce_domains(e: &str) -> String`
+//! - `pub(super) fn xyce_power_calls(e: &str) -> String`
+//! - `pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String`
+//! - `pub(super) fn close(b: &[u8], i: usize) -> Option<usize>`
 
 use std::cell::Cell;
 
@@ -209,7 +214,137 @@ pub(super) fn rename_call(e: &str, from: &str, to: &str) -> String {
     out
 }
 
+/// The index closing the group `b[i]` opens; `None` when `b[i]` opens
+/// none or the group is unclosed. Quotes nest nothing.
+pub(super) fn close(b: &[u8], i: usize) -> Option<usize> {
+    let shut = |c: u8| match c {
+        b'(' => Some(b')'),
+        b'[' => Some(b']'),
+        b'{' => Some(b'}'),
+        b'\'' | b'"' => Some(c),
+        _ => None,
+    };
+    let mut want = vec![shut(b[i])?];
+    let mut j = i + 1;
+    while j < b.len() {
+        let top = want[want.len() - 1];
+        if b[j] == top {
+            want.pop();
+            if want.is_empty() {
+                return Some(j);
+            }
+        } else if !matches!(top, b'\'' | b'"')
+            && let Some(s) = shut(b[j])
+        {
+            want.push(s);
+        }
+        j += 1;
+    }
+    None
+}
+
+/// `e` with Xyce's `pow(x, y)` and `pwr(x, y)` spelled `((x)**(y))` (both
+/// are its `**`: RG 7.10 §2.3; 7.10 by hand: `pwr(-2,3)` -8,
+/// `pwr(-2.5,2.1)` 6.5145) and `pwrs(x, y)` `(sgn(x)*abs(x)**(y))` (its
+/// definition; ngspice-45 has no `pwrs`), for the power rewrite to give
+/// each the source's value on ngspice (`powers`).
+pub(super) fn xyce_power_calls(e: &str) -> String {
+    let power = |a: &[String]| match a {
+        [x, y] => Some(format!("(({x})**({y}))")),
+        _ => None,
+    };
+    let signed = |a: &[String]| match a {
+        [x, y] => Some(format!("(sgn({x})*abs({x})**({y}))")),
+        _ => None,
+    };
+    let e = map_calls(e, "pow", &power, 0);
+    let e = map_calls(&e, "pwr", &power, 0);
+    map_calls(&e, "pwrs", &signed, 0)
+}
+
+/// `e` with ngspice's power calls spelled as its `**`, which has one
+/// meaning in both of its evaluators (ngspice-45 by hand, n = -2). In a B
+/// source (`b_source`) `pow(n,3)` is `|n|^3` = 8: `((x)**(y))`, and
+/// `pwr(n,3)` `sgn(n)*|n|^3` = -8: `(sgn(x)*((x)**(y)))`. In a `{}` value
+/// `pwr(n,3)` is `|n|^3` = 8: `((x)**(y))`; `pow(n,3)` is C's (-8) and
+/// stands.
+pub(super) fn ngspice_power_calls(e: &str, b_source: bool) -> String {
+    let power = |a: &[String]| match a {
+        [x, y] => Some(format!("(({x})**({y}))")),
+        _ => None,
+    };
+    let signed = |a: &[String]| match a {
+        [x, y] => Some(format!("(sgn({x})*(({x})**({y})))")),
+        _ => None,
+    };
+    match b_source {
+        true => map_calls(&map_calls(e, "pow", &power, 0), "pwr", &signed, 0),
+        false => map_calls(e, "pwr", &power, 0),
+    }
+}
+
+/// `e` with Xyce's value of a call outside its real domain spelled for
+/// ngspice, which fails the analysis there. Xyce keeps the real part of
+/// the complex result: `sqrt(x)` is 0 under x < 0 (`sqrt(max(x,0))`),
+/// `acosh(x)` is `acosh(|x|)` and 0 inside (-1, 1)
+/// (`acosh(max(abs(x),1))`). Its `atanh` clamps an argument that reads a
+/// parameter or a probe to ±(1 - 1e-12) (`atanh(-2.5)` is -14.1621); an
+/// argument of numbers alone stands: Xyce folds it with no clamp
+/// (`atanh(2)` is 0.5493) and ngspice refuses the NaN. Xyce 7.10 and
+/// ngspice-45 by hand (`research/impl/evidence/P3-016`).
+pub(super) fn xyce_domains(e: &str) -> String {
+    let sqrt = |a: &[String]| match a {
+        [x] => Some(format!("sqrt(max({x},0))")),
+        _ => None,
+    };
+    let acosh = |a: &[String]| match a {
+        [x] => Some(format!("acosh(max(abs({x}),1))")),
+        _ => None,
+    };
+    let atanh = |a: &[String]| match a {
+        [x] if reads(x) => Some(format!("atanh(min(max({x},-1+1e-12),1-1e-12))")),
+        _ => None,
+    };
+    let e = map_calls(e, "sqrt", &sqrt, 0);
+    let e = map_calls(&e, "acosh", &acosh, 0);
+    map_calls(&e, "atanh", &atanh, 0)
+}
+
+/// `e` with each `{…}` group inside it in parentheses, which every
+/// dialect reads as the group; the braces that hold all of `e` (a value's
+/// delimiters) stay. Xyce 7.10 and LTspice 26.1.1 read `{a-b}*i(v1)` as
+/// `(a-b)*i(v1)`; ngspice-45's B-source reader drops the braces
+/// (`a-b*i(v1)`) and its `.param` refuses `{{a-b}*3}` (run by hand,
+/// `research/impl/evidence/P3-084`). A value with a string in it is
+/// copied: a brace there is text.
+pub(super) fn brace_groups(e: &str) -> String {
+    let t = e.trim();
+    let whole = t.starts_with('{') && close(t.as_bytes(), 0) == Some(t.len() - 1);
+    let parens = |s: &str| s.replace('{', "(").replace('}', ")");
+    match whole {
+        _ if e.contains('"') => e.to_string(),
+        true if t[1..].contains('{') => format!("{{{}}}", parens(&t[1..t.len() - 1])),
+        true => e.to_string(),
+        false => parens(e),
+    }
+}
+
 // ---- private ----
+
+/// Whether `x` reads a parameter or a probe: a name that is no call's, or
+/// a `v(…)` or `i(…)`. A number's suffix or exponent (`2k`, `1e-3`) is no
+/// name, and a call of numbers (`exp(1)`) reads nothing.
+fn reads(x: &str) -> bool {
+    let b = x.as_bytes();
+    let word = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    (0..b.len()).any(|i| {
+        let start = (b[i].is_ascii_alphabetic() || b[i] == b'_')
+            && (i == 0 || !(word(b[i - 1]) || b[i - 1] == b'.'));
+        let end = i + b[i..].iter().take_while(|&&c| word(c)).count();
+        let probe = end == i + 1 && matches!(b[i], b'v' | b'V' | b'i' | b'I');
+        start && (probe || b.get(end) != Some(&b'('))
+    })
+}
 
 /// `s` with its ternaries spelled, at nesting `depth`.
 fn fix(s: &str, m: Mode, depth: u32) -> String {
@@ -365,41 +500,62 @@ fn commas(s: &str) -> Vec<&str> {
     out
 }
 
-/// The index closing the group `b[i]` opens; `None` when `b[i]` opens
-/// none or the group is unclosed. Quotes nest nothing.
-fn close(b: &[u8], i: usize) -> Option<usize> {
-    let shut = |c: u8| match c {
-        b'(' => Some(b')'),
-        b'[' => Some(b']'),
-        b'{' => Some(b'}'),
-        b'\'' | b'"' => Some(c),
-        _ => None,
-    };
-    let mut want = vec![shut(b[i])?];
-    let mut j = i + 1;
-    while j < b.len() {
-        let top = want[want.len() - 1];
-        if b[j] == top {
-            want.pop();
-            if want.is_empty() {
-                return Some(j);
-            }
-        } else if !matches!(top, b'\'' | b'"')
-            && let Some(s) = shut(b[j])
-        {
-            want.push(s);
-        }
-        j += 1;
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         Nest, Read, ngspice_nest, nominal, parenthesize, rename_call, rename_word, spell_clamp,
         spell_if, spell_nint,
     };
+
+    /// Each spelling's value on ngspice-45 is the call's on its own
+    /// simulator (Xyce 7.10, ngspice-45: `research/impl/evidence/P3-078`).
+    #[test]
+    fn power_calls_are_spelled_as_powers() {
+        let xy = super::xyce_power_calls;
+        assert_eq!(xy("pwr(V(1),v(2))"), "((V(1))**(v(2)))");
+        assert_eq!(
+            xy("POW(a, 3)+pwrs(-b,c)"),
+            "((a)**(3))+(sgn(-b)*abs(-b)**(c))"
+        );
+        assert_eq!(xy("pow(a)"), "pow(a)");
+        let ng = super::ngspice_power_calls;
+        assert_eq!(ng("pow(v(n),3)", true), "((v(n))**(3))");
+        assert_eq!(ng("pwr(v(n),2)", true), "(sgn(v(n))*((v(n))**(2)))");
+        assert_eq!(ng("pow(n,3)+pwr(n,2)", false), "pow(n,3)+((n)**(2))");
+    }
+
+    /// Each spelling's value on ngspice-45 is Xyce 7.10's of the call
+    /// (`research/impl/evidence/P3-016/cases.txt`).
+    #[test]
+    fn a_xyce_domain_is_spelled_for_ngspice() {
+        let d = super::xyce_domains;
+        assert_eq!(d("5V*SQRT(V(1,0))"), "5V*sqrt(max(V(1,0),0))");
+        assert_eq!(
+            d("acosh(V(3))+asqrt(x)"),
+            "acosh(max(abs(V(3)),1))+asqrt(x)"
+        );
+        assert_eq!(d("ATANH(V(4))"), "atanh(min(max(V(4),-1+1e-12),1-1e-12))");
+        assert_eq!(d("atanh(k)"), "atanh(min(max(k,-1+1e-12),1-1e-12))");
+        // Numbers alone: Xyce folds the call with no clamp.
+        for folded in ["atanh(2)", "atanh(exp(1))", "atanh(2k)", "atanh(1e-3)"] {
+            assert_eq!(d(folded), folded);
+        }
+        assert_eq!(d("sqrt(sqrt(x))"), "sqrt(max(sqrt(max(x,0)),0))");
+    }
+
+    /// ngspice-45 gives each spelling the value Xyce 7.10 gives the
+    /// braced text (`research/impl/evidence/P3-084/cases.txt`).
+    #[test]
+    fn a_brace_group_inside_an_expression_is_parenthesized() {
+        let g = super::brace_groups;
+        assert_eq!(g("{bletch-foobie}*I(V1)"), "(bletch-foobie)*I(V1)");
+        assert_eq!(g("{{bletch-foobie}*3}"), "{(bletch-foobie)*3}");
+        assert_eq!(g("2**{1+m}"), "2**(1+m)");
+        // A value's own braces, and text with none, stay.
+        for kept in ["{a*2}", " {a} ", "a+b", "\"x{y}\""] {
+            assert_eq!(g(kept), kept);
+        }
+    }
 
     #[test]
     fn a_c_then_branch_ternary_is_parenthesized() {

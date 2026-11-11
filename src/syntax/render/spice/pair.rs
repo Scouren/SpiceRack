@@ -63,6 +63,11 @@ pub(super) struct Pair {
     pub(super) r_model_multiplies: bool,
     /// ngspice has no `if()` (Xyce's, LTspice's): a ternary.
     pub(super) spell_if: bool,
+    /// Xyce and LTspice read a `{…}` group inside an expression as a
+    /// parenthesised one; ngspice-45's B-source reader drops the braces
+    /// (`{a-b}*i(v1)` is `a-b*i(v1)`: 2.01 for -0.01) and its `.param`
+    /// refuses a nested one: parentheses (`ternary::brace_groups`).
+    pub(super) brace_groups: bool,
     /// `log` is natural in the source, base 10 on Xyce (RG §2.3): `ln`.
     pub(super) log_to_ln: bool,
     /// Xyce's `log` (base 10) where the target's is natural: `log10`.
@@ -81,6 +86,23 @@ pub(super) struct Pair {
     /// An ngspice SFFM is (VO VA FM MDI FC), SPICE3's, HSPICE's, Xyce's
     /// and LTspice's (VO VA FC MDI FS) (`vsrcload.c`): the two swapped.
     pub(super) sffm_swap: bool,
+    /// SPICE3's SFFM on ngspice's cards (ngspice, ESPice, CDL), whose SFFM
+    /// limits MDI to FC/FM and is 0 at time zero (ngspice-45
+    /// `vsrcload.c:256,272`): a wave past that is a behavioural source of
+    /// time (`Wave::ngspice_sffm`, `waves::wave_as_b`).
+    pub(super) sffm_as_b: bool,
+    /// LTspice's SINE cycle count (help, Current Source: the sine holds
+    /// its value after Ncycles/Freq) where the target's SIN never stops
+    /// (ngspice manual §4.1.2; Xyce RG; HSPICE UG): a behavioural source
+    /// of time (`Wave::sin_cycles`, `waves::wave_as_b`).
+    pub(super) sin_cycles_as_b: bool,
+    /// A PULSE's cycle count (ngspice's NP, manual §4.1.1; LTspice's
+    /// Ncycles) where the target's PULSE has seven values (Xyce 7.10
+    /// ignores an eighth, run: 1 V at 12 µs where ngspice-45 and LTspice
+    /// give V1; HSPICE UG, PULSE): the pulses as a PWL (`Wave::pulses`).
+    /// ESPice runs NP as ngspice does (0.3.0, run); CDL's cards are
+    /// ngspice's.
+    pub(super) pulse_as_pwl: bool,
     /// Another dialect's `.print` on ngspice's `.print`: each output spelled as
     /// ngspice's `.print` reads it (`prints`).
     pub(super) foreign_prints: bool,
@@ -103,6 +125,26 @@ pub(super) struct Pair {
     /// An ngspice deck's model cards on Xyce: each judged by Xyce's device
     /// (`xyce_cards::xyce_instance`).
     pub(super) xyce_from_ngspice: bool,
+    /// Xyce evaluates a function on complex numbers and keeps the real
+    /// part, and clamps `atanh` (7.10: `sqrt(-4)` is 0, `acosh(-2.5)`
+    /// 1.5668, `atanh(-2.5)` -14.1621), where ngspice-45 fails the
+    /// analysis: the domain spelled (`ternary::xyce_domains`).
+    pub(super) xyce_domains: bool,
+    /// ngspice's `**` and `^` take the base's magnitude (ngspice-45:
+    /// `(-2)**3` is 8 in `{}` and in a B source; manual §5.1), the
+    /// target's keep a negative base's sign: `abs(x)**y`
+    /// (`powers::Law::Abs`), ngspice's power calls spelled as powers first.
+    pub(super) abs_power_out: bool,
+    /// The reverse, another dialect's power on ngspice: a negative base
+    /// keeps its sign under a whole exponent (Xyce 7.10 and LTspice 26.1.1:
+    /// `(-2)**3` is -8; HSPICE UG Table 27 `x**y`; Spectre 25.1,
+    /// settle-remote): `(sgn(x)*abs(x)**n)` (`powers::Law::Signed`).
+    pub(super) abs_power_in: bool,
+    /// A Xyce power on ngspice: under an exponent that is no whole
+    /// literal Xyce gives the real part of the complex power (7.10:
+    /// `(-2.5)**2.1` is 6.5145), spelled with a cosine
+    /// (`powers::Law::Real`); its `pow`, `pwr`, `pwrs` spelled as powers.
+    pub(super) xyce_power: bool,
     /// Another dialect's deck on LTspice: its SCALE option refused (LTspice
     /// has none and takes every L and W as written) (`ngspice_options`).
     pub(super) ltspice_from_other: bool,
@@ -122,6 +164,7 @@ impl Pair {
         let (nf, nt) = (from.netlist_rules, to.netlist_rules);
         let (ef, et) = (from.expr_eval, to.expr_eval);
         let foreign = from.text_family != to.text_family;
+        let counts = |r: NetlistRules| matches!(r, NetlistRules::Ngspice | NetlistRules::Ltspice);
         let natural =
             |x: ExprEval| matches!(x, ExprEval::Ngspice | ExprEval::Hspice | ExprEval::Ltspice);
         let pair = Pair {
@@ -135,6 +178,7 @@ impl Pair {
             xyce_m_rename: xy(nf) && ng(nt) && to.subckt_multiplicity,
             r_model_multiplies: xy(nt) && !xy(nf),
             spell_if: foreign && et == ExprEval::Ngspice,
+            brace_groups: foreign && et == ExprEval::Ngspice,
             log_to_ln: foreign && natural(ef) && et == ExprEval::Xyce,
             log_to_log10: foreign && ef == ExprEval::Xyce && natural(et),
             spell_clamp: foreign
@@ -145,6 +189,9 @@ impl Pair {
             lt_parasitics: from.card_rules == CardRules::Ltspice
                 && to.parasitics == Parasitics::Elements,
             sffm_swap: ng(nf) != (ng(nt) || to.writer == Writer::Cdl),
+            sffm_as_b: !ng(nf) && (ng(nt) || to.writer == Writer::Cdl),
+            sin_cycles_as_b: nf == NetlistRules::Ltspice && nt != NetlistRules::Ltspice,
+            pulse_as_pwl: counts(nf) && !(counts(nt) || to.writer == Writer::Cdl),
             foreign_prints: !ng(nf) && to.analysis_form == AnalysisForm::Ngspice,
             foreign_measures: !ng(nf) && ng(nt),
             caret_reread: from.caret_power != to.caret_power,
@@ -154,12 +201,18 @@ impl Pair {
             xyce_from_other: to.param_form == ParamForm::Xyce && from.param_form != ParamForm::Xyce,
             xyce_from_ngspice: to.param_form == ParamForm::Xyce
                 && from.model_semantics == ModelSemantics::Ngspice,
+            xyce_domains: foreign && ef == ExprEval::Xyce && et == ExprEval::Ngspice,
+            abs_power_out: foreign && ef == ExprEval::Ngspice && et != ExprEval::Ngspice,
+            abs_power_in: foreign && ef != ExprEval::Ngspice && et == ExprEval::Ngspice,
+            xyce_power: foreign && ef == ExprEval::Xyce && et == ExprEval::Ngspice,
             ltspice_from_other: !lt(nf) && lt(nt),
             hspice_from_other: !hs(nf) && hs(nt),
         };
         // The two directions of one rule never hold together.
         assert!(!(pair.log_to_ln && pair.log_to_log10));
         assert!(!(pair.nint_to_xyce && pair.nint_to_ngspice));
+        assert!(!(pair.abs_power_out && pair.abs_power_in));
+        assert!(!pair.xyce_power || pair.abs_power_in);
         if from == to {
             debug_assert_eq!(
                 pair,
@@ -203,7 +256,12 @@ mod tests {
             ("spell_clamp", to_ng.spell_clamp),
             ("stat_nominal", to_ng.stat_nominal),
             ("sffm_swap", to_ng.sffm_swap),
+            ("sffm_as_b", to_ng.sffm_as_b),
             ("foreign_measures", to_ng.foreign_measures),
+            ("brace_groups", to_ng.brace_groups),
+            ("xyce_domains", to_ng.xyce_domains),
+            ("abs_power_in", to_ng.abs_power_in),
+            ("xyce_power", to_ng.xyce_power),
         ] {
             assert!(holds, "xyce -> ngspice: {rule}");
         }
@@ -216,6 +274,8 @@ mod tests {
             ("xyce_from_ngspice", to_xy.xyce_from_ngspice),
             ("xyce_from_other", to_xy.xyce_from_other),
             ("sffm_swap", to_xy.sffm_swap),
+            ("abs_power_out", to_xy.abs_power_out),
+            ("pulse_as_pwl", to_xy.pulse_as_pwl),
         ] {
             assert!(holds, "ngspice -> xyce: {rule}");
         }

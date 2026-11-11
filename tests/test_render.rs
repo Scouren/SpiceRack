@@ -336,7 +336,7 @@ fn what_a_writer_leaves_out_or_copies_is_a_note_by_code() {
             Code::W0025,
         ),
         (
-            "t\nV1 a 0 PULSE(0 1 0 1n 1n 5n 10n 3)\nR1 a 0 1k\n.tran 1n 10n\n.end\n",
+            "t\nV1 a 0 PULSE(0 1 0 1n 1n 5n 10n 3 9)\nR1 a 0 1k\n.tran 1n 10n\n.end\n",
             Dialect::Ngspice,
             Dialect::Hspice,
             Code::W0026,

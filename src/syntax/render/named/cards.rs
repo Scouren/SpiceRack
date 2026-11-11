@@ -140,6 +140,18 @@ impl W<'_, '_> {
                 }
                 let extra = self.parasitics(letter, n, &np, &nm, &mut parasitics);
                 let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
+                // LTspice's SINE with a cycle count: the card a 0 source,
+                // its wave a behavioural source (`W::wave_b`).
+                let behav = match &wave {
+                    Some(w) if w.cycled() => {
+                        Some(self.wave_b(tok, n, letter, [&np, &nm], w, &value)?)
+                    }
+                    _ => None,
+                };
+                let (wave, value, nm, b_line) = match behav {
+                    Some((end, line)) => (None, Val::Num(0.0), end, Some(line)),
+                    None => (wave, value, nm, None),
+                };
                 let (l, master) = match letter {
                     'V' => ('v', "vsource"),
                     _ => ('i', "isource"),
@@ -166,6 +178,10 @@ impl W<'_, '_> {
                     s.push_str(&w);
                 }
                 s.push_str(&self.part_lines(extra));
+                if let Some(line) = b_line {
+                    s.push('\n');
+                    s.push_str(&line);
+                }
                 s
             }
             Card::Behavioural {

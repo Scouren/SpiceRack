@@ -293,6 +293,29 @@ impl W<'_, '_> {
         else {
             unreachable!("a source card")
         };
+        // A counted PULSE where the target's PULSE has no count: the PWL
+        // of its pulses, refused where they are none (`Wave::pulses`).
+        let wave = match wave {
+            Some(w) if self.pair.pulse_as_pwl && w.counted() => match w.pulses() {
+                Some(pwl) => Some(pwl),
+                None => {
+                    self.refuse(crate::syntax::diag::Code::W0108, tok);
+                    Some(w)
+                }
+            },
+            w => w,
+        };
+        // A wave the target's own form would run otherwise is written as
+        // a behavioural source (`wave_as_b`); the card stays as a 0
+        // source, or as what is left of its DC value (`beside_b`).
+        let behav = match &wave {
+            Some(w) => self.wave_as_b(w, tok),
+            None => None,
+        };
+        let (wave, value) = match (&behav, wave) {
+            (Some(_), Some(w)) => self.beside_b(&w, value, tok),
+            (_, wave) => (wave, value),
+        };
         if let Some(w) = &wave {
             self.wave_ok(letter, w, tok);
         }
@@ -316,6 +339,19 @@ impl W<'_, '_> {
             }
         };
         let np = extra.as_ref().map_or(np, |(at, _)| at.clone());
+        // A V is in series with its behavioural source, on node
+        // `{decl}_w`; an I in parallel with it.
+        let (b, nm) = match behav {
+            Some(expr) => {
+                let at = match letter {
+                    'V' => format!("{decl}_w"),
+                    _ => np.clone(),
+                };
+                let line = self.wave_b(&decl, [&at, &nm], letter == 'I', &expr, tok);
+                (Some(line), if letter == 'V' { at } else { nm })
+            }
+            None => (None, nm),
+        };
         let mut s = format!("{decl} {np} {nm} {}", self.value(&value));
         if let Some(mag) = ac_mag {
             s.push_str(&format!(" AC {}", self.sp.decimal(mag, self.x)));
@@ -334,7 +370,7 @@ impl W<'_, '_> {
             s.push_str(&self.wave(w));
         }
         s.push_str(&self.params(&parasitics));
-        for l in extra.map(|e| e.1).unwrap_or_default() {
+        for l in extra.map(|e| e.1).unwrap_or_default().into_iter().chain(b) {
             s.push('\n');
             s.push_str(&l);
         }
@@ -401,21 +437,11 @@ impl W<'_, '_> {
         if laplace::has_laplace(self.rd, value) {
             self.laplace(&decl, &np, &nm, value, current, tok)
         } else {
-            let key = if current { 'I' } else { 'V' };
             let expr = self.names.refs(self.scope, &expr);
             // ngspice's B-source parser reads `?:` by C's grammar.
             let expr = self.ternaries_as(&expr, Read::C);
-            match self.ask(Construct::BehaviouralSource, tok) {
-                // The map names it `G1`/`E1` (`renamed`).
-                Action::Spell(Alt::VolCur) if current => {
-                    format!("{decl} {np} {nm} cur='{expr}'")
-                }
-                Action::Spell(Alt::VolCur) => format!("{decl} {np} {nm} vol='{expr}'"),
-                Action::Spell(Alt::BracedBehaviour) => {
-                    format!("{decl} {np} {nm} {key}={{{expr}}}")
-                }
-                _ => format!("{decl} {np} {nm} {key}={expr}"),
-            }
+            // The map names it `G1`/`E1` (`renamed`).
+            self.b_line(&decl, [&np, &nm], current, &expr, tok)
         }
     }
 
