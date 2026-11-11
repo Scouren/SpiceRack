@@ -250,6 +250,7 @@ calls! {
     option_spell(spice: &str, text: &str);
     option_method(spice: &str);
     option_cosmetic(spice: &str);
+    model_load(master: &str, path: &str);
     spice_model_type(kind: &str);
     level_alias(kind: &str, source_level: u32, neutral_level: Option<u32>);
     kept_word(word: &str, c: PyConstruct);

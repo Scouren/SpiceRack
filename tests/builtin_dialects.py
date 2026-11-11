@@ -361,6 +361,9 @@ def hspice(d):
         .spectre_analysis("montecarlo")
         # The circuit temperature in an expression (HSPICE UG, temper).
         .temp_name("temper")
+        # The `.model` levels HSPICE numbers its own way (BJT 11: UCSD HBT).
+        .level_alias("npn", 11, None)
+        .level_alias("pnp", 11, None)
         # The VACASK analyses it has (HSPICE RF .HB, .HBAC, .HBNOISE).
         .vacask_analysis("hb")
         .vacask_analysis("hbac")
@@ -1277,6 +1280,13 @@ def vacask(d):
         .model_master("nmf", [1], "mes1", "1")
         .model_master("pmf", [1], "mes1", "-1")
         .model_master("vdmos", [1], "vdmos", "1")
+        # Xyce's VBIC 1.3 (`Q` level 11, 12): modules in files of their own.
+        .model_master("npn", [11], "vbic13", "1")
+        .model_master("pnp", [11], "vbic13", "-1")
+        .model_master("npn", [12], "vbic13_5t", "1")
+        .model_master("pnp", [12], "vbic13_5t", "-1")
+        .model_load("vbic13", "vbic_1p3.osdi")
+        .model_load("vbic13_5t", "vbic_1p3_5t.osdi")
         .spice_model_type("nmos")
         .spice_model_type("pmos")
         .spice_model_type("npn")

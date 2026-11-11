@@ -1,20 +1,25 @@
 //! The VACASK `model` lines: an ngspice `.model` kind and LEVEL → the
-//! `sp_<module>` VACASK builds from ngspice's device code, each parameter
-//! checked against the names the module declares (VACASK stops on another:
-//! "Parameter 'utra' not found.") and those ngspice-45 reads on the same
-//! device's card (ngspice ignores another: "unrecognized parameter -
-//! ignored"). Both name tables are generated, one line per module
-//! (`<module> <name> <name> …`, lowercase): `vacask_params.txt` from VACASK
-//! 36be560 `devices/spice/<module>.va` (`parameter` and `aliasparam`
-//! names), `ngspice_params.txt` from ngspice-45
+//! `sp_<module>` VACASK builds from ngspice's device code, or a module in
+//! a file of its own (`Behaviours::model_load`: Xyce's VBIC 1.3 is
+//! `vbic13`), each parameter checked against the names the module declares
+//! (VACASK stops on another: "Parameter 'utra' not found.") and those
+//! ngspice-45 reads on the same device's card (ngspice ignores another:
+//! "unrecognized parameter - ignored"). Both name tables are generated,
+//! one line per module (`<module> <name> <name> …`, lowercase):
+//! `vacask_params.txt` from VACASK 36be560 `devices/spice/<module>.va`
+//! (`parameter` and `aliasparam` names) and `devices/vbic/vbic_1p3.va`
+//! (its model parameters), `ngspice_params.txt` from ngspice-45
 //! `src/spicelib/devices/<dev>/*.c` (the `IOP*`/`IP*` rows; `OP` rows are
 //! outputs).
 //!
-//! Cites: VACASK 36be560 `devices/spice/*.va`; ngspice-45
+//! Cites: VACASK 36be560 `devices/spice/*.va`, `devices/vbic/vbic_1p3.va`
+//! L194-L229 (its three modules), `devices/CMakeLists.txt` L10-L12; Xyce
+//! RG 7.10 §2.3.17 (`Q` levels 11 and 12); ngspice-45
 //! `parser/inpgmod.c`, `parser/inpdomod.c` L271-L314 (BSIM versions),
 //! `devices/*/*.c` parameter tables.
 //!
 //! Contents:
+//! - `W::module_of(&self, n: u32, model: &str) -> Option<&'static str>`
 //! - `W::model_lines(&mut self, b: &Block, loads: &mut BTreeSet<String>) -> Vec<String>`
 //! - `W::is_vdmos(&self, n: u32, model: &str) -> bool`
 
@@ -31,6 +36,27 @@ const VACASK: &str = include_str!("vacask_params.txt");
 const NGSPICE: &str = include_str!("ngspice_params.txt");
 
 impl W<'_, '_> {
+    /// The module instance `n`'s model `model` is written as (`vbic13`): a
+    /// card of this file's whose type and neutral LEVEL
+    /// (`Behaviours::neutral_level`) have a master row. `None`: no card
+    /// here, or no row.
+    // ponytail: a card in another kit file is not looked at (its instance
+    // is written as read): `read::file_models`, as the Xyce writer's
+    // verdicts, when a deck needs it.
+    pub(super) fn module_of(&self, n: u32, model: &str) -> Option<&'static str> {
+        let (None, card) = self.rd.instance_model(n, model)? else {
+            return None;
+        };
+        let m = self.rd.model_view(card, crate::syntax::ast::NONE);
+        let kind = m.kind.to_ascii_lowercase();
+        // The source's number, in the numbering the rows are keyed by.
+        let level = self.rd.b.neutral_level(&kind, super::params::level(&m))?;
+        match self.b.model_master(&kind, level) {
+            MasterAnswer::Master(r) => Some(r.master),
+            MasterAnswer::Refused | MasterAnswer::AsWritten => None,
+        }
+    }
+
     /// Block `b`'s `model` lines, the OSDI files their modules need added
     /// to `loads`; a model with no VACASK module is refused.
     pub(super) fn model_lines(&mut self, b: &Block, loads: &mut BTreeSet<String>) -> Vec<String> {
@@ -202,11 +228,18 @@ impl W<'_, '_> {
         let Some(rows) = self.osdi_rows(m, module, tok)? else {
             return Some(String::new());
         };
-        loads.insert(format!("spice/{module}.osdi"));
+        // A master with a load row is a module of that name in that file
+        // (`vbic13` of `vbic_1p3.osdi`); any other is ngspice's device
+        // code, `sp_<master>` of `spice/<master>.osdi`.
+        let (file, module) = match self.b.model_load(module) {
+            Some(path) => (path.to_string(), module.to_string()),
+            None => (format!("spice/{module}.osdi"), format!("sp_{module}")),
+        };
+        loads.insert(file);
         // `type=` is the polarity, and keeps an otherwise empty list
         // non-empty: `model x sp_diode ( )` is a syntax error.
         Some(format!(
-            "model {name} sp_{module}{}",
+            "model {name} {module}{}",
             self.vacask_list(sign, &rows)
         ))
     }
@@ -274,5 +307,18 @@ mod tests {
         assert!(vacask_has("mos2", "uo") && vacask_has("mos2", "u0"));
         assert!(!vacask_has("mos2", "utra") && !ngspice_reads("mos2", "utra"));
         assert!(ngspice_reads("mos2", "vto") && !vacask_has("nomodule", "vto"));
+    }
+
+    /// `devices/vbic/vbic_1p3.va` L453 (`rth`), L308 (`gmin`); L292-L294
+    /// (`trise`, `sw_noise`, `sw_et` are instance parameters: Xyce 7.10
+    /// ignores one on a model card, "No model parameter SW_ET found",
+    /// where VACASK takes it); L300-L302 (`npn`, `pnp`, `type`: the
+    /// polarity is the line's own `type=`).
+    #[test]
+    fn a_vbic_module_has_its_model_names_only() {
+        for module in ["vbic13", "vbic13_5t"] {
+            assert!(vacask_has(module, "rth") && vacask_has(module, "gmin"));
+            assert!(!vacask_has(module, "sw_et") && !vacask_has(module, "type"));
+        }
     }
 }

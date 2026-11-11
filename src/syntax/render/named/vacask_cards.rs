@@ -249,6 +249,15 @@ impl W<'_, '_> {
                 }
                 let kept = if vdmos { 3 } else { nodes.len() };
                 let ns: Vec<String> = nodes[..kept].iter().map(|x| q(x)).collect();
+                // Xyce's level 11 card may name a fourth node, the thermal
+                // `dt` (RG 7.10 §2.3.17.2); `vbic13` keeps it inside
+                // (`vbic_1p3.va` L196-L200), and VACASK stops on the card:
+                // "Too many terminals specified at instantiation."
+                let dt = letter == 'Q' && nodes.len() > 3;
+                if dt && self.module_of(n, &model) == Some("vbic13") {
+                    self.refuse(Code::W0105, tok);
+                    return None;
+                }
                 // A loaded module's instance keeps its name as read.
                 let letter = match letter {
                     'N' => String::new(),

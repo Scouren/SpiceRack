@@ -266,6 +266,21 @@ pub(super) fn vacask() -> DialectDef {
         .model_master("nmf", &[1], "mes1", Some("1"))
         .model_master("pmf", &[1], "mes1", Some("-1"))
         .model_master("vdmos", &[1], "vdmos", Some("1"))
+        // Xyce's VBIC 1.3 (RG 7.10 §2.3.17: `Q` level 11 on three
+        // terminals, 12 with the substrate, the thermal node `dt` optional
+        // after them) is the CMC source VACASK builds too (36be560
+        // `devices/vbic/vbic_1p3.va` L194-L229, `devices/CMakeLists.txt`
+        // L10-L12): `vbic13` (c b e) and `vbic13_5t` (c b e s dt), each a
+        // file of its own, named as it is. With `dt` left unconnected
+        // `vbic13_5t` is `vbic13_4t` (both run: the same twelve digits), so
+        // level 12 is one row. ngspice-45 has no BJT at 11 or 12 ("Unable
+        // to find definition of given model").
+        .model_master("npn", &[11], "vbic13", Some("1"))
+        .model_master("pnp", &[11], "vbic13", Some("-1"))
+        .model_master("npn", &[12], "vbic13_5t", Some("1"))
+        .model_master("pnp", &[12], "vbic13_5t", Some("-1"))
+        .model_load("vbic13", "vbic_1p3.osdi")
+        .model_load("vbic13_5t", "vbic_1p3_5t.osdi")
         .spice_model_type("nmos")
         .spice_model_type("pmos")
         .spice_model_type("npn")

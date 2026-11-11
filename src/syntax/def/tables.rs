@@ -15,7 +15,7 @@
 //!   `DialectDef::option_spell(self, spice: &str, text: &str) -> Self`, `DialectDef::option_method(self, spice: &str) -> Self`,
 //!   `DialectDef::option_cosmetic(self, spice: &str) -> Self`
 //! - `DialectDef::model_master(self, kind: &str, levels: &[u32], master: &str, type_: Option<&str>) -> Self`,
-//!   `DialectDef::spice_model_type(self, kind: &str) -> Self`
+//!   `DialectDef::spice_model_type(self, kind: &str) -> Self`, `DialectDef::model_load(self, master: &str, path: &str) -> Self`
 //! - `DialectDef::kept_word(self, word: &str, c: Construct) -> Self`, `DialectDef::dot_rule(self, word: &str, r: DotRule) -> Self`
 //! - `DialectDef::level_alias(self, kind: &str, source_level: u32, neutral_level: Option<u32>) -> Self`
 
@@ -132,6 +132,19 @@ impl DialectDef {
             None => v.push(row),
         }
         self.b.model_masters = Box::leak(v.into_boxed_slice());
+        self
+    }
+
+    /// The target loads the file `path` for master `master` (a
+    /// `model_master` row's, spelled alike), and the master is the module's
+    /// own name there: VACASK `load "vbic_1p3.osdi"` and `model x vbic13`.
+    /// A master with no row is in the target's default file (VACASK:
+    /// `sp_<master>` of `spice/<master>.osdi`, ngspice's device code as
+    /// VACASK builds it). A row of the same master is replaced in place.
+    pub fn model_load(mut self, master: &str, path: &str) -> Self {
+        let mut v = self.b.model_loads.to_vec();
+        put(&mut v, leak(master), leak(path));
+        self.b.model_loads = Box::leak(v.into_boxed_slice());
         self
     }
 
