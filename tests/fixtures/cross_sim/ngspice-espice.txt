@@ -1837,7 +1837,6 @@ ngspice/examples/inductive-systems/positive-definite-3.sp simulator-fails # no r
 ngspice/examples/measure/func_cap.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
 ngspice/examples/measure/inv-meas-tran-auto.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # plots ["op"] became ["tran"]
 ngspice/examples/mos/ro-meas.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(xro.n2): 0.7617871250767438 leaves the tube at t=0.0000000008145599999999978 (tol 1.576e-2)
-ngspice/examples/optran/F5TurboV2thermal-optran.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/examples/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars
 ngspice/examples/optran/TLV9002-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ COM SW+ VALUE = {IF((V(OLN,COM)>10E-3 | V(OLP,COM)>10E-3),1,0)} | Error: .cross_sim_d
 ngspice/examples/p-to-n-examples/logic.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: B1 1 0 V=~(~v(9)&v(8)) + 0.5 | Error: .cross_sim_deck.sp: ParseError
@@ -1906,7 +1905,6 @@ ngspice/paranoia/TransmissionLines/ltra4_1_line.sp simulator-differs:source reas
 ngspice/paranoia/TransmissionLines/ltra6_2_line.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnknownControlSource
 ngspice/paranoia/TransmissionLines/ltra7_4_line.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnknownControlSource
 ngspice/paranoia/measure/func_cap.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
-ngspice/paranoia/optran/F5TurboV2thermal-ic-out.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/paranoia/optran/TLV6001-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ 1 2 Value = {IF((V(3,1)>10e-3 | V(4,1)>10e-3),1,0)} | Error: .cross_sim_deck.sp: Pars
 ngspice/paranoia/optran/TLV9002-test.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: GSW+ COM SW+ VALUE = {IF((V(OLN,COM)>10E-3 | V(OLP,COM)>10E-3),1,0)} | Error: .cross_sim_d
 ngspice/paranoia/pton/Optimos_out.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: UnresolvedParameter
@@ -1964,6 +1962,8 @@ ngspice/tests/polezero/filt_multistage.sp simulator-differs:source reason=S-TARG
 ngspice/tests/polezero/pz2.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # plots ["op"] became ["dc"]
 ngspice/tests/polezero/pzt.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # plots ["op"] became ["dc"]
 ngspice/tests/regression/lib-processing/ex1b.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # op v(9): 1+0i vs 1.3333333333333335+0i at 0 (tol 2.002e-3)
+ngspice/tests/regression/lib-processing/ex2a.sp simulator-fails reason=ESPICE-NESTED-LIB proof=espice-nested-lib-work-dir.md # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound
+ngspice/tests/regression/lib-processing/ex3a.sp simulator-fails reason=ESPICE-NESTED-LIB proof=espice-nested-lib-work-dir.md # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: FileNotFound
 ngspice/tests/regression/misc/ac-zero.sp simulator-fails # no raw file .cross_sim_out.raw: error: analysis: .ac lin 1 0 0: InvalidAnalysisArguments | Error: .cross_sim_deck.sp: InvalidAnalysisArguments
 ngspice/tests/regression/misc/asrc-tc-1.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: cannot read the card: b2  2 0  i=v(1) tc1=0.001 | Error: .cross_sim_deck.sp: ParseError
 ngspice/tests/regression/misc/bugs-2.sp simulator-fails # no raw file .cross_sim_out.raw: error: netlist: @v1[dc]: v1 has no variable 'dc'; its variables are: | Error: .cross_sim_deck.sp: UnsupportedCard

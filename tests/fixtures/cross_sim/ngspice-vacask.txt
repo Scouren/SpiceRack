@@ -26,6 +26,7 @@ ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] beca
 ngspice/examples/noise/resdiv.sp mismatch # plots ["noise", "noise", "noise", "total", "total", "total"] became ["noise", "noise", "noise"]
 ngspice/examples/snapshot/adder_mos.sp target-fails # no plot: Parser syntax error, unexpected newline, expecting (
 ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.x1.net.1): 1.6918051527003348 leaves the tube at t=0.0000002065 (tol 1.918e-2)
+ngspice/examples/soa/nic_soa.sp mismatch # tran v(bias): 0.6388506757411574 leaves the tube at t=0 (tol 6.502e-3)
 ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])
 ngspice/examples/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@d1[gd]", "@d1[cd]", "@d1[qd]"] vs ["1", "d1:a_int", "d1:implicit_equation_0", "v1:flow(br)"])

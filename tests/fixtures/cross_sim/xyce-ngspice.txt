@@ -178,7 +178,6 @@ Certification_Tests/BUG_1211_SON/specialChars.cir mismatch # op 2$: 0.6666666666
 Certification_Tests/BUG_1222_SON/bug_1222_son_1.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [betty]
 Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir target-fails # no raw file .cross_sim_out.raw: Formula() error. | Undefined parameter [test1]
 Certification_Tests/BUG_1299_SON/bug1299son.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.9968095107021919 leaves the tube at t=0.487283156964356 (tol 1.000e-2)
-Certification_Tests/BUG_1325_SON/inc_lib_file_relative_path.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [p4]
 Certification_Tests/BUG_1377/test1.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.0012802943687932882+0i vs -0.0012729629523547516+0i at 0.34 (tol 7.305e-6)
 Certification_Tests/BUG_1430/bug_1430.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v1 | Not enough parameters
 Certification_Tests/BUG_1558/bug_1558_1.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r]
@@ -520,6 +519,7 @@ POWER/power_thermalres_trap.cir target-fails # no raw file .cross_sim_out.raw: U
 POWERNODE/sixNode.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VIN1#branch: -0.0019033154118347267 leaves the tube at t=0.000002025180494428555 (tol 1.241e-4)
 POWERNODE/sixNode_in.cir mismatch # tran VCONNECTVSS#branch: 0.000000000035662640770425025 leaves the tube at t=0 (tol 2.924e-12)
 PSP103/invert_psp.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1)
+RESISTOR/DefaultValueWarning.cir mismatch # op 2A: 0.33333333333333337+0i vs 0.0004997501249375312+0i at 0 (tol 6.687e-4) (ZERO-LEDGER P3-136: Xyce runs a model resistor with no value at 1k, ngspice at RSH times one square)
 RESISTOR/resistor_lv3.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
 RESISTOR/resistor_lv3_2.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
 ROM/MULTIPORT/RLC_mesh2.cir slow # ngspice past its output budget: 1082 vectors over 5 us at 10 ps, a 4.3 GB raw file
