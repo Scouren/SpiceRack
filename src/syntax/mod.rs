@@ -36,6 +36,9 @@ mod kinds;
 
 pub mod ast;
 pub mod behaviour;
+// Its one caller outside the tests is the Python deck (`python::deck`).
+#[cfg(any(test, feature = "python"))]
+pub(crate) mod build;
 mod check;
 pub mod def;
 pub mod device;

@@ -365,10 +365,18 @@ impl Deck {
         render: impl Fn(&render::Source, Lang) -> Result<T, String>,
     ) -> Result<T, String> {
         let name = self.top.name.as_str();
-        let source = self.source(super::def_::builtin_of(lang))?;
+        let (source, rows, ast) = self.build(super::def_::builtin_of(lang))?.finish();
         let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
-        let tokens = crate::syntax::tokenize(&source, lex);
-        let ast = crate::syntax::parse(&tokens, lex);
+        let tokens = crate::syntax::token::Tokens::from_rows(&source, lex, rows);
+        // The second writer's guards (DESIGN-python-ast-builders §3), in a
+        // debug build: every row keeps its tag's layout, and the deck is,
+        // row for row, the parse of its own text.
+        debug_assert_eq!(ast.check(&tokens), Ok(()), "a built tree's layouts");
+        debug_assert_eq!(
+            crate::syntax::build::unlike_parse(&tokens, &ast),
+            None,
+            "a built deck is its own text, read"
+        );
         let src = render::Source {
             ast: &ast,
             tokens: &tokens,
@@ -379,6 +387,18 @@ impl Deck {
             numbers: render::Numbers::Given,
         };
         render(&src, lang)
+    }
+
+    /// The deck for target `d` as a `Build`: its title line, then every
+    /// line after it ([`Self::source`]) as the reader reads it, the rows
+    /// moved in beside the text.
+    fn build(&self, d: Dialect) -> Result<crate::syntax::build::Build, String> {
+        let source = self.source(d)?;
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
+        let (title, rest) = source.split_once('\n').unwrap_or((source.as_str(), ""));
+        let mut b = crate::syntax::build::Build::new(title, lex);
+        b.text(rest);
+        Ok(b)
     }
 
     /// The deck as ngspice text, for target `d`: a model library's path
@@ -609,6 +629,23 @@ mod tests {
             }),
             ..Deck::default()
         }
+    }
+
+    #[test]
+    fn p8_140_a_deck_is_built_as_the_reader_reads_its_text() {
+        // DESIGN-python-ast-builders §3, the differential: the rows a deck
+        // is built as are the tokenizer's and parser's of the text it
+        // wrote. Oracle: the reader over `source`. Checks: 3.
+        let mut d = deck(vec![]);
+        d.top
+            .elements
+            .push(Card::element("in", "Vin in 0 1 AC 1".into()));
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
+        let (src, rows, ast) = d.build(Dialect::Ngspice).expect("built").finish();
+        assert_eq!(src, d.source(Dialect::Ngspice).expect("source"));
+        let tokens = crate::syntax::token::Tokens::from_rows(&src, lex, rows);
+        assert_eq!(ast.check(&tokens), Ok(()));
+        assert_eq!(crate::syntax::build::unlike_parse(&tokens, &ast), None);
     }
 
     #[test]

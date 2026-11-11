@@ -19,6 +19,7 @@ use crate::syntax::statement::{Analysis, Command};
 use crate::syntax::token::Tokens;
 use crate::syntax::{parse, tokenize};
 
+mod build;
 mod check;
 mod heads;
 mod render;

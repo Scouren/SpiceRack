@@ -303,7 +303,8 @@ pub struct Location {
 /// The rows of a [`Tokens`] whose text is not borrowed yet: what a writer
 /// other than the tokenizer appends while it still owns the text, column
 /// for column as [`Tokens`] (the line starts are found from the text).
-// Until the AST builder calls it (DESIGN-python-ast-builders §9 step 2).
+// `syntax::build` fills it, which only the tests and the `python` feature
+// compile.
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Default)]
 pub(crate) struct TokRows {
@@ -394,7 +395,8 @@ impl<'s> Tokens<'s> {
     /// `number_tokens` every [`Tag::Number`] token in order with one value
     /// each, `switches` every [`Tag::LangSpice`] and [`Tag::LangSpectre`]
     /// token in order with one lexicon each.
-    // Until the AST builder calls it (DESIGN-python-ast-builders §9 step 2).
+    // `syntax::build`'s decks call it, which only the tests and the
+    // `python` feature compile.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn from_rows(
         source: &'s str,
