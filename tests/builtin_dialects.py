@@ -378,6 +378,7 @@ def hspice(d):
         .kept_word(".sample", Construct.HspiceAnalysis)
         .kept_word(".trannoise", Construct.HspiceAnalysis)
         .kept_word(".lstb", Construct.HspiceAnalysis)
+        .kept_word(".op", Construct.HspiceAnalysis)
         .kept_word("w", Construct.HspiceWLine)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)

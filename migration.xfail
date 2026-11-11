@@ -691,3 +691,12 @@ xyce/Certification_Tests/ISSUE_405/precedence_b1.cir cdl written differently: on
 xyce/Certification_Tests/ISSUE_405/precedence_b2.cir spectre written differently: only the first definition of a parameter defined twice (P3-017)
 xyce/Certification_Tests/ISSUE_405/precedence_b2.cir vacask written differently: only the first definition of a parameter defined twice (P3-017)
 xyce/Certification_Tests/ISSUE_405/precedence_b2.cir cdl written differently: only the first definition of a parameter defined twice (P3-017)
+
+# S1: P3-028: HSPICE `.op <time> …` (a report at each transient time) is kept as HSPICE's text: HSPICE copies the card (it wrote a bare `.op`), every other simulator target refuses it (W0015) instead of running a DC operating point
+hspice/hspice/op_times.sp hspice written differently: `.op 1n 5n` copied (W0027), was a bare `.op` (P3-028)
+hspice/hspice/op_times.sp ngspice now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
+hspice/hspice/op_times.sp espice now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
+hspice/hspice/op_times.sp xyce now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
+hspice/hspice/op_times.sp ltspice now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
+hspice/hspice/op_times.sp spectre now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
+hspice/hspice/op_times.sp vacask now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)

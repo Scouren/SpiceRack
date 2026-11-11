@@ -387,6 +387,19 @@ impl<'a> Rd<'a> {
             Tag::Measure => Some(Card::Meas),
             Tag::Step => self.step(n, items),
             Tag::Analysis => match kind.as_str() {
+                // HSPICE `.OP format time …`: a report at each transient
+                // time (Reference Manual: Commands and Control Options
+                // E-2010.12 pp.232-233; ESPice `--tokenizer=hspice`: one
+                // operating point a time). No other target's `.op` takes a
+                // time (ngspice-45 runs `.op 1n 5n` as `.op`), so the card
+                // is no analysis of the IR: it stays HSPICE's text, which
+                // HSPICE copies and the rest refuse (its `.op` kept word).
+                "op" if hspice
+                    && items.iter().all(|&k| self.tag(k) == Tag::Word)
+                    && items.iter().any(|&k| self.numw(k)) =>
+                {
+                    None
+                }
                 "op" => Some(Card::Op),
                 "dc" if matches!(
                     self.b.card_rules,

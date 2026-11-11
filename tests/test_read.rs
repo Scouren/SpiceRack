@@ -73,6 +73,32 @@ fn a_control_pre_osdi_is_a_load_ltspice_refuses() {
     assert!(refusal(deck, Dialect::Ngspice, Dialect::Ltspice).contains(&Code::W0004));
 }
 
+// ZERO-LEDGER P3-028: HSPICE `.OP format time …` reports the operating
+// point at each transient time (HSPICE Reference Manual: Commands and
+// Control Options E-2010.12 pp.232-233). Oracle: the manual pages; and
+// ESPice 0.3.0 `--tokenizer=hspice` on this deck publishes v(out) =
+// 0.18119 V at 1 ns and 0.63210 V at 5 ns (1 - exp(-t / 5 ns)), where
+// ngspice-45 runs `.op 1n 5n` as `.op`: v(out) = 0 V.
+#[test]
+fn p3_028_an_hspice_op_at_times_is_kept() {
+    let deck = "* t\nv1 in 0 pulse(0 1 0 1p 1p 1 2)\nr1 in out 1k\nc1 out 0 5p\n\
+                .tran 0.1n 10n\n.op 1n 5n\n.end\n";
+    let hs = Dialect::Hspice;
+    oracle::spec_example("HSPICE `.OP format time`", deck, hs, hs, &[".op 1n 5n"]);
+    // ngspice manual §11.3.5, Xyce RG `.OP`, LTspice help `.op`, Spectre
+    // Reference `dc`, VACASK `op`: none takes a time.
+    for to in [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Xyce,
+        Dialect::Ltspice,
+        Dialect::Spectre,
+        Dialect::Vacask,
+    ] {
+        oracle::spec_refusal("no timed `.op` on the target", deck, hs, to, &[Code::W0015]);
+    }
+}
+
 // ZERO-LEDGER P3-017: a parameter defined twice. Oracle: each simulator on
 // the divider v(b) = 4 V · 1k / (rx + 1k). ngspice-45 keeps the last
 // definition (rx = 3k: 1 V), Xyce 7.10 the first (rx = 1k: 2 V), VACASK
