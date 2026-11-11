@@ -12,6 +12,7 @@
 //!   `W::ternaries_as(&self, e: &str, read: Read) -> String`
 //! - `W::m_rename(&self, params: &[(String, String)]) -> Option<String>`
 //! - `W::declares(&self, master: &str, p: &str) -> bool`, `W::r_default(&self, letter: char, m: &str) -> Option<String>`
+//! - `W::undeclared(&mut self, sc: &Block, head: &[(String, String)]) -> Vec<(String, String)>`
 //! - `W::encloses(&self, outer: u32, inner: u32) -> bool`, `W::inherited_models(&self, sc: &Block) -> Vec<(u32, u32)>`
 //! - `pub(super) fn r_value(kind: &str, params: &[(String, String)]) -> Option<String>`
 
@@ -22,6 +23,8 @@ use super::ternary::{
 };
 use super::ternary::{brace_groups, ngspice_power_calls, xyce_domains, xyce_power_calls};
 use crate::syntax::behaviour::{ExprEval, ParamForm, ValueQuoting};
+use crate::syntax::diag::Code;
+use crate::syntax::render::read::{Block, Card};
 
 /// One expression rewrite: `apply` where `holds`.
 struct Rewrite {
@@ -151,6 +154,72 @@ impl W<'_, '_> {
             .find(|b| b.name.eq_ignore_ascii_case(master));
         def.and_then(|b| self.rd.subckt_head(b.node))
             .is_some_and(|h| h.params.iter().any(|(k, _)| k.eq_ignore_ascii_case(p)))
+    }
+
+    /// The parameters the deck's `X` lines pass to subcircuit `sc` that
+    /// neither its head (`head`) nor a `.param` of its body declares, each
+    /// with its default on the head, on ngspice from Xyce. Xyce sets such
+    /// a parameter for the instance (7.10 runs of XYCE_CORPUS
+    /// `Certification_Tests/BUG_1558/bug_1558_{1,3,4}.cir`: R = 100k, over
+    /// the top-level `.param R=1k`); ngspice-45 stops on the line
+    /// ("Mismatch: 0 formal but 1 actual params"). The default is the
+    /// top-level `.param` of that name, which a line that passes other
+    /// parameters reads on Xyce, else the first value passed. ngspice
+    /// reads a body `.param` as a head default already. `M` is the
+    /// multiplicity (RG `X`), never a parameter passed. An `X` line with
+    /// no parameter at all computes on Xyce with what the line of `sc`
+    /// before it passed (7.10 run), which no default says: refused
+    /// (W0140) beside any line that passes one the head lacks.
+    pub(super) fn undeclared(
+        &mut self,
+        sc: &Block,
+        head: &[(String, String)],
+    ) -> Vec<(String, String)> {
+        if !self.pair.xyce_undeclared {
+            return Vec::new();
+        }
+        let has =
+            |ps: &[(String, String)], k: &str| ps.iter().any(|(p, _)| p.eq_ignore_ascii_case(k));
+        let views = |ps: &[u32]| {
+            ps.iter()
+                .map(|&a| self.rd.param_view(a))
+                .collect::<Vec<_>>()
+        };
+        let (local, global) = (views(&sc.locals), views(&self.deck.top.params));
+        // ponytail: every `X` line of the deck read again per subcircuit;
+        // one master → lines table built in `write` when a Xyce deck of
+        // thousands of subcircuits is slow.
+        let mut uses: Vec<(u32, Vec<(String, String)>)> = Vec::new();
+        for b in self.blocks() {
+            for &(_, n) in &b.insts {
+                if let Card::Inst { master, params, .. } = self.rd.card_view(n)
+                    && master.eq_ignore_ascii_case(&sc.name)
+                {
+                    uses.push((n, params));
+                }
+            }
+        }
+        let mut out: Vec<(String, String)> = Vec::new();
+        let mut passed = false;
+        for (k, v) in uses.iter().flat_map(|(_, params)| params) {
+            if has(head, k) || v.is_empty() || k.eq_ignore_ascii_case("m") {
+                continue;
+            }
+            passed = true;
+            if has(&local, k) || has(&out, k) {
+                continue;
+            }
+            let default = global.iter().find(|(g, _)| g.eq_ignore_ascii_case(k));
+            out.push((k.clone(), default.map_or(v, |(_, d)| d).clone()));
+        }
+        for (n, params) in &uses {
+            if passed && params.is_empty() {
+                self.refuse(Code::W0140, self.rd.main(*n));
+            }
+        }
+        debug_assert!(out.iter().all(|(k, _)| !has(head, k)), "the head has none");
+        debug_assert!(!has(&out, "m"), "M is the multiplicity");
+        out
     }
 
     /// The resistance an R model `m` gives an instance with no value,

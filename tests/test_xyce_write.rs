@@ -356,3 +356,114 @@ fn an_ngspice_vdmos_is_refused() {
     let deck = "* t\n.model n1 vdmos vto=1 kp=1e-5\nvd d 0 1\nm1 d d 0 n1\n.op\n.end\n";
     assert_eq!(refusal(deck), [Code::W0053, Code::W0050]);
 }
+
+/// ngspice-45 `inpdomod.c:347-348` (levels 10 and 58 are B4SOI); Xyce RG
+/// 7.10 `M` level table (70 is BSIM-SOI 4, 10 is BSIM-SOI 3.2, no 58):
+/// written `level=70`. With self-heating the two SOI generations part:
+/// ngspice-45 v(d) 0.563875, Xyce 7.10 at level 70 0.563876, at the copied
+/// level 10 0.611222 (ledger P3-007).
+#[test]
+fn p3_007_an_ngspice_b4soi_is_xyce_level_70() {
+    let deck = |level: u32| {
+        format!(
+            "* t\nvd dd 0 1.5\nrd dd d 1k\nvg g 0 1.5\nm1 d g 0 0 n1 w=4u l=0.15u\n\
+             .model n1 nmos level={level} tox=5n tsi=90n tbox=500n vth0=0.5 u0=0.05 nch=8e17 \
+             k1=0.1 eta0=0.5 dsub=0.35 nfactor=0.4 pclm=1 rdsw=100 vsat=80000 shmod=1 rth0=1\n\
+             .op\n.end\n"
+        )
+    };
+    same_op(&deck(10), "d");
+    let w = write(&deck(58));
+    assert!(w.contains("level=70"), "{w}");
+}
+
+/// ngspice-45 `mos6set.c:93-97`: a level-6 MOSFET's λ is `lambda0`, by
+/// default `lambda`. Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` reads LAMBDA
+/// only when LAMBDA0 is given too: both written with ngspice's value.
+/// Saturation, 1 mA·(1 + λ·Vds) through 1k from 5 V: v(d) = 4/(1 + λ)
+/// (ngspice-45: 3.333333, 3.333333, 3.809524; Xyce 7.10 on the copied
+/// cards: 4.0, 4.0, 3.3333). Ledger P3-073; spice-bench
+/// `ngspice/tests/mos6/simpleinv.sp` (`LAMBDA0=` alone).
+#[test]
+fn p3_073_an_ngspice_level_6_lambda_holds_on_xyce() {
+    let cards = [
+        ("lambda=0.2", 0.2),
+        ("lambda0=0.2", 0.2),
+        ("lambda=0.2 lambda0=0.05", 0.05),
+    ];
+    for (lambdas, lambda) in cards {
+        let deck = format!(
+            "* t\nvd dd 0 5\nrd dd d 1k\nvg g 0 3\nm1 d g 0 0 nm l=1u w=10u\n\
+             .model nm nmos level=6 vto=1 {lambdas}\n.op\n.end\n"
+        );
+        let on = [Dialect::Ngspice, Dialect::Xyce];
+        let tol = Tol {
+            rel: 1e-6,
+            floor: 0.0,
+        };
+        closed_form(
+            Dialect::Ngspice,
+            &deck,
+            &on,
+            "d",
+            At::First,
+            4.0 / (1.0 + lambda),
+            tol,
+        );
+    }
+}
+
+/// ngspice-45 `bjttemp.c`: `tbf1` or `tbf2` given, at 0 too, computes
+/// BF·(1 + tbf1·dT + tbf2·dT²) in place of the XTB law (L236-239); NE is
+/// times 1 + tne1·dT + tne2·dT² (L126); `iss` is the substrate diode
+/// (L181). Xyce 7.10's level-1 `Q` has none of the five (`Xyce -param Q
+/// 1`; it runs the card with "No model parameter TBF1 found"). The cards'
+/// TNOM is 50 K below the circuit. 10 uA into the base, BF(T)·Ib through
+/// 1k from 5 V: ngspice-45 v(c) 3.8 (`tbf1=4e-3`), 3.75 (`tbf2=1e-4`), 4.0
+/// (`xtb=1.5 tbf1=0`); Xyce 7.10 on the same cards 4.0, 4.0, 3.6857. 1 uA
+/// into a leaking base: 0.45836 V (`tne1=5e-4`, `tne2=1e-5`), Xyce
+/// 0.45376. 10 uA into the substrate: 1.5317 V (`iss=1e-14`), Xyce 10 V.
+/// Refused (W0050); `tne1`, `tne2`, `iss` at 0 are left out and the two
+/// agree (ledger P3-091; the gf180 `vnpn`/`vpnp` cards).
+#[test]
+fn p3_091_refuses_gf180_bjt_temperature_names() {
+    let beta = |card: &str| {
+        format!(
+            "* t\n.model qn npn is=1e-16 bf=100 tnom=-23 {card}\nvcc cc 0 5\nrc cc c 1k\n\
+             i1 0 b 10u\nq1 c b 0 qn\n.op\n.end\n"
+        )
+    };
+    let leak = |card: &str| {
+        format!(
+            "* t\n.model qn npn is=1e-16 bf=100 ise=1e-12 ne=2 tnom=-23 {card}\nvc c 0 2\n\
+             i1 0 b 1u\nq1 c b 0 qn\n.op\n.end\n"
+        )
+    };
+    let sub = |card: &str| {
+        format!(
+            "* t\n.model qn npn is=1e-16 bf=100 {card}\nvc c 0 1\nvb b 0 0.6\ni1 0 s 10u\n\
+             rs s 0 1meg\nq1 c b 0 s qn\n.op\n.end\n"
+        )
+    };
+    let refused = [
+        beta("tbf1=4e-3"),
+        beta("tbf2=1e-4"),
+        beta("xtb=1.5 tbf1=0"),
+        leak("tne1=5e-4"),
+        leak("tne2=1e-5"),
+        sub("iss=1e-14"),
+    ];
+    for deck in refused {
+        assert_eq!(refusal(&deck), [Code::W0053, Code::W0050], "{deck}");
+    }
+    let off = [
+        (leak("tne1=0 tne2=0"), "b"),
+        (sub("iss=0"), "s"),
+        (beta("xtb=1.5"), "c"),
+    ];
+    for (deck, node) in off {
+        let w = write(&deck);
+        assert!(!w.contains("tne1") && !w.contains("iss="), "{w}");
+        same_op(&deck, node);
+    }
+}

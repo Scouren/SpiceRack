@@ -20,12 +20,13 @@ const PER_PERIOD: f64 = 50.0;
 
 impl W<'_, '_> {
     /// The TSTEP written for a zero one over `span` (see the module).
+    ///
+    /// # Panics
+    /// When `span` is not positive: the caller refuses an empty or
+    /// reversed span (W0141), there is nothing to choose from.
     pub(super) fn chosen_step(&self, span: f64) -> f64 {
+        assert!(span > 0.0, "a span to choose a step from");
         let mut step = span / 50.0;
-        // A deck's own empty or reversed span: nothing to choose from.
-        if span.is_nan() || span <= 0.0 {
-            return step;
-        }
         let mut cap = |t: Option<f64>| match t {
             Some(t) if t > 0.0 && t.is_finite() => step = step.min(t),
             Some(_) => {}

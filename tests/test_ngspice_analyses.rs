@@ -46,6 +46,39 @@ fn noise_returns_the_spectra_plot_and_matches_sqrt_4ktr() {
     }
 }
 
+#[test]
+fn p3_093_a_noise_run_keeps_its_integrated_plot() {
+    // Oracle: closed form. The output noise of R into C over [f1, f2] is
+    // sqrt(4kTR * fc * (atan(f2/fc) - atan(f1/fc))), fc = 1/(2 pi R C):
+    // 6.4245e-8 V over [1, 1e8] Hz and 3.8254e-8 V over [1, 100] Hz at
+    // 300.15 K. ngspice-45 integrates its 10 points/decade grid 0.11 % low
+    // (6.4174e-8 and 3.8227e-8: research/impl/evidence/P3-093), hence 5e-3.
+    use spicerack::backend::Kind;
+    let deck = "* noise totals\nVin in 0 0 AC 1\nR1 in out 1k\nC1 out 0 1u\n.op\n\
+                .noise v(out) Vin dec 10 1 1e8\n.noise v(out) Vin dec 10 1 100\n.end\n";
+    let kinds = [Kind::Op, Kind::Noise, Kind::Noise];
+    let each = spicerack::simulation::run_each(spicerack::backend::Sim::NGSPICE, deck, &kinds)
+        .expect("runs");
+    assert_eq!(each.len(), 3);
+    let fc = 1.0 / (2.0 * std::f64::consts::PI * 1e3 * 1e-6);
+    let ktr4 = 4.0 * 1.380649e-23 * 300.15 * 1e3;
+    for (plots, stop) in each[1..].iter().zip([1e8f64, 100.0]) {
+        let names: Vec<&str> = plots.iter().map(|p| p.plot_name.as_str()).collect();
+        assert_eq!(names, ["Noise Spectral Density Curves", "Integrated Noise"]);
+        let last = *column(&plots[0], "frequency").last().expect("points");
+        assert!(
+            close(last, stop, 1e-9),
+            "the band stops at {last}, want {stop}"
+        );
+        let want = (ktr4 * fc * ((stop / fc).atan() - (1.0 / fc).atan())).sqrt();
+        let total = scalar(&plots[1], "onoise_total");
+        assert!(
+            close(total, want, 5e-3),
+            "onoise_total {total}, want {want}"
+        );
+    }
+}
+
 // ── .disto ──
 
 #[test]
@@ -70,6 +103,38 @@ fn pz_finds_the_rc_pole_at_minus_one_over_rc() {
     let pole = raw.complex_data[0][0];
     assert!(close(pole.re, -1000.0, 1e-6), "pole {pole}");
     assert!(pole.im.abs() < 1e-6, "real pole expected, got {pole}");
+}
+
+// ── .dc, two sources ──
+
+#[test]
+fn p3_094_a_two_source_dc_keeps_its_outer_sweep() {
+    // Oracle: the simulator's own node voltages (`v(a)` is V1, `v(b)` is
+    // V2) and the closed form of the resistor star, out = (V1 + V2) / 3.
+    use spicerack::backend::Kind;
+    let deck = "* dc2\nV1 a 0 0\nV2 b 0 0\nR1 a out 1k\nR2 b out 1k\nR3 out 0 1k\n\
+                .dc V1 0 1 0.5 V2 0 2 1\n.end\n";
+    let each = spicerack::simulation::run_each(spicerack::backend::Sim::NGSPICE, deck, &[Kind::Dc])
+        .expect("runs");
+    let raw = &each[0][0];
+    let (inner, outer) = (column(raw, "v-sweep"), column(raw, "sweep1"));
+    assert_eq!(
+        inner,
+        column(raw, "a"),
+        "the inner source's own node voltage"
+    );
+    assert_eq!(
+        outer,
+        column(raw, "b"),
+        "the outer source's own node voltage"
+    );
+    assert_eq!(outer, [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0]);
+    for ((x, y), out) in inner.iter().zip(outer).zip(column(raw, "out")) {
+        assert!(
+            (out - (x + y) / 3.0).abs() < 1e-12,
+            "({x} + {y}) / 3 is not {out}"
+        );
+    }
 }
 
 // ── .four ──
@@ -227,6 +292,37 @@ fn continued_four_card_reports_its_fourier_table() {
         .and_then(|s| s.parse().ok())
         .expect("THD in table");
     assert!(thd < 1e-6, "THD {thd} %");
+}
+
+#[test]
+fn p3_049_the_four_tables_are_read_from_stdout() {
+    // ZERO-LEDGER P3-049. Oracle: closed form. 1 V at 1 kHz in series with
+    // 0.1 V at 3 kHz: harmonic 1 of v(in) is 1 V, harmonic 3 is 0.1 V, the
+    // others 0, THD = 0.1 / 1 = 10 %; v(mid) is the 3 kHz source alone.
+    // ngspice-45 printed 0.999996, 0.0999964 and 9.99968 %
+    // (research/impl/evidence/P3-049/ng.log).
+    let deck = common::written(
+        Dialect::Ngspice,
+        "* four\nV1 in mid SIN(0 1 1k)\nV2 mid 0 SIN(0 0.1 3k)\nR1 in 0 1k\n\
+         .tran 1u 10m 0 1u\n.four 1k v(in) v(mid)\n.end\n",
+    );
+    let tables = spicerack::measure_parse::parse_fourier(&run(&deck).stdout);
+    let outputs: Vec<&str> = tables.iter().map(|t| t.output.as_str()).collect();
+    assert_eq!(outputs, ["v(in)", "v(mid)"], "{deck}");
+    let t = &tables[0];
+    assert_eq!(t.frequency.len(), 10, "DC and nine harmonics");
+    assert_eq!(&t.frequency[..4], [0.0, 1e3, 2e3, 3e3]);
+    assert!(close(t.magnitude[1], 1.0, 1e-3), "{}", t.magnitude[1]);
+    assert!(close(t.magnitude[3], 0.1, 1e-3), "{}", t.magnitude[3]);
+    assert!(t.magnitude[2].abs() < 1e-6, "{}", t.magnitude[2]);
+    assert!(
+        close(t.norm_magnitude[3], 0.1, 1e-3),
+        "{}",
+        t.norm_magnitude[3]
+    );
+    assert!(close(t.thd, 10.0, 1e-3), "{}", t.thd);
+    let mid = tables[1].magnitude[3];
+    assert!(close(mid, 0.1, 1e-3), "{mid}");
 }
 
 // ── circuit features claimed in the capability table ──

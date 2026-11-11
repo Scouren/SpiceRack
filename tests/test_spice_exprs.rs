@@ -409,3 +409,73 @@ fn a_resistor_tc_pair_is_tc1_and_tc2_on_ngspice() {
     let i = raw.real_data[i.expect("i(v1)")][0];
     assert!((i + 1e-3).abs() < 1e-9, "{i}\n{w}");
 }
+
+// ── Xyce instance parameters ngspice's devices lack (ledger P3-067) ──
+
+/// Xyce RG 7.10 `C` ("If AGE is given, then the capacitance is
+/// C[1 − D log(AGE)]"; Xyce 7.10: v(a) 0.677124 with `age=87600`, 0.632197
+/// without or at `age=0`), `M` ("IC1 and IC2 may therefore be specified
+/// compactly as IC=<ic1>,<ic2>"), BSIM-SOI's instance `shmod` (Xyce:
+/// 0.563876 against 0.383470). ngspice-45: "unknown parameter (age)",
+/// "(ic1)", "(shmod)" (`cap.c`, `b4soi.c` instance tables; manual ch.11:
+/// an M's `ic=vds,vgs,vbs`). An aging C and an instance `shmod` are
+/// refused; `age=0` leaves with its `d`; `IC1`/`IC2` are the `ic=` vector.
+/// XYCE_CORPUS `AGECAP/agecap.cir`, `INIT_CONDS/comparatorICnonVector.cir`,
+/// `B4SOI_461/test1_shmod1.cir`.
+#[test]
+fn p3_067_o_dev_params_instance_model() {
+    let cite = "ngspice-45 cap.c, b4soi.c (instance tables): no age, no shmod";
+    let rc = |c: &str| format!("* t\nv1 1 0 1\nr1 1 a 1k\n{c}\n.tran 10u 4m uic\n.end\n");
+    let (xy, ng) = (Dialect::Xyce, Dialect::Ngspice);
+    oracle::spec_refusal(cite, &rc("c1 a 0 4u age=87600"), xy, ng, &[Code::W0114]);
+    let w = write(&rc("c1 a 0 4u age=0 d=0.05"), xy, ng).to_ascii_lowercase();
+    assert!(!w.contains("age") && !w.contains("d=0.05"), "{w}");
+    let mos = |p: &str| {
+        format!(
+            "* t\nvd d 0 1\nvg g 0 3\nm1 d g 0 0 nm w=10u l=1u {p}\n\
+             .model nm nmos level=1 vto=1 kp=2e-5\n.tran 1n 10n uic\n.end\n"
+        )
+    };
+    let w = write(&mos("ic1=2 ic2=3"), xy, ng).to_ascii_lowercase();
+    assert!(w.contains("ic=2,3") && !w.contains("ic1"), "{w}");
+    oracle::spec_refusal(cite, &mos("shmod=1"), xy, ng, &[Code::W0114]);
+}
+
+// ── a level-6 MOSFET's lambda on Xyce and ngspice (ledger P3-073) ──
+
+/// Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` (`if(lambda0Given)`, the test of
+/// ngspice-45 `mos6set.c:93-97` inverted): λ is LAMBDA when LAMBDA0 is
+/// given too, else 0; ngspice's is `lambda0`, by default `lambda`.
+/// Saturation, Id = KC·(W/L)·(Vgs − VTO)^NC·(1 + λ·Vds) = 1 mA·(1 + λ·Vds)
+/// (the defaults KC 5e-5, NC 1) through 1k from 5 V: v(d) = 4/(1 + λ).
+/// Xyce 7.10: 4 V with `lambda=0.2` alone and with `lambda0=0.2` alone,
+/// 3.3333 V with `lambda=0.2 lambda0=0.05`; ngspice-45 on the copied
+/// cards: 3.3333, 3.3333, 3.8095. XYCE_CORPUS `MOS6/invert_mos6.cir`.
+#[test]
+fn p3_073_xyce_mos_level_xyce_drops() {
+    let cards = [
+        ("lambda=0.2", 0.0),
+        ("lambda0=0.2", 0.0),
+        ("lambda=0.2 lambda0=0.05", 0.2),
+    ];
+    for (lambdas, lambda) in cards {
+        let deck = format!(
+            "* t\nvd dd 0 5\nrd dd d 1k\nvg g 0 3\nm1 d g 0 0 nm l=1u w=10u\n\
+             .model nm nmos level=6 vto=1 {lambdas}\n.op\n.end\n"
+        );
+        let (on, at) = ([Dialect::Xyce, Dialect::Ngspice], oracle::At::First);
+        let tol = oracle::Tol {
+            rel: 1e-6,
+            floor: 0.0,
+        };
+        oracle::closed_form(
+            Dialect::Xyce,
+            &deck,
+            &on,
+            "d",
+            at,
+            4.0 / (1.0 + lambda),
+            tol,
+        );
+    }
+}

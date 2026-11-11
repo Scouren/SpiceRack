@@ -9,16 +9,16 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 
 | Method | Emits | Signature |
 |---|---|---|
-| `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; VACASK a source behind a series resistor; elsewhere `W0007`) |
-| `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
+| `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; VACASK a source behind a series resistor; elsewhere `W0007`); `distof1=(mag, phase)` / `distof2=` make it a `distortion` input at F1 / F2 (ngspice `DISTOF1`/`DISTOF2`, degrees; ngspice/ESPice, elsewhere `W0001`) |
+| `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None, distof1=None, distof2=None)`; `distof1`/`distof2` as `V`'s |
 | `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only: the text after the nodes; `value` is written before it when it opens with a parameter (`"tc=1e-3"`) |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |
-| `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither); refused on VACASK (`W0105`) |
-| `L` | `L` | `(name, positive, negative, value)` |
+| `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither) |
+| `L` | `L` | `(name, positive, negative, value)`; `R`, `C`, `L` on `Circuit`/`Subcircuit` also take instance parameters (`tc1=1e-3`) and `model="rm"`, a `.model` card's name written after the value (`R1 a b 1k rm`) |
 | `K` | `K` | `(name, *inductors, coupling)`: two or more inductors by full name, added before the `K`: `K("1", "L1", "L2", coupling=0.9)`; three or more couple every pair; `coupling` a number or `"{k}"`; else `ValueError`. Three or more, and an expression, net for ngspice/ESPice only (`W0001` elsewhere) |
 | `D` | `D` | `(name, anode, cathode, model)` |
 | `Q` / `BJT` | `Q` | `(name, collector, base, emitter, model)` |
-| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), refused on Spectre and VACASK (`W0105`) |
+| `M` / `MOSFET` | `M` | `(name, drain, gate, source, bulk=None, model, extra_nodes=None, **kwargs)` — e.g. `L=`, `W=`; `bulk=None` is a three-node device (ngspice VDMOS), written on VACASK (`sp_vdmos`), refused on Spectre (`W0105`) |
 | `J` | `J` | `(name, drain, gate, source, model)` |
 | `Z` | `Z` | `(name, drain, gate, source, model)` |
 | `E` | `E` | `(name, positive, negative, control_positive, control_negative, voltage_gain)` |
@@ -112,14 +112,14 @@ queued beside others raise instead.
 | Run method | Queue method | Signature | Result |
 |---|---|---|---|
 | `operating_point()` | `add_operating_point()` | — | `OperatingPoint` |
-| `dc(**sweeps)` | `add_dc(**sweeps)` | `Vin=slice(start, stop, step)` | `DcAnalysis` |
+| `dc(**sweeps)` | `add_dc(**sweeps)` | `Vin=slice(start, stop, step)`; a second keyword is an outer sweep, read as `dc["sweep1"]` | `DcAnalysis` |
 | `ac(...)` | `add_ac(...)` | `(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(...)` | `add_transient(...)` | `(step_time, end_time, start_time=, max_time=)` | `TransientAnalysis` |
-| `noise(...)` | `add_noise(...)` | `(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis` |
+| `noise(...)` | `add_noise(...)` | `(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)`; the two nodes by name (`"out"`, or `"v(out)"`), else `ValueError` | `NoiseAnalysis` |
 | — | `add_fourier(...)` | `(fundamental_frequency, [vars], num_harmonics=)` | see note |
 | `polezero(...)` | — | — | `PoleZeroAnalysis` |
-| `transfer_function(...)` | — | — | `TransferFunctionAnalysis` |
-| `distortion(...)` | — | — | `DistortionAnalysis` |
+| `transfer_function(...)` | `add_tf(...)` | `(outvar, insrc)`; `outvar` is `"v(out)"`, `"v(a,b)"`, `"i(vload)"` or a node name, else `ValueError` | `TransferFunctionAnalysis` |
+| `distortion(...)` | — | — | `DistortionAnalysis` (2F1; all 0 unless a source has `distof1=(mag, phase)`) |
 
 `variation` is `"dec"`, `"oct"`, `"lin"` or `"log"` (N log-spaced points in total, Spectre's `log=N-1`, its steps; every other target refuses it, `W0040`), any
 case; any other name raises `ValueError` at the call, before anything runs. So
@@ -128,9 +128,12 @@ Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...
 `noise`'s `points_per_summary` is ngspice's, HSPICE's and Xyce's last field;
 LTspice's `.noise` has none, so it is left out there with a note (W0033).
 
-`add_fourier` emits ngspice's `.four`, whose output table is not parsed — the
-harmonics are unreachable. For THD, compute a Goertzel over the transient
-waveform. `num_harmonics=n` (harmonics past DC; the simulators' default is 9)
+`add_fourier` emits ngspice's `.four`. Its slot in `tb.run()` is `None`; the
+tables are `tran.fourier` on the same run's transient result (ngspice,
+LTspice): one dict per output, `t["thd"]` in percent and `t["magnitude"][n]`,
+`t["phase"][n]`, `t["frequency"][n]`, `t["norm_magnitude"][n]`,
+`t["norm_phase"][n]` for harmonic `n` (0 is DC). `[]` when the run printed no
+table. `num_harmonics=n` (harmonics past DC; the simulators' default is 9)
 is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
 `.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it with
 `W0040` (their `.four` takes no count), VACASK refuses any `.four` (`W0015`).
@@ -151,18 +154,22 @@ uic=)` on Spectre is `W0040` (no such `pss` fields).
 
 ## Results
 
-Every result type has `result[node]`, `result.measures` (`{name: value}`; `None` for a failed measure).
-`DcAnalysis` additionally has `.nodes` and `.branches`.
+Every result type has `result[node]`, `result.measures` (`{name: value}`; `None` for a failed
+measure), and `.nodes` and `.branches` (the names it holds). `op["v(out)"]` and `op["out"]` are one node.
 
 | Type | Axis | Extra |
 |---|---|---|
 | `OperatingPoint` | — | scalar per node |
 | `DcAnalysis` | `.sweep` | `.nodes`, `.branches` |
 | `AcAnalysis` | `.frequency` | `.magnitude(n)`, `.magnitude_db(n)`, `.phase(n)` |
-| `TransientAnalysis` | `.time` | |
-| `NoiseAnalysis` | `.frequency` | `inoise_spectrum`, `onoise_spectrum` |
+| `TransientAnalysis` | `.time` | `.fourier`: the run's `.four` tables, `[{"output", "thd", "magnitude", ...}]` |
+| `NoiseAnalysis` | `.frequency` | `inoise_spectrum`, `onoise_spectrum`; `inoise_total`, `onoise_total` (V rms over the band, one-element lists; ngspice and ESPice) |
 
 `ac[node]` is the real part. Use `.magnitude()` for `|H|`.
+
+A `transfer_function` result has the same keys on every backend:
+`tf["transfer_function"]`, `tf["input_impedance"]`, `tf["output_impedance"]`
+(one-element lists; VACASK reports no output impedance: `KeyError`).
 
 ## Re-measuring (`spicerack.remeasure`)
 

@@ -245,7 +245,9 @@ def espice(d):
         .lift(Construct.Laplace, Rule.LaplaceTable)
         .native(Construct.PwlRepeatI)
         .refuse(Construct.NoiseWave, Code.W0009)
-        .refuse(Construct.TableSource, Code.W0102)
+        # No `pwl()` in a B source, and its own `TABLE` rounds the corners
+        # (0.95 where Xyce gives 1.0, run): the segments as ternaries.
+        .spell(Construct.TableSource, Alt.TernaryValue)
         # ESPice 0.3.0 runs ngspice's AM but no VO: "AM with a nonzero VO
         # offset" (run).
         .spell(Construct.AmWave, Alt.AmNoOffset)
@@ -376,6 +378,7 @@ def hspice(d):
         .kept_word(".sample", Construct.HspiceAnalysis)
         .kept_word(".trannoise", Construct.HspiceAnalysis)
         .kept_word(".lstb", Construct.HspiceAnalysis)
+        .kept_word(".op", Construct.HspiceAnalysis)
         .kept_word("w", Construct.HspiceWLine)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
@@ -1353,7 +1356,7 @@ def vacask(d):
         .omit(Construct.NgBehavior, Code.W0030)
         .native(Construct.LibSection)
         .refuse(Construct.RclModel, Code.W0006)
-        .refuse(Construct.ChargeCapacitor, Code.W0105)
+        .native(Construct.ChargeCapacitor)
         .native(Construct.BehaviouralSource)
         .refuse(Construct.Laplace, Code.W0011)
         .native(Construct.RfPort)

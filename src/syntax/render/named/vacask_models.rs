@@ -16,12 +16,14 @@
 //!
 //! Contents:
 //! - `W::model_lines(&mut self, b: &Block, loads: &mut BTreeSet<String>) -> Vec<String>`
+//! - `W::is_vdmos(&self, n: u32, model: &str) -> bool`
 
 use std::collections::BTreeSet;
 
 use super::W;
 use super::vacask::q;
-use crate::syntax::behaviour::{MasterAnswer, ModelSemantics};
+use crate::syntax::ast::NONE;
+use crate::syntax::behaviour::{MasterAnswer, ModelSemantics, NetlistRules};
 use crate::syntax::diag::Code;
 use crate::syntax::render::read::{Block, Model};
 
@@ -57,6 +59,21 @@ impl W<'_, '_> {
         }
         out
     }
+
+    /// Whether instance `n`'s model `model` is this file's `vdmos` card
+    /// (ngspice's and LTspice's power MOSFET: `d g s` and an optional bulk).
+    // ponytail: one model view per M card, and a card in another kit file
+    // is not looked at (its instance keeps the MOSFET rule, W0105):
+    // `read::file_models`, as the Xyce writer's verdicts, when a deck needs it.
+    pub(super) fn is_vdmos(&self, n: u32, model: &str) -> bool {
+        match self.rd.instance_model(n, model) {
+            Some((None, card)) => {
+                let kind = self.rd.model_view(card, NONE).kind;
+                kind.eq_ignore_ascii_case("vdmos")
+            }
+            _ => false,
+        }
+    }
 }
 
 // ---- private ----
@@ -82,6 +99,11 @@ impl W<'_, '_> {
             if k == "level" {
                 continue;
             }
+            // A VDMOS card's polarity flag is the line's `type`
+            // (`W::vacask_model`), never a parameter to note or refuse.
+            if module == "vdmos" && v.is_empty() && matches!(k.as_str(), "pchan" | "nchan") {
+                continue;
+            }
             if k == "version" {
                 let ver = v
                     .trim()
@@ -101,6 +123,17 @@ impl W<'_, '_> {
                     }
                     continue;
                 }
+            }
+            // A Xyce diode's knee is the PSpice law, id·√(IKF/(IKF+id))
+            // (`N_DEV_Diode.C:2396-2401`); `sp_diode`'s is ngspice's,
+            // id/(1+√(id/IKF)) (`diode.va`, `dioload.c:382-386`).
+            if module == "diode"
+                && k == "ikf"
+                && self.rd.b.netlist_rules == NetlistRules::Xyce
+                && crate::syntax::render::models::fold(v) != Some(0.0)
+            {
+                self.refuse(Code::W0114, tok);
+                return Some(None);
             }
             if vacask_has(module, &k) {
                 rows.push((k, v.clone()));
@@ -152,6 +185,14 @@ impl W<'_, '_> {
                     self.vacask_params(m, None)
                 ));
             }
+        };
+        // A VDMOS card names its polarity by a flag (`pchan`; `nchan` is
+        // the default: ngspice-45 manual, "Power MOSFET model (VDMOS)"),
+        // the module by `type` (`devices/spice/vdmos.va` L113).
+        let pchan = |(k, v): &(String, String)| v.is_empty() && k.eq_ignore_ascii_case("pchan");
+        let sign = match module == "vdmos" && m.params.iter().any(pchan) {
+            true => Some("-1"),
+            false => sign,
         };
         let Some(rows) = self.osdi_rows(m, module, tok)? else {
             return Some(String::new());

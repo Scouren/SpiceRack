@@ -321,8 +321,8 @@ fn ngspice_value_forms_and_statistical_functions() {
 /// - a charge-defined capacitor (ngspice §3.3.9 `C a b q='expr'`):
 ///   ngspice runs the deck written back to the same transient, and so does
 ///   it read as HSPICE (`hsa`); Spectre gets a `bsource q=` (Reference 19.1
-///   p.459); VACASK, with no charge element, refuses it (`W0105`, a
-///   device with no VACASK master);
+///   p.459); VACASK, with no charge element, gets the source line
+///   `i=ddt(q)` (`docs/dev-builtin-behavioral.md`, ZERO-LEDGER P4-017);
 /// - an instance naming its subcircuit after its parameters (the
 ///   `special_pfet_latch` alias, which ngspice 45 itself rejects: "unknown
 ///   subckt") reads as that subcircuit; no other shape does.
@@ -357,9 +357,8 @@ fn charge_capacitor_and_late_subcircuit_name() {
         scs.contains("\ncq (b 0) bsource q=1u*v(b)+0.5u*v(b)*v(b)\n"),
         "{scs}"
     );
-    let refused = render_text(deck, Dialect::Ngspice, "q", Dialect::Vacask).unwrap_err();
-    let got: Vec<Code> = refused.diags.iter().map(|d| d.code).collect();
-    assert_eq!(got, [Code::W0105], "{}", refused.messages);
+    let va = written(deck, Dialect::Ngspice, "q", Dialect::Vacask).text;
+    assert!(va.contains("\ncq (b 0) i=ddt("), "{va}");
 
     let late = "t\n.subckt pass d g s b w=1\nR1 d s {w}\n.ends pass\n.subckt latch d g s b\nxp d g s b w = {2} pass\n.ends latch\n";
     let w = written(late, Dialect::Ngspice, "t", Dialect::Ngspice);

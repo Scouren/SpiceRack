@@ -33,17 +33,24 @@ pub(super) fn xyce_globals(text: &str) -> String {
             !before.is_some_and(|c| word(c) || c == '$') && !after.is_some_and(word)
         })
     };
-    let mut out = text.to_string();
     let found_len = found.len();
-    let mut names = Vec::with_capacity(found_len);
-    for g in found {
+    let mut names: Vec<String> = Vec::with_capacity(found_len);
+    for &g in &found {
         let base = &g[1..];
         let name = std::iter::once(base.to_string())
             .chain((1..).map(|k| format!("{base}_{k}")))
-            .find(|n| !taken(n))
+            .find(|n| !taken(n) && !names.contains(n))
             .expect("an unused name");
-        out = out.replace(g, &name);
         names.push(name);
+    }
+    // The longest node first: `$G_A` is also the head of `$G_AB`, and a
+    // replace of the shorter first would rename the longer's head (Xyce
+    // 7.10 on `V1 $G_A 0 1`, `R1 $G_AB 0 1k`, `R2 G_AB 0 1k`: three nodes).
+    let mut order: Vec<usize> = (0..found_len).collect();
+    order.sort_by_key(|&i| std::cmp::Reverse(found[i].len()));
+    let mut out = text.to_string();
+    for i in order {
+        out = out.replace(found[i], &names[i]);
     }
     debug_assert!(!out.contains("$G_"), "every $G_ node renamed");
     debug_assert_eq!(names.len(), found_len);
@@ -51,5 +58,33 @@ pub(super) fn xyce_globals(text: &str) -> String {
     match out.find('\n') {
         Some(i) if out.starts_with('*') => format!("{}{line}{}", &out[..=i], &out[i + 1..]),
         _ => format!("{line}{out}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::xyce_globals;
+
+    // Oracle: Xyce 7.10 on this deck keeps three nodes (1 V, 2 V, 3 V with
+    // the sources of `tests/test_xyce_source.rs`); the text is derived by
+    // hand: `G_AB` is the deck's own word, so `$G_AB` takes `G_AB_1`.
+    #[test]
+    fn a_global_that_heads_another_keeps_its_own_name() {
+        let out = xyce_globals("* t\nV1 $G_A 0 1\nR1 $G_AB 0 1k\nR2 G_AB 0 1k\n");
+        assert_eq!(
+            out,
+            "* t\n.global G_A G_AB_1\nV1 G_A 0 1\nR1 G_AB_1 0 1k\nR2 G_AB 0 1k\n"
+        );
+    }
+
+    // Two globals never share a name: `$G_X` takes `G_X_1` (the deck holds
+    // `G_X`), so `$G_X_1` moves on to `G_X_1_1`.
+    #[test]
+    fn two_globals_never_take_one_name() {
+        let out = xyce_globals("* t\nR1 $G_X 0 1\nR2 $G_X_1 0 1\nR3 G_X 0 1\n");
+        assert_eq!(
+            out,
+            "* t\n.global G_X_1 G_X_1_1\nR1 G_X_1 0 1\nR2 G_X_1_1 0 1\nR3 G_X 0 1\n"
+        );
     }
 }

@@ -1,1 +1,0 @@
-hspice/op_times.sp mismatch # plots ["op", "op", "tran"] became ["op", "tran"]

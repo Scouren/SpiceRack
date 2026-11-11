@@ -25,14 +25,14 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | Method | Returns |
 | --- | --- |
 | `operating_point()` | `OperatingPoint` |
-| `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep. `temp=slice(...)` sweeps temperature |
+| `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep: the first is the inner one (`dc.sweep`, once per outer value), the second the outer one (`dc["sweep1"]`). `temp=slice(...)` sweeps temperature |
 | `ac(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(step_time, end_time, start_time=None, max_time=None, use_initial_condition=False)` | `TransientAnalysis` |
-| `noise(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis` |
-| `tf(outvar, insrc)` | `TransferFunctionAnalysis` (gain, input and output resistance) |
+| `noise(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis`. `output_node` and `ref_node` are node names (`"out"`; `"v(out)"` names the same node); any other form raises `ValueError` |
+| `tf(outvar, insrc)` | `TransferFunctionAnalysis` (gain, input and output resistance). `outvar` is `"v(out)"`, `"v(a,b)"`, `"i(vload)"` or a node name (`"out"` is written `v(out)`); any other form raises `ValueError` |
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(n1, n2, n3, n4, tf_type, pz_type)` | `PoleZeroAnalysis` |
-| `distortion(...)` | `DistortionAnalysis` |
+| `distortion(...)` | `DistortionAnalysis` (ngspice; its input is the source built with `distof1=(mag, phase)`, else every vector is 0) |
 | `pss`, `s_param`, `harmonic_balance`, `stability`, `network_params` | RF and periodic analyses; each runs only where a backend supports it (see below) |
 | `transient_noise(step_time, end_time)` | ngspice's transient noise: a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources (no device noise) |
 | `spectre_sweep`, `spectre_monte_carlo` (`spectre_montecarlo` is a deprecated alias), `spectre_pac`, `spectre_pnoise`, `spectre_pxf`, `spectre_pstb` | Spectre only |
@@ -58,12 +58,16 @@ t = tran.time                     # the axis: .time, .frequency or .sweep
 mag = ac.magnitude_db("vout")     # AC results are complex:
 ph = ac.phase("vout")             # degrees, wrapped to (-180, 180]
 lin = ac.magnitude("vout")        # ac["vout"] alone is only the real part
+four = tran.fourier               # a run's .four tables (add_fourier; [] without one)
 density = nz["onoise_spectrum"]   # V/sqrt(Hz)
+total = nz["onoise_total"][0]     # V rms over the band (ngspice, ESPice)
 ```
 
 Branch currents are not saved unless you ask: `tb.save("I(Vin)")`, or
-`sim.save_currents = True` on a `Circuit` simulator. `dc.nodes` and
-`dc.branches` list what came back.
+`sim.save_currents = True` on a `Circuit` simulator. `res.nodes` and
+`res.branches` list what came back, on every result (`op.nodes` is sorted).
+An operating point reads a vector by the simulator's spelling too:
+`op["v(vout)"]` is `op["vout"]`, `op["I(Vin)"]` is `op["i(vin)"]`.
 
 ## Simulator settings
 
@@ -152,7 +156,11 @@ print(mismatch.netlist("spectre"))   # ... dcmm3 (vout 0) dcmatch mth=0.001 wher
 
 `tb.run()` runs the queued analyses as that one deck and returns one result per
 analysis, in the order they were queued, each the type its immediate twin
-returns (`None` for `add_fourier`, whose table goes to stdout). ngspice runs a
+returns (`None` for `add_fourier`: a `.four` writes no plot, its tables are
+`tran.fourier` on the same run's transient result, one dict per output with
+`output`, `thd` in percent, and `frequency`, `magnitude`, `phase` (degrees),
+`norm_magnitude`, `norm_phase` as lists indexed by harmonic, 0 the DC
+component; read from ngspice's stdout and LTspice's log). ngspice runs a
 deck's analyses in its own order, so results are matched to analyses by plot
 name, never by position. `pss`, `hb`, `stb` and the Spectre
 analyses run alone; queued beside others, `run()` raises rather than guess

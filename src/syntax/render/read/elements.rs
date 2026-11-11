@@ -38,12 +38,13 @@ pub(in crate::syntax::render) enum Card {
         model: Option<String>,
         params: Vec<(String, String)>,
     },
-    /// `C1 a b q=expr`.
+    /// `C1 a b q=expr`: the charge's text, and its tree (the value node).
     Charge {
         name: String,
         n1: String,
         n2: String,
         charge: String,
+        value: u32,
         params: Vec<(String, String)>,
     },
     /// Xyce's `E`/`G` `TABLE {expr} = (x,y) …`: the output (a current for
@@ -507,6 +508,7 @@ impl<'a> Rd<'a> {
                     n1,
                     n2,
                     charge: self.body_text(self.ast.rhs(Node(pair))),
+                    value: self.ast.rhs(Node(pair)),
                     params,
                 });
             }

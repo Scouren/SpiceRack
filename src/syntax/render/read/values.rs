@@ -51,11 +51,13 @@ impl Rd<'_> {
         }
     }
 
-    /// The count item `n` is: a [`Rd::number`] that is a whole number
-    /// `>= 0` (saturating at `u32::MAX`); `None` for anything else.
+    /// The count item `n` is: a [`Rd::number`] that is a whole number in
+    /// `0..=u32::MAX`; `None` for anything else (a fraction, a negative,
+    /// a larger one: a cast would saturate it into a count the deck never
+    /// wrote).
     pub(in crate::syntax::render) fn count(&self, n: u32) -> Option<u32> {
         self.number(n)
-            .filter(|v| *v >= 0.0 && v.fract() == 0.0)
+            .filter(|v| (0.0..=f64::from(u32::MAX)).contains(v) && v.fract() == 0.0)
             .map(|v| v as u32)
     }
 

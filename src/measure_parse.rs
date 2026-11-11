@@ -27,18 +27,48 @@
 //!      2    failed
 //! ```
 //!
-//! Simulator text in, [`MeasureResult`] rows out.
+//! A `.four` table is in the same text: ngspice's `Fourier analysis for
+//! v(out):` block on stdout, LTspice's `Fourier components of v(out)` block
+//! in its log.
+//!
+//! Simulator text in, [`MeasureResult`] and [`Fourier`] rows out.
 //!
 //! Cites: none (the formats above are the simulators' printed output:
-//! ngspice-45 and LTspice 26.1.1, recorded in the tests).
+//! ngspice-45 `src/frontend/fourier.c`, LTspice 26.1.1's log).
 //!
 //! Contents:
+//! - `pub struct Fourier`
 //! - `pub fn parse_measures(text: &str, backend: Option<Dialect>) -> Vec<MeasureResult>`
 //! - `pub fn in_deck_order(deck: &str, rows: Vec<MeasureResult>, backend: Dialect) -> Vec<MeasureResult>`
 //! - `pub fn at_step(rows: &[MeasureResult], k: usize) -> Vec<MeasureResult>`
+//! - `pub fn parse_fourier(text: &str) -> Vec<Fourier>`
 
 use crate::result::{MeasureResult, MeasureStatus};
 use crate::syntax::Dialect;
+
+/// One output's `.four` table, by column: row `n` of every column is
+/// harmonic `n` of the fundamental, row 0 the DC component (LTspice prints
+/// that one on its own line: it is row 0 here, with zeros beside it as
+/// ngspice prints its own).
+#[derive(Debug, Clone, Default)]
+pub struct Fourier {
+    /// The output as the simulator printed it (`v(out)`).
+    pub output: String,
+    /// Total harmonic distortion in percent; NaN when the table has no THD
+    /// line.
+    pub thd: f64,
+    /// Hz: `n` times the fundamental.
+    pub frequency: Vec<f64>,
+    /// The harmonic's amplitude, in the output's unit.
+    pub magnitude: Vec<f64>,
+    /// Degrees, in the simulator's own reference: for a `SIN` source's
+    /// fundamental ngspice prints 0, LTspice 90.
+    pub phase: Vec<f64>,
+    /// `magnitude` over the fundamental's.
+    pub norm_magnitude: Vec<f64>,
+    /// `phase` less the fundamental's, in degrees.
+    pub norm_phase: Vec<f64>,
+}
 
 /// Prefixes of the LTspice log lines that are no measure result: a line
 /// with a `:` this table does not name is read as `name: value`. A new
@@ -139,7 +169,84 @@ pub fn at_step(rows: &[MeasureResult], k: usize) -> Vec<MeasureResult> {
         .collect()
 }
 
+/// The `.four` tables in `text` (ngspice's stdout or LTspice's log), one
+/// per output in the order printed; empty when `text` holds none. A
+/// table's rows are the lines after its header that count on from its last
+/// harmonic, so a later table of numbers is not read into it.
+pub fn parse_fourier(text: &str) -> Vec<Fourier> {
+    let mut tables: Vec<Fourier> = Vec::new();
+    // ngspice's row is magnitude, phase, norm. mag, norm. phase; LTspice's
+    // is component, normalized component, phase, normalized phase.
+    let mut ltspice = false;
+    for line in text.lines().map(str::trim) {
+        let ngspice_header = line.strip_prefix("Fourier analysis for ");
+        let ltspice_header = line.strip_prefix("Fourier components of ");
+        if let Some(output) = ngspice_header.or(ltspice_header) {
+            ltspice = ltspice_header.is_some();
+            tables.push(Fourier {
+                output: output.trim_end_matches(':').to_string(),
+                thd: f64::NAN,
+                ..Fourier::default()
+            });
+            continue;
+        }
+        let Some(table) = tables.last_mut() else {
+            continue;
+        };
+        if let Some(thd) = distortion(line) {
+            table.thd = thd;
+            continue;
+        }
+        let rows = table.frequency.len();
+        let dc = line.strip_prefix("DC component:");
+        let row = match dc.and_then(|v| v.trim().parse::<f64>().ok()) {
+            Some(dc) if rows == 0 => Some([0.0, dc, 0.0, 0.0, 0.0]),
+            _ => harmonic_row(line, rows),
+        };
+        let Some([frequency, magnitude, b, c, norm_phase]) = row else {
+            continue;
+        };
+        let (phase, norm_magnitude) = if ltspice { (c, b) } else { (b, c) };
+        table.frequency.push(frequency);
+        table.magnitude.push(magnitude);
+        table.phase.push(phase);
+        table.norm_magnitude.push(norm_magnitude);
+        table.norm_phase.push(norm_phase);
+    }
+    for t in &tables {
+        assert_eq!(t.magnitude.len(), t.frequency.len(), "{}", t.output);
+        assert_eq!(t.norm_phase.len(), t.frequency.len(), "{}", t.output);
+    }
+    tables
+}
+
 // ---- private ----
+
+/// `line` as harmonic `n`'s row less its number: the five values after it.
+/// `None` when `line` is not six numbers, the first of them `n`. A `°`
+/// after a value (LTspice's phases) is no part of it.
+fn harmonic_row(line: &str, n: usize) -> Option<[f64; 5]> {
+    let mut fields = line
+        .split_whitespace()
+        .map(|f| f.trim_end_matches('°').parse::<f64>().ok());
+    if fields.next()?? != n as f64 {
+        return None;
+    }
+    let mut row = [0.0; 5];
+    for value in &mut row {
+        *value = fields.next()??;
+    }
+    fields.next().is_none().then_some(row)
+}
+
+/// The total harmonic distortion `line` states, in percent: ngspice's
+/// `THD: 9.99968 %`, LTspice's `Total Harmonic Distortion:   9.999731%`.
+fn distortion(line: &str) -> Option<f64> {
+    let (_, rest) = line
+        .split_once("THD:")
+        .or_else(|| line.split_once("Total Harmonic Distortion:"))?;
+    rest.split_once('%')?.0.trim().parse().ok()
+}
 
 /// Parse NGSpice batch-mode stdout for .meas results.
 ///
@@ -782,5 +889,83 @@ vout: V(out)=1 at 2
         let results = parse_ngspice(stdout);
         assert_eq!(results.len(), 1);
         assert!((results[0].value - 5.6789e6).abs() < 1.0);
+    }
+
+    #[test]
+    fn p3_049_ngspice_four_tables_are_read() {
+        // ngspice-45's stdout for `fourier 1k v(in) v(mid)`: 1 V at 1 kHz in
+        // series with 0.1 V at 3 kHz (research/impl/evidence/P3-049/ng.log;
+        // the rows past harmonic 3, and past 1 of v(mid), left out).
+        let stdout = "\
+No. of Data Rows : 10008
+Fourier analysis for v(in):
+  No. Harmonics: 10, THD: 9.99968 %, Gridsize: 200, Interpolation Degree: 1
+
+Harmonic Frequency   Magnitude   Phase       Norm. Mag   Norm. Phase
+-------- ---------   ---------   -----       ---------   -----------
+ 0       0           2.77289e-14 0           0           0
+ 1       1000        0.999996    2.10116e-07 1           0
+ 2       2000        4.27847e-14 -87.107     4.27848e-14 -87.107
+ 3       3000        0.0999964   5.6732e-06  0.0999968   5.46309e-06
+
+Fourier analysis for v(mid):
+  No. Harmonics: 10, THD: 2.78969e+15 %, Gridsize: 200, Interpolation Degree: 1
+
+Harmonic Frequency   Magnitude   Phase       Norm. Mag   Norm. Phase
+-------- ---------   ---------   -----       ---------   -----------
+ 0       0           -4.6296e-16 0           0           0
+ 1       1000        3.58449e-15 -157.26     1           0
+";
+        let tables = parse_fourier(stdout);
+        assert_eq!(tables.len(), 2);
+        let t = &tables[0];
+        assert_eq!((t.output.as_str(), t.thd), ("v(in)", 9.99968));
+        assert_eq!(t.frequency, [0.0, 1000.0, 2000.0, 3000.0]);
+        assert_eq!(t.magnitude, [2.77289e-14, 0.999996, 4.27847e-14, 0.0999964]);
+        assert_eq!(t.phase, [0.0, 2.10116e-07, -87.107, 5.6732e-06]);
+        assert_eq!(t.norm_magnitude, [0.0, 1.0, 4.27848e-14, 0.0999968]);
+        assert_eq!(t.norm_phase, [0.0, 0.0, -87.107, 5.46309e-06]);
+        assert_eq!(
+            (tables[1].output.as_str(), tables[1].thd),
+            ("v(mid)", 2.78969e15)
+        );
+        assert_eq!(tables[1].magnitude, [-4.6296e-16, 3.58449e-15]);
+    }
+
+    #[test]
+    fn p3_049_ltspice_four_tables_are_read() {
+        // LTspice 26.1.1's log for `.four 1k v(in)` on the same circuit
+        // (research/impl/evidence/P3-049/ltspice-deck.log; harmonics 4 to 9
+        // left out): the DC component on its own line, the normalized
+        // component before the phase, a degree sign after each phase.
+        let log = "Total elapsed time: 0.062 seconds.\n\nFourier components of v(in)\n\
+            N-Period=1\nDC component:-4.27431e-12\n\n\
+            Harmonic\tFrequency\t Fourier \tNormalized\t Phase  \tNormalized\n\
+            Number \t  [Hz]   \tComponent\t Component\t[degree]\tPhase [deg]\n\
+            1   \t 1.000e+03\t 1.000e+00\t 1.000e+00\t   90.00°\t    0.00°\n\
+            2   \t 2.000e+03\t 4.398e-10\t 4.398e-10\t   90.98°\t    0.98°\n\
+            3   \t 3.000e+03\t 1.000e-01\t 1.000e-01\t   90.00°\t    0.00°\n\
+            Partial Harmonic Distortion: 9.999732%\n\
+            Total Harmonic Distortion:   9.999731%\n";
+        let tables = parse_fourier(log);
+        assert_eq!(tables.len(), 1);
+        let t = &tables[0];
+        assert_eq!((t.output.as_str(), t.thd), ("v(in)", 9.999731));
+        assert_eq!(t.frequency, [0.0, 1e3, 2e3, 3e3]);
+        assert_eq!(t.magnitude, [-4.27431e-12, 1.0, 4.398e-10, 0.1]);
+        assert_eq!(t.phase, [0.0, 90.0, 90.98, 90.0]);
+        assert_eq!(t.norm_magnitude, [0.0, 1.0, 4.398e-10, 0.1]);
+        assert_eq!(t.norm_phase, [0.0, 0.0, 0.98, 0.0]);
+    }
+
+    #[test]
+    fn p3_049_a_four_table_ends_where_its_harmonics_stop_counting() {
+        // The last line is six numbers (a `print` row), not harmonic 2.
+        let text = "Fourier analysis for v(a):\n 0 0 1 0 0 0\n 1 5 2 0 1 0\n\n 0 5 5 5 5 5\n";
+        let tables = parse_fourier(text);
+        assert_eq!(tables[0].frequency, [0.0, 5.0]);
+        assert!(tables[0].thd.is_nan(), "no THD line: {}", tables[0].thd);
+        // No header, no table.
+        assert!(parse_fourier("vout = 1.0\n 0 0 1 0 0 0\n").is_empty());
     }
 }

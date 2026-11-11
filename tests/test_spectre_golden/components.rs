@@ -215,3 +215,43 @@ fn ltspice_parasitics_are_spectre_elements() {
         assert!(w.text.contains(l), "{l}\n{}", w.text);
     }
 }
+
+/// Ledger P3-039: Spectre names are case-sensitive (`[CMP]` front matter,
+/// "Names are case sensitive"), and a MOSFET's instance parameters are `w`
+/// and `l` (`[CMP]` p.408 `nch1 (1 2 0 0) nchmod1 l=2u w=15u ad=60p …`).
+/// Spectre 25.1 on `m2 … W=10u L=1u`: "SFE-102 Parameter `W' … ignored",
+/// the default size, Id 4.225e-5 for 4.225e-4 (research/settle-remote.md,
+/// recheck P3-039, iccad4 2026-11-07). A SPICE card's names are
+/// case-blind, so they are written lowercase.
+#[test]
+fn p3_039_api_spectre_mos_instance_params() {
+    for (card, want) in [
+        (
+            "M1 out in 0 0 nm W=10u L=1u",
+            "m1 (out in 0 0) nm w=10u l=1u",
+        ),
+        (
+            "M2 d g s b pm w=2u L=1u AD=1p",
+            "m2 (d g s b) pm w=2u l=1u ad=1p",
+        ),
+    ] {
+        assert_eq!(component(card), want, "{card}");
+    }
+}
+
+/// Ledger P3-088: Spectre 25.1 stops on a diode model's `minr=0`
+/// ("CMI-2049: Value of `minr' should be greater than zero") and runs the
+/// same deck without it (research/settle-remote.md, "Spectre writer check",
+/// `t_m3_diodes`, iccad4 2026-11-07). `[CMP]` p.306 #48 `minr=0.1`: the
+/// default is positive. What ngspice does not do stays written (`dskip`,
+/// `jmax`: `[CMP]` p.307 #68, #69).
+#[test]
+fn p3_088_spectre_writer_emits_minr_diode() {
+    let text = spectre("t\n.model dj d level=3 is=1e-14 rs=10\nD1 a 0 dj\n.op\n.end\n").unwrap();
+    let model = text
+        .lines()
+        .find(|l| l.starts_with("model dj diode "))
+        .unwrap_or_else(|| panic!("no diode model in\n{text}"));
+    assert!(!model.contains("minr"), "{model}");
+    assert!(model.contains(" dskip=no jmax="), "{model}");
+}

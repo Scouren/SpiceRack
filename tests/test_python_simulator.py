@@ -434,6 +434,36 @@ def test_ac_magnitude_and_phase_match_rc_theory():
     assert type(ac.frequency) is list and ac.frequency[0] == 1.0
 
 
+@pytest.mark.parametrize("backend, zout", [("ngspice", 750.0), ("espice", 750.0), ("vacask", None)])
+def test_p3_095_api_tf_result_names_differ(backend, zout):
+    """ZERO-LEDGER P3-095: a `.tf` result has the same names on every backend.
+    Oracle: the closed form of a 1k/3k divider (gain 3k/4k, input impedance
+    1k + 3k, output impedance 1k || 3k), which each simulator's raw file
+    holds under its own names (ngspice `vin#Input_impedance`, ESPice
+    `input_resistance`, VACASK `zin(vin)`). VACASK's `dcxf` reports a gain
+    and an input impedance for every source of the deck (`Vaux` here: 0 and
+    1k) and no output impedance."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("div", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.R(name="2", positive="out", negative="0", value=3e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="in", positive="in", negative="0", value=1.0)
+    tb.V(name="aux", positive="aux", negative="0", value=1.0)
+    tb.R(name="aux", positive="aux", negative="0", value=1e3)
+    tf = tb.transfer_function("v(out)", "Vin")
+    assert tf["transfer_function"] == pytest.approx([0.75], rel=1e-9)
+    assert tf["input_impedance"] == pytest.approx([4000.0], rel=1e-9)
+    if zout is None:
+        assert tf["transfer_function(vaux)"] == pytest.approx([0.0], abs=1e-12)
+        with pytest.raises(KeyError):
+            tf["output_impedance"]
+    else:
+        assert tf["output_impedance"] == pytest.approx([zout], rel=1e-9)
+
+
 def test_raw_meas_line_reports_its_measure_on_ngspice():
     """A `.meas` written as raw lines (a `+` continuation included) gets the
     `.control` block ngspice needs to report it; under `-r` it would be lost."""
@@ -452,10 +482,37 @@ def test_raw_meas_line_reports_its_measure_on_ngspice():
     assert tran.measures["vend"] == pytest.approx(1 - math.exp(-1), rel=2e-3)
 
 
+@pytest.mark.needs("vacask")
+def test_p3_032_api_vacask_subcircuit_node_xu1():
+    """ZERO-LEDGER P3-032: a node inside a VACASK instance is a voltage under
+    its hierarchical name, not the current `i(<instance>)`. Oracle: the
+    closed form of 1.5 V over 1k + 1k + 2k (m = 1.5*3/4, q = 1.5*2/4, the
+    source's branch current -1.5/4k), which VACASK 36be560's own raw file
+    holds under `xu1:m`, `xu1:q` and `vdd:flow(br)`."""
+    import spicerack as ps
+
+    half = ps.Subcircuit("half", ["a", "b"])
+    half.R(name="1", positive="a", negative="m", value=1e3)
+    half.R(name="2", positive="m", negative="q", value=1e3)
+    half.R(name="3", positive="q", negative="b", value=2e3)
+    top = ps.Subcircuit("top", ["vdd"])
+    top.X("u1", "half", "vdd", "0")
+    tb = ps.Testbench(top)
+    tb.with_backend("vacask")
+    tb.add_subcircuit(half)
+    tb.V(name="dd", positive="vdd", negative="0", value=1.5)
+    op = tb.operating_point()
+    assert op["xu1.m"] == pytest.approx(1.125, rel=1e-9)
+    assert op["xu1.q"] == pytest.approx(0.75, rel=1e-9)
+    assert op["i(vdd)"] == pytest.approx(-1.5 / 4e3, rel=1e-9)
+    with pytest.raises(KeyError):
+        op["i(xu1)"]
+
+
 def test_raw_four_line_runs_as_fourier_on_ngspice():
     """A raw `.four` testbench line becomes `fourier` in the `.control` block
-    (the table goes to stdout, which Python does not expose; the Rust suite
-    checks its numbers), and the transient still comes back."""
+    (the table goes to stdout, which `tran.fourier` reads: the P3-049 test
+    below), and the transient still comes back."""
     import spicerack as ps
 
     dut = ps.Subcircuit("rc4", ["in", "out"])
@@ -469,6 +526,40 @@ def test_raw_four_line_runs_as_fourier_on_ngspice():
     assert ".control\ntran 1u 2m\nfourier 1k v(out)\n.endc" in deck and ".four" not in deck
     tran = tb.transient(step_time=1e-6, end_time=2e-3)
     assert tran.time[-1] == pytest.approx(2e-3)
+    assert tran.fourier[0]["output"] == "v(out)"
+
+
+def test_p3_049_api_fourier_results_unreachable():
+    """ZERO-LEDGER P3-049: the `.four` tables of a run are read back, on its
+    transient result. Oracle: closed form. 1 V at 1 kHz in series with 0.1 V
+    at 3 kHz: harmonic 1 is 1 V, harmonic 3 is 0.1 V, the others 0, THD =
+    0.1/1 = 10 % (ngspice-45 printed 0.999996, 0.0999964 and 9.99968 %)."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("load", ["in"])
+    dut.R(name="1", positive="in", negative="0", value=1e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.SinusoidalVoltageSource(name="1", positive="in", negative="mid", amplitude=1.0, frequency=1e3)
+    tb.SinusoidalVoltageSource(name="3", positive="mid", negative="0", amplitude=0.1, frequency=3e3)
+    tb.add_transient(step_time=1e-6, end_time=10e-3, max_time=1e-6)
+    tb.add_fourier(fundamental_frequency=1e3, outputs=["v(in)"])
+    tran, four = tb.run()
+    assert four is None
+    (table,) = tran.fourier
+    assert table["output"] == "v(in)"
+    assert table["frequency"] == [n * 1e3 for n in range(10)]
+    assert table["magnitude"][1] == pytest.approx(1.0, rel=1e-3)
+    assert table["magnitude"][3] == pytest.approx(0.1, rel=1e-3)
+    assert abs(table["magnitude"][2]) < 1e-6
+    assert table["norm_magnitude"][3] == pytest.approx(0.1, rel=1e-3)
+    assert table["thd"] == pytest.approx(10.0, rel=1e-3)
+    assert len(table["phase"]) == len(table["norm_phase"]) == 10
+    # A run with no `.four` has no table.
+    plain = ps.Testbench(dut)
+    plain.with_backend("ngspice")
+    plain.V(name="1", positive="in", negative="0", value=1.0)
+    assert plain.transient(step_time=1e-6, end_time=1e-4).fourier == []
 
 
 def test_noise_runs_when_saves_are_set():
@@ -530,6 +621,84 @@ def test_p3_044_api_subcircuit_k_takes_names(backend):
             transformer(first, second)
 
 
+@pytest.mark.needs("ngspice")
+def test_p3_034_api_distortion_always_only_hd2():
+    """`distof1=(mag, phase)` on `V`/`I` is ngspice's `DISTOF1`: the source's
+    `.disto` input, without which every distortion vector is 0. Oracle
+    (closed form): a diode under 0.6 V driven by a*cos(wt) carries
+    I0*exp(a*cos(wt)/Vt), I0 = Is*exp(0.6/Vt); its 2F1 component is
+    I0*a^2/(4*Vt^2) = 0.0443646 A for a = 1, the source's the negative.
+    ngspice-45 and ESPice 0.3.0 print -4.43650e-02 on the hand deck (their
+    kT/q is 3.4e-7 off SI 2019's, 8e-6 on I0: hence rel=1e-4;
+    research/impl/evidence/P3-034). Half the input at 90 degrees is a
+    quarter of it, turned by 2*90 degrees."""
+    import spicerack as ps
+
+    vt = 1.380649e-23 * 300.15 / 1.602176634e-19
+    second = 1e-14 * math.exp(0.6 / vt) / (4 * vt**2)
+
+    def at_2f1(**disto):
+        dut = ps.Subcircuit("dd", ["a"])
+        dut.model("dn", "D", IS=1e-14)
+        dut.D("1", "a", dut.gnd, model="dn")
+        tb = ps.Testbench(dut)
+        tb.with_backend("ngspice")
+        tb.V("1", "a", "0", 0.6, **disto)
+        d = tb.distortion(variation="dec", points=1, start_frequency=1e3, stop_frequency=1e3)
+        return tb, d["i(v1)"][0]
+
+    assert at_2f1()[1] == 0.0
+    assert at_2f1(distof1=(1.0, 0.0))[1] == pytest.approx(-second, rel=1e-4)
+    tb, quarter = at_2f1(distof1=(0.5, 90.0), distof2=(0.25, 0.0))
+    assert quarter == pytest.approx(second / 4, rel=1e-4)
+    assert "V1 a 0 600m distof1 0.5 90 distof2 0.25 0" in tb.netlist("ngspice")
+    sub = ps.Subcircuit("s", ["a"])
+    sub.V("1", "a", sub.gnd, 0.0, ac=1.0, distof1=(1.0, 0.0))
+    sub.I("2", "a", sub.gnd, 0.0, distof2=(2.0, -90.0))
+    assert "V1 a 0 0 AC 1 distof1 1 0\nI2 a 0 0 distof2 2 -90\n" in sub.to_source()
+
+
+@pytest.mark.needs("ngspice")
+def test_p3_033_api_add_noise_written_noise():
+    """`output_node` is a node: "out" and "v(out)" name the same one, and no
+    other form reaches the deck. Oracle (closed form): at 1 Hz the 1 uF of a
+    1k/1k divider is open (corner 318 Hz), so its output noise is the thermal
+    noise of 1k || 1k, sqrt(4kT * 500 Ohm) = 2.87889e-9 V/sqrt(Hz) at
+    ngspice's 27 C. ngspice-45 prints 2.878880e-09 for `.noise V(out)` and 0
+    for `.noise V(v(out))` (research/impl/evidence/P3-033)."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("nz", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.R(name="2", positive="out", negative="0", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.V(name="in", positive="in", negative="0", value=0.0, ac=1.0)
+    # 1e-3: the capacitor moves the 1 Hz point by 5e-6, ngspice's k by 1e-8.
+    expected = math.sqrt(4 * 1.380649e-23 * 300.15 * 500.0)
+    for form in ("out", "v(out)", "V(out)", " v( out ) "):
+        noise = tb.noise(output_node=form, ref_node="0", src="Vin", variation="dec", points=10,
+                         start_frequency=1.0, stop_frequency=1e5)
+        assert noise["onoise_spectrum"][0] == pytest.approx(expected, rel=1e-3), form
+    for bad in ("v(out", "i(Vin)", "v(in,out)", "out 0", ""):
+        with pytest.raises(ValueError, match="is not a node"):
+            tb.add_noise(bad, "0", "Vin")
+    with pytest.raises(ValueError, match="is not a node"):
+        tb.add_noise("out", "v(0", "Vin")
+    # `.tf outvar insrc` (ngspice manual 11.3.9: `v(5, 3)`, `i(VLOAD)`): the
+    # signal is kept, a node is written v(node) (ngspice-45 refuses the bare
+    # `.tf out Vin`: "voltage or current expected").
+    for form, card in (("out", ".tf v(out) Vin"), ("v(out)", ".tf v(out) Vin"), ("i(Vin)", ".tf i(Vin) Vin")):
+        bench = ps.Testbench(dut)
+        bench.V(name="in", positive="in", negative="0", value=0.0, ac=1.0)
+        bench.add_tf(form, "Vin")
+        assert card in bench.netlist("ngspice").splitlines(), form
+    for bad in ("v(out", "v(v(out))", "out 0", "db(out)", ""):
+        with pytest.raises(ValueError, match="is not a node"):
+            tb.add_tf(bad, "Vin")
+
+
 # ======================================================================
 # Testbench.run: every queued analysis in one deck
 # ======================================================================
@@ -580,6 +749,32 @@ def test_run_returns_one_result_per_queued_analysis_in_queue_order(backend):
     _check_queued(tran, op, ac)
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p3_096_api_operatingpoint_has_no_nodes(backend):
+    """ZERO-LEDGER P3-096: an OperatingPoint lists its nodes and branches and
+    reads a vector by the simulator's spelling too. Oracle: closed form, 9 V
+    over 2k + 1k: vout = 9 * 1k/3k = 3 V, the source's branch current
+    -9/3k = -3 mA."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("divider", ["vin", "vout"])
+    dut.R(name="top", positive="vin", negative="vout", value=2e3)
+    dut.R(name="bot", positive="vout", negative="0", value=1e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="supply", positive="vin", negative="0", value=9.0)
+    op = tb.operating_point()
+    for key in ["v(vout)", "V(VOUT)", "vout"]:
+        assert op[key] == pytest.approx(3.0, rel=1e-9), key
+    for key in ["i(vsupply)", "I(Vsupply)", "vsupply#branch"]:
+        assert op[key] == pytest.approx(-3e-3, rel=1e-9), key
+    assert op.nodes == ["vin", "vout"]
+    assert op.branches == ["i(vsupply)"]
+    assert op.vout == pytest.approx(3.0, rel=1e-9)
+    with pytest.raises(KeyError, match="No node 'v\\(nope\\)'"):
+        op["v(nope)"]
+
+
 def test_run_with_a_measure_runs_every_analysis_from_the_control_block():
     """A `.meas` moves ngspice's analyses into a `.control` block, which runs
     them in card order; the results still land on their own analyses."""
@@ -628,6 +823,30 @@ def test_p8_102_a_failed_measure_reads_none():
             assert m[name] == pytest.approx(value, rel=2e-3), name
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p3_094_api_two_sweep_dc_has(backend):
+    """ZERO-LEDGER P3-094: a two-source dc returns both sweeps: the inner one
+    is the axis (`dc.sweep`), the outer one the vector `sweep1`, on every
+    backend. Oracle: the simulator's own node voltages (`a` is V1, `b` is
+    V2) and the closed form of the resistor star, out = (V1 + V2) / 3."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("star", ["a", "b", "out"])
+    dut.R(name="1", positive="a", negative="out", value=1e3)
+    dut.R(name="2", positive="b", negative="out", value=1e3)
+    dut.R(name="3", positive="out", negative="0", value=1e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="1", positive="a", negative="0", value=0.0)
+    tb.V(name="2", positive="b", negative="0", value=0.0)
+    dc = tb.dc(V1=slice(0.0, 1.0, 0.5), V2=slice(0.0, 2.0, 1.0))
+    assert dc.sweep == pytest.approx([0.0, 0.5, 1.0] * 3)
+    assert dc.sweep == pytest.approx(dc["a"])
+    assert dc["sweep1"] == pytest.approx([0.0] * 3 + [1.0] * 3 + [2.0] * 3)
+    assert dc["sweep1"] == pytest.approx(dc["b"])
+    assert dc["out"] == pytest.approx([(x + y) / 3 for x, y in zip(dc.sweep, dc["sweep1"])])
+
+
 def test_run_gives_none_for_a_fourier_and_refuses_an_empty_queue():
     """`.four` prints its table to stdout and writes no plot."""
     import spicerack as ps
@@ -639,6 +858,38 @@ def test_run_gives_none_for_a_fourier_and_refuses_an_empty_queue():
     empty = ps.Testbench(ps.Subcircuit("e", ["a"]))
     with pytest.raises(ValueError, match="add_"):
         empty.run()
+
+
+@pytest.mark.parametrize("backend, measured", [("ngspice", False), ("ngspice", True), ("espice", False)])
+def test_p3_031_api_two_analyses_same_kind(backend, measured):
+    """ZERO-LEDGER P3-031: two analyses of one kind come back in queue order.
+    Oracle: each result's own axis is the sweep its card asked for
+    (`.ac lin 3 100 300`: 100, 200, 300 Hz; `.ac dec 1 1 10`: 1, 10 Hz; the
+    transients stop at 10 us and 20 us). ngspice-45 runs dot cards kind by
+    kind, the last card of a kind first (`cktnewan.c:34-35`; this deck's raw
+    file holds the decade plot before the linear one), and the commands of
+    the `.control` block a `.meas` gives the deck in order; ESPice runs its
+    dot cards in deck order."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("q", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.R(name="2", positive="out", negative="0", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="in", positive="in", negative="0", value=1.0, ac=1.0)
+    tb.add_ac(variation="lin", number_of_points=3, start_frequency=100.0, stop_frequency=300.0)
+    tb.add_transient(step_time=1e-6, end_time=10e-6)
+    tb.add_ac(variation="dec", number_of_points=1, start_frequency=1.0, stop_frequency=10.0)
+    tb.add_transient(step_time=1e-6, end_time=20e-6)
+    if measured:
+        tb.measure("ac", "vmax", "max", "vm(out)")
+    lin, short, dec, long = tb.run()
+    assert list(lin.frequency) == pytest.approx([100.0, 200.0, 300.0])
+    assert list(dec.frequency) == pytest.approx([1.0, 10.0])
+    assert short.time[-1] == pytest.approx(10e-6)
+    assert long.time[-1] == pytest.approx(20e-6)
 
 
 # ======================================================================
@@ -730,6 +981,41 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     v = res["out"]
     rms = math.sqrt(sum(x * x for x in v) / len(v))
     assert 0.75e-3 < rms < 1.06e-3, rms
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p3_093_api_ngspice_integrated_noise_plot(backend):
+    """ZERO-LEDGER P3-093: a noise result keeps the simulator's "Integrated
+    Noise" plot: `onoise_total` is a one-point vector beside the spectra.
+    Oracle: closed form. The output noise of R into C over [f1, f2] is
+    sqrt(4kTR*fc*(atan(f2/fc) - atan(f1/fc))), fc = 1/(2*pi*R*C): 6.4245e-8 V
+    over [1, 1e8] Hz, 3.8254e-8 V over [1, 100] Hz at 300.15 K. ngspice-45
+    and ESPice 0.3.0 integrate their 10 points/decade grid 0.11 % low
+    (6.4174e-8, 3.8227e-8), hence rel=5e-3."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("rc", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="in", positive="in", negative="0", value=0.0, ac=1.0)
+    band = dict(output_node="out", ref_node="0", src="Vin", variation="dec", points=10, start_frequency=1.0)
+    fc = 1 / (2 * math.pi * 1e3 * 1e-6)
+
+    def total(stop):
+        return math.sqrt(4 * 1.380649e-23 * 300.15 * 1e3 * fc * (math.atan(stop / fc) - math.atan(1 / fc)))
+
+    alone = tb.noise(stop_frequency=1e8, **band)
+    assert alone["onoise_total"] == pytest.approx([total(1e8)], rel=5e-3)
+    assert len(alone["onoise_spectrum"]) == len(alone.frequency) == 81
+    tb.add_operating_point()
+    tb.add_noise(stop_frequency=1e8, **band)
+    tb.add_noise(stop_frequency=100.0, **band)
+    _, wide, narrow = tb.run()
+    assert wide["onoise_total"] == pytest.approx([total(1e8)], rel=5e-3)
+    assert narrow["onoise_total"] == pytest.approx([total(100.0)], rel=5e-3)
+    assert narrow.frequency[-1] == pytest.approx(100.0)
 
 
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])

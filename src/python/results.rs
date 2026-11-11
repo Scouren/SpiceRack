@@ -64,6 +64,15 @@ macro_rules! analysis_class {
             #[getter]
             fn measures(&self) -> HashMap<String, Option<f64>> { measures_to_dict(&self.inner.raw.measures) }
 
+            /// The `.four` tables of the run this result is from
+            /// (`add_fourier`, a `.four` line), one dict per output:
+            /// `output`, `thd` (percent) and, as lists indexed by harmonic
+            /// (0 the DC component), `frequency`, `magnitude`, `phase`
+            /// (degrees), `norm_magnitude`, `norm_phase`. Empty when the
+            /// run printed none.
+            #[getter]
+            fn fourier<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, pyo3::types::PyDict>>> { fourier_tables(py, &self.inner.raw) }
+
             /// The `.step` point this result is: {parameter: value}, empty
             /// when nothing steps.
             #[getter]
@@ -147,7 +156,9 @@ analysis_classes! {
 }
 
 /// `plots`, analysis `a`'s run, as its single-analysis method returns it:
-/// the first plot as `a`'s result class, `None` for none (a Fourier's); for
+/// the first plot as `a`'s result class, with the vectors of a plot behind
+/// it (a noise run's "Integrated Noise": `onoise_total`, `inoise_total`,
+/// one point each) as further vectors, `None` for none (a Fourier's); for
 /// a run read one plot per step (their `params` set: LTspice), a list of
 /// one result per step, in step order (ZERO D42).
 pub(super) fn typed_result(
@@ -156,7 +167,7 @@ pub(super) fn typed_result(
     plots: Vec<RawData>,
 ) -> PyResult<Py<PyAny>> {
     if plots.iter().all(|p| p.params.is_empty()) {
-        return one_result(py, a, plots.into_iter().next());
+        return one_result(py, a, joined(plots));
     }
     let each: Vec<Py<PyAny>> = plots
         .into_iter()
@@ -166,6 +177,26 @@ pub(super) fn typed_result(
 }
 
 // ---- private ----
+
+/// An unstepped analysis's plots as one: the first, with every vector of
+/// the plots behind it as further columns (a noise run's "Integrated
+/// Noise": `onoise_total` and `inoise_total`, one point each beside the
+/// spectra's many). `None` for no plot.
+fn joined(plots: Vec<RawData>) -> Option<RawData> {
+    let mut plots = plots.into_iter();
+    let mut first = plots.next()?;
+    for more in plots {
+        // A column's index is its place in `real_data`: real plots both.
+        assert_eq!(first.real_data.len(), first.variables.len(), "a real plot");
+        assert_eq!(more.real_data.len(), more.variables.len(), "a real plot");
+        for (v, column) in more.variables.into_iter().zip(more.real_data) {
+            let index = first.variables.len();
+            first.variables.push(crate::result::VarInfo { index, ..v });
+            first.real_data.push(column);
+        }
+    }
+    Some(first)
+}
 
 /// `raw` as `a`'s result class; `None` as Python's `None`.
 fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py<PyAny>> {
@@ -183,7 +214,13 @@ fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py
         Analysis::Noise { .. } | Analysis::SpectrePnoise { .. } => {
             Py::new(py, PyNoiseAnalysis { inner: r() })?.into_any()
         }
-        Analysis::Tf { .. } => Py::new(py, PyTransferFunctionAnalysis { inner: r() })?.into_any(),
+        Analysis::Tf { source, .. } => Py::new(
+            py,
+            PyTransferFunctionAnalysis {
+                inner: tf_of(r(), source),
+            },
+        )?
+        .into_any(),
         Analysis::Sensitivity { .. } => {
             Py::new(py, PySensitivityAnalysis { inner: r() })?.into_any()
         }
@@ -204,6 +241,22 @@ fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py
             Py::new(py, PyRawData { inner: r().raw })?.into_any()
         }
     })
+}
+
+/// A `.tf` result that answers the bare names with `source`'s own vectors:
+/// a plot holding one `transfer_function(<source>)` and
+/// `input_impedance(<source>)` per source of the deck (VACASK's `dcxf`)
+/// reads `transfer_function` and `input_impedance` as the analysis's
+/// source's. A plot with the bare names already (ngspice, ESPice) is `r`.
+fn tf_of(mut r: Results, source: &str) -> Results {
+    let source = source.to_lowercase();
+    for name in ["transfer_function", "input_impedance"] {
+        if let Some(&i) = r.nodes.get(&format!("{name}({source})")) {
+            r.nodes.insert(name.to_string(), i);
+        }
+    }
+    assert!(r.nodes.len() + r.branches.len() <= r.raw.variables.len() + 2);
+    r
 }
 
 #[pymethods]
@@ -294,16 +347,32 @@ impl PyOperatingPoint {
     fn params(&self) -> HashMap<String, f64> {
         self.inner.raw.params.iter().cloned().collect()
     }
+
+    /// The nodes the point holds, by canonical name (`out`, `x1.mid`),
+    /// sorted.
+    #[getter]
+    fn nodes(&self) -> Vec<String> {
+        sorted(&self.inner.nodes)
+    }
+
+    /// The branch currents the point holds (`i(vin)`), sorted.
+    #[getter]
+    fn branches(&self) -> Vec<String> {
+        sorted(&self.inner.branches)
+    }
 }
 
 impl PyOperatingPoint {
     /// The one point's value; `missing` for no such node, a `ValueError`
     /// for a run that wrote several points (a `.step` around the operating
-    /// point), whose values one float cannot hold.
+    /// point), whose values one float cannot hold. `name` is a canonical
+    /// name or a simulator's spelling of one: `v(out)` is `out`, `I(Vin)`
+    /// and `vin#branch` are `i(vin)` (`normalize::canonical`).
     fn value(&self, name: &str, missing: fn(String) -> PyErr) -> PyResult<f64> {
+        let key = crate::normalize::canonical(name, None).0;
         let col = self
             .inner
-            .get(name)
+            .get(&key)
             .ok_or_else(|| missing(format!("No node '{name}'")))?;
         match *col {
             [v] => Ok(v),
@@ -315,6 +384,14 @@ impl PyOperatingPoint {
     }
 }
 
+/// The names of `map` (a result's nodes, or its branches), sorted: a hash
+/// map's own order changes from run to run.
+fn sorted(map: &HashMap<String, usize>) -> Vec<String> {
+    let mut names: Vec<String> = map.keys().cloned().collect();
+    names.sort();
+    names
+}
+
 /// A result's measures as a Python dict: {name: value}, `None` the value
 /// of a measure with none (failed).
 fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> HashMap<String, Option<f64>> {
@@ -322,6 +399,33 @@ fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> HashMap<String
     measures
         .iter()
         .map(|m| (m.name.clone(), (m.status == ok).then_some(m.value)))
+        .collect()
+}
+
+/// The `.four` tables the run behind `raw` printed, each as a Python dict
+/// (`measure_parse::Fourier`'s fields by name): ngspice's are in the run's
+/// stdout, LTspice's in its log.
+fn fourier_tables<'py>(
+    py: Python<'py>,
+    raw: &RawData,
+) -> PyResult<Vec<Bound<'py, pyo3::types::PyDict>>> {
+    let mut tables = crate::measure_parse::parse_fourier(&raw.stdout);
+    if tables.is_empty() {
+        tables = crate::measure_parse::parse_fourier(&raw.log_content);
+    }
+    tables
+        .iter()
+        .map(|t| {
+            let d = pyo3::types::PyDict::new(py);
+            d.set_item("output", t.output.as_str())?;
+            d.set_item("thd", t.thd)?;
+            d.set_item("frequency", float_list(py, &t.frequency)?)?;
+            d.set_item("magnitude", float_list(py, &t.magnitude)?)?;
+            d.set_item("phase", float_list(py, &t.phase)?)?;
+            d.set_item("norm_magnitude", float_list(py, &t.norm_magnitude)?)?;
+            d.set_item("norm_phase", float_list(py, &t.norm_phase)?)?;
+            Ok(d)
+        })
         .collect()
 }
 

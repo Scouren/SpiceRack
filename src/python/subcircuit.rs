@@ -159,16 +159,20 @@ impl PySubcircuit {
     /// `portnum` makes the source RF port `portnum` (from 1) for
     /// `s_param`, with `z0` ohms in series in every analysis (ngspice's
     /// `portnum n z0 x`; ngspice and ESPice only).
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0))]
-    fn V(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64) {
+    /// `distof1=(mag, phase)` makes the source a `distortion` input at F1,
+    /// `distof2=` at F2 (ngspice's `DISTOF1`/`DISTOF2`, the phase in
+    /// degrees); with neither on any source every distortion vector is 0.
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, portnum=None, z0=50.0, distof1=None, distof2=None))]
+    fn V(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, portnum: Option<u32>, z0: f64, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
         let port = portnum.map(|n| (n, z0));
-        let c = source(false, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, port, None);
+        let c = source(false, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], port, None);
         self.inner.elements.push(c);
     }
 
-    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None))]
-    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>) {
-        let c = source(true, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, None, None);
+    /// `distof1`, `distof2`: as `V`'s.
+    #[pyo3(signature = (name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None))]
+    fn I(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, ac: Option<f64>, ac_phase: Option<f64>, distof1: Option<(f64, f64)>, distof2: Option<(f64, f64)>) {
+        let c = source(true, name, self.net(positive), self.net(negative), value.value(), ac, ac_phase, [distof1, distof2], None, None);
         self.inner.elements.push(c);
     }
 
@@ -589,7 +593,10 @@ impl PySubcircuit {
         )))
     }
 
-    /// An R, C or L card: `R<name> n1 n2 value params`.
+    /// An R, C or L card: `R<name> n1 n2 value [model] params`. A `model=`
+    /// keyword is the card's model word, written after the value (ngspice
+    /// manual §3.3.2 `RXXXXXXX n+ n- <value> <mname> <l=length> ...`), never
+    /// a parameter: `model=rm` is an undefined parameter `rm` to ngspice.
     fn two(
         &mut self,
         letter: char,
@@ -600,8 +607,14 @@ impl PySubcircuit {
         kwargs: Option<Bound<'_, PyDict>>,
     ) -> PyResult<()> {
         let nets = self.nets(&[p, n]);
-        let ps = params(&kw_params(kwargs)?);
-        self.push(name, format!("{letter}{name} {nets} {}{ps}", value.text()));
+        let mut ps = kw_params(kwargs)?;
+        let at = ps.iter().position(|(k, _)| k.eq_ignore_ascii_case("model"));
+        let model = at
+            .map(|i| format!(" {}", ps.remove(i).1))
+            .unwrap_or_default();
+        let ps = params(&ps);
+        let text = format!("{letter}{name} {nets} {}{model}{ps}", value.text());
+        self.push(name, text);
         Ok(())
     }
 

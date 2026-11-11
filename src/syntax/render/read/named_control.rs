@@ -343,7 +343,7 @@ impl<'a> Rd<'a> {
             let mode = ["dec", "oct", "lin", "log"]
                 .into_iter()
                 .find(|m| s("mode").is_some_and(|x| x.eq_ignore_ascii_case(m)))?;
-            let points = num("points")? as u32 + u32::from(mode == "lin");
+            let points = intervals(num("points")?)?.checked_add(u32::from(mode == "lin"))?;
             Some(Sweep {
                 variation: mode,
                 points,
@@ -446,7 +446,7 @@ impl<'a> Rd<'a> {
             }
             (Some(m @ ("dec" | "oct")), None) => DcSweep::Log(Sweep {
                 variation: if m == "dec" { "dec" } else { "oct" },
-                points: num("points")? as u32,
+                points: intervals(num("points")?)?,
                 start: num("from")?,
                 stop: num("to")?,
             }),
@@ -513,4 +513,12 @@ fn save_items(text: &str) -> Option<Vec<String>> {
         items.push(cur);
     }
     (depth == 0).then_some(items)
+}
+
+/// A `points=` value as a count, its fraction dropped as VACASK drops it
+/// (36be560: `points=2.5` runs 2 intervals); `None` below 0 (VACASK:
+/// "Number of intervals … must be nonnegative") and above `u32::MAX`,
+/// where a cast would saturate.
+fn intervals(v: f64) -> Option<u32> {
+    (0.0..=f64::from(u32::MAX)).contains(&v).then_some(v as u32)
 }

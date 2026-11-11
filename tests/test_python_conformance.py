@@ -374,14 +374,14 @@ EXPECTED = {
     'K_three': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     # A coupling given as an expression: kept as ngspice's card, as `K_three` (P5-030 reads it).
     'K_expr': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
-    # VACASK has no charge-formulated capacitor (`Construct::ChargeCapacitor`: W0105).
-    'C_charge': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    # VACASK has no charge element: the source line `c2 (out 0) i=ddt(1e-9*v(out))` (P4-017).
+    'C_charge': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     # The `off` flag: Spectre's `region=off`; VACASK has no spelling for it (W0101).
     'D_off': (OK, OK, OK, OK, OK, OK, 'W0101', OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'M_three_node': (OK, OK, OK, 'W0050+W0053', OK, 'W0104+W0105', 'W0105', OK, OK),
+    'M_three_node': (OK, OK, OK, 'W0050+W0053', OK, 'W0104+W0105', OK, OK, OK),
     'J': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'Z': (OK, OK, OK, OK, OK, 'W0104', OK, OK, OK),
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -500,6 +500,68 @@ def divider(mod):
 def h(f):
     """The divider's transfer at `f` (closed form)."""
     return 0.75 / complex(1.0, 2 * math.pi * f * 750.0 * 1e-9)
+
+
+def test_p3_039_api_spectre_mos_instance_params():
+    """Ledger P3-039: the API's `M(..., W=, L=)` on Spectre. Spectre names are case-sensitive (Spectre
+    Reference 5.0 front matter) and a MOSFET's instance parameters are `w`, `l` (p.408). Spectre 25.1
+    on `W=10u L=1u`: "SFE-102 Parameter `W' ... ignored" and the default size, Id 4.225e-5 for 4.225e-4
+    (iccad4, 2026-11-07; research/settle-remote.md, recheck P3-039)."""
+    text = FEATURES["M"](ps()).netlist("spectre")
+    cards = [line.strip() for line in text.splitlines() if line.strip().startswith("m1 ")]
+    assert cards == ["m1 (out in 0 0) nm w=1u l=1u"], text
+
+
+def p3_042_bench():
+    """The divider of P3-042's tests: R2 names the model `rm` (tc1) at 127 C."""
+    mod = ps()
+    d = mod.Subcircuit("div", ["in", "out"])
+    d.model("rm", "r", tc1=1e-3)
+    d.R("1", "in", "out", 1e3)
+    d.R("2", "out", d.gnd, 1e3, model="rm")
+    t = mod.Testbench(d)
+    t.V("in", "in", "0", 1.0)
+    t.temperature = 127.0
+    t.add_operating_point()
+    return t
+
+
+def p3_042_cards(target, head):
+    text = p3_042_bench().netlist(target)
+    return [line.strip() for line in text.splitlines() if line.strip().startswith(head)]
+
+
+def p3_042_runs(backend):
+    if shutil.which(backend) is None:
+        pytest.fail(f"{backend} not on PATH: run the tests in `nix develop .#testing`")
+    t = p3_042_bench()
+    t.with_backend(backend)
+    (op,) = t.run()
+    assert op["out"] == pytest.approx(11 / 21, rel=1e-9), backend
+
+
+def test_p3_042_api_model_rm_resistor():
+    """Ledger P3-042: `R(..., model="rm")` names a `.model` card. ngspice-45 manual §3.3.2: `RXXXXXXX n+
+    n- <value> <mname> <l=length> ...`. Spectre Reference 5.0 p.628: `Name 1 2 ModelName parameter=value
+    ...`, "with model: r1 (1 2) resmod l=8u w=1u"; R(T) = R(tnom)*[1 + tc1*(T - tnom)]. The model line's
+    `l=10u w=10u r=1m ...` are ngspice's defaults where Spectre's differ, as the pinned
+    tests/spectre/t_m1_resistors.scs (Spectre 25.1: PASS 6/6, research/settle-remote.md). The numbers:
+    R2 = 1k*(1 + 1e-3*(127 - 27)) = 1.1k under R1 = 1k, so out = 11/21 (the closed form). `model=rm` as a
+    parameter is ngspice-45's fatal "Undefined parameter [rm]" (research/impl/evidence/P3-042)."""
+    assert p3_042_cards("ngspice", "R2 ") == ["R2 out 0 1k rm"]
+    p3_042_runs("ngspice")
+
+
+# Known failure: the reader keeps `R2 out 0 1k rm` as ngspice text (render/read/elements.rs::rcl reads a word
+# after the value as a flag), so Spectre and VACASK refuse it W0001 (batch-9).
+@pytest.mark.xfail(strict=True, raises=RuntimeError, reason="ZERO-LEDGER P3-126")
+def test_p3_042_api_spectre_model_rm_resistor():
+    """P3-042 on Spectre and VACASK: the card `r2 (out 0) rm r=1k`, the model's Spectre defaults, 11/21."""
+    assert p3_042_cards("spectre", "r2 ") == ["r2 (out 0) rm r=1k"]
+    assert p3_042_cards("spectre", "model rm ") == [
+        "model rm resistor tc1=1m l=10u w=10u r=1m af=1 wdexp=0 ldexp=0 leexp=1 weexp=1"
+    ]
+    p3_042_runs("vacask")
 
 
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])

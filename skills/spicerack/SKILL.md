@@ -39,7 +39,7 @@ Each of these returns a plausible wrong number rather than an error.
 
 **Use ASCII micro units: `u_uF`, `u_uH`, `u_uA`, `u_uV`, `u_uW`, `u_us`.** Python normalises identifiers, so a `u_µF` spelled with U+00B5 cannot be imported. The `u_Ω` family does work.
 
-**`.nodes` and `.branches` exist only on `DcAnalysis`.** `.measures` is on every result type: `{name: value}`, the value `None` when the measure failed. Elsewhere, index the result: `res["vout"]`.
+**`.nodes` and `.branches` are names, not values.** Every result type has them (and `.measures`: `{name: value}`, the value `None` when the measure failed); index the result for the numbers: `res["vout"]`. An `OperatingPoint` also takes the simulator's spelling: `op["v(vout)"]` is `op["vout"]`.
 
 **A `UnitValue` in `**kwargs` is written as its SI number.** `M(..., W=1 @ u_MOhm)` emits `W=1e6`. Strings pass through verbatim, so expressions go in as `"{w*2}"`. `True` is a bare flag (`off=True` emits `off`); `False` and `None` emit nothing.
 
