@@ -43,7 +43,8 @@ impl W<'_, '_> {
             self.refuse(Code::W0142, self.rd.main(n));
         }
         let kind = m.kind.to_ascii_lowercase();
-        if !self.b.same_level(self.rd.b, &kind, m.level()) {
+        let same = self.b.same_level(self.rd.b, &kind, m.level());
+        if !same {
             self.refuse(Code::W0104, self.rd.main(n));
         }
         if self.b.param_form == ParamForm::Xyce {
@@ -59,8 +60,8 @@ impl W<'_, '_> {
             }
         }
         // A Xyce card on ngspice, ESPice or HSPICE: its level as the target
-        // numbers it (`ngspice_models`).
-        if self.pair.xyce_models_on_ngspice {
+        // numbers it (`ngspice_models`); one refused above is refused once.
+        if self.pair.xyce_models_on_ngspice && same {
             let hspice = self.b.netlist_rules == NetlistRules::Hspice;
             match ngspice_models::ngspice_model(hspice, &m.kind, &m.params) {
                 Ok(Some(params)) => m.params = params,
