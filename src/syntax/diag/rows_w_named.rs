@@ -34,7 +34,7 @@ macro_rules! rows_w_named {
             /// A `.model` whose kind (and level) has no master in the target.
             W0104 Refusal {
                 title: "a model kind with no master in the target",
-                cite: "Spectre Reference 19.1 p.498 (model masters); VACASK spice/*.osdi",
+                cite: "Spectre Reference 19.1 p.498 (model masters); VACASK spice/*.osdi; ngspice-45 spicelib/parser/inpdomod.c (the level switch), inpfindl.c:51-57",
                 explain: "No master of the target has this model kind and level's equations; the nearest master would compute something else. Use a model the target ships, or load the model as Verilog-A.",
             }
             /// A device the target has no master or terminal list for (a MOSFET without its bulk or with extra nodes, a current-controlled switch; in VACASK a charge capacitor, a switch, a POLY source whose term order or lone coefficient the tree does not settle).

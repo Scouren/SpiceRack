@@ -12,6 +12,7 @@
 //! waveforms, `bench` the testbench and analyses (`xyce_options` Xyce's
 //! options, `ngspice_options` the others' and HSPICE's defaults, `xyce_cards`
 //! Xyce's spellings of another dialect's cards, `xyce_models` its model cards,
+//! `ngspice_models` a Xyce model card's level elsewhere,
 //! `prints` the `.print` cards, `epochs` the script lines of a circuit
 //! changed between analyses), `checks` the deck-wide
 //! refusals (another family's text, `^`, statistical calls), `laplace` the
@@ -53,6 +54,7 @@ mod globals;
 mod initial;
 mod laplace;
 mod model_cards;
+mod ngspice_models;
 mod ngspice_options;
 mod pair;
 pub(in crate::syntax::render) mod parasitics;

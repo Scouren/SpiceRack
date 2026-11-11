@@ -623,3 +623,46 @@ fn p5_005_an_ltspice_startup_ramps_the_top_dc_sources_on_every_target() {
         "{sp}"
     );
 }
+
+// ── a Xyce model level on ngspice, ESPice and HSPICE (ledger P3-006) ──
+
+/// ngspice-45 `inpdomod.c` (L73-75, L383-385: the levels in its binary)
+/// and `inpfindl.c:51-57` (a level above 99 is computed as level 1): Xyce's
+/// PSP 103, power MOSFET 18, VBIC 1.3 (11) and MEXTRAM 504 have no device
+/// there, nor in HSPICE (MOSFET Models D-2010.12 Table 1): refused. Xyce
+/// 7.10 `level=103` at 1 V, 1 V: 1.111 mA; ngspice-45 on the copied card
+/// 0.100 mA (XYCE_CORPUS `PSP103/`, `VBIC13/`, `MEXTRAM/`, `VDMOS/`).
+/// HICUM/L2 is Xyce's 234 and ngspice's 8 (both v2.4.0): the same
+/// collector node on both simulators (Xyce 0.540334, ngspice 0.540309;
+/// their constants differ by 2.8e-5 in kT/q).
+#[test]
+fn p3_006_xyce_model_levels_copied_ngspice() {
+    let cite = "ngspice-45 inpdomod.c L73-75, L383-385; HSPICE MOSFET Models Table 1";
+    for (kind, level) in [("nmos", 103), ("nmos", 18), ("npn", 11), ("npn", 504)] {
+        let card = match kind {
+            "nmos" => "m1 d g 0 0 nm l=1u w=10u",
+            _ => "q1 d g 0 nm",
+        };
+        let deck =
+            format!("* t\nvd d 0 1\nvg g 0 1\n{card}\n.model nm {kind} level={level}\n.op\n.end\n");
+        for to in [Dialect::Ngspice, Dialect::Espice, Dialect::Hspice] {
+            oracle::spec_refusal(cite, &deck, Dialect::Xyce, to, &[Code::W0104]);
+        }
+    }
+    let hicum = "* t\nvc cc 0 1.5\nrc cc c 100\nvb b 0 0.85\nq1 c b 0 0 t qh\nrt t 0 1\n\
+        .model qh npn level=234 c10=9.074e-30 qp0=1.008e-13 ibeis=1.328e-19 mbei=1.027 \
+        re=1.511 rcx=2.483 rbx=2.568\n.op\n.end\n";
+    let tol = oracle::Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    oracle::sim_pair(
+        Dialect::Xyce,
+        hicum,
+        Dialect::Ngspice,
+        "c",
+        oracle::At::First,
+        tol,
+    );
+    assert!(write(hicum, Dialect::Xyce, Dialect::Ngspice).contains("level=8"));
+}

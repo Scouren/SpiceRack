@@ -125,6 +125,12 @@ pub(super) struct Pair {
     /// An ngspice deck's model cards on Xyce: each judged by Xyce's device
     /// (`xyce_cards::xyce_instance`).
     pub(super) xyce_from_ngspice: bool,
+    /// A Xyce deck's model levels are Xyce's numbering (RG `M`, `Q` level
+    /// tables), which ngspice, ESPice and HSPICE number otherwise or lack
+    /// (ngspice-45 `inpdomod.c`; above 99 it computes level 1,
+    /// `inpfindl.c:51-57`): each card as the target's device reads it, or
+    /// refused (`ngspice_models`).
+    pub(super) xyce_models_on_ngspice: bool,
     /// Xyce evaluates a function on complex numbers and keeps the real
     /// part, and clamps `atanh` (7.10: `sqrt(-4)` is 0, `acosh(-2.5)`
     /// 1.5668, `atanh(-2.5)` -14.1621), where ngspice-45 fails the
@@ -201,6 +207,7 @@ impl Pair {
             xyce_from_other: to.param_form == ParamForm::Xyce && from.param_form != ParamForm::Xyce,
             xyce_from_ngspice: to.param_form == ParamForm::Xyce
                 && from.model_semantics == ModelSemantics::Ngspice,
+            xyce_models_on_ngspice: xy(nf) && (ng(nt) || hs(nt)),
             xyce_domains: foreign && ef == ExprEval::Xyce && et == ExprEval::Ngspice,
             abs_power_out: foreign && ef == ExprEval::Ngspice && et != ExprEval::Ngspice,
             abs_power_in: foreign && ef != ExprEval::Ngspice && et == ExprEval::Ngspice,
@@ -258,6 +265,7 @@ mod tests {
             ("sffm_swap", to_ng.sffm_swap),
             ("sffm_as_b", to_ng.sffm_as_b),
             ("foreign_measures", to_ng.foreign_measures),
+            ("xyce_models_on_ngspice", to_ng.xyce_models_on_ngspice),
             ("brace_groups", to_ng.brace_groups),
             ("xyce_domains", to_ng.xyce_domains),
             ("abs_power_in", to_ng.abs_power_in),
