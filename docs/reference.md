@@ -24,7 +24,7 @@ nodes are positional; everything after `*` is keyword-only.
 
 | Method | Signature |
 | --- | --- |
-| `R` | `(name, positive, negative, value, *, raw_spice=None, **params)` |
+| `R` | `(name, positive, negative, value, *, raw_spice=None, **params)`; `raw_spice` is the text after the nodes (`"1k tc=0.01"`); when it opens with a parameter (`"tc=1e-3"`) or is empty, `value` is written before it. In every `**params`: `True` is a bare flag (`off`), `False` and `None` are left out |
 | `C`, `L` | `(name, positive, negative, value, **params)` |
 | `C` by its charge | `(name, positive, negative, *, charge="expr", **params)`: the charge as an expression of the capacitor's voltage (`charge="1n*v(a,b)"`), in place of `value`; VACASK refuses it (`W0105`) |
 | `K` | `(name, inductor1, inductor2, *, coupling)` |

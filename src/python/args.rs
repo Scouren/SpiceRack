@@ -31,11 +31,16 @@ pub(super) enum PyValueArg {
 pub(super) struct Num(pub(super) Value);
 
 /// `**kwargs` as ordered `(name, value)` pairs, values per [`param_value`].
+/// A pair it gives no text for (`False`, `None`) is left out; an empty text
+/// (`True`) is a bare flag, as `model::params` and the `.options` card
+/// write it.
 pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>> {
     let mut out = vec![];
     if let Some(dict) = params {
         for (k, v) in dict.iter() {
-            out.push((k.extract::<String>()?, param_value(&v)?));
+            if let Some(text) = param_value(&v)? {
+                out.push((k.extract::<String>()?, text));
+            }
         }
     }
     Ok(out)
@@ -108,11 +113,21 @@ impl Num {
 ///
 /// A `UnitValue` is written as its SI value (`1e-6`), never its display form:
 /// `str(1 @ u_MOhm)` is `1MOhm`, which every SPICE reads as 1 milliohm, and
-/// `1F` reads as one femtofarad. Everything else keeps its Python `str()`, so
+/// `1F` reads as one femtofarad. A `bool` is SPICE's flag: `True` is the
+/// empty text (the bare word, `off`, `klu`), `False` is `None`, and so is
+/// Python's `None`: `str()` of either would put `True`/`None` on the card,
+/// which no SPICE reads. Everything else keeps its Python `str()`, so
 /// expressions such as `"{w*2}"` pass through verbatim.
-fn param_value(v: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(uv) = v.extract::<PyUnitValue>() {
-        return Ok(format!("{:e}", uv.inner.value));
+fn param_value(v: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    if v.is_none() {
+        return Ok(None);
     }
-    Ok(v.str()?.to_string())
+    // `bool` first: a Python `bool` is also an `int`, an `int` is not a `bool`.
+    if let Ok(flag) = v.extract::<bool>() {
+        return Ok(flag.then(String::new));
+    }
+    if let Ok(uv) = v.extract::<PyUnitValue>() {
+        return Ok(Some(format!("{:e}", uv.inner.value)));
+    }
+    Ok(Some(v.str()?.to_string()))
 }

@@ -39,7 +39,7 @@ Each of these returns a plausible wrong number rather than an error.
 
 **`.nodes` and `.branches` exist only on `DcAnalysis`.** `.measures` is on every result type. Elsewhere, index the result: `res["vout"]`.
 
-**A `UnitValue` in `**kwargs` is written as its SI number.** `M(..., W=1 @ u_MOhm)` emits `W=1e6`. Strings pass through verbatim, so expressions go in as `"{w*2}"`.
+**A `UnitValue` in `**kwargs` is written as its SI number.** `M(..., W=1 @ u_MOhm)` emits `W=1e6`. Strings pass through verbatim, so expressions go in as `"{w*2}"`. `True` is a bare flag (`off=True` emits `off`); `False` and `None` emit nothing.
 
 **Results are `list[float]`, not numpy arrays.** Slice and iterate them; `.mean()` and stride-slicing raise.
 

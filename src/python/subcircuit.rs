@@ -98,10 +98,15 @@ impl PySubcircuit {
     // ── Elements ──
 
     /// `value` is a number, a `UnitValue` or an expression string; `**kwargs`
-    /// are instance parameters (`tc1=1e-3`, `m=2`).
+    /// are instance parameters (`tc1=1e-3`, `m=2`). `raw_spice` is the text
+    /// after the nodes; when it gives no resistance ([`lacks_value`]),
+    /// `value` is written before it.
     #[pyo3(signature = (name, positive, negative, value, *, raw_spice=None, **kwargs))]
     fn R(&mut self, name: &str, positive: &str, negative: &str, value: PyValueArg, raw_spice: Option<&str>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
         let value = match raw_spice {
+            Some(text) if lacks_value(text) => {
+                Value::Raw(format!("{} {}", value.value().text(), text.trim()).trim_end().to_string())
+            }
             Some(text) => Value::Raw(text.to_string()),
             None => value.value(),
         };
@@ -552,4 +557,14 @@ fn is_laplace(expr: &str) -> bool {
     lower
         .find("laplace")
         .is_some_and(|i| lower[i + 7..].trim_start().starts_with('('))
+}
+
+/// Whether `raw`, the text after an R card's nodes, gives no resistance: it
+/// is empty or opens with a parameter (`tc=1e-3`) other than `r=` (ngspice
+/// manual §3.3.4 writes a behavioural resistor `R1 a b r='expr'`).
+fn lacks_value(raw: &str) -> bool {
+    raw.split_whitespace().next().is_none_or(|w| {
+        w.split_once('=')
+            .is_some_and(|(k, _)| !k.eq_ignore_ascii_case("r"))
+    })
 }

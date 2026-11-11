@@ -79,6 +79,9 @@ res = tb.transient(step_time=1e-8, end_time=5e-6, max_time=1e-8)
 print(res.measures["vmax"])
 ```
 
+An option or parameter given as `True` is a bare flag (`tb.options(KLU=True)` writes
+`.options KLU`); `False` and `None` write nothing.
+
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
 emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
 On LTspice a stepped run returns a list, one result per step in step order, and

@@ -11,7 +11,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 |---|---|---|
 | `V` **TB** | `V` | `(name, positive, negative, value, ac=None, ac_phase=None, portnum=None, z0=50.0)`; `portnum` makes it an RF port for `s_param` (ngspice/ESPice; Spectre `port`, its `dc`/`mag` halved; VACASK a source behind a series resistor; elsewhere `W0007`) |
 | `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
-| `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only |
+| `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only: the text after the nodes; `value` is written before it when it opens with a parameter (`"tc=1e-3"`) |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |
 | `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither); refused on VACASK (`W0105`) |
 | `L` | `L` | `(name, positive, negative, value)` |
@@ -36,7 +36,9 @@ Current-controlled sources (`F`, `H`) sense through a named voltage source; add 
 0 V source in the branch you want to measure.
 
 `**kwargs` values (`M`, `X`, `model`, `Subcircuit(..., **params)`, `options`): a
-`UnitValue` is written as its SI number (`1 @ u_MOhm` -> `1e6`); anything else is its
+`UnitValue` is written as its SI number (`1 @ u_MOhm` -> `1e6`); `True` is a bare flag
+(`D(..., off=True)` -> `off`, `options(KLU=True)` -> `.options KLU`); `False` and `None`
+write nothing; anything else is its
 `str()`, so pass expressions as `"{w*2}"`. A PDK device that is a subcircuit (all sky130
 and gf180 FETs) is an `X` with parameters:
 

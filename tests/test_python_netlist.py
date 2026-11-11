@@ -1081,3 +1081,37 @@ class TestChargeCapacitor:
         with pytest.raises(ValueError, match="exactly one"):
             c.C("1", "a", c.gnd)
         assert "C1" not in str(c)
+
+
+@pytest.mark.needs("ngspice")
+def test_p3_041_api_python_values_written_text():
+    """`True` is SPICE's bare flag, `False` and `None` write nothing, and
+    `R(..., value, raw_spice="tc=1e-3")` keeps its value. Oracles: the cards
+    of the ngspice-45 manual (7.1 `D n+ n- mname <off>`, 11.1.1 `.options
+    klu`, 3.3.1 `R n+ n- value <tc1=..>`), and ngspice's run of the deck: a
+    1k/1k divider under 1 V is 0.5 V (closed form). ngspice-45 runs today's
+    `R2 out 0 tc=1e-3` as 1 mOhm, 1e-6 V (research/impl/evidence/P3-041)."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("d", ["a", "out"])
+    dut.model("dn", "D", IS=1e-14)
+    dut.D("1", "0", "a", model="dn", off=True, area=None)
+    dut.D("2", "0", "a", model="dn", off=False)
+    dut.R("1", "a", "out", 1e3)
+    dut.R("2", "out", "0", 1e3, raw_spice="tc=1e-3")
+    dut.R("3", "a", "0", 5.0, raw_spice="1meg tc=1e-3")
+    dut.R("4", "a", "0", 5.0, raw_spice="r=1meg")
+    dut.R("5", "a", "0", 1e6, raw_spice="")
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.V("1", "a", "0", 1.0)
+    tb.options(KLU=True, NOACCT=False, MAXORD=None, RELTOL=1e-4)
+    lines = tb.netlist("ngspice").splitlines()
+    for card in ("D1 0 a dn off", "D2 0 a dn", "R2 out 0 1k tc=1e-3", "R3 a 0 1meg tc=1e-3", "R5 a 0 1meg",
+                 ".options KLU RELTOL=0.0001"):
+        assert card in lines, (card, lines)
+    # raw_spice that holds its own value (a number, or `r=`) still replaces `value`.
+    assert not any(l.startswith(("R3 a 0 5", "R4 a 0 5")) for l in lines), lines
+    assert not any("True" in l or "False" in l or "None" in l for l in lines), lines
+    # 1e-6: gmin and the reverse diodes shift the divider by less than 1e-9.
+    assert tb.operating_point()["out"] == pytest.approx(0.5, rel=1e-6)
