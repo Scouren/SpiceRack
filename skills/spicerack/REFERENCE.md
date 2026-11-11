@@ -114,9 +114,12 @@ Spectre `inner_type` (`dc`, `ac`, `tran`, `noise`, `xf`, `sp`, `stb`, `pss`, ...
 `noise`'s `points_per_summary` is ngspice's, HSPICE's and Xyce's last field;
 LTspice's `.noise` has none, so it is left out there with a note (W0033).
 
-`add_fourier` emits ngspice's `.four`, whose output table is not parsed — the
-harmonics are unreachable. For THD, compute a Goertzel over the transient
-waveform. `num_harmonics=n` (harmonics past DC; the simulators' default is 9)
+`add_fourier` emits ngspice's `.four`. Its slot in `tb.run()` is `None`; the
+tables are `tran.fourier` on the same run's transient result (ngspice,
+LTspice): one dict per output, `t["thd"]` in percent and `t["magnitude"][n]`,
+`t["phase"][n]`, `t["frequency"][n]`, `t["norm_magnitude"][n]`,
+`t["norm_phase"][n]` for harmonic `n` (0 is DC). `[]` when the run printed no
+table. `num_harmonics=n` (harmonics past DC; the simulators' default is 9)
 is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
 `.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it with
 `W0040` (their `.four` takes no count), VACASK refuses any `.four` (`W0015`).
@@ -141,7 +144,7 @@ Every result type has `result[node]`, `result.measures`, and `.nodes` and
 | `OperatingPoint` | — | scalar per node |
 | `DcAnalysis` | `.sweep` | `.nodes`, `.branches` |
 | `AcAnalysis` | `.frequency` | `.magnitude(n)`, `.magnitude_db(n)`, `.phase(n)` |
-| `TransientAnalysis` | `.time` | |
+| `TransientAnalysis` | `.time` | `.fourier`: the run's `.four` tables, `[{"output", "thd", "magnitude", ...}]` |
 | `NoiseAnalysis` | `.frequency` | `inoise_spectrum`, `onoise_spectrum`; `inoise_total`, `onoise_total` (V rms over the band, one-element lists; ngspice and ESPice) |
 
 `ac[node]` is the real part. Use `.magnitude()` for `|H|`.

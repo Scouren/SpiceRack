@@ -62,6 +62,15 @@ macro_rules! analysis_class {
             #[getter]
             fn measures(&self) -> HashMap<String, f64> { measures_to_dict(&self.inner.raw.measures) }
 
+            /// The `.four` tables of the run this result is from
+            /// (`add_fourier`, a `.four` line), one dict per output:
+            /// `output`, `thd` (percent) and, as lists indexed by harmonic
+            /// (0 the DC component), `frequency`, `magnitude`, `phase`
+            /// (degrees), `norm_magnitude`, `norm_phase`. Empty when the
+            /// run printed none.
+            #[getter]
+            fn fourier<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, pyo3::types::PyDict>>> { fourier_tables(py, &self.inner.raw) }
+
             /// The `.step` point this result is: {parameter: value}, empty
             /// when nothing steps.
             #[getter]
@@ -360,6 +369,33 @@ fn sorted(map: &HashMap<String, usize>) -> Vec<String> {
 /// Convert MeasureResult vec to a Python-friendly dict
 fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> HashMap<String, f64> {
     measures.iter().map(|m| (m.name.clone(), m.value)).collect()
+}
+
+/// The `.four` tables the run behind `raw` printed, each as a Python dict
+/// (`measure_parse::Fourier`'s fields by name): ngspice's are in the run's
+/// stdout, LTspice's in its log.
+fn fourier_tables<'py>(
+    py: Python<'py>,
+    raw: &RawData,
+) -> PyResult<Vec<Bound<'py, pyo3::types::PyDict>>> {
+    let mut tables = crate::measure_parse::parse_fourier(&raw.stdout);
+    if tables.is_empty() {
+        tables = crate::measure_parse::parse_fourier(&raw.log_content);
+    }
+    tables
+        .iter()
+        .map(|t| {
+            let d = pyo3::types::PyDict::new(py);
+            d.set_item("output", t.output.as_str())?;
+            d.set_item("thd", t.thd)?;
+            d.set_item("frequency", float_list(py, &t.frequency)?)?;
+            d.set_item("magnitude", float_list(py, &t.magnitude)?)?;
+            d.set_item("phase", float_list(py, &t.phase)?)?;
+            d.set_item("norm_magnitude", float_list(py, &t.norm_magnitude)?)?;
+            d.set_item("norm_phase", float_list(py, &t.norm_phase)?)?;
+            Ok(d)
+        })
+        .collect()
 }
 
 /// A column as a Python list of floats, built from the stored slice with no

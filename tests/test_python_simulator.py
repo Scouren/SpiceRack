@@ -511,8 +511,8 @@ def test_p3_032_api_vacask_subcircuit_node_xu1():
 
 def test_raw_four_line_runs_as_fourier_on_ngspice():
     """A raw `.four` testbench line becomes `fourier` in the `.control` block
-    (the table goes to stdout, which Python does not expose; the Rust suite
-    checks its numbers), and the transient still comes back."""
+    (the table goes to stdout, which `tran.fourier` reads: the P3-049 test
+    below), and the transient still comes back."""
     import spicerack as ps
 
     dut = ps.Subcircuit("rc4", ["in", "out"])
@@ -526,6 +526,40 @@ def test_raw_four_line_runs_as_fourier_on_ngspice():
     assert ".control\ntran 1u 2m\nfourier 1k v(out)\n.endc" in deck and ".four" not in deck
     tran = tb.transient(step_time=1e-6, end_time=2e-3)
     assert tran.time[-1] == pytest.approx(2e-3)
+    assert tran.fourier[0]["output"] == "v(out)"
+
+
+def test_p3_049_api_fourier_results_unreachable():
+    """ZERO-LEDGER P3-049: the `.four` tables of a run are read back, on its
+    transient result. Oracle: closed form. 1 V at 1 kHz in series with 0.1 V
+    at 3 kHz: harmonic 1 is 1 V, harmonic 3 is 0.1 V, the others 0, THD =
+    0.1/1 = 10 % (ngspice-45 printed 0.999996, 0.0999964 and 9.99968 %)."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("load", ["in"])
+    dut.R(name="1", positive="in", negative="0", value=1e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.SinusoidalVoltageSource(name="1", positive="in", negative="mid", amplitude=1.0, frequency=1e3)
+    tb.SinusoidalVoltageSource(name="3", positive="mid", negative="0", amplitude=0.1, frequency=3e3)
+    tb.add_transient(step_time=1e-6, end_time=10e-3, max_time=1e-6)
+    tb.add_fourier(fundamental_frequency=1e3, outputs=["v(in)"])
+    tran, four = tb.run()
+    assert four is None
+    (table,) = tran.fourier
+    assert table["output"] == "v(in)"
+    assert table["frequency"] == [n * 1e3 for n in range(10)]
+    assert table["magnitude"][1] == pytest.approx(1.0, rel=1e-3)
+    assert table["magnitude"][3] == pytest.approx(0.1, rel=1e-3)
+    assert abs(table["magnitude"][2]) < 1e-6
+    assert table["norm_magnitude"][3] == pytest.approx(0.1, rel=1e-3)
+    assert table["thd"] == pytest.approx(10.0, rel=1e-3)
+    assert len(table["phase"]) == len(table["norm_phase"]) == 10
+    # A run with no `.four` has no table.
+    plain = ps.Testbench(dut)
+    plain.with_backend("ngspice")
+    plain.V(name="1", positive="in", negative="0", value=1.0)
+    assert plain.transient(step_time=1e-6, end_time=1e-4).fourier == []
 
 
 def test_noise_runs_when_saves_are_set():

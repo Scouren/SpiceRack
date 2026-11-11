@@ -58,6 +58,7 @@ t = tran.time                     # the axis: .time, .frequency or .sweep
 mag = ac.magnitude_db("vout")     # AC results are complex:
 ph = ac.phase("vout")             # degrees, wrapped to (-180, 180]
 lin = ac.magnitude("vout")        # ac["vout"] alone is only the real part
+thd = tran.fourier[0]["thd"]      # percent: a run's .four tables (add_fourier)
 density = nz["onoise_spectrum"]   # V/sqrt(Hz)
 total = nz["onoise_total"][0]     # V rms over the band (ngspice, ESPice)
 ```
@@ -128,7 +129,11 @@ LTspice, VACASK, Spectre or ESPice.
 
 `tb.run()` runs the queued analyses as that one deck and returns one result per
 analysis, in the order they were queued, each the type its immediate twin
-returns (`None` for `add_fourier`, whose table goes to stdout). ngspice runs a
+returns (`None` for `add_fourier`: a `.four` writes no plot, its tables are
+`tran.fourier` on the same run's transient result, one dict per output with
+`output`, `thd` in percent, and `frequency`, `magnitude`, `phase` (degrees),
+`norm_magnitude`, `norm_phase` as lists indexed by harmonic, 0 the DC
+component; read from ngspice's stdout and LTspice's log). ngspice runs a
 deck's analyses in its own order, so results are matched to analyses by plot
 name, never by position. `pss`, `hb`, `stb` and the Spectre
 analyses run alone; queued beside others, `run()` raises rather than guess

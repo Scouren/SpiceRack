@@ -93,7 +93,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `global_nodes(*nodes)` | `.global` |
 | `extra_line(line, dialect="ngspice")` | a line of `dialect`'s text: copied as written on a target of that dialect's family, refused (`W0001`) on any other |
 | `add_operating_point()`, `add_dc(**sweeps)`, `add_ac(...)`, `add_transient(...)`, `add_noise(...)`, `add_tf(...)`, `add_fourier(f0, outputs, num_harmonics=None)`, `add_pss(...)`, `add_s_param(...)`, `add_harmonic_balance(...)`, `add_stability(...)`, `add_transient_noise(...)`, `add_network_params(...)`, `add_spectre_sweep(...)`, `add_spectre_monte_carlo(...)`, `add_spectre_pac(...)`, `add_spectre_pnoise(...)`, `add_spectre_pxf(...)`, `add_spectre_pstb(...)`, ... | queue an analysis instead of running it: each run method's twin, same arguments |
-| `run()` | runs every queued analysis as one deck: a list, one result per analysis in queue order (`None` for `add_fourier`) |
+| `run()` | runs every queued analysis as one deck: a list, one result per analysis in queue order (`None` for `add_fourier`: its tables are the transient result's `fourier`) |
 
 ## Settings (`Testbench`, `CircuitSimulator`)
 
@@ -139,7 +139,11 @@ otherwise; `op["v(node)"]` names the same node), `res.nodes` and `res.branches`
 LTspice steps returns a list of results, one per step. AC-type results add
 `magnitude(name)`, `magnitude_db(name)` and `phase(name)` (degrees). `RawData`
 has `title`, `plot_name`, `is_complex`, `variable_names`, `measures`, `params`
-and `complex(name)`.
+and `complex(name)`. A swept result's `fourier` is its run's `.four` tables
+(ngspice, LTspice), one dict per output: `output`, `thd` (percent), and
+`frequency`, `magnitude`, `phase` (degrees, the simulator's own reference),
+`norm_magnitude`, `norm_phase` as lists indexed by harmonic (0 is the DC
+component); `[]` when the run printed none.
 
 A `transfer_function` result names its values the same on every backend:
 `tf["transfer_function"]`, `tf["input_impedance"]`, `tf["output_impedance"]`

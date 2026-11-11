@@ -282,7 +282,7 @@ impl PyTestbench {
     /// Runs every queued analysis (`add_*`) as one deck and returns one
     /// result per analysis, in queue order, each the type its single-analysis
     /// twin returns (a list of one per step for an LTspice `.step` run) (`op, tran = tb.run()`); `None` for `add_fourier`, whose
-    /// table goes to stdout. `ValueError` with nothing queued.
+    /// tables are the same run's transient result's `fourier`. `ValueError` with nothing queued.
     fn run(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         let sim = slf.as_super();
         let deck = sim.deck_as_queued();

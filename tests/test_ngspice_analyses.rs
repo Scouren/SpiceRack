@@ -292,6 +292,37 @@ fn continued_four_card_reports_its_fourier_table() {
     assert!(thd < 1e-6, "THD {thd} %");
 }
 
+#[test]
+fn p3_049_the_four_tables_are_read_from_stdout() {
+    // ZERO-LEDGER P3-049. Oracle: closed form. 1 V at 1 kHz in series with
+    // 0.1 V at 3 kHz: harmonic 1 of v(in) is 1 V, harmonic 3 is 0.1 V, the
+    // others 0, THD = 0.1 / 1 = 10 %; v(mid) is the 3 kHz source alone.
+    // ngspice-45 printed 0.999996, 0.0999964 and 9.99968 %
+    // (research/impl/evidence/P3-049/ng.log).
+    let deck = common::written(
+        Dialect::Ngspice,
+        "* four\nV1 in mid SIN(0 1 1k)\nV2 mid 0 SIN(0 0.1 3k)\nR1 in 0 1k\n\
+         .tran 1u 10m 0 1u\n.four 1k v(in) v(mid)\n.end\n",
+    );
+    let tables = spicerack::measure_parse::parse_fourier(&run(&deck).stdout);
+    let outputs: Vec<&str> = tables.iter().map(|t| t.output.as_str()).collect();
+    assert_eq!(outputs, ["v(in)", "v(mid)"], "{deck}");
+    let t = &tables[0];
+    assert_eq!(t.frequency.len(), 10, "DC and nine harmonics");
+    assert_eq!(&t.frequency[..4], [0.0, 1e3, 2e3, 3e3]);
+    assert!(close(t.magnitude[1], 1.0, 1e-3), "{}", t.magnitude[1]);
+    assert!(close(t.magnitude[3], 0.1, 1e-3), "{}", t.magnitude[3]);
+    assert!(t.magnitude[2].abs() < 1e-6, "{}", t.magnitude[2]);
+    assert!(
+        close(t.norm_magnitude[3], 0.1, 1e-3),
+        "{}",
+        t.norm_magnitude[3]
+    );
+    assert!(close(t.thd, 10.0, 1e-3), "{}", t.thd);
+    let mid = tables[1].magnitude[3];
+    assert!(close(mid, 0.1, 1e-3), "{mid}");
+}
+
 // ── circuit features claimed in the capability table ──
 
 #[test]
