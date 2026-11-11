@@ -108,11 +108,15 @@ impl W<'_, '_> {
                         self.b.analysis_form,
                         AnalysisForm::Ngspice | AnalysisForm::Espice
                     );
-                let step = if zero {
-                    self.chosen_step(stop - start.unwrap_or(0.0))
-                } else {
-                    *step
-                };
+                // No span to choose from: Xyce 7.10 aborts on such a
+                // `.tran` itself, and span/50 would be a step ngspice
+                // stops on ("TSTEP is invalid").
+                let span = stop - start.unwrap_or(0.0);
+                if zero && (span.is_nan() || span <= 0.0) {
+                    self.refuse(Code::W0141, tok);
+                    return String::new();
+                }
+                let step = if zero { self.chosen_step(span) } else { *step };
                 let mut s = format!(".tran {} {}", num(self, step), num(self, *stop));
                 if let Some(st) = start {
                     s.push_str(&format!(" {}", num(self, *st)));

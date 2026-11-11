@@ -544,6 +544,24 @@ fn a_hoisted_subcircuit_takes_the_models_around_it() {
     assert!((v - 1000.0 / 1001.0).abs() < 1e-6, "{v}\n{w}");
 }
 
+// ── a chosen transient step ──
+
+/// ZERO-LEDGER P3-100: `.tran 0 1m 2m` leaves the step to Xyce and stops
+/// before it starts. Xyce 7.10 aborts on it ("Final time of 0.001 is
+/// earlier or same as start time of 0.002"); the step ngspice needs was
+/// chosen as span/50 = -20 µs, and ngspice-45 stops on `.tran -2e-5 1m 2m`
+/// ("TSTEP is invalid, must be greater than zero"). Refused.
+#[test]
+fn p3_100_a_chosen_step_needs_a_span() {
+    let cite = "ngspice manual §11.3.10: TSTEP > 0";
+    for tran in [".tran 0 1m 2m", ".tran 0 1m 1m"] {
+        let deck = format!("* t\nV1 a 0 SIN(0 1 1k)\nR1 a 0 1k\n{tran}\n.end\n");
+        for to in [Dialect::Ngspice, Dialect::Espice] {
+            oracle::spec_refusal(cite, &deck, Dialect::Xyce, to, &[Code::W0141]);
+        }
+    }
+}
+
 // ── LTspice's start-up ramp ──
 
 /// Ledger P5-005. LTspice help, `.TRAN`: `startup` solves the operating

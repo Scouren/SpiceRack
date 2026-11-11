@@ -700,3 +700,7 @@ hspice/hspice/op_times.sp xyce now refused: W0015, a timed `.op` no target but H
 hspice/hspice/op_times.sp ltspice now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
 hspice/hspice/op_times.sp spectre now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
 hspice/hspice/op_times.sp vacask now refused: W0015, a timed `.op` no target but HSPICE has (P3-028)
+
+# S1: P3-100: a `.tran` whose step the simulator chooses (TSTEP 0) over an empty or reversed span is refused with W0141 on ngspice and ESPice; it was written with the negative step span/50, which ngspice rejects
+xyce/Message/Input/TRAN_setAnalysisParams.cir ngspice now refused: W0141, a chosen step with no span (was `.tran -20m 0 1`) (P3-100)
+xyce/Message/Input/TRAN_setAnalysisParams.cir espice now refused: W0141, a chosen step with no span (was `.tran -20m 0 1`) (P3-100)
