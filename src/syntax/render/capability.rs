@@ -389,9 +389,14 @@ mod tests {
             "vdmos",
         ];
         // The modules in a file of their own (`lib/vacask/mod/*.osdi`,
-        // `devices/CMakeLists.txt` L10-L12; ZERO-LEDGER P4-012): a master
-        // with a `model_load` row ships as that file.
-        const FILES_36BE560: &[&str] = &["vbic_1p3.osdi", "vbic_1p3_4t.osdi", "vbic_1p3_5t.osdi"];
+        // `devices/CMakeLists.txt` L10-L13; ZERO-LEDGER P4-012, P4-013): a
+        // master with a `model_load` row ships as that file.
+        const FILES_36BE560: &[&str] = &[
+            "psp103v4.osdi",
+            "vbic_1p3.osdi",
+            "vbic_1p3_4t.osdi",
+            "vbic_1p3_5t.osdi",
+        ];
         let b = Lang::from(Dialect::Vacask).behaviours();
         for m in b.model_masters {
             let ships = match b.model_load(m.master) {
