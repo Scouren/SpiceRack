@@ -89,11 +89,15 @@ class TestNetlist:
 
     def test_capability_table_reports_step_params_as_supported(self):
         # A control-block `var` is visible to the netlist body and sweepable,
-        # so `.step param` has a faithful VACASK spelling.
+        # so `.step param` has a faithful VACASK spelling. (A device's name,
+        # `Rtop`, is refused, W0016: no variable reaches it.)
         mod = ps()
-        tb = bench(mod, divider(mod))
+        sc = mod.Subcircuit("div", ["vdd", "out"], r="1k")
+        sc.R(name="top", positive="vdd", negative="out", value="{r}")
+        sc.R(name="bot", positive="out", negative=sc.gnd, value=1e3)
+        tb = bench(mod, sc)
         tb.V(name="dd", positive="vdd", negative="0", value=1.0)
-        tb.step("rtop", 1e3, 3e3, 1e3)
+        tb.step("r", 1e3, 3e3, 1e3)
         tb.add_operating_point()
         assert tb.check_backend("vacask") == []
 
