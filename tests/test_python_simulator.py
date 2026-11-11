@@ -495,6 +495,41 @@ def test_noise_runs_when_saves_are_set():
     assert spectrum[0] == pytest.approx(expected, rel=0.02)
 
 
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p3_044_api_subcircuit_k_takes_names(backend):
+    """`K` couples two inductors of the subcircuit, named as `L()` named them
+    ("1") or by card ("L1"), and refuses any other name. Oracle (closed
+    form): an unloaded transformer, |v(out)| = k*sqrt(L2/L1) * |v(a)| with
+    |v(a)| = wL1/sqrt(R^2 + (wL1)^2): 0.5 * 2 * 0.98757049 at 1 kHz for
+    1 Ohm, 1 mH, 4 mH. ngspice-45 prints 9.875705e-01 for `K1 L1 L2 0.5` and
+    "coupling to non-existent inductor ll1" for `K1 LL1 LL2 0.5`
+    (research/impl/evidence/P3-044)."""
+    import spicerack as ps
+
+    def transformer(first, second):
+        d = ps.Subcircuit("xf", ["in", "out"])
+        d.R("1", "in", "a", 1.0)
+        d.L("1", "a", "0", 1e-3)
+        d.L("2", "out", "0", 4e-3)
+        d.K("1", first, second, coupling=0.5)
+        return d
+
+    w = 2 * math.pi * 1e3 * 1e-3
+    expected = 0.5 * 2.0 * w / math.hypot(1.0, w)
+    for first, second in (("1", "2"), ("L1", "L2"), ("l1", "L2")):
+        tb = ps.Testbench(transformer(first, second))
+        tb.with_backend(backend)
+        tb.V("in", "in", "0", 0.0, ac=1.0)
+        for target in ("ngspice", "espice", "hspice", "xyce", "ltspice", "spectre", "vacask", "cdl"):
+            assert "ll1" not in tb.netlist(target).lower(), (first, target)
+        ac = tb.ac(variation="lin", number_of_points=1, start_frequency=1e3, stop_frequency=1e3)
+        # AC is a linear solve: exact to rounding.
+        assert ac.magnitude("out")[0] == pytest.approx(expected, rel=1e-9), (first, second)
+    for first, second in (("zz", "2"), ("1", "L3"), ("L", "2"), ("", "2")):
+        with pytest.raises(ValueError, match="names no inductor"):
+            transformer(first, second)
+
+
 # ======================================================================
 # Testbench.run: every queued analysis in one deck
 # ======================================================================

@@ -131,9 +131,15 @@ impl PySubcircuit {
         self.two('L', name, positive, negative, &value.value(), kwargs)
     }
 
+    /// `inductor1` and `inductor2` name two inductors of this subcircuit, as
+    /// `L()` named them (`"1"`) or by card name (`"L1"`); a name that is
+    /// neither is a `ValueError` (ngspice: "coupling to non-existent
+    /// inductor").
     #[pyo3(signature = (name, inductor1, inductor2, *, coupling))]
-    fn K(&mut self, name: &str, inductor1: &str, inductor2: &str, coupling: f64) {
-        self.push(name, format!("K{name} L{inductor1} L{inductor2} {}", dec(coupling)));
+    fn K(&mut self, name: &str, inductor1: &str, inductor2: &str, coupling: f64) -> PyResult<()> {
+        let (l1, l2) = (self.inductor(name, inductor1)?, self.inductor(name, inductor2)?);
+        self.push(name, format!("K{name} {l1} {l2} {}", dec(coupling)));
+        Ok(())
     }
 
     /// `portnum` makes the source RF port `portnum` (from 1) for
@@ -504,6 +510,31 @@ impl PySubcircuit {
 
     fn push(&mut self, name: &str, text: String) {
         self.inner.elements.push(Card::element(name, text));
+    }
+
+    /// The card name of the inductor `given` names for coupling `k`:
+    /// `L<given>` when this body has that card (an `L()` element, or a line
+    /// given as text), else `given` itself when it is such a card's name
+    /// (`L1`). SPICE names are case blind.
+    fn inductor(&self, k: &str, given: &str) -> PyResult<String> {
+        let has = |card: &str| {
+            let cards = self.inner.elements.iter().map(|c| c.text.as_str());
+            cards
+                .chain(self.inner.raw.iter().map(String::as_str))
+                .flat_map(str::lines)
+                .filter_map(|l| l.split_whitespace().next())
+                .any(|w| w.eq_ignore_ascii_case(card))
+        };
+        if has(&format!("L{given}")) {
+            return Ok(format!("L{given}"));
+        }
+        if given.starts_with(['L', 'l']) && has(given) {
+            return Ok(given.to_string());
+        }
+        Err(PyValueError::new_err(format!(
+            "K{k}: '{given}' names no inductor of '{}': add it with L() first",
+            self.inner.name
+        )))
     }
 
     /// An R, C or L card: `R<name> n1 n2 value params`.
