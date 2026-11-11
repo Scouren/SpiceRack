@@ -239,6 +239,8 @@ fn lexicon(l: Lex, lang: Lang) -> Lexicon {
         ops: Ops {
             infix: slice(l.infix),
             right: slice(l.right),
+            nonassoc: slice(l.nonassoc),
+            ternary: l.ternary,
             prefix: slice(l.prefix),
             prefix_bp: l.prefix_bp,
             probes: strs(l.probes),

@@ -9,7 +9,8 @@
 //!
 //! Contents:
 //! - `pub(super) const HEADER: &str`
-//! - `pub(super) fn to_source(b: &Body) -> Result<String, String>`
+//! - `pub(super) fn to_source(b: &Body) -> Result<String, String>`,
+//!   `pub(super) fn definition(b: &Body) -> Result<String, String>`
 //! - `pub(super) fn from_source(text: &str, d: Option<Lang>) -> Result<Body, String>`
 //! - `pub(super) fn with_loads(text: &str, loads: &[String]) -> String`
 //! - `pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String>`
@@ -42,19 +43,30 @@ const LIBRARY: &str = "* spicerack-library ";
 /// A `verilog()` block, which has no source form until it is lowered (a
 /// run lowers it).
 pub(super) fn to_source(b: &Body) -> Result<String, String> {
+    let out = format!("{}\n{}\n.end\n", b.name, definition(b)?);
+    Ok(with_loads(&out, &b.osdi))
+}
+
+/// `b` as the lines of its definition, `.subckt` through `.ends` (no
+/// newline after it): what [`to_source`] stores, and what a definition
+/// nested in another subcircuit is written as (`Subcircuit.subcircuit`;
+/// ngspice-45 manual §2.6.1).
+///
+/// # Errors
+/// As [`to_source`].
+pub(super) fn definition(b: &Body) -> Result<String, String> {
     if !b.verilog.is_empty() {
         return Err(format!(
             "{}: a verilog() block has no source form; it is lowered when the deck is written",
             b.name
         ));
     }
-    let mut out = format!("{}\n", b.name);
     let ps = match b.params.is_empty() {
         true => String::new(),
         false => format!(" PARAMS:{}", params(&b.params)),
     };
     let ports: String = b.ports.iter().map(|p| format!(" {p}")).collect();
-    w(&mut out, format_args!(".subckt {}{ports}{ps}\n", b.name));
+    let mut out = format!(".subckt {}{ports}{ps}\n", b.name);
     b.includes
         .iter()
         .for_each(|i| w(&mut out, format_args!(".include {i}\n")));
@@ -68,8 +80,8 @@ pub(super) fn to_source(b: &Body) -> Result<String, String> {
     cards
         .chain(&b.raw)
         .for_each(|l| w(&mut out, format_args!("{l}\n")));
-    w(&mut out, format_args!(".ends {}\n.end\n", b.name));
-    Ok(with_loads(&out, &b.osdi))
+    w(&mut out, format_args!(".ends {}", b.name));
+    Ok(out)
 }
 
 /// The subcircuit `text` defines: its first `.subckt`, and the loads at
@@ -94,7 +106,8 @@ pub(super) fn from_source(text: &str, d: Option<Lang>) -> Result<Body, String> {
             b.osdi.extend(loads(&a, &t, n));
         }
     }
-    for &n in a.body(Node(sc)) {
+    let kids = a.body(Node(sc));
+    for (i, &n) in kids.iter().enumerate() {
         let line = statement(&a, &t, n);
         let first = line
             .split_whitespace()
@@ -115,6 +128,17 @@ pub(super) fn from_source(text: &str, d: Option<Lang>) -> Result<Body, String> {
                     true => b.instances.push(card),
                     false => b.elements.push(card),
                 }
+            }
+            // A definition nested in this one (`Subcircuit.subcircuit`): its
+            // lines through its `.ends`, which is where the next statement,
+            // or this subcircuit's own `.ends`, starts.
+            _ if a.tag(Node(n)) == Tag::Subckt => {
+                let next = kids.get(i + 1).copied().map(Node);
+                let to = next
+                    .or_else(|| a.closer(Node(sc)))
+                    .map_or(text.len(), |k| t.start(a.main_token(k)) as usize);
+                let from = t.start(a.main_token(Node(n))) as usize;
+                b.raw.push(text[from..to].trim_end().to_string());
             }
             _ => b.raw.push(line.clone()),
         }
@@ -140,7 +164,8 @@ pub(super) fn with_loads(text: &str, loads: &[String]) -> String {
     out
 }
 
-/// The deck stored `text` holds, as a top block: its title the name, a
+/// The deck stored `text` holds, as a top block: its title the name
+/// (`title`: without the comment leader a writer put before it), a
 /// top-level `.control` block of `pre_osdi` lines alone its loads, and
 /// every other statement but `.end` a line given as text, its bytes as
 /// written (comments and blank lines after it included), so [`with_loads`]
@@ -150,7 +175,20 @@ pub(super) fn with_loads(text: &str, loads: &[String]) -> String {
 /// A dialect with no reader; text the renderer refuses to write as
 /// ngspice; a [`HEADER`] naming no dialect.
 pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String> {
+    // The title line as the deck's own dialect writes it: behind that
+    // dialect's comment leader, or bare in the store's own text
+    // (`with_loads`: a `HEADER` line first).
+    let given = match text.starts_with(HEADER) {
+        true => "",
+        false => d.unwrap_or(Lang::NGSPICE).spelling().comment,
+    };
     let text = ngspice_text(text, d)?;
+    // Another dialect's text was written as ngspice just above: the title
+    // is behind the ngspice writer's leader.
+    let leader = match &text {
+        Cow::Borrowed(_) => given,
+        Cow::Owned(_) => Lang::NGSPICE.spelling().comment,
+    };
     let t = tokenize(&text, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let a = parse(&t, Lang::NGSPICE_GIVEN.lexicon().expect("a reader"));
     let top = a.fields(a.root());
@@ -161,7 +199,7 @@ pub(super) fn read_deck(text: &str, d: Option<Lang>) -> Result<Body, String> {
     let starts: Vec<usize> = top.iter().map(|&n| line_start(n)).collect();
     assert!(starts.is_sorted(), "the top statements are in source order");
     let mut b = Body {
-        name: text.lines().next().unwrap_or_default().trim().to_string(),
+        name: title(&text, leader).to_string(),
         ..Body::default()
     };
     for (i, &n) in top.iter().enumerate() {
@@ -246,6 +284,15 @@ pub(super) fn libraries(text: &str) -> Vec<ModelLibrary> {
 
 fn w(s: &mut String, args: std::fmt::Arguments<'_>) {
     s.write_fmt(args).expect("a String takes any write");
+}
+
+/// A deck's title: line 1 of `text` without `leader`, the comment leader
+/// its dialect's writers put before the title (`Spelling::comment`: `*`,
+/// `//`, nothing for VACASK), so the deck written again has the same line.
+/// One leader only: a writer adds one.
+fn title<'a>(text: &'a str, leader: &str) -> &'a str {
+    let line = text.lines().next().unwrap_or_default().trim();
+    line.strip_prefix(leader).map_or(line, str::trim_start)
 }
 
 /// Statement `n`'s text: its first token to its last, continuation lines
@@ -373,6 +420,32 @@ mod tests {
     }
 
     #[test]
+    fn p8_013_a_nested_definition_reads_back_whole() {
+        // ngspice-45 manual §2.6.1: a definition may hold other definitions.
+        // The store's oracle is its own text, read back and written again
+        // byte for byte (D3). Checks: 3.
+        let leaf = Body {
+            name: "leaf".into(),
+            ports: vec!["p".into()],
+            elements: vec![Card::element("1", "R1 p 0 1k".into())],
+            ..Body::default()
+        };
+        let mut outer = sample();
+        outer.raw.push(definition(&leaf).unwrap());
+        let text = to_source(&outer).unwrap();
+        assert!(
+            text.ends_with(".subckt leaf p\nR1 p 0 1k\n.ends leaf\n.ends amp\n.end\n"),
+            "{text}"
+        );
+        let again = from_source(&text, None).unwrap();
+        assert_eq!(
+            again.raw.last().map(String::as_str),
+            Some(".subckt leaf p\nR1 p 0 1k\n.ends leaf")
+        );
+        assert_eq!(to_source(&again).unwrap(), text);
+    }
+
+    #[test]
     fn a_deck_reads_back_as_its_statements_and_loads() {
         // ngspice manual §16 (`pre_osdi` in `.control`): the loads block
         // comes back as loads, every other statement as written, the blank
@@ -390,6 +463,26 @@ mod tests {
         );
         let raw: String = b.raw.iter().map(|l| format!("{l}\n")).collect();
         assert_eq!(with_loads(&format!("tb\n{raw}.end\n"), &b.osdi), text);
+    }
+
+    #[test]
+    fn p8_312_a_written_decks_title_reads_back_without_its_comment_leader() {
+        // ngspice manual §2.1 (line 1 is the title, whatever it holds); the
+        // ngspice writer puts `* ` before the name it is given
+        // (`render/spice/mod.rs`: `"{comment} {name}"`), so the name a
+        // written deck is read under is line 1 without that leader, and
+        // writing it again gives the same line (ROUNDTRIP-TRIAGE K1 b).
+        // Checks: 4.
+        let name = |text: &str| read_deck(text, None).unwrap().name;
+        assert_eq!(name("* rc\nR1 a 0 1k\n.end\n"), "rc");
+        // One leader only: the writer adds one.
+        assert_eq!(name("* * rc\nR1 a 0 1k\n.end\n"), "* rc");
+        // A bare title is the title.
+        assert_eq!(name("rc\nR1 a 0 1k\n.end\n"), "rc");
+        // The store's own text holds the title bare: a leading `*` is the
+        // title's own (`with_loads` wrote the name as it was).
+        let stored = with_loads("* rc\nR1 a 0 1k\n.end\n", &[]);
+        assert_eq!(name(&stored), "* rc");
     }
 
     #[test]

@@ -46,6 +46,8 @@ impl Lex {
             caret: Some(l.caret),
             infix: l.ops.infix.to_vec(),
             right: l.ops.right.to_vec(),
+            nonassoc: l.ops.nonassoc.to_vec(),
+            ternary: l.ops.ternary,
             prefix: l.ops.prefix.to_vec(),
             prefix_bp: l.ops.prefix_bp,
             probes: owned(l.ops.probes),

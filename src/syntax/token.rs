@@ -17,6 +17,8 @@
 //! - `pub enum Tag`, `Tag::lexeme(self) -> Option<&'static str>`
 //! - `pub struct Tokens<'s>`
 //! - `pub struct Location { pub line: u32, pub column: u32 }`
+//! - `pub(crate) struct TokRows`,
+//!   `Tokens::from_rows(source: &'s str, lexicon: &'static Lexicon, rows: TokRows) -> Tokens<'s>`
 //! - `Tokens::source(&self) -> &'s str`, `Tokens::tags(&self) -> &[Tag]`,
 //!   `Tokens::len(&self) -> usize`, `Tokens::is_empty(&self) -> bool`,
 //!   `Tokens::start(&self, i: u32) -> u32`, `Tokens::end(&self, i: u32) -> u32`,
@@ -298,6 +300,29 @@ pub struct Location {
     pub column: u32,
 }
 
+/// The rows of a [`Tokens`] whose text is not borrowed yet: what a writer
+/// other than the tokenizer appends while it still owns the text, column
+/// for column as [`Tokens`] (the line starts are found from the text).
+// Until the AST builder calls it (DESIGN-python-ast-builders §9 step 2).
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Default)]
+pub(crate) struct TokRows {
+    /// Each token's tag.
+    pub(crate) tags: Vec<Tag>,
+    /// Each token's first byte.
+    pub(crate) starts: Vec<u32>,
+    /// One past each token's last byte.
+    pub(crate) ends: Vec<u32>,
+    /// Every [`Tag::Number`] token, in order.
+    pub(crate) number_tokens: Vec<u32>,
+    /// The value of each `number_tokens` entry.
+    pub(crate) number_values: Vec<f64>,
+    /// Every [`Tag::LangSpice`] and [`Tag::LangSpectre`] token, in order.
+    pub(crate) switches: Vec<u32>,
+    /// The lexicon in force after each switch, by `switches` index.
+    pub(crate) switch_lexicons: Vec<&'static Lexicon>,
+}
+
 impl Tag {
     /// The fixed spelling of a punctuation tag; `None` for words and the
     /// structure tags, whose text is re-lexed.
@@ -359,6 +384,74 @@ impl Tag {
 }
 
 impl<'s> Tokens<'s> {
+    /// The tokens of `source` from rows built beside it, `lexicon` the
+    /// file's own: the twin of `tokenize` for a writer that appends text
+    /// and rows together.
+    ///
+    /// # Panics
+    /// When the rows break [`Tokens`]' invariants: a start and an end per
+    /// tag, starts that never decrease, every token inside `source`,
+    /// `number_tokens` every [`Tag::Number`] token in order with one value
+    /// each, `switches` every [`Tag::LangSpice`] and [`Tag::LangSpectre`]
+    /// token in order with one lexicon each.
+    // Until the AST builder calls it (DESIGN-python-ast-builders §9 step 2).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn from_rows(
+        source: &'s str,
+        lexicon: &'static Lexicon,
+        rows: TokRows,
+    ) -> Tokens<'s> {
+        let n = rows.tags.len();
+        assert!(
+            rows.starts.len() == n && rows.ends.len() == n,
+            "a start and an end per token"
+        );
+        assert!(rows.starts.is_sorted(), "token starts never decrease");
+        let inside = |(s, e): (&u32, &u32)| s <= e && *e as usize <= source.len();
+        assert!(
+            rows.starts.iter().zip(&rows.ends).all(inside),
+            "every token is inside the source"
+        );
+        let of = |want: fn(Tag) -> bool| {
+            let tags = &rows.tags;
+            (0..n as u32).filter(move |&i| want(tags[i as usize]))
+        };
+        assert!(
+            of(|t| t == Tag::Number).eq(rows.number_tokens.iter().copied()),
+            "number_tokens lists every Number token, in order"
+        );
+        assert_eq!(
+            rows.number_tokens.len(),
+            rows.number_values.len(),
+            "a value per number token"
+        );
+        assert!(
+            of(|t| matches!(t, Tag::LangSpice | Tag::LangSpectre))
+                .eq(rows.switches.iter().copied()),
+            "switches lists every lexicon switch, in order"
+        );
+        assert_eq!(
+            rows.switches.len(),
+            rows.switch_lexicons.len(),
+            "a lexicon per switch"
+        );
+        let line_ends = source.bytes().enumerate().filter(|&(_, b)| b == b'\n');
+        Tokens {
+            source,
+            lexicon,
+            tags: rows.tags,
+            starts: rows.starts,
+            ends: rows.ends,
+            line_starts: std::iter::once(0)
+                .chain(line_ends.map(|(i, _)| i as u32 + 1))
+                .collect(),
+            number_tokens: rows.number_tokens,
+            number_values: rows.number_values,
+            switches: rows.switches,
+            switch_lexicons: rows.switch_lexicons,
+        }
+    }
+
     /// The text the tokens index.
     pub fn source(&self) -> &'s str {
         self.source
@@ -461,5 +554,37 @@ mod tests {
         assert_eq!(size_of::<Tag>() + 2 * size_of::<u32>(), 9);
         assert_eq!(size_of::<u32>() + size_of::<f64>(), 12);
         assert_eq!(size_of::<Location>(), 8);
+    }
+
+    #[test]
+    fn p8_002_rows_built_beside_the_source_read_as_tokenized() {
+        // Oracle: the tokenizer's own rows (a round trip). A deck with
+        // numbers and a `simulator lang=` region (two lexicon switches),
+        // its columns handed to `from_rows`, reads token for token as
+        // `tokenize` left it. Checks: 2 + 4 per token.
+        use crate::syntax::{Lang, tokenize};
+        let src = "t\nR1 a 0 1k\nsimulator lang=spectre\nr2 (a 0) resistor r=2k\nsimulator lang=spice\n.op\n";
+        let lex = Lang::NGSPICE_GIVEN.lexicon().expect("a reader");
+        let a = tokenize(src, lex);
+        assert!(a.switches.len() == 2 && a.number_tokens.len() >= 2);
+        let rows = TokRows {
+            tags: a.tags.clone(),
+            starts: a.starts.clone(),
+            ends: a.ends.clone(),
+            number_tokens: a.number_tokens.clone(),
+            number_values: a.number_values.clone(),
+            switches: a.switches.clone(),
+            switch_lexicons: a.switch_lexicons.clone(),
+        };
+        let b = Tokens::from_rows(src, lex, rows);
+        assert_eq!(a.tags(), b.tags());
+        for i in 0..a.len() as u32 {
+            assert_eq!((a.start(i), a.end(i)), (b.start(i), b.end(i)), "{i}");
+            assert_eq!(a.location(i), b.location(i), "token {i}");
+            assert!(std::ptr::eq(a.lexicon_at(i), b.lexicon_at(i)), "token {i}");
+            if a.tags()[i as usize] == Tag::Number {
+                assert_eq!(a.value(i).to_bits(), b.value(i).to_bits(), "{i}");
+            }
+        }
     }
 }

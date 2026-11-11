@@ -993,3 +993,91 @@ class TestRealisticCircuits:
         assert "R1 n0 n1 100" in netlist
         assert "R100 n99 n100 100" in netlist
         assert "Rload n100 0" in netlist
+
+
+# ======================================================================
+# A definition nested in a subcircuit (P8-013; ngspice-45 manual §2.6.1)
+# ======================================================================
+
+def wrapped(name, ohms):
+    """`leaf` (one resistor of `ohms`) defined inside subcircuit `name`."""
+    leaf = ps().Subcircuit("leaf", ["p", "q"])
+    leaf.R("1", "p", "q", ohms)
+    wrap = ps().Subcircuit(name, ["a", "b"])
+    wrap.subcircuit(leaf)
+    wrap.X("1", "leaf", "a", "b")
+    return wrap
+
+
+class TestNestedSubcircuit:
+    def test_p8_013_a_nested_definition_is_written_under_its_parents_name(self):
+        c = ps().Circuit("n")
+        c.subcircuit(wrapped("wrap", 1e3))
+        c.X("1", "wrap", "in", c.gnd)
+        lines = str(c).splitlines()
+        # `render/read/blocks.rs::close`: hoisted as `<parent>__<name>`, the
+        # parent's instances renamed (golden record: model-scope-5.sp,
+        # `.subckt sub2__sub3 4 5`, `X31 41a 41b sub2__sub3`).
+        assert ".subckt wrap__leaf p q" in lines
+        assert "X1 a b wrap__leaf" in lines
+        assert ".subckt leaf p q" not in lines
+
+    def test_p8_013_two_parents_each_keep_their_own(self):
+        # Strictly local (manual §2.6.1): the same name in two parents is
+        # two definitions.
+        c = ps().Circuit("n")
+        c.subcircuit(wrapped("one", 1e3))
+        c.subcircuit(wrapped("two", 2e3))
+        lines = str(c).splitlines()
+        at = {n: lines.index(f".subckt {n}__leaf p q") for n in ("one", "two")}
+        assert lines[at["one"] + 1] == "R1 p q 1k"
+        assert lines[at["two"] + 1] == "R1 p q 2k"
+
+    def test_p8_013_the_store_keeps_a_nested_definition(self):
+        wrap = wrapped("wrap", 1e3)
+        text = wrap.to_source()
+        assert ".subckt leaf p q\nR1 p q 1k\n.ends leaf\n.ends wrap\n" in text
+        again = ps().Subcircuit.from_source(text)
+        assert again.to_source() == text
+
+    def test_p8_013_a_childs_files_move_up_and_a_verilog_block_is_refused(self):
+        leaf = ps().Subcircuit("leaf", ["p"])
+        leaf.include("/m/x.inc")
+        wrap = ps().Subcircuit("wrap", ["a"])
+        wrap.subcircuit(leaf)
+        text = wrap.to_source()
+        assert text.count(".include /m/x.inc") == 1
+        assert text.index(".include /m/x.inc") < text.index(".subckt leaf p")
+        bad = ps().Subcircuit("bad", ["p"])
+        bad.include("/m/y.inc")
+        bad.verilog(source="module inv(input a, output y); assign y = ~a; endmodule",
+                    instance_name="u1", connections={"a": "p", "y": "q"})
+        with pytest.raises(ValueError, match="verilog"):
+            wrap.subcircuit(bad)
+        assert wrap.to_source() == text  # nothing of `bad` was kept
+
+
+# ======================================================================
+# A capacitor given by its charge (P8-015; ngspice manual §3.3.9)
+# ======================================================================
+
+class TestChargeCapacitor:
+    def test_p8_015_charge_is_the_q_card(self):
+        c = ps().Circuit("q")
+        c.C("1", "a", c.gnd, charge="1n*v(a)")
+        # The manual's form, as the ngspice writer spells a charge capacitor
+        # (`render/spice/cards.rs::charge_card`: `Q='…'`).
+        assert "C1 a 0 Q='1n*v(a)'" in str(c).splitlines()
+
+    def test_p8_015_one_pair_of_braces_is_dropped(self):
+        c = ps().Circuit("q")
+        c.C("1", "a", c.gnd, charge="{1n*v(a)}")
+        assert "C1 a 0 Q='1n*v(a)'" in str(c).splitlines()
+
+    def test_p8_015_value_and_charge_exclude_each_other(self):
+        c = ps().Circuit("q")
+        with pytest.raises(ValueError, match="exactly one"):
+            c.C("1", "a", c.gnd, 1e-9, charge="1n*v(a)")
+        with pytest.raises(ValueError, match="exactly one"):
+            c.C("1", "a", c.gnd)
+        assert "C1" not in str(c)

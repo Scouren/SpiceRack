@@ -41,7 +41,7 @@
 
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::diag::Code;
-use crate::syntax::lexicon::{Backslash, Lexicon};
+use crate::syntax::lexicon::{Backslash, Lexicon, Tail};
 use crate::syntax::token::{Tag as T, Tokens};
 use std::borrow::Cow;
 
@@ -297,7 +297,10 @@ impl<'s> Parser<'_, 's> {
         Some((first as u32, eos as u32))
     }
 
-    /// `P0007` for an `Invalid` token and `P0005` for a NaN number.
+    /// `P0007` for an `Invalid` token and `P0005` for a NaN number; a NaN
+    /// number of a lexicon whose numbers take no tail ([`Tail::None`]) is
+    /// left to the expression parser (`P0020` where it is an operand): the
+    /// same token is a name where a name stands (`2n3904`).
     fn check_tokens(&mut self, first: u32, eos: u32) {
         // One search for the statement's first number row, then a cursor
         // forward through `number_tokens`, which lists them in token order.
@@ -307,7 +310,9 @@ impl<'s> Parser<'_, 's> {
                 T::Invalid => self.ast.diag(Code::P0007, k),
                 T::Number => {
                     debug_assert_eq!(self.t.number_tokens[row], k, "the cursor is at token k");
-                    if self.t.number_values[row].is_nan() {
+                    if self.t.number_values[row].is_nan()
+                        && self.t.lexicon_at(k).numbers.tail != Tail::None
+                    {
                         self.ast.diag(Code::P0005, k);
                     }
                     row += 1;

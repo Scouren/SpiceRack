@@ -13,6 +13,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `I` **TB** | `I` | `(name, positive, negative, value, ac=None, ac_phase=None)` |
 | `R` **TB** | `R` | `(name, positive, negative, value, raw_spice=None)` — `raw_spice` on `Circuit`/`Subcircuit` only |
 | `C` **TB** | `C` | `(name, positive, negative, value)` |
+| `C` (charge) | `C` | `(name, positive, negative, charge="1n*v(a,b)")` on `Circuit`/`Subcircuit`: the charge as an expression of its voltage, in place of `value` (`ValueError` with both or neither); refused on VACASK (`W0105`) |
 | `L` | `L` | `(name, positive, negative, value)` |
 | `K` | `K` | `(name, inductor1, inductor2, coupling)` |
 | `D` | `D` | `(name, anode, cathode, model)` |
@@ -45,6 +46,8 @@ dut.X("MN1", "sky130_fd_pr__nfet_01v8", "d", "g", "s", "b", W=1, L=0.15, nf=2)
 ```
 
 `Subcircuit.instance(subckt, name, *nodes, **params)` is the same card from the object. `subckt.name` and `subckt.ports` (declaration order) read a DUT back, e.g. to wrap it: `harness.instance(dut, "dut", *dut.ports)`.
+
+`Subcircuit.subcircuit(child)` defines `child` inside that subcircuit (a nested `.subckt`: only its own instances see it, two parents can each hold a `buf`); every target writes it as a top-level `<parent>__<child>`. A definition every block shares goes to the top: `tb.add_subcircuit(child)` / `Circuit.subcircuit(child)`.
 
 Waveform sources, all **TB**:
 
@@ -195,7 +198,7 @@ The `u_Ω` family is registered with U+03A9 and does work.
 | `ps.Dialect(name)` | base class; override `define(self, d) -> DialectDef` |
 | `ps.register_dialect(obj)` | `DialectDef(obj.name)`, one-argument class attributes as calls, `obj.define(d)`, register; returns `Lang` |
 | `ps.dialects.NGSPICE` ... `VERILOG` | the built-ins as base classes (`define` is `d.extends(Lang.X)`) |
-| `def_.DialectDef(name)` | the Rust calls 1:1, chained: `extends`, `renamed`, `comment_line`, `keyword`, `scale`, `write_head`, `option`, `option_to`, `model_master`, `spell`, `refuse`, `code`, `refuse_code`, `hook`, `runs_on`, `kept_word(word, Construct)`, `dot_rule(word, DotRule.Note(Code) \| DotRule.SParams)`, ... |
+| `def_.DialectDef(name)` | the Rust calls 1:1, chained: `extends`, `renamed`, `comment_line`, `keyword`, `scale`, `write_head`, `option`, `option_to`, `model_master`, `spell`, `refuse`, `code`, `refuse_code`, `hook`, `runs_on`, `kept_word(word, Construct)`, `dot_rule(word, DotRule.Note(Code) \| DotRule.SParams)`, `no_infix(tag)`, `no_scale(text)`, `nonassoc(tag)`, `ternary_nesting(Nesting.Explicit)`, ... |
 | `def_.register(d)` | registers a `DialectDef`; `ValueError` names the rule it breaks |
 | `def_.Lang` | `Lang.NGSPICE` ... `Lang.VERILOG`, `Lang.from_name(n)`, `.name()`, `.dump()`, `.runs_on()` |
 | `def_.Card`, `def_.Answer` | a hook's card (`head`, `words`, `params`, `text`) and answer (`Answer.Text(s)`, `Answer.Refuse(id)`) |

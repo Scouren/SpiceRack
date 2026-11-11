@@ -166,6 +166,7 @@ PARITY = {
     "use_pdk": (FEATURES["use_pdk"], tw_setting([], top=["* spicerack-library /ng/m.lib corner=tt spectre=/sp/m.scs", ".lib /ng/m.lib tt"]), "store.rs library_marker", None),
     "use_pdk_include": (FEATURES["use_pdk_include"], tw_setting([], top=["* spicerack-library /ng/m.inc", ".include /ng/m.inc"]), "store.rs library_marker", None),
     "subcircuit": (FEATURES["subcircuit"], deck(subckts=[[".subckt buf a b", "R1 a b 1e3", ".ends buf"]], top=RC + ["X1 out 0 buf"], bench=[VIN, ".op"]), "ng §2.4 .subckt", None),
+    "subcircuit_nested": (FEATURES["subcircuit_nested"], deck(subckts=[[".subckt wrap a b", ".subckt buf a b", "R1 a b 1e3", ".ends buf", "X1 a b buf", ".ends wrap"]], top=RC + ["X1 out 0 wrap"], bench=[VIN, ".op"]), "ng §2.6.1 .subckt (a definition inside a definition, local to it)", "P8-013"),
     # ── Sources ──
     "sin": (FEATURES["sin"], tw_source(["Vin in 0 0 SIN(0 1 1000 0 0 0)"]), "ng §4.1.1 SIN", None),
     "pulse": (FEATURES["pulse"], tw_source(["Vin in 0 0 PULSE(0 1 0 1e-9 1e-9 50e-9 100e-9)"]), "ng §4.1.2 PULSE", None),
@@ -180,6 +181,7 @@ PARITY = {
     "rf_port": (FEATURES["rf_port"], tw_source(["Vin in 0 0 portnum 1 z0 50"]), "ng portnum (RF port)", None),
     # ── Elements and directives ──
     "L_K": (FEATURES["L_K"], tw_elem(["L1 in 0 1e-6", "L2 out 0 1e-6", "K1 LL1 LL2 0.5"]), "ng §3 L, K", None),
+    "C_charge": (FEATURES["C_charge"], tw_elem(["C2 out 0 q={1n*v(out)}"]), "ng §3.3.9 C (Q = 'expression')", "P8-015"),
     "D": (FEATURES["D"], tw_elem([".model dn d", "D1 out 0 dn"]), "ng §3 D", None),
     "Q": (FEATURES["Q"], tw_elem([".model qn npn", "Q1 out in 0 qn"]), "ng §3 Q", None),
     "M": (FEATURES["M"], tw_elem([".model nm nmos", "M1 out in 0 0 nm W=1e-06 L=1e-06"]), "ng §3 M", None),
@@ -297,26 +299,21 @@ def test_build_equals_text(name, target):
 # existing 85 `FEATURES` rows hit it today; a future row fills it in).
 STORE_GAP = {}
 
-# A bug `test_store_round_trip` found (python-api §2, "state outside the
-# AST"), now ledger row P8-312 (owner `src/python/store.rs::read_deck`):
-# it keeps the title line's leading `* ` as part of `Body.name` instead
-# of stripping it, so netlisting a testbench a *second* time (after a
-# round trip) doubles the comment marker (`* * rc`). It reaches every
-# cell that writes (not refuses) on ngspice, since the title line is
-# universal. Found here, not fixed here (outside this row's owner
-# files); remove this marker and its names when P8-312 lands.
-STORE_TITLE_P8_312 = (
-    "A", "ac", "ac_oct", "ac_sensitivity", "am", "BV_BI", "current_source", "D",
-    "dc", "dc_sensitivity", "dc_temp", "distortion", "E_G", "exp", "extra_line",
-    "F_H", "fourier", "fourier_count", "function", "global_nodes", "I", "include",
-    "initial_condition", "J", "lib", "L_K", "M", "measure", "M_three_node",
-    "ngbehavior", "node_set", "noise", "noise_summary", "op", "options",
-    "osdi", "parameter", "polezero", "POLY", "print", "pss", "pss_controls",
-    "pulse", "pwl", "pwl_repeat", "Q", "raw_spice", "rf_port", "S", "save",
-    "sffm", "sin", "s_param", "subcircuit", "T", "temperature", "tf", "tran",
-    "tran_full", "transient_noise", "trnoise", "trrandom", "use_pdk",
-    "use_pdk_include", "veriloga", "W", "X", "Z",
-)
+# What the doubled title (P8-312, fixed) hid on the two same-family
+# targets: `(name, target)` -> the ledger row that owns the cause. Each
+# fails on an unexpected pass; P8-313 removes the marker when it is empty.
+STORE_HIDDEN = {
+    # ROUNDTRIP-TRIAGE K3: the ngspice writer runs `.four` as a `fourier`
+    # line of its `.control` block, which the ngspice reader drops (W0025).
+    ("fourier", "ngspice"): "P4-109",
+    ("fourier_count", "ngspice"): "P4-109",
+    # ESPice's Verilog-A load is `.hdl "<file>"`, which the reader keeps as
+    # text: it is written back below the elements, not as the top's load.
+    ("veriloga", "espice"): "P5-097",
+    # The ngspice writer's `*spicerack ngbehavior=<mode>` line (the backend
+    # lifts it) is a comment to the ngspice reader: the mode is lost.
+    ("ngbehavior", "ngspice"): "P8-313",
+}
 
 
 # Every `(name, target)` the round trip actually runs on: every written
@@ -348,9 +345,10 @@ def test_store_round_trip(name, target):
     if gap is not None:
         assert got != built, f"{name} on {target}: STORE_GAP {gap} passed unexpectedly; remove the marker"
         pytest.xfail(f"STORE_GAP: {gap}")
-    if name in STORE_TITLE_P8_312:
-        assert got != built, f"{name} on {target}: P8-312 passed unexpectedly; remove it from STORE_TITLE_P8_312"
-        pytest.xfail("P8-312: store.rs::read_deck doubles the title's '* ' on a second round trip")
+    hidden = STORE_HIDDEN.get((name, target))
+    if hidden is not None:
+        assert got != built, f"{name} on {target}: {hidden} passed unexpectedly; remove it from STORE_HIDDEN"
+        pytest.xfail(f"STORE_HIDDEN: {hidden}")
     assert got == built
 
 

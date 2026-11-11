@@ -177,6 +177,9 @@ calls! {
     caret(v: PyCaret);
     infix(t: PyTag, bp: u8);
     right(t: PyTag);
+    nonassoc(t: PyTag);
+    ternary_nesting(v: PyNesting);
+    no_infix(t: PyTag);
     prefix(t: PyTag);
     prefix_bp(v: u8);
     probe(name: &str);
@@ -184,6 +187,7 @@ calls! {
     lib_sections(v: bool);
     exponent(letters: &str);
     scale(text: &str, s: PyScale);
+    no_scale(text: &str);
     tail(v: PyTail);
     arithmetic(v: PyArithmetic);
     keywords(table: PyKeywords);
@@ -369,6 +373,8 @@ impl PyLang {
     const VERILOG: PyLang = PyLang(Lang::VERILOG);
     #[classattr]
     const NGSPICE_GIVEN: PyLang = PyLang(Lang::NGSPICE_GIVEN);
+    #[classattr]
+    const SPICERACK: PyLang = PyLang(Lang::SPICERACK);
 
     /// The language registered as `name`, or `None`.
     #[staticmethod]

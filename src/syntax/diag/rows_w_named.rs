@@ -153,6 +153,15 @@ macro_rules! rows_w_named {
                 cite: "Xyce RG `.STEP` and LTspice help `.step` (a step runs every analysis of the deck); HSPICE cmdref `.ALTER` (E-2010.12 pp.32-34); ESPice 0.3.0 (`.control` commands ignored, run); ngspice manual §13.5.5 (`alterparam`); VACASK `docs/cmd-alter.md`",
                 explain: "The source runs an analysis, changes a parameter (VACASK `alter`, ngspice `alterparam`) and runs another: two circuit states in one deck. This target's deck is one circuit and every analysis in it runs on that one. Write one deck per state, or netlist for ngspice, whose `.control` script changes the parameter between the runs.",
             }
+            // W0136 is not a code: ngspice-45 linearizes `exp` in a B source only under
+            // `ngbehavior=ps`, where `pow(exp(1), x)` is exact (P8-149, P8-146).
+            /// A neutral power, `sqrt` or `log` whose base or argument may leave the
+            /// domain, on a target that then computes a number instead of failing.
+            W0137 Refusal {
+                title: "an expression whose domain the target evaluates differently",
+                cite: "ngspice manual §5.1 and ngspice-45 `ptfuncs.c` `PTpower` (`pow(fabs(x1), x2)`); Xyce 7.10 runs: `(-2)**0.5` = 8.66e-17, `sqrt(-2)` = 0, `ln(-2)` = 0.693 (the real part of a complex value); Spectre 25.1 run: `(-2)**0.5` = 0 (settle-remote P4-003); recorded under `research/impl/evidence/P8-146/`",
+                explain: "The neutral expression has a real value only inside its domain (`x**y` with x < 0 needs an integer y; `sqrt` and `log` need x >= 0). Outside it this target does not fail: it returns the power of |x|, or the real part of a complex result, so the deck would run to a wrong number. The writer lowers a base or argument it can prove non-negative (a non-negative constant, `abs(...)`, a square `x*x` or `x**2`, `exp(...)`) and refuses the rest. Wrap the base or argument in `abs(...)`.",
+            }
         }
     };
 }
