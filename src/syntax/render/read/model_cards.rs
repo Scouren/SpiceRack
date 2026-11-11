@@ -97,7 +97,12 @@ pub(in crate::syntax::render) fn file_models<R>(
     let ast = parse(&t, lex);
     assert_eq!(ast.len(), kit.node_count(file), "the kit file's tree");
     let d = kit.lang().behaviours().text_family;
-    let rd = Rd::new(&ast, &t, d, Some((kit, file)));
+    let mut rd = Rd::new(&ast, &t, d, Some((kit, file)));
+    // The file's `.model` names, as `read` sets them: an `ako:` card
+    // finds its base (`Rd::derived`).
+    if !rd.named() {
+        rd.models = rd.model_names(ast.fields(ast.root()));
+    }
     let mut out = Vec::new();
     for def in kit.definitions() {
         if def.file == file && matches!(def.kind, DefKind::Model { .. }) && !rd.named() {

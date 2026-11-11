@@ -447,6 +447,11 @@ impl W<'_, '_> {
 
     /// Model `m`'s master, or its refusal at `tok`.
     fn master(&mut self, m: &Model, tok: u32) -> Option<Master> {
+        // An `ako:` card the reader could not resolve (`Rd::derived`).
+        if m.kind.to_ascii_lowercase().starts_with("ako:") {
+            self.refuse(Code::W0142, tok);
+            return None;
+        }
         let found = match self.table_kind(m) {
             Some(k) => Some((Some(k.spectre), None)),
             None => spectre_master(self.b, self.rd.b, m),

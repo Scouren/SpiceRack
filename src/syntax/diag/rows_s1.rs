@@ -25,7 +25,12 @@ macro_rules! rows_s1 {
                 cite: "ngspice manual §11.3.10 (`.tran`; ngspice-45: \"TSTEP is invalid, must be greater than zero\"); Xyce RG `.TRAN` (Xyce 7.10: \"Final time of … is earlier or same as start time of …\")",
                 explain: "The source's `.tran` leaves the step to its simulator (a TSTEP of 0) and stops at or before its start time. The target needs a step, which is chosen from the span between the two, and there is none; the source's own simulator runs nothing either (Xyce aborts, LTspice saves no point). Give the `.tran` a stop time after its start time.",
             }
-            // slot W0142
+            /// An `ako:` model card the reader cannot resolve: no base model in its file, or a type word that is not the base's.
+            W0142 Refusal {
+                title: "an `ako:` model with no base model to derive it from",
+                cite: "LTspice help, `.model` (`.model <modname> ako: <modname> [<type>] [(<parameter list>)]`: \"Although the type specification is optional, it must match the type of the source model if present\"); ngspice manual §12.14.5 (PSPICE compatibility: \".model replacement in ako (a kind of) model descriptions\"; ngspice-45 with `ngbehavior=psa`: \"no model found for .model qp ako:qp350\", \"Original (pnp) and new (npn) type for AKO model disagree\")",
+                explain: "PSpice's and LTspice's `.model new ako:base type (k=v …)` is the model `base` with the listed parameters changed, and the deck is written with that model in full. This card cannot be: no `.model base` card is in its file (a base in another file is not looked up), the cards derive from each other in a circle, or the card's first word is not the base's type. No target reads an `ako:` type as written. Put the base model's card in the same file, or write the model's parameters out.",
+            }
             // slot W0143
             // slot W0144
             // slot W0145

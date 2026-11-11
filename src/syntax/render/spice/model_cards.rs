@@ -25,7 +25,8 @@ impl W<'_, '_> {
         }
     }
 
-    /// `.model name kind (k=v …)`, on Xyce as its device reads it
+    /// `.model name kind (k=v …)` (an `ako:` card the reader left as
+    /// read is refused, W0142), on Xyce as its device reads it
     /// (`xyce_models`; one it cannot compute is left out, W0053, and false
     /// returned: nothing written), a Xyce card on ngspice, ESPice or HSPICE
     /// as that device reads it (`ngspice_models`; a level the target has no
@@ -36,6 +37,11 @@ impl W<'_, '_> {
     /// number names another model there.
     pub(super) fn model(&mut self, n: u32, bin: u32) -> bool {
         let mut m = self.rd.model_view(n, bin);
+        // An `ako:` card the reader could not resolve (`Rd::derived`):
+        // its type is no target's.
+        if m.kind.to_ascii_lowercase().starts_with("ako:") {
+            self.refuse(Code::W0142, self.rd.main(n));
+        }
         let kind = m.kind.to_ascii_lowercase();
         if !self.b.same_level(self.rd.b, &kind, m.level()) {
             self.refuse(Code::W0104, self.rd.main(n));
