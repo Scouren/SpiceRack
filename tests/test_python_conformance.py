@@ -248,10 +248,15 @@ EXPECTED = {
     # LTspice and Xyce `.step` over the one analysis: stream A (Spectre analyses as Bench analyses).
     'spectre_sweep': ('W0015', 'W0015', 'W0001', 'W0001', 'W0001', OK, 'W0001', OK, OK),
     'spectre_monte_carlo': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, OK, OK, OK),
-    'spectre_pac': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    'spectre_pnoise': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    'spectre_pxf': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
-    'spectre_pstb': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
+    # VACASK 36be560 runs pac/pnoise untranslated (ZERO-LEDGER P4-001, VS
+    # dossier M4): W0001, not "the target lacks it". pxf and pstb carry
+    # their own pss alongside (`add_spectre_pxf`/`add_spectre_pstb`
+    # `pss_fundamental`/`pss_stabilization`): the pss half is now W0001
+    # too, the pxf/pstb half still W0015 (untouched by this row).
+    'spectre_pac': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
+    'spectre_pnoise': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
+    'spectre_pxf': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001+W0015', OK, OK),
+    'spectre_pstb': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001+W0015', OK, OK),
     'options': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'temperature': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'initial_condition': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

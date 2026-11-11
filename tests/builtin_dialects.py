@@ -1245,6 +1245,8 @@ def vacask(d):
         .model_master("pnp", [1], "bjt", "-1")
         .model_master("njf", [1], "jfet1", "1")
         .model_master("pjf", [1], "jfet1", "-1")
+        .model_master("njf", [2], "jfet2", "1")
+        .model_master("pjf", [2], "jfet2", "-1")
         .model_master("nmf", [1], "mes1", "1")
         .model_master("pmf", [1], "mes1", "-1")
         .model_master("vdmos", [1], "vdmos", "1")
@@ -1270,6 +1272,11 @@ def vacask(d):
         .spectre_analysis("sweep")
         .spectre_analysis("xf")
         .spectre_analysis("montecarlo")
+        .spectre_analysis("pss")
+        .spectre_analysis("pac")
+        .spectre_analysis("pnoise")
+        .spectre_analysis("hbac")
+        .spectre_analysis("hbnoise")
         # The circuit temperature in an expression (docs/expr-special.md).
         .temp_name("$temp")
         # docs/expr-constants.md: the builtin constants and their values.

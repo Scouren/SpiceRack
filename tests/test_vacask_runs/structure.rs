@@ -195,3 +195,18 @@ fn control_lines_keep_their_place_among_the_analyses() {
     close(col(&plots[0], "a")[0], 1.0, 1e-9);
     close(col(&plots[1], "a")[0], 2.0, 1e-9);
 }
+
+// NG dossier §4 M4 (ZERO-LEDGER P4-001): `spice/jfet2.osdi` (JFET LEVEL 2,
+// Parker-Skellern) ships at VACASK 36be560; a LEVEL 2 `.model` gave W0104
+// "no master" though the module is built, the cell written against an
+// older VACASK. A level-1 JFET already runs this way (`devices.rs`
+// `a_jfet_runs`).
+#[test]
+fn p4_001_vacask_cells_were_written_against() {
+    let deck = "jfet2\n.model jn NJF (LEVEL=2 VTO=-2 BETA=1e-3)\nRd vdd drain 1k\nJ1 drain 0 0 jn\nVdd vdd 0 5\n.op\n.end\n";
+    let netlist = emit(deck).unwrap();
+    assert!(netlist.contains("load \"spice/jfet2.osdi\""), "{}", netlist);
+    assert!(netlist.contains("model jn sp_jfet2 (type=1"), "{}", netlist);
+    let raw = run(deck);
+    assert!(col(&raw, "drain")[0] < 5.0);
+}

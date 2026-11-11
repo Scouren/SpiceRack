@@ -228,6 +228,12 @@ pub(super) fn vacask() -> DialectDef {
         .model_master("pnp", &[1], "bjt", Some("-1"))
         .model_master("njf", &[1], "jfet1", Some("1"))
         .model_master("pjf", &[1], "jfet1", Some("-1"))
+        // LEVEL 2 (Parker-Skellern): `spice/jfet2.osdi` ships at 36be560
+        // too (ZERO-LEDGER P4-001; NG dossier §4 M4). Was W0104 "no
+        // master" though the module is built; `vacask_params.txt`'s
+        // `jfet2` row was already generated and unused.
+        .model_master("njf", &[2], "jfet2", Some("1"))
+        .model_master("pjf", &[2], "jfet2", Some("-1"))
         .model_master("nmf", &[1], "mes1", Some("1"))
         .model_master("pmf", &[1], "mes1", Some("-1"))
         .model_master("vdmos", &[1], "vdmos", Some("1"))
@@ -253,6 +259,23 @@ pub(super) fn vacask() -> DialectDef {
         .spectre_analysis("sweep")
         .spectre_analysis("xf")
         .spectre_analysis("montecarlo")
+        // Misclassified as "target lacks it" (W0015) though VACASK
+        // 36be560 runs each one (ZERO-LEDGER P4-001; VS dossier §3 M4):
+        // `pss`, `pac`, `pnoise`, `hbac`, `hbnoise` are its own spelling
+        // of Spectre's same-named analyses ([SR] pp.771,748,759; no
+        // VACASK page for hbac/hbnoise, run-confirmed). Kept untranslated
+        // (W0001), not refused as absent (W0015); the writer still has no
+        // `Ana` arm for them (`render/named/vacask_bench.rs`), only the
+        // generic `Ana::Spectre` fallback. `stb` is not here: it stays
+        // W0015 (`src/syntax/tests/render.rs`
+        // `a_region_spectre_analysis_is_written_by_spectre_and_refused_by_cause`
+        // pins it, citing a stale `docs/analysis_types.md`; that pin is
+        // outside this row's owner files — reported to team-lead).
+        .spectre_analysis("pss")
+        .spectre_analysis("pac")
+        .spectre_analysis("pnoise")
+        .spectre_analysis("hbac")
+        .spectre_analysis("hbnoise")
         // The circuit temperature in an expression (docs/expr-special.md).
         .temp_name("$temp")
         // docs/expr-constants.md: the builtin constants and their values.
