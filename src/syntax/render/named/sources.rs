@@ -9,8 +9,11 @@
 //! - `W::wave(&mut self, letter, w, tok) -> Option<String>`
 //! - `W::port(&mut self, tok, own, port, nodes, value, ac) -> Option<String>`
 //! - `fn assert_held(w: &Wave)`
+//! - `W::wave_b(&mut self, tok, n, letter, nodes, w, value) -> Option<(String, String)>`
 
 use super::W;
+use super::vacask::q;
+use crate::syntax::behaviour::NamedRules;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Num, Val, Wave, WaveKind};
@@ -150,16 +153,67 @@ impl W<'_, '_> {
             }
         })
     }
+
+    /// The behavioural source that carries a source card's wave where the
+    /// target's own waves cannot run it (LTspice's SINE with a cycle
+    /// count, `Wave::sin_cycles`): the node the card then ends at in place
+    /// of `nm`, and the statement, Spectre's `bsource` (`[CMP]` p.856;
+    /// `$time`, `?:` pp.867-868) or VACASK's source line
+    /// (`docs/dev-builtin-behavioral.md`; `$abstime`). The card itself is
+    /// written as a 0 source, its name and AC value kept: a V in series
+    /// with the statement on node `{decl}_w`, an I in parallel with it.
+    /// `None` when it is refused: the target has no behavioural source, a
+    /// value of the wave is an expression, or the card's DC value is not
+    /// the wave's at time zero (the behavioural source gives the operating
+    /// point the wave's).
+    ///
+    /// # Panics
+    /// When `w` is not [`Wave::cycled`].
+    pub(super) fn wave_b(
+        &mut self,
+        tok: u32,
+        n: u32,
+        letter: char,
+        [np, nm]: [&str; 2],
+        w: &Wave,
+        value: &Val,
+    ) -> Option<(String, String)> {
+        assert!(w.cycled(), "a SINE with a cycle count");
+        assert!(matches!(letter, 'V' | 'I'), "a source's letter");
+        if let Action::Refuse(_) = self.ask(Construct::BehaviouralSource, tok) {
+            return None;
+        }
+        let vacask = self.b.named_rules == NamedRules::Vacask;
+        let expr = w.sin_cycles(if vacask { "$abstime" } else { "$time" });
+        let Some(expr) = expr.filter(|_| *value == w.at_zero()) else {
+            self.refuse(Code::W0108, tok);
+            return None;
+        };
+        let decl = self.names.decl(n).to_ascii_lowercase();
+        let (name, mid) = (format!("b{decl}_w"), format!("{decl}_w"));
+        let (key, a, end) = match letter {
+            'V' => ("v", mid.as_str(), mid.clone()),
+            _ => ("i", np, nm.to_string()),
+        };
+        let line = if vacask {
+            format!("{} ({} {}) {key}={expr}", q(&name), q(a), q(nm))
+        } else {
+            let (name, a, nm) = (self.node(&name), self.node(a), self.node(nm));
+            format!("{name} ({a} {nm}) bsource {key}={expr}")
+        };
+        Some((end, line))
+    }
 }
 
 /// Asserts that `w` holds its kind's value count, as the readers build it
-/// (`read::Wave::args`): SIN and EXP 6, PULSE 8, TRNOISE 7, SFFM and
+/// (`read::Wave::args`): SIN 7, EXP 6, PULSE 8, TRNOISE 7, SFFM and
 /// TRRANDOM 5, AM 8, PWL its pairs. The writers index the values by
 /// position.
 pub(super) fn assert_held(w: &Wave) {
     let n = w.args.len();
     let held = match w.kind {
-        WaveKind::Sin | WaveKind::Exp => 6,
+        WaveKind::Sin => 7,
+        WaveKind::Exp => 6,
         WaveKind::Pulse => 8,
         WaveKind::Trnoise => 7,
         WaveKind::Sffm | WaveKind::Trrandom => 5,

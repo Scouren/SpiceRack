@@ -83,6 +83,7 @@ impl<'a> Rd<'a> {
                     f("delay")?,
                     f(damp)?,
                     f("sinephase")?,
+                    Num::Num(0.0),
                 ],
                 repeat: None,
                 delay: None,

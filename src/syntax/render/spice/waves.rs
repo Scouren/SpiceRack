@@ -8,6 +8,9 @@
 //! Contents:
 //! - `W::wave_num(&self, n: &Num) -> String`, `W::wave_ok(&mut self, letter: char, w: &Wave, tok: u32)`,
 //!   `W::wave(&self, w: &Wave) -> String`
+//! - `W::wave_as_b(&mut self, w: &Wave, tok: u32) -> Option<String>`,
+//!   `W::wave_b(&mut self, decl: &str, nodes: [&str; 2], current: bool, expr: &str, tok: u32) -> String`,
+//!   `W::b_line(&mut self, decl: &str, nodes: [&str; 2], current: bool, expr: &str, tok: u32) -> String`
 
 use super::W;
 use crate::syntax::render::capability::{Action, Alt, Construct};
@@ -76,6 +79,9 @@ impl W<'_, '_> {
         match w.kind {
             // A PULSE's cycle count is written only when given (0 is none).
             WaveKind::Pulse if !w.counted() => args.truncate(7),
+            // LTspice's SINE cycle count likewise (written for LTspice
+            // only: elsewhere the wave is a behavioural source).
+            WaveKind::Sin if !w.cycled() => args.truncate(6),
             // The RTS fields are left off when all zero, as the manual's
             // white and 1/f examples write the card.
             WaveKind::Trnoise if w.args[4..].iter().all(|a| a.num() == Some(0.0)) => {
@@ -108,6 +114,67 @@ impl W<'_, '_> {
             s.push_str(&format!(" td={}", self.wave_num(td)));
         }
         s
+    }
+
+    /// The behavioural expression of `time` a source is written with in
+    /// place of wave `w`, where the target's own form would run another
+    /// wave: LTspice's SINE with a cycle count ([`Wave::sin_cycles`]).
+    /// `None`: `w` is written in its own form, or it has no such
+    /// expression and is refused (W0108).
+    pub(super) fn wave_as_b(&mut self, w: &Wave, tok: u32) -> Option<String> {
+        let expr = match w.kind {
+            WaveKind::Sin if self.pair.sin_cycles_as_b && w.cycled() => w.sin_cycles("time"),
+            _ => return None,
+        };
+        if expr.is_none() {
+            self.refuse(crate::syntax::diag::Code::W0108, tok);
+        }
+        expr
+    }
+
+    /// The behavioural source that carries card `decl`'s wave, expression
+    /// `expr`, between `nodes`: `B{decl}_w`, on HSPICE `E{decl}_w` or
+    /// `G{decl}_w` (as `cards::renamed` names a B card there).
+    pub(super) fn wave_b(
+        &mut self,
+        decl: &str,
+        nodes: [&str; 2],
+        current: bool,
+        expr: &str,
+        tok: u32,
+    ) -> String {
+        let vol_cur =
+            self.cells[Construct::BehaviouralSource as usize] == Action::Spell(Alt::VolCur);
+        let letter = match (vol_cur, current) {
+            (false, _) => 'B',
+            (true, true) => 'G',
+            (true, false) => 'E',
+        };
+        self.b_line(&format!("{letter}{decl}_w"), nodes, current, expr, tok)
+    }
+
+    /// Behavioural source `decl np nm` with expression `expr` (C's `?:`)
+    /// in the target's form: HSPICE's `vol=`/`cur=` (`decl` already its
+    /// `E`/`G` name), Xyce's braced value, else `V=`/`I=`.
+    pub(super) fn b_line(
+        &mut self,
+        decl: &str,
+        [np, nm]: [&str; 2],
+        current: bool,
+        expr: &str,
+        tok: u32,
+    ) -> String {
+        let key = if current { 'I' } else { 'V' };
+        match self.ask(Construct::BehaviouralSource, tok) {
+            Action::Spell(Alt::VolCur) if current => {
+                format!("{decl} {np} {nm} cur='{expr}'")
+            }
+            Action::Spell(Alt::VolCur) => format!("{decl} {np} {nm} vol='{expr}'"),
+            Action::Spell(Alt::BracedBehaviour) => {
+                format!("{decl} {np} {nm} {key}={{{expr}}}")
+            }
+            _ => format!("{decl} {np} {nm} {key}={expr}"),
+        }
     }
 }
 

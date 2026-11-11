@@ -81,6 +81,11 @@ pub(super) struct Pair {
     /// An ngspice SFFM is (VO VA FM MDI FC), SPICE3's, HSPICE's, Xyce's
     /// and LTspice's (VO VA FC MDI FS) (`vsrcload.c`): the two swapped.
     pub(super) sffm_swap: bool,
+    /// LTspice's SINE cycle count (help, Current Source: the sine holds
+    /// its value after Ncycles/Freq) where the target's SIN never stops
+    /// (ngspice manual §4.1.2; Xyce RG; HSPICE UG): a behavioural source
+    /// of time (`Wave::sin_cycles`, `waves::wave_as_b`).
+    pub(super) sin_cycles_as_b: bool,
     /// A PULSE's cycle count (ngspice's NP, manual §4.1.1; LTspice's
     /// Ncycles) where the target's PULSE has seven values (Xyce 7.10
     /// ignores an eighth, run: 1 V at 12 µs where ngspice-45 and LTspice
@@ -153,6 +158,7 @@ impl Pair {
             lt_parasitics: from.card_rules == CardRules::Ltspice
                 && to.parasitics == Parasitics::Elements,
             sffm_swap: ng(nf) != (ng(nt) || to.writer == Writer::Cdl),
+            sin_cycles_as_b: nf == NetlistRules::Ltspice && nt != NetlistRules::Ltspice,
             pulse_as_pwl: counts(nf) && !(counts(nt) || to.writer == Writer::Cdl),
             foreign_prints: !ng(nf) && to.analysis_form == AnalysisForm::Ngspice,
             foreign_measures: !ng(nf) && ng(nt),

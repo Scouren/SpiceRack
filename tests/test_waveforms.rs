@@ -47,6 +47,48 @@ fn ltspice_on_ngspice(deck: &str, t: f64, want: f64, tol: Tol) {
 // A row's test goes below this line (other helpers: `oracle::…` by path).
 
 #[test]
+fn p3_020_ltspice_sine_cycle_count_holds_after_its_cycles() {
+    // Ledger P3-020. LTspice help, Current Source: SINE(Ioffset Iamp Freq
+    // Td Theta Phi Ncycles) runs Ncycles cycles and then holds. By hand:
+    // 0.5 + sin 30° = 1.0 before Td = 2 us; 0.5 + sin 300° = -0.36603 at
+    // 9.5 us; from 17 us the value there, 0.5 + sin 570° = 0. LTspice
+    // 26.1.1 on this deck: 1, -0.36601, 8e-16
+    // (research/impl/evidence/P3-020/lt.cir). No other simulator's SIN
+    // stops, so each gets the wave as a behavioural source of time, run
+    // here on five of them. Corpus: ltspice_examples/6088.net. Tolerance:
+    // 1e-3 V, the simulators' RELTOL on a 1 V sine.
+    let deck = "p3-020\nV1 a 0 SINE(0.5 1 100k 2u 0 30 1.5)\nR1 a 0 1k\n.tran 10n 20u\n.end\n";
+    let tol = Tol {
+        rel: 1e-3,
+        floor: 1.0,
+    };
+    ltspice_on_ngspice(deck, 18e-6, 0.0, tol);
+    let on = [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Xyce,
+        Dialect::Hspice,
+        Dialect::Vacask,
+    ];
+    for (t, want) in [(1e-6, 1.0), (9.5e-6, -0.36603), (18e-6, 0.0)] {
+        closed_form(Dialect::Ltspice, deck, &on, "a", At::Time(t), want, tol);
+    }
+    // Spectre (no local run): the same expression as a `bsource` of
+    // `$time` (Spectre Reference 5.0 [CMP] p.856; `?:` pp.867-868), in
+    // series with the 0 V source.
+    let sp = oracle::write(deck, Dialect::Ltspice, Dialect::Spectre);
+    for want in [
+        "v1 (a v1_w) vsource dc=0",
+        "bv1_w (v1_w 0) bsource v=$time<0.000002 ? 0.5+1*exp(",
+    ] {
+        assert!(sp.lines().any(|l| l.starts_with(want)), "{want}\n{sp}");
+    }
+    // LTspice itself keeps the count.
+    let lt = oracle::write(deck, Dialect::Ltspice, Dialect::Ltspice);
+    assert!(lt.contains("SIN(0.5 1 100000 0.000002 0 30 1.5)"), "{lt}");
+}
+
+#[test]
 fn p3_011_pulse_cycle_count_is_kept() {
     // Ledger P3-011. A PULSE's eighth value is its cycle count: LTspice's
     // Ncycles (help, Current Source), ngspice's NP (manual §4.1.1); V1

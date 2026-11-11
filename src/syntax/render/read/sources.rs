@@ -33,7 +33,8 @@ pub(in crate::syntax::render) enum Num {
 #[derive(Clone, PartialEq, Debug)]
 pub(in crate::syntax::render) struct Wave {
     pub(in crate::syntax::render) kind: WaveKind,
-    /// The values: SIN 6, PULSE 8 (the eighth its cycle count, ngspice's
+    /// The values: SIN 7 (the seventh LTspice's cycle count, 0 for none),
+    /// PULSE 8 (the eighth its cycle count, ngspice's
     /// NP and LTspice's Ncycles, 0 for none), EXP 6, SFFM 5, TRNOISE 7,
     /// TRRANDOM 5
     /// (the type first), PWL its pairs flat; AM 8 in ngspice-45's order
@@ -287,7 +288,8 @@ impl WaveKind {
     /// every value (PWL's pairs).
     pub(in crate::syntax::render) const fn held(self) -> Option<usize> {
         match self {
-            WaveKind::Sin | WaveKind::Exp => Some(6),
+            WaveKind::Sin => Some(7),
+            WaveKind::Exp => Some(6),
             WaveKind::Pulse => Some(8),
             WaveKind::Trnoise => Some(7),
             WaveKind::Sffm | WaveKind::Am | WaveKind::Trrandom => Some(5),
@@ -531,10 +533,11 @@ impl<'a> Rd<'a> {
         // so elsewhere the card's values past seven are cut.
         let counts =
             self.b.source_rules == SourceRules::Ngspice || self.b.card_rules == CardRules::Ltspice;
-        let read = if w == WaveKind::Pulse && !counts {
-            7
-        } else {
-            held
+        let read = match w {
+            WaveKind::Pulse if !counts => 7,
+            // A SINE's seventh value is LTspice's cycle count only.
+            WaveKind::Sin if self.b.card_rules != CardRules::Ltspice => 6,
+            _ => held,
         };
         let padded = |k: usize| -> Vec<Num> {
             (0..k)

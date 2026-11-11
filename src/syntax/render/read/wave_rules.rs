@@ -1,6 +1,7 @@
 //! Waveform rules past a card's plain values, over the [`Num`]s and the
 //! `Wave` view every writer takes: LTspice's PWL time relative to the
-//! point before it; a PULSE with a cycle count as the PWL of its pulses.
+//! point before it; a PULSE with a cycle count as the PWL of its pulses;
+//! LTspice's SINE with a cycle count as an expression of time.
 //!
 //! Cites: ngspice manual §4.1.1 (PULSE's table; NP); LTspice help, Current
 //! Source (PULSE's Ncycles); LTspice help, Voltage Source (PWL: a time
@@ -11,6 +12,7 @@
 //! Contents:
 //! - `Rd::pwl_relative(&self, vals: &[u32]) -> Option<Vec<Num>>`
 //! - `Wave::counted(&self) -> bool`, `Wave::pulses(&self) -> Option<Wave>`
+//! - `Wave::cycled(&self) -> bool`, `Wave::sin_cycles(&self, t: &str) -> Option<String>`
 
 use super::{Num, Rd, Wave, WaveKind};
 use crate::syntax::behaviour::CardRules;
@@ -18,7 +20,51 @@ use crate::syntax::behaviour::CardRules;
 /// The most pulses [`Wave::pulses`] writes as PWL points (four a pulse).
 const PULSES_MAX: f64 = 1000.0;
 
+/// π to an f64's digits, for an expression's text.
+const PI: &str = "3.141592653589793";
+
 impl Wave {
+    /// Whether this is LTspice's SINE with a cycle count (its seventh
+    /// value; 0 is none).
+    pub(in crate::syntax::render) fn cycled(&self) -> bool {
+        self.kind == WaveKind::Sin && self.args[6] != Num::Num(0.0)
+    }
+
+    /// LTspice's `SINE(Voff Vamp Freq Td Theta Phi Ncycles)` as an
+    /// expression of the target's time variable `t`: Voff + Vamp·sin(φ)
+    /// before Td; Voff + Vamp·e^(−(t−Td)·Theta)·sin(2π·Freq·(t−Td) + φ)
+    /// for Ncycles/Freq after it; then the value it has there, held
+    /// (LTspice help, Current Source; LTspice 26.1.1, run: `SINE(0.5 1
+    /// 100k 2u 0 30 1.5)` is 1.0 V before 2 µs and 0 V from 17 µs). The
+    /// text is `+ - * /`, `<`, `exp`, `sin` and a parenthesised `?:`,
+    /// which ngspice, ESPice, Xyce, HSPICE, Spectre and VACASK read alike
+    /// (run on each but Spectre). `None`: a value that is an expression.
+    ///
+    /// # Panics
+    /// When the wave is not [`Wave::cycled`].
+    pub(in crate::syntax::render) fn sin_cycles(&self, t: &str) -> Option<String> {
+        assert!(self.cycled(), "a SINE with a cycle count");
+        assert!(!t.is_empty(), "a time variable");
+        let a: Vec<String> = self
+            .args
+            .iter()
+            .map(|x| x.num().map(operand))
+            .collect::<Option<_>>()?;
+        let [vo, va, f, td, theta, phi, n] = &a[..] else {
+            unreachable!("a SINE holds seven values")
+        };
+        // The wave `dt` after Td, `cycles` into its sine.
+        let at = |dt: &str, cycles: &str| {
+            format!("{vo}+{va}*exp(-{dt}*{theta})*sin(2*{PI}*{cycles}+{phi}*{PI}/180)")
+        };
+        let first = at("0", "0");
+        let run = at(&format!("({t}-{td})"), &format!("{f}*({t}-{td})"));
+        let held = at(&format!("{n}/{f}"), n);
+        Some(format!(
+            "{t}<{td} ? {first} : ({t}<{td}+{n}/{f} ? {run} : {held})"
+        ))
+    }
+
     /// Whether this is a PULSE with a cycle count (its eighth value:
     /// ngspice's NP, LTspice's Ncycles; 0 is none).
     pub(in crate::syntax::render) fn counted(&self) -> bool {
@@ -134,6 +180,16 @@ impl Rd<'_> {
 }
 
 // ---- private ----
+
+/// `v` as an operand in an expression's text: as it prints, a negative
+/// number in parentheses.
+fn operand(v: f64) -> String {
+    if v < 0.0 {
+        format!("({v})")
+    } else {
+        format!("{v}")
+    }
+}
 
 /// `x` to 15 significant digits, so a sum of two decimal times prints as
 /// the decimal sum (`0.002701`, not `0.0027010000000000003`).
