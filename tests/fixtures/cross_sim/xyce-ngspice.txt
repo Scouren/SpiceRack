@@ -364,7 +364,7 @@ GMIN_STEPPING/gstep_minconduct.cir mismatch # tran V(2): 0.99999990000001 leaves
 GROUND_PATH/IndPathToGround.cir slow # quarantined
 GenCoupAPI/rlc_series_vccs_nogenext.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran L1#branch: -0.00004572797996727911 leaves the tube at t=0.0000020491505328520325 (tol 8.120e-7)
 HB/RC/simpleRC.cir simulator-differs:closed-form reason=SIMPLERC-XYCE-STEP proof=simplerc-closed-form.md # v(2): Xyce 3.8e-5 V off the closed form, ngspice 2.1e-6
-HB/RC/simpleRC2.cir mismatch # tran V(1): 3.9500591261282025 leaves the tube at t=0.0000006399000000000002 (tol 3.962e-2)
+HB/RC/simpleRC2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 20 ns agree (worst 0.008 of the tolerance); the harness's levels leave Xyce's own step, v(2) 28 x the tolerance
 HB/gilbert_cell_hbTran.cir slow # quarantined
 HB/gilbert_cell_hbTran2.cir slow # quarantined
 HB/gilbert_cell_hbTran_copy1.cir slow # quarantined
@@ -385,8 +385,8 @@ IC_AND_NODESET/ic_comp.cir simulator-differs:refinement reason=S-NUMERIC-CONVERG
 IC_AND_NODESET/ic_gmin_bjt.cir mismatch # tran VIN1#branch: -0.00503688935060338 leaves the tube at t=0 (tol 5.526e-5)
 IC_AND_NODESET/nodeset_bjt.cir mismatch # tran XN15:VB3: 0.000000013920704224356513 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 IC_AND_NODESET/nodeset_bjt2.cir mismatch # tran XN15:VB3: 0.000000013920704224356513 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-IC_AND_NODESET/ring_osc_bsim3_ic.cir mismatch # tran V(10): -0.055918291679567834 leaves the tube at t=0.0000000012702714319605303 (tol 2.082e-2)
-IC_AND_NODESET/ring_osc_bsim4_ic.cir mismatch # tran V(3): 1.461509824680592 leaves the tube at t=0.000000007397678658186048 (tol 1.943e-2)
+IC_AND_NODESET/ring_osc_bsim3_ic.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # predicted (P1-045): refined, only the last tube width before TSTOP was out (cmp.rs end_holds)
+IC_AND_NODESET/ring_osc_bsim4_ic.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 both agree; V(7) was out in the last tube width only (cmp.rs end_holds); was: tran V(3): 1.461509824680592 leaves the tube at t=0.000000007397678658186048 (tol 1.943e-2)
 INVALID_CHARS/valid_chars_device_node_names.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v$ | Not enough parameters
 INVALID_CHARS/valid_chars_expressions.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v$ | Not enough parameters
 INVERT1/invert1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.001771236106629716 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
@@ -397,7 +397,7 @@ LTRA/ltra2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=har
 LTRA/ltra3.cir simulator-differs:third-simulator reason=S-LTRA3-LADDER proof=ltra3-ladder.md # tran V(3): 0.37630219503443 leaves the tube at t=0.000000031753987916230536 (tol 8.116e-3)
 LTRA/square-wave-gen-resistor-compact.cir slow # quarantined
 LTRA/square-wave-gen-resistor.cir slow # quarantined
-LUMPEDLINE/baselineLumpedLine.cir mismatch # tran 1B: -0.14498790723931973 leaves the tube at t=0.0000006334134722967974 (tol 1.178e-2)
+LUMPEDLINE/baselineLumpedLine.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 both agree (worst 0.654 of the tolerance) since the written deck carries method=gear (P3-004); was: tran VSIGGEN#branch: -0.00038369065280601157 leaves the tube at t=0.0000002881999999999999 (tol 7.271e-5)
 MCNC_BJT_LATCH/latch.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VREF#branch: 0.0018988876953777145 leaves the tube at t=0.000000021 (tol 1.899e-5)
 MCNC_BJT_OPAMPAL/opampal.cir mismatch # tran VVIN#branch: -0.00000016134418585703294 leaves the tube at t=0.000011000000000000001 (tol 1.877e-9)
 MEASURE/DefaultValOption.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v]
@@ -530,7 +530,7 @@ ROM/MULTIPORT/RLC_mesh2.cir slow # ngspice past its output budget: 1082 vectors 
 ROM/cab_dak_sig_o_simple.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran CABLEEND: 0.709773006377744 leaves the tube at t=0.00000011119356155429531 (tol 9.093e-3)
 SANDLER21/sandler21.cir mismatch # tran V(1): 0.012754436069687644 leaves the tube at t=0.0011607171242355243 (tol 1.132e-1)
 SANDLER22/sandler22.cir mismatch # tran V(4): 5.063378303425906 leaves the tube at t=0.0005998033489313946 (tol 5.102e-2)
-SANDLER23/sandler23.cir mismatch # tran X1:11: -0.2046651074515119 leaves the tube at t=0.0029001381500723556 (tol 2.049e-3)
+SANDLER23/sandler23.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 20 ns ((TSTOP-TSTART)/100000) agree (worst 0.973 of the tolerance); at /20000 X1:12 is 1.61 x out
 SANDLER25/sandler25.cir mismatch # tran V(10): 10.106854603507237 leaves the tube at t=0.008250966929121743 (tol 1.031e-1)
 SANDLER28/sandler28.cir simulator-differs:self-inconsistency reason=XYCE-GLOBAL-FLOATING-NODE proof=xyce-global-floating-node.md # Xyce spikes at 1.019 ms with $G_BAD_PATH global, not local; ngspice the same either way
 SAVE_AND_LOAD/bjt_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
@@ -551,8 +551,8 @@ SUBCKT/subckt_a3.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t
 SUBCKT/subckt_a3_hs.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
 SUBCKT/subckt_a4.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
 SUBCKT/subckt_a4_hs.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a5.cir mismatch # tran OUT: 4.990780137463921 leaves the tube at t=0.00001655477576422263 (tol 4.991e-2)
-SUBCKT/subckt_a5_hs.cir mismatch # tran OUT: 4.990780137463921 leaves the tube at t=0.00001655477576422263 (tol 4.991e-2)
+SUBCKT/subckt_a5.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 8.46 x out
+SUBCKT/subckt_a5_hs.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 8.46 x out
 SUBCKT/subckt_j1.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 22 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted d
 SUBCKT/subckt_j1_dup.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 22 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted d
 SUBCKT/subckt_j1_hs.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 22 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted d

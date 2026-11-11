@@ -19,6 +19,10 @@
 //! from 2 * 7e-3 / sqrt(2), the two errors independent) plus 2 * VNTOL,
 //! through a time tube of 1% of the stop time (`tube.rs`): the two
 //! simulators choose different steps and move an edge by a few of them.
+//! In the last tube width before the common end the band stops with the
+//! run: a sample out of it there passes when the other run's end lies in
+//! this run's band (`end_holds`), since a run that lags by less than the
+//! tube has not reached the value yet.
 //!
 //! Cites: ngspice manual §11.1.1 (`.options` RELTOL, VNTOL, ABSTOL, TRTOL
 //! defaults); Xyce Reference Guide 7.10 §2.1.20 (`.options device`/`timeint`
@@ -332,7 +336,9 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
             if t.autonomous && oscillates_alike(&ta, &va, &xb, &rb, tol, current) {
                 continue;
             }
-            if let Some(p) = leaves_tube(&ta, &va, &xb, &rb, dx, tol) {
+            if let Some(p) = leaves_tube(&ta, &va, &xb, &rb, dx, tol)
+                && !(ta[p] > hi - dx && end_holds(&ta, &va, &xb, &rb, hi - dx, dx, tol))
+            {
                 return Err(format!(
                     "tran {}: {} leaves the tube at t={} (tol {tol:.3e})",
                     v.name, va[p], ta[p]
@@ -403,6 +409,18 @@ fn waveform_source(line: &str) -> bool {
     line.split(|c: char| c.is_whitespace() || c == '(')
         .skip(1)
         .any(|w| words.contains(&w))
+}
+
+/// Whether `(xb, yb)` from the time `from` on lies in the tube of
+/// `(xa, ya)`: the tube turned around for the last tube width before the
+/// common end, where the band a sample is held to stops with the run. A
+/// run that lags by less than `dx` has not reached the other's last values,
+/// but its own end lies in the other's band; a wrong value lies in neither.
+fn end_holds(xa: &[f64], ya: &[f64], xb: &[f64], yb: &[f64], from: f64, dx: f64, tol: f64) -> bool {
+    assert_eq!(xa.len(), ya.len(), "a sample has its time");
+    assert_eq!(xb.len(), yb.len(), "a sample has its time");
+    let k = xb.partition_point(|&x| x < from);
+    leaves_tube(&xb[k..], &yb[k..], xa, ya, dx, tol).is_none()
 }
 
 /// An autonomous oscillation (mismatches.md §4.1: phases drift over many
@@ -515,6 +533,28 @@ mod tests {
             assert_eq!(normal(n), "v1#branch");
         }
         assert_eq!(normal("X1:N2"), "x1.n2");
+    }
+
+    #[test]
+    fn p1_045_a_run_that_lags_at_the_end_is_in_the_tube() {
+        // An edge in the last 1% of the run, and the same edge half a tube
+        // width later: when both runs stop the late one has not reached
+        // the last values, so the tube fails there and only there, and the
+        // late run's end lies in the first's band. A run that ends on
+        // another value fails both ways.
+        // Oracle: the tube's definition (a shift under dx is no
+        // difference), on waveforms written out by hand. Checks: 4.
+        let xs: Vec<f64> = (0..=1000).map(|k| f64::from(k) / 1000.0).collect();
+        let edge = |t: f64| ((t - 0.99) / 0.01).clamp(0.0, 1.0);
+        let a: Vec<f64> = xs.iter().map(|&t| edge(t)).collect();
+        let late: Vec<f64> = xs.iter().map(|&t| edge(t - 0.005)).collect();
+        let wrong: Vec<f64> = xs.iter().map(|&t| -edge(t)).collect();
+        let (dx, tol) = (0.01, 0.01);
+        let out = leaves_tube(&xs, &a, &xs, &late, dx, tol);
+        assert!(out.is_some_and(|p| xs[p] > 1.0 - dx), "{out:?}");
+        assert!(end_holds(&xs, &a, &xs, &late, 1.0 - dx, dx, tol));
+        assert!(leaves_tube(&xs, &a, &xs, &wrong, dx, tol).is_some());
+        assert!(!end_holds(&xs, &a, &xs, &wrong, 1.0 - dx, dx, tol));
     }
 
     #[test]

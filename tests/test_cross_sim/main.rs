@@ -23,7 +23,10 @@
 //! reason=<rule-id> proof=<file>` a mismatch the simulators make, not the
 //! writer: `source` the target's simulator gives it on the original too
 //! (ESPice reads ngspice), `refinement` both decks agree once refined to
-//! TMAX (TSTOP-TSTART)/2000 (both `proof=harness`), and `third-simulator`,
+//! TMAX (TSTOP-TSTART)/2000 or /20000 (both `proof=harness`, or a proof
+//! file: then the deck may still be observed as a mismatch, the file's
+//! run being one the harness does not make, a finer step or a cell with
+//! no control: `lists.rs::BY_HAND`), and `third-simulator`,
 //! `reference-data`, `closed-form`, `self-inconsistency` a proof file under
 //! `proof/` that settles a deck still observed as a mismatch (`listed`,
 //! mismatches.md §4.3); `target-fails` the
