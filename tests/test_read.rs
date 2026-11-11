@@ -73,6 +73,27 @@ fn a_control_pre_osdi_is_a_load_ltspice_refuses() {
     assert!(refusal(deck, Dialect::Ngspice, Dialect::Ltspice).contains(&Code::W0004));
 }
 
+// ZERO-LEDGER P3-017: a parameter defined twice. Oracle: each simulator on
+// the divider v(b) = 4 V · 1k / (rx + 1k). ngspice-45 keeps the last
+// definition (rx = 3k: 1 V), Xyce 7.10 the first (rx = 1k: 2 V), VACASK
+// refuses a second one ("Parameter redefinition."): every target is
+// written the source's winner only (Xyce_Regression
+// `ISSUE_202/first_last.cir` is the corpus deck of the Xyce half).
+#[test]
+fn p3_017_a_parameter_defined_twice_keeps_its_sources_winner() {
+    let deck = "* t\n.param rx=1k\n.param rx=3k\nv1 a 0 4\nr1 a b {rx}\nr2 b 0 1k\n.op\n.end\n";
+    // A linear divider: the simulators' answers are exact to rounding.
+    let tol = oracle::Tol {
+        rel: 1e-9,
+        floor: 0.0,
+    };
+    let (ng, xy, va) = (Dialect::Ngspice, Dialect::Xyce, Dialect::Vacask);
+    // 4 V · 1k / (3k + 1k) = 1 V: the last definition.
+    oracle::closed_form(ng, deck, &[ng, xy, va], "b", oracle::At::First, 1.0, tol);
+    // 4 V · 1k / (1k + 1k) = 2 V: the first definition.
+    oracle::closed_form(xy, deck, &[xy, ng, va], "b", oracle::At::First, 2.0, tol);
+}
+
 // ZERO-LEDGER P3-106: HSPICE `.option delmax=` is the largest step of the
 // deck's transients (HSPICE Reference Manual: Commands and Control Options
 // E-2010.12 p.443); ngspice's is `.tran`'s fourth number (manual §11.3.10,

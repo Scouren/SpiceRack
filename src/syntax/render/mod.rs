@@ -317,6 +317,7 @@ pub fn writes(target: Dialect) -> bool {
 fn write_lang(src: &Source, target: Lang) -> (String, Vec<Diag>) {
     let (mut rd, mut deck) = read::read(src.ast, src.tokens, src.lang, src.name, src.kit);
     rd.write_for(target);
+    rd.param_winners(&mut deck, target.behaviours());
     deck.given_loads.extend(src.loads.iter().cloned());
     deck.numbers = src.numbers;
     let (text, written) = match target.behaviours().writer {

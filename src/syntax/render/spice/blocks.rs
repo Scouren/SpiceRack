@@ -253,17 +253,8 @@ impl W<'_, '_> {
     /// `.param name=value`, one card each, in order, with the draws the
     /// `statistics` lift puts before each and the value it gives one.
     fn param_cards(&mut self, params: &[u32]) {
-        // Xyce keeps a parameter's first definition, ngspice its last
-        // (Xyce_Regression `ISSUE_202/first_last.cir`: R1 = 1 kΩ on Xyce,
-        // 1 Ω on ngspice for the deck as read): only the first is written.
-        let first = self.pair.first_param;
-        let mut seen: Vec<String> = Vec::new();
         for &a in params {
             let (name, mut v) = self.rd.param_view(a);
-            if first && seen.iter().any(|n| n.eq_ignore_ascii_case(&name)) {
-                continue;
-            }
-            seen.push(name.clone());
             let draws = self.draws.before(a).to_vec();
             self.param_lines(&draws);
             if let Some(d) = self.draws.value(a) {

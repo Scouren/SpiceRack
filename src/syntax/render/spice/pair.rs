@@ -47,9 +47,6 @@ pub(super) struct Pair {
     /// Xyce's `$G_` global nodes, where `$` starts a comment (ngspice-45:
     /// "Not enough parameters"): `.global` nodes (`globals`).
     pub(super) xyce_globals: bool,
-    /// Xyce keeps a parameter's first definition, the target its last
-    /// (`ISSUE_202/first_last.cir`): only the first is written.
-    pub(super) first_param: bool,
     /// HSPICE reads a double-quoted value as an expression, the target as
     /// a string: braced.
     pub(super) quoted_expr: bool,
@@ -184,7 +181,6 @@ impl Pair {
             stat_nominal: matches!(ef, ExprEval::Hspice | ExprEval::Xyce)
                 && et == ExprEval::Ngspice,
             xyce_globals: xy(nf) && (ng(nt) || hs(nt)),
-            first_param: xy(nf) && !xy(nt),
             quoted_expr: ef == ExprEval::Hspice && et != ExprEval::Hspice,
             xyce_m_rename: xy(nf) && ng(nt) && to.subckt_multiplicity,
             xyce_undeclared: xy(nf) && ng(nt),
@@ -262,7 +258,6 @@ mod tests {
         for (rule, holds) in [
             ("device_ic_in_op", to_ng.device_ic_in_op),
             ("xyce_globals", to_ng.xyce_globals),
-            ("first_param", to_ng.first_param),
             ("xyce_m_rename", to_ng.xyce_m_rename),
             ("xyce_undeclared", to_ng.xyce_undeclared),
             ("log_to_log10", to_ng.log_to_log10),

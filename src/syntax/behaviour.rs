@@ -370,7 +370,8 @@ pub enum NetlistRules {
     /// multiplicity; a parameter's first definition; a device IC in the
     /// DCOP; `$G_` global nodes; TSTEP 0 the simulator's choice.
     Xyce,
-    /// HSPICE: TNOM and TEMP 25 °C; GSHUNT, GMINDC, SEARCH options.
+    /// HSPICE: TNOM and TEMP 25 °C; GSHUNT, GMINDC, SEARCH options; a
+    /// parameter's last definition.
     Hspice,
     /// LTspice: TSTEP 0 the simulator's choice; no SCALE option
     /// (`.options scale=1u` is a syntax error in LTspice 26.1.1); a
