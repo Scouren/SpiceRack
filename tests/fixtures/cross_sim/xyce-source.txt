@@ -508,3 +508,15 @@ MEASURE/bad_dot_measure_line2.cir source-fails # Xyce 7.10 stops on the original
 Message/Input/CircuitBlock_handleLinePass1_1.cir source-fails # Xyce 7.10 stops on the original: line 4: Y device line specified with only one token: YAND. Need at least two.
 SENS/improperVectorParams.cir source-fails # Xyce 7.10 stops on the original: line 20: .SENS line is mis-formatted. Possibly a missing comma in vector parameter
 VPAT/bad_vpat.cir source-fails # Xyce 7.10 stops on the original: line 21: Device instance V6: Invalid bit symbol in DATA field for the PAT source
+Certification_Tests/BUG_204/bug204.cir source-fails # Xyce 7.10 stops on the original: line 14: .DC line not formatted correctly, found unexpected number of fields
+Certification_Tests/BUG_281/bug_281.cir source-fails # Xyce 7.10 stops on the original: line 7: .DC line not formatted correctly, found unexpected number of fields
+Certification_Tests/BUG_630_SON/vpwlRepeatFail.cir source-fails # Xyce 7.10 stops on the original: line 3: Device instance V1: PWL source repeat value (R) must be >= 0 and < last value
+Certification_Tests/BUG_636_SON/bug636.cir source-fails # Xyce 7.10 stops on the original: line 10: .TRAN line has an unexpected number of fields
+Certification_Tests/BUG_80_SON/Bad_PWL_Source.cir source-fails # Xyce 7.10 stops on the original: line 17: Could not parse time/value pairs for PWL function in device: V2
+Message/Input/AC_extractACData1.cir source-fails # Xyce 7.10 stops on the original: line 14: .AC line has an unexpected number of fields
+Message/Input/DC_excessArgs.cir source-fails # Xyce 7.10 stops on the original: line 6: Extraneous values on .DC line
+Message/Input/NOISE_extractNOISEData1.cir source-fails # Xyce 7.10 stops on the original: line 21: .NOISE line has an unexpected number of fields.  NumFields = 9
+Output/MPDE/startup_printline_for_mpde-probe-defaults-to-prn.cir source-fails # Xyce 7.10 stops on the original: line 7: .TRAN line has an unexpected number of fields
+Output/MPDE/startup_printline_for_mpde-probe-fallback-defaults-to-prn.cir source-fails # Xyce 7.10 stops on the original: line 7: .TRAN line has an unexpected number of fields
+Output/MPDE/startup_printline_for_mpde-raw-defaults-to-prn.cir source-fails # Xyce 7.10 stops on the original: line 7: .TRAN line has an unexpected number of fields
+Output/MPDE/startup_printline_for_mpde-raw-fallback-defaults-to-prn.cir source-fails # Xyce 7.10 stops on the original: line 7: .TRAN line has an unexpected number of fields

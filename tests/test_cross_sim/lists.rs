@@ -113,6 +113,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn p1_060_the_originals_xyce_rejects_are_named() {
+        // P1-022 leaves out a line Xyce rejects, so the ngspice target
+        // writes these 12 decks and the harness runs their originals,
+        // which Xyce stops on. Oracle: Xyce 7.10 on each original, run as
+        // `sim.rs` runs it (no raw file, exit 1), its verdict recorded here
+        // by name. Checks: 12.
+        let source = listed("xyce-source");
+        for deck in [
+            "Certification_Tests/BUG_204/bug204.cir",
+            "Certification_Tests/BUG_281/bug_281.cir",
+            "Certification_Tests/BUG_630_SON/vpwlRepeatFail.cir",
+            "Certification_Tests/BUG_636_SON/bug636.cir",
+            "Certification_Tests/BUG_80_SON/Bad_PWL_Source.cir",
+            "Message/Input/AC_extractACData1.cir",
+            "Message/Input/DC_excessArgs.cir",
+            "Message/Input/NOISE_extractNOISEData1.cir",
+            "Output/MPDE/startup_printline_for_mpde-probe-defaults-to-prn.cir",
+            "Output/MPDE/startup_printline_for_mpde-probe-fallback-defaults-to-prn.cir",
+            "Output/MPDE/startup_printline_for_mpde-raw-defaults-to-prn.cir",
+            "Output/MPDE/startup_printline_for_mpde-raw-fallback-defaults-to-prn.cir",
+        ] {
+            let class = source.get(deck).map(String::as_str);
+            assert_eq!(class, Some("source-fails"), "{deck}");
+        }
+    }
+
+    #[test]
     fn p1_037_a_proof_file_admits_a_reader_failure() {
         // ESPice's HSPICE reader stops on text HSPICE reads (a node voltage
         // in a resistor value: HSPICE User Guide E-2010.12 p.170, p.173)
