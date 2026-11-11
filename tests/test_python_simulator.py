@@ -983,6 +983,54 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     assert 0.75e-3 < rms < 1.06e-3, rms
 
 
+def _p8_060_am_with_phases(backend):
+    """An AM source with both phases across 1 kOhm: its time and voltage
+    samples over 100 us."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("am", ["in"])
+    d.R("1", "in", d.gnd, 1e3)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0.5, amplitude=1.0, modulating_frequency=1e3,
+                                       carrier_frequency=1e4, signal_phase=45.0, carrier_phase=90.0)
+    tran = tb.transient(step_time=1e-6, end_time=1e-4, max_time=1e-6)
+    return list(tran.time), list(tran["in"])
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_060_an_am_source_with_phases_follows_its_closed_form(backend):
+    """ngspice-45 manual §4.1.6, eq. 4.4: V(t) = VO + (VMO + VMA sin(2 pi FM
+    t + PHASEM)) sin(2 pi FC t + PHASEC) for t > TD, the phases in degrees.
+    The source drives the node, so every sample after t = 0 is the closed
+    form to rounding: ngspice-45 exactly, ESPice 0.3.0 to 2e-16
+    (research/impl/evidence/P8-060/t18.out)."""
+    import math
+
+    time, v = _p8_060_am_with_phases(backend)
+    assert len(time) > 100 and time[-1] == pytest.approx(1e-4)
+    for t, got in zip(time[1:], v[1:]):
+        want = (0.5 + math.sin(2 * math.pi * 1e3 * t + math.radians(45))) * math.sin(2 * math.pi * 1e4 * t + math.radians(90))
+        assert got == pytest.approx(want, abs=1e-12), t
+
+
+@pytest.mark.parametrize(
+    "backend",
+    [
+        "ngspice",
+        # ESPICE-AM-T0: ESPice 0.3.0 gives the waveform's value at t = 0
+        # (1.2071 V here; research/impl/evidence/P8-060/t18.out). The marker
+        # goes when ESPice gives 0 there: until then a pass fails.
+        pytest.param("espice", marks=pytest.mark.xfail(strict=True, reason="ESPICE-AM-T0")),
+    ],
+)
+def test_p8_060_an_am_source_is_zero_until_its_delay(backend):
+    """ngspice-45 manual §4.1.6: "with t > TD, else V(t) = 0"
+    (`vsrcload.c:307-309`), the operating point included."""
+    time, v = _p8_060_am_with_phases(backend)
+    assert time[0] == 0.0 and v[0] == 0.0
+
+
 @pytest.mark.parametrize(
     "backend",
     [

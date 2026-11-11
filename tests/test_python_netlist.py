@@ -527,6 +527,20 @@ class TestWaveformSources:
         with pytest.raises(TypeError):
             c.PulseVoltageSource("x", "x", c.gnd, dc=1.0, dc_offset=1.0)
 
+    def test_p8_060_an_am_source_takes_its_two_phases(self):
+        am = dict(offset=0.5, amplitude=1.0, modulating_frequency=1e3, carrier_frequency=1e4)
+        c = ps().Circuit("t")
+        c.AmplitudeModulatedVoltageSource("m", "m", c.gnd, **am, signal_phase=45.0, carrier_phase=90.0)
+        c.AmplitudeModulatedCurrentSource("c", "c", c.gnd, **am, carrier_phase="{ph}")
+        c.AmplitudeModulatedVoltageSource("n", "n", c.gnd, **am)
+        cards = c.to_source().splitlines()
+        # ngspice-45 manual §4.1.6: AM(VO VMO VMA FM FC TD PHASEM PHASEC), the
+        # phases in degrees. One given: the other is written 0.
+        assert "Vm m 0 0 AM(0 0.5 1 1000 10000 0 45 90)" in cards
+        assert "Ic c 0 0 AM(0 0.5 1 1000 10000 0 0 {ph})" in cards
+        # Neither given: the six fields as before.
+        assert "Vn n 0 0 AM(0 0.5 1 1000 10000 0)" in cards
+
     def test_testbench_builds_tf_sens_pz_disto(self):
         dut = ps().Subcircuit("d")
         dut.R("1", "in", "out", 1e3)

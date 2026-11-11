@@ -285,6 +285,7 @@ FEATURES = {
     "exp": source(lambda tb: tb.ExponentialVoltageSource("in", "in", "0", initial_value=0, pulsed_value=1, rise_time_constant=1e-6, fall_delay_time=5e-6, fall_time_constant=1e-6)),
     "sffm": source(lambda tb: tb.SingleFrequencyFMVoltageSource("in", "in", "0", offset=0, amplitude=1, carrier_frequency=1e6, modulation_index=2, signal_frequency=1e4)),
     "am": source(lambda tb: tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0, amplitude=1, modulating_frequency=1e4, carrier_frequency=1e6)),
+    "am_phases": source(lambda tb: tb.AmplitudeModulatedVoltageSource("in", "in", "0", offset=0, amplitude=1, modulating_frequency=1e4, carrier_frequency=1e6, carrier_phase=90)),
     "trnoise": source(lambda tb: tb.TransientNoiseVoltageSource("in", "in", "0", noise_rms=1e-3, time_step=1e-9)),
     "trrandom": source(lambda tb: tb.RandomVoltageSource("in", "in", "0", random_type="uniform", duration=1e-9)),
     "current_source": source(lambda tb: tb.I("in", "0", "in", 1e-3)),
@@ -430,6 +431,8 @@ EXPECTED = {
     # Xyce and LTspice have no AM source; VACASK's `type="am"` cannot hold a
     # zero carrier (`offset=0`: modindex VMA/VMO); stream D's AM order.
     'am': (OK, OK, OK, 'W0108', 'W0108', 'W0108', 'W0108', OK, OK),
+    # AM with a phase: ngspice's fields 7 and 8; HSPICE's AM has none (P5-034 writes the B form).
+    'am_phases': (OK, OK, 'W0108', 'W0108', 'W0108', 'W0108', 'W0108', OK, OK),
     'trnoise': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'trrandom': (OK, 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', 'W0009', OK, OK),
     'current_source': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
