@@ -1284,3 +1284,78 @@ class TestNonLinearSources:
             sub.NonLinearVoltageSource("1", "a", sub.gnd, "V(a)")
         with pytest.raises(TypeError):
             sub.NonLinearCurrentSource("1", "a", sub.gnd)
+
+
+# ======================================================================
+# The analyses only Spectre has, one door (P8-025; Spectre Reference 19.1 ch.3)
+# ======================================================================
+
+def rc_bench():
+    dut = ps().Subcircuit("rc", ["in", "out"])
+    dut.R("1", "in", "out", 1e3)
+    dut.C("1", "out", dut.gnd, 1e-9)
+    tb = ps().Testbench(dut)
+    tb.V("in", "in", "0", 1.0)
+    return tb
+
+
+class TestSpectreAnalysis:
+    def test_p8_025_the_statement_is_the_manuals_form(self):
+        # Spectre Reference 19.1 p.73: `dcmm1 dcmatch mth=1e-3 oprobe=vd porti=1`,
+        # `dcmm3 n1 n2 dcmatch mth=1e-3 where=rawfile stats=yes`; p.49: `Name
+        # ([node1] [node2]) acmatch parameter=value ...`. Python writes 1e-3 as 0.001.
+        tb = rc_bench()
+        tb.add_spectre_analysis("dcmatch", "dcmm1", mth=1e-3, oprobe="vin", porti=1)
+        tb.add_spectre_analysis("dcmatch", "dcmm3", ("out", "0"), mth=1e-3, where="rawfile", stats="yes")
+        tb.add_spectre_analysis("acmatch", nodes=["out", "0"], start=1, stop="1G", dec=10)
+        tb.add_spectre_analysis("tdr", nodes=())
+        lines = tb.netlist("spectre").splitlines()
+        for want in ("dcmm1 dcmatch mth=0.001 oprobe=vin porti=1",
+                     "dcmm3 (out 0) dcmatch mth=0.001 where=rawfile stats=yes",
+                     "acmatch1 (out 0) acmatch start=1 stop=1G dec=10",
+                     "tdr1 tdr"):
+            assert lines.count(want) == 1, want
+
+    def test_p8_025_a_target_without_the_analysis_refuses_it(self):
+        # `read::spectre_refusal`: no other target has a `dcmatch` (W0015);
+        # CDL and Verilog write no analysis at all.
+        for other in ("ngspice", "espice", "hspice", "xyce", "ltspice", "vacask"):
+            tb = rc_bench()
+            tb.add_spectre_analysis("dcmatch", mth=1e-3)
+            with pytest.raises(RuntimeError, match="W0015"):
+                tb.netlist(other)
+        tb = rc_bench()
+        tb.add_spectre_analysis("dcmatch", mth=1e-3)
+        assert "dcmatch" not in tb.netlist("cdl")
+        assert "dcmatch" not in tb.netlist("verilog")
+
+    @pytest.mark.parametrize("call, message", [
+        (lambda tb: tb.add_spectre_analysis("dcmach"), "'dcmach' is no Spectre analysis"),
+        (lambda tb: tb.add_spectre_analysis("options", reltol=1e-3), "'options' is no Spectre analysis"),
+        (lambda tb: tb.add_spectre_analysis("DCMATCH"), "'DCMATCH' is no Spectre analysis"),
+        (lambda tb: tb.add_spectre_analysis("dcmatch", "my run"), "dcmatch: 'my run' is no statement name"),
+        (lambda tb: tb.add_spectre_analysis("dcmatch", nodes=("out 0",)), "dcmatch: 'out 0' is no node name"),
+        (lambda tb: tb.add_spectre_analysis("dcmatch", nodes=("(out", "0)")), r"dcmatch: '\(out' is no node name"),
+        (lambda tb: tb.add_spectre_analysis("dcmatch", **{"m th": 1}), "dcmatch: 'm th' is no parameter name"),
+        (lambda tb: tb.add_spectre_analysis("dcmatch", stats=True), "dcmatch: stats= takes a value on one line"),
+        (lambda tb: tb.add_spectre_analysis("dcmatch", file="a\nb"), "dcmatch: file= takes a value on one line"),
+    ])
+    def test_p8_025_a_bad_statement_is_a_value_error_and_adds_nothing(self, call, message):
+        tb = rc_bench()
+        tb.add_transient(1e-6, 1e-3)
+        before = tb.netlist("spectre")
+        with pytest.raises(ValueError, match=message):
+            call(tb)
+        assert tb.netlist("spectre") == before
+
+    def test_p8_025_nodes_are_a_sequence_of_names(self):
+        tb = rc_bench()
+        with pytest.raises(TypeError):
+            tb.add_spectre_analysis("dcmatch", nodes="out")
+
+    def test_p8_025_the_store_keeps_the_statement(self):
+        tb = rc_bench()
+        tb.add_spectre_analysis("dcmatch", "dcmm3", ("out", "0"), mth=1e-3)
+        again = ps().Testbench.from_source(tb.to_source())
+        assert again.netlist("spectre") == tb.netlist("spectre")
+        assert "dcmm3 (out 0) dcmatch mth=0.001" in again.netlist("spectre").splitlines()

@@ -18,6 +18,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - backend: a run is routed by every analysis of the deck (was: the first), to a simulator (`backend::Sim`; `select(kinds, …) -> Sim`); a refusal names its cause (the analysis, the feature, or that no simulator runs them all).
 - python: `Subcircuit.add_function(name, args, body)` writes a `.func` inside the subcircuit; one reading a parameter of the subcircuit stays local to it (LTspice, Spectre and VACASK refuse it, `W0106`).
 - python: `NonLinearVoltageSource` / `NonLinearCurrentSource(name, positive, negative, expression=...)` build the E and G cards `value={expr}` (PySpice's names): the behavioural source of `BV` / `BI` under the E/G letter.
+- python: `Testbench.add_spectre_analysis(kind, name=None, nodes=(), **params)` writes any Spectre analysis as its statement (`dcmm3 (out 0) dcmatch mth=0.001`), checked against the analyses Spectre names; a target with no such analysis refuses it (`W0015`).
 
 ## 0.2.0 (2026-11-03)
 

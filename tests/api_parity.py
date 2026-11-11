@@ -147,6 +147,7 @@ PARITY = {
     "spectre_pnoise": (FEATURES["spectre_pnoise"], tw_analysis(["simulator lang=spectre", "pss1 pss fund=1M tstab=10u harms=10", "pnoise1 (out 0) pnoise start=1 stop=1G dec=100", "simulator lang=spice"]), "SR p.253-256 pnoise", None),
     "spectre_pxf": (FEATURES["spectre_pxf"], tw_analysis(["simulator lang=spectre", "pss1 pss fund=1M tstab=10u harms=10", "pxf1 (out 0) pxf start=1 stop=1G dec=100", "simulator lang=spice"]), "SR p.303-304 pxf", None),
     "spectre_pstb": (FEATURES["spectre_pstb"], tw_analysis(["simulator lang=spectre", "pss1 pss fund=1M tstab=10u harms=10", "pstb1 pstb start=1 stop=1G dec=100 probe=vin", "simulator lang=spice"]), "SR p.298-299 pstb", None),
+    "spectre_analysis": (FEATURES["spectre_analysis"], tw_analysis(["simulator lang=spectre", "dcmm3 (out 0) dcmatch mth=0.001 where=rawfile stats=yes", "simulator lang=spice"]), "SR p.70-73 dcmatch (example dcmm3, p.73)", "P8-025"),
     # ── Settings ──
     "options": (FEATURES["options"], tw_setting([".options RELTOL=0.0001 noacct"]), "ng §11.1 .options (RELTOL; NOACCT a flag, api-parity Q2)", None),
     "temperature": (FEATURES["temperature"], tw_setting([".temp 85", ".options tnom=27"]), "ng §11.2 .temp/.options tnom", None),

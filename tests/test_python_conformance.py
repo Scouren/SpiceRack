@@ -173,6 +173,7 @@ FEATURES = {
     "spectre_pnoise": analysis(lambda tb: tb.add_spectre_pnoise(1e6, 1e-5, "out", "0")),
     "spectre_pxf": analysis(lambda tb: tb.add_spectre_pxf(1e6, 1e-5, "out", "Vin")),
     "spectre_pstb": analysis(lambda tb: tb.add_spectre_pstb(1e6, 1e-5, "Vin")),
+    "spectre_analysis": analysis(lambda tb: tb.add_spectre_analysis("dcmatch", "dcmm3", ("out", "0"), mth=1e-3, where="rawfile", stats="yes")),
     # Settings.
     "options": setting(lambda tb: tb.options(RELTOL=1e-4, noacct=True)),
     "temperature": setting(lambda tb: (setattr(tb, "temperature", 85.0), setattr(tb, "nominal_temperature", 27.0))),
@@ -289,6 +290,9 @@ EXPECTED = {
     'spectre_pnoise': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
     'spectre_pxf': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001+W0015', OK, OK),
     'spectre_pstb': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001+W0015', OK, OK),
+    # `dcmatch`, through the one door for the kinds only Spectre has: no other target
+    # lists it (`Behaviours::spectre_analyses`), as `stability`'s `stb` above.
+    'spectre_analysis': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0015', OK, OK),
     'options': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'temperature': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'initial_condition': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -398,6 +402,7 @@ NOT_A_FEATURE = {
 }
 COVERED = {
     "Testbench": {
+        "add_spectre_analysis",
         "V", "I", "R", "C", "add_operating_point", "add_dc", "add_ac", "add_transient",
         "add_noise", "add_tf", "add_transfer_function", "add_dc_sensitivity",
         "add_ac_sensitivity", "add_polezero", "add_distortion", "add_pss", "add_s_param",

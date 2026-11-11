@@ -275,6 +275,22 @@ impl PyTestbench {
         Ok(())
     }
 
+    /// Any other analysis of Spectre's own, as its statement `name
+    /// [(nodes)] kind key=value …` in the deck's Spectre region:
+    /// `add_spectre_analysis("dcmatch", "dcmm3", ("out", "0"), mth=1e-3)`
+    /// (Spectre Reference 19.1 ch.3). Spectre writes it, a target with no
+    /// such analysis refuses it (`W0015`). `name` defaults to `<kind>1`; a
+    /// value is written as given (`stats="yes"`). `ValueError` for a kind
+    /// Spectre does not name, and per [`card::spectre_statement`]. It is
+    /// the deck's text: `run()` returns no result for it.
+    #[pyo3(signature = (kind, name=None, nodes=None, **params))]
+    fn add_spectre_analysis(mut slf: PyRefMut<'_, Self>, kind: &str, name: Option<&str>, nodes: Option<Vec<String>>, params: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        let params = super::args::kw_params(params)?;
+        let line = card::spectre_statement(kind, name, &nodes.unwrap_or_default(), &params).map_err(PyValueError::new_err)?;
+        slf.as_super().tb().extra_lines.push((line, crate::syntax::Lang::SPECTRE));
+        Ok(())
+    }
+
     /// Runs every queued analysis (`add_*`) as one deck and returns one
     /// result per analysis, in queue order, each the type its single-analysis
     /// twin returns (a list of one per step for an LTspice `.step` run) (`op, tran = tb.run()`); `None` for `add_fourier`, whose

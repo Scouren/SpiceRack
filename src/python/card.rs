@@ -19,12 +19,17 @@
 //! - `pub(super) fn harmonic_balance(frequencies: Vec<f64>, harmonics: Option<Vec<u32>>) -> Analysis`
 //! - `pub(super) fn stability(probe, variation, points, start, stop) -> PyResult<Analysis>`
 //! - `pub(super) fn network_params(output_current, input_source, z_in, z_out) -> String`
+//! - `pub(super) fn spectre_statement(kind, name, nodes, params) -> Result<String, String>`
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::analysis::{Analysis, DcSweep, FreqSweep};
+
+use crate::syntax::Lang;
+use crate::syntax::statement::Statement;
+
 /// Extract DC sweep params: kwargs like Vinput=slice(-2, 5, 0.01)
 pub(super) fn dc_sweeps(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Analysis> {
     let mut sweeps = Vec::new();
@@ -237,6 +242,54 @@ pub(super) fn stability(
         probe: probe.into(),
         sweep: sweep(variation, points, start, stop)?,
     })
+}
+
+/// A Spectre analysis statement, `name [(nodes)] kind key=value …`, the
+/// text a `simulator lang=spectre` region holds (Spectre Reference 19.1
+/// ch.3: `Name ([node1] [node2]) acmatch parameter=value ...` p.49,
+/// `dcmm1 dcmatch mth=1e-3 oprobe=vd porti=1` p.73). `name` defaults to
+/// `<kind>1`; a value is written as given.
+///
+/// # Errors
+/// A `kind` the Spectre dialect's statement table has no analysis for; a
+/// name or key that is no identifier; a node that is empty or holds a blank
+/// or a parenthesis; a value that is empty (a `True` flag: Spectre's
+/// booleans are `yes` and `no`) or holds a line break.
+pub(super) fn spectre_statement(
+    kind: &str,
+    name: Option<&str>,
+    nodes: &[String],
+    params: &[(String, String)],
+) -> Result<String, String> {
+    let spectre = Lang::SPECTRE.lexicon().expect("Spectre has a reader");
+    if !matches!(spectre.master(kind), Some(Statement::Analysis(_))) {
+        return Err(format!("'{kind}' is no Spectre analysis"));
+    }
+    let word = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+    let mut out = name.map_or_else(|| format!("{kind}1"), str::to_string);
+    if !word(&out) {
+        return Err(format!("{kind}: '{out}' is no statement name"));
+    }
+    let blank = |c: char| c.is_whitespace() || c == '(' || c == ')';
+    if let Some(n) = nodes.iter().find(|n| n.is_empty() || n.contains(blank)) {
+        return Err(format!("{kind}: '{n}' is no node name"));
+    }
+    if !nodes.is_empty() {
+        out.push_str(&format!(" ({})", nodes.join(" ")));
+    }
+    out.push_str(&format!(" {kind}"));
+    for (k, v) in params {
+        if !word(k) {
+            return Err(format!("{kind}: '{k}' is no parameter name"));
+        }
+        if v.is_empty() || v.contains(['\n', '\r']) {
+            return Err(format!(
+                "{kind}: {k}= takes a value on one line (Spectre's booleans are yes and no)"
+            ));
+        }
+        out.push_str(&format!(" {k}={v}"));
+    }
+    Ok(out)
 }
 
 /// LTspice's `.net` card (no other dialect has one), beside an `.ac`.

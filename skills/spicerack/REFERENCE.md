@@ -137,6 +137,10 @@ so any deck is netlisted before it runs: also `add_pss`, `add_s_param`,
 `add_harmonic_balance`, `add_stability`, `add_transient_noise`,
 `add_network_params`, `add_spectre_sweep`, `add_spectre_monte_carlo`,
 `add_spectre_pac`, `add_spectre_pnoise`, `add_spectre_pxf`, `add_spectre_pstb`.
+Any other Spectre analysis (`dcmatch`, `acmatch`, `qpss`, `envlp`, `tdr`, `psp`, `hbsp`, `hbstb`, `pdisto`, ...) is
+`tb.add_spectre_analysis(kind, name=None, nodes=(), **params)`, the statement `name (nodes) kind key=value ...`
+(`tb.add_spectre_analysis("dcmatch", "dcmm3", ("out", "0"), mth=1e-3, stats="yes")`): written on Spectre, `W0015` on
+a target with no such analysis, `ValueError` for a kind Spectre does not name; netlist only (`run()` returns nothing for it).
 `spectre_montecarlo` warns, deprecated. `transient_noise(step, stop)` is
 ngspice's transient noise: a `.tran` whose noise is the bench's `TRNOISE`/
 `TRRANDOM` sources (no device noise). `pss(..., sc_iter=, steady_coeff=,

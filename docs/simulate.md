@@ -136,6 +136,19 @@ run method has one with the same arguments (`add_operating_point`, `add_ac`,
 are netlist-only: `netlist()` writes them, `run()` needs one of ngspice,
 LTspice, VACASK, Spectre or ESPice.
 
+A Spectre analysis with no method of its own goes through one door,
+`add_spectre_analysis(kind, name=None, nodes=(), **params)`: the statement
+`name (nodes) kind key=value ...` of the Spectre reference, checked against the
+analyses Spectre names (`ValueError` for any other word). Spectre writes it; a
+target with no such analysis refuses it (`W0015`).
+
+```python
+mismatch = ps.Testbench(rc)
+mismatch.V("in", "vin", "0", 1.0)
+mismatch.add_spectre_analysis("dcmatch", "dcmm3", ("vout", "0"), mth=1e-3, where="rawfile", stats="yes")
+print(mismatch.netlist("spectre"))   # ... dcmm3 (vout 0) dcmatch mth=0.001 where=rawfile stats=yes
+```
+
 `tb.run()` runs the queued analyses as that one deck and returns one result per
 analysis, in the order they were queued, each the type its immediate twin
 returns (`None` for `add_fourier`, whose table goes to stdout). ngspice runs a
