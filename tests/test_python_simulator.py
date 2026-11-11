@@ -1025,6 +1025,167 @@ def test_transient_noise_is_a_tran_over_trnoise_sources():
     assert 0.75e-3 < rms < 1.06e-3, rms
 
 
+def _p8_lines_nearest(time, v, t):
+    """The sample of `v` nearest to time `t`."""
+    return v[min(range(len(time)), key=lambda i: abs(time[i] - t))]
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_049_a_lossy_line_at_dc_is_its_series_resistance(backend):
+    """ngspice-45 manual §6.2: an LTRA model's `r` is ohms per unit length
+    and `len` the line's length, so at DC the line is r*len in series:
+    10 Ohm/m over 5 m under a 50 Ohm load and 1 V is 50/(50+50) V (closed
+    form; ngspice-45 and ESPice 0.3.0 give 0.5,
+    research/impl/evidence/P8-049/t21.ng.out, t21.es.out)."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("ltra", ["in", "out"])
+    d.model("omod", "ltra", r=10, l=250e-9, c=100e-12, len=5)
+    d.O("1", "in", d.gnd, "out", d.gnd, model="omod")
+    d.R("l", "out", d.gnd, 50)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.V("in", "in", "0", 1.0)
+    # A linear DC solve: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(50 / (50 + 10 * 5), rel=1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+@pytest.mark.parametrize("lumps", [None, 6])
+def test_p8_053_a_uniform_rc_line_at_dc_is_its_series_resistance(backend, lumps):
+    """ngspice-45 manual §6.3: a URC line is `rperl` ohms per metre over
+    `l` metres, in any number of lumps: 1 MOhm/m over 1 mm is 1 kOhm, and
+    under a 1 kOhm load and 1 V the output is 1/2 V (closed form)."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("urc", ["in", "out"])
+    d.model("umod", "urc", rperl=1e6, cperl=1e-12, fmax=1e9)
+    d.U("1", "in", "out", d.gnd, model="umod", length=1e-3, lumps=lumps)
+    d.R("l", "out", d.gnd, 1e3)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.V("in", "in", "0", 1.0)
+    # A linear DC solve over the lumps: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(1e3 / (1e3 + 1e6 * 1e-3), rel=1e-9)
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+@pytest.mark.parametrize("length", [None, 2])
+def test_p8_050_a_txl_line_delays_a_step_by_its_length(backend, length):
+    """A matched line: Z0 = sqrt(l/c) = 50 Ohm between a 50 Ohm source and
+    a 50 Ohm load, 5 ns per metre (sqrt(l*c)). A 1 V step reaches the load
+    as 1/2 V after the line's delay and not before; `length=` on the card
+    (ngspice-45 manual §6.4.1, `<LEN=LENGTH>`) replaces the model's 1 m.
+    The closed form is the lossless line's: `r` is 0.01 Ohm/m (ESPice
+    0.3.0 refuses a `txl` model with r=0), which moves the level by at
+    most 0.5 * 0.02/100 = 1e-4 V."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("txl", ["s", "out"])
+    d.model("ymod", "txl", r=0.01, l=250e-9, g=0, c=100e-12, length=1)
+    d.R("s", "s", "in", 50)
+    d.Y("1", "in", d.gnd, "out", d.gnd, model="ymod", length=length)
+    d.R("l", "out", d.gnd, 50)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.PulseVoltageSource("s", "s", "0", initial_value=0.0, pulsed_value=1.0, delay=0.0, rise_time=1e-10,
+                          fall_time=1e-10, pulse_width=1e-7, period=2e-7)
+    tran = tb.transient(step_time=1e-10, end_time=3e-8, max_time=1e-10)
+    time, v = list(tran.time), list(tran["out"])
+    delay = (length or 1) * math.sqrt(250e-9 * 100e-12)
+    assert delay == pytest.approx((length or 1) * 5e-9)
+    # Half a nanosecond either side of the arrival (the edge is 0.1 ns).
+    assert _p8_lines_nearest(time, v, delay - 0.5e-9) == pytest.approx(0.0, abs=1e-6)
+    assert _p8_lines_nearest(time, v, delay + 0.5e-9) == pytest.approx(0.5, abs=5e-4)
+    assert v[-1] == pytest.approx(0.5, abs=5e-4)
+
+
+# A symmetric pair, per metre (the L11, L12 and C11, C12 of the ngspice-45
+# manual's §6.4.2 example): each conductor's own value, then the mutual one.
+_P8_051_L = (3.83572e-7, 8.26253e-8)  # H/m
+_P8_051_C = (9.143579e-11, -9.78265e-12)  # F/m, Maxwell form
+
+
+def _p8_051_cpl_step(backend, length):
+    """Two coupled lines, 50 Ohm at all four ends, a 1 V step into the
+    first: time and the far-end voltages of the driven line and its
+    neighbour."""
+    import spicerack as ps
+
+    (l11, l12), (c11, c12) = _P8_051_L, _P8_051_C
+    d = ps.Subcircuit("cpl", ["s", "b1", "b2"])
+    d.model("pmod", "cpl", r="0 0 0", l=f"{l11} {l12} {l11}", g="0 0 0", c=f"{c11} {c12} {c11}", length=1)
+    d.R("s1", "s", "a1", 50)
+    d.R("s2", "a2", d.gnd, 50)
+    d.P("1", ["a1", "a2"], d.gnd, ["b1", "b2"], d.gnd, model="pmod", length=length)
+    d.R("l1", "b1", d.gnd, 50)
+    d.R("l2", "b2", d.gnd, 50)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.PulseVoltageSource("s", "s", "0", initial_value=0.0, pulsed_value=1.0, delay=0.0, rise_time=1e-10,
+                          fall_time=1e-10, pulse_width=1.0, period=2.0)
+    tran = tb.transient(step_time=1e-10, end_time=1.2e-8 * (length or 1), max_time=1e-10)
+    return list(tran.time), list(tran["b1"]), list(tran["b2"])
+
+
+def _p8_051_modes():
+    """The pair's even and odd modes, each as (seconds per metre, the
+    step's share at a 50 Ohm far end from a 50 Ohm source). A symmetric
+    lossless pair carries a step on line 1 as half even (both lines
+    alike) and half odd (opposite): mode m has L = l11 +- l12 and
+    C = c11 +- c12, travels at sqrt(L*C) per metre in Z = sqrt(L/C), is
+    launched as 1/2 * Z/(50+Z) and arrives as that times 2*50/(50+Z)."""
+    (l11, l12), (c11, c12) = _P8_051_L, _P8_051_C
+    out = []
+    for sign in (1, -1):
+        l, c = l11 + sign * l12, c11 + sign * c12
+        z = math.sqrt(l / c)
+        out.append((math.sqrt(l * c), 50 * z / (50 + z) ** 2))
+    return out
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice"])
+def test_p8_051_coupled_lines_carry_a_step_as_two_modes(backend):
+    """The odd mode is the faster (5.519 ns/m against 6.170 ns/m), so the
+    far ends read 0 until it arrives, then +-0.2495310 V (line 1, line 2),
+    then 0.4891703 V and -0.0098917 V once the even mode is in, until the
+    first reflection (three odd delays). ngspice-45 and ESPice 0.3.0 give
+    these to 7 digits (research/impl/evidence/P8-049/api/t25.out). A card with
+    its nodes in another order gives none of the three plateaus."""
+    time, b1, b2 = _p8_051_cpl_step(backend, None)
+    (t_even, even), (t_odd, odd) = _p8_051_modes()
+    assert t_odd < t_even < 3 * t_odd
+    for t, want1, want2 in [
+        (t_odd - 0.3e-9, 0.0, 0.0),
+        ((t_odd + t_even) / 2, odd, -odd),
+        (t_even + 1e-9, even + odd, even - odd),
+    ]:
+        assert _p8_lines_nearest(time, b1, t) == pytest.approx(want1, abs=1e-5), t
+        assert _p8_lines_nearest(time, b2, t) == pytest.approx(want2, abs=1e-5), t
+
+
+@pytest.mark.parametrize(
+    "backend",
+    [
+        "ngspice",
+        # ESPICE-CPL-LEN: ESPice 0.3.0 reads a P card's `LEN=` and keeps the
+        # model's length (research/impl/evidence/P8-049/api/t25.out). The marker
+        # goes when ESPice takes the card's: until then a pass fails.
+        pytest.param("espice", marks=pytest.mark.xfail(strict=True, reason="ESPICE-CPL-LEN")),
+    ],
+)
+def test_p8_051_a_coupled_line_takes_its_length_from_the_card(backend):
+    """ngspice-45 manual §6.4.2: "len will override the model parameter
+    length for the specific instance only". Ten times the model's metre is
+    ten times each delay: nothing at the far end 0.3 ns before ten odd
+    delays, the odd plateau between the two arrivals."""
+    time, b1, b2 = _p8_051_cpl_step(backend, 10)
+    (t_even, _), (t_odd, odd) = _p8_051_modes()
+    assert _p8_lines_nearest(time, b1, 10 * t_odd - 0.3e-9) == pytest.approx(0.0, abs=1e-5)
+    assert _p8_lines_nearest(time, b1, 5 * (t_odd + t_even)) == pytest.approx(odd, abs=1e-5)
+    assert _p8_lines_nearest(time, b2, 5 * (t_odd + t_even)) == pytest.approx(-odd, abs=1e-5)
+
+
 def _p8_060_am_with_phases(backend):
     """An AM source with both phases across 1 kOhm: its time and voltage
     samples over 100 us."""

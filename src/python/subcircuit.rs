@@ -64,7 +64,7 @@ pub(super) fn read_file(path: &str) -> PyResult<String> {
 
 // ---- private ----
 
-pymethods_with_waves! {
+pymethods_with_lines! {
 #[pymethods]
 impl PySubcircuit {
     #[new]
