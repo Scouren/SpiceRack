@@ -27,13 +27,23 @@ impl W<'_, '_> {
         self.line("");
         self.line("control");
         let mut opts = String::from("  options rawfile=\"binary\"");
+        // With a MAXORD the order is the option's: VACASK's `trap` and
+        // `gear2` are order 2 whatever `tran_maxord` says, `am` and `gear`
+        // read it (`lib/coretran.cpp`, "Set up integration method"; ngspice
+        // manual p.318: MAXORD=1 with the trapezoid is backward Euler).
+        let ord = tb
+            .options
+            .iter()
+            .any(|o| o.0.eq_ignore_ascii_case("maxord"));
         for (k, v, tok) in &tb.options {
             let k = k.to_ascii_lowercase();
             match self.b.option_map.iter().find(|o| o.0 == k).map(|o| o.1) {
                 Some(OptionTo::Name(own)) => opts.push_str(&format!(" {own}={}", respell(v))),
-                Some(OptionTo::Method) => match v.to_ascii_lowercase().as_str() {
-                    "trap" | "trapezoidal" => opts.push_str(" tran_method=\"trap\""),
-                    "gear" | "gear2" => opts.push_str(" tran_method=\"gear2\""),
+                Some(OptionTo::Method) => match (v.to_ascii_lowercase().as_str(), ord) {
+                    ("trap" | "trapezoidal", false) => opts.push_str(" tran_method=\"trap\""),
+                    ("trap" | "trapezoidal", true) => opts.push_str(" tran_method=\"am\""),
+                    ("gear" | "gear2", false) => opts.push_str(" tran_method=\"gear2\""),
+                    ("gear" | "gear2", true) => opts.push_str(" tran_method=\"gear\""),
                     _ => {
                         self.ask(Construct::UnmappedOption, *tok);
                     }
@@ -50,6 +60,10 @@ impl W<'_, '_> {
                     self.ask(Construct::UnmappedOption, *tok);
                 }
             }
+        }
+        // A MAXORD with no METHOD: SPICE's default trapezoid at that order.
+        if ord && !opts.contains(" tran_method=") {
+            opts.push_str(" tran_method=\"am\"");
         }
         for (k, v, _) in &tb.vacask {
             opts.push_str(&format!(" {k}={v}"));

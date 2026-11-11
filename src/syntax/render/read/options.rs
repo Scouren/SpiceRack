@@ -69,6 +69,13 @@ impl<'a> Rd<'a> {
                     out.push(match (pkg.as_str(), k.to_ascii_lowercase().as_str(), x) {
                         ("device", "temp", Some(x)) => Opt::Temp(x),
                         ("device", "tnom", Some(x)) => Opt::Tnom(x),
+                        // RG Table 2-5: METHOD `gear` or 8 is the Gear
+                        // method and MAXORD the highest order tried,
+                        // SPICE's `method=gear` and `maxord`.
+                        ("timeint", "method", _) if v.eq_ignore_ascii_case("gear") || v == "8" => {
+                            Opt::Portable("method".into(), "gear".into())
+                        }
+                        ("timeint", "maxord", Some(_)) => Opt::Portable("maxord".into(), v),
                         // RG `.OPTIONS TIMEINT` RELTOL: the integrator's
                         // relative tolerance, SPICE's RELTOL.
                         ("timeint", "reltol", Some(_)) => Opt::Portable("reltol".into(), v),

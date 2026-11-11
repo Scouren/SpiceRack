@@ -1211,6 +1211,9 @@ def vacask(d):
         .option_to("scale", "scale")
         # `method=trap|gear` is `tran_method` (`docs/cmd-options-tran.md`).
         .option_method("method")
+        # `maxord=n` is `tran_maxord` (`lib/options.cpp`); the writer
+        # pairs it with the `am`/`gear` method names that read it.
+        .option_to("maxord", "tran_maxord")
         # Keys that only steer a simulator's bookkeeping or printing:
         # dropping one changes no number in the raw file.
         .option_cosmetic("noacct")

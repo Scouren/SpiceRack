@@ -188,6 +188,9 @@ pub(super) fn vacask() -> DialectDef {
         .option_to("scale", "scale")
         // `method=trap|gear` is `tran_method` (`docs/cmd-options-tran.md`).
         .option_method("method")
+        // `maxord=n` is `tran_maxord` (`lib/options.cpp`); the writer
+        // pairs it with the `am`/`gear` method names that read it.
+        .option_to("maxord", "tran_maxord")
         // Keys that only steer a simulator's bookkeeping or printing:
         // dropping one changes no number in the raw file.
         .option_cosmetic("noacct")
@@ -215,9 +218,9 @@ pub(super) fn vacask() -> DialectDef {
         // `docs/cmd-options-op.md` `op_itl`, `-tran.md` `tran_itl`,
         // `-homotopy.md` `homotopy_gminsteps` and `homotopy_srcsteps`, a
         // step count with 0 = off as SPICE's; ZERO-LEDGER P4-009).
-        // `maxord` is not here: `tran_maxord` bounds the variable-order
-        // methods only, and the writer's `trap` and `gear2` are fixed
-        // order 2.
+        // `maxord` is the `tran_maxord` row above: `tran_maxord` bounds
+        // the variable-order methods only, so the writer pairs it with
+        // `am`/`gear`, not the fixed-order `trap`/`gear2` (P3-004).
         .option_to("itl1", "op_itl")
         .option_to("itl4", "tran_itl")
         .option_to("gminsteps", "homotopy_gminsteps")

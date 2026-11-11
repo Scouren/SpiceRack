@@ -21,6 +21,28 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-004. Xyce RG Table 2-5 (TIMEINT): `METHOD=gear` or 8 is the
+/// Gear method, MAXORD the highest order tried. ngspice manual p.318:
+/// `METHOD=name` (Gear), `MAXORD=x` (2 to 6 for Gear). VACASK
+/// `lib/coretran.cpp`: `tran_method="gear"` reads `tran_maxord`, `"gear2"`
+/// is order 2 whatever it says. Both written decks run on their simulator.
+#[test]
+fn p3_004_xyce_timeint_gear_is_method_gear() {
+    let deck = "t\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 1u\n\
+        .options timeint method=8 maxord=3\n.tran 10u 2m\n.end\n";
+    let ng = oracle::spec_example(
+        "ngspice manual p.318: METHOD=name, MAXORD=x",
+        deck,
+        Dialect::Xyce,
+        Dialect::Ngspice,
+        &[".options method=gear maxord=3"],
+    );
+    let va = oracle::write(deck, Dialect::Xyce, Dialect::Vacask);
+    assert!(va.contains(" tran_method=\"gear\" tran_maxord=3"), "{va}");
+    assert!(!oracle::run(Dialect::Ngspice, &ng).is_empty(), "{ng}");
+    assert!(!oracle::run(Dialect::Vacask, &va).is_empty(), "{va}");
+}
+
 /// Ledger P3-003. Xyce RG `.OPTIONS TIMEINT` RELTOL is the integrator's
 /// relative tolerance, ngspice's RELTOL (manual p.317). A 1 kHz sine
 /// through R = 1 kΩ into C = 1 µF (τ = 1 ms, ωτ = 2π) at t = 20.25 ms, the
