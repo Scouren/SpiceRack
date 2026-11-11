@@ -295,7 +295,8 @@ fn a_vacask_save_is_the_targets_save_list() {
 fn a_vacask_sweep_over_an_operating_point_is_the_targets_dc_sweep() {
     // cmd-sweep.md: `step=` a uniform step, `mode="lin" points=N` N
     // intervals, `mode="dec" points=N` N per decade; ngspice's `.dc` is
-    // linear only (manual §15.3.2), so a decade sweep is refused W0038.
+    // linear only (manual §15.3.2), so a decade sweep is a `foreach` loop
+    // of its control script, one plot a point (ZERO-LEDGER P5-001 step 6).
     // The divider's v(2) is 0.9 v1.
     let bare = SCRIPTED.split("embed").next().expect("a deck");
     let sweep = |s: &str| {
@@ -321,7 +322,17 @@ fn a_vacask_sweep_over_an_operating_point_is_the_targets_dc_sweep() {
         }
     }
     let dec = sweep("from=1 to=100 mode=\"dec\" points=2");
-    assert_eq!(refusals(written(&dec, Dialect::Ngspice)), vec![Code::W0038]);
+    let ng = written(&dec, Dialect::Ngspice).expect("written").text;
+    let plots = Dialect::Ngspice.run_all(&ng).expect("ngspice runs");
+    let nn: Vec<f64> = plots.iter().map(|p| node(p, "2")).collect();
+    let v = run(Dialect::Vacask, &dec);
+    let vv = column(&v, "2");
+    assert_eq!((vv.len(), nn.len()), (5, 5), "{ng}");
+    for (k, (a, b)) in vv.iter().zip(nn).enumerate() {
+        let want = 0.9 * 10f64.powf(k as f64 / 2.0);
+        let near = |x: f64| (x - want).abs() < 1e-9 * want;
+        assert!(near(*a) && near(b), "point {k}: {a} {b}\n{ng}");
+    }
 }
 
 #[test]

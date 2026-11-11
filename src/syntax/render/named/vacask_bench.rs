@@ -135,8 +135,7 @@ impl W<'_, '_> {
         assert!(tb.plan.single_epoch(), "a second epoch has no writer yet");
         for (idx, (a, tok)) in tb.plan.runs.iter().zip(&tb.plan.run_tok).enumerate() {
             while let Some((n, _)) = extra.next_if(|&(_, before)| before <= idx) {
-                let l = self.rd.line(n);
-                self.line(&format!("  {l}"));
+                self.kept_line(n);
             }
             // The DC analyses see a waveform source's DC value
             // (`W::dc_alters`), a transient its waveform.
@@ -172,8 +171,7 @@ impl W<'_, '_> {
             }
         }
         for (n, _) in extra {
-            let l = self.rd.line(n);
-            self.line(&format!("  {l}"));
+            self.kept_line(n);
         }
         self.line("endc");
     }
@@ -465,6 +463,20 @@ impl W<'_, '_> {
             .map(|(n, v)| format!("\"{}\", {}", n.to_ascii_lowercase(), self.vval(v)));
         let body: Vec<String> = nodes.chain(more.iter().cloned()).collect();
         format!(" {key}={{{}}}", body.join(", "))
+    }
+
+    /// Kept control statement `n`, in its place among the analyses:
+    /// VACASK's own copied as it stands; another language's (an ngspice
+    /// `alterparam`, which no VACASK statement is written for yet:
+    /// ZERO-LEDGER P5-050) asked about as the text it is.
+    fn kept_line(&mut self, n: u32) {
+        let tok = self.rd.main(n);
+        if self.rd.text_behaviours(tok).named_rules != NamedRules::Vacask {
+            self.ask(self.rd.kept_construct(tok), tok);
+            return;
+        }
+        let l = self.rd.line(n);
+        self.line(&format!("  {l}"));
     }
 
     /// The top's RF ports in `portnum` order, each the pair `acsp` names

@@ -103,7 +103,9 @@ therefore says `.options tnom=27` and `.temp 27` where you set neither, and
 runs at the temperature every other target runs it at.
 
 `tb.step(param, start, stop, step)` and `tb.step_sweep(param, start, stop, n, "dec")`
-emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not.
+emit `.step`: LTspice, VACASK and Spectre run it, ngspice and ESPice do not
+(`netlist("ngspice")` writes the sweep as `foreach` loops of a `.control`
+script; a run still goes to a backend that returns one result per step).
 On LTspice a stepped run returns a list, one result per step in step order, and
 each result's `params` names its step (`{"r": 2000.0}`; `{}` when nothing steps),
 so `[op.params["r"] for op in tb.operating_point()]` lists the step values

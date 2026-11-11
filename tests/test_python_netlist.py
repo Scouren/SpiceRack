@@ -406,6 +406,38 @@ class TestSwitchesAndTLines:
         assert "Z0=50" in netlist
         assert "TD=" in netlist
 
+    def test_p8_049_the_line_elements_write_their_cards(self):
+        c = ps().Circuit("t")
+        c.O("1", "in", c.gnd, "out", c.gnd, model="lossymod")
+        c.Y("1", "in", c.gnd, "out", c.gnd, model="ymod")
+        c.Y("2", "in", c.gnd, "out", c.gnd, model="ymod", length=16)
+        c.P("1", ["a1", "a2"], c.gnd, ["b1", "b2"], c.gnd, model="pline")
+        c.P("2", ["a1"], "ga", ["b1"], "gb", model="pline", length="{len}")
+        c.U("1", "in", "out", c.gnd, model="urcmod", length=50e-6)
+        c.U("2", "in", "out", c.gnd, model="urcmod", length="len", lumps=6)
+        cards = c.to_source().splitlines()
+        # ngspice-45 manual §6.2: `OXXXXXXX n1 n2 n3 n4 mname`.
+        assert "O1 in 0 out 0 lossymod" in cards
+        # §6.4.1: `YXXXXXXX N1 0 N2 0 mname <LEN=LENGTH>`.
+        assert "Y1 in 0 out 0 ymod" in cards
+        assert "Y2 in 0 out 0 ymod LEN=16" in cards
+        # §6.4.2: `PXXXXXXX NI1 NI2...NIX GND1 NO1 NO2...NOX GND2 mname
+        # <LEN=LENGTH>`: the inputs, their ground, the outputs, theirs.
+        assert "P1 a1 a2 0 b1 b2 0 pline" in cards
+        assert "P2 a1 ga b1 gb pline LEN={len}" in cards
+        # §6.3: `UXXXXXXX n1 n2 n3 mname l=len <n=lumps>`.
+        assert "U1 in out 0 urcmod l=0.00005" in cards
+        assert "U2 in out 0 urcmod l={len} n=6" in cards
+
+    def test_p8_051_coupled_lines_need_one_output_per_input(self):
+        c = ps().Circuit("t")
+        with pytest.raises(ValueError, match="P1: 2 inputs and 1 outputs"):
+            c.P("1", ["a1", "a2"], c.gnd, ["b1"], c.gnd, model="pline")
+        with pytest.raises(ValueError, match="P2: 0 inputs and 0 outputs"):
+            c.P("2", [], c.gnd, [], c.gnd, model="pline")
+        # Nothing was kept.
+        assert "P1" not in c.to_source() and "P2" not in c.to_source()
+
     def test_p8_045_a_switch_takes_its_initial_state(self):
         c = ps().Circuit("t")
         c.S("1", "out", c.gnd, control_positive="cp", control_negative="cm", model="sw1", initial_state="on")

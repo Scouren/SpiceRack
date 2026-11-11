@@ -103,11 +103,12 @@ macro_rules! rows_w_spice {
                 cite: "ngspice manual ch.11; HSPICE UG; Xyce RG Table 6-1; LTspice help",
                 explain: "The target has no analysis of this kind. Run it on a simulator that has one, or drop it from the deck.",
             }
-            /// A `.step` sweep the target has no card for (it would run once).
+            /// A `.step` sweep the target has no card for (it would run
+            /// once), or one ngspice's control script has no command for.
             W0016 Refusal {
                 title: "a `.step` the target lacks",
                 cite: "ngspice manual (no `.step`; `.dc` sweeps); HSPICE `.alter`; Xyce RG p.155",
-                explain: "The target has no `.step`, so the deck would run once. Sweep with the target's own form (`.dc` over a parameter, `.alter`, a script loop).",
+                explain: "The target has no `.step`, so the deck would run once. Sweep with the target's own form (`.dc` over a parameter, `.alter`, a script loop). ngspice runs a `.step` over the temperature, a parameter the deck's top declares or a top-level R, C, L, V, I as a loop of its `.control` script; a step over anything else (a device or model parameter, a name an included file declares) is refused.",
             }
             /// An option the target has no spelling for.
             W0017 Refusal {
@@ -160,11 +161,11 @@ macro_rules! rows_w_spice {
                 cite: "Xyce RG pp.96-104 (`.options <pkg>`); VACASK docs/cmd-options.md",
                 explain: "The option is another simulator's own (VACASK's on a SPICE target, Xyce's packaged options on Spectre or VACASK) or only cosmetic, so it is left out. Set the target's own option if one has the same effect.",
             }
-            /// A `.control` line other than an analysis: not written.
+            /// A `.control` line that changes no run: not written.
             W0025 Note {
                 title: "a control-block line not written",
                 cite: "ngspice manual ch.13 (the control language is a script, not a netlist)",
-                explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated. Run the script on ngspice, or rewrite it for the target's own scripting. (A VACASK control block's script lines are W0120.)",
+                explain: "Of an ngspice `.control` block the analyses and the top-level parameter changes (`alterparam` then `reset`) are read. A line that shows, writes or post-processes results (`let`, `print`, `write`, `plot`, `set filetype=` …) changes no run and is left out, as is an `alterparam` no `reset` follows. (A line that changes the circuit is W0160; a VACASK control block's script lines are W0120.)",
             }
             /// A waveform's arguments past the count the target's form takes.
             W0026 Note {
@@ -239,11 +240,11 @@ macro_rules! rows_w_spice {
                 cite: "LTspice help (`.TRAN` modifier `startup`: the operating point with the independent sources off, each ramped on over the first 20 µs); ngspice manual, transient options (`RAMPTIME`, a ramp of given length whose shape LTspice does not state); HSPICE, Xyce RG `.TRAN`, Spectre, VACASK: no start-up ramp",
                 explain: "The transient starts from an operating point with every independent source at zero and ramps them on over its first 20 µs. A target with no such start gets each top-level DC source as a PWL from zero to its value over 20 µs. This source's DC value is neither a number nor an expression, so no ramp is written for it; without one the run starts from the full-source operating point, another answer for a circuit that latches or soft-starts. Write the value as a number or a braced expression, or ramp the source in the deck (a PWL from zero) and drop `startup`.",
             }
-            /// A `.dc` axis by decade, octave or list on a target whose `.dc` is linear only.
+            /// A `.dc` axis by decade, octave or list on a target whose `.dc` is linear only and that has no loop for it.
             W0038 Refusal {
                 title: "a log or list DC sweep the target lacks",
-                cite: "ngspice manual, `.dc` (`.dc srcnam vstart vstop vincr [src2 …]`: linear only); Xyce RG `.DC` (`DEC`, `OCT`, `LIST`)",
-                explain: "A `.dc` axis sweeps by decade, by octave or over a list of values, and the target's `.dc` steps linearly only. Sweep the values another way (a `.control` loop of `alter` and `op`, a linear sweep covering them) or run the deck on a simulator with log sweeps.",
+                cite: "ngspice manual, `.dc` (`.dc srcnam vstart vstop vincr [src2 …]`: linear only, two sources), §13.6.4 (`foreach`); Xyce RG `.DC` (`DEC`, `OCT`, `LIST`); ESPice 0.3.0 (runs no `.control` command)",
+                explain: "A `.dc` axis sweeps by decade, by octave or over a list of values, and the target's `.dc` steps linearly only. ngspice runs such an axis as a `foreach` loop of its control script around one `dc`; it is refused there when the script has no such run: a third axis, an axis over a parameter (ngspice's `dc` sweeps a source, a resistor or `temp`), a decade or octave grid that does not run up from a positive start to its stop, more than 4096 values, or a `.meas dc` in the deck (ngspice would evaluate it at every pass of the loop, not over the sweep). Sweep the values another way (a linear sweep covering them) or run the deck on a simulator with log sweeps.",
             }
             /// A statement only its own simulator has (Xyce's own analyses and `Y` devices).
             W0039 Refusal {

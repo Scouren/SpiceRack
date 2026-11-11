@@ -147,11 +147,12 @@ macro_rules! rows_w_named {
             // ranges"): W0130 S2 StepStates, W0131 S1 REFUSE-SOURCE (P4-096), W0132
             // S2 no line fit, W0133 S2 pac without pss, W0134 S1 (P4-103), W0135 S1
             // (P4-104), W0136-W0137 S3 (P8-149); W0138 free.
-            /// A circuit changed between two analyses, on a target whose deck is one circuit.
+            /// A circuit changed between two analyses, on a target whose deck is one circuit
+            /// or whose table of states does not hold these states.
             W0130 Refusal {
                 title: "a circuit changed between analyses, which the target runs on one circuit",
-                cite: "Xyce RG `.STEP` and LTspice help `.step` (a step runs every analysis of the deck); HSPICE cmdref `.ALTER` (E-2010.12 pp.32-34); ESPice 0.3.0 (`.control` commands ignored, run); ngspice manual §13.5.5 (`alterparam`); VACASK `docs/cmd-alter.md`",
-                explain: "The source runs an analysis, changes a parameter (VACASK `alter`, ngspice `alterparam`) and runs another: two circuit states in one deck. This target's deck is one circuit and every analysis in it runs on that one. Write one deck per state, or netlist for ngspice, whose `.control` script changes the parameter between the runs.",
+                cite: "Xyce RG 7.10 §2.1.2 `.DATA`, §2.1.36.5 `.STEP DATA=` and LTspice help `.STEP`, `.PARAM` `table()` (a step runs every analysis of the deck at every point); HSPICE UG E-2010.12 pp.107-108 and cmdref pp.32-34 (`.ALTER` reruns the analyses before the first block); ESPice 0.3.0 (`.control` commands ignored; reading HSPICE, an `.IF` keeps its first branch after `.ALTER`: run); ngspice manual §13.5.5 (`alterparam`); VACASK `docs/cmd-alter.md`",
+                explain: "The source runs an analysis, changes a parameter (VACASK `alter`, ngspice `alterparam`) and runs another: two circuit states in one deck. Xyce and LTspice step the whole deck through the states and HSPICE reruns it per `.ALTER` block, so there the states are written only when every state runs the same analyses, each changed parameter is one top-level `.param` holding a number, and the deck has no `.step` of its own (on HSPICE, no `.if` block either); ESPice runs one circuit a deck. Give every state the same analyses and plain numbers, write one deck per state, or netlist for ngspice, whose `.control` script changes the parameter between the runs.",
             }
             // W0136 is not a code: ngspice-45 linearizes `exp` in a B source only under
             // `ngbehavior=ps`, where `pow(exp(1), x)` is exact (P8-149, P8-146).

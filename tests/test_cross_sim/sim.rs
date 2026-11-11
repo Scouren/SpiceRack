@@ -257,6 +257,9 @@ fn run_in(
                 .filter(|p| !p.plot_name.eq_ignore_ascii_case("constants")),
         );
     }
+    if matches!(sim, Sim::Ngspice | Sim::NgspiceHsa) && dc_loop(&text) {
+        plots = join_dc_passes(plots);
+    }
     if sim == Sim::Xyce
         && let Some(n) = xyce_noise(&dir.join(format!("{DECK}.{ext}_noise.dat")))
     {
@@ -267,6 +270,49 @@ fn run_in(
         return Ok(Ran::Failed(format!("no plot: {}", said())));
     }
     Ok(Ran::Plots(plots))
+}
+
+/// A `.control` `dc` at a loop's value (`dc v1 $d1 $d1 1`): the `.dc`
+/// axis by decade, octave or list that `render/spice/loops.rs` writes as
+/// `foreach` passes, a plot a pass.
+fn dc_loop(text: &str) -> bool {
+    text.lines().any(|l| {
+        let l = l.trim_start().to_ascii_lowercase();
+        l.starts_with("dc ") && l.contains('$')
+    })
+}
+
+/// Consecutive real DC plots over the same vectors as one, their points
+/// appended in run order: a `.dc` loop's passes as the source's one `.dc`
+/// plot (the first axis innermost, as the loops run).
+// ponytail: a second `.dc` card beside the loop, over the same vectors,
+// joins it too; split by the loop's pass count when a deck has both.
+fn join_dc_passes(plots: Vec<RawData>) -> Vec<RawData> {
+    let dc = |p: &RawData| {
+        !p.is_complex
+            && p.plot_name
+                .eq_ignore_ascii_case("dc transfer characteristic")
+    };
+    let mut out: Vec<RawData> = Vec::with_capacity(plots.len());
+    for p in plots {
+        match out.last_mut() {
+            Some(last) if dc(last) && dc(&p) && same_vectors(last, &p) => {
+                for (col, more) in last.real_data.iter_mut().zip(p.real_data) {
+                    col.extend(more);
+                }
+            }
+            _ => out.push(p),
+        }
+    }
+    out
+}
+
+fn same_vectors(a: &RawData, b: &RawData) -> bool {
+    a.variables.len() == b.variables.len()
+        && a.variables
+            .iter()
+            .zip(&b.variables)
+            .all(|(x, y)| x.name.eq_ignore_ascii_case(&y.name))
 }
 
 /// A run directory or process the harness itself cannot make (a full
@@ -488,7 +534,12 @@ fn has_control(text: &str) -> bool {
 
 /// `text` with a pinned seed (gf180's `agauss` draws a fresh value each run
 /// otherwise) and, when a `.control` block runs the analyses, a `write` of
-/// the current plot at the end of the last block.
+/// every plot but `const` at the end of the last block, appended to the
+/// one raw file in run order (`$plots` lists the plots oldest first: run
+/// on ngspice-45). A script that runs an analysis once a pass of a loop,
+/// or once a circuit state, gives a plot each, as a `.step` does on Xyce;
+/// a bare `write` kept the last one (ngspice manual §13.5.107 `write`,
+/// `appendwrite`; §13.5.92 `strcmp`).
 fn ngspice_text(text: &str, raw: &Path) -> String {
     let (title, body) = text.split_once('\n').unwrap_or((text, ""));
     let body = match std::env::var("CROSS_SIM_TMAX")
@@ -502,7 +553,12 @@ fn ngspice_text(text: &str, raw: &Path) -> String {
     if has_control(text)
         && let Some(at) = out.to_ascii_lowercase().rfind("\n.endc")
     {
-        out.insert_str(at, &format!("\nwrite {}", raw.display()));
+        let write = format!(
+            "\nset appendwrite\nforeach p $plots\nstrcmp _sr_const $p const\n\
+             if $_sr_const ne 0\nsetplot $p\nwrite {}\nend\nend",
+            raw.display()
+        );
+        out.insert_str(at, &write);
     }
     out
 }

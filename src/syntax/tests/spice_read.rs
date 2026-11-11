@@ -114,8 +114,10 @@ fn a_xyce_bare_initial_condition_is_a_node_voltage() {
 fn a_log_or_list_dc_is_written_where_the_target_sweeps_so() {
     // Xyce RG `.DC` (`DEC src start stop points`, `src LIST v…`; Xyce
     // 7.10 ran each: 1, 1.585, …, 10 for DEC 5 over 1..10); HSPICE `.DC var
-    // type np start stop`, `POI np v…`; ngspice manual `.dc`: linear only
-    // (W0038). Checks: 3.
+    // type np start stop`, `POI np v…`; ngspice manual `.dc`: linear only,
+    // so each axis is a `foreach` loop of its control script (§13.6.4)
+    // around one `dc` of one point, the first axis innermost (run on
+    // ngspice-45: ZERO-LEDGER P5-001 step 6). Checks: 3.
     let text = "t\nV1 1 0 1\nV2 2 0 1\nR1 1 0 1k\nR2 2 0 1k\n.DC DEC V1 1 10 5 V2 LIST 0 1\n.end\n";
     let read = |d| render_text(text, Dialect::Xyce, "t", d);
     let xy = read(Dialect::Xyce).expect("written").text;
@@ -128,19 +130,39 @@ fn a_log_or_list_dc_is_written_where_the_target_sweeps_so() {
         hs.lines().any(|l| l == ".dc V1 DEC 5 1 10 V2 POI 2 0 1"),
         "{hs}"
     );
-    let ng = read(Dialect::Ngspice).expect_err("refused");
-    assert!(
-        ng.diags.iter().any(|g| g.code == Code::W0038),
-        "{}",
-        ng.messages
+    let ng = read(Dialect::Ngspice).expect("written").text;
+    let script: Vec<&str> = ng.lines().skip_while(|l| *l != ".control").collect();
+    assert_eq!(script.len(), 8, "{ng}");
+    assert_eq!(script[..2], [".control", "foreach d2 0 1"], "{ng}");
+    // The decade's six values, from 1 to 10.
+    let d1: Vec<&str> = script[2].split_whitespace().collect();
+    assert_eq!(d1.len(), 8, "{ng}");
+    assert_eq!(
+        [d1[0], d1[1], d1[2], d1[7]],
+        ["foreach", "d1", "1", "10"],
+        "{ng}"
+    );
+    assert_eq!(
+        script[3..],
+        [
+            "dc V1 $d1 $d1 1 V2 $d2 $d2 1",
+            "end",
+            "end",
+            ".endc",
+            ".end"
+        ],
+        "{ng}"
     );
 }
 
 #[test]
-fn a_list_step_is_xyces_and_ltspices_and_refused_without_a_step() {
+fn a_list_step_is_xyces_and_ltspices_and_a_loop_on_ngspice() {
     // Xyce RG `.STEP <name> LIST <val>*`; LTspice help `.step param
-    // <name> list`, `.step temp list`; ngspice has no `.step` (W0016).
-    // Checks: 4.
+    // <name> list`, `.step temp list`; ngspice runs each as a `foreach`
+    // loop of its control script (manual §13.6.4), the first `.step`
+    // innermost (Xyce RG `.STEP`), the parameter before `reset`, which
+    // would undo the temperature (ngspice-45 run,
+    // research/impl/evidence/P5-001-s3/). Checks: 4.
     let text = "t\nR1 1 0 {r}\nI1 0 1 1m\n.param r=1k\n.step temp list 25 100\n.step r list 1k 2k\n.op\n.end\n";
     let xy = render_text(text, Dialect::Xyce, "t", Dialect::Xyce)
         .expect("written")
@@ -151,11 +173,26 @@ fn a_list_step_is_xyces_and_ltspices_and_refused_without_a_step() {
         .text;
     assert!(lt.lines().any(|l| l == ".step temp list 25 100"), "{lt}");
     assert!(lt.lines().any(|l| l == ".step param r list 1k 2k"), "{lt}");
-    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice).expect_err("refused");
-    assert!(
-        ng.diags.iter().any(|g| g.code == Code::W0016),
-        "{}",
-        ng.messages
+    let ng = render_text(text, Dialect::Xyce, "t", Dialect::Ngspice)
+        .expect("written")
+        .text;
+    let script: Vec<&str> = ng.lines().skip_while(|l| *l != ".control").collect();
+    assert_eq!(
+        script,
+        [
+            ".control",
+            "foreach s2 1000 2000",
+            "foreach s1 25 100",
+            "alterparam r=$s2",
+            "reset",
+            "option temp=$s1",
+            "op",
+            "end",
+            "end",
+            ".endc",
+            ".end",
+        ],
+        "{ng}"
     );
 }
 

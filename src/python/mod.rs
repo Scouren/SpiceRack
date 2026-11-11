@@ -18,6 +18,7 @@
 //! - `args.rs`: Python arguments → card fields
 //! - `model.rs`: the cards and the blocks that hold them
 //! - `source.rs`: `V`/`I` cards and the waveform-source method table
+//! - `lines.rs`: the `O`, `Y`, `P`, `U` line elements of `Subcircuit`
 //! - `analysis.rs`, `analysis_region.rs`: the analyses, their ngspice cards, and
 //!   what a dialect region says (Spectre statements, a Fourier harmonic count)
 //! - `card.rs`: analysis arguments → `Analysis`
@@ -44,6 +45,8 @@ use pyo3::prelude::*;
 // Macro modules first: `#[macro_use]` scopes their macros to the modules declared after them.
 #[macro_use]
 mod source;
+#[macro_use]
+mod lines;
 #[macro_use]
 mod spectre;
 #[macro_use]
