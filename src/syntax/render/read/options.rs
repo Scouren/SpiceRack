@@ -1,6 +1,8 @@
 //! SPICE `.options` → [`Opt`] views (as the old lowering applied them): the
 //! portable `k=v` list, Xyce's per-package form (`.options <pkg> k=v`, `k v`,
-//! comma lists), and `DEVICE TEMP`/`TNOM`.
+//! comma lists), `DEVICE TEMP`/`TNOM`, and each Xyce option that is a
+//! portable one under a package (`TIMEINT RELTOL` is `reltol`: the arms of
+//! `Rd::options_view`).
 //!
 //! Cites: the old lowering; the old SPICE grammar's `Options`,
 //! `oitem`; the old Xyce grammar's `Options`, `Pkg`, `xopt`, `Pair_x`, `MVal_x`,
@@ -67,6 +69,9 @@ impl<'a> Rd<'a> {
                     out.push(match (pkg.as_str(), k.to_ascii_lowercase().as_str(), x) {
                         ("device", "temp", Some(x)) => Opt::Temp(x),
                         ("device", "tnom", Some(x)) => Opt::Tnom(x),
+                        // RG `.OPTIONS TIMEINT` RELTOL: the integrator's
+                        // relative tolerance, SPICE's RELTOL.
+                        ("timeint", "reltol", Some(_)) => Opt::Portable("reltol".into(), v),
                         _ => Opt::Xyce(format!("{pkg}.{}", k.to_ascii_lowercase()), v),
                     });
                 }
