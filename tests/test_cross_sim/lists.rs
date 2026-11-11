@@ -1,12 +1,16 @@
 //! A cell's list of decks that do not pass (`tests/fixtures/cross_sim/<cell>.txt`):
 //! each line `<deck> <class>`, a `simulator-differs:<kind>` line with its
-//! rule and proof (ZERO-LEDGER P1-030), `#` to the end a comment.
+//! rule and proof (ZERO-LEDGER P1-030), a `simulator-fails` line the
+//! harness's control does not show with its rule and proof file (P1-037),
+//! `#` to the end a comment.
 //!
 //! Cites: mismatches.md §4.3 (the kinds of simulator-differs).
 //!
 //! Contents:
 //! - `pub fn listed(cell: &str) -> BTreeMap<String, String>`
+//! - `pub fn admits(class: &str, now: Option<&str>) -> bool`
 //! - `pub const KINDS: [&str; 6]`, `pub const HARNESS_KINDS: [&str; 2]`
+//! - `pub const PROVEN_FAILS: &str`
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -25,12 +29,21 @@ pub const KINDS: [&str; 6] = [
 /// the original (`source`), both refined (`refinement`).
 pub const HARNESS_KINDS: [&str; 2] = ["source", "refinement"];
 
+/// The class [`listed`] gives a `simulator-fails` line that names a proof
+/// file: the target's simulator fails on text the target's manual allows
+/// and runs the original in its other mode, so the control does not show
+/// the failure and the harness observes `target-fails` (ZERO P1-037).
+pub const PROVEN_FAILS: &str = "simulator-fails:proof";
+
 /// A cell's list: deck path -> class, `#` to the end of a line a comment.
 /// A `simulator-differs:<kind>` line names its rule and its proof
 /// (`<deck> simulator-differs:<kind> reason=<rule-id> proof=<file>`, ZERO
 /// P1-030): a kind outside [`KINDS`], or no rule or proof, fails the gate;
 /// `proof=harness` only for the kinds the harness runs itself, any other a
-/// file under `tests/fixtures/cross_sim/proof/`.
+/// file under `tests/fixtures/cross_sim/proof/`. A `simulator-fails` line
+/// with more words than its class names both too (`<deck> simulator-fails
+/// reason=<rule-id> proof=<file>`, a file, never `harness`) and is given
+/// the class [`PROVEN_FAILS`].
 pub fn listed(cell: &str) -> BTreeMap<String, String> {
     let dir = format!("{}/tests/fixtures/cross_sim", env!("CARGO_MANIFEST_DIR"));
     let text = std::fs::read_to_string(format!("{dir}/{cell}.txt")).unwrap_or_default();
@@ -58,7 +71,74 @@ pub fn listed(cell: &str) -> BTreeMap<String, String> {
                     None => panic!("{cell}: {deck}: a simulator-differs line needs proof=<file>"),
                 }
             }
+            if class == "simulator-fails" && w.len() > 2 {
+                let field = |k: &str| w.iter().find_map(|x| x.strip_prefix(k));
+                let file = |f: &str| Path::new(&format!("{dir}/proof/{f}")).is_file();
+                assert!(
+                    field("reason=").is_some_and(|r| !r.is_empty()),
+                    "{cell}: {deck}: a simulator-fails line with a proof needs reason=<rule-id>"
+                );
+                assert!(
+                    field("proof=").is_some_and(file),
+                    "{cell}: {deck}: a simulator-fails line with a rule needs proof=<file> under tests/fixtures/cross_sim/proof/"
+                );
+                return Some((deck.to_string(), PROVEN_FAILS.to_string()));
+            }
             Some((deck.to_string(), class.to_string()))
         })
         .collect()
+}
+
+/// Whether a deck listed as `class` may be observed as `now` (`None`: it
+/// passes or is refused). A class is observed as itself; a
+/// `simulator-differs` kind a proof file settles (a third simulator,
+/// reference data, a closed form, a self-inconsistent source) as a
+/// `mismatch`; [`PROVEN_FAILS`] as `target-fails`.
+pub fn admits(class: &str, now: Option<&str>) -> bool {
+    assert!(!class.is_empty(), "a listed class is a word");
+    assert!(
+        now != Some(PROVEN_FAILS),
+        "the harness never observes {PROVEN_FAILS}"
+    );
+    let seen = match class.strip_prefix("simulator-differs:") {
+        Some(kind) if !HARNESS_KINDS.contains(&kind) => "mismatch",
+        _ if class == PROVEN_FAILS => "target-fails",
+        _ => class,
+    };
+    now == Some(class) || now == Some(seen)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn p1_037_a_proof_file_admits_a_reader_failure() {
+        // ESPice's HSPICE reader stops on text HSPICE reads (a node voltage
+        // in a resistor value: HSPICE User Guide E-2010.12 p.170, p.173)
+        // and its own reader runs the original, so the harness observes
+        // `target-fails` where the list says `simulator-fails` with a proof.
+        // Oracle: the list file's own lines, and the class table below
+        // written out by hand (what `against` accepted before, plus the
+        // one new pair). Checks: 2 + 7.
+        let list = listed("ngspice-hspice-espice");
+        let class = |deck: &str| list.get(deck).map(String::as_str);
+        let proven = class("ngspice/tests/regression/misc/asrc-tc-2.sp");
+        assert_eq!(proven, Some(PROVEN_FAILS));
+        let plain = class("ngspice/tests/regression/parser/bxpressn-1.sp");
+        assert_eq!(plain, Some("simulator-fails"));
+        let third = "simulator-differs:third-simulator";
+        let refined = "simulator-differs:refinement";
+        for (line, now, ok) in [
+            (PROVEN_FAILS, Some("target-fails"), true),
+            (PROVEN_FAILS, Some("simulator-fails"), false),
+            (PROVEN_FAILS, None, false),
+            ("simulator-fails", Some("target-fails"), false),
+            ("target-fails", Some("target-fails"), true),
+            (third, Some("mismatch"), true),
+            (refined, Some("mismatch"), false),
+        ] {
+            assert_eq!(admits(line, now), ok, "{line} observed as {now:?}");
+        }
+    }
 }

@@ -28,7 +28,11 @@
 //! `proof/` that settles a deck still observed as a mismatch (`listed`,
 //! mismatches.md §4.3); `target-fails` the
 //! written deck does not run; `simulator-fails` neither does the original on
-//! the target's simulator (ESPice lacks what the deck uses); `slow` a deck past the CPU budget or the
+//! the target's simulator (ESPice lacks what the deck uses), or, as
+//! `simulator-fails reason=<rule-id> proof=<file>`, the target's simulator
+//! fails on text the target's manual allows and reads the original in its
+//! other mode (ESPice's HSPICE reader; observed as `target-fails`,
+//! `lists.rs::admits`); `slow` a deck past the CPU budget or the
 //! output one (a raw file past 2 GiB), quarantined by name and not
 //! simulated. An original that does not run on its own simulator
 //! (`source-fails`, or `slow`) is named once per corpus, in
@@ -68,7 +72,7 @@ mod sim;
 #[path = "../test_import_suite/tube.rs"]
 mod tube;
 
-use lists::{HARNESS_KINDS, listed};
+use lists::{admits, listed};
 use sim::{Ran, Sim};
 
 /// One target of a corpus: the dialect written, the simulator that runs it,
@@ -404,11 +408,7 @@ fn against(
     }
     for (d, class) in list.iter().filter(|(d, _)| decks.contains(d)) {
         let now = seen.get(d).map(|s| s.0);
-        // A kind a proof file settles (a third simulator, reference data, a
-        // closed form, a self-inconsistent source) is observed as a mismatch.
-        let proven =
-            class.starts_with("simulator-differs:") && !HARNESS_KINDS.contains(&&class[18..]);
-        if now != Some(class.as_str()) && !(proven && now == Some("mismatch")) {
+        if !admits(class, now) {
             let now = now.unwrap_or("pass or refused");
             bad.push(format!("{name}: {d} listed {class}, now {now}"));
         }
