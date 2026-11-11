@@ -145,7 +145,7 @@ card is written for ngspice and ESPice and refused elsewhere (`W0001`).
 | `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis`: every node and branch at 2F1 (with `f2overf1`, at F1+F2), as complex values; all 0 unless a source has `distof1=` (and, with `f2overf1`, `distof2=`) |
 | `pss(fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=False)` | `PssAnalysis`; the last three are ngspice's `sciter`, `steadycoeff`, `uic` (Spectre's `pss` has none: `W0040`) |
 | `s_param(variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10)` | `SParamAnalysis`; the deck needs its RF ports first (`V(..., portnum=n)`; ngspice wants two): with none, `s_param` and `add_s_param` raise `ValueError` |
-| `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis` |
+| `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis`. `num_harmonics` is one count for every tone (`5`) or a list with one count per tone (`[5, 3]`); 7 each when left out. A list of another length, or no tone, raises `ValueError` |
 | `stability(probe, variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e10)` | `StabilityAnalysis` |
 | `transient_noise(step_time, end_time)` | `TransientNoiseAnalysis`: ngspice's transient noise, a `.tran` whose noise is the bench's `TransientNoise`/`Random` sources |
 | `network_params(output_current, input_source, z_in=50.0, z_out=50.0, ...)` | `SParamAnalysis` (LTspice `.net`) |

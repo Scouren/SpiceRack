@@ -16,7 +16,8 @@
 //! - `pub(super) fn spectre_monte_carlo(iterations, inner, inner_type, seed) -> PyResult<Analysis>`
 //! - `pub(super) fn pss(fundamental, stabilization, observe_node, points_per_period, harmonics, sc_iter, steady_coeff, uic) -> Analysis`
 //! - `pub(super) fn s_param(variation, points, start, stop) -> PyResult<Analysis>`
-//! - `pub(super) fn harmonic_balance(frequencies: Vec<f64>, harmonics: Option<Vec<u32>>) -> Analysis`
+//! - `pub(super) enum Harmonics`,
+//!   `pub(super) fn harmonic_balance(frequencies: Vec<f64>, harmonics: Option<Harmonics>) -> PyResult<Analysis>`
 //! - `pub(super) fn stability(probe, variation, points, start, stop) -> PyResult<Analysis>`
 //! - `pub(super) fn network_params(output_current, input_source, z_in, z_out) -> String`
 //! - `pub(super) fn spectre_statement(kind, name, nodes, params) -> Result<String, String>`
@@ -29,6 +30,14 @@ use super::analysis::{Analysis, DcSweep, FreqSweep};
 
 use crate::syntax::Lang;
 use crate::syntax::statement::Statement;
+
+/// `num_harmonics=`: one count for every tone (tried first), or a list
+/// with one count per tone.
+#[derive(FromPyObject)]
+pub(super) enum Harmonics {
+    Every(u32),
+    Each(Vec<u32>),
+}
 
 /// Extract DC sweep params: kwargs like Vinput=slice(-2, 5, 0.01)
 pub(super) fn dc_sweeps(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Analysis> {
@@ -237,13 +246,30 @@ pub(super) fn s_param(variation: &str, points: u32, start: f64, stop: f64) -> Py
     })
 }
 
-/// Harmonic balance over `frequencies`, seven harmonics each unless given.
-pub(super) fn harmonic_balance(frequencies: Vec<f64>, harmonics: Option<Vec<u32>>) -> Analysis {
-    let harmonics = harmonics.unwrap_or_else(|| vec![7; frequencies.len()]);
-    Analysis::HarmonicBalance {
+/// Harmonic balance over the tones `frequencies`. `harmonics` is one count
+/// for every tone or one per tone; seven each when `None`. `ValueError`
+/// for no tone and for a list that is not one count per tone: Spectre
+/// reads `maxharms` against `fundfreqs` by position (Spectre Reference
+/// 19.1 p.91).
+pub(super) fn harmonic_balance(
+    frequencies: Vec<f64>,
+    harmonics: Option<Harmonics>,
+) -> PyResult<Analysis> {
+    let tones = frequencies.len();
+    let harmonics = match harmonics {
+        None => vec![7; tones],
+        Some(Harmonics::Every(k)) => vec![k; tones],
+        Some(Harmonics::Each(ks)) => ks,
+    };
+    if tones == 0 || harmonics.len() != tones {
+        return Err(PyValueError::new_err(format!(
+            "harmonic balance: {tones} fundamental frequencies, num_harmonics={harmonics:?}: one tone or more, and one count for all of them or one per tone"
+        )));
+    }
+    Ok(Analysis::HarmonicBalance {
         frequencies,
         harmonics,
-    }
+    })
 }
 
 /// Spectre `stb` around `probe`; `variation` per [`sweep`].

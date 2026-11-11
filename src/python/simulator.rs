@@ -358,9 +358,9 @@ impl PySimulator {
     fn harmonic_balance(
         &self,
         fundamental_frequencies: Vec<f64>,
-        num_harmonics: Option<Vec<u32>>,
+        num_harmonics: Option<card::Harmonics>,
     ) -> PyResult<Py<PyAny>> {
-        let a = card::harmonic_balance(fundamental_frequencies, num_harmonics);
+        let a = card::harmonic_balance(fundamental_frequencies, num_harmonics)?;
         self.typed(a)
     }
 

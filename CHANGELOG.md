@@ -27,6 +27,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - python: `I`, `G`, `F`, `BV` and `BI` take instance parameters (`m=2`; on a B source also `tc1`, `tc2`, `temp`, `dtemp`), written last on the card.
 - python: `ac=`, `ac_phase=` on `V`, `I` and the waveform sources, and a waveform source's `dc=`, take an expression (`ac="{amp}"`).
 - python: `Block()` and `conditional(branches, otherwise=None)` on `Subcircuit`, `Circuit` and `Block` write `.if` / `.elseif` / `.else` / `.endif`; a stored subcircuit keeps a conditional whole (`from_source` dropped its branches).
+- python: `harmonic_balance` / `add_harmonic_balance` take `num_harmonics` as one count or one per tone, and refuse a list that does not match the tones (it was written as given) and an empty tone list.
 
 ## 0.2.0 (2026-11-03)
 

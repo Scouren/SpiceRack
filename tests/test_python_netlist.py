@@ -931,6 +931,41 @@ class TestConditional:
 
 
 # ======================================================================
+# Harmonic balance: one count per tone (P8-023; Spectre Reference 19.1 p.90-91)
+# ======================================================================
+
+def hb_statement(tones, *counts):
+    d = ps().Subcircuit("rc", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    tb = ps().Testbench(d)
+    tb.add_harmonic_balance(tones, *counts)
+    return [l for l in tb.netlist("spectre").splitlines() if l.startswith("hb1 ")]
+
+
+class TestHarmonicBalanceCounts:
+    @pytest.mark.parametrize("counts, want", [
+        ((), "[7 7]"),         # the default, for every tone
+        ((5,), "[5 5]"),       # one count, for every tone
+        (([5, 3],), "[5 3]"),  # one per tone
+    ])
+    def test_p8_023_maxharms_holds_one_count_per_tone(self, counts, want):
+        # SR p.91: `maxharms` is the "array of number of harmonics of each
+        # fundamental".
+        assert hb_statement([1e6, 1.1e6], *counts) == [f"hb1 hb fundfreqs=[1M 1.1M] maxharms={want}"]
+
+    @pytest.mark.parametrize("tones, counts", [
+        ([1e6, 1.1e6], [5]),   # was written: fundfreqs=[1M 1.1M] maxharms=[5]
+        ([1e6], [5, 3]),
+        ([], 5),               # was written: fundfreqs=[] maxharms=[]
+    ])
+    def test_p8_023_counts_that_do_not_match_the_tones_are_refused(self, tones, counts):
+        with pytest.raises(ValueError, match="num_harmonics"):
+            hb_statement(tones, counts)
+        with pytest.raises(ValueError, match="num_harmonics"):
+            ps().Circuit("c").simulator().harmonic_balance(tones, counts)
+
+
+# ======================================================================
 # Ground node aliasing
 # ======================================================================
 

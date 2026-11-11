@@ -234,8 +234,9 @@ impl PyTestbench {
     }
 
     #[pyo3(signature = (fundamental_frequencies, num_harmonics=None))]
-    fn add_harmonic_balance(mut slf: PyRefMut<'_, Self>, fundamental_frequencies: Vec<f64>, num_harmonics: Option<Vec<u32>>) {
-        slf.as_super().tb().analyses.push(card::harmonic_balance(fundamental_frequencies, num_harmonics));
+    fn add_harmonic_balance(mut slf: PyRefMut<'_, Self>, fundamental_frequencies: Vec<f64>, num_harmonics: Option<card::Harmonics>) -> PyResult<()> {
+        slf.as_super().tb().analyses.push(card::harmonic_balance(fundamental_frequencies, num_harmonics)?);
+        Ok(())
     }
 
     #[pyo3(signature = (probe, variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e10))]

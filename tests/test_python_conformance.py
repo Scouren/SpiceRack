@@ -236,6 +236,7 @@ FEATURES = {
     "pss_controls": oscillator(lambda tb: tb.add_pss(5e6, 1e-5, "x", sc_iter=20)),
     "s_param": two_port(lambda tb: tb.add_s_param()),
     "harmonic_balance": analysis(lambda tb: tb.add_harmonic_balance([1e6])),
+    "harmonic_balance_tones": analysis(lambda tb: tb.add_harmonic_balance([1e6, 1.1e6], 5)),
     "stability": analysis(lambda tb: tb.add_stability("Vin")),
     "transient_noise": analysis(lambda tb: tb.add_transient_noise(1e-9, 1e-6)),
     "fourier": analysis(lambda tb: (tb.add_transient(1e-6, 1e-3), tb.add_fourier(1e3, ["V(out)"]))),
@@ -361,6 +362,8 @@ EXPECTED = {
     # VACASK has `hb` (its test_hb1.sim), Xyce and HSPICE `.HB` (W0001, has but untranslated:
     # read::spectre_refusal): writers C and B (FINDINGS-python.md).
     'harmonic_balance': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
+    # Two tones, one count for both: the same Spectre statement, the same cells.
+    'harmonic_balance_tones': ('W0015', 'W0015', 'W0001', 'W0001', 'W0015', OK, 'W0001', OK, OK),
     # VACASK has `acstb` (36be560 docs/cmd-analysis-acstb.md; ZERO-LEDGER P4-106): W0001 until P4-008 writes it.
     'stability': ('W0015', 'W0015', 'W0015', 'W0015', 'W0015', OK, 'W0001', OK, OK),
     'transient_noise': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

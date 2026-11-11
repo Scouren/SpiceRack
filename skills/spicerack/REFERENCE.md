@@ -142,6 +142,10 @@ is `.options nfreqs=n+1` on ngspice (one count per deck), LTspice's
 `.four f n …`, Spectre's `fourier … harms=n`; Xyce and HSPICE refuse it with
 `W0040` (their `.four` takes no count), VACASK refuses any `.four` (`W0015`).
 
+`harmonic_balance(fundamental_frequencies, num_harmonics=None)` (Spectre's `hb`): `num_harmonics` is one
+count for every tone or a list with one per tone (7 each by default); a list of another length, or no
+tone, raises `ValueError`.
+
 Every run method has an `add_` twin on `Testbench` with the same arguments,
 so any deck is netlisted before it runs: also `add_pss`, `add_s_param`
 (add the RF ports first, `V(..., portnum=n)`: with none it raises `ValueError`),
