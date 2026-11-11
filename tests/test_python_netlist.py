@@ -1205,12 +1205,29 @@ class TestCouplingNames:
         c.K("1", "L1", "L2", coupling=0.95)
         assert "K1 L1 L2 0.95" in str(c).splitlines()
 
+    def test_p8_008_k_couples_three_or_more_inductors(self):
+        c = coupled()
+        c.L("3", "e", "f", 1e-6)
+        c.K("1", "L1", "L2", "L3", coupling=0.5)
+        # One card for every pair: ngspice-45 gives it the numbers of the
+        # three pairwise K (evidence/P8-008/ng/k3one.log, k3pairs.log).
+        assert "K1 L1 L2 L3 0.5" in c.to_source().splitlines()
+
+    @pytest.mark.parametrize("coupling", ["k", "{k}"])
+    def test_p8_008_k_coupling_is_an_expression(self, coupling):
+        c = coupled()
+        c.parameter("k", "0.5")
+        c.K("1", "L1", "L2", coupling=coupling)
+        # One pair of braces, whether the caller wrote them or not
+        # (evidence/P8-008/ng/kx.cir is the card ngspice-45 ran).
+        assert "K1 L1 L2 {k}" in c.to_source().splitlines()
+
     @pytest.mark.parametrize("names", [
         ("1", "2"),          # the old spelling: the names without their letter
         ("L1", "L9"),        # no such inductor
         ("L1", "R1"),        # an element, but no inductor
         ("L1",),             # one
-        ("L1", "L2", "L1"),  # three (P8-008)
+        ("L1", "L2", "L1"),  # one inductor named twice
     ])
     def test_p8_017_k_refuses_what_is_no_pair_of_its_inductors(self, names):
         c = coupled()

@@ -219,6 +219,8 @@ FEATURES = {
     "rf_port": source(lambda tb: tb.V("in", "in", "0", 0.0, portnum=1)),
     # Elements and directives.
     "L_K": elem(lambda d: (d.L("1", "in", "0", 1e-6), d.L("2", "out", "0", 1e-6), d.K("1", "L1", "L2", coupling=0.5))),
+    "K_three": elem(lambda d: (d.L("1", "in", "a", 1e-6), d.L("2", "out", "b", 1e-6), d.L("3", "out", "c", 1e-6), d.K("1", "L1", "L2", "L3", coupling=0.5))),
+    "K_expr": elem(lambda d: (d.parameter("k", "0.5"), d.L("1", "in", "a", 1e-6), d.L("2", "out", "b", 1e-6), d.K("1", "L1", "L2", coupling="{k}"))),
     "C_charge": elem(lambda d: d.C("2", "out", d.gnd, charge="1n*v(out)")),
     "D": elem(lambda d: (d.model("dn", "d"), d.D("1", "out", "0", model="dn"))),
     "Q": elem(lambda d: (d.model("qn", "npn"), d.Q("1", "out", "in", "0", model="qn"))),
@@ -342,6 +344,10 @@ EXPECTED = {
     # Xyce's P port (D's a5f2c0a); HSPICE has a `P` port: writer B (FINDINGS-python.md).
     'rf_port': (OK, OK, 'W0007', OK, 'W0007', OK, OK, OK, OK),
     'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    # A `K` over three inductors is kept as ngspice's card: its own family writes it, W0001 elsewhere (P5-074 reads it).
+    'K_three': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
+    # A coupling given as an expression: kept as ngspice's card, as `K_three` (P5-030 reads it).
+    'K_expr': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     # VACASK has no charge-formulated capacitor (`Construct::ChargeCapacitor`: W0105).
     'C_charge': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

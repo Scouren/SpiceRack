@@ -131,18 +131,28 @@ impl PySubcircuit {
         self.two('L', name, positive, negative, &value.value(), kwargs)
     }
 
-    /// Couples two inductors of this body, each by its card name (`"L1"`,
-    /// in any case) and added before the call (ngspice manual §3.3.12:
-    /// `KXXXXXXX LYYYYYYY LZZZZZZZ value`). `ValueError` for a name that is
-    /// no `L` here (ngspice: "coupling to non-existent inductor") and for
-    /// any count but two (three or more: P8-008).
+    /// Couples two or more inductors of this body, each by its card name
+    /// (`"L1"`, in any case) and added before the call (ngspice manual
+    /// §3.3.12: `KXXXXXXX LYYYYYYY LZZZZZZZ value`; ngspice-45 takes further
+    /// inductors before the value and couples every pair with it).
+    /// `coupling` is a number or an expression (`"{k}"`). `ValueError` for
+    /// a name that is no `L` here (ngspice: "coupling to non-existent
+    /// inductor"), for one named twice, and for fewer than two.
     #[pyo3(signature = (name, *inductors, coupling))]
-    fn K(&mut self, name: &str, inductors: Vec<String>, coupling: f64) -> PyResult<()> {
-        let [l1, l2] = inductors.as_slice() else {
-            return Err(PyValueError::new_err(format!("K{name}: couples two inductors, {} given", inductors.len())));
+    fn K(&mut self, name: &str, inductors: Vec<String>, coupling: PyValueArg) -> PyResult<()> {
+        if inductors.len() < 2 {
+            return Err(PyValueError::new_err(format!("K{name}: couples two or more inductors, {} given", inductors.len())));
+        }
+        let ls = inductors.iter().map(|l| self.inductor(name, l)).collect::<PyResult<Vec<_>>>()?;
+        let twice = ls.iter().enumerate().find_map(|(i, l)| ls[..i].iter().any(|m| m.eq_ignore_ascii_case(l)).then_some(l));
+        if let Some(l) = twice {
+            return Err(PyValueError::new_err(format!("K{name}: '{l}' is named twice")));
+        }
+        let k = match coupling.value() {
+            Value::Num(v) => dec(v),
+            v => v.text(),
         };
-        let (l1, l2) = (self.inductor(name, l1)?, self.inductor(name, l2)?);
-        self.push(name, format!("K{name} {l1} {l2} {}", dec(coupling)));
+        self.push(name, format!("K{name} {} {k}", ls.join(" ")));
         Ok(())
     }
 
