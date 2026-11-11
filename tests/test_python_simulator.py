@@ -646,6 +646,38 @@ def test_run_gives_none_for_a_fourier_and_refuses_an_empty_queue():
         empty.run()
 
 
+@pytest.mark.parametrize("backend, measured", [("ngspice", False), ("ngspice", True), ("espice", False)])
+def test_p3_031_api_two_analyses_same_kind(backend, measured):
+    """ZERO-LEDGER P3-031: two analyses of one kind come back in queue order.
+    Oracle: each result's own axis is the sweep its card asked for
+    (`.ac lin 3 100 300`: 100, 200, 300 Hz; `.ac dec 1 1 10`: 1, 10 Hz; the
+    transients stop at 10 us and 20 us). ngspice-45 runs dot cards kind by
+    kind, the last card of a kind first (`cktnewan.c:34-35`; this deck's raw
+    file holds the decade plot before the linear one), and the commands of
+    the `.control` block a `.meas` gives the deck in order; ESPice runs its
+    dot cards in deck order."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("q", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.R(name="2", positive="out", negative="0", value=1e3)
+    dut.C(name="1", positive="out", negative="0", value=1e-6)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="in", positive="in", negative="0", value=1.0, ac=1.0)
+    tb.add_ac(variation="lin", number_of_points=3, start_frequency=100.0, stop_frequency=300.0)
+    tb.add_transient(step_time=1e-6, end_time=10e-6)
+    tb.add_ac(variation="dec", number_of_points=1, start_frequency=1.0, stop_frequency=10.0)
+    tb.add_transient(step_time=1e-6, end_time=20e-6)
+    if measured:
+        tb.measure("ac", "vmax", "max", "vm(out)")
+    lin, short, dec, long = tb.run()
+    assert list(lin.frequency) == pytest.approx([100.0, 200.0, 300.0])
+    assert list(dec.frequency) == pytest.approx([1.0, 10.0])
+    assert short.time[-1] == pytest.approx(10e-6)
+    assert long.time[-1] == pytest.approx(20e-6)
+
+
 # ======================================================================
 # ngspice compatibility mode, and no init file reaching a run
 # ======================================================================

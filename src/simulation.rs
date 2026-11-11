@@ -4,7 +4,10 @@
 //! picked first (`backend::select`), since the deck's text is that
 //! simulator's dialect.
 //!
-//! Cites: none (plot names are ngspice's and ESPice's `Plotname` lines).
+//! Cites: ngspice-45 `src/spicelib/analysis/cktnewan.c:34-35` and
+//! `cktdojob.c:210-218` (a deck's dot cards run kind by kind, the last
+//! card of a kind first); plot names are ngspice's and ESPice's
+//! `Plotname` lines.
 //!
 //! Contents:
 //! - `pub fn run(sim: Dialect, deck: &str) -> Result<RawData, BackendError>`
@@ -52,8 +55,11 @@ pub fn run_all(sim: Dialect, deck: &str) -> Result<Vec<RawData>, BackendError> {
 /// order (ZERO D42), or none for a `Fourier`, which prints its table and
 /// writes none. ngspice runs a deck's analyses in its own order, so a plot
 /// is matched by its `Plotname` (ngspice's and ESPice's), not by position;
-/// VACASK's are in deck order, one per analysis. A lone analysis takes the
-/// first plot, as [`run`], or every step.
+/// two analyses of one kind are told apart by run order: ngspice runs the
+/// dot cards of a kind last first, the commands of a `.control` block
+/// (and ESPice its dot cards) in deck order. VACASK's are in deck order,
+/// one per analysis. A lone analysis takes the first plot, as [`run`], or
+/// every step.
 ///
 /// # Errors
 /// As [`run_all`], and `SimulationError` when an analysis's plot is not
@@ -96,6 +102,12 @@ pub fn run_each(
         }
         return Ok(plots.into_iter().flatten().map(|p| vec![p]).collect());
     }
+    // ngspice pushes each dot card's job at the head of its task's list
+    // (`cktnewan.c:34-35`) and walks the list once per kind
+    // (`cktdojob.c:210-218`): `.ac lin 3 100 300` then `.ac dec 1 1 10`
+    // writes the decade plot first (ngspice-45). Commands of a `.control`
+    // block run in the block's order.
+    let last_first = sim == Dialect::Ngspice && !commands_run(deck);
     let mut out = Vec::with_capacity(analyses.len());
     for &a in analyses {
         let name = match a.spec().plot {
@@ -108,10 +120,14 @@ pub fn run_each(
                 return Err(missing(&format!("matchable {py_name}")));
             }
         };
-        let i = plots
-            .iter()
-            .position(|p| p.as_ref().is_some_and(|p| p.plot_name.starts_with(name)))
-            .ok_or_else(|| missing(name))?;
+        let named = |p: &Option<RawData>| p.as_ref().is_some_and(|p| p.plot_name.starts_with(name));
+        // The k-th queued analysis of a kind is the k-th plot of that kind
+        // from the end where the last card ran first.
+        let i = match last_first {
+            true => plots.iter().rposition(named),
+            false => plots.iter().position(named),
+        }
+        .ok_or_else(|| missing(name))?;
         out.push(plots[i].take().into_iter().collect());
     }
     assert_eq!(out.len(), analyses.len());
@@ -168,6 +184,30 @@ fn ltspice_each(deck: &str, analyses: &[Kind]) -> Result<Vec<Vec<RawData>>, Back
     }
     assert_eq!(out.len(), analyses.len());
     Ok(out)
+}
+
+/// Whether a `.control` block of `deck` issues an analysis as a command
+/// (`ac lin 3 100 300`), the ngspice writer's shape for a deck with
+/// `.meas` or `.four`: the run's plots are then in the block's order. A
+/// `run` is no such command (it runs the dot cards), nor is a block that
+/// only loads (`pre_osdi`).
+fn commands_run(deck: &str) -> bool {
+    // The ngspice writer's analysis cards without their dot
+    // (`render/spice/bench.rs::W::run_analyses`).
+    const COMMANDS: [&str; 11] = [
+        "op", "dc", "ac", "tran", "noise", "tf", "sens", "pz", "disto", "sp", "pss",
+    ];
+    let mut inside = false;
+    for line in deck.lines() {
+        if is_card(line, ".control") {
+            inside = true;
+        } else if is_card(line, ".endc") {
+            inside = false;
+        } else if inside && COMMANDS.iter().any(|c| is_card(line, c)) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether `line` is the `word` card (`.tran 1n 1u`, any case).
