@@ -68,6 +68,7 @@ mod cmp;
 mod kit;
 mod lists;
 mod ltspice;
+mod proofs;
 mod sim;
 #[path = "../test_import_suite/tube.rs"]
 mod tube;

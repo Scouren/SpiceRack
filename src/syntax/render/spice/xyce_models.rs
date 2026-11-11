@@ -11,13 +11,17 @@
 //! column), and `render/named/ngspice_params.txt` from ngspice-45.
 //!
 //! Cites: Xyce RG 7.10 `D` (levels 1, 2, 200, 2002: level 1 is SPICE3f5's
-//! diode), `Q` (level 1 Gummel-Poon, 234 HICUM/L2), Table 2-36 (BSIM3 is
+//! diode), `Q` (level 1 Gummel-Poon, 234 HICUM/L2), `M` (level 70 BSIM-SOI
+//! 4, level 10 BSIM-SOI 3.2; ngspice's B4SOI is 10 and 58,
+//! `inpdomod.c:347-348`), Table 2-36 (BSIM3 is
 //! level 49, 8 rejected); ngspice-45 `devices/dio/dio.c`, `diosetup.c`
 //! (level 3: the area and perimeter from `w`, `l`, the metal and poly
 //! capacitances, the only level-3 terms; `diotemp.c` L210 its breakdown
 //! current times the area, as Xyce's level 1), `devices/bjt/bjt.c`,
 //! `bjtsetup.c` (the defaults), `devices/hicum2/hicum2.c` (level 8, its
-//! aliases).
+//! aliases), `devices/mos6/mos6set.c:93-97` (level 6: `lambda0`, by default
+//! `lambda`); Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` (`LAMBDA` read only
+//! beside `LAMBDA0`).
 //!
 //! Contents:
 //! - `pub(super) enum Shape`, `pub(super) fn xyce_shape_of(kind: &str, params: &[(String, String)]) -> Shape`
@@ -163,6 +167,10 @@ const BJT: Device = Device {
         ("tvje", Off::At(0.0)),
         ("tvjc", Off::At(0.0)),
         ("tvjs", Off::At(0.0)),
+        // NE·(1 + tne1·dT + tne2·dT²) (`bjttemp.c:126`). `tbf1`, `tbf2`
+        // have no row: given, at 0 too, they replace the XTB law (L236).
+        ("tne1", Off::At(0.0)),
+        ("tne2", Off::At(0.0)),
         ("iss", Off::At(0.0)),
         ("ns", Off::At(1.0)),
         ("ibe", Off::At(0.0)),
@@ -254,6 +262,12 @@ pub(super) fn xyce_model(
         // Xyce's BSIM3 is level 49 and it rejects 8 (RG Table 2-36).
         ("nmos" | "pmos", Some("8")) => return Ok(Some(leveled(params, "49"))),
         _ if !ngspice => return Ok(None),
+        // ngspice's level 6 computes with `lambda0`, by default `lambda`;
+        // Xyce's with `LAMBDA`, and only beside `LAMBDA0` (`mos6_lambda`).
+        ("nmos" | "pmos", Some("6")) => return Ok(mos6_lambda(params)),
+        // ngspice's 10 and 58 are B4SOI (`inpdomod.c:347-348`), Xyce's 70;
+        // Xyce's 10 is BSIM-SOI 3.2 and it has no 58 (RG `M` level table).
+        ("nmos" | "pmos", Some("10" | "58")) => return Ok(Some(leveled(params, "70"))),
         ("d", None | Some("1" | "3")) => &DIODE,
         ("npn" | "pnp", None | Some("1")) => &BJT,
         ("npn" | "pnp", Some("8")) => &HICUM,
@@ -352,6 +366,31 @@ fn names(table: &'static str, device: &str) -> Vec<&'static str> {
         .lines()
         .find_map(|l| l.strip_prefix(device)?.strip_prefix(' '))
         .map_or_else(Vec::new, |rest| rest.split(' ').collect())
+}
+
+/// An ngspice level-6 MOSFET card as Xyce computes the same λ from:
+/// ngspice's is `lambda0`, by default `lambda` (`mos6set.c:93-97`); Xyce's
+/// is `LAMBDA`, and only when `LAMBDA0` is given too
+/// (`N_DEV_MOSFET6.C:3055-3062`), so both are written with ngspice's
+/// value. `None`: the card names neither (0 in both).
+fn mos6_lambda(params: &[(String, String)]) -> Option<Vec<(String, String)>> {
+    let is = |k: &str, n: &str| k.eq_ignore_ascii_case(n);
+    let get = |n: &str| {
+        params
+            .iter()
+            .find(|(k, _)| is(k, n))
+            .map(|(_, v)| v.clone())
+    };
+    let value = get("lambda0").or_else(|| get("lambda"))?;
+    let mut out: Vec<(String, String)> = params
+        .iter()
+        .filter(|(k, _)| !is(k, "lambda") && !is(k, "lambda0"))
+        .cloned()
+        .collect();
+    out.push(("lambda".to_string(), value.clone()));
+    out.push(("lambda0".to_string(), value));
+    debug_assert!(out.len() <= params.len() + 1, "one name may join");
+    Some(out)
 }
 
 /// `params` with the level `level`.

@@ -25,10 +25,10 @@ nodes are positional; everything after `*` is keyword-only.
 | Method | Signature |
 | --- | --- |
 | `R` | `(name, positive, negative, value, *, raw_spice=None, **params)`; `raw_spice` is the text after the nodes (`"1k tc=0.01"`); when it opens with a parameter (`"tc=1e-3"`) or is empty, `value` is written before it. In every `**params`: `True` is a bare flag (`off`), `False` and `None` are left out |
-| `C`, `L` | `(name, positive, negative, value, **params)` |
+| `C`, `L` | `(name, positive, negative, value, **params)`; on `R`, `C` and `L`, `model="rm"` is the card's model word, written after the value (`R1 a b 1k rm`), not a parameter |
 | `C` by its charge | `(name, positive, negative, *, charge="expr", **params)`: the charge as an expression of the capacitor's voltage (`charge="1n*v(a,b)"`), in place of `value` |
 | `K` | `(name, *inductors, coupling)`: two inductors of the same body by their full names (`K("1", "L1", "L2", coupling=0.9)`), each added before the `K`; any other name or count raises `ValueError` |
-| `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None)`; `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
+| `V`, `I` | `(name, positive, negative, value, *, ac=None, ac_phase=None, distof1=None, distof2=None)`; `distof1=(mag, phase)` makes the source a `distortion` input at F1, `distof2=` at F2 (ngspice's `DISTOF1`/`DISTOF2`, the phase in degrees; ngspice and ESPice write the words, other targets refuse the card, `W0001`); `V` also takes `portnum=None, z0=50.0`: an RF port for `s_param`, with `z0` in series in every analysis (ngspice and ESPice; Spectre writes its `port`, `dc`/`mag` the voltage across the terminated port, half the source behind `z0`; VACASK writes the source behind a series resistor `z0`, the pair its `acsp` names; other targets refuse it, `W0007`) |
 | `BV`, `BI` | `(name, positive, negative, *, expression)` |
 | `NonLinearVoltageSource`, `NonLinearCurrentSource` | `(name, positive, negative, *, expression)`: the E and G cards `E<name> n+ n- value={expression}`, the same behavioural source as `BV` / `BI` under the E/G letter |
 | `E` | `(name, positive, negative, *, control_positive, control_negative, voltage_gain)` |
@@ -96,7 +96,7 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `extra_line(line, dialect="ngspice")` | a line of `dialect`'s text: copied as written on a target of that dialect's family, refused (`W0001`) on any other |
 | `add_spectre_analysis(kind, name=None, nodes=(), **params)` | any other analysis of Spectre's own (`dcmatch`, `acmatch`, `qpss`, `envlp`, `tdr`, `psp`, `hbsp`, `hbstb`, `pdisto`, ...) as its statement `name (nodes) kind key=value ...`: `add_spectre_analysis("dcmatch", "dcmm3", ("out", "0"), mth=1e-3, stats="yes")`. `name` defaults to `<kind>1`; a value is written as given, so a device it names is spelled as `netlist("spectre")` spells it. Written on Spectre, refused (`W0015`) on a target with no such analysis; a kind Spectre does not name is a `ValueError`. `run()` returns no result for it |
 | `add_operating_point()`, `add_dc(**sweeps)`, `add_ac(...)`, `add_transient(...)`, `add_noise(...)`, `add_tf(...)`, `add_fourier(f0, outputs, num_harmonics=None)`, `add_pss(...)`, `add_s_param(...)`, `add_harmonic_balance(...)`, `add_stability(...)`, `add_transient_noise(...)`, `add_network_params(...)`, `add_spectre_sweep(...)`, `add_spectre_monte_carlo(...)`, `add_spectre_pac(...)`, `add_spectre_pnoise(...)`, `add_spectre_pxf(...)`, `add_spectre_pstb(...)`, ... | queue an analysis instead of running it: each run method's twin, same arguments |
-| `run()` | runs every queued analysis as one deck: a list, one result per analysis in queue order (`None` for `add_fourier`) |
+| `run()` | runs every queued analysis as one deck: a list, one result per analysis in queue order (`None` for `add_fourier`: its tables are the transient result's `fourier`) |
 
 ## Settings (`Testbench`, `CircuitSimulator`)
 
@@ -117,11 +117,11 @@ ngspice's `.options` (manual §11.1) in any letter case; `True` is a bare flag;
 | `dc(**{source: slice(start, stop, step)})` | `DcAnalysis` (`.sweep`, `.nodes`, `.branches`) |
 | `ac(variation="dec", number_of_points=10, start_frequency=1.0, stop_frequency=1e9)` | `AcAnalysis` (`.frequency`) |
 | `transient(step_time, end_time, start_time=None, max_time=None, use_initial_condition=False)` | `TransientAnalysis` (`.time`) |
-| `noise(output_node, ref_node, src, variation="dec", points=10, start_frequency=1e3, stop_frequency=1e8, points_per_summary=None)` | `NoiseAnalysis` |
-| `transfer_function(outvar, insrc)` / `tf` | `TransferFunctionAnalysis` |
+| `noise(output_node, ref_node, src, variation="dec", points=10, start_frequency=1e3, stop_frequency=1e8, points_per_summary=None)` | `NoiseAnalysis`; `output_node`, `ref_node`: a node name, or `v(node)`; else `ValueError` |
+| `transfer_function(outvar, insrc)` / `tf` | `TransferFunctionAnalysis`; `outvar`: `v(out)`, `v(a,b)`, `i(vload)` or a node name; else `ValueError` |
 | `dc_sensitivity(var)`, `ac_sensitivity(var, ...)` | `SensitivityAnalysis` |
 | `polezero(node1, node2, node3, node4, tf_type, pz_type)` | `PoleZeroAnalysis` (`pz["pole(1)"]`) |
-| `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis` |
+| `distortion(variation="dec", points=10, start_frequency=100.0, stop_frequency=1e8, f2overf1=None)` | `DistortionAnalysis`: every node and branch at 2F1 (with `f2overf1`, at F1+F2), as complex values; all 0 unless a source has `distof1=` (and, with `f2overf1`, `distof2=`) |
 | `pss(fundamental_frequency, stabilization_time, observe_node, points_per_period=128, harmonics=10, sc_iter=None, steady_coeff=None, uic=False)` | `PssAnalysis`; the last three are ngspice's `sciter`, `steadycoeff`, `uic` (Spectre's `pss` has none: `W0040`) |
 | `s_param(variation="dec", number_of_points=10, start_frequency=1e6, stop_frequency=1e10)` | `SParamAnalysis` |
 | `harmonic_balance(fundamental_frequencies, num_harmonics=None)` | `HarmonicBalanceAnalysis` |
@@ -139,13 +139,24 @@ LTspice's `.noise` has none, so it is left out there with a note (W0033).
 ## Results
 
 Every result: `res["node"]` or `res.node` (a float for `OperatingPoint`, a list
-otherwise), `res.measures` (`.meas` values by name, `None` for a measure
+otherwise; `op["v(node)"]` names the same node), `res.nodes` and `res.branches`
+(the names it holds), `res.measures` (`.meas` values by name, `None` for a measure
 that failed; of a stepped run, that step's values) and `res.params` (the
 `.step` point it is, `{param: value}`; `{}` when nothing steps). A run that
 LTspice steps returns a list of results, one per step. AC-type results add
 `magnitude(name)`, `magnitude_db(name)` and `phase(name)` (degrees). `RawData`
 has `title`, `plot_name`, `is_complex`, `variable_names`, `measures`, `params`
-and `complex(name)`.
+and `complex(name)`. A swept result's `fourier` is its run's `.four` tables
+(ngspice, LTspice), one dict per output: `output`, `thd` (percent), and
+`frequency`, `magnitude`, `phase` (degrees, the simulator's own reference),
+`norm_magnitude`, `norm_phase` as lists indexed by harmonic (0 is the DC
+component); `[]` when the run printed none.
+
+A `transfer_function` result names its values the same on every backend:
+`tf["transfer_function"]`, `tf["input_impedance"]`, `tf["output_impedance"]`
+(one-element lists). VACASK's `dcxf` reports no output impedance (a
+`KeyError`), and a gain and an input impedance for every source of the deck:
+the other sources' are `tf["transfer_function(vaux)"]`.
 
 ## Units (`spicerack.unit`)
 

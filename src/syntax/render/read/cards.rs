@@ -17,12 +17,16 @@
 //! - `Rd::subckt_head(&self, n: u32) -> Option<Head>`, `Rd::model_head(&self, n: u32) -> Option<Node>`
 //! - `Rd::model_view(&self, n: u32) -> Model`, `Rd::include_path(&self, n: u32) -> String`,
 //!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::param_view(&self, a: u32) -> (String, String)`,
+//!   `Rd::file_order(&self, b: &Block) -> Vec<(u32, bool)>`,
 //!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::dot_rule(&self, word: &str) -> Option<DotRule>`,
-//!   `Rd::is_word_item(&self, n: u32) -> bool`
+//!   `Rd::is_word_item(&self, n: u32) -> bool`,
+//!   `Rd::param_winners(&self, deck: &mut Deck, to: &Behaviours)`
 
-use super::{Acc, Block, Func, Kept, Rd, Scope};
+use std::collections::HashMap;
+
+use super::{Acc, Block, Deck, Func, Kept, Rd, Scope};
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::{CardRules, DotRule};
+use crate::syntax::behaviour::{Behaviours, CardRules, DotRule, NetlistRules};
 use crate::syntax::token::Tag as T;
 
 /// A `.subckt` head as the old grammar read it: its ports and parameter
@@ -242,6 +246,19 @@ impl Rd<'_> {
         }
     }
 
+    /// Block `b`'s `.include` and `.lib` cards in statement order, each
+    /// with whether it is a `.lib` call. A file read later may set again
+    /// what an earlier one set (ngspice-45: the later `.param` wins), so a
+    /// writer keeps the deck's order.
+    pub(in crate::syntax::render) fn file_order(&self, b: &Block) -> Vec<(u32, bool)> {
+        let includes = b.includes.iter().map(|&n| (n, false));
+        let mut cards: Vec<(u32, bool)> =
+            includes.chain(b.libs.iter().map(|&n| (n, true))).collect();
+        // A statement's main token is its place in the source.
+        cards.sort_by_key(|&(n, _)| self.main(n));
+        cards
+    }
+
     /// Whether the `.param` assignment `a` is an Xyce `.global_param`'s:
     /// Xyce runs a constant instance `temp={…}` from a `.param` at the
     /// swept temperature, from a `.global_param` at its value
@@ -257,6 +274,52 @@ impl Rd<'_> {
             self.text(self.ast.lhs(Node(a))),
             self.vtext(self.ast.rhs(Node(a))),
         )
+    }
+
+    /// Leaves, of the definitions one block gives one parameter name, the
+    /// one the source reads, when `to` would read another: the writers
+    /// write `deck`'s parameters as they stand. Xyce keeps the first
+    /// definition (7.10 on `.param rx=1k`, `.param rx=3k`: 1 kΩ), ngspice
+    /// and HSPICE the last (ngspice-45: 3 kΩ, and a parameter between the
+    /// two reads the last; HSPICE User Guide: Simulation and Analysis
+    /// E-2010.12 p.340); LTspice, VACASK and Spectre refuse a second one
+    /// (Spectre Reference 19.1, option `redefinedparams`; under `warning`
+    /// it keeps the last). A deck for the source's own rules, or between
+    /// two that keep the last, is left as read.
+    pub(in crate::syntax::render) fn param_winners(&self, deck: &mut Deck, to: &Behaviours) {
+        let (from, to) = (self.b.netlist_rules, to.netlist_rules);
+        let last = |r: NetlistRules| matches!(r, NetlistRules::Ngspice | NetlistRules::Hspice);
+        if from == to || (last(from) && last(to)) {
+            return;
+        }
+        // ponytail: two named languages share `NetlistRules::Spice`, so
+        // Spectre → VACASK keeps a redefinition Spectre only reads under
+        // `redefinedparams=warning`; a named rule set of its own when one
+        // such deck turns up. A name defined in an `.if` branch and again
+        // outside it is two blocks' and is left alone.
+        let first = from == NetlistRules::Xyce;
+        let mut work: Vec<&mut Block> = vec![&mut deck.top];
+        work.extend(deck.defs.iter_mut());
+        for s in &mut deck.sections {
+            work.push(&mut s.body);
+            work.extend(s.defs.iter_mut());
+        }
+        let mut blocks = 0;
+        while let Some(b) = work.pop() {
+            blocks += 1;
+            assert!(blocks <= self.ast.len(), "a block is a node: the walk ends");
+            let Block {
+                params,
+                locals,
+                conds,
+                ..
+            } = b;
+            self.keep_winners(params, first);
+            self.keep_winners(locals, first);
+            for (_, c) in conds {
+                work.extend(c.branches.iter_mut().map(|(_, body)| body));
+            }
+        }
     }
 
     /// The reader's rule for the file's own dot card `word` (lowercased,
@@ -459,5 +522,32 @@ impl Rd<'_> {
             && v != NONE
             && self.tag(v) == Tag::Binary
             && self.ttag(self.first(v)) == T::LBrace
+    }
+
+    /// Keeps, of the definitions `params` gives one name, the source's:
+    /// its `first`, else its last; the others' order is kept. A SPICE
+    /// name is read caselessly, a named language's as written.
+    fn keep_winners(&self, params: &mut Vec<u32>, first: bool) {
+        let fold = !self.named();
+        let names: Vec<String> = params
+            .iter()
+            .map(|&a| self.text(self.ast.lhs(Node(a))))
+            .map(|n| if fold { n.to_ascii_lowercase() } else { n })
+            .collect();
+        let mut winner: HashMap<&str, usize> = HashMap::with_capacity(names.len());
+        for (k, name) in names.iter().map(String::as_str).enumerate() {
+            if first {
+                winner.entry(name).or_insert(k);
+            } else {
+                winner.insert(name, k);
+            }
+        }
+        let mut k = 0;
+        params.retain(|_| {
+            k += 1;
+            winner[names[k - 1].as_str()] == k - 1
+        });
+        assert_eq!(k, names.len(), "every definition was weighed once");
+        assert_eq!(params.len(), winner.len(), "one definition a name is left");
     }
 }

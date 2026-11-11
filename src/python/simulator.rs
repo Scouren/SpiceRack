@@ -226,7 +226,7 @@ impl PySimulator {
 
     #[pyo3(signature = (outvar, insrc))]
     fn transfer_function(&self, outvar: &str, insrc: &str) -> PyResult<Py<PyAny>> {
-        self.typed(card::tf(outvar, insrc))
+        self.typed(card::tf(outvar, insrc)?)
     }
 
     #[pyo3(signature = (outvar, insrc))]

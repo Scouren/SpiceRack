@@ -279,11 +279,28 @@ impl W<'_, '_> {
                     'N' => String::new(),
                     l => l.to_ascii_lowercase().to_string(),
                 };
+                // The rescaled sidewall current reads the circuit's `temp`,
+                // never a card's own rise (ruling R10 on P3-089).
+                if letter == 'D' && self.diode_own_rise(&model, &params) {
+                    self.refuse(Code::W0114, self.rd.param_token(n, "dtemp"));
+                    return None;
+                }
                 let params =
                     match letter == 'D' && self.rd.b.model_semantics == ModelSemantics::Ngspice {
                         true => self.element_rows(letter, &params, n)?,
                         false => params,
                     };
+                // A SPICE card's parameter names are case-blind; a Spectre
+                // primitive's are lowercase, and `W=` is an unknown name
+                // there (SFE-102: ignored, the default size used). A loaded
+                // module's are as its source declares them.
+                let params: Vec<(String, String)> = match self.keep_case || letter == 'N' {
+                    true => params,
+                    false => params
+                        .into_iter()
+                        .map(|(k, v)| (k.to_ascii_lowercase(), v))
+                        .collect(),
+                };
                 let ns: Vec<String> = nodes.iter().map(|x| self.node(x)).collect();
                 format!(
                     "{}{} ({}) {}{}",

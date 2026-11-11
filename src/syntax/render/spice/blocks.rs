@@ -41,12 +41,13 @@ impl W<'_, '_> {
             "" if p.contains(char::is_whitespace) => "\"",
             q => q,
         };
-        for &inc in &b.includes {
-            let p = self.rd.include_path(inc);
-            let q = quote(&p);
-            self.o.token(&format!(".include {q}{p}{q}"), Space::Line);
-        }
-        for &lib in &b.libs {
+        for (lib, is_lib) in self.rd.file_order(b) {
+            if !is_lib {
+                let p = self.rd.include_path(lib);
+                let q = quote(&p);
+                self.o.token(&format!(".include {q}{p}{q}"), Space::Line);
+                continue;
+            }
             let (p, section) = self.rd.lib_view(lib);
             let q = quote(&p);
             if section.is_empty() {
@@ -77,10 +78,13 @@ impl W<'_, '_> {
         assert_eq!(self.scope, crate::syntax::ast::NONE, "no subcircuit open");
         assert!(self.m_param.is_none(), "no subcircuit's M renamed");
         self.scope = sc.node;
-        let head = self
+        let mut head = self
             .rd
             .subckt_head(sc.node)
             .expect("the reader read the head");
+        // A Xyce `X` line's parameter the head lacks (`W::undeclared`).
+        let passed = self.undeclared(sc, &head.params);
+        head.params.extend(passed);
         let mut line = format!(".subckt {}", sc.name);
         for p in &head.ports {
             line.push(' ');
@@ -250,17 +254,8 @@ impl W<'_, '_> {
     /// `.param name=value`, one card each, in order, with the draws the
     /// `statistics` lift puts before each and the value it gives one.
     fn param_cards(&mut self, params: &[u32]) {
-        // Xyce keeps a parameter's first definition, ngspice its last
-        // (Xyce_Regression `ISSUE_202/first_last.cir`: R1 = 1 kΩ on Xyce,
-        // 1 Ω on ngspice for the deck as read): only the first is written.
-        let first = self.pair.first_param;
-        let mut seen: Vec<String> = Vec::new();
         for &a in params {
             let (name, mut v) = self.rd.param_view(a);
-            if first && seen.iter().any(|n| n.eq_ignore_ascii_case(&name)) {
-                continue;
-            }
-            seen.push(name.clone());
             let draws = self.draws.before(a).to_vec();
             self.param_lines(&draws);
             if let Some(d) = self.draws.value(a) {

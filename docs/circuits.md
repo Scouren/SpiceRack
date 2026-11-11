@@ -63,10 +63,10 @@ Every element takes its name and nodes first; the rest are keywords.
 
 | Method | Element | Arguments after `name, nodes...` |
 | --- | --- | --- |
-| `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`) |
+| `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`); `model="rm"` names a `.model` card (`R1 a b 1k rm`) |
 | `C` | a capacitor given by its charge | `charge="1n*v(a,b)"` in place of `value` |
 | `K` | inductor coupling | the two inductors' full names (`"L1", "L2"`), added first; `coupling=` |
-| `V`, `I` | DC sources | `value, ac=, ac_phase=` |
+| `V`, `I` | DC sources | `value, ac=, ac_phase=, distof1=, distof2=` |
 | `E`, `G` | voltage-controlled sources | `control_positive=, control_negative=, voltage_gain=` / `transconductance=` |
 | `F`, `H` | current-controlled sources | `vsense=` (a V source name), `current_gain=` / `transresistance=` |
 | `POLY` | polynomial E/G/F/H | `kind, positive, negative, controls, coefficients` |

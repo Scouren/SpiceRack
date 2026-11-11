@@ -218,6 +218,9 @@ pub const DIODE3: Kind = Kind {
         row_("level", To("level"), Same),
         row_("is", To("js"), Same),
         row_("js", To("js"), Same),
+        // With no `ns`, ngspice runs the sidewall current on the bottom's
+        // characteristic: Spectre's `jsw` and `ns` are rewritten for it
+        // (`named::params`, `diode_laws`).
         row_("jsw", To("jsw"), Same),
         row_("isw", To("jsw"), Same),
         row_("tnom", To("tnom"), Same),
@@ -284,6 +287,8 @@ pub const DIODE3: Kind = Kind {
         row_("var", To("bv"), Same),
         row_("ibv", To("ibv"), Same),
         row_("ib", To("ibv"), Same),
+        // ngspice: `bv - tcv*dT` (`tlev=0`), else `bv*(1 - tcv*dT)`;
+        // Spectre: `bv*(1 + tbv1*dT)`. The value is rewritten (`diode_laws`).
         row_("tcv", To("tbv1"), Same),
         row_("tbv1", To("tbv1"), Same),
         // Safe-operating-area limits: ngspice warns, the solution is the same.
@@ -323,10 +328,11 @@ pub const DIODE3: Kind = Kind {
         ("fcs", Implied::Text("0.5")),
         ("xom", Implied::Text("10000")),
         ("xoi", Implied::Text("10000")),
-        // What ngspice does not do: drop a series resistance below `minr`
-        // (default 0.1), linearize below 0.1*iabstol, limit the current
-        // to `jmax*area` (default 1 A).
-        ("minr", Implied::Text("0")),
+        // What ngspice does not do: linearize below 0.1*iabstol, limit the
+        // current to `jmax*area` (default 1 A). Spectre also drops a series
+        // resistance below `minr` (default 0.1 ohm), which ngspice keeps:
+        // `minr` is not written, Spectre 25.1 stops on `minr=0` (CMI-2049,
+        // "should be greater than zero").
         ("dskip", Implied::Text("no")),
         ("jmax", Implied::Text("1e+20")),
     ],

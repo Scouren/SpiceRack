@@ -544,6 +544,24 @@ fn a_hoisted_subcircuit_takes_the_models_around_it() {
     assert!((v - 1000.0 / 1001.0).abs() < 1e-6, "{v}\n{w}");
 }
 
+// ── a chosen transient step ──
+
+/// ZERO-LEDGER P3-100: `.tran 0 1m 2m` leaves the step to Xyce and stops
+/// before it starts. Xyce 7.10 aborts on it ("Final time of 0.001 is
+/// earlier or same as start time of 0.002"); the step ngspice needs was
+/// chosen as span/50 = -20 µs, and ngspice-45 stops on `.tran -2e-5 1m 2m`
+/// ("TSTEP is invalid, must be greater than zero"). Refused.
+#[test]
+fn p3_100_a_chosen_step_needs_a_span() {
+    let cite = "ngspice manual §11.3.10: TSTEP > 0";
+    for tran in [".tran 0 1m 2m", ".tran 0 1m 1m"] {
+        let deck = format!("* t\nV1 a 0 SIN(0 1 1k)\nR1 a 0 1k\n{tran}\n.end\n");
+        for to in [Dialect::Ngspice, Dialect::Espice] {
+            oracle::spec_refusal(cite, &deck, Dialect::Xyce, to, &[Code::W0141]);
+        }
+    }
+}
+
 // ── LTspice's start-up ramp ──
 
 /// Ledger P5-005. LTspice help, `.TRAN`: `startup` solves the operating
@@ -621,5 +639,95 @@ fn p5_005_an_ltspice_startup_ramps_the_top_dc_sources_on_every_target() {
         sp.lines()
             .any(|l| l == "v1 (a 0) vsource dc=5 type=pwl wave=[0 0 20u 5]"),
         "{sp}"
+    );
+}
+
+// ── a Xyce model level on ngspice, ESPice and HSPICE (ledger P3-006) ──
+
+/// ngspice-45 `inpdomod.c` (L73-75, L383-385: the levels in its binary)
+/// and `inpfindl.c:51-57` (a level above 99 is computed as level 1): Xyce's
+/// PSP 103, power MOSFET 18, VBIC 1.3 (11) and MEXTRAM 504 have no device
+/// there, nor in HSPICE (MOSFET Models D-2010.12 Table 1): refused. Xyce
+/// 7.10 `level=103` at 1 V, 1 V: 1.111 mA; ngspice-45 on the copied card
+/// 0.100 mA (XYCE_CORPUS `PSP103/`, `VBIC13/`, `MEXTRAM/`, `VDMOS/`).
+/// HICUM/L2 is Xyce's 234 and ngspice's 8 (both v2.4.0): the same
+/// collector node on both simulators (Xyce 0.540334, ngspice 0.540309;
+/// their constants differ by 2.8e-5 in kT/q).
+#[test]
+fn p3_006_xyce_model_levels_copied_ngspice() {
+    let cite = "ngspice-45 inpdomod.c L73-75, L383-385; HSPICE MOSFET Models Table 1";
+    for (kind, level) in [("nmos", 103), ("nmos", 18), ("npn", 11), ("npn", 504)] {
+        let card = match kind {
+            "nmos" => "m1 d g 0 0 nm l=1u w=10u",
+            _ => "q1 d g 0 nm",
+        };
+        let deck =
+            format!("* t\nvd d 0 1\nvg g 0 1\n{card}\n.model nm {kind} level={level}\n.op\n.end\n");
+        for to in [Dialect::Ngspice, Dialect::Espice, Dialect::Hspice] {
+            oracle::spec_refusal(cite, &deck, Dialect::Xyce, to, &[Code::W0104]);
+        }
+    }
+    let hicum = "* t\nvc cc 0 1.5\nrc cc c 100\nvb b 0 0.85\nq1 c b 0 0 t qh\nrt t 0 1\n\
+        .model qh npn level=234 c10=9.074e-30 qp0=1.008e-13 ibeis=1.328e-19 mbei=1.027 \
+        re=1.511 rcx=2.483 rbx=2.568\n.op\n.end\n";
+    let tol = oracle::Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    oracle::sim_pair(
+        Dialect::Xyce,
+        hicum,
+        Dialect::Ngspice,
+        "c",
+        oracle::At::First,
+        tol,
+    );
+    assert!(write(hicum, Dialect::Xyce, Dialect::Ngspice).contains("level=8"));
+}
+
+/// Xyce RG 7.10 `M` level table: 10 is BSIM-SOI 3.2. ngspice-45
+/// `inpdomod.c:347-348`: 10 and 58 are B4SOI (4.4), 57 is B3SOIPD 2.2.3;
+/// HSPICE's 10 is AMD's model (MOSFET Models Table 1). No target device
+/// has Xyce's equations (this card: v(d) 0.611222 on Xyce 7.10, 0.563875
+/// on ngspice-45 given the copy; XYCE_CORPUS `BSIMSOI3/`): refused.
+#[test]
+fn p3_007_xyce_nmos_level_written_level() {
+    let deck = "* t\nvd dd 0 1.5\nrd dd d 1k\nvg g 0 1.5\nm1 d g 0 0 n1 w=4u l=0.15u\n\
+        .model n1 nmos level=10 tox=5n tsi=90n tbox=500n vth0=0.5 u0=0.05 nch=8e17 k1=0.1 \
+        eta0=0.5 dsub=0.35 nfactor=0.4 pclm=1 rdsw=100 vsat=80000 shmod=1 rth0=1\n.op\n.end\n";
+    let cite = "ngspice-45 inpdomod.c:347-348; Xyce RG 7.10 M level table";
+    for to in [Dialect::Ngspice, Dialect::Espice, Dialect::Hspice] {
+        oracle::spec_refusal(cite, deck, Dialect::Xyce, to, &[Code::W0104]);
+    }
+}
+
+/// Xyce `N_DEV_Diode.C:2396-2401`: id·√(IKF/(IKF+id)); ngspice-45
+/// `dio/dioload.c:382-386`: id/(1+√(id/IKF)), HSPICE's law too (Elements
+/// and Device Models, Diodes, "Forward Bias"). This card at 0.75 V: Xyce
+/// 7.10 1.98154 mA, ngspice-45 1.62690 mA. Refused; `ikf=0` is the knee
+/// off in both (v(b) 0.683450 and 0.683463: their kT/q). Ledger P3-069;
+/// XYCE_CORPUS `Certification_Tests/BUG_456/converter_baseline.cir`.
+#[test]
+fn p3_069_xyce_diode_ikf_is_refused_on_ngspice() {
+    let deck = |ikf: &str| {
+        format!(
+            "* t\nv1 a 0 0.75\nr1 a b 100\nd1 b 0 dk\n.model dk d (is=1e-14 n=1.05 rs=10 ikf={ikf})\n.op\n.end\n"
+        )
+    };
+    let cite = "Xyce N_DEV_Diode.C:2396-2401; ngspice-45 dio/dioload.c:382-386";
+    for to in [Dialect::Ngspice, Dialect::Espice, Dialect::Hspice] {
+        oracle::spec_refusal(cite, &deck("1e-3"), Dialect::Xyce, to, &[Code::W0114]);
+    }
+    let tol = oracle::Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    oracle::sim_pair(
+        Dialect::Xyce,
+        &deck("0"),
+        Dialect::Ngspice,
+        "b",
+        oracle::At::First,
+        tol,
     );
 }

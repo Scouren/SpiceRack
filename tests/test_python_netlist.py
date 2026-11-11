@@ -990,6 +990,34 @@ class TestRealisticCircuits:
         assert "Rload n100 0" in netlist
 
 
+@pytest.mark.needs("ngspice")
+def test_p3_045_api_use_pdk_two_libraries(tmp_path):
+    """Libraries are written in `use_pdk` call order on every target: a file
+    read later sets again what an earlier one set. Oracle: ngspice's own
+    run. `first.lib` (section tt) sets rload = 1k and `second.spice`, used
+    after it, 3k, so a 1k/rload divider under 1 V reads 3k/(1k+3k) = 0.75 V;
+    in the other order it reads 0.5 V (ngspice-45 prints 7.500000e-01 and
+    5.000000e-01, research/impl/evidence/P3-045)."""
+    import spicerack as ps
+
+    first, second = tmp_path / "first.lib", tmp_path / "second.spice"
+    first.write_text(".lib tt\n.param rload=1k\n.endl\n")
+    second.write_text(".param rload=3k\n")
+    dut = ps.Subcircuit("d", ["a", "out"])
+    dut.R("1", "a", "out", 1e3)
+    dut.R("2", "out", "0", "{rload}")
+    tb = ps.Testbench(dut)
+    tb.with_backend("ngspice")
+    tb.V("1", "a", "0", 1.0)
+    tb.use_pdk(ps.ModelLibrary(str(first), corner="tt"))
+    tb.use_pdk(ps.ModelLibrary(str(second)))
+    for target in ("ngspice", "espice", "hspice", "xyce", "ltspice", "spectre", "vacask"):
+        text = tb.netlist(target)
+        assert 0 <= text.find("first.lib") < text.find("second.spice"), (target, text)
+    # Two resistors and a source: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(0.75, rel=1e-9)
+
+
 # ======================================================================
 # A definition nested in a subcircuit (P8-013; ngspice-45 manual §2.6.1)
 # ======================================================================

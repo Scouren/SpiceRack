@@ -1,5 +1,6 @@
 //! A block's `.model` cards: each as the target reads it (on Xyce as its
-//! device reads it, `xyce_models`, its R model's multiplier; ngspice's
+//! device reads it, `xyce_models`, its R model's multiplier; a Xyce card
+//! as ngspice, ESPice or HSPICE read it, `ngspice_models`; ngspice's
 //! built-in device names).
 //!
 //! Cites: Xyce RG Table 2-36 (BSIM3 level 49), resistor model `R`; ngspice
@@ -8,8 +9,8 @@
 //! Contents:
 //! - `W::models(&mut self, b: &Block)`, `W::model(&mut self, n: u32, bin: u32) -> bool`
 
-use super::{W, values, xyce_models};
-use crate::syntax::behaviour::{LoadForm, ModelSemantics, ParamForm};
+use super::{W, ngspice_models, values, xyce_models};
+use crate::syntax::behaviour::{LoadForm, ModelSemantics, NetlistRules, ParamForm};
 use crate::syntax::diag::Code;
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::Block;
@@ -26,7 +27,9 @@ impl W<'_, '_> {
 
     /// `.model name kind (k=v …)`, on Xyce as its device reads it
     /// (`xyce_models`; one it cannot compute is left out, W0053, and false
-    /// returned: nothing written). The parameter list is separated from the
+    /// returned: nothing written), a Xyce card on ngspice, ESPice or HSPICE
+    /// as that device reads it (`ngspice_models`; a level the target has no
+    /// device for is refused, W0104). The parameter list is separated from the
     /// type by a space: ngspice-45 drops the parameters of an OSDI model
     /// written `vres(r=3k)`.
     pub(super) fn model(&mut self, n: u32, bin: u32) -> bool {
@@ -41,6 +44,16 @@ impl W<'_, '_> {
                     self.note(Code::W0053, self.rd.main(n));
                     return false;
                 }
+            }
+        }
+        // A Xyce card on ngspice, ESPice or HSPICE: its level as the target
+        // numbers it (`ngspice_models`).
+        if self.pair.xyce_models_on_ngspice {
+            let hspice = self.b.netlist_rules == NetlistRules::Hspice;
+            match ngspice_models::ngspice_model(hspice, &m.kind, &m.params) {
+                Ok(Some(params)) => m.params = params,
+                Ok(None) => {}
+                Err(code) => self.refuse(code, self.rd.main(n)),
             }
         }
         // A loaded module named as a built-in device: ngspice reads the

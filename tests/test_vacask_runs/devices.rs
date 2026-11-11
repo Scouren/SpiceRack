@@ -348,3 +348,22 @@ fn p4_016_a_vdmos_is_sp_vdmos_on_three_terminals() {
     close(col(&raw, "d")[0], 7.426614746246, 1e-6);
     close(col(&raw, "d2")[0], 4.851229595786, 1e-6);
 }
+
+/// Ledger P3-069. VACASK's `sp_diode` is ngspice's diode (`diode.va`
+/// L119-120 `ikf`, alias `ik`): an ngspice card's knee current runs with
+/// ngspice's law, id/(1+√(id/IKF)) (`dioload.c:382-386`; ngspice-45 on
+/// this deck: I(V1) = -1.62690e-3, VACASK by hand -1.626683e-3). Xyce's
+/// law is PSpice's (`N_DEV_Diode.C:2396-2401`; Xyce 7.10: -1.98154e-3),
+/// so the same card read as Xyce is refused.
+#[test]
+fn p3_069_diode_knee_current_ngspice_ik() {
+    let deck =
+        "knee\n.model dk D (IS=1e-14 N=1.05 RS=10 IKF=1e-3)\nV1 a 0 0.75\nD1 a 0 dk\n.op\n.end\n";
+    close(col(&run(deck), "v1:flow(br)")[0], -1.62690e-3, 1e-3);
+    let xyce = spicerack::syntax::render::render_text(deck, Dialect::Xyce, "t", Dialect::Vacask);
+    let codes: Vec<Code> = xyce
+        .err()
+        .map(|e| e.diags.iter().map(|d| d.code).collect())
+        .unwrap_or_default();
+    assert!(codes.contains(&Code::W0114), "{codes:?}");
+}

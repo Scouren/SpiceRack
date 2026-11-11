@@ -299,12 +299,11 @@ impl W<'_, '_> {
 
     /// A block's `include` and `include … section=` statements.
     fn file_cards(&mut self, b: &Block) {
-        for &inc in &b.includes {
-            let p = self.rd.include_path(inc);
-            self.line(&format!("include \"{p}\""));
-        }
-        for &lib in &b.libs {
-            let l = self.lib_include(lib);
+        for (n, is_lib) in self.rd.file_order(b) {
+            let l = match is_lib {
+                true => self.lib_include(n),
+                false => format!("include \"{}\"", self.rd.include_path(n)),
+            };
             self.line(&l);
         }
     }

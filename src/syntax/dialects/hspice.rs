@@ -174,6 +174,8 @@ pub(super) fn hspice() -> DialectDef {
         .kept_word(".sample", Construct::HspiceAnalysis)
         .kept_word(".trannoise", Construct::HspiceAnalysis)
         .kept_word(".lstb", Construct::HspiceAnalysis)
+        // `.OP format time …` (the reader keeps only the timed card).
+        .kept_word(".op", Construct::HspiceAnalysis)
         .kept_word("w", Construct::HspiceWLine)
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)

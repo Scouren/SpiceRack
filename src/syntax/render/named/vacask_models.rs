@@ -23,7 +23,7 @@ use std::collections::BTreeSet;
 use super::W;
 use super::vacask::q;
 use crate::syntax::ast::NONE;
-use crate::syntax::behaviour::{MasterAnswer, ModelSemantics};
+use crate::syntax::behaviour::{MasterAnswer, ModelSemantics, NetlistRules};
 use crate::syntax::diag::Code;
 use crate::syntax::render::read::{Block, Model};
 
@@ -123,6 +123,17 @@ impl W<'_, '_> {
                     }
                     continue;
                 }
+            }
+            // A Xyce diode's knee is the PSpice law, id·√(IKF/(IKF+id))
+            // (`N_DEV_Diode.C:2396-2401`); `sp_diode`'s is ngspice's,
+            // id/(1+√(id/IKF)) (`diode.va`, `dioload.c:382-386`).
+            if module == "diode"
+                && k == "ikf"
+                && self.rd.b.netlist_rules == NetlistRules::Xyce
+                && crate::syntax::render::models::fold(v) != Some(0.0)
+            {
+                self.refuse(Code::W0114, tok);
+                return Some(None);
             }
             if vacask_has(module, &k) {
                 rows.push((k, v.clone()));

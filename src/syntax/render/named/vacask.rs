@@ -356,12 +356,11 @@ impl W<'_, '_> {
     /// Block `b`'s `include` and `include … section=` statements, each
     /// after `pad`.
     fn vacask_files(&mut self, b: &Block, pad: &str) {
-        for &inc in &b.includes {
-            let p = self.rd.include_path(inc);
-            self.line(&format!("{pad}include \"{p}\""));
-        }
-        for &lib in &b.libs {
-            let l = self.lib_include(lib);
+        for (n, is_lib) in self.rd.file_order(b) {
+            let l = match is_lib {
+                true => self.lib_include(n),
+                false => format!("include \"{}\"", self.rd.include_path(n)),
+            };
             self.line(&format!("{pad}{l}"));
         }
     }

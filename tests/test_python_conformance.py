@@ -454,6 +454,55 @@ def h(f):
     return 0.75 / complex(1.0, 2 * math.pi * f * 750.0 * 1e-9)
 
 
+def test_p3_039_api_spectre_mos_instance_params():
+    """Ledger P3-039: the API's `M(..., W=, L=)` on Spectre. Spectre names are case-sensitive (Spectre
+    Reference 5.0 front matter) and a MOSFET's instance parameters are `w`, `l` (p.408). Spectre 25.1
+    on `W=10u L=1u`: "SFE-102 Parameter `W' ... ignored" and the default size, Id 4.225e-5 for 4.225e-4
+    (iccad4, 2026-11-07; research/settle-remote.md, recheck P3-039)."""
+    text = FEATURES["M"](ps()).netlist("spectre")
+    cards = [line.strip() for line in text.splitlines() if line.strip().startswith("m1 ")]
+    assert cards == ["m1 (out in 0 0) nm w=1u l=1u"], text
+
+
+def test_p3_042_api_spectre_model_rm_resistor():
+    """Ledger P3-042: `R(..., model="rm")` names a `.model` card. ngspice-45 manual §3.3.2: `RXXXXXXX n+
+    n- <value> <mname> <l=length> ...`. Spectre Reference 5.0 p.628: `Name 1 2 ModelName parameter=value
+    ...`, "with model: r1 (1 2) resmod l=8u w=1u"; R(T) = R(tnom)*[1 + tc1*(T - tnom)]. The model line's
+    `l=10u w=10u r=1m ...` are ngspice's defaults where Spectre's differ, as the pinned
+    tests/spectre/t_m1_resistors.scs (Spectre 25.1: PASS 6/6, research/settle-remote.md). The numbers:
+    R2 = 1k*(1 + 1e-3*(127 - 27)) = 1.1k under R1 = 1k, so out = 11/21 (the closed form). `model=rm` as a
+    parameter is ngspice-45's fatal "Undefined parameter [rm]" (research/impl/evidence/P3-042)."""
+    mod = ps()
+
+    def tb():
+        d = mod.Subcircuit("div", ["in", "out"])
+        d.model("rm", "r", tc1=1e-3)
+        d.R("1", "in", "out", 1e3)
+        d.R("2", "out", d.gnd, 1e3, model="rm")
+        t = mod.Testbench(d)
+        t.V("in", "in", "0", 1.0)
+        t.temperature = 127.0
+        t.add_operating_point()
+        return t
+
+    def cards(target, head):
+        text = tb().netlist(target)
+        return [line.strip() for line in text.splitlines() if line.strip().startswith(head)]
+
+    assert cards("ngspice", "R2 ") == ["R2 out 0 1k rm"]
+    assert cards("spectre", "r2 ") == ["r2 (out 0) rm r=1k"]
+    assert cards("spectre", "model rm ") == [
+        "model rm resistor tc1=1m l=10u w=10u r=1m af=1 wdexp=0 ldexp=0 leexp=1 weexp=1"
+    ]
+    for backend in ("ngspice", "vacask"):
+        if shutil.which(backend) is None:
+            pytest.fail(f"{backend} not on PATH: run the tests in `nix develop .#testing`")
+        t = tb()
+        t.with_backend(backend)
+        (op,) = t.run()
+        assert op["out"] == pytest.approx(11 / 21, rel=1e-9), backend
+
+
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
 def test_written_decks_meet_the_closed_form(backend):
     if shutil.which(backend) is None:

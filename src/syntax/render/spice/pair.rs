@@ -47,9 +47,6 @@ pub(super) struct Pair {
     /// Xyce's `$G_` global nodes, where `$` starts a comment (ngspice-45:
     /// "Not enough parameters"): `.global` nodes (`globals`).
     pub(super) xyce_globals: bool,
-    /// Xyce keeps a parameter's first definition, the target its last
-    /// (`ISSUE_202/first_last.cir`): only the first is written.
-    pub(super) first_param: bool,
     /// HSPICE reads a double-quoted value as an expression, the target as
     /// a string: braced.
     pub(super) quoted_expr: bool,
@@ -57,6 +54,11 @@ pub(super) struct Pair {
     /// declares `m`, ngspice's only where it does not (RG `X`;
     /// ISSUE_267/test_a3.cir): the declared `m` is renamed.
     pub(super) xyce_m_rename: bool,
+    /// Xyce sets a parameter an `X` line passes even where the `.subckt`
+    /// line does not declare it (7.10 runs of BUG_1558/bug_1558_3.cir),
+    /// ngspice stops on the line ("0 formal but 1 actual params"): the
+    /// head declares it (`values::W::undeclared`).
+    pub(super) xyce_undeclared: bool,
     /// Xyce's R model `R` multiplies the instance's 1k (RG 7.10 resistor),
     /// the source's is the resistance (ngspice manual §3.3.2): the instance
     /// takes it, the model card drops it.
@@ -125,6 +127,12 @@ pub(super) struct Pair {
     /// An ngspice deck's model cards on Xyce: each judged by Xyce's device
     /// (`xyce_cards::xyce_instance`).
     pub(super) xyce_from_ngspice: bool,
+    /// A Xyce deck's model levels are Xyce's numbering (RG `M`, `Q` level
+    /// tables), which ngspice, ESPice and HSPICE number otherwise or lack
+    /// (ngspice-45 `inpdomod.c`; above 99 it computes level 1,
+    /// `inpfindl.c:51-57`): each card as the target's device reads it, or
+    /// refused (`ngspice_models`).
+    pub(super) xyce_models_on_ngspice: bool,
     /// Xyce evaluates a function on complex numbers and keeps the real
     /// part, and clamps `atanh` (7.10: `sqrt(-4)` is 0, `acosh(-2.5)`
     /// 1.5668, `atanh(-2.5)` -14.1621), where ngspice-45 fails the
@@ -173,9 +181,9 @@ impl Pair {
             stat_nominal: matches!(ef, ExprEval::Hspice | ExprEval::Xyce)
                 && et == ExprEval::Ngspice,
             xyce_globals: xy(nf) && (ng(nt) || hs(nt)),
-            first_param: xy(nf) && !xy(nt),
             quoted_expr: ef == ExprEval::Hspice && et != ExprEval::Hspice,
             xyce_m_rename: xy(nf) && ng(nt) && to.subckt_multiplicity,
+            xyce_undeclared: xy(nf) && ng(nt),
             r_model_multiplies: xy(nt) && !xy(nf),
             spell_if: foreign && et == ExprEval::Ngspice,
             brace_groups: foreign && et == ExprEval::Ngspice,
@@ -201,6 +209,7 @@ impl Pair {
             xyce_from_other: to.param_form == ParamForm::Xyce && from.param_form != ParamForm::Xyce,
             xyce_from_ngspice: to.param_form == ParamForm::Xyce
                 && from.model_semantics == ModelSemantics::Ngspice,
+            xyce_models_on_ngspice: xy(nf) && (ng(nt) || hs(nt)),
             xyce_domains: foreign && ef == ExprEval::Xyce && et == ExprEval::Ngspice,
             abs_power_out: foreign && ef == ExprEval::Ngspice && et != ExprEval::Ngspice,
             abs_power_in: foreign && ef != ExprEval::Ngspice && et == ExprEval::Ngspice,
@@ -249,8 +258,8 @@ mod tests {
         for (rule, holds) in [
             ("device_ic_in_op", to_ng.device_ic_in_op),
             ("xyce_globals", to_ng.xyce_globals),
-            ("first_param", to_ng.first_param),
             ("xyce_m_rename", to_ng.xyce_m_rename),
+            ("xyce_undeclared", to_ng.xyce_undeclared),
             ("log_to_log10", to_ng.log_to_log10),
             ("nint_to_ngspice", to_ng.nint_to_ngspice),
             ("spell_clamp", to_ng.spell_clamp),
@@ -258,6 +267,7 @@ mod tests {
             ("sffm_swap", to_ng.sffm_swap),
             ("sffm_as_b", to_ng.sffm_as_b),
             ("foreign_measures", to_ng.foreign_measures),
+            ("xyce_models_on_ngspice", to_ng.xyce_models_on_ngspice),
             ("brace_groups", to_ng.brace_groups),
             ("xyce_domains", to_ng.xyce_domains),
             ("abs_power_in", to_ng.abs_power_in),

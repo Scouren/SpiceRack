@@ -61,7 +61,7 @@
     "test": "T-M3",
     "nominal": { "2": 6.8448213332e-01, "4": -1.1887586514e+01, "6": 8.7384788390e-01, "8": -1.1827334925e+01 },
     "rel_tol": 1e-3,
-    "why": "level-3 diodes (DIODES: a made-up one and sky130's ndiode) forward through 1k from 2 V and in breakdown from -20 V at 60 C; ngspice 45's values at its reltol=1e-3 (VACASK's ngspice-code diode lands within it). Spectre's level=3 diode with its own junction equations (no hcomp): the test of the mapping"
+    "why": "level-3 diodes (DIODES: a made-up one and sky130's ndiode) forward through 1k from 2 V and in breakdown from -20 V at 60 C; ngspice 45's values at its reltol=1e-3 (VACASK's ngspice-code diode lands within it). Spectre's level=3 diode with its own junction equations (no hcomp): the test of the mapping. Spectre 25.1 (iccad4, 2026-11-07, settle-remote) ran the deck as P3-088 wrote it: 0.667480, -12.589478, 0.686465, -11.827256. P3-089 fitted the sidewall and tbv1 laws to that run and rewrote the card (ns, jsw over temp, tbv1's sign): this text is UNRUN_SPECTRE_HSPICE (ZERO D43), its oracle ngspice on the equivalent deck (tests/test_model_kinds.rs p3_089_spectre_diode_mapping_wrong_t)"
   },
   "t_m4_dependent.scs": {
     "test": "T-M4",
