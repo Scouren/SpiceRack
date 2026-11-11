@@ -35,8 +35,11 @@
 //! `/// <one line>` then `Wnnnn Refusal|Note { title, cite, explain }` at
 //! its numeric place (the codes stay ascending: `Code`'s `Ord` is the
 //! order two diagnostics on one token are rendered in, and
-//! `codes_follow_their_stage_ranges` fails out of order). `cite` names
-//! the target's manual clause (or the run) that makes it a refusal;
+//! `codes_follow_their_stage_ranges` fails out of order). A stream's free
+//! code (S1, S2, S3, and P0015–P0019) holds a `// slot <CODE>` line at its
+//! numeric place: write the row directly after its slot and delete the
+//! marker, so the codes stay ascending whatever order rows land in. `cite`
+//! names the target's manual clause (or the run) that makes it a refusal;
 //! `Kind::Refusal` stops the deck, `Kind::Note` keeps it. Raise it from a
 //! capability cell (`DialectDef::refuse`/`omit`/`copy`, in
 //! `syntax::dialects`) or push `Diag::new(code, token, 0)` from a stage.

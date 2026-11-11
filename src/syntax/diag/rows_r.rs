@@ -1,6 +1,6 @@
 //! The catalogue's resolve rows (R0001–R0100), with the R streams' block
-//! headers: a block of `catalogue!`'s list (`mod.rs` chains every block,
-//! in code order).
+//! headers and their free codes' `// slot <CODE>` markers: a block of
+//! `catalogue!`'s list (`mod.rs` chains every block, in code order).
 //!
 //! Cites: each row's `cite` names its own clause.
 //!
@@ -79,6 +79,36 @@ macro_rules! rows_r {
             }
             // R0011–R0019: R0011 S2 (import-files). R0020–R0029: S1.
             // R0030–R0039: S2. R0040–R0049: S3.
+            // slot R0020
+            // slot R0021
+            // slot R0022
+            // slot R0023
+            // slot R0024
+            // slot R0025
+            // slot R0026
+            // slot R0027
+            // slot R0028
+            // slot R0029
+            // slot R0030
+            // slot R0031
+            // slot R0032
+            // slot R0033
+            // slot R0034
+            // slot R0035
+            // slot R0036
+            // slot R0037
+            // slot R0038
+            // slot R0039
+            // slot R0040
+            // slot R0041
+            // slot R0042
+            // slot R0043
+            // slot R0044
+            // slot R0045
+            // slot R0046
+            // slot R0047
+            // slot R0048
+            // slot R0049
         }
     };
 }

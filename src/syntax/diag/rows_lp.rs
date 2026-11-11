@@ -1,6 +1,7 @@
 //! The catalogue's tokenize rows (L0001–L0100, none yet) and parse rows
-//! (P0001–P0100), with the P streams' block headers: the first block of
-//! `catalogue!`'s list (`mod.rs` chains every block, in code order).
+//! (P0001–P0100), with the P streams' block headers and their free codes'
+//! `// slot <CODE>` markers: the first block of `catalogue!`'s list
+//! (`mod.rs` chains every block, in code order).
 //!
 //! Cites: each row's `cite` names its own clause.
 //!
@@ -83,6 +84,41 @@ macro_rules! rows_lp {
                 cite: "ngspice-45 run: \"repeat start time value … does not match any time point given!\", \"… must be smaller than final time point given!\" (ngspice manual §4.1.4)",
                 explain: "ngspice repeats a PWL wave from the time point `r=` names, which must be one of the wave's time points before the last; any other value stops the run. The source is left out and the rest of the deck is written; set `r=` to one of the wave's time points.",
             }
+            // slot P0015
+            // slot P0016
+            // slot P0017
+            // slot P0018
+            // slot P0019
+            // slot P0030
+            // slot P0031
+            // slot P0032
+            // slot P0033
+            // slot P0034
+            // slot P0035
+            // slot P0036
+            // slot P0037
+            // slot P0038
+            // slot P0039
+            // slot P0040
+            // slot P0041
+            // slot P0042
+            // slot P0043
+            // slot P0044
+            // slot P0045
+            // slot P0046
+            // slot P0047
+            // slot P0048
+            // slot P0049
+            // slot P0050
+            // slot P0051
+            // slot P0052
+            // slot P0053
+            // slot P0054
+            // slot P0055
+            // slot P0056
+            // slot P0057
+            // slot P0058
+            // slot P0059
         }
     };
 }
