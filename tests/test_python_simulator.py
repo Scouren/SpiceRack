@@ -434,6 +434,36 @@ def test_ac_magnitude_and_phase_match_rc_theory():
     assert type(ac.frequency) is list and ac.frequency[0] == 1.0
 
 
+@pytest.mark.parametrize("backend, zout", [("ngspice", 750.0), ("espice", 750.0), ("vacask", None)])
+def test_p3_095_api_tf_result_names_differ(backend, zout):
+    """ZERO-LEDGER P3-095: a `.tf` result has the same names on every backend.
+    Oracle: the closed form of a 1k/3k divider (gain 3k/4k, input impedance
+    1k + 3k, output impedance 1k || 3k), which each simulator's raw file
+    holds under its own names (ngspice `vin#Input_impedance`, ESPice
+    `input_resistance`, VACASK `zin(vin)`). VACASK's `dcxf` reports a gain
+    and an input impedance for every source of the deck (`Vaux` here: 0 and
+    1k) and no output impedance."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("div", ["in", "out"])
+    dut.R(name="1", positive="in", negative="out", value=1e3)
+    dut.R(name="2", positive="out", negative="0", value=3e3)
+    tb = ps.Testbench(dut)
+    tb.with_backend(backend)
+    tb.V(name="in", positive="in", negative="0", value=1.0)
+    tb.V(name="aux", positive="aux", negative="0", value=1.0)
+    tb.R(name="aux", positive="aux", negative="0", value=1e3)
+    tf = tb.transfer_function("v(out)", "Vin")
+    assert tf["transfer_function"] == pytest.approx([0.75], rel=1e-9)
+    assert tf["input_impedance"] == pytest.approx([4000.0], rel=1e-9)
+    if zout is None:
+        assert tf["transfer_function(vaux)"] == pytest.approx([0.0], abs=1e-12)
+        with pytest.raises(KeyError):
+            tf["output_impedance"]
+    else:
+        assert tf["output_impedance"] == pytest.approx([zout], rel=1e-9)
+
+
 def test_raw_meas_line_reports_its_measure_on_ngspice():
     """A `.meas` written as raw lines (a `+` continuation included) gets the
     `.control` block ngspice needs to report it; under `-r` it would be lost."""

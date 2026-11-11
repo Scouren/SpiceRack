@@ -160,7 +160,13 @@ fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py
         Analysis::Noise { .. } | Analysis::SpectrePnoise { .. } => {
             Py::new(py, PyNoiseAnalysis { inner: r() })?.into_any()
         }
-        Analysis::Tf { .. } => Py::new(py, PyTransferFunctionAnalysis { inner: r() })?.into_any(),
+        Analysis::Tf { source, .. } => Py::new(
+            py,
+            PyTransferFunctionAnalysis {
+                inner: tf_of(r(), source),
+            },
+        )?
+        .into_any(),
         Analysis::Sensitivity { .. } => {
             Py::new(py, PySensitivityAnalysis { inner: r() })?.into_any()
         }
@@ -181,6 +187,22 @@ fn one_result(py: Python<'_>, a: &Analysis, raw: Option<RawData>) -> PyResult<Py
             Py::new(py, PyRawData { inner: r().raw })?.into_any()
         }
     })
+}
+
+/// A `.tf` result that answers the bare names with `source`'s own vectors:
+/// a plot holding one `transfer_function(<source>)` and
+/// `input_impedance(<source>)` per source of the deck (VACASK's `dcxf`)
+/// reads `transfer_function` and `input_impedance` as the analysis's
+/// source's. A plot with the bare names already (ngspice, ESPice) is `r`.
+fn tf_of(mut r: Results, source: &str) -> Results {
+    let source = source.to_lowercase();
+    for name in ["transfer_function", "input_impedance"] {
+        if let Some(&i) = r.nodes.get(&format!("{name}({source})")) {
+            r.nodes.insert(name.to_string(), i);
+        }
+    }
+    assert!(r.nodes.len() + r.branches.len() <= r.raw.variables.len() + 2);
+    r
 }
 
 #[pymethods]

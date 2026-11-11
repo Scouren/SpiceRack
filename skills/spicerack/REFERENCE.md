@@ -146,6 +146,10 @@ Every result type has `result[node]`, `result.measures`.
 
 `ac[node]` is the real part. Use `.magnitude()` for `|H|`.
 
+A `transfer_function` result has the same keys on every backend:
+`tf["transfer_function"]`, `tf["input_impedance"]`, `tf["output_impedance"]`
+(one-element lists; VACASK reports no output impedance: `KeyError`).
+
 ## Re-measuring (`spicerack.remeasure`)
 
 Recompute a deciding number from the raw file instead of trusting `.meas`.

@@ -6,6 +6,9 @@
 //!   VACASK `v1:flow(br)` -> `i(v1)`
 //! - LTspice's and VACASK's `:` hierarchy separator becomes `.`:
 //!   `V(x1:internal)`, VACASK `x1:internal` -> `x1.internal`
+//! - a `.tf` result's vectors get one name each: `transfer_function`,
+//!   `input_impedance`, `output_impedance` (VACASK reports one pair per
+//!   source and keeps it: `transfer_function(vin)`)
 //! - anything else (`time`, `frequency`, `onoise_spectrum`, bare Spectre nodes) is lowercased
 //!
 //! Cites: none (each simulator's raw-file vector names).
@@ -52,14 +55,43 @@ pub fn canonical(name: &str, backend: Option<Dialect>) -> (String, bool) {
     let wrapped = lower
         .strip_prefix("v(")
         .or_else(|| lower.strip_prefix("v ("));
-    match wrapped.and_then(|s| s.strip_suffix(')')) {
-        Some(inner) => (
-            hierarchy(inner.split(',').next().unwrap_or(inner).trim()),
-            false,
-        ),
-        None if colon => (hierarchy(&lower), false),
-        None => (lower, false),
+    let node = match wrapped.and_then(|s| s.strip_suffix(')')) {
+        Some(inner) => hierarchy(inner.split(',').next().unwrap_or(inner).trim()),
+        None if colon => hierarchy(&lower),
+        None => lower,
+    };
+    (tf_name(node, backend), false)
+}
+
+// ---- private ----
+
+/// `name` (lowercase, out of its `v()`) under the one name a `.tf` vector
+/// has on every backend, or `name` itself when it is none. The names each
+/// simulator writes:
+/// - ngspice-45 (and LTspice, SPICE3's names): `transfer_function`,
+///   `<source>#input_impedance`, `output_impedance_at_<output>`
+/// - ESPice 0.3.0: `transfer_function`, `input_resistance`,
+///   `output_resistance`
+/// - VACASK 36be560 (`lib/core.cpp:183-185`): `tf(<source>)` and
+///   `zin(<source>)` for every source of the deck, which keep it
+///   (`transfer_function(vin)`), and no output impedance
+fn tf_name(name: String, backend: Option<Dialect>) -> String {
+    debug_assert!(!name.chars().any(char::is_uppercase), "{name}");
+    let espice = backend == Some(Dialect::Espice);
+    let vacask = backend == Some(Dialect::Vacask);
+    if name.ends_with("#input_impedance") || (espice && name == "input_resistance") {
+        return "input_impedance".to_string();
     }
+    if name.starts_with("output_impedance_at_") || (espice && name == "output_resistance") {
+        return "output_impedance".to_string();
+    }
+    if vacask && let Some(source) = name.strip_prefix("tf(") {
+        return format!("transfer_function({source}");
+    }
+    if vacask && let Some(source) = name.strip_prefix("zin(") {
+        return format!("input_impedance({source}");
+    }
+    name
 }
 
 #[cfg(test)]
@@ -206,6 +238,36 @@ mod tests {
     fn test_noise_vars_preserved() {
         assert_eq!(norm("inoise_spectrum", "ngspice"), "inoise_spectrum");
         assert_eq!(norm("onoise_spectrum", "ngspice"), "onoise_spectrum");
+    }
+
+    // ── .tf ──
+
+    #[test]
+    fn p3_095_tf_vectors_have_one_name_on_every_backend() {
+        // Oracle: the names each simulator wrote for `.tf V(out) Vin` of a
+        // 1k/3k divider (research/impl/evidence/P3-095/RESULT.txt: ngspice-45,
+        // ESPice 0.3.0, VACASK 36be560).
+        for (raw, backend, name) in [
+            ("v(Transfer_function)", "ngspice", "transfer_function"),
+            ("v(vin#Input_impedance)", "ngspice", "input_impedance"),
+            (
+                "v(output_impedance_at_V(out))",
+                "ngspice",
+                "output_impedance",
+            ),
+            ("transfer_function", "espice", "transfer_function"),
+            ("input_resistance", "espice", "input_impedance"),
+            ("output_resistance", "espice", "output_impedance"),
+            ("tf(vin)", "vacask", "transfer_function(vin)"),
+            ("zin(vin)", "vacask", "input_impedance(vin)"),
+            ("tf(xu1:v1)", "vacask", "transfer_function(xu1.v1)"),
+        ] {
+            assert_eq!(norm(raw, backend), name, "{raw} on {backend}");
+            assert!(!cur(raw, backend), "{raw} on {backend}");
+        }
+        // Another simulator's node of that name is a node.
+        assert_eq!(norm("v(input_resistance)", "ngspice"), "input_resistance");
+        assert_eq!(norm("v(tf)", "vacask"), "tf");
     }
 
     // ── is_current_name ──

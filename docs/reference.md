@@ -140,6 +140,12 @@ LTspice steps returns a list of results, one per step. AC-type results add
 has `title`, `plot_name`, `is_complex`, `variable_names`, `measures`, `params`
 and `complex(name)`.
 
+A `transfer_function` result names its values the same on every backend:
+`tf["transfer_function"]`, `tf["input_impedance"]`, `tf["output_impedance"]`
+(one-element lists). VACASK's `dcxf` reports no output impedance (a
+`KeyError`), and a gain and an input impedance for every source of the deck:
+the other sources' are `tf["transfer_function(vaux)"]`.
+
 ## Units (`spicerack.unit`)
 
 `u_V u_mV u_uV`, `u_A u_mA u_uA u_nA`, `u_Ohm u_kOhm u_MOhm` (`u_Ω u_kΩ u_MΩ`),
