@@ -6,7 +6,8 @@
 //! in `tests/fixtures/conformance_noise.txt`.
 //!
 //! Cites: Xyce 7.10 `-norun` on each class (the messages in `P0010`'s
-//! cite); ngspice-45 runs (`P0011`'s cite, ngspice manual §4.1.4).
+//! cite); Xyce Reference Guide 7.10 §2.1.8 (`.FFT`: the window names,
+//! FORMAT, NP); ngspice-45 runs (`P0011`'s cite, ngspice manual §4.1.4).
 //!
 //! Contents:
 //! - `Rd::rejected(&self, n: u32) -> Option<Code>`
@@ -73,63 +74,338 @@ impl Pwl {
 }
 
 impl Rd<'_> {
-    /// Xyce 7.10 `-norun` rejects the line `first..=last`: an analysis
-    /// card's field count, an R/L/C with fewer than two nodes or a second
-    /// bare value, a PWL with no points or `r=` outside `[0, t_last)`.
+    /// Xyce 7.10 `-norun` rejects the line `first..=last`: a card's
+    /// fields (an analysis's count, `.FFT`'s and `.MEASURE`'s words,
+    /// `.SENS`'s vectors), an element's (a letter Xyce has no device for,
+    /// too few nodes, values past the device's, a PWL or PAT wave), or a
+    /// spelling no Xyce line reads (an unclosed brace, `{POLY` with no
+    /// count, an exponent in braces, a lead current of two names).
     fn xyce_rejects(&self, first: u32, last: u32) -> bool {
         let head = self.t.text(first).to_ascii_lowercase();
         let p = self.pieces(first, last);
-        let word = |i: usize| p.get(i).map(|&(a, b)| self.span(a, b).to_ascii_lowercase());
-        let sweep =
-            |w: Option<String>| w.is_some_and(|w| matches!(w.as_str(), "dec" | "oct" | "lin"));
-        match head.as_str() {
-            ".tran" => return p.len() < 2,
-            ".fft" => return p.is_empty(),
-            ".four" => return p.len() < 2,
-            ".ac" => return sweep(word(0)) && p.len() != 4,
-            // `.DC v start stop step …`: four fields per linear sweep.
-            ".dc" => {
-                let keyed = (0..p.len()).any(|i| {
-                    let w = word(i).expect("i < p.len()");
-                    sweep(Some(w.clone()))
-                        || w == "list"
-                        || w.contains('=')
-                        || w.starts_with("data")
-                });
-                return !keyed && !p.len().is_multiple_of(4);
-            }
-            // `.NOISE out src type n fstart fstop [pts]`.
-            ".noise" => {
-                return (0..p.len())
-                    .find(|&i| sweep(word(i)))
-                    .is_some_and(|i| !matches!(p.len() - i, 4 | 5));
-            }
-            _ => {}
+        if self.xyce_spelling(first, last) {
+            return true;
+        }
+        if head.starts_with('.') {
+            return self.xyce_card(&head, &p);
         }
         // `L=1E-4 …`: a continuation's keys cut off by a comment line
         // (Xyce_Regression BUG_250, which Xyce runs), no element.
         if first < last && self.ttag(first + 1) == T::Equal {
             return false;
         }
-        match head.as_bytes()[0].to_ascii_uppercase() {
+        let pos = self.positional(&p);
+        let bare = |q: &(u32, u32)| q.0 == q.1 && self.ttag(q.0) == T::Number;
+        // A `{` or `'` that opens a field (after a blank, or touching the
+        // name) and never closes: Xyce reads the rest as one value ("Not
+        // enough fields", "Invalid DC value"); one inside a field (`1{`)
+        // is a name character.
+        let open = (first + 1..=last).any(|k| {
+            let opens = k == first + 1 || self.t.end(k - 1) != self.t.start(k);
+            let closer = match self.ttag(k) {
+                T::LBrace => T::RBrace,
+                T::Quote => T::Quote,
+                _ => return false,
+            };
+            opens && !(k + 1..=last).any(|j| self.ttag(j) == closer)
+        });
+        open || match head.as_bytes()[0].to_ascii_uppercase() {
+            // "Unrecognized line"; "Invalid device type".
+            b'#' | b'A' | b'N' => true,
             b'R' | b'L' | b'C' => {
-                let bare = |i: usize| {
-                    p.get(i)
-                        .is_some_and(|&(a, b)| a == b && self.ttag(a) == T::Number)
-                };
-                p.len() < 2 || (bare(2) && bare(3))
+                let rest = pos.get(2..).unwrap_or_default();
+                pos.len() < 2 || rest.len() > 2 || (rest.len() == 2 && rest.iter().all(bare))
             }
-            b'V' | b'I' => self.pwl(first, last).is_some_and(|w| {
-                let times = w.times();
-                let no_points = w.points.is_empty() && !w.expr && !w.file;
-                let off = match (w.repeat, times.last(), w.expr) {
-                    (Some(r), Some(&end), false) => r < 0.0 || r >= end,
-                    _ => false,
-                };
-                no_points || off
-            }),
+            // "Model is required for device".
+            b'D' => self.words(first, last) < 4,
+            // A second coupling value: "Specified model not found".
+            b'K' => pos.iter().filter(|&q| bare(q)).count() > 1,
+            // Four nodes, then keys only: "Unrecognized parameter".
+            b'T' => pos.len() > 4,
+            b'V' | b'I' => {
+                let pwl = self.pwl(first, last).is_some_and(|w| {
+                    let times = w.times();
+                    let no_points = w.points.is_empty() && !w.expr && !w.file;
+                    let off = match (w.repeat, times.last(), w.expr) {
+                        (Some(r), Some(&end), false) => r < 0.0 || r >= end,
+                        _ => false,
+                    };
+                    no_points || off
+                });
+                // "Not enough fields on input line": the name and two nodes.
+                self.words(first, last) < 3 || pwl || self.pat_rejected(first, last)
+            }
             _ => false,
         }
+    }
+
+    /// Xyce's dot card `head` with fields `p` that `-norun` rejects.
+    fn xyce_card(&self, head: &str, p: &[(u32, u32)]) -> bool {
+        const MODES: [&str; 10] = [
+            "tran",
+            "tr",
+            "dc",
+            "ac",
+            "fft",
+            "noise",
+            "tran_cont",
+            "dc_cont",
+            "ac_cont",
+            "noise_cont",
+        ];
+        // Xyce RG `.FFT`; `.MEASURE` (FFT measures).
+        const WINDOWS: [&str; 19] = [
+            "rect",
+            "rectangular",
+            "bart",
+            "bartlett",
+            "bartletthann",
+            "black",
+            "blackman",
+            "hamm",
+            "hamming",
+            "hann",
+            "hanning",
+            "harris",
+            "blackmanharris",
+            "nuttall",
+            "cosine2",
+            "cosine4",
+            "halfcyclesine",
+            "halfcyclesine3",
+            "halfcyclesine6",
+        ];
+        const FFT_TYPES: [&str; 8] = ["enob", "eqn", "param", "find", "sfdr", "sndr", "snr", "thd"];
+        const ONE_VAR: [&str; 7] = ["avg", "max", "min", "pp", "rms", "integ", "integral"];
+        let word = |i: usize| p.get(i).map(|&(a, b)| self.span(a, b).to_ascii_lowercase());
+        let words: Vec<String> = (0..p.len())
+            .map(|i| word(i).expect("i < p.len()"))
+            .collect();
+        assert!(head.starts_with('.'), "a card's head");
+        assert_eq!(words.len(), p.len(), "a word per field");
+        let key = |k: &str| {
+            words
+                .iter()
+                .find_map(|w| w.strip_prefix(k).and_then(|v| v.strip_prefix('=')))
+        };
+        let sweep =
+            |w: Option<String>| w.is_some_and(|w| matches!(w.as_str(), "dec" | "oct" | "lin"));
+        match head {
+            ".tran" => p.len() < 2,
+            ".four" => p.len() < 2,
+            ".ac" => sweep(word(0)) && p.len() != 4,
+            // `.DC v start stop step …`: four fields per linear sweep.
+            ".dc" => {
+                let keyed = words.iter().any(|w| {
+                    sweep(Some(w.clone()))
+                        || w == "list"
+                        || w.contains('=')
+                        || w.starts_with("data")
+                });
+                !keyed && !p.len().is_multiple_of(4)
+            }
+            // `.NOISE out src type n fstart fstop [pts]`.
+            ".noise" => (0..p.len())
+                .find(|&i| sweep(word(i)))
+                .is_some_and(|i| !matches!(p.len() - i, 4 | 5)),
+            // "Invalid WINDOW type", "Invalid FORMAT type", "NP value …
+            // must be … >=4" (NP=0; Xyce rounds a positive NP).
+            ".fft" => {
+                p.is_empty()
+                    || key("window").is_some_and(|w| !WINDOWS.contains(&w))
+                    || key("format").is_some_and(|f| !matches!(f, "norm" | "unorm"))
+                    || key("np")
+                        .and_then(|n| n.parse::<f64>().ok())
+                        .is_some_and(|n| n < 1.0)
+            }
+            ".measure" | ".meas" => {
+                let (mode, name, kind) = (word(0), word(1), word(2));
+                let is_mode =
+                    |w: &Option<String>| w.as_ref().is_some_and(|w| MODES.contains(&w.as_str()));
+                let has = |w: &str| words.iter().any(|x| x == w);
+                let fft = mode.as_deref() == Some("fft");
+                let kind = kind.unwrap_or_default();
+                !is_mode(&mode)
+                    || is_mode(&name)
+                    || (ONE_VAR.contains(&kind.as_str()) && p.len() == 3)
+                    || (kind == "trig" && !has("targ"))
+                    || words.last().is_some_and(|w| w == "when")
+                    || (fft
+                        && !FFT_TYPES
+                            .iter()
+                            .any(|t| kind == *t || kind.starts_with(&format!("{t}="))))
+                    || (fft && kind == "find" && !has("at") && key("at").is_none())
+            }
+            // "Possibly a missing comma in vector parameter" (braces with
+            // no comma between, a list ending in `,` before the next key, a
+            // value with no comma before it); "Vector parameter begins with
+            // a comma", "Error parsing vector parameter" (a comma after
+            // `=`, after a comma, or ending the line).
+            ".sens" => {
+                let comma = |k: u32| self.ttag(k) == T::Comma;
+                let end = p.last().map_or(0, |q| q.1);
+                let stray = p.first().is_some_and(|f| {
+                    (f.0..=end).any(|k| {
+                        comma(k) && (k == end || comma(k + 1) || self.ttag(k - 1) == T::Equal)
+                    })
+                });
+                // A value before the first key is read past (`.sens v(a)` runs).
+                let key = p
+                    .first()
+                    .and_then(|f| (f.0..=end).find(|&k| self.ttag(k) == T::Equal));
+                let bare = key.is_some_and(|eq| {
+                    let pos = self.positional(p);
+                    pos.iter().any(|&(a, _)| a > eq && !comma(a))
+                });
+                let list = |(i, &(a, b)): (usize, &(u32, u32))| {
+                    let key_next = p
+                        .get(i + 1)
+                        .is_some_and(|&(c, d)| (c..=d).any(|k| self.ttag(k) == T::Equal));
+                    (comma(b) && key_next)
+                        || (a..b).any(|k| {
+                            self.ttag(k) == T::RBrace
+                                && self.ttag(k + 1) == T::LBrace
+                                && self.t.end(k) == self.t.start(k + 1)
+                        })
+                };
+                stray || bare || p.iter().enumerate().any(list)
+            }
+            ".print" => self.lead_of_two_names(p),
+            _ => false,
+        }
+    }
+
+    /// The words of the line `first..=last` as Xyce cuts a D, V or I line,
+    /// its name included: at a blank, a comma and a parenthesis
+    /// (`D1 (a 0) DM`, `V1 a,0`, `V1(a 0)`: Xyce 7.10 reads each; an R, L
+    /// or C keeps the comma and the parenthesis as fields).
+    fn words(&self, first: u32, last: u32) -> usize {
+        assert!(first <= last, "a line has its head");
+        let cut = |c: char| c.is_whitespace() || matches!(c, ',' | '(' | ')');
+        let line = self.span(first, last);
+        let n = line.split(cut).filter(|w| !w.is_empty()).count();
+        assert!(n <= line.len(), "a word holds a byte");
+        n
+    }
+
+    /// A spelling no Xyce line reads: `{POLY` with no `(n)` ("Syntax
+    /// error in number of nodes"), a number whose exponent is a brace
+    /// expression (`2.0e+{x}`, "Invalid notation").
+    fn xyce_spelling(&self, first: u32, last: u32) -> bool {
+        assert!(first <= last, "a line has its head");
+        (first..last).any(|k| match self.ttag(k) {
+            T::LBrace => {
+                self.t.text(k + 1).eq_ignore_ascii_case("poly")
+                    && (k + 2 > last || self.ttag(k + 2) != T::LParen)
+            }
+            T::Number => {
+                let touch = |j: u32| j <= last && self.t.end(j - 1) == self.t.start(j);
+                let sign = matches!(self.ttag(k + 1), T::Plus | T::Minus) && touch(k + 1);
+                let brace = k + 1 + u32::from(sign);
+                let n = self.t.text(k).to_ascii_lowercase();
+                (n.ends_with('e') || n.ends_with("e+") || n.ends_with("e-"))
+                    && touch(brace)
+                    && self.ttag(brace) == T::LBrace
+            }
+            _ => false,
+        })
+    }
+
+    /// A `.PRINT` brace expression holding a lead current of two
+    /// blank-separated names (`{I2(YPDE BJT)}`: "Unrecognized character";
+    /// outside braces Xyce reads the two words as one device name).
+    fn lead_of_two_names(&self, p: &[(u32, u32)]) -> bool {
+        p.iter().any(|&(a, b)| {
+            assert!(a <= b, "a field has its first token");
+            self.ttag(a) == T::LBrace
+                && (a..b).any(|k| {
+                    let lead = self.ttag(k) == T::Ident
+                        && self.t.text(k).starts_with(['i', 'I'])
+                        && self.ttag(k + 1) == T::LParen
+                        && self.t.end(k) == self.t.start(k + 1);
+                    lead && k + 3 <= b
+                        && self.ttag(k + 2) == T::Ident
+                        && self.ttag(k + 3) == T::Ident
+                })
+        })
+    }
+
+    /// A PAT source Xyce rejects: TR, TF or TSAMPLE not positive, no DATA
+    /// field or one not `b` and bits 0/1, an `RB` past 1 (Xyce RG, PAT
+    /// source; `-norun` on each: `RB=0` and `RB=-1` run).
+    fn pat_rejected(&self, first: u32, last: u32) -> bool {
+        let Some(kw) = (first + 1..=last)
+            .find(|&k| self.ttag(k) == T::Ident && self.t.text(k).eq_ignore_ascii_case("pat"))
+        else {
+            return false;
+        };
+        let (mut nums, mut data, mut k) = (Vec::new(), None, kw + 1);
+        // `DATA=`: the fields are given by name, not by place.
+        let mut named = false;
+        // Each pass moves `k` on by at least one token.
+        while k <= last {
+            match self.ttag(k) {
+                T::LBrace | T::Quote => return false,
+                T::Ident if k < last && self.ttag(k + 1) == T::Equal => {
+                    let key = self.t.text(k);
+                    if key.eq_ignore_ascii_case("rb")
+                        && k + 2 <= last
+                        && self.ttag(k + 2) == T::Number
+                        && self.t.value(k + 2) > 1.0
+                    {
+                        return true;
+                    }
+                    named |= key.eq_ignore_ascii_case("data");
+                    k += 2;
+                }
+                T::Minus if k < last && self.ttag(k + 1) == T::Number => {
+                    nums.push(-self.t.value(k + 1));
+                    k += 1;
+                }
+                T::Number if nums.len() < 6 => nums.push(self.t.value(k)),
+                T::Number | T::Ident if nums.len() == 6 && data.is_none() => data = Some(k),
+                // A name where a number goes (a parameter, another wave's
+                // word after a node named `pat`): no plain PAT.
+                T::Ident if nums.len() < 6 => return false,
+                _ => {}
+            }
+            k += 1;
+        }
+        assert!(k > last, "the line is read to its end");
+        let not_positive = nums.get(3..6).is_some_and(|t| t.iter().any(|&v| v <= 0.0));
+        let no_data = nums.len() == 6 && data.is_none() && !named;
+        let bits = |d: u32| {
+            let t = self.t.text(d).to_ascii_lowercase();
+            self.ttag(d) == T::Ident
+                && t.len() > 1
+                && t.starts_with('b')
+                && t[1..].bytes().all(|c| c == b'0' || c == b'1')
+        };
+        not_positive || no_data || data.is_some_and(|d| !bits(d))
+    }
+
+    /// The pieces of `p` that are no `key=value` (nor a value after a
+    /// `key =` or after a piece ending in `,`): the positional fields.
+    fn positional(&self, p: &[(u32, u32)]) -> Vec<(u32, u32)> {
+        assert!(
+            p.iter().all(|&(a, b)| a <= b),
+            "a field has its first token"
+        );
+        let mut out = Vec::new();
+        let mut joined = false;
+        for (i, &(a, b)) in p.iter().enumerate() {
+            let keyed = (a..=b).any(|k| self.ttag(k) == T::Equal)
+                || p.get(i + 1).is_some_and(|&(c, _)| self.ttag(c) == T::Equal);
+            if !(joined || keyed) {
+                out.push((a, b));
+            }
+            joined = matches!(self.ttag(b), T::Equal | T::Comma);
+        }
+        assert!(
+            out.len() <= p.len(),
+            "a positional field is one of the fields"
+        );
+        out
     }
 
     /// ngspice-45 stops on a PWL `r=` at or past the last time point or

@@ -489,3 +489,22 @@ XDM/HSPICE/SPARAMS/telegrapher_line.cir source-fails # no raw file .cross_sim_ou
 XDM/PSPICE/IC_AND_NODESET/ic_nodeset.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 10
 YACC/ForcedDampedHO.cir source-fails # no raw file .cross_sim_out.raw: Netlist error: No analysis specified. | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | errors 
 YLIN/ylin-5port-linAnalysis.cir source-fails # no raw file .cross_sim_out.raw: ***** Number of Unknowns = 17
+Certification_Tests/BUG_1116/bug_1116.cir source-fails # Xyce 7.10 stops on the original: line 4: Model is required for device D1 and no valid model card found.
+Certification_Tests/BUG_1578/bug_1578.cir source-fails # Xyce 7.10 stops on the original: line 10: Invalid device type for device NETLIST
+Certification_Tests/BUG_198/bug_198.cir source-fails # Xyce 7.10 stops on the original: line 3: Unrecognized line
+Certification_Tests/BUG_258/bug_198.cir source-fails # Xyce 7.10 stops on the original: line 3: Unrecognized line
+Certification_Tests/BUG_401/bad-device-line.cir source-fails # Xyce 7.10 stops on the original: line 5: Invalid device type for device AN
+Certification_Tests/BUG_401/extra-space.cir source-fails # Xyce 7.10 stops on the original: line 2: Invalid device type for device APERFECT
+Certification_Tests/BUG_401/worse-device-line.cir source-fails # Xyce 7.10 stops on the original: line 6: Illegal value found for device REALLY for parameter = R value = OF
+Certification_Tests/BUG_587/587.cir source-fails # Xyce 7.10 stops on the original: line 43: Invalid notation encountered.
+Certification_Tests/BUG_67/bug_67.cir source-fails # Xyce 7.10 stops on the original: Syntax error in number of nodes in expression: {POLY I(V6) 300u 1}
+Certification_Tests/BUG_726/adjacent.cir source-fails # Xyce 7.10 stops on the original: line 13: Specified model not found for device K1
+CommandLine/bad_command_line.cir source-fails # Xyce 7.10 stops on the original: line 17: Unrecognized parameter INPUT for device THIS
+FFT/bad_fft_line2.cir source-fails # Xyce 7.10 stops on the original: Invalid WINDOW type BOGO on .FFT line
+INVALID_CHARS/right_curly_fails.cir source-fails # Xyce 7.10 stops on the original: line 19: Not enough fields on input line for device V2
+INVALID_CHARS/semicolon_fails.cir source-fails # Xyce 7.10 stops on the original: line 25: Not enough fields on input line for device V2
+INVALID_CHARS/single_quote_fails.cir source-fails # Xyce 7.10 stops on the original: line 21: Not enough fields on input line for device V2
+MEASURE/bad_dot_measure_line2.cir source-fails # Xyce 7.10 stops on the original: ONE has incomplete MEASURE line
+Message/Input/CircuitBlock_handleLinePass1_1.cir source-fails # Xyce 7.10 stops on the original: line 4: Y device line specified with only one token: YAND. Need at least two.
+SENS/improperVectorParams.cir source-fails # Xyce 7.10 stops on the original: line 20: .SENS line is mis-formatted. Possibly a missing comma in vector parameter
+VPAT/bad_vpat.cir source-fails # Xyce 7.10 stops on the original: line 21: Device instance V6: Invalid bit symbol in DATA field for the PAT source

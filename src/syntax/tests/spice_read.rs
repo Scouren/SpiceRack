@@ -462,3 +462,122 @@ fn p1_022_lines_source_own_simulator_rejects() {
         }
     }
 }
+
+#[test]
+fn p1_056_remaining_one_line_xyce_rejects() {
+    // Oracle: Xyce 7.10 `-norun` on the deck below holding each line alone
+    // (V9, R9, L2, L3, `.model DM D`, `.model RM R`, `.param rv`). It stops
+    // on every `rejected` line with the message beside it and reads every
+    // `legal` one, its neighbour (the corpus decks: Xyce_Regression BUG_198,
+    // BUG_1578, BUG_401, bad_command_line, BUG_1116, BUG_587, BUG_67,
+    // BUG_726, INVALID_CHARS/*_fails, lead_pde_2d2, bad_fft_line2,
+    // MEASURE*, improperVectorParams, bad_vpat). A rejected line is left
+    // out with P0010 and no W0001; a legal one carries no P0010. Checks: 2
+    // per rejected line and 1 per legal line, on 2 targets.
+    let rejected = [
+        "A1 a 0 1",    // Invalid device type for device A1
+        "N1 a 0 1",    // Invalid device type for device N1
+        "# a comment", // Unrecognized line
+        "Really good example of perfect nonsense that is too easy to get from a user!", // Illegal value found for device REALLY for parameter = R value = OF
+        "T1 1 0 2 0 50 1n",             // Unrecognized parameter 50 for device T1
+        "D1 a DM",                      // Model is required for device D1
+        "D1 a 0",                       // Model is required for device D1
+        "D1 (a 0)",                     // Model is required for device D1
+        "R1 a 0 RM 1k 2k",              // Unrecognized parameter 2K for device R1
+        "C1 a 0 1p 2 3",                // Unrecognized parameter 2 for device C1
+        "K1 L2 L3 0.75 0.5",            // Specified model not found for device K1
+        "R1 1 2 2.0e+{1}",              // Invalid notation encountered
+        "B1 1 0 V={POLY I(V9) 300u 1}", // Syntax error in number of nodes in expression
+        ".print tran {I(V9 R9)}",       // Unrecognized character: V in expression I(V9 R9)
+        ".fft v(a) WINDOW=BOGO",        // Invalid WINDOW type BOGO on .FFT line
+        ".fft v(a) WINDOW=GAUSS",       // Invalid WINDOW type GAUSS on .FFT line
+        ".fft v(a) FORMAT=bogo",        // Invalid FORMAT type BOGO on .FFT line
+        ".fft v(a) NP=0",               // NP value on .FFT line must be a power of 2, and >=4
+        ".measure tran tran avg v(a)",  // Illegal name in .MEASURE line
+        ".measure bleem m1 avg v(a)",   // Unknown mode in .MEASURE line
+        ".measure tran m1 avg",         // M1 has incomplete MEASURE line
+        ".measure tran m1 trig v(a)=0.5", // M1 has invalid MEASURE line
+        ".measure tran m1 find v(a) when", // M1 has invalid MEASURE line
+        ".measure fft m1 avg v(a)", // Only ENOB, EQN/PARAM, FIND, SDFR, SNDR, SNR and THD measure types
+        ".measure fft m1 find v(a) when v(a)=0.5", // Only FIND-AT supported for FFT measure M1
+        ".sens objfunc={V(a)}{V(1)} param=R9:R", // .SENS line is mis-formatted
+        ".sens objfunc={V(a)},{V(1)}, param=R9:R", // .SENS line is mis-formatted
+        ".sens objfunc=,{V(a)},{V(1)} param=R9:R", // .SENS line is mis-formatted
+        ".sens objfunc={V(a)} param=R9:R V9:DCV0", // .SENS line is mis-formatted
+        ".sens objfunc={V(a)} param=R9:R,V9:DCV0,", // .SENS line is mis-formatted
+        ".sens objfunc={V(a)} param=R9:R,,V9:DCV0", // .SENS line is mis-formatted
+        "V1 1 0 PAT(5 0 0n 1n 1n 5n b10z)", // Invalid bit symbol in DATA field
+        "V1 1 0 PAT(5 0 0n 1n 1n 5n 10)", // Invalid DATA field
+        "V1 1 0 PAT(5 0 0n -1n 1n 5n b10)", // TR, TF and TSAMPLE must all be non-negative
+        "V1 1 0 PAT(5 0 0n 1n 0n 5n b10)", // TR, TF and TSAMPLE must all be non-negative
+        "V1 1 0 PAT(5 0 0n 1n 1n 5n)", // VHI, VLO, TD, TR, TF, TSAMPLE and DATA parameters are all required
+        "V1 1 0 PAT(5 0 0n 1n 1n 5n b10 RB=2)", // Only RB=1 is supported
+        "v4 { 0 1",                    // Not enough fields on input line for device V4
+        "V1 a 0 {1",                   // Invalid DC value "{1" for device V1
+        "V1 1",                        // Not enough fields on input line for device V1
+        "V1",                          // Not enough fields on input line for device V1
+    ];
+    let legal = [
+        "T1 1 0 2 0 Z0=50 TD=1n",
+        "D1 a 0 DM",
+        "D1 a 0 DM 2",
+        "D1 (a 0) DM",
+        "D1 a,0,DM",
+        "R1 a 0 RM 1k",
+        "R1 a 0 RM L=1u W=1u",
+        "R1 a 0 RM rv",
+        "R1 a 0 1k TC=1, 2",
+        "K1 L2 L3 0.75",
+        "B1 1 0 V={POLY(1) v(a,0) 1E-3 1}",
+        ".fft v(a) WINDOW=HANN FORMAT=UNORM NP=8",
+        ".fft v(a) WINDOW=hanning FORMAT=norm NP=2",
+        ".fft v(a) NP=1",
+        ".measure tran m1 avg v(a)",
+        ".measure tran m1 max v(a) from=0 to=1u",
+        ".measure tran m1 when v(a)=0.5",
+        ".measure tran m1 trig v(a)=0.5 targ v(a)=0.6",
+        ".measure tran trig max v(a)",
+        ".measure fft m1 find v(a) at=1e3",
+        ".measure fft m1 find v(a) at = 1e3",
+        ".measure fft m1 sfdr v(a)",
+        ".sens objfunc={V(a)} param=R9:R,\n+ V9:DCV0",
+        ".sens objfunc={V(a)},{V(1)} param=R9:R",
+        ".sens objfunc={V(a)} param=R9:R ,V9:DCV0",
+        ".sens objfunc = {V(a)} param = R9:R",
+        "V1 1 0 PAT(5 0 -1n 1n 1n 5n b10)",
+        "V1 1 0 PAT(5 0 0n 1n 1n 5n b10 RB=0)",
+        "V1 1 0 PAT(VHI=5 VLO=0 TD=0 TR=1n TF=1n TSAMPLE=5n DATA=b10)",
+        "V1 pat 0 DC 5",
+        ".sens v(a) param=R9:R",
+        "V1 1 0",
+        "V1 a,0",
+        "V1(a 0)",
+        "r2 1 2;",
+        "v3 1{ 0 1",
+        "v4 } 0 1",
+        "v3 3( 0 1",
+        "v4 \" 0 1",
+    ];
+    let deck = |l: &str| {
+        format!(
+            "t\nV9 a 0 1\nR9 a 0 1\nL2 1 0 1u\nL3 1 0 1u\n.model DM D\n.model RM R (RSH=1)\n.param rv=1k\n{l}\n.tran 1n 1u\n.print tran v(a)\n.end\n"
+        )
+    };
+    let codes = |l: &str, d: Dialect| -> Vec<Code> {
+        match render_text(&deck(l), Dialect::Xyce, "t", d) {
+            Ok(w) => w.notes.diags.iter().map(|g| g.code).collect(),
+            Err(e) => e.diags.iter().map(|g| g.code).collect(),
+        }
+    };
+    for d in [Dialect::Ngspice, Dialect::Xyce] {
+        for l in rejected {
+            let c = codes(l, d);
+            assert!(c.contains(&Code::P0010), "{d:?} {l}: {c:?}");
+            assert!(!c.contains(&Code::W0001), "{d:?} {l}: {c:?}");
+        }
+        for l in legal {
+            let c = codes(l, d);
+            assert!(!c.contains(&Code::P0010), "{d:?} {l}: {c:?}");
+        }
+    }
+}

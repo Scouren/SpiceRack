@@ -212,30 +212,12 @@ xyce/Certification_Tests/BUG_548/overlap.cir semantic: a PDE device's electrodes
 xyce/MINDUCTORS/MINDUCTORS_IC4.cir Xyce 7.10 crashes on it (signal 11 under -norun)
 xyce/NEURON/Cable_UserDefined.cir Xyce 7.10 crashes on it (signal 11 under -norun)
 #
-# One line, outside P0010's classes (field counts of the analysis cards,
-# R/L/C fields, PWL points and `r=`): each rejected line has a form of its
-# own, named here until a reader rule sees it.
-xyce/Certification_Tests/BUG_198/bug_198.cir one line: free text Xyce reads as no card
-xyce/Certification_Tests/BUG_258/bug_198.cir one line: free text Xyce reads as no card
-xyce/Certification_Tests/BUG_1578/bug_1578.cir one line: free text Xyce reads as no card
-xyce/Certification_Tests/BUG_401/bad-device-line.cir one line: free text Xyce reads as no card
-xyce/Certification_Tests/BUG_401/extra-space.cir one line: free text Xyce reads as no card
-xyce/Certification_Tests/BUG_401/worse-device-line.cir one line: free text Xyce reads as no card
-xyce/CommandLine/bad_command_line.cir one line: free text Xyce reads as no card
-xyce/Certification_Tests/BUG_690/misspelled.cir one line: a misspelled dot card
-xyce/Certification_Tests/BUG_1116/bug_1116.cir one line: a diode with one node
-xyce/Certification_Tests/BUG_587/587.cir one line: a number with an expression for its exponent
-xyce/Certification_Tests/BUG_67/bug_67.cir one line: a POLY inside a brace expression
-xyce/Certification_Tests/BUG_726/adjacent.cir one line: two K elements on one line
-xyce/INVALID_CHARS/semicolon_fails.cir one line: a character Xyce names cannot hold
-xyce/INVALID_CHARS/right_curly_fails.cir one line: a character Xyce names cannot hold
-xyce/INVALID_CHARS/single_quote_fails.cir one line: a character Xyce names cannot hold
-xyce/LEAD_CURRENTS/lead_pde_2d2.cir one line: a lead current of a name with a blank
-xyce/FFT/bad_fft_line2.cir one line: a .FFT WINDOW, FORMAT or NP Xyce has not
+# One line, outside P0010's classes (`render/read/rejects.rs`): `.MEASURE`
+# forms no rule sees yet (a VAL with no `=`, an unclosed PAR or quote, a
+# RISE, FALL or CROSS that is no count, a bound that names another
+# measure), and a misspelled `.SUBCKT` Xyce only warns about, so its
+# instance names no subcircuit.
 xyce/MEASURE/bad_dot_measure_line1.cir one line: a malformed .MEASURE
 xyce/MEASURE/bad_dot_measure_line2.cir one line: a malformed .MEASURE
 xyce/MEASURE/bad_dot_measure_line9.cir one line: a malformed .MEASURE
-xyce/MEASURE_FFT/bad_dot_measure_line2.cir one line: a malformed .MEASURE
-xyce/MEASURE_FFT/unsupported_fft_measure_types.cir one line: a malformed .MEASURE
-xyce/SENS/improperVectorParams.cir one line: a malformed .SENS parameter list
-xyce/VPAT/bad_vpat.cir one line: a malformed PAT source
+xyce/Certification_Tests/BUG_690/misspelled.cir one line: a misspelled dot card
