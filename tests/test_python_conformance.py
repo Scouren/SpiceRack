@@ -300,7 +300,7 @@ EXPECTED = {
     'E_G': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'F_H': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'BV_BI': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    'POLY': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    'POLY': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
     'T': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

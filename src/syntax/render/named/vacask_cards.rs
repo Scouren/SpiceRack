@@ -9,10 +9,11 @@
 //! Contents:
 //! - `W::vacask_card(&mut self, n: u32) -> Option<String>`
 //! - `W::dc_alters(&self, swept: &[String]) -> Vec<(String, &'static str)>`
+//! - `fn poly(xs: &[String], coeffs: &[f64]) -> String`
 
 use super::W;
 use super::vacask::{num, q};
-use crate::syntax::behaviour::ModelSemantics;
+use crate::syntax::behaviour::{ModelSemantics, NamedRules};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::{Card, Comp, Num, Val, Wave, WaveKind};
@@ -242,8 +243,60 @@ impl W<'_, '_> {
                     num(td)
                 )
             }
-            // No polynomial builtin, no switch.
-            Card::Poly { .. } | Card::Switch { .. } => {
+            // No polynomial builtin: `E/G/F/H … POLY(n)` is the behavioural
+            // line `e1 (p n) v=<polynomial>`
+            // (`docs/dev-builtin-behavioral.md`), the controls `v(a,b)` or
+            // `i(v1)` (a source's branch current, ngspice's sign), the terms
+            // by `poly`.
+            Card::Poly {
+                letter,
+                name: _,
+                np,
+                nm,
+                controls,
+                coeffs,
+            } => {
+                let pairs = matches!(letter, 'E' | 'G');
+                let dims = controls.len() / if pairs { 2 } else { 1 };
+                // Kept refused: no control or half a pair; a lone
+                // coefficient in one dimension (SPICE2 and HSPICE read it as
+                // the gain, HSPICE UG "P1 (P0=0.0)"; ngspice-45 refuses the
+                // card: the tree does not say which); a Spectre `pv*` list
+                // past degree 2 (`[CMP]` p.616 gives the order to degree 2
+                // only).
+                // ponytail: the lone coefficient belongs to the reader
+                // (`[0, c]` where the source dialect reads it as the gain).
+                let spectre = self.rd.b.named_rules == NamedRules::Spectre;
+                if dims == 0
+                    || pairs && !controls.len().is_multiple_of(2)
+                    || dims == 1 && coeffs.len() == 1
+                    || spectre && coeffs.len() > 1 + dims + dims * (dims + 1) / 2
+                {
+                    self.refuse(Code::W0105, tok);
+                    return None;
+                }
+                let xs: Vec<String> = match pairs {
+                    true => controls
+                        .chunks(2)
+                        .map(|c| format!("v({},{})", q(&c[0]), q(&c[1])))
+                        .collect(),
+                    false => controls.iter().map(|c| format!("i({})", q(c))).collect(),
+                };
+                let key = match letter {
+                    'G' | 'F' => 'i',
+                    _ => 'v',
+                };
+                format!(
+                    "{}{} ({} {}) {key}={}",
+                    letter.to_ascii_lowercase(),
+                    q(own),
+                    q(&np),
+                    q(&nm),
+                    poly(&xs, &coeffs)
+                )
+            }
+            // No switch.
+            Card::Switch { .. } => {
                 self.refuse(Code::W0105, tok);
                 return None;
             }
@@ -400,5 +453,44 @@ impl W<'_, '_> {
                 return None;
             }
         })
+    }
+}
+
+// ---- private ----
+
+/// A `POLY(n)` source's polynomial over its controls `xs`, `coeffs` in
+/// SPICE's term order (ngspice manual §5.5.1, Xyce RG "POLY"): the
+/// constant, then each degree in turn, a degree's terms the non-decreasing
+/// lists of controls in lexicographic order (`x1*x1`, `x1*x2`, …, `x2*x2`,
+/// …; measured on ngspice-45 to degree 3, ZERO-LEDGER P4-004). A zero
+/// coefficient's term is left out; `0` when none is left.
+fn poly(xs: &[String], coeffs: &[f64]) -> String {
+    assert!(!xs.is_empty(), "a polynomial has a control");
+    let mut terms = Vec::new();
+    // The term's controls, by index, non-decreasing; none: the constant.
+    let mut ix: Vec<usize> = Vec::new();
+    for &c in coeffs {
+        if c != 0.0 {
+            let mut t = num(c);
+            for &i in &ix {
+                t.push('*');
+                t.push_str(&xs[i]);
+            }
+            terms.push(t);
+        }
+        // The next list: the last index below the top goes up one and
+        // the ones after it follow; none below the top: one degree up.
+        match ix.iter().rposition(|&i| i + 1 < xs.len()) {
+            Some(p) => {
+                let v = ix[p] + 1;
+                ix[p..].fill(v);
+            }
+            None => ix = vec![0; ix.len() + 1],
+        }
+    }
+    assert!(terms.len() <= coeffs.len(), "a term per coefficient");
+    match terms.is_empty() {
+        true => "0".to_string(),
+        false => terms.join("+"),
     }
 }
