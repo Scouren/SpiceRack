@@ -125,7 +125,8 @@ impl W<'_, '_> {
 
     /// Text that did not parse is the source's own: its dialect gets it
     /// back as written, another target refuses it (W0032) unless the
-    /// statement holding it was left out (a drop note at its first token).
+    /// statement holding it was left out (a drop note at its first token,
+    /// or the reader's `P0010`/`P0011` for a line its simulator rejects).
     /// Asked once the deck is written, when its drops are noted.
     pub(super) fn unparsed(&mut self) {
         if !self.pair.foreign_text {
@@ -152,6 +153,13 @@ impl W<'_, '_> {
             }
             _ => None,
         }));
+        // A line its own simulator rejects was left out by the reader
+        // (`Rd::rejected`, its note at the line's first token): text
+        // inside it is no unread text.
+        let rejected = [Code::P0010, Code::P0011];
+        let notes = self.deck.notes.iter();
+        let left_out = notes.filter(|d| rejected.contains(&d.code));
+        dropped.extend(left_out.map(|d| (d.token, self.rd.line_last(d.token))));
         let unread = [Code::P0002, Code::P0003, Code::P0008];
         let bad = self.rd.ast.diags().iter().find(|d| {
             unread.contains(&d.code) && !dropped.iter().any(|&(a, b)| (a..=b).contains(&d.token))

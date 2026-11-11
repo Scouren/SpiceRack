@@ -72,3 +72,21 @@ fn a_control_pre_osdi_is_a_load_ltspice_refuses() {
     let deck = "t\nR1 a 0 1k\n.control\npre_osdi m.osdi\n.endc\n.op\n.end\n";
     assert!(refusal(deck, Dialect::Ngspice, Dialect::Ltspice).contains(&Code::W0004));
 }
+
+#[test]
+fn p1_057_a_rejected_lines_fragment_is_no_unparsed_text() {
+    // Xyce 7.10 `-norun` stops on `.FOUR {` (".FOUR line needs at least 3
+    // arguments"), so the reader leaves the line out (P0010, P1-022); its
+    // unclosed `{` (P0008) leaves with it and is no text another dialect
+    // has to refuse (W0032). Oracle: Xyce 7.10 `-norun` on this deck, and
+    // the golden gate's fx15 record of Xyce_Regression
+    // FOURIER/bad_dot_four_line1.cir, which CDL writes. Checks: 3 per target.
+    let deck = "t\nV1 1 0 1\nR1 1 0 1\n.TRAN 1N 100N\n.FOUR {\n.PRINT TRAN V(1)\n.END\n";
+    for to in [Dialect::Cdl, Dialect::Ngspice] {
+        let w = oracle::written(deck, Dialect::Xyce, to);
+        let codes = oracle::notes(&w);
+        assert!(codes.contains(&Code::P0010), "{to:?}: {codes:?}");
+        assert!(codes.contains(&Code::P0008), "{to:?}: {codes:?}");
+        assert!(!w.text.contains('{'), "{to:?}: {}", w.text);
+    }
+}

@@ -115,15 +115,13 @@ xyce/Output/MPDE/startup_printline_for_mpde-raw-fallback-defaults-to-prn.cir xyc
 xyce/XDM/QUERY/query.cir xyce written differently: the line Xyce rejects left out with P0010 (P1-022)
 
 # Phase 7: team-lead: P1-022 on the CDL target (batch A): the rejected line leaves with its
-# `* error: W0001` comment. bad_dot_four_line1 is P1-022's defect, row P1-057: the unparsed
-# fragment of a rejected line survives as W0032 and refuses CDL (the xyce target drops it).
+# `* error: W0001` comment.
 xyce/Certification_Tests/BUG_630_SON/vpwlRepeatFail.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-022)
 xyce/Certification_Tests/BUG_657_SON/Bad_PWL_Source.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-022)
 xyce/Certification_Tests/BUG_80_SON/Bad_PWL_Source.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-022)
 xyce/Message/Device/DeviceBlock_extractMIDeviceData2.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-022)
 xyce/Message/Device/DeviceBlock_extractNodes_1.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-022)
 xyce/XDM/QUERY/query.cir cdl written differently: the line Xyce rejects left out with P0010 (P1-022)
-xyce/FOURIER/bad_dot_four_line1.cir cdl now refused: W0032 for the rejected .FOUR line's fragment (P1-022 defect, fixed by P1-057)
 # Phase 7: implementer: ZERO-LEDGER P1-007, LTspice runs one analysis a deck: a written LTspice deck of several analyses carries render::LTSPICE_EACH before its cards (only that line added; simulation::run_each runs each card alone)
 hspice/hspice/noise_ac_sweep.sp ltspice the LTSPICE_EACH line before several analysis cards (P1-007)
 hspice/hspice/op_times.sp ltspice the LTSPICE_EACH line before several analysis cards (P1-007)
