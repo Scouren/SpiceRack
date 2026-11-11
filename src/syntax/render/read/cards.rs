@@ -17,6 +17,7 @@
 //! - `Rd::subckt_head(&self, n: u32) -> Option<Head>`, `Rd::model_head(&self, n: u32) -> Option<Node>`
 //! - `Rd::model_view(&self, n: u32) -> Model`, `Rd::include_path(&self, n: u32) -> String`,
 //!   `Rd::lib_view(&self, n: u32) -> (String, String)`, `Rd::param_view(&self, a: u32) -> (String, String)`,
+//!   `Rd::file_order(&self, b: &Block) -> Vec<(u32, bool)>`,
 //!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::dot_rule(&self, word: &str) -> Option<DotRule>`,
 //!   `Rd::is_word_item(&self, n: u32) -> bool`,
 //!   `Rd::param_winners(&self, deck: &mut Deck, to: &Behaviours)`
@@ -243,6 +244,19 @@ impl Rd<'_> {
             [p, s, ..] => (self.path_of(*p), self.text(*s)),
             [] => unreachable!("lib_call read it"),
         }
+    }
+
+    /// Block `b`'s `.include` and `.lib` cards in statement order, each
+    /// with whether it is a `.lib` call. A file read later may set again
+    /// what an earlier one set (ngspice-45: the later `.param` wins), so a
+    /// writer keeps the deck's order.
+    pub(in crate::syntax::render) fn file_order(&self, b: &Block) -> Vec<(u32, bool)> {
+        let includes = b.includes.iter().map(|&n| (n, false));
+        let mut cards: Vec<(u32, bool)> =
+            includes.chain(b.libs.iter().map(|&n| (n, true))).collect();
+        // A statement's main token is its place in the source.
+        cards.sort_by_key(|&(n, _)| self.main(n));
+        cards
     }
 
     /// Whether the `.param` assignment `a` is an Xyce `.global_param`'s:

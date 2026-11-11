@@ -41,12 +41,13 @@ impl W<'_, '_> {
             "" if p.contains(char::is_whitespace) => "\"",
             q => q,
         };
-        for &inc in &b.includes {
-            let p = self.rd.include_path(inc);
-            let q = quote(&p);
-            self.o.token(&format!(".include {q}{p}{q}"), Space::Line);
-        }
-        for &lib in &b.libs {
+        for (lib, is_lib) in self.rd.file_order(b) {
+            if !is_lib {
+                let p = self.rd.include_path(lib);
+                let q = quote(&p);
+                self.o.token(&format!(".include {q}{p}{q}"), Space::Line);
+                continue;
+            }
             let (p, section) = self.rd.lib_view(lib);
             let q = quote(&p);
             if section.is_empty() {
