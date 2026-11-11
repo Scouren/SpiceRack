@@ -57,3 +57,8 @@ spice-bench/ngspice/paranoia/vdmos/VDMOS-DIO.sp vacask written differently: a fo
 spice-bench/ngspice/paranoia/vdmos/vdmos-out.sp vacask written differently: a four-node VDMOS card is `sp_vdmos` on d, g, s, its bulk dropped (P4-016)
 spice-bench/ngspice/paranoia/vdmos/vdmos-out_ir.sp vacask written differently: a four-node VDMOS card is `sp_vdmos` on d, g, s, its bulk dropped (P4-016)
 spice-bench/ngspice/paranoia/vdmos/vdmos-out_ir_mtr.sp vacask written differently: a four-node VDMOS card is `sp_vdmos` on d, g, s, its bulk dropped (P4-016)
+
+# S1: P4-020: VACASK's `mc` draws at every call site (docs/cmd-analysis-mc.md at 36be560), so the scope a Spectre
+# `montecarlo variations=` leaves out is written at its nominal. Oracle: tests/spectre/expected.json T-S3 and
+# tests/test_vacask_runs/analyses.rs::p4_020_a_montecarlos_left_out_scope_is_nominal.
+fixtures/tests/spectre/t_s3_mismatch.scs vacask now written: the scope a `montecarlo` leaves out is written at its nominal (P4-020)

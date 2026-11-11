@@ -98,11 +98,11 @@ macro_rules! rows_w_named {
                 cite: "`render::models` (each row's ngspice-45 and Spectre Reference 5.0 clause)",
                 explain: "The parameter at this position has no parameter in the target with ngspice's equation (a tunnelling current, an exponential temperature coefficient, a knee current Spectre reads only with `hcomp=1`), or ngspice and the target rank it against another one in opposite orders. Set it to its off value, or model the effect another way.",
             }
-            /// A Spectre `montecarlo` whose `variations` leaves out a scope the deck draws in, on a target that varies every call (VACASK's `mc`).
+            /// A Spectre `montecarlo` whose `variations` leaves out a scope the deck draws in, in a deck whose `montecarlo`s do not all leave out that scope, on a target that varies every call (VACASK's `mc`).
             W0115 Refusal {
                 title: "a Monte Carlo the target varies wider",
                 cite: "Spectre Reference 19.1 p.166 (`variations`, default `process`); VACASK docs/cmd-analysis-mc.md (`mc` draws at every call site)",
-                explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Write `variations=all`, or keep the deck's draws to the scope the montecarlo names.",
+                explain: "The montecarlo varies only the process (top-level) or the mismatch (in-subcircuit) draws, and the target's Monte Carlo varies every draw. Where every montecarlo of a deck leaves out the same scope, that scope's draws are written at their nominal values; this deck's montecarlos differ. Give them the same `variations`, or run them from separate decks.",
             }
             // W0120–W0124: the Spectre and VACASK reader's (`render::read::named*`).
             /// A VACASK control command or `embed` that only steers a VACASK run

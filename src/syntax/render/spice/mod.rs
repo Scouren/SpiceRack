@@ -147,12 +147,11 @@ pub(super) fn write(rd: &mut Rd, deck: &Deck, lang: Lang) -> (String, Vec<Diag>)
         diags.push(Diag::new(Code::W0037, tok, 0));
     }
     let draws = match lang.action(Construct::Statistics) {
-        Action::Lift(Rule::StatisticsDraws) => {
-            draws::lift(rd, deck, Layers::Two).unwrap_or_else(|d| {
+        Action::Lift(Rule::StatisticsDraws) => draws::lift(rd, deck, Layers::Two, None)
+            .unwrap_or_else(|d| {
                 diags.push(d);
                 draws::Draws::default()
-            })
-        }
+            }),
         _ => draws::Draws::default(),
     };
     let rd: &Rd = rd;

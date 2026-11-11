@@ -19,7 +19,9 @@
 //! VACASK has `agauss`, `gauss`, `aunif` and `unif`, drawn once per call
 //! site per scope as Spectre's process/mismatch split (VACASK
 //! `docs/cmd-analysis-mc.md` lines 31-61), so its rule
-//! (`Lift(VacaskCalls)`, [`vacask_calls`]) spells out only what it lacks.
+//! (`Lift(VacaskCalls)`, [`vacask_calls`]) spells out only what it lacks,
+//! and writes the scope every `montecarlo` leaves out ([`left_out`]) at
+//! its nominal: VACASK's `mc` has no `variations`.
 //!
 //! Cites: Spectre Reference 19.1 pp.175-179; ngspice `xpressn.c:45-85`
 //! (the guards); Spectre Reference 19.1 p.481 (user functions), p.474 (no
@@ -28,8 +30,9 @@
 //! Contents:
 //! - `pub(super) struct Lifted`, `pub(super) struct Var`
 //! - `pub(super) fn lift(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) -> Lifted`
-//! - `pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>)`
+//! - `pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, out: Option<bool>, refused: &mut Vec<Diag>)`
 //! - `pub(super) fn draw_scopes(rd: &Rd, deck: &Deck) -> (bool, bool)`
+//! - `pub(super) fn left_out(rd: &Rd, deck: &Deck) -> Option<bool>`
 //! - `Lifted::writes(&self, f: Func) -> bool`,
 //!   `Lifted::vars_at(&self, at: Option<usize>) -> impl Iterator<Item = &Var>`,
 //!   `Lifted::block_at(&self, at: Option<usize>) -> Option<Stats>`,
@@ -40,7 +43,7 @@ use std::collections::HashSet;
 use super::sites::{Site, sites};
 use crate::syntax::ast::{NONE, Name, Node, Tag};
 use crate::syntax::diag::{Code, Diag};
-use crate::syntax::render::read::{Deck, Func, Lift, Rd, Stats, Step, Vary};
+use crate::syntax::render::read::{Ana, BenchCard, Deck, Func, Lift, Rd, Stats, Step, Vary};
 
 /// The lift's declarations: its variables in walk order and the `rack_*`
 /// functions the deck then calls.
@@ -245,21 +248,22 @@ pub(super) fn lift(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) -> Lifted 
 /// Spells out the statistical calls VACASK lacks, as fixups
 /// in `rd`: `limit(nom, avar)` as an `aunif` ternary, Xyce's clamp
 /// `limit(x, lo, hi)` as `min(max())`, a two-argument `agauss`/`gauss` with
-/// its sigma 1; nothing when the deck calls none. HSPICE's four-argument
-/// form is refused into `refused`.
-pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) {
-    let scoped = sites(rd, deck);
-    let calls: Vec<u32> = scoped
-        .iter()
-        .flat_map(|s| &s.sites)
-        .flat_map(|s| &s.roots)
-        .flat_map(|&r| rd.calls_in(r))
-        .collect();
-    if !calls.iter().any(|&c| draws(rd, c)) {
+/// its sigma 1; nothing when the deck calls none. A draw in the scope `out`
+/// names ([`left_out`]) is written at its nominal, `(nom)`. HSPICE's
+/// four-argument form is refused into `refused`.
+pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, out: Option<bool>, refused: &mut Vec<Diag>) {
+    // Each call, with whether its scope is the one left out.
+    let mut calls: Vec<(u32, bool)> = Vec::new();
+    for s in &sites(rd, deck) {
+        let left = out == Some(s.subckt.is_some());
+        let roots = s.sites.iter().flat_map(|site| &site.roots);
+        calls.extend(roots.flat_map(|&r| rd.calls_in(r)).map(|c| (c, left)));
+    }
+    if !calls.iter().any(|&(c, _)| draws(rd, c)) {
         return;
     }
     let mut fixes = Vec::new();
-    for call in calls {
+    for (call, left) in calls {
         let (name, args) = rd.call_of(call);
         let f = name.to_ascii_lowercase();
         let Some(f) = STATISTICAL.iter().copied().find(|s| *s == f) else {
@@ -267,8 +271,9 @@ pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) {
         };
         let tok = rd.main(call);
         match (f, args) {
-            ("limit", 2) => fixes.push((tok, Lift::Limit)),
             ("limit", 3) => fixes.push((tok, Lift::Clamp)),
+            _ if left => fixes.push((tok, Lift::Nominal)),
+            ("limit", 2) => fixes.push((tok, Lift::Limit)),
             ("agauss" | "gauss", 2) => fixes.push((tok, Lift::Sigma(f))),
             ("agauss" | "gauss", 3) | ("aunif" | "unif", 2) => {}
             _ => refused.push(Diag::new(Code::W0107, tok, 0)),
@@ -280,10 +285,11 @@ pub(super) fn vacask_calls(rd: &mut Rd, deck: &Deck, refused: &mut Vec<Diag>) {
 }
 
 /// Whether the deck draws at its or a section's top (Spectre's `process`
-/// scope) and inside a subcircuit (`mismatch`): the scopes a Spectre
-/// `montecarlo variations=` picks from (Spectre Reference 19.1 p.166),
-/// which VACASK's `mc` varies alike (`docs/cmd-analysis-mc.md` lines
-/// 31-61).
+/// scope) and inside a subcircuit (`mismatch`), by a statistical call or
+/// by a `statistics` block's `vary`: the scopes a Spectre `montecarlo
+/// variations=` picks from (Spectre Reference 19.1 p.166), which VACASK's
+/// `mc` varies alike (`docs/cmd-analysis-mc.md` lines 31-61). The scope
+/// written at its nominal ([`left_out`]) draws nothing.
 pub(super) fn draw_scopes(rd: &Rd, deck: &Deck) -> (bool, bool) {
     let (mut process, mut mismatch) = (false, false);
     for s in sites(rd, deck) {
@@ -294,7 +300,37 @@ pub(super) fn draw_scopes(rd: &Rd, deck: &Deck) -> (bool, bool) {
             None => process |= drawn,
         }
     }
-    (process, mismatch)
+    let bodies = std::iter::once(&deck.top).chain(deck.sections.iter().map(|s| &s.body));
+    for &st in bodies.flat_map(|b| &b.statistics) {
+        let s = rd.statistics(st);
+        process |= !s.process.is_empty();
+        mismatch |= !s.mismatch.is_empty();
+    }
+    match left_out(rd, deck) {
+        Some(true) => (process, false),
+        Some(false) => (false, mismatch),
+        None => (process, mismatch),
+    }
+}
+
+/// The scope every `montecarlo` of the deck leaves out: `Some(true)` the
+/// subcircuits' draws (`mismatch`: Spectre's default `variations=process`
+/// keeps the top's alone, Reference 19.1 p.166), `Some(false)` the top's
+/// (`process`); `None` with no `montecarlo`, with one that takes `all`, or
+/// with two that leave out different scopes (no one text is both).
+pub(super) fn left_out(rd: &Rd, deck: &Deck) -> Option<bool> {
+    let cards = deck.bench.iter().flat_map(|&b| rd.bench_cards(b));
+    let mut asked = cards.filter_map(|c| match c {
+        BenchCard::Ana(Ana::MonteCarlo { variations, .. }) => Some(variations),
+        _ => None,
+    });
+    let scope = |v: Option<String>| match v.as_deref() {
+        None | Some("process") => Some(true),
+        Some("mismatch") => Some(false),
+        _ => None,
+    };
+    let first = scope(asked.next()?)?;
+    asked.all(|v| scope(v) == Some(first)).then_some(first)
 }
 
 impl Lifted {

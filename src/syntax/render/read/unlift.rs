@@ -97,6 +97,9 @@ pub(in crate::syntax::render) enum Lift {
     Limit,
     /// Xyce's three-argument `limit(x, lo, hi)` → `min(max(x, lo), hi)`.
     Clamp,
+    /// `f(nom, …)` → `(nom)`: a draw of the scope the deck's `montecarlo`
+    /// leaves out, at its nominal (VACASK's `mc` draws at every call).
+    Nominal,
 }
 
 /// The five statistical functions (ngspice §2.11.5).
@@ -559,6 +562,7 @@ impl<'a> Rd<'a> {
                 a[0], a[1], a[0], a[1]
             ),
             Lift::Clamp => format!("min(max({}, {}), {})", a[0], a[1], a[2]),
+            Lift::Nominal => format!("({})", a[0]),
         }
     }
 }

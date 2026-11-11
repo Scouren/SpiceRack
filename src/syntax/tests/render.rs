@@ -145,7 +145,8 @@ fn a_region_montecarlo_is_spectres_and_vacasks_mc_or_refused() {
     // VACASK `flake.nix` pins, `bcd48e2`, has no `mc`, so no run checks
     // it); ngspice has no such statement (`W0015`); a draw inside a
     // subcircuit is `mismatch`, which the default leaves out and VACASK
-    // would vary (`W0115`). Checks: 7.
+    // would vary: written at its nominal (ZERO-LEDGER P4-020), and refused
+    // (`W0115`) where a second montecarlo takes it. Checks: 9.
     let deck = |sub: &str, vary: &str| {
         format!(
             "t\n.subckt s a\nR1 a 0 {sub}\n.ends\nX1 n s\nR2 n 0 {{agauss(1k, 100, 1)}}\n\
@@ -180,17 +181,21 @@ fn a_region_montecarlo_is_spectres_and_vacasks_mc_or_refused() {
             .contains("W0015")
     );
     let mismatch = deck("{agauss(1k, 100, 1)}", "");
+    let nominal = given(&mismatch, Dialect::Vacask).expect("written");
+    assert!(nominal.contains("r1 (a 0) resistor r=(1k)"), "{nominal}");
     assert!(
-        given(&mismatch, Dialect::Vacask)
+        nominal.contains("r2 (n 0) resistor r=agauss(1k, 100, 1)"),
+        "{nominal}"
+    );
+    let all = deck("{agauss(1k, 100, 1)}", " variations=all");
+    let all = given(&all, Dialect::Vacask).expect("written");
+    assert_eq!(all.matches("r=agauss(1k, 100, 1)").count(), 2, "{all}");
+    let second = "mc2 montecarlo numruns=20 variations=all {\ntran2 tran\n}\nsimulator lang=spice";
+    let both = mismatch.replace("simulator lang=spice", second);
+    assert!(
+        given(&both, Dialect::Vacask)
             .expect_err("refused")
             .contains("W0115")
-    );
-    assert!(
-        given(
-            &deck("{agauss(1k, 100, 1)}", " variations=all"),
-            Dialect::Vacask
-        )
-        .is_ok()
     );
 }
 
