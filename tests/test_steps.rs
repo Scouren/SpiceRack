@@ -24,6 +24,7 @@
 mod oracle;
 
 use spicerack::backend::Dialect;
+use spicerack::syntax::Lang;
 use spicerack::syntax::diag::Code;
 
 /// A divider up to its `.step` cards: v(out) = vv · rr / (1k + rr).
@@ -53,13 +54,15 @@ fn outs(on: Dialect, text: &str) -> Vec<f64> {
 /// its `lin`), beside what the card means: `Sweep::Log`'s N points in
 /// all, which ngspice-45 ran by hand as the loop written from the same
 /// card (five points, 1k to 16k: research/impl/evidence/P5-101/n1.log).
+/// The deck is read as the Python API gives it (`Lang::NGSPICE_GIVEN`):
+/// a `.step` in an ngspice file is kept as text (W0027; ngspice has none).
 /// Tolerance: a linear solve of three elements, RELTOL class.
 #[test]
 fn p5_101_a_log_step_counts_spectres_steps() {
     let deck = format!("{DIVIDER}.step log rr 1k 16k 5\n.op\n.end\n");
     // The card's points, as the script written from it runs them.
     let want = [0.5, 2.0 / 3.0, 0.8, 8.0 / 9.0, 16.0 / 17.0];
-    let text = oracle::write(&deck, Dialect::Ngspice, Dialect::Ngspice);
+    let text = oracle::write(&deck, Lang::NGSPICE_GIVEN, Dialect::Ngspice);
     let got = outs(Dialect::Ngspice, &text);
     let tol = oracle::Tol {
         rel: 1e-6,
@@ -73,7 +76,7 @@ fn p5_101_a_log_step_counts_spectres_steps() {
     oracle::spec_example(
         "Spectre Reference 19.1 p.407: log, Number of steps, log sweep",
         &deck,
-        Dialect::Ngspice,
+        Lang::NGSPICE_GIVEN,
         Dialect::Spectre,
         &["sweep1_rr sweep param=rr start=1k stop=16k log=4 {"],
     );
@@ -81,7 +84,7 @@ fn p5_101_a_log_step_counts_spectres_steps() {
     // that is no whole number.
     for count in ["1", "2.5"] {
         let deck = format!("{DIVIDER}.step log rr 1k 16k {count}\n.op\n.end\n");
-        let codes = oracle::refusal(&deck, Dialect::Ngspice, Dialect::Spectre);
+        let codes = oracle::refusal(&deck, Lang::NGSPICE_GIVEN, Dialect::Spectre);
         assert_eq!(codes, [Code::W0016], "log {count}");
     }
 }

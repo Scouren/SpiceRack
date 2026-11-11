@@ -46,9 +46,9 @@
 //! Contents:
 //! - `pub struct Tol`, `Tol::within(self, got: f64, want: f64) -> bool`
 //! - `pub enum At`
-//! - `pub fn write(text: &str, from: Dialect, to: Dialect) -> String`
-//! - `pub fn written(text: &str, from: Dialect, to: Dialect) -> Written`
-//! - `pub fn refusal(text: &str, from: Dialect, to: Dialect) -> Vec<Code>`
+//! - `pub fn write(text: &str, from: impl Into<Lang>, to: Dialect) -> String`
+//! - `pub fn written(text: &str, from: impl Into<Lang>, to: Dialect) -> Written`
+//! - `pub fn refusal(text: &str, from: impl Into<Lang>, to: Dialect) -> Vec<Code>`
 //! - `pub fn notes(w: &Written) -> Vec<Code>`
 //! - `pub fn run(on: Dialect, text: &str) -> Vec<RawData>`
 //! - `pub fn value(plots: &[RawData], node: &str, at: At) -> f64`
@@ -59,7 +59,7 @@
 //! - `pub fn sim_pair(from: Dialect, deck: &str, to: Dialect, node: &str, at: At, tol: Tol) -> (f64, f64)`
 //! - `pub fn closed_form(from: Dialect, deck: &str, on: &[Dialect], node: &str, at: At, want: f64, tol: Tol)`
 //! - `pub fn golden(name: &str, provenance: &str, got: &str)`
-//! - `pub fn spec_example(cite: &str, text: &str, from: Dialect, to: Dialect, want: &[&str]) -> String`
+//! - `pub fn spec_example(cite: &str, text: &str, from: impl Into<Lang>, to: Dialect, want: &[&str]) -> String`
 //! - `pub fn spec_refusal(cite: &str, text: &str, from: Dialect, to: Dialect, want: &[Code])`
 
 #![allow(dead_code)]
@@ -70,9 +70,9 @@ mod sim;
 use std::path::Path;
 
 use spicerack::result::RawData;
-use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::render::{Written, render_text};
+use spicerack::syntax::{Dialect, Lang};
 
 /// A tolerance: `|got - want| <= rel * max(|want|, floor)`. The test names
 /// where `rel` comes from (the simulator's RELTOL, the closed form's own
@@ -109,11 +109,12 @@ impl Tol {
     }
 }
 
-/// `text`, read as `from`, written for `to`.
+/// `text`, read as `from` (a dialect, or a lexicon such as
+/// `Lang::NGSPICE_GIVEN`: a deck the Python API built), written for `to`.
 ///
 /// # Panics
 /// On a refusal, with its messages.
-pub fn write(text: &str, from: Dialect, to: Dialect) -> String {
+pub fn write(text: &str, from: impl Into<Lang>, to: Dialect) -> String {
     written(text, from, to).text
 }
 
@@ -121,7 +122,7 @@ pub fn write(text: &str, from: Dialect, to: Dialect) -> String {
 ///
 /// # Panics
 /// On a refusal, with its messages.
-pub fn written(text: &str, from: Dialect, to: Dialect) -> Written {
+pub fn written(text: &str, from: impl Into<Lang>, to: Dialect) -> Written {
     render_text(text, from, "t", to).unwrap_or_else(|e| panic!("{to:?}: {}\n{text}", e.messages))
 }
 
@@ -130,7 +131,7 @@ pub fn written(text: &str, from: Dialect, to: Dialect) -> Written {
 ///
 /// # Panics
 /// When `to` writes the deck instead.
-pub fn refusal(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
+pub fn refusal(text: &str, from: impl Into<Lang>, to: Dialect) -> Vec<Code> {
     match render_text(text, from, "t", to) {
         Ok(w) => panic!("written, not refused:\n{}", w.text),
         Err(e) => e.diags.iter().map(|d| d.code).collect(),
@@ -452,7 +453,13 @@ pub fn golden(name: &str, provenance: &str, got: &str) {
 ///
 /// # Panics
 /// On a refusal, or on a line of `want` the text lacks.
-pub fn spec_example(cite: &str, text: &str, from: Dialect, to: Dialect, want: &[&str]) -> String {
+pub fn spec_example(
+    cite: &str,
+    text: &str,
+    from: impl Into<Lang>,
+    to: Dialect,
+    want: &[&str],
+) -> String {
     assert!(
         !cite.trim().is_empty() && !want.is_empty(),
         "a clause and its lines"
