@@ -101,12 +101,7 @@ class TestSubcircuitComponents:
             negative="d",
             value=1e-3,
         )
-        sc.K(
-            name="1",
-            inductor1="1",
-            inductor2="2",
-            coupling=0.99,
-        )
+        sc.K("1", "L1", "L2", coupling=0.99)
         assert "K1 L1 L2 0.99" in cards(sc)
 
     def test_voltage_source(self):

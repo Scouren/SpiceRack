@@ -131,13 +131,17 @@ impl PySubcircuit {
         self.two('L', name, positive, negative, &value.value(), kwargs)
     }
 
-    /// `inductor1` and `inductor2` name two inductors of this subcircuit, as
-    /// `L()` named them (`"1"`) or by card name (`"L1"`); a name that is
-    /// neither is a `ValueError` (ngspice: "coupling to non-existent
-    /// inductor").
-    #[pyo3(signature = (name, inductor1, inductor2, *, coupling))]
-    fn K(&mut self, name: &str, inductor1: &str, inductor2: &str, coupling: f64) -> PyResult<()> {
-        let (l1, l2) = (self.inductor(name, inductor1)?, self.inductor(name, inductor2)?);
+    /// Couples two inductors of this body, each by its card name (`"L1"`,
+    /// in any case) and added before the call (ngspice manual §3.3.12:
+    /// `KXXXXXXX LYYYYYYY LZZZZZZZ value`). `ValueError` for a name that is
+    /// no `L` here (ngspice: "coupling to non-existent inductor") and for
+    /// any count but two (three or more: P8-008).
+    #[pyo3(signature = (name, *inductors, coupling))]
+    fn K(&mut self, name: &str, inductors: Vec<String>, coupling: f64) -> PyResult<()> {
+        let [l1, l2] = inductors.as_slice() else {
+            return Err(PyValueError::new_err(format!("K{name}: couples two inductors, {} given", inductors.len())));
+        };
+        let (l1, l2) = (self.inductor(name, l1)?, self.inductor(name, l2)?);
         self.push(name, format!("K{name} {l1} {l2} {}", dec(coupling)));
         Ok(())
     }
@@ -512,10 +516,9 @@ impl PySubcircuit {
         self.inner.elements.push(Card::element(name, text));
     }
 
-    /// The card name of the inductor `given` names for coupling `k`:
-    /// `L<given>` when this body has that card (an `L()` element, or a line
-    /// given as text), else `given` itself when it is such a card's name
-    /// (`L1`). SPICE names are case blind.
+    /// `given` when it is the card name (`L1`) of an inductor of this body
+    /// (an `L()` element, or a line given as text), for coupling `k`. SPICE
+    /// names are case blind.
     fn inductor(&self, k: &str, given: &str) -> PyResult<String> {
         let has = |card: &str| {
             let cards = self.inner.elements.iter().map(|c| c.text.as_str());
@@ -525,14 +528,11 @@ impl PySubcircuit {
                 .filter_map(|l| l.split_whitespace().next())
                 .any(|w| w.eq_ignore_ascii_case(card))
         };
-        if has(&format!("L{given}")) {
-            return Ok(format!("L{given}"));
-        }
         if given.starts_with(['L', 'l']) && has(given) {
             return Ok(given.to_string());
         }
         Err(PyValueError::new_err(format!(
-            "K{k}: '{given}' names no inductor of '{}': add it with L() first",
+            "K{k}: '{given}' names no inductor of '{}': give its full name (`L1`), added with L() first",
             self.inner.name
         )))
     }

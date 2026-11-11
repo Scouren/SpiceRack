@@ -142,12 +142,7 @@ class TestPassives:
             negative="d",
             value=1e-6,
         )
-        c.K(
-            name="1",
-            inductor1="1",
-            inductor2="2",
-            coupling=0.95,
-        )
+        c.K("1", "L1", "L2", coupling=0.95)
         netlist = str(c)
         assert "K1 L1 L2 0.95" in netlist
 
@@ -1190,3 +1185,35 @@ class TestPortableOptions:
             c.options(tran_method="trap")
         with pytest.raises(ValueError, match="not a portable option"):
             c.simulator().options(tran_method="trap")
+
+
+# ======================================================================
+# K names its inductors in full (P8-017; ngspice manual §3.3.12)
+# ======================================================================
+
+def coupled():
+    c = ps().Circuit("k")
+    c.L("1", "a", "b", 1e-6)
+    c.L("2", "c", "d", 1e-6)
+    c.R("1", "b", "d", 1.0)
+    return c
+
+
+class TestCouplingNames:
+    def test_p8_017_k_takes_the_inductors_full_names(self):
+        c = coupled()
+        c.K("1", "L1", "L2", coupling=0.95)
+        assert "K1 L1 L2 0.95" in str(c).splitlines()
+
+    @pytest.mark.parametrize("names", [
+        ("1", "2"),          # the old spelling: the names without their letter
+        ("L1", "L9"),        # no such inductor
+        ("L1", "R1"),        # an element, but no inductor
+        ("L1",),             # one
+        ("L1", "L2", "L1"),  # three (P8-008)
+    ])
+    def test_p8_017_k_refuses_what_is_no_pair_of_its_inductors(self, names):
+        c = coupled()
+        with pytest.raises(ValueError, match="^K1: "):
+            c.K("1", *names, coupling=0.5)
+        assert not any(l.startswith("K") for l in str(c).splitlines())

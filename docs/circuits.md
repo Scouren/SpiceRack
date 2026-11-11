@@ -65,7 +65,7 @@ Every element takes its name and nodes first; the rest are keywords.
 | --- | --- | --- |
 | `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`) |
 | `C` | a capacitor given by its charge | `charge="1n*v(a,b)"` in place of `value` |
-| `K` | inductor coupling | `inductor1, inductor2, coupling=`; the two `L` names (`"1"` or `"L1"`), added first |
+| `K` | inductor coupling | the two inductors' full names (`"L1", "L2"`), added first; `coupling=` |
 | `V`, `I` | DC sources | `value, ac=, ac_phase=` |
 | `E`, `G` | voltage-controlled sources | `control_positive=, control_negative=, voltage_gain=` / `transconductance=` |
 | `F`, `H` | current-controlled sources | `vsense=` (a V source name), `current_gain=` / `transresistance=` |

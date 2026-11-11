@@ -14,7 +14,7 @@ dut = ps.Subcircuit("rlc_bp", ["input", "output"])
 dut.R(name="src", positive="input", negative="n1", value=50.0)
 dut.L(name="pri", positive="n1", negative=dut.gnd, value=10 @ u_uH)
 dut.L(name="sec", positive="output", negative=dut.gnd, value=10 @ u_uH)
-dut.K(name="xfmr", inductor1="pri", inductor2="sec", coupling=0.9)
+dut.K("xfmr", "Lpri", "Lsec", coupling=0.9)
 dut.C(name="tune", positive="output", negative=dut.gnd, value=100 @ u_pF)
 dut.R(name="load", positive="output", negative=dut.gnd, value=1 @ u_kOhm)
 

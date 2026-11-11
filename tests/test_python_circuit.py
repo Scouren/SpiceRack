@@ -88,12 +88,7 @@ class TestPassiveComponents:
             negative="d",
             value=1e-6,
         )
-        c.K(
-            name="1",
-            inductor1="1",
-            inductor2="2",
-            coupling=0.99,
-        )
+        c.K("1", "L1", "L2", coupling=0.99)
         netlist = str(c)
         assert "K1 L1 L2 0.99" in netlist
 
