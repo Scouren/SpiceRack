@@ -84,8 +84,8 @@ Every deck pytest builds was logged on every target through both paths
   HSPICE, a TRNOISE on ESPice) is refused (`W0001`, `W0009`) where the old
   writer copied it.
 - A `.tran` step cap with no start: SPICE's placeholder start `0` is read
-  as a start, so Spectre writes `start=0` and HSPICE `START=0` (the same
-  run).
+  as a start, so Spectre writes `start=0` (the same run); HSPICE leaves a
+  zero start to its default (ledger P3-064).
 - `nominal_temperature` is a `.options tnom=` card: a card of its own on
   SPICE targets (below the options card, above `.temp`), `mytnom options
   tnom=` on Spectre, after `temp` on VACASK and Xyce (ledger P3-001: the

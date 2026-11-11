@@ -301,11 +301,11 @@ macro_rules! rows_w_spice {
                 cite: "ngspice-45 `devices/cap/cap.c` (`cap`), `devices/ind/ind.c` (`ind`), `parser/inpgmod.c` (an instance parameter on the card is the instance's default); Xyce RG 7.10 C, L model parameters (`C`, `L`: multipliers of the instance value)",
                 explain: "In ngspice the model's `c=` (`l=`) is the value of an element that gives none; Xyce multiplies the element's value by it. Give the value on each element and leave it off the model.",
             }
-            /// An output Xyce writes no vector for: an `.op` beside another analysis, the integrated noise, an ngspice `@dev[param]` vector.
+            /// An output the target writes no vector for: on Xyce an `.op` beside another analysis, the integrated noise, an ngspice `@dev[param]` vector; on HSPICE a saved ngspice `@dev[param]`.
             W0052 Note {
-                title: "an output Xyce writes no vector for",
-                cite: "Xyce RG 7.10 `.OP` (\"if specified with another analysis type, no additional operating point will be calculated\"), `.NOISE` (the total noise integrals are sent to stdout), `.PRINT` (node voltages, lead currents, power); ngspice manual §15.6 (`@device[param]`)",
-                explain: "Xyce runs `.op` beside another analysis as a printout of the bias point, writes a noise sweep's integrals to its standard output only, and has no name for an ngspice device vector (`@q1[gm]`), so the results lack that plot or vector. Run the operating point alone, integrate the noise spectrum, or compute the quantity from node voltages and lead currents.",
+                title: "an output the target writes no vector for",
+                cite: "Xyce RG 7.10 `.OP` (\"if specified with another analysis type, no additional operating point will be calculated\"), `.NOISE` (the total noise integrals are sent to stdout), `.PRINT` (node voltages, lead currents, power); HSPICE cmdref E-2010.12 `.PROBE` (p.255: \"voltage, current, or element template\"); ngspice manual §15.6 (`@device[param]`)",
+                explain: "Xyce runs `.op` beside another analysis as a printout of the bias point, writes a noise sweep's integrals to its standard output only, and has no name for an ngspice device vector (`@q1[gm]`); HSPICE's `.probe` takes a voltage, a current or an element template, so a saved device vector is left out of its cards. The results lack that plot or vector. Run the operating point alone, integrate the noise spectrum, or compute the quantity from node voltages and lead currents.",
             }
             /// A model card Xyce's devices cannot compute, left out of the file written for Xyce.
             W0053 Note {

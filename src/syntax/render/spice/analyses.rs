@@ -87,8 +87,10 @@ impl W<'_, '_> {
                     s.push_str(&format!(".option delmax={}\n", num(self, *ms)));
                 }
                 s.push_str(&format!(".tran {} {}", num(self, *step), num(self, *stop)));
-                if let Some(st) = start {
-                    s.push_str(&format!(" START={}", num(self, *st)));
+                // START is when printing begins, 0 unless given (cmdref
+                // `.TRAN`): a zero start is the card without the word.
+                if let Some(st) = start.filter(|&st| st != 0.0) {
+                    s.push_str(&format!(" START={}", num(self, st)));
                 }
                 if *uic {
                     s.push_str(" UIC");
