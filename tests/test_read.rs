@@ -213,3 +213,40 @@ fn p6_003_ltspice_fra_analyzer_probe() {
     let tran = format!("{rc}.tran 1m\n.end\n");
     assert!(write(&tran, lt, Dialect::Ngspice).contains(".tran"));
 }
+
+// ZERO-LEDGER P6-006: LTspice's `.savestate` and `.loadstate` (a
+// transient's complete state, "stored in a proprietary format": LTspice
+// help, `.SAVESTATE`, `.LOADSTATE`) and `.savebias` (the operating point
+// as a file for `.loadbias`: help, `.SAVEBIAS`). Oracle: the help pages;
+// and LTspice 26.1.1 wrote `s.state` (1,036 bytes opening `<Binary File>`)
+// for the first and `.nodeset V(in)=1 V(out)=0.75` for the last. No other
+// simulator reads those files, so each refuses the card as LTspice's own
+// statement (W0039), never as text it could not read (W0001); LTspice
+// gets it back as written. Checks: 18 refusals, 3 lines, 1 neighbour.
+#[test]
+fn p6_006_ltspice_savebias_loadstate_savestate() {
+    let lt = Dialect::Ltspice;
+    let cite = "LTspice help, `.SAVESTATE`, `.LOADSTATE`, `.SAVEBIAS`: LTspice's own files";
+    let rc = "* t\nV1 in 0 1\nR1 in out 1k\nC1 out 0 1n\n";
+    for card in [
+        ".savestate \"s.state\" time=20u",
+        ".loadstate \"s.state\"",
+        ".savebias \"b.txt\"",
+    ] {
+        let deck = format!("{rc}{card}\n.end\n");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Xyce,
+            Dialect::Spectre,
+            Dialect::Vacask,
+        ] {
+            oracle::spec_refusal(cite, &deck, lt, to, &[Code::W0039]);
+        }
+        oracle::spec_example(cite, &deck, lt, lt, &[card]);
+    }
+    // The legal neighbour: the circuit without a state card is written.
+    let plain = format!("{rc}.op\n.end\n");
+    assert!(write(&plain, lt, Dialect::Ngspice).contains(".op"));
+}

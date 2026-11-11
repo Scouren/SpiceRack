@@ -154,6 +154,12 @@ pub(super) fn ltspice() -> DialectDef {
         .kept_word(".fra", Construct::PrivateText)
         .kept_word("@", Construct::PrivateText)
         .kept_word("&", Construct::PrivateText)
+        // Its state files (ZERO-LEDGER P6-006; help, `.SAVESTATE`,
+        // `.LOADSTATE`: "a proprietary format"; `.SAVEBIAS`: a file for
+        // `.loadbias`, P5-026's).
+        .kept_word(".savestate", Construct::PrivateText)
+        .kept_word(".loadstate", Construct::PrivateText)
+        .kept_word(".savebias", Construct::PrivateText)
         // The dot rules: `.backanno` names port currents for LTspice's
         // viewer and changes no number (LTspice help): left out, noted.
         .dot_rule("backanno", DotRule::Note(Code::W0036))

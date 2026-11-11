@@ -737,6 +737,10 @@ def ltspice(d):
         .kept_word(".fra", Construct.PrivateText)
         .kept_word("@", Construct.PrivateText)
         .kept_word("&", Construct.PrivateText)
+        # Its state files (LTspice help, `.SAVESTATE`, `.LOADSTATE`, `.SAVEBIAS`: P6-006).
+        .kept_word(".savestate", Construct.PrivateText)
+        .kept_word(".loadstate", Construct.PrivateText)
+        .kept_word(".savebias", Construct.PrivateText)
         # The dot rules (LTspice help, `.backanno`).
         .dot_rule("backanno", DotRule.Note(Code.W0036))
         # The capability column.
