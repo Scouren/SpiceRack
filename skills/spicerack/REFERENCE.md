@@ -26,6 +26,7 @@ Available on `Circuit` and `Subcircuit`. `Testbench` carries only the rows marke
 | `F` | `F` | `(name, positive, negative, vsense, current_gain)` — `vsense` names a V source |
 | `H` | `H` | `(name, positive, negative, vsense, transresistance)` |
 | `BV` / `BI` | `B` | `(name, positive, negative, expression)` |
+| `initial_condition`, `node_set` | `.ic`, `.nodeset` | `(**nodes)` on `Testbench`/`CircuitSimulator` (top level) and on `Subcircuit`/`Circuit` (inside its `.subckt`); a value is a number or an expression (`out="{vdd/2}"`), an instance's node is `**{"x1.n": 0.5}`. Inside a subcircuit it nets for ngspice/ESPice only (`W0001` elsewhere) |
 | `NonLinearVoltageSource` / `NonLinearCurrentSource` | `E` / `G` | `(name, positive, negative, expression=...)` — `E<name> n+ n- value={expr}`: `BV` / `BI` under the E/G letter (PySpice's names); give an E and a G different names |
 | `T` | `T` | `(name, input_positive, input_negative, output_positive, output_negative, Z0, TD)` |
 | `S` | `S` | `(name, positive, negative, control_positive, control_negative, model)` |

@@ -8,7 +8,7 @@
 //!   `Num::zero(&self) -> bool`, `Num::value(&self) -> Value`
 //! - `pub(super) fn kw_params(params: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 //! - `pub(super) fn kw_options(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
-//! - `pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, f64)>>`
+//! - `pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>>`
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -76,12 +76,14 @@ pub(super) fn kw_options(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(Str
     Ok(out)
 }
 
-/// `**kwargs` of node voltages (`out=1.65`) as ordered pairs.
-pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, f64)>> {
+/// `**kwargs` of node voltages (`out=1.65`, `out="{vdd/2}"`) as ordered
+/// `(node, value)` pairs, the value as a card writes it ([`Num::text`]: a
+/// number in plain decimal, an expression braced).
+pub(super) fn kw_volts(kwargs: Option<Bound<'_, PyDict>>) -> PyResult<Vec<(String, String)>> {
     let mut out = vec![];
     if let Some(dict) = kwargs {
         for (k, v) in dict.iter() {
-            out.push((k.extract::<String>()?, v.extract::<f64>()?));
+            out.push((k.extract::<String>()?, v.extract::<Num>()?.text()));
         }
     }
     Ok(out)

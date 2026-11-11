@@ -23,6 +23,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - build: pyo3 0.24.2 → 0.27.2, so the extension builds for Python 3.14 (`Python::attach`, `Py<PyAny>` and the two-lifetime `FromPyObject` replace their 0.24 forms); `flake.nix`'s vendor hash follows the lock again; the release workflow builds a 3.14 wheel (ZERO-LEDGER P8-160).
 - python: `spicerack.export(results, stem, *, raw_format="binary")` writes a run's results as `<stem>.raw` (one ngspice raw file, every vector under its canonical name) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar: analyses, steps, `.meas` values with their status) and returns the two paths (ZERO-LEDGER P8-100).
 - python: `K` couples two or more inductors (one card, every pair), and `coupling` may be an expression (`"{k}"`).
+- python: `initial_condition`/`node_set` take an expression value (`out="{vdd/2}"`), and `Subcircuit`/`Circuit` have both, written inside the `.subckt`.
 
 ## 0.2.0 (2026-11-03)
 

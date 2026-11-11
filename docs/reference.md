@@ -120,6 +120,12 @@ none (ngspice refuses one outside a library file).
 ngspice's `.options` (manual §11.1) in any letter case; `True` is a bare flag;
 `None`, `False` and any other key raise `ValueError`.
 
+`initial_condition(**v)` and `node_set(**v)` take a number or an expression per node
+(`out=0.5`, `out="{vdd/2}"`); a node of an instance is a keyword given through a dict
+(`**{"x1.n": 0.5}`). `Subcircuit` and `Circuit` have the same two methods: they write the
+`.ic`/`.nodeset` inside the body's `.subckt`, where ngspice applies it to every instance; such a
+card is written for ngspice and ESPice and refused elsewhere (`W0001`).
+
 ## Analyses (`Testbench`, `CircuitSimulator`)
 
 | Method | Returns |

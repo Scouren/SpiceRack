@@ -98,6 +98,23 @@ def source(build):
     return f
 
 
+def _with_ic(mod):
+    """A child whose internal node `n` holds an `.ic` and a `.nodeset`
+    inside its own `.subckt` (ngspice applies them to every instance)."""
+    c = mod.Subcircuit("buf", ["a", "b"])
+    c.R("1", "a", "n", 1e3)
+    c.R("2", "n", "b", 1e3)
+    c.C("1", "n", c.gnd, 1e-9)
+    c.initial_condition(n=0.5)
+    c.node_set(n=0.25)
+    d = dut(mod)
+    d.instance(c, "1", "out", "0")
+    tb = bench(mod, d)
+    tb.add_subcircuit(c)
+    tb.add_transient(1e-6, 1e-5)
+    return tb
+
+
 def _child(mod):
     c = mod.Subcircuit("buf", ["a", "b"])
     c.R("1", "a", "b", 1e3)
@@ -189,6 +206,8 @@ FEATURES = {
     "temperature": setting(lambda tb: (setattr(tb, "temperature", 85.0), setattr(tb, "nominal_temperature", 27.0))),
     "initial_condition": setting(lambda tb: tb.initial_condition(out=0.0)),
     "node_set": setting(lambda tb: tb.node_set(out=0.0)),
+    "ic_expression": setting(lambda tb: (tb.initial_condition(out="{r/2000}"), tb.node_set(out="{r/2000}"))),
+    "ic_in_subcircuit": _with_ic,
     "save": setting(lambda tb: tb.save("V(out)")),
     "measure": setting(lambda tb: tb.measure("tran", "vmax", "max", "v(out)")),
     "print": setting(lambda tb: tb.add_print("tran", "v(out)")),
@@ -311,6 +330,9 @@ EXPECTED = {
     'temperature': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'initial_condition': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'node_set': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
+    'ic_expression': (OK,) * 9,
+    # `.ic`/`.nodeset` inside a `.subckt` are kept as ngspice's cards: its own family writes them, W0001 elsewhere (P5-025 reads them).
+    'ic_in_subcircuit': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'save': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'measure': (OK, OK, OK, OK, OK, OK, 'W0109', OK, OK),
     'print': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
@@ -439,6 +461,7 @@ COVERED = {
         "add_function",
         "subcircuit",
         "R", "C", "L", "K", "D", "Q", "BJT", "M", "MOSFET", "J", "Z", "E", "G", "F", "H",
+        "initial_condition", "node_set",
         "BV", "BI", "POLY", "S", "W", "T", "X", "A", "V", "I", "model", "parameter",
         "include", "lib", "raw_spice", "osdi", "veriloga", "verilog",
     },

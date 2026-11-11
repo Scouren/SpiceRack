@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 // `either`, `Num`, `Wave`, `Value`: names `pymethods_with_waves!` resolves here.
-use super::args::{Num, PyValueArg, kw_params};
+use super::args::{Num, PyValueArg, kw_params, kw_volts};
 use super::circuit::hoisted;
 use super::deck::runtime_err;
 use super::model::{Body, Card, Value, dec, need, num, params};
@@ -392,6 +392,21 @@ impl PySubcircuit {
         Ok(())
     }
 
+    /// Initial node voltages inside this body: one `.ic V(node)=value` per
+    /// keyword (ngspice manual §11.2), a value a number or an expression
+    /// (`n="{vdd/2}"`). ngspice applies the card to every instance.
+    #[pyo3(signature = (**kwargs))]
+    fn initial_condition(&mut self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        self.volts(".ic", kwargs)
+    }
+
+    /// As `initial_condition`, a `.nodeset`: a first guess for the
+    /// operating point, not a held value.
+    #[pyo3(signature = (**kwargs))]
+    fn node_set(&mut self, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        self.volts(".nodeset", kwargs)
+    }
+
     fn raw_spice(&mut self, line: &str) {
         self.inner.raw.push(line.to_string());
     }
@@ -538,6 +553,15 @@ impl PySubcircuit {
     /// The nets joined by blanks, each as [`Self::net`] names it.
     fn nets(&self, ns: &[&str]) -> String {
         ns.iter().map(|n| self.net(n)).collect::<Vec<_>>().join(" ")
+    }
+
+    /// One `<card> V(node)=value` line of the body's text per keyword
+    /// (`card` is `.ic` or `.nodeset`), written after its instances.
+    fn volts(&mut self, card: &str, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<()> {
+        for (n, v) in kw_volts(kwargs)? {
+            self.inner.raw.push(format!("{card} V({n})={v}"));
+        }
+        Ok(())
     }
 
     fn push(&mut self, name: &str, text: String) {

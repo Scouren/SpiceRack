@@ -526,10 +526,10 @@ fn bench(out: &mut String, tb: &Bench, d: Dialect) -> Result<(), String> {
         let _ = writeln!(out, ".options tnom={}", dec(t));
     }
     for (n, v) in &tb.ics {
-        let _ = writeln!(out, ".ic V({n})={}", dec(*v));
+        let _ = writeln!(out, ".ic V({n})={v}");
     }
     for (n, v) in &tb.nodesets {
-        let _ = writeln!(out, ".nodeset V({n})={}", dec(*v));
+        let _ = writeln!(out, ".nodeset V({n})={v}");
     }
     if !tb.saves.is_empty() {
         let _ = writeln!(out, ".save {}", tb.saves.join(" "));

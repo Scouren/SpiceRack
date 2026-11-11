@@ -741,6 +741,47 @@ class TestElementAccess:
 
 
 # ======================================================================
+# Initial conditions: an expression value, and inside a subcircuit (P8-006)
+# ======================================================================
+
+class TestInitialConditions:
+    def test_p8_006_a_value_is_a_number_or_an_expression(self):
+        mod = ps()
+        d = mod.Subcircuit("rc", ["in", "out"], r="1k")
+        d.R("1", "in", "out", "{r}")
+        d.C("1", "out", d.gnd, 1e-9)
+        tb = mod.Testbench(d)
+        tb.V("in", "in", "0", 1.0)
+        tb.initial_condition(out="{r/2000}")
+        tb.node_set(out=0.25)
+        tb.add_transient(1e-6, 1e-5)
+        lines = tb.netlist("ngspice").splitlines()
+        # The cards ngspice-45 ran (evidence/P8-006/ng/topexpr.cir, top.cir).
+        assert ".ic V(out)={r/2000}" in lines
+        assert ".nodeset V(out)=0.25" in lines
+        # Spectre's statement (Spectre Reference, `ic`): the bare expression.
+        assert "ic out=r/2000" in tb.netlist("spectre").splitlines()
+
+    def test_p8_006_a_subcircuit_holds_its_own_initial_conditions(self):
+        c = ps().Subcircuit("buf", ["a", "b"])
+        c.R("1", "a", "n", 1e3)
+        c.C("1", "n", c.gnd, 1e-9)
+        c.initial_condition(n=0.5)
+        c.node_set(n="vdd/2")
+        lines = c.to_source().splitlines()
+        # Inside the `.subckt`, where ngspice-45 applies them to each
+        # instance (evidence/P8-006/ng/sub.cir).
+        assert lines.index(".subckt buf a b") < lines.index(".ic V(n)=0.5") < lines.index(".ends buf")
+        assert ".nodeset V(n)={vdd/2}" in lines
+
+    def test_p8_006_a_value_that_is_no_number_or_string_adds_nothing(self):
+        c = ps().Subcircuit("buf", ["a", "b"])
+        with pytest.raises(TypeError):
+            c.initial_condition(n=0.5, m=[1.0])
+        assert ".ic" not in c.to_source()
+
+
+# ======================================================================
 # Ground node aliasing
 # ======================================================================
 

@@ -153,6 +153,8 @@ PARITY = {
     "temperature": (FEATURES["temperature"], tw_setting([".temp 85", ".options tnom=27"]), "ng §11.2 .temp/.options tnom", None),
     "initial_condition": (FEATURES["initial_condition"], tw_setting([".ic V(out)=0"]), "ng §11.2 .ic", None),
     "node_set": (FEATURES["node_set"], tw_setting([".nodeset V(out)=0"]), "ng §11.2 .nodeset", None),
+    "ic_expression": (FEATURES["ic_expression"], tw_setting([".ic V(out)={r/2000}", ".nodeset V(out)={r/2000}"]), "ng §11.2 .ic, .nodeset; ngspice-45 run: an expression value (evidence/P8-006/ng/topexpr.log)", "P8-006"),
+    "ic_in_subcircuit": (FEATURES["ic_in_subcircuit"], deck(subckts=[[".subckt buf a b", "R1 a n 1e3", "R2 n b 1e3", "C1 n 0 1e-9", ".ic V(n)=0.5", ".nodeset V(n)=0.25", ".ends buf"]], top=RC + ["X1 out 0 buf"], bench=[VIN, ".tran 1e-6 1e-5"]), "ngspice-45 run: .ic inside a .subckt holds for its instance (evidence/P8-006/ng/sub.log)", "P8-006"),
     "save": (FEATURES["save"], tw_setting([".save V(out)"]), "ng §11.2 .save", None),
     "measure": (FEATURES["measure"], tw_setting([".meas tran vmax max v(out)"]), "ng §11.3.4 .meas", None),
     "print": (FEATURES["print"], tw_setting([".print tran v(out)"]), "ng §11.3.5 .print", None),

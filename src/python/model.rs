@@ -78,8 +78,10 @@ pub(super) struct Bench {
     pub(super) measures: Vec<String>,
     pub(super) temperature: Option<f64>,
     pub(super) nominal_temperature: Option<f64>,
-    pub(super) ics: Vec<(String, f64)>,
-    pub(super) nodesets: Vec<(String, f64)>,
+    /// `.ic` and `.nodeset` pairs: the node, and the value as the card
+    /// writes it (`args::kw_volts`).
+    pub(super) ics: Vec<(String, String)>,
+    pub(super) nodesets: Vec<(String, String)>,
     pub(super) steps: Vec<Step>,
     /// Lines given as one dialect's text (`extra_line`), each with its
     /// dialect's family: written as is for that family, refused elsewhere.
