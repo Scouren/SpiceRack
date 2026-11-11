@@ -84,11 +84,11 @@ impl W<'_, '_> {
                 )
             }
             Card::Charge {
-                name: _,
                 n1,
                 n2,
                 charge,
                 params,
+                ..
             } => {
                 // Node voltages are lowercase `v(a,b)`; a branch current, a
                 // braced parameter or SPICE's `time`, `temper`, `hertz` has

@@ -1353,7 +1353,7 @@ def vacask(d):
         .omit(Construct.NgBehavior, Code.W0030)
         .native(Construct.LibSection)
         .refuse(Construct.RclModel, Code.W0006)
-        .refuse(Construct.ChargeCapacitor, Code.W0105)
+        .native(Construct.ChargeCapacitor)
         .native(Construct.BehaviouralSource)
         .refuse(Construct.Laplace, Code.W0011)
         .native(Construct.RfPort)

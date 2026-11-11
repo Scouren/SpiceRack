@@ -308,8 +308,8 @@ EXPECTED = {
     # Xyce's P port (D's a5f2c0a); HSPICE has a `P` port: writer B (FINDINGS-python.md).
     'rf_port': (OK, OK, 'W0007', OK, 'W0007', OK, OK, OK, OK),
     'L_K': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
-    # VACASK has no charge-formulated capacitor (`Construct::ChargeCapacitor`: W0105).
-    'C_charge': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    # VACASK has no charge element: the source line `c2 (out 0) i=ddt(1e-9*v(out))` (P4-017).
+    'C_charge': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'D': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'Q': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'M': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

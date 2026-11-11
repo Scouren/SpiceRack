@@ -267,9 +267,31 @@ impl W<'_, '_> {
                     self.inst_params(&params)
                 )
             }
-            Card::Charge { .. } => {
+            // No charge element: a capacitor given by its charge is the
+            // source line `c1 (a b) i=ddt(<q>)`, the charge's derivative as
+            // the current from the first node through the device to the
+            // second (`docs/dev-builtin-behavioral.md`, "Functions": `ddt`;
+            // equal to the ODE's closed form, ZERO-LEDGER P4-017).
+            // ponytail: the line takes no instance parameter, so a card
+            // with one (`tc1=`, `m=`, `ic=`) is refused; `m=` is a factor on
+            // the charge when a deck needs it.
+            Card::Charge {
+                n1,
+                n2,
+                value,
+                params,
+                ..
+            } => {
                 self.ask(Construct::ChargeCapacitor, tok);
-                return None;
+                if !params.is_empty() {
+                    self.refuse(Code::W0105, tok);
+                    return None;
+                }
+                let Some(e) = self.bsource_expr(value) else {
+                    self.refuse(Code::W0103, tok);
+                    return None;
+                };
+                format!("c{} ({} {}) i=ddt({e})", q(own), q(&n1), q(&n2))
             }
             // VACASK's source line, `b1 (p n) v=<expr>`: the tree through
             // `bsource.rs` (`docs/dev-builtin-behavioral.md`).

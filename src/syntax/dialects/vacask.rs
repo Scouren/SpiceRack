@@ -362,7 +362,9 @@ pub(super) fn vacask() -> DialectDef {
         .omit(Construct::NgBehavior, Code::W0030)
         .native(Construct::LibSection)
         .refuse(Construct::RclModel, Code::W0006)
-        .refuse(Construct::ChargeCapacitor, Code::W0105)
+        // `c1 (a b) i=ddt(<q>)`: the source line's `ddt`
+        // (`docs/dev-builtin-behavioral.md` at 36be560; ZERO-LEDGER P4-017).
+        .native(Construct::ChargeCapacitor)
         // `<name> (p n) v=<expr>` / `i=<expr>`, no master
         // (`docs/dev-builtin-behavioral.md` at 36be560; ZERO-LEDGER P4-002).
         .native(Construct::BehaviouralSource)

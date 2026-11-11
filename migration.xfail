@@ -14,3 +14,9 @@
 # landed on fx16). Every line this list held against baseline-9c7a7e0-fx16 was
 # a reviewed, intended change and is now the baseline; the list starts empty.
 # A new line goes under a section header naming its ledger row.
+
+# S1: P4-017: a capacitor given by its charge is VACASK's source line `c1 (a b) i=ddt(q)` (docs/dev-builtin-behavioral.md
+# at 36be560). Oracle: the ODE's closed form (tests/test_vacask_runs/devices.rs::p4_017_a_charge_capacitor_is_the_charges_ddt).
+fixtures/tests/ltspice/p_charge_capacitor.cir vacask now written: a charge capacitor is the source line `i=ddt(q)` (P4-017)
+ltspice/ltspice_examples/1677.net vacask now written: a charge capacitor is the source line `i=ddt(q)` (P4-017)
+xyce/SOLN_DEP_CAP/voltDepCharge_test.cir vacask now written: a charge capacitor is the source line `i=ddt(q)` (P4-017)
