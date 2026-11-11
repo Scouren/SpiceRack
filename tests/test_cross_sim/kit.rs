@@ -98,9 +98,11 @@ pub fn codes(messages: &str) -> String {
 
 // ---- private ----
 
-/// `text` (a file read from `base`) with each quoted path that names a
-/// moved file, resolved from `base`, replaced by its name in the run
-/// directory. Each include is written quoted by every writer here.
+/// `text` (a file read from `base`) with each path that names a moved
+/// file, resolved from `base`, replaced by its name in the run directory:
+/// a quoted span anywhere (the HSPICE, VACASK and Spectre writers quote an
+/// include's path) and an include card's bare path ([`bare`]: the ngspice,
+/// ESPice, Xyce and LTspice writers do not).
 fn relink(text: &str, base: &Path, moved: &HashMap<PathBuf, String>) -> String {
     if moved.is_empty() {
         return text.to_string();
@@ -128,6 +130,39 @@ fn relink(text: &str, base: &Path, moved: &HashMap<PathBuf, String>) -> String {
         rest = &rest[open + 2 + len..];
     }
     out.push_str(rest);
+    bare(&out, base, moved)
+}
+
+/// `text` with the bare path of each `.include`, `.inc` or `.lib` card
+/// that names a moved file, resolved from `base`, replaced by its name in
+/// the run directory. The path is the card's second word; a quoted one is
+/// [`relink`]'s and names no moved file here.
+fn bare(text: &str, base: &Path, moved: &HashMap<PathBuf, String>) -> String {
+    assert!(!moved.is_empty(), "relink returns early with nothing moved");
+    let cards = [".include", ".inc", ".lib"];
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        let mut words = line.split_whitespace();
+        let first = words.next();
+        let card = first.filter(|w| cards.iter().any(|c| w.eq_ignore_ascii_case(c)));
+        let path = card.and(words.next());
+        let name = path.and_then(|p| moved.get(&lexical(&base.join(p))));
+        match (card, path, name) {
+            (Some(card), Some(path), Some(name)) => {
+                // The card is the line's first text, the path the first
+                // match after it.
+                let at = line.find(card).map_or(0, |i| i + card.len());
+                out.push_str(&line[..at]);
+                out.push_str(&line[at..].replacen(path, name, 1));
+            }
+            _ => out.push_str(line),
+        }
+    }
+    assert_eq!(
+        out.lines().count(),
+        text.lines().count(),
+        "a relinked path holds no line break"
+    );
     out
 }
 
@@ -144,4 +179,49 @@ fn lexical(p: &Path) -> PathBuf {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn p1_058_a_bare_include_path_is_relinked() {
+        // The ngspice, ESPice, Xyce and LTspice writers leave an include's
+        // path bare (golden record fx17, spice-bench
+        // ngspice/tests/regression/lib-processing/ex2a.sp: `.lib
+        // /nix/store/.../ex2.lib MOS` in ngspice.txt, quoted in
+        // hspice.txt). The run directory holds the written library under
+        // `.cross_sim_inc/`, and the deck has to name it there, quoted or
+        // not; a path beside the deck and a word of another card stay.
+        // Oracle: each line's expected text written out by hand. Checks: 7.
+        let base = Path::new("/corpus/deck");
+        let moved: HashMap<PathBuf, String> = [
+            ("/corpus/assets/ex2.lib", ".cross_sim_inc/1-ex2.lib"),
+            ("/corpus/deck/sub1/inc1", ".cross_sim_inc/2-inc1"),
+            ("/corpus/mos.inc", ".cross_sim_inc/3-mos.inc"),
+        ]
+        .into_iter()
+        .map(|(p, n)| (PathBuf::from(p), n.to_string()))
+        .collect();
+        for (line, want) in [
+            (
+                ".lib /corpus/assets/ex2.lib MOS",
+                ".lib .cross_sim_inc/1-ex2.lib MOS",
+            ),
+            (
+                ".lib '/corpus/assets/ex2.lib' MOS",
+                ".lib '.cross_sim_inc/1-ex2.lib' MOS",
+            ),
+            (".INCLUDE sub1/inc1", ".INCLUDE .cross_sim_inc/2-inc1"),
+            ("  .inc ../mos.inc", "  .inc .cross_sim_inc/3-mos.inc"),
+            (".include ./beside.inc", ".include ./beside.inc"),
+            ("R1 a 0 sub1/inc1", "R1 a 0 sub1/inc1"),
+            (".lib sub1/inc1x MOS", ".lib sub1/inc1x MOS"),
+        ] {
+            let text = format!("t\n{line}\nV1 a 0 1\n");
+            let want = format!("t\n{want}\nV1 a 0 1\n");
+            assert_eq!(relink(&text, base, &moved), want, "{line}");
+        }
+    }
 }
