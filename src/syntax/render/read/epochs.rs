@@ -7,7 +7,8 @@
 //! single-epoch invariant).
 //!
 //! The table grows a column with the reader that fills it: the alter
-//! rows hold top-level parameters (VACASK's `alter` of `__topinst__`);
+//! rows hold top-level parameters (VACASK's `alter` of `__topinst__`, an
+//! ngspice `.control` script's `alterparam` at its `reset`);
 //! instance and model alters and the loop rows come with their readers
 //! (ZERO-LEDGER P5-050, P5-001 step 3).
 //!

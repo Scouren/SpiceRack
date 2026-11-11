@@ -47,7 +47,7 @@ fn each_linear_element_family_reads_as_a_typed_card() {
 #[test]
 fn a_control_blocks_analysis_reads_and_its_script_is_noted() {
     // ngspice manual ch.17: `op` in `.control` runs the analysis; `let` is
-    // the script's (W0025, `control::ControlLine::Script`). Checks: 2.
+    // the script's (W0025, `control::ControlLine::Skipped`). Checks: 2.
     let deck = "t\nR1 a 0 1k\n.control\nlet x=1\nop\n.endc\n.end\n";
     assert!(notes(deck, Dialect::Ngspice, Dialect::Ngspice).contains(&Code::W0025));
     let out = write(deck, Dialect::Ngspice, Dialect::Xyce);

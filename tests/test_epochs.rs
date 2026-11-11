@@ -4,7 +4,9 @@
 //! by real ngspice on the deck written from it; a target whose deck is one
 //! circuit refuses by its code. A deck that steps (`.step`) is the same
 //! script's `foreach` loops on ngspice: the oracle is the closed form at
-//! the points Xyce and LTspice stepped through.
+//! the points Xyce and LTspice stepped through. An ngspice `.control`
+//! script's `alterparam` and `reset` is the same plan: the oracle is
+//! ngspice running the source script itself.
 //!
 //! Unsupported fails, never skips: without `vacask` and `ngspice` on PATH
 //! every run fails; run the tests in `nix develop .#testing`.
@@ -32,6 +34,9 @@ const EPOCHS_HEAD: &str = "t\nground 0\nload \"spice/resistor.osdi\"\nmodel resi
 /// A divider every `.step` test steps, up to the end of R2's card: v(out)
 /// = V1 · R2 / (1k + R2), R2 = rr (times 1 + 0.01 (T − 27) with `tc1=0.01`).
 const STEPPED: &str = "* steps\n.param rr=1k\nV1 in 0 1\nR1 in out 1k\nR2 out 0 {rr}";
+
+/// An ngspice divider up to its `.control` line: v(out) = rr / (1k + rr).
+const SCRIPTED: &str = "* script\n.param rr=1k\nV1 in 0 1\nR1 in out 1k\nR2 out 0 {rr}\n.control\n";
 
 // ---- private ----
 
@@ -267,4 +272,149 @@ fn p5_001_s3_a_step_runs_as_ngspice_foreach_loops() {
     let deck = format!("{STEPPED}\n.step rr 1k 3k 1k\n.op\n.end\n");
     let codes = oracle::refusal(&deck, Dialect::Xyce, Dialect::Espice);
     assert!(codes.contains(&Code::W0016), "{codes:?}");
+}
+
+/// ZERO-LEDGER P5-001 step 4 (DESIGN-control-epochs §6 commit 4). Oracle:
+/// ngspice-45 running the source script itself (the deck written from
+/// what was read equals the script, same simulator), and the closed form
+/// v(out) = rr / (1k + rr); both by hand in
+/// research/impl/evidence/P5-001-s4/RESULTS.txt §1, §4. Each case ends on
+/// the run under test, read as the run's last plot. Tolerance: one
+/// simulator's linear solve of a divider, twice.
+#[test]
+fn p5_001_s4_an_ngspice_alterparam_takes_effect_at_its_reset() {
+    // The script, and v(out) of its last run.
+    const CASES: [(&str, f64); 4] = [
+        ("op\nalterparam rr = 2k\nreset\nop\n", 2.0 / 3.0),
+        // No `reset` yet: the run is on the netlist as written
+        // (ngspice manual §13.5.5).
+        ("op\nalterparam rr = 2k\nop\n", 0.5),
+        // Before any run; the last of two values wins.
+        ("alterparam rr=3k\nalterparam rr=4k\nreset\nop\n", 0.8),
+        (
+            "op\nalterparam rr=2k\nreset\nop\nalterparam rr=3k\nreset\nop\nprint v(out)\n",
+            0.75,
+        ),
+    ];
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let last = |text: &str| {
+        let plots = oracle::run(Dialect::Ngspice, text);
+        oracle::value(&plots[plots.len() - 1..], "out", oracle::At::First)
+    };
+    for (script, want) in CASES {
+        let deck = format!("{SCRIPTED}{script}.endc\n.end\n");
+        let text = oracle::write(&deck, Dialect::Ngspice, Dialect::Ngspice);
+        let (got, own) = (last(&text), last(&deck));
+        assert!(
+            tol.within(got, own),
+            "written {got}, the source script {own}\n{text}"
+        );
+        assert!(tol.within(got, want), "v(out) = {got}, want {want}\n{text}");
+    }
+    // The script written from the plan (`spice/epochs.rs`), and the one
+    // line left out: `print` changes no run (W0025).
+    let deck = format!("{SCRIPTED}{}.endc\n.end\n", CASES[3].0);
+    let w = oracle::written(&deck, Dialect::Ngspice, Dialect::Ngspice);
+    let script: Vec<&str> = w.text.lines().skip_while(|l| *l != ".control").collect();
+    assert_eq!(
+        script,
+        [
+            ".control",
+            "op",
+            "alterparam rr=2000",
+            "reset",
+            "op",
+            "alterparam rr=3000",
+            "reset",
+            "op",
+            ".endc",
+            ".end",
+        ],
+        "{}",
+        w.text
+    );
+    let notes = oracle::notes(&w);
+    let left_out = notes.iter().filter(|c| **c == Code::W0025).count();
+    assert_eq!(left_out, 1, "{notes:?}");
+    // A dot card after the block runs on the state the script left
+    // (ngspice -b: RESULTS.txt §3, e7), which is the plan's order.
+    let deck = format!("{SCRIPTED}alterparam rr=2k\nreset\n.endc\n.op\n.end\n");
+    let text = oracle::write(&deck, Dialect::Ngspice, Dialect::Ngspice);
+    let got = last(&text);
+    assert!(tol.within(got, 2.0 / 3.0), "v(out) = {got}\n{text}");
+}
+
+/// ZERO-LEDGER P5-001 step 4 (and P3-018's rule): a script line that
+/// changes the circuit and is not read refuses the deck on every target,
+/// ngspice too (its writer writes the script from what was read); a
+/// state that is read is refused where a deck is one circuit. Oracle:
+/// ngspice-45, where each of these lines changed the next run's v(out)
+/// (research/impl/evidence/P5-001-s4/RESULTS.txt §1 to §3); before this
+/// step each was left out with a note and the deck written.
+#[test]
+fn p5_001_s4_an_unread_script_line_that_changes_the_circuit_is_refused() {
+    const LINES: [&str; 8] = [
+        "alter r2 = 2k",
+        "altermod r2 r = 2k",
+        "option temp=127",
+        "set temp=127",
+        "alterparam rr = 2*1k",
+        "alterparam half f = 3k",
+        "foreach v 1k 2k",
+        "source other.sp",
+    ];
+    for line in LINES {
+        let deck = format!("{SCRIPTED}op\n{line}\nop\n.endc\n.end\n");
+        for target in [Dialect::Ngspice, Dialect::Xyce, Dialect::Vacask] {
+            let codes = oracle::refusal(&deck, Dialect::Ngspice, target);
+            assert!(
+                codes.contains(&Code::W0160),
+                "{line} on {target:?}: {codes:?}"
+            );
+        }
+    }
+    assert_eq!(info(Code::W0160).kind, Kind::Refusal);
+    // A parameter change beside the deck's dot-card analyses: ngspice -b
+    // runs those after the script and at each `run` (§3: e5, e6).
+    let before = SCRIPTED.replace(".control\n", ".op\n.control\n");
+    for deck in [
+        format!("{before}alterparam rr=2k\nreset\n.endc\n.end\n"),
+        format!("{SCRIPTED}run\nalterparam rr=2k\nreset\nrun\n.endc\n.op\n.end\n"),
+    ] {
+        let codes = oracle::refusal(&deck, Dialect::Ngspice, Dialect::Ngspice);
+        assert!(codes.contains(&Code::W0160), "{codes:?}\n{deck}");
+    }
+    // The state that is read: one circuit a deck refuses by its cell;
+    // the named targets keep the line as text until their `alter` is
+    // written from the plan (ZERO-LEDGER P5-050).
+    let deck = format!("{SCRIPTED}op\nalterparam rr = 2k\nreset\nop\n.endc\n.end\n");
+    for (targets, code) in [
+        (
+            &[
+                Dialect::Espice,
+                Dialect::Hspice,
+                Dialect::Xyce,
+                Dialect::Ltspice,
+            ][..],
+            Code::W0130,
+        ),
+        (&[Dialect::Spectre, Dialect::Vacask][..], Code::W0001),
+    ] {
+        for &target in targets {
+            let codes = oracle::refusal(&deck, Dialect::Ngspice, target);
+            assert!(codes.contains(&code), "{target:?}: {codes:?}");
+            assert!(!codes.contains(&Code::W0160), "{target:?}: {codes:?}");
+        }
+    }
+    // The legal neighbour: lines that change no run are left out with a
+    // note each, and the deck is written.
+    let deck =
+        format!("{SCRIPTED}set filetype=ascii\nop\nlet x = 1\nprint v(out)\nquit\n.endc\n.end\n");
+    let w = oracle::written(&deck, Dialect::Ngspice, Dialect::Xyce);
+    let notes = oracle::notes(&w);
+    let left_out = notes.iter().filter(|c| **c == Code::W0025).count();
+    assert_eq!(left_out, 4, "{notes:?}");
 }

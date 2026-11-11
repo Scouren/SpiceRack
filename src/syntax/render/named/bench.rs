@@ -359,10 +359,12 @@ impl W<'_, '_> {
                     BenchCard::NodeVals(false, v) => tb.nodesets.extend(v),
                     BenchCard::Print(_, outs) => tb.prints.push((outs, tok)),
                     BenchCard::Meas(m) => tb.measures.push((m, tok)),
-                    // A VACASK `alter`: kept as its statement, once (it
-                    // gives one card per parameter). VACASK's own writer
-                    // copies it; Spectre's has no `alter` yet (W0001
-                    // through `kept_construct`; ZERO-LEDGER P5-050).
+                    // A VACASK `alter` or an ngspice `alterparam`: kept
+                    // as its statement, once (a VACASK one gives one card
+                    // per parameter). VACASK's writer copies its own and
+                    // asks about another's (`W::kept_line`); Spectre's has
+                    // no `alter` yet (W0001 through `kept_construct`;
+                    // ZERO-LEDGER P5-050).
                     BenchCard::Alter { node, .. } => {
                         if tb.extra.last().is_none_or(|e| e.0 != node) {
                             tb.extra.push((node, script.len()));

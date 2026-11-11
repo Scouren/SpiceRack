@@ -161,11 +161,11 @@ macro_rules! rows_w_spice {
                 cite: "Xyce RG pp.96-104 (`.options <pkg>`); VACASK docs/cmd-options.md",
                 explain: "The option is another simulator's own (VACASK's on a SPICE target, Xyce's packaged options on Spectre or VACASK) or only cosmetic, so it is left out. Set the target's own option if one has the same effect.",
             }
-            /// A `.control` line other than an analysis: not written.
+            /// A `.control` line that changes no run: not written.
             W0025 Note {
                 title: "a control-block line not written",
                 cite: "ngspice manual ch.13 (the control language is a script, not a netlist)",
-                explain: "Only the analyses of an ngspice `.control` block are read; its script lines (`let`, `alter`, `write`, `plot` …) are not translated. Run the script on ngspice, or rewrite it for the target's own scripting. (A VACASK control block's script lines are W0120.)",
+                explain: "Of an ngspice `.control` block the analyses and the top-level parameter changes (`alterparam` then `reset`) are read. A line that shows, writes or post-processes results (`let`, `print`, `write`, `plot`, `set filetype=` …) changes no run and is left out, as is an `alterparam` no `reset` follows. (A line that changes the circuit is W0160; a VACASK control block's script lines are W0120.)",
             }
             /// A waveform's arguments past the count the target's form takes.
             W0026 Note {
