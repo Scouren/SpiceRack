@@ -36,6 +36,7 @@ mod kinds;
 
 pub mod ast;
 pub mod behaviour;
+mod check;
 pub mod def;
 pub mod device;
 pub mod diag;

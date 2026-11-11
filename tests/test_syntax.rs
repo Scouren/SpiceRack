@@ -9,7 +9,10 @@
 //!   instance master binds or carries an `R0001`; the counts are printed;
 //! - `token_ends`: every token's stored end is the end its lexer finds again
 //!   from its start (`Tokens::end_relexed`, the re-lex `end` was before the
-//!   column).
+//!   column);
+//! - `p8_002_every_corpus_parse_passes_check`: every input's tree passes
+//!   `Ast::check`, the validator a second writer of the tree is held to
+//!   (DESIGN-python-ast-builders §3).
 //!
 //! The stages' throughput is the perf suite's (`benches/perf.py`,
 //! TESTING.md "Performance").
@@ -275,6 +278,21 @@ fn token_ends() {
         tokens += t.len();
     }
     println!("{tokens} token ends");
+}
+
+#[test]
+fn p8_002_every_corpus_parse_passes_check() {
+    // Oracle: the layouts `Tag::word_kinds` declares, over every tree the
+    // parser makes of a golden-gate input.
+    let mut nodes = 0usize;
+    for (name, src, d) in every_input() {
+        let lex = Lang::from(d).lexicon().expect("a reader");
+        let t = tokenize(&src, lex);
+        let a = parse(&t, lex);
+        assert_eq!(a.check(&t), Ok(()), "{name}");
+        nodes += a.len();
+    }
+    println!("{nodes} nodes checked");
 }
 
 /// Every golden-gate input as `(set/relpath, the text today reads, dialect)`,

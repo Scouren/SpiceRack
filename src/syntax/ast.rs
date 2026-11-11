@@ -26,6 +26,7 @@
 //! Adding a tag: a variant of [`Tag`] in its group, its doc saying how
 //! `main_token`, `lhs`, `rhs` and its extra words read (one of the layouts
 //! above where it can); [`Tag::has_header`] when its `lhs` is a header;
+//! its arm in [`Tag::word_kinds`] (how its `lhs` and `rhs` read);
 //! then the parser transform that pushes it (`spice.rs` for a SPICE dot
 //! card, `named.rs` for a Spectre/VACASK keyword), then the arm in each
 //! exhaustive match over `Tag` (`resolve/walk.rs`, `import.rs`), which the
@@ -36,13 +37,16 @@
 //! docs).
 //!
 //! Contents:
-//! - `pub enum Tag`, `Tag::has_header(self) -> bool`, `pub struct Node(pub u32)`,
-//!   `pub const NONE: u32`, `pub struct Header<'a>`
+//! - `pub enum Tag`, `Tag::has_header(self) -> bool`,
+//!   `Tag::word_kinds(self) -> [WordKind; 2]`, `pub struct Node(pub u32)`,
+//!   `pub const NONE: u32`, `pub struct Header<'a>`, `pub enum WordKind`,
+//!   `pub struct CheckError`
 //! - `pub struct Name(pub u32)`, `pub struct Mark`
 //! - `pub struct Ast<'s>`
 //! - `Ast::tag(&self, n: Node) -> Tag`, `Ast::main_token(&self, n: Node) -> u32`,
 //!   `Ast::lhs(&self, n: Node) -> u32`, `Ast::rhs(&self, n: Node) -> u32`,
 //!   `Ast::len(&self) -> usize`, `Ast::is_empty(&self) -> bool`,
+//!   `Ast::extra_len(&self) -> usize`, `Ast::names_len(&self) -> usize`,
 //!   `Ast::root(&self) -> Node`, `Ast::list(&self, at: u32) -> &[u32]`,
 //!   `Ast::extra(&self, at: u32) -> u32`, `Ast::fields(&self, n: Node) -> &[u32]`,
 //!   `Ast::header(&self, n: Node) -> Header<'_>`,
@@ -268,6 +272,65 @@ pub struct Header<'a> {
     pub nodes: &'a [u32],
 }
 
+/// How one of a node's two data words (`lhs`, `rhs`) reads
+/// ([`Tag::word_kinds`]): what [`Ast::check`] holds the word to, and what
+/// moving rows into another tree shifts (a node id by the node base, a
+/// token by the token base, an `extra_data` offset by the extra base and
+/// the words behind it by their own kinds, a name through the name map).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum WordKind {
+    /// Not used by the tag: always [`NONE`].
+    Unused,
+    /// A number that names nothing (a `Verbatim`'s `Lang` index): never
+    /// shifted.
+    Value,
+    /// A node id.
+    Node,
+    /// A node id, or [`NONE`].
+    NodeOpt,
+    /// A token index.
+    Token,
+    /// A token index, or [`NONE`].
+    TokenOpt,
+    /// An interned [`Name`].
+    Name,
+    /// An `extra_data` offset of a list `[n, item0 .. item(n-1)]`, each item
+    /// a node id or [`NONE`] (an empty `.if` condition); or [`NONE`], the
+    /// empty list.
+    List,
+    /// An `extra_data` offset of a header and the fields after it: `[name,
+    /// master, code, n, node0 .. node(n-1), m, arg0 .. arg(m-1)]`, `name`
+    /// and `master` each a node id or [`NONE`], `code` a number.
+    Header,
+    /// An `extra_data` offset of a body `[next, closer, n, s0 .. s(n-1)]`,
+    /// `next` and `closer` each a node id or [`NONE`]; or [`NONE`], no
+    /// body.
+    Body,
+    /// An `extra_data` offset of `[close, n, item0 .. item(n-1)]`: `close`
+    /// a token, the items node ids (a `Group`, `Call`, `Probe`, `Vector`,
+    /// `List`).
+    Group,
+    /// An `extra_data` offset of two node ids (a `Ternary`'s branches).
+    Pair,
+    /// An `extra_data` offset of `[node, close]`: a node id, then a token
+    /// (an `Index`'s subscript and its `]`).
+    IndexTail,
+}
+
+/// The first thing [`Ast::check`] found broken.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CheckError {
+    /// The node whose row breaks its tag's layout; [`NONE`] when a token is
+    /// what is broken.
+    pub node: u32,
+    /// The token whose stored end is not its re-lexed end; [`NONE`] when a
+    /// row is what is broken.
+    pub token: u32,
+    /// The rule broken.
+    pub what: &'static str,
+}
+
 /// A point to undo appends back to: a speculative parse that lost.
 #[derive(Clone, Copy, Debug)]
 pub struct Mark {
@@ -298,6 +361,7 @@ const _: () = assert!(size_of::<Tag>() == 1);
 const _: () = assert!(size_of::<Tag>() + 3 * size_of::<u32>() == 13);
 const _: () = assert!(size_of::<Node>() == 4);
 const _: () = assert!(size_of::<Name>() == 4);
+const _: () = assert!(size_of::<WordKind>() == 1);
 
 impl Tag {
     /// Whether the statement's `lhs` is a [`Header`] and its fields.
@@ -306,6 +370,57 @@ impl Tag {
             self,
             Tag::Instance | Tag::Analysis | Tag::Command | Tag::Options
         )
+    }
+
+    /// How this tag's `lhs` and `rhs` read, in that order. One arm per tag
+    /// and no `_` arm: a new tag does not compile until it says.
+    pub const fn word_kinds(self) -> [WordKind; 2] {
+        use WordKind as K;
+        match self {
+            Tag::Root => [K::List, K::Unused],
+            Tag::Title | Tag::End | Tag::Num => [K::Unused, K::Unused],
+            Tag::Verbatim => [K::Token, K::Value],
+            Tag::Line | Tag::Bad => [K::Token, K::Unused],
+            Tag::Include
+            | Tag::LibCall
+            | Tag::Subckt
+            | Tag::Section
+            | Tag::Library
+            | Tag::If
+            | Tag::Else
+            | Tag::Control
+            | Tag::Region
+            | Tag::Data
+            | Tag::Param
+            | Tag::Func
+            | Tag::Model
+            | Tag::Save
+            | Tag::Print
+            | Tag::Measure
+            | Tag::Ic
+            | Tag::Nodeset
+            | Tag::Temp
+            | Tag::Global
+            | Tag::Step
+            | Tag::Statistics
+            | Tag::Process
+            | Tag::Card => [K::List, K::Body],
+            Tag::Options | Tag::Analysis | Tag::Command | Tag::Instance => [K::Header, K::Body],
+            Tag::Word => [K::Token, K::Name],
+            Tag::Assign => [K::Node, K::NodeOpt],
+            Tag::Group => [K::NodeOpt, K::Group],
+            Tag::Seq => [K::List, K::Unused],
+            Tag::Delimited => [K::NodeOpt, K::Token],
+            Tag::Ident => [K::Name, K::Token],
+            Tag::Str => [K::TokenOpt, K::Unused],
+            Tag::Unary => [K::Node, K::Unused],
+            Tag::Binary => [K::Node, K::Node],
+            Tag::Ternary => [K::Node, K::Pair],
+            Tag::Call | Tag::Probe => [K::Name, K::Group],
+            Tag::Index => [K::Node, K::IndexTail],
+            Tag::Paren => [K::Node, K::Token],
+            Tag::Vector | Tag::List => [K::Unused, K::Group],
+        }
     }
 }
 
@@ -355,6 +470,17 @@ impl<'s> Ast<'s> {
     /// there).
     pub fn is_empty(&self) -> bool {
         self.tags.is_empty()
+    }
+
+    /// The number of words in `extra_data`: every offset a row holds is
+    /// below it.
+    pub fn extra_len(&self) -> usize {
+        self.extra_data.len()
+    }
+
+    /// The number of interned names: every [`Name`] is below it.
+    pub fn names_len(&self) -> usize {
+        self.names.len()
     }
 
     /// The `Root` node.

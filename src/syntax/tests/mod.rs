@@ -19,6 +19,7 @@ use crate::syntax::statement::{Analysis, Command};
 use crate::syntax::token::Tokens;
 use crate::syntax::{parse, tokenize};
 
+mod check;
 mod heads;
 mod render;
 mod spice_read;
@@ -31,6 +32,7 @@ mod spice_read_sources;
 fn read(src: &str, lex: &'static Lexicon) -> (Vec<String>, Vec<Code>) {
     let t = tokenize(src, lex);
     let a = parse(&t, lex);
+    assert_eq!(a.check(&t), Ok(()), "{src}");
     let top = a
         .fields(a.root())
         .iter()
