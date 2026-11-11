@@ -111,6 +111,12 @@ impl W<'_, '_> {
                 // `montecarlo.spice`).
                 "scale" => ("parser", "scale"),
                 "parser" if v.is_empty() => continue,
+                // HSPICE's SEARCH directories: the kit read the files
+                // under the paths their cards name (`ngspice_options`).
+                "search" if self.pair.hspice_elsewhere => {
+                    self.note(Code::W0024, *tok);
+                    continue;
+                }
                 k if LISTING.contains(&k) => {
                     self.note(Code::W0024, *tok);
                     continue;

@@ -588,3 +588,13 @@ xyce/DC_UPGRADE/dcDec.cir ngspice now written: a log or list `.dc` axis runs as 
 xyce/DC_UPGRADE/dcList.cir ngspice now written: a log or list `.dc` axis runs as a foreach loop of the control script (P5-001-s6)
 xyce/DC_UPGRADE/dcOct.cir ngspice now written: a log or list `.dc` axis runs as a foreach loop of the control script (P5-001-s6)
 xyce/XDM/PSPICE/OTHER_PARSING/probe_dc_lines.cir ngspice now written: a log or list `.dc` axis runs as a foreach loop of the control script (P5-001-s6)
+
+# S1: P4-123: HSPICE `.option search='dir'` (Command Reference p.639: `.LIB`, `.INC` and `.LOAD` look for their file in
+# the directory): the kit reads an include its own directory lacks from there, under the path its card names, and the
+# option is left out (W0024). Oracle: the manual's clause by hand (src/syntax/resolve/tests.rs::
+# p4_123_an_hspice_search_directory_finds_an_include); ESPice and ngspice-45 give the deck's 0.75 V.
+hspice/hspice/search_lib.sp espice now written: the two includes are read through `search`, the option is a W0024 note (P4-123)
+hspice/hspice/search_lib.sp ltspice now written: the two includes are read through `search`, the option is a W0024 note (P4-123)
+hspice/hspice/search_lib.sp ngspice now written: the two includes are read through `search`, the option is a W0024 note (P4-123)
+hspice/hspice/search_lib.sp vacask now written: the two includes are read through `search`, the option is a W0024 note (P4-123)
+hspice/hspice/search_lib.sp xyce now written: the two includes are read through `search`, the option is a W0024 note (P4-123)

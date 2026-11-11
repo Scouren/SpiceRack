@@ -285,8 +285,9 @@ fn sffm_keeps_its_carrier_across_dialects() {
 /// HSPICE reads `.param t2="a^3"` as an expression (ESPice's HSPICE
 /// reading of `hspice_expressions.sp`: r2 = 1k·2³ = 8k); ngspice-45 reads
 /// the quotes as a string ("Undefined parameter [t2]"): written in braces,
-/// real ngspice gives 1 V / 8k. HSPICE's `.option search=` has no ngspice
-/// option (manual §11.1): refused W0017.
+/// real ngspice gives 1 V / 8k. HSPICE's `.option search=` names where its
+/// includes are looked up, which the kit does (`resolve::Kit::load`): no
+/// other target has the option, each leaves it out (W0024).
 #[test]
 fn hspice_quoted_params_and_search_on_ngspice() {
     let deck = "* t\n.param a=2\n.param t2=\"a^3\"\nv2 n2 0 1\nr2 n2 0 '1k*t2'\n.op\n.end\n";
@@ -303,7 +304,11 @@ fn hspice_quoted_params_and_search_on_ngspice() {
         "{w}"
     );
     let search = "* t\n.option search='dir'\nv1 a 0 1\nr1 a 0 1k\n.op\n.end\n";
-    assert!(refusal(search, Dialect::Hspice, Dialect::Ngspice).contains(&Code::W0017));
+    for to in [Dialect::Ngspice, Dialect::Xyce, Dialect::Vacask] {
+        let w = oracle::written(search, Dialect::Hspice, to);
+        assert!(oracle::notes(&w).contains(&Code::W0024), "{to:?}");
+        assert!(!w.text.contains("search"), "{to:?}\n{}", w.text);
+    }
 }
 
 // ── Xyce's global nodes ──

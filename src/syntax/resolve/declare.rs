@@ -9,7 +9,10 @@
 //! name` … `.endl`), §2.8.2 (`.func`), §2.9 (`.param`); Spectre UG p.94
 //! (`subckt`, `parameters`), p.98 (`include … section=`), p.108 (model
 //! groups), p.118 (`ahdl_include`); VACASK `share/doc/vacask` (`load`,
-//! `model NAME module type=±1`).
+//! `model NAME module type=±1`); HSPICE Command Reference E-2010.12
+//! p.639 (`.OPTION SEARCH`: `.LIB`, `.INC` and `.LOAD` look for their file
+//! in its directory), Simulation and Analysis p.105 (in the options'
+//! order).
 //!
 //! Contents:
 //! - `pub(super) struct Declared`, `pub(super) struct Ref`
@@ -20,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::{Def, DefKind, FileId, Polarity, Role, Scope, key, walk};
 use crate::syntax::ast::{Ast, NONE, Name, Node, Tag};
-use crate::syntax::behaviour::NamedRules;
+use crate::syntax::behaviour::{CardRules, NamedRules};
 use crate::syntax::device::{self, Primitive};
 use crate::syntax::diag::{Code, Diag};
 use crate::syntax::token::{Tag as T, Tokens};
@@ -32,6 +35,9 @@ pub(super) struct Declared {
     pub(super) role: Role,
     /// `R0002` rows.
     pub(super) diags: Vec<Diag>,
+    /// HSPICE `.option search='dir'` directories, as written, in source
+    /// order.
+    pub(super) search: Vec<String>,
 }
 
 /// A file a statement names.
@@ -93,6 +99,7 @@ pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declar
         refs: Vec::new(),
         role: Role::Library,
         diags: Vec::new(),
+        search: Vec::new(),
     };
     let mut names: HashSet<(u32, Space, String)> = HashSet::new();
     // A Spectre subckt's def, by node: its `parameters` are its params.
@@ -168,6 +175,17 @@ pub(super) fn declare(file: FileId, t: &Tokens, ast: &Ast, fold: bool) -> Declar
             Tag::Include | Tag::LibCall => {
                 if let Some(r) = reference(t, ast, node, scope, within) {
                     out.refs.push(r);
+                }
+                None
+            }
+            // HSPICE `.option search='dir'`: where an `.include`, `.inc`
+            // or `.lib` file its includer's directory lacks is looked up
+            // (Command Reference p.639).
+            Tag::Options if lex.lang.behaviours().card_rules == CardRules::Hspice => {
+                for (k, v) in assigns(ast, fields) {
+                    if word_text(ast, k).is_some_and(|w| w.eq_ignore_ascii_case("search")) {
+                        out.search.extend(enclosed(t, ast, v));
+                    }
                 }
                 None
             }
@@ -388,6 +406,25 @@ fn reference(t: &Tokens, ast: &Ast, node: Node, scope: Scope, within: u32) -> Op
         scope,
         within,
     })
+}
+
+/// An option value's text as a path: what a `'…'`, `"…"` or `{…}` pair
+/// encloses in the source (HSPICE reads `search='../lib'` between its
+/// quotes; the tree holds an expression there), else a word's or a
+/// string's ([`path_text`]).
+fn enclosed(t: &Tokens, ast: &Ast, v: u32) -> Option<String> {
+    if v == NONE {
+        return None;
+    }
+    let n = Node(v);
+    if ast.tag(n) != Tag::Delimited {
+        return path_text(t, ast, v);
+    }
+    let (open, close) = (ast.main_token(n), ast.rhs(n));
+    assert!(open < close, "a delimiter pair in source order");
+    assert!((close as usize) < t.len(), "the closer is a token");
+    let text = &t.source()[t.end(open) as usize..t.start(close) as usize];
+    Some(text.trim().to_string())
 }
 
 /// A path item's text without its quotes: a `Word` (a SPICE chunk) or a

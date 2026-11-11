@@ -266,6 +266,11 @@ struct Facts {
     targets: Vec<(u32, Target)>,
 }
 
+/// The most HSPICE `.option search` directories a kit looks an include up
+/// in, the first ones read; a later one is not searched (HSPICE Simulation
+/// and Analysis p.105: "a sequence of up to 40 directories").
+const SEARCH_MAX: usize = 40;
+
 /// A file the walk has yet to read.
 struct Pending {
     path: PathBuf,
@@ -308,6 +313,9 @@ impl Kit {
     /// refuses or lacks is a [`Role::Unread`] row with an `R0006` or
     /// `R0007`. Files are read breadth first, each once (by path), relative
     /// to the including file's directory, to [`DEPTH_MAX`] and [`FILES_MAX`].
+    /// An include that directory lacks is looked up in the directories of
+    /// the HSPICE `.option search` cards read so far, in their order, and
+    /// keeps the path beside its includer.
     ///
     /// Cost: two tokenize-and-parse passes per file; one file's tree is
     /// alive at a time.
@@ -330,6 +338,8 @@ impl Kit {
         };
         let mut refs: Vec<Vec<declare::Ref>> = Vec::new();
         let mut seen: HashMap<PathBuf, FileId> = HashMap::new();
+        // HSPICE `.option search` directories, in the order read.
+        let mut search: Vec<PathBuf> = Vec::new();
         let mut todo: VecDeque<Pending> = entries
             .iter()
             .map(|e| Pending {
@@ -362,7 +372,23 @@ impl Kit {
                 diags: Vec::new(),
             };
             let mut found = Vec::new();
-            match load(&file.path) {
+            // An include its includer's directory lacks is looked up in
+            // the search directories, under the name its card gives
+            // (HSPICE Command Reference p.639), in the options' order
+            // (Simulation and Analysis p.105). It keeps the path beside
+            // its includer: a written kit holds it there.
+            let beside = p
+                .from
+                .and_then(|(f, _)| kit.files[f.0 as usize].path.parent())
+                .and_then(|d| file.path.strip_prefix(d).ok());
+            let text = match (load(&file.path), beside) {
+                (Err(LoadError::NotFound), Some(name)) if p.load.is_none() => search
+                    .iter()
+                    .find_map(|s| load(&normalize(&s.join(name))).ok())
+                    .ok_or(LoadError::NotFound),
+                (text, _) => text,
+            };
+            match text {
                 Err(e) => {
                     file.role = Role::Unread(e);
                     if p.from.is_none() {
@@ -388,6 +414,12 @@ impl Kit {
                     file.diags.extend(d.diags);
                     kit.defs.extend(d.defs);
                     found = d.refs;
+                    // ponytail: a directory is joined to its own card's
+                    // file's directory (HSPICE: the run's, which the kit
+                    // does not know); the same thing for a deck's card.
+                    let dir = file.path.parent().unwrap_or(Path::new(""));
+                    search.extend(d.search.iter().map(|s| normalize(&dir.join(s))));
+                    search.truncate(SEARCH_MAX);
                 }
             }
             let dir = file.path.parent().unwrap_or(Path::new("")).to_path_buf();
