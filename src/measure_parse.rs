@@ -12,6 +12,11 @@
 //! that fails prints no line at all (ngspice names it on stderr), so a
 //! card of the deck with no line is a failed measure ([`in_deck_order`]).
 //!
+//! A `meas` command of a `.control` block prints its line under no header,
+//! as `print half` prints `half = 7.5e-01`: such a line is a measure only
+//! when the deck names it ([`in_deck_order`]). `Stack = 0 bytes.`, a line
+//! of ngspice's footer, is never one.
+//!
 //! **LTspice** (log file):
 //! ```text
 //! Measurement: rise_time
@@ -121,9 +126,13 @@ pub fn parse_measures(text: &str, backend: Option<Dialect>) -> Vec<MeasureResult
 /// [`parse_measures`]) gets its card's analysis word, a stepped measure's
 /// rows staying in step order. ngspice and ESPice print a value or nothing,
 /// so on them a card with no row is a failed measure; LTspice names its
-/// failures itself. Rows of no card (a `meas` command of a `.control`
-/// block) follow, in their order. Of two cards of one name the first
-/// takes the rows.
+/// failures itself. Of two cards of one name the first takes the rows.
+///
+/// A row no card names follows, in its order, when the deck makes it a
+/// measure: a `meas` command of a `.control` block names it, or the deck
+/// reads another file (`.include`, `.lib`), whose cards its text does not
+/// show. Any other row is dropped: it is a line that reads like a measure
+/// and is none (`print half` in a `.control` block prints `half = 7.5e-01`).
 pub fn in_deck_order(deck: &str, rows: Vec<MeasureResult>, backend: Dialect) -> Vec<MeasureResult> {
     let given = rows.len();
     let silent = matches!(backend, Dialect::Ngspice | Dialect::Espice);
@@ -149,8 +158,14 @@ pub fn in_deck_order(deck: &str, rows: Vec<MeasureResult>, backend: Dialect) -> 
             out.push(row);
         }
     }
-    out.extend(rest.into_iter().flatten());
-    assert!(out.len() >= given, "no row is lost");
+    let unseen = reads_files(deck);
+    let named: Vec<&str> = commands(deck).collect();
+    out.extend(
+        rest.into_iter()
+            .flatten()
+            .filter(|row| unseen || named.iter().any(|n| n.eq_ignore_ascii_case(&row.name))),
+    );
+    assert!(!unseen || out.len() >= given, "no row is lost");
     assert!(
         out.iter()
             .all(|m| m.value.is_nan() == (m.status == MeasureStatus::Failed)),
@@ -260,10 +275,10 @@ fn parse_ngspice(text: &str) -> Vec<MeasureResult> {
     //
     //     tplh   =  9.975241e-12 targ=  1.059975e-09 trig=  1.050000e-09
     //
-    // Anchoring to that block matters because ngspice's resource footer ends
-    // with `Stack = 0 bytes.`, which a bare `name = value` scan reports as a
-    // measurement named "Stack". Trailing text after the value is legitimate
-    // (targ/trig/at/from/to), so the value cannot be required to stand alone.
+    // Anchoring to that block matters because other lines of the printout
+    // read `name = value` too (a `print` of a `.control` block). Trailing
+    // text after the value is legitimate (targ/trig/at/from/to), so the
+    // value cannot be required to stand alone.
     let mut results: Vec<MeasureResult> = Vec::new();
     let mut in_block = false;
     let mut saw_block = false;
@@ -293,8 +308,10 @@ fn parse_ngspice(text: &str) -> Vec<MeasureResult> {
         return results;
     }
 
-    // No header (non-batch output, or a caller passing a bare fragment):
-    // fall back to scanning every line.
+    // No header (the `meas` commands of a `.control` block print none, nor
+    // does a bare fragment a caller passes): every line that reads like a
+    // measure. The caller that has the deck keeps the ones it names
+    // (`in_deck_order`).
     for line in text.lines() {
         if let Some(result) = measure_line(line.trim()) {
             push_measure(&mut results, result);
@@ -304,7 +321,9 @@ fn parse_ngspice(text: &str) -> Vec<MeasureResult> {
 }
 
 /// Parse a single `name = value [extra...]` measure line, or ngspice's
-/// `name = failed`.
+/// `name = failed`. What follows a value is `targ=`, `at=` or `from=`
+/// (ngspice-45's printout of each measure kind): `Stack = 0 bytes.`, a
+/// line of its resource footer, is no measure.
 fn measure_line(trimmed: &str) -> Option<MeasureResult> {
     let (name_part, value_part) = trimmed.split_once('=')?;
     let name = name_part.trim();
@@ -315,8 +334,12 @@ fn measure_line(trimmed: &str) -> Option<MeasureResult> {
     if value_str.starts_with("failed") {
         return Some(MeasureResult::failed(name));
     }
-    let value = value_str.split_whitespace().next()?.parse::<f64>().ok()?;
-    Some(MeasureResult::ok(name, value))
+    let mut words = value_str.split_whitespace();
+    let value = words.next()?.parse::<f64>().ok()?;
+    match words.next() {
+        Some(word) if !word.contains('=') => None,
+        _ => Some(MeasureResult::ok(name, value)),
+    }
 }
 
 /// Later values win: a deck that reports a measure twice should not yield
@@ -445,11 +468,46 @@ fn cards(deck: &str) -> impl Iterator<Item = (&str, &str)> {
         if !head.eq_ignore_ascii_case(".meas") {
             return None;
         }
-        let first = words.next()?;
-        match MEAS_ANALYSES.iter().any(|a| first.eq_ignore_ascii_case(a)) {
-            true => Some((first, words.next()?)),
-            false => Some(("", first)),
+        subject(words)
+    })
+}
+
+/// The names of the `meas` commands in `deck`'s `.control` blocks, in deck
+/// order and as written (`meas tran vend find v(out) at=5m` names `vend`).
+fn commands(deck: &str) -> impl Iterator<Item = &str> {
+    let mut control = false;
+    deck.lines().filter_map(move |line| {
+        let mut words = line.split_whitespace();
+        let head = words.next()?;
+        if head.eq_ignore_ascii_case(".control") {
+            control = true;
+        } else if head.eq_ignore_ascii_case(".endc") {
+            control = false;
         }
+        let meas = head.eq_ignore_ascii_case("meas") || head.eq_ignore_ascii_case("measure");
+        match control && meas {
+            true => subject(words).map(|(_, name)| name),
+            false => None,
+        }
+    })
+}
+
+/// A measure statement's analysis word (empty when it has none) and its
+/// measure's name, as written: `words` are the ones after its first.
+fn subject<'a>(mut words: impl Iterator<Item = &'a str>) -> Option<(&'a str, &'a str)> {
+    let first = words.next()?;
+    match MEAS_ANALYSES.iter().any(|a| first.eq_ignore_ascii_case(a)) {
+        true => Some((first, words.next()?)),
+        false => Some(("", first)),
+    }
+}
+
+/// True when `deck` reads another file (`.include`, `.inc`, `.lib`): that
+/// file's cards are not in its text.
+fn reads_files(deck: &str) -> bool {
+    deck.lines().any(|line| {
+        let head = line.trim_start().get(..4).unwrap_or("");
+        head.eq_ignore_ascii_case(".inc") || head.eq_ignore_ascii_case(".lib")
     })
 }
 
@@ -967,5 +1025,173 @@ Harmonic Frequency   Magnitude   Phase       Norm. Mag   Norm. Phase
         assert!(tables[0].thd.is_nan(), "no THD line: {}", tables[0].thd);
         // No header, no table.
         assert!(parse_fourier("vout = 1.0\n 0 0 1 0 0 0\n").is_empty());
+    }
+
+    /// ngspice-45's whole stdout (`ngspice -b -n -r out.raw`, 2026-11-11) for
+    /// a divider with `.op` and no measure
+    /// (research/impl/evidence/P8-320/as-backend/none.cir).
+    const NG_NONE: &str = "\
+\n\
+Note: No compatibility mode selected!\n\
+\n\
+\n\
+Circuit: * p8-320 no measure\n\
+\n\
+binary raw file \"out.raw\"\n\
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000\n\
+\n\
+Using SPARSE 1.3 as Direct Linear Solver\n\
+No. of Data Columns : 3  \n\
+\n\
+No. of Data Rows : 1\n\
+\n\
+Total analysis time (seconds) = 5.7736E-05\n\
+\n\
+Total elapsed time (seconds) = 0.003 \n\
+\n\
+Total DRAM available = 31795.074 MB.\n\
+DRAM currently available = 10784.574 MB.\n\
+Maximum ngspice program size =   25.168 MB.\n\
+Current ngspice program size =   13.832 MB.\n\
+\n\
+Shared ngspice pages =   10.844 MB.\n\
+Text (code) pages =    6.535 MB.\n\
+Stack = 0 bytes.\n\
+Library pages =    3.008 MB.\n\
+\n\
+";
+
+    /// A deck whose `.control` block prints three lines and measures nothing.
+    const PRINT_DECK: &str = "\
+* p8-320 a print command, no measure\n\
+R1 in out 1k\n\
+R2 out 0 3k\n\
+Vin in 0 2\n\
+.control\n\
+op\n\
+print v(out)\n\
+let half = v(out)/2\n\
+print half\n\
+echo done = 1\n\
+.endc\n\
+.end\n\
+";
+
+    /// ngspice-45's stdout for [`PRINT_DECK`] (`ngspice -b -n`, 2026-11-11),
+    /// from `No. of Data Rows` on.
+    const NG_PRINT: &str = "\
+No. of Data Rows : 1\n\
+v(out) = 1.500000e+00\n\
+half = 7.500000e-01\n\
+done = 1\n\
+binary raw file \"out.raw\"\n\
+Note: Simulation executed from .control section \n\
+";
+
+    /// A deck whose measures are four `meas` commands, and no card.
+    const COMMAND_DECK: &str = "\
+* p8-320 a meas command\n\
+R1 in out 1k\n\
+C1 out 0 1u\n\
+Vin in 0 PULSE(0 1 0 1n 1n 1 2)\n\
+.control\n\
+tran 10u 5m\n\
+meas tran vend find v(out) at=5m\n\
+meas tran vavg avg v(out) from=0 to=5m\n\
+meas tran tdelay trig v(in) val=0.5 rise=1 targ v(out) val=0.5 rise=1\n\
+meas tran vmax max v(out)\n\
+.endc\n\
+.end\n\
+";
+
+    /// ngspice-45's stdout for [`COMMAND_DECK`] (`ngspice -b -n`, 2026-11-11),
+    /// from `No. of Data Rows` on.
+    const NG_COMMANDS: &str = "\
+No. of Data Rows : 526\n\
+vend                =  9.932623e-01\n\
+vavg                =  8.013474e-01 from=  0.000000e+00 to=  5.000000e-03\n\
+tdelay              =  6.931531e-04 targ=  6.931536e-04 trig=  5.000000e-10\n\
+vmax                =  9.932623e-01 at=  5.000000e-03\n\
+binary raw file \"out.raw\"\n\
+Note: Simulation executed from .control section \n\
+";
+
+    /// ngspice-45's first measure block (`ngspice -b -n`, 2026-11-11) for the
+    /// RC step of [`COMMAND_DECK`] with a card of each measure kind
+    /// (research/impl/evidence/P8-320/as-backend/kinds2.cir): trig/targ, find,
+    /// when, avg, rms, integ, max, min, pp, param, and a find named `stack`.
+    const NG_KINDS: &str = "\
+\x20 Measurements for Transient Analysis\n\
+\n\
+tdelay              =  6.931531e-04 targ=  6.931536e-04 trig=  5.000000e-10\n\
+vend                =  9.932623e-01\n\
+thalf               =   6.93154e-04\n\
+vavg                =  8.013474e-01 from=  0.000000e+00 to=  5.000000e-03\n\
+vrms                =   8.38268e-01 from=  0.00000e+00 to=  5.00000e-03\n\
+vint                =   4.00675e-03 from=  0.00000e+00 to=  5.00000e-03\n\
+vmax                =  9.932623e-01 at=  5.000000e-03\n\
+vmin                =  0.000000e+00 at=  0.000000e+00\n\
+vpp                 =  9.932623e-01 from=  0.000000e+00 to=  0.000000e+00\n\
+twice               =  1.98652e+00\n\
+stack               =  6.321194e-01\n\
+\n\
+";
+
+    #[test]
+    fn p8_320_the_resource_footer_is_no_measure() {
+        // Oracle: the deck, which measures nothing, and ngspice-45's own
+        // printout of it, which holds the footer line.
+        assert!(NG_NONE.contains("\nStack = 0 bytes.\n"));
+        let printed = parse_measures(NG_NONE, Some(Dialect::Ngspice));
+        assert!(printed.is_empty(), "{printed:?}");
+        // Oracle: the names of the eleven cards ngspice printed a value
+        // for, in card order, and the values it printed. The last is a
+        // measure named `stack`: a value with nothing after it.
+        assert_eq!(
+            fields(&parse_measures(NG_KINDS, Some(Dialect::Ngspice))),
+            [
+                ("tdelay", "", None, Some(6.931531e-4)),
+                ("vend", "", None, Some(0.9932623)),
+                ("thalf", "", None, Some(6.93154e-4)),
+                ("vavg", "", None, Some(0.8013474)),
+                ("vrms", "", None, Some(0.838268)),
+                ("vint", "", None, Some(4.00675e-3)),
+                ("vmax", "", None, Some(0.9932623)),
+                ("vmin", "", None, Some(0.0)),
+                ("vpp", "", None, Some(0.9932623)),
+                ("twice", "", None, Some(1.98652)),
+                ("stack", "", None, Some(0.6321194)),
+            ]
+        );
+    }
+
+    #[test]
+    fn p8_320_only_what_the_deck_names_is_a_measure() {
+        // Oracle: the decks. PRINT_DECK measures nothing: the three lines
+        // its `print` and `echo` commands wrote read like measures.
+        let printed = parse_measures(NG_PRINT, Some(Dialect::Ngspice));
+        let names: Vec<&str> = printed.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(names, ["v(out)", "half", "done"]);
+        let rows = in_deck_order(PRINT_DECK, printed.clone(), Dialect::Ngspice);
+        assert!(rows.is_empty(), "{rows:?}");
+        // A deck that reads a file may have a card there: the rows stay.
+        let reads = PRINT_DECK.replace(".control\n", ".include \"cards.inc\"\n.control\n");
+        assert_eq!(in_deck_order(&reads, printed, Dialect::Ngspice).len(), 3);
+        // COMMAND_DECK's four `meas` commands, in command order, with the
+        // values ngspice printed; a command has no analysis word to give.
+        let printed = parse_measures(NG_COMMANDS, Some(Dialect::Ngspice));
+        assert_eq!(
+            fields(&in_deck_order(COMMAND_DECK, printed, Dialect::Ngspice)),
+            [
+                ("vend", "", None, Some(0.9932623)),
+                ("vavg", "", None, Some(0.8013474)),
+                ("tdelay", "", None, Some(6.931531e-4)),
+                ("vmax", "", None, Some(0.9932623)),
+            ]
+        );
+        // A `meas` outside a `.control` block is no command (an element's
+        // name), and a command names its measure after the analysis word.
+        let deck = "meas tran a max v(x)\n.control\nMEASURE b max v(x)\n.endc\n";
+        assert_eq!(commands(deck).collect::<Vec<_>>(), ["b"]);
     }
 }

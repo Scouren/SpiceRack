@@ -865,6 +865,32 @@ def test_p8_102_a_failed_measure_reads_none():
             assert m[name] == pytest.approx(value, rel=2e-3), name
 
 
+def test_p8_320_only_a_measure_the_deck_names_is_one():
+    """ZERO-LEDGER P8-320: 1k into 1 uF, a 0 -> 1 V step. Oracle: the deck. With no measure a result
+    has none (the line `Stack = 0 bytes.` of ngspice's footer was read as one:
+    research/impl/evidence/P8-320/probe-b13.out); with one it has that name alone, and its value
+    is the closed form."""
+    import spicerack as ps
+
+    def bench():
+        dut = ps.Subcircuit("rc", ["in", "out"])
+        dut.R(name="1", positive="in", negative="out", value=1e3)
+        dut.C(name="1", positive="out", negative="0", value=1e-6)
+        tb = ps.Testbench(dut)
+        tb.with_backend("ngspice")
+        tb.PulseVoltageSource(name="in", positive="in", negative="0", initial_value=0.0, pulsed_value=1.0,
+                              delay=0.0, rise_time=1e-9, fall_time=1e-9, pulse_width=1.0, period=2.0)
+        return tb
+
+    assert bench().operating_point().measures == {}
+    assert bench().transient(step_time=1e-5, end_time=5e-3).measures == {}
+    tb = bench()
+    tb.measure("tran", "vend", "find", "v(out)", "at=5m")
+    measures = tb.transient(step_time=1e-5, end_time=5e-3).measures
+    assert list(measures) == ["vend"]
+    assert measures["vend"] == pytest.approx(1.0 - math.exp(-5.0), rel=2e-3)
+
+
 @pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
 def test_p3_094_api_two_sweep_dc_has(backend):
     """ZERO-LEDGER P3-094: a two-source dc returns both sweeps: the inner one
