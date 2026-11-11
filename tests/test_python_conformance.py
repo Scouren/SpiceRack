@@ -303,7 +303,7 @@ EXPECTED = {
     'POLY': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
     'S': (OK, OK, OK, OK, OK, 'W0104', 'W0104+W0105', OK, OK),
     'W': (OK, OK, OK, OK, OK, 'W0104+W0105', 'W0104+W0105', OK, OK),
-    'T': (OK, OK, OK, OK, OK, OK, 'W0105', OK, OK),
+    'T': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'A': (OK, OK, 'W0001', 'W0001', 'W0001', 'W0001', 'W0001', OK, OK),
     'parameter': (OK, OK, OK, OK, OK, OK, OK, OK, OK),
     'include': (OK, OK, OK, OK, OK, OK, OK, OK, OK),

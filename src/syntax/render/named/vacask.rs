@@ -34,13 +34,16 @@ use crate::syntax::render::read::{Block, Card, Comp, Num, Raw, Val, Visit};
 use crate::syntax::resolve::Role;
 
 /// A device module the deck needs: VACASK's build of the SPICE device set
-/// (`load "spice/<m>.osdi"` and `model <m> sp_<m>`) or a built-in (a
-/// `model` line only). The model is named after the module, as upstream's
-/// own decks do (`model resistor resistor`, `test/test_op.sim`).
+/// (`load "spice/<m>.osdi"` and `model <m> sp_<m>`), a built-in (a
+/// `model` line only), or a module VACASK ships beside the SPICE set
+/// (`load "<m>.osdi"` and `model <m> <m>`: `tline_ideal`,
+/// `docs/dev-vacask.md`). The model is named after the module, as
+/// upstream's own decks do (`model resistor resistor`, `test/test_op.sim`).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Need {
     Sp(&'static str),
     Builtin(&'static str),
+    Own(&'static str),
 }
 
 impl W<'_, '_> {
@@ -88,8 +91,14 @@ impl W<'_, '_> {
             })
             .collect();
         for n in &needs {
-            if let Need::Sp(m) = n {
-                loads.insert(format!("spice/{m}.osdi"));
+            match n {
+                Need::Sp(m) => {
+                    loads.insert(format!("spice/{m}.osdi"));
+                }
+                Need::Own(m) => {
+                    loads.insert(format!("{m}.osdi"));
+                }
+                Need::Builtin(_) => {}
             }
         }
         let (def_models, section_models) = match library {
@@ -488,7 +497,7 @@ impl Need {
     /// The synthesised model's name, the module's.
     fn auto(&self) -> &'static str {
         match self {
-            Need::Sp(m) | Need::Builtin(m) => m,
+            Need::Sp(m) | Need::Builtin(m) | Need::Own(m) => m,
         }
     }
 
@@ -496,7 +505,7 @@ impl Need {
     fn line(&self) -> String {
         match self {
             Need::Sp(m) => format!("model {m} sp_{m}"),
-            Need::Builtin(m) => format!("model {m} {m}"),
+            Need::Builtin(m) | Need::Own(m) => format!("model {m} {m}"),
         }
     }
 }
@@ -542,6 +551,7 @@ fn need(c: &Card) -> Option<Need> {
         Card::Linear { letter: 'G', .. } => Need::Builtin("vccs"),
         Card::Linear { letter: 'F', .. } => Need::Builtin("cccs"),
         Card::Linear { .. } => Need::Builtin("ccvs"),
+        Card::Line { .. } => Need::Own("tline_ideal"),
         _ => return None,
     })
 }

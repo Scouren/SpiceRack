@@ -31,7 +31,6 @@ fn refusals_are_errors_not_broken_decks() {
     // with the row that translates it: ZERO-LEDGER P4-002 took the B source).
     for card in [
         "S1 a 0 c 0 sw\n.model sw SW",
-        "T1 a 0 b 0 Z0=50 TD=1n",
         "A1 a d_and\n.model d_and d_and",
         "V1 a 0 0 SIN(0 1 1k 0 0 90)",
     ] {

@@ -253,3 +253,25 @@ fn p4_002_a_spectre_bsource_runs_on_vacask() {
     let raw = run_text(&netlist);
     close(*col(&raw, "b").last().expect("a point"), 33.0, 1e-9);
 }
+
+/// ZERO-LEDGER P4-005. Oracle: the closed form of a lossless line matched
+/// at both ends (source and load Z0): `b` is `a` delayed by TD = 2 ns, no
+/// reflection. The pulse is on `a` from 1.1 ns to 6.1 ns, so at 2.5 ns
+/// a = 0.5 and b = 0, at 5 ns both are 0.5, at 7 ns a = 0 and b = 0.5.
+/// ngspice-45 on this deck gives the same six numbers
+/// (research/impl/evidence/P4-005/ngspice.run.log).
+#[test]
+fn p4_005_a_lossless_line_delays_on_vacask() {
+    let deck = "t\nV1 in 0 PULSE(0 1 1n 0.1n 0.1n 5n 20n)\nR1 in a 50\n\
+        T1 a 0 b 0 Z0=50 TD=2n\nR2 b 0 50\n.tran 0.05n 10n\n.end\n";
+    let raw = run(deck);
+    let time = col(&raw, "time");
+    let at = |node: &str, t: f64| {
+        let i = time.iter().position(|&x| x >= t).expect("a point at t");
+        col(&raw, node)[i]
+    };
+    for (t, a, b) in [(2.5e-9, 0.5, 0.0), (5e-9, 0.5, 0.5), (7e-9, 0.0, 0.5)] {
+        assert!((at("a", t) - a).abs() < 1e-6, "a at {t:e}: {}", at("a", t));
+        assert!((at("b", t) - b).abs() < 1e-6, "b at {t:e}: {}", at("b", t));
+    }
+}

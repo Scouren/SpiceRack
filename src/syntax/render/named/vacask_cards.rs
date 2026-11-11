@@ -224,8 +224,26 @@ impl W<'_, '_> {
                 self.ask(Construct::TableSource, tok);
                 return None;
             }
-            // No polynomial builtin, no switch, no lossless line.
-            Card::Poly { .. } | Card::Switch { .. } | Card::Line { .. } => {
+            // `tline_ideal` (`devices/tline_ideal.va`): port 1 `(p1 n1)`,
+            // port 2 `(p2 n2)`, as SPICE's `T`. `td` is always written:
+            // without it the module's delay is `nl/f`, 1 ms.
+            Card::Line {
+                name: _,
+                nodes,
+                z0,
+                td,
+            } => {
+                let ns: Vec<String> = nodes.iter().map(|x| q(x)).collect();
+                format!(
+                    "t{} ({}) tline_ideal z0={} td={}",
+                    q(own),
+                    ns.join(" "),
+                    num(z0),
+                    num(td)
+                )
+            }
+            // No polynomial builtin, no switch.
+            Card::Poly { .. } | Card::Switch { .. } => {
                 self.refuse(Code::W0105, tok);
                 return None;
             }
