@@ -285,7 +285,7 @@ fn spectre_maps_each_parameter_onto_its_equation() {
         " cjo=1m m=400m vj=800m ",
         " pta=1m ptp=1m ",
         " tnom=30 ",
-        " tbv1=1m ",
+        " tbv1=-1m ",
         " eg=1.11 nz=1.05 fcs=500m dskip=no jmax=",
         "d1 (2 0) dj area=500m perim=3",
     ] {
@@ -348,6 +348,24 @@ fn each_refusal_has_a_legal_neighbour() {
     for (bad, good) in [
         (diode("jtun=1e-5"), diode("jtun=0")),
         (diode("ikr=4e8"), diode("ikr=1e-30")),
+        // P3-089: a sidewall current on the bottom's characteristic scales
+        // by `tlev=2`'s law, a `tcv` by a `tlev` that is no constant; with
+        // its own `ns`, or a `tlev` given, each is written.
+        (
+            diode("jsw=1e-15 n=1.05 tlev=2"),
+            diode("jsw=1e-15 n=1.05 ns=1.05 tlev=2"),
+        ),
+        (
+            "t\n.param tl=1\n.model dt d level=3 is=1e-14 bv=12 tcv=1e-3 tlev={tl}\nd1 a 0 dt\n.end\n"
+                .to_string(),
+            diode("bv=12 tcv=1e-3 tlev=1"),
+        ),
+        // R10: a card's own `dtemp` is not in the rescaled `jsw`; with the
+        // model's own `ns` nothing is rescaled and the card is written.
+        (
+            diode("jsw=1e-15 n=1.05").replace("d1 a 0 dt", "d1 a 0 dt dtemp=10"),
+            diode("jsw=1e-15 n=1.05 ns=1.05").replace("d1 a 0 dt", "d1 a 0 dt dtemp=10"),
+        ),
         (res("rsh=10 tce=1e-3"), res("rsh=10 tce=0")),
         (res("rsh=10 r=5"), res("r=5")),
         (
@@ -369,6 +387,69 @@ fn each_refusal_has_a_legal_neighbour() {
     let refused = render_text(hspice, Dialect::Hspice, "t", Dialect::Spectre).unwrap_err();
     let codes: Vec<Code> = refused.diags.iter().map(|d| d.code).collect();
     assert!(codes.contains(&Code::W0006), "{codes:?}");
+}
+
+/// Ledger P3-089: the level-3 diode's two laws on Spectre.
+///
+/// `tbv1`: Spectre 25.1's breakdown voltage is `bv*(1 + tbv1*dT)` (the
+/// recorded runs of settle-remote: `t_m3_diodes` at `tlev=1`, −12.589478
+/// for today's `tbv1=+tcv`; P4-097), ngspice's at `tlev=1` `bv*(1 -
+/// tcv*dT)` (`diotemp.c` L204-L209): `tbv1=-1m` for `tcv=1e-3`.
+///
+/// The sidewall current: the oracle is ngspice-45 on the equivalent deck.
+/// With an `ns`, ngspice runs the sidewall on its own characteristic,
+/// scaled with `ns` (`dioload.c` L259-L261): the law the recorded Spectre
+/// run fits to 1e-6 (`research/impl/evidence/P3-089`). So the written
+/// `ns` and `jsw` (Spectre's `temp` is ngspice's `temper`), put on the
+/// source's cards, must give the source's own values, at 60 C and away
+/// from it. Tolerance: ngspice's RELTOL (1e-3), each run's own accuracy
+/// (the two differ by 2e-6; `ns = n` alone by 3.3e-3 and 2.6e-2 at 60 C).
+/// No Spectre run of this text exists: UNRUN_SPECTRE_HSPICE (ZERO D43).
+#[test]
+fn p3_089_spectre_diode_mapping_wrong_t() {
+    let text = written(DIODES, Dialect::Spectre);
+    assert!(text.contains(" tlev=1 tbv1=-1m "), "{text}");
+    let mut eq = DIODES.to_string();
+    for (model, jsw, n) in [
+        ("ndiode", "jsw=6e-016", "1.2928"),
+        ("dj", "jsw=1e-15", "1.05"),
+    ] {
+        let head = format!("model {model} diode ");
+        let line = text
+            .lines()
+            .find(|l| l.starts_with(&head))
+            .unwrap_or_else(|| panic!("no {model} in\n{text}"));
+        let word = |key: &str| -> String {
+            let found = line.split(' ').find_map(|w| w.strip_prefix(key));
+            found
+                .unwrap_or_else(|| panic!("no `{key}` in {line}"))
+                .to_string()
+        };
+        assert_eq!(word("ns="), n, "{line}");
+        let scaled = word("jsw=").replace("temp", "temper");
+        assert_eq!(eq.matches(jsw).count(), 1, "{jsw}");
+        eq = eq.replace(jsw, &format!("jsw={{{scaled}}} ns={n}"));
+    }
+    let tmp = tempfile::tempdir().unwrap();
+    for temp in ["60", "100"] {
+        let run = |deck: &str, name: &str| {
+            let dir = tmp.path().join(format!("{name}{temp}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            ngspice(&dir, &deck.replace(".temp 60", &format!(".temp {temp}")))
+        };
+        let (want, got) = (run(DIODES, "src"), run(&eq, "eq"));
+        for node in ["v(2)", "v(4)", "v(6)", "v(8)"] {
+            let at = |out: &[(String, f64)]| {
+                let found = out.iter().find(|(k, _)| k == node);
+                found.unwrap_or_else(|| panic!("{node}: {out:?}")).1
+            };
+            let (w, g) = (at(&want), at(&got));
+            assert!(
+                (g - w).abs() <= 1e-3 * w.abs(),
+                "{temp} C {node}: the written card {g}, the source {w}\n{eq}"
+            );
+        }
+    }
 }
 
 #[test]

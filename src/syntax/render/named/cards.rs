@@ -279,6 +279,12 @@ impl W<'_, '_> {
                     'N' => String::new(),
                     l => l.to_ascii_lowercase().to_string(),
                 };
+                // The rescaled sidewall current reads the circuit's `temp`,
+                // never a card's own rise (ruling R10 on P3-089).
+                if letter == 'D' && self.diode_own_rise(&model, &params) {
+                    self.refuse(Code::W0114, self.rd.param_token(n, "dtemp"));
+                    return None;
+                }
                 let params =
                     match letter == 'D' && self.rd.b.model_semantics == ModelSemantics::Ngspice {
                         true => self.element_rows(letter, &params, n)?,

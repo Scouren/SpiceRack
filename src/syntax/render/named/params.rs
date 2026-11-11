@@ -1,5 +1,6 @@
 //! An ngspice card's parameters → the target's, through `render::models`'
-//! rows: a model card's (with Spectre's implied ngspice defaults), an R, C
+//! rows: a model card's (with Spectre's implied ngspice defaults and the
+//! level-3 diode's sidewall and breakdown laws), an R, C
 //! or D element's (Spectre), and the voltage-dependent resistance ngspice
 //! runs as a behavioural source. Each refusal anchors at the parameter it
 //! is about; each parameter left out is noted.
@@ -9,11 +10,16 @@
 //! `temper`, `hertz`, `time`), L6621-L6680 (the `B` line keeps `tc1`, `tc2`
 //! and `m`); Spectre Reference 5.0 p.859 (`resistor r=100*(1+v(n1,n2)/2)`),
 //! p.884 (`temp` in an expression); VACASK `docs/cmd-options-temp.md`
-//! (`$temp`).
+//! (`$temp`); ngspice-45 `dio/dioload.c` L257-L296 (the sidewall current
+//! on the bottom's characteristic), `dio/diotemp.c` L113-L128 (its
+//! temperature scaling), L204-L209 (`tcv`); Spectre Reference 5.0
+//! p.305-306 (`ns`, `tbv1`), 19.1 p.475 (`ln`, `exp`), p.507 (`temp` and
+//! `tnom` in a model parameter).
 //!
 //! Contents:
 //! - `W::table_kind(&self, m: &Model) -> Option<&'static Kind>`, `W::model_rows(&mut self, m: &Model, node: u32, k: &'static Kind) -> Option<Vec<(String, String)>>`
 //! - `W::element_rows(&mut self, letter: char, params: &[(String, String)], node: u32) -> Option<Vec<(String, String)>>`
+//! - `W::diode_own_rise(&self, model: &str, params: &[(String, String)]) -> bool`
 //! - `W::tran_ic(&mut self, letter: char, params: Vec<(String, String)>, node: u32) -> Vec<(String, String)>`
 //! - `W::dependent(&mut self, value: &Val, model: bool, params: &[(String, String)], node: u32) -> Option<Option<Dependent>>`
 //! - `type Dependent`
@@ -40,8 +46,9 @@ impl W<'_, '_> {
     }
 
     /// Model `m`'s (statement `node`'s) parameters as the target's `(name,
-    /// value)`, the value as written; Spectre's implied defaults after.
-    /// `None` when a row refuses one.
+    /// value)`, the value as written; Spectre's implied defaults after,
+    /// then its diode's laws (`diode_laws`). `None` when a row or a law
+    /// refuses one.
     pub(super) fn model_rows(
         &mut self,
         m: &Model,
@@ -79,6 +86,10 @@ impl W<'_, '_> {
                 }
             };
             out.push((name.to_string(), value));
+        }
+        // The one kind with laws that read several parameters.
+        if k.spectre == "diode" {
+            self.diode_laws(node, &mut out)?;
         }
         Some(out)
     }
@@ -156,6 +167,26 @@ impl W<'_, '_> {
             out.push(("m".to_string(), format!("({m}){op}({s})")));
         }
         Some(out)
+    }
+
+    /// Whether a D card's `params` hold its own `dtemp` while its model
+    /// `model` is a level-3 diode whose sidewall current `diode_laws`
+    /// rescales. The rescaled `jsw` reads the circuit's `temp` and the
+    /// model's `trise`, never a card's own rise, so the caller refuses the
+    /// card (ruling R10 on P3-089); a card's `temp` is refused by its row.
+    /// `false` for a model the deck's blocks do not hold.
+    pub(super) fn diode_own_rise(&self, model: &str, params: &[(String, String)]) -> bool {
+        assert!(self.b.named_params == NamedParams::Spectre, "Spectre's");
+        if !params.iter().any(|(k, _)| k.eq_ignore_ascii_case("dtemp")) {
+            return false;
+        }
+        let rescaled = |&(m, bin): &(u32, u32)| {
+            let view = self.rd.model_view(m, bin);
+            view.name.eq_ignore_ascii_case(model)
+                && self.table_kind(&view).is_some_and(|k| k.spectre == "diode")
+                && sidewall_rescaled(&view.params)
+        };
+        self.blocks().iter().flat_map(|b| &b.models).any(rescaled)
     }
 
     /// ngspice's behavioural resistor (inpcom.c L6621-L6680): when the
@@ -337,12 +368,105 @@ impl W<'_, '_> {
             }
         }
     }
+
+    /// The level-3 diode's two laws no row states, applied to `out`
+    /// (Spectre's names, the implied defaults in); `None` when one has no
+    /// Spectre form, refused at its parameter of statement `node`.
+    ///
+    /// Breakdown: ngspice's voltage is `bv - tcv*dT` at `tlev=0` and
+    /// `bv*(1 - tcv*dT)` otherwise (`diotemp.c` L204-L209), Spectre's
+    /// `bv*(1 + tbv1*dT)` at either (Spectre 25.1: settle-remote
+    /// `t_m3_diodes`, P4-097). So `tbv1` is `-tcv/bv` or `-tcv`.
+    ///
+    /// Sidewall: with no `ns`, ngspice adds `jsw*pj` to the bottom's
+    /// saturation current, so it conducts with `n`, yet scales it over
+    /// temperature with `ns = 1` (`dioload.c` L257-L296, `diotemp.c`
+    /// L113-L128). Spectre's sidewall diode conducts and scales with its
+    /// `ns` (default 1). So `ns` is `n`, and `jsw` carries the scaling
+    /// `ns = n` loses: `exp((1 - 1/n)*A)`, `A = (T/Tnom - 1)*eg/(k/q*T) +
+    /// xti*ln(T/Tnom)`, in Spectre's `temp` and `tnom` (`[REF]` p.507);
+    /// `k/q` is ngspice-45's (`CONSTboltz/CHARGE`).
+    // The expression reads the circuit's `temp` and the model's `trise`;
+    // a card's own `dtemp` (its `trise`) is not in it: that card is
+    // refused (`diode_own_rise`, ruling R10).
+    fn diode_laws(&mut self, node: u32, out: &mut Vec<(String, String)>) -> Option<()> {
+        assert!(self.b.named_params == NamedParams::Spectre, "Spectre's");
+        assert!(has(out, "eg"), "the implied `eg` comes before the laws");
+        let raw = |name: &str| value_of(out, name).map(str::to_string);
+        let (tcv, bv, jsw, n) = (raw("tbv1"), raw("bv"), raw("jsw"), raw("n"));
+        let (eg, xti, tnom, rise) = (raw("eg"), raw("xti"), raw("tnom"), raw("trise"));
+        let own = has(out, "ns");
+        // `None`: no constant, so the law it selects is not known here.
+        let tlev = raw("tlev").map_or(Some(0.0), |v| models::fold(&v));
+        let folds = |v: &str, x: f64| models::fold(v) == Some(x);
+        if let Some(tcv) = tcv.filter(|v| !folds(v, 0.0)) {
+            if tlev.is_none() {
+                self.refuse(Code::W0114, self.rd.param_token(node, "tcv"));
+                return None;
+            }
+            let neg = match models::fold(&tcv) {
+                Some(x) => (-x).to_string(),
+                None => format!("-({})", self.value_text(&tcv)),
+            };
+            match (tlev == Some(0.0), &bv) {
+                // ngspice reads `tcv` only beside a `bv` (`diotemp.c` L204).
+                (true, None) => {}
+                (true, Some(bv)) => {
+                    replace(out, "tbv1", format!("{neg}/({})", self.value_text(bv)));
+                }
+                (false, _) => replace(out, "tbv1", neg),
+            }
+        }
+        if let (Some(jsw), Some(n), Some(eg), false) = (&jsw, &n, &eg, own)
+            && !folds(jsw, 0.0)
+            && !folds(n, 1.0)
+        {
+            // `tlev=2` scales with the gap's own temperature law.
+            if !matches!(tlev, Some(0.0 | 1.0)) {
+                self.refuse(Code::W0114, self.rd.param_token(node, "jsw"));
+                return None;
+            }
+            let temp = self.b.temp_name;
+            let t = match &rise {
+                Some(r) => format!("({temp}+({})+273.15)", self.value_text(r)),
+                None => format!("({temp}+273.15)"),
+            };
+            let tnom = tnom
+                .as_deref()
+                .map_or("tnom".to_string(), |v| format!("({})", self.value_text(v)));
+            let xti = xti
+                .as_deref()
+                .map_or("3".to_string(), |v| self.value_text(v));
+            let ratio = format!("{t}/({tnom}+273.15)");
+            let a = format!(
+                "({ratio}-1)*({})/(8.6173303e-5*{t})+({xti})*ln({ratio})",
+                self.value_text(eg)
+            );
+            let scaled = format!(
+                "({})*exp((1-1/({}))*({a}))",
+                self.value_text(jsw),
+                self.value_text(n)
+            );
+            replace(out, "jsw", scaled);
+            out.push(("ns".to_string(), n.clone()));
+        }
+        Some(())
+    }
 }
 
 /// `out` with `name=v`, replacing an earlier `name`.
 fn put(out: &mut Vec<(String, String)>, name: String, v: &str) {
     out.retain(|(n, _)| *n != name);
     out.push((name, v.to_string()));
+}
+
+/// `out`'s `name` given the value `v`, in its place.
+fn replace(out: &mut [(String, String)], name: &str, v: String) {
+    let at = out.iter().position(|(n, _)| n == name);
+    assert!(at.is_some(), "`{name}` is a row of the card");
+    if let Some(i) = at {
+        out[i].1 = v;
+    }
 }
 
 /// `e` with each identifier passed through `f`.
@@ -368,4 +492,20 @@ fn has(out: &[(String, String)], name: &str) -> bool {
 
 fn value_of<'a>(out: &'a [(String, String)], name: &str) -> Option<&'a str> {
     out.iter().find(|(n, _)| n == name).map(|(_, v)| v.as_str())
+}
+
+/// Whether a level-3 diode card's `params` (ngspice's names) get
+/// `diode_laws`' sidewall rewrite: a `jsw` (or `isw`) that is not 0 and an
+/// `n` that is not 1, with no `ns` of its own.
+fn sidewall_rescaled(params: &[(String, String)]) -> bool {
+    let last = |names: &[&str]| {
+        let named = |k: &str| names.iter().any(|n| k.eq_ignore_ascii_case(n));
+        let found = params.iter().rev().find(|(k, _)| named(k));
+        found.map(|(_, v)| v.as_str())
+    };
+    let folds = |v: &str, x: f64| models::fold(v) == Some(x);
+    let (jsw, n) = (last(&["jsw", "isw"]), last(&["n"]));
+    last(&["ns"]).is_none()
+        && jsw.is_some_and(|v| !folds(v, 0.0))
+        && n.is_some_and(|v| !folds(v, 1.0))
 }
