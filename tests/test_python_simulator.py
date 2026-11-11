@@ -452,6 +452,33 @@ def test_raw_meas_line_reports_its_measure_on_ngspice():
     assert tran.measures["vend"] == pytest.approx(1 - math.exp(-1), rel=2e-3)
 
 
+@pytest.mark.needs("vacask")
+def test_p3_032_api_vacask_subcircuit_node_xu1():
+    """ZERO-LEDGER P3-032: a node inside a VACASK instance is a voltage under
+    its hierarchical name, not the current `i(<instance>)`. Oracle: the
+    closed form of 1.5 V over 1k + 1k + 2k (m = 1.5*3/4, q = 1.5*2/4, the
+    source's branch current -1.5/4k), which VACASK 36be560's own raw file
+    holds under `xu1:m`, `xu1:q` and `vdd:flow(br)`."""
+    import spicerack as ps
+
+    half = ps.Subcircuit("half", ["a", "b"])
+    half.R(name="1", positive="a", negative="m", value=1e3)
+    half.R(name="2", positive="m", negative="q", value=1e3)
+    half.R(name="3", positive="q", negative="b", value=2e3)
+    top = ps.Subcircuit("top", ["vdd"])
+    top.X("u1", "half", "vdd", "0")
+    tb = ps.Testbench(top)
+    tb.with_backend("vacask")
+    tb.add_subcircuit(half)
+    tb.V(name="dd", positive="vdd", negative="0", value=1.5)
+    op = tb.operating_point()
+    assert op["xu1.m"] == pytest.approx(1.125, rel=1e-9)
+    assert op["xu1.q"] == pytest.approx(0.75, rel=1e-9)
+    assert op["i(vdd)"] == pytest.approx(-7.5e-4, rel=1e-9)
+    with pytest.raises(KeyError):
+        op["i(xu1)"]
+
+
 def test_raw_four_line_runs_as_fourier_on_ngspice():
     """A raw `.four` testbench line becomes `fourier` in the `.control` block
     (the table goes to stdout, which Python does not expose; the Rust suite

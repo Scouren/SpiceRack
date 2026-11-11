@@ -2,8 +2,10 @@
 //!
 //! Every backend's vector names map to one lowercase canonical form:
 //! - node voltages lose their `v()` wrapper and reference node: `V(OUT,0)` -> `out`
-//! - branch currents become `i(name)`: `I(V1)`, `v1#branch`, Spectre/VACASK `V1:p` -> `i(v1)`
-//! - LTspice's `:` hierarchy separator becomes `.`: `V(x1:internal)` -> `x1.internal`
+//! - branch currents become `i(name)`: `I(V1)`, `v1#branch`, Spectre `V1:p`,
+//!   VACASK `v1:flow(br)` -> `i(v1)`
+//! - LTspice's and VACASK's `:` hierarchy separator becomes `.`:
+//!   `V(x1:internal)`, VACASK `x1:internal` -> `x1.internal`
 //! - anything else (`time`, `frequency`, `onoise_spectrum`, bare Spectre nodes) is lowercased
 //!
 //! Cites: none (each simulator's raw-file vector names).
@@ -18,9 +20,10 @@ use crate::syntax::Dialect;
 /// of `name`, plus one more for a name it rewrites.
 pub fn canonical(name: &str, backend: Option<Dialect>) -> (String, bool) {
     let lower = name.to_lowercase();
-    let lt = backend == Some(Dialect::Ltspice);
+    // LTspice and VACASK separate hierarchy levels with `:`.
+    let colon = matches!(backend, Some(Dialect::Ltspice | Dialect::Vacask));
     let hierarchy = |s: &str| {
-        if lt {
+        if colon {
             s.replace(':', ".")
         } else {
             s.to_string()
@@ -32,8 +35,15 @@ pub fn canonical(name: &str, backend: Option<Dialect>) -> (String, bool) {
     if let Some((dev, _)) = lower.split_once("#branch") {
         return (format!("i({dev})"), true);
     }
-    // Spectre/VACASK terminal currents are `<device>:<terminal>`; inside v() a `:` is hierarchy.
-    if matches!(backend, Some(Dialect::Spectre | Dialect::Vacask))
+    // VACASK (36be560) names a branch current `<device>:flow(<branch>)`
+    // (`vdd:flow(br)`); every other `:` of its names is hierarchy (`xu1:m`).
+    if backend == Some(Dialect::Vacask)
+        && let Some((dev, _)) = lower.split_once(":flow(")
+    {
+        return (format!("i({})", hierarchy(dev)), true);
+    }
+    // Spectre terminal currents are `<device>:<terminal>`; inside v() a `:` is hierarchy.
+    if backend == Some(Dialect::Spectre)
         && !lower.starts_with("v(")
         && let Some((dev, _)) = lower.split_once(':')
     {
@@ -47,7 +57,7 @@ pub fn canonical(name: &str, backend: Option<Dialect>) -> (String, bool) {
             hierarchy(inner.split(',').next().unwrap_or(inner).trim()),
             false,
         ),
-        None if lt => (hierarchy(&lower), false),
+        None if colon => (hierarchy(&lower), false),
         None => (lower, false),
     }
 }
@@ -153,7 +163,33 @@ mod tests {
 
     #[test]
     fn test_vacask_current() {
-        assert_eq!(norm("V1:p", "vacask"), "i(v1)");
+        // VACASK 36be560's own name for the branch current of `vdd`.
+        assert_eq!(norm("vdd:flow(br)", "vacask"), "i(vdd)");
+        assert!(cur("vdd:flow(br)", "vacask"));
+    }
+
+    #[test]
+    fn p3_032_a_vacask_subcircuit_node_is_a_voltage() {
+        // Oracle: the names VACASK 36be560 wrote for a 1k/1k/2k chain inside
+        // instance xu1, and inside xu2's instance xin
+        // (research/impl/evidence/P3-032/op1.raw): nodes, at 1.125 V and 0.75 V.
+        for (raw, name) in [
+            ("xu1:m", "xu1.m"),
+            ("xu1:q", "xu1.q"),
+            ("xu2:xin:m", "xu2.xin.m"),
+            ("d1:a_int", "d1.a_int"),
+        ] {
+            assert_eq!(
+                canonical(raw, Some(Dialect::Vacask)),
+                (name.to_string(), false),
+                "{raw}"
+            );
+        }
+        // A current inside an instance keeps its path (evidence inner-op1.raw).
+        assert_eq!(
+            canonical("xu1:v1:flow(br)", Some(Dialect::Vacask)),
+            ("i(xu1.v1)".to_string(), true)
+        );
     }
 
     // ── Sweep variables ──
@@ -182,7 +218,8 @@ mod tests {
     #[test]
     fn test_is_current_spectre_terminal() {
         assert!(cur("V1:p", "spectre"));
-        assert!(cur("I0:src", "vacask"));
+        assert!(cur("I0:src", "spectre"));
+        assert!(!cur("I0:src", "vacask"));
     }
 
     #[test]
