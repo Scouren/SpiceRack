@@ -22,7 +22,7 @@ use std::sync::atomic::Ordering;
 
 use acme::{NOISE_CALLS, NOISE_CARDS, acme_as};
 use spicerack::syntax::behaviour::DotRule;
-use spicerack::syntax::def::{Answer, DialectDef, RegisterError, register};
+use spicerack::syntax::def::{Answer, DialectDef, RegisterError, RunsOn, register};
 use spicerack::syntax::diag::{Code, Kind};
 use spicerack::syntax::lexicon::Scale;
 use spicerack::syntax::render::capability::Construct;
@@ -361,7 +361,7 @@ fn registration_rules() {
         ),
         (
             acme_as("acme-sp").runs_on(Dialect::Spectre),
-            RegisterError::RunsOn("acme-sp".into(), Dialect::Spectre),
+            RegisterError::RunsOn("acme-sp".into(), "spectre".into(), "spectre"),
         ),
     ];
     for (def, want) in cases {
@@ -375,18 +375,84 @@ fn registration_rules() {
 #[test]
 fn runs_on() {
     assert_eq!(acme_lang().runs_on(), None);
-    assert_eq!(Lang::HSPICE.runs_on(), Some(Dialect::Hspice));
+    assert_eq!(Lang::HSPICE.runs_on(), Some("hspice"));
     let my = DialectDef::new("my-ngspice")
         .extends(Lang::NGSPICE)
         .runs_on(Dialect::Ngspice);
     let my = register(my).expect("registers");
-    assert_eq!(my.runs_on(), Some(Dialect::Ngspice));
+    assert_eq!(my.runs_on(), Some("ngspice"));
     let deeper = register(DialectDef::new("my-ngspice-2").extends(my)).expect("registers");
+    assert_eq!(deeper.runs_on(), Some("ngspice"), "copied by extends");
+    let built_in = RunsOn::from(Dialect::Ngspice);
+    assert_eq!(built_in.sim, "ngspice");
+    assert_eq!(built_in.dialect, Lang::NGSPICE);
+}
+
+/// Oracle: note 12 §5's rule, worked by hand on two simulators: one that
+/// reads ngspice, one that reads a plugin. A dialect whose `extends`
+/// chain holds the simulator's language registers and names it; any
+/// other is refused, the simulator and its language named.
+#[cfg(feature = "backend")]
+#[test]
+fn p8_207_runs_on_takes_a_registered_simulator() {
+    use spicerack::backend::{
+        Installed, Kind as Analysis, Output, Runner, SimDef, by_name, parse_arg, register_simulator,
+    };
+
+    let sim = |name: &str, dialect: Lang| {
+        register_simulator(SimDef {
+            name: name.into(),
+            dialect,
+            runner: Runner::Command {
+                argv: vec![
+                    parse_arg(name).expect("a word"),
+                    parse_arg("{deck}").expect("a word"),
+                ],
+                output: Output::NgspiceRaw,
+            },
+            features: 0,
+            analyses: 1 << Analysis::Op as u32,
+            installed: Installed::OnPath(name.into()),
+        })
+        .expect("registers")
+    };
+
+    // A simulator that reads ngspice.
+    let reads_ng = sim("p8-207-sim", Lang::NGSPICE);
+    let on = RunsOn::from(reads_ng);
+    assert_eq!(on.sim, "p8-207-sim");
+    assert_eq!(on.dialect, Lang::NGSPICE);
+    let mine = DialectDef::new("p8-207-ng")
+        .extends(Lang::NGSPICE)
+        .runs_on(reads_ng);
+    let mine = register(mine).expect("ngspice is in its chain");
+    assert_eq!(mine.runs_on(), Some("p8-207-sim"));
+    assert_eq!(mine.runs_on().and_then(by_name), Some(reads_ng));
+    assert!(mine.dump().contains("\nruns_on Some(p8-207-sim)\n"));
+    let other = DialectDef::new("p8-207-sp")
+        .extends(Lang::SPECTRE)
+        .runs_on(reads_ng);
+    let want = RegisterError::RunsOn("p8-207-sp".into(), "p8-207-sim".into(), "ngspice");
     assert_eq!(
-        deeper.runs_on(),
-        Some(Dialect::Ngspice),
-        "copied by extends"
+        want.to_string(),
+        "'p8-207-sp': runs_on('p8-207-sim'), but it does not extend 'ngspice', \
+         the language simulator 'p8-207-sim' reads"
     );
+    assert_eq!(register(other), Err(want));
+
+    // A simulator that reads the plugin: the rule is the simulator's
+    // language, not its built-in family.
+    let reads_mine = sim("p8-207-deep", mine);
+    let child = DialectDef::new("p8-207-child")
+        .extends(mine)
+        .runs_on(reads_mine);
+    let child = register(child).expect("the plugin is in its chain");
+    assert_eq!(child.runs_on(), Some("p8-207-deep"));
+    let aside = DialectDef::new("p8-207-aside")
+        .extends(Lang::NGSPICE)
+        .runs_on(reads_mine);
+    let want = RegisterError::RunsOn("p8-207-aside".into(), "p8-207-deep".into(), "p8-207-ng");
+    assert_eq!(register(aside), Err(want));
 }
 
 /// Oracle: metamorphic (determinism): two registration orders give the

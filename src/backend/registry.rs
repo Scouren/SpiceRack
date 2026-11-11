@@ -19,7 +19,8 @@
 //!   `Sim::of(d: Dialect) -> Option<Sim>`, `Sim::builtin(self) -> Option<Dialect>`,
 //!   `Sim::row(self) -> &'static SimDef`, `Sim::name(self) -> &'static str`,
 //!   `Sim::family(self) -> Dialect`, `Sim::installed(self) -> bool`,
-//!   `Sim::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`
+//!   `Sim::run_all(self, netlist: &str) -> Result<Vec<RawData>, BackendError>`,
+//!   `From<Sim> for RunsOn` (a dialect definition's `runs_on`)
 //! - `pub struct SimDef`, `SimDef::check(&self) -> Result<(), SimRegisterError>`,
 //!   `pub enum Runner` (`BuiltIn`, `Command`), `pub enum Installed` (`Fn`,
 //!   `OnPath`), `pub enum SimRegisterError`, `SimRegisterError::code(&self) -> Code`
@@ -33,6 +34,7 @@ use std::sync::{Mutex, Once, OnceLock};
 use super::command::{self, Arg, Output, Piece};
 use super::{BACKENDS, BackendError, Kind, RUNNABLE, feature, is_on_path};
 use crate::result::RawData;
+use crate::syntax::def::RunsOn;
 use crate::syntax::diag::Code;
 use crate::syntax::{Dialect, Lang};
 
@@ -210,6 +212,18 @@ impl Sim {
         };
         assert!(!plots.is_empty(), "a raw file read holds at least one plot");
         Ok(plots)
+    }
+}
+
+impl From<Sim> for RunsOn {
+    /// A registered simulator as a dialect definition's `runs_on` takes
+    /// it: the name it is held under and the language it reads.
+    fn from(sim: Sim) -> RunsOn {
+        let row = sim.row();
+        RunsOn {
+            sim: row.name.as_str(),
+            dialect: row.dialect,
+        }
     }
 }
 

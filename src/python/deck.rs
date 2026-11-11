@@ -259,27 +259,29 @@ impl Deck {
     /// deck written for it, in that simulator's language.
     fn for_run(&self, backend: Option<&str>) -> PyResult<(Sim, String)> {
         let deck = self.lowered()?;
-        // A plugin language's name that is no simulator's: it runs where
-        // its definition says (`runs_on`), as written.
+        let kinds: Vec<Kind> = deck.analyses().iter().map(Analysis::kind).collect();
+        // A plugin language's name that is no simulator's: it runs on the
+        // simulator its definition names (`runs_on`), routed by that name
+        // (so held to what the simulator declares), written as the plugin.
         let plugin = backend
             .filter(|n| crate::backend::by_name(n).is_none())
             .and_then(super::def_::plugin);
         if let Some(lang) = plugin {
-            let d = lang.runs_on().ok_or_else(|| {
+            let name = lang.runs_on().ok_or_else(|| {
                 runtime_err(format!(
                     "no simulator runs '{}': it is netlist only (its definition declares no runs_on)",
                     lang.name()
                 ))
             })?;
-            let sim = Sim::of(d).ok_or_else(|| {
-                runtime_err(BackendError::SimulationError(format!(
-                    "no {} simulator is driven by SpiceRack",
-                    d.name()
-                )))
-            })?;
+            if crate::backend::by_name(name).is_none() {
+                return Err(runtime_err(BackendError::SimulationError(format!(
+                    "no {name} simulator is driven by SpiceRack"
+                ))));
+            }
+            let sim = crate::backend::select(&kinds, Some(name), deck.needs(), |_| true)
+                .map_err(backend_err)?;
             return Ok((sim, deck.write_to(lang).map_err(runtime_err)?.text));
         }
-        let kinds: Vec<Kind> = deck.analyses().iter().map(Analysis::kind).collect();
         let writes = |s: Sim| deck.write_to(s.row().dialect).is_ok();
         let sim =
             crate::backend::select(&kinds, backend, deck.needs(), writes).map_err(backend_err)?;

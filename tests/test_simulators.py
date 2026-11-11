@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 import spicerack as ps
+from spicerack.def_ import DialectDef, Simulator as BuiltIn
 
 FAKE = Path(__file__).parent / "fixtures" / "sims" / "fake" / "fake.py"
 FAKE_TOML = FAKE.with_name("fake.toml")
@@ -219,3 +220,42 @@ def test_p8_205_a_bad_descriptor_file_names_its_key(tmp_path):
         assert str(e.value).startswith(R0040 + key + ": "), (key, str(e.value))
     with pytest.raises(OSError):
         ps.load_simulator(tmp_path / "missing.toml")
+
+
+def test_p8_207_a_dialect_runs_on_a_registered_simulator():
+    ps.register_simulator(fake("p8-207-fake"))
+
+    def on(base, sim):
+        class Plugin(base):
+            def define(self, d):
+                return super().define(d).comment_tail("//").runs_on(sim)
+
+        return Plugin
+
+    # By name: the deck is written in the plugin's dialect and run on the simulator it names.
+    lang = ps.register_dialect(on(ps.dialects.NGSPICE, "p8-207-fake")("p8-207-mine"))
+    assert lang.runs_on() == "p8-207-fake"
+    sim = divider().simulator(simulator="p8-207-mine")
+    sim.save("V(out)")
+    assert sim.operating_point()["out"] == expected("out")
+    # ... and is held to what that simulator declares.
+    with pytest.raises(RuntimeError, match="^W0180 ") as e:
+        sim.transient(step_time=1e-6, end_time=1e-3)
+    assert e.value.diagnostic["missing"] == {"analyses": ["tran"], "features": []}
+
+    # A `Simulator` (by its name) and a built-in are taken too.
+    by_object = ps.register_dialect(on(ps.dialects.NGSPICE, fake("p8-207-fake"))("p8-207-by-object"))
+    assert by_object.runs_on() == "p8-207-fake"
+    built_in = ps.register_dialect(on(ps.dialects.NGSPICE, BuiltIn.Ngspice)("p8-207-built-in"))
+    assert built_in.runs_on() == "ngspice"
+
+    # A dialect that does not extend the simulator's language is refused, the simulator named.
+    refusal = "'p8-207-wrong': runs_on('p8-207-fake'), but it does not extend 'ngspice', the language simulator 'p8-207-fake' reads"
+    with pytest.raises(ValueError) as e:
+        ps.register_dialect(on(ps.dialects.SPECTRE, "p8-207-fake")("p8-207-wrong"))
+    assert refusal in str(e.value)
+    # The simulator is registered first.
+    with pytest.raises(ValueError, match="no simulator is registered as 'p8-207-later'"):
+        DialectDef("p8-207-early").runs_on("p8-207-later")
+    with pytest.raises(TypeError, match="runs_on takes"):
+        DialectDef("p8-207-early").runs_on(3)

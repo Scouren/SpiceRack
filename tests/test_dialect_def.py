@@ -248,7 +248,7 @@ def test_a_plugin_that_runs_on_ngspice_gives_ngspice_results(uniq):
 
     mine = uniq("my-ngspice")
     lang = ps.register_dialect(MyNgspice(mine))
-    assert lang.runs_on() == Simulator.Ngspice
+    assert lang.runs_on() == "ngspice"
 
     def op(backend):
         dut = ps.Subcircuit("div", ["a", "b"])

@@ -10,12 +10,15 @@
 //! Contents:
 //! - `pub(super) struct PySim`
 //! - `pub(super) fn add(m: &Bound<'_, PyModule>) -> PyResult<()>`
+//! - `pub(super) fn runs_on(sim: &Bound<'_, PyAny>) -> PyResult<RunsOn>`
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyString};
 
+use super::def_enums::PySimulator;
 use crate::backend::{self, Installed, Kind, Output, Piece, Runner, SimDef, SimRegisterError};
+use crate::syntax::def::RunsOn;
 use crate::syntax::diag::{Code, info};
 
 // A simulator's descriptor, checked (`SimDef::check`) when it was built.
@@ -46,6 +49,37 @@ pub(super) fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySim>()?;
     m.add_function(wrap_pyfunction!(register_simulator, m)?)?;
     m.add_function(wrap_pyfunction!(simulators, m)?)
+}
+
+/// What a dialect definition's `runs_on` is given, as the simulator it
+/// names: a built-in (`def_.Simulator.X`), or a `Simulator` or a name,
+/// both looked up in the registry by name.
+///
+/// # Errors
+/// `ValueError`: no simulator is registered under the name (the simulator
+/// is registered before the dialect that runs on it). `TypeError`: `sim`
+/// is none of the three.
+pub(super) fn runs_on(sim: &Bound<'_, PyAny>) -> PyResult<RunsOn> {
+    if let Ok(built_in) = sim.cast::<PySimulator>() {
+        return Ok(built_in.get().0.into());
+    }
+    let name = match sim.cast::<PySim>() {
+        Ok(s) => s.get().def.name.clone(),
+        Err(_) => sim.extract::<String>().map_err(|_| {
+            let takes = "runs_on takes a Simulator, a def_.Simulator or a simulator's name";
+            PyTypeError::new_err(takes)
+        })?,
+    };
+    let held = backend::by_name(&name).ok_or_else(|| {
+        let why = format!("runs_on: no simulator is registered as '{name}' (register it first)");
+        PyValueError::new_err(why)
+    })?;
+    let on = RunsOn::from(held);
+    assert!(
+        backend::by_name(on.sim) == Some(held),
+        "held under its name"
+    );
+    Ok(on)
 }
 
 // ---- private ----

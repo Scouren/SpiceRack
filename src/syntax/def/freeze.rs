@@ -9,6 +9,7 @@
 //! - `pub fn register(def: DialectDef) -> Result<Lang, RegisterError>`, `pub enum RegisterError`
 
 use super::{DialectDef, Lex, leak};
+use crate::syntax::Lang;
 use crate::syntax::behaviour::DotRule;
 use crate::syntax::diag::{self, Code, Kind};
 use crate::syntax::lang::{self, CONSTRUCTS, Cells, Row};
@@ -17,7 +18,6 @@ use crate::syntax::lexicon::{
 };
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::spelling::Spelling;
-use crate::syntax::{Dialect, Lang};
 
 /// Why a definition was not registered.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -46,9 +46,11 @@ pub enum RegisterError {
     #[error("'{0}': region '{1}' names a language with no reader")]
     Readerless(String, String),
     /// `runs_on` names a simulator whose language the definition does not
-    /// extend.
-    #[error("'{0}': runs_on({1:?}), but it does not extend {1:?}'s language")]
-    RunsOn(String, Dialect),
+    /// extend: the definition, the simulator, the simulator's language.
+    #[error(
+        "'{0}': runs_on('{1}'), but it does not extend '{2}', the language simulator '{1}' reads"
+    )]
+    RunsOn(String, String, &'static str),
     /// Every slot is taken (or the code table is full).
     #[error("{} languages are registered", lang::LANGS_MAX)]
     Full,
@@ -84,10 +86,11 @@ pub fn register(def: DialectDef) -> Result<Lang, RegisterError> {
     {
         return Err(RegisterError::Readerless(name, r.0.clone()));
     }
-    if let Some(sim) = def.runs_on {
+    if let Some(on) = def.runs_on {
         let chain = std::iter::successors(def.base, |l| l.base());
-        if !chain.into_iter().any(|l| l == Lang::from(sim)) {
-            return Err(RegisterError::RunsOn(name, sim));
+        if !chain.into_iter().any(|l| l == on.dialect) {
+            let reads = on.dialect.name();
+            return Err(RegisterError::RunsOn(name, on.sim.to_string(), reads));
         }
     }
     // ponytail: a held name's candidate row is built (and leaked) to be

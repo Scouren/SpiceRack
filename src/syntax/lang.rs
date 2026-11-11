@@ -22,7 +22,7 @@
 //!   `Lang::lexicon(self) -> Option<&'static Lexicon>`, `Lang::spelling(self) -> &'static Spelling`,
 //!   `Lang::cells(self) -> &'static Cells`, `Lang::action(self, c: Construct) -> Action`,
 //!   `Lang::behaviours(self) -> &'static Behaviours`
-//! - `Lang::runs_on(self) -> Option<Dialect>`, `Lang::dump(self) -> String`, `Lang::base(self) -> Option<Lang>`,
+//! - `Lang::runs_on(self) -> Option<&'static str>`, `Lang::dump(self) -> String`, `Lang::base(self) -> Option<Lang>`,
 //!   `Lang::row(self) -> &'static Row`
 //! - `pub struct PluginCode`, `pub fn plugin_code(detail: u16) -> PluginCode`
 //! - `impl From<Dialect> for Lang`
@@ -34,7 +34,7 @@ use std::sync::{Mutex, Once, OnceLock};
 
 use crate::syntax::Dialect;
 use crate::syntax::behaviour::Behaviours;
-use crate::syntax::def::Hook;
+use crate::syntax::def::{Hook, RunsOn};
 use crate::syntax::diag::Kind;
 use crate::syntax::lexicon::Lexicon;
 use crate::syntax::render::capability::{Action, Construct};
@@ -137,7 +137,7 @@ pub(crate) struct Row {
     pub(crate) options: &'static [(&'static str, &'static str)],
     pub(crate) hooks: &'static [(&'static str, Hook)],
     /// The simulator that reads its text (`DialectDef::runs_on`).
-    pub(crate) runs_on: Option<Dialect>,
+    pub(crate) runs_on: Option<RunsOn>,
     /// The language it extends.
     pub(crate) base: Option<Lang>,
 }
@@ -228,11 +228,14 @@ impl Lang {
         &self.row().behaviours
     }
 
-    /// The simulator that reads its text: a built-in's own, a plugin's
-    /// declared one (`DialectDef::runs_on`); `None`: netlist only.
-    pub fn runs_on(self) -> Option<Dialect> {
+    /// The simulator that reads its text, by the name it is registered
+    /// under (`backend::by_name`): a built-in's own (its dialect's name,
+    /// whether or not SpiceRack drives one), a plugin's declared one
+    /// (`DialectDef::runs_on`); `None`: netlist only.
+    pub fn runs_on(self) -> Option<&'static str> {
         let own = Dialect::ALL.into_iter().find(|&d| Lang::from(d) == self);
-        own.or(self.row().runs_on)
+        let declared = self.row().runs_on.map(|on| on.sim);
+        own.map(Dialect::name).or(declared)
     }
 
     /// Its row as canonical text: every table, behaviour, cell, code and
