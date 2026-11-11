@@ -151,8 +151,8 @@ macro_rules! rows_w_spice {
             /// An output request (`.print`, `.save`, `.probe`) not written.
             W0023 Note {
                 title: "an output request not written",
-                cite: "LTspice help, Xyce RG §2.1.21, VACASK docs (every vector saved); Spectre Reference 5.0 p.886 (`save` takes nodes and terminal currents only)",
-                explain: "The target saves every vector anyway (LTspice, Xyce, VACASK), or has no form for the request: a `.print` output that is no node voltage or device current on Spectre (an expression, `format=`, a device parameter), or no node voltage or source current on VACASK; HSPICE's `.probe` under a noise run. Select the outputs in the target's post-processing.",
+                cite: "LTspice help, Xyce RG §2.1.21, VACASK docs (every vector saved); Spectre Reference 5.0 p.886 (`save` takes nodes and terminal currents only); Xyce RG 7.10 §2.1.30 (`.PREPROCESS ADDRESISTORS` writes a second netlist file; its own run adds no resistor)",
+                explain: "The target saves every vector anyway (LTspice, Xyce, VACASK), or has no form for the request: a `.print` output that is no node voltage or device current on Spectre (an expression, `format=`, a device parameter), or no node voltage or source current on VACASK; HSPICE's `.probe` under a noise run. Select the outputs in the target's post-processing. Xyce's `.PREPROCESS ADDRESISTORS` asks for a copy of the netlist with a resistor from each dangling node to ground and runs the deck as it stands, so the card is left out; add the resistors to the deck to have them.",
             }
             /// An option not written: another simulator's own, or one with no effect
             /// on the numbers.

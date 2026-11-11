@@ -385,9 +385,11 @@ fn a_kept_statement_is_one_diagnostic_on_the_named_writers() {
     // XY §3.1, §3.2: Spectre and VACASK wrote a W0001 beside each W0039
     // statement and two W0001 for a deck's first kept statement
     // (rallpack2.cir: 1,024 W0001 against 2 W0039). Each kept statement is
-    // one diagnostic: two Xyce-only `.PREPROCESS` lines are W0039 W0039.
+    // one diagnostic: two Xyce-only lines (`.PREPROCESS REPLACEGROUND
+    // TRUE`, `.MPDE`) are W0039 W0039. `.PREPROCESS ADDRESISTORS` is no
+    // kept statement since P6-014 (left out, W0023).
     let xyce = "t\nR1 a 0 1k\nV1 a 0 1\n.PREPROCESS REPLACEGROUND TRUE\n\
-                .PREPROCESS ADDRESISTORS NODCPATH 1G\n.op\n.end\n";
+                .MPDE 0.1ms 0.1ms 1s\n.op\n.end\n";
     for t in [Dialect::Spectre, Dialect::Vacask] {
         let e = render_text(xyce, Dialect::Xyce, "t", t).expect_err("refused");
         let codes: Vec<Code> = e.diags.iter().map(|d| d.code).collect();

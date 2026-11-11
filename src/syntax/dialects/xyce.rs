@@ -204,6 +204,10 @@ pub(super) fn xyce() -> DialectDef {
         // The dot rules: `.LIN` (RG `.LIN`) is the S-parameter analysis over
         // the deck's `.AC` sweep.
         .dot_rule("lin", DotRule::SParams)
+        // `.PREPROCESS` (RG §2.1.28–30) is applied as the deck is read
+        // (ZERO-LEDGER P6-014); its `REPLACEGROUND TRUE` stays the kept
+        // word above.
+        .dot_rule("preprocess", DotRule::Preprocess)
         // The `.model` levels Xyce numbers its own way. Its JFET level 2
         // is the Shockley model with THETA and DELTA (RG 7.10 §2.3.19,
         // Table 2-87); ngspice's level 2 is Parker-Skellern (manual

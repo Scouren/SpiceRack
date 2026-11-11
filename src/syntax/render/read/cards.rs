@@ -20,6 +20,7 @@
 //!   `Rd::file_order(&self, b: &Block) -> Vec<(u32, bool)>`,
 //!   `Rd::global_param(&self, a: u32) -> bool`, `Rd::dot_rule(&self, word: &str) -> Option<DotRule>`,
 //!   `Rd::is_word_item(&self, n: u32) -> bool`,
+//!   `Rd::removeunused(&self, stmts: &[u32]) -> String`,
 //!   `Rd::param_winners(&self, deck: &mut Deck, to: &Behaviours)`
 
 use std::collections::HashMap;
@@ -334,6 +335,37 @@ impl Rd<'_> {
     pub(super) fn is_word_item(&self, n: u32) -> bool {
         n != NONE && self.tag(n) == Tag::Word
     }
+
+    /// The element letters, uppercased, the Xyce `.PREPROCESS REMOVEUNUSED`
+    /// card among `stmts` (the top's statements) lists (RG 7.10 §2.1.29:
+    /// C, D, I, L, M, Q, R, V). Empty, the card then staying kept text:
+    /// with no such card, with a list Xyce stops on (none, or another
+    /// word), and beside a `REPLACEGROUND TRUE`, whose ground names the
+    /// reader does not rename.
+    pub(super) fn removeunused(&self, stmts: &[u32]) -> String {
+        if self.dot_rule("preprocess") != Some(DotRule::Preprocess) {
+            return String::new();
+        }
+        let mut cards = Vec::new();
+        for &n in stmts {
+            let head = self.t.text(self.main(n));
+            if head.eq_ignore_ascii_case(".preprocess") {
+                cards.push(self.words_after(n));
+            }
+        }
+        let renames = cards.iter().any(|w| *w == ["replaceground", "true"]);
+        let list = cards
+            .iter()
+            .find(|w| w.first().is_some_and(|x| x == "removeunused"));
+        let letters = list.map_or(<&[String]>::default(), |w| &w[1..]);
+        let known = |l: &String| l.len() == 1 && "cdilmqrv".contains(l.as_str());
+        let out = match renames || !letters.iter().all(known) {
+            true => String::new(),
+            false => letters.concat().to_ascii_uppercase(),
+        };
+        assert!(out.bytes().all(|b| b"CDILMQRV".contains(&b)), "{out}");
+        out
+    }
 }
 
 // ---- private ----
@@ -358,13 +390,46 @@ impl Rd<'_> {
                 acc.bench.push(super::Bench::Card(n));
                 true
             }
+            Some(DotRule::Preprocess) => self.preprocess(n, acc),
             Some(DotRule::Note(_) | DotRule::SParams) | None => false,
         };
-        assert_eq!(
-            placed,
-            acc.bench.len() + acc.notes.len() == bench + notes + 1
-        );
+        let grew = acc.bench.len() + acc.notes.len() - (bench + notes);
+        assert!(grew <= usize::from(placed), "placed once, or left as read");
         placed
+    }
+
+    /// Xyce's `.PREPROCESS` card `n` (RG 7.10 §2.1.28–30), `true` when the
+    /// reader applies it: `REMOVEUNUSED` when its devices are left out
+    /// ([`Rd::removeunused`]), `ADDRESISTORS` (the run adds no resistor:
+    /// the card asks for a second netlist file, W0023), `REPLACEGROUND
+    /// FALSE` (the default). Any other form stays the card's kept text.
+    fn preprocess(&self, n: u32, acc: &mut Acc) -> bool {
+        let words = self.words_after(n);
+        let words: Vec<&str> = words.iter().map(String::as_str).collect();
+        match words[..] {
+            ["removeunused", ..] => !self.removed.is_empty(),
+            ["addresistors", "oneterminal" | "nodcpath", _] => {
+                let note = crate::syntax::diag::Code::W0023;
+                acc.notes
+                    .push(crate::syntax::diag::Diag::new(note, self.main(n), 0));
+                true
+            }
+            ["replaceground", "false"] => true,
+            _ => false,
+        }
+    }
+
+    /// The lowercased words of flat statement `n` after its first, split
+    /// at blanks and commas (`.PREPROCESS REMOVEUNUSED R,C`: `removeunused`,
+    /// `r`, `c`).
+    fn words_after(&self, n: u32) -> Vec<String> {
+        let line = self.line(n).to_ascii_lowercase();
+        let words = line.split(|c: char| c == ',' || c.is_whitespace());
+        words
+            .filter(|w| !w.is_empty())
+            .skip(1)
+            .map(String::from)
+            .collect()
     }
 
     /// The text of card `n` from its first field to the line's end, a path

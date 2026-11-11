@@ -582,8 +582,9 @@ def xyce(d):
         .kept_word("ypowergridbusshunt", Construct.PrivateText)
         .kept_word("ypowergridtransformer", Construct.PrivateText)
         .kept_word(".sens", Construct.XyceSens)
-        # The dot rules (RG `.LIN`).
+        # The dot rules (RG `.LIN`, `.PREPROCESS`: P6-014).
         .dot_rule("lin", DotRule.SParams)
+        .dot_rule("preprocess", DotRule.Preprocess)
         # The `.model` levels Xyce numbers its own way (RG `J`: level 2).
         .level_alias("njf", 2, None)
         .level_alias("pjf", 2, None)

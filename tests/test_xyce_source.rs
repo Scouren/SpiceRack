@@ -212,3 +212,61 @@ fn p3_056_o_tf_name_tf_naming() {
     let cap = "* t\nV1 a 0 1\nC1 a 0 1p\n.dc C1:C 1p 2p 1p\n.end\n";
     oracle::spec_refusal(cite, cap, xy, ng, &[Code::W0015]);
 }
+
+// Ledger P6-014. Xyce RG 7.10 §2.1.29: `.PREPROCESS REMOVEUNUSED R,C`
+// removes, before the run, the listed kinds' devices whose terminals are
+// one node (a MOSFET's and a BJT's first three). §2.1.30: `.PREPROCESS
+// ADDRESISTORS` "creates an auxiliary netlist file", and the deck's own
+// run "will not include the effects of adding resistors". §2.1.28:
+// `REPLACEGROUND FALSE` is the default. Xyce 7.10 runs the first deck at
+// 0.5 V and stops on a singular matrix without its card (`V11 n3 N3 4`);
+// it runs the second at 1 V and writes `t.cir_xyce.cir` (`RONETERM1 2 0
+// 1K`). No other simulator has the card, so the reader applies it and
+// every target gets the deck Xyce ran. `REPLACEGROUND TRUE` renames
+// nodes, which the reader does not do yet (P6-014-s2): W0039, as is a
+// `REMOVEUNUSED` beside it or with a list Xyce stops on. LINEAR: each
+// deck is one linear solve. Checks: 6 runs, 5 texts, 4 refusals.
+#[test]
+fn p6_014_xyce_preprocess_removeunused_addresistors() {
+    let (xy, ng, es) = (Dialect::Xyce, Dialect::Ngspice, Dialect::Espice);
+    let unused = "* t\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 1k\nV11 n3 N3 4\nR11 2 2 1\nC11 2 2 1\n\
+        .dc V1 1 1 1\n.print dc v(2)\n.preprocess removeunused R,C,V\n.end\n";
+    // 1 V over 1k/1k.
+    oracle::closed_form(xy, unused, &[xy, ng, es], "2", At::First, 0.5, LINEAR);
+    // A listed kind on two nodes stays, as does an unlisted kind on one
+    // (`I11`); a transistor goes by its first three terminals.
+    let kinds = "* t\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 1k\nI11 2 2 1\nM1 2 2 2 0 nm\nM2 1 2 2 0 nm\n\
+        Q1 2 2 2 0 qm\n.model nm nmos (level=1)\n.model qm npn\n.op\n\
+        .preprocess removeunused M,Q,R\n.end\n";
+    let text = oracle::spec_example("Xyce RG 7.10 §2.1.29", kinds, xy, ng, &["I11 2 2 1"]);
+    let names: Vec<&str> = text.lines().filter_map(|l| l.split(' ').next()).collect();
+    assert!(names.contains(&"R1") && names.contains(&"M2"), "{text}");
+    assert!(!names.contains(&"M1") && !names.contains(&"Q1"), "{text}");
+    assert!(!text.to_ascii_lowercase().contains("preprocess"), "{text}");
+    // ADDRESISTORS: node 2 has one terminal and stays at 1 V (0.5 V had the
+    // 1 kΩ been added); the card is an output request, noted.
+    let plain = "* t\nV1 1 0 1\nR1 1 2 1k\n.dc V1 1 1 1\n.print dc v(2)\n.end\n";
+    let add = plain.replace(
+        ".end\n",
+        ".preprocess addresistors oneterminal 1k\n.preprocess addresistors nodcpath 1k\n\
+         .preprocess replaceground false\n.end\n",
+    );
+    oracle::closed_form(xy, &add, &[xy, ng, es], "2", At::First, 1.0, LINEAR);
+    let (source, _) = sim_pair(xy, &add, ng, "2", At::First, LINEAR);
+    assert!(LINEAR.within(source, 1.0), "Xyce's own run: {source}");
+    let w = oracle::written(&add, xy, ng);
+    assert_eq!(oracle::notes(&w), [Code::W0023, Code::W0023]);
+    assert_eq!(w.text, oracle::write(plain, xy, ng));
+    // The forms the reader does not apply: Xyce's own.
+    let cite = "ngspice-45 manual ch.2 (circuit description): no .PREPROCESS";
+    for card in [
+        ".preprocess replaceground true",
+        ".preprocess removeunused",
+        ".preprocess removeunused R,X",
+    ] {
+        let deck = unused.replace(".preprocess removeunused R,C,V", card);
+        oracle::spec_refusal(cite, &deck, xy, ng, &[Code::W0039]);
+    }
+    let both = unused.replace(".end\n", ".preprocess replaceground true\n.end\n");
+    oracle::spec_refusal(cite, &both, xy, ng, &[Code::W0039]);
+}

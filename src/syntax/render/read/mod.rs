@@ -144,6 +144,10 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// The top's DC sources read with LTspice's start-up ramp, once a
     /// writer whose target has no such start asks ([`Rd::ramp_startup`]).
     ramped: HashSet<u32>,
+    /// The element letters, uppercased, of the top's Xyce `.PREPROCESS
+    /// REMOVEUNUSED` ([`Rd::removeunused`]): an element of one whose
+    /// terminals are one node is left out (`Rd::unused`).
+    removed: String,
 }
 
 /// What the reader made of a file: every block and the deck-wide lists, in
@@ -367,6 +371,7 @@ pub(in crate::syntax::render) fn read<'a>(
         rd.instances(&top_stmts);
     } else {
         rd.models = rd.model_names(&top_stmts);
+        rd.removed = rd.removeunused(&top_stmts);
     }
     let mut acc = Acc::default();
     let mut top = Block {
@@ -551,6 +556,7 @@ impl<'a> Rd<'a> {
             promoted: HashSet::new(),
             merge_units: false,
             ramped: HashSet::new(),
+            removed: String::new(),
         }
     }
 }

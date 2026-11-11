@@ -215,6 +215,12 @@ pub enum DotRule {
     /// The S-parameter analysis over the deck's `.ac`, when the card's
     /// testbench rule reads it (Xyce `.LIN`: ngspice's `.sp` of that sweep).
     SParams,
+    /// Xyce's `.PREPROCESS` (RG 7.10 §2.1.28–30), applied as the deck is
+    /// read: `REMOVEUNUSED`'s devices are left out, `ADDRESISTORS` (a
+    /// request for a second netlist file) is left out with W0023,
+    /// `REPLACEGROUND FALSE` states the default; `REPLACEGROUND TRUE`
+    /// stays the card's kept text.
+    Preprocess,
 }
 
 /// The writer layout.

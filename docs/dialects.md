@@ -180,8 +180,9 @@ behaviours (`writer`, `card_rules`, `control_block`, ...), the reader's
 own words (`kept_word(word, construct)`: a line kept as this dialect's text
 whose first word is `word` is that construct, a one-letter word every
 element line of that letter; `dot_rule(word, rule)`: a dot card read its own
-way, `DotRule.Note(code)` left out with a note or `DotRule.SParams` the
-S-parameter analysis over the deck's `.ac`), `code`, `hook` and `runs_on`. `ps.def_.register(d)` registers a `DialectDef` directly.
+way, `DotRule.Note(code)` left out with a note, `DotRule.SParams` the
+S-parameter analysis over the deck's `.ac`, or `DotRule.Preprocess` Xyce's
+`.PREPROCESS` applied as the deck is read), `code`, `hook` and `runs_on`. `ps.def_.register(d)` registers a `DialectDef` directly.
 
 The vocabulary is the Rust enums by name: `Tag.KwSubckt` (also
 `Keyword`), `Construct.Laplace`, `Alt.ChargeBraced`, `Scale.Exp(6)`,
