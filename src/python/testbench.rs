@@ -377,6 +377,17 @@ impl PyTestbench {
         slf.as_super().deck.netlist(backend)
     }
 
+    /// `netlist(dialect)`'s deck and its notes, as `Diagnostic`s: what the
+    /// target does not get as written. `netlist()` raises each as a
+    /// `UserWarning`; this returns them and warns of none.
+    fn netlist_with_notes(
+        slf: PyRef<'_, Self>,
+        dialect: &str,
+    ) -> PyResult<(String, Vec<super::error::PyDiagnostic>)> {
+        let written = slf.as_super().deck.written(dialect)?;
+        Ok((written.text, written.notes))
+    }
+
     fn __str__(slf: PyRef<'_, Self>) -> String {
         let deck = &slf.as_super().deck;
         let n = deck.bench.as_ref().map_or(0, |tb| tb.analyses.len());

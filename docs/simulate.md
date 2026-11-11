@@ -189,6 +189,52 @@ ignores `.four` when it writes a rawfile with `-r`. Run such a deck by hand with
 `.four` and none of those three analyses is refused when it runs, rather than
 returning without its results.
 
+### Refusals and notes
+
+A target that cannot say something the deck holds refuses the whole deck: `netlist()` raises
+`spicerack.Error`, a `RuntimeError` whose text is one line per diagnostic
+(`<deck>:<line>:<column>: <code> <title>`). The same diagnostics are data on the exception:
+
+```python
+noted = ps.Testbench(rc)
+noted.V("in", "vin", "0", 1.0)
+noted.save("v(vout)")
+noted.measure("tran", "vmax", "max", "v(vout)")
+noted.add_transient(step_time=1e-8, end_time=5e-6)
+
+try:
+    noted.netlist("vacask")                 # VACASK has no statement for a measurement
+except ps.Error as e:
+    print(e.status)                         # refused
+    for d in e.diagnostics:
+        print(d.code, d.kind, d.line, d.statement)
+    # W0023 note 5 .save v(vout)
+    # W0109 refusal 6 .meas tran vmax max v(vout)
+```
+
+Each `Diagnostic` has `code`, `kind` (`"refusal"` or `"note"`), `title` and `cite` (the code's fixed
+text), `message` (its line of the exception's text), `line` and `column` (from 1, in the deck's own
+ngspice text, the title first), `statement` (the statement's text) and `element` (the element's
+name, `"Vin"`, when the statement is one; else `None`). `file` is `None` for a deck built in Python.
+
+A note is what a target does not get as written while the deck is still written (an output
+request, an option). `netlist()` raises each as a `UserWarning`; `netlist_with_notes()` returns
+them beside the text and warns of none:
+
+```python
+text, notes = noted.netlist_with_notes("xyce")
+print([(n.code, n.kind, n.statement) for n in notes])   # [('W0023', 'note', '.save v(vout)')]
+```
+
+Every failure of a netlist, a run or a compile is a `spicerack.Error`. `status` is `"refused"` when
+nothing was run: the writer refused the deck, or no simulator could be routed for it (`W0180` to
+`W0182`). It is `"failed"` when something that ran failed (a simulator, a compiler, a dialect's
+hook). A failure with no code has no diagnostics. A refusal that is at no statement has one
+diagnostic whose `line`, `column`, `statement` and `element` are `None`: a routing refusal, and
+`W0040` (an analysis argument the target has no word for, refused before the deck has the
+analysis's statement). A bad argument is a `ValueError`, a name that is not there a `KeyError`, a
+file that does not open an `OSError` and a removed method a `NotImplementedError`, as before.
+
 ## Choosing a simulator
 
 ```python
@@ -326,7 +372,8 @@ print(ps.provisional)                             # ('Simulator.read',)
 
 A registered simulator is routed like a built-in. It is a candidate for every analysis it declares, after
 the built-ins, in registration order, and it is held to what it declares. A run that cannot be routed
-raises `RuntimeError` opening with its code, and `exc.diagnostic` holds the same as data:
+raises `spicerack.Error` opening with its code (status `"refused"`; `"failed"` for `R0041`), the code
+its one `Diagnostic`, and `exc.diagnostic` holds the route as data:
 
 | code | when | `exc.diagnostic` |
 | --- | --- | --- |

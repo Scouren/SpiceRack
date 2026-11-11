@@ -22,6 +22,7 @@
 //!   what a dialect region says (Spectre statements, a Fourier harmonic count)
 //! - `card.rs`: analysis arguments → `Analysis`
 //! - `deck.rs`: the blocks → ngspice source → a backend's netlist or a run's `RawData`
+//! - `error.rs`: `Error` and `Diagnostic`: a failure's status and its located diagnostics, a written deck's notes
 //! - `verilog.rs`: `verilog(...)` blocks and their lowering
 //! - `subcircuit.rs`, `circuit.rs`: `Subcircuit`, `Circuit`
 //! - `block.rs`: `Block`, a branch of a conditional (`Subcircuit.conditional`)
@@ -57,6 +58,7 @@ mod circuit;
 mod deck;
 mod def_;
 mod def_tag;
+mod error;
 mod export;
 mod keywords;
 mod model;
@@ -96,6 +98,7 @@ pub fn spicerack(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Module-level functions
     m.add_function(wrap_pyfunction!(lint, m)?)?;
     m.add_function(wrap_pyfunction!(read_raw, m)?)?;
+    error::add(m)?;
     export::add(m)?;
     m.add_function(wrap_pyfunction!(compile_veriloga, m)?)?;
     sims::add(m)?;
@@ -156,7 +159,7 @@ fn lint<'py>(
 fn compile_veriloga(source_or_path: &str) -> PyResult<String> {
     crate::veriloga::resolve(source_or_path)
         .and_then(|p| crate::veriloga::compile_osdi(&p))
-        .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+        .map_err(deck::runtime_err)
 }
 
 /// Every plot of a `.raw` file, in file order (ngspice, ESPice, VACASK,

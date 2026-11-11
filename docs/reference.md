@@ -17,6 +17,8 @@ nodes are positional; everything after `*` is keyword-only.
 | `lint(netlist, backend=None)` | `{"errors": [...], "warnings": [...]}` |
 | `compile_veriloga(source_or_path)` | compiles Verilog-A with OpenVAF, returns the `.osdi` path |
 | `read_raw(path)` | every plot of a `.raw` file, as `RawData` |
+| `Error` | every failure of a netlist, a run or a compile; a `RuntimeError`: `.status` (`"refused"`: nothing was run; `"failed"`) and `.diagnostics`, a list of `Diagnostic` ([Refusals and notes](simulate.md#refusals-and-notes)) |
+| `Diagnostic` | one diagnostic: `.code`, `.kind` (`"refusal"`, `"note"`), `.title`, `.cite`, `.message`, `.file`, `.line`, `.column`, `.statement`, `.element` (the last five `None` at no statement) |
 | `export(results, stem, *, raw_format="binary")` | writes `<stem>.raw` (one ngspice raw file: the plots of every result, vectors under their canonical names) and `<stem>.meas.json` (the `spicerack.measures/1` sidecar) and returns the two paths ([Exporting results](simulate.md#exporting-results)) |
 | `unit` | unit constants, used as `10 @ u_kOhm` |
 | `Dialect(name)`, `register_dialect(obj)` | a dialect plugin's base class and its registration ([Dialect plugins](dialects.md)); returns its `def_.Lang` |
@@ -105,7 +107,8 @@ none (ngspice refuses one outside a library file).
 | `add_subcircuit(subckt)` | registers a child definition |
 | `use_pdk(lib)` | attaches a `ModelLibrary` |
 | `with_backend(name)` | pins the simulator |
-| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `RuntimeError` naming its code; each note on the written deck (an output or option the target does not get, e.g. `W0023`) is a `UserWarning` `spicerack <deck>:<line>:<col>: <code> <title>`, on a built-in or a registered dialect alike (a plugin's `omit_code` note is `W0202 <dialect>:<id> <message>`) |
+| `netlist(backend="ngspice")` | the deck in any dialect the writer has (ngspice, ESPice, HSPICE, Xyce, LTspice, Spectre, VACASK, CDL, Verilog); a refused construct raises `spicerack.Error` (a `RuntimeError`) naming its code, with the diagnostics as data (`.diagnostics`); each note on the written deck (an output or option the target does not get, e.g. `W0023`) is a `UserWarning` `spicerack <deck>:<line>:<col>: <code> <title>`, on a built-in or a registered dialect alike (a plugin's `omit_code` note is `W0202 <dialect>:<id> <message>`) |
+| `netlist_with_notes(dialect)` | `(text, notes)`: the deck `netlist(dialect)` writes and its notes as a list of `Diagnostic`, with no warning |
 | `to_source()`, `save_source(path)`, `Testbench.from_source(text, dialect=None)`, `Testbench.load(path)` | the store, as for `Subcircuit` (`save(*outputs)` stays the `.save` card): a deck read back writes the same netlists, a `ModelLibrary` at each target's path (a `* spicerack-library` line keeps them); its analyses are its text, and `run()` runs those queued on it |
 | `check_backend(name)` | reasons it will not run on `name`: missing features, and the writer's refusal with its code |
 | `global_nodes(*nodes)` | `.global` |

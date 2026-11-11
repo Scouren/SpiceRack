@@ -210,6 +210,15 @@ Sample a transient for `sndr` with a max step well under `1/fs` (or ngspice
 
 `analyses[].index` is the number of its first plot in the raw file; `kind` is `tran`, `ac`, ... (`null` for a plot read from a file); `steps` is `null` or one `{param: value}` per step. `measures[].analysis` is a place in `analyses`, `step` a place in its `steps` (or `null`); `value` is `null` exactly when `status` is `"failed"`. Order: analysis, step, the deck's `.meas` order.
 
+## Errors and notes
+
+| Name | What it is |
+|---|---|
+| `ps.Error` | every failure of a netlist, a run or a compile; a `RuntimeError`. `.status`: `"refused"` (the writer refused the deck, or no simulator was routed: nothing ran) or `"failed"` (a simulator, a compiler or a dialect's hook that ran failed). `.diagnostics`: a list of `Diagnostic`, empty when the failure has no code |
+| `ps.Diagnostic` | `.code` (`"W0109"`), `.kind` (`"refusal"`, `"note"`), `.title`, `.cite`, `.message` (`<deck>:<line>:<column>: <code> <title>`), `.line` and `.column` (from 1, in the deck's own ngspice text), `.statement` (its text), `.element` (`"Vin"`, or `None`), `.file` (`None` for a built deck); at no statement (a routing refusal, `W0040`) the four place fields are `None` |
+| `tb.netlist_with_notes(dialect)` | `(text, notes)`: `netlist(dialect)`'s deck and its notes as `Diagnostic`s; no `UserWarning` |
+| `ValueError`, `KeyError`, `OSError` | a bad argument (an unknown dialect, a bad descriptor), a name that is not there, a file that does not open; never `ps.Error` |
+
 ## Units
 
 `from spicerack.unit import u_V, u_kOhm, ...` then `10 @ u_V`.

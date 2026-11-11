@@ -16,7 +16,7 @@
 //! - `pub(super) fn create_def_module(m: &Bound<'_, PyModule>) -> PyResult<()>`
 //! - `pub(super) fn plugin(name: &str) -> Option<Lang>`, `pub(super) fn parse_lang(name: &str) -> Result<Lang, String>`,
 //!   `pub(super) fn builtin_of(lang: Lang) -> Dialect`
-//! - `pub(super) fn render(src: &Source, lang: Lang) -> Result<render::Written, String>`
+//! - `pub(super) fn render(src: &Source, lang: Lang) -> PyResult<Wrote>`
 
 use std::sync::Mutex;
 
@@ -24,6 +24,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use super::def_enums::*;
+use super::error::{self, Wrote};
 use crate::syntax::def::{Answer, DialectDef, register as def_register};
 use crate::syntax::render::{self, Pending, Source};
 use crate::syntax::{Dialect, Lang};
@@ -124,19 +125,25 @@ pub(super) fn builtin_of(lang: Lang) -> Dialect {
 }
 
 /// `src` written for `lang`, its Python hooks called (once per hook per
-/// deck), with its notes; or the refusal's messages.
+/// deck), with its notes located in the source.
 ///
 /// # Errors
-/// The deck is refused; a hook raises, answers a different number of
-/// cards than it was given, or refuses with a code `lang` did not declare.
-pub(super) fn render(src: &Source, lang: Lang) -> Result<render::Written, String> {
-    let messages = |e: render::Diags| e.messages.trim_end().to_string();
-    let p = render::render_pending(src, lang).map_err(messages)?;
+/// `spicerack.Error`. Status `"refused"`, with every diagnostic of the
+/// deck located: the deck is refused. Status `"failed"`, with no
+/// diagnostic: a hook raises, answers a different number of cards than it
+/// was given, or refuses with a code `lang` did not declare.
+pub(super) fn render(src: &Source, lang: Lang) -> PyResult<Wrote> {
+    let refused = |e: render::Diags| error::refused(&e, src);
+    let p = render::render_pending(src, lang).map_err(refused)?;
     let answers = match p.requests.is_empty() {
         true => Vec::new(),
-        false => Python::attach(|py| answers(py, &p, lang))?,
+        false => Python::attach(|py| answers(py, &p, lang)).map_err(error::failed)?,
     };
-    render::splice(src, p, &answers).map_err(messages)
+    let written = render::splice(src, p, &answers).map_err(refused)?;
+    Ok(Wrote {
+        notes: error::locate(&written.notes, src),
+        text: written.text,
+    })
 }
 
 impl From<PyLang> for Lang {

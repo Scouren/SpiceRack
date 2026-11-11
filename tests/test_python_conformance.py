@@ -518,7 +518,7 @@ def test_every_cell_is_written_or_refused_with_its_code():
 # feature above, or listed here as no deck feature (it reads, runs or
 # stores a deck, or it is an alias of one that is).
 NOT_A_FEATURE = {
-    "netlist", "run", "to_source", "save_source", "from_source", "load", "save",
+    "netlist", "netlist_with_notes", "run", "to_source", "save_source", "from_source", "load", "save",
     "to_json", "from_json", "save_json", "load_json", "check_backend", "with_backend",
     "available_backends", "add_subcircuit", "name", "ports", "gnd", "instance",
 }
