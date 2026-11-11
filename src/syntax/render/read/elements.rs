@@ -459,11 +459,14 @@ impl<'a> Rd<'a> {
         if val.is_some_and(|v| !self.val_ok(v) || self.tag(v) == Tag::Seq) || !self.inst_ok(inst) {
             return None;
         }
-        // A flag before the parameters (the old lowering).
+        // A flag before the parameters (the old lowering); an LTspice
+        // capacitor's `x<n>` (n units in parallel) stands anywhere.
+        let lt_cap = self.b.card_rules == CardRules::Ltspice && e == Element::Capacitor;
+        let units = |x: u32| lt_cap && super::parallel::units(&self.text(x)).is_some();
         let first_pair = inst.iter().position(|&x| self.tag(x) == Tag::Assign);
         if inst
             .iter()
-            .position(|&x| self.is_word(x))
+            .position(|&x| self.is_word(x) && !units(x))
             .is_some_and(|f| first_pair.is_none_or(|p| f < p))
         {
             return None;
@@ -520,6 +523,10 @@ impl<'a> Rd<'a> {
                 params.remove(i);
                 self.value(self.ast.rhs(Node(pair)))
             }
+        };
+        let (value, params) = match self.merge_units && lt_cap {
+            true => self.merged_units(n, value, params),
+            false => (value, params),
         };
         let letter = match e {
             Element::Resistor => 'R',

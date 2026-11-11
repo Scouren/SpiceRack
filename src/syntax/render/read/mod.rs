@@ -66,6 +66,7 @@ mod named_masters;
 mod named_waves;
 mod options;
 mod outputs;
+mod parallel;
 mod refused;
 mod rejects;
 mod shapes;
@@ -133,6 +134,10 @@ pub(in crate::syntax::render) struct Rd<'a> {
     /// VACASK: the subcircuits the control block's one `elaborate` makes
     /// toplevel circuits, read as the top (`Rd::vacask_promoted`).
     promoted: HashSet<String>,
+    /// Whether an LTspice capacitor's `x<n>` units are read as one scaled
+    /// capacitor: once a writer names a target that writes a part's
+    /// parasitics as elements ([`Rd::write_for`]).
+    merge_units: bool,
     /// The top's DC sources read with LTspice's start-up ramp, once a
     /// writer whose target has no such start asks ([`Rd::ramp_startup`]).
     ramped: HashSet<u32>,
@@ -538,6 +543,7 @@ impl<'a> Rd<'a> {
             nums: Vec::new(),
             global_params: HashSet::new(),
             promoted: HashSet::new(),
+            merge_units: false,
             ramped: HashSet::new(),
         }
     }

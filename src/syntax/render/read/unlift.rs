@@ -33,7 +33,7 @@ use std::collections::{HashMap, HashSet};
 use super::{Block, Comp, Deck, Func, Rd};
 use crate::syntax::Lang;
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::{NamedRules, Writer};
+use crate::syntax::behaviour::{CardRules, NamedRules, Parasitics, Writer};
 use crate::syntax::lexicon::Lexicon;
 use crate::syntax::number;
 use crate::syntax::token::Tag as T;
@@ -264,6 +264,10 @@ impl<'a> Rd<'a> {
     pub(in crate::syntax::render) fn write_for(&mut self, target: Lang) {
         assert!(self.target.is_none(), "one target a read");
         self.target = Some(target.spelling());
+        // LTspice's `x<n>` on a capacitor is its own flag; a target that
+        // writes the part's parasitics as elements reads one unit.
+        self.merge_units = self.b.card_rules == CardRules::Ltspice
+            && target.behaviours().parasitics == Parasitics::Elements;
         let nums = (0..self.ast.len() as u32).filter(|&n| self.ast.tag(Node(n)) == Tag::Num);
         self.nums = nums.map(|n| self.main(n)).collect();
         self.nums.sort_unstable();
