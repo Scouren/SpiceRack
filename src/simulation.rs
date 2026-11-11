@@ -86,7 +86,7 @@ pub fn run_each(
     assert!(!plots.is_empty(), "a run returns at least one plot");
     let stepped = plots.iter().flatten().any(|p| !p.params.is_empty());
     // ngspice and ESPice write a nested `.dc`'s inner sweep alone.
-    let inner_only = matches!(sim, Dialect::Ngspice | Dialect::Espice);
+    let inner_only = matches!(sim.family(), Dialect::Ngspice | Dialect::Espice);
     if analyses.len() <= 1 {
         if !stepped {
             let second = analyses.first().is_some_and(|&a| also(a, plots.get(1)));
@@ -122,7 +122,7 @@ pub fn run_each(
     // (`cktdojob.c:210-218`): `.ac lin 3 100 300` then `.ac dec 1 1 10`
     // writes the decade plot first (ngspice-45). Commands of a `.control`
     // block run in the block's order.
-    let last_first = sim == Dialect::Ngspice && !commands_run(deck);
+    let last_first = sim.family() == Dialect::Ngspice && !commands_run(deck);
     let mut out = Vec::with_capacity(analyses.len());
     for &a in analyses {
         let name = match a.spec().plot {

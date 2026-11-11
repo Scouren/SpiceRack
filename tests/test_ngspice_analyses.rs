@@ -57,7 +57,8 @@ fn p3_093_a_noise_run_keeps_its_integrated_plot() {
     let deck = "* noise totals\nVin in 0 0 AC 1\nR1 in out 1k\nC1 out 0 1u\n.op\n\
                 .noise v(out) Vin dec 10 1 1e8\n.noise v(out) Vin dec 10 1 100\n.end\n";
     let kinds = [Kind::Op, Kind::Noise, Kind::Noise];
-    let each = spicerack::simulation::run_each(Dialect::Ngspice, deck, &kinds).expect("runs");
+    let each = spicerack::simulation::run_each(spicerack::backend::Sim::NGSPICE, deck, &kinds)
+        .expect("runs");
     assert_eq!(each.len(), 3);
     let fc = 1.0 / (2.0 * std::f64::consts::PI * 1e3 * 1e-6);
     let ktr4 = 4.0 * 1.380649e-23 * 300.15 * 1e3;
@@ -113,7 +114,8 @@ fn p3_094_a_two_source_dc_keeps_its_outer_sweep() {
     use spicerack::backend::Kind;
     let deck = "* dc2\nV1 a 0 0\nV2 b 0 0\nR1 a out 1k\nR2 b out 1k\nR3 out 0 1k\n\
                 .dc V1 0 1 0.5 V2 0 2 1\n.end\n";
-    let each = spicerack::simulation::run_each(Dialect::Ngspice, deck, &[Kind::Dc]).expect("runs");
+    let each = spicerack::simulation::run_each(spicerack::backend::Sim::NGSPICE, deck, &[Kind::Dc])
+        .expect("runs");
     let raw = &each[0][0];
     let (inner, outer) = (column(raw, "v-sweep"), column(raw, "sweep1"));
     assert_eq!(
