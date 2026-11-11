@@ -14,7 +14,7 @@
 //! - `pub(super) fn plot_of(ob: &Bound<'_, PyAny>) -> Option<(Option<Kind>, RawData)>`
 //! - `pub(super) fn typed_result(py: Python<'_>, a: &Analysis, plots: Vec<RawData>) -> PyResult<Py<PyAny>>`
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use pyo3::exceptions::{PyAttributeError, PyKeyError};
 use pyo3::prelude::*;
@@ -62,7 +62,7 @@ macro_rules! analysis_class {
             )?
 
             #[getter]
-            fn measures(&self) -> HashMap<String, Option<f64>> { measures_to_dict(&self.inner.raw.measures) }
+            fn measures(&self) -> BTreeMap<String, Option<f64>> { measures_to_dict(&self.inner.raw.measures) }
 
             /// The `.four` tables of the run this result is from
             /// (`add_fourier`, a `.four` line), one dict per output:
@@ -76,11 +76,14 @@ macro_rules! analysis_class {
             /// The `.step` point this result is: {parameter: value}, empty
             /// when nothing steps.
             #[getter]
-            fn params(&self) -> HashMap<String, f64> { self.inner.raw.params.iter().cloned().collect() }
+            fn params(&self) -> BTreeMap<String, f64> { self.inner.raw.params.iter().cloned().collect() }
 
+            /// The nodes the result holds, by canonical name, sorted (the
+            /// sweep's own vector among them: `time`, `frequency`).
             #[getter]
             fn nodes(&self) -> Vec<String> { self.inner.nodes.keys().cloned().collect() }
 
+            /// The branch currents the result holds (`i(vin)`), sorted.
             #[getter]
             fn branches(&self) -> Vec<String> { self.inner.branches.keys().cloned().collect() }
 
@@ -304,12 +307,12 @@ impl PyRawData {
     /// The plot's .meas results as {name: value}, `None` the value of a
     /// measure that failed
     #[getter]
-    fn measures(&self) -> HashMap<String, Option<f64>> {
+    fn measures(&self) -> BTreeMap<String, Option<f64>> {
         measures_to_dict(&self.inner.measures)
     }
     /// The `.step` point: {parameter: value}, empty when nothing steps.
     #[getter]
-    fn params(&self) -> HashMap<String, f64> {
+    fn params(&self) -> BTreeMap<String, f64> {
         self.inner.params.iter().cloned().collect()
     }
 }
@@ -338,13 +341,13 @@ impl PyOperatingPoint {
     /// Parsed .meas results as {name: value} dict, `None` the value of a
     /// measure that failed
     #[getter]
-    fn measures(&self) -> HashMap<String, Option<f64>> {
+    fn measures(&self) -> BTreeMap<String, Option<f64>> {
         measures_to_dict(&self.inner.raw.measures)
     }
 
     /// The `.step` point: {parameter: value}, empty when nothing steps.
     #[getter]
-    fn params(&self) -> HashMap<String, f64> {
+    fn params(&self) -> BTreeMap<String, f64> {
         self.inner.raw.params.iter().cloned().collect()
     }
 
@@ -352,13 +355,13 @@ impl PyOperatingPoint {
     /// sorted.
     #[getter]
     fn nodes(&self) -> Vec<String> {
-        sorted(&self.inner.nodes)
+        self.inner.nodes.keys().cloned().collect()
     }
 
     /// The branch currents the point holds (`i(vin)`), sorted.
     #[getter]
     fn branches(&self) -> Vec<String> {
-        sorted(&self.inner.branches)
+        self.inner.branches.keys().cloned().collect()
     }
 }
 
@@ -384,17 +387,10 @@ impl PyOperatingPoint {
     }
 }
 
-/// The names of `map` (a result's nodes, or its branches), sorted: a hash
-/// map's own order changes from run to run.
-fn sorted(map: &HashMap<String, usize>) -> Vec<String> {
-    let mut names: Vec<String> = map.keys().cloned().collect();
-    names.sort();
-    names
-}
-
-/// A result's measures as a Python dict: {name: value}, `None` the value
-/// of a measure with none (failed).
-fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> HashMap<String, Option<f64>> {
+/// A result's measures as a Python dict: {name: value} in name order (a
+/// hash map's own order changes from one result to the next), `None` the
+/// value of a measure with none (failed).
+fn measures_to_dict(measures: &[crate::result::MeasureResult]) -> BTreeMap<String, Option<f64>> {
     let ok = crate::result::MeasureStatus::Ok;
     measures
         .iter()

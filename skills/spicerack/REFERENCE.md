@@ -164,7 +164,7 @@ uic=)` on Spectre is `W0040` (no such `pss` fields).
 ## Results
 
 Every result type has `result[node]`, `result.measures` (`{name: value}`; `None` for a failed
-measure), and `.nodes` and `.branches` (the names it holds). `op["v(out)"]` and `op["out"]` are one node.
+measure), and `.nodes` and `.branches` (the names it holds). All three are in name order on every result. `op["v(out)"]` and `op["out"]` are one node.
 
 | Type | Axis | Extra |
 |---|---|---|

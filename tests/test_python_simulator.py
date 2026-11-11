@@ -775,6 +775,48 @@ def test_p3_096_api_operatingpoint_has_no_nodes(backend):
         op["v(nope)"]
 
 
+@pytest.mark.needs("ngspice")
+def test_p8_318_every_result_lists_its_names_in_one_order():
+    """ZERO-LEDGER P8-318: `nodes`, `branches`, `measures` and `params` of a result are in name
+    order, the same on every result object (they were a hash map's: another order per
+    object). Oracle: the deck's six nodes and six measures, written out by hand in name
+    order, and Python's own `sorted` for the lists that hold the sweep's vector too."""
+    import spicerack as ps
+
+    dut = ps.Subcircuit("ladder", ["a", "f"])
+    for name, (p, n) in zip("123456", zip("abcdef", "bcdef0")):
+        dut.R(name, p, n, 1e3)
+
+    def bench():
+        tb = ps.Testbench(dut)
+        tb.with_backend("ngspice")
+        tb.V("in", "a", "0", 1.0, ac=1.0)
+        return tb
+
+    def dc():
+        return bench().dc(Vin=slice(0.0, 1.0, 0.5))
+
+    def ac():
+        return bench().ac(variation="dec", number_of_points=2, start_frequency=1.0, stop_frequency=100.0)
+
+    def tran():
+        tb = bench()
+        for node in "fedcba":  # declared last name first
+            tb.measure("tran", f"m_{node}", "max", f"v({node})")
+        return tb.transient(step_time=1e-6, end_time=1e-5)
+
+    for run in (dc, ac, tran, lambda: bench().operating_point()):
+        one, two = run(), run()
+        kind = type(one).__name__
+        assert one.nodes == two.nodes == sorted(one.nodes), kind
+        # The deck's nodes are the one-letter names; a sweep's own vector is a longer one.
+        assert [n for n in one.nodes if len(n) == 1] == list("abcdef"), kind
+        assert one.branches == two.branches == ["i(vin)"], kind
+        assert list(one.measures) == list(two.measures) == sorted(one.measures), kind
+        assert list(one.params) == sorted(one.params), kind
+    assert list(tran().measures) == ["m_a", "m_b", "m_c", "m_d", "m_e", "m_f"]
+
+
 def test_run_with_a_measure_runs_every_analysis_from_the_control_block():
     """A `.meas` moves ngspice's analyses into a `.control` block, which runs
     them in card order; the results still land on their own analyses."""

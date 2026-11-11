@@ -165,9 +165,9 @@ LTspice's `.noise` has none, so it is left out there with a note (W0033).
 
 Every result: `res["node"]` or `res.node` (a float for `OperatingPoint`, a list
 otherwise; `op["v(node)"]` names the same node), `res.nodes` and `res.branches`
-(the names it holds), `res.measures` (`.meas` values by name, `None` for a measure
+(the names it holds, sorted), `res.measures` (`.meas` values by name, `None` for a measure
 that failed; of a stepped run, that step's values) and `res.params` (the
-`.step` point it is, `{param: value}`; `{}` when nothing steps). A run that
+`.step` point it is, `{param: value}`; `{}` when nothing steps), both in name order. A run that
 LTspice steps returns a list of results, one per step. AC-type results add
 `magnitude(name)`, `magnitude_db(name)` and `phase(name)` (degrees). `RawData`
 has `title`, `plot_name`, `is_complex`, `variable_names`, `measures`, `params`
