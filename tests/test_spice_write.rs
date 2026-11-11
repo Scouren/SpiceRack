@@ -666,3 +666,19 @@ fn p3_006_xyce_model_levels_copied_ngspice() {
     );
     assert!(write(hicum, Dialect::Xyce, Dialect::Ngspice).contains("level=8"));
 }
+
+/// Xyce RG 7.10 `M` level table: 10 is BSIM-SOI 3.2. ngspice-45
+/// `inpdomod.c:347-348`: 10 and 58 are B4SOI (4.4), 57 is B3SOIPD 2.2.3;
+/// HSPICE's 10 is AMD's model (MOSFET Models Table 1). No target device
+/// has Xyce's equations (this card: v(d) 0.611222 on Xyce 7.10, 0.563875
+/// on ngspice-45 given the copy; XYCE_CORPUS `BSIMSOI3/`): refused.
+#[test]
+fn p3_007_xyce_nmos_level_written_level() {
+    let deck = "* t\nvd dd 0 1.5\nrd dd d 1k\nvg g 0 1.5\nm1 d g 0 0 n1 w=4u l=0.15u\n\
+        .model n1 nmos level=10 tox=5n tsi=90n tbox=500n vth0=0.5 u0=0.05 nch=8e17 k1=0.1 \
+        eta0=0.5 dsub=0.35 nfactor=0.4 pclm=1 rdsw=100 vsat=80000 shmod=1 rth0=1\n.op\n.end\n";
+    let cite = "ngspice-45 inpdomod.c:347-348; Xyce RG 7.10 M level table";
+    for to in [Dialect::Ngspice, Dialect::Espice, Dialect::Hspice] {
+        oracle::spec_refusal(cite, deck, Dialect::Xyce, to, &[Code::W0104]);
+    }
+}

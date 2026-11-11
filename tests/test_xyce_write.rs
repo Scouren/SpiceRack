@@ -356,3 +356,23 @@ fn an_ngspice_vdmos_is_refused() {
     let deck = "* t\n.model n1 vdmos vto=1 kp=1e-5\nvd d 0 1\nm1 d d 0 n1\n.op\n.end\n";
     assert_eq!(refusal(deck), [Code::W0053, Code::W0050]);
 }
+
+/// ngspice-45 `inpdomod.c:347-348` (levels 10 and 58 are B4SOI); Xyce RG
+/// 7.10 `M` level table (70 is BSIM-SOI 4, 10 is BSIM-SOI 3.2, no 58):
+/// written `level=70`. With self-heating the two SOI generations part:
+/// ngspice-45 v(d) 0.563875, Xyce 7.10 at level 70 0.563876, at the copied
+/// level 10 0.611222 (ledger P3-007).
+#[test]
+fn p3_007_an_ngspice_b4soi_is_xyce_level_70() {
+    let deck = |level: u32| {
+        format!(
+            "* t\nvd dd 0 1.5\nrd dd d 1k\nvg g 0 1.5\nm1 d g 0 0 n1 w=4u l=0.15u\n\
+             .model n1 nmos level={level} tox=5n tsi=90n tbox=500n vth0=0.5 u0=0.05 nch=8e17 \
+             k1=0.1 eta0=0.5 dsub=0.35 nfactor=0.4 pclm=1 rdsw=100 vsat=80000 shmod=1 rth0=1\n\
+             .op\n.end\n"
+        )
+    };
+    same_op(&deck(10), "d");
+    let w = write(&deck(58));
+    assert!(w.contains("level=70"), "{w}");
+}

@@ -11,7 +11,9 @@
 //! column), and `render/named/ngspice_params.txt` from ngspice-45.
 //!
 //! Cites: Xyce RG 7.10 `D` (levels 1, 2, 200, 2002: level 1 is SPICE3f5's
-//! diode), `Q` (level 1 Gummel-Poon, 234 HICUM/L2), Table 2-36 (BSIM3 is
+//! diode), `Q` (level 1 Gummel-Poon, 234 HICUM/L2), `M` (level 70 BSIM-SOI
+//! 4, level 10 BSIM-SOI 3.2; ngspice's B4SOI is 10 and 58,
+//! `inpdomod.c:347-348`), Table 2-36 (BSIM3 is
 //! level 49, 8 rejected); ngspice-45 `devices/dio/dio.c`, `diosetup.c`
 //! (level 3: the area and perimeter from `w`, `l`, the metal and poly
 //! capacitances, the only level-3 terms; `diotemp.c` L210 its breakdown
@@ -254,6 +256,9 @@ pub(super) fn xyce_model(
         // Xyce's BSIM3 is level 49 and it rejects 8 (RG Table 2-36).
         ("nmos" | "pmos", Some("8")) => return Ok(Some(leveled(params, "49"))),
         _ if !ngspice => return Ok(None),
+        // ngspice's 10 and 58 are B4SOI (`inpdomod.c:347-348`), Xyce's 70;
+        // Xyce's 10 is BSIM-SOI 3.2 and it has no 58 (RG `M` level table).
+        ("nmos" | "pmos", Some("10" | "58")) => return Ok(Some(leveled(params, "70"))),
         ("d", None | Some("1" | "3")) => &DIODE,
         ("npn" | "pnp", None | Some("1")) => &BJT,
         ("npn" | "pnp", Some("8")) => &HICUM,
