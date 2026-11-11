@@ -180,6 +180,11 @@ pub(super) fn changes_solution(key: &str, v: &str) -> bool {
             v.to_ascii_lowercase().as_str(),
             "0" | "3" | "gmin" | "34" | "sourcestep" | "35" | "sourcestep2"
         ),
+        // RG Table 2-2 (DEVICE) MINRES, MINCAP: a floor in place of each
+        // semiconductor model's default-zero internal resistance or
+        // capacitance (5 V through 100 Ω into a diode, `minres=100`:
+        // 2.867 V for 0.752 V). No other SPICE has it.
+        "device.minres" | "device.mincap" => true,
         _ => false,
     }
 }

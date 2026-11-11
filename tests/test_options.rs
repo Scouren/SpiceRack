@@ -21,6 +21,24 @@ use spicerack::syntax::Dialect;
 
 // ---- private ----
 
+/// Ledger P3-059. Xyce RG Table 2-2 (DEVICE): MINRES and MINCAP stand in
+/// for a model's default-zero internal resistance and capacitance; ngspice
+/// has no such option (manual §11.1). Xyce 7.10 by hand on this deck:
+/// v(a) = 2.867 V, and 0.752 V without the option, which is what ngspice
+/// gives for the deck with the option left out: refused.
+#[test]
+fn p3_059_xyce_minres_and_mincap_are_refused_where_there_is_none() {
+    let w0017 = spicerack::syntax::diag::Code::W0017;
+    let deck = "t\nV1 in 0 5\nR1 in a 100\nD1 a 0 dm\n.model dm D(IS=1e-14)\n\
+        .options device minres=100\n.op\n.end\n";
+    let xyce = oracle::op(Dialect::Xyce, deck, "a");
+    assert!((xyce - 2.867).abs() < 1e-3, "Xyce with MINRES: {xyce}");
+    for d in [deck.to_string(), deck.replace("minres=100", "mincap=1n")] {
+        let codes = oracle::refusal(&d, Dialect::Xyce, Dialect::Ngspice);
+        assert!(codes.contains(&w0017), "{codes:?}\n{d}");
+    }
+}
+
 /// Ledger P3-058. Xyce RG Table 2-6: NONLIN CONTINUATION=1 is the
 /// natural-parameter homotopy (with the LOCA block), 2/`mos` the MOSFET
 /// one; ngspice has gmin and source stepping only (manual §11.1.2), so the
