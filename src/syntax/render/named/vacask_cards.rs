@@ -254,6 +254,25 @@ impl W<'_, '_> {
                     'N' => String::new(),
                     l => l.to_ascii_lowercase().to_string(),
                 };
+                // A Verilog-A module named directly (Spectre's
+                // `ahdl_include`): VACASK instantiates a model ("Master
+                // 'vres' not found." otherwise), so the instance takes one
+                // of its own with the module's parameters, as ngspice's `N`
+                // card does (`render/spice/cards.rs`); `m`, the multiplier,
+                // stays on the instance.
+                if let Some(module) = self.rd.va_module(n) {
+                    let is_m = |p: &(String, String)| p.0.eq_ignore_ascii_case("m");
+                    let (stay, on_model): (Vec<_>, Vec<_>) = params.into_iter().partition(is_m);
+                    let of = q(&format!("{own}__va"));
+                    return Some(format!(
+                        "model {of} {}{}\n{} ({}) {of}{}",
+                        q(&module),
+                        self.inst_params(&on_model),
+                        q(own),
+                        ns.join(" "),
+                        self.inst_params(&stay)
+                    ));
+                }
                 format!(
                     "{}{} ({}) {}{}",
                     letter,

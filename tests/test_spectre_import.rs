@@ -1,15 +1,18 @@
 //! Spectre decks read and written for another simulator, the constructs
 //! the Spectre reader's rounds 2 and 3 added: a Verilog-A module instance
-//! (ngspice's OSDI `N` card, compiled by OpenVAF and run against the
-//! closed form) and a parameter `sweep` over an analysis (Xyce's `.step`,
+//! (ngspice's OSDI `N` card, compiled by OpenVAF; VACASK's model of the
+//! module, compiled by VACASK; each run against the closed form) and a
+//! parameter `sweep` over an analysis (Xyce's `.step`,
 //! run on real Xyce). Spectre itself is licence-gated: its text is checked
 //! by the Reference's clause.
 //!
-//! Unsupported fails, never skips: without `ngspice`, `openvaf` and `Xyce`
-//! on PATH every run fails; run the tests in `nix develop .#testing`.
+//! Unsupported fails, never skips: without `ngspice`, `openvaf`, `vacask`
+//! (with its `openvaf-r`) and `Xyce` on PATH every run fails; run the
+//! tests in `nix develop .#testing`.
 //!
 //! Cites: Spectre Reference 19.1 pp.406-409 (`sweep`), Spectre Reference
-//! 5.0 (`ahdl_include`); ngspice manual §13; Xyce RG `.STEP`.
+//! 5.0 (`ahdl_include`); ngspice manual §13; VACASK `docs/cir-loading.md`;
+//! Xyce RG `.STEP`.
 //!
 //! Contents: none (tests only).
 #![cfg(feature = "backend")]
@@ -149,4 +152,46 @@ fn a_spectre_parameter_sweep_is_a_step_on_xyce() {
     );
     let ng = written(deck, Dialect::Spectre, Dialect::Ngspice);
     assert_eq!(refusals(ng), vec![Code::W0016]);
+}
+
+#[test]
+fn p4_021_a_spectre_verilog_a_load_is_vacasks_own_load() {
+    // ZERO-LEDGER P4-021. VACASK `docs/cir-loading.md` (36be560): `load
+    // "x.va"` compiles the source itself, so Spectre's `ahdl_include` is
+    // that line and the writer runs no OpenVAF. VACASK instantiates a
+    // model, never a module ("Master 'vres' not found."), so each instance
+    // takes a model of its own with the module's parameters; `m` stays on
+    // the instance (`$mfactor`). Oracle: real VACASK against the divider's
+    // closed form with r1 = 1k / 2: v(2) = 10 * 9k / 9.5k.
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let va = "`include \"disciplines.vams\"\nmodule vres(a, b);\n  inout a, b;\n  electrical a, b;\n\
+              parameter real r = 1k;\n  analog I(a, b) <+ V(a, b) / r;\nendmodule\n";
+    let source = dir.path().join("vres.va");
+    std::fs::write(&source, va).expect("write the module");
+    let deck = format!(
+        "simulator lang=spectre\nahdl_include \"{}\"\nv1 (1 0) vsource dc=10\n\
+         r1 (1 2) vres r=1k m=2\nr2 (2 0) vres r=9k\nop1 dc\n",
+        source.display()
+    );
+    let path = dir.path().join("deck.scs");
+    std::fs::write(&path, deck).expect("write the deck");
+    let kit = spicerack::import::kit(
+        &[path],
+        spicerack::syntax::resolve::Form::Deck,
+        Dialect::Spectre,
+        dir.path(),
+    );
+    let fid = spicerack::syntax::resolve::FileId(0);
+    let w = spicerack::syntax::render::render_kit(&kit, fid, "deck", Dialect::Vacask)
+        .unwrap_or_else(|d| panic!("{}", d.messages));
+    let load = format!("\nload \"{}\"\n", source.display());
+    assert!(w.text.contains(&load), "{}", w.text);
+    let compiled = source.with_extension("osdi");
+    assert!(!compiled.exists(), "the writer ran OpenVAF");
+    let exact = 10.0 * 9.0 / 9.5;
+    assert!(
+        (node(&run(Dialect::Vacask, &w.text), "2") - exact).abs() < 1e-6,
+        "{}",
+        w.text
+    );
 }
