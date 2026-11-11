@@ -3684,3 +3684,26 @@ ltspice/ltspice_examples/Fc.net espice written differently: brace groups in two 
 ltspice/ltspice_examples/Fc.net ngspice written differently: brace groups in two B expressions are parenthesised (P3-084)
 xyce/Certification_Tests/BUG_2039/bug_2039.cir espice written differently: `{bletch-foobie}*I(V1)` is `(bletch-foobie)*I(V1)` (P3-084)
 xyce/Certification_Tests/BUG_2039/bug_2039.cir ngspice written differently: `{bletch-foobie}*I(V1)` is `(bletch-foobie)*I(V1)` (P3-084)
+# S1: P4-019: VACASK takes no `td2` that is not above 0 ("Parameter td2 of exponential transient must be greater than 0."
+# at 36be560): an EXP whose TD2 is not above TD1 is refused, never written as `td2=0`.
+xyce/Message/Device/Core_SourceData_TranData.cir vacask now refused: W0108 for an EXP whose TD2 is not above TD1; VACASK rejects `td2=0` (P4-019)
+
+# S1: P4-018: VACASK's `noise` takes a node pair (docs/cmd-analysis-noise.md at 36be560): `.noise V(P,N)` is written.
+# Oracle: 4kT(R2 || (R1 + R3)) and ngspice-45 (tests/test_vacask_runs/analyses.rs::p4_018_a_differential_noise_output_is_a_node_pair).
+ltspice/ltspice_demos/LTC6400-20_Noise.net vacask now written: a differential `.noise` output is VACASK's `out=["p", "n"]` (P4-018)
+ltspice/ltspice_demos/LTC6404-1_SE_RBal.net vacask now written: a differential `.noise` output is VACASK's `out=["p", "n"]` (P4-018)
+
+# S1: P4-110: VACASK's sp_capacitor and sp_inductor have no `ic` ("Parameter 'ic' not found." at 36be560): a capacitor's
+# IC is the transient's `ic` list; an inductor's, or a floating capacitor's with no UIC, has no form (W0129).
+xyce/Certification_Tests/BUG_201_SON/bug201a.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/Certification_Tests/BUG_201_SON/bug201b.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/MINDUCTORS/InductorICBug.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/MINDUCTORS/MINDUCTORS_IC.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/MINDUCTORS/MINDUCTORS_IC2.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/MINDUCTORS/MINDUCTORS_IC2baseline.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/MINDUCTORS/cpldLMIs_ic.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/MULTIPLICITY_FACTOR/inductor_ic.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/NMOS_ANALYTIC/mosfet_level1.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/POWERNODE/capInner.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/TIA/TRAP/teststep1.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)
+xyce/TIA/TRAP/teststepgear1.cir vacask now refused: W0129 for an inductor's `ic=`, or a floating capacitor's with no UIC: VACASK's module has no `ic` and its `ic` list no form for it (P4-110)

@@ -1,7 +1,8 @@
 //! The testbench → VACASK's `control` block: one `options` line, the
 //! stepped parameters as control variables swept ahead of each analysis,
-//! and the analyses, initial conditions on each `analysis` line; a Spectre
-//! `montecarlo` as an `mc` loop around its inner analysis.
+//! and the analyses, initial conditions on each transient's line and
+//! nodesets on every `analysis` line; a Spectre `montecarlo` as an `mc`
+//! loop around its inner analysis.
 //!
 //! Cites: VACASK `share/doc/vacask/demo` (`analysis`, `sweep`, `options`,
 //! `var`), `docs/cmd-analysis-mc.md` (`mc`; as the old VACASK writer
@@ -99,13 +100,16 @@ impl W<'_, '_> {
                 values(v)
             ));
         }
-        let mut ic = String::new();
-        if !tb.ics.is_empty() {
-            ic.push_str(&self.node_list("ic", &tb.ics));
-        }
-        if !tb.nodesets.is_empty() {
-            ic.push_str(&self.node_list("nodeset", &tb.nodesets));
-        }
+        // `.ic` and a capacitor's `ic=` are a transient's: ngspice forces
+        // them in a transient's operating point only (`.ic` beside `.op`
+        // leaves the node free, run) and VACASK's `op` has no `ic`
+        // ("Parameter 'ic' not found.": it skips the analysis). A nodeset
+        // is every analysis's.
+        let caps = self.cap_ics();
+        let nodeset = match tb.nodesets.is_empty() {
+            true => String::new(),
+            false => self.node_list("nodeset", &tb.nodesets, &[]),
+        };
         // `Construct::Save` is `Spell(Omit)`: VACASK saves every node. A
         // kept control line runs where it stood among the analyses (an
         // `elaborate` picks the circuit the next ones run on): each is
@@ -157,12 +161,18 @@ impl W<'_, '_> {
                 Ana::MonteCarlo { .. } => self.vacask_mc(idx, a, *tok, tb),
                 a => self.vacask_analysis(idx, a, *tok),
             };
+            let held = match tran {
+                true => self.held_ics(a, &caps),
+                false => vec![],
+            };
             for l in lines {
-                let ic = match l.trim_start().starts_with("analysis") {
-                    true => ic.as_str(),
-                    false => "",
+                let on = l.trim_start().starts_with("analysis");
+                let ic = match on && tran && !(tb.ics.is_empty() && held.is_empty()) {
+                    true => self.node_list("ic", &tb.ics, &held),
+                    false => String::new(),
                 };
-                self.line(&format!("  {l}{ic}"));
+                let nodeset = if on { nodeset.as_str() } else { "" };
+                self.line(&format!("  {l}{ic}{nodeset}"));
             }
         }
         for (n, _) in extra {
@@ -269,7 +279,9 @@ impl W<'_, '_> {
                 });
                 out.push(s);
             }
-            // `out=` names one node: a non-ground reference has no form.
+            // `out=` is a node to ground or a node pair
+            // (`docs/cmd-analysis-noise.md`: "a two-element vector
+            // specifies a node pair"; ZERO-LEDGER P4-018).
             Ana::Noise {
                 output,
                 reference,
@@ -277,17 +289,19 @@ impl W<'_, '_> {
                 sweep,
                 ..
             } => {
-                let f = freq_sweep(sweep);
-                if !reference.is_empty() && reference != "0" || f.is_none() {
+                let Some(f) = freq_sweep(sweep) else {
                     self.refuse(Code::W0015, tok);
                     return vec![];
-                }
+                };
+                let node = bare_node(output).to_ascii_lowercase();
+                let pair = match reference.as_str() {
+                    "" | "0" => format!("\"{node}\""),
+                    r => format!("[\"{node}\", \"{}\"]", r.to_ascii_lowercase()),
+                };
                 out.push(format!(
-                    "analysis {} noise out=\"{}\" in=\"{}\" {}",
+                    "analysis {} noise out={pair} in=\"{}\" {f}",
                     name("noise"),
-                    bare_node(output).to_ascii_lowercase(),
-                    source.to_ascii_lowercase(),
-                    f.expect("checked")
+                    source.to_ascii_lowercase()
                 ));
             }
             Ana::Tf(output, _) => out.push(format!(
@@ -407,12 +421,13 @@ impl W<'_, '_> {
     /// ` ic={"n", v, …}`: each node and its value ([`W::vval`]), upstream
     /// VACASK's mixed list (36be560; a run of `ic={"out", 0.5}` starts out
     /// at 0.5 V). The fork's `["n"; v]` is its "unexpected ;", `["n", v]`
-    /// its "Vector component type incompatibility".
-    fn node_list(&self, key: &str, items: &[(String, Val)]) -> String {
-        let body: Vec<String> = items
+    /// its "Vector component type incompatibility". `more` are entries
+    /// already spelled (`W::cap_ics`' node pairs), after the nodes.
+    fn node_list(&self, key: &str, items: &[(String, Val)], more: &[String]) -> String {
+        let nodes = items
             .iter()
-            .map(|(n, v)| format!("\"{}\", {}", n.to_ascii_lowercase(), self.vval(v)))
-            .collect();
+            .map(|(n, v)| format!("\"{}\", {}", n.to_ascii_lowercase(), self.vval(v)));
+        let body: Vec<String> = nodes.chain(more.iter().cloned()).collect();
         format!(" {key}={{{}}}", body.join(", "))
     }
 

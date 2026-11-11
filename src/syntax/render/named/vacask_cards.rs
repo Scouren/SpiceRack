@@ -59,6 +59,22 @@ impl W<'_, '_> {
                     ));
                 }
                 let mut params = self.tran_ic(letter, params, n);
+                // `sp_capacitor` and `sp_inductor` have no `ic` ("Parameter
+                // 'ic' not found."): a top capacitor's is the transients'
+                // `ic` on its node pair (`W::cap_ics`, written by
+                // `control`); an inductor's current, or a capacitor's in a
+                // subcircuit, has no form (ZERO-LEDGER P4-110).
+                let ic = params
+                    .iter()
+                    .position(|(k, _)| k.eq_ignore_ascii_case("ic"));
+                if let Some(at) = ic {
+                    let top = &self.deck.top.comps;
+                    if letter != 'C' || !top.iter().any(|c| matches!(c, Comp::Card(m) if *m == n)) {
+                        self.refuse(Code::W0129, tok);
+                        return None;
+                    }
+                    params.remove(at);
+                }
                 let extra = self.parasitics(letter, n, &n1, &n2, &mut params);
                 let n1 = extra.as_ref().map_or(n1, |(at, _)| at.clone());
                 let (l, m) = match letter {
@@ -434,23 +450,23 @@ impl W<'_, '_> {
                 )
             }
             WaveKind::Exp => {
-                // VACASK counts td2 from delay.
-                let (Some(rd), Some(fd)) = (w.args[2].num(), w.args[4].num()) else {
-                    self.refuse(Code::W0108, tok);
-                    return None;
+                // VACASK counts td2 from delay (`docs/dev-builtin-src.md`,
+                // "Exponential") and takes none that is not above 0
+                // ("Parameter td2 of exponential transient must be greater
+                // than 0.", run). With a delay that is an expression the
+                // difference is one too: VACASK evaluates it and applies
+                // the same bound (ZERO-LEDGER P4-019).
+                let td2 = match (w.args[2].num(), w.args[4].num()) {
+                    (Some(rd), Some(fd)) if fd <= rd => {
+                        self.refuse(Code::W0108, tok);
+                        return None;
+                    }
+                    (Some(rd), Some(fd)) => num(fd - rd),
+                    _ => format!("({})-({})", a[4], a[2]),
                 };
-                if fd < rd {
-                    self.refuse(Code::W0108, tok);
-                    return None;
-                }
                 format!(
-                    "type=\"exp\" val0={} val1={} delay={} tau1={} td2={} tau2={}",
-                    a[0],
-                    a[1],
-                    a[2],
-                    a[3],
-                    num(fd - rd),
-                    a[5]
+                    "type=\"exp\" val0={} val1={} delay={} tau1={} td2={td2} tau2={}",
+                    a[0], a[1], a[2], a[3], a[5]
                 )
             }
             WaveKind::Sffm => format!(

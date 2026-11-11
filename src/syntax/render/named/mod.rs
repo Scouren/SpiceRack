@@ -11,6 +11,7 @@
 //! rules (Spectre's `Lift(RackVars)`, VACASK's `Lift(VacaskCalls)`: fixups
 //! over `Call` nodes) and `sites` the expressions they walk, `vacask` the
 //! VACASK spine and its blocks, `vacask_models` its models, `vacask_cards` its instances,
+//! `vacask_ic` its capacitors' initial conditions,
 //! `vacask_bench` its `control` block. The two share the reader's plan, the checks, the
 //! testbench fold and the lift's walk; their decks differ around them.
 //!
@@ -39,6 +40,7 @@ mod statistics;
 mod vacask;
 mod vacask_bench;
 mod vacask_cards;
+mod vacask_ic;
 mod vacask_models;
 
 use super::capability::{Action, Alt, Construct, Rule};

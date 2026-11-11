@@ -169,3 +169,29 @@ fn p4_011_a_sine_phase_is_vacasks_tdphase() {
         assert!((v - want).abs() < 1e-9, "t {t:e}: got {v}, want {want}");
     }
 }
+
+/// ZERO-LEDGER P4-019. Oracle: SPICE's EXP closed form (ngspice-45
+/// `vsrcload.c`; its run of this deck gave 0.1352119 at 1 ms,
+/// research/impl/evidence/P4-019/ngspice.run.log): V1 up to TD1, from
+/// there V1 + (V2 - V1)(1 - exp(-(t - TD1)/TAU1)), and from TD2 on plus
+/// (V1 - V2)(1 - exp(-(t - TD2)/TAU2)), checked at every saved point. For
+/// the refusal: VACASK 36be560's own "Parameter td2 of exponential
+/// transient must be greater than 0." on `td2=0`
+/// (`vacask.td2zero.log`).
+#[test]
+fn p4_019_an_exp_with_parameter_delays_runs_on_vacask() {
+    let raw = run(
+        "exp\n.param t1=0.1m t2=0.6m\nV1 a 0 EXP(0 1 {t1} 0.1m {t2} 0.2m)\nR1 a 0 1k\n.tran 10u 1m 0 10u\n.end\n",
+    );
+    let t = col(&raw, "time");
+    let v = col(&raw, "a");
+    assert!(t.len() >= 100, "{} points", t.len());
+    for (&t, &v) in t.iter().zip(&v) {
+        let rise = 1.0 - (-(t - 1e-4).max(0.0) / 1e-4).exp();
+        let fall = 1.0 - (-(t - 6e-4).max(0.0) / 2e-4).exp();
+        let want = rise - fall;
+        assert!((v - want).abs() < 1e-9, "t {t:e}: got {v}, want {want}");
+    }
+    let equal = "exp\nV1 a 0 EXP(0 1 1m 0.1m 1m 0.2m)\nR1 a 0 1k\n.tran 10u 2m\n.end\n";
+    assert_eq!(emit(equal).unwrap_err(), [Code::W0108]);
+}

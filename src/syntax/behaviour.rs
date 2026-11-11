@@ -373,7 +373,9 @@ pub enum NetlistRules {
     /// HSPICE: TNOM and TEMP 25 °C; GSHUNT, GMINDC, SEARCH options.
     Hspice,
     /// LTspice: TSTEP 0 the simulator's choice; no SCALE option
-    /// (`.options scale=1u` is a syntax error in LTspice 26.1.1).
+    /// (`.options scale=1u` is a syntax error in LTspice 26.1.1); a
+    /// capacitor's IC in the operating point (26.1.1, run: `ic=1` is 1 V at
+    /// t = 0 with no UIC).
     Ltspice,
 }
 
