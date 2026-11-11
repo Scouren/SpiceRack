@@ -63,7 +63,7 @@ Every element takes its name and nodes first; the rest are keywords.
 
 | Method | Element | Arguments after `name, nodes...` |
 | --- | --- | --- |
-| `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`) |
+| `R`, `C`, `L` | passives | `value`, then instance parameters (`tc1=...`); `model="rm"` names a `.model` card (`R1 a b 1k rm`) |
 | `C` | a capacitor given by its charge | `charge="1n*v(a,b)"` in place of `value` |
 | `K` | inductor coupling | `inductor1, inductor2, coupling=` |
 | `V`, `I` | DC sources | `value, ac=, ac_phase=` |

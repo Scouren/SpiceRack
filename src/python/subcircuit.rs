@@ -501,7 +501,10 @@ impl PySubcircuit {
         self.inner.elements.push(Card::element(name, text));
     }
 
-    /// An R, C or L card: `R<name> n1 n2 value params`.
+    /// An R, C or L card: `R<name> n1 n2 value [model] params`. A `model=`
+    /// keyword is the card's model word, written after the value (ngspice
+    /// manual §3.3.2 `RXXXXXXX n+ n- <value> <mname> <l=length> ...`), never
+    /// a parameter: `model=rm` is an undefined parameter `rm` to ngspice.
     fn two(
         &mut self,
         letter: char,
@@ -512,8 +515,14 @@ impl PySubcircuit {
         kwargs: Option<Bound<'_, PyDict>>,
     ) -> PyResult<()> {
         let nets = self.nets(&[p, n]);
-        let ps = params(&kw_params(kwargs)?);
-        self.push(name, format!("{letter}{name} {nets} {}{ps}", value.text()));
+        let mut ps = kw_params(kwargs)?;
+        let at = ps.iter().position(|(k, _)| k.eq_ignore_ascii_case("model"));
+        let model = at
+            .map(|i| format!(" {}", ps.remove(i).1))
+            .unwrap_or_default();
+        let ps = params(&ps);
+        let text = format!("{letter}{name} {nets} {}{model}{ps}", value.text());
+        self.push(name, text);
         Ok(())
     }
 
