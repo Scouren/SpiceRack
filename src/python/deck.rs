@@ -27,6 +27,7 @@
 //!   `Deck::run(&self, backend: Option<&str>) -> PyResult<RawData>`,
 //!   `Deck::run_each(&self, backend: Option<&str>) -> PyResult<Vec<Vec<RawData>>>`,
 //!   `Deck::to_source(&self) -> PyResult<String>`, `Deck::issues(&self, backend: &str) -> Vec<String>`,
+//!   `Deck::has_rf_port(&self) -> bool`,
 //!   `Deck::card(body: &Body, name: &str) -> PyResult<String>`
 //! - `pub(super) fn check_backend_name(name: &str) -> PyResult<()>`
 //! - `pub(super) fn region_dialect(name: &str) -> Result<Lang, String>`
@@ -141,6 +142,19 @@ impl Deck {
             ));
         }
         out
+    }
+
+    /// Whether a card of the deck is an RF port (`V… portnum n`, ngspice
+    /// manual §4.1.11): a source of the testbench or of a body, or a line
+    /// given as text. `.sp` sweeps over these.
+    pub(super) fn has_rf_port(&self) -> bool {
+        let port = |t: &str| {
+            t.split_whitespace()
+                .any(|w| w.eq_ignore_ascii_case("portnum"))
+        };
+        let stimulus = self.bench.iter().flat_map(|tb| &tb.stimulus);
+        let mut cards = self.bodies().flat_map(|b| &b.elements).chain(stimulus);
+        cards.any(|c| port(&c.text)) || self.bodies().flat_map(|b| &b.raw).any(|l| port(l))
     }
 
     /// The ngspice card of `body`'s first element or instance called

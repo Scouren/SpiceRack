@@ -6,6 +6,7 @@
 //! Contents:
 //! - `pub(super) struct PySimulator` (Python `CircuitSimulator`)
 //! - `PySimulator::tb(&mut self) -> &mut Bench`, `PySimulator::stim(&mut self, c: Card)`,
+//!   `PySimulator::with_port(&self, a: Analysis) -> PyResult<Analysis>`,
 //!   `PySimulator::deck_as_queued(&self) -> Deck`
 
 use pyo3::exceptions::PyValueError;
@@ -38,6 +39,18 @@ impl PySimulator {
     /// Appends `c` to the testbench stimulus, outside the DUT.
     pub(super) fn stim(&mut self, c: Card) {
         self.tb().stimulus.push(c);
+    }
+
+    /// `a`, an `.sp` analysis, when the deck has an RF port for it to sweep
+    /// ([`Deck::has_rf_port`]); else a `ValueError`: ngspice-45 stops such a
+    /// deck ("No RF Port is present, cannot run sp analysis").
+    pub(super) fn with_port(&self, a: Analysis) -> PyResult<Analysis> {
+        if self.deck.has_rf_port() {
+            return Ok(a);
+        }
+        Err(PyValueError::new_err(
+            "s_param: no source of the deck is an RF port; add one first: V(name, p, n, value, portnum=1)",
+        ))
     }
 
     /// A copy of the deck with every queued analysis.
@@ -315,7 +328,7 @@ impl PySimulator {
         stop_frequency: f64,
     ) -> PyResult<Py<PyAny>> {
         let a = card::s_param(variation, number_of_points, start_frequency, stop_frequency)?;
-        self.typed(a)
+        self.typed(self.with_port(a)?)
     }
 
     /// LTspice `.net` network-parameter analysis over an AC sweep.
