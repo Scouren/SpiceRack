@@ -148,6 +148,12 @@ pub(super) fn ltspice() -> DialectDef {
         .spectre_analysis("sweep")
         // The circuit temperature in an expression (help, temp).
         .temp_name("temp")
+        // The kept words: statements only LTspice has (ZERO-LEDGER P6-003;
+        // help, `.FRA`: a time-domain frequency response analysis, its `@`
+        // analyzer and `&` probe devices), W0039 on any other target.
+        .kept_word(".fra", Construct::PrivateText)
+        .kept_word("@", Construct::PrivateText)
+        .kept_word("&", Construct::PrivateText)
         // The dot rules: `.backanno` names port currents for LTspice's
         // viewer and changes no number (LTspice help): left out, noted.
         .dot_rule("backanno", DotRule::Note(Code::W0036))

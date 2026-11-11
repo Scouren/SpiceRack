@@ -733,6 +733,10 @@ def ltspice(d):
         .spectre_analysis("sweep")
         # The circuit temperature in an expression (help, temp).
         .temp_name("temp")
+        # The kept words (LTspice help, `.FRA`, `@`, `&`: P6-003).
+        .kept_word(".fra", Construct.PrivateText)
+        .kept_word("@", Construct.PrivateText)
+        .kept_word("&", Construct.PrivateText)
         # The dot rules (LTspice help, `.backanno`).
         .dot_rule("backanno", DotRule.Note(Code.W0036))
         # The capability column.

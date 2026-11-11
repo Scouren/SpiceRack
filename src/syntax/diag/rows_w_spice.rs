@@ -245,10 +245,11 @@ macro_rules! rows_w_spice {
                 cite: "ngspice manual, `.dc` (`.dc srcnam vstart vstop vincr [src2 …]`: linear only); Xyce RG `.DC` (`DEC`, `OCT`, `LIST`)",
                 explain: "A `.dc` axis sweeps by decade, by octave or over a list of values, and the target's `.dc` steps linearly only. Sweep the values another way (a `.control` loop of `alter` and `op`, a linear sweep covering them) or run the deck on a simulator with log sweeps.",
             }
-            /// A statement only its own simulator has (Xyce's own analyses and `Y` devices).
+            /// A statement only its own simulator has (Xyce's own analyses and `Y`
+            /// devices, HSPICE's eye and vector cards, LTspice's `.fra` and its devices).
             W0039 Refusal {
                 title: "a statement only its source simulator has",
-                cite: "Xyce RG, analysis commands (`.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`) and devices (`Y` devices: neuron, synapse, ROM, reaction network, general external, accelerometer, power grid); none in the ngspice manual, HSPICE, LTspice help, Spectre Reference, VACASK docs; HSPICE UG, `.STATEYE`, `.VEC`, `.CHECK`, `.POWER`, in no other simulator",
+                cite: "Xyce RG, analysis commands (`.MPDE`, `.MOR`, `.PCE`, `.EMBEDDEDSAMPLING`) and devices (`Y` devices: neuron, synapse, ROM, reaction network, general external, accelerometer, power grid); none in the ngspice manual, HSPICE, LTspice help, Spectre Reference, VACASK docs; HSPICE UG, `.STATEYE`, `.VEC`, `.CHECK`, `.POWER`, in no other simulator; LTspice help, `.FRA` (a time-domain frequency response analysis) with its `@` analyzer and `&` probe devices, in no other simulator",
                 explain: "The statement is an analysis or a device that only the simulator the deck was written for has, so no other target can run it. Run the deck on that simulator, or replace the device with a model the target has.",
             }
             // W0040–W0044: the Python deck builder's (`python::deck`).

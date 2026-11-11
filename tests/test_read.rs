@@ -167,3 +167,49 @@ fn p1_057_a_rejected_lines_fragment_is_no_unparsed_text() {
         assert!(!w.text.contains('{'), "{to:?}: {}", w.text);
     }
 }
+
+// ZERO-LEDGER P6-003: LTspice's `.fra` (a time-domain frequency response
+// analysis) with its `@` analyzer and `&` probe devices (LTspice help,
+// `.FRA`, "@. Frequency Response Analyzer", "&. Frequency Response
+// Analysis Probe"). Oracle: the help pages; and LTspice 26.1.1 runs this
+// deck, stepping 4 kHz, 2 kHz and 1 kHz, where `probe_1` is 0.84667 at
+// 1 kHz (the low-pass's 1 / sqrt(1 + (f / 1591.55 Hz)^2) = 0.84673). No
+// other simulator has the analysis (ngspice manual ch.11, HSPICE command
+// reference, Xyce RG §2.1, Spectre Reference, VACASK docs), so each
+// refuses each statement as LTspice's own (W0039), never as text it
+// could not read (W0001). Checks: 18 refusals, 3 lines, 1 neighbour.
+#[test]
+fn p6_003_ltspice_fra_analyzer_probe() {
+    let lt = Dialect::Ltspice;
+    let rc = "* t\nV1 in 0 1\nR1 A out 1k\nC1 out 0 100n\n";
+    let fra = [
+        "@1 in A fstart=1k fend=4k oct=1 pp0=10m tavgmin=1m",
+        "&1 out 0 A 0",
+        ".fra",
+    ];
+    for line in fra {
+        let deck = format!("{rc}{line}\n.end\n");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Xyce,
+            Dialect::Spectre,
+            Dialect::Vacask,
+        ] {
+            // The parser has no rule for an `@` or `&` line: its note
+            // (P0001) stands beside the refusal.
+            let codes: Vec<Code> = refusal(&deck, lt, to)
+                .into_iter()
+                .filter(|c| *c != Code::P0001)
+                .collect();
+            assert_eq!(codes, [Code::W0039], "{to:?}: {line}");
+        }
+    }
+    // LTspice gets its own statements back as written.
+    let deck = format!("{rc}{}\n.end\n", fra.join("\n"));
+    oracle::spec_example("LTspice help, `.FRA`", &deck, lt, lt, &fra);
+    // The legal neighbour: the same circuit with a `.tran` is written.
+    let tran = format!("{rc}.tran 1m\n.end\n");
+    assert!(write(&tran, lt, Dialect::Ngspice).contains(".tran"));
+}
