@@ -27,9 +27,7 @@ ngspice/examples/noise/resdiv.sp mismatch # plots ["noise", "noise", "noise", "t
 ngspice/examples/snapshot/adder_mos.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (maxstep, TSTOP/100000) agree; its .tran is in the included file and the harness refines no VACASK deck; as written v(10) is 2.52 x out
 ngspice/examples/snapshot/adder_mos_circ.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (maxstep, TSTOP/100000) agree (worst 0.806 of the tolerance); at TSTOP/20000 i(vin3b) is 7.91 x out; the harness refines no VACASK deck
 ngspice/examples/soa/nic_soa.sp mismatch # tran v(bias): 0.6388506757411574 leaves the tube at t=0 (tol 6.502e-3)
-ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])
 ngspice/examples/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@d1[gd]", "@d1[cd]", "@d1[qd]"] vs ["1", "d1:a_int", "d1:implicit_equation_0", "v1:flow(br)"])
 ngspice/examples/various/roessler-attractor.sp mismatch # tran v(z): 15.171474718990456 leaves the tube at t=172.01896000045733 (tol 2.284e-01; target there 14.46884464898786)
 ngspice/examples/various/todo-temper-3.sp target-fails # no raw file dc1.raw: Variable or constant 'temper' not defined. | model dplain sp_diode (is=temper >= 25 ? 1e-10 : (temper+1)*1e-11) | ^ | 9:27 (0x66) in .cross
 ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
@@ -43,7 +41,6 @@ ngspice/tests/regression/lib-processing/ex1a.sp target-fails # no raw file op1.r
 ngspice/tests/regression/lib-processing/ex1b.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'RES'.
 ngspice/tests/regression/lib-processing/ex2a.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'MOS'.
 ngspice/tests/regression/lib-processing/ex3a.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'MOS'.
-ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["1", "v1:flow(br)"])
 ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file op1.raw: Circuit has no unknowns.
 ngspice/tests/regression/misc/if-elseif.sp target-fails # no raw file op1.raw: Parser syntax error, unexpected =
 ngspice/tests/regression/misc/log-functions-1.sp target-fails # no raw file op1.raw: Inf found in vector, row node 'bb1:flow(br)' (ln of a node at the first iterate's 0 V)

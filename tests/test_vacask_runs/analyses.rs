@@ -445,3 +445,36 @@ fn p3_040_a_dc_sweep_of_a_resistor_sweeps_its_resistance() {
     close(out[0], 0.5, 1e-9);
     close(out[1], 2.0 / 3.0, 1e-9);
 }
+
+/// ZERO-LEDGER P1-066. ngspice's `.noise` writes its integrals as a second
+/// plot and names device vectors `@dev[param]`; VACASK writes neither.
+/// Oracle: both simulators on these decks (VACASK: one plot "Small-Signal
+/// Noise Analysis", an operating point of `1`, `2`, `v1:flow(br)`;
+/// ngspice-45: "Noise Spectral Density Curves" and "Integrated Noise",
+/// `i(@r1[i])`; research/impl/evidence/P1-066-vacask-noted-drops/runs.txt).
+/// The spectrum VACASK does write is `noise_matches_a_resistors_thermal_floor`'s.
+/// Checks: 4.
+#[test]
+fn p1_066_outputs_vacask_writes_no_vector_for_are_noted() {
+    let notes = |cards: &str| -> Vec<Code> {
+        let deck = format!("t\nv1 1 0 dc 1 ac 1\nr1 1 2 1k\nr2 2 0 1k\n{cards}\n.end\n");
+        let w =
+            spicerack::syntax::render::render_text(&deck, Dialect::Ngspice, "t", Dialect::Vacask)
+                .unwrap();
+        w.notes.diags.iter().map(|d| d.code).collect()
+    };
+    let noise = notes(".noise v(2) v1 dec 10 1 1k");
+    assert_eq!(noise, [Code::W0052], "the integrated-noise plot");
+    let saved = notes(".save @r1[i]\n.op");
+    assert!(
+        saved.contains(&Code::W0052),
+        "a saved device vector: {saved:?}"
+    );
+    let printed = notes(".print dc @r1[i]\n.dc v1 0 1 0.5");
+    assert!(printed.contains(&Code::W0052), "a printed one: {printed:?}");
+    let plain = notes(".dc v1 0 1 0.5");
+    assert!(
+        plain.is_empty(),
+        "nothing dropped, nothing noted: {plain:?}"
+    );
+}

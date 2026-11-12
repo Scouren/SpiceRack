@@ -58,6 +58,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - syntax: a Xyce harmonic balance print written for HSPICE takes HSPICE RF's print types: `.print hb_fd` is `.print hb`, `.print hb_td` is `.print hbtran`, and `.print hb_ic` and `.print hb_startup` (the transient ahead of the balance, which HSPICE RF does not print) are left out with a note (`W0023`); they were copied as read (ZERO-LEDGER P5-007).
 - backend: ESPice is started with `--tokenizer=ngspice`. A deck written for ESPice is ngspice text, and ESPice 0.3.0, not told, reads a deck holding a card ngspice lacks (`.fft`, `.data`, `.alter`, …) as HSPICE text: a brace expression stops it (ParseError) and the temperature defaults to 25 °C (a diode's voltage 0.6255 V where the deck's own 27 °C gives 0.6294 V, measured). The cross-sim harness's ESPice cells are started the same way (S4-rf-espice-tokenizer).
 - dialects (VACASK): an ngspice HFET model card (`nhfet`, `phfet`) is refused (W0104) instead of copied as a master VACASK does not have ("Device 'nhfet' not found.") (ZERO-LEDGER P1-066).
+- render/named (VACASK): an ngspice `.noise`'s integrated-noise plot and a saved or printed `@dev[param]` vector, which VACASK writes no vector for, are noted (W0052), as on Xyce (ZERO-LEDGER P1-066).
 
 ## 0.2.0 (2026-11-03)
 
