@@ -1,0 +1,4 @@
+# `vsource` and `spare` are read by nothing; `isource` is unbound by drop_builtin_models first.
+owner = runrules
+proves = drop_unread_source_v
+proves = drop_unread_source_i

@@ -6,7 +6,8 @@
 //! `FromHere` item holds for the analyses after it until a later one of the same thing or a
 //! `Reset` of its class; where both set one thing, the `FromHere` one in force wins (the model's
 //! choice: the passes never convert such an item, so either choice compares the same).
-//! A next-only condition holds for the next analysis alone and wins there. Saves add up. Loops
+//! A next-only condition holds for the next analysis alone and wins there. Saves add up, each
+//! in force at the analyses of its kinds only (`Save::analyses`, A22). Loops
 //! are not unrolled: an analysis in a loop body is one execution.
 //!
 //! Contents: `pub enum Thing`, `pub type State`, `pub fn states(&ir::Design) -> Vec<(ir::ItemRef, State)>`
@@ -84,8 +85,15 @@ pub fn states(design: &ir::Design) -> Vec<(ir::ItemRef, State)> {
                     let mut state = whole.clone();
                     state.extend(here.iter().map(|(t, v)| (t.clone(), *v)));
                     state.extend(std::mem::take(&mut next));
-                    let mut saves: Vec<u32> =
-                        whole_saves.iter().chain(&here_saves).copied().collect();
+                    // a save governs the analyses of its kinds only (A22); another kind
+                    // writes its own default set (R29)
+                    let kind = design.row::<ir::Analysis>(item.index).kind;
+                    let mut saves: Vec<u32> = whole_saves
+                        .iter()
+                        .chain(&here_saves)
+                        .copied()
+                        .filter(|&s| design.row::<ir::Save>(s).analyses.contains(kind))
+                        .collect();
                     saves.sort_unstable();
                     out.push((item, (state, saves)));
                 }

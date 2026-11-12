@@ -46,7 +46,6 @@ const PENDING_PAIRS: &[&str] = &[
     "formal_defaults_to_instances_default",
     "formal_defaults_to_instances_outer",
     "formal_defaults_to_instances_unbound",
-    "splice_elaborate",
     "constant_param_to_formal",
     "name_with_letter",
 ];

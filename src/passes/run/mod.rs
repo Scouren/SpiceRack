@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
@@ -28,6 +28,7 @@ pub mod loop_end;
 pub mod names_dropped;
 pub mod names_given;
 pub mod run_items_together;
+pub mod save_set_to_all;
 pub mod tran_ceiling_given;
 pub mod whole_run_state_first;
 
@@ -193,6 +194,13 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[loop_end::LOOP_END_KEPT],
         run: loop_end::loop_keep_last_to_restore,
     },
+    Pass {
+        name: "save_set_to_all",
+        removes: ir::Feature::Run(ir::RunExtra::SaveAnalysisSet),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[save_set_to_all::SAVE_SET_KEPT],
+        run: save_set_to_all::save_set_to_all,
+    },
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
@@ -301,6 +309,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a loop whose targets' value after it the target cannot state",
             cite: "rewrite/AMEND-A12.md A22, A27",
             explain: "The target ends this loop the other way (restoring its targets, or keeping the last value), so an alter after the loop must set what the source holds there. It cannot here: a target is not a parameter, the value is not a stated expression (a range sweep, a Monte Carlo loop) or holds a random draw, the loop stands in a body, or something before it already changed the target. The loop is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        save_set_to_all::SAVE_SET_KEPT,
+        ir::Info {
+            title: "a save scoped to a set of analysis kinds, beside an analysis of another kind",
+            cite: "rewrite/AMEND-A12.md A22; R43",
+            explain: "The target's save governs every analysis. This one governs some kinds only, and the design runs an analysis of another kind, which writes its own default set in the source; widened, the save would drop vectors from that analysis's results, so it is refused.",
             kind: ir::Kind::Note,
         },
     ),

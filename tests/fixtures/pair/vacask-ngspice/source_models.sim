@@ -1,0 +1,11 @@
+source_models: a current source into a resistor (v(1) = 2m * 1k = 2 V) in a deck that declares builtin source models no element uses, as VACASK's test/test_inductor.sim does
+load "spice/resistor.osdi"
+model vsource vsource
+model isource isource
+model spare isource
+model resistor sp_resistor
+i1 (0 1) isource dc=2m
+r1 (1 0) resistor r=1k
+control
+  analysis op1 op
+endc

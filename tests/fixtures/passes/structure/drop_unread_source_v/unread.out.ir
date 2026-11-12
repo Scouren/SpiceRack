@@ -1,0 +1,5 @@
+file "a.sp" deck
+  model isource source_i
+  model resistor resistor
+  element isource i1 (0 1) dc=1m
+  element resistor r1 (1 0) model=resistor value=1k
