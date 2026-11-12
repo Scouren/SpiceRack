@@ -18,6 +18,7 @@ mod oracle;
 
 use oracle::{At, Tol, closed_form};
 use spicerack::syntax::Dialect;
+use spicerack::syntax::diag::Code;
 
 // ---- private ----
 
@@ -267,4 +268,35 @@ fn p3_003_xyce_timeint_reltol_is_reltol() {
     let nonlin = deck.replace("timeint", "nonlin");
     let w = oracle::write(&nonlin, Dialect::Xyce, Dialect::Ngspice);
     assert!(!w.to_ascii_lowercase().contains("reltol"), "{w}");
+}
+
+/// Ledger P3-036. ngspice's `.options savecurrents` saves each device's
+/// terminal currents (manual §11.7.3). LTspice 26.1.1 has no such option
+/// (a deck holding it: "syntax error") and saves every device current
+/// without it; ESPice 0.3.0 has none ("ignoring unsupported option"). Both
+/// leave it out with a note and the deck runs: 1 V over 1 kΩ and 3 kΩ is
+/// 0.75 V (a linear DC solve: 1e-9).
+#[test]
+fn p3_036_savecurrents_is_left_out_where_the_target_has_none() {
+    let deck = "t\nV1 in 0 1\nR1 in out 1k\nR2 out 0 3k\n.options savecurrents\n.op\n.end\n";
+    for to in [Dialect::Ltspice, Dialect::Espice] {
+        let w = oracle::written(deck, Dialect::Ngspice, to);
+        let text = w.text.to_ascii_lowercase();
+        assert!(!text.contains("savecurrents"), "{to:?}: {text}");
+        assert!(oracle::notes(&w).contains(&Code::W0024), "{to:?}");
+    }
+    let own = oracle::write(deck, Dialect::Ngspice, Dialect::Ngspice);
+    assert!(own.contains(".options savecurrents"), "{own}");
+    closed_form(
+        Dialect::Ngspice,
+        deck,
+        &[Dialect::Ltspice, Dialect::Espice],
+        "out",
+        At::First,
+        0.75,
+        Tol {
+            rel: 1e-9,
+            floor: 0.0,
+        },
+    );
 }

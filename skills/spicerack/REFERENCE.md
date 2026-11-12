@@ -88,7 +88,10 @@ injection, propagation delay and pedestal all track them.
 
 `Circuit` / `Subcircuit` only: `model(name, kind, **params)`, `include(path)`,
 `lib(path, section)`, `parameter(name, value)`, `raw_spice(line)`, `veriloga(...)`,
-`osdi(...)`, `verilog(...)`. `temp(value)` and `options(**kw)` are `Circuit` only.
+`osdi(...)`, `verilog(...)`. `temp(value)` and `options(**kw)` are `Circuit` only, as is
+`netlist(target)`; `Testbench(circuit)` keeps the circuit's `subcircuit()` definitions, options and
+temperature, and `circuit.to_source()` / `save(path)` store that whole deck (`Testbench.from_source` /
+`Testbench.load` read it).
 `parameter(name, value)` takes a number, a `UnitValue` (written as its SI value) or a string (an
 expression); `None`, a `bool` or an empty string is a `ValueError`. `tb.parameter(name, value)` is
 the top-level `.param` of a `Testbench`: the DUT's parameter of that name takes the new value (a

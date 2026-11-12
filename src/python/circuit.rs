@@ -5,6 +5,7 @@
 //! Contents:
 //! - `pub(super) struct PyCircuit` (Python `Circuit`, extends `Subcircuit`)
 //! - `pub(super) fn hoisted(top: &mut Body, child: &Body) -> Body`
+//! - `PyCircuit::deck(slf: &PyRef<'_, Self>) -> Deck`
 
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
@@ -14,7 +15,7 @@ use super::args::kw_options;
 use super::deck::{Deck, check_backend_name};
 use super::model::{Bench, Body};
 use super::simulator::PySimulator;
-use super::subcircuit::PySubcircuit;
+use super::subcircuit::{PySubcircuit, write_file};
 
 #[pyclass(name = "Circuit", extends = PySubcircuit)]
 pub(super) struct PyCircuit {
@@ -48,6 +49,21 @@ pub(super) fn hoisted(top: &mut Body, child: &Body) -> Body {
     def.libs.clear();
     def.osdi.clear();
     def
+}
+
+impl PyCircuit {
+    /// The circuit as a whole deck: its top, the definitions
+    /// `subcircuit()` registered, and a testbench holding its `options()`
+    /// and `temp()` (a `Testbench` of the circuit adds its stimulus and
+    /// analyses to that one).
+    pub(super) fn deck(slf: &PyRef<'_, Self>) -> Deck {
+        Deck {
+            top: slf.as_super().inner.clone(),
+            bench: Some(slf.tb.clone()),
+            defs: slf.defs.clone(),
+            ..Default::default()
+        }
+    }
 }
 
 // ---- private ----
@@ -127,6 +143,27 @@ impl PyCircuit {
         Ok(format!(".title{}", deck.strip_prefix('*').unwrap_or(&deck)))
     }
 
+    /// The circuit as a deck in `backend`'s dialect, as
+    /// `Testbench.netlist` writes one: every dialect the writer has; a
+    /// refused construct raises `spicerack.Error`, a note is a
+    /// `UserWarning`.
+    #[pyo3(signature = (backend="ngspice"))]
+    fn netlist(slf: PyRef<'_, Self>, backend: &str) -> PyResult<String> {
+        Self::deck(&slf).netlist(backend)
+    }
+
+    /// The circuit's stored deck (`Deck::to_source`): its ngspice source
+    /// behind a `* spicerack-source ngspice` line, the definitions,
+    /// `.options` and `.temp` in it. `Testbench.from_source` reads it back.
+    fn to_source(slf: PyRef<'_, Self>) -> PyResult<String> {
+        Self::deck(&slf).to_source()
+    }
+
+    /// Writes [`Self::to_source`] to `path` (`Testbench.load` reads it).
+    fn save(slf: PyRef<'_, Self>, path: &str) -> PyResult<()> {
+        write_file(path, &Self::deck(&slf).to_source()?)
+    }
+
     fn __repr__(slf: PyRef<'_, Self>) -> String {
         format!("Circuit('{}')", slf.as_super().inner.name)
     }
@@ -139,18 +176,6 @@ impl PyCircuit {
         Ok(PySimulator {
             deck: Self::deck(&slf),
             backend: simulator.map(str::to_string),
-            save_currents: false,
         })
-    }
-}
-
-impl PyCircuit {
-    fn deck(slf: &PyRef<'_, Self>) -> Deck {
-        Deck {
-            top: slf.as_super().inner.clone(),
-            bench: Some(slf.tb.clone()),
-            defs: slf.defs.clone(),
-            ..Default::default()
-        }
     }
 }

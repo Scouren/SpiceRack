@@ -135,3 +135,16 @@ def test_p8_100_a_stepped_run_exports_a_plot_and_a_point_per_step(tmp_path):
         ("vmax", 0, 2, "ok"), ("tnever", 0, 2, "failed")]
     assert [m["value"] for m in doc["measures"][0::2]] == pytest.approx(gains, rel=1e-6)
     assert [m["value"] for m in doc["measures"][1::2]] == [None, None, None]
+
+
+def test_p3_037_a_stepped_source_steps_its_own_dc_value():
+    """ZERO-LEDGER P3-037 / P3-134. Oracle: the divider's closed form, V(out) = Vdd / 2 at r = 1k, at
+    Vdd = 1, 2, 3 V (LTspice 26.1.1 by hand on `.step Vin 1 3 1`: research/impl/evidence/P3-134/run.txt).
+    `.step param Vdd` stepped a parameter no card reads: 0.5 V at every step."""
+    if pending_mirror():
+        return
+    tb = divider(ps())
+    tb.step("Vdd", 1.0, 3.0, 1.0)
+    assert ".step Vdd 1 3 1" in tb.netlist("ltspice").splitlines()
+    ops = tb.operating_point()
+    assert [op["out"] for op in ops] == pytest.approx([0.5, 1.0, 1.5], rel=1e-6)

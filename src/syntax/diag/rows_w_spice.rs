@@ -108,7 +108,7 @@ macro_rules! rows_w_spice {
             W0016 Refusal {
                 title: "a `.step` the target lacks",
                 cite: "ngspice manual (no `.step`; `.dc` sweeps); HSPICE `.alter`; Xyce RG p.155",
-                explain: "The target has no `.step`, so the deck would run once. Sweep with the target's own form (`.dc` over a parameter, `.alter`, a script loop). ngspice runs a `.step` over the temperature, a parameter the deck's top declares or a top-level R, C, L, V, I as a loop of its `.control` script; a step over anything else (a device or model parameter, a name an included file declares) is refused.",
+                explain: "The target has no `.step`, so the deck would run once. Sweep with the target's own form (`.dc` over a parameter, `.alter`, a script loop). ngspice runs a `.step` over the temperature, a parameter the deck's top declares or a top-level R, C, L, V, I as a loop of its `.control` script; a step over anything else (a device or model parameter, a name an included file declares) is refused. LTspice, Spectre and VACASK step the temperature, a parameter and a top-level V or I source's DC value (LTspice and Spectre: a source with no waveform; Spectre also a top-level R, C or L's value); a step over another device or a device's parameter is refused: step a parameter the device reads.",
             }
             /// An option the target has no spelling for.
             W0017 Refusal {

@@ -25,7 +25,7 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | Method | Returns |
 | --- | --- |
 | `operating_point()` | `OperatingPoint` |
-| `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep: the first is the inner one (`dc.sweep`, once per outer value), the second the outer one (`dc["sweep1"]`). `temp=slice(...)` sweeps temperature |
+| `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep: the first is the inner one (`dc.sweep`, once per outer value), the second the outer one (`dc["sweep1"]`). `temp=slice(...)` sweeps temperature, a top-level resistor's name (`Rl=slice(...)`) its resistance (ngspice, ESPice, Spectre, VACASK) |
 | `ac(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(step_time, end_time, start_time=None, max_time=None, use_initial_condition=False)` | `TransientAnalysis` |
 | `noise(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis`. `output_node` and `ref_node` are node names (`"out"`; `"v(out)"` names the same node); any other form raises `ValueError` |
@@ -64,7 +64,7 @@ total = nz["onoise_total"][0]     # V rms over the band (ngspice, ESPice)
 ```
 
 Branch currents are not saved unless you ask: `tb.save("I(Vin)")`, or
-`sim.save_currents = True` on a `Circuit` simulator. `res.nodes` and
+`tb.save_currents = True` (every device's currents on ngspice, `.options savecurrents`). `res.nodes` and
 `res.branches` list what came back, on every result (`op.nodes` is sorted).
 An operating point reads a vector by the simulator's spelling too:
 `op["v(vout)"]` is `op["vout"]`, `op["I(Vin)"]` is `op["i(vin)"]`.
@@ -116,10 +116,13 @@ each result's `params` names its step (`{"r": 2000.0}`; `{}` when nothing steps)
 so `[op.params["r"] for op in tb.operating_point()]` lists the step values
 (`tests/test_ltspice_backend.py` runs it).
 
-On VACASK the stepped name is a parameter, `temp` (the temperature) or a
-top-level voltage or current source (`tb.step("Vdd", 1.0, 3.0, 1.0)` sweeps
-its DC value). Another device's name, or a device parameter (`R1:R`), has no
-sweep written and is refused (`W0016`).
+On LTspice, Spectre and VACASK the stepped name is a parameter, `temp` (the
+temperature) or a top-level voltage or current source
+(`tb.step("Vdd", 1.0, 3.0, 1.0)` sweeps its DC value; on LTspice and Spectre
+a source with no waveform). Spectre also steps a top-level R, C or L that has
+no model (its value). Another device's name, or a device parameter (`R1:R`),
+has no sweep written and is refused (`W0016`): step a parameter the device
+reads (`value="{r}"`, then `tb.step("r", …)`).
 
 On VACASK a stepped result holds every step's points one after another on the
 analysis's own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a

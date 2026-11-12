@@ -18,6 +18,7 @@ use super::bench::{Signal, bare_node, signal_of};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep};
+use crate::syntax::render::swept::dc_value;
 
 /// The most points an `oct` sweep's `values` list holds.
 const OCT_POINTS_MAX: usize = 100_000;
@@ -44,7 +45,7 @@ impl W<'_, '_> {
                             n(self, *b),
                             n(self, *c)
                         );
-                        (dc_selector(src), iv)
+                        (self.dc_selector(src), iv)
                     })
                     .collect();
                 nest_dc(axes)
@@ -71,7 +72,7 @@ impl W<'_, '_> {
                             return None;
                         }
                     };
-                    out.push((dc_selector(&ax.src), iv));
+                    out.push((self.dc_selector(&ax.src), iv));
                 }
                 nest_dc(out)
             }
@@ -280,16 +281,23 @@ fn nest_dc(axes: Vec<(String, String)>) -> String {
     s
 }
 
-/// SPICE `.dc Vin 0 5 0.1` sweeps a source's dc value: `dev=vin
-/// param=dc`; `temp` is `param=temp`; anything else a netlist parameter
-/// (`[REF]` p.64).
-fn dc_selector(source: &str) -> String {
-    let lower = source.to_lowercase();
-    if lower == "temp" {
-        return "param=temp".into();
-    }
-    match lower.as_bytes().first() {
-        Some(b'v' | b'i') => format!("dev={lower} param=dc"),
-        _ => format!("param={source}"),
+impl W<'_, '_> {
+    /// SPICE `.dc Vin 0 5 0.1` sweeps a source's dc value: `dev=vin
+    /// param=dc`; `temp` is `param=temp`; a top-level R, C or L with no
+    /// model its own value ([`dc_value`]): `dev=rl param=r` (`[REF]`
+    /// p.408: `dev`, `param`); anything else a netlist parameter (`[REF]`
+    /// p.64).
+    fn dc_selector(&self, source: &str) -> String {
+        let lower = source.to_lowercase();
+        if lower == "temp" {
+            return "param=temp".into();
+        }
+        if let Some(p) = dc_value(self.rd, self.deck, &self.names, source) {
+            return format!("dev={lower} param={p}");
+        }
+        match lower.as_bytes().first() {
+            Some(b'v' | b'i') => format!("dev={lower} param=dc"),
+            _ => format!("param={source}"),
+        }
     }
 }

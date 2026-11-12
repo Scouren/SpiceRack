@@ -263,3 +263,73 @@ fn p5_099_a_ranged_step_runs_the_sources_points_on_every_target() {
     let range = text.lines().any(|l| l == ".step param rr 1000 9000 4000");
     assert!(range, "{text}");
 }
+
+/// ZERO-LEDGER P3-134 (the text path of P3-037). Oracle: Xyce 7.10
+/// running the source deck (a `.step` over a bare device name sets its
+/// default parameter, RG 7.10 `.STEP`: a source's DC value), each point
+/// the divider's closed form v(out) = V1 · 3/4, met by LTspice 26.1.1 on
+/// the written deck (unless CI's `LTSPICE_CI_PENDING_MIRROR` marker says
+/// it is absent). Spectre has no binary here: its text is held to
+/// Reference 19.1 pp.406-408 (`sweep`: `dev`, "Device instance whose
+/// parameter value is to be swept"; `param`, "Name of parameter to
+/// sweep"). What a target cannot say is refused: LTspice 26.1.1 runs
+/// `.step param R2 …` and `.step param R2:R …` with R2 as its card has it
+/// and stops on a stepped source with a waveform ("Can't sweep that.").
+/// By hand: research/impl/evidence/P3-134/run.txt. Tolerance: a linear
+/// solve of three elements; LTspice's raw file holds single floats (6e-8).
+#[test]
+fn p3_134_a_stepped_source_steps_its_own_value_on_ltspice_and_spectre() {
+    const DECK: &str = "* stepped source\nV1 in 0 1\nR1 in out 1k\nR2 out 0 3k\n";
+    let stepped = |card: &str| format!("{DECK}{card}\n.op\n.end\n");
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let meets = |on: Dialect, text: &str, want: &[f64]| {
+        let got = outs(on, text);
+        let near = got.len() == want.len() && got.iter().zip(want).all(|(g, w)| tol.within(*g, *w));
+        assert!(near, "{on:?}: v(out) = {got:?}, want {want:?}\n{text}");
+    };
+    let ltspice = std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_none();
+    let sweep = "Spectre Reference 19.1 pp.406-408: sweep, dev=, param=";
+    // The card (LTspice's too), and Spectre's sweep head.
+    let cases = [
+        (
+            ".step V1 1 3 1",
+            "sweep1_v1 sweep dev=v1 param=dc start=1 stop=3 step=1 {",
+        ),
+        (
+            ".step V1 list 1 2 3",
+            "sweep1_v1 sweep dev=v1 param=dc values=[1 2 3] {",
+        ),
+    ];
+    for (card, head) in cases {
+        let deck = stepped(card);
+        meets(Dialect::Xyce, &deck, &[0.75, 1.5, 2.25]);
+        let text = oracle::write(&deck, Dialect::Xyce, Dialect::Ltspice);
+        assert!(text.lines().any(|l| l == card), "no `{card}`\n{text}");
+        if ltspice {
+            meets(Dialect::Ltspice, &text, &[0.75, 1.5, 2.25]);
+        }
+        oracle::spec_example(sweep, &deck, Dialect::Xyce, Dialect::Spectre, &[head]);
+    }
+    // A resistor by its value: Spectre's `r`; LTspice has no such item.
+    let resistor = stepped(".step R2 1k 3k 1k");
+    let head = "sweep1_r2 sweep dev=r2 param=r start=1k stop=3k step=1k {";
+    oracle::spec_example(sweep, &resistor, Dialect::Xyce, Dialect::Spectre, &[head]);
+    let codes = oracle::refusal(&resistor, Dialect::Xyce, Dialect::Ltspice);
+    assert_eq!(codes, [Code::W0016], "{resistor}");
+    // A device's parameter and a source with a waveform: neither target.
+    let wave = "* wave\nV1 in 0 SIN(0 1 1k)\nR1 in 0 1k\n.step V1 1 3 1\n.op\n.end\n";
+    let parameter = stepped(".step R2:R 1k 3k 1k");
+    for to in [Dialect::Ltspice, Dialect::Spectre] {
+        for deck in [parameter.as_str(), wave] {
+            let codes = oracle::refusal(deck, Dialect::Xyce, to);
+            assert_eq!(codes, [Code::W0016], "{to:?}\n{deck}");
+        }
+    }
+    // The temperature is LTspice's `temp` item (help `.STEP`).
+    let temp = stepped(".step temp 0 100 50");
+    let text = oracle::write(&temp, Dialect::Xyce, Dialect::Ltspice);
+    assert!(text.lines().any(|l| l == ".step temp 0 100 50"), "{text}");
+}

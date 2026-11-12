@@ -989,9 +989,15 @@ class TestTestbenchCreation:
             value=100.0,
         )
         tb = ps.Testbench(dut)
-        tb.step("R1", 100.0, 10000.0, 100.0)
+        tb.step("r", 100.0, 10000.0, 100.0)
         # ngspice has no `.step` (it would run once); LTspice does (`.step param`).
-        assert ".step param R1 100 10000 100" in tb.netlist("ltspice").splitlines()
+        assert ".step param r 100 10000 100" in tb.netlist("ltspice").splitlines()
+        # LTspice steps no resistor: `.step param R1` stepped a parameter no
+        # card reads (ZERO-LEDGER P3-134; 26.1.1, run).
+        tb = ps.Testbench(dut)
+        tb.step("R1", 100.0, 10000.0, 100.0)
+        with pytest.raises(RuntimeError, match="W0016"):
+            tb.netlist("ltspice")
 
     def test_waveform_sources(self):
         ps = import_spicerack()

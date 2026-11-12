@@ -14,13 +14,15 @@
 //! (ngspice manual §11.1.2); GMINDC has no ngspice option (ngspice reads
 //! and ignores it: `gmindc.sp` gives 1.01e-12 A for 1e-3), refused W0017.
 //! The other way, a deck's one GMIN is HSPICE's GMIN (transient) and
-//! GMINDC (DC) both (cmdref `.OPTION GMIN`, `.OPTION GMINDC`).
+//! GMINDC (DC) both (cmdref `.OPTION GMIN`, `.OPTION GMINDC`). An option
+//! the target's `option_map` declares cosmetic is left out (W0024).
 //!
 //! Contents:
 //! - `W::hspice_defaults(&self, tb: &mut Tb, runs: bool)`, `W::options_line(&mut self, tb: &Tb) -> Option<String>`
 
 use super::W;
 use super::bench::Tb;
+use crate::syntax::behaviour::OptionTo;
 use crate::syntax::diag::Code;
 
 impl W<'_, '_> {
@@ -68,6 +70,16 @@ impl W<'_, '_> {
             // the option says nothing more (`search_lib.sp`: real ngspice
             // on the written files gives its 0.75 V).
             if self.pair.hspice_elsewhere && lower == "search" {
+                self.note(Code::W0024, *tok);
+                continue;
+            }
+            // An option the target declares it has none of, with no number
+            // changed for its lack (`OptionTo::Cosmetic`): left out.
+            // `savecurrents` on LTspice 26.1.1 is a syntax error, and every
+            // device current is saved without it; ESPice 0.3.0 ignores it
+            // (runs, ZERO-LEDGER P3-036).
+            let cosmetic = |o: &(&str, OptionTo)| o.0 == lower && o.1 == OptionTo::Cosmetic;
+            if self.b.option_map.iter().any(cosmetic) {
                 self.note(Code::W0024, *tok);
                 continue;
             }

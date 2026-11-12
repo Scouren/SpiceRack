@@ -1492,3 +1492,120 @@ def test_p8_319_a_vacask_decks_title_is_never_read_as_a_statement(title):
     assert (tran.time[0], tran.time[-1]) == (0.0, pytest.approx(1e-6, rel=1e-9))
     assert all(t0 < t1 for t0, t1 in zip(tran.time, tran.time[1:]))
     assert tran["out"] == pytest.approx([0.75] * len(tran.time), rel=1e-6)
+
+
+def _p3_035_circuit():
+    """1 V over a child's 1k (tc1 = 0.01/K) and the top's 3k, at 50 C."""
+    import spicerack as ps
+
+    buf = ps.Subcircuit("buf", ["a", "b"])
+    buf.R("1", "a", "b", 1e3, tc1=0.01)
+    c = ps.Circuit("top")
+    c.V("in", "in", c.gnd, 1.0)
+    c.subcircuit(buf)
+    c.X("1", "buf", "in", "out")
+    c.R("2", "out", c.gnd, 3e3)
+    c.options(reltol=1e-4)
+    c.temp(50)
+    return ps, c
+
+
+@pytest.mark.needs("ngspice")
+def test_p3_035_a_testbench_of_a_circuit_keeps_its_definitions_options_and_temperature():
+    """ZERO-LEDGER P3-035: `Testbench(circuit)` took the circuit's top alone: `X1 in out buf` with no
+    `.subckt buf` (ngspice-45: "unknown subckt") and no `.options` or `.temp`. Oracle: closed form on
+    ngspice-45, the child's 1k at 50 C with tc1 = 0.01/K and TNOM 27 C is 1k * (1 + 0.01 * 23) = 1230,
+    so v(out) = 3000 / 4230 = 0.70922 (0.75 with the `.temp` lost; research/impl/evidence/P3-035)."""
+    ps, c = _p3_035_circuit()
+    tb = ps.Testbench(c)
+    tb.with_backend("ngspice")
+    tb.add_operating_point()
+    words = [l.lower().split() for l in tb.netlist("ngspice").splitlines()]
+    assert [".subckt", "buf", "a", "b"] in words
+    assert any(w[0].startswith(".option") and any(x.startswith("reltol=") for x in w) for w in words if w)
+    assert [".temp", "50"] in words
+    # A linear DC solve: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(3000 / 4230, rel=1e-9)
+    # A `Subcircuit` DUT is its top alone, as before.
+    assert ps.Testbench(ps.Subcircuit("s", ["a"])).netlist("ngspice").splitlines()[-1] == ".end"
+
+
+def test_p3_035_a_circuit_is_netlisted_and_stored_as_its_whole_deck(tmp_path):
+    """ZERO-LEDGER P3-035: `Circuit.netlist(target)` is the deck `Testbench(circuit)` writes, in any
+    dialect, and `Circuit.to_source()` / `save(path)` store that deck. Oracle: a round trip, the
+    stored text read back (`Testbench.from_source`, `Testbench.load`) writes the same netlists."""
+    ps, c = _p3_035_circuit()
+    text = c.to_source()
+    assert text.startswith("* spicerack-source ngspice\n")
+    assert ".subckt buf a b" in text.splitlines()
+    for target in ("ngspice", "xyce"):
+        assert c.netlist(target) == ps.Testbench(c).netlist(target), target
+        assert ps.Testbench.from_source(text).netlist(target) == c.netlist(target), target
+    path = str(tmp_path / "top.sp")
+    c.save(path)
+    assert open(path).read() == text
+    assert ps.Testbench.load(path).netlist("ngspice") == c.netlist("ngspice")
+
+
+@pytest.mark.needs("ngspice")
+def test_p3_036_save_currents_is_written_by_netlist_and_keeps_the_saves():
+    """ZERO-LEDGER P3-036: `save_currents` was applied at a run only, where it replaced the `save()`
+    list with `all @all[i]` (no ngspice vector: "unrecognized variable"). It is ngspice's `.options
+    savecurrents` (manual 11.7.3), in the deck `netlist()` writes too, beside the saves. Oracle:
+    ngspice-45 on that deck saves v(out) and each resistor's current (research/impl/evidence/P3-036:
+    `i(@r1[i])` = 0.25 mA for 1 V over 1k + 3k)."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("div", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    d.R("2", "out", d.gnd, 3e3)
+    tb = ps.Testbench(d)
+    tb.V("in", "in", "0", 1.0)
+    tb.with_backend("ngspice")
+    tb.save("v(out)")
+    assert tb.save_currents is False
+    tb.save_currents = True
+    assert tb.save_currents is True
+    lines = [l.lower() for l in tb.netlist("ngspice").splitlines()]
+    assert ".options savecurrents" in lines
+    assert ".save v(out)" in lines
+    op = tb.operating_point()
+    assert op["out"] == pytest.approx(0.75, rel=1e-9)
+    # 1 V over 1k + 3k: 0.25 mA through each resistor (ngspice names the vector `i(@r1[i])`).
+    assert op.branches == ["i(@r1[i])", "i(@r2[i])"]
+    assert op["i(@r1[i])"] == pytest.approx(2.5e-4, rel=1e-9)
+    # Off again: the option goes, the saves stay.
+    tb.save_currents = False
+    lines = [l.lower() for l in tb.netlist("ngspice").splitlines()]
+    assert ".save v(out)" in lines and not any("savecurrents" in l for l in lines)
+    # A target with no such option leaves it out with a note (W0024).
+    tb.save_currents = True
+    with pytest.warns(UserWarning, match="W0024"):
+        assert "savecurrents" not in tb.netlist("ltspice").lower()
+
+
+@pytest.mark.needs("vacask")
+def test_p3_040_a_dc_sweep_of_a_resistor_sweeps_its_resistance():
+    """ZERO-LEDGER P3-040: `tb.dc(Rl=slice(...))` sweeps resistor Rl (ngspice's `.dc` takes a
+    source, a resistor or `temp`). Spectre got `dc param=Rl`, a netlist parameter nothing
+    declares, and VACASK `instance="rl" parameter="dc"`, which a resistor does not have (the run
+    wrote no dc1.raw). Oracle: closed form, 1 V over 1k + Rl is Rl / (1k + Rl): 0.5, 2/3, 0.75,
+    which ngspice-45, Xyce 7.10 and ESPice 0.3.0 give (research/impl/evidence/P3-040); the
+    Spectre line is Spectre Reference 19.1 p.408 (`dev`, `param`)."""
+    import spicerack as ps
+
+    def bench(backend):
+        c = ps.Circuit("div")
+        c.V("in", "in", "0", 1.0)
+        c.R("1", "in", "out", 1e3)
+        c.R("l", "out", "0", 3e3)
+        tb = ps.Testbench(c)
+        tb.with_backend(backend)
+        return tb
+
+    dc = bench("vacask").dc(Rl=slice(1e3, 3e3, 1e3))
+    assert dc.sweep == pytest.approx([1e3, 2e3, 3e3], rel=1e-12)
+    assert dc["out"] == pytest.approx([0.5, 2 / 3, 0.75], rel=1e-9)
+    tb = bench("spectre")
+    tb.add_dc(Rl=slice(1e3, 3e3, 1e3))
+    assert "dc1 dc dev=rl param=r start=1k stop=3k step=1k" in tb.netlist("spectre").splitlines()
