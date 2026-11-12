@@ -200,7 +200,11 @@ fn each_kernel_invariant_has_its_fixture() {
     }
     let covered: Vec<Violation> = cases.iter().map(|c| c.0).collect();
     // circuit-owned: element rows, and A13's names (circuit_check.rs has their fixtures)
-    let owners = [Violation::TerminalCount, Violation::DetailRow, Violation::DuplicateElement];
+    let owners = [
+        Violation::TerminalCount,
+        Violation::DetailRow,
+        Violation::DuplicateElement,
+    ];
     let kernel: Vec<Violation> = Violation::ALL
         .into_iter()
         .filter(|v| !owners.contains(v))
