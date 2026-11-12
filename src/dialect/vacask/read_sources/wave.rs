@@ -170,6 +170,14 @@ fn plan(l: &Lower<'_, '_, '_>, p: &Params, typ: &str) -> Result<Plan, Fail> {
         "exp" => {
             p.get("td2").ok_or_else(invalid)?;
             refuse_if("td2")?;
+            // A zero time constant (its default) runs into NaN at the first analysis (run
+            // src-r-tau: "NaN found in vector"): VACASK fails the deck.
+            for tau in ["tau1", "tau2"] {
+                let v = p.get(tau).ok_or_else(invalid)?;
+                if at_default(l, v, "0.") {
+                    return Err(invalid());
+                }
+            }
             Plan::Wave("exp", f(&["val0", "val1", "delay", "tau1", "td2", "tau2"]))
         }
         "am" | "fm" => Plan::Wave(

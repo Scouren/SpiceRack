@@ -1,0 +1,6 @@
+refused: an exp time constant at its default 0
+model vsource vsource
+v1 (a 0) vsource type="exp" td2=1u tau1=1u
+control
+  analysis tr1 tran stop=4u step=1n
+endc

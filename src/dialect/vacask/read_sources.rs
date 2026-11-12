@@ -11,7 +11,7 @@
 //! - a parameter the `type` does not read is kept by VACASK for a later `alter … type=` (VS V5):
 //!   with no such alter it moves no number, dropped with a note (R42);
 //! - what VACASK rejects is `InvalidInSource` (src-r-*): an unknown parameter, a terminal count
-//!   the module does not have, a literal `rise` ≤ 0 (p2), no `td2` or a literal one ≤ 0, a
+//!   the module does not have, a literal `rise` ≤ 0 (p2), no `td2` or a literal one ≤ 0, no `tau1`/`tau2` or a zero one (NaN), a
 //!   literal sine `freq` ≤ 0, a PWL with an odd count or one point, a missing `ctlinst`,
 //!   `ind1`, `ind2`, `$mfactor` on a `mutual`;
 //! - what only VACASK has is `Private`: PWL shaping and breakpoints off their defaults, the
@@ -100,7 +100,7 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         INVALID,
         "a source statement VACASK rejects",
         "VD dev-builtin-src, -cccs, -mutual; runs p2, src-r-*",
-        "An unknown parameter, a terminal count the module does not have, a literal rise at or below 0, no td2 or one at or below 0, a sine frequency at or below 0, a PWL with an odd count or one point, a cccs/ccvs without ctlinst, a mutual without ind1 or ind2, with terminals or with $mfactor. The statement is kept as text and the deck refused.",
+        "An unknown parameter, a terminal count the module does not have, a literal rise at or below 0, no td2 or one at or below 0, an exp time constant absent or 0 (the run fails with NaN), a sine frequency at or below 0, a PWL with an odd count or one point, a cccs/ccvs without ctlinst, a mutual without ind1 or ind2, with terminals or with $mfactor. The statement is kept as text and the deck refused.",
         ir::Kind::Refusal,
     ),
     row(

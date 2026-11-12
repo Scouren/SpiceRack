@@ -549,6 +549,10 @@ fn settle_what_vacask_refuses() {
         ("src_r_ctlinst.sim", "Peer instance '' not found."),
         ("src_r_mutual.sim", "Peer instance '' not found."),
         ("src_r_mfactor.sim", "Parameter '$mfactor' not found."),
+        (
+            "src_r_tau.sim",
+            "NaN found in vector, row node 'v1:flow(br)'.",
+        ),
     ] {
         let (out, _dir) = vacask(deck);
         assert!(out.contains(message), "{deck}: no `{message}` in:\n{out}");

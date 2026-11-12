@@ -3,8 +3,9 @@
 # than 0." (no td2: its default 0), "Frequency of sinusoidal transient must be greater than 0.",
 # "Parameter 'foo' not found.", a vsource has two terminals (VD), an unknown `type`, a PWL with
 # an odd count (VD), "Peer instance '' not found." (cccs without ctlinst; mutual without
-# ind2), "Parameter '$mfactor' not found." (mutual), a mutual with terminals.
-# codes: P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004
+# ind2), "Parameter '$mfactor' not found." (mutual), a mutual with terminals, an exp time
+# constant absent (its default 0) or 0: "NaN found in vector" at the first analysis (src-r-tau).
+# codes: P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004
 file "refused.sim" deck
   title "refused sources"
   model vsource source_v
@@ -22,3 +23,5 @@ file "refused.sim" deck
   opaque vacask invalid "m1 () m k=0.5 ind1=\"l1\""
   opaque vacask invalid "m2 () m k=0.5 ind1=\"l1\" ind2=\"l2\" $mfactor=2"
   opaque vacask invalid "m3 (a 0) m k=0.5 ind1=\"l1\" ind2=\"l2\""
+  opaque vacask invalid "v9 (a 0) vsource type=\"exp\" td2=1u tau1=1u"
+  opaque vacask invalid "v10 (a 0) vsource type=\"exp\" td2=1u tau1=0 tau2=1u"
