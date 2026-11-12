@@ -182,8 +182,11 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     });
     let (a, b) = match ran {
         Ok((Ran::Plots(a), Ran::Plots(b))) => (
-            plots::only(a, pair.vectors.as_ref()),
-            plots::only(plots::renamed(b, &spine.renames), pair.vectors.as_ref()),
+            plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
+            plots::only(
+                plots::renamed(plots::hierarchical(b), &spine.renames),
+                pair.vectors.as_ref(),
+            ),
         ),
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
@@ -211,9 +214,9 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
                     match (a2, b2) {
                         (Ran::Plots(x), Ran::Plots(y)) => Some(
                             cmp::compare(
-                                &plots::only(x, pair.vectors.as_ref()),
+                                &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
                                 &plots::only(
-                                    plots::renamed(y, &spine.renames),
+                                    plots::renamed(plots::hierarchical(y), &spine.renames),
                                     pair.vectors.as_ref(),
                                 ),
                                 tol,
