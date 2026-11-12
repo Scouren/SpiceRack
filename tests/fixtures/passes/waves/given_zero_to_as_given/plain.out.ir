@@ -1,0 +1,5 @@
+file "d.sp" deck
+  param w = 2u
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 rise=$tstep fall=1n width=(w == 0 ? $tstop : w) period=$tstop)
+  element vsource v2 (b 0) dc=0 wave=sin(offset=0 amplitude=1 freq=(1 / $tstop) delay=0 damping=0 phase_deg=0)
+  element vsource v3 (c 0) dc=0 wave=exp(v1=0 v2=1 td1=1n tau1=$tstep td2=(1n + $tstep) tau2=2n)
