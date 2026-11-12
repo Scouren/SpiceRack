@@ -50,6 +50,12 @@ pub(super) const CODES: &[Row] = &[
         "ngspice sets a node's condition only with its .ic and .nodeset cards, which hold for the whole run; refused.",
     ),
     refusal(
+        SCRIPT_VALUE,
+        "a script option whose value is no number",
+        "ng-control's run settle/option_brace.sp (option temp={q}: bad type; {10+40}: 10)",
+        "a script option's value is the frontend's number, never a numparam expression; refused.",
+    ),
+    refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
         "ngspice-45 dctrcurv.c:89-149, inp2dot.c dot_pss",
@@ -71,18 +77,34 @@ const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
 /// An initial condition or node set that holds from its place on: ngspice's script has no
 /// command that sets one (`commands.c`), and its `.ic`/`.nodeset` cards hold for the whole run.
 const NODESET_FROM_HERE: ir::Code = ir::Code::new(b'W', 1303);
+/// An option or temperature that holds from its place on (a script `option`) whose value is no
+/// number literal: the frontend reads a number, never a numparam expression.
+const SCRIPT_VALUE: ir::Code = ir::Code::new(b'W', 1304);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21): a card form (`W1300`, `W1301`), a value that reads the temperature (`W1302`), a node set
-/// that holds from its place on (`W1303`).
+/// that holds from its place on (`W1303`), a script option's value that is no number (`W1304`).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     let mut values = Vec::new();
     // a `FromHere` state item is `RunExtra::StateFromHere`, which FEATURES lack
+    // a script `option`'s value is the frontend's number, never a numparam `{…}` (ng-control's
+    // run settle/option_brace.sp: `option temp={q}` is a bad type, `{10+40}` runs 10)
+    let mut script_values = |holds: ir::Applies, vals: &[ir::ExprId]| {
+        let number = |e: &ir::ExprId| e.is_none() || matches!(design.expr(*e), ir::Expr::Num(_));
+        if holds == ir::Applies::FromHere && !vals.iter().all(number) {
+            refuse(SCRIPT_VALUE);
+        }
+    };
     match item.kind {
-        ir::ItemKind::Option => values.push(design.row::<ir::OptionRow>(item.index).value),
+        ir::ItemKind::Option => {
+            let o: ir::OptionRow = design.row(item.index);
+            script_values(o.holds, &[o.value]);
+            values.push(o.value);
+        }
         ir::ItemKind::Env => {
             let e: ir::Env = design.row(item.index);
+            script_values(e.holds, &[e.temp, e.tnom]);
             values.extend([e.temp, e.tnom]);
         }
         ir::ItemKind::NodeSet => {
