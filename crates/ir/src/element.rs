@@ -147,8 +147,9 @@ pub enum ElemKind {
     /// Current-controlled switch (D30). Terminals (p, n), exactly 2. `Model` master required.
     /// Detail `Switch` (`sense` the sensing element).
     ISwitch,
-    /// Lossless transmission line (D31, D84, D73). Terminals (a+, a−, b+, b−), exactly 4. No
-    /// master. Detail `Line`.
+    /// Lossless transmission line (D31, D84, D73). Terminals (a+, a−, b+, b−), exactly 4.
+    /// Optional `Model` master of `ModelFamily::TlineIdeal` (VACASK `tline_ideal`, A20). Detail
+    /// `Line`.
     LosslessLine,
     /// Lossy line, LTRA (D32, D72). Terminals (a+, a−, b+, b−), exactly 4. `Model` master
     /// required. Detail `Line`.
@@ -549,7 +550,8 @@ impl ElemKind {
             | ElemKind::Vcvs
             | ElemKind::Vccs
             | ElemKind::Cccs
-            | ElemKind::Ccvs => Some(DefKind::Model),
+            | ElemKind::Ccvs
+            | ElemKind::LosslessLine => Some(DefKind::Model),
             ElemKind::ChargeCapacitor
             | ElemKind::FluxInductor
             | ElemKind::Port
@@ -559,7 +561,6 @@ impl ElemKind {
             | ElemKind::Laplace
             | ElemKind::FreqTable
             | ElemKind::Delay
-            | ElemKind::LosslessLine
             | ElemKind::Unresolved => None,
         }
     }

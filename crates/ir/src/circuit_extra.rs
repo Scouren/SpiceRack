@@ -218,8 +218,8 @@ pub enum CircuitExtra {
     ElementWithoutModel,
     /// A model whose family has no `DeviceLibrary` of that family in the design (design-level; A12 C5).
     ModelWithoutLibrary,
-    /// An independent or linear controlled source that names a model, or a coupling bound to
-    /// the builtin `Mutual` model: ngspice has no model for these (AMEND-A12 C5; a pass drops
+    /// An independent or linear controlled source or a lossless line that names a model (A20),
+    /// or a coupling bound to the builtin `Mutual` model: ngspice has no model for these (AMEND-A12 C5; a pass drops
     /// the model and unbinds the element).
     BuiltinMaster,
     // A13 (R23)

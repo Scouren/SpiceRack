@@ -7,7 +7,8 @@
 //! docs.
 //!
 //! Contents (crate-private): `pub(crate) fn has_polarity`, `pub(crate) fn versioned`,
-//! `pub(crate) fn typed_key`, `pub(crate) fn builtin_kind`, `pub(crate) fn builtin_fits`,
+//! `pub(crate) fn typed_key`, `pub(crate) fn library_free`, `pub(crate) fn builtin_kind`,
+//! `pub(crate) fn builtin_fits`,
 //! `pub(crate) fn bound_family`
 
 use crate::circuit_fields::Fields;
@@ -161,6 +162,12 @@ pub(crate) fn typed_key(kind: DetailKind, key: &str) -> bool {
         || names.contains(&"temp_abs") && is("temp")
 }
 
+/// Whether a model of `f` needs no `DeviceLibrary` on any target: the builtins of A12 C5. The
+/// ideal line (A20) is a builtin that VACASK loads, so it is not one of them.
+pub(crate) fn library_free(f: ModelFamily) -> bool {
+    builtin_kind(f).is_some() && f != ModelFamily::TlineIdeal
+}
+
 /// The element kind a builtin family's model serves (AMEND-A12 C5), or `None` for every other
 /// family.
 pub(crate) fn builtin_kind(f: ModelFamily) -> Option<ElemKind> {
@@ -172,6 +179,7 @@ pub(crate) fn builtin_kind(f: ModelFamily) -> Option<ElemKind> {
         ModelFamily::Ccvs => Some(ElemKind::Ccvs),
         ModelFamily::Cccs => Some(ElemKind::Cccs),
         ModelFamily::Mutual => Some(ElemKind::Coupling),
+        ModelFamily::TlineIdeal => Some(ElemKind::LosslessLine),
         _ => None, // every other family serves the kinds its own docs name
     }
 }
@@ -188,6 +196,7 @@ pub(crate) fn builtin_fits(kind: ElemKind, family: ModelFamily) -> bool {
             | ElemKind::Vccs
             | ElemKind::Cccs
             | ElemKind::Ccvs
+            | ElemKind::LosslessLine
     );
     match builtin_kind(family) {
         Some(k) => k == kind,

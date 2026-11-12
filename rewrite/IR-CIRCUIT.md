@@ -204,9 +204,14 @@ only its builtin (a coupling may also name a core, and a coupling bound to `Mutu
 `CouplingCore`); a builtin model has no parameters and no polarity. A builtin family needs no
 `DeviceLibrary`, so it never sets `ModelWithoutLibrary` (confirmed by the VACASK agent: the builtins `vsource isource vcvs vccs ccvs cccs mutual` need a
 `model` line and no `load`, VD cir-loading, run n2; VACASK has no port module and its `b` source
-takes no model, VD dev-builtin-behavioral; model names are the deck's choice). Features: `ElementWithoutModel`
-(an element with no master: VACASK lacks it) and `BuiltinMaster` (a source or linear controlled
-source naming a model, or a coupling bound to `Mutual`: ngspice lacks it). The two conversions
+takes no model, VD dev-builtin-behavioral; model names are the deck's choice). The ideal transmission line (A20, R39) is one more builtin: `ModelFamily::TlineIdeal`
+(VACASK `tline_ideal`, a loaded OSDI module), parameterless and without polarity, the optional
+master of a `LosslessLine` (`master_kind` says so; `check` accepts only that family). Unlike
+the others a target may need a `DeviceLibrary` for it, so it is not exempt from
+`ModelWithoutLibrary` (`circuit_tables::library_free`). Features: `ElementWithoutModel`
+(an element with no master: VACASK lacks it) and `BuiltinMaster` (a source, linear controlled
+source or lossless line naming a model, or a coupling bound to `Mutual`: ngspice lacks it; its
+T card names none). The two conversions
 are the dialect slices' neutral passes (`src/passes/`), not this crate's; the rule they follow:
 one model per scope and family, in the scope that first needs it, named by the family's
 IR-text word (`source_v`, `vcvs`, …) and renamed on a collision; the reverse pass drops the

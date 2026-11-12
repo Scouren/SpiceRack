@@ -51,13 +51,14 @@ const NONE_REF: Ref = Ref {
 };
 
 /// The builtin families and the kinds they serve (AMEND-A12 C5).
-const BUILTINS: [(ModelFamily, ElemKind); 6] = [
+const BUILTINS: [(ModelFamily, ElemKind); 7] = [
     (ModelFamily::SourceV, ElemKind::VSource),
     (ModelFamily::SourceI, ElemKind::ISource),
     (ModelFamily::Vcvs, ElemKind::Vcvs),
     (ModelFamily::Vccs, ElemKind::Vccs),
     (ModelFamily::Ccvs, ElemKind::Ccvs),
     (ModelFamily::Cccs, ElemKind::Cccs),
+    (ModelFamily::TlineIdeal, ElemKind::LosslessLine),
 ];
 
 /// The generator's state for one row.

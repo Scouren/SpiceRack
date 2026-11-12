@@ -11,8 +11,8 @@
 //! `pub(crate) fn reads_circuit`, `pub(crate) fn dc_at_zero`, `pub(crate) fn library_features`,
 //! `pub(crate) fn mult_class`
 
-use crate::circuit_check::{bound_family, builtin_kind};
 use crate::circuit_extra::CircuitExtra as X;
+use crate::circuit_tables::{bound_family, library_free};
 use crate::circuit_text::get_row;
 use crate::class::{ExprClass, expr_class};
 use crate::controlled::{
@@ -53,6 +53,7 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
             | ElemKind::Vccs
             | ElemKind::Cccs
             | ElemKind::Ccvs
+            | ElemKind::LosslessLine
     );
     let mutual = bound_family(design, e.model) == Some(ModelFamily::Mutual);
     if source_like && e.model.name != NameId::NONE || e.kind == ElemKind::Coupling && mutual {
@@ -251,7 +252,7 @@ pub(crate) fn library_features(design: &Design, set: &mut FeatureSet) {
     let missing = reachable.iter().any(|&(item, _)| {
         item.kind == ItemKind::Model && {
             let family = design.row::<Model>(item.index).family;
-            builtin_kind(family).is_none() && !has_library[family as usize]
+            !library_free(family) && !has_library[family as usize]
         }
     });
     if missing {
