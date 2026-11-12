@@ -46,6 +46,7 @@
 pub mod facts;
 
 pub mod build;
+pub mod build_expr;
 pub mod check;
 pub mod design;
 pub mod diag;
@@ -136,3 +137,7 @@ pub use text::{dump, parse};
 // not read the raw identifier as a module, sees no import after it.
 #[cfg(any(test, feature = "gen"))]
 pub mod r#gen;
+
+// `check`'s fixtures need the crate-private tables; last, after `gen`, for check_style.py
+#[cfg(test)]
+mod check_tests;

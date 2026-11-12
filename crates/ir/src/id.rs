@@ -19,7 +19,7 @@
 //! - `pub struct ItemRef`, `ItemRef::NONE`, `ItemRef::new(kind, index) -> ItemRef`
 //! - `pub struct Ref`, `Ref::unresolved(name) -> Ref`, `Ref::is_resolved(self) -> bool`
 //! - `pub struct List<T>`, `List::EMPTY`, `List::len(self) -> usize`,
-//!   `List::is_empty(self) -> bool`; `pub type NameList`, `pub type ExprList`,
+//!   `List::is_empty(self) -> bool`, `List::range(u32, u32) -> List<T>` (crate); `pub type NameList`, `pub type ExprList`,
 //!   `pub type ParamList`, `pub type BranchList`
 //! - capacities: `pub const FILES_MAX`, `pub const NAMES_MAX`, `pub const BYTES_MAX`,
 //!   `pub const EXPRS_MAX`, `pub const ROWS_MAX`, `pub const SCOPES_MAX`, `pub const DEFS_MAX`,
@@ -112,19 +112,24 @@ macro_rules! handle {
 
             /// The row index in the handle's table. Asserts the handle is not `NONE`.
             pub const fn index(self) -> usize {
-                todo!()
+                assert!(self.0 != <$int>::MAX, "a handle used as an index is not NONE");
+                self.0 as usize
             }
 
             /// Whether this is the `NONE` sentinel.
             pub const fn is_none(self) -> bool {
-                todo!()
+                self.0 == <$int>::MAX
             }
         }
 
         // `Debug` is the letter and the index (`n12`), or the letter and `-` for `NONE`.
         impl fmt::Debug for $name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                todo!()
+                if self.is_none() {
+                    write!(f, concat!($letter, "-"))
+                } else {
+                    write!(f, concat!($letter, "{}"), self.0)
+                }
             }
         }
 
@@ -200,19 +205,22 @@ impl ItemRef {
 
     /// The item at `index` of `kind`'s table. Does not check that the row exists.
     pub const fn new(kind: ItemKind, index: u32) -> ItemRef {
-        todo!()
+        ItemRef { kind, index }
     }
 }
 
 impl Ref {
     /// A reference to `name` that binds to nothing yet.
     pub const fn unresolved(name: NameId) -> Ref {
-        todo!()
+        Ref {
+            name,
+            def: DefId::NONE,
+        }
     }
 
     /// Whether `def` is set.
     pub const fn is_resolved(self) -> bool {
-        todo!()
+        !self.def.is_none() && self.def.0 != DefId::HELD.0
     }
 }
 
@@ -224,13 +232,22 @@ impl<T> List<T> {
         pool: PhantomData,
     };
 
+    /// The range `[start, start + len)` (crate-internal: lists are made by the builder).
+    pub(crate) const fn range(start: u32, len: u32) -> List<T> {
+        List {
+            start,
+            len,
+            pool: PhantomData,
+        }
+    }
+
     /// Element count.
     pub const fn len(self) -> usize {
-        todo!()
+        self.len as usize
     }
 
     /// Whether the list has no element.
     pub const fn is_empty(self) -> bool {
-        todo!()
+        self.len == 0
     }
 }
