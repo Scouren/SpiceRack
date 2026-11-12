@@ -1,0 +1,10 @@
+# oracle: ngspice-45 com_measure2.c (the .meas forms of measure_extract_variables' header); written by hand
+file "measure.sp" deck
+  title "measure"
+  param half = 0.5
+  measure tr tran trig_targ (cross rise (v (a)) value=0.2 count=1) (at value=2u)
+  measure w tran when (cross fall last (v (a)) value=half delay=1u)
+  measure f tran find (v (out)) (cross cross (v (in)) value=(v(b)) count=2)
+  measure g ac find (v db (out)) (cross rise (v re (in)) value=0.5 count=1)
+  measure s dc stat avg (i (v1)) (at value=0.1) (bound)
+  measure p tran param value=(tr * 2 + half)

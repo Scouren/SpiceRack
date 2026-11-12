@@ -1,0 +1,10 @@
+# codes:
+file "meas_stat.sp" deck
+  title "meas_stat"
+  comment " oracle: ngspice-45 com_measure2.c measure_minMaxAvg, measure_rms_integral (from=, to= bound the window; none given: the whole analysis); runs: av = -1.395530e-04, rm = 7.07109e-01"
+  measure av tran stat avg (v (a)) (at value=0.5u) (at value=1.5u)
+  measure mx tran stat max (v (b)) (bound) (bound)
+  measure mn tran stat min (v (b)) (bound) (at value=2u)
+  measure p tran stat pp (v (b)) (at value=1u) (bound)
+  measure r tran stat rms (v (a)) (bound) (bound)
+  measure ig tran stat integ (v (a)) (at value=0) (at value=1u)

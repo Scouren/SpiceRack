@@ -1,0 +1,7 @@
+# codes:
+file "meas_find.sp" deck
+  title "meas_find"
+  comment " oracle: ngspice-45 com_measure2.c measure_parse_find, measure_at (linear interpolation at AT); run: f2 = -4.503393e-01"
+  measure f1 tran find (v (b)) (cross rise (v (a)) value=0.5 count=2)
+  measure f2 tran find (v (b)) (at value=1u)
+  measure f3 tran find (param (m1) (id)) (cross cross (i (v1)) value=1m count=1)

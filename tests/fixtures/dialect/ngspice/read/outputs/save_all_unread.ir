@@ -1,0 +1,6 @@
+# codes: P1350 P1350
+file "save_all_unread.sp" deck
+  title "save_all_unread"
+  comment " oracle: run: .save all, .save allv and no .save keep every node voltage and every branch current (e1#branch, l1#branch, v1#branch); the IR has no category for every branch current"
+  opaque ngspice unread ".save all"
+  opaque ngspice unread ".save alli"

@@ -1,0 +1,5 @@
+# codes:
+file "print_tran.sp" deck
+  title "print_tran"
+  comment " oracle: ngspice-45 dotcards.c fixem (v(a,b) prints v(a)-v(b), i(x) is x#branch); run: .print ac v(x1.n) i(v.x1.v9) printed both"
+  print tran (v (a)) (vdiff (a) (b)) (i (v1)) (param (r1) (i)) (v (x1 n))
