@@ -47,6 +47,7 @@ use crate::probe::{
 };
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -74,6 +75,10 @@ impl DetailFacts for Dc {
     }
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.dc_axes(self.axes);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
         r.dc_axes(self.axes);
     }
 
@@ -176,6 +181,10 @@ impl DetailFacts for Ac {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.sweep(&mut self.sweep);
     }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
@@ -220,6 +229,11 @@ impl DetailFacts for Noise {
         r.probe(&mut self.output);
         r.sweep(&mut self.sweep);
         r.expr(&mut self.points_per_summary);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
+        r.one(&mut self.source);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -330,6 +344,11 @@ impl DetailFacts for Tf {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.output);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
+        r.one(&mut self.source);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -375,6 +394,10 @@ impl DetailFacts for DcXf {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.output);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -414,6 +437,10 @@ impl DetailFacts for Sens {
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.output);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -456,6 +483,10 @@ impl DetailFacts for Xf {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.output);
         r.sweep(&mut self.sweep);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -504,6 +535,10 @@ impl DetailFacts for SensAc {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.output);
         r.sweep(&mut self.sweep);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);

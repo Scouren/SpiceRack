@@ -37,9 +37,7 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-#[cfg(any(test, feature = "gen"))]
-use crate::id::NameId;
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
@@ -50,6 +48,7 @@ use crate::plan::{
 use crate::plan::{gen_ref, gen_target, target_kinds};
 use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
+use crate::run_names::{names, names_of};
 use crate::run_words::{
     get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
     take_word, trim_lead, word, write_ref,
@@ -79,6 +78,11 @@ impl RowFacts for Loop {
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let row: Loop = design.row(at.index);
         by_loop!(row.kind, exprs_of(design, row.detail, f));
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Loop = design.row(at.index);
+        by_loop!(row.kind, names_of(design, row.detail, f));
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -311,6 +315,12 @@ impl RowFacts for Alter {
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let mut row: Alter = design.row(at.index);
         f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let mut row: Alter = design.row(at.index);
+        names(design, f).target(&mut row.target);
         design.editor().set(at.index, row);
     }
 

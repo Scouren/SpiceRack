@@ -43,6 +43,7 @@ use crate::probe::{
 };
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -188,6 +189,10 @@ impl DetailFacts for Tran {
         if let StepCeiling::Given(e) = &mut self.ceiling {
             r.expr(e);
         }
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
@@ -363,6 +368,10 @@ impl DetailFacts for Four {
         ] {
             r.expr(e);
         }
+        r.probes(self.outputs);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
         r.probes(self.outputs);
     }
 

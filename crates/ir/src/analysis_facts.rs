@@ -10,6 +10,7 @@
 //! IR-DECISIONS.md` R4, R5 (a periodic small-signal analysis follows an `Hb` or `Pss`).
 //!
 //! Contents: `pub(crate) trait DetailFacts` (`DetailFacts::handles`, `DetailFacts::map_exprs`,
+//! `DetailFacts::map_names`,
 //! `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
 //! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
@@ -27,14 +28,13 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-#[cfg(any(test, feature = "gen"))]
-use crate::id::NameId;
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::{target_refs, target_refs_into};
 use crate::run_exprs::{Roots, exprs_of};
 use crate::run_extra::RunExtra;
+use crate::run_names::{Names, names_of};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::loop_depth;
 use crate::run_words::{put_name, take_enum, take_name, word};
@@ -53,6 +53,9 @@ pub(crate) trait DetailFacts: RunDetail {
     /// Visits the row's expression roots, its pools' included, as `handles` lists them (A23);
     /// the caller stores the row back.
     fn map_exprs(&mut self, r: &mut Roots<'_>);
+    /// Visits the row's element names, its pools' included, in field order (A32); the caller
+    /// stores the row back.
+    fn map_names(&mut self, r: &mut Names<'_>);
     /// Adds the row's `RunExtra` and option features.
     fn features(&self, design: &Design, set: &mut FeatureSet);
     /// The first broken invariant of the row's own fields: `FieldDomain`, or `HandleRange` for a
@@ -185,6 +188,11 @@ impl RowFacts for Analysis {
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let row: Analysis = design.row(at.index);
         by_detail!(row.kind, (), exprs_of(design, row.detail, f));
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Analysis = design.row(at.index);
+        by_detail!(row.kind, (), names_of(design, row.detail, f));
     }
 
     fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {

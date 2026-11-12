@@ -46,6 +46,7 @@ use crate::id::{ExprId, ItemRef, NameId, NameList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
+use crate::run_names::names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -419,6 +420,18 @@ impl RowFacts for NodeSet {
         let mut row: NodeSet = design.row(at.index);
         f(&mut row.value, ExprUse::Constant);
         design.editor().set(at.index, row);
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: NodeSet = design.row(at.index);
+        let mut r = names(design, f);
+        match row.kind {
+            NodeSetKind::Device => r.path(row.node),
+            NodeSetKind::Ic | NodeSetKind::Nodeset => {
+                r.net_path(row.node);
+                r.net_path(row.reference);
+            }
+        }
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
