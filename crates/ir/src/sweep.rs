@@ -241,17 +241,7 @@ pub(crate) fn sweep_valid(s: &SweepSpec) -> bool {
 /// Adds the sweep's `RunExtra` features.
 pub(crate) fn sweep_features(s: &SweepSpec, set: &mut FeatureSet) {
     let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
-    match s.kind {
-        SweepKind::Lin => {
-            if !s.points.is_none() {
-                add(RunExtra::SweepLinPoints);
-            }
-        }
-        SweepKind::Dec => add(RunExtra::SweepDec),
-        SweepKind::Oct => add(RunExtra::SweepOct),
-        SweepKind::Log => add(RunExtra::SweepLog),
-        SweepKind::List => add(RunExtra::SweepList),
-    }
+    // stub (A24): the use-and-form members
     if s.end == SweepEnd::OnStop {
         add(RunExtra::SweepEndOnStop);
     }
@@ -317,16 +307,12 @@ pub(crate) fn parse_sweep(
 pub(crate) fn gen_sweep(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> SweepSpec {
     let has = |x: RunExtra| features.contains(Feature::Run(x));
     let mut kinds = vec![SweepKind::Lin];
-    for (k, x) in [
-        (SweepKind::Dec, RunExtra::SweepDec),
-        (SweepKind::Oct, RunExtra::SweepOct),
-        (SweepKind::Log, RunExtra::SweepLog),
-        (SweepKind::List, RunExtra::SweepList),
-    ] {
-        if has(x) {
-            kinds.push(k);
-        }
-    }
+    kinds.extend([
+        SweepKind::Dec,
+        SweepKind::Oct,
+        SweepKind::Log,
+        SweepKind::List,
+    ]); // stub
     let kind = kinds[g.below(kinds.len() as u32) as usize];
     let value = |g: &mut Gen, b: &mut Builder<'_>| g.expr(b, features, Reads::Constant);
     let s = if kind == SweepKind::List {
@@ -336,9 +322,7 @@ pub(crate) fn gen_sweep(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet)
     } else {
         let (start, stop, n) = (value(g, b), value(g, b), value(g, b));
         match kind {
-            SweepKind::Lin if has(RunExtra::SweepLinPoints) && g.chance(2) => {
-                SweepSpec::lin_points(start, stop, n)
-            }
+            SweepKind::Lin if g.chance(2) => SweepSpec::lin_points(start, stop, n),
             SweepKind::Lin => SweepSpec::lin_step(start, stop, n),
             SweepKind::Dec => SweepSpec::dec(start, stop, n),
             SweepKind::Oct => SweepSpec::oct(start, stop, n),

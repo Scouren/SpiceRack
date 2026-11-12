@@ -22,11 +22,11 @@ pub enum RunExtra {
     TranSimulatorStep,
     /// A transient that records from a later start (`record_start` set).
     TranRecordStart,
-    /// A transient with its own step ceiling (`max_step` set).
+    /// A transient with its own step ceiling (`StepCeiling::Given`).
     TranMaxStep,
     /// A transient with a first-step size (`initial_step` set; Xyce).
     TranInitialStep,
-    /// A transient whose default step ceiling is none (`cap` `None`, `max_step` `NONE`).
+    /// A transient whose default step ceiling is none (`StepCeiling::Rule(StepCap::None)`).
     TranCapNone,
     /// A transient whose default step ceiling is ngspice's `min(print_step, span/50)`.
     TranCapNgspice,
@@ -60,16 +60,42 @@ pub enum RunExtra {
     DcAxisModelParam,
     /// A DC axis over an option.
     DcAxisOption,
-    /// A linear sweep by point count (`points` set).
-    SweepLinPoints,
-    /// A sweep per decade.
-    SweepDec,
-    /// A sweep per octave.
-    SweepOct,
-    /// A log sweep by total point count (Spectre `log=`).
-    SweepLog,
-    /// A sweep over listed values.
-    SweepList,
+    /// The sweep of a DC axis, linear by step (`step` set) (A24: one member per use and form).
+    SweepDcLinStep,
+    /// The sweep of a DC axis, linear by count (`points` set) (A24: one member per use and form).
+    SweepDcLinPoints,
+    /// The sweep of a DC axis, per decade (A24: one member per use and form).
+    SweepDcDec,
+    /// The sweep of a DC axis, per octave (A24: one member per use and form).
+    SweepDcOct,
+    /// The sweep of a DC axis, logarithmic by total count (Spectre `log=`) (A24: one member per use and form).
+    SweepDcLog,
+    /// The sweep of a DC axis, over listed values (A24: one member per use and form).
+    SweepDcList,
+    /// The sweep of a sweep loop, linear by step (`step` set) (A24: one member per use and form).
+    SweepLoopLinStep,
+    /// The sweep of a sweep loop, linear by count (`points` set) (A24: one member per use and form).
+    SweepLoopLinPoints,
+    /// The sweep of a sweep loop, per decade (A24: one member per use and form).
+    SweepLoopDec,
+    /// The sweep of a sweep loop, per octave (A24: one member per use and form).
+    SweepLoopOct,
+    /// The sweep of a sweep loop, logarithmic by total count (Spectre `log=`) (A24: one member per use and form).
+    SweepLoopLog,
+    /// The sweep of a sweep loop, over listed values (A24: one member per use and form).
+    SweepLoopList,
+    /// The sweep of a frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal), linear by step (`step` set) (A24: one member per use and form).
+    SweepFreqLinStep,
+    /// The sweep of a frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal), linear by count (`points` set) (A24: one member per use and form).
+    SweepFreqLinPoints,
+    /// The sweep of a frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal), per decade (A24: one member per use and form).
+    SweepFreqDec,
+    /// The sweep of a frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal), per octave (A24: one member per use and form).
+    SweepFreqOct,
+    /// The sweep of a frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal), logarithmic by total count (Spectre `log=`) (A24: one member per use and form).
+    SweepFreqLog,
+    /// The sweep of a frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal), over listed values (A24: one member per use and form).
+    SweepFreqList,
     /// A sweep that ends on its stop value off the grid (LTspice).
     SweepEndOnStop,
     /// A sweep written as centre and span (Spectre).
@@ -306,11 +332,14 @@ pub enum RunExtra {
     /// operating point, its sweeps and the transient, not AC; A22). One kind is
     /// `SavePerAnalysis`; every kind neither.
     SaveAnalysisSet,
+    /// An autonomous PSS whose oscillator reference node is not ground (`Pss::osc_n`; ngspice's
+    /// `.pss` names one node only; A24).
+    PssOscDiff,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 137] = [
+    pub const ALL: [RunExtra; 151] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -333,11 +362,24 @@ impl RunExtra {
         RunExtra::DcAxisDeviceParam,
         RunExtra::DcAxisModelParam,
         RunExtra::DcAxisOption,
-        RunExtra::SweepLinPoints,
-        RunExtra::SweepDec,
-        RunExtra::SweepOct,
-        RunExtra::SweepLog,
-        RunExtra::SweepList,
+        RunExtra::SweepDcLinStep,
+        RunExtra::SweepDcLinPoints,
+        RunExtra::SweepDcDec,
+        RunExtra::SweepDcOct,
+        RunExtra::SweepDcLog,
+        RunExtra::SweepDcList,
+        RunExtra::SweepLoopLinStep,
+        RunExtra::SweepLoopLinPoints,
+        RunExtra::SweepLoopDec,
+        RunExtra::SweepLoopOct,
+        RunExtra::SweepLoopLog,
+        RunExtra::SweepLoopList,
+        RunExtra::SweepFreqLinStep,
+        RunExtra::SweepFreqLinPoints,
+        RunExtra::SweepFreqDec,
+        RunExtra::SweepFreqOct,
+        RunExtra::SweepFreqLog,
+        RunExtra::SweepFreqList,
         RunExtra::SweepEndOnStop,
         RunExtra::SweepCenterSpan,
         RunExtra::NoiseSummary,
@@ -448,6 +490,7 @@ impl RunExtra {
         RunExtra::RunInterleaved,
         RunExtra::IcBeyondNext,
         RunExtra::SaveAnalysisSet,
+        RunExtra::PssOscDiff,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
