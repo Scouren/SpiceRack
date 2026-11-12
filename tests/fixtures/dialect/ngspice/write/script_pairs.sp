@@ -8,4 +8,12 @@ echo b
 .control
 run
 .endc
+.control
+op
+.endc
+.control
+if 1
+op
+end
+.endc
 .end
