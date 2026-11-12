@@ -122,11 +122,8 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         ("model a mesa polarity=n params=(vto=1)", "W1203"),
         ("model a bsim4 polarity=n version=\"4.9\"", "W1202"),
         ("model a hisim_hv polarity=n version=\"3.0\"", "W1202"),
-        // no version on a versioned family: written without one, ngspice's reader would read
-        // its default back (b4set.c:205, b3soiddset.c:69, hicum2setup.c:45): L5 seed 0
-        ("model a bsim4 polarity=n", "W1202"),
-        ("model a b3_soi_dd polarity=n", "W1202"),
-        ("model a hicum2 polarity=n", "W1202"),
+        // a version is written as the vocabulary spells it (b4v5check.c:64: 4.5 is 4.5.0)
+        ("model a bsim4 polarity=n version=\"4.5\"", "W1202"),
         // a module's version is no field ngspice has (its reader keeps `version=` a parameter)
         ("model a module module=m version=\"1.0\"", "W1202"),
         // the type word is a code model or an OSDI module by what ngspice loaded (inpdomod.c
@@ -152,7 +149,7 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         assert_eq!(got, [code], "{line}");
     }
     // and admits a card of each kind it spells
-    let fine = "file \"t.sp\" deck\n  title \"t\"\n  model a mos1 polarity=n params=(vto=1 kp=2)\n  model b.1 bsim4 polarity=p params=(lmin=1 toxe=2) bin_of=b version=\"4.5\"\n  model c vbic polarity=n version=\"1.2\"\n  model d diode params=(m=0.3)\n";
+    let fine = "file \"t.sp\" deck\n  title \"t\"\n  model a mos1 polarity=n params=(vto=1 kp=2)\n  model b.1 bsim4 polarity=p params=(lmin=1 toxe=2) bin_of=b version=\"4.5.0\"\n  model c vbic polarity=n version=\"1.2\"\n  model d diode params=(m=0.3)\n";
     let mut design = parse_ir(fine);
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut design, row(), &mut diags);
