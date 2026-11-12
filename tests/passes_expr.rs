@@ -11,402 +11,74 @@
 //!
 //! Contents: tests only.
 
+#[path = "passes_expr/bindings.rs"]
+mod bindings;
+#[path = "passes_expr/compare.rs"]
+mod compare;
+
 use spicerack::ir;
-use spicerack::ir::r#gen::{Size, generate};
-use spicerack::passes;
 
-/// A moderate design (the pass laws' size).
-const SIZE: Size = Size {
-    items: 48,
-    scope_depth: 3,
-    expr_depth: 4,
-    files: 3,
-};
+use compare::{ANY, code, keeps_boundary_values, keeps_generated_values, notes, typed};
 
-/// Every tag pair of two operands.
-const ANY: &[u8] = &[0, 1, 2, 3];
+/// Each rule of the powers, roundings and ternaries: its rows, the texts whose roots it
+/// rewrites (operands `x` and `y`), and the node it removes.
+type Rule = (&'static str, &'static [&'static str], fn(ir::Expr) -> bool);
 
-/// Seeds of the generated designs.
-const SEEDS: std::ops::Range<u64> = 0..200;
-
-/// Bindings per generated design.
-const TRIALS: u64 = 8;
-
-/// Every read answers a value drawn by (trial, name) from the boundary set or a random finite
-/// number; a whole value within 2⁵³ is Int on odd draws.
-struct Point<'d> {
-    design: &'d ir::Design,
-    trial: u64,
-    /// A resolved parameter read is its definition's value, evaluated (a head default for a
-    /// formal), as the tag table assumes: the typed passes decide by it.
-    follow: bool,
-    depth: std::cell::Cell<u32>,
-}
-
-/// `x` and `y` bound to two values, the temperature 27, everything else 1.
-struct Pair<'d> {
-    design: &'d ir::Design,
-    x: ir::Value,
-    y: ir::Value,
-}
-
-impl ir::Bindings for Point<'_> {
-    fn param(&self, p: ir::Ref) -> Option<f64> {
-        self.param_value(p).map(|v| v.number)
-    }
-    fn param_value(&self, p: ir::Ref) -> Option<ir::Value> {
-        if !self.follow || !p.is_resolved() {
-            return Some(self.value(self.design.str(p.name)));
-        }
-        let def = self.design.def(p.def);
-        let value = match (def.kind, def.item.kind) {
-            (ir::DefKind::Param, ir::ItemKind::Param) => {
-                self.design.row::<ir::item::Param>(def.item.index).value
-            }
-            (ir::DefKind::Param, ir::ItemKind::Subckt) => {
-                let s: ir::item::Subckt = self.design.row(def.item.index);
-                let given = self
-                    .design
-                    .params(s.params)
-                    .iter()
-                    .find(|q| q.0 == def.name);
-                given.map_or(ir::ExprId::NONE, |q| q.1)
-            }
-            _ => return Some(ir::Value::real(self.value(self.design.str(p.name)).number)),
-        };
-        if value.is_none() || self.depth.get() > 64 {
-            return None;
-        }
-        self.depth.set(self.depth.get() + 1);
-        let v = ir::eval_typed(self.design, value, self).ok();
-        self.depth.set(self.depth.get() - 1);
-        v
-    }
-    fn voltage(&self, net: ir::NameId, _: ir::NameId) -> Option<f64> {
-        Some(self.value(self.design.str(net)).number)
-    }
-    fn current(&self, element: ir::NameId) -> Option<f64> {
-        Some(self.value(self.design.str(element)).number)
-    }
-    fn time(&self) -> Option<f64> {
-        Some(self.value("$time").number)
-    }
-    fn temp(&self) -> Option<f64> {
-        Some(self.value("$temp").number)
-    }
-    fn freq(&self) -> Option<f64> {
-        Some(self.value("$freq").number)
-    }
-    fn tstep(&self) -> Option<f64> {
-        Some(self.value("$tstep").number)
-    }
-    fn tstop(&self) -> Option<f64> {
-        Some(self.value("$tstop").number)
-    }
-    fn tnom(&self) -> Option<f64> {
-        Some(self.value("$tnom").number)
-    }
-    fn draw(&self, _: ir::Dist, _: ir::DrawWhen, _: ir::DrawPer, args: &[f64]) -> Option<f64> {
-        Some(args[0])
-    }
-}
-
-impl ir::Bindings for Pair<'_> {
-    fn param(&self, p: ir::Ref) -> Option<f64> {
-        self.param_value(p).map(|v| v.number)
-    }
-    fn param_value(&self, p: ir::Ref) -> Option<ir::Value> {
-        Some(match self.design.str(p.name) {
-            "x" => self.x,
-            "y" => self.y,
-            _ => ir::Value::real(1.0),
-        })
-    }
-    fn voltage(&self, _: ir::NameId, _: ir::NameId) -> Option<f64> {
-        Some(1.0)
-    }
-    fn current(&self, _: ir::NameId) -> Option<f64> {
-        Some(1.0)
-    }
-    fn time(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn temp(&self) -> Option<f64> {
-        Some(27.0)
-    }
-    fn freq(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn tstep(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn tstop(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn tnom(&self) -> Option<f64> {
-        Some(27.0)
-    }
-    fn draw(&self, _: ir::Dist, _: ir::DrawWhen, _: ir::DrawPer, args: &[f64]) -> Option<f64> {
-        Some(args[0])
-    }
-}
+const RULES: &[Rule] = &[
+    (
+        "pow_to_powabs",
+        &[
+            "pow(x, 2)",
+            "pow(x, 3)",
+            "pow(x, -1)",
+            "pow(x, -2)",
+            "pow(x, 0.5)",
+            "pow(x, 1.5)",
+            "pow(abs(x), y)",
+            "pow(exp(x), y)",
+            "pow(sqr(x), y)",
+        ],
+        |e| matches!(e, ir::Expr::Call(ir::Func::Pow, _)),
+    ),
+    (
+        "round_half_even_to_away",
+        &["round_half_even(x)", "round_half_even(x * y)"],
+        |e| matches!(e, ir::Expr::Call(ir::Func::RoundHalfEven, _)),
+    ),
+    (
+        "round_half_away_to_floor",
+        &["round_half_away(x)", "round_half_away(x - y)"],
+        |e| matches!(e, ir::Expr::Call(ir::Func::RoundHalfAway, _)),
+    ),
+    ("sgn_to_ternary", &["sgn(x)", "sgn(x - y)"], |e| {
+        matches!(e, ir::Expr::Call(ir::Func::Sgn, _))
+    }),
+    ("step_to_ternary", &["step(x)", "step(x * y)"], |e| {
+        matches!(e, ir::Expr::Call(ir::Func::Step, _))
+    }),
+    (
+        "step_half_to_ternary",
+        &["step_half(x)", "step_half(x + y)"],
+        |e| matches!(e, ir::Expr::Call(ir::Func::StepHalf, _)),
+    ),
+    ("ramp_to_ternary", &["ramp(x)", "ramp(x - y)"], |e| {
+        matches!(e, ir::Expr::Call(ir::Func::Ramp, _))
+    }),
+    (
+        "pwl_to_ternary",
+        &[
+            "pwl(x, -1, 2, 0.5, -3, 2.5, 7)",
+            "pwl(x * y, 0, 1)",
+            "pwl(x, 0, 0, 1, 1)",
+        ],
+        |e| matches!(e, ir::Expr::Call(ir::Func::Pwl, _)),
+    ),
+];
 
 // ---- private ----
 
-/// A code of this group.
-const fn code(n: u16) -> ir::Code {
-    ir::Code::new(b'U', n)
-}
-
-/// Whether `e` may compute an Int (the operators of A12 K1's table that keep one).
-fn int_capable(e: ir::Expr) -> bool {
-    use ir::BinOp::{Add, DivTyped, Mul, Sub};
-    use ir::Func::{Max, Min, SgnZeroPos, ToInt};
-    matches!(
-        e,
-        ir::Expr::Binary(Add | Sub | Mul | DivTyped, ..)
-            | ir::Expr::Unary(ir::UnOp::Neg, _)
-            | ir::Expr::Call(Min | Max | SgnZeroPos | ToInt, _)
-    )
-}
-
-impl Point<'_> {
-    fn value(&self, name: &str) -> ir::Value {
-        let mut h = self.trial.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03;
-        for b in name.bytes() {
-            h = (h ^ u64::from(b)).wrapping_mul(0x100_0000_01B3);
-        }
-        h ^= h >> 29;
-        let set = boundary();
-        let number = match h % 3 {
-            0 => (h >> 8) as f64 / (1u64 << 52) as f64 * 8.0 - 4.0,
-            _ => set[(h >> 8) as usize % set.len()],
-        };
-        let whole = number.fract() == 0.0 && number.abs() <= 9_007_199_254_740_992.0;
-        match whole && (h >> 40) & 1 == 1 {
-            true => ir::Value::int(number),
-            false => ir::Value::real(number),
-        }
-    }
-}
-
-/// The boundary set: zeros, halves and their neighbours, 2⁵² ± 1, 2⁵³, the ends of the doubles.
-fn boundary() -> Vec<f64> {
-    let p52 = 4_503_599_627_370_496.0f64;
-    let mut out = vec![
-        0.0,
-        -0.0,
-        1.0,
-        -1.0,
-        2.0,
-        3.0,
-        -3.0,
-        0.5,
-        -0.5,
-        1.5,
-        2.5,
-        -2.5,
-        2.5f64.next_up(),
-        2.5f64.next_down(),
-        0.5f64.next_down(),
-        -(0.5f64.next_down()),
-        1.0 / 3.0,
-        p52 - 1.0,
-        p52,
-        p52 + 1.0,
-        -(p52 + 1.0),
-        2.0 * p52,
-        1e308,
-        f64::MAX,
-        f64::MIN_POSITIVE,
-        5e-324,
-        -1e-300,
-    ];
-    out.extend([1.0f64, -1.0].map(|s| s * (1.0f64).next_up()));
-    out
-}
-
-/// The registered pass `name`.
-fn pass(name: &str) -> &'static passes::Pass {
-    passes::all()
-        .find(|p| p.name == name)
-        .unwrap_or_else(|| panic!("{name} is not registered"))
-}
-
-/// Every expression root of every reachable item, in `map_exprs` order.
-fn roots(design: &ir::Design) -> Vec<ir::ExprId> {
-    let mut copy = design.clone();
-    let mut out = Vec::new();
-    let items: Vec<ir::ItemRef> = copy.reachable().into_iter().map(|(i, _)| i).collect();
-    let mut editor = copy.editor();
-    for item in items {
-        editor.map_exprs(item, &mut |e, _| out.push(*e));
-    }
-    out
-}
-
-/// Whether the tree under `root` holds a node `hit` accepts (bounded by the row count).
-fn holds(design: &ir::Design, root: ir::ExprId, hit: fn(ir::Expr) -> bool) -> bool {
-    let mut stack = vec![root];
-    for _ in 0..=design.expr_count() * 4 {
-        let Some(e) = stack.pop() else { return false };
-        if e.is_none() {
-            continue;
-        }
-        let x = design.expr(e);
-        if hit(x) {
-            return true;
-        }
-        match x {
-            ir::Expr::Call(_, l)
-            | ir::Expr::UserCall(_, l)
-            | ir::Expr::Draw(_, _, _, l)
-            | ir::Expr::List(l) => stack.extend_from_slice(design.exprs(l)),
-            ir::Expr::Unary(_, a) => stack.push(a),
-            ir::Expr::Binary(_, a, b) => stack.extend([a, b]),
-            ir::Expr::Ternary(c, a, b) => stack.extend([c, a, b]),
-            _ => {}
-        }
-    }
-    panic!("the walk outgrew the table")
-}
-
-/// `None` when the two results agree, else the pair: the same bits, or the same domain error
-/// kind; the same tag while `after` holds a typed division (only `DivTyped` reads a tag, A12
-/// K1). Without one, an Int beyond 2⁵³ (a domain error, R12: not carried) may become a Real:
-/// an error at a node that may compute an Int may become a value or another error.
-fn differ(
-    after: &ir::Design,
-    a: Result<ir::Value, ir::Domain>,
-    b: Result<ir::Value, ir::Domain>,
-) -> Option<String> {
-    let used = ir::features_used(after);
-    let typed = used.contains(ir::Feature::Binary(ir::BinOp::DivTyped))
-        || used.contains(ir::Feature::BinaryDyn(ir::BinOp::DivTyped));
-    let same = match (a, b) {
-        (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits() && (!typed || x.int == y.int),
-        (Err(ir::Domain::OutOfDomain(e)), _) if !typed && int_capable(after.expr(e)) => true,
-        (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
-        _ => false,
-    };
-    (!same).then(|| format!("{a:?} before, {b:?} after"))
-}
-
-/// Runs `name` on generated designs and compares every root it changed, under [`TRIALS`]
-/// bindings each; returns how many changed roots held a node `hit` accepts.
-fn keeps_generated_values(name: &str, hit: fn(ir::Expr) -> bool, follow: bool) -> usize {
-    let p = pass(name);
-    let mut compared = 0;
-    for seed in SEEDS {
-        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
-        let before = roots(&design);
-        let mut diags = ir::Diags::new();
-        (p.run)(&mut design, &mut diags);
-        let after = roots(&design);
-        assert_eq!(before.len(), after.len(), "seed {seed}: the roots stay");
-        for (&old, &new) in before.iter().zip(&after) {
-            if old == new {
-                continue;
-            }
-            compared += usize::from(holds(&design, old, hit));
-            for trial in 0..TRIALS {
-                let env = Point {
-                    design: &design,
-                    trial: seed * TRIALS + trial,
-                    follow,
-                    depth: std::cell::Cell::new(0),
-                };
-                let got = differ(
-                    &design,
-                    ir::eval_typed(&design, old, &env),
-                    ir::eval_typed(&design, new, &env),
-                );
-                assert!(got.is_none(), "{name} seed {seed} trial {trial}: {got:?}");
-            }
-        }
-    }
-    compared
-}
-
-/// Reads `text` (one deck whose params `x` and `y` are the operands), runs `name`, and compares
-/// every root it changed with `x` and `y` bound to each pair of the boundary set, under each
-/// tag pair of `tags` (bit 0: `x` Int, bit 1: `y` Int; a non-whole value stays Real). Returns
-/// the points compared.
-fn keeps_boundary_values(name: &str, text: &str, tags: &[u8]) -> usize {
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    ir::parse(text, &mut design.builder(), &mut diags);
-    assert!(diags.is_empty(), "{:?}", diags.rows());
-    let before = roots(&design);
-    (pass(name).run)(&mut design, &mut diags);
-    let after = roots(&design);
-    let changed: Vec<(ir::ExprId, ir::ExprId)> = before
-        .into_iter()
-        .zip(after)
-        .filter(|(a, b)| a != b)
-        .collect();
-    assert!(!changed.is_empty(), "{name}: the pass changed no root");
-    let set = boundary();
-    let mut points = 0;
-    for &x in &set {
-        for &y in &set {
-            for &tags in tags {
-                let env = Pair {
-                    design: &design,
-                    x: tagged(x, tags & 1 == 1),
-                    y: tagged(y, tags & 2 == 2),
-                };
-                if env.x.int != (tags & 1 == 1) || env.y.int != (tags & 2 == 2) {
-                    continue; // a non-whole value has no Int binding
-                }
-                for &(old, new) in &changed {
-                    points += 1;
-                    let got = differ(
-                        &design,
-                        ir::eval_typed(&design, old, &env),
-                        ir::eval_typed(&design, new, &env),
-                    );
-                    assert!(got.is_none(), "{name} x={x:e} y={y:e} tags {tags}: {got:?}");
-                }
-            }
-        }
-    }
-    points
-}
-
-/// `v` Int when asked and whole within 2⁵³, else Real.
-fn tagged(v: f64, int: bool) -> ir::Value {
-    match int && v.fract() == 0.0 && v.abs() <= 9_007_199_254_740_992.0 {
-        true => ir::Value::int(v),
-        false => ir::Value::real(v),
-    }
-}
-
 fn is_powabs(e: ir::Expr) -> bool {
     matches!(e, ir::Expr::Call(ir::Func::PowAbs, _))
-}
-
-/// The notes `name` leaves on the fixture `case` of its folder, by code.
-fn notes(name: &str, case: &str) -> Vec<ir::Code> {
-    let path = format!(
-        "{}/tests/fixtures/passes/expr/{name}/{case}.ir",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let text = std::fs::read_to_string(&path).expect("the fixture");
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    ir::parse(&text, &mut design.builder(), &mut diags);
-    assert!(diags.is_empty(), "{:?}", diags.rows());
-    (pass(name).run)(&mut design, &mut diags);
-    diags.rows().iter().map(|d| d.code).collect()
-}
-
-/// Every root `name` changes keeps its value on generated designs, its parameters bound to
-/// their definitions; returns the changed roots that held a node `hit` accepts.
-fn typed(name: &str, hit: fn(ir::Expr) -> bool) -> usize {
-    let n = keeps_generated_values(name, hit, true);
-    eprintln!("{name}: {n} generated roots");
-    n
 }
 
 #[test]
@@ -522,4 +194,71 @@ fn sgnzeropos_to_ternary_keeps_every_value() {
     assert!(typed("sgnzeropos_to_ternary", hit) > 0);
     assert!(typed("sgnzeropos_to_ternary_dyn", hit) > 0);
     assert_eq!(notes("sgnzeropos_to_ternary", "typed"), [code(103)]);
+}
+
+#[test]
+fn the_powers_roundings_and_ternaries_keep_every_value() {
+    for &(name, texts, hit) in RULES {
+        let dyn_name = format!("{name}_dyn");
+        for &(row, dynamic) in &[(name, false), (dyn_name.as_str(), true)] {
+            let mut points = 0;
+            for &body in texts {
+                let field = match dynamic {
+                    true => format!("  element behav b1 (n 0) expr=({body} + v(n))\n"),
+                    false => format!("  param r = {body}\n"),
+                };
+                let text = format!("file \"p.sp\" deck\n  param x = 1\n  param y = 1\n{field}");
+                points += keeps_boundary_values(row, &text, ANY);
+            }
+            let generated = keeps_generated_values(row, hit, false);
+            eprintln!("{row}: {points} boundary points, {generated} generated roots");
+            // generated pwl points are rarely increasing literals: its own test draws them
+            assert!(
+                generated > 0 || name == "pwl_to_ternary",
+                "{row}: no generated root held its node"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_rules_that_cannot_convert_say_why() {
+    assert_eq!(notes("pow_to_powabs", "base_may_be_negative"), [code(104)]);
+    assert_eq!(notes("round_half_even_to_away", "draw"), [code(105)]);
+    assert_eq!(notes("sgn_to_ternary", "draw"), [code(105)]);
+    assert_eq!(notes("pwl_to_ternary", "decreasing"), [code(106)]);
+}
+
+#[test]
+fn pwl_to_ternary_keeps_every_value_on_drawn_points() {
+    // oracle: eval_typed of `pwl` itself, on 1 to 5 strictly increasing literal points (Int
+    // and Real forms, negative and fractional), the input bound to the boundary set
+    let mut h = 0x2545_F491_4F6C_DD1Du64;
+    let mut next = move |n: u64| {
+        h ^= h << 13;
+        h ^= h >> 7;
+        h ^= h << 17;
+        h % n
+    };
+    let mut points = 0;
+    for _ in 0..100 {
+        let n = 1 + next(5);
+        let mut at = next(7) as i64 - 3;
+        let mut args = String::new();
+        for _ in 0..n {
+            let y = next(11) as i64 - 5;
+            let form = |v: i64, k: u64| match k {
+                0 => format!("{v}i"),
+                1 => format!("{v}.5"),
+                _ => format!("{v}"),
+            };
+            args.push_str(&format!(", {}, {}", form(at, next(3)), form(y, next(3))));
+            at += 1 + next(3) as i64;
+        }
+        let text = format!(
+            "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = pwl(x{args}) /: 2i\n"
+        );
+        points += keeps_boundary_values("pwl_to_ternary", &text, ANY);
+    }
+    eprintln!("pwl_to_ternary: {points} drawn points");
 }

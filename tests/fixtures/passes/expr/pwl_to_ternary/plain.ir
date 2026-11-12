@@ -1,0 +1,5 @@
+file "d.sp" deck
+  param a = 2
+  param r = pwl(a, 0, 1, 2, 3)
+  param s = pwl(a, 0, 1, 1, 2, 3, -1)
+  param t = pwl(a, 5, 7)
