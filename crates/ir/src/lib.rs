@@ -39,7 +39,7 @@
 //!   `dump`, `parse`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
-//! - run owner: `Analysis`, `AnalysisKind`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
+//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
 //!   `EventKind`, `MeasureKind`, `Stat`, `Env`, `IcScope`, `NodeSet`, `NodeSetKind`,
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
@@ -138,7 +138,7 @@ pub mod stats;
 pub mod sweep;
 pub mod tran;
 
-pub use analysis::{Analysis, AnalysisKind, RunDetail, RunDetails};
+pub use analysis::{Analysis, AnalysisKind, AnalysisKinds, RunDetail, RunDetails};
 pub use build::Builder;
 pub use check::{Violation, check, check_legal};
 pub use class::{ExprClass, expr_class};

@@ -19,7 +19,7 @@
 //! `PrintView::ALL`, `PrintView::COUNT`; `RowFacts` for `Save` and `Print` (`Measure`'s:
 //! `measure_facts.rs`)
 
-use crate::analysis::AnalysisKind;
+use crate::analysis::{AnalysisKind, AnalysisKinds};
 use crate::analysis_facts::report;
 use crate::build::Builder;
 use crate::check::Violation;
@@ -51,11 +51,11 @@ use crate::text_expr::Ctx;
 /// Quantities to keep in the results: a member of the deck's save set.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Save {
-    /// The analysis kind whose results keep them (HSPICE `.probe tran …`); read only when
-    /// `every_analysis` is false.
-    pub analysis: AnalysisKind,
-    /// Whether they are kept for every analysis (`.save`, Spectre and VACASK `save`).
-    pub every_analysis: bool,
+    /// The analyses whose results keep them, exactly: `AnalysisKinds::ALL` for every analysis
+    /// (`.save`, Spectre `save`), one kind (HSPICE `.probe tran …`), or a set (VACASK's `save`
+    /// governs the operating point, its sweeps and the transient, not AC; A22). Never empty
+    /// (checked).
+    pub analyses: AnalysisKinds,
     /// The quantities, at least one.
     pub probes: ProbeList,
 }
@@ -121,7 +121,7 @@ impl RowFacts for Save {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        flag(set, !self.every_analysis, RunExtra::SavePerAnalysis);
+        flag(set, self.analyses.len() == 1, RunExtra::SavePerAnalysis);
         list_features(design, self.probes, set);
     }
 
@@ -133,8 +133,10 @@ impl RowFacts for Save {
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         let at = out.len();
-        if !self.every_analysis {
-            put_word(out, &format!("analysis={}", word(self.analysis)));
+        if let Some(kind) = self.analyses.iter().next()
+            && self.analyses != AnalysisKinds::ALL
+        {
+            put_word(out, &format!("analysis={}", word(kind)));
         }
         dump_list(design, ctx, self.probes, out);
         trim_lead(out, at);
@@ -146,25 +148,17 @@ impl RowFacts for Save {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        let (mut analysis, mut every_analysis) = (AnalysisKind::Op, true);
+        let mut analyses = AnalysisKinds::ALL;
         if take_key(words, "analysis") {
             let Some(kind) = take_enum(words, &AnalysisKind::ALL, diags) else {
                 return ItemRef::NONE;
             };
-            (analysis, every_analysis) = (kind, false);
+            analyses = AnalysisKinds::of(&[kind]);
         }
         let Some(probes) = parse_list(words, scope, b, diags) else {
             return ItemRef::NONE;
         };
-        b.push(
-            scope,
-            Save {
-                analysis,
-                every_analysis,
-                probes,
-            },
-            words.span(),
-        )
+        b.push(scope, Save { analyses, probes }, words.span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -179,20 +173,12 @@ impl RowFacts for Save {
         }
         let probes = gen_list(g, b, features);
         let per = has(features, RunExtra::SavePerAnalysis) && g.chance(3);
-        let analysis = if per {
-            AnalysisKind::ALL[g.below(AnalysisKind::COUNT as u32) as usize]
+        let analyses = if per {
+            AnalysisKinds::of(&[AnalysisKind::ALL[g.below(AnalysisKind::COUNT as u32) as usize]])
         } else {
-            AnalysisKind::Op
+            AnalysisKinds::ALL
         };
-        b.push(
-            scope,
-            Save {
-                analysis,
-                every_analysis: !per,
-                probes,
-            },
-            Span::NONE,
-        )
+        b.push(scope, Save { analyses, probes }, Span::NONE)
     }
 }
 

@@ -32,9 +32,9 @@ use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-#[cfg(any(test, feature = "gen"))]
-use crate::id::ExprId;
 use crate::id::ScopeId;
+#[cfg(any(test, feature = "gen"))]
+use crate::id::{ExprId, NameId};
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::gen_target;
 use crate::plan::{
@@ -110,7 +110,11 @@ impl DetailFacts for Dc {
         while words.peek() == Some("(") {
             let target = parse_target(words, b, diags)?;
             let sweep = parse_sweep(words, scope, b, diags)?;
-            axes.push(DcAxis { target, sweep });
+            axes.push(DcAxis {
+                target,
+                sweep,
+                name: NameId::NONE,
+            });
         }
         let restart = take_word(words, "restart");
         Some(Dc {
@@ -137,6 +141,7 @@ impl DetailFacts for Dc {
             axes.push(DcAxis {
                 target,
                 sweep: gen_sweep(g, b, features),
+                name: NameId::NONE,
             });
         }
         let restart = has(features, RunExtra::DcRestart) && g.chance(2);

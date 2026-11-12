@@ -16,10 +16,10 @@ use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::tran::{Four, StepCap, Tran};
 use spicerack_ir::{
-    Alter, Analysis, AnalysisKind, Applies, Builder, Design, Diags, Edge, Elaborate, Env, Event,
-    ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet,
-    NodeSetKind, OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId, ScopeKind, Span,
-    Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
+    Alter, Analysis, AnalysisKind, AnalysisKinds, Applies, Builder, Design, Diags, Edge, Elaborate,
+    Env, Event, ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId,
+    NodeSet, NodeSetKind, OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId,
+    ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
 };
 
 type Fixture = (&'static str, Violation, fn(&mut Builder<'_>, ScopeId));
@@ -101,11 +101,15 @@ const BROKEN: &[Fixture] = &[
         save(b, s, p);
     }),
     ("save of nothing", Violation::FieldDomain, |b, s| {
-        b.push(s, Save { analysis: AnalysisKind::Op, every_analysis: true, probes: List::EMPTY }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::ALL, probes: List::EMPTY }, Span::NONE);
+    }),
+    ("save for no analysis", Violation::FieldDomain, |b, s| {
+        let probes = b.probes(&[Probe::category(ProbeKind::AllV)]);
+        b.push(s, Save { analyses: AnalysisKinds::EMPTY, probes }, Span::NONE);
     }),
     ("save list past its pool", Violation::HandleRange, |b, s| {
         let probes = List { start: 0, len: 4, pool: Default::default() };
-        b.push(s, Save { analysis: AnalysisKind::Op, every_analysis: true, probes }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::ALL, probes }, Span::NONE);
     }),
     ("table loop with a partial row", Violation::FieldDomain, |b, s| {
         let columns = b.targets(&[Target::TEMP, Target::TEMP]);
@@ -289,8 +293,7 @@ fn save(b: &mut Builder<'_>, s: ScopeId, p: Probe) {
     b.push(
         s,
         Save {
-            analysis: AnalysisKind::Op,
-            every_analysis: true,
+            analyses: AnalysisKinds::ALL,
             probes,
         },
         Span::NONE,
@@ -364,7 +367,7 @@ fn a_valid_run_reports_nothing() {
             Span::NONE,
         );
         let p = b.probe_v(&["out"]);
-        b.save(s, None, &[p], Span::NONE);
+        b.save(s, AnalysisKinds::ALL, &[p], Span::NONE);
         let half = b.num(0.5);
         let at = Event::cross(p, Edge::Rise, half, one);
         b.measure(

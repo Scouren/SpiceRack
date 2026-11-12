@@ -16,6 +16,10 @@
 //! Contents:
 //! - `pub enum AnalysisKind` (`ALL`, `COUNT`, `AnalysisKind::has_detail(self) -> bool`),
 //!   `pub struct Analysis`, `pub struct RunDetails`
+//! - `pub struct AnalysisKinds` (`EMPTY`, `ALL`, `AnalysisKinds::of(&[AnalysisKind]) -> Self`,
+//!   `AnalysisKinds::contains(self, AnalysisKind) -> bool`, `AnalysisKinds::len(self) -> u32`,
+//!   `AnalysisKinds::is_empty(self) -> bool`,
+//!   `AnalysisKinds::iter(self) -> impl Iterator<Item = AnalysisKind>`)
 //! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
 //! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`); crate:
@@ -259,6 +263,54 @@ impl AnalysisKind {
     /// Whether the kind has a detail row (every kind but `Op` and `DcInc`).
     pub const fn has_detail(self) -> bool {
         !matches!(self, AnalysisKind::Op | AnalysisKind::DcInc)
+    }
+}
+
+/// A set of analysis kinds (a `Save`'s scope, A22): one bit per `AnalysisKind`, in declaration
+/// order; no bit past the last kind is ever set (the constructors keep it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct AnalysisKinds(u32);
+
+const _: () = assert!(AnalysisKind::COUNT <= 32);
+
+impl AnalysisKinds {
+    /// No kind.
+    pub const EMPTY: AnalysisKinds = AnalysisKinds(0);
+    /// Every kind (a SPICE `.save`: every analysis keeps the quantities).
+    pub const ALL: AnalysisKinds = AnalysisKinds((1u32 << AnalysisKind::COUNT) - 1);
+
+    /// The set of `kinds` (repeats are one member).
+    pub const fn of(kinds: &[AnalysisKind]) -> Self {
+        let mut bits = 0u32;
+        let mut k = 0;
+        while k < kinds.len() {
+            bits |= 1 << kinds[k] as u32;
+            k += 1;
+        }
+        AnalysisKinds(bits)
+    }
+
+    /// Whether `kind` is a member.
+    pub const fn contains(self, kind: AnalysisKind) -> bool {
+        self.0 & (1 << kind as u32) != 0
+    }
+
+    /// The member count.
+    pub const fn len(self) -> u32 {
+        self.0.count_ones()
+    }
+
+    /// Whether the set has no member.
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    /// The members, in declaration order.
+    pub fn iter(self) -> impl Iterator<Item = AnalysisKind> {
+        AnalysisKind::ALL
+            .into_iter()
+            .filter(move |&k| self.contains(k))
     }
 }
 

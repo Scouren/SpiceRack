@@ -147,6 +147,12 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::FourHarmonicsOption, "  option n_freqs value=10\n  analysis four fundamental=1k periods=1 (v (out))", "  option n_freqs value=10\n  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"),
     (RunExtra::StateFromHere, "  env temp=1", "  env temp=1 whole_run"),
     (RunExtra::StateWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
+    (RunExtra::DcAxisNamed, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1", D),
+    (RunExtra::LoopNamed, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op", L),
+    (RunExtra::SweepBodyNotOne, "  loop sweep (temp) (list values=[1])\n    option klu\n    analysis op", "  loop sweep (temp) (list values=[1])\n    comment \"c\"\n    loop sweep (param p) (list values=[1])\n      analysis op"),
+    (RunExtra::RunInterleaved, "  analysis op\n  param p = 1\n  save (v (out))", "  analysis op\n  comment \"c\"\n  opaque ngspice private \".x\"\n  save (v (out))\n  param p = 1"),
+    (RunExtra::IcBeyondNext, S, "  nodeset ic transient next_only node=(a) value=1"),
+    (RunExtra::SaveAnalysisSet, "  save analysis=(op dc tran) (v (out))", "  save analysis=tran (v (out))"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
