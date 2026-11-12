@@ -1492,3 +1492,56 @@ def test_p8_319_a_vacask_decks_title_is_never_read_as_a_statement(title):
     assert (tran.time[0], tran.time[-1]) == (0.0, pytest.approx(1e-6, rel=1e-9))
     assert all(t0 < t1 for t0, t1 in zip(tran.time, tran.time[1:]))
     assert tran["out"] == pytest.approx([0.75] * len(tran.time), rel=1e-6)
+
+
+def _p3_035_circuit():
+    """1 V over a child's 1k (tc1 = 0.01/K) and the top's 3k, at 50 C."""
+    import spicerack as ps
+
+    buf = ps.Subcircuit("buf", ["a", "b"])
+    buf.R("1", "a", "b", 1e3, tc1=0.01)
+    c = ps.Circuit("top")
+    c.V("in", "in", c.gnd, 1.0)
+    c.subcircuit(buf)
+    c.X("1", "buf", "in", "out")
+    c.R("2", "out", c.gnd, 3e3)
+    c.options(reltol=1e-4)
+    c.temp(50)
+    return ps, c
+
+
+@pytest.mark.needs("ngspice")
+def test_p3_035_a_testbench_of_a_circuit_keeps_its_definitions_options_and_temperature():
+    """ZERO-LEDGER P3-035: `Testbench(circuit)` took the circuit's top alone: `X1 in out buf` with no
+    `.subckt buf` (ngspice-45: "unknown subckt") and no `.options` or `.temp`. Oracle: closed form on
+    ngspice-45, the child's 1k at 50 C with tc1 = 0.01/K and TNOM 27 C is 1k * (1 + 0.01 * 23) = 1230,
+    so v(out) = 3000 / 4230 = 0.70922 (0.75 with the `.temp` lost; research/impl/evidence/P3-035)."""
+    ps, c = _p3_035_circuit()
+    tb = ps.Testbench(c)
+    tb.with_backend("ngspice")
+    tb.add_operating_point()
+    words = [l.lower().split() for l in tb.netlist("ngspice").splitlines()]
+    assert [".subckt", "buf", "a", "b"] in words
+    assert any(w[0].startswith(".option") and any(x.startswith("reltol=") for x in w) for w in words if w)
+    assert [".temp", "50"] in words
+    # A linear DC solve: exact to rounding.
+    assert tb.operating_point()["out"] == pytest.approx(3000 / 4230, rel=1e-9)
+    # A `Subcircuit` DUT is its top alone, as before.
+    assert ps.Testbench(ps.Subcircuit("s", ["a"])).netlist("ngspice").splitlines()[-1] == ".end"
+
+
+def test_p3_035_a_circuit_is_netlisted_and_stored_as_its_whole_deck(tmp_path):
+    """ZERO-LEDGER P3-035: `Circuit.netlist(target)` is the deck `Testbench(circuit)` writes, in any
+    dialect, and `Circuit.to_source()` / `save(path)` store that deck. Oracle: a round trip, the
+    stored text read back (`Testbench.from_source`, `Testbench.load`) writes the same netlists."""
+    ps, c = _p3_035_circuit()
+    text = c.to_source()
+    assert text.startswith("* spicerack-source ngspice\n")
+    assert ".subckt buf a b" in text.splitlines()
+    for target in ("ngspice", "xyce"):
+        assert c.netlist(target) == ps.Testbench(c).netlist(target), target
+        assert ps.Testbench.from_source(text).netlist(target) == c.netlist(target), target
+    path = str(tmp_path / "top.sp")
+    c.save(path)
+    assert open(path).read() == text
+    assert ps.Testbench.load(path).netlist("ngspice") == c.netlist("ngspice")

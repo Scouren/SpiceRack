@@ -14,7 +14,7 @@ use pyo3::types::PyDict;
 use super::analysis::{Analysis, PssBase};
 use super::args::{Num, PyValueArg, kw_params, param_text};
 use super::card::{self, dc_sweeps};
-use super::circuit::hoisted;
+use super::circuit::{PyCircuit, hoisted};
 use super::deck::{Deck, check_backend_name};
 use super::model::{Card, Func, ModelLibrary, Value, params};
 use super::results::typed_result;
@@ -35,10 +35,16 @@ pub(super) struct PyModelLibrary {
 pymethods_with_waves! {
 #[pymethods]
 impl PyTestbench {
+    /// `dut`: a `Subcircuit` (the deck's top), or a `Circuit`, a whole
+    /// deck: the definitions its `subcircuit()` registered, its
+    /// `options()` and its `temp()` come with its top.
     #[new]
-    fn new(dut: &PySubcircuit) -> (Self, PySimulator) {
-        let deck = Deck { top: dut.inner.clone(), bench: Some(Default::default()), ..Default::default() };
-        (Self {}, PySimulator { deck, backend: None, save_currents: false })
+    fn new(dut: &Bound<'_, PySubcircuit>) -> PyResult<(Self, PySimulator)> {
+        let deck = match dut.as_any().cast::<PyCircuit>() {
+            Ok(circuit) => PyCircuit::deck(&circuit.try_borrow()?),
+            Err(_) => Deck { top: dut.try_borrow()?.inner.clone(), bench: Some(Default::default()), ..Default::default() },
+        };
+        Ok((Self {}, PySimulator { deck, backend: None, save_currents: false }))
     }
 
     /// Register a child definition (its include/lib/osdi are hoisted to the top level).

@@ -9,7 +9,7 @@ nodes are positional; everything after `*` is keyword-only.
 | --- | --- |
 | `Circuit(title)` | flat circuit; `str(circuit)` is its netlist |
 | `Subcircuit(name, ports=None, **params)` | a block with ports |
-| `Testbench(dut)` | stimulus and analyses around a `Subcircuit` |
+| `Testbench(dut)` | stimulus and analyses around a `Subcircuit`, or around a `Circuit` (its `subcircuit()` definitions, `options()` and `temp()` come with it) |
 | `Block()` | one branch of a conditional: no name and no ports, and the element, instance (`X`, `instance`) and `model` calls of a `Subcircuit`; `conditional(...)` on a `Subcircuit`, a `Circuit` or another `Block` places it |
 | `Section(name)` | a library section, `.lib name` … `.endl name`, holding `parameter(name, value)`, `model(name, kind, **params)`, `include(path)`, `lib(path, section)` and `subcircuit(subckt)` lines; `Circuit.section(s)` adds it to a library file |
 | `CircuitSimulator` | what `Circuit.simulator()` returns; `CircuitSimulator.available_backends()` lists installed simulators |
@@ -96,7 +96,11 @@ Waveform sources, each a `...VoltageSource` and a `...CurrentSource`, also on
 | `to_source()`, `save(path)`, `Subcircuit.from_source(text, dialect=None)`, `Subcircuit.load(path)` | the store: the deck's source text behind a `* spicerack-source ngspice` line (`dialect=None` reads that line; another dialect is written as ngspice first); the JSON methods raise `NotImplementedError` naming these |
 
 `Circuit` only: `options(**kw)`, `temp(t)`, `node(name)`, `element(name)`,
-`set_source_value(name, value)`, `subcircuit(subckt)`, `simulator(simulator=None)`.
+`set_source_value(name, value)`, `subcircuit(subckt)`, `simulator(simulator=None)`,
+`netlist(backend="ngspice")` (the circuit as a deck in any dialect the writer has, as
+`Testbench.netlist`). A `Circuit`'s `to_source()` and `save(path)` store its whole deck (its
+definitions, `.options` and `.temp` in it), which `Testbench.from_source(text)` /
+`Testbench.load(path)` read back.
 
 `Circuit.section(s)` adds a `Section` at the circuit's top. The circuit is then a
 library file: `str(circuit)` in ngspice's dialect, `Testbench(circuit).netlist(target)`
