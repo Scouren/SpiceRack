@@ -411,3 +411,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The generator builds a body from operators the set allows in both forms (`Gen::both_forms`), since its callers, and so its forms, come later.
 - Finding, reported to the lead: inlining can change a root's form when it drops an argument of class `Temp` or above (an extra argument, or one for a formal the body never reads): the caller was dynamic only through that argument. The inlining property excludes those inlinings and counts them; inlining that drops nothing adds no feature. Separately, the generator calls user functions with an argument count unequal to the formals, and `check` does not refuse it.
 
+## A28: the generator setting
+
+- `gen::Params { Untyped, TypedOnly }` and `generate_with(seed, features, size, params)`; `generate` is `generate_with(…, Params::Untyped)`, so no caller changes. The setting reaches the row generators as `Gen::params`. The kernel's rows draw no untyped parameter list (a subcircuit's head parameters are formals, typed by the row), so the setting's effect is the circuit owner's element and model generators; they honour it in their files.
+
