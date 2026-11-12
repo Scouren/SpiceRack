@@ -29,7 +29,7 @@ use crate::diag::Diags;
 use crate::facts::Handle;
 use crate::id::{ExprId, ExprList, List, NameId, NameList, ScopeId};
 use crate::measure::{Event, dump_event, event_handles, parse_event};
-use crate::plan::{Target, dump_target, parse_target, target_handles};
+use crate::plan::{Target, TargetList, dump_target, parse_target, target_handles};
 use crate::probe::{AcPart, Probe, ProbeKind, ProbeList, dump_probe, parse_probe, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_names::Names;
@@ -79,6 +79,8 @@ pub(crate) enum RunField<'a> {
     DcAxes(&'a mut DcAxisList),
     /// Probes, one after another while a `(` follows.
     Probes(&'a mut ProbeList),
+    /// Targets, one after another while a `(` follows.
+    Targets(&'a mut TargetList),
     /// A transient's step ceiling, required: ` max_step=v` or ` cap=word`.
     Ceiling(&'a mut StepCeiling),
 }
@@ -232,6 +234,11 @@ pub(crate) fn field_handles<R: RunFields>(row: &R, design: &Design, out: &mut Ve
                 probe_handles(p, out);
             }
         }
+        RunField::Targets(l) => {
+            for t in get(&design.run.targets, *l).unwrap_or(&[]) {
+                target_handles(t, out);
+            }
+        }
         RunField::Ceiling(c) => {
             if let StepCeiling::Given(e) = c {
                 out.push(Handle::Expr(*e));
@@ -250,6 +257,7 @@ pub(crate) fn field_exprs<R: RunFields>(row: &mut R, r: &mut Roots<'_>) {
         RunField::Event(e) => r.event(e),
         RunField::DcAxes(l) => r.dc_axes(*l),
         RunField::Probes(l) => r.probes(*l),
+        RunField::Targets(_) => {}
         RunField::Ceiling(c) => {
             if let StepCeiling::Given(e) = c {
                 r.expr(e);
@@ -276,6 +284,7 @@ pub(crate) fn field_names<R: RunFields>(row: &mut R, r: &mut Names<'_>) {
         RunField::Target(t) => r.target(t),
         RunField::DcAxes(l) => r.dc_axes(*l),
         RunField::Probes(l) => r.probes(*l),
+        RunField::Targets(l) => r.targets(*l),
         RunField::Ceiling(_) => {}
         RunField::Expr(_)
         | RunField::Exprs(_)
@@ -316,6 +325,11 @@ pub(crate) fn field_dump<R: RunFields>(row: &R, design: &Design, ctx: &Ctx, out:
         RunField::Probes(l) => {
             for p in design.probes(*l) {
                 dump_probe(design, ctx, p, out);
+            }
+        }
+        RunField::Targets(l) => {
+            for t in design.targets(*l) {
+                dump_target(design, ctx, t, out);
             }
         }
         RunField::Ceiling(StepCeiling::Given(e)) => put_expr(out, design, ctx, "max_step", *e),
@@ -431,6 +445,18 @@ fn read(
                 probes.push(p);
             }
             *l = b.probes(&probes);
+            true
+        }
+        RunField::Targets(l) => {
+            let mut targets = Vec::new();
+            // each round consumes a target or returns
+            while words.peek() == Some("(") {
+                let Some(t) = parse_target(words, b, diags) else {
+                    return false;
+                };
+                targets.push(t);
+            }
+            *l = b.targets(&targets);
             true
         }
         RunField::Ceiling(c) => {
