@@ -236,6 +236,7 @@ fn item(w: &mut Writer<'_, '_>, todo: &mut Vec<Task>, at: ir::ItemRef) {
         | ir::ItemKind::Save
         | ir::ItemKind::Print
         | ir::ItemKind::Measure
+        | ir::ItemKind::Reset
         | ir::ItemKind::Elaborate => write_run::analysis(w, at),
     }
 }

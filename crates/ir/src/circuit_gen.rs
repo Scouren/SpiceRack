@@ -286,7 +286,8 @@ impl R<'_, '_> {
                     }
                     Some(_) if BUILTINS.iter().any(|b| b.1 == kind) => self.has(X::BuiltinMaster),
                     Some(_) => true,
-                    None => false,
+                    // names no master, so it needs no `ElementWithoutModel`
+                    None => true,
                 })
     }
 

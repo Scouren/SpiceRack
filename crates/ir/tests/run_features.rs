@@ -88,14 +88,12 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::LoopDeviceParam, "  loop sweep (device_param m1 w) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopModelParam, "  loop sweep (model_param nch vth0) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopOption, "  loop sweep (option gmin) (list values=[1])\n    analysis op", L),
-    (RunExtra::AlterTemp, "  alter (temp) value=1", "  alter (param p) value=1"),
-    (RunExtra::AlterParam, "  alter (param p) value=1", AL),
+    (RunExtra::AlterParam, "  alter (param p) value=1", "  alter (subckt_param div r) value=1"),
     (RunExtra::AlterSubcktParam, "  alter (subckt_param div r) value=1", AL),
     (RunExtra::AlterSourceDc, "  alter (source_dc v1) value=1", AL),
     (RunExtra::AlterElementValue, "  alter (element_value r1) value=1", AL),
     (RunExtra::AlterDeviceParam, "  alter (device_param m1 w) value=1", AL),
     (RunExtra::AlterModelParam, "  alter (model_param nch vth0) value=1", AL),
-    (RunExtra::AlterOption, "  alter (option gmin) value=1", AL),
     (RunExtra::AlterString, "  alter (device_param v1 type) value=\"dc\"", "  alter (device_param v1 type) value=1"),
     (RunExtra::TargetInInstance, "  alter (device_param m1 w path=(x1)) value=1", "  alter (device_param m1 w) value=1"),
     (RunExtra::McSeed, "  loop monte_carlo runs=10 seed=1\n    analysis op", M),
@@ -167,6 +165,14 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::IcBeyondNext, S, "  nodeset ic transient next_only node=(a) value=1"),
     (RunExtra::SaveAnalysisSet, "  save analysis=(op dc tran) (v (out))", "  save analysis=tran (v (out))"),
     (RunExtra::PssOscDiff, "  analysis pss autonomous fundamental=1meg tstab=1u osc_p=out osc_n=ref", "  analysis pss autonomous fundamental=1meg tstab=1u osc_p=out osc_n=0"),
+    (RunExtra::ResetValues, "  reset values", RS),
+    (RunExtra::ResetOptions, "  reset options", RS),
+    (RunExtra::ResetTemp, "  reset temp", RS),
+    (RunExtra::ResetTnom, "  reset tnom", RS),
+    (RunExtra::ResetSaves, RS, "  reset values options temp tnom"),
+    (RunExtra::SaveFromHere, "  save from_here (v (out))", P),
+    (RunExtra::SaveWholeRun, P, "  save from_here (v (out))"),
+    (RunExtra::SaveMidRun, "  analysis op\n  save from_here (v (out))", "  save from_here (v (out))\n  analysis op"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
@@ -180,9 +186,10 @@ const PSS: &str = "  analysis pss driven fundamental=1meg tstab=1u";
 const L: &str = "  loop sweep (temp) (list values=[1])\n    analysis op";
 const LL: &str = "  loop sweep (temp) (lin start=0 stop=1 step=1)\n    analysis op";
 const M: &str = "  loop monte_carlo runs=10\n    analysis op";
-const AL: &str = "  alter (temp) value=1";
+const AL: &str = "  alter (param p) value=1";
 const S: &str = "  nodeset ic transient node=(a) value=1";
 const P: &str = "  save (v (out))";
+const RS: &str = "  reset saves";
 const MW: &str = "  measure m tran when (cross rise (v (a)) value=1 count=1)";
 const MP: &str = "  measure m tran param value=1";
 const ST: &str = "  statistics process (p gauss spread=1)";
@@ -235,7 +242,9 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Option(OptionKey::Klu))
         .with(Feature::Run(RunExtra::TranCapNone))
         .with(Feature::Run(RunExtra::TranUic))
-        .with(Feature::Run(RunExtra::StateFromHere));
+        .with(Feature::Run(RunExtra::WholeRunMidRun))
+        .with(Feature::Run(RunExtra::StateFromHere))
+        .with(Feature::Run(RunExtra::SaveWholeRun));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
 

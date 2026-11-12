@@ -70,13 +70,13 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         let row: ir::Model = design.row(at.index);
         let module = word(design, &row);
         if module.is_empty() {
-            diags.push(LIBRARIES, design.span_of(at), 0);
+            diags.push_at(LIBRARIES, design, at, 0);
         }
         if [design.str(row.name), module.as_str()]
             .iter()
             .any(|n| n.chars().any(char::is_whitespace))
         {
-            diags.push(UNSPELLED, design.span_of(at), 0);
+            diags.push_at(UNSPELLED, design, at, 0);
         }
         let module_family = row.family == ir::ModelFamily::Module;
         let mut lacked = design.params(row.params).iter().any(|&(key, _)| {
@@ -93,7 +93,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         lacked |= !row.version.is_none()
             && families::model_name_in(&module, "version") != Name::Ir("version".into());
         if lacked {
-            diags.push(LACKED, design.span_of(at), 0);
+            diags.push_at(LACKED, design, at, 0);
         }
     }
 }

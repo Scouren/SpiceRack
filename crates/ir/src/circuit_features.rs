@@ -42,7 +42,8 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     let mut add = |x: X| got = got.with(Feature::Circuit(x));
     let some = |x: ExprId| x != ExprId::NONE;
     let mut wave_kind = None;
-    if e.model.name == NameId::NONE {
+    // a kind with no master names none and states nothing a target lacks
+    if e.model.name == NameId::NONE && e.kind.master_kind().is_some() {
         add(X::ElementWithoutModel);
     }
     let source_like = matches!(

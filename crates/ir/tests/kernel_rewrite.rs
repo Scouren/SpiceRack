@@ -254,6 +254,7 @@ fn a_rewrite_of_one_form_keeps_the_other() {
         let (wrapper, other) = match form {
             Form::Static => (Feature::Unary(UnOp::Neg), Feature::UnaryDyn(UnOp::Neg)),
             Form::Dynamic => (Feature::UnaryDyn(UnOp::Neg), Feature::Unary(UnOp::Neg)),
+            Form::Both => unreachable!("a pass rewrites one form"),
         };
         let mut reached = false;
         for seed in 0..100u64 {

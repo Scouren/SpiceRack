@@ -398,3 +398,29 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `Builder::element_named(scope, name) -> Option<ItemRef>`: the first element of that whole name listed in `scope`, from an index on `Design` (`element_names`, lookup only) built on first use in O(items). It is extended by `Builder::push` itself whenever the row is an `Element`, so IR text (which pushes through the low tier) and `Builder::element` both keep it. It is cleared where `editor()` hands out its door and in `Editor::items_mut` and `Editor::set`, the mutations that can move or rename an element, as the class cache is. It takes `&mut self` because the builder's design is `&mut`; it reads only.
 
+## A28 applied: dead scopes, draws
+
+- `check` walks the live scopes: a file's top, and the body of an item listed in a live scope (`check_scopes::live_scopes`, an explicit worklist). Range checks still run on every scope, since a pass reads them; the tree's shape, owners and listings are checked on live scopes only. `files_and_scopes` moved to `check_scopes.rs` (check.rs passed 500 lines).
+- `Feature::DistDyn(Dist)`, the 21st group, appended last. A draw's distribution counts `DistDyn` in a dynamic root, `Dist` in a static one; `DrawWhen` and `DrawPer` stay one feature each (no simulator was found to differ by form there). The generator picks a distribution from the form's features.
+
+## A28 applied: body forms (R51)
+
+- The forms are a second cache beside the class table (`Design::forms`, an `FxMap` from a body's `ExprId` to bits), computed on first use by an explicit worklist: every listed root that is no body seeds the calls its tree makes with its own form, and each (definition, form) is expanded once. One helper, `Design::derived_changed`, clears both caches at every site that cleared the classes. `root_form` and the feature count look a body up by its expression id; a body id also used by another field would be read as a body (no builder makes one).
+- The form logic (`Form`, `root_form`, `form_of`, `form_feature`, the forms computation) moved to `form.rs`, re-exported from `feature`; feature.rs passed 500 lines.
+- `Func(Ddt)` and `Func(Idt)` are no longer unreachable: an uncalled body that holds one counts it static.
+- The generator builds a body from operators the set allows in both forms (`Gen::both_forms`), since its callers, and so its forms, come later.
+- Finding, reported to the lead: inlining can change a root's form when it drops an argument of class `Temp` or above (an extra argument, or one for a formal the body never reads): the caller was dynamic only through that argument. The inlining property excludes those inlinings and counts them; inlining that drops nothing adds no feature. Separately, the generator calls user functions with an argument count unequal to the formals, and `check` does not refuse it.
+
+## A28: the generator setting
+
+- `gen::Params { Untyped, TypedOnly }` and `generate_with(seed, features, size, params)`; `generate` is `generate_with(…, Params::Untyped)`, so no caller changes. The setting reaches the row generators as `Gen::params`. The kernel's rows draw no untyped parameter list (a subcircuit's head parameters are formals, typed by the row), so the setting's effect is the circuit owner's element and model generators; they honour it in their files.
+
+
+## Amendments A27 and A28, run owner (R49)
+
+- "From here X is v" has one form, the state item: a `FromHere` `OptionRow` for an option, and a `FromHere` `Env` for the temperature or the nominal temperature (a script's `option tnom=`). `check` refuses an `Alter` of `TargetKind::Temp` or `Option` (`FieldDomain`), and `Builder::alter` asserts the same. Both kinds stay for loop and DC-axis targets; the generator never picks them for an alter. `RunExtra::AlterTemp` and `AlterOption` are removed. Rename: an alter of the temperature is now `Env` (`StateFromHere`, `EnvMidRun`); an alter of an option is now `OptionRow` (`StateFromHere`, `OptionMidRun`).
+- `Reset { restores: ResetSet }` is a new run item: `ItemKind::Reset`, appended after `Elaborate`, its kernel arms written by the run owner on the lead's go-ahead, as for `Elaborate`. Its row is in `reset.rs`. `ResetSet` is a `u8` set of `Restorable { Values, Options, Temp, Tnom, Saves }`, never empty (checked). Text: `reset <class> …` in declaration order. One feature per class (`ResetValues` … `ResetSaves`). The row states what "earlier" means: run order, includes in place, and inside a loop body every earlier pass's items too. There is no class for parameters: no simulator restores them (R18).
+- `Save.holds: Applies` (`Save` 12 → 16 bytes). The builder's `save` takes it, `WholeRun` for a card. Text: `from_here` after `analysis=`. Features `SaveFromHere`, `SaveWholeRun`, and `SaveMidRun` for a `FromHere` save after a run item. A `WholeRun` save there sets `WholeRunMidRun`, as every `WholeRun` state item does, so a `.save` card after an analysis now sets it too.
+- `Loop.name`'s doc: the loop's own name in its dialect (Spectre's or VACASK's statement name, ngspice's `foreach` variable).
+- Oracle: the feature table with a neighbour for each new member, three new `check` rows, the IR text round trip, and builder asserts. The tests were not committed red before the bodies. Instead, with the bodies stubbed out (no reset features, no `from_here` text, a save's mode ignored by the listed-order walk), the feature table, the text test and the walk test each failed on exactly the stubbed members.
+- Reach over 4,000 full-set seeds: every new member is in 1,868 seeds or more. The scaling gate (`throughput -- scaling`) passes: build ratio 4.20 at 4× items, bound 8.

@@ -367,3 +367,27 @@ fn a_row_names_the_item_it_is_about() {
         (title, ItemRef::NONE)
     );
 }
+
+#[test]
+fn a_dead_body_is_no_violation() {
+    // A28: a pass that takes a scope-owning item out of every list leaves its body dead; check
+    // walks reachable scopes only, so the shrunk design is valid (its live neighbour too)
+    let mut d = Design::new();
+    let top = {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
+        let one = b.num(1.0);
+        b.param(body, "k", one, Span::NONE);
+        let (_, inner) = b.subckt(body, "t", &[], &[], Span::NONE);
+        b.param(inner, "j", one, Span::NONE);
+        top
+    };
+    assert_eq!(violations(&d), vec![], "the live design");
+    d.editor().items_mut(top).clear();
+    assert_eq!(
+        violations(&d),
+        vec![],
+        "the outer subckt dropped: its body and the inner one are dead"
+    );
+}

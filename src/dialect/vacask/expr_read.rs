@@ -99,6 +99,11 @@ pub(super) const FEATURES: ir::FeatureSet = dynamic(static_funcs(ir::FeatureSet:
     .with(ir::Feature::Dist(ir::Dist::RelGauss))
     .with(ir::Feature::Dist(ir::Dist::AbsUnif))
     .with(ir::Feature::Dist(ir::Dist::RelUnif))
+    // A draw in a field of dynamic form (an instance's `r=agauss(…)`: run g2).
+    .with(ir::Feature::DistDyn(ir::Dist::AbsGauss))
+    .with(ir::Feature::DistDyn(ir::Dist::RelGauss))
+    .with(ir::Feature::DistDyn(ir::Dist::AbsUnif))
+    .with(ir::Feature::DistDyn(ir::Dist::RelUnif))
     .with(ir::Feature::DrawWhen(ir::DrawWhen::Sampling))
     .with(ir::Feature::DrawPer(ir::DrawPer::CallSite));
 
