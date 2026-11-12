@@ -13,16 +13,17 @@
 //! (`FieldDomain`); the field docs of `element.rs`, `passive.rs`, `source.rs`,
 //! `controlled.rs`, `semi.rs`, `line.rs`, `wave.rs`, `model.rs`.
 //!
-//! Contents (crate-private): `pub(crate) struct Verdict`, `pub(crate) fn verdict`,
+//! Contents (crate-private): `pub(crate) struct Verdict`, `pub(crate) enum Classes`,
+//! `pub(crate) fn verdict`,
 //! `pub(crate) fn check_element`, `pub(crate) fn check_model`, `pub(crate) fn model_ok`,
 //! `pub(crate) fn detail_len`; it re-exports the tables of `circuit_tables.rs`
 
 use crate::check::Violation;
-use crate::circuit_features::reads_circuit;
 pub(crate) use crate::circuit_tables::{
     bound_family, builtin_fits, builtin_kind, has_polarity, typed_key, versioned,
 };
 use crate::circuit_text::get_row;
+use crate::class::{ExprClass, def_classes, tree_class};
 use crate::controlled::{DelayLaw, OutKind, Quantity, TableLaw};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
@@ -44,8 +45,20 @@ pub(crate) struct Verdict {
     pub(crate) domain: bool,
 }
 
-/// The verdict on `e`'s rows and fields (not its terminal count). Total.
-pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
+/// Where `verdict` takes the definitions' expression classes from.
+#[derive(Clone, Copy)]
+pub(crate) enum Classes<'a> {
+    /// The builder's assert: no table is computed (it is O(design) after every push), and a
+    /// value is assumed to read the circuit, so the rules that depend on a class admit it and
+    /// `check` decides them.
+    Assume,
+    /// `check`: the design's table (`class::def_classes`).
+    Table(&'a [ExprClass]),
+}
+
+/// The verdict on `e`'s rows and fields (not its terminal count). Total. Under
+/// `Classes::Assume` it is O(the element's rows), with no table sized by the design.
+pub(crate) fn verdict(design: &Design, e: &Element, classes: Classes<'_>) -> Verdict {
     let mut v = Verdict {
         rows: true,
         domain: true,
@@ -83,7 +96,7 @@ pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
         v.rows = false;
         return v;
     }
-    detail_verdict(design, e, &mut v);
+    detail_verdict(design, e, classes, &mut v);
     v
 }
 
@@ -99,7 +112,7 @@ pub(crate) fn check_element(e: &Element, design: &Design, at: ItemRef, out: &mut
             at.index,
         );
     }
-    let v = verdict(design, e);
+    let v = verdict(design, e, Classes::Table(def_classes(design)));
     if !v.rows {
         out.push_at(violation_code(Violation::DetailRow), design, at, at.index);
     }
@@ -178,7 +191,14 @@ fn paired(a: ExprId, b: ExprId) -> bool {
 }
 
 /// The detail row of `e` (in range) and its side and wave rows.
-fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
+fn detail_verdict(design: &Design, e: &Element, classes: Classes<'_>, v: &mut Verdict) {
+    let reads_circuit = |root: ExprId| {
+        root != ExprId::NONE
+            && match classes {
+                Classes::Assume => true,
+                Classes::Table(t) => tree_class(design, root, t) == ExprClass::Circuit,
+            }
+    };
     let i = e.detail;
     let terms = e.terminals.len();
     let ok = match e.kind.detail() {
@@ -189,9 +209,9 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
             let resistor = e.kind == ElemKind::Resistor;
             // A15 C2: the 27 °C base and the reciprocal law only where ngspice's behavioural
             // rewrite gives them a meaning (a circuit-valued value with a coefficient)
-            let dynamic = reads_circuit(design, p.value) && (some(p.tc1) || some(p.tc2));
+            let dynamic = (some(p.tc1) || some(p.tc2)) && reads_circuit(p.value);
             // A19: only a resistor or a circuit-valued element has thermal noise to switch off
-            (p.noisy || resistor || reads_circuit(design, p.value))
+            (p.noisy || resistor || reads_circuit(p.value))
                 && (p.tc_base == TcBase::Tnom || dynamic)
                 && (p.tc_law == TcLaw::Direct || dynamic && e.kind == ElemKind::Capacitor)
                 && (some(p.value) || e.model.name != NameId::NONE)

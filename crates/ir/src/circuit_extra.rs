@@ -122,6 +122,9 @@ pub enum CircuitExtra {
     PwlJoinRampWidth,
     /// A PWL repeat joined by VACASK's periodic law (`PwlJoin::Extrapolate`, va; A22).
     PwlJoinExtrapolate,
+    /// A periodic PWL joined by a jump (`PwlRepeat::Period` with `PwlJoin::Jump`, ng/sp `pwlperiod`;
+    /// VACASK lacks it: its periodic PWL only extrapolates; A24).
+    PwlPeriodJump,
     /// PWL points in a file (`Pwl::file`, 5.12).
     PwlFile,
     // controlled sources
@@ -158,8 +161,11 @@ pub enum CircuitExtra {
     // semiconductors and switches
     /// A semiconductor area factor (`Semi::area`).
     SemiArea,
-    /// A semiconductor first guess (`Semi::initial` not `Unset`).
-    SemiInitial,
+    /// A semiconductor first guessed off (`InitialState::Off`; A24 ruling).
+    SemiInitialOff,
+    /// A semiconductor first guessed on (`InitialState::On`: Spectre `region=on`; ngspice lacks
+    /// it, its semiconductors take `off` only; A24 ruling).
+    SemiInitialOn,
     /// A diode with a thermal terminal (3 terminals, ng, D65).
     DiodeThermal,
     /// A switch first guess (`Switch::initial` not `Unset`, D57).
@@ -249,7 +255,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 104] = [
+    pub const ALL: [CircuitExtra; 106] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -301,6 +307,7 @@ impl CircuitExtra {
         CircuitExtra::PwlJoinRamp,
         CircuitExtra::PwlJoinRampWidth,
         CircuitExtra::PwlJoinExtrapolate,
+        CircuitExtra::PwlPeriodJump,
         CircuitExtra::PwlFile,
         CircuitExtra::TableExact,
         CircuitExtra::TableNgspiceRounded,
@@ -318,7 +325,8 @@ impl CircuitExtra {
         CircuitExtra::FreqDbLogFreq,
         CircuitExtra::DelaySampled,
         CircuitExtra::SemiArea,
-        CircuitExtra::SemiInitial,
+        CircuitExtra::SemiInitialOff,
+        CircuitExtra::SemiInitialOn,
         CircuitExtra::DiodeThermal,
         CircuitExtra::SwitchInitial,
         CircuitExtra::SwitchControlExpr,
