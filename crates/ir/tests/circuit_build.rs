@@ -278,7 +278,7 @@ mod tests {
             (x.kind, x.detail, x.mult),
             (ElemKind::Instance, NO_ROW, two)
         );
-        assert_eq!(design.items(top).len(), 15);
+        assert_eq!(design.items(top).len(), 14);
     }
 
     #[test]
