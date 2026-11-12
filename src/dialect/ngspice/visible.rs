@@ -22,6 +22,13 @@ use crate::ir;
 pub(super) struct Visible {
     /// `(scope, kind, name)` → the definition that scope sees without looking outward.
     seen: HashMap<(ir::ScopeId, ir::DefKind, ir::NameId), ir::DefId>,
+    /// An included file's top scope or a called section's body → the scope of the include
+    /// statement that reads it, the first one the entries reach (an active call): ngspice reads
+    /// the text there, so a lookup that leaves it goes on in that scope (settle
+    /// `inc_lib_self.sp`: a called section reads its caller's `.param`).
+    caller: HashMap<ir::ScopeId, ir::ScopeId>,
+    /// The scopes of the design: a bound on a lookup's steps.
+    scopes: usize,
 }
 
 impl Visible {
@@ -43,7 +50,32 @@ impl Visible {
                 }
             }
         }
-        Visible { seen }
+        // the active calls: from the entries' top scopes through the includes they reach
+        let mut caller = HashMap::new();
+        let mut todo: Vec<ir::ScopeId> = d
+            .files()
+            .map(|f| d.file(f))
+            .filter(|f| f.role == ir::Role::Deck)
+            .map(|f| f.top)
+            .collect();
+        // Bounded: a scope is pushed when it first gets its caller.
+        while let Some(at) = todo.pop() {
+            for &item in d.items(at) {
+                if item.kind == ir::ItemKind::Include
+                    && let Some(t) = target(d, item)
+                    && t != at
+                    && !caller.contains_key(&t)
+                {
+                    caller.insert(t, at);
+                    todo.push(t);
+                }
+            }
+        }
+        Visible {
+            seen,
+            caller,
+            scopes: scopes.len(),
+        }
     }
 
     /// The definition of `(kind, name)` ngspice binds from `scope`: the nearest scope outward
@@ -56,12 +88,16 @@ impl Visible {
         name: ir::NameId,
     ) -> ir::DefId {
         let mut at = scope;
-        // Bounded by the nesting: each step moves to an enclosing scope; a top scope has none.
-        while !at.is_none() {
+        // Bounded: each step moves to an enclosing scope or to a caller, and a caller was
+        // reached from the entries before the scope it calls, so no step repeats.
+        for _ in 0..2 * self.scopes + 2 {
+            if at.is_none() {
+                break;
+            }
             if let Some(&def) = self.seen.get(&(at, kind, name)) {
                 return def;
             }
-            at = d.scope(at).parent;
+            at = self.caller.get(&at).copied().unwrap_or(d.scope(at).parent);
         }
         ir::DefId::NONE
     }

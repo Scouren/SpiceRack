@@ -86,6 +86,34 @@ fn an_include_cycle_is_refused() {
     assert_eq!(cycles, 2, "{diags:?}");
 }
 
+#[test]
+fn a_section_calling_another_section_of_its_own_file_is_no_cycle_and_reads_its_caller() {
+    // inc_lib_self.sp: i(v1) = -5e-4 (mim's R1 = 1k*scale, scale from the calling corner
+    // section): the gf180 kit's idiom (sm141064.ngspice); no P1015, X1 and scale bound
+    let (d, diags) = read(&["inc_lib_self.sp", "inc_lib_self.lib"]);
+    assert!(!codes(&diags).contains(&"P1015".to_string()), "{diags:?}");
+    assert_eq!(master_file(&d, "x1"), Some("inc_lib_self.lib".into()));
+    let reads: Vec<ir::DefId> = (0..d.expr_count())
+        .filter_map(|k| match d.expr(ir::ExprId(k as u32)) {
+            ir::Expr::Param(r) if d.str(r.name) == "scale" => Some(r.def),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !reads.is_empty() && reads.iter().all(|r| !r.is_none()),
+        "scale bound: {reads:?}"
+    );
+}
+
+#[test]
+fn section_chains_of_one_file_are_no_cycle() {
+    // inc_lib_chain.sp: a calls b calls c, d calls c too: i(v1) = -5e-4, "redefinition of
+    // .subckt leaf, ignored"; no P1015, X1 bound
+    let (d, diags) = read(&["inc_lib_chain.sp", "inc_lib_chain.lib"]);
+    assert!(!codes(&diags).contains(&"P1015".to_string()), "{diags:?}");
+    assert_eq!(master_file(&d, "x1"), Some("inc_lib_chain.lib".into()));
+}
+
 /// The files read (the first the deck) from the settle folder, leniently.
 fn read(files: &[&str]) -> (ir::Design, ir::Diags) {
     let mut src = Sources::new();
