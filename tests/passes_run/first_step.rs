@@ -81,7 +81,7 @@ fn tran_first_step_to_print_moves_exactly_the_unread_first_steps() {
                 (true, _) => {
                     assert_eq!(new.print_step, old.initial_step, "seed {seed}: moved");
                     assert!(new.initial_step.is_none(), "seed {seed}: moved");
-                    assert_eq!(notes[0].code.number, 414, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 419, "seed {seed}");
                     assert_eq!(notes[0].arg, old.initial_step.0, "seed {seed}: the value");
                     moved += 1;
                 }
@@ -90,11 +90,11 @@ fn tran_first_step_to_print_moves_exactly_the_unread_first_steps() {
                         (new.print_step, new.initial_step),
                         (old.print_step, old.initial_step)
                     );
-                    assert_eq!(notes[0].code.number, 415, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 440, "seed {seed}");
                     kept += 1;
                 }
                 (false, false) => {
-                    assert_eq!(notes[0].code.number, 416, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 441, "seed {seed}");
                     none += 1;
                 }
             }

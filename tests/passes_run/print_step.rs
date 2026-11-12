@@ -1,7 +1,7 @@
 //! `tran_print_step_to_simulator`'s proof (R67, A41): the interval only resamples the output,
 //! so the state at every analysis and every row reference stay (`keeps_state`, the model in
 //! `passes_run/state.rs`), and over generated designs each transient's print step goes with a
-//! `U0412` note carrying the old interval, or stays with `U0413` exactly where something reads
+//! `U0417` note carrying the old interval, or stays with `U0418` exactly where something reads
 //! it (ngspice's ceiling rule, a `$tstep` leaf, further segments). Oracle: the rows read back
 //! against the rule's statement.
 //!
@@ -65,12 +65,12 @@ fn tran_print_step_to_simulator_drops_exactly_the_unread_intervals() {
             match read {
                 true => {
                     assert_eq!(new.print_step, old.print_step, "seed {seed}: kept");
-                    assert_eq!(notes[0].code.number, 413, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 418, "seed {seed}");
                     kept += 1;
                 }
                 false => {
                     assert!(new.print_step.is_none(), "seed {seed}: dropped");
-                    assert_eq!(notes[0].code.number, 412, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 417, "seed {seed}");
                     assert_eq!(
                         notes[0].arg, old.print_step.0,
                         "seed {seed}: the old interval"

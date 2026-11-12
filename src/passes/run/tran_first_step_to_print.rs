@@ -34,11 +34,11 @@ use crate::ir;
 use ir::tran::{StepCeiling, Tran};
 
 /// The note at a transient whose first step became its print step: `arg` is its `ExprId`.
-pub const FIRST_STEP_MOVED: ir::Code = ir::Code::new(b'U', 414);
+pub const FIRST_STEP_MOVED: ir::Code = ir::Code::new(b'U', 419);
 /// The note at a transient whose first step cannot move.
-pub const FIRST_STEP_KEPT: ir::Code = ir::Code::new(b'U', 415);
+pub const FIRST_STEP_KEPT: ir::Code = ir::Code::new(b'U', 440);
 /// The note at a transient with neither a print step nor a first step.
-pub const NO_STEP_VALUE: ir::Code = ir::Code::new(b'U', 416);
+pub const NO_STEP_VALUE: ir::Code = ir::Code::new(b'U', 441);
 
 /// Moves every reachable transient's first step into its absent print step where nothing else
 /// reads it; notes every other with a first step or no print step.

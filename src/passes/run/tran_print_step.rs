@@ -24,9 +24,9 @@ use crate::ir;
 use ir::tran::{StepCap, StepCeiling, Tran};
 
 /// The note at a transient whose print step was dropped: `arg` is the interval's `ExprId`.
-pub const PRINT_STEP_DROPPED: ir::Code = ir::Code::new(b'U', 412);
+pub const PRINT_STEP_DROPPED: ir::Code = ir::Code::new(b'U', 417);
 /// The note at a transient whose print step something still reads.
-pub const PRINT_STEP_READ: ir::Code = ir::Code::new(b'U', 413);
+pub const PRINT_STEP_READ: ir::Code = ir::Code::new(b'U', 418);
 
 /// Drops every reachable transient's print step that nothing reads; notes every other.
 pub fn tran_print_step_to_simulator(design: &mut ir::Design, diags: &mut ir::Diags) {
