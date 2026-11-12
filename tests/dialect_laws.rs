@@ -45,17 +45,13 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "vacask",
-        "seed 31: a formal default reading $tnom is dependent in VACASK (run c3) and reads back as a local; FormalNotConstant counts Temp but not Tnom",
+        "62 of 64 seeds differ under eq_meaning, which compares table ids: each design read back is equal to the generated one once both go through the IR text (the ir row reading its own write); the order the vacask reader pushes rows in is not the generator's",
     ),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
-    ("l3", "vacask", "no generated design admitted: as l4"),
-    ("l8", "vacask", "no generated design admitted: as l4"),
-    (
-        "l4",
-        "vacask",
-        "Gen draws parameter names and library paths no shipped module has: admits refuses W2002, W2004 and S4.1's W2102, W2103 on nearly every seed (the R21 name-pool gap, S4-AREAS)",
-    ),
 ];
+
+/// The most seeds the shrink self-test searches for its case.
+const SEARCH_MAX: u64 = 1024;
 
 /// The seeds the reach list draws from: more than a law's, since it asks for every kind once.
 const REACH_SEEDS: std::ops::Range<u64> = 0..512;
@@ -63,29 +59,14 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
 /// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
 const KNOWN_REACH: &[(&str, &str)] = &[
-    // vacask: the families its `load` lines read as device libraries; a generated
-    // `DeviceLibrary` sets no `Family` feature until A25 (ir-circuit), and no `Model` row is
-    // read before S4.1 lands.
-    ("vacask", "Family(Resistor)"),
-    ("vacask", "Family(Capacitor)"),
-    ("vacask", "Family(Inductor)"),
+    // vacask: legalize refuses Circuit(ElementWithoutModel) on a behavioural source, a kind
+    // that names no model (ir-circuit's fix, the lead's note on R52).
+    ("vacask", "Elem(Behav)"),
+    // vacask: every generated model of these families (8 over 512 seeds) holds `to_real` in a
+    // parameter expression of class Temp, which W2006 refuses (gap c, deferred: R52).
     ("vacask", "Family(Diode)"),
-    ("vacask", "Family(GummelPoon)"),
-    ("vacask", "Family(Vbic)"),
-    ("vacask", "Family(Mos1)"),
-    ("vacask", "Family(Mos2)"),
-    ("vacask", "Family(Mos3)"),
-    ("vacask", "Family(Mos6)"),
-    ("vacask", "Family(Mos9)"),
     ("vacask", "Family(Bsim3)"),
     ("vacask", "Family(Bsim4)"),
-    ("vacask", "Family(Psp103)"),
-    ("vacask", "Family(BsimBulk)"),
-    ("vacask", "Family(Vdmos)"),
-    ("vacask", "Family(JfetShichman)"),
-    ("vacask", "Family(JfetParkerSkellern)"),
-    ("vacask", "Family(Mesfet)"),
-    ("vacask", "Family(TlineIdeal)"),
 ];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
@@ -190,7 +171,7 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
 
 #[test]
 fn l4_write_is_total_over_a_design_legalize_accepted() {
-    laws("l4", l4_on);
+    laws("l4", |row, writer| l4_on(row, writer, SEEDS));
 }
 
 #[test]
@@ -210,7 +191,9 @@ fn l5_read_of_write_is_the_design() {
             };
             tally.admit();
             let back = read_all(row, &write_all(&design, row));
-            if canonical(&back) != canonical(&design) {
+            // By meaning (R28): real literals equal by value, whatever their form; the IR text
+            // is only the failure's evidence.
+            if !back.eq_meaning(&design) {
                 return Err(format!(
                     "seed {seed}:\n{}\nread back as\n{}",
                     canonical(&design),
@@ -238,11 +221,12 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
         for (k, text) in texts.iter().enumerate() {
             let once = read_text(row, text).0;
             let twice = read_all(row, &write_all(&once, row));
-            assert_eq!(
-                canonical(&twice),
+            assert!(
+                twice.eq_meaning(&once),
+                "{} corpus text {k} (by meaning, R28):\n{}\nread back as\n{}",
+                row.name,
                 canonical(&once),
-                "{} corpus text {k}",
-                row.name
+                canonical(&twice)
             );
         }
     }
@@ -344,8 +328,9 @@ fn reach_every_kind_the_row_claims() {
 }
 
 /// The self-test of shrink to admitted (A25): a row whose `admits` refuses every item but
-/// elements admits no generated design as it comes, and its writer panics on a capacitor;
-/// shrunk, L4 runs and sees the panic.
+/// elements refuses every design as generated, and its writer panics on a capacitor; on a seed
+/// (searched, bounded, so the test does not depend on the generator's stream) whose shrunk
+/// design keeps a capacitor, L4 runs and sees the panic.
 #[test]
 fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
     let row: &'static DialectRow = Box::leak(Box::new(DialectRow {
@@ -354,22 +339,34 @@ fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
         read: None,
         write: Some(&Panicky),
     }));
-    let unshrunk = SEEDS.filter(|&seed| {
+    // Independent of the generator's stream: the first seed, within a bound, whose design the
+    // row refuses as generated and whose shrunk design keeps a capacitor.
+    let refused_as_generated = |seed: u64| {
         let mut design = generate(seed, &generated(row, &Panicky), SIZE);
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row, &mut diags);
-        !diags.rows().iter().any(|d| dialect::refuses(d.code))
-    });
-    assert_eq!(unshrunk.count(), 0, "as generated, the row admits nothing");
-    let found = l4_on(row, &Panicky).expect_err("L4 sees the writer's panic");
+        diags.rows().iter().any(|d| dialect::refuses(d.code))
+    };
+    let keeps_a_capacitor = |seed: u64| {
+        admitted(seed, row, &Panicky).is_ok_and(|d| {
+            d.reachable().iter().any(|(i, _)| {
+                i.kind == ir::ItemKind::Element
+                    && d.row::<ir::Element>(i.index).kind == ir::ElemKind::Capacitor
+            })
+        })
+    };
+    let seed = (0..SEARCH_MAX)
+        .find(|&s| refused_as_generated(s) && keeps_a_capacitor(s))
+        .expect("within SEARCH_MAX seeds, a refused design whose shrink keeps a capacitor");
+    let found = l4_on(row, &Panicky, seed..seed + 1).expect_err("L4 sees the writer's panic");
     assert!(found.contains("panicked"), "{found}");
 }
 
 /// L4 on one row: each seed shrunk to admitted, every file written; a refusal or a writer's
 /// panic is the failure (with its seed).
-fn l4_on(row: &DialectRow, writer: &dyn Write) -> Result<(), String> {
+fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> Result<(), String> {
     let mut tally = Tally::new();
-    for seed in SEEDS {
+    for seed in seeds {
         let design = match admitted(seed, row, writer) {
             Ok(d) => d,
             Err(code) => {
@@ -418,7 +415,7 @@ fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Result<(), String>)
     let mut failing = Vec::new();
     let mut messages = Vec::new();
     for (row, writer) in writers() {
-        if let Err(m) = law(row, writer) {
+        if let Err(m) = caught(|| law(row, writer)) {
             failing.push(row.name);
             messages.push(format!("{}: {m}", row.name));
         }
@@ -431,12 +428,25 @@ fn reader_laws(name: &str, law: impl Fn(&DialectRow, &dyn Read) -> Result<(), St
     let mut failing = Vec::new();
     let mut messages = Vec::new();
     for (row, reader) in readers() {
-        if let Err(m) = law(row, reader) {
+        if let Err(m) = caught(|| law(row, reader)) {
             failing.push(row.name);
             messages.push(format!("{}: {m}", row.name));
         }
     }
     check_known(name, &failing, &messages);
+}
+
+/// `law()`, a panic in it (a reader's or a writer's) turned into the row's failure, so one row
+/// that panics fails as a row instead of aborting the law for every row.
+fn caught(law: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    match catch_unwind(AssertUnwindSafe(law)) {
+        Ok(result) => result,
+        Err(p) => {
+            let msg = p.downcast_ref::<String>().cloned();
+            let msg = msg.or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()));
+            Err(format!("panicked: {}", msg.unwrap_or_default()))
+        }
+    }
 }
 
 /// The rows that failed law `name` against its [`KNOWN`] rows, in `BUILTIN` order.

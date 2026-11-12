@@ -128,7 +128,7 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an integer literal past 32 bits",
             cite: "DIALECT-VACASK Appendix A run iw1",
             explain: "VACASK's integers are 32 bits and a wider literal wraps (`2147483648` is -2147483648, `99999999999` is 1215752191); the IR's integer does not wrap. Write it with a point to make it real.",
-            kind: ir::Kind::Refusal,
+            kind: ir::Kind::Note,
         },
     ),
     (

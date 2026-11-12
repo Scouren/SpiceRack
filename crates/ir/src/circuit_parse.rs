@@ -1,8 +1,10 @@
 //! The reader of the circuit owner's IR-text forms (`circuit_text.rs` documents them): one
 //! `element` or `model` statement's words in, builder pushes out (`parse_element`,
-//! `parse_model`). Total: an unknown key or word is a `TEXT_SYNTAX` row and is skipped; the row
-//! is pushed through the low tier (`Builder::push`), so a statement that breaks an invariant is
-//! built and `check` reports it. Values are read, names interned and rows pushed in text order
+//! `parse_model`). Total: an unknown key or word is a `TEXT_SYNTAX` row and is skipped; a
+//! statement the builder would assert on (a terminal count, a detail row or field outside its
+//! domain, a model's word, module or polarity) is one `TEXT_SYNTAX` row and pushes no item, as
+//! the kernel rows' reader does; the row is pushed through the low tier (`Builder::push`), so
+//! what only `check` decides (a duplicate element name, a class rule) is built and reported. Values are read, names interned and rows pushed in text order
 //! (side and wave rows at their field, the detail row after its fields), which is the order the
 //! builder calls of the same design make.
 //!
@@ -13,6 +15,7 @@
 //! `pub(crate) fn parse_library`
 
 use crate::build::Builder;
+use crate::circuit_check::{Classes, model_ok, verdict};
 use crate::circuit_fields::{Field, Fields, Side};
 use crate::circuit_text::{FAMILY_WORDS, KIND_WORDS, WAVE_WORDS};
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
@@ -102,6 +105,14 @@ pub(crate) fn parse_element(
         // never linked (`master_kind` is `None`), so `name?`'s held mark is cleared here
         head.model.def = crate::id::DefId::NONE;
     }
+    // what `Builder::element` asserts on (its detail and side rows stay unreferenced)
+    let (lo, hi) = kind.terminals();
+    let count = head.terminals.len();
+    let v = verdict(b.design(), &head, Classes::Assume);
+    if count < lo as usize || count > hi as usize || !v.rows || !v.domain {
+        words.error(diags);
+        return ItemRef::NONE;
+    }
     b.push(scope, head, span)
 }
 
@@ -163,9 +174,14 @@ pub(crate) fn parse_model(
             }
         }
     }
-    if b.design()
-        .def_index
-        .contains_key(&(scope, DefKind::Model, name))
+    // what `Builder::model` asserts on, and a second model of the name
+    let code = matches!(family, ModelFamily::CodeModel | ModelFamily::Other);
+    if (m.word != NameId::NONE) != code
+        || (m.module.name != NameId::NONE) != (family == ModelFamily::Module)
+        || !model_ok(b.design(), &m)
+        || b.design()
+            .def_index
+            .contains_key(&(scope, DefKind::Model, name))
     {
         words.error(diags);
         return ItemRef::NONE;

@@ -17,10 +17,10 @@ use spicerack_ir::dc_ac::{
     SensAc, Sp, Tf, TimedOp, Xf,
 };
 use spicerack_ir::periodic::{FreqAxis, Hb, HbTruncate, Pac, Pnoise, Pss, PssMode, Pstb, Pxf, Stb};
-use spicerack_ir::tran::{Four, StepCap, Tran};
+use spicerack_ir::tran::{Four, StepCap, StepCeiling, Tran};
 use spicerack_ir::{
-    AcPart, Builder, Design, Diags, ExprId, FileId, Literal, NameId, NumForm, Role, ScopeId, Span,
-    SweepEnd, SweepSpec, Target, TargetKind, dump, link, parse,
+    AcPart, Builder, Design, Diags, ExprId, FileId, List, Literal, NameId, NumForm, Role, ScopeId,
+    Span, SweepEnd, SweepSpec, Target, TargetKind, dump, link, parse,
 };
 
 const NO: ExprId = ExprId::NONE;
@@ -230,6 +230,7 @@ fn dc_and_small_signal_analyses() {
 fn time_domain_and_periodic_analyses() {
     let text = "file \"t.sp\" deck
   analysis tran name=t1 stop=1u print_step=1n segments=[2n, 2u] cap=ngspice_rule uic
+  analysis tran stop=2u record_start=1u print_step=1n max_step=2n
   analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (v db (in))
   option n_freqs value=10
   analysis four fundamental=2k periods=1 (v (out))
@@ -251,17 +252,27 @@ fn time_domain_and_periodic_analyses() {
             stop,
             record_start: NO,
             print_step: step,
-            max_step: NO,
             initial_step: NO,
             noise_fmax: NO,
             noise_fmin: NO,
             noise_seed: NO,
             segments,
-            cap: StepCap::NgspiceRule,
+            ceiling: StepCeiling::Rule(StepCap::NgspiceRule),
             uic: true,
             startup: false,
         };
         b.analysis(top, Some("t1"), row, Span::NONE);
+        let (stop2, rec, step2, cap2) = (n(b, "2u"), n(b, "1u"), n(b, "1n"), n(b, "2n"));
+        let given = Tran {
+            stop: stop2,
+            record_start: rec,
+            print_step: step2,
+            ceiling: StepCeiling::Given(cap2),
+            uic: false,
+            segments: List::EMPTY,
+            ..row
+        };
+        b.analysis(top, None, given, Span::NONE);
         let (f, h, p) = (n(b, "1k"), n(b, "9"), n(b, "1"));
         let probes = [
             b.probe_v(&["out"]),

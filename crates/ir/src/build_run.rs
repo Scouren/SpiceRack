@@ -17,7 +17,7 @@
 //! use spicerack_ir::dc_ac::{Dc, DcAxis};
 //! use spicerack_ir::measure::MeasureTrigTarg;
 //! use spicerack_ir::plan::SweepLoop;
-//! use spicerack_ir::tran::{StepCap, Tran};
+//! use spicerack_ir::tran::{StepCap, StepCeiling, Tran};
 //! use spicerack_ir::{AnalysisKinds, NameId};
 //! use spicerack_ir::{
 //!     AnalysisKind, Design, Edge, Event, ExprId, ItemKind, List, LoopEnd, Role, Span, SweepSpec,
@@ -44,9 +44,9 @@
 //!
 //! let tran = Tran {
 //!     stop: b.num(1e-6), print_step: b.num(1e-9), record_start: ExprId::NONE,
-//!     max_step: ExprId::NONE, initial_step: ExprId::NONE, cap: StepCap::SpanOver10,
-//!     noise_fmax: ExprId::NONE, noise_fmin: ExprId::NONE, noise_seed: ExprId::NONE,
-//!     segments: List::EMPTY, uic: true, startup: false,
+//!     initial_step: ExprId::NONE, noise_fmax: ExprId::NONE, noise_fmin: ExprId::NONE,
+//!     noise_seed: ExprId::NONE, segments: List::EMPTY,
+//!     ceiling: StepCeiling::Rule(StepCap::SpanOver10), uic: true, startup: false,
 //! };
 //! b.analysis(body, None, tran, span);
 //!

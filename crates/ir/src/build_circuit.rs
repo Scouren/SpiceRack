@@ -87,7 +87,7 @@
 //!   `Builder::define_model`
 
 use crate::build::Builder;
-use crate::circuit_check::{model_ok, verdict};
+use crate::circuit_check::{Classes, model_ok, verdict};
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, OutKind, Poly, TableSource};
 use crate::element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 use crate::id::{ExprId, ItemRef, List, NameId, NameList, ParamList, Ref, ScopeId};
@@ -199,7 +199,7 @@ impl Builder<'_> {
             detail,
             mult_law: head.mult_law,
         };
-        let v = verdict(self.design(), &row);
+        let v = verdict(self.design(), &row, Classes::Assume);
         assert!(
             v.rows,
             "{kind:?}: detail row {detail} missing, misplaced or out of range"

@@ -33,7 +33,7 @@ use crate::run_words::{
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::sweep::gen_sweep;
-use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
+use crate::sweep::{SweepUse, dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
 use crate::text_expr::Ctx;
 
@@ -49,7 +49,7 @@ impl DetailFacts for Pac {
         r.expr(&mut self.relharm);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
             set,
             self.axis == FreqAxis::Relative,
@@ -86,7 +86,7 @@ impl DetailFacts for Pac {
         features: &FeatureSet,
     ) -> Option<Self> {
         after_base(b, scope)?;
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let (sidebands, relharm, axis) = gen_side(g, b, features);
         Some(Pac {
             sweep,
@@ -113,7 +113,7 @@ impl DetailFacts for Pnoise {
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
             set,
             self.axis == FreqAxis::Relative,
@@ -159,7 +159,7 @@ impl DetailFacts for Pnoise {
         after_base(b, scope)?;
         let output = gen_probe(g, b, features, true);
         let source = g.fresh_name(b);
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let (sidebands, relharm, axis) = gen_side(g, b, features);
         Some(Pnoise {
             output,
@@ -187,7 +187,7 @@ impl DetailFacts for Pxf {
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
             set,
             self.axis == FreqAxis::Relative,
@@ -229,7 +229,7 @@ impl DetailFacts for Pxf {
     ) -> Option<Self> {
         after_base(b, scope)?;
         let output = gen_probe(g, b, features, true);
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let (sidebands, relharm, axis) = gen_side(g, b, features);
         Some(Pxf {
             output,
@@ -254,7 +254,7 @@ impl DetailFacts for Pstb {
         r.expr(&mut self.relharm);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
             set,
             self.axis == FreqAxis::Relative,
@@ -296,7 +296,7 @@ impl DetailFacts for Pstb {
     ) -> Option<Self> {
         after_base(b, scope)?;
         let probe = g.fresh_name(b);
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let (sidebands, relharm, axis) = gen_side(g, b, features);
         Some(Pstb {
             probe,
@@ -318,7 +318,7 @@ impl DetailFacts for Stb {
         r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(!self.probe.is_none() && sweep_valid(&self.sweep))
@@ -349,7 +349,7 @@ impl DetailFacts for Stb {
         let probe = g.fresh_name(b);
         Some(Stb {
             probe,
-            sweep: gen_sweep(g, b, features),
+            sweep: gen_sweep(g, b, features, SweepUse::Freq),
         })
     }
 }

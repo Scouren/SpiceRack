@@ -1,0 +1,10 @@
+dup ports
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s(a a)
+  r1 (a 0) res r=1
+ends
+x1 (n m) s
+control
+  analysis op1 op
+endc

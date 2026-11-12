@@ -86,7 +86,10 @@ impl Gen {
                     continue;
                 }
                 // a tree that still owes its probe takes a leaf where an empty node would end it
-                Some((node, _)) if !need_probe => build(b, node, Vec::new()),
+                Some((node, _)) if !need_probe => {
+                    self.class = self.class.max(self.own_class(&node));
+                    build(b, node, Vec::new())
+                }
                 Some(_) | None => self.leaf(b, features, &probes, dynamic, &mut need_probe),
             };
             // hand the value up, building every frame it completes
@@ -99,6 +102,7 @@ impl Gen {
                     break;
                 }
                 let frame = stack.pop().expect("the frame just filled");
+                self.class = self.class.max(self.own_class(&frame.node));
                 value = build(b, frame.node, frame.kids);
             }
         }
@@ -108,6 +112,16 @@ impl Gen {
 // ---- private ----
 
 impl Gen {
+    /// The class a built node adds by itself: a circuit-reading function, or a user function's
+    /// noted class (its arguments add theirs as they are built).
+    fn own_class(&self, node: &Node) -> ExprClass {
+        match node {
+            Node::Call(f) if f.reads_circuit() => ExprClass::Circuit,
+            Node::User(_, def) if !def.is_none() => self.class_of(*def),
+            _ => ExprClass::Constant,
+        }
+    }
+
     /// A leaf the set allows: constants, parameter reads and the constant leaves; in a
     /// circuit-reading tree also probes, its first leaf always one.
     fn leaf(
@@ -132,7 +146,7 @@ impl Gen {
             let leaves: Vec<ExprTag> = CONSTANT
                 .into_iter()
                 .filter(|t| features.contains(Feature::Expr(*t)))
-                .filter(|t| *t != ExprTag::Param || self.param_reads)
+                .filter(|t| !matches!(t, ExprTag::Param | ExprTag::Tnom) || self.param_reads)
                 .chain(probes.iter().copied().filter(|_| dynamic))
                 .collect();
             leaves[self.below(leaves.len() as u32) as usize]
@@ -320,14 +334,8 @@ impl Gen {
             return None;
         }
         let k = self.below(nodes.len() as u32) as usize;
-        let chosen = nodes.swap_remove(k);
-        let own = match &chosen.0 {
-            Node::Call(f) if f.reads_circuit() => ExprClass::Circuit,
-            Node::User(_, def) if !def.is_none() => self.class_of(*def),
-            _ => ExprClass::Constant,
-        };
-        self.class = self.class.max(own);
-        Some(chosen)
+        // the node's class is added when it is built, not here: a choice may end in a leaf
+        Some(nodes.swap_remove(k))
     }
 }
 
@@ -347,5 +355,51 @@ fn build(b: &mut Builder<'_>, node: Node, kids: Vec<ExprId>) -> ExprId {
         }
         Node::Draw(d, w, p) => b.draw(d, w, p, &kids),
         Node::List => b.list(&kids),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::class::{ExprClass, expr_class};
+    use crate::design::Design;
+    use crate::feature::FeatureSet;
+    use crate::r#gen::{Gen, Reads, Size};
+    use crate::id::DefId;
+    use crate::item::{DefKind, Role};
+    use crate::span::Span;
+
+    #[test]
+    fn the_tracked_class_is_the_trees() {
+        // `Gen::class` is the generated tree's class (oracle: `expr_class`), with nullary user
+        // functions of class Circuit to pick: a node chosen and then abandoned for a leaf adds
+        // nothing
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        for seed in 0..300u64 {
+            let mut d = Design::new();
+            let mut b = d.builder();
+            let (_, top) = b.file("t.sp", Role::Deck);
+            let mut g = Gen::new(seed, &FeatureSet::ALL, size);
+            g.scope = top;
+            for k in 0..3 {
+                let v = b.v("out", None);
+                b.func(top, &format!("h{k}"), &[], v, Span::NONE);
+                let def =
+                    b.design()
+                        .lookup(top, DefKind::Func, b.design().find_name(&format!("h{k}")));
+                g.note(def, ExprClass::Circuit);
+            }
+            let _ = DefId::NONE;
+            for _ in 0..20 {
+                for reads in [Reads::Circuit, Reads::Constant] {
+                    let e = g.expr(&mut b, &FeatureSet::ALL, reads);
+                    assert_eq!(g.class, expr_class(b.design(), e), "seed {seed}, {reads:?}");
+                }
+            }
+        }
     }
 }

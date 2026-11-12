@@ -120,6 +120,24 @@ mod tests {
         }
     }
 
+    /// A25: given a set without `Family(F)`, the generator makes no library of F.
+    #[test]
+    fn no_library_of_a_family_the_set_lacks() {
+        let set = circuit_set().minus(FeatureSet::EMPTY.with(Feature::Family(ModelFamily::Bsim4)));
+        let mut libraries = 0;
+        for seed in 0..400u64 {
+            let d = generate(seed, &set, SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind == ItemKind::DeviceLibrary {
+                    libraries += 1;
+                    let family = d.row::<spicerack_ir::DeviceLibrary>(item.index).family;
+                    assert_ne!(family, ModelFamily::Bsim4, "seed {seed}");
+                }
+            }
+        }
+        assert!(libraries > 0, "the property saw a library");
+    }
+
     #[test]
     fn the_full_set_reaches_every_circuit_kind_and_extra() {
         let set = circuit_set();

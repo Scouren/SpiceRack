@@ -23,13 +23,22 @@ use spicerack::ir;
 const MUTANTS: u64 = 32;
 
 /// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l1-mutants",
-    "ir",
-    "ir::parse pushes element rows ir::check refuses (X0016 a second element of one name, X0015 \
-     a key of another kind, X0006 a terminal count out of range) instead of a P9001; reported to \
-     the circuit owner",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l1-mutants",
+        "ir",
+        "ir::parse pushes element rows ir::check refuses (X0016 a second element of one name, X0015 \
+         a key of another kind, X0006 a terminal count out of range) instead of a P9001; reported to \
+         the circuit owner",
+    ),
+    (
+        "l1-mutants",
+        "vacask",
+        "read_elements (S4.1) pushes an instance whose parameter list repeats a name \
+         (`r9 (a 0) libres r=2k r=2k`): Builder::params asserts distinct names; reported to \
+         vc-devices",
+    ),
+];
 
 /// splitmix64.
 struct Rng(u64);

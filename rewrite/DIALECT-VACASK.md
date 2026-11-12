@@ -452,3 +452,4 @@ Still open:
 | dcw | ngspice-45 `V1 a 0 DC -6 PULSE(0 1 1u 1u 1u 2u 10u)` into 1k: `op`, `tran 10n 5u`, `op`; VACASK on `type="dc" dc=-6` with the pulse's parameters, `alter instance("v1") type="pulse"` before the `tran` and `type="dc"` after it (R42) | both: op −6, transient 0, 0.5, 1, 0.5 at 0.5, 1.5, 3, 4.5 µs, op −6 again |
 | iw1 | `r=` of `2147483647`, `2147483648`, `4294967297`, `2147483647+1`, `65536*65536`, `99999999999` (a 21-digit integer: "Integer literal out of range.") | 2147483647, −2147483648, 1, −2147483648, 0, 1215752191: VACASK's integers are 32 bits and wrap, literals and arithmetic alike |
 | lr1 | `vsource dc=` of 1 + 2⁻⁵³ (a tie), a hair above it, 1 + 3·2⁻⁵³ (a tie), and 30 digits `e-29` | the correctly rounded doubles, ties to even: VACASK keeps a long literal's digits (A18 `LongLiteral`) |
+| dp1 | `subckt s(a a)` | "Terminal '1' is not unique.": a subckt naming a port twice is `InvalidInSource` R2001 (found by the mutation law) |
