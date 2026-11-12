@@ -46,13 +46,7 @@ const SIZE: Size = Size {
 
 /// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
 /// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "p1",
-    "toreal_to_mul",
-    "seed 53: `until=(to_real(\"two words\"))` becomes `until=\"two words\"`, a string root in a \
-         typed field (X0021, A25 item 4): the tag table counts a string Real, so to_real(x) is \
-         written x; with the expr owner",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set

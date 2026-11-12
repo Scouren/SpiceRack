@@ -1,7 +1,7 @@
 //! The expression group's diagnostic codes (`U0100..=U0199`) and their catalogue rows: the
 //! notes its passes put at an item they leave carrying a feature.
 //!
-//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const CALL_LEFT`, `pub(crate) const FUNC_CALLED`, `pub(crate) const OPERAND_TOO_LARGE`, `pub(crate) const UNTYPED_READ`, `pub(crate) const BOTH_FORMS`
+//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const CALL_LEFT`, `pub(crate) const FUNC_CALLED`, `pub(crate) const OPERAND_TOO_LARGE`, `pub(crate) const UNTYPED_READ`, `pub(crate) const BOTH_FORMS`, `pub(crate) const TEXT_OPERAND`
 
 use crate::ir;
 
@@ -35,6 +35,8 @@ pub(crate) const OPERAND_TOO_LARGE: ir::Code = ir::Code::new(b'U', 116);
 pub(crate) const UNTYPED_READ: ir::Code = ir::Code::new(b'U', 115);
 /// A function body its callers read in both forms.
 pub(crate) const BOTH_FORMS: ir::Code = ir::Code::new(b'U', 112);
+/// A typed conversion of a value that may be a string or a list.
+pub(crate) const TEXT_OPERAND: ir::Code = ir::Code::new(b'U', 117);
 
 /// The group's catalogue rows (`U0100..=U0199`).
 pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
@@ -170,6 +172,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a function body its callers read in both forms",
             cite: "rewrite/AMEND-A12.md A28; rewrite/RULINGS.md R51",
             explain: "The body of a user function counts in the forms of the expressions that call it; this one is called from a constant expression and from one that reads the circuit or the temperature. A rule that converts one form cannot rewrite it without changing the other's spelling. Inlining the function (inline_funcs) gives each caller its own copy; without it, the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        TEXT_OPERAND,
+        ir::Info {
+            title: "a conversion to a real of a string or a list",
+            cite: "rewrite/AMEND-A12.md A21, A25",
+            explain: "real(x) is x as a Real; this x may be a string or a list, which has no numeric tag, so writing x alone or 1 * x would put text where a number is read. The call is left and the item is refused.",
             kind: ir::Kind::Note,
         },
     ),
