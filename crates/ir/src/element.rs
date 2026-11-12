@@ -29,16 +29,19 @@
 //! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
 //!   `pub(crate) fn design_check(&Design, &mut Diags)`
 
+use std::collections::HashSet;
+
 use crate::build::Builder;
+use crate::check::Violation;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
 use crate::design::{Design, DetailRow};
-use crate::diag::Diags;
+use crate::diag::{Diags, violation_code};
 use crate::facts::{Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 use crate::id::{ExprId, ItemRef, NameId, NameList, ParamList, Ref, ScopeId};
-use crate::item::DefKind;
+use crate::item::{DefKind, ItemKind};
 use crate::line::Line;
 use crate::passive::{Coupling, Parasitics, Passive};
 use crate::semi::{Semi, Switch};
@@ -624,5 +627,22 @@ pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
 /// already has (`arg`: the later element's row). Called once by `check`. One pass per scope;
 /// the map is lookup only, so the rows come in item order.
 pub(crate) fn design_check(design: &Design, out: &mut Diags) {
-    let _ = (design, out);
+    let mut seen: HashSet<NameId> = HashSet::new();
+    // bounded: every scope once, every item of its list once
+    for scope in 0..design.scopes.len() {
+        seen.clear();
+        for &item in &design.scope_items[scope] {
+            if item.kind != ItemKind::Element {
+                continue;
+            }
+            let element: Element = design.row(item.index);
+            if !seen.insert(element.name) {
+                out.push(
+                    violation_code(Violation::DuplicateElement),
+                    design.span_of(item),
+                    item.index,
+                );
+            }
+        }
+    }
 }
