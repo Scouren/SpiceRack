@@ -1,7 +1,7 @@
 structure
 // one line
-/* two
- lines */
+// two
+// lines 
 parameters a=1
 parameters 'q.r'=a + 2
 include "lib.inc" section=tt

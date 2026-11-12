@@ -1,5 +1,4 @@
-//! The structure rows → VACASK statements: `Title` (line 1), `Comment` (`//text`, or `/*text*/`
-//! for a text with a newline), `Include` (`include "path" [section=name]`), `Section`,
+//! The structure rows → VACASK statements: `Title` (line 1), `Comment` (`//text`: one line), `Include` (`include "path" [section=name]`), `Section`,
 //! `Load` (`load "path"`), `Subckt` (`subckt name (ports)`, its head as one `parameters` line,
 //! then its body, `ends`), `Param` (`parameters name=value`), `Global`, `If` (`@if c`,
 //! `@elseif c`, `@else`, `@end`), and an `Opaque` of VACASK's text family copied as written.
@@ -7,7 +6,7 @@
 //!
 //! Cites: VD input-include, cir-subckt, cir-nodes, cir-conditional, cir-loading.
 //!
-//! Contents: `NO_LIBRARY`, `NO_DEFAULT`, `LOAD_KIND`, `CODES`, `title`, `comment`, `include`, `section`, `section_end`,
+//! Contents: `LOAD_KIND`, `CODES`, `title`, `comment`, `include`, `section`, `section_end`,
 //! `load`, `device_library`, `admits`,
 //! `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` (crate-private)
 
@@ -17,46 +16,20 @@ use super::tables;
 use super::write::Writer;
 use crate::ir;
 
-/// A device library of a family VACASK ships no file for.
-pub(super) const NO_LIBRARY: ir::Code = ir::Code::new(b'W', 2002);
-
-/// A subcircuit formal with no default (VACASK: "each parameter must have an expression").
-pub(super) const NO_DEFAULT: ir::Code = ir::Code::new(b'W', 2003);
-
 /// A load whose kind its path's extension does not state (VACASK compiles a `.va`, loads the
 /// rest as OSDI: VD cir-loading).
 pub(super) const LOAD_KIND: ir::Code = ir::Code::new(b'W', 2004);
 
 /// This area's rows.
-pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
-    (
-        LOAD_KIND,
-        ir::Info {
-            title: "a load whose kind its file's extension does not state",
-            cite: "VD cir-loading (a `.va` is compiled, any other file loaded as OSDI)",
-            explain: "VACASK decides from the extension whether a `load` compiles Verilog-A; a Verilog-A load of another extension, or an OSDI load of a `.va`, has no VACASK spelling.",
-            kind: ir::Kind::Refusal,
-        },
-    ),
-    (
-        NO_DEFAULT,
-        ir::Info {
-            title: "a subcircuit parameter with no default",
-            cite: "VD cir-subckt (Parameters: each parameter must have an expression)",
-            explain: "VACASK declares a subcircuit's parameters with `parameters name=value`; one with no value has no VACASK spelling. ponytail: a kernel feature (requested) will state it, and this refusal goes.",
-            kind: ir::Kind::Refusal,
-        },
-    ),
-    (
-        NO_LIBRARY,
-        ir::Info {
-            title: "a device library of a family VACASK ships no file for",
-            cite: "VD dev-spice, dev-builtin; the store's lib/vacask/mod listing (tables.rs)",
-            explain: "The design asks for the target's default library of a device family VACASK has no module file for; name a file (`path`) or a family VACASK has.",
-            kind: ir::Kind::Refusal,
-        },
-    ),
-];
+pub(super) const CODES: &[(ir::Code, ir::Info)] = &[(
+    LOAD_KIND,
+    ir::Info {
+        title: "a load whose kind its file's extension does not state",
+        cite: "VD cir-loading (a `.va` is compiled, any other file loaded as OSDI)",
+        explain: "VACASK decides from the extension whether a `load` compiles Verilog-A; a Verilog-A load of another extension, or an OSDI load of a `.va`, has no VACASK spelling.",
+        kind: ir::Kind::Refusal,
+    },
+)];
 
 /// Line 1 of an entry deck: the title's text, or nothing.
 pub(super) fn title(w: &mut Writer<'_, '_>, row: Option<ir::item::Title>) {
@@ -68,20 +41,10 @@ pub(super) fn title(w: &mut Writer<'_, '_>, row: Option<ir::item::Title>) {
 
 /// A comment line.
 pub(super) fn comment(w: &mut Writer<'_, '_>, row: ir::item::Comment) {
-    let text = w.design.text(row.text);
     w.line();
-    match text.contains('\n') {
-        true => {
-            w.out.push_str("/*");
-            w.out.push_str(text);
-            w.out.push_str("*/\n");
-        }
-        false => {
-            w.out.push_str("//");
-            w.out.push_str(text);
-            w.out.push('\n');
-        }
-    }
+    w.out.push_str("//");
+    w.out.push_str(w.design.text(row.text));
+    w.out.push('\n');
 }
 
 /// An `include` line.
@@ -149,7 +112,8 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// A `load` of a device library: its path, or the family's default file.
 pub(super) fn device_library(w: &mut Writer<'_, '_>, row: ir::DeviceLibrary) {
     let path = match row.path.is_none() {
-        true => tables::default_file(row.family).expect("admits refused a family with no file"),
+        true => tables::default_file(row.family)
+            .expect("FEATURES holds only the families VACASK ships a file for"),
         false => w.design.str(row.path).to_string(),
     };
     w.line();
@@ -158,32 +122,17 @@ pub(super) fn device_library(w: &mut Writer<'_, '_>, row: ir::DeviceLibrary) {
     w.out.push('\n');
 }
 
-/// Appends a refusal for what no feature states and VACASK cannot spell: a device library with no
-/// path of a family with no VACASK file; a subcircuit formal with no default; a load whose kind
-/// its extension does not state.
+/// Appends a refusal for what no feature states and VACASK cannot spell: a load whose kind its
+/// extension does not state.
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     for (at, _) in design.reachable() {
-        match at.kind {
-            ir::ItemKind::DeviceLibrary => {
-                let row: ir::DeviceLibrary = design.row(at.index);
-                if row.path.is_none() && tables::default_file(row.family).is_none() {
-                    diags.push(NO_LIBRARY, design.span_of(at), 0);
-                }
-            }
-            ir::ItemKind::Load => {
-                let row: ir::item::Load = design.row(at.index);
-                let va = design.str(row.path).ends_with(".va");
-                if va != (row.kind == ir::LoadKind::VerilogA) {
-                    diags.push(LOAD_KIND, design.span_of(at), 0);
-                }
-            }
-            ir::ItemKind::Subckt => {
-                let row: ir::item::Subckt = design.row(at.index);
-                if design.params(row.params).iter().any(|(_, v)| v.is_none()) {
-                    diags.push(NO_DEFAULT, design.span_of(at), 0);
-                }
-            }
-            _ => {}
+        if at.kind != ir::ItemKind::Load {
+            continue;
+        }
+        let row: ir::item::Load = design.row(at.index);
+        let va = design.str(row.path).ends_with(".va");
+        if va != (row.kind == ir::LoadKind::VerilogA) {
+            diags.push(LOAD_KIND, design.span_of(at), 0);
         }
     }
 }

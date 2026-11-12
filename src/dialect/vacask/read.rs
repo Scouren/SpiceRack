@@ -167,7 +167,11 @@ impl Lower<'_, '_, '_> {
                 start,
                 len,
             };
-            self.b.comment(self.scope, text, span);
+            // A comment item is one line (`ir::check`): a block comment is one per line.
+            for line in text.split('\n') {
+                self.b
+                    .comment(self.scope, line.strip_suffix('\r').unwrap_or(line), span);
+            }
             at = next;
         }
     }

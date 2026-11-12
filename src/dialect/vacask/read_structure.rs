@@ -30,7 +30,7 @@ use crate::ir;
 use crate::syntax::ast::{Name, Node, Tag};
 
 /// What this area's rows use.
-pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
+pub(super) const FEATURES: ir::FeatureSet = families(ir::FeatureSet::EMPTY)
     .with(ir::Feature::Item(ir::ItemKind::Title))
     .with(ir::Feature::Item(ir::ItemKind::Comment))
     .with(ir::Feature::Item(ir::ItemKind::Include))
@@ -383,6 +383,23 @@ pub(super) fn embed(l: &mut Lower<'_, '_, '_>, n: Node) {
 }
 
 // ---- private ----
+
+/// `set` with the family of every library file VACASK ships (A15 `Family`; a device library of
+/// another family is a feature VACASK lacks).
+const fn families(set: ir::FeatureSet) -> ir::FeatureSet {
+    let mut out = set;
+    let mut i = 0;
+    while i < tables::SPICE_FILES.len() {
+        out = out.with(ir::Feature::Family(tables::SPICE_FILES[i].1));
+        i += 1;
+    }
+    let mut k = 0;
+    while k < tables::OWN_FILES.len() {
+        out = out.with(ir::Feature::Family(tables::OWN_FILES[k].1));
+        k += 1;
+    }
+    out
+}
 
 /// `key = value` field `f`: the key's name and the value's node.
 fn assign(l: &Lower<'_, '_, '_>, f: u32) -> Option<(String, u32)> {

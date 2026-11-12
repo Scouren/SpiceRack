@@ -31,12 +31,11 @@ fn canonical(design: &ir::Design) -> String {
 }
 
 #[test]
-// marker: the generator's designs are almost never VACASK-spellable until these land, so the
-// law admits too few (it fails, and goes red as an unexpected pass when they do): the kernel's
-// `DeckWithoutTitle` and the spine's `deck_title` pass; A15's `Placed` (a `global`, `include`,
-// `load` only where VACASK allows it) and `Family`; a feature for a formal with no default or a
-// default of `$temp` (W2003; run c2); a feature for a scale letter VACASK lacks (`c`, `peta`).
-#[should_panic(expected = "designs admitted")]
+// marker: known failures, each a cause outside this slice (S4-AREAS.md, Known failures): a
+// `global` inside a branch or subcircuit until A15's `Placed`; a formal whose default reads
+// `$temp` until `FormalReadsParam` covers it (run c2). It goes red (an unexpected pass) when
+// both land.
+#[should_panic(expected = "first difference")]
 fn l5_read_of_write_is_the_design_without_foreign_opaques() {
     let row = dialect::by_name("vacask").expect("the vacask row");
     let set = row.write.expect("a writer").features().minus(

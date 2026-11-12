@@ -4,7 +4,8 @@
 file "structure.sim" deck
   title "structure"
   comment " one line"
-  comment " two\n lines "
+  comment " two"
+  comment " lines "
   param a = 1i
   param `q.r` = a + 2i
   include "lib.inc" section=tt
