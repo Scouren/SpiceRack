@@ -44,18 +44,11 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
-const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "l5",
-        "ngspice",
-        "seed 10 Untyped: a FromHere Env tnom={expression} is written as a script `option tnom={…}` and reads back a Private opaque (the frontend's option takes no numparam braces): control and run (ng-control, ng-run)",
-    ),
-    (
-        "l7",
-        "ngspice",
-        "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
-    ),
-];
+const KNOWN: &[(&str, &str, &str)] = &[(
+    "l7",
+    "ngspice",
+    "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
+)];
 
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;

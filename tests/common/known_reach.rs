@@ -30,7 +30,12 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Analysis(Disto)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Pss)", FIXPOINT, RUN),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
-    ("ngspice", "Family(CodeModel)", FIXPOINT, CODE_MODELS),
+    (
+        "ngspice",
+        "Family(CodeModel)",
+        "code_models_of_the_build_round_trip_by_meaning",
+        CODE_MODELS,
+    ),
 ];
 
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
@@ -41,4 +46,4 @@ const ELEMENTS: &str =
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, noise, sens, disto, pss)";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
-const CODE_MODELS: &str = "interim: dialect_ngspice_models' fixture code_module; the generator's code-model words never name one of the build's code models (W1206)";
+const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";
