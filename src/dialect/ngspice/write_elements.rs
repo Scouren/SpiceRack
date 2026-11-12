@@ -2,7 +2,7 @@
 //! `read_elements` reads it back to the same rows (law L5), the name as it is (R23), nodes in
 //! ngspice's order, a card number in `INPevaluate`'s spelling, any other value in `{…}`, a
 //! B-source field (`v=`, `i=`, `vol=`, `cur=`, a table's input, an R/C/L value ngspice runs as a
-//! B source) in the B-source grammar. A `VSource`/`ISource` goes to `write_sources::source`.
+//! B source) in the B-source grammar. A `VSource`, `ISource` or `Port` (ngspice's `V … portnum`) goes to `write_sources::source`.
 //!
 //! What a feature cannot state and ngspice cannot spell is refused by [`admits`] (R21, code
 //! `W1100`): a name whose letter is not its kind's card (until A13's `NameWithoutLetter`), `m`
@@ -45,7 +45,8 @@ pub(super) const CODES: &[Row] = &[(
 /// Appends a refusal for an element ngspice cannot spell for a reason no feature states (R21).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let e: ir::Element = design.row(item.index);
-    if matches!(e.kind, K::VSource | K::ISource) {
+    if matches!(e.kind, K::VSource | K::ISource | K::Port) {
+        // the source area's (`write_sources::admits` once it lands)
         return;
     }
     if !admit::spellable(design, &e) {
@@ -56,7 +57,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
 /// An `Element`: its card.
 pub(super) fn element(w: &mut Out<'_>, item: ir::ItemRef) {
     let e: ir::Element = w.design.row(item.index);
-    if matches!(e.kind, K::VSource | K::ISource) {
+    if matches!(e.kind, K::VSource | K::ISource | K::Port) {
         return write_sources::source(w, item);
     }
     assert!(
