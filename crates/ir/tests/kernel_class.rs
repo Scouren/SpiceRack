@@ -270,3 +270,37 @@ fn an_argument_no_formal_reads_adds_no_class() {
         Form::Static
     );
 }
+
+#[test]
+fn an_unbound_read_is_constant_by_assumption_until_bound() {
+    // A33 (the lead's answer c): an unbound parameter read counts as Constant by assumption (a
+    // reader that leaves it unbound asserts a parameter will bind it, R4); binding it to a
+    // definition of class Temp makes the root Temp (the binding door clears the derived tables)
+    use spicerack_ir::{ExprClass, expr_class};
+    let mut d = Design::new();
+    let (read, hot) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let t = b.temp();
+        b.param(top, "hot", t, Span::NONE);
+        let read = b.param_ref("hot"); // left unbound by its reader
+        b.param(top, "p", read, Span::NONE);
+        let hot = b.design().lookup(
+            top,
+            spicerack_ir::DefKind::Param,
+            b.design().find_name("hot"),
+        );
+        (read, hot)
+    };
+    assert_eq!(
+        expr_class(&d, read),
+        ExprClass::Constant,
+        "unbound: Constant by assumption"
+    );
+    d.builder().resolve(read, hot);
+    assert_eq!(
+        expr_class(&d, read),
+        ExprClass::Temp,
+        "bound to a Temp definition"
+    );
+}

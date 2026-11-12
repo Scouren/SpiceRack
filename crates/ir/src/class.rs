@@ -43,6 +43,11 @@ pub enum ExprClass {
 
 /// The class of `e` (see the module header). O(its tree) once the design's definition classes
 /// are cached; the first call after a mutation computes them, O(design).
+///
+/// An unbound parameter read counts as `Constant` by assumption, not knowledge (A33): the reader
+/// that left it unbound asserts a parameter will bind it (R4), and its class is known only once
+/// one does. The one signal carried today is `Extra::FormalNotConstant`, for a subcircuit
+/// default holding such a read.
 pub fn expr_class(design: &Design, e: ExprId) -> ExprClass {
     tree_class(design, e, def_classes(design))
 }
