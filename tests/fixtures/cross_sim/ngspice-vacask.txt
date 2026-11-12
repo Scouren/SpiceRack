@@ -1,7 +1,7 @@
-circuitsim90/BJT/vreg.sp mismatch # dc v(2): 0.5586759973994992+0i vs 0.5651719649161091+0i at 2 (tol 4.595e-3)
+circuitsim90/BJT/vreg.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # dc v(2): 0.5586759973994992+0i vs 0.5651719649161091+0i at 2 (tol 4.595e-3)
 circuitsim90/MOS2/ab_ac.sp mismatch # ac v(18): -2923.888930836546+0.0248810538697466i vs -2836.018098941056+0.023435298285597393i at 1 (tol 5.848e0)
 circuitsim90/MOS2/cram.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 95 step(s) tried.
-circuitsim90/MOS2/gm6.sp mismatch # op v(13): 0.40898654762563585+0i vs 0+0i at 0 (tol 8.200e-4)
+circuitsim90/MOS2/gm6.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # op v(13): 0.40898654762563585+0i vs 0+0i at 0 (tol 8.200e-4)
 circuitsim90/MOS2/hussamp.sp target-fails # no raw file op1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 147 step(s) tried.
 circuitsim90/MOS2/mux8.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 87 step(s) tried.
 circuitsim90/MOS2/ring.sp mismatch # tran v(2): 1.5267320280194356 leaves the tube at t=0.00000008005055142853478 (tol 3.055e-2)
@@ -30,16 +30,10 @@ ngspice/examples/soa/nic_soa.sp mismatch # tran v(bias): 0.6388506757411574 leav
 ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])
 ngspice/examples/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@d1[gd]", "@d1[cd]", "@d1[qd]"] vs ["1", "d1:a_int", "d1:implicit_equation_0", "v1:flow(br)"])
-ngspice/examples/various/roessler-attractor.sp target-fails # Parameter 'ic' not found: `c1 (x 0) capacitor c=1e0 ic=1` (a C card's `ic=` under `uic`; not this row's card)
+ngspice/examples/various/roessler-attractor.sp mismatch # tran v(z): 15.171474718990456 leaves the tube at t=172.01896000045733 (tol 2.284e-01; target there 14.46884464898786)
 ngspice/examples/various/todo-temper-3.sp target-fails # no raw file dc1.raw: Variable or constant 'temper' not defined. | model dplain sp_diode (is=temper >= 25 ? 1e-10 : (temper+1)*1e-11) | ^ | 9:27 (0x66) in .cross
 ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/paranoia/vdmos/IXTP6N100D2-cap.sp target-fails # no raw file tran1.raw: Factorization failed, size=16, rank=15, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 ste
-ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp target-fails # no raw file dc1.raw: Factorization failed, size=24, rank=22, zero pivot @ node 'vs2:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step
-ngspice/paranoia/vdmos/VDMOS-DIO-AC.sp target-fails # no raw file ac1.raw: Factorization failed, size=20, rank=19, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step(
-ngspice/paranoia/vdmos/VDMOS-DIO.sp target-fails # no raw file tran1.raw: Factorization failed, size=20, rank=19, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 ste
-ngspice/paranoia/vdmos/vdmos-out.sp target-fails # no raw file dc1.raw: Factorization failed, size=14, rank=13, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step(
-ngspice/paranoia/vdmos/vdmos-out_ir.sp target-fails # no raw file dc1.raw: Factorization failed, size=15, rank=14, zero pivot @ node 'vs:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step(
-ngspice/paranoia/vdmos/vdmos-out_ir_mtr.sp target-fails # no raw file dc1.raw: Factorization failed, size=22, rank=20, zero pivot @ node 'vs2:flow(br)'. | Leaving core NR loop in iteration 1. | Homotopy failed, 12 step
+ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp mismatch # dc: sweep grid changed (5400 -> 505 points)
 ngspice/tests/general/fourbitadder.sp mismatch # tran v(x1.x1.x1.x6.8): 0.00004785659230303885 leaves the tube at t=0.000000000038400000000000004 (tol 2.781e-6)
 ngspice/tests/general/mosamp.sp mismatch # tran v(5): 7.48424320532575 leaves the tube at t=0.000005006817099418725 (tol 1.363e-1)
 ngspice/tests/general/rc.sp target-fails # no raw file tran1.raw: Rise time of pulse transient must be grater than 0. | vin (1 0) vsource dc=0 mag=1e0 type="pulse" val0=0 val1=1e0 delay=0 ri ... | ^ | 14

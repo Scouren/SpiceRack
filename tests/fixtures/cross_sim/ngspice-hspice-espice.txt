@@ -7,7 +7,6 @@ circuitsim90/MOS2/nand.sp simulator-fails # no raw file .cross_sim_out.raw: Erro
 circuitsim90/MOS2/pump.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS2/ring.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(2): 3.035043276482301 leaves the tube at t=0.00000003142807272942943 (tol 3.055e-2)
 circuitsim90/MOS2/slowlatch.sp simulator-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
-circuitsim90/MOS2_LARGE/add20.sp target-fails # no raw file .cross_sim_out.raw: Error: .cross_sim_deck.sp: TimestepTooSmall
 circuitsim90/MOS2_LARGE/dac.sp slow # quarantined
 circuitsim90/MOS2_LARGE/fadd32.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(27): 4.82997 leaves the tube at t=4.21361e-08 (tol 5.262e-02)
 circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined

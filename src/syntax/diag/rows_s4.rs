@@ -35,7 +35,12 @@ macro_rules! rows_s4 {
             // slot W0319
             // slot W0320
             // W0321–W0335: spec-mm (cross-sim mismatch triage).
-            // slot W0321
+            /// More than one analysis in a deck written for Xyce, which runs one a deck.
+            W0321 Refusal {
+                title: "more than one analysis, and Xyce runs one a deck",
+                cite: "Xyce 7.10.0 run on two-analysis decks (ZERO-LEDGER P1-066): of `.DC`, `.AC`, `.TRAN`, `.NOISE` cards the last alone is run, with no message; two `.DC` cards run as one nested sweep; Xyce RG 7.10 `.OP` (an `.op` beside another analysis is not calculated: W0052)",
+                explain: "The deck holds two or more of `.dc`, `.ac`, `.tran`, `.noise`, `.sp`. ngspice, HSPICE and VACASK run each of them; Xyce runs the last card only and reports nothing, and reads two `.DC` cards as one nested sweep, so the written deck would give other results than its source. Write one deck per analysis. An `.op` beside one analysis is kept and noted (W0052).",
+            }
             // slot W0322
             // slot W0323
             // slot W0324
