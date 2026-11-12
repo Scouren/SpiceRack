@@ -33,7 +33,7 @@ fn set(fs: &[Feature]) -> FeatureSet {
 
 #[test]
 fn index_and_from_index_are_inverses() {
-    assert_eq!(Feature::COUNT, 507); // A11: +6; A12 K1: DivTyped and ToInt twice, IntLiteral
+    assert_eq!(Feature::COUNT, 509); // A11: +6; A12 K1: +5; A12 K2: EnclosingRef, FormalReadsParam
     let mut seen = vec![false; Feature::COUNT as usize];
     for i in 0..Feature::COUNT {
         let f = Feature::from_index(i);
@@ -131,7 +131,7 @@ fn features_of_a_hand_built_deck() {
 fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
-    let cases: [(Extra, Build, Build); 9] = [
+    let cases: [(Extra, Build, Build); 11] = [
         (
             Extra::NestedSubckt,
             |b, top| {
@@ -231,6 +231,60 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             |b, top| {
                 let v = b.num(3.0);
                 b.param(top, "k", v, Span::NONE);
+            },
+        ),
+        (
+            Extra::EnclosingRef,
+            |b, top| {
+                // outer body defines p; the inner subckt's param reads it: an enclosing body
+                let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
+                let one = b.num(1.0);
+                b.param(outer, "p", one, Span::NONE);
+                let (_, inner) = b.subckt(outer, "inner", &[], &[], Span::NONE);
+                let read = b.param_ref("p");
+                let p = b.design().lookup(
+                    outer,
+                    spicerack_ir::DefKind::Param,
+                    b.design().find_name("p"),
+                );
+                b.resolve(read, p);
+                b.param(inner, "q", read, Span::NONE);
+            },
+            |b, top| {
+                // the neighbour reads its own subcircuit's p and the top's t
+                let one = b.num(1.0);
+                b.param(top, "t", one, Span::NONE);
+                let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
+                let (_, inner) = b.subckt(outer, "inner", &[], &[], Span::NONE);
+                let two = b.num(2.0);
+                b.param(inner, "p", two, Span::NONE);
+                let own = b.param_ref("p");
+                let p = b.design().lookup(
+                    inner,
+                    spicerack_ir::DefKind::Param,
+                    b.design().find_name("p"),
+                );
+                b.resolve(own, p);
+                let at_top = b.param_ref("t");
+                let t =
+                    b.design()
+                        .lookup(top, spicerack_ir::DefKind::Param, b.design().find_name("t"));
+                b.resolve(at_top, t);
+                let sum = b.binary(BinOp::Add, own, at_top);
+                b.param(inner, "q", sum, Span::NONE);
+            },
+        ),
+        (
+            Extra::FormalReadsParam,
+            |b, top| {
+                let one = b.num(1.0);
+                b.param(top, "w0", one, Span::NONE);
+                let read = b.param_ref("w0");
+                b.subckt(top, "s", &[], &[("w", read)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
             },
         ),
     ];

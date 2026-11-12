@@ -105,6 +105,13 @@ pub enum Extra {
     CaseSensitiveNames,
     /// A literal of form `Int` anywhere in the design (A12 K1: typed arithmetic).
     IntLiteral,
+    /// An item holds a reference bound to a definition in the body of a subcircuit enclosing
+    /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
+    /// resolves in the own scope, then the top, never an enclosing subcircuit).
+    EnclosingRef,
+    /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
+    /// only a formal whose default folds to a constant).
+    FormalReadsParam,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -233,7 +240,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 9] = [
+    pub const ALL: [Extra; 11] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -243,6 +250,8 @@ impl Extra {
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
         Extra::IntLiteral,
+        Extra::EnclosingRef,
+        Extra::FormalReadsParam,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
