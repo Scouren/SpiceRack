@@ -46,7 +46,7 @@ use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
-    domain_unless, flag, get, is_one, put_expr, put_exprs, put_flag, put_word, take_enum,
+    domain_unless, flag, get, is_one, is_zero, put_expr, put_exprs, put_flag, put_word, take_enum,
     take_expr, take_exprs, take_key, take_word, word,
 };
 use crate::text::Words;
@@ -208,9 +208,21 @@ impl DetailFacts for Tran {
         flag(set, self.segments.len > 0, RunExtra::TranSegments);
     }
 
-    fn fault(&self, _design: &Design) -> Option<Violation> {
+    fn fault(&self, design: &Design) -> Option<Violation> {
         let noise = self.noise_fmax.is_none() == self.noise_fmin.is_none();
-        domain_unless(!self.stop.is_none() && noise && self.segments.len.is_multiple_of(2))
+        // one meaning, one row (A24): a 0 ceiling is no ceiling given, a 0 start no start given
+        let ceiling = match self.ceiling {
+            StepCeiling::Given(e) => !e.is_none() && !is_zero(design, e),
+            StepCeiling::Rule(_) => true,
+        };
+        let start = !is_zero(design, self.record_start);
+        domain_unless(
+            !self.stop.is_none()
+                && noise
+                && self.segments.len.is_multiple_of(2)
+                && ceiling
+                && start,
+        )
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {

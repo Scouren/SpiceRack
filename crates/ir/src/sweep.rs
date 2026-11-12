@@ -21,9 +21,12 @@
 //!   `SweepSpec::oct(ExprId, ExprId, ExprId) -> SweepSpec`,
 //!   `SweepSpec::log(ExprId, ExprId, ExprId) -> SweepSpec`, `SweepSpec::list(ExprList) -> SweepSpec`,
 //!   `SweepSpec::ending(self, SweepEnd) -> SweepSpec`
-//! - the run rows' sweep facts: `pub(crate) fn sweep_handles`, `pub(crate) fn sweep_valid`,
-//!   `pub(crate) fn sweep_features`, `pub(crate) fn dump_sweep`, `pub(crate) fn parse_sweep`,
-//!   `pub(crate) fn gen_sweep`
+//! - the run rows' sweep facts: `pub(crate) enum SweepUse`, `pub(crate) fn sweep_handles`,
+//!   `pub(crate) fn sweep_valid`, `pub(crate) fn sweep_features`, `pub(crate) fn dump_sweep`,
+//!   `pub(crate) fn parse_sweep`, `pub(crate) fn sweep_possible` (gen), `pub(crate) fn gen_sweep`
+//!
+//! A sweep's form is a feature per use (A24): `form_feature` is the table of
+//! `Sweep{Dc,Loop,Freq}{LinStep,LinPoints,Dec,Oct,Log,List}`.
 //!
 //! IR text: `(kind [on_stop] [center_span] [start=v] [stop=v] [step=v] [points=v]
 //! [values=[v, …]])`, e.g. `(lin start=0 stop=5 step=0.1)`, `(dec on_stop start=1 stop=1g
@@ -111,6 +114,40 @@ pub enum SweepBounds {
     /// `center=`/`span=`, `INV-semantics.md` 8.08).
     CenterSpan,
 }
+
+/// Where a sweep is used: its form's feature is per use (A24; ngspice's DC axis is lin by step
+/// only, its frequency sweeps have no step).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SweepUse {
+    /// A DC analysis's axis.
+    Dc,
+    /// A sweep loop.
+    Loop,
+    /// A frequency sweep (AC, noise, transfer, S-parameter, distortion, periodic small-signal).
+    Freq,
+}
+
+/// A sweep's form: its kind, and for `Lin` whether by step or by count.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Form {
+    LinStep,
+    LinPoints,
+    Dec,
+    Oct,
+    Log,
+    List,
+}
+
+/// Every form, in `RunExtra` order.
+#[cfg(any(test, feature = "gen"))]
+const FORMS: [Form; 6] = [
+    Form::LinStep,
+    Form::LinPoints,
+    Form::Dec,
+    Form::Oct,
+    Form::Log,
+    Form::List,
+];
 
 const _: () = assert!(size_of::<SweepSpec>() == 28);
 const _: () = assert!(size_of::<SweepKind>() == 1);
@@ -239,9 +276,9 @@ pub(crate) fn sweep_valid(s: &SweepSpec) -> bool {
 }
 
 /// Adds the sweep's `RunExtra` features.
-pub(crate) fn sweep_features(s: &SweepSpec, set: &mut FeatureSet) {
+pub(crate) fn sweep_features(s: &SweepSpec, at: SweepUse, set: &mut FeatureSet) {
     let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
-    // stub (A24): the use-and-form members
+    add(form_feature(at, form_of(s)));
     if s.end == SweepEnd::OnStop {
         add(RunExtra::SweepEndOnStop);
     }
@@ -304,16 +341,29 @@ pub(crate) fn parse_sweep(
 
 /// A random valid sweep using only `features` (a linear sweep by step needs none).
 #[cfg(any(test, feature = "gen"))]
-pub(crate) fn gen_sweep(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> SweepSpec {
+pub(crate) fn gen_sweep(
+    g: &mut Gen,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+    at: SweepUse,
+) -> SweepSpec {
     let has = |x: RunExtra| features.contains(Feature::Run(x));
-    let mut kinds = vec![SweepKind::Lin];
-    kinds.extend([
-        SweepKind::Dec,
-        SweepKind::Oct,
-        SweepKind::Log,
-        SweepKind::List,
-    ]); // stub
-    let kind = kinds[g.below(kinds.len() as u32) as usize];
+    let forms: Vec<Form> = FORMS
+        .into_iter()
+        .filter(|&f| has(form_feature(at, f)))
+        .collect();
+    assert!(
+        !forms.is_empty(),
+        "a sweep generated only where `sweep_possible`"
+    );
+    let form = forms[g.below(forms.len() as u32) as usize];
+    let kind = match form {
+        Form::LinStep | Form::LinPoints => SweepKind::Lin,
+        Form::Dec => SweepKind::Dec,
+        Form::Oct => SweepKind::Oct,
+        Form::Log => SweepKind::Log,
+        Form::List => SweepKind::List,
+    };
     let value = |g: &mut Gen, b: &mut Builder<'_>| g.expr(b, features, Reads::Constant);
     let s = if kind == SweepKind::List {
         let n = 1 + g.below(3) as usize;
@@ -322,7 +372,7 @@ pub(crate) fn gen_sweep(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet)
     } else {
         let (start, stop, n) = (value(g, b), value(g, b), value(g, b));
         match kind {
-            SweepKind::Lin if g.chance(2) => SweepSpec::lin_points(start, stop, n),
+            SweepKind::Lin if form == Form::LinPoints => SweepSpec::lin_points(start, stop, n),
             SweepKind::Lin => SweepSpec::lin_step(start, stop, n),
             SweepKind::Dec => SweepSpec::dec(start, stop, n),
             SweepKind::Oct => SweepSpec::oct(start, stop, n),
@@ -343,6 +393,14 @@ pub(crate) fn gen_sweep(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet)
     s
 }
 
+/// Whether `features` hold some form of a sweep used `at` (`gen_sweep`'s precondition).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn sweep_possible(features: &FeatureSet, at: SweepUse) -> bool {
+    FORMS
+        .into_iter()
+        .any(|f| features.contains(Feature::Run(form_feature(at, f))))
+}
+
 // ---- private ----
 
 /// A range sweep of no kind yet: the fields every constructor shares.
@@ -356,5 +414,42 @@ const fn range(start: ExprId, stop: ExprId) -> SweepSpec {
         step: ExprId::NONE,
         points: ExprId::NONE,
         values: List::EMPTY,
+    }
+}
+
+/// The form of a sweep.
+fn form_of(s: &SweepSpec) -> Form {
+    match s.kind {
+        SweepKind::Lin if s.points.is_none() => Form::LinStep,
+        SweepKind::Lin => Form::LinPoints,
+        SweepKind::Dec => Form::Dec,
+        SweepKind::Oct => Form::Oct,
+        SweepKind::Log => Form::Log,
+        SweepKind::List => Form::List,
+    }
+}
+
+/// The feature of each use and form (A24's class).
+const fn form_feature(at: SweepUse, form: Form) -> RunExtra {
+    use RunExtra as X;
+    match (at, form) {
+        (SweepUse::Dc, Form::LinStep) => X::SweepDcLinStep,
+        (SweepUse::Dc, Form::LinPoints) => X::SweepDcLinPoints,
+        (SweepUse::Dc, Form::Dec) => X::SweepDcDec,
+        (SweepUse::Dc, Form::Oct) => X::SweepDcOct,
+        (SweepUse::Dc, Form::Log) => X::SweepDcLog,
+        (SweepUse::Dc, Form::List) => X::SweepDcList,
+        (SweepUse::Loop, Form::LinStep) => X::SweepLoopLinStep,
+        (SweepUse::Loop, Form::LinPoints) => X::SweepLoopLinPoints,
+        (SweepUse::Loop, Form::Dec) => X::SweepLoopDec,
+        (SweepUse::Loop, Form::Oct) => X::SweepLoopOct,
+        (SweepUse::Loop, Form::Log) => X::SweepLoopLog,
+        (SweepUse::Loop, Form::List) => X::SweepLoopList,
+        (SweepUse::Freq, Form::LinStep) => X::SweepFreqLinStep,
+        (SweepUse::Freq, Form::LinPoints) => X::SweepFreqLinPoints,
+        (SweepUse::Freq, Form::Dec) => X::SweepFreqDec,
+        (SweepUse::Freq, Form::Oct) => X::SweepFreqOct,
+        (SweepUse::Freq, Form::Log) => X::SweepFreqLog,
+        (SweepUse::Freq, Form::List) => X::SweepFreqList,
     }
 }
