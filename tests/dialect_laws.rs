@@ -53,7 +53,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 4 Untyped: an Env temp=-804.376meg (below absolute zero) is written as `.temp` and reads back 27, ngspice's run of an unusable .temp; the writer should refuse what its reader reads as 27 (run: ng-run)",
+        "seed 9 Untyped: a code_model model (word=g50) is written `.model g48 g50 …` and reads back as a module model: the type word alone does not say which (models: ng-models)",
     ),
     (
         "l7",
