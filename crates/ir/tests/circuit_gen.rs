@@ -21,7 +21,7 @@ mod tests {
 
     use spicerack_ir::r#gen::{Size, generate};
     use spicerack_ir::{
-        CircuitExtra, Design, Diags, ElemKind, Feature, FeatureSet, ItemKind, ModelFamily,
+        CircuitExtra, Design, Diags, ElemKind, ExprId, Feature, FeatureSet, ItemKind, ModelFamily,
         WaveKind, check, dump, features_used, parse,
     };
 
@@ -142,6 +142,62 @@ mod tests {
             .filter(|k| !seen.contains(Feature::Elem(*k)))
             .collect();
         assert!(missing.is_empty(), "{missing:?}");
+    }
+
+    /// The generator's version vocabulary: a model of a versioned family draws its version from
+    /// the standard's published versions where a simulator's list is known. Oracle: ngspice-45's
+    /// accepted versions per family as `ng-models` read them (parser/inpdomod.c, b3v32set.c:86-92,
+    /// b3check.c:49, b4v5check.c:64-69, b4v6check.c:815, b4v7check.c:834, b4check.c:68-70,
+    /// hsmhvset.c:76-81, hsmhv2set.c:136-150, hsm2set.c:132-138, hicum2setup.c:45, b4soiset.c:124,
+    /// b3soi{fd,dd,pd}set.c:69, vbicsetup.c:360), written here by hand.
+    #[test]
+    fn a_versioned_model_draws_a_published_version() {
+        let lists: [(ModelFamily, &[&str]); 10] = [
+            (
+                ModelFamily::Bsim3,
+                &["3.0", "3.1", "3.2", "3.2.2", "3.2.3", "3.2.4", "3.3.0"],
+            ),
+            (
+                ModelFamily::Bsim4,
+                &[
+                    "4.0.0", "4.1.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.6.5", "4.7.0",
+                    "4.8.0", "4.8.1", "4.8.2", "4.8.3",
+                ],
+            ),
+            (ModelFamily::HisimHv, &["1.24", "2.20"]),
+            (ModelFamily::Hisim2, &["280"]),
+            (ModelFamily::Hicum2, &["2.4.0"]),
+            (ModelFamily::B4Soi, &["4.4"]),
+            (ModelFamily::B3SoiFd, &["2.0"]),
+            (ModelFamily::B3SoiDd, &["2.0"]),
+            (ModelFamily::B3SoiPd, &["2.0"]),
+            (ModelFamily::Vbic, &["1.2"]),
+        ];
+        let set = circuit_set();
+        let mut seen = 0;
+        for seed in 0..1000u64 {
+            let d = generate(seed, &set, SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Model {
+                    continue;
+                }
+                let m: spicerack_ir::Model = d.row(item.index);
+                let Some((_, list)) = lists.iter().find(|l| l.0 == m.family) else {
+                    continue;
+                };
+                seen += 1;
+                let text = match (m.version != ExprId::NONE).then(|| d.expr(m.version)) {
+                    Some(spicerack_ir::Expr::Str(s)) => d.str(s).to_string(),
+                    other => panic!("seed {seed}: {:?} version {other:?}", m.family),
+                };
+                assert!(
+                    list.contains(&text.as_str()),
+                    "seed {seed}: {:?} {text}",
+                    m.family
+                );
+            }
+        }
+        assert!(seen > 20, "the property saw {seen} listed models");
     }
 
     /// A25: given a set without `Family(F)`, the generator makes no library of F.

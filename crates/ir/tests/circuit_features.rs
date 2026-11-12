@@ -641,6 +641,25 @@ mod tests {
         (X::BehavRpar, |b, t, on| {
             behav_el(b, t, OutKind::Voltage, false, on, false)
         }),
+        (X::BehavUntypedParam, |b, t, on| {
+            // A33: the bare read; its neighbour the read under `to_real`
+            let one = n(b, 1);
+            b.param(t, "p", one, Span::NONE);
+            let p = b.param_ref("p");
+            let read = if on {
+                p
+            } else {
+                b.call(spicerack_ir::Func::ToReal, &[p])
+            };
+            let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+            b.behav(
+                t,
+                ElemKind::Behav,
+                h,
+                behav(read, OutKind::Voltage),
+                Span::NONE,
+            );
+        }),
         (X::CouplingMany, |b, t, on| {
             let one = n(b, 1);
             let inductors = if on {
@@ -1718,5 +1737,56 @@ mod tests {
         };
         assert!(!with(false), "a behavioural source");
         assert!(with(true), "a resistor");
+    }
+
+    /// A33 (R56): a behavioural source whose expression reads a parameter outside `ToReal` and
+    /// `ToInt` states `BehavUntypedParam`; neighbours: the read under `to_real`, and a resistor
+    /// valued by the bare read (the feature is the behavioural source's own).
+    #[test]
+    fn an_untyped_parameter_read_in_a_behavioural_source() {
+        let used = |case: fn(&mut Builder<'_>, ScopeId)| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            case(&mut d.builder(), top);
+            features_used(&d).contains(Feature::Circuit(X::BehavUntypedParam))
+        };
+        fn behav_reading(b: &mut Builder<'_>, top: ScopeId, typed: bool) {
+            let one = n(b, 1);
+            b.param(top, "p", one, Span::NONE);
+            let p = b.param_ref("p");
+            let read = if typed {
+                b.call(spicerack_ir::Func::ToReal, &[p])
+            } else {
+                p
+            };
+            let v = b.v("a", None);
+            let e = b.binary(spicerack_ir::BinOp::Mul, read, v);
+            let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+            b.behav(
+                top,
+                ElemKind::Behav,
+                h,
+                behav(e, OutKind::Voltage),
+                Span::NONE,
+            );
+        }
+        assert!(used(|b, t| behav_reading(b, t, false)));
+        assert!(!used(|b, t| behav_reading(b, t, true)));
+        assert!(!used(|b, top| {
+            let one = n(b, 1);
+            b.param(top, "p", one, Span::NONE);
+            let p = b.param_ref("p");
+            let h = b.head("r1", &["a", "0"], None, &[], ExprId::NONE);
+            b.passive(
+                top,
+                ElemKind::Resistor,
+                h,
+                Passive {
+                    value: p,
+                    ..Passive::PLAIN
+                },
+                Span::NONE,
+            );
+        }));
     }
 }

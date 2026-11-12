@@ -65,6 +65,10 @@ pub enum CircuitExtra {
     SourceParasitics,
     /// A behavioural source's parallel resistance (`Behav::rpar`, lt, D101).
     BehavRpar,
+    /// A behavioural source whose expression reads a parameter outside `ToReal` and `ToInt`
+    /// (A33, R56): VACASK types every identifier of a behavioural expression, ngspice's B
+    /// source never does.
+    BehavUntypedParam,
     // couplings
     /// A coupling of three or more inductors on one row (xy, lt; ngspice expands, D56).
     CouplingMany,
@@ -257,7 +261,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 106] = [
+    pub const ALL: [CircuitExtra; 107] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -282,6 +286,7 @@ impl CircuitExtra {
         CircuitExtra::ElementParasitics,
         CircuitExtra::SourceParasitics,
         CircuitExtra::BehavRpar,
+        CircuitExtra::BehavUntypedParam,
         CircuitExtra::CouplingMany,
         CircuitExtra::CouplingCore,
         CircuitExtra::SourceTc,
