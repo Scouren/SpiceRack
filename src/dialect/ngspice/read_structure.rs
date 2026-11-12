@@ -21,6 +21,7 @@
 use super::codes;
 use super::cst::{self, joined};
 use super::declare::Class;
+use super::expr_lex;
 use super::expr_read::{self, Tree};
 use super::read::{Def, Lower, Stmt};
 use super::read_outputs;
@@ -102,19 +103,28 @@ pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     if !distinct_names(&ports) {
         return malformed(lw, st);
     }
+    if defaults_cycle(&head.params) {
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::DEFAULT_CYCLE);
+    }
     let name = lw.names.fold(&head.name);
     let mut params = Vec::new();
-    let mark = lw.pending();
+    let mut marks = vec![lw.pending()];
     for ((key, _), tree) in head.params.iter().zip(&trees) {
         let e = lw.expr(st, tree, st.scope);
         params.push((lw.names.fold(key), e));
+        marks.push(lw.pending());
     }
+    let mark = marks[0];
     let ports: Vec<&str> = ports.iter().map(String::as_str).collect();
     let params: Vec<(&str, ir::ExprId)> = params.iter().map(|(k, e)| (k.as_str(), *e)).collect();
     let span = lw.span(st.node);
     let (_, body) = lw.b.subckt(st.scope, &name, &ports, &params, span);
-    // a head default reads from the subcircuit's body (IR-KERNEL A10)
+    // a head default reads from the subcircuit's body (IR-KERNEL A10), its own name from the
+    // enclosing scope (runs outer.cir, selfplus.cir)
     lw.rescope(mark, body);
+    for (k, (key, _)) in params.iter().enumerate() {
+        lw.rescope_name(marks[k], marks[k + 1], key, st.scope);
+    }
     open_body(lw, st, body);
 }
 
@@ -463,6 +473,49 @@ fn malformed(lw: &mut Lower<'_, '_>, st: Stmt) {
 fn distinct(pairs: &[(String, String)]) -> bool {
     let names: Vec<String> = pairs.iter().map(|(n, _)| n.to_ascii_lowercase()).collect();
     distinct_names(&names)
+}
+
+/// Whether the head defaults read each other in a cycle (a default's read of its own name is
+/// the enclosing scope's, no edge): ngspice stops ("a level depth greater 1000 for dependent
+/// parameters", run mutual.cir).
+fn defaults_cycle(params: &[(String, String)]) -> bool {
+    let n = params.len();
+    let reads: Vec<Vec<usize>> = params
+        .iter()
+        .enumerate()
+        .map(|(k, (_, value))| {
+            let leaves = expr_lex::leaves(value);
+            (0..n)
+                .filter(|&j| j != k)
+                .filter(|&j| {
+                    leaves
+                        .names
+                        .iter()
+                        .any(|(m, call)| !call && m.eq_ignore_ascii_case(&params[j].0))
+                })
+                .collect()
+        })
+        .collect();
+    // Kahn: what no default reads first; a cycle is what is left. Bounded: each default once.
+    let mut indegree = vec![0usize; n];
+    for r in &reads {
+        for &j in r {
+            indegree[j] += 1;
+        }
+    }
+    let mut ready: Vec<usize> = (0..n).filter(|&k| indegree[k] == 0).collect();
+    let mut done = 0;
+    while let Some(k) = ready.pop() {
+        done += 1;
+        for &j in &reads[k] {
+            indegree[j] -= 1;
+            if indegree[j] == 0 {
+                ready.push(j);
+            }
+        }
+    }
+    debug_assert!(done <= n, "each default is taken once");
+    done < n
 }
 
 /// Whether the names are distinct under ngspice's case folding.

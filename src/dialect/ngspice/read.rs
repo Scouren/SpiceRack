@@ -22,7 +22,7 @@
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
-//! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
+//! class, subckt_formals, refer, pending, rescope, rescope_name, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use std::collections::HashSet;
 
@@ -422,6 +422,22 @@ impl<'a, 'd> Lower<'a, 'd> {
         assert!(mark <= self.pending.len(), "rescope: a mark from before");
         for p in &mut self.pending[mark..] {
             p.1 = scope;
+        }
+    }
+
+    /// Makes the parameter reads of `name` queued in `from..to` bind from `scope`: a head
+    /// default's read of its own name is the enclosing scope's (ngspice runs outer.cir,
+    /// selfplus.cir: `t={t*2}` reads the outer `t`).
+    pub(super) fn rescope_name(&mut self, from: usize, to: usize, name: &str, scope: ir::ScopeId) {
+        assert!(
+            from <= to && to <= self.pending.len(),
+            "rescope_name: marks from before"
+        );
+        for p in &mut self.pending[from..to] {
+            let own = matches!(self.b.design().expr(p.0), ir::Expr::Param(r) if self.b.design().str(r.name) == name);
+            if own {
+                p.1 = scope;
+            }
         }
     }
 

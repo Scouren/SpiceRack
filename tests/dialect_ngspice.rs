@@ -22,6 +22,7 @@ use spicerack::ir;
 
 /// The read fixtures, by name.
 const READ: &[&str] = &[
+    "default_self",
     "element_twice",
     "expr_ops",
     "expr_power",
