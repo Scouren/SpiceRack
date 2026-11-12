@@ -262,3 +262,40 @@ fn check_legal_agrees_with_features_used() {
         }
     }
 }
+
+#[test]
+fn refs_and_map_refs_list_the_same_references_in_the_same_order() {
+    // M5: the read-only twin drifts from the visitor by no reference, kind or position, for
+    // every item of every kind (FeatureSet::ALL reaches all; oracle: map_refs itself)
+    let mut kinds_seen = FeatureSet::EMPTY;
+    for seed in 0..300u64 {
+        let d = generate(seed, &FeatureSet::ALL, SIZE);
+        let items: Vec<_> = d.reachable().into_iter().map(|(item, _)| item).collect();
+        let mut scratch = d.clone();
+        for item in items {
+            let mut read = Vec::new();
+            d.item_refs(item, &mut read);
+            let mut visited = Vec::new();
+            scratch
+                .editor()
+                .map_refs(item, &mut |r, kind| visited.push((*r, kind)));
+            assert_eq!(read, visited, "seed {seed}, {item:?}");
+            if !read.is_empty() {
+                kinds_seen = kinds_seen.with(Feature::Item(item.kind));
+            }
+        }
+    }
+    // the kinds that hold references were exercised with some
+    for kind in [
+        ItemKind::Element,
+        ItemKind::Model,
+        ItemKind::Alter,
+        ItemKind::Loop,
+        ItemKind::Elaborate,
+    ] {
+        assert!(
+            kinds_seen.contains(Feature::Item(kind)),
+            "{kind:?} with a reference"
+        );
+    }
+}

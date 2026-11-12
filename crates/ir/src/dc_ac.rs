@@ -43,6 +43,9 @@ pub struct DcAxis {
     pub target: Target,
     /// Its values.
     pub sweep: SweepSpec,
+    /// The axis's name, or `NONE` (VACASK's `sweep <name>` names the swept vector in the
+    /// results; SPICE `.dc` has none; A22).
+    pub name: NameId,
 }
 
 /// An ordered list of DC axes, a range into the run owner's axis pool.
@@ -225,7 +228,7 @@ pub struct TimedOp {
 }
 
 const _: () = assert!(size_of::<Dc>() == 12);
-const _: () = assert!(size_of::<DcAxis>() == 52);
+const _: () = assert!(size_of::<DcAxis>() == 56);
 const _: () = assert!(size_of::<Ac>() == 28);
 const _: () = assert!(size_of::<Noise>() == 64);
 const _: () = assert!(size_of::<Tf>() == 28);

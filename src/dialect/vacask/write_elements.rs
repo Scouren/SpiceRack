@@ -21,16 +21,7 @@ use crate::ir;
 pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
     let e: ir::Element = d.row(at.index);
-    w.line();
-    name::spell(d.str(e.name), Place::Other, w.out);
-    w.out.push_str(" (");
-    for (k, &t) in d.names(e.terminals).iter().enumerate() {
-        if k > 0 {
-            w.out.push(' ');
-        }
-        name::spell(d.str(t), Place::Node, w.out);
-    }
-    w.out.push(')');
+    w.head(&e);
     if e.kind == ir::ElemKind::Behav {
         let row = d.behav(&e);
         w.out.push_str(match row.output {
@@ -41,8 +32,6 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         w.out.push('\n');
         return;
     }
-    w.out.push(' ');
-    name::spell(d.str(e.model.name), Place::Other, w.out);
     for (key, value) in fields(d, &e) {
         w.out.push(' ');
         name::spell(&key, Place::Other, w.out);

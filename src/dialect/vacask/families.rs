@@ -106,6 +106,12 @@ pub(super) const FAMILIES: &[Module] = &[
     m("vbic13", ir::ModelFamily::Vbic, "vbic_1p3.osdi", 3),
     m("vbic13_4t", ir::ModelFamily::Vbic, "vbic_1p3_4t.osdi", 4),
     m("vbic13_5t", ir::ModelFamily::Vbic, "vbic_1p3_5t.osdi", 5),
+    m(
+        "tline_ideal",
+        ir::ModelFamily::TlineIdeal,
+        "tline_ideal.osdi",
+        4,
+    ),
     m("vsource", ir::ModelFamily::SourceV, "", 2),
     m("isource", ir::ModelFamily::SourceI, "", 2),
     m("vcvs", ir::ModelFamily::Vcvs, "", 4),
@@ -127,6 +133,8 @@ pub(super) const PROVEN: &[&str] = &[
     "ccvs",
     "cccs",
     "mutual",
+    // VACASK's own ideal line is the IR's TlineIdeal family by definition (R39, A20).
+    "tline_ideal",
     // settle devices_rcl (runs prc, own): every printed digit equal to ngspice-45's R, C, L
     "sp_resistor",
     "sp_capacitor",
@@ -258,6 +266,7 @@ pub(super) fn kind(family: ir::ModelFamily) -> ir::ElemKind {
         F::Ccvs => K::Ccvs,
         F::Cccs => K::Cccs,
         F::Mutual => K::Coupling,
+        F::TlineIdeal => K::LosslessLine,
         F::Module => K::ModuleModel,
         _ => K::Mosfet,
     }
@@ -281,6 +290,7 @@ pub(super) fn has_polarity(family: ir::ModelFamily) -> bool {
             | F::Ccvs
             | F::Cccs
             | F::Mutual
+            | F::TlineIdeal
             | F::Module
     )
 }

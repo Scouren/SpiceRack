@@ -66,7 +66,7 @@ mod tests {
             (E::Igbt, (3, 3), D::Semi, true, m),
             (E::VSwitch, (2, 4), D::Switch, true, m),
             (E::ISwitch, (2, 2), D::Switch, true, m),
-            (E::LosslessLine, (4, 4), D::Line, false, None),
+            (E::LosslessLine, (4, 4), D::Line, false, m),
             (E::LossyLine, (4, 4), D::Line, true, m),
             (E::RcLine, (3, 3), D::Line, true, m),
             (E::SingleLossyLine, (4, 4), D::Line, true, m),
@@ -440,6 +440,7 @@ mod tests {
                 phase_c_deg: v,
                 mod_time: AmModTime::CarrierPhase,
                 pre: PreDelay::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             Wave::TrNoise(TrNoise {
                 na: v,
@@ -456,6 +457,7 @@ mod tests {
                 p1: v,
                 p2: v,
                 kind: TrRandomKind::Poisson,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             Wave::Pattern(Pattern {
                 high: v,

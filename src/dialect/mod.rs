@@ -341,8 +341,8 @@ pub fn transpile(
     Ok(Written { text, notes: diags })
 }
 
-/// The catalogue row of `code`: the spine's own, else the IR crate's; `None` for a code no
-/// catalogue holds (each dialect slice adds its table here when it lands).
+/// The catalogue row of `code`: the spine's own, the passes' (`passes::info`), else the IR
+/// crate's; `None` for a code no catalogue holds (each dialect slice adds its table here).
 pub fn info(code: ir::Code) -> Option<ir::Info> {
     let spine = SPINE_CODES
         .iter()
@@ -350,6 +350,7 @@ pub fn info(code: ir::Code) -> Option<ir::Info> {
         .map(|(_, i)| *i);
     spine
         .or_else(|| vacask::info(code))
+        .or_else(|| passes::info(code))
         .or_else(|| ir::diag::info(code))
 }
 

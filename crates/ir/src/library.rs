@@ -54,6 +54,10 @@ impl RowFacts for DeviceLibrary {
         // holds no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // `Feature::Item(DeviceLibrary)` is the kernel's; the row states nothing else
     }

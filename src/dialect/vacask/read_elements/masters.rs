@@ -72,17 +72,16 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
         // Bounded: each node is taken once (the statement tree is acyclic).
         while let Some((s, holder)) = todo.pop() {
             let n = Node(s);
-            let fields = ast.fields(n);
             match ast.tag(n) {
                 Tag::Model => {
-                    if let [name, module, ..] = fields {
+                    if let [name, module, ..] = ast.fields(n) {
                         let key = (holder, read::field_name(cst, *name));
                         let master = Master::Model(read::field_name(cst, *module));
                         out.defs.entry(key).or_insert(master);
                     }
                 }
                 Tag::Subckt => {
-                    let Some((&name, ports)) = fields.split_first() else {
+                    let Some((&name, ports)) = ast.fields(n).split_first() else {
                         continue;
                     };
                     let start = cst.tokens.start(ast.main_token(n)) - cst.shift;

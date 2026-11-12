@@ -98,14 +98,15 @@ pub struct Passive {
     /// C and L. Native: ng only. Evidence: D2, 6.17.
     pub ac: ExprId,
     /// The ngspice instance scale (dimensionless): it divides a resistor's conductance and
-    /// multiplies a capacitor's capacitance. `NONE`: 1. Native: ng (Spectre's geometry scale
+    /// multiplies a capacitor's capacitance and an inductor's inductance (`indtemp.c:79`). `NONE`: 1. Native: ng (Spectre's geometry scale
     /// is folded into `mult` by its reader). Evidence: D2, 6.07.
     pub scale: ExprId,
     /// Row in the parasitics table, or `NO_ROW` for none. Evidence: D8, 6.04, 6.05.
     pub parasitics: u32,
     /// When `ic` applies; `IcMode::None` exactly when `ic` is `NONE`.
     pub ic_mode: IcMode,
-    /// Whether the element adds its thermal noise. `false` for lt `noiseless`, ng `noisy=0`,
+    /// Whether the element adds its thermal noise; `false` only on a resistor or a
+    /// circuit-valued element, the rows that have thermal noise to switch off (A19). `false` for lt `noiseless`, ng `noisy=0`,
     /// sp `isnoisy=no`, hs `NOISE=0`, and for an ngspice behavioural R/C/L without `noisy=1`
     /// (6.14). Evidence: D82, 6.17.
     pub noisy: bool,

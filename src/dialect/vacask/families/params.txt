@@ -81,3 +81,6 @@ vbic13_4t a cbc0=cbco cbe0=cbeo ccs0=ccso dtmp=dtemp gamma=gamm qc0=qco tref=tno
 vbic13_5t i $mfactor m trise sw_noise sw_et 
 vbic13_5t m abk afn ajc aje ajs art avc1 avc2 avcx1 avcx2 bbk bfn cbco cbeo ccso cjc cjcp cje cjep cth dear ea eaic eaie eais eanc eane eans eap fc gamm gmin hrcf ibbe ibci ibcip ibcn ibcnp ibei ibeip iben ibenp ibk0 ikf ikp ikr is isp isrr itf kfn maxexp mc mcx me ms nbbe nci ncip ncn ncnp nei nen nf nfp nkf npn nr pc pe pnjmaxi pnp ps qbm qco qnibeir qtf rbi rbp rbx rci rcx re rs rth scale shrink tavc tavcx tcrth tcvef tcver td tf tmax tmaxclip tmin tminclip tnbbe tnf tnom tr tvbbe1 tvbbe2 type vbbe vef ver vo vpte vrt vtf wbe wsp xii xikf xin xis xisr xrb xrbi xrbp xrbx xrc xrci xrcx xre xrs xtf xvo 
 vbic13_5t a cbc0=cbco cbe0=cbeo ccs0=ccso dtmp=dtemp gamma=gamm qc0=qco tref=tnom v0=vo version=vers vrev=rev xv0=xvo 
+tline_ideal i $mfactor z0 td f nl 
+tline_ideal m 
+tline_ideal a zo=z0 

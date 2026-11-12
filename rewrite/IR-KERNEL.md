@@ -215,6 +215,7 @@ above could not say, so its final shape is (as implemented in `facts.rs`):
 ```rust
 fn handles(&self, design: &Design, out: &mut Vec<Handle>);
 fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>); // M5: read twin
 fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
 fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
 fn dump(&self, design: &Design, ctx: &text::Ctx, out: &mut String);
@@ -272,8 +273,9 @@ number; `Bindings::param_value` passes a typed parameter, defaulting to `param` 
 `Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
 `Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
 chosen branch's; `ToInt` Int; `SgnZeroPos` (−1 for `x < 0`, +1 otherwise, −0.0 included:
-VACASK's `sgn`, runs e1, f4) its operand's; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
-domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`. An Int
+VACASK's `sgn`, runs e1, f4) its operand's; `ToReal` (A21, R40: the value of `x`, VACASK run
+b1) Real; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`, `ToReal` is `to_real`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
 **A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
@@ -338,6 +340,36 @@ the set (`gen::placeable`, also for a row's own generator that pushes into a bod
 sections may now be nested where the set allows. `Placed(_, Title)` never occurs: a title stands
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
+
+**A19 (2026-11-12): a field that may read the circuit counts the dynamic form (R38).** An
+expression a row lists as `Handle::ExprDyn` counts its functions and operators as `FuncDyn`,
+`BinaryDyn` and `UnaryDyn` whatever its class; elsewhere the form follows the class as before
+(dynamic when `Temp` or `Circuit`). A constant in a B source's expression is the dynamic form,
+because its simulator reads that field with the behavioural parser (`B1 a 0 V={2**3}`). The
+generator picks operators from the dynamic features for every tree under `Reads::Circuit`, and
+for a `Handle::ExprDyn` field it builds with constant reads (`Gen::dyn_form`, a measure's
+threshold).
+
+**A23 (2026-11-12): the passes' door for expressions.** A fourth row fact beside `handles`,
+`map_refs` and `refs`:
+
+```rust
+pub enum ExprUse { Constant, Circuit }
+fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)); // default: no root
+```
+
+It calls `f` on exactly the roots `handles` lists, in its order (`NONE` included): a single
+`Expr` (`Constant`) or `ExprDyn` (`Circuit`) field, each `Exprs` element and each `Params` value
+(`Constant`), and stores back what `f` changed. `Editor::map_exprs` dispatches it;
+`Design::item_handles` dispatches `handles` for readers. `rewrite_exprs(design, rule) -> u32`
+(`rewrite.rs`) rewrites every root of every listed item bottom-up: `rule(b, node)` sees a node
+whose children are rewritten and returns `Some(new)`; a node whose child changed is appended
+again (`Builder::rebuild`), an unchanged tree keeps its ids, a shared subtree is rewritten once
+(a memo by old id), the walk is an explicit stack, and only rows that existed before the pass are
+visited. Properties (`tests/kernel_rewrite.rs`): `map_exprs` against `handles` for every
+generated item (every kind of all three owners, since round 4), an identity
+rule changes no id, a wrapping rule changes every visited root and no `eval` value, and `check`
+finds nothing after either.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

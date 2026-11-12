@@ -118,7 +118,8 @@ impl R<'_, '_> {
         } else {
             NO_ROW
         };
-        let noisy = !self.maybe(X::PassiveNoiseless);
+        // A19: noiseless only where there is thermal noise to switch off
+        let noisy = !((kind == ElemKind::Resistor || dynamic) && self.maybe(X::PassiveNoiseless));
         Passive {
             value,
             ic,
@@ -233,7 +234,20 @@ impl R<'_, '_> {
 
     pub(super) fn behav(&mut self, kind: ElemKind) -> Behav {
         let expr = self.dy();
-        let tc = self.maybe(X::BehavTc) && (self.has(X::TcBaseTnom) || self.has(X::TcBaseFixed27));
+        // a charge-defined capacitor's coefficient also needs a law the set has (A17)
+        let charge = kind == ElemKind::ChargeCapacitor;
+        let law_ok = self.has(X::TcLawDirect) || self.has(X::TcLawReciprocal);
+        let tc = self.maybe(X::BehavTc)
+            && (self.has(X::TcBaseTnom) || self.has(X::TcBaseFixed27))
+            && (!charge || law_ok);
+        let tc_law = if tc && charge {
+            self.pick(&[
+                (TcLaw::Direct, Some(X::TcLawDirect)),
+                (TcLaw::Reciprocal, Some(X::TcLawReciprocal)),
+            ])
+        } else {
+            TcLaw::Direct
+        };
         let tc_base = if tc {
             self.pick(&[
                 (TcBase::Tnom, Some(X::TcBaseTnom)),
@@ -270,6 +284,7 @@ impl R<'_, '_> {
             rpar,
             output,
             tc_base,
+            tc_law,
         }
     }
 

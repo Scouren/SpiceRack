@@ -28,7 +28,7 @@ use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
@@ -36,6 +36,7 @@ use crate::id::{ExprId, ItemRef, List, Ref, ScopeId};
 use crate::item::DefKind;
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::gen_ref;
+use crate::run_exprs::roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -160,6 +161,25 @@ impl RowFacts for Statistics {
         }
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Statistics = design.row(at.index);
+        {
+            let mut r = roots(design, f);
+            r.varies(row.process);
+            r.varies(row.mismatch);
+            r.correlations(row.process_correlations);
+            r.correlations(row.mismatch_correlations);
+            for e in [
+                &mut row.truncate,
+                &mut row.process_truncate,
+                &mut row.mismatch_truncate,
+            ] {
+                r.expr(e);
+            }
+        }
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // Every vary's parameter (process, then mismatch), then every correlation's two ends.
         let row: Statistics = design.row(at.index);
@@ -176,6 +196,25 @@ impl RowFacts for Statistics {
             for c in &mut design.run.correlations[start.min(end)..end] {
                 f(&mut c.a, DefKind::Param);
                 f(&mut c.b, DefKind::Param);
+            }
+        }
+    }
+
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order: every vary's parameter, then every correlation's two ends
+        for list in [self.process, self.mismatch] {
+            let start = list.start as usize;
+            let end = (start + list.len as usize).min(design.run.varies.len());
+            for v in &design.run.varies[start.min(end)..end] {
+                out.push((v.param, DefKind::Param));
+            }
+        }
+        for list in [self.process_correlations, self.mismatch_correlations] {
+            let start = list.start as usize;
+            let end = (start + list.len as usize).min(design.run.correlations.len());
+            for c in &design.run.correlations[start.min(end)..end] {
+                out.push((c.a, DefKind::Param));
+                out.push((c.b, DefKind::Param));
             }
         }
     }

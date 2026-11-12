@@ -1,0 +1,15 @@
+a source with a DC value and a pulse (R42): the op reads dc, the transient the pulse
+V1 a 0 DC -6 PULSE(0 1 1u 1u 1u 2u 10u)
+R1 a 0 1k
+.control
+op
+print v(a)
+tran 10n 5u 0 10n
+meas tran w1 find v(a) at=0.5u
+meas tran w2 find v(a) at=1.5u
+meas tran w3 find v(a) at=3u
+meas tran w4 find v(a) at=4.5u
+op
+print v(a)
+.endc
+.end

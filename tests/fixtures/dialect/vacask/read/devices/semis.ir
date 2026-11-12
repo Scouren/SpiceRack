@@ -3,7 +3,7 @@
 # user module, R41 a, its parameters as written and `$mfactor` its `mult`); the `spice/*.va`
 # instance lists (`area`, `temp`, `dtemp` the Semi fields; `w l ad` the device's own); run fwd
 # (sp_mos1 has 4 terminals: one left out is Private P2104).
-# codes: P2004 P2004 P2104 S0001 S0001 S0002 S0004
+# codes: P2004 P2004 P2104 S0001 S0001 S0002
 file "semis.sim" deck
   title "diodes transistors and an unproven module"
   device_library resistor
