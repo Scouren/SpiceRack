@@ -132,3 +132,27 @@ fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {}
 `dialect::legalize` calls it last. Law L4 reads: `write` is total over a design `legalize`
 accepted. The law harness skips and counts generated designs `admits` refuses, and fails when a
 dialect admits none of a kind its `FEATURES` claims.
+
+# Amendment A13: an element's name is its whole name (R23)
+
+Source: the ngspice scaffold (`rewrite/S3-AREAS.md` on `dialect-ngspice`): with names stored
+without their SPICE letter, `i(vdd)` reads as `I("dd")`, and a current through `L1` cannot be
+told from one through `V1`: every by-name reference to an element (`Expr::I`, a coupling's
+inductors, a controlled source's sensing element, a sweep or alter target, a probe) would need a
+kind beside the name.
+
+- **Rule.** `Element.name` is the element's whole name as its dialect spells it (ngspice: the
+  letter included, folded: `r1`, `vdd`, `x1`). Element names are unique in their scope across
+  kinds; a by-name reference names exactly one element. `IR-KERNEL.md` §6's "without any type
+  letter" and `DIALECT-NGSPICE.md` §4's "prefixes an element name with its kind's letter" are
+  withdrawn; the worked example of `text.rs` already spells whole names.
+- **Circuit.** `spice_letter(design, element) -> Option<u8>`: the SPICE card letter of an
+  element (its kind, and its detail where the letter depends on it; `None` for a kind SPICE
+  cards do not have). Feature `CircuitExtra::NameWithoutLetter`: an element whose name does not
+  begin with its SPICE letter (ASCII case ignored): a SPICE-card dialect cannot spell it, and a
+  pass renames it and every reference to it. The generator makes letter-led names when the set
+  lacks the feature.
+- **Kernel.** `Violation::DuplicateElement` (two elements of one name in one scope; `arg`: the
+  second), reported through a design-level check hook of the circuit owner
+  (`pub(crate) fn design_check(design, out)` in `element.rs`, called once by `check`, as
+  `design_features` is).

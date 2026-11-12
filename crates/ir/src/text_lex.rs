@@ -63,7 +63,9 @@ pub(crate) fn lex_literal(word: &str) -> Option<Literal> {
     if int.is_empty() && dec.is_empty() || dec.len() > 18 || int.len() + dec.len() > 19 {
         return None;
     }
-    let digits: u64 = format!("{int}{dec}").parse().ok()?;
+    let digits = int.bytes().chain(dec.bytes()).try_fold(0u64, |n, c| {
+        n.checked_mul(10)?.checked_add((c - b'0') as u64)
+    })?;
     let (exp10, form) = if rest.is_empty() {
         (0, NumForm::Plain)
     } else if rest == "mil" {

@@ -400,3 +400,17 @@ fn a_deep_expression_does_not_overflow_the_stack() {
     };
     assert_eq!(eval(&d, top, &BOUND), Ok(100_000.0));
 }
+
+#[test]
+fn the_a11_members() {
+    exact(call(Func::StepHalf, &[-1.0]), 0.0);
+    exact(call(Func::StepHalf, &[0.0]), 0.5); // the half step at zero
+    exact(call(Func::StepHalf, &[2.0]), 1.0);
+    exact(call(Func::PowSigned, &[2.0, 3.0]), 8.0);
+    exact(call(Func::PowSigned, &[-2.0, 3.0]), -8.0); // −pow(2, 3)
+    near(call(Func::PowSigned, &[-2.0, 0.5]), -SQRT_2); // −pow(2, 0.5): defined, unlike Pow
+    near(call(Func::PowSigned, &[-8.0, 1.0 / 3.0]), -2.0);
+    out_of_domain(call(Func::PowSigned, &[0.0, -1.0]));
+    exact(call(Func::Sqr, &[-3.0]), 9.0);
+    exact(call(Func::Sqr, &[1.5]), 2.25);
+}

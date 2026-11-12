@@ -18,7 +18,7 @@
 //! - `Design::semi(&self, &Element) -> Semi`, `Design::switch(&self, &Element) -> Switch`
 
 use crate::design::Design;
-use crate::element::Element;
+use crate::element::{DetailKind, Element};
 use crate::id::{ExprId, ExprList, NameId};
 use crate::passive::IcMode;
 
@@ -83,11 +83,21 @@ impl InitialState {
 impl Design {
     /// The row of a diode, BJT, MOSFET, JFET, MESFET or IGBT. Asserts the kind.
     pub fn semi(&self, element: &Element) -> Semi {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Semi,
+            "{:?} has no Semi row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a voltage or current switch. Asserts the kind.
     pub fn switch(&self, element: &Element) -> Switch {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Switch,
+            "{:?} has no Switch row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 }

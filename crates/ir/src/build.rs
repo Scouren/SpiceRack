@@ -1,7 +1,9 @@
 //! The append-only door: a reader's or builder's calls in, new rows out. Readers, the Python and
 //! Rust builders and the IR text parser all build through it; nothing here reads source text.
 //!
-//! Every value goes through its constructor once, at this edge: a reader's number is the
+//! An empty list is always `List::EMPTY` (start 0), whichever constructor made it, so equal
+//! designs compare equal; `check` reports any other empty range. Every value goes through its
+//! constructor once, at this edge: a reader's number is the
 //! [`Literal`] it read (digits in, no floating arithmetic in a reader, Addendum A3), checked
 //! against the literal's invariants; a built number (`num`) is refused unless finite (the NaN
 //! gate, C9) and becomes its shortest literal; names unless non-empty, handles unless in range, capacities asserted
@@ -46,6 +48,7 @@
 //!   `Builder::opaque`, `Builder::subckt`, `Builder::section`, `Builder::if_`, `Builder::param`,
 //!   `Builder::func`
 //! - definitions: `Builder::define(&mut self, DefKind, NameId, ScopeId, ItemRef) -> DefId`,
+//!   `Builder::bind_ref(&mut self, ItemRef, u32, DefId)`,
 //!   `Builder::resolve(&mut self, ExprId, DefId)`
 
 use crate::design::{Design, DetailRow, ItemRow};
@@ -109,6 +112,9 @@ impl<'d> Builder<'d> {
 
     /// Interns each name and appends the list.
     pub fn names(&mut self, names: &[&str]) -> NameList {
+        if names.is_empty() {
+            return NameList::EMPTY;
+        }
         let start = self.design.name_pool.len();
         assert!(
             start + names.len() <= POOL_MAX,
@@ -144,6 +150,9 @@ impl<'d> Builder<'d> {
     /// Interns each name and appends the pairs. Asserts the names are distinct; a value may be
     /// `NONE` only where the receiving field says so.
     pub fn params(&mut self, params: &[(&str, ExprId)]) -> ParamList {
+        if params.is_empty() {
+            return ParamList::EMPTY;
+        }
         let count = self.design.exprs.tags.len();
         let start = self.design.param_pool.len();
         assert!(
@@ -183,6 +192,7 @@ impl<'d> Builder<'d> {
     /// and the table's capacity; the row's own fields are validated by `check` (through its
     /// `RowFacts`), not here. Does not define anything.
     pub fn push<R: ItemRow>(&mut self, scope: ScopeId, row: R, span: Span) -> ItemRef {
+        self.design.classes.take();
         assert!(
             scope.index() < self.design.scopes.len(),
             "a scope id in range"
@@ -392,9 +402,37 @@ impl<'d> Builder<'d> {
 
     // ---- definitions ----
 
+    /// Sets the `k`-th reference of `item` (in its `RowFacts::map_refs` order) to `def`: a reader
+    /// binding a row's reference to a definition it pushed later, by its own simulator's rule
+    /// (`resolve` covers expressions). Asserts `k` is in range and `def` has the kind that slot
+    /// expects.
+    pub fn bind_ref(&mut self, item: ItemRef, k: u32, def: DefId) {
+        let target = self.design.def(def).kind;
+        let mut kinds = Vec::new();
+        self.design
+            .editor()
+            .map_refs(item, &mut |_, kind| kinds.push(kind));
+        assert!(
+            (k as usize) < kinds.len(),
+            "bind_ref names one of the item's references"
+        );
+        assert!(
+            kinds[k as usize] == target,
+            "bind_ref binds a definition of the kind its slot expects"
+        );
+        let mut slot = 0;
+        self.design.editor().map_refs(item, &mut |r, _| {
+            if slot == k {
+                r.def = def;
+            }
+            slot += 1;
+        });
+    }
+
     /// Adds a definition. Asserts no definition of `kind` named `name` exists in `scope` yet:
     /// the reader keeps one winner by its simulator's rule before it calls.
     pub fn define(&mut self, kind: DefKind, name: NameId, scope: ScopeId, item: ItemRef) -> DefId {
+        self.design.classes.take();
         assert!(
             scope.index() < self.design.scopes.len(),
             "a scope id in range"
@@ -423,6 +461,7 @@ impl<'d> Builder<'d> {
     /// that `def` has the name and a kind the expression accepts: `Param` (or `Measure`, for a
     /// measure reading an earlier measure, A7) for a `Param` tag, `Func` for a `UserCall`.
     pub fn resolve(&mut self, expr: ExprId, def: DefId) {
+        self.design.classes.take();
         self.assert_expr(expr);
         let target = self.design.def(def);
         let i = expr.index();
@@ -492,14 +531,16 @@ impl Builder<'_> {
     }
 
     /// Binds every unresolved `Param` read of a formal argument in `body` to the function `def`.
-    /// Explicit stack (C11); a shared subtree is visited once per path, bounded by the rows.
+    /// Explicit stack (C11); each row of the body is visited once.
     fn bind_formals(&mut self, body: ExprId, args: NameList, def: DefId) {
         let formals: Vec<NameId> = self.design.names(args).to_vec();
         let mut stack = vec![body];
         let mut kids = Vec::new();
-        let mut seen = vec![false; body.index() + 1];
+        // the rows of this body only: a set, not a vector sized by the design (O(body), not
+        // O(expressions so far), per function)
+        let mut seen = std::collections::HashSet::new();
         while let Some(e) = stack.pop() {
-            if std::mem::replace(&mut seen[e.index()], true) {
+            if !seen.insert(e) {
                 continue;
             }
             let i = e.index();
@@ -519,6 +560,9 @@ impl Builder<'_> {
 
 /// Appends `items` to `pool` and returns their range. Asserts `POOL_MAX`.
 fn pooled<T: Copy>(pool: &mut Vec<T>, items: &[T]) -> List<T> {
+    if items.is_empty() {
+        return List::EMPTY; // the one empty list: equality does not depend on how it was made
+    }
     let start = pool.len();
     assert!(
         start + items.len() <= POOL_MAX,

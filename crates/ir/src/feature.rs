@@ -15,18 +15,19 @@
 //! - `pub enum Feature`, `Feature::COUNT`, `Feature::index(self) -> u16`,
 //!   `Feature::from_index(u16) -> Feature`
 //! - `pub enum Extra`, `Extra::ALL`, `Extra::COUNT`
-//! - `pub struct FeatureSet`, `FeatureSet::EMPTY`, `FeatureSet::with(self, Feature) -> FeatureSet`,
+//! - `pub struct FeatureSet`, `FeatureSet::EMPTY`, `FeatureSet::ALL`, `FeatureSet::with(self, Feature) -> FeatureSet`,
 //!   `FeatureSet::union(self, FeatureSet) -> FeatureSet`,
 //!   `FeatureSet::minus(self, FeatureSet) -> FeatureSet`,
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
-//! - crate: `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
+//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
+use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
@@ -248,6 +249,21 @@ impl FeatureSet {
     /// The empty set.
     pub const EMPTY: FeatureSet = FeatureSet { words: [0; WORDS] };
 
+    /// Every feature: all `Feature::COUNT` bits (the IR-text writer's set: IR text spells
+    /// everything).
+    pub const ALL: FeatureSet = FeatureSet::first(Feature::COUNT as usize);
+
+    /// The set of the first `n` feature indices.
+    const fn first(n: usize) -> FeatureSet {
+        let mut words = [0u64; WORDS];
+        let mut i = 0;
+        while i < n {
+            words[i / 64] |= 1 << (i % 64);
+            i += 1;
+        }
+        FeatureSet { words }
+    }
+
     /// This set and `f`.
     pub const fn with(self, f: Feature) -> FeatureSet {
         let i = f.index() as usize;
@@ -309,19 +325,30 @@ impl FeatureSet {
 
 /// Every feature the design uses, in one scan over its reachable items: per item, its
 /// `Feature::Item`, its row's `RowFacts::features` (one exhaustive dispatch over `ItemKind`), and
-/// the expression features of the expressions in its `RowFacts::handles`.
-/// An expression's functions and operators count as `*Dyn` when the expression holds a `V`,
-/// `I`, `Time` or `Freq` leaf.
+/// the expression features of the expressions in its `RowFacts::handles`; then the features of the
+/// whole design: the case clash and the circuit and run owners' `design_features` hooks, each
+/// called once.
+/// An expression's functions and operators count as `*Dyn` when its class is at least `Temp`
+/// (`class::expr_class`: it, or a parameter or function it reads, holds the temperature or reads
+/// the circuit; R14, A11).
 pub fn features_used(design: &Design) -> FeatureSet {
     let mut set = FeatureSet::EMPTY;
     let mut walk = ExprWalk::new(design);
     for (item, scope) in design.reachable() {
         item_features(design, item, scope, &mut walk, &mut set);
     }
-    if case_clash(design) {
-        set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
-    }
+    design_level(design, &mut set);
     set
+}
+
+/// The features of the whole design, no item's: the case clash and each owner's
+/// `design_features` hook (A9). `check_legal` reports these at `Span::NONE`.
+pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
+    if case_clash(design) {
+        *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
+    crate::element::design_features(design, set);
+    crate::analysis::design_features(design, set);
 }
 
 /// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),
@@ -337,7 +364,7 @@ pub(crate) fn item_features(
     let mut handles = Vec::new();
     for_kind!(item.kind, R => {
         let row: R = design.row(item.index);
-        row.features(design, set);
+        row.features(design, item, scope, set);
         row.handles(design, &mut handles);
     });
     let (in_subckt, in_branch) = enclosing(design, scope);
@@ -376,12 +403,11 @@ pub(crate) fn item_features(
     }
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);
-        let dynamic = nodes.iter().any(|&e| {
-            matches!(
-                design.expr(e),
-                Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq
-            )
-        });
+        // the Dyn features are class >= Temp (R14, A11): transitive through reads
+        let table = def_classes(design);
+        let dynamic = nodes
+            .iter()
+            .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
             let f = match design.expr(e) {
