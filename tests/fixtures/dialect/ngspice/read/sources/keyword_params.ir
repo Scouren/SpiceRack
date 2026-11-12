@@ -1,0 +1,16 @@
+# codes: P1406 P1406
+file "keyword_params.sp" deck
+  title "keyword_params"
+  comment " oracle: ngspice-45 examples numparam/param-example.cir, vdmos/100W.sp, xspice/delay/analog-delay1.cir (parameters named like source keywords, quoted or braced: numparam substitutes them first); runs give the values printed; the writer braces them (bare `phase`, `v`, `freq` would read as keywords)"
+  param amplitude = 1
+  param phase = 0
+  param dcvoltage = 0
+  param V = 1.44
+  param freq = 1k
+  element vsource V1 (a 0) dc=dcvoltage ac_mag=amplitude ac_phase_deg=phase
+  element vsource V2 (b 0) dc=0 ac_mag=0 ac_phase_deg=0 wave=sin(offset=0 amplitude=V freq=1k pre=hold_delay_value given_zero=spice_default)
+  element vsource V3 (c 0) dc=0 wave=sin(offset=0 amplitude=1 freq=freq pre=hold_delay_value given_zero=spice_default)
+  analysis op
+  opaque ngspice inert ".control\nprint v(a) v(b) v(c)\n.endc"
+  analysis tran stop=1m print_step=10u cap=ngspice_rule
+  opaque ngspice inert ".control\nprint v(b)[30] v(c)[30]\n.endc"
