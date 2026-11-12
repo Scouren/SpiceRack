@@ -1,0 +1,7 @@
+# codes:
+file "switches.sp" deck
+  title "switches"
+  comment " oracle: ngspice-45 inp2s.c (model 5th), inp2w.c (control element 3rd), sw.c, csw.c (on, off)"
+  element vswitch S1 (a b c d) model=smod? initial=on
+  element iswitch W1 (a b) model=wmod? sense=vctl initial=off
+  element vswitch S2 (a b c d) model=smod?

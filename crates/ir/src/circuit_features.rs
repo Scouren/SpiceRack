@@ -18,21 +18,22 @@ use crate::controlled::{
     Behav, DelayLaw, FreqLaw, FreqTable, Laplace, LaplaceForm, OutKind, TableLaw, TableSource,
 };
 use crate::design::Design;
+use crate::element::MultLaw;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::expr::Expr;
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{ExprId, NameId};
 use crate::item::ItemKind;
-use crate::letter::spice_letter;
+use crate::letter::spice_letters;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily};
-use crate::passive::{Coupling, IcMode, Passive};
+use crate::passive::{Coupling, IcMode, Passive, TcBase, TcLaw};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, PortSpec, Source};
 use crate::wave::{
-    Am, AmModTime, Exp, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw, Sin,
-    TdFrom, WaveKind, WaveRef,
+    Am, AmModTime, Exp, GivenZero, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm,
+    SffmLaw, Sin, TdFrom, WaveKind, WaveRef,
 };
 
 /// Adds the element's kind, its waveform's kind and its circuit extras.
@@ -57,19 +58,25 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     if source_like && e.model.name != NameId::NONE || e.kind == ElemKind::Coupling && mutual {
         add(X::BuiltinMaster);
     }
-    if let Some(letter) = spice_letter(design, e) {
+    // a name begins with one of the letters a SPICE card may give it (A13; a voltage B may be
+    // an E card, a current one a G card, a port a V card)
+    let letters = spice_letters(design, e);
+    if !letters.is_empty() {
         let first = design.str(e.name).as_bytes().first().copied().unwrap_or(0);
-        if !first.eq_ignore_ascii_case(&letter) {
+        if !letters.iter().any(|l| first.eq_ignore_ascii_case(l)) {
             add(X::NameWithoutLetter);
         }
     }
     if some(e.mult) {
-        add(mult_class(e.kind));
+        add(match e.mult_law {
+            MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
+            MultLaw::Parallel => mult_class(e.kind),
+        });
     }
     match e.kind.detail() {
         DetailKind::Passive => {
             if let Some(p) = get_row::<Passive>(design, e.detail) {
-                passive(design, p, &mut add);
+                passive(design, e.kind, p, &mut add);
             }
         }
         DetailKind::Coupling => {
@@ -190,8 +197,10 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     *set = set.union(got);
 }
 
-/// Adds the model's circuit extras.
+/// Adds the model's family (`Feature::Family`) and its circuit extras.
 pub(crate) fn model_features(m: &Model, set: &mut FeatureSet) {
+    // A15 K5 (R32): every model is a feature of its family
+    *set = set.with(Feature::Family(m.family));
     if m.bin_of != NameId::NONE {
         *set = set.with(Feature::Circuit(X::ModelBin));
     }
@@ -293,7 +302,7 @@ pub(crate) fn mult_class(kind: ElemKind) -> X {
         | E::FreqTable
         | E::Delay => X::MultControlled,
         E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
-        E::Instance => X::MultInstance,
+        E::Instance => X::MultInstanceParallel, // the law's own member: `element_features`
         E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
         E::ChargeCapacitor
         | E::FluxInductor
@@ -312,6 +321,13 @@ pub(crate) fn mult_class(kind: ElemKind) -> X {
 
 // ---- private ----
 
+fn tc_base(base: TcBase) -> X {
+    match base {
+        TcBase::Tnom => X::TcBaseTnom,
+        TcBase::Fixed27 => X::TcBaseFixed27,
+    }
+}
+
 fn ic_mode(mode: IcMode, add: &mut impl FnMut(X)) {
     match mode {
         IcMode::None => {}
@@ -320,9 +336,19 @@ fn ic_mode(mode: IcMode, add: &mut impl FnMut(X)) {
     }
 }
 
-fn passive(design: &Design, p: Passive, add: &mut impl FnMut(X)) {
+fn passive(design: &Design, kind: ElemKind, p: Passive, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
     ic_mode(p.ic_mode, add);
+    // A15 C2: a circuit-valued element's coefficient states its base (and a capacitor's, its law)
+    if reads_circuit(design, p.value) && (some(p.tc1) || some(p.tc2)) {
+        add(tc_base(p.tc_base));
+        if kind == ElemKind::Capacitor {
+            add(match p.tc_law {
+                TcLaw::Direct => X::TcLawDirect,
+                TcLaw::Reciprocal => X::TcLawReciprocal,
+            });
+        }
+    }
     let flags = [
         (reads_circuit(design, p.value), X::PassiveDynamicValue),
         (!p.noisy, X::PassiveNoiseless),
@@ -368,6 +394,7 @@ fn behav(b: Behav, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
     if some(b.tc1) || some(b.tc2) {
         add(X::BehavTc);
+        add(tc_base(b.tc_base));
     }
     if some(b.rpar) {
         add(X::BehavRpar);
@@ -399,6 +426,23 @@ fn pre(p: PreDelay, offset: X, hold: X, zero: X) -> X {
 
 fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
+    // A17: the zero rule of the waves that have one
+    let rule = match w.kind {
+        WaveKind::Pulse => get_row::<Pulse>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Sin => get_row::<Sin>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Exp => get_row::<Exp>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Sffm => get_row::<Sffm>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Pwl
+        | WaveKind::Am
+        | WaveKind::TrNoise
+        | WaveKind::TrRandom
+        | WaveKind::Pattern => None,
+    };
+    match rule {
+        Some(GivenZero::AsGiven) => add(X::GivenZeroAsGiven),
+        Some(GivenZero::SpiceDefault) => add(X::GivenZeroSpiceDefault),
+        None => {}
+    }
     match w.kind {
         WaveKind::Pulse => {
             if let Some(p) = get_row::<Pulse>(design, w.index) {

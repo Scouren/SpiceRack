@@ -1,0 +1,9 @@
+# codes:
+file "coupling.sp" deck
+  title "coupling"
+  comment " oracle: ngspice-45 inp2k.c (K L1 L2 k), ind.c (k, coefficient), inpcom.c inp_compat (three or more inductors: every pair); INV-semantics 6.18"
+  element inductor L1 (a 0) value=1u
+  element inductor L2 (b 0) value=1u
+  element inductor L3 (c 0) value=1u
+  element coupling K1 () inductors=(L1 L2) k=0.5
+  element coupling K2 () inductors=(L1 L2 L3) k=0.9

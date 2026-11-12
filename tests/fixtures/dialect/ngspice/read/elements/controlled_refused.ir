@@ -1,0 +1,6 @@
+# codes: P1100 P1100
+file "controlled_refused.sp" deck
+  title "controlled_refused"
+  comment " oracle: runs f3 (E laplace: Undefined parameter, fatal), f4 (E m=3: unknown parameter (m)); vcvs.c has no m"
+  opaque ngspice invalid "E1 a 0 b 0 2 m=3"
+  opaque ngspice invalid "E2 a 0 laplace {v(b)} {1/(1+s)}"
