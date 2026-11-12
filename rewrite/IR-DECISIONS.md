@@ -255,3 +255,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - Replaces "the first `Deck` file, else file 0": the entry is file 0 whatever its role (`NONE` with no file). A kit whose entry is a library reaching a deck writes the library. `kernel_store::files_scopes_and_entry` and `kernel_structure::entry_is_total` now pin file 0.
 
+## A15 K2 applied
+
+- Both are row facts (`Subckt::features`, `If::features`). `IfConditionDynamic` reads each condition's class through `class::tree_class`, a walk sized by the tree, not the design: `expr_class` (now built on it) allocated an expression-table stamp per call, quadratic when a row calls it per expression.
+- The generator: `Gen::constant_only` keeps a tree non-dynamic around `If` conditions; a formal always gets a default unless the set has `FormalWithoutDefault`, and a set with neither literals nor that feature makes subcircuits without formals.
+

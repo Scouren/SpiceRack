@@ -314,6 +314,10 @@ impl RowFacts for Subckt {
         if defaults.into_iter().any(|e| reads_param(design, e)) {
             *set = set.with(Feature::Extra(Extra::FormalReadsParam));
         }
+        // A15 K2: a formal an instance must pass
+        if design.params(self.params).iter().any(|p| p.1.is_none()) {
+            *set = set.with(Feature::Extra(Extra::FormalWithoutDefault));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -412,8 +416,15 @@ impl RowFacts for If {
         // no reference field
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        // A15 K2: a condition no constant fold decides
+        let table = crate::class::def_classes(design);
+        let dynamic = design.branches(self.branches).iter().any(|br| {
+            crate::class::tree_class(design, br.cond, table) >= crate::class::ExprClass::Temp
+        });
+        if dynamic {
+            *set = set.with(Feature::Extra(Extra::IfConditionDynamic));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {

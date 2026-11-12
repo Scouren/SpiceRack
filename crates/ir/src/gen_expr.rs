@@ -62,7 +62,7 @@ impl Gen {
             dyn_leaves.push(ExprTag::Temp);
         }
         let probes = dyn_leaves;
-        let dynamic = !probes.is_empty() && self.chance(2);
+        let dynamic = !self.constant_only && !probes.is_empty() && self.chance(2);
         (self.dynamic, self.reads, self.class) = (dynamic, reads, ExprClass::Constant);
         self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
         let mut need_probe = dynamic;

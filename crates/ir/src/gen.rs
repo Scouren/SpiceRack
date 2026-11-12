@@ -83,6 +83,9 @@ pub struct Gen {
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
     /// `Extra::CaseSensitiveNames`).
     pub(crate) case_ok: bool,
+    /// Whether the expression being built must be of class `Constant` (cleared around an `If`
+    /// condition when the set lacks `Extra::IfConditionDynamic`).
+    pub(crate) constant_only: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -134,6 +137,7 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
         param_reads: true,
         case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
+        constant_only: false,
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);

@@ -295,6 +295,12 @@ copies it and another family leaves it out, the numbers moving at most within th
 tolerance (not `Inert`'s note: an `Inert` statement moves no number). Dropping it is the spine's
 `legalize`, not the kernel's.
 
+**A15 K2 (2026-11-12): two more extras.** `Extra::FormalWithoutDefault`: a `Subckt` head
+parameter with no default (an instance must pass it). `Extra::IfConditionDynamic`: an `If`
+condition of class `Temp` or `Circuit` (transitive, as the `*Dyn` features are). The generator
+gives every formal a default and makes every condition `Constant` unless the set has the
+feature.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
