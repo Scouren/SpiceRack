@@ -7,7 +7,8 @@
 //!
 //! Cites: Xyce RG 7.10 §2.1.36 (`.STEP`: "the first .STEP line … will be
 //! the innermost loop"; lin, dec, oct or a list), p.155; LTspice help
-//! `.step` (`.step param`, `temp` bare; lin, oct, dec or a list); HSPICE
+//! `.STEP` (its item: `param <name>`, `temp`, an independent source by
+//! its name; lin, oct, dec or a list); HSPICE
 //! UG `.TEMP t1 t2 …`. Run on Xyce 7.10 and LTspice 26.1.1
 //! (`research/impl/evidence/P5-100/RESULTS.txt`): a range and a list
 //! loop in card order, in either order; LTspice's grid
@@ -23,6 +24,7 @@ use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::step_points;
+use crate::syntax::render::swept::{Swept, step_swept};
 
 impl W<'_, '_> {
     /// The deck's `.step` cards in read order, ranges and lists as they
@@ -45,9 +47,9 @@ impl W<'_, '_> {
 // ---- private ----
 
 impl W<'_, '_> {
-    /// The ranged `.step`s' cards, each with its first token (Xyce's
-    /// `.step <param>`, the others' `.step param`); a total-count `log`
-    /// refused (W0016).
+    /// The ranged `.step`s' cards, each with its first token and its
+    /// target's item ([`W::step_item`]); a total-count `log` refused
+    /// (W0016).
     fn steps(&mut self, tb: &Tb) -> Vec<(u32, String)> {
         let mut out = Vec::with_capacity(tb.steps.len());
         for (sweep, param, [a, b, c], tok) in &tb.steps {
@@ -68,12 +70,13 @@ impl W<'_, '_> {
             let lt = self.b.analysis_form == AnalysisForm::Ltspice;
             let short = step_points(*sweep, [*a, *b, *c])
                 .filter(|(points, short)| lt && *short && points.is_sorted());
-            let line = match (short, self.b.analysis_form, sweep) {
-                (Some((points, _)), ..) => self.list_card(param, &points),
-                (None, AnalysisForm::Xyce, Some(s)) => format!(".step {s} {param} {a} {b} {c}"),
-                (None, AnalysisForm::Xyce, None) => format!(".step {param} {a} {b} {c}"),
-                (None, _, Some(s)) => format!(".step {s} param {param} {a} {b} {c}"),
-                (None, _, None) => format!(".step param {param} {a} {b} {c}"),
+            let Some(item) = self.step_item(param, *tok) else {
+                continue;
+            };
+            let line = match (short, sweep) {
+                (Some((points, _)), _) => self.list_card(&item, &points),
+                (None, Some(s)) => format!(".step {s} {item} {a} {b} {c}"),
+                (None, None) => format!(".step {item} {a} {b} {c}"),
             };
             out.push((*tok, line));
         }
@@ -99,19 +102,42 @@ impl W<'_, '_> {
             if act != Action::Native {
                 continue;
             }
-            out.push((*tok, self.list_card(param, values)));
+            if let Some(item) = self.step_item(param, *tok) {
+                out.push((*tok, self.list_card(&item, values)));
+            }
         }
         out
     }
 
-    /// A list `.step` card: Xyce RG `.STEP <name> LIST`; LTspice help
-    /// `.step param <name> list`, `temp` bare.
-    fn list_card(&self, param: &str, values: &[f64]) -> String {
+    /// A list `.step` card of `item` ([`W::step_item`]): Xyce RG `.STEP
+    /// <name> LIST`; LTspice help `.STEP`, `.step <item> list`.
+    fn list_card(&self, item: &str, values: &[f64]) -> String {
         let vals: Vec<String> = values.iter().map(|v| self.sp.number(*v, self.x)).collect();
-        let name = match (self.b.analysis_form, param.eq_ignore_ascii_case("temp")) {
-            (AnalysisForm::Ltspice, false) => format!("param {param}"),
-            _ => param.to_string(),
-        };
-        format!(".step {name} list {}", vals.join(" "))
+        format!(".step {item} list {}", vals.join(" "))
+    }
+
+    /// The item a `.step` over `param` names on the target: the name
+    /// itself (Xyce RG `.STEP`); on LTspice (help `.STEP`: "Temperature:
+    /// temp", "Parameter RLOAD: param RLOAD", "Voltage source v1: v1")
+    /// `temp`, `param <name>`, or a top-level V or I card with no waveform
+    /// by its name ([`step_swept`]). `None`, refused (W0016), where
+    /// LTspice has no item: a source with a waveform ("Can't sweep that.",
+    /// 26.1.1), an R, C or L, another device, a device's or model's
+    /// parameter (`.step param R1:R` steps a parameter no card reads:
+    /// run, `research/impl/evidence/P3-134/run.txt`).
+    // ponytail: a stepped R, C or L is refused; its lift is the card's
+    // value as `{<name>}` beside `.step param <name>` when a deck needs it.
+    fn step_item(&mut self, param: &str, tok: u32) -> Option<String> {
+        if self.b.analysis_form != AnalysisForm::Ltspice {
+            return Some(param.to_string());
+        }
+        match step_swept(self.rd, self.deck, &self.names, param) {
+            Swept::Temp | Swept::Source { plain: true } => Some(param.to_string()),
+            Swept::Param | Swept::Unseen => Some(format!("param {param}")),
+            Swept::Source { plain: false } | Swept::Value(_) | Swept::Other => {
+                self.refuse(Code::W0016, tok);
+                None
+            }
+        }
     }
 }

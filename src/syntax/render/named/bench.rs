@@ -26,6 +26,7 @@ use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::epochs::{Plan, plan};
 use crate::syntax::render::read::{Bench, BenchCard, Opt, Val, step_points};
+use crate::syntax::render::swept::{Swept, step_swept};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
@@ -206,15 +207,15 @@ impl W<'_, '_> {
         // One `sweep` block per `.step`, in read order from the inside
         // out: the first `.step` is the innermost loop (Xyce RG 7.10
         // §2.1.36; LTspice 26.1.1, run) and the last the outermost. A
-        // list `.step` is `sweep param=p values=[…]` (`[REF]` pp.406-409).
+        // list `.step` is `sweep … values=[…]` (`[REF]` pp.406-409) of
+        // what a ranged one sweeps (`W::sweep_what`).
         let mut heads: Vec<(u32, String)> = Vec::new();
         for (i, (p, v, tok)) in tb.step_lists.iter().enumerate() {
             let k = tb.steps.len() + i + 1;
-            let head = format!(
-                "sweep{k}_{} sweep param={p} {} {{",
-                suffix(p),
-                self.values(v)
-            );
+            let Some(what) = self.sweep_what(p, *tok) else {
+                continue;
+            };
+            let head = format!("sweep{k}_{} sweep {what} {} {{", suffix(p), self.values(v));
             heads.push((*tok, head));
         }
         for (idx, step) in tb.steps.iter().enumerate() {
@@ -451,8 +452,9 @@ impl W<'_, '_> {
         }
     }
 
-    /// `sweep<k>_<name> sweep param=p start= stop= step= {` for `.step`
-    /// `idx`; `None` when it is refused. A `log` step counts its points
+    /// `sweep<k>_<name> sweep <what> start= stop= step= {` for `.step`
+    /// `idx` ([`W::sweep_what`]); `None` when it is refused. A `log` step
+    /// counts its points
     /// in all (`python/keywords.rs` `Sweep::Log`) and Spectre's `log=` its
     /// steps (`[REF]` p.407: "Number of steps, log sweep"), one fewer. A
     /// grid that ends short of its stop value is `values=[…]`, its points
@@ -475,18 +477,40 @@ impl W<'_, '_> {
             }
             _ => ("step", *step),
         };
+        let what = self.sweep_what(param, *tok)?;
         if let Some((points, true)) = step_points(*sweep, [*start, *stop, *step]) {
             let values = self.values(&points);
             let k = idx + 1;
-            return Some(format!("sweep{k}_{suffix} sweep param={param} {values} {{"));
+            return Some(format!("sweep{k}_{suffix} sweep {what} {values} {{"));
         }
         Some(format!(
-            "sweep{}_{suffix} sweep param={param} start={} stop={} {by}={} {{",
+            "sweep{}_{suffix} sweep {what} start={} stop={} {by}={} {{",
             idx + 1,
             self.num(*start),
             self.num(*stop),
             self.num(count)
         ))
+    }
+
+    /// What a `.step` over `name` sweeps ([`step_swept`]), as a `sweep`'s
+    /// variable (`[REF]` p.406: `param=temp` and a top-level netlist
+    /// parameter "without a dev, mod, or sub parameter"; p.408: `dev`,
+    /// "Device instance whose parameter value is to be swept", `param`,
+    /// "Name of parameter to sweep"): a top-level V or I card's `dc`
+    /// (`[CMP]` p.682), an R, C or L's `r`, `c` or `l`. `None`, refused
+    /// (W0016): a source with a waveform (no page says a DC analysis reads
+    /// `dc` under another `type`), another device, a device's or model's
+    /// parameter (`M1:L`: the name is the source simulator's).
+    fn sweep_what(&mut self, name: &str, tok: u32) -> Option<String> {
+        match step_swept(self.rd, self.deck, &self.names, name) {
+            Swept::Temp | Swept::Param | Swept::Unseen => Some(format!("param={name}")),
+            Swept::Source { plain: true } => Some(format!("dev={} param=dc", self.inst_ref(name))),
+            Swept::Value(p) => Some(format!("dev={} param={p}", self.inst_ref(name))),
+            Swept::Source { plain: false } | Swept::Other => {
+                self.refuse(Code::W0016, tok);
+                None
+            }
+        }
     }
 }
 

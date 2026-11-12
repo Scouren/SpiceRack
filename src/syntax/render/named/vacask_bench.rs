@@ -23,6 +23,7 @@ use crate::syntax::behaviour::{NamedRules, OptionTo};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val, step_points};
+use crate::syntax::render::swept::{Swept, step_swept};
 
 impl W<'_, '_> {
     /// The `control` block: options, then per analysis the stepped sweeps
@@ -427,43 +428,29 @@ impl W<'_, '_> {
         })
     }
 
-    /// What a `.step` over `name` sets, as a `sweep`'s target: the `temp`
-    /// option; where the source's `.step` names a device too (Xyce RG
-    /// `.STEP`: a bare device name is its default parameter, a parameter
-    /// of that name first, Xyce 7.10 run; LTspice's `.step param` and
-    /// Spectre's `sweep param=` name a parameter only), a top-level V or
-    /// I card's own `dc`; else a control variable, declared here at
-    /// `first`, that the netlist's parameters read. `None`: another
-    /// device, or a device's or model's parameter (`R1:TC1`), which no
-    /// variable reaches: refused (W0016).
+    /// What a `.step` over `name` sets ([`step_swept`]), as a `sweep`'s
+    /// target: the `temp` option; a top-level V or I card's own `dc`; a
+    /// parameter as a control variable, declared here at `first`, that
+    /// the netlist's parameters read. `None`: another device, or a
+    /// device's or model's parameter (`R1:TC1`), which no variable
+    /// reaches: refused (W0016).
     // ponytail: a source in an included file is not looked at (its step
-    // stays a variable); R, C, L by their value parameter and
-    // `V1:DCV0` when a deck needs them.
+    // stays a variable); R, C, L by their value parameter
+    // (`Swept::Value`) and `V1:DCV0` when a deck needs them.
     fn step_what(&mut self, name: &str, first: f64, tok: u32) -> Option<String> {
-        assert!(!name.is_empty(), "a `.step` names what it sweeps");
         let low = name.to_ascii_lowercase();
-        if low == "temp" {
-            return Some("option=\"temp\"".into());
-        }
-        let top = &self.deck.top.params;
-        let param = top
-            .iter()
-            .any(|&a| self.rd.param_view(a).0.eq_ignore_ascii_case(name));
-        let ltspice = self.rd.b.card_rules == crate::syntax::behaviour::CardRules::Ltspice;
-        if !(param || ltspice || self.rd.named()) {
-            let letter = low.as_bytes()[0].to_ascii_uppercase() as char;
-            let scope = crate::syntax::ast::NONE;
-            let device = self.names.reference(scope, name, letter).is_some();
-            if device && matches!(letter, 'V' | 'I') {
-                return Some(format!("instance=\"{low}\" parameter=\"dc\""));
-            }
-            if device || name.contains(':') {
+        match step_swept(self.rd, self.deck, &self.names, name) {
+            Swept::Temp => Some("option=\"temp\"".into()),
+            Swept::Source { .. } => Some(format!("instance=\"{low}\" parameter=\"dc\"")),
+            Swept::Value(_) | Swept::Other => {
                 self.refuse(Code::W0016, tok);
-                return None;
+                None
+            }
+            Swept::Param | Swept::Unseen => {
+                self.line(&format!("  var {low}={}", num(first)));
+                Some(format!("variable=\"{low}\""))
             }
         }
-        self.line(&format!("  var {low}={}", num(first)));
-        Some(format!("variable=\"{low}\""))
     }
 }
 

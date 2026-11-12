@@ -45,6 +45,7 @@ mod relink;
 mod role;
 pub mod spelling;
 mod spice;
+mod swept;
 
 pub use def_pass::{Pending, Request, card_fields};
 pub use read::portable_option;
