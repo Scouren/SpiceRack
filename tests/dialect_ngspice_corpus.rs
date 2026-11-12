@@ -5,8 +5,8 @@
 //! - `read`: read with its includes (`Sources::load`), no panic (the reader asserts law L1:
 //!   every statement accounted for);
 //! - `check`: `ir::check` clean;
-//! - `legalize`: `dialect::legalize` for ngspice leaves no `U0001` (every feature a plain
-//!   ngspice deck produces is in ngspice's `FEATURES`);
+//! - `legalize`: `dialect::legalize` for ngspice refuses nothing: no `U0001` (every feature a
+//!   plain ngspice deck produces is in ngspice's `FEATURES`) and no `admits` code;
 //! - `round_trip`: written, read back, equal to the legalized design by `eq_meaning` (L5).
 //!
 //! Oracle: the decks are ngspice's own examples, so each step's expectation is ngspice reading
@@ -24,98 +24,11 @@ use spicerack::dialect::{self, DialectRow, Sources};
 use spicerack::ir;
 
 /// The decks that fail today: (deck relative to `examples/`, step, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "Monte_Carlo/OpWien.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "TransmissionLines/cpl4_txl_2_line.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "cider/serial/meclgate.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "digital/compare/adder_bip.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "memristor/memristor_x.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "optran/HiPass3opamps_optran.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "osdi/bsimcmg/inverter_ro.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "p-to-n-examples/555-timer-2.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "p-to-n-examples/MOS1_out.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "probe/555-timer-2.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "tclspice/tcl-testbench2/example.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "tclspice/tcl-testbench3/FB14.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "tclspice/tcl-testbench4/example.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "xspice/see/CMOSOpAmp/CMOS-OP1.cir",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "xspice/table/table-generator-q-2d.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "xspice/table/table-model-bip-2d-1-oc.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "xspice/table/table-model-bip-2d-1.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "xspice/table/table-model-bip-2d-2.sp",
-        "legalize",
-        "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-];
+const KNOWN: &[(&str, &str, &str)] = &[(
+    "Monte_Carlo/OpWien.sp",
+    "legalize",
+    "elements: W1100 twice, an element the reader makes and the writer has no card for (`R2 4 6 R = 'res + 0.033 * res*V(r2)'`, `C2 …`, behavioural R/C), L5's image; with ng-elements",
+)];
 
 /// The step names, in order.
 const STEPS: [&str; 4] = ["read", "check", "legalize", "round_trip"];
@@ -253,11 +166,15 @@ fn run(row: &DialectRow, deck: &Path) -> Result<(), (&'static str, String)> {
     let mut legal = design.clone();
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut legal, row, &mut diags);
+    // a lacked feature by name, any other refusal (an `admits` code) by its code
     let lacked: Vec<String> = diags
         .rows()
         .iter()
-        .filter(|d| d.code == ir::diag::UNSUPPORTED)
-        .map(|d| feature_name(d.arg))
+        .filter(|d| dialect::refuses(d.code))
+        .map(|d| match d.code == ir::diag::UNSUPPORTED {
+            true => feature_name(d.arg),
+            false => d.code.to_string(),
+        })
         .collect();
     if !lacked.is_empty() {
         return Err(("legalize", lacked.join(" ")));

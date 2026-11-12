@@ -21,7 +21,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Wave(Pulse)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Sin)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Exp)", FIXPOINT, SOURCES),
-    ("ngspice", "Wave(Pwl)", FIXPOINT, SOURCES_NONE),
+    ("ngspice", "Wave(Pwl)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Sffm)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Am)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrNoise)", FIXPOINT, SOURCES),
@@ -35,10 +35,10 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Family(Hicum2)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(Bsim3)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(Bsim4)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(B3SoiFd)", FIXPOINT, MODELS_NONE),
-    ("ngspice", "Family(B3SoiDd)", FIXPOINT, MODELS_NONE),
+    ("ngspice", "Family(B3SoiFd)", FIXPOINT, VERSIONED),
+    ("ngspice", "Family(B3SoiDd)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(B4Soi)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(Hisim2)", FIXPOINT, MODELS_NONE),
+    ("ngspice", "Family(Hisim2)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(HisimHv)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
 ];
@@ -48,11 +48,7 @@ const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 // Why, per area: every admitted generated design drops the kind by that area's refusal.
 const ELEMENTS: &str =
     "interim: dialect_ngspice_elements' fixtures (resistor, capacitor_inductor, controlled)";
-const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, sin, exp, sffm, am, noise, ac_forms, distof_port)";
-const SOURCES_NONE: &str =
-    "interim: no read fixture of the kind yet in dialect_ngspice_sources (asked)";
+const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, noise, sens, disto, pss)";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
-const VERSIONED: &str = "interim: dialect_ngspice_models' fixtures (bjt, mos_levels, bins, polarity_default, bsim_version); no valid version drawn before ir-circuit b6888c35";
-const MODELS_NONE: &str =
-    "interim: no read fixture of the family yet in dialect_ngspice_models (asked)";
+const VERSIONED: &str = "interim: dialect_ngspice_models' fixtures (bjt, mos_levels, bins, polarity_default, bsim_version, b3soi_fd, b3soi_dd, hisim2); no valid version drawn before ir-circuit b6888c35";

@@ -18,7 +18,7 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`, `RESET_PART`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
-//! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
+//! `pub(super) fn admits(&ir::Design, ir::ItemRef, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn load`, `loop_`, `alter`, `reset`
 
 use super::codes::Row;
@@ -117,8 +117,14 @@ pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
 }
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21, `Write::admits`).
-pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
+/// (R21, `Write::admits`). `_next` is the item after `item` in its scope (`ItemRef::NONE` at the
+/// end), handed by the spine so the check needs no walk of its own.
+pub(super) fn admits(
+    design: &ir::Design,
+    item: ir::ItemRef,
+    _next: ir::ItemRef,
+    diags: &mut ir::Diags,
+) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     match item.kind {
         ir::ItemKind::Alter => {
