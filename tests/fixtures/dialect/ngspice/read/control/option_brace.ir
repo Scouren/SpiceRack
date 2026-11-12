@@ -1,0 +1,7 @@
+# codes: P1409
+file "option_brace.sp" deck
+  title "option_brace"
+  comment " oracle: settle/option_brace.sp: a script option's value in braces is not a numparam expression (ngspice: bad type given for option, or the digits before an operator): Private, ngspice's own"
+  param q = 50
+  opaque ngspice private ".control\noption temp={q}\n.endc"
+  analysis op
