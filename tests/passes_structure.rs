@@ -13,6 +13,8 @@
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_structure/r53.rs"]
+mod r53;
 #[path = "passes_structure/reads.rs"]
 mod reads;
 
@@ -478,6 +480,17 @@ fn splice_and_constant_params_keep_what_every_read_binds() {
         assert!(ran > 0, "{name}: no generated design");
         eprintln!("{name}: {ran} generated designs");
     }
+}
+
+/// R53 over seeded designs of the shape it converts (R55: built for the rule, not drawn from
+/// the generator, whose expressions rarely evaluate): top parameters, a wrapper subcircuit
+/// shadowing some of them, a subcircuit whose formals default to constants, to unbound reads of
+/// those parameters, and to sibling formals, and instances at the top and in the wrapper
+/// passing random subsets of actuals. Every formal's value at every instance (`passes_structure/
+/// r53.rs`, ngspice's rule as bindings) is the same, bit for bit, before and after the pass.
+#[test]
+fn formal_defaults_keep_every_instances_values() {
+    r53::keeps_every_instances_values();
 }
 
 #[test]
