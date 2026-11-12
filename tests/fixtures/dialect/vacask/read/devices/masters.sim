@@ -17,4 +17,5 @@ ends
 x1 (n1 n2) sub g=2 $mfactor=3
 x2 (n1 n2) sub h=2
 x3 (n1) sub
+x5 (n1 n2 n3) sub
 x4 (n1 n2) nothing w=1

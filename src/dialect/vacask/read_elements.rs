@@ -28,7 +28,7 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.2 (instance, `$mfactor`, R C L, behavioural); VD
 //! cir-instance, cir-mfactor, dev-builtin-behavioral.
 //!
-//! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `NO_PARENS`,
+//! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `TOO_MANY`, `NO_PARENS`,
 //! `DUPLICATE`, `REPEATED`, `NOISY`, `repeated`,
 //! `Declared`, `declare`, `instance`
 //! (crate-private)
@@ -84,6 +84,8 @@ pub(super) const NO_MFACTOR: ir::Code = ir::Code::new(b'R', 2005);
 /// `sp_vdmos` (5) in `demo/spice/` and `benchmark/vadistiller/bjtring` (R41 Q3: the count
 /// decides whether the short instance is ever typed).
 pub(super) const TERMINALS: ir::Code = ir::Code::new(b'P', 2104);
+/// A subcircuit instance with more terminals than the subcircuit has ports (settle fwd_long).
+pub(super) const TOO_MANY: ir::Code = ir::Code::new(b'P', 2109);
 /// An instance whose terminals are not in parentheses.
 pub(super) const NO_PARENS: ir::Code = ir::Code::new(b'P', 2107);
 /// An instance name already defined in its scope.
@@ -129,6 +131,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             cite: "VD cir-instance (Unconnected terminal handling); run fwd; RULINGS R41 (Q3)",
             explain: "VACASK connects the trailing terminals an OSDI or subcircuit instance leaves out to internal nodes; the IR has no terminal for an own internal node, so the statement is kept as VACASK's text (more terminals than the master has is VACASK's error).",
             kind: ir::Kind::Note,
+        },
+    ),
+    (
+        TOO_MANY,
+        ir::Info {
+            title: "a subcircuit instance with more terminals than its subcircuit has ports",
+            cite: "settle fwd_long (VACASK 36be560: \"Too many terminals specified at instantiation.\"); R61, A36",
+            explain: "VACASK rejects an instance that connects more nodes than its subcircuit declares ports.",
+            kind: ir::Kind::Refusal,
         },
     ),
     (
@@ -197,9 +208,9 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         super::write_elements::PORTS,
         ir::Info {
-            title: "a subcircuit instance whose terminal count is not its subcircuit's",
-            cite: "VD cir-instance (Unconnected terminal handling); run fwd",
-            explain: "VACASK connects the terminals an instance leaves out to internal nodes and refuses extra ones; the IR states neither, so the design has no VACASK spelling.",
+            title: "a device whose terminal count is not its shipped module's",
+            cite: "VD cir-instance (Unconnected terminal handling); run fwd; R61 (a subcircuit instance's count is the IR invariant X0022)",
+            explain: "VACASK connects the terminals a device leaves out to internal nodes and refuses extra ones; a shipped module's terminal list is not in the IR, so the writer checks it against its own table.",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -377,12 +388,12 @@ fn subckt(
     declared: &[String],
     entries: &[(String, u32)],
 ) {
-    if who.1.len() != ports {
-        let class = match who.1.len() < ports {
-            true => ir::OpaqueClass::Private,
-            false => ir::OpaqueClass::InvalidInSource,
-        };
-        return read::opaque(l, n, class, Some(TERMINALS));
+    // R61, A36: a bound instance's terminals are its definition's ports (IR invariant X0022).
+    if who.1.len() < ports {
+        return read::opaque(l, n, ir::OpaqueClass::Private, Some(TERMINALS));
+    }
+    if who.1.len() > ports {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(TOO_MANY));
     }
     for (key, _) in entries {
         if !declared.contains(key) {

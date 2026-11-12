@@ -444,6 +444,20 @@ fn dp1_a_subcircuit_port_named_twice_is_rejected() {
 }
 
 #[test]
+fn fwd_an_instance_with_too_many_terminals_is_rejected_a_short_one_runs() {
+    // R61, A36: more terminals than the subcircuit's ports is VACASK's error (InvalidInSource
+    // P2109); fewer gives the missing ones internal nodes and runs (Private P2104).
+    assert!(says(
+        &run("vacask", "fwd_long.sim"),
+        "Too many terminals specified at instantiation."
+    ));
+    assert!(says(
+        &run("vacask", "fwd_short.sim"),
+        "Running analysis 'op1'."
+    ));
+}
+
+#[test]
 fn ip_parameter_reads_in_a_behavioural_source() {
     // ip1: `$intparam` truncates toward zero to an integer (2.7 → 2, −2.7 → −2, integer
     // division after it); `$realparam(p)` and a bare `p` are the real (R56).

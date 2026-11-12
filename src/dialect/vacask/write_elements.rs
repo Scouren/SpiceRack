@@ -19,7 +19,8 @@ use crate::ir;
 
 /// An element whose master VACASK would not find from its place.
 pub(super) const MASTERLESS: ir::Code = ir::Code::new(b'W', 2104);
-/// An instance whose terminal count is not its subckt's ports or its shipped module's terminals.
+/// A device whose terminal count is not its shipped module's (a subcircuit instance's is the IR
+/// invariant X0022: R61, A36).
 pub(super) const PORTS: ir::Code = ir::Code::new(b'W', 2105);
 
 /// An unresolved element with a multiplicity: VACASK's `$mfactor` is the multiplicity on a
@@ -74,9 +75,8 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// no feature states (R21): a name holding white space, a parameter its module lacks, a master
 /// VACASK would not find from the element's place (it takes the kind from the master, so the
 /// element would read back `Unresolved`; a source's too), an unresolved element with a
-/// multiplicity (W2109), an instance whose terminal count is not its subckt's
-/// or its shipped module's (VACASK connects the missing ones to internal nodes: read back
-/// `Private`), a kind other than its model's family gives (W2108), a behavioural source with
+/// multiplicity (W2109), a device whose terminal count is not its shipped module's (VACASK
+/// connects the missing ones to internal nodes: read back `Private`), a kind other than its model's family gives (W2108), a behavioural source with
 /// `tc1 tc2 temp dtemp rpar` or a multiplicity (VD dev-builtin-behavioral: its expression only;
 /// W2106).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
@@ -110,13 +110,6 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             let extra = [b.tc1, b.tc2, b.temp_abs, b.dtemp, b.rpar, e.mult];
             if extra.iter().any(|x| !x.is_none()) {
                 diags.push_at(BEHAV_FIELD, design, at, 0);
-            }
-        }
-        if e.kind == ir::ElemKind::Instance && !e.model.def.is_none() {
-            let def = design.def(e.model.def);
-            let sub: ir::item::Subckt = design.row(def.item.index);
-            if design.names(sub.ports).len() != e.terminals.len() {
-                diags.push_at(PORTS, design, at, 0);
             }
         }
         let names = std::iter::once(e.name)
