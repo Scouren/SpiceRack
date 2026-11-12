@@ -18,7 +18,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -169,10 +169,6 @@ pub(super) const SWEEP_WAVE: ir::Code = ir::Code::new(b'P', 2314);
 pub(super) const SOURCE_SWEEP_WAVE: ir::Code = ir::Code::new(b'W', 2307);
 /// A control statement VACASK rejects.
 pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 2320);
-/// The writer named an unnamed analysis.
-pub(super) const ANALYSIS_NAME_MADE: ir::Code = ir::Code::new(b'W', 2301);
-/// The writer named an unnamed sweep.
-pub(super) const SWEEP_NAME_MADE: ir::Code = ir::Code::new(b'W', 2302);
 
 /// A save of a probe category VACASK has no directive for (refused by `write_outputs::admits`).
 pub(super) const SAVE_CATEGORY: ir::Code = ir::Code::new(b'W', 2303);
@@ -295,20 +291,6 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "VD cmd-overview, cmd-sweep, cmd-analysis-*, cmd-options; runs e3, e6, x1, x3",
         "An unknown option or analysis parameter, an unknown analysis kind, a sweep not followed by a sweep or an analysis, an unmatched mc or endmc, a second control block: VACASK stops with an error.",
         ir::Kind::Refusal,
-    ),
-    row(
-        ANALYSIS_NAME_MADE,
-        "an analysis given a generated name",
-        "DIALECT-VACASK §4",
-        "VACASK requires a name; an analysis with none is named after its kind and its place among the deck's analyses (`tran2`).",
-        ir::Kind::Note,
-    ),
-    row(
-        SWEEP_NAME_MADE,
-        "a sweep given a generated name",
-        "VD cmd-sweep",
-        "VACASK requires a sweep name (it names the swept vector); a sweep with none is named `sweep<n>`.",
-        ir::Kind::Note,
     ),
     row(
         OPTION_ROW_PRIVATE,

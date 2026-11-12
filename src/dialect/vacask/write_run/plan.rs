@@ -8,11 +8,10 @@
 //!
 //! Contents: `loop_`, `alter`, `elaborate`, `option`, `env`, `option_word` (crate-private)
 
-use super::analyses::{range, sweep_name, sweeps_before, target};
+use super::analyses::{range, target};
 use super::{body, name_of, quote};
 use crate::dialect::vacask::expr_write::write_expr;
 use crate::dialect::vacask::name::{self, Place};
-use crate::dialect::vacask::read_run::SWEEP_NAME_MADE;
 use crate::dialect::vacask::write::Writer;
 use crate::ir;
 
@@ -20,13 +19,8 @@ use crate::ir;
 pub(super) fn loop_(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
     let row: ir::Loop = d.row(at.index);
-    let name = match row.name.is_none() {
-        false => d.str(row.name).to_string(),
-        true => {
-            w.diags.push_at(SWEEP_NAME_MADE, d, at, 0);
-            sweep_name(sweeps_before(d, at) + 1)
-        }
-    };
+    assert!(!row.name.is_none(), "FEATURES lacks LoopUnnamed");
+    let name = d.str(row.name).to_string();
     w.line();
     match row.kind {
         ir::LoopKind::Sweep => {

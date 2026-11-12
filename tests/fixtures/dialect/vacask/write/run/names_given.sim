@@ -1,0 +1,10 @@
+names given
+control
+  analysis op1 op
+  analysis tran1 tran stop=1m
+  sweep loop1 option="temp" values=[0]
+    analysis ac1 ac values=[1k]
+  sweep axis2 instance="v1" parameter="dc" from=1 to=3 step=0.5
+  sweep axis1 instance="v2" parameter="dc" values=[0, 1]
+    analysis dc1 op
+endc
