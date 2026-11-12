@@ -261,13 +261,18 @@ pub struct Literal {
 ## 8. Features (`feature.rs`, kernel)
 
 Every kind is a feature: `enum Feature { Item(ItemKind), Elem(ElemKind), Wave(WaveKind),
-Analysis(AnalysisKind), Func(Func), Binary(BinOp), Unary(UnOp), Dist(Dist), Extra(Extra) }` with a
-`const fn index(self) -> u16`. `Extra` is the closed list of features that are fields, not kinds
-(`PulseCycles`, `PwlRepeat`, `NestedSubckt`, `LocalModel`, `LocalFunc`, `ParamInBranch`,
-`IcInOp`, `IcUicOnly`, `InstanceMult`, `ElementParasitics`, `CaseSensitiveNames`, …); the circuit
-and run owners append theirs in their marked regions. `FeatureSet` is a fixed bitset with `const`
-constructors (`FeatureSet::EMPTY.with(f)`), `contains`, `minus`, `iter`. `features_used(&Design)
--> FeatureSet` is one scan.
+Analysis(AnalysisKind), Expr(ExprTag), Func(Func), FuncDyn(Func), Binary(BinOp), BinaryDyn(BinOp),
+Unary(UnOp), UnaryDyn(UnOp), Dist(Dist), DrawWhen(DrawWhen), DrawPer(DrawPer), Extra(Extra),
+Circuit(CircuitExtra), Run(RunExtra), Option(OptionKey) }` with a `const fn index(self) -> u16`
+(496 features at the freeze). The features that are fields, not kinds, are three closed enums,
+one per owner and each in its owner's file, so adding one never touches a kernel file: `Extra`
+(kernel, `feature.rs`: `NestedSubckt`, `LocalModel`, `LocalFunc`, `ParamInBranch`,
+`CaseSensitiveNames`, …), `CircuitExtra` (`circuit_extra.rs`: pulse cycle counts, PWL repeat
+forms, each law variant, IC modes, parasitics, multiplicity per kind class, …), `RunExtra`
+(`run_extra.rs`: a simulator-chosen step, start-up, list and table sweeps, sweep ends, loop
+targets, measure and probe kinds, …). `FeatureSet` is a fixed bitset with `const` constructors
+(`FeatureSet::EMPTY.with(f)`), `contains`, `minus`, `iter`. `features_used(&Design) ->
+FeatureSet` is one scan.
 
 ## 9. Check, text, generator (signatures only in this phase)
 
