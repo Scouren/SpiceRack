@@ -37,6 +37,7 @@ const READ: &[&str] = &[
     "mosfet_soi3",
     "osdi_codemodel",
     "rcl_dynamic",
+    "rcl_dynamic_quoted",
     "rcl_dynamic_refused",
     "resistor",
     "resistor_ignored",
