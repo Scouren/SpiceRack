@@ -51,35 +51,19 @@ pub const NO_FAMILY: ir::Code = ir::Code::new(b'U', 300);
 /// would be a placement the target may lack, and one outside is not read with the section.
 pub const NO_PLACE: ir::Code = ir::Code::new(b'U', 301);
 
-/// Each kind that may name a model and need not, its family, and that family's IR-text word.
-const FAMILIES: [(ir::ElemKind, ir::ModelFamily, &str); 11] = [
-    (
-        ir::ElemKind::Resistor,
-        ir::ModelFamily::Resistor,
-        "resistor",
-    ),
-    (
-        ir::ElemKind::Capacitor,
-        ir::ModelFamily::Capacitor,
-        "capacitor",
-    ),
-    (
-        ir::ElemKind::Inductor,
-        ir::ModelFamily::Inductor,
-        "inductor",
-    ),
-    (ir::ElemKind::Coupling, ir::ModelFamily::Mutual, "mutual"),
-    (ir::ElemKind::VSource, ir::ModelFamily::SourceV, "source_v"),
-    (ir::ElemKind::ISource, ir::ModelFamily::SourceI, "source_i"),
-    (ir::ElemKind::Vcvs, ir::ModelFamily::Vcvs, "vcvs"),
-    (ir::ElemKind::Vccs, ir::ModelFamily::Vccs, "vccs"),
-    (ir::ElemKind::Ccvs, ir::ModelFamily::Ccvs, "ccvs"),
-    (ir::ElemKind::Cccs, ir::ModelFamily::Cccs, "cccs"),
-    (
-        ir::ElemKind::LosslessLine,
-        ir::ModelFamily::TlineIdeal,
-        "tline_ideal",
-    ),
+/// Each kind that may name a model and need not, and its family.
+const FAMILIES: [(ir::ElemKind, ir::ModelFamily); 11] = [
+    (ir::ElemKind::Resistor, ir::ModelFamily::Resistor),
+    (ir::ElemKind::Capacitor, ir::ModelFamily::Capacitor),
+    (ir::ElemKind::Inductor, ir::ModelFamily::Inductor),
+    (ir::ElemKind::Coupling, ir::ModelFamily::Mutual),
+    (ir::ElemKind::VSource, ir::ModelFamily::SourceV),
+    (ir::ElemKind::ISource, ir::ModelFamily::SourceI),
+    (ir::ElemKind::Vcvs, ir::ModelFamily::Vcvs),
+    (ir::ElemKind::Vccs, ir::ModelFamily::Vccs),
+    (ir::ElemKind::Ccvs, ir::ModelFamily::Ccvs),
+    (ir::ElemKind::Cccs, ir::ModelFamily::Cccs),
+    (ir::ElemKind::LosslessLine, ir::ModelFamily::TlineIdeal),
 ];
 
 /// Binds every reachable model-less element of a [`FAMILIES`] kind to its scope's model of its
@@ -110,7 +94,7 @@ pub fn explicit_family_models(design: &mut ir::Design, diags: &mut ir::Diags) {
     if bare.is_empty() {
         return;
     }
-    let names: Vec<String> = FAMILIES.iter().map(|f| fresh(design, f.2)).collect();
+    let names: Vec<String> = FAMILIES.iter().map(|f| fresh(design, f.1.word())).collect();
     // one model per (home, family), in first-need order, then each element bound to its own
     let mut models: Vec<(ir::ScopeId, usize, ir::DefId)> = Vec::new();
     for &(item, scope, k) in &bare {

@@ -256,14 +256,18 @@ const fn ceiling(ops: &[ir::BinOp], min: bool) -> ir::FeatureSet {
     if !ops.is_empty() {
         set = set.with(ir::Feature::Expr(ir::ExprTag::Binary));
     }
+    // both forms: a field reading `$temp` makes the root dynamic (R14)
     let mut k = 0;
     while k < ops.len() {
-        set = set.with(ir::Feature::Binary(ops[k]));
+        set = set
+            .with(ir::Feature::Binary(ops[k]))
+            .with(ir::Feature::BinaryDyn(ops[k]));
         k += 1;
     }
     if min {
         set = set
             .with(ir::Feature::Func(ir::Func::Min))
+            .with(ir::Feature::FuncDyn(ir::Func::Min))
             .with(ir::Feature::Expr(ir::ExprTag::Call));
     }
     set

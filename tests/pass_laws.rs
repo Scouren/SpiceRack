@@ -51,16 +51,62 @@ const KNOWN: &[(&str, &str, &str)] = &[];
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
 /// comes from the pass's row (its `removes`, the kinds that hold it, `Expr(Num)`, without the
 /// competing features), as the IR owner who knows the generator states it; (pass name, set).
-const GEN_SETS: &[(&str, ir::FeatureSet)] = &[(
-    "tran_cap_ngspice_to_given",
-    ir::FeatureSet::EMPTY
-        .with(ir::Feature::Item(ir::ItemKind::Title))
-        .with(ir::Feature::Item(ir::ItemKind::Analysis))
-        .with(ir::Feature::Expr(ir::ExprTag::Num))
-        .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
-        .with(ir::Feature::Run(ir::RunExtra::TranCapNgspice))
-        .with(ir::Feature::Run(ir::RunExtra::TranRecordStart)),
-)];
+const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
+    (
+        "hoist_enclosing_refs",
+        ir::FeatureSet::EMPTY
+            .with(ir::Feature::Item(ir::ItemKind::Title))
+            .with(ir::Feature::Item(ir::ItemKind::Subckt))
+            .with(ir::Feature::Item(ir::ItemKind::Param))
+            .with(ir::Feature::Placed(
+                ir::ScopeKind::Subckt,
+                ir::ItemKind::Subckt,
+            ))
+            .with(ir::Feature::Placed(
+                ir::ScopeKind::Subckt,
+                ir::ItemKind::Param,
+            ))
+            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
+            .with(ir::Feature::Expr(ir::ExprTag::Num))
+            .with(ir::Feature::Expr(ir::ExprTag::Param))
+            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
+            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
+            .with(ir::Feature::Binary(ir::BinOp::Add))
+            .with(ir::Feature::Binary(ir::BinOp::Mul)),
+    ),
+    (
+        "hoist_enclosing_refs_default",
+        ir::FeatureSet::EMPTY
+            .with(ir::Feature::Item(ir::ItemKind::Title))
+            .with(ir::Feature::Item(ir::ItemKind::Subckt))
+            .with(ir::Feature::Item(ir::ItemKind::Param))
+            .with(ir::Feature::Placed(
+                ir::ScopeKind::Subckt,
+                ir::ItemKind::Subckt,
+            ))
+            .with(ir::Feature::Placed(
+                ir::ScopeKind::Subckt,
+                ir::ItemKind::Param,
+            ))
+            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
+            .with(ir::Feature::Expr(ir::ExprTag::Num))
+            .with(ir::Feature::Expr(ir::ExprTag::Param))
+            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
+            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
+            .with(ir::Feature::Binary(ir::BinOp::Add))
+            .with(ir::Feature::Binary(ir::BinOp::Mul)),
+    ),
+    (
+        "tran_cap_ngspice_to_given",
+        ir::FeatureSet::EMPTY
+            .with(ir::Feature::Item(ir::ItemKind::Title))
+            .with(ir::Feature::Item(ir::ItemKind::Analysis))
+            .with(ir::Feature::Expr(ir::ExprTag::Num))
+            .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
+            .with(ir::Feature::Run(ir::RunExtra::TranCapNgspice))
+            .with(ir::Feature::Run(ir::RunExtra::TranRecordStart)),
+    ),
+];
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);

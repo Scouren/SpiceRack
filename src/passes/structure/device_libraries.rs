@@ -6,8 +6,7 @@
 //! moves, and it always converts: no note.
 //!
 //! Cites: `rewrite/IR-CIRCUIT.md` §4a; AMEND-A12 C5; R17, R44, R45; `crates/ir/src/circuit_tables.rs`
-//! (`library_free`, which this file's table must equal: `tests/passes_structure.rs` checks it
-//! against the IR's own `ModelWithoutLibrary`).
+//! (`ModelFamily::library_free`).
 //!
 //! Contents: `pub fn device_libraries(design: &mut ir::Design, diags: &mut ir::Diags)`
 
@@ -44,7 +43,7 @@ fn add_libraries(design: &mut ir::Design, families: &[ir::ModelFamily]) {
     let mut added = 0;
     let mut editor = design.editor();
     for &family in families {
-        if library_free(family) || std::mem::replace(&mut has[family as usize], true) {
+        if family.library_free() || std::mem::replace(&mut has[family as usize], true) {
             continue;
         }
         let row = ir::DeviceLibrary {
@@ -58,25 +57,4 @@ fn add_libraries(design: &mut ir::Design, families: &[ir::ModelFamily]) {
         added += 1;
     }
     assert!(added <= ir::ModelFamily::COUNT, "one library per family");
-}
-
-/// Whether a model of `f` needs no `DeviceLibrary` on any target: the builtins of A12 C5 but
-/// the ideal line, and the families whose code is a `Load` or unbound (R44).
-// ponytail: a copy of the IR's crate-private `circuit_tables::library_free`; the test pins it
-// to the IR's feature, and it goes when the IR exports it.
-fn library_free(f: ir::ModelFamily) -> bool {
-    use ir::ModelFamily as F;
-    matches!(
-        f,
-        F::Module
-            | F::CodeModel
-            | F::Other
-            | F::SourceV
-            | F::SourceI
-            | F::Vcvs
-            | F::Vccs
-            | F::Ccvs
-            | F::Cccs
-            | F::Mutual
-    )
 }
