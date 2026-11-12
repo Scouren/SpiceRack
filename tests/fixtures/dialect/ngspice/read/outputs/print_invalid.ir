@@ -1,0 +1,8 @@
+# codes: P1351 P1351 P1350 P1350
+file "print_invalid.sp" deck
+  title "print_invalid"
+  comment " oracle: run: .print ac vi(x1.n) saves x1.n#branch (gettoks) and the analysis does not run; .print tran with no output warns 'no nodes given' and prints nothing; a column expression and .print op are not typed"
+  opaque ngspice invalid ".print ac vi(a)"
+  opaque ngspice invalid ".print tran"
+  opaque ngspice unread ".print tran v(a) -v(b)"
+  opaque ngspice unread ".print op v(a)"

@@ -1,0 +1,4 @@
+# oracle: ngspice-45 dotcards.c gettoks (the .save forms) and the runs of save_probes; written by hand
+file "save.sp" deck
+  title "save"
+  save (all_v) (all_branch_i) (v (a)) (i (v1)) (param (m1) (gm)) (v (x1 x2 n)) (i (x1 l3)) (param (x1 m2) (id))

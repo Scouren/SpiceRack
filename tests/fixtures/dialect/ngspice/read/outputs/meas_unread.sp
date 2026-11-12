@@ -1,0 +1,9 @@
+meas_unread
+* oracle: forms the IR cannot state: td= on a window (measure_minMaxAvg ignores it), td= off tran (only tran_check reads m_td), td= with from= (both skip: their maximum), to=0 on a crossing ('no limit', m_to != 0.0e0), from= on a dc crossing (swapped, defaulted to -1e99..1e99), a trigger's from= as an expression (copied to the other clause only when not 0), par() (inpcom.c makes a B source)
+.meas tran a4 avg v(a) td=1u
+.meas ac a5 when vdb(out)=-3 td=1
+.meas tran a6 find par('v(a)*2') at=1u
+.meas tran a7 when v(a)=0.5 td=1u from=2u
+.meas tran a8 when v(a)=0.5 to=0
+.meas dc a9 when v(a)=0.5 from=1
+.meas tran a10 trig v(a) val=0.2 rise=1 from={t0} targ v(b) val=0.5 fall=1

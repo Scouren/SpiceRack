@@ -1,0 +1,5 @@
+# codes:
+file "save_probes.sp" deck
+  title "save_probes"
+  comment " oracle: ngspice-45 dotcards.c gettoks (v(a,b) is two saves; i(x) is x#branch); runs: .save v(a,c) i(v1) kept a c v1#branch, .save v(x1.n) i(v.x1.v9) @r.x1.r9[i] kept x1.n v.x1.v9#branch @r.x1.r9[i]"
+  save (v (a)) (v (a)) (v (b)) (i (v1)) (i (v1)) (param (r1) (i)) (v (x1 n)) (i (x1 v9)) (param (x1 r9) (i))

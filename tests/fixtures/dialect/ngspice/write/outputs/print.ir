@@ -1,0 +1,6 @@
+# oracle: ngspice-45 dotcards.c fixem (the .print forms); written by hand
+file "print.sp" deck
+  title "print"
+  print tran (v (a)) (vdiff (a) (b)) (i (v1))
+  print ac (v db (out)) (v phase_rad (out)) (v mag (out)) (v re (out)) (v (out))
+  print dc (v (out))

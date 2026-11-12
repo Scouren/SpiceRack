@@ -1,0 +1,7 @@
+# codes: P1352 P1352 P1352
+file "plot_inert.sp" deck
+  title "plot_inert"
+  comment " oracle: ngspice-45 dotcards.c ft_cktcoms (.plot is com_asciiplot: a picture on stdout; .width sets the output width; no number)"
+  opaque ngspice inert ".plot tran v(a) v(b)"
+  opaque ngspice inert ".plot ac vdb(a) (0,10)"
+  opaque ngspice inert ".width out=80"

@@ -81,6 +81,8 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 | a run card in a `.subckt` body | the deck's (run sub.cir); a `.ic` there holds each instance's own node (run icsub.cir) | in its scope, `RunExtra::RunItemNested` (R26); `NodeSetInSubckt` |
 | `.temp` list | ngspice runs 27 °C and says so (4.02); so does a value `strtod` does not read whole (`.temp 0.1k`: run temp4.cir, `inp.c:1173-1182`) | `Env` 27 with a note |
 | `.control` | `alterparam` needs `reset`; a dot-card analysis runs after the script and at each `run` (13.01) | run items in run order; display commands `Inert` |
+| save set | no `.save`, `.save all` and `.save allv` keep the same vectors: every node voltage at every depth and every branch current (V, E, L; no device current) (run: `a b c x1.n e1#branch l1#branch v1#branch`; `outitf.c` `cieq(name, "all") \|\| cieq(name, "allv")`); `.save v(a,b)` keeps `a` and `b` (`dotcards.c` `gettoks`) | `all` → `Save { AllV, AllBranchI }`; no `.save`: no item, the target's default (R29) |
+| `.meas` | a measure's `v(x)` in ac is the real part, `vp` radians unless `set units=degrees` (`com_measure2.c` `get_value`, run: `ph` = −0.5610 at 100 Hz); no RISE/FALL/CROSS is the first crossing after the first interval (576–579); FROM= skips below as TD= does in tran and is copied TRIG↔TARG when the other has none (runs); DERIV and ERR are "not supported"; `td=<measure>` is fatal; `vr(x)` in a measure saves nothing in batch mode (run) | `Measure` rows; `skip_initial` (R30), `until`, `Stat::MinAt`/`MaxAt` (A15) |
 
 ### Options by class (R19, A16; `read_run/state.rs`)
 
