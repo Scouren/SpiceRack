@@ -234,6 +234,10 @@ fn literal(
     let significant = digits.trim_start_matches('0');
     let mut frac = frac as i32;
     let mut power: i32 = 0;
+    // ponytail: more significant digits than the mantissa holds are rounded half to even on the
+    // digits (decimal, no float; P1005). Ceiling: on ngspice card values (INPevaluate) the
+    // rounded text can land a few ulp from the double the long text gives (run: see
+    // DIALECT-NGSPICE.md §3 numbers). Upgrade: A18 keeps the digit text beside the literal.
     let (mut mantissa, rounded) = if significant.len() > DIGITS_MAX {
         power += (significant.len() - DIGITS_MAX) as i32;
         (round_digits(significant, DIGITS_MAX), true)
@@ -249,6 +253,12 @@ fn literal(
     let shift = power.min(frac);
     frac -= shift;
     power -= shift;
+    // more fraction digits than a literal holds (18): the whole fraction moves into the power,
+    // exactly (`0.0027500000000000003` is 27500000000000003 × 10^-19, form Exponent)
+    if frac > 18 {
+        power -= frac;
+        frac = 0;
+    }
     if mantissa == 0 {
         return Some((ir::Literal::ZERO, rounded));
     }
@@ -418,6 +428,20 @@ mod tests {
         assert!(scan("e3", Grammar::Inp).is_none());
         assert!(scan(".", Grammar::Inp).is_none());
         assert!(scan("1e999", Grammar::Inp).is_none());
+    }
+
+    #[test]
+    fn a_fraction_longer_than_a_literal_holds_moves_into_the_exponent_exactly() {
+        // sky130 BSIM4 cards (ng-models' census: 95 of 6616): 19 digits after the point.
+        let s = card("0.0027500000000000003").expect("ngspice reads it");
+        assert_eq!(
+            s.literal,
+            lit(27500000000000003, 0, -19, ir::NumForm::Exponent)
+        );
+        assert_eq!(s.literal.value(), 0.0027500000000000003);
+        let mut out = String::new();
+        spell(s.literal, Grammar::Inp, &mut out);
+        assert_eq!(scan(&out, Grammar::Inp).expect(&out).literal, s.literal);
     }
 
     #[test]
