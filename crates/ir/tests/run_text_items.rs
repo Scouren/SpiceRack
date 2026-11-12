@@ -18,10 +18,10 @@ use spicerack_ir::measure::{
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::{
-    AcPart, AnalysisKind, BinOp, Builder, Design, Diags, Edge, Event, ExprId, FileId, IcScope,
-    List, Literal, LoopEnd, NodeSet, NodeSetKind, NumForm, OptionKey, PrintView, Probe, Ref, Role,
-    ScopeId, Span, Stat, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, dump, link,
-    parse,
+    AcPart, AnalysisKind, Applies, BinOp, Builder, Design, Diags, Edge, Env, Event, ExprId, FileId,
+    IcScope, List, Literal, LoopEnd, NodeSet, NodeSetKind, NumForm, OptionKey, OptionRow,
+    PrintView, Probe, Ref, Role, ScopeId, Span, Stat, Statistics, SweepSpec, Target, TargetKind,
+    Vary, VaryDist, dump, link, parse,
 };
 
 const NO: ExprId = ExprId::NONE;
@@ -105,9 +105,10 @@ fn sweep(
 fn loops_alters_and_state() {
     let text = "file \"t.sp\" deck
   env temp=85 tnom=27
+  env temp=27 whole_run
   option rel_tol value=1m
   option klu
-  option private timeint.reltol xyce value=1m
+  option private timeint.reltol xyce value=1m whole_run
   loop sweep keep_last name=sw1 (param r) (lin start=1k stop=10k step=1k)
     alter (device_param r1 r path=(x1)) value=2k
     analysis op
@@ -116,18 +117,36 @@ fn loops_alters_and_state() {
   alter (option private tran_rmax vacask) value=10
   alter (option rel_tol) value=1m
   nodeset ic transient node=(x1 n) value=1
-  nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5
+  nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5 whole_run
   nodeset device every_op node=(c1) value=0
   elaborate (div amp)
 ";
     case(text, |b, top| {
         let (t, tn) = (n(b, "85"), n(b, "27"));
         b.env(top, t, tn, Span::NONE);
+        let t = n(b, "27");
+        b.push(
+            top,
+            Env {
+                temp: t,
+                tnom: NO,
+                holds: Applies::WholeRun,
+            },
+            Span::NONE,
+        );
         let v = n(b, "1m");
         b.option(top, OptionKey::RelTol, v, Span::NONE);
         b.option(top, OptionKey::Klu, NO, Span::NONE);
-        let v = n(b, "1m");
-        b.option_private(top, "xyce", "timeint.reltol", v, Span::NONE);
+        let value = n(b, "1m");
+        let (private, dialect) = (b.name("timeint.reltol"), b.name("xyce"));
+        let row = OptionRow {
+            key: OptionKey::Private,
+            private,
+            dialect,
+            value,
+            holds: Applies::WholeRun,
+        };
+        b.push(top, row, Span::NONE);
         b.name("sw1"); // the text names the loop before its target
         let r = b.target(TargetKind::Param, &[], "r", None);
         let s = sweep(b, SweepSpec::lin_step, ["1k", "10k", "1k"]);
@@ -193,6 +212,7 @@ fn loops_alters_and_state() {
             node,
             reference,
             value,
+            holds: Applies::WholeRun,
         };
         b.push(top, row, Span::NONE);
         let v = n(b, "0");

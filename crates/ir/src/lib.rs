@@ -153,7 +153,7 @@ pub use id::{
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
 pub use link::link;
 pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
-pub use option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
+pub use option::{Applies, Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 pub use option_key::{OptionClass, OptionKey};
 pub use output::{Measure, Print, PrintView, Save};
 pub use plan::{

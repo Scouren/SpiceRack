@@ -91,7 +91,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::McLatinHypercube, "  loop monte_carlo runs=10 latin_hypercube\n    analysis op", M),
     (RunExtra::McNominal, "  loop monte_carlo runs=10 nominal\n    analysis op", M),
     (RunExtra::McMismatch, "  loop monte_carlo runs=10 mismatch\n    analysis op", M),
-    (RunExtra::OptionMidRun, "  analysis op\n  option klu", "  option klu\n  analysis op"),
+    (RunExtra::OptionMidRun, "  analysis op\n  option klu", "  analysis op\n  option klu whole_run"),
     (RunExtra::IcEveryOp, "  nodeset ic every_op node=(a) value=1", S),
     (RunExtra::IcNextOnly, "  nodeset ic transient next_only node=(a) value=1", S),
     (RunExtra::IcDifferential, "  nodeset ic transient node=(a) reference=(b) value=1", S),
@@ -136,6 +136,10 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::VaryPercent, "  statistics process (p gauss percent spread=1)", ST),
     (RunExtra::VaryMean, "  statistics process (p gauss mean=2 spread=1)", ST),
     (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
+    (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
+    (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
+    (RunExtra::WholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
+    (RunExtra::RunItemNested, "  subckt s ()\n    analysis op", "  if (1)\n    analysis op"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";

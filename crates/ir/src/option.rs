@@ -28,7 +28,7 @@
 //! ```
 //!
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
-//! `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
+//! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
 //! `OptionRow`, `Env` and `NodeSet`
 
 use crate::analysis_facts::report;
@@ -72,18 +72,23 @@ pub struct OptionRow {
     pub dialect: NameId,
     /// The value in the key's unit; `NONE` for a flag. A string value is an `Expr::Str`.
     pub value: ExprId,
+    /// Which run items it holds for (A14, R24).
+    pub holds: Applies,
 }
 
-/// The circuit temperature and the nominal temperature, °C. Both always present (IR-RUN §3).
-/// One per deck, before its first run item; a change between runs is an `Alter` of
-/// `Target::TEMP`.
+/// The circuit temperature and the nominal temperature, °C. An `Env` sets what it names (A14):
+/// either may be `NONE`, not both (checked). A reader fills its simulator's defaults into the
+/// deck's first `Env` (HSPICE 25/25, the others 27/27), so every run sees both; a change
+/// between runs is an `Alter` of `Target::TEMP` or a `FromHere` `Env`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Env {
-    /// The circuit temperature; never `NONE`. May be an expression of parameters (ngspice
-    /// `.temp {t}`).
+    /// The circuit temperature, or `NONE` when this item does not set it. May be an expression
+    /// of parameters (ngspice `.temp {t}`).
     pub temp: ExprId,
-    /// The temperature model parameters were measured at; never `NONE`.
+    /// The temperature model parameters were measured at, or `NONE` when not set here.
     pub tnom: ExprId,
+    /// Which run items it holds for (A14, R24).
+    pub holds: Applies,
 }
 
 /// An initial condition or a node set on one node, or on the voltage between two.
@@ -108,6 +113,24 @@ pub struct NodeSet {
     /// inductor's current); never `NONE`. May be an expression of parameters (Xyce
     /// `.ic v(1)={V1}`).
     pub value: ExprId,
+    /// Which run items it holds for (A14, R24); distinct from `applies`, which says which
+    /// operating points of a run hold an `Ic`.
+    pub holds: Applies,
+}
+
+/// Which run items a state item (`OptionRow`, `Env`, `NodeSet`) holds for (A14, R24).
+/// `FromHere` is the default (builder, IR text): it is the meaning state items had before A14.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Applies {
+    /// The run items after it in listed order (a script's `option`, a VACASK `control`
+    /// statement).
+    FromHere,
+    /// Every run item of its deck, wherever it stands (ngspice's `.options`, `.temp`, `.ic`,
+    /// `.nodeset`). Among `WholeRun` items that set the same thing (an option key, `temp`,
+    /// `tnom`, one node's condition) the last in listed order holds; listed order reads an
+    /// `Include` as the items of the file it names, in place.
+    WholeRun,
 }
 
 /// What a [`NodeSet`] does.
@@ -136,8 +159,15 @@ pub enum IcScope {
 }
 
 const _: () = assert!(size_of::<OptionRow>() == 16);
-const _: () = assert!(size_of::<Env>() == 8);
+const _: () = assert!(size_of::<Env>() == 12);
 const _: () = assert!(size_of::<NodeSet>() == 24);
+
+impl Applies {
+    /// Every mode, in declaration order.
+    pub const ALL: [Applies; 2] = [Applies::FromHere, Applies::WholeRun];
+    /// Mode count.
+    pub const COUNT: usize = Self::ALL.len();
+}
 
 impl NodeSetKind {
     /// Every kind, in declaration order.
@@ -214,6 +244,7 @@ impl RowFacts for OptionRow {
                 private,
                 dialect,
                 value,
+                holds: Applies::FromHere,
             },
             words.span(),
         )
@@ -254,6 +285,7 @@ impl RowFacts for OptionRow {
                 private,
                 dialect,
                 value,
+                holds: Applies::FromHere,
             }
         } else {
             let value = if key.is_flag() {
@@ -266,6 +298,7 @@ impl RowFacts for OptionRow {
                 private: NameId::NONE,
                 dialect: NameId::NONE,
                 value,
+                holds: Applies::FromHere,
             }
         };
         b.push(scope, row, Span::NONE)
@@ -304,7 +337,15 @@ impl RowFacts for Env {
     ) -> ItemRef {
         let temp = take_expr(words, "temp", scope, b, diags);
         let tnom = take_expr(words, "tnom", scope, b, diags);
-        b.push(scope, Env { temp, tnom }, words.span())
+        b.push(
+            scope,
+            Env {
+                temp,
+                tnom,
+                holds: Applies::FromHere,
+            },
+            words.span(),
+        )
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -319,7 +360,15 @@ impl RowFacts for Env {
         }
         let temp = g.expr(b, features, Reads::Constant);
         let tnom = g.expr(b, features, Reads::Constant);
-        b.push(scope, Env { temp, tnom }, Span::NONE)
+        b.push(
+            scope,
+            Env {
+                temp,
+                tnom,
+                holds: Applies::FromHere,
+            },
+            Span::NONE,
+        )
     }
 }
 
@@ -402,6 +451,7 @@ impl RowFacts for NodeSet {
             node,
             reference,
             value,
+            holds: Applies::FromHere,
         };
         b.push(scope, row, words.span())
     }
@@ -459,6 +509,7 @@ impl RowFacts for NodeSet {
             node,
             reference,
             value,
+            holds: Applies::FromHere,
         };
         b.push(scope, row, Span::NONE)
     }

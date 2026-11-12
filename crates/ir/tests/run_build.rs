@@ -13,10 +13,10 @@ use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::tran::{StepCap, Tran};
 use spicerack_ir::{
-    AcPart, Alter, Analysis, AnalysisKind, Builder, DefKind, Design, Edge, Env, Event, ExprId,
-    IcScope, ItemKind, ItemRef, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NodeSet,
-    NodeSetKind, OptionKey, OptionRow, Print, PrintView, ProbeKind, Ref, Role, Save, ScopeId,
-    ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist,
+    AcPart, Alter, Analysis, AnalysisKind, Applies, Builder, DefKind, Design, Edge, Env, Event,
+    ExprId, IcScope, ItemKind, ItemRef, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind,
+    NodeSet, NodeSetKind, OptionKey, OptionRow, Print, PrintView, ProbeKind, Ref, Role, Save,
+    ScopeId, ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist,
 };
 
 // ---- private ----
@@ -250,7 +250,8 @@ fn state_items_hold_their_fields() {
         d.row::<Env>(en.index),
         Env {
             temp: t85,
-            tnom: t27
+            tnom: t27,
+            holds: Applies::FromHere
         }
     );
     let n: NodeSet = d.row(ic.index);
@@ -280,12 +281,35 @@ fn a_flag_with_a_value_asserts() {
 }
 
 #[test]
-#[should_panic(expected = "tnom")]
-fn env_without_tnom_asserts() {
+fn env_sets_what_it_names_from_here_by_default() {
     let (mut d, top) = deck();
     let mut b = d.builder();
     let t = b.num(27.0);
-    b.env(top, t, ExprId::NONE, Span::NONE);
+    let e = b.env(top, t, ExprId::NONE, Span::NONE);
+    let o = b.option(top, OptionKey::Klu, ExprId::NONE, Span::NONE);
+    let v = b.num(1.0);
+    let n = b.node_set(
+        top,
+        NodeSetKind::Ic,
+        IcScope::Transient,
+        &["a"],
+        v,
+        Span::NONE,
+    );
+    let row: Env = d.row(e.index);
+    assert_eq!(
+        (row.temp, row.tnom, row.holds),
+        (t, ExprId::NONE, Applies::FromHere)
+    );
+    assert_eq!(d.row::<OptionRow>(o.index).holds, Applies::FromHere);
+    assert_eq!(d.row::<NodeSet>(n.index).holds, Applies::FromHere);
+}
+
+#[test]
+#[should_panic(expected = "names temp or tnom")]
+fn env_of_neither_asserts() {
+    let (mut d, top) = deck();
+    d.builder().env(top, ExprId::NONE, ExprId::NONE, Span::NONE);
 }
 
 #[test]

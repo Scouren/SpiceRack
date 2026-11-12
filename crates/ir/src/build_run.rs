@@ -85,7 +85,7 @@ use crate::design::ItemRow;
 use crate::id::{ExprId, ItemRef, List, NameId, NameList, Ref, ScopeId};
 use crate::item::{DefKind, ScopeKind};
 use crate::measure::MeasureKind;
-use crate::option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
+use crate::option::{Applies, Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 use crate::option_key::OptionKey;
 use crate::output::{Measure, Print, PrintView, Save};
 use crate::plan::{
@@ -335,6 +335,7 @@ impl Builder<'_> {
             private: NameId::NONE,
             dialect: NameId::NONE,
             value,
+            holds: Applies::FromHere,
         };
         self.push(scope, row, span)
     }
@@ -358,6 +359,7 @@ impl Builder<'_> {
                 private,
                 dialect,
                 value,
+                holds: Applies::FromHere,
             },
             span,
         )
@@ -369,7 +371,15 @@ impl Builder<'_> {
             !temp.is_none() && !tnom.is_none(),
             "env: temp and tnom are always present"
         );
-        self.push(scope, Env { temp, tnom }, span)
+        self.push(
+            scope,
+            Env {
+                temp,
+                tnom,
+                holds: Applies::FromHere,
+            },
+            span,
+        )
     }
 
     /// An initial condition or node set on one node's voltage to ground, for every analysis
@@ -401,6 +411,7 @@ impl Builder<'_> {
             node,
             reference: List::EMPTY,
             value,
+            holds: Applies::FromHere,
         };
         self.push(scope, row, span)
     }
