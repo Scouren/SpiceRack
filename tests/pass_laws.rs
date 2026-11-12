@@ -45,7 +45,28 @@ const SIZE: Size = Size {
 
 /// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
 /// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "p1",
+        "tran_cap_ngspice_to_given",
+        "the generator makes no TranCapNgspice transient; coverage asked of ir-run",
+    ),
+    (
+        "p2",
+        "tran_cap_ngspice_to_given",
+        "the generator makes no TranCapNgspice transient; coverage asked of ir-run",
+    ),
+    (
+        "p3",
+        "tran_cap_ngspice_to_given",
+        "the generator makes no TranCapNgspice transient; coverage asked of ir-run",
+    ),
+    (
+        "p4",
+        "tran_cap_ngspice_to_given",
+        "the generator makes no TranCapNgspice transient; coverage asked of ir-run",
+    ),
+];
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);

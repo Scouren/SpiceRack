@@ -1,0 +1,7 @@
+file "a.sp" deck
+  element resistor load (a 0) value=1k
+  element vsource v1 (a 0) dc=1
+  element behav b1 (o 0) expr=(i(load) * 2) output=current
+  subckt amp (x y)
+    element resistor r1 (x y) value=1
+  element instance amp1 (a 0) model=amp

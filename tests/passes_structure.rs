@@ -44,6 +44,7 @@ const PENDING_PAIRS: &[&str] = &[
     "formal_defaults_to_instances_default",
     "splice_elaborate",
     "constant_param_to_formal",
+    "name_with_letter",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -277,6 +278,7 @@ fn drop_device_libraries_drops_only_libraries() {
 fn hoist_nested_subckts_keeps_what_every_read_binds() {
     let nested = ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt);
     let mut ran = 0;
+    let mut refused = 0;
     for seed in SEEDS {
         let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
         if !ir::features_used(&design).contains(nested) {
@@ -317,6 +319,11 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
                 "seed {seed}: every instance passes the old definition"
             );
         }
+        refused += diags
+            .rows()
+            .iter()
+            .filter(|d| d.code == ir::Code::new(b'U', 303))
+            .count();
         let still = ir::features_used(&design).contains(nested);
         assert!(
             !still || !diags.is_empty(),
@@ -324,7 +331,7 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
         );
     }
     assert!(ran > 0, "no generated design had a nested subcircuit");
-    eprintln!("hoist_nested_subckts: {ran} generated designs");
+    eprintln!("hoist_nested_subckts: {ran} generated designs, {refused} left with U0303");
 }
 
 /// R53's runs (ng-scaffold, ngspice-45, `tests/fixtures/passes/structure/
@@ -363,6 +370,61 @@ fn formal_defaults_to_instances_gives_the_values_ngspice_measured() {
         let got = ir::eval(&design, actual, &ByDefinition(&design));
         assert_eq!(got, Ok(ohms), "{case}: {formal}");
     }
+}
+
+/// A rename keeps what every by-name reference names: each use (`Design::element_uses`, in
+/// the same order before and after) names, in its scope's list, the same element; every
+/// renamed element begins with one of its letters; each element left unrenamed with its name
+/// wrong has a note; the notes' old names are the elements' names before.
+#[test]
+fn name_with_letter_keeps_what_every_reference_names() {
+    let feature = ir::Feature::Circuit(ir::CircuitExtra::NameWithoutLetter);
+    let named = |d: &ir::Design, u: ir::ElementUse| -> Option<ir::ItemRef> {
+        (!u.scope.is_none()).then_some(())?;
+        d.items(u.scope).iter().copied().find(|i| {
+            i.kind == ir::ItemKind::Element && d.row::<ir::Element>(i.index).name == u.name
+        })
+    };
+    let mut ran = 0;
+    let mut renamed = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        if !ir::features_used(&design).contains(feature) {
+            continue;
+        }
+        ran += 1;
+        let before: Vec<Option<ir::ItemRef>> = design
+            .element_uses()
+            .into_iter()
+            .map(|(_, u)| named(&design, u))
+            .collect();
+        let names: Vec<(ir::ItemRef, ir::NameId)> = elements(&design)
+            .map(|i| (i, design.row::<ir::Element>(i.index).name))
+            .collect();
+        let mut diags = ir::Diags::new();
+        passes::structure::name_with_letter::name_with_letter(&mut design, &mut diags);
+        let mut found = ir::Diags::new();
+        ir::check(&design, &mut found);
+        assert!(found.is_empty(), "seed {seed}: {:?}", found.rows());
+        let after: Vec<Option<ir::ItemRef>> = design
+            .element_uses()
+            .into_iter()
+            .map(|(_, u)| named(&design, u))
+            .collect();
+        assert_eq!(
+            after, before,
+            "seed {seed}: a reference names another element"
+        );
+        for d in diags.rows() {
+            if d.code == ir::Code::new(b'U', 311) {
+                renamed += 1;
+                let old = names.iter().find(|n| n.0 == d.item).map(|n| n.1.0);
+                assert_eq!(old, Some(d.arg), "seed {seed}: the note's old name");
+            }
+        }
+    }
+    assert!(ran > 0 && renamed > 0, "no generated element to rename");
+    eprintln!("name_with_letter: {ran} generated designs, {renamed} renames");
 }
 
 #[test]

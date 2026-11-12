@@ -19,7 +19,7 @@
 //!
 //! Contents: `pub mod constant_param_to_formal`, `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
 //! `pub mod drop_device_libraries`, `pub mod explicit_family_models`,
-//! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`,
+//! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`, `pub mod name_with_letter`,
 //! `pub mod splice_elaborate`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
@@ -31,6 +31,7 @@ pub mod drop_device_libraries;
 pub mod explicit_family_models;
 pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
+pub mod name_with_letter;
 pub mod splice_elaborate;
 
 use super::Pass;
@@ -75,7 +76,7 @@ pub(super) const PASSES: &[Pass] = &[
             hoist_nested_subckts::READS_ENCLOSING,
             hoist_nested_subckts::NOT_IN_BODY,
         ],
-        run: hoist_nested_subckts::hoist_nested_subckts,
+        run: hoist_nested_subckts::hoist_enclosing_refs,
     },
     Pass {
         name: "hoist_enclosing_refs_default",
@@ -86,7 +87,7 @@ pub(super) const PASSES: &[Pass] = &[
             hoist_nested_subckts::NOT_IN_BODY,
             hoist_nested_subckts::HOIST_DEFAULT,
         ],
-        run: hoist_nested_subckts::hoist_nested_subckts_default,
+        run: hoist_nested_subckts::hoist_enclosing_refs_default,
     },
     Pass {
         name: "constant_param_to_formal",
@@ -122,6 +123,13 @@ pub(super) const PASSES: &[Pass] = &[
             formal_defaults_to_instances::PASS_DEFAULT,
         ],
         run: formal_defaults_to_instances::formal_defaults_to_instances_default,
+    },
+    Pass {
+        name: "name_with_letter",
+        removes: ir::Feature::Circuit(ir::CircuitExtra::NameWithoutLetter),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[name_with_letter::UNRESOLVED_USE],
+        run: name_with_letter::name_with_letter,
     },
     // before `device_libraries`: the models it adds may need libraries (it adds them itself)
     Pass {
@@ -248,6 +256,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a subcircuit's local parameter an instance passes a value for",
             cite: "rewrite/AMEND-A12.md A25; R48",
             explain: "The target reads a constant parameter in a subcircuit's body as a formal an instance may override. An instance passes a value of this parameter's name, which the source ignores and the target would take, so the parameter is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        name_with_letter::RENAMED,
+        ir::Info {
+            title: "an element renamed to begin with its letter",
+            cite: "R23; rewrite/AMEND-A12.md A13, A32",
+            explain: "The target spells an element's kind by its name's first letter, and this name began with another, so the element was renamed (the letter before its name) and every reference to it follows. The note's argument is the old name: results are given back under it.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        name_with_letter::UNRESOLVED_USE,
+        ir::Info {
+            title: "an element whose name a reference reads through an unknown subcircuit",
+            cite: "R23; rewrite/AMEND-A12.md A32",
+            explain: "The element's name does not begin with its letter, but a reference reads a name like it through an instance whose subcircuit no read file defines, so renaming could leave that reference behind; the element is refused.",
             kind: ir::Kind::Note,
         },
     ),

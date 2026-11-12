@@ -47,7 +47,6 @@ pub const FROM_HERE_SAME: ir::Code = ir::Code::new(b'U', 403);
 
 /// Moves each walk's mid-run `WholeRun` items to just before its first run item.
 pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
-    let noted = diags.len();
     for (top, order) in walks(design) {
         let Some(first) = order.iter().position(|&(i, _)| is_run(i.kind)) else {
             continue;
@@ -80,10 +79,6 @@ pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
             .expect("the first run item is listed");
         items.splice(at..at, moved);
         assert!(items.len() == before, "a move keeps every item");
-    }
-    // the feature is the design's (`check_legal` reports it at no item): one note there too
-    if diags.len() > noted {
-        diags.push_at(STATE_ELSEWHERE, design, ir::ItemRef::NONE, 0);
     }
 }
 

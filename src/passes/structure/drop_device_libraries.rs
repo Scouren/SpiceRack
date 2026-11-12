@@ -12,17 +12,13 @@ use crate::ir;
 
 /// Drops every reachable device library. Adds no diagnostic.
 pub fn drop_device_libraries(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    let scopes: Vec<ir::ScopeId> = design
+    let libraries: Vec<(ir::ItemRef, ir::ScopeId)> = design
         .reachable()
         .into_iter()
         .filter(|(i, _)| i.kind == ir::ItemKind::DeviceLibrary)
-        .map(|(_, s)| s)
         .collect();
     let mut editor = design.editor();
-    for scope in scopes {
-        let items = editor.items_mut(scope);
-        let before = items.len();
-        items.retain(|i| i.kind != ir::ItemKind::DeviceLibrary);
-        assert!(items.len() <= before, "only libraries go");
+    for (item, scope) in libraries {
+        editor.remove_item(scope, item);
     }
 }

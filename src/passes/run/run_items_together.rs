@@ -33,7 +33,6 @@ enum Listed {
 
 /// Moves each file top's circuit items out from between its run items.
 pub fn run_items_together(design: &mut ir::Design, diags: &mut ir::Diags) {
-    let noted = diags.len();
     let holders = holders(design);
     let tops: Vec<ir::ScopeId> = design.files().map(|f| design.file(f).top).collect();
     for top in tops {
@@ -64,10 +63,6 @@ pub fn run_items_together(design: &mut ir::Design, diags: &mut ir::Diags) {
         let at = first.min(items.len());
         items.splice(at..at, moved);
         assert!(items.len() == before, "a move keeps every item");
-    }
-    // the feature is the design's (`check_legal` reports it at no item): one note there too
-    if diags.len() > noted {
-        diags.push_at(HOLDS_RUN_ITEMS, design, ir::ItemRef::NONE, 0);
     }
 }
 
