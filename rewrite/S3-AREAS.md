@@ -72,6 +72,11 @@ Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `dia
   `name` nearest `scope` outward (`Design::lookup`) and calls `Builder::bind_ref(item, k, def)`;
   no definition leaves it unresolved (R4). Each slot expects one kind (`map_refs` states it);
   queue that kind.
+- More of `Lower` for the areas: `lw.is_model(word)` (any `.model` of any file, folded);
+  `lw.subckt_formals(st, name) -> Option<Vec<String>>` (the folded head parameters of the
+  `.subckt name` visible from `st`'s block, else a top-level one of an earlier file);
+  `lw.measure_reads(mark)` with `mark = lw.pending()` taken before the `lw.expr` calls of a
+  `.meas … param=` (those reads bind to a measure of the name first, then to a parameter).
 - Element names (R23, AMEND-A12 §A13): the IR name is the whole folded name, letter included;
   `i(vdd)` is `I("vdd")` and every `i(<element>)` reads. The writer writes names as they are;
   `CircuitExtra::NameWithoutLetter` stays out of `FEATURES`.

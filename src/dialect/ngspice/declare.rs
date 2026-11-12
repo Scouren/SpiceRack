@@ -12,7 +12,7 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::class`
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::formals`, `Declared::class`
 
 use std::collections::HashMap;
 
@@ -33,6 +33,8 @@ pub(super) struct Declared {
     parent: HashMap<u32, u32>,
     /// `(block, Param | Func, folded name)` → its class.
     classes: HashMap<(u32, Def, String), Class>,
+    /// `(block, folded subcircuit name)` → its head parameters, folded (the first definition).
+    formals: HashMap<(u32, String), Vec<String>>,
 }
 
 /// How much of a run an expression reads (R14), ordered.
@@ -106,6 +108,14 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
                     };
                     if let Some(name) = read_structure::def_name(ast, toks, s) {
                         put(def, &name, 0, false);
+                        if def == Def::Subckt {
+                            let heads = assigns(ast, toks, s)
+                                .into_iter()
+                                .map(|(k, _)| name::key(&k));
+                            d.formals
+                                .entry((block, name::key(&name)))
+                                .or_insert_with(|| heads.collect());
+                        }
                     }
                     d.parent.insert(s.0, block);
                     stack.push(s);
@@ -133,6 +143,22 @@ impl Declared {
     pub(super) fn wins(&self, block: Node, def: Def, name: &str, node: Node, k: usize) -> bool {
         let key = (block.0, def, name::key(name));
         self.winners.get(&key) == Some(&(node.0, k))
+    }
+
+    /// The head parameter names (folded) of the `.subckt name` visible from `block`: the nearest
+    /// block outward that defines it; `None` when this file has none there.
+    pub(super) fn formals(&self, block: Node, name: &str) -> Option<&[String]> {
+        let key = name::key(name);
+        let mut at = Some(block.0);
+        // Bounded by the nesting: each step moves to an enclosing block.
+        for _ in 0..=self.parent.len() {
+            let b = at?;
+            if let Some(f) = self.formals.get(&(b, key.clone())) {
+                return Some(f);
+            }
+            at = self.parent.get(&b).copied();
+        }
+        None
     }
 
     /// The class of `text` read in `block`, `formals` shadowing the definitions they name.

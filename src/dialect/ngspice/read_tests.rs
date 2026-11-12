@@ -462,3 +462,45 @@ fn a_model_name_is_known_from_any_file_before_lowering() {
     assert_eq!(got, ["nch", "pch"]);
     let _ = read(&src);
 }
+
+#[test]
+fn a_read_in_a_measure_binds_to_a_measure_before_a_parameter() {
+    // ngspice-45 measure.c do_measure: every other measure runs first and enters its result with
+    // nupa_add_param, so inside `.meas ... param=` a measure hides a `.param` of its name; outside
+    // one the `.param` is read.
+    let mut d = ir::Design::new();
+    let mut b = d.builder();
+    let (_, top) = b.file("d.sp", ir::Role::Deck);
+    let one = b.num(1.0);
+    let p = b.param(top, "x", one, ir::Span::NONE);
+    let c = b.comment(top, "stands in for a measure item", ir::Span::NONE);
+    let x = b.name("x");
+    let m = b.define(ir::DefKind::Measure, x, top, c);
+    let inside = b.param_ref("x");
+    let outside = b.param_ref("x");
+    let pending = [(inside, top), (outside, top)];
+    super::read::bind_reads(&mut b, &pending, &[(0, 1)]);
+    let def = |e| match b.design().expr(e) {
+        ir::Expr::Param(r) => r.def,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(def(inside), m);
+    assert_eq!(b.design().def(def(outside)).item, p);
+}
+
+#[test]
+fn a_subckts_formals_are_known_from_any_enclosing_block() {
+    // inpcom.c found_mult_param: an X line's m= is the multiplier unless the subcircuit declares
+    // m; the declare step answers for a .subckt defined anywhere in the enclosing blocks.
+    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
+    let text = "t\n.subckt outer a\n.subckt inner b params: M=1 w=2\n.ends\n.ends\n.subckt top c m=3\n.ends\n";
+    let toks = crate::syntax::tokenize(text, lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    let d = super::declare::declare(&ast, &toks);
+    let root = ast.root();
+    assert_eq!(d.formals(root, "TOP"), Some(&["m".to_string()][..]));
+    assert_eq!(d.formals(root, "inner"), None, "inner is outer's");
+    let outer = crate::syntax::ast::Node(ast.fields(root)[1]);
+    let want = ["m".to_string(), "w".to_string()];
+    assert_eq!(d.formals(outer, "inner"), Some(&want[..]));
+}
