@@ -10,22 +10,23 @@
 //! Contents: `pub fn sqrt_abs_to_sqrt(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn sqrt_abs_to_sqrt_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::nodes::form;
+use super::BOTH_FORMS;
+use super::nodes::{form, func_form, note_left};
 use crate::ir;
 
 /// Rewrites `SqrtAbs` in every root of the plain form.
-pub fn sqrt_abs_to_sqrt(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, false);
+pub fn sqrt_abs_to_sqrt(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, false);
 }
 
 /// The same in every root of the dynamic form.
-pub fn sqrt_abs_to_sqrt_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, true);
+pub fn sqrt_abs_to_sqrt_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, true);
 }
 
 // ---- private ----
 
-fn run(design: &mut ir::Design, dynamic: bool) {
+fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         let ir::Expr::Call(ir::Func::SqrtAbs, args) = b.design().expr(e) else {
             return None;
@@ -34,4 +35,10 @@ fn run(design: &mut ir::Design, dynamic: bool) {
         let abs = b.call(ir::Func::Abs, &[x]);
         Some(b.call(ir::Func::Sqrt, &[abs]))
     });
+    note_left(
+        design,
+        diags,
+        func_form(ir::Func::SqrtAbs, dynamic),
+        BOTH_FORMS,
+    );
 }

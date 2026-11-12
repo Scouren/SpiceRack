@@ -4,7 +4,7 @@
 //! both are `|x|.powf(y)` with the one domain error at `x == 0, y < 0`; `x` and `y` are each
 //! evaluated once, in the same order, so a draw is neither duplicated nor reordered. Bit for
 //! bit equal on finite operands (R12: a non-finite operand is outside every function's domain:
-//! `abs` refuses it where `pow_abs` would not see it). It refuses nothing.
+//! `abs` refuses it where `pow_abs` would not see it). It refuses nothing but a function body its callers read in both forms (A28), which no one-form row rewrites: note `U0112`.
 //!
 //! `powabs_to_pow` removes `Func(PowAbs)` and requires `Func(Abs)`, `Func(Pow)`;
 //! `powabs_to_pow_dyn` removes `FuncDyn(PowAbs)` and requires their dynamic forms.
@@ -15,18 +15,32 @@
 //! Contents: `pub fn powabs_to_pow(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn powabs_to_pow_dyn(&mut ir::Design, &mut ir::Diags)`
 
+use super::BOTH_FORMS;
+use super::nodes::note_left;
 use crate::ir;
 
 /// Rewrites `pow_abs(x, y)` as `pow(abs(x), y)` in every root that does not read the circuit.
-pub fn powabs_to_pow(design: &mut ir::Design, _diags: &mut ir::Diags) {
+pub fn powabs_to_pow(design: &mut ir::Design, diags: &mut ir::Diags) {
     ir::rewrite_exprs_in(design, ir::Form::Static, &mut rule);
+    note_left(
+        design,
+        diags,
+        ir::Feature::Func(ir::Func::PowAbs),
+        BOTH_FORMS,
+    );
 }
 
 /// Rewrites `pow_abs(x, y)` as `pow(abs(x), y)` in every root of the dynamic form: one that
 /// reads the circuit or the temperature, or stands in a circuit field (a behavioural source, a
 /// function body).
-pub fn powabs_to_pow_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
+pub fn powabs_to_pow_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
     ir::rewrite_exprs_in(design, ir::Form::Dynamic, &mut rule);
+    note_left(
+        design,
+        diags,
+        ir::Feature::FuncDyn(ir::Func::PowAbs),
+        BOTH_FORMS,
+    );
 }
 
 // ---- private ----

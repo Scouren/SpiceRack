@@ -12,6 +12,7 @@
 //! `pub(super) fn instance(&ir::Design, ir::ItemRef) -> Option<(ir::ItemRef, ir::ParamList)>`,
 //! `pub(super) fn live(&ir::Design) -> Vec<ir::ExprId>`, `pub(super) fn reads_tags(&ir::Design) -> bool`,
 //! `pub(super) fn note_left(&ir::Design, &mut ir::Diags, ir::Feature, ir::Code)`,
+//! `pub(super) fn both_forms(&ir::Design, ir::ItemRef) -> bool`,
 //! `pub(super) fn carrying(&ir::Design, ir::Feature) -> Vec<ir::ItemRef>`,
 //! `pub(super) fn samples(&ir::Design) -> bool`,
 //! `pub(super) fn leaf_literal(&ir::Design, ir::ExprId) -> Option<ir::Literal>`,
@@ -19,6 +20,7 @@
 //! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`,
 //! `pub(super) fn form(bool) -> ir::Form`
 
+use super::BOTH_FORMS;
 use crate::ir;
 
 /// Which definitions' values may hold a draw (a parameter whose value, or a function whose
@@ -210,7 +212,8 @@ pub(super) fn reads_tags(design: &ir::Design) -> bool {
         .any(|e| matches!(design.expr(e), ir::Expr::Binary(ir::BinOp::DivTyped, ..)))
 }
 
-/// Puts `code` at every item that still carries `feature` (`ir::check_legal`'s items, the
+/// Puts `code` (`U0112` at a function body read in both forms) at every item that still
+/// carries `feature` (`ir::check_legal`'s items, the
 /// ones `legalize` will refuse), with the feature's index as its argument.
 pub(super) fn note_left(
     design: &ir::Design,
@@ -219,9 +222,34 @@ pub(super) fn note_left(
     code: ir::Code,
 ) {
     let index = u32::from(feature.index());
+    // only a function's or operator's feature has a form (A26)
+    let split = matches!(
+        feature,
+        ir::Feature::Func(_)
+            | ir::Feature::FuncDyn(_)
+            | ir::Feature::Binary(_)
+            | ir::Feature::BinaryDyn(_)
+            | ir::Feature::Unary(_)
+            | ir::Feature::UnaryDyn(_)
+    );
     for item in carrying(design, feature) {
+        let code = if split && both_forms(design, item) {
+            BOTH_FORMS
+        } else {
+            code
+        };
         diags.push_at(code, design, item, index);
     }
+}
+
+/// Whether `item` is a function whose body its callers read in both forms (A28): no one-form
+/// row rewrites it, whatever the rule.
+pub(super) fn both_forms(design: &ir::Design, item: ir::ItemRef) -> bool {
+    if item.kind != ir::ItemKind::Func {
+        return false;
+    }
+    let body = design.row::<ir::item::Func>(item.index).body;
+    ir::root_form(design, body, ir::ExprUse::Circuit) == ir::Form::Both
 }
 
 /// The items that carry `feature` (`ir::check_legal` against every feature but it), in its

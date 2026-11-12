@@ -1,5 +1,5 @@
 file "d.sp" deck
   param a = 3i
   param s = a / 2i
-  element behav b1 (n 0) expr=(v(n) /: a)
-  func f(x) = 1 * x /: 2i
+  element behav b1 (n 0) expr=(v(n) /: a + @f(v(n)))
+  func f(x) = x /: 2i

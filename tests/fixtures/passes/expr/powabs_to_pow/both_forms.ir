@@ -1,0 +1,4 @@
+file "p.sp" deck
+  param q = @f(2)
+  element behav b1 (n 0) expr=(@f(v(n)))
+  func f(x) = pow_abs(x, 3)

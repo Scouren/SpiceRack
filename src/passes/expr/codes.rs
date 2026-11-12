@@ -1,7 +1,7 @@
 //! The expression group's diagnostic codes (`U0100..=U0199`) and their catalogue rows: the
 //! notes its passes put at an item they leave carrying a feature.
 //!
-//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`
+//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const BOTH_FORMS`
 
 use crate::ir;
 
@@ -25,6 +25,8 @@ pub(crate) const PLAIN_RUN_NOMINAL: ir::Code = ir::Code::new(b'U', 109);
 pub(crate) const DRAW_SAMPLES: ir::Code = ir::Code::new(b'U', 110);
 /// A literal's digits past a double's precision were rounded.
 pub(crate) const DIGITS_ROUNDED: ir::Code = ir::Code::new(b'U', 111);
+/// A function body its callers read in both forms.
+pub(crate) const BOTH_FORMS: ir::Code = ir::Code::new(b'U', 112);
 
 /// The group's catalogue rows (`U0100..=U0199`).
 pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
@@ -115,6 +117,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a literal's digits past a double's precision were written as the shortest decimal of its double",
             cite: "rewrite/RULINGS.md R37; rewrite/AMEND-A12.md A18",
             explain: "The source wrote more significant digits than the target keeps; the literal is written as the shortest decimal that reads back as the correctly rounded double of the digits. A simulator whose own conversion of the long digits is not correctly rounded (ngspice's INPevaluate) may have computed a double a few ulp away from it.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        BOTH_FORMS,
+        ir::Info {
+            title: "a function body its callers read in both forms",
+            cite: "rewrite/AMEND-A12.md A28; rewrite/RULINGS.md R51",
+            explain: "The body of a user function counts in the forms of the expressions that call it; this one is called from a constant expression and from one that reads the circuit or the temperature. A rule that converts one form cannot rewrite it without changing the other's spelling. Inlining the function (inline_funcs) gives each caller its own copy; without it, the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

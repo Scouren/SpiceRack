@@ -13,24 +13,25 @@
 //! Contents: `pub fn div_to_div_typed(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn div_to_div_typed_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::nodes::form;
+use super::BOTH_FORMS;
 use super::nodes::plain;
+use super::nodes::{binary_form, form, note_left};
 use super::tags::{REAL, Tags};
 use crate::ir;
 
 /// Rewrites `Div` as a typed division that stays real, in every root of the plain form.
-pub fn div_to_div_typed(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, false);
+pub fn div_to_div_typed(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, false);
 }
 
 /// The same in every root of the dynamic form.
-pub fn div_to_div_typed_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, true);
+pub fn div_to_div_typed_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, true);
 }
 
 // ---- private ----
 
-fn run(design: &mut ir::Design, dynamic: bool) {
+fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let mut tags = Tags::new(design);
     ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         tags.of(b.design(), e);
@@ -51,4 +52,10 @@ fn run(design: &mut ir::Design, dynamic: bool) {
         }
         Some(q)
     });
+    note_left(
+        design,
+        diags,
+        binary_form(ir::BinOp::Div, dynamic),
+        BOTH_FORMS,
+    );
 }

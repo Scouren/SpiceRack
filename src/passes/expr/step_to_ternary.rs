@@ -8,23 +8,24 @@
 //! Contents: `pub fn step_to_ternary(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn step_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::nodes::form;
+use super::BOTH_FORMS;
 use super::nodes::plain;
+use super::nodes::{form, func_form, note_left};
 use crate::ir;
 
 /// Rewrites `Step` in every root of the plain form.
-pub fn step_to_ternary(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, false);
+pub fn step_to_ternary(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, false);
 }
 
 /// The same in every root of the dynamic form.
-pub fn step_to_ternary_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, true);
+pub fn step_to_ternary_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, true);
 }
 
 // ---- private ----
 
-fn run(design: &mut ir::Design, dynamic: bool) {
+fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         let ir::Expr::Call(ir::Func::Step, args) = b.design().expr(e) else {
             return None;
@@ -34,4 +35,10 @@ fn run(design: &mut ir::Design, dynamic: bool) {
         let above = b.binary(ir::BinOp::Gt, x, zero);
         Some(b.ternary(above, one, zero))
     });
+    note_left(
+        design,
+        diags,
+        func_form(ir::Func::Step, dynamic),
+        BOTH_FORMS,
+    );
 }

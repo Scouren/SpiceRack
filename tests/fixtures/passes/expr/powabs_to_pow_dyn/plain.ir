@@ -3,5 +3,5 @@ file "p.sp" deck
   param t = pow_abs($temp, 2)
   param u = pow_abs(t, 2)
   param s = pow_abs(a, 2)
-  element behav b1 (n 0) expr=(pow_abs(v(n), a))
+  element behav b1 (n 0) expr=(pow_abs(v(n), a) + @f(v(n)))
   func f(x) = pow_abs(x, 3)

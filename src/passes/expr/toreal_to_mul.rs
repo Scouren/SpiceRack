@@ -10,24 +10,25 @@
 //! Contents: `pub fn toreal_to_mul(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn toreal_to_mul_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::nodes::form;
+use super::BOTH_FORMS;
 use super::nodes::plain;
+use super::nodes::{form, func_form, note_left};
 use super::tags::{REAL, Tags};
 use crate::ir;
 
 /// Rewrites `ToReal` in every root of the plain form.
-pub fn toreal_to_mul(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, false);
+pub fn toreal_to_mul(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, false);
 }
 
 /// The same in every root of the dynamic form.
-pub fn toreal_to_mul_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    run(design, true);
+pub fn toreal_to_mul_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
+    run(design, diags, true);
 }
 
 // ---- private ----
 
-fn run(design: &mut ir::Design, dynamic: bool) {
+fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let mut tags = Tags::new(design);
     ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         tags.of(b.design(), e);
@@ -43,4 +44,10 @@ fn run(design: &mut ir::Design, dynamic: bool) {
         tags.of(b.design(), m);
         Some(m)
     });
+    note_left(
+        design,
+        diags,
+        func_form(ir::Func::ToReal, dynamic),
+        BOTH_FORMS,
+    );
 }
