@@ -24,7 +24,8 @@ mod tests {
     use spicerack_ir::diag::violation_code;
     use spicerack_ir::passive::{Coupling, IcMode, Passive};
     use spicerack_ir::semi::{InitialState, Switch};
-    use spicerack_ir::wave::{Pwl, PwlJoin, PwlRepeat};
+    use spicerack_ir::source::DcRule;
+    use spicerack_ir::wave::{PulseLaw, Pwl, PwlJoin, PwlRepeat};
     use spicerack_ir::{
         Builder, Code, DefId, Design, Diags, ElemKind, Element, ExprId, List, ModelFamily, NO_ROW,
         NameId, Polarity, Ref, ScopeId, Span, Violation, WaveRef, check,
@@ -49,7 +50,7 @@ mod tests {
         master: Option<&str>,
         detail: u32,
     ) {
-        let name = b.name("e1");
+        let name = unique(b, top);
         let terminals = b.names(terms);
         let model = Ref {
             name: master.map_or(NameId::NONE, |m| b.name(m)),
@@ -65,6 +66,53 @@ mod tests {
             detail,
         };
         b.push(top, row, Span::NONE);
+    }
+
+    /// Pushes a model of `family` named `name` and returns a reference bound to it.
+    fn bound(b: &mut Builder<'_>, top: ScopeId, name: &str, family: ModelFamily) -> Ref {
+        let n = b.name(name);
+        let polarity = if family == ModelFamily::Bsim4 {
+            Polarity::N
+        } else {
+            Polarity::None
+        };
+        b.model(top, model(n, family, polarity), Span::NONE);
+        let def = DefId(b.design().definitions().len() as u32 - 1);
+        Ref { name: n, def }
+    }
+
+    /// An element of `kind` whose master is `master`, with a valid detail row.
+    fn with_master(b: &mut Builder<'_>, top: ScopeId, kind: ElemKind, master: Ref) {
+        let one = n(b, 1);
+        let (terms, detail): (&[&str], u32) = match kind {
+            ElemKind::VSource => (&["a", "0"], b.detail(source(one))),
+            _ => (
+                &["a", "b"],
+                b.detail(Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                }),
+            ),
+        };
+        let name = unique(b, top);
+        let terminals = b.names(terms);
+        let row = Element {
+            kind,
+            name,
+            terminals,
+            model: master,
+            params: List::EMPTY,
+            mult: ExprId::NONE,
+            detail,
+        };
+        b.push(top, row, Span::NONE);
+    }
+
+    /// A name no element of `top` has yet: `e` and the scope's item count (A13: names are unique
+    /// in a scope).
+    fn unique(b: &mut Builder<'_>, top: ScopeId) -> spicerack_ir::NameId {
+        let k = b.design().items(top).len();
+        b.name(&format!("e{k}"))
     }
 
     fn only(v: Violation) -> Vec<Code> {
@@ -106,6 +154,13 @@ mod tests {
             );
             push(b, top, ElemKind::Instance, &["a"], Some("sub"), NO_ROW);
             push(b, top, ElemKind::Unresolved, &[], Some("kit_cell"), NO_ROW);
+            let wave = b.wave(pulse(one));
+            let w = b.detail(spicerack_ir::source::Source {
+                wave,
+                dc_rule: DcRule::WaveAtZero,
+                ..source(ExprId::NONE)
+            });
+            push(b, top, ElemKind::VSource, &["a", "0"], None, w);
             let name = b.name("nch");
             b.push(
                 top,
@@ -171,15 +226,15 @@ mod tests {
     #[test]
     fn every_field_domain_rule_is_reported_alone() {
         type Case = fn(&mut Builder<'_>, ScopeId);
-        let cases: [(&str, Case); 26] = [
+        let cases: [(&str, Case); 33] = [
             ("diode without a model", |b, top| {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
             }),
-            ("source naming a model", |b, top| {
+            ("behavioural source naming a model", |b, top| {
                 let one = n(b, 1);
-                let v = b.detail(source(one));
-                push(b, top, ElemKind::VSource, &["a", "0"], Some("vm"), v);
+                let v = b.detail(behav(one, spicerack_ir::controlled::OutKind::Voltage));
+                push(b, top, ElemKind::Behav, &["a", "0"], Some("bm"), v);
             }),
             ("unresolved master bound", |b, top| {
                 b.subckt(top, "sub", &[], &[], Span::NONE);
@@ -423,9 +478,119 @@ mod tests {
                     Span::NONE,
                 );
             }),
+            ("wave-at-zero rule with a dc", |b, top| {
+                let one = n(b, 1);
+                let wave = b.wave(pulse(one));
+                let v = b.detail(spicerack_ir::source::Source {
+                    wave,
+                    dc_rule: DcRule::WaveAtZero,
+                    ..source(one)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            }),
+            ("wave-at-zero rule without a wave", |b, top| {
+                let v = b.detail(spicerack_ir::source::Source {
+                    dc_rule: DcRule::WaveAtZero,
+                    ..source(ExprId::NONE)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            }),
+            ("vacask pulse with a zero rise", |b, top| {
+                let one = n(b, 1);
+                let zero = n(b, 0);
+                let wave = b.wave(spicerack_ir::wave::Pulse {
+                    rise: zero,
+                    law: PulseLaw::Vacask,
+                    ..pulse(one)
+                });
+                let v = b.detail(spicerack_ir::source::Source {
+                    wave,
+                    ..source(one)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            }),
+            ("voltage source bound to a transistor model", |b, top| {
+                let m = bound(b, top, "nch", ModelFamily::Bsim4);
+                with_master(b, top, ElemKind::VSource, m);
+            }),
+            ("resistor bound to a builtin source model", |b, top| {
+                let m = bound(b, top, "v", ModelFamily::SourceV);
+                with_master(b, top, ElemKind::Resistor, m);
+            }),
+            ("builtin model with parameters", |b, top| {
+                let name = b.name("v");
+                let one = n(b, 1);
+                let params = b.params(&[("dc", one)]);
+                b.push(
+                    top,
+                    spicerack_ir::Model {
+                        params,
+                        ..model(name, ModelFamily::SourceV, Polarity::None)
+                    },
+                    Span::NONE,
+                );
+            }),
+            ("builtin model with a polarity", |b, top| {
+                let name = b.name("v");
+                b.push(
+                    top,
+                    model(name, ModelFamily::SourceV, Polarity::N),
+                    Span::NONE,
+                );
+            }),
         ];
         for (what, case) in cases {
             assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
         }
+    }
+
+    /// An element of `kind` named `name` in `scope`, with a valid detail row.
+    fn named(b: &mut Builder<'_>, scope: ScopeId, kind: ElemKind, name: &str) {
+        let one = n(b, 1);
+        let detail = match kind {
+            ElemKind::VSource => b.detail(source(one)),
+            _ => b.detail(Passive {
+                value: one,
+                ..Passive::PLAIN
+            }),
+        };
+        let name = b.name(name);
+        let terminals = b.names(&["a", "0"]);
+        let row = Element {
+            kind,
+            name,
+            terminals,
+            model: Ref {
+                name: NameId::NONE,
+                def: DefId::NONE,
+            },
+            params: List::EMPTY,
+            mult: ExprId::NONE,
+            detail,
+        };
+        b.push(scope, row, Span::NONE);
+    }
+
+    #[test]
+    fn two_elements_of_one_name_in_one_scope_across_kinds() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        named(&mut b, top, ElemKind::Resistor, "x1");
+        named(&mut b, top, ElemKind::VSource, "x1");
+        let mut diags = Diags::new();
+        check(&d, &mut diags);
+        assert_eq!(codes(&diags), only(Violation::DuplicateElement));
+        assert_eq!(diags.rows()[0].arg, 1, "the second element's row");
+    }
+
+    #[test]
+    fn one_name_in_two_scopes_is_legal() {
+        let got = checked(|b, top| {
+            named(b, top, ElemKind::Resistor, "x1");
+            let (_, body) = b.subckt(top, "sub", &[], &[], Span::NONE);
+            named(b, body, ElemKind::VSource, "x1");
+        });
+        assert_eq!(got, Vec::<Code>::new());
     }
 }

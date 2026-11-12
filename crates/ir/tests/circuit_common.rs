@@ -14,8 +14,8 @@ use spicerack_ir::controlled::Behav;
 use spicerack_ir::line::Line;
 use spicerack_ir::passive::IcMode;
 use spicerack_ir::semi::{InitialState, Semi};
-use spicerack_ir::source::{PortSpec, Source};
-use spicerack_ir::wave::{PreDelay, Pulse, Sin};
+use spicerack_ir::source::{DcRule, PortSpec, Source};
+use spicerack_ir::wave::{PreDelay, Pulse, PulseLaw, Sin};
 use spicerack_ir::{
     Builder, Code, Design, Diags, ExprId, Feature, FeatureSet, List, Literal, Model, ModelFamily,
     NO_ROW, NameId, NumForm, Polarity, Ref, Role, ScopeId, WaveRef,
@@ -61,6 +61,7 @@ pub fn source(dc: ExprId) -> Source {
         parasitics: NO_ROW,
         port: NO_ROW,
         distof: NO_ROW,
+        dc_rule: DcRule::Given,
     }
 }
 
@@ -86,6 +87,7 @@ pub fn pulse(v: ExprId) -> Pulse {
         width: v,
         period: v,
         cycles: ExprId::NONE,
+        law: PulseLaw::Spice,
     }
 }
 

@@ -398,6 +398,7 @@ pub(crate) fn item_features(
         | ItemKind::Param
         | ItemKind::Func
         | ItemKind::Model
+        | ItemKind::DeviceLibrary
         | ItemKind::Statistics
         | ItemKind::Element
         | ItemKind::Analysis

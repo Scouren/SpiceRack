@@ -3,15 +3,16 @@
 //! `Extra` beside a legal neighbour that does not set it, `check_legal`'s refusals, and the
 //! kernel's code table.
 //!
-//! Oracles: the inverse (`from_index(index(f)) == f` for all 496); spec examples (the expected
+//! Oracles: the inverse (`from_index(index(f)) == f` for every index); spec examples (the expected
 //! feature sets are written out in each test); a legal neighbour per `Extra`.
 //!
 //! Contents: none (tests only).
 
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
-    BinOp, Code, Design, Diags, Dist, DrawPer, DrawWhen, ExprTag, Extra, Feature, FeatureSet, Func,
-    ItemKind, Kind, LoadKind, OpaqueClass, Role, Span, UnOp, Violation, check_legal, features_used,
+    AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
+    ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass, OptionKey,
+    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -33,7 +34,26 @@ fn set(fs: &[Feature]) -> FeatureSet {
 
 #[test]
 fn index_and_from_index_are_inverses() {
-    assert_eq!(Feature::COUNT, 509); // A11: +6; A12 K1: +5; A12 K2: EnclosingRef, FormalReadsParam
+    // the count follows the enums it is built from: a member added to any of them moves it,
+    // and no hand edit here is needed (the inverse below shows each index is one feature)
+    let groups = [
+        ItemKind::ALL.len(),
+        ElemKind::ALL.len(),
+        WaveKind::ALL.len(),
+        AnalysisKind::ALL.len(),
+        ExprTag::ALL.len(),
+        2 * Func::ALL.len(),
+        2 * BinOp::ALL.len(),
+        2 * UnOp::ALL.len(),
+        Dist::ALL.len(),
+        DrawWhen::ALL.len(),
+        DrawPer::ALL.len(),
+        Extra::ALL.len(),
+        CircuitExtra::ALL.len(),
+        RunExtra::ALL.len(),
+        OptionKey::ALL.len(),
+    ];
+    assert_eq!(Feature::COUNT as usize, groups.iter().sum::<usize>());
     let mut seen = vec![false; Feature::COUNT as usize];
     for i in 0..Feature::COUNT {
         let f = Feature::from_index(i);
@@ -41,7 +61,10 @@ fn index_and_from_index_are_inverses() {
         assert!(!std::mem::replace(&mut seen[i as usize], true));
     }
     assert_eq!(Feature::Item(ItemKind::Title).index(), 0);
-    assert_eq!(Feature::Item(ItemKind::Measure).index(), 22);
+    assert_eq!(
+        Feature::Item(ItemKind::Measure).index(),
+        ItemKind::Measure as u16
+    );
     // the groups in declaration order: the last feature is the last option key
     let last = Feature::from_index(Feature::COUNT - 1);
     assert!(matches!(last, Feature::Option(_)), "{last:?}");
