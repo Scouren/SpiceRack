@@ -309,6 +309,11 @@ on a design with no other violation (the class table reads definitions through t
 The generator writes one-line titles and comments, and a tree under `Reads::Constant` reads no
 `Circuit`-class definition.
 
+**A15 K4 (2026-11-12): literal equality (R28).** `Design::eq_meaning` compares two real
+literals by exact value whatever their forms (`1k` = `1e3` = `1000` = `1000.0`); an `Int` literal
+equals only an `Int` of the same value. `Design::eq_ignoring_spans` stays exact: forms are
+compared. Both were already so; `kernel_literal` pins it.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
