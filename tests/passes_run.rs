@@ -19,6 +19,8 @@ mod loops;
 mod names;
 #[path = "passes_run/params.rs"]
 mod params;
+#[path = "passes_run/print_step.rs"]
+mod print_step;
 #[path = "passes_run/state.rs"]
 mod state;
 #[path = "passes_run/walk.rs"]
@@ -54,6 +56,7 @@ const PENDING_PAIRS: &[&str] = &[
     "analysis_name_given",
     "dc_axis_name_given",
     "loop_name_given",
+    "tran_print_step_to_simulator",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
 ];

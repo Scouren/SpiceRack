@@ -136,6 +136,13 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ("hoist_enclosing_refs", HOIST_SET),
     ("hoist_enclosing_refs_default", HOIST_SET),
     (
+        "tran_print_step_to_simulator",
+        ir::FeatureSet::ALL
+            .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Expr(ir::ExprTag::TStep)))
+            .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranCapNgspice)))
+            .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranSegments))),
+    ),
+    (
         "tran_cap_ngspice_to_given",
         ir::FeatureSet::EMPTY
             .with(ir::Feature::Item(ir::ItemKind::Title))
