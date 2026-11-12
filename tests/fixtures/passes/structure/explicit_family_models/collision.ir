@@ -1,0 +1,5 @@
+file "a.sp" deck
+  param resistor = 1
+  model Resistor_1 resistor params=(r=5)
+  device_library resistor
+  element resistor r1 (a 0) value=resistor

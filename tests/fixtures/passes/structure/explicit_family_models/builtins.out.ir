@@ -1,0 +1,14 @@
+file "a.sp" deck
+  device_library inductor
+  device_library tline_ideal
+  model inductor inductor
+  model mutual mutual
+  model cccs cccs
+  model source_v source_v
+  model tline_ideal tline_ideal
+  element inductor l1 (a 0) model=inductor value=1u
+  element inductor l2 (b 0) model=inductor value=1u
+  element coupling k1 () model=mutual inductors=(l1 l2) k=0.5
+  element cccs f1 (o 0) model=cccs gain=2 sense=v1
+  element vsource v1 (a 0) model=source_v dc=0
+  element lossless_line t1 (a 0 b 0) model=tline_ideal z0=50 td=1n

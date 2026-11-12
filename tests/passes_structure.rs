@@ -1,0 +1,280 @@
+//! The meaning of the structure passes (`src/passes/structure/`), on the IR alone, until the
+//! trunk's pair decks prove them on the simulators (`PENDING_PAIRS`).
+//!
+//! Oracles, never the passes' own arithmetic: the IR's own doors over generated designs
+//! (`ir::r#gen::generate`): every reference an item held before the pass binds the same
+//! definition after it (`Design::item_refs`); an element bound to a model keeps it; an element
+//! a pass binds names a parameterless model and `ir::check` accepts the binding (it refuses a
+//! source naming anything but its builtin); the IR's `ModelWithoutLibrary` decides which
+//! families need a library (`features_used`), and `legalize` for a target without the features
+//! leaves nothing to refuse.
+//!
+//! Contents: tests only.
+
+use std::path::Path;
+
+use spicerack::ir;
+use spicerack::ir::r#gen::{Size, generate};
+use spicerack::passes;
+
+/// The structure passes whose simulator proof (a pair deck naming it in `proves =`,
+/// `rewrite/SPINE.md` §8a) is still to come: compared by name with the decks, both ways.
+const PENDING_PAIRS: &[&str] = &["deck_title", "explicit_family_models", "device_libraries"];
+
+const SEEDS: std::ops::Range<u64> = 0..96;
+
+const SIZE: Size = Size {
+    items: 48,
+    scope_depth: 3,
+    expr_depth: 4,
+    files: 3,
+};
+
+// ---- private ----
+
+#[test]
+fn explicit_family_models_keeps_every_reference_and_binds_only_the_bare() {
+    let without = feature(ir::CircuitExtra::ElementWithoutModel);
+    let mut ran = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        if !ir::features_used(&design).contains(without) {
+            continue;
+        }
+        ran += 1;
+        let before = refs(&design);
+        let bare: Vec<ir::ItemRef> = elements(&design)
+            .filter(|&i| design.row::<ir::Element>(i.index).model.name == ir::NameId::NONE)
+            .collect();
+        let had_library_gap =
+            ir::features_used(&design).contains(feature(ir::CircuitExtra::ModelWithoutLibrary));
+        let mut diags = ir::Diags::new();
+        passes::structure::explicit_family_models::explicit_family_models(&mut design, &mut diags);
+        let mut found = ir::Diags::new();
+        ir::check(&design, &mut found);
+        assert!(found.is_empty(), "seed {seed}: {:?}", found.rows());
+        for (item, refs_before) in &before {
+            let mut after = Vec::new();
+            design.item_refs(*item, &mut after);
+            if !bare.contains(item) {
+                assert_eq!(&after, refs_before, "seed {seed}: {item:?} rebound");
+                continue;
+            }
+            let e = design.row::<ir::Element>(item.index);
+            if e.model.name == ir::NameId::NONE {
+                let noted = diags.rows().iter().any(|d| d.item == *item);
+                assert!(noted, "seed {seed}: {item:?} left bare with no note");
+                continue;
+            }
+            let def = design.def(e.model.def);
+            assert_eq!(def.kind, ir::DefKind::Model, "seed {seed}");
+            let m = design.row::<ir::Model>(def.item.index);
+            assert!(m.params.is_empty(), "seed {seed}: a parameterless model");
+            assert_eq!(m.polarity, ir::Polarity::None, "seed {seed}");
+            assert_eq!(
+                design.lookup(def.scope, ir::DefKind::Model, e.model.name),
+                e.model.def,
+                "seed {seed}: the binding is the lexical one"
+            );
+        }
+        let gap =
+            ir::features_used(&design).contains(feature(ir::CircuitExtra::ModelWithoutLibrary));
+        assert!(
+            !gap || had_library_gap,
+            "seed {seed}: it left a model without a library"
+        );
+    }
+    assert!(ran > 0, "no generated design had a model-less element");
+    eprintln!("explicit_family_models: {ran} generated designs");
+}
+
+#[test]
+fn device_libraries_keeps_every_item_and_reference() {
+    let gap = feature(ir::CircuitExtra::ModelWithoutLibrary);
+    let mut ran = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        if !ir::features_used(&design).contains(gap) {
+            continue;
+        }
+        ran += 1;
+        let before = refs(&design);
+        let mut diags = ir::Diags::new();
+        passes::structure::device_libraries::device_libraries(&mut design, &mut diags);
+        assert!(diags.is_empty(), "seed {seed}: no note");
+        assert!(!ir::features_used(&design).contains(gap), "seed {seed}");
+        let after: Vec<(ir::ItemRef, Vec<(ir::Ref, ir::DefKind)>)> = refs(&design)
+            .into_iter()
+            .filter(|(i, _)| !added_library(&before, *i))
+            .collect();
+        assert_eq!(after, before, "seed {seed}: an item or reference moved");
+    }
+    assert!(ran > 0, "no generated design had a model without a library");
+    eprintln!("device_libraries: {ran} generated designs");
+}
+
+/// The group's copy of the IR's library-free table, pinned to the IR's own feature: for one
+/// model of each family, the pass adds a library exactly when the IR says one is missing.
+#[test]
+fn device_libraries_adds_a_library_exactly_for_the_families_the_ir_says_lack_one() {
+    for family in ir::ModelFamily::ALL {
+        let mut design = ir::Design::new();
+        {
+            let mut b = design.builder();
+            let (_, top) = b.file("a.sp", ir::Role::Deck);
+            let name = b.name("m");
+            let other = b.name("w");
+            let open = matches!(family, ir::ModelFamily::CodeModel | ir::ModelFamily::Other);
+            let module = match family {
+                ir::ModelFamily::Module => ir::Ref::unresolved(other),
+                _ => ir::Ref::unresolved(ir::NameId::NONE),
+            };
+            let polarity = [ir::Polarity::None, ir::Polarity::N]
+                .into_iter()
+                .find(|&p| {
+                    let row = model_row(name, family, p, module, open.then_some(other));
+                    let mut d = ir::Design::new();
+                    let mut bb = d.builder();
+                    let (_, t) = bb.file("p.sp", ir::Role::Deck);
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        bb.model(t, row, ir::Span::NONE)
+                    }))
+                    .is_ok()
+                })
+                .expect("one polarity is in the family's domain");
+            let row = model_row(name, family, polarity, module, open.then_some(other));
+            b.model(top, row, ir::Span::NONE);
+        }
+        let gap = feature(ir::CircuitExtra::ModelWithoutLibrary);
+        let missing = ir::features_used(&design).contains(gap);
+        let mut diags = ir::Diags::new();
+        passes::structure::device_libraries::device_libraries(&mut design, &mut diags);
+        let top = design.file(design.entry()).top;
+        let libraries = design
+            .items(top)
+            .iter()
+            .filter(|i| i.kind == ir::ItemKind::DeviceLibrary)
+            .count();
+        assert_eq!(libraries, usize::from(missing), "{family:?}");
+        assert!(!ir::features_used(&design).contains(gap), "{family:?}");
+    }
+}
+
+#[test]
+fn legalize_gives_every_model_less_element_a_model_and_a_library() {
+    let text = "file \"a.sp\" deck\n  element resistor r1 (a 0) value=1k\n  element vsource v1 (a 0) dc=1\n  element lossless_line t1 (a 0 b 0) z0=50 td=1n\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let lacks = ir::FeatureSet::EMPTY
+        .with(feature(ir::CircuitExtra::ElementWithoutModel))
+        .with(feature(ir::CircuitExtra::ModelWithoutLibrary));
+    passes::legalize(&mut design, &ir::FeatureSet::ALL.minus(lacks), &mut diags);
+    assert!(diags.is_empty(), "nothing to refuse: {:?}", diags.rows());
+    assert!(
+        ir::features_used(&design)
+            .minus(ir::FeatureSet::ALL.minus(lacks))
+            .is_empty()
+    );
+}
+
+#[test]
+fn every_structure_pass_has_its_pair_deck_or_a_pending_marker_and_not_both() {
+    let proven = proven_by_pair_decks();
+    let group = passes::GROUPS
+        .iter()
+        .find(|g| g.name == "structure")
+        .expect("the group");
+    let mut wrong = Vec::new();
+    for pass in group.passes {
+        let pending = PENDING_PAIRS.contains(&pass.name);
+        if pending == proven.iter().any(|p| p == pass.name) {
+            wrong.push(pass.name);
+        }
+    }
+    for &p in PENDING_PAIRS {
+        if !group.passes.iter().any(|q| q.name == p) {
+            wrong.push(p);
+        }
+    }
+    assert!(
+        wrong.is_empty(),
+        "pair deck against PENDING_PAIRS: {wrong:?}"
+    );
+}
+
+fn feature(x: ir::CircuitExtra) -> ir::Feature {
+    ir::Feature::Circuit(x)
+}
+
+/// Every reachable item with the references it holds.
+fn refs(design: &ir::Design) -> Vec<(ir::ItemRef, Vec<(ir::Ref, ir::DefKind)>)> {
+    let reachable = design.reachable().into_iter();
+    reachable
+        .map(|(item, _)| {
+            let mut out = Vec::new();
+            design.item_refs(item, &mut out);
+            (item, out)
+        })
+        .collect()
+}
+
+fn elements(design: &ir::Design) -> impl Iterator<Item = ir::ItemRef> + '_ {
+    let reachable = design.reachable().into_iter();
+    reachable
+        .map(|(i, _)| i)
+        .filter(|i| i.kind == ir::ItemKind::Element)
+}
+
+/// Whether `item` is a library the pass added (no item of `before`).
+fn added_library(before: &[(ir::ItemRef, Vec<(ir::Ref, ir::DefKind)>)], item: ir::ItemRef) -> bool {
+    item.kind == ir::ItemKind::DeviceLibrary && !before.iter().any(|(i, _)| *i == item)
+}
+
+fn model_row(
+    name: ir::NameId,
+    family: ir::ModelFamily,
+    polarity: ir::Polarity,
+    module: ir::Ref,
+    word: Option<ir::NameId>,
+) -> ir::Model {
+    ir::Model {
+        name,
+        params: ir::ParamList::EMPTY,
+        bin_of: ir::NameId::NONE,
+        ako: ir::Ref::unresolved(ir::NameId::NONE),
+        module,
+        version: ir::ExprId::NONE,
+        word: word.unwrap_or(ir::NameId::NONE),
+        family,
+        polarity,
+    }
+}
+
+/// The passes some pair deck says it proves (`proves = <pass>` in a `.pair` file).
+fn proven_by_pair_decks() -> Vec<String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pair");
+    let mut out = Vec::new();
+    let cells = std::fs::read_dir(root).into_iter().flatten().flatten();
+    for cell in cells.filter(|c| c.path().is_dir()) {
+        for deck in std::fs::read_dir(cell.path())
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            if deck.path().extension().is_some_and(|e| e == "pair") {
+                let text = std::fs::read_to_string(deck.path()).unwrap_or_default();
+                for line in text.lines() {
+                    let line = line.split('#').next().unwrap_or("");
+                    if let Some((k, v)) = line.split_once('=')
+                        && k.trim() == "proves"
+                    {
+                        out.push(v.trim().to_string());
+                    }
+                }
+            }
+        }
+    }
+    out
+}
