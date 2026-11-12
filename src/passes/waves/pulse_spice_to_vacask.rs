@@ -17,6 +17,18 @@
 //! laws agree on it either way) and notes every other with the same code; it removes
 //! `Circuit(PulseVacask)` and requires `Circuit(PulseSpice)`. A wave law has no form.
 //!
+//! The inverse row also writes VACASK's single pulses (`period ≤ 0`, VACASK runs once.sim and
+//! step.sim in `tests/fixtures/passes/waves/pulse_vacask_to_spice/`: a pulse with no period
+//! rises, holds, falls once and stays at `val0`; with no fall either it rises and holds `val1`
+//! to the stop) as SPICE pulses equal to them up to the design's last transient stop, where
+//! every value is read. With τ_max = stop − delay (every stop and the delay literals, τ_max >
+//! 0): a pulse with a fall keeps its fields and gets `period = 2·τ_max + rise + width + fall`
+//! (no wrap before the stop, longer than one pulse); a step (`fall ≤ 0`) gets `width = fall =
+//! 2·τ_max` and the same period (its fall is never reached). Every number is the deck's,
+//! derived, never chosen (R13); past the last stop the two differ, and no analysis reads there.
+//! A design with no transient, a stop or a field that is no literal, or a sum that rounds onto
+//! τ_max keeps the pulse with `U0201`.
+//!
 //! Cites: `rewrite/AMEND-A12.md` C1, A30; `rewrite/DIALECT-VACASK.md` §6.1 (RUN p1, p2, q13);
 //! `crates/ir/src/wave.rs` (`PulseLaw`).
 //!
@@ -35,9 +47,13 @@ pub fn pulse_spice_to_vacask(design: &mut ir::Design, diags: &mut ir::Diags) {
     note_left(design, diags, feature, PULSE_LAWS_DIFFER);
 }
 
-/// Relabels every VACASK pulse SPICE's law reproduces; notes every other.
+/// Relabels every VACASK pulse SPICE's law reproduces, and writes a VACASK single pulse or step
+/// as a SPICE pulse that does not repeat before the design's last stop; notes every other.
 pub fn pulse_vacask_to_spice(design: &mut ir::Design, diags: &mut ir::Diags) {
     relabel(design, (PulseLaw::Vacask, PulseLaw::Spice));
+    if let Some(stop) = last_stop(design) {
+        once(design, stop);
+    }
     let feature = ir::Feature::Circuit(ir::CircuitExtra::PulseVacask);
     note_left(design, diags, feature, PULSE_LAWS_DIFFER);
 }
@@ -80,4 +96,75 @@ fn agree(design: &ir::Design, pulse: &Pulse) -> bool {
     };
     // SPICE's own sum (`τ ≥ rise + width + fall`), in its order
     rise > 0.0 && fall > 0.0 && width >= 0.0 && period > rise + width + fall
+}
+
+/// The largest stop of the design's reachable transients; `None` when there is none or one
+/// is no literal.
+fn last_stop(design: &ir::Design) -> Option<f64> {
+    let mut last: Option<f64> = None;
+    for (item, _) in design.reachable() {
+        if item.kind != ir::ItemKind::Analysis {
+            continue;
+        }
+        let a = design.row::<ir::Analysis>(item.index);
+        if a.kind != ir::AnalysisKind::Tran {
+            continue;
+        }
+        let stop = literal(design, design.detail::<ir::tran::Tran>(a.detail).stop)?;
+        last = Some(last.map_or(stop, |l| l.max(stop)));
+    }
+    last
+}
+
+/// Every VACASK pulse with no period written as a SPICE pulse equal to it up to `stop` (the
+/// module header's construction), where its literals allow.
+fn once(design: &mut ir::Design, stop: f64) {
+    let rows: Vec<u32> = sources(design)
+        .into_iter()
+        .filter(|(_, s)| !s.wave.is_none() && s.wave.kind == ir::WaveKind::Pulse)
+        .map(|(_, s)| s.wave.index)
+        .collect();
+    for index in rows {
+        let p: Pulse = design.detail(index);
+        let get = |e| literal(design, e);
+        let fields = (
+            get(p.delay),
+            get(p.rise),
+            get(p.fall),
+            get(p.width),
+            get(p.period),
+        );
+        let (Some(delay), Some(rise), Some(fall), Some(width), Some(period)) = fields else {
+            continue;
+        };
+        let vacask = p.law == PulseLaw::Vacask && p.given_zero == GivenZero::AsGiven;
+        let tau = stop - delay;
+        if !vacask || !p.cycles.is_none() || period > 0.0 || rise <= 0.0 || tau <= 0.0 {
+            continue;
+        }
+        // a step holds val1 past the stop: its flat top and its fall outlast τ_max (2·τ_max
+        // is exact, and rise + 2·τ_max > τ_max)
+        let step = fall <= 0.0;
+        let (width, fall) = match step {
+            true => (2.0 * tau, 2.0 * tau),
+            false => (width, fall),
+        };
+        let period = 2.0 * tau + rise + width + fall;
+        // no wrap before the stop (SPICE wraps for τ > period), and a period longer than one
+        // pulse; checked in the doubles the simulator computes with
+        if width < 0.0 || period <= tau || period <= rise + width + fall {
+            continue;
+        }
+        let mut editor = design.editor();
+        let mut b = editor.builder();
+        let mut num = |v: f64| b.literal(ir::Literal::from_f64(v));
+        let spice = Pulse {
+            width: if step { num(width) } else { p.width },
+            fall: if step { num(fall) } else { p.fall },
+            period: num(period),
+            law: PulseLaw::Spice,
+            ..p
+        };
+        editor.set_detail(index, spice);
+    }
 }
