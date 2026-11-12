@@ -104,7 +104,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             | ir::ItemKind::Param
             | ir::ItemKind::Func => write_structure::admits(design, item, scope, diags),
             ir::ItemKind::Element => write_elements::admits(design, item, diags),
-            ir::ItemKind::Model => write_models::admits(design, item, diags),
+            ir::ItemKind::Model => write_models::admits(design, item, scope, diags),
             ir::ItemKind::Statistics
             | ir::ItemKind::Analysis
             | ir::ItemKind::Option
