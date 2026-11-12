@@ -89,13 +89,15 @@ impl Draws {
         unreachable!("each round marks a definition or ends")
     }
 
-    /// Whether the tree under `e` holds a draw or reads a definition that may. O(its tree).
+    /// Whether the tree under `e` holds a draw or reads a definition that may. O(its rows):
+    /// a row two parents share is visited once (a pass's output is a DAG).
     pub(super) fn holds(&self, design: &ir::Design, e: ir::ExprId) -> bool {
         let mut stack = vec![e];
+        let mut seen = std::collections::HashSet::new();
         let mut out = Vec::new();
-        for _ in 0..=design.expr_count() {
+        for _ in 0..=2 * design.expr_count() + 1 {
             let Some(e) = stack.pop() else { return false };
-            if e.is_none() {
+            if e.is_none() || !seen.insert(e) {
                 continue;
             }
             match design.expr(e) {

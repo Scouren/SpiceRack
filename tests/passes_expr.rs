@@ -451,3 +451,67 @@ fn inline_funcs_keeps_every_value() {
     );
     assert_eq!(notes("drop_unused_funcs", "plain"), [code(114)]);
 }
+
+#[test]
+fn legalize_chains_the_two_roundings_for_a_target_with_neither() {
+    // oracle: eval_typed of the input root against the legalized root (A32: a pass runs when a
+    // registered pass removes what it requires); the target lacks both roundings, so
+    // round_half_even_to_away runs only because round_half_away_to_floor removes its output
+    let lacks = [
+        ir::Feature::Func(ir::Func::RoundHalfEven),
+        ir::Feature::Func(ir::Func::RoundHalfAway),
+        ir::Feature::FuncDyn(ir::Func::RoundHalfEven),
+        ir::Feature::FuncDyn(ir::Func::RoundHalfAway),
+    ];
+    let target = lacks.iter().fold(ir::FeatureSet::ALL, |t, &f| {
+        t.minus(ir::FeatureSet::EMPTY.with(f))
+    });
+    let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = round_half_even(x)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    let before = compare::roots(&design);
+    spicerack::passes::legalize(&mut design, &target, &mut diags);
+    assert!(diags.is_empty(), "nothing refused: {:?}", diags.rows());
+    let used = ir::features_used(&design);
+    assert!(
+        lacks.iter().all(|&f| !used.contains(f)),
+        "both roundings are gone"
+    );
+    let pairs = compare::pairs(&before, &compare::roots(&design));
+    let (old, new) = *pairs.last().expect("the root of r");
+    assert_ne!(old, new);
+    for x in bindings::boundary() {
+        let env = bindings::Pair {
+            design: &design,
+            x: ir::Value::real(x),
+            y: ir::Value::real(0.0),
+        };
+        let (a, b) = (ir::eval(&design, old, &env), ir::eval(&design, new, &env));
+        assert_eq!(a.map(f64::to_bits), b.map(f64::to_bits), "x = {x:e}");
+    }
+}
+
+#[test]
+fn legalize_refuses_the_power_cycle_instead_of_looping() {
+    // pow_to_powabs requires PowSigned, which pow_signed_to_ternary removes by requiring Pow:
+    // for a target with neither, the least fixed point holds neither pass, and the item is
+    // refused (U0001) instead of the two undoing each other
+    let lacks = [
+        ir::Feature::Func(ir::Func::Pow),
+        ir::Feature::Func(ir::Func::PowSigned),
+    ];
+    let target = lacks.iter().fold(ir::FeatureSet::ALL, |t, &f| {
+        t.minus(ir::FeatureSet::EMPTY.with(f))
+    });
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(
+        "file \"p.sp\" deck\n  param x = 2\n  param r = pow(x, 3)\n",
+        &mut design.builder(),
+        &mut diags,
+    );
+    spicerack::passes::legalize(&mut design, &target, &mut diags);
+    let codes: Vec<ir::Code> = diags.rows().iter().map(|d| d.code).collect();
+    assert_eq!(codes, [ir::diag::UNSUPPORTED], "{:?}", diags.rows());
+}

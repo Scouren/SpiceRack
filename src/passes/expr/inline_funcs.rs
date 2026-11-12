@@ -25,7 +25,7 @@
 //! Contents: `pub fn inline_funcs(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn drop_unused_funcs(&mut ir::Design, &mut ir::Diags)`
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::nodes::{Draws, kids, live, note_left};
 use super::{CALL_LEFT, FUNC_CALLED};
@@ -150,24 +150,40 @@ fn inline(
         ir::Expr::Param(r) if r.def == def => formals.iter().position(|n| *n == r.name),
         _ => None,
     };
-    // reads of each formal along every path of the body (a shared row counts at each use)
-    let mut reads = vec![0usize; formals.len()];
+    // reads of each formal along every path of the body (a shared row counts at each use),
+    // saturating at 2: the count of paths to each row, parents before children (ids descend)
+    let mut rows = Vec::new();
+    let mut seen = HashSet::new();
     let mut stack = vec![row.body];
     let mut out = Vec::new();
-    let bound = 64 * d.expr_count() + 64;
-    for _ in 0..bound {
-        let Some(e) = stack.pop() else { break };
-        if let Some(k) = formal(d, e) {
-            reads[k] += 1;
+    while let Some(e) = stack.pop() {
+        if e.is_none() || !seen.insert(e) {
+            continue;
         }
+        rows.push(e);
         out.clear();
         kids(d, e, &mut out);
         stack.extend_from_slice(&out);
     }
-    assert!(stack.is_empty(), "a body's paths are bounded");
+    rows.sort_unstable_by(|a, b| b.cmp(a));
+    let mut paths: HashMap<ir::ExprId, u8> = HashMap::from([(row.body, 1)]);
+    let mut reads = vec![0u8; formals.len()];
+    for &e in &rows {
+        let p = paths.get(&e).copied().unwrap_or(0);
+        if let Some(k) = formal(d, e) {
+            reads[k] = reads[k].saturating_add(p).min(2);
+        }
+        out.clear();
+        kids(d, e, &mut out);
+        for &k in &out {
+            let slot = paths.entry(k).or_insert(0);
+            *slot = slot.saturating_add(p).min(2);
+        }
+    }
     if (0..args.len()).any(|k| reads[k] > 1 && draws.holds(d, args[k])) {
         return None;
     }
+    // marker CALL_CLASS (until the kernel classes a call by its body, the lead's A28 refinement):
     // an argument the body never reads drops out of the copy; one of class Temp or above made
     // its caller count the dynamic form (R14), which the copy would no longer
     let dynamic = |k: usize| ir::expr_class(d, args[k]) >= ir::ExprClass::Temp;
