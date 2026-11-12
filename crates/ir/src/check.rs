@@ -82,6 +82,11 @@ pub enum Violation {
     /// names one element). Reported by the circuit owner's `element::design_check`. `arg`: the
     /// second element's row in the `Element` table.
     DuplicateElement,
+    /// Parameter or function definitions that read one another in a cycle (A28; A29: a default
+    /// bound to its own formal): invalid on every simulator. Reported once per definition on
+    /// the cycle, at its item; what merely reads the cycle is not reported again. `arg`: the
+    /// definition.
+    DefinitionCycle,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -92,7 +97,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; 16] = [
+    pub const ALL: [Violation; Violation::DefinitionCycle as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -109,6 +114,7 @@ impl Violation {
         Violation::OpaqueEmpty,
         Violation::FieldDomain,
         Violation::DuplicateElement,
+        Violation::DefinitionCycle,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();

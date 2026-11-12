@@ -391,3 +391,35 @@ fn a_dead_body_is_no_violation() {
         "the outer subckt dropped: its body and the inner one are dead"
     );
 }
+
+#[test]
+fn a_definition_cycle_is_its_own_violation() {
+    // A28: `subckt s` whose formal `t` defaults to a read of `t` (bound to the formal itself, a
+    // cycle of one), and a body parameter that reads `t`: one DefinitionCycle at the formal, no
+    // ProbeContext at the reader
+    let mut d = Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let read = b.param_ref("t");
+        let (_, body) = b.subckt(top, "s", &[], &[("t", read)], Span::NONE);
+        let inner = b.param_ref("t");
+        b.param(body, "k", inner, Span::NONE);
+    }
+    link(&mut d, &mut Diags::new());
+    assert_eq!(violations(&d), vec![Violation::DefinitionCycle]);
+    // its neighbour: the default reads a top parameter of another name
+    let mut ok = Design::new();
+    {
+        let mut b = ok.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let one = b.num(1.0);
+        b.param(top, "u", one, Span::NONE);
+        let read = b.param_ref("u");
+        let (_, body) = b.subckt(top, "s", &[], &[("t", read)], Span::NONE);
+        let inner = b.param_ref("t");
+        b.param(body, "k", inner, Span::NONE);
+    }
+    link(&mut ok, &mut Diags::new());
+    assert_eq!(violations(&ok), vec![]);
+}
