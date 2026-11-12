@@ -4,6 +4,11 @@
 //! in IR order: a number as `INPevaluate` reads it, a string quoted, anything else
 //! `expr_write::value` (bare name or `{…}`). A bin's name is already `base.<digits>`.
 //!
+//! The version is always written, also when it equals ngspice's default (one spelling, no
+//! omission: a silent card reads as its device's default and is written out; fixtures
+//! `read/models/bsim_version` (`p4`: silent → "4.8.3", b4set.c:205) and `write/models/families`
+//! (`q`: "4.8.3" → `version=4.8.3`)).
+//!
 //! A family ngspice has no device for is a `Feature::Family` its `FEATURES` lack (R32).
 //! `admits` (R21) refuses what ngspice cannot run as the row says: a version that picks no device or a version on a family ngspice runs one way, a
 //! parameter the device's tables lack (ngspice would ignore it: a wrong number with no crash),
@@ -32,9 +37,9 @@ pub(super) const FEATURES: ir::FeatureSet = read_models::FEATURES;
 pub(super) const CODES: &[Row] = &[
     refusal(
         VERSION,
-        "a model version ngspice has no device for",
+        "a model version ngspice has no device for, or none on a versioned family",
         "ngspice-45 inpdomod.c INPfindVer",
-        "BSIM3, BSIM4 and HiSIM-HV pick their device by the version's prefix; a family with one device and no version parameter runs one version.",
+        "BSIM3, BSIM4 and HiSIM-HV pick their device by the version's prefix; a family with one device and no version parameter runs one version; a family with a version parameter needs the row's version (none would be ngspice's default, which the row does not state).",
     ),
     refusal(
         PARAM,
@@ -88,8 +93,11 @@ pub(super) fn admits(
             .clone()
             .flatten()
             .filter(|_| families::dispatches(m.family));
+        // a family ngspice runs in several versions states one (IR-CIRCUIT §4: `NONE` only for
+        // a family with a single version; ngspice's reader writes its device's default, R6):
+        // left out, ngspice would pick its own default, which the row does not say
         let ok = match &version {
-            None => true,
+            None => !has,
             Some(v) => has && v.as_deref().is_some_and(bare),
         };
         match families::device(m.family, picked.as_deref()) {
