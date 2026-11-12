@@ -4,8 +4,8 @@ Each line: question → choice → why.
 
 ## Decisions
 
-1. `src/passes/mod.rs` alone fails `check_style.py` (a folder holding one file) → `src/passes.rs`;
-   it becomes `passes/mod.rs` with the first pass file → the house rule; `layering.rs` covers both forms.
+1. `passes` was `src/passes.rs` while it held no pass (check_style.py refuses a one-file folder);
+   with `deck_title` it is `src/passes/mod.rs` + one file per pass, as SPINE §4 says.
 2. `Sources` and `Reference` → `src/dialect/sources.rs` (spine file, re-exported from `dialect`) →
    keeps `mod.rs` one transform; `layering.rs` lists `mod`, `facade`, `sources` as spine, not dialects.
 3. `Sources` entries → the first file `add`ed is the entry; `load` marks its `entries` (all leading);
@@ -80,6 +80,23 @@ Each line: question → choice → why.
     empty `.ir` is then one empty deck, not a panic in `Design::entry` (the lead's exception, "a text
     with no `file` line is a `P9001`", does not hold: an empty or comment-only text gives no row).
     `transpile` asserts an entry after a read with no refusal.
+
+26. Which reader's one text holds several files (the law harness) → a method on `Read`,
+    `names_its_files(&self) -> bool`, default `false`, `true` for `IrText`. Not `text_family ==
+    ANY_FAMILY`: that is a writer fact (which `Opaque` it may copy), and a reader-side fact must
+    not ride on it. A method, not an associated `const`: `Read` is used as `dyn Read`. The harness
+    (`written`) writes each file of a design as its own text at the design's path, the entry
+    first, its role setting the `Sources` form (`Sources::set_form`, new); for a reader that names
+    its files, the texts concatenated. `l5_per_file_sources_carry_each_file_at_its_own_path`
+    runs the per-file path today through a wrapper of the IR text with `names_its_files` false.
+27. `deck_title` (the first pass) → `src/passes/deck_title.rs`, `pub fn deck_title`: an empty
+    `Title` first in each `Deck` whose top scope has none, built with `Builder::title` and moved to
+    the front of the list; no diagnostic. Tested as SPINE §4 says (IR text in, IR text out,
+    nothing else moves, only `Item(Title)` can be gained). Not in `PASSES` yet:
+    `Extra::DeckWithoutTitle` is not in the kernel at cf98e0d4. Cue: its test asserts the design
+    loses no feature, which goes red when the kernel reports the member; then the test asserts
+    it loses exactly that, and the row `{removes: Extra(DeckWithoutTitle), requires: EMPTY}` joins
+    `PASSES`.
 
 ## Requests (ruled by the lead)
 

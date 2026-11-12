@@ -4,6 +4,10 @@
 //! L5 round trip (both); L6 corpus fixpoint (both, `--features corpus` only). L9 belongs to each dialect's own simulator
 //! tests. In slice S2 the only row is `ir`.
 //!
+//! Each file a writer writes is its own text at its own path, read back as one `Sources`
+//! (entry first); a reader whose one text names its files (`Read::names_its_files`, the IR
+//! text) reads them concatenated.
+//!
 //! Oracles: generated designs (`ir::gen::generate(seed, row's features, size)`, valid and legal
 //! for the set by construction) and their canonical IR text (`ir::dump`, which has no spans:
 //! `≅`); fixed seeds, each printed in the failing assertion.
@@ -26,6 +30,43 @@ const SIZE: Size = Size {
     expr_depth: 4,
     files: 3,
 };
+
+/// The IR text read one file per text (`names_its_files` false): the harness's per-file path,
+/// exercised before a dialect with that shape lands.
+struct PerFile;
+
+static PER_FILE: DialectRow = DialectRow {
+    name: "ir-per-file",
+    text_family: dialect::ANY_FAMILY,
+    read: Some(&PerFile),
+    write: Some(&PerFile),
+};
+
+impl Read for PerFile {
+    fn references(&self, text: &str) -> Vec<dialect::Reference> {
+        dialect::irtext::IrText.references(text)
+    }
+
+    fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        dialect::irtext::IrText.read(src, out, diags);
+    }
+}
+
+impl Write for PerFile {
+    fn features(&self) -> &'static ir::FeatureSet {
+        &ir::FeatureSet::ALL
+    }
+
+    fn write(
+        &self,
+        design: &ir::Design,
+        file: ir::FileId,
+        out: &mut String,
+        diags: &mut ir::Diags,
+    ) {
+        dialect::irtext::IrText.write(design, file, out, diags);
+    }
+}
 
 // ---- private ----
 
@@ -73,11 +114,12 @@ fn l1_an_empty_text_is_one_file_with_no_item() {
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
     for (row, writer) in writers() {
         for seed in SEEDS.take(8) {
-            let text = all_files(&generate(seed, writer.features(), SIZE), row);
-            let once = all_files(&read_text(row, &text).0, row);
-            let threads: Vec<String> = std::thread::scope(|s| {
+            let src = written(&generate(seed, writer.features(), SIZE), row);
+            let bytes = |d: &ir::Design| written(d, row).files().to_vec();
+            let once = bytes(&read_src(row, &src));
+            let threads: Vec<Vec<(String, String)>> = std::thread::scope(|s| {
                 let jobs: Vec<_> = (0..4)
-                    .map(|_| s.spawn(|| all_files(&read_text(row, &text).0, row)))
+                    .map(|_| s.spawn(|| bytes(&read_src(row, &src))))
                     .collect();
                 jobs.into_iter()
                     .map(|j| j.join().expect("a reader thread"))
@@ -141,13 +183,38 @@ fn l5_read_of_write_is_the_design() {
         }
         for seed in SEEDS {
             let design = generate(seed, writer.features(), SIZE);
-            let text = all_files(&design, row);
-            let back = read_text(row, &text).0;
+            let back = read_src(row, &written(&design, row));
             assert_eq!(
                 canonical(&back),
                 canonical(&design),
                 "{} seed {seed}",
                 row.name
+            );
+        }
+    }
+}
+
+#[test]
+fn l5_per_file_sources_carry_each_file_at_its_own_path() {
+    for seed in SEEDS {
+        let design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        let src = written(&design, &PER_FILE);
+        assert_eq!(
+            src.files().len(),
+            design.files().count(),
+            "seed {seed}: one text per file"
+        );
+        let entry = design.str(design.file(design.entry()).path);
+        assert_eq!(src.entries()[0].0, entry, "seed {seed}: the entry first");
+        let back = read_src(&PER_FILE, &src);
+        // The entry comes first, so compare file by file under each path.
+        for f in design.files() {
+            let path = design.str(design.file(f).path);
+            let again = back.find_file(path);
+            assert_eq!(
+                one_file(&back, again),
+                one_file(&design, f),
+                "seed {seed}: {path}"
             );
         }
     }
@@ -168,7 +235,7 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
         );
         for (k, text) in texts.iter().enumerate() {
             let once = read_text(row, text).0;
-            let twice = read_text(row, &all_files(&once, row)).0;
+            let twice = read_src(row, &written(&once, row));
             assert_eq!(
                 canonical(&twice),
                 canonical(&once),
@@ -272,13 +339,44 @@ fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags) {
     (design, diags)
 }
 
-/// Every file of `design` written by `row`, concatenated (the form one read takes back).
-fn all_files(design: &ir::Design, row: &DialectRow) -> String {
+/// Every file of `design` written by `row`, as the sources one read takes back: each file its
+/// own text at the path the design gives it, the entry first (in its role); or, for a reader
+/// whose one text names its files (`Read::names_its_files`), the texts concatenated.
+fn written(design: &ir::Design, row: &DialectRow) -> Sources {
     let mut diags = ir::Diags::new();
+    let entry = design.entry();
+    let order = std::iter::once(entry).chain(design.files().filter(|&f| f != entry));
+    let texts: Vec<(String, String)> = order
+        .map(|f| {
+            (
+                design.str(design.file(f).path).to_string(),
+                dialect::write(design, f, row, &mut diags),
+            )
+        })
+        .collect();
+    if row.read.is_some_and(|r| r.names_its_files()) {
+        return Sources::one(
+            "law",
+            &texts.iter().map(|(_, t)| t.as_str()).collect::<String>(),
+        );
+    }
+    let mut src = Sources::new();
+    for (path, text) in &texts {
+        src.add(path, text);
+    }
+    src.set_form(match design.file(entry).role {
+        ir::Role::Deck => ir::Role::Deck,
+        ir::Role::Library | ir::Role::VerilogA | ir::Role::Missing => ir::Role::Library,
+    });
+    src
+}
+
+/// `src` read by `row`, leniently.
+fn read_src(row: &DialectRow, src: &Sources) -> ir::Design {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(src, row, Policy::Lenient, &mut design, &mut diags);
     design
-        .files()
-        .map(|f| dialect::write(design, f, row, &mut diags))
-        .collect()
 }
 
 /// One file as IR text.

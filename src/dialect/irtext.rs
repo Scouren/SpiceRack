@@ -62,6 +62,11 @@ impl Read for IrText {
             "IrText::read: a file per text"
         );
     }
+
+    /// Yes: its `file` blocks name the design's files.
+    fn names_its_files(&self) -> bool {
+        true
+    }
 }
 
 impl Write for IrText {
