@@ -38,7 +38,7 @@ use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
@@ -194,6 +194,12 @@ impl RowFacts for OptionRow {
         ]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: OptionRow = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -320,6 +326,13 @@ impl RowFacts for Env {
         out.extend([Handle::Expr(self.temp), Handle::Expr(self.tnom)]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Env = design.row(at.index);
+        f(&mut row.temp, ExprUse::Constant);
+        f(&mut row.tnom, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -398,6 +411,12 @@ impl RowFacts for NodeSet {
             Handle::Names(self.reference),
             Handle::Expr(self.value),
         ]);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: NodeSet = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {

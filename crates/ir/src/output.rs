@@ -25,11 +25,11 @@ use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ItemRef, NameId, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::measure::MeasureKind;
 #[cfg(any(test, feature = "gen"))]
@@ -37,6 +37,7 @@ use crate::probe::gen_probe;
 use crate::probe::{
     Probe, ProbeList, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
+use crate::run_exprs::roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -110,6 +111,11 @@ impl PrintView {
 impl RowFacts for Save {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         list_handles(design, self.probes, out);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let row: Save = design.row(at.index);
+        roots(design, f).probes(row.probes);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -218,6 +224,11 @@ impl RowFacts for Save {
 impl RowFacts for Print {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         list_handles(design, self.probes, out);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let row: Print = design.row(at.index);
+        roots(design, f).probes(row.probes);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {

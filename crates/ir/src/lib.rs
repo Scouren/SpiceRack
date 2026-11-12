@@ -133,6 +133,7 @@ mod periodic_ss_facts;
 pub mod plan;
 mod plan_facts;
 pub mod probe;
+mod run_exprs;
 pub mod run_extra;
 mod run_words;
 mod state_order;

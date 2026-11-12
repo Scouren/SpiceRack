@@ -32,6 +32,7 @@ use crate::id::ScopeId;
 #[cfg(any(test, feature = "gen"))]
 use crate::id::{ExprId, NameId};
 use crate::periodic::{Hb, HbTruncate, Pss, PssMode};
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -49,6 +50,12 @@ impl DetailFacts for Hb {
             Handle::Exprs(self.harmonics),
             Handle::Expr(self.intermod),
         ]);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.exprs(self.tones);
+        r.exprs(self.harmonics);
+        r.expr(&mut self.intermod);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.tones.len > 1, RunExtra::HbMultiTone);
@@ -142,6 +149,19 @@ impl DetailFacts for Pss {
         }
         out.extend([Handle::Name(self.osc_p), Handle::Name(self.osc_n)]);
         out.extend([Handle::Expr(self.sc_iter), Handle::Expr(self.steady_coeff)]);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        for e in [
+            &mut self.fundamental,
+            &mut self.tstab,
+            &mut self.harmonics,
+            &mut self.points,
+            &mut self.sc_iter,
+            &mut self.steady_coeff,
+        ] {
+            r.expr(e);
+        }
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.mode == PssMode::Driven, RunExtra::PssDriven);

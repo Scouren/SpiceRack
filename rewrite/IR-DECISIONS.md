@@ -345,3 +345,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `rewrite_exprs` reads the roots through `handles` and stores them back through `map_exprs`: the drift property makes the two the same list, so every root is reached and stored.
 - `item_facts.rs` passed 500 lines: `Param` and `Func` moved to `item_facts_defs.rs`; `field_domain` and `distinct` became crate-visible for it.
 
+
+## Amendment A23, run owner (`map_exprs`)
+
+- `run_exprs::Roots` holds the kernel's expression-list pool, the run pools and the pass's visitor. Its methods mirror the `*_handles` helpers one for one (`expr`, `exprs`, `sweep`, `probe`, `probes`, `event`, `dc_axes`, `varies`, `correlations`), so each row's `map_exprs` is one call per field, in `handles`' order. Pools are written in place. A probe's expression and an event's value are `Circuit`; every other root is `Constant`.
+- `DetailFacts::map_exprs(&mut self, &mut Roots)` is required, so every detail kind writes its own roots. `exprs_of::<D>` reads the detail row, visits it, and stores it back. Analysis, Loop and Measure dispatch through it; Alter, OptionRow, Env, NodeSet, Save, Print and Statistics write their own fields. Elaborate keeps the default because it holds no expression.
+- Oracle: the kernel's drift property (`kernel_rewrite`). It went red on a swapped event order (`count`/`delay`) before it was trusted green.

@@ -33,13 +33,13 @@ use crate::diag::Diags;
 use crate::expr::Expr;
 #[cfg(any(test, feature = "gen"))]
 use crate::expr::ExprTag;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::NameId;
-use crate::id::{ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
@@ -48,6 +48,7 @@ use crate::plan::{
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_ref, gen_target, target_kinds};
+use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
 use crate::run_words::{
     get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
@@ -73,6 +74,11 @@ impl RowFacts for Loop {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.name), Handle::Scope(self.body)]);
         by_loop!(self.kind, handles_of(design, self.detail, out));
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let row: Loop = design.row(at.index);
+        by_loop!(row.kind, exprs_of(design, row.detail, f));
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -295,6 +301,12 @@ impl RowFacts for Alter {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         target_handles(&self.target, out);
         out.push(Handle::Expr(self.value));
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Alter = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {

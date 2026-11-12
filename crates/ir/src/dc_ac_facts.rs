@@ -45,6 +45,7 @@ use crate::probe::gen_probe;
 use crate::probe::{
     Probe, ProbeKind, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -70,6 +71,10 @@ impl DetailFacts for Dc {
             sweep_handles(&axis.sweep, out);
             out.push(Handle::Name(axis.name));
         }
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.dc_axes(self.axes);
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {
@@ -167,6 +172,10 @@ impl DetailFacts for Ac {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         sweep_handles(&self.sweep, out);
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);
     }
@@ -205,6 +214,12 @@ impl DetailFacts for Noise {
         out.push(Handle::Name(self.source));
         sweep_handles(&self.sweep, out);
         out.push(Handle::Expr(self.points_per_summary));
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.points_per_summary);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -311,6 +326,10 @@ impl DetailFacts for Tf {
         probe_handles(&self.output, out);
         out.push(Handle::Name(self.source));
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -352,6 +371,10 @@ impl DetailFacts for DcXf {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -387,6 +410,10 @@ impl DetailFacts for DcXf {
 impl DetailFacts for Sens {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -424,6 +451,11 @@ impl DetailFacts for Xf {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -467,6 +499,11 @@ impl DetailFacts for SensAc {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
