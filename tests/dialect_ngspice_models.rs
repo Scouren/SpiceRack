@@ -226,6 +226,69 @@ fn written_models_run_on_ngspice_to_the_original_numbers() {
     }
 }
 
+#[test]
+fn code_models_of_the_build_round_trip_by_meaning() {
+    // The covering property for `Family(CodeModel)` (the neutral generator does not know
+    // ngspice's code-model names, R55): seeded designs of code models whose words are the
+    // pinned build's (families.rs `CODE_MODELS`, a `devhelp` run), with and without parameters,
+    // each with one A instance; written, read back, equal by meaning (oracle: the round trip).
+    let source = include_str!("../src/dialect/ngspice/families.rs");
+    let words: Vec<&str> = source
+        .split("const CODE_MODELS: &str = \"")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .expect("the code-model list")
+        .split(|c: char| c.is_whitespace() || c == '\\')
+        .filter(|w| !w.is_empty())
+        .collect();
+    assert!(words.len() > 50, "the list parsed: {words:?}");
+    let (mut run, mut holding) = (0, 0);
+    for seed in 0..64u64 {
+        let mut state = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        let mut next = |n: u64| {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (state >> 33) % n
+        };
+        let mut ir = String::from("file \"p.sp\" deck\n  title \"p\"\n");
+        let models = 1 + next(3);
+        for k in 0..models {
+            let word = words[next(words.len() as u64) as usize];
+            let params: Vec<String> = (0..next(3))
+                .map(|j| format!("p{j}={}.{}", next(100), next(10)))
+                .collect();
+            let params = if params.is_empty() {
+                String::new()
+            } else {
+                format!(" params=({})", params.join(" "))
+            };
+            ir.push_str(&format!("  model m{k} code_model{params} word={word}\n"));
+            ir.push_str(&format!("  element code_model a{k} (n{k} 0) model=m{k}\n"));
+        }
+        let mut design = parse_ir(&ir);
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
+        assert!(
+            !diags.rows().iter().any(|d| dialect::refuses(d.code)),
+            "seed {seed}: {diags:?}\n{ir}"
+        );
+        let text = write_entry(&design);
+        let (back, _) = read_deck("p.sp", &text);
+        assert!(
+            back.eq_meaning(&design),
+            "seed {seed}:\n{ir}\n{text}\n{}",
+            dump(&back)
+        );
+        run += 1;
+        holding += usize::from(ir.contains("code_model"));
+    }
+    // floors: every seed ran and held a code model
+    assert!(run >= 64 && holding >= 64, "{run} run, {holding} holding");
+}
+
 /// The ngspice row.
 fn row() -> &'static DialectRow {
     dialect::by_name("ngspice").expect("the ngspice row")
