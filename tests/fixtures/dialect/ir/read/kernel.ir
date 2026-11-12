@@ -1,0 +1,20 @@
+file "kit.sp" deck
+  title "kernel kinds"
+  comment "a note"
+  global vdd vss
+  include "models.lib" section=tt
+  param w = 2u
+  param l = w / 2
+  func area(a, b) = a * b
+  subckt cell (a b) r=w
+    param k = r * 2
+  if (w > 1u)
+    param m = 1
+  elif (w > 0)
+    param m = 2
+  else
+    param m = 3
+  opaque ngspice inert ".width out=80"
+file "models.lib" library
+  section tt
+    param vth = 0.4

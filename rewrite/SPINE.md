@@ -145,9 +145,11 @@ plus `requires`; P4 running it twice equals running it once (IR text equal); P5 
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
 simulator on both forms) is each pass's own test.
 
-**Fixtures.** `tests/fixtures/passes/<group>/<pass>/<case>.ir` and `<case>.out.ir`: the pass
-laws read each case, run its pass, check, and compare the written text; a folder naming no
-registered pass fails. The golden walk excludes `tests/fixtures/passes/`.
+**Fixtures.** `tests/fixtures/passes/<group>/<pass>/<case>.ir` and `<case>.out.ir`, and
+`<case>.notes` when the pass appends a row (A26: the codes it appends, one a line, in order,
+`#` comments): the pass laws read each case, run its pass, compare the codes with `.notes`
+(a case whose pass appends a row and has no `.notes` fails), check, and compare the written
+text; a folder naming no registered pass fails. The golden walk excludes `tests/fixtures/passes/`.
 
 ## 5. The seam: the old entry points route (`src/dialect/facade.rs`, two call sites)
 

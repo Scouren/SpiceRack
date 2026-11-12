@@ -128,6 +128,23 @@ Each line: question → choice → why.
     counts when it is one of `Pass::notes` at the same span. Planted bugs: a no-op `deck_title`
     turned P2 and the fixtures red; `requires: EMPTY` turned P3 red.
 
+33. Pass fixtures state their notes (A26) → a sidecar `<case>.notes` beside `<case>.out.ir`: the
+    codes the pass appended, one a line, in order (`U0101`), `#` comments. Absent means "the
+    pass appends nothing"; a pass that appends a row with no sidecar fails, and so does a
+    sidecar listing what it did not append. A sidecar over a header line: `.out.ir` stays the
+    exact canonical text `dump` writes.
+34. L1/L2 on card-shaped text → `tests/dialect_mutants.rs` (its own binary: `dialect_laws.rs` is at
+    the 500-line cap), 32 seeded token mutants per fixture deck (`tests/fixtures/dialect/<row>/
+    read/**`, the corpus under `--features corpus`): a `k=v` duplicated, a key renamed to another
+    key of the deck, a token dropped, two tokens swapped, a line duplicated or moved. Each mutant
+    is read by the row's reader and checked apart (not through `dialect::read`, whose debug
+    assertion would hide the `X` code); a panic is caught; each distinct failure is reported once
+    with its deck, seed and the mutant shrunk line by line. The `ir` row's decks are new:
+    `tests/fixtures/dialect/ir/read/{worked,kernel}.ir`. Its first run found three IR-text
+    reader holes (KNOWN): `ir::parse` pushes an element row `check` refuses instead of a `P9001`
+    for a second element of one name (X0016), a key of another kind (`dc=` on a resistor,
+    X0015) and a terminal count out of range (X0006).
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.
