@@ -60,7 +60,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             .map(|n| design.str(n))
             .any(|n| n.chars().any(char::is_whitespace))
         {
-            diags.push(write_models::UNSPELLED, design.span_of(at), 0);
+            diags.push_at(write_models::UNSPELLED, design, at, 0);
         }
         let Some(word) = module(design, &e) else {
             continue;
@@ -69,7 +69,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             key != "$mfactor" && !matches!(families::instance_name_in(&word, key), Name::Ir(_))
         });
         if lacked {
-            diags.push(write_models::LACKED, design.span_of(at), 0);
+            diags.push_at(write_models::LACKED, design, at, 0);
         }
     }
 }

@@ -62,11 +62,6 @@ const KNOWN_REACH: &[(&str, &str)] = &[
     // vacask: legalize refuses Circuit(ElementWithoutModel) on a behavioural source, a kind
     // that names no model (ir-circuit's fix, the lead's note on R52).
     ("vacask", "Elem(Behav)"),
-    // vacask: every generated model of these families (8 over 512 seeds) holds `to_real` in a
-    // parameter expression of class Temp, which W2006 refuses (gap c, deferred: R52).
-    ("vacask", "Family(Diode)"),
-    ("vacask", "Family(Bsim3)"),
-    ("vacask", "Family(Bsim4)"),
 ];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics

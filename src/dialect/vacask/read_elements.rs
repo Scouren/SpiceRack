@@ -29,7 +29,7 @@
 //! cir-instance, cir-mfactor, dev-builtin-behavioral.
 //!
 //! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `NO_PARENS`,
-//! `DUPLICATE`, `NOISY`,
+//! `DUPLICATE`, `REPEATED`, `NOISY`, `repeated`,
 //! `Declared`, `declare`, `instance`
 //! (crate-private)
 
@@ -85,6 +85,8 @@ pub(super) const TERMINALS: ir::Code = ir::Code::new(b'P', 2104);
 pub(super) const NO_PARENS: ir::Code = ir::Code::new(b'P', 2107);
 /// An instance name already defined in its scope.
 pub(super) const DUPLICATE: ir::Code = ir::Code::new(b'R', 2101);
+/// A parameter given twice on one line.
+pub(super) const REPEATED: ir::Code = ir::Code::new(b'P', 2108);
 /// A `noisy=` that is not the literal 0 or 1.
 pub(super) const NOISY: ir::Code = ir::Code::new(b'P', 2106);
 
@@ -141,6 +143,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an instance name defined twice in one scope",
             cite: "run dup (\"An instance with name 'r1' already exists.\")",
             explain: "VACASK refuses a second instance of one name in a scope; the first is kept.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        REPEATED,
+        ir::Info {
+            title: "a parameter given twice on one line",
+            cite: "run rep (`r=1k r=2k` on an instance, `rsh=1 rsh=2` on a model, `g=2 g=3` on a subckt instance: \"Parameter first defined here.\")",
+            explain: "VACASK refuses a statement that gives one parameter twice.",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -227,6 +238,9 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
         let key = read::field_name(l.cst, l.cst.ast.lhs(Node(f)));
         entries.push((key, l.cst.ast.rhs(Node(f))));
     }
+    if repeated(&entries) {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(REPEATED));
+    }
     let Some(master) = h.master else {
         return behavioural::source(l, n, &name, &nodes, &entries);
     };
@@ -238,6 +252,14 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
         }
         Found::Here(Master::Model(word)) => device(l, n, (&name, &nodes, &master), &word, &entries),
     }
+}
+
+/// Whether a parameter name appears twice in `entries` (run rep).
+pub(super) fn repeated(entries: &[(String, u32)]) -> bool {
+    entries
+        .iter()
+        .enumerate()
+        .any(|(k, (key, _))| entries[..k].iter().any(|(other, _)| other == key))
 }
 
 // ---- private ----
