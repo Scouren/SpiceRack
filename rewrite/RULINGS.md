@@ -1,0 +1,14 @@
+# Rulings
+
+Decisions on points the specs or the inventories left open. Newest last. A ruling changes a spec
+file in the same commit when it contradicts one.
+
+| # | Date | Question | Ruling | Why |
+|---|---|---|---|---|
+| R1 | 2026-11-11 | What is a number in the IR: the source simulator's double, or the correctly rounded decimal? (`INV-semantics.md` 1.08; ledger P3-133 against P3-105 and D15) | Neither: the decimal literal as written (`IR-KERNEL.md` §7.3). | The source's double is exact on the same simulator and unreadable everywhere else; the rounded decimal is one ulp off on the same simulator, which moves ngspice's time steps (1.09). The literal gives both: the same digits make the same simulator compute the same double, and `100u` stays `100u` across dialects. Readers do no floating arithmetic. |
+| R2 | 2026-11-11 | How does a reader state a simulator's own meaning of a function, a law or a default? | As a node, a law field, a mode field or an explicit field; never as an idiom built from other nodes (`IR-KERNEL.md` §7.1, `IR-CIRCUIT.md` §1). | A reader and its writer must be inverse on their own dialect (law L5). `Ln(Abs(x))` written by the ngspice writer reads back as `LnAbs(Abs(x))`: the idiom breaks the inverse, the member does not. Conversions are passes, each proved once with the reference evaluator. |
+| R3 | 2026-11-11 | Who binds references? | A dialect reader, by its own simulator's rule. Builders and the IR text parser call the neutral `link` (exact names, innermost scope first). An instance of an unresolved master is never linked: binding it also decides its kind, which needs the kit and belongs to the reader that has it. | Scoping and case rules differ per simulator; a neutral linker applied to a deck read from a dialect would be a pair rule in disguise. |
+| R4 | 2026-11-11 | `link` leaves a reference unbound: silent or noted? | Noted (`R9001`, kind Note). | Unresolved is legal (the kit may be absent), and the note costs nothing. |
+| R5 | 2026-11-11 | Xyce and a dot line that starts with a blank (`INV-semantics.md` 14.03: the manual-based code drops it, a 7.10 run reads it) | The run wins: the Xyce reader reads it. Settled again by a run in the Xyce slice before the reader fixture is written. | The simulator is the oracle of its own dialect; a manual is the fallback when no run exists. |
+| R6 | 2026-11-11 | ngspice level-3 diode mask offset: `xw` or `xom` (`INV-semantics.md` 6.27) | `xw`, as the cited source (`dio/diosetup.c:304-305`) reads; checked against ngspice in the ngspice slice. | One side cites the source line, the other does not. |
+| R7 | 2026-11-11 | `sdt`/time integral on ESPice (`INV-semantics.md` 2.18: one settle file says translate by run, another refuse) | Open until the ESPice flavour's slice: one run on the pinned ESPice decides, and the feature set states the result with the run as its citation. | Two files disagree and both claim evidence. |
