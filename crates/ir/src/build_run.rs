@@ -4,7 +4,7 @@
 //! same asserts as every push (handles in range, numbers finite, C9, C10).
 //!
 //! A detail row is plain data the caller fills, then hands to the one push of its header kind
-//! (`analysis`, `loop_`, `measure`): the [`Detail`] type names the kind. Lists inside a detail
+//! (`analysis`, `loop_`, `measure`): the [`RunDetail`] type names the kind. Lists inside a detail
 //! row (probes, DC axes, targets, variations) are appended first with the pool methods below.
 //! Names and paths are interned here; references stay unresolved for the caller's rule (a
 //! dialect reader binds by its simulator's; a builder calls `link`, A4).
@@ -61,7 +61,7 @@
 //!   `Builder::node_set`, `Builder::save`, `Builder::print`, `Builder::measure`,
 //!   `Builder::statistics`
 
-use crate::analysis::{AnalysisKind, Detail};
+use crate::analysis::{AnalysisKind, RunDetail};
 use crate::build::Builder;
 use crate::dc_ac::{DcAxis, DcAxisList};
 use crate::id::{ExprId, ItemRef, ScopeId};
@@ -158,7 +158,7 @@ impl Builder<'_> {
 
     /// An analysis with a detail row; `name` is the statement name (Spectre, VACASK) or
     /// `None`. Asserts the name is not already an analysis's.
-    pub fn analysis<D: Detail<Kind = AnalysisKind>>(
+    pub fn analysis<D: RunDetail<Kind = AnalysisKind>>(
         &mut self,
         scope: ScopeId,
         name: Option<&str>,
@@ -180,7 +180,7 @@ impl Builder<'_> {
 
     /// A loop and its empty body scope (`ScopeKind::Loop`); push its run items into the
     /// returned scope. Asserts the nesting stays within `plan::LOOP_DEPTH_MAX`.
-    pub fn loop_<D: Detail<Kind = LoopKind>>(
+    pub fn loop_<D: RunDetail<Kind = LoopKind>>(
         &mut self,
         scope: ScopeId,
         name: Option<&str>,
@@ -259,7 +259,7 @@ impl Builder<'_> {
     }
 
     /// A named measure of `analysis`'s results with its detail row.
-    pub fn measure<D: Detail<Kind = MeasureKind>>(
+    pub fn measure<D: RunDetail<Kind = MeasureKind>>(
         &mut self,
         scope: ScopeId,
         name: &str,

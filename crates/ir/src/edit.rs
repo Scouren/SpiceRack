@@ -13,10 +13,11 @@
 //! `Editor::builder(&mut self) -> Builder<'_>`,
 //! `Editor::items_mut(&mut self, ScopeId) -> &mut Vec<ItemRef>`,
 //! `Editor::set<R: ItemRow>(&mut self, u32, R)`,
+//! `Editor::set_detail<D: DetailRow>(&mut self, u32, D)`,
 //! `Editor::map_refs(&mut self, ItemRef, &mut dyn FnMut(&mut Ref, DefKind))`
 
 use crate::build::Builder;
-use crate::design::{Design, ItemRow};
+use crate::design::{Design, DetailRow, ItemRow};
 use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::DefKind;
 
@@ -46,6 +47,13 @@ impl<'d> Editor<'d> {
     /// Replaces the row at `index` of `R`'s table; the span is kept. Asserts the index is in
     /// range and the row's handles are.
     pub fn set<R: ItemRow>(&mut self, index: u32, row: R) {
+        todo!()
+    }
+
+    /// Replaces the row at `index` of `D`'s table (a pass rewriting a typed field). Asserts the
+    /// index is in range and the row's handles are. A detail row shared by two headers is a bug
+    /// of the pass that shared it: the builder gives each header its own.
+    pub fn set_detail<D: DetailRow>(&mut self, index: u32, row: D) {
         todo!()
     }
 

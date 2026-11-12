@@ -42,6 +42,7 @@
 //!   `Builder::user_call`, `Builder::unary`, `Builder::binary`, `Builder::ternary`, `Builder::v`,
 //!   `Builder::i`, `Builder::time`, `Builder::temp`, `Builder::freq`, `Builder::tstep`,
 //!   `Builder::tstop`, `Builder::tnom`, `Builder::draw`, `Builder::list` (each `-> ExprId`)
+//! - detail rows: `Builder::detail<D: DetailRow>(&mut self, D) -> u32`
 //! - items: `Builder::push<R: ItemRow>(&mut self, ScopeId, R, Span) -> ItemRef`,
 //!   `Builder::push_scoped<R: ItemRow>(…) -> (ItemRef, ScopeId)`, `Builder::title`,
 //!   `Builder::comment`, `Builder::include`, `Builder::global`, `Builder::load`,
@@ -50,7 +51,7 @@
 //! - definitions: `Builder::define(&mut self, DefKind, NameId, ScopeId, ItemRef) -> DefId`,
 //!   `Builder::resolve(&mut self, ExprId, DefId)`
 
-use crate::design::{Design, ItemRow};
+use crate::design::{Design, DetailRow, ItemRow};
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, Literal, UnOp};
 #[cfg(doc)]
 use crate::id::Ref;
@@ -210,6 +211,15 @@ impl<'d> Builder<'d> {
 
     /// A vector value.
     pub fn list(&mut self, elements: &[ExprId]) -> ExprId {
+        todo!()
+    }
+
+    // ---- detail rows ----
+
+    /// Appends one detail or side row to `D`'s table (an owner's typed push calls this, then
+    /// pushes the header that indexes it) and returns its index. Asserts the row's handles are
+    /// in range and `ROWS_MAX`.
+    pub fn detail<D: DetailRow>(&mut self, row: D) -> u32 {
         todo!()
     }
 

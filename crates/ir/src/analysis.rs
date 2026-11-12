@@ -1,6 +1,7 @@
 //! Analyses: the closed list of analysis kinds, the analysis header row, and the run owner's
-//! detail tables (`RunDetails`, the design's `run` field) with the one generic door to them
-//! ([`Detail`]). A reader's analysis statement in, a header row plus one detail row out.
+//! detail tables (`RunDetails`, the design's `run` field), reached through the kernel's
+//! [`DetailRow`] (A6) with [`RunDetail`] naming each table's header kind. A reader's analysis
+//! statement in, a header row plus one detail row out.
 //!
 //! Every analysis is `Analysis { kind, name, detail }`; a kind with parameters has its detail
 //! row in its own table (`tran.rs`, `dc_ac.rs`, `periodic.rs`). Loops and measures use the same
@@ -15,17 +16,14 @@
 //! Contents:
 //! - `pub enum AnalysisKind` (`ALL`, `COUNT`, `AnalysisKind::has_detail(self) -> bool`),
 //!   `pub struct Analysis`, `pub struct RunDetails`
-//! - `pub trait Detail` (`Detail::Kind`, `Detail::KIND`, `Detail::table`, `Detail::table_mut`),
-//!   implemented for every analysis, loop and measure detail row
-//! - `Design::detail<D: Detail>(&self, u32) -> D`, `Editor::set_detail<D: Detail>(&mut self,
-//!   u32, D)`
+//! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
+//!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
 //! - `RowFacts` for `Analysis` (`todo_facts!` placeholder, A2)
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
 };
-use crate::design::Design;
-use crate::edit::Editor;
+use crate::design::{Design, DetailRow};
 use crate::id::NameId;
 use crate::measure::{
     MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen,
@@ -150,24 +148,19 @@ pub struct RunDetails {
     pub(crate) correlations: Vec<Correlation>,
 }
 
-/// A detail row: a row of an analysis, loop or measure kind's own table, reached through its
-/// header's `detail` index. Implemented here for every detail row, and nowhere else.
+/// A run detail row: the kernel's [`DetailRow`] plus the header kind whose rows live in its
+/// table (an analysis, loop or measure kind). Implemented here for every run detail row, and
+/// nowhere else; the builder's typed pushes use `Kind` to pick the header kind.
 ///
 /// Rung (`codebase-clean-code` LADDER): the axis is the detail row type; 31 cases exist today;
 /// one accessor, one push and one replace per type would be 93 near-identical methods, and the
 /// compiler still lists every type here (the kernel's `ItemRow` made the same call).
-pub trait Detail: Copy + 'static {
+pub trait RunDetail: DetailRow {
     /// The header enum whose member names this table (`AnalysisKind`, `LoopKind`,
     /// `MeasureKind`).
     type Kind: Copy + Eq + 'static;
     /// The header kind whose rows live in this table.
     const KIND: Self::Kind;
-
-    /// The table.
-    fn table(run: &RunDetails) -> &[Self];
-
-    /// The table, mutable: reachable only through `&mut Design` (builders and editors).
-    fn table_mut(run: &mut RunDetails) -> &mut Vec<Self>;
 }
 
 const _: () = assert!(size_of::<AnalysisKind>() == 1);
@@ -176,15 +169,17 @@ const _: () = assert!(size_of::<Analysis>() == 12);
 macro_rules! details {
     ($($row:ty => $kind:ident :: $variant:ident, $field:ident;)*) => {
         $(
-            impl Detail for $row {
+            impl DetailRow for $row {
+                fn rows(design: &Design) -> &[Self] {
+                    &design.run.$field
+                }
+                fn rows_mut(design: &mut Design) -> &mut Vec<Self> {
+                    &mut design.run.$field
+                }
+            }
+            impl RunDetail for $row {
                 type Kind = $kind;
                 const KIND: $kind = $kind::$variant;
-                fn table(run: &RunDetails) -> &[Self] {
-                    &run.$field
-                }
-                fn table_mut(run: &mut RunDetails) -> &mut Vec<Self> {
-                    &mut run.$field
-                }
             }
         )*
     };
@@ -257,23 +252,6 @@ impl AnalysisKind {
 
     /// Whether the kind has a detail row (every kind but `Op` and `DcInc`).
     pub const fn has_detail(self) -> bool {
-        todo!()
-    }
-}
-
-impl Design {
-    /// The detail row at `index` of `D`'s table (an `Analysis`, `Loop` or `Measure` header's
-    /// `detail`; the caller matched the header's kind to `D::KIND`). Asserts `index` is in
-    /// range.
-    pub fn detail<D: Detail>(&self, index: u32) -> D {
-        todo!()
-    }
-}
-
-impl Editor<'_> {
-    /// Replaces the detail row at `index` of `D`'s table. Asserts the index is in range and
-    /// the row's handles are.
-    pub fn set_detail<D: Detail>(&mut self, index: u32, row: D) {
         todo!()
     }
 }

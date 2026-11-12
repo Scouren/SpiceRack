@@ -58,8 +58,7 @@
 //! - `pub struct ElemHead`
 //! - `Builder::head(&mut self, &str, &[&str], Option<&str>, &[(&str, ExprId)], ExprId) ->
 //!   ElemHead`
-//! - low tier: `Builder::detail<D: DetailRow>(&mut self, D) -> u32`,
-//!   `Builder::wave<W: WaveRow>(&mut self, W) -> WaveRef`,
+//! - low tier (with the kernel's `Builder::detail`, A6): `Builder::wave<W: WaveRow>(&mut self, W) -> WaveRef`,
 //!   `Builder::element(&mut self, ScopeId, ElemKind, ElemHead, u32, Span) -> ItemRef`
 //! - per family (each `-> ItemRef`): `Builder::passive`, `Builder::coupling`,
 //!   `Builder::source`, `Builder::controlled`, `Builder::poly`, `Builder::table_source`,
@@ -69,7 +68,7 @@
 
 use crate::build::Builder;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
-use crate::element::{DetailRow, ElemKind};
+use crate::element::ElemKind;
 use crate::id::{ExprId, ItemRef, NameId, NameList, ParamList, Ref, ScopeId};
 use crate::line::Line;
 use crate::model::Model;
@@ -114,12 +113,6 @@ impl Builder<'_> {
     }
 
     // ---- low tier ----
-
-    /// Appends one detail or side row (a `Parasitics`, `PortSpec`, `Distof`, or a kind's
-    /// detail) and returns its index. Asserts its handles are in range and `ROWS_MAX`.
-    pub fn detail<D: DetailRow>(&mut self, row: D) -> u32 {
-        todo!()
-    }
 
     /// Appends a waveform row and returns its reference. Asserts as `detail`.
     pub fn wave<W: WaveRow>(&mut self, row: W) -> WaveRef {

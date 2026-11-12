@@ -11,9 +11,9 @@
 //! bound. A kind is the meaning, never a letter: `B` on HSPICE, `E … VALUE=` and `bsource` are
 //! one `Behav` (INV-constructs B16).
 //!
-//! Detail rows are reached generically through [`DetailRow`] (`design.detail::<Passive>(i)`,
-//! `builder.detail(row)`, `editor.set_detail(i, row)`), one impl per row type, as the kernel's
-//! `ItemRow` does for items.
+//! Detail rows are reached generically through the kernel's [`DetailRow`]
+//! (`design.detail::<Passive>(i)`, `builder.detail(row)`, `editor.set_detail(i, row)`, A6); the
+//! impls for every row type of [`CircuitDetails`] are here.
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §6, C2, C12, Addenda A2 and A4; `rewrite/IR-CIRCUIT.md` §2;
 //! `rewrite/INV-constructs.md` D1–D136 (D44 terminal classes, D45 master positions), B8–B10,
@@ -25,17 +25,13 @@
 //!   `ElemKind::needs_model(self) -> bool`, `ElemKind::master_kind(self) -> Option<DefKind>`
 //! - `pub enum DetailKind` (`ALL`, `COUNT`)
 //! - `pub struct Element`, `pub const NO_ROW`
-//! - `pub struct CircuitDetails`, `pub trait DetailRow` (`DetailRow::rows`,
-//!   `DetailRow::rows_mut`)
-//! - `Design::detail<D: DetailRow>(&self, u32) -> D`,
-//!   `Editor::set_detail<D: DetailRow>(&mut self, u32, D)`
+//! - `pub struct CircuitDetails`; `DetailRow` (kernel, A6) for every row type it holds
 //! - `RowFacts` for `Element`
 
 use crate::build::Builder;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
-use crate::design::Design;
+use crate::design::{Design, DetailRow};
 use crate::diag::Diags;
-use crate::edit::Editor;
 use crate::facts::{Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
@@ -276,18 +272,6 @@ pub struct CircuitDetails {
     pub(crate) patterns: Vec<Pattern>,
 }
 
-/// A row type of one of the circuit owner's tables: it names its table. Implemented here for
-/// every row type of [`CircuitDetails`], and nowhere else (the generic door behind
-/// `Design::detail`, `Builder::detail`, `Editor::set_detail`).
-pub trait DetailRow: Copy + 'static {
-    /// The table of this row type.
-    fn rows(details: &CircuitDetails) -> &[Self];
-
-    /// The table of this row type, mutable. Reachable only through `&mut Design`, which
-    /// readers and writers never hold.
-    fn rows_mut(details: &mut CircuitDetails) -> &mut Vec<Self>;
-}
-
 const _: () = assert!(size_of::<ElemKind>() == 1);
 const _: () = assert!(size_of::<DetailKind>() == 1);
 const _: () = assert!(size_of::<Element>() == 40);
@@ -296,11 +280,11 @@ macro_rules! detail_rows {
     ($($row:ty => $field:ident;)*) => {
         $(
             impl DetailRow for $row {
-                fn rows(details: &CircuitDetails) -> &[Self] {
-                    &details.$field
+                fn rows(design: &Design) -> &[Self] {
+                    &design.circuit.$field
                 }
-                fn rows_mut(details: &mut CircuitDetails) -> &mut Vec<Self> {
-                    &mut details.$field
+                fn rows_mut(design: &mut Design) -> &mut Vec<Self> {
+                    &mut design.circuit.$field
                 }
             }
         )*
@@ -572,23 +556,6 @@ impl DetailKind {
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
-}
-
-impl Design {
-    /// The row at `index` of `D`'s table. Asserts `index` is in range. The typed accessors
-    /// (`design.passive(&e)`, …) add the kind check on top of this.
-    pub fn detail<D: DetailRow>(&self, index: u32) -> D {
-        todo!()
-    }
-}
-
-impl Editor<'_> {
-    /// Replaces the row at `index` of `D`'s table (a pass rewriting a typed field). Asserts the
-    /// index is in range and the row's handles are. A detail row shared by two elements is a
-    /// bug of the pass that shared it: the builder gives each element its own.
-    pub fn set_detail<D: DetailRow>(&mut self, index: u32, row: D) {
-        todo!()
-    }
 }
 
 impl RowFacts for Element {

@@ -111,3 +111,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - R18. A Spectre statistics `correlate param=[a b c]` → its pairs (`Correlation { a, b, cc }`), which write back as pairs (the law holds on the IR). `Vary::mean` (`NONE` = the parameter's value) is added for table forms that state a centre (Xyce `means=`).
 - R19. "Analysis kind or none" fields (IR-RUN §6) → `Save { analysis, every_analysis: bool }`; `Print` always names its kind (`.print` requires one).
 - R20. Item count of `Extra` → the run owner adds 118 members; with the kernel's 8 the `u8` repr leaves the circuit owner 130. If the two owners' regions together pass 256, `Extra` needs `#[repr(u16)]` (kernel).
+
+## Addendum A6 (one detail door)
+
+- The merge of the two halves did not compile (E0592: both owners defined `Design::detail` and `Editor::set_detail`) → one kernel trait `DetailRow { rows(&Design), rows_mut(&mut Design) }` in `design.rs` beside `ItemRow`, and one `Design::detail`, `Builder::detail`, `Editor::set_detail`, defined once in `design.rs`, `build.rs` and `edit.rs`. `design.rs` stays under 500 code lines, so there is no `detail.rs`.
+- Circuit: the circuit-local `DetailRow` trait and its `Design::detail`/`Editor::set_detail`/`Builder::detail` are deleted; `element.rs`'s `detail_rows!` now implements the kernel trait through `design.circuit.<field>`; `wave.rs`'s `WaveRow: DetailRow` names the kernel trait. `DetailKind` and every typed accessor are unchanged.
+- Run: `Detail` became `RunDetail: DetailRow { type Kind; const KIND }` (the name says it is the run owner's sub-trait), with `table`/`table_mut` removed; `analysis.rs`'s `details!` implements both traits through `design.run.<field>`; `build_run.rs`'s three typed pushes bound on `RunDetail<Kind = …>`. Its duplicate `Design::detail`/`Editor::set_detail` are deleted.
+- `lib.rs` re-exports `DetailRow` from `design` (kernel group) instead of `element`, and `RunDetail` instead of `Detail`; its header names every run re-export.

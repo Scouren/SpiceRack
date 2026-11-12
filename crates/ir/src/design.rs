@@ -26,7 +26,7 @@
 //!
 //! Contents:
 //! - `pub struct Design`, `pub trait ItemRow` (`ItemRow::KIND`, `ItemRow::table`,
-//!   `ItemRow::table_mut`)
+//!   `ItemRow::table_mut`), `pub trait DetailRow` (`DetailRow::rows`, `DetailRow::rows_mut`)
 //! - `Design::new() -> Design`, `Design::builder(&mut self) -> Builder<'_>`,
 //!   `Design::editor(&mut self) -> Editor<'_>`, `Design::entry(&self) -> FileId`,
 //!   `Design::files(&self) -> impl Iterator<Item = FileId>`, `Design::file(&self, FileId) -> File`,
@@ -36,6 +36,7 @@
 //!   `Design::names(&self, NameList) -> &[NameId]`, `Design::exprs(&self, ExprList) -> &[ExprId]`,
 //!   `Design::params(&self, ParamList) -> &[(NameId, ExprId)]`,
 //!   `Design::branches(&self, BranchList) -> &[Branch]`, `Design::text(&self, TextId) -> &str`,
+//!   `Design::detail<D: DetailRow>(&self, u32) -> D`,
 //!   `Design::expr(&self, ExprId) -> Expr`, `Design::num(&self, NumId) -> Literal`,
 //!   `Design::expr_count(&self) -> usize`,
 //!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
@@ -127,6 +128,20 @@ pub trait ItemRow: Copy + 'static {
     /// The table of this kind, mutable. Reachable only through `&mut Design`, which readers and
     /// writers never hold (they get `Builder` and `&Design`).
     fn table_mut(design: &mut Design) -> &mut Table<Self>;
+}
+
+/// A row of an owner's table that an item header or another row indexes (an element's or an
+/// analysis's detail, a waveform, a side row). Implemented by the owner of the table, in the
+/// row's owner file, reaching `design.circuit.<field>` or `design.run.<field>`; the one generic
+/// door behind `Design::detail`, `Builder::detail` and `Editor::set_detail` (A6). Detail rows
+/// have no spans: a detail's span is its header's.
+pub trait DetailRow: Copy + 'static {
+    /// The table of this row type.
+    fn rows(design: &Design) -> &[Self];
+
+    /// The table of this row type, mutable. Reachable only through `&mut Design`, which
+    /// readers and writers never hold (they get `Builder` and `&Design`).
+    fn rows_mut(design: &mut Design) -> &mut Vec<Self>;
 }
 
 macro_rules! item_rows {
@@ -221,6 +236,12 @@ impl Design {
 
     /// The row at `index` of `R`'s table. Asserts `index` is in range.
     pub fn row<R: ItemRow>(&self, index: u32) -> R {
+        todo!()
+    }
+
+    /// The detail row at `index` of `D`'s table. Asserts `index` is in range. The owners' typed
+    /// accessors (`design.passive(&e)`, …) add the header-kind check on top of this.
+    pub fn detail<D: DetailRow>(&self, index: u32) -> D {
         todo!()
     }
 

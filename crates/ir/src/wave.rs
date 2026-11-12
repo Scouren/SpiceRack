@@ -24,7 +24,7 @@
 //! - `Design::wave(&self, WaveRef) -> Wave`
 
 use crate::design::Design;
-use crate::element::DetailRow;
+use crate::design::DetailRow;
 use crate::id::{ExprId, ExprList, NameId};
 
 /// A waveform kind (IR-CIRCUIT §3): which table a [`WaveRef`] indexes.
