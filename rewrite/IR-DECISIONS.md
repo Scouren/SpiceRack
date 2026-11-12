@@ -279,3 +279,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - Replaces "the first `Deck` file, else file 0": the entry is file 0 whatever its role (`NONE` with no file). A kit whose entry is a library reaching a deck writes the library. `kernel_store::files_scopes_and_entry` and `kernel_structure::entry_is_total` now pin file 0.
 
+
+## Amendment A16, run owner
+
+- `Pss::sc_iter` and `Pss::steady_coeff` are appended (`Pss` 28 → 36 bytes), written `sc_iter=` and `steady_coeff=` after the oscillator nodes. `Four::harmonics` may be `NONE`; `check`'s invariant for it: the design sets an `OptionKey::NFreqs` (O(options) per such `Four`). `OptionKey` gains `NFreqs` and `FourGridSize` (class `Output`, not flags), inserted before `Private`. `AnalysisNamed` is set per row; analysis names are generated only with it.
+- The generator gives a count-less `Four` its predecessor itself: half the time, an `Analysis` generator that picked `Four` first pushes an `nfreqs` option (mode by the same mid-run rules), and `Four` drops its count when an `nfreqs` option is among the last 16. Reach over the harness's 4,000 seeds: every run feature in at least 41 (`FourHarmonicsOption` was in 3 without it).

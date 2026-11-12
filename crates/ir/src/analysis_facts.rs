@@ -180,6 +180,9 @@ impl RowFacts for Analysis {
         if crate::state_order::nested(design, scope) {
             *set = set.with(Feature::Run(RunExtra::RunItemNested));
         }
+        if !self.name.is_none() {
+            *set = set.with(Feature::Run(RunExtra::AnalysisNamed));
+        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -267,8 +270,17 @@ impl RowFacts for Analysis {
             return ItemRef::NONE;
         }
         let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // A Fourier analysis that takes its count from the deck's option gets the option from
+        // here, first (it is listed before the analysis, and holds no name the header's name
+        // would follow), half the time.
+        if kind == AnalysisKind::Four
+            && features.contains(Feature::Run(RunExtra::FourHarmonicsOption))
+            && g.chance(2)
+        {
+            crate::option::gen_nfreqs(g, scope, b, features);
+        }
         // The name first: the text, and so the parse, interns it before the detail's names.
-        let name = if g.chance(4) {
+        let name = if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
             g.fresh_name(b)
         } else {
             NameId::NONE
@@ -294,11 +306,12 @@ impl RowFacts for Analysis {
                 .collect();
             if !follow.is_empty() {
                 let kind = follow[g.below(follow.len() as u32) as usize];
-                let name = if g.chance(4) {
-                    g.fresh_name(b)
-                } else {
-                    NameId::NONE
-                };
+                let name =
+                    if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
+                        g.fresh_name(b)
+                    } else {
+                        NameId::NONE
+                    };
                 let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
                     .expect("a periodic kind generates right after its base");
                 b.push(

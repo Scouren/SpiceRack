@@ -141,6 +141,7 @@ impl DetailFacts for Pss {
             out.push(Handle::Expr(e));
         }
         out.extend([Handle::Name(self.osc_p), Handle::Name(self.osc_n)]);
+        out.extend([Handle::Expr(self.sc_iter), Handle::Expr(self.steady_coeff)]);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.mode == PssMode::Driven, RunExtra::PssDriven);
@@ -150,6 +151,8 @@ impl DetailFacts for Pss {
             RunExtra::PssAutonomous,
         );
         flag(set, self.uic, RunExtra::PssUic);
+        flag(set, !self.sc_iter.is_none(), RunExtra::PssScIter);
+        flag(set, !self.steady_coeff.is_none(), RunExtra::PssSteadyCoeff);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         let osc = !self.osc_p.is_none() && !self.osc_n.is_none();
@@ -169,6 +172,8 @@ impl DetailFacts for Pss {
         put_expr(out, design, ctx, "points", self.points);
         put_name(out, design, "osc_p", self.osc_p);
         put_name(out, design, "osc_n", self.osc_n);
+        put_expr(out, design, ctx, "sc_iter", self.sc_iter);
+        put_expr(out, design, ctx, "steady_coeff", self.steady_coeff);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -184,6 +189,8 @@ impl DetailFacts for Pss {
         let points = take_expr(words, "points", scope, b, diags);
         let osc_p = take_name(words, "osc_p", b, diags);
         let osc_n = take_name(words, "osc_n", b, diags);
+        let sc_iter = take_expr(words, "sc_iter", scope, b, diags);
+        let steady_coeff = take_expr(words, "steady_coeff", scope, b, diags);
         Some(Pss {
             mode,
             uic,
@@ -193,8 +200,8 @@ impl DetailFacts for Pss {
             points,
             osc_p,
             osc_n,
-            sc_iter: ExprId::NONE,
-            steady_coeff: ExprId::NONE,
+            sc_iter,
+            steady_coeff,
         })
     }
     #[cfg(any(test, feature = "gen"))]
@@ -234,6 +241,15 @@ impl DetailFacts for Pss {
             PssMode::Autonomous => (g.fresh_name(b), NameId::GROUND),
         };
         let uic = has(features, RunExtra::PssUic) && g.chance(2);
+        let opt = |g: &mut Gen, b: &mut Builder<'_>, x: RunExtra| {
+            if has(features, x) && g.chance(3) {
+                g.expr(b, features, Reads::Constant)
+            } else {
+                ExprId::NONE
+            }
+        };
+        let sc_iter = opt(g, b, RunExtra::PssScIter);
+        let steady_coeff = opt(g, b, RunExtra::PssSteadyCoeff);
         Some(Pss {
             mode,
             uic,
@@ -243,8 +259,8 @@ impl DetailFacts for Pss {
             points,
             osc_p,
             osc_n,
-            sc_iter: ExprId::NONE,
-            steady_coeff: ExprId::NONE,
+            sc_iter,
+            steady_coeff,
         })
     }
 }

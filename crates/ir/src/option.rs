@@ -30,7 +30,8 @@
 //!
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
 //! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
-//! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`)
+//! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`); crate:
+//! `pub(crate) fn gen_nfreqs`
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
@@ -520,6 +521,37 @@ impl RowFacts for NodeSet {
         };
         b.push(scope, row, Span::NONE)
     }
+}
+
+/// Pushes an `nfreqs` option into `scope` for a Fourier analysis about to follow it (its count
+/// then comes from the option, A16), when the set allows one there. Whether it pushed.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_nfreqs(
+    g: &mut Gen,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+) -> bool {
+    let allowed = features.contains(Feature::Item(crate::item::ItemKind::Option))
+        && features.contains(Feature::Option(OptionKey::NFreqs))
+        && g.items_left > 1;
+    let Some(holds) = allowed
+        .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun))
+        .flatten()
+    else {
+        return false;
+    };
+    let value = g.expr(b, features, Reads::Constant);
+    let row = OptionRow {
+        key: OptionKey::NFreqs,
+        private: NameId::NONE,
+        dialect: NameId::NONE,
+        value,
+        holds,
+    };
+    b.push(scope, row, Span::NONE);
+    g.items_left -= 1;
+    true
 }
 
 // ---- private ----

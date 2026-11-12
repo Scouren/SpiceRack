@@ -34,6 +34,7 @@ use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::List;
 use crate::id::{ExprId, ExprList, ScopeId};
+use crate::option_key::OptionKey;
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
 use crate::probe::{
@@ -303,6 +304,7 @@ impl DetailFacts for Four {
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(set, !is_one(design, self.periods), RunExtra::FourPeriods);
         flag(set, !self.grid.is_none(), RunExtra::FourGrid);
+        flag(set, self.harmonics.is_none(), RunExtra::FourHarmonicsOption);
         for p in get(&design.run.probes, self.outputs).unwrap_or(&[]) {
             probe_features(p, set);
         }
@@ -312,10 +314,15 @@ impl DetailFacts for Four {
         let Some(outputs) = get(&design.run.probes, self.outputs) else {
             return Some(Violation::HandleRange);
         };
-        let given = [self.fundamental, self.harmonics, self.periods]
-            .iter()
-            .all(|e| !e.is_none());
-        domain_unless(given && !outputs.is_empty() && outputs.iter().all(probe_valid))
+        let given = !self.fundamental.is_none() && !self.periods.is_none();
+        // An absent count is the deck's `nfreqs`: the design must set one (O(options)).
+        let count = !self.harmonics.is_none()
+            || design
+                .options
+                .rows()
+                .iter()
+                .any(|o| o.key == OptionKey::NFreqs);
+        domain_unless(given && count && !outputs.is_empty() && outputs.iter().all(probe_valid))
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -360,7 +367,20 @@ impl DetailFacts for Four {
         features: &FeatureSet,
     ) -> Option<Self> {
         let fundamental = g.expr(b, features, Reads::Constant);
-        let harmonics = g.expr(b, features, Reads::Constant);
+        // The count from the deck's option only when one is already there (looked for among
+        // the last few options: O(1) per row).
+        let options = b.design().options.rows();
+        let from_option = has(features, RunExtra::FourHarmonicsOption)
+            && options
+                .iter()
+                .rev()
+                .take(16)
+                .any(|o| o.key == OptionKey::NFreqs);
+        let harmonics = if from_option {
+            ExprId::NONE
+        } else {
+            g.expr(b, features, Reads::Constant)
+        };
         let periods = if has(features, RunExtra::FourPeriods) && g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {
