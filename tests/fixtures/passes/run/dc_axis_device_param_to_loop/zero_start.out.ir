@@ -1,0 +1,3 @@
+file "a.sp" deck
+  loop sweep keep_last (device_param g3 g4) (list values=[0, 0.5, 1, 1.5, 2])
+    analysis op

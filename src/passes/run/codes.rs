@@ -6,8 +6,8 @@
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`
 
 use super::{
-    dc_axes_to_loops, fs, ic_next_only, loop_end, names_dropped, names_given, run_items_together,
-    save_set_to_all, sweep_forms, tc, tran_print_step, wr,
+    dc_axes_to_loops, drop_print, fs, ic_next_only, inert_options, loop_end, names_dropped,
+    names_given, run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -208,6 +208,42 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a circuit item between run items that holds run items",
             cite: "rewrite/AMEND-A12.md A22",
             explain: "The target lists a file's run items together. A circuit item between them would move before them, but it holds run items in its body or includes a file that does, and the move would reorder those, so it is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        inert_options::OPTION_DROPPED,
+        ir::Info {
+            title: "an option that changes no result, dropped",
+            cite: "R67, R83; tests/passes_run/decks/options_probe.sp",
+            explain: "The target has no such option, and this one changes nothing the run writes: with and without it, ngspice-45 writes the same raw file (it changes the log only), or for a solver selection the same within that solver's rounding (1e-7 relative), so it was dropped. The note's argument is the key.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        inert_options::OPTION_KEPT,
+        ir::Info {
+            title: "an inert option the rule cannot drop here",
+            cite: "R67",
+            explain: "The option changes no result, but it stands where dropping it would change something else: in a loop's body or a branch (the body's shape is a feature of its own), or as a loop's or alter's target. It is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        drop_print::PRINT_DROPPED,
+        ir::Info {
+            title: "a print card dropped",
+            cite: "R49, R83",
+            explain: "The target has no print card here, and a print writes the run's log, never its saved results: ngspice writes the same raw file with and without it. It was dropped.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        drop_print::PRINT_KEPT,
+        ir::Info {
+            title: "a print card in a loop's body or a branch",
+            cite: "R83",
+            explain: "The print changes no result, but dropping it from a loop's body or a branch changes the body's shape, a feature of its own, so it is refused.",
             kind: ir::Kind::Note,
         },
     ),

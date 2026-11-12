@@ -15,6 +15,25 @@ pub const PENDING_PAIRS: &[&str] = &[
     // compares one DC plot with one, and the rule writes one op plot a pass
     "dc_axis_device_param_to_loop",
     "dc_axis_model_param_to_loop",
+    // proven on ngspice by `passes_run/options.rs` (the raw file unchanged); no VACASK deck holds
+    // these options
+    "drop_option_noacct",
+    "drop_option_acct",
+    "drop_option_list",
+    "drop_option_nomod",
+    "drop_option_nopage",
+    "drop_option_node",
+    "drop_option_opts",
+    "drop_option_warn",
+    "drop_option_maxwarns",
+    "drop_option_norefvalue",
+    "drop_option_noinit",
+    "drop_option_nfreqs",
+    "drop_option_fourgridsize",
+    "drop_option_klu",
+    "drop_option_sparse",
+    // proven on ngspice by `passes_run/options.rs` (prints): no VACASK deck holds a print
+    "drop_print",
     "whole_run_option_first",
     "whole_run_env_first",
     "whole_run_node_set_first",

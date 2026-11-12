@@ -31,6 +31,12 @@
 //!
 //! Otherwise the analysis keeps the feature with a `DC_AXIS_KEPT` note.
 //!
+//! Next step, once R75's per-axis continuation members are on the trunk (not before): the
+//! condition `dc.restart` in `convert` becomes "every peeled axis starts afresh". The rows are
+//! keyed by the continuation feature they remove, not by a target kind. They peel through the
+//! innermost axis whose continuation the target cannot state, not the innermost of one kind.
+//! And they take any target a loop can alter (`peel`'s list; the temperature needs `LoopTemp`).
+//!
 //! Cites: `crates/ir/src/{dc_ac,plan}.rs`; `rewrite/IR-RUN.md` §1; AMEND-A12 A22, A27.
 //!
 //! Contents: `pub fn dc_axis_device_param_to_loop(&mut ir::Design, &mut ir::Diags)`,

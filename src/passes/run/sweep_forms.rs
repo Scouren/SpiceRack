@@ -131,7 +131,11 @@ pub fn sweep_freq_list_to_lin_points(design: &mut ir::Design, diags: &mut ir::Di
 /// The values of a linear or listed sweep as decimal literals, in run order: a list's own
 /// literals, a linear sweep's `start + i·step` (by count, the step `(stop − start)/(n − 1)` when
 /// it terminates; by step, every grid value at or before `stop`), at most `VALUES_MAX`; `None`
-/// for a log sweep, a value that is no literal, or a grid past the bound.
+/// for a log sweep, a value that is no literal, a value no IR literal holds (`Literal::is_valid`;
+/// a zero is `Literal::ZERO`), or a grid past the bound. A sweep from `start` to `start` is the
+/// one point `start` whatever its step, as VACASK runs it (run: `from=0 to=0 step=8.02e-15`, one
+/// point; ngspice-45's `.dc v1 0 0 8.02e-15` runs 28 by its absolute end test, which
+/// `ngspice_count` refuses for the DC rows).
 pub(super) fn values(design: &ir::Design, s: &ir::SweepSpec) -> Option<Vec<ir::Literal>> {
     if s.end != ir::SweepEnd::Grid || s.bounds != ir::SweepBounds::StartStop {
         return None;
@@ -337,6 +341,9 @@ fn dec(l: ir::Literal) -> Option<Dec> {
 
 /// The real literal of `d`, or `None` when its digits exceed a literal's mantissa.
 fn lit(d: Dec) -> Option<ir::Literal> {
+    if d.m == 0 {
+        return Some(ir::Literal::ZERO); // the one canonical zero (`Literal::is_valid`)
+    }
     let (mut m, mut e) = (d.m, d.e);
     while m != 0 && m % 10 == 0 {
         m /= 10;
@@ -346,7 +353,7 @@ fn lit(d: Dec) -> Option<ir::Literal> {
         return None;
     }
     let m = i64::try_from(m).ok()?;
-    match e {
+    let l = match e {
         -6..=0 => Some(plain(m, u8::try_from(-e).ok()?)),
         _ => Some(ir::Literal {
             mantissa: m,
@@ -354,7 +361,9 @@ fn lit(d: Dec) -> Option<ir::Literal> {
             exp10: i16::try_from(e).ok()?,
             form: ir::NumForm::Exponent,
         }),
-    }
+    };
+    // a literal past what the IR's literal holds is no literal: the caller keeps the item
+    l.filter(|l| l.is_valid())
 }
 
 /// A plain real literal `m · 10^-frac`.
