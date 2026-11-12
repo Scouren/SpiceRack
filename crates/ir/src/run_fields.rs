@@ -23,6 +23,7 @@
 //! `run_fields!`, `table_facts!`
 
 use crate::build::Builder;
+use crate::dc_ac::{DcAxis, DcAxisList};
 use crate::design::Design;
 use crate::diag::Diags;
 use crate::facts::Handle;
@@ -33,8 +34,8 @@ use crate::probe::{AcPart, Probe, ProbeKind, dump_probe, parse_probe, probe_hand
 use crate::run_exprs::Roots;
 use crate::run_names::Names;
 use crate::run_words::{
-    put_expr, put_exprs, put_flag, put_name, put_names, put_word, take_exprs, take_key, take_name,
-    take_names, take_word,
+    get, put_expr, put_exprs, put_flag, put_name, put_names, put_word, take_exprs, take_key,
+    take_name, take_names, take_word,
 };
 use crate::sweep::{
     SweepBounds, SweepEnd, SweepKind, SweepSpec, dump_sweep, parse_sweep, sweep_handles,
@@ -73,6 +74,8 @@ pub(crate) enum RunField<'a> {
     Target(&'a mut Target),
     /// A positional measure event ` (…)`.
     Event(&'a mut Event),
+    /// DC axes, each its own fields (`DcAxis`'s table), one after another while a `(` follows.
+    DcAxes(&'a mut DcAxisList),
 }
 
 /// A closed enum field seen through its IR-text words (`run_words::word`).
@@ -174,7 +177,7 @@ macro_rules! run_fields {
 macro_rules! table_facts {
     () => {
         fn handles(&self, _design: &$crate::design::Design, out: &mut Vec<$crate::facts::Handle>) {
-            $crate::run_fields::field_handles(self, out);
+            $crate::run_fields::field_handles(self, _design, out);
         }
         fn map_exprs(&mut self, r: &mut $crate::run_exprs::Roots<'_>) {
             $crate::run_fields::field_exprs(self, r);
@@ -202,7 +205,7 @@ macro_rules! table_facts {
 }
 
 /// Appends every handle of `row`'s fields, in field order (a choice or a word has none).
-pub(crate) fn field_handles<R: RunFields>(row: &R, out: &mut Vec<Handle>) {
+pub(crate) fn field_handles<R: RunFields>(row: &R, design: &Design, out: &mut Vec<Handle>) {
     let mut row = *row;
     row.fields(&mut |_, field| match field {
         RunField::Expr(e) => out.push(Handle::Expr(*e)),
@@ -214,6 +217,11 @@ pub(crate) fn field_handles<R: RunFields>(row: &R, out: &mut Vec<Handle>) {
         RunField::Sweep(s) => sweep_handles(s, out),
         RunField::Target(t) => target_handles(t, out),
         RunField::Event(e) => event_handles(e, out),
+        RunField::DcAxes(l) => {
+            for axis in get(&design.run.dc_axes, *l).unwrap_or(&[]) {
+                field_handles(axis, design, out);
+            }
+        }
     });
 }
 
@@ -225,6 +233,7 @@ pub(crate) fn field_exprs<R: RunFields>(row: &mut R, r: &mut Roots<'_>) {
         RunField::Probe(p) => r.probe(p),
         RunField::Sweep(s) => r.sweep(s),
         RunField::Event(e) => r.event(e),
+        RunField::DcAxes(l) => r.dc_axes(*l),
         RunField::Name(_)
         | RunField::Element(_)
         | RunField::Names(_)
@@ -244,6 +253,7 @@ pub(crate) fn field_names<R: RunFields>(row: &mut R, r: &mut Names<'_>) {
         RunField::Probe(p) => r.probe(p),
         RunField::Event(e) => r.event(e),
         RunField::Target(t) => r.target(t),
+        RunField::DcAxes(l) => r.dc_axes(*l),
         RunField::Expr(_)
         | RunField::Exprs(_)
         | RunField::Name(_)
@@ -275,6 +285,11 @@ pub(crate) fn field_dump<R: RunFields>(row: &R, design: &Design, ctx: &Ctx, out:
         RunField::Sweep(s) => dump_sweep(design, ctx, s, out),
         RunField::Target(t) => dump_target(design, ctx, t, out),
         RunField::Event(e) => dump_event(design, ctx, e, out),
+        RunField::DcAxes(l) => {
+            for axis in design.dc_axes(*l) {
+                field_dump(axis, design, ctx, out);
+            }
+        }
     });
 }
 
@@ -362,5 +377,17 @@ fn read(
         RunField::Event(e) => parse_event(words, scope, b, diags)
             .map(|x| *e = x)
             .is_some(),
+        RunField::DcAxes(l) => {
+            let mut axes = Vec::new();
+            // each round consumes an axis or returns
+            while words.peek() == Some("(") {
+                let Some(axis) = field_parse::<DcAxis>(words, scope, b, diags) else {
+                    return false;
+                };
+                axes.push(axis);
+            }
+            *l = b.dc_axes(&axes);
+            true
+        }
     }
 }
