@@ -1,0 +1,6 @@
+# codes:
+file "four_gridsize.sp" deck
+  title "four_gridsize"
+  comment " oracle: ngspice-45 fourier.c:69-72 (the count is nfreqs alone; fourgridsize sets the interpolation grid only); the mutation law's shrunk input (seed 26): the count stays the default 9"
+  option four_grid_size value=400 whole_run
+  analysis four fundamental=1k harmonics=9 periods=1 (v (out))
