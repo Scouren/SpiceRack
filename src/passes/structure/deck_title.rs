@@ -1,8 +1,9 @@
 //! Pass `deck_title`: a design in, the same design out with an empty `Title` as the first item
 //! of every `Deck` file whose top scope holds none. It removes `Extra::DeckWithoutTitle`
 //! (ngspice and VACASK read a deck's first line as its title whatever it holds, so "no title"
-//! and "an empty title" are one text there) and requires nothing. Nothing else moves: every
-//! other item keeps its place, and the only feature the design can gain is `Item(Title)`.
+//! and "an empty title" are one text there) and requires `Item(Title)`, the title it adds.
+//! Nothing else moves: every other item keeps its place, and the only feature the design can
+//! gain is `Item(Title)`.
 //!
 //! Cites: the lead's ruling on decks without a title (VACASK scaffold); `rewrite/SPINE.md` §4.
 //!

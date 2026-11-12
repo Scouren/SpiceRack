@@ -90,27 +90,64 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   text family copies it).
 - Every branch on which work happens is in these four functions.
 
-## 4. Legalization (`src/passes/mod.rs`)
+## 4. Legalization (`src/passes/`)
 
 ```rust
 pub struct Pass {
-    pub name: &'static str,
-    /// The feature it removes.
-    pub removes: ir::Feature,
-    /// What the target must have for the pass's output to be legal.
-    pub requires: ir::FeatureSet,
+    pub name: &'static str,                  // its file, its fixtures' folder
+    pub removes: ir::Feature,                // the feature it removes
+    pub requires: ir::FeatureSet,            // every feature its output may add (law P3)
+    pub notes: &'static [ir::Code],          // its notes at items it leaves carrying `removes`
     pub run: fn(&mut ir::Design, &mut ir::Diags),
 }
-pub static PASSES: &[Pass];                     // empty in this slice
+pub struct Group { pub name: &'static str, pub passes: &'static [Pass],
+                   pub codes: &'static [(ir::Code, ir::Info)], pub range: (u16, u16) }
+pub static GROUPS: &[Group];                 // structure, expr, waves, run: in this order
 pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir::Diags);
+pub fn all() -> impl Iterator<Item = &'static Pass>;
+pub fn info(code: ir::Code) -> Option<ir::Info>;   // chained into `dialect::info`
 ```
 
-`legalize` loops: the features the design uses and the target lacks; for each, the first pass
-that removes it and whose `requires` the target has; run it; `ir::check`; repeat until nothing
-changes (bounded by `PASSES.len() + 1` rounds, asserted). What is left is refused: one `U` row
-per item that carries the feature. A pass imports `crate::ir` only. One pass per file, tested on
-its own (IR text in, IR text out, and the reference evaluator or a simulator that runs both
-forms).
+**Groups, one owner each.** `structure` (subcircuits, models, names, libraries, decks;
+`U0300..=U0399`), `expr` (expressions; `U0100..=U0199`), `waves` (sources and elements;
+`U0200..=U0299`), `run` (analyses, options, state items, loops, outputs; `U0400..=U0499`). A
+group is `src/passes/<group>.rs` while it holds no pass, then `src/passes/<group>/mod.rs` with
+one file per pass beside it (a folder of one file fails `check_style.py`); it exports
+`pub(super) const PASSES: &[Pass]` and `pub(super) const CODES`, its contract in its `//!`
+header. `mod.rs` chains the four in `GROUPS`.
+
+**Order is meaning.** `legalize` loops: the features the design uses and the target lacks;
+every pass in `GROUPS` order, then the group's own order, that removes one of them and whose
+`requires` the target has, runs (the first such pass per feature per round), then `ir::check`;
+repeat until nothing is missing or a round changes nothing (bounded by the pass count + 1,
+asserted). Then `ir::check_legal` reports what is left: one `U0001` row per item that carries
+a feature. A pass may produce input for the passes after it, never rely on one after it:
+`structure` first (every other pass walks the scopes, names and definitions it settles), then
+`expr` (wave and run passes read fields it has substituted, such as the transient leaves), then
+`waves`, then `run`.
+
+**Codes.** A pass that leaves an item carrying its feature (it cannot convert it: two
+transients for `substitute_tran_leaves`, an operand holding a draw that would be duplicated)
+puts one coded note of its own at that item (`Pass::notes`, rows of its group's `CODES`, `U` in
+the group's range). `passes::info` serves them to `dialect::info`; a test checks each code is in
+its group's range, appears once, is not the IR crate's, and each `notes` code has a row.
+
+**Imports.** A pass imports `crate::ir`, `crate::passes` (for `Pass`) and its own group only; a
+helper shared by passes of one group lives in that group's folder. `tests/layering.rs` fails on
+any other edge, a pass of one group importing another group included.
+
+**Laws** (`tests/pass_laws.rs`, generic over `GROUPS`, failing passes compared by name with a
+strict `KNOWN` list; a law that runs on no generated design for a pass fails for it), over
+generated designs that use the pass's `removes` and over ones that do not: P1 `ir::check` is
+clean after it; P2 every item still carrying `removes` (by `ir::check_legal`) has a note of the
+pass at it, every other has lost it; P3 the output uses nothing outside the input's features
+plus `requires`; P4 running it twice equals running it once (IR text equal); P5 on a design
+without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
+simulator on both forms) is each pass's own test.
+
+**Fixtures.** `tests/fixtures/passes/<group>/<pass>/<case>.ir` and `<case>.out.ir`: the pass
+laws read each case, run its pass, check, and compare the written text; a folder naming no
+registered pass fails. The golden walk excludes `tests/fixtures/passes/`.
 
 ## 5. The seam: the old entry points route (`src/dialect/facade.rs`, two call sites)
 
@@ -156,7 +193,7 @@ laws run on.
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
   edge: a file under `src/dialect/<d>/` importing another dialect (except a declared parent),
-  `syntax::render`, or `passes`; a file under `src/passes/` importing anything but `ir`; a file
+  `syntax::render`, or `passes`; a file under `src/passes/` importing anything but `ir` and `passes`, or another pass group; a file
   under `src/dialect/spice/` or `src/dialect/named/` naming a dialect. The rule table is data at
   the top of the test.
 - `tests/test_spine.rs`: `transpile` over the `ir` dialect on hand-written IR text (a deck with
