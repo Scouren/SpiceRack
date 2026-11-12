@@ -309,11 +309,10 @@ fn tran(lw: &mut Lower<'_, '_>, st: Stmt, w: &[String]) -> Result<Card, Fail> {
         optional.push(words::value(lw, st, s)?);
     }
     let mut optional = optional.into_iter();
-    let start = optional.next();
-    // a zero tmax is no tmax (traninit.c:29)
-    let max = optional
-        .next()
-        .filter(|v| !matches!(v, Val::Lit(l, _) if l.mantissa == 0));
+    // a zero tmax is no tmax (traninit.c:29); a zero tstart is recording from 0, the IR's none
+    let zero = |v: &Val| matches!(v, Val::Lit(l, _) if l.mantissa == 0);
+    let start = optional.next().filter(|v| !zero(v));
+    let max = optional.next().filter(|v| !zero(v));
     Ok(Card::Tran {
         step,
         stop,

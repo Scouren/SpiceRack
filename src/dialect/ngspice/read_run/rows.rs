@@ -13,7 +13,7 @@ use super::words;
 use crate::ir;
 use crate::ir::dc_ac::{Ac, Dc, DcAxis, Disto, Noise, NoiseRef, Pz, PzInput, Sens, SensAc, Sp, Tf};
 use crate::ir::periodic::{Pss, PssMode};
-use crate::ir::tran::{Four, StepCap, Tran};
+use crate::ir::tran::{Four, StepCap, StepCeiling, Tran};
 
 /// Appends `card` as one `Analysis` in `st.scope`.
 /// The control area calls it with the card `analysis::read` made of a script command's words.
@@ -70,18 +70,20 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             let stop = words::emit(lw, st, stop);
             let record_start = start.as_ref().map_or(none, |v| words::emit(lw, st, v));
             let print_step = words::emit(lw, st, step);
-            let max_step = max.as_ref().map_or(none, |v| words::emit(lw, st, v));
+            let ceiling = match max {
+                Some(v) => StepCeiling::Given(words::emit(lw, st, v)),
+                None => StepCeiling::Rule(StepCap::NgspiceRule),
+            };
             let row = Tran {
                 stop,
                 record_start,
                 print_step,
-                max_step,
                 initial_step: none,
                 noise_fmax: none,
                 noise_fmin: none,
                 noise_seed: none,
                 segments: ir::List::EMPTY,
-                cap: StepCap::NgspiceRule,
+                ceiling,
                 uic: *uic,
                 startup: false,
             };

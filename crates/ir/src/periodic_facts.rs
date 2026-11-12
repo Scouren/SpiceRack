@@ -28,9 +28,9 @@ use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-use crate::id::ScopeId;
 #[cfg(any(test, feature = "gen"))]
-use crate::id::{ExprId, NameId};
+use crate::id::ExprId;
+use crate::id::{NameId, ScopeId};
 use crate::periodic::{Hb, HbTruncate, Pss, PssMode};
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
@@ -173,6 +173,11 @@ impl DetailFacts for Pss {
         flag(set, self.uic, RunExtra::PssUic);
         flag(set, !self.sc_iter.is_none(), RunExtra::PssScIter);
         flag(set, !self.steady_coeff.is_none(), RunExtra::PssSteadyCoeff);
+        flag(
+            set,
+            self.mode == PssMode::Autonomous && self.osc_n != NameId::GROUND,
+            RunExtra::PssOscDiff,
+        );
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         let osc = !self.osc_p.is_none() && !self.osc_n.is_none();
@@ -258,7 +263,15 @@ impl DetailFacts for Pss {
         };
         let (osc_p, osc_n) = match mode {
             PssMode::Driven => (NameId::NONE, NameId::NONE),
-            PssMode::Autonomous => (g.fresh_name(b), NameId::GROUND),
+            PssMode::Autonomous => {
+                let p = g.fresh_name(b);
+                let n = if has(features, RunExtra::PssOscDiff) && g.chance(3) {
+                    g.fresh_name(b)
+                } else {
+                    NameId::GROUND
+                };
+                (p, n)
+            }
         };
         let uic = has(features, RunExtra::PssUic) && g.chance(2);
         let opt = |g: &mut Gen, b: &mut Builder<'_>, x: RunExtra| {

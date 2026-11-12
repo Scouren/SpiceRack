@@ -5,8 +5,9 @@
 //! initial-step guess, ngspice's a print step that also caps the step, HSPICE's further fields
 //! are segments, Spectre's `step` is for output only), so the row names every quantity and the
 //! reader puts each number in the field its simulator means (IR-RUN §2, `INV-semantics.md`
-//! 8.01–8.03). The step ceiling a simulator applies by default differs too: that is `cap`, a law
-//! field, used when `max_step` is `NONE`; no number is computed by a reader.
+//! 8.01–8.03). The step ceiling a simulator applies by default differs too: the row's `ceiling`
+//! is either a given expression or the default rule, a law; no number is computed by a reader.
+//! One meaning has one row (A24, R47): no literal-zero ceiling or `record_start`.
 //!
 //! Cites: `rewrite/IR-RUN.md` §2; `rewrite/INV-constructs.md` G6, G7, G14, G39, G42, G48, G50,
 //! G54, H29, I11, I19; `rewrite/INV-semantics.md` 8.01–8.03, 8.19, 8.20, 8.21, 8.25.
@@ -14,13 +15,13 @@
 //! IR text (after `analysis tran|four [name=n]`):
 //!
 //! ```text
-//! tran stop=v [record_start=v] [print_step=v] [max_step=v] [initial_step=v] [noise_fmax=v]
-//!      [noise_fmin=v] [noise_seed=v] [segments=[v, …]] cap=<rule> [uic] [startup]
+//! tran stop=v [record_start=v] [print_step=v] [initial_step=v] [noise_fmax=v] [noise_fmin=v]
+//!      [noise_seed=v] [segments=[v, …]] max_step=v|cap=<rule> [uic] [startup]
 //! four fundamental=v harmonics=v periods=v [grid=v] <probe> …
 //! ```
 //!
-//! Contents: `pub struct Tran`, `pub enum StepCap`, `pub struct Four`; `StepCap::ALL`,
-//! `StepCap::COUNT`; `DetailFacts` for `Tran` and `Four`
+//! Contents: `pub struct Tran`, `pub enum StepCeiling`, `pub enum StepCap`, `pub struct Four`;
+//! `StepCap::ALL`, `StepCap::COUNT`; `DetailFacts` for `Tran` and `Four`
 
 use crate::analysis_facts::DetailFacts;
 use crate::build::Builder;
@@ -45,7 +46,7 @@ use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
-    domain_unless, flag, get, is_one, put_expr, put_exprs, put_flag, put_word, take_enum,
+    domain_unless, flag, get, is_one, is_zero, put_expr, put_exprs, put_flag, put_word, take_enum,
     take_expr, take_exprs, take_key, take_word, word,
 };
 use crate::text::Words;
@@ -58,15 +59,12 @@ pub struct Tran {
     /// The end time, s; never `NONE`.
     pub stop: ExprId,
     /// When results start being recorded, s (SPICE `tstart`, HSPICE `START=`, VACASK
-    /// `start=`); `NONE` = from 0.
+    /// `start=`); `NONE` = from 0, so never the literal 0 (checked; A24).
     pub record_start: ExprId,
     /// The output interval, s (ngspice `tstep`, Spectre `step`); `NONE` = the simulator
     /// chooses (Xyce and LTspice step 0; ngspice has no such thing: its writer lacks
     /// `RunExtra::TranSimulatorStep`).
     pub print_step: ExprId,
-    /// The time-step ceiling, s (SPICE `tmax`, Spectre and VACASK `maxstep`, Xyce's fourth
-    /// field; a Xyce `schedule()` is its smallest nonzero step); `NONE` = `cap` decides.
-    pub max_step: ExprId,
     /// The first step's size, s (Xyce's first field); `NONE` = the simulator's guess.
     pub initial_step: ExprId,
     /// Device noise in the transient: the highest frequency, Hz (VACASK `noisefmax=`); `NONE`
@@ -80,14 +78,27 @@ pub struct Tran {
     /// HSPICE's further segments: `(print_step, stop)` pairs after the first, in order; empty
     /// elsewhere.
     pub segments: ExprList,
-    /// The step ceiling when `max_step` is `NONE`.
-    pub cap: StepCap,
+    /// The time-step ceiling: given, or the simulator's default rule.
+    pub ceiling: StepCeiling,
     /// Skip the operating point and start from the initial conditions (`uic`, Xyce `NOOP`,
     /// Spectre `skipdc=yes`, VACASK `icmode="uic"`).
     pub uic: bool,
     /// Ramp the DC-only top-level sources over the first 20 µs (LTspice `startup`); lowering
     /// it to PWL sources is a pass.
     pub startup: bool,
+}
+
+/// A transient's time-step ceiling (A24, R47): one field, so a given ceiling leaves no unread
+/// rule beside it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StepCeiling {
+    /// The deck's ceiling, s (SPICE `tmax`, Spectre and VACASK `maxstep`, Xyce's fourth field;
+    /// a Xyce `schedule()` is its smallest nonzero step). Never `NONE` and never the literal 0
+    /// (checked): ngspice (`traninit.c:29`) and VACASK read a 0 as none given, which is a
+    /// `Rule`.
+    Given(ExprId),
+    /// None given: the simulator's default rule.
+    Rule(StepCap),
 }
 
 /// The ceiling a simulator puts on the time step when the deck gives none. The span is
@@ -126,7 +137,8 @@ pub struct Four {
     pub outputs: ProbeList,
 }
 
-const _: () = assert!(size_of::<Tran>() == 44);
+const _: () = assert!(size_of::<Tran>() == 48);
+const _: () = assert!(size_of::<StepCeiling>() == 8);
 const _: () = assert!(size_of::<Four>() == 24);
 
 impl StepCap {
@@ -147,7 +159,6 @@ impl DetailFacts for Tran {
             self.stop,
             self.record_start,
             self.print_step,
-            self.max_step,
             self.initial_step,
             self.noise_fmax,
             self.noise_fmin,
@@ -156,6 +167,9 @@ impl DetailFacts for Tran {
             out.push(Handle::Expr(e));
         }
         out.push(Handle::Exprs(self.segments));
+        if let StepCeiling::Given(e) = self.ceiling {
+            out.push(Handle::Expr(e));
+        }
     }
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
@@ -163,7 +177,6 @@ impl DetailFacts for Tran {
             &mut self.stop,
             &mut self.record_start,
             &mut self.print_step,
-            &mut self.max_step,
             &mut self.initial_step,
             &mut self.noise_fmax,
             &mut self.noise_fmin,
@@ -172,38 +185,59 @@ impl DetailFacts for Tran {
             r.expr(e);
         }
         r.exprs(self.segments);
+        if let StepCeiling::Given(e) = &mut self.ceiling {
+            r.expr(e);
+        }
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.print_step.is_none(), RunExtra::TranSimulatorStep);
         flag(set, !self.record_start.is_none(), RunExtra::TranRecordStart);
-        flag(set, !self.max_step.is_none(), RunExtra::TranMaxStep);
         flag(set, !self.initial_step.is_none(), RunExtra::TranInitialStep);
-        if self.max_step.is_none() {
-            flag(set, true, cap_feature(self.cap));
-        }
+        flag(
+            set,
+            true,
+            match self.ceiling {
+                StepCeiling::Given(_) => RunExtra::TranMaxStep,
+                StepCeiling::Rule(cap) => cap_feature(cap),
+            },
+        );
         flag(set, self.uic, RunExtra::TranUic);
         flag(set, self.startup, RunExtra::TranStartup);
         flag(set, !self.noise_fmax.is_none(), RunExtra::TranNoise);
         flag(set, self.segments.len > 0, RunExtra::TranSegments);
     }
 
-    fn fault(&self, _design: &Design) -> Option<Violation> {
+    fn fault(&self, design: &Design) -> Option<Violation> {
         let noise = self.noise_fmax.is_none() == self.noise_fmin.is_none();
-        domain_unless(!self.stop.is_none() && noise && self.segments.len.is_multiple_of(2))
+        // one meaning, one row (A24): a 0 ceiling is no ceiling given, a 0 start no start given
+        let ceiling = match self.ceiling {
+            StepCeiling::Given(e) => !e.is_none() && !is_zero(design, e),
+            StepCeiling::Rule(_) => true,
+        };
+        let start = !is_zero(design, self.record_start);
+        domain_unless(
+            !self.stop.is_none()
+                && noise
+                && self.segments.len.is_multiple_of(2)
+                && ceiling
+                && start,
+        )
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         put_expr(out, design, ctx, "stop", self.stop);
         put_expr(out, design, ctx, "record_start", self.record_start);
         put_expr(out, design, ctx, "print_step", self.print_step);
-        put_expr(out, design, ctx, "max_step", self.max_step);
         put_expr(out, design, ctx, "initial_step", self.initial_step);
         put_expr(out, design, ctx, "noise_fmax", self.noise_fmax);
         put_expr(out, design, ctx, "noise_fmin", self.noise_fmin);
         put_expr(out, design, ctx, "noise_seed", self.noise_seed);
         put_exprs(out, design, ctx, "segments", self.segments);
-        put_word(out, &format!("cap={}", word(self.cap)));
+        match self.ceiling {
+            StepCeiling::Given(e) => put_expr(out, design, ctx, "max_step", e),
+            StepCeiling::Rule(cap) => put_word(out, &format!("cap={}", word(cap))),
+        }
         put_flag(out, self.uic, "uic");
         put_flag(out, self.startup, "startup");
     }
@@ -217,30 +251,32 @@ impl DetailFacts for Tran {
         let stop = take_expr(words, "stop", scope, b, diags);
         let record_start = take_expr(words, "record_start", scope, b, diags);
         let print_step = take_expr(words, "print_step", scope, b, diags);
-        let max_step = take_expr(words, "max_step", scope, b, diags);
         let initial_step = take_expr(words, "initial_step", scope, b, diags);
         let noise_fmax = take_expr(words, "noise_fmax", scope, b, diags);
         let noise_fmin = take_expr(words, "noise_fmin", scope, b, diags);
         let noise_seed = take_expr(words, "noise_seed", scope, b, diags);
         let segments = take_exprs(words, "segments", scope, b, diags);
-        if !take_key(words, "cap") {
+        let given = take_expr(words, "max_step", scope, b, diags);
+        let ceiling = if !given.is_none() {
+            StepCeiling::Given(given)
+        } else if take_key(words, "cap") {
+            StepCeiling::Rule(take_enum(words, &StepCap::ALL, diags)?)
+        } else {
             words.error(diags);
             return None;
-        }
-        let cap = take_enum(words, &StepCap::ALL, diags)?;
+        };
         let uic = take_word(words, "uic");
         let startup = take_word(words, "startup");
         Some(Tran {
             stop,
             record_start,
             print_step,
-            max_step,
             initial_step,
             noise_fmax,
             noise_fmin,
             noise_seed,
             segments,
-            cap,
+            ceiling,
             uic,
             startup,
         })
@@ -270,10 +306,9 @@ impl DetailFacts for Tran {
         };
         let stop = value(g, b, true);
         let on = has(features, RunExtra::TranRecordStart) && g.chance(3);
-        let record_start = value(g, b, on);
+        let record_start = if on { nonzero(g, b) } else { ExprId::NONE };
         let chosen = has(features, RunExtra::TranSimulatorStep) && g.chance(3);
         let print_step = value(g, b, !chosen);
-        let max_step = value(g, b, own_cap);
         let on = has(features, RunExtra::TranInitialStep) && g.chance(3);
         let initial_step = value(g, b, on);
         let noise = has(features, RunExtra::TranNoise) && g.chance(3);
@@ -287,22 +322,22 @@ impl DetailFacts for Tran {
         } else {
             List::EMPTY
         };
-        let cap = if own_cap {
-            StepCap::None
+        // after the segments: the text writes the ceiling there
+        let ceiling = if own_cap {
+            StepCeiling::Given(nonzero(g, b))
         } else {
-            caps[g.below(caps.len() as u32) as usize]
+            StepCeiling::Rule(caps[g.below(caps.len() as u32) as usize])
         };
         Some(Tran {
             stop,
             record_start,
             print_step,
-            max_step,
             initial_step,
             noise_fmax,
             noise_fmin,
             noise_seed,
             segments,
-            cap,
+            ceiling,
             uic: has(features, RunExtra::TranUic) && g.chance(2),
             startup: has(features, RunExtra::TranStartup) && g.chance(2),
         })
@@ -447,4 +482,18 @@ fn cap_feature(cap: StepCap) -> RunExtra {
         StepCap::SpanOver50 => RunExtra::TranCapSpan50,
         StepCap::SpanOver10 => RunExtra::TranCapSpan10,
     }
+}
+
+/// A literal that is not 0, for a field that must not hold the literal 0 (A24): the
+/// generator's literal, with a zero replaced by 1.
+#[cfg(any(test, feature = "gen"))]
+fn nonzero(g: &mut Gen, b: &mut Builder<'_>) -> ExprId {
+    let l = g.literal();
+    let one = crate::expr::Literal {
+        mantissa: 1,
+        frac: 0,
+        exp10: 0,
+        form: crate::expr::NumForm::Plain,
+    };
+    b.literal(if l.mantissa == 0 { one } else { l })
 }
