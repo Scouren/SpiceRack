@@ -369,6 +369,30 @@ impl RowFacts for Subckt {
         for p in design.params(self.params) {
             value_type(design, p.1, set);
         }
+        // R62/A37: a default's reads by rule, a sibling formal's aside
+        let formals: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
+        let mut nodes = Vec::new();
+        for p in design.params(self.params) {
+            nodes.clear();
+            crate::class::tree_nodes(design, p.1, &mut nodes);
+            for &e in &nodes {
+                let crate::expr::Expr::Param(r) = design.expr(e) else {
+                    continue;
+                };
+                let rule = if !r.is_resolved() {
+                    (!formals.contains(&r.name)).then_some(Extra::FormalUnboundRead)
+                } else {
+                    let outside = r
+                        .def
+                        .index_checked(design.defs.len())
+                        .is_some_and(|k| design.defs[k].scope != self.body);
+                    outside.then_some(Extra::FormalOuterRead)
+                };
+                if let Some(x) = rule {
+                    *set = set.with(Feature::Extra(x));
+                }
+            }
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {

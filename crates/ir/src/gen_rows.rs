@@ -111,6 +111,9 @@ pub(crate) fn gen_subckt(
     // FormalNotConstant (A12 K2, A15)
     let free = f.contains(Feature::Extra(Extra::FormalNotConstant));
     g.param_reads = free;
+    // R62/A37: a read bound outside the subcircuit, or left unbound, only as the set allows
+    g.bound_reads = f.contains(Feature::Extra(Extra::FormalOuterRead));
+    g.unbound_reads = f.contains(Feature::Extra(Extra::FormalUnboundRead));
     g.constant_only = !free;
     // no formal can be made when it may neither go without a default nor have one
     let formals = if f.contains(Feature::Expr(ExprTag::Num))
@@ -139,6 +142,7 @@ pub(crate) fn gen_subckt(
         .collect();
     g.param_reads = true;
     g.constant_only = false;
+    (g.bound_reads, g.unbound_reads) = (true, true);
     let name = g.fresh();
     let ports: Vec<String> = (0..g.below(4)).map(|_| g.fresh()).collect();
     let keys: Vec<String> = defaults.iter().map(|_| g.fresh()).collect();

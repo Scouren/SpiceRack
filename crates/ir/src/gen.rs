@@ -106,6 +106,11 @@ pub struct Gen {
     /// set allows; every other field is a number).
     pub(crate) root_str: bool,
     pub(crate) root_list: bool,
+    /// Whether a parameter read may bind a visible definition, and whether it may be left
+    /// unbound (R62/A37: cleared around a head default when the set lacks `FormalOuterRead`,
+    /// `FormalUnboundRead`); a read neither allows is a literal instead.
+    pub(crate) bound_reads: bool,
+    pub(crate) unbound_reads: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -337,6 +342,8 @@ impl Gen {
             typed_params: false,
             root_str: false,
             root_list: false,
+            bound_reads: true,
+            unbound_reads: true,
             params: Params::Untyped,
         }
     }

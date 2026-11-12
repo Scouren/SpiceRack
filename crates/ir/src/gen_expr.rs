@@ -35,6 +35,9 @@ struct Frame {
     node: Node,
     kids: Vec<ExprId>,
     need: usize,
+    /// Per operand: whether the tree's class skips it (a bound call's argument whose formal
+    /// the body never reads, `class::class_nodes`).
+    unread: Vec<bool>,
 }
 
 impl Gen {
@@ -80,6 +83,17 @@ impl Gen {
         loop {
             let depth = stack.len();
             let here = if depth == 0 { &at_root } else { features };
+            // a slot the class skips cannot hold the tree's probe: a dynamic tree whose only
+            // dynamic leaf sits in an unread argument is constant, and its operators' form wrong
+            let unread = stack
+                .iter()
+                .any(|f| f.unread.get(f.kids.len()).copied().unwrap_or(false));
+            let mut no_probe = false;
+            let owes = if unread {
+                &mut no_probe
+            } else {
+                &mut need_probe
+            };
             let node = if depth + 1 >= self.size.expr_depth as usize || self.chance(3) {
                 None
             } else {
@@ -87,19 +101,26 @@ impl Gen {
             };
             let mut value = match node {
                 Some((node, need)) if need > 0 => {
+                    let unread = match &node {
+                        Node::User(_, def) => crate::class::formals_read(b.design(), *def)
+                            .map(|read| read.iter().map(|r| !r).collect())
+                            .unwrap_or_default(),
+                        _ => Vec::new(),
+                    };
                     stack.push(Frame {
                         node,
                         kids: Vec::new(),
                         need,
+                        unread,
                     });
                     continue;
                 }
                 // a tree that still owes its probe takes a leaf where an empty node would end it
-                Some((node, _)) if !need_probe => {
+                Some((node, _)) if !*owes => {
                     self.class = self.class.max(self.own_class(&node));
                     build(b, node, Vec::new())
                 }
-                Some(_) | None => self.leaf(b, here, &probes, dynamic, &mut need_probe),
+                Some(_) | None => self.leaf(b, here, &probes, dynamic, owes),
             };
             // hand the value up, building every frame it completes
             loop {
@@ -263,7 +284,7 @@ impl Gen {
     /// fresh name no definition has.
     fn param_read(&mut self, b: &mut Builder<'_>) -> ExprId {
         let def = self.pick_def(b.design(), self.scope, DefKind::Param);
-        let readable = !def.is_none() && self.may_read(def);
+        let readable = !def.is_none() && self.may_read(def) && self.bound_reads;
         match self.below(3) {
             0 if readable => {
                 self.class = self.class.max(self.class_of(def));
@@ -277,9 +298,13 @@ impl Gen {
                 let name = self.formals[k].clone();
                 b.param_ref(&name)
             }
-            _ => {
+            _ if self.unbound_reads => {
                 let name = self.fresh();
                 b.param_ref(&name)
+            }
+            _ => {
+                let l = self.literal();
+                b.literal(l)
             }
         }
     }

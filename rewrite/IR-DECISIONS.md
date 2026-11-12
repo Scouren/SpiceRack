@@ -465,3 +465,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Strings and lists by type are root tests, by the ruling's words ("a string as the value"). A ternary of two strings is not a `StringValue`. The typed-field invariant also covers `Handle::Exprs` roots. Both owners stated their vector fields are lists of scalar roots, so a list root there is as wrong as in an `Expr` field.
 - Exceptions are a row method (`RowFacts::string_roots`), not a kernel table of field names. The kernel does not know an owner's fields, and a row's exception holds wherever it is checked. `Param`'s value is the kernel's own exemption, by kind.
 
+## R62/A37: a default's two rules, and a probe in an unread argument
+
+- "Outside its subcircuit" is a definition whose scope is not the subcircuit's body: a formal, or a local of the body, is inside. A sibling by name is an unbound read whose name is one of the head's formals.
+- The two new members shifted `random_subsets_restrict_the_generator`'s coin flips and exposed a generator bug that predates them. A dynamic tree's one probe could land in a bound call's argument whose formal the body never reads. Since the ruling on a call's class, that argument adds nothing, so the tree was Constant while its operators had been drawn in the dynamic form (subset 2, seed 12: `@g43($temp != …) << ""` used `Binary(Shl)` outside its set). The fix: a frame records which operands the class skips (`class::formals_read`), and a leaf drawn under one never pays the tree's probe.
+
