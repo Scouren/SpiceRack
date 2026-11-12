@@ -48,6 +48,9 @@ pub struct Fail {
     pub class: String,
     /// The message.
     pub said: String,
+    /// For a step-2 refusal of a foreign `Opaque`: each refused opaque as
+    /// `<dialect>/<class>/<reader code>/<first word>`, in item order (the census counts them).
+    pub opaques: Vec<String>,
 }
 
 /// One deck's verdict: each failing step, the last step that ran, and the written files (when
@@ -206,8 +209,11 @@ pub fn determinism(
 
 /// `deck` read, legalized and written (steps 1 and 2 and the writing), or `None` when a step
 /// refused or panicked.
+#[cfg_attr(not(feature = "corpus"), allow(dead_code))] // the corpus cells call it
 pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written> {
-    spine(from, to, &deck.src, deck.policy).ok().map(|s| s.files)
+    spine(from, to, &deck.src, deck.policy)
+        .ok()
+        .map(|s| s.files)
 }
 
 /// A failure of class `class`.
@@ -215,6 +221,7 @@ pub fn fail(class: &str, said: String) -> Fail {
     Fail {
         class: class.to_string(),
         said,
+        opaques: Vec::new(),
     }
 }
 
@@ -239,7 +246,11 @@ fn spine(
     let text = src.files().first().map_or("", |f| f.1.as_str());
     // `ir::check`'s violations (`X` rows) are the reader's bug: a debug build panics on them in
     // `dialect::read` (class `panic`), a release build only reports them (class `check:<codes>`).
-    let bad: Vec<&ir::Diag> = diags.rows().iter().filter(|d| d.code.letter == b'X').collect();
+    let bad: Vec<&ir::Diag> = diags
+        .rows()
+        .iter()
+        .filter(|d| d.code.letter == b'X')
+        .collect();
     if !bad.is_empty() {
         let codes: BTreeSet<String> = bad.iter().map(|d| d.code.to_string()).collect();
         let class = format!("check:{}", codes.into_iter().collect::<Vec<_>>().join(","));
@@ -259,7 +270,8 @@ fn spine(
     }
     let read = diags.len();
     guard(2, || dialect::legalize(&mut design, to, &mut diags))?;
-    if let Some(f) = refusal(&diags, read, text) {
+    if let Some(mut f) = refusal(&diags, read, text) {
+        f.opaques = opaques(&design, &diags, read);
         return Err((2, f));
     }
     let renames: HashMap<String, String> = diags.rows()[read..]
@@ -393,6 +405,37 @@ fn describe(rows: &[&ir::Diag], text: &str) -> String {
         })
         .collect();
     said.join(" | ")
+}
+
+/// Each `Opaque` `legalize` refused (a `U0001` row from `read` on whose feature is
+/// `Item(Opaque)`), as `<dialect>/<class>/<code>/<first word>`: the code is the reader's note at
+/// the same source bytes (its `P` code first; `-` when it gave none), the word the statement's
+/// first (`<instance>` for an instance line).
+fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
+    let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
+    let rows = diags.rows();
+    rows[read..]
+        .iter()
+        .filter(|d| d.code == ir::diag::UNSUPPORTED && d.arg == opaque)
+        .filter(|d| d.item.kind == ir::ItemKind::Opaque)
+        .map(|d| {
+            let o: ir::item::Opaque = design.row(d.item.index);
+            // The reader's own code at those bytes (`P…`) before the spine's class code (`S…`).
+            let at: Vec<&ir::Diag> = rows[..read].iter().filter(|r| r.span == d.span).collect();
+            let note = at
+                .iter()
+                .find(|r| r.code.letter == b'P')
+                .or(at.first())
+                .map_or("-".to_string(), |r| r.code.to_string());
+            let words: Vec<&str> = design.text(o.text).split_whitespace().take(2).collect();
+            let instance = words.iter().any(|w| w.contains('('));
+            let word = match instance {
+                true => "<instance>",
+                false => words.first().copied().unwrap_or(""),
+            };
+            format!("{}/{:?}/{note}/{word}", design.str(o.dialect), o.class)
+        })
+        .collect()
 }
 
 /// Step 4's verdict when a run gave no plots: whose run, and why.

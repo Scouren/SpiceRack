@@ -7,7 +7,8 @@
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
 //! table on stderr: decks by the first step that fails and its class, and the step-2
-//! refusals by feature (a deck once per feature it is refused for). The failing steps are
+//! refusals by feature (a deck once per feature it is refused for) and its refused opaques by
+//! dialect, class and the reader's code. The failing steps are
 //! compared with `tests/fixtures/pair/<cell>-corpus.txt` as an authored cell's are.
 //!
 //! Cites: `rewrite/SPINE.md` §8a; `tests/test_cross_sim/main.rs` (the corpora and their keep
@@ -17,7 +18,7 @@
 //! - `pub struct Corpus`
 //! - `pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String>`
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -70,7 +71,11 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     // memory at once. Step 6 keeps a hash of the written bytes, not the bytes.
     let load = |p: &Path| {
         let dir = p.parent().expect("a deck in a folder").to_path_buf();
-        let name = p.file_name().expect("a file").to_string_lossy().into_owned();
+        let name = p
+            .file_name()
+            .expect("a file")
+            .to_string_lossy()
+            .into_owned();
         let mut read = |f: &str| std::fs::read_to_string(dir.join(f)).ok();
         Deck {
             name: rel(p),
@@ -98,7 +103,7 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
                     let h = v.written.take().map(|w| hash(&w));
                     let mut all = done.lock().expect("no worker panicked");
                     all.push((k, v, h));
-                    if all.len() % 200 == 0 {
+                    if all.len().is_multiple_of(200) {
                         eprintln!("{}: {} of {} decks", c.name, all.len(), paths.len());
                     }
                 }
@@ -172,12 +177,17 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
     }
     let mut by_class: BTreeMap<String, usize> = BTreeMap::new();
     let mut by_feature: BTreeMap<String, usize> = BTreeMap::new();
+    let mut by_opaque: BTreeMap<String, usize> = BTreeMap::new();
     for ((deck, step), f) in seen {
         if std::ptr::eq(first[deck], f) {
             let class = f.class.split(':').take(2).collect::<Vec<_>>().join(":");
             *by_class.entry(format!("{step} {class}")).or_default() += 1;
         }
         if *step == 2 {
+            let kinds: BTreeSet<&String> = f.opaques.iter().collect();
+            for o in kinds {
+                *by_opaque.entry(o.clone()).or_default() += 1;
+            }
             for feature in f
                 .class
                 .split(':')
@@ -199,6 +209,12 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
     feats.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     for (f, n) in feats {
         out += &format!("  {n:5} {f}\n");
+    }
+    out += "step-2 refused opaques by dialect/class/reader code (decks):\n";
+    let mut ops: Vec<(&String, &usize)> = by_opaque.iter().collect();
+    ops.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+    for (o, n) in ops {
+        out += &format!("  {n:5} {o}\n");
     }
     out
 }
