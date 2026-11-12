@@ -186,8 +186,18 @@ impl R<'_, '_> {
                     AmModTime::Delay
                 };
                 let given_zero = self.zero_rule();
-                let [offset, amplitude, mod_offset]: [ExprId; 3] =
-                    std::array::from_fn(|_| self.ex());
+                let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
+                // A31: without `AmModOffset` the modulating offset is the real literal 1
+                let mod_offset = if self.maybe(X::AmModOffset) {
+                    self.ex()
+                } else {
+                    self.b.literal(crate::literal::Literal {
+                        mantissa: 1,
+                        frac: 0,
+                        exp10: 0,
+                        form: crate::literal::NumForm::Plain,
+                    })
+                };
                 let [
                     mod_index,
                     mod_freq,
@@ -277,12 +287,7 @@ impl R<'_, '_> {
             (PwlRepeat::Never, None),
             (PwlRepeat::From, Some(X::PwlRepeatFrom)),
         ];
-        let periodic_joins = [
-            X::PwlPeriodJump,
-            X::PwlJoinRamp,
-            X::PwlJoinRampWidth,
-            X::PwlJoinExtrapolate,
-        ];
+        let periodic_joins = [X::PwlPeriodJump, X::PwlJoinRampWidth, X::PwlJoinExtrapolate];
         if periodic_joins.iter().any(|&x| self.has(x)) {
             repeats.push((PwlRepeat::Period, Some(X::PwlRepeatPeriod)));
         }
@@ -290,15 +295,17 @@ impl R<'_, '_> {
         let join = if repeat == PwlRepeat::Never {
             PwlJoin::Jump
         } else {
-            self.pick(&[
-                (
-                    PwlJoin::Jump,
-                    (repeat == PwlRepeat::Period).then_some(X::PwlPeriodJump),
-                ),
-                (PwlJoin::Ramp, Some(X::PwlJoinRamp)),
-                (PwlJoin::RampWidth, Some(X::PwlJoinRampWidth)),
-                (PwlJoin::Extrapolate, Some(X::PwlJoinExtrapolate)),
-            ])
+            // A30 finding 4: a repeat from a point ramps or jumps; a period jumps, ramps over a
+            // width or extrapolates
+            if repeat == PwlRepeat::From {
+                self.pick(&[(PwlJoin::Jump, None), (PwlJoin::Ramp, Some(X::PwlJoinRamp))])
+            } else {
+                self.pick(&[
+                    (PwlJoin::Jump, Some(X::PwlPeriodJump)),
+                    (PwlJoin::RampWidth, Some(X::PwlJoinRampWidth)),
+                    (PwlJoin::Extrapolate, Some(X::PwlJoinExtrapolate)),
+                ])
+            }
         };
         let n = 2 + 2 * self.g.below(2);
         let points = self.exprs(n);

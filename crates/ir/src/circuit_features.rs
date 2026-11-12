@@ -118,6 +118,9 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
         DetailKind::Behav => {
             if let Some(b) = get_row::<Behav>(design, e.detail) {
                 behav(b, &mut add);
+                if e.kind == ElemKind::Behav && untyped_read(design, b.expr) {
+                    add(X::BehavUntypedParam);
+                }
                 // A17: a charge-defined capacitor's coefficient states its law
                 if e.kind == ElemKind::ChargeCapacitor && (some(b.tc1) || some(b.tc2)) {
                     add(match b.tc_law {
@@ -470,6 +473,16 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
         WaveKind::Am => {
             if let Some(a) = get_row::<Am>(design, w.index) {
                 add(pre(a.pre, X::AmPreOffset, X::AmPreHold, X::AmPreZero));
+                // A31: VACASK's AM has the modulating offset 1 only, as the real literal (an Int
+                // 1 reads back real there)
+                let one = a.mod_offset == ExprId::NONE
+                    || matches!(design.expr(a.mod_offset),
+                        crate::expr::Expr::Num(k)
+                            if design.num(k).form != crate::literal::NumForm::Int
+                                && design.literal_value(design.num(k)) == 1.0);
+                if !one {
+                    add(X::AmModOffset);
+                }
                 if a.mod_time == AmModTime::CarrierPhase {
                     add(X::AmModCarrierPhase);
                 }
@@ -500,4 +513,28 @@ fn pwl(p: Pwl, add: &mut impl FnMut(X)) {
             add(x);
         }
     }
+}
+
+/// Whether the tree under `root` holds a parameter read that is the operand of neither
+/// `ToReal` nor `ToInt` (A33). Explicit stack (C11); a node seen twice is walked once.
+fn untyped_read(design: &Design, root: ExprId) -> bool {
+    use crate::expr::{Expr, Func};
+    let mut stack = vec![(root, false)];
+    let mut seen = std::collections::HashSet::new();
+    let mut kids = Vec::new();
+    // bounded: each (row, typed) pair is pushed at most once
+    while let Some((e, typed)) = stack.pop() {
+        if e == ExprId::NONE || !seen.insert((e, typed)) {
+            continue;
+        }
+        let expr = design.expr(e);
+        if matches!(expr, Expr::Param(_)) && !typed {
+            return true;
+        }
+        let wraps = matches!(expr, Expr::Call(Func::ToReal | Func::ToInt, _));
+        kids.clear();
+        design.children(e, &mut kids);
+        stack.extend(kids.iter().map(|&k| (k, wraps)));
+    }
+    false
 }

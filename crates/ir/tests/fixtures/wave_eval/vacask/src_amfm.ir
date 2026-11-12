@@ -1,0 +1,7 @@
+# The IR of vc-sources:tests/fixtures/dialect/vacask/settle/src_amfm.sim, by the mapping of the
+# VACASK reader's fixture read/sources/am_fm.ir (AM: mod_offset 1, mod_time Delay; FM: Sffm law
+# Spice3; both PreDelay::HoldDelayValue).
+file "src_amfm.sim" deck
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=am(offset=0.5 amplitude=2 mod_offset=1 mod_index=0.7 mod_freq=1k carrier_freq=10k delay=20u phase_m_deg=45 phase_c_deg=30 pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=sffm(offset=0.5 amplitude=2 carrier_freq=10k mod_index=0.7 signal_freq=1k delay=20u phase_c_deg=30 phase_m_deg=45 pre=hold_delay_value) dc_rule=wave_at_zero

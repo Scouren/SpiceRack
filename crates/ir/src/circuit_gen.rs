@@ -20,13 +20,14 @@ use crate::build::Builder;
 use crate::build_circuit::ElemHead;
 use crate::circuit_check::{builtin_kind, has_polarity, versioned};
 use crate::circuit_extra::CircuitExtra as X;
+use crate::circuit_tables::{VERSIONS, needs_version};
 use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
     Quantity, TableLaw, TableSource,
 };
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
-use crate::r#gen::{Gen, Reads};
+use crate::r#gen::{Gen, Params, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::letter::letter_of;
@@ -199,7 +200,8 @@ pub(crate) fn generate_model(
     };
     let mut pairs: Vec<(String, ExprId)> = Vec::new();
     // values first, then keys: the order `Words::params` creates them in
-    let count = if builtin_kind(family).is_some() {
+    // A28 item 5: `TypedOnly` draws no untyped parameter (elements never draw one)
+    let count = if builtin_kind(family).is_some() || r.g.params == Params::TypedOnly {
         0
     } else {
         r.g.below(3)
@@ -229,7 +231,19 @@ pub(crate) fn generate_model(
     } else {
         NONE_REF
     };
-    let version = if versioned(family) && r.g.chance(4) {
+    // a versioned standard states its version, from the vocabulary where one is known
+    let version = if needs_version(family) {
+        match VERSIONS.iter().find(|v| v.0 == family) {
+            Some((_, list)) => {
+                let k = r.g.below(list.len() as u32) as usize;
+                r.b.string(list[k])
+            }
+            None => {
+                let word = r.g.fresh();
+                r.b.string(&word)
+            }
+        }
+    } else if versioned(family) && r.g.chance(4) {
         r.ex()
     } else {
         ExprId::NONE

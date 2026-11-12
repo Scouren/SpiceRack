@@ -95,6 +95,11 @@ impl Gen {
             // hand the value up, building every frame it completes
             loop {
                 let Some(top) = stack.last_mut() else {
+                    // the tree's class by the kernel's rule, with this generator's own table
+                    let table = &self.def_class;
+                    self.class = crate::class::tree_class_with(b.design(), value, &|d| {
+                        table.get(d.index()).copied().unwrap_or(ExprClass::Constant)
+                    });
                     return value;
                 };
                 top.kids.push(value);
@@ -303,7 +308,18 @@ impl Gen {
             } else {
                 b.design().str(b.design().def(def).name).to_string()
             };
-            nodes.push((Node::User(name, def), self.below(3) as usize));
+            // a bound call takes its function's formals, one argument each (CallArity)
+            let bound = (!def.is_none())
+                .then(|| b.design().def(def))
+                .filter(|d| d.item.kind == crate::item::ItemKind::Func);
+            let arity = match bound {
+                Some(d) => {
+                    let f: crate::item::Func = b.design().row(d.item.index);
+                    b.design().names(f.args).len()
+                }
+                None => self.below(3) as usize,
+            };
+            nodes.push((Node::User(name, def), arity));
         }
         if has(Feature::Expr(ExprTag::Draw)) {
             let dists: Vec<Dist> = Dist::ALL

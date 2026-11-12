@@ -1,0 +1,9 @@
+# The IR of vc-sources:tests/fixtures/dialect/vacask/settle/src_pwl.sim, by the mapping of the
+# VACASK reader's fixture read/sources/pwl.ir (period > 0: PwlRepeat::Period, PwlJoin::Extrapolate).
+file "src_pwl.sim" deck
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=pwl(points=[1u, 1, 2u, 3]) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=pwl(points=[1u, 1, 2u, 3] delay=1u) dc_rule=wave_at_zero
+  element vsource v3 (c 0) model=vsource wave=pwl(points=[0, 0, 1u, 1] repeat_at=2u repeat=period join=extrapolate) dc_rule=wave_at_zero
+  element vsource v4 (d 0) model=vsource wave=pwl(points=[1u, 1, 2u, 3] repeat_at=4u repeat=period join=extrapolate) dc_rule=wave_at_zero
+  element vsource v5 (e 0) model=vsource wave=pwl(points=[1u, 1, 2u, 3] delay=1u repeat_at=4u repeat=period join=extrapolate) dc_rule=wave_at_zero
