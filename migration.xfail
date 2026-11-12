@@ -3144,3 +3144,9 @@ xyce/Certification_Tests/BUG_991_SON/BH_nogap_lv2.cir cdl the kept line's CDL co
 xyce/Certification_Tests/BUG_991_SON/BH_test.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
 xyce/Certification_Tests/BUG_991_SON/BH_test_lv2.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
 xyce/DIGITAL_DFF/DFF_Verify_Xyce.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+
+# S4: P3-036: `.options savecurrents` is left out with W0024 on a target that has no such option: LTspice 26.1.1
+# stops on it ("syntax error") and saves every device current anyway, ESPice 0.3.0 ignores it (runs,
+# research/impl/evidence/P3-036; tests/test_options.rs::p3_036_savecurrents_is_left_out_where_the_target_has_none).
+spice-bench/ngspice/examples/mos/ro-meas.sp espice written differently: `.options savecurrents` left out, W0024 (P3-036)
+spice-bench/ngspice/examples/mos/ro-meas.sp ltspice written differently: `.options savecurrents` left out, W0024 (P3-036)

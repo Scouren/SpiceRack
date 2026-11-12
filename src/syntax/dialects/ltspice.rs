@@ -233,4 +233,8 @@ pub(super) fn ltspice() -> DialectDef {
         // A statement another dialect's simulator runs to the same numbers
         // without (its `kept_word` rows) is left out, noted.
         .omit(Construct::InertText, Code::W0336)
+        // LTspice 26.1.1 stops on `.options savecurrents` ("syntax error",
+        // run) and saves every device current without it (ZERO-LEDGER
+        // P3-036).
+        .option_cosmetic("savecurrents")
 }

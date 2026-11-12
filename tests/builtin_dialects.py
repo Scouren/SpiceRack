@@ -258,7 +258,8 @@ def espice(d):
         .refuse(Construct.Epochs, Code.W0130)
         .refuse(Construct.Step, Code.W0016)
         .refuse(Construct.StepList, Code.W0016)
-        .refuse(Construct.DcLogList, Code.W0038))
+        .refuse(Construct.DcLogList, Code.W0038)
+        .option_cosmetic("savecurrents"))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,
@@ -841,7 +842,8 @@ def ltspice(d):
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
         .spell(Construct.Epochs, Alt.StatesTable)
-        .omit(Construct.InertText, Code.W0336))
+        .omit(Construct.InertText, Code.W0336)
+        .option_cosmetic("savecurrents"))
 
 
 SPECTRE_SCALES = [

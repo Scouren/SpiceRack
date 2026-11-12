@@ -176,7 +176,6 @@ impl PyCircuit {
         Ok(PySimulator {
             deck: Self::deck(&slf),
             backend: simulator.map(str::to_string),
-            save_currents: false,
         })
     }
 }

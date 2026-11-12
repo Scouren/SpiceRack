@@ -27,8 +27,11 @@ pub(super) struct PySimulator {
     /// `bench` holds the config; each analysis call runs a copy with only its analysis.
     pub(super) deck: Deck,
     pub(super) backend: Option<String>,
-    pub(super) save_currents: bool,
 }
+
+/// ngspice's option that saves every device's terminal currents (manual
+/// §11.7.3): what `save_currents` sets in the testbench's options.
+const SAVE_CURRENTS: &str = "savecurrents";
 
 impl PySimulator {
     /// The deck's testbench, created empty on first use.
@@ -55,12 +58,7 @@ impl PySimulator {
 
     /// A copy of the deck with every queued analysis.
     pub(super) fn deck_as_queued(&self) -> Deck {
-        let mut deck = self.deck.clone();
-        if self.save_currents {
-            deck.bench.get_or_insert_with(Default::default).saves =
-                vec!["all".into(), "@all[i]".into()];
-        }
-        deck
+        self.deck.clone()
     }
 }
 
@@ -99,14 +97,23 @@ impl PySimulator {
         self.tb().measures.push(args.join(" "));
     }
 
+    /// Every device's terminal currents saved: ngspice's `.options
+    /// savecurrents` (manual §11.7.3) in the deck `netlist()` and a run
+    /// both write; `save(...)` vectors are kept beside it. A target with
+    /// no such option leaves it out with a `W0024` note.
     #[setter]
     fn set_save_currents(&mut self, v: bool) {
-        self.save_currents = v;
+        let options = &mut self.tb().options;
+        options.retain(|(k, _)| !k.eq_ignore_ascii_case(SAVE_CURRENTS));
+        if v {
+            options.push((SAVE_CURRENTS.into(), String::new()));
+        }
     }
 
     #[getter]
     fn get_save_currents(&self) -> bool {
-        self.save_currents
+        let mut options = self.deck.bench.iter().flat_map(|tb| &tb.options);
+        options.any(|(k, _)| k.eq_ignore_ascii_case(SAVE_CURRENTS))
     }
 
     #[setter]

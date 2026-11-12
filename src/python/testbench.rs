@@ -44,7 +44,7 @@ impl PyTestbench {
             Ok(circuit) => PyCircuit::deck(&circuit.try_borrow()?),
             Err(_) => Deck { top: dut.try_borrow()?.inner.clone(), bench: Some(Default::default()), ..Default::default() },
         };
-        Ok((Self {}, PySimulator { deck, backend: None, save_currents: false }))
+        Ok((Self {}, PySimulator { deck, backend: None }))
     }
 
     /// Register a child definition (its include/lib/osdi are hoisted to the top level).
@@ -356,7 +356,7 @@ impl PyTestbench {
         let top = super::store::read_deck(text, d).map_err(PyValueError::new_err)?;
         let libraries = super::store::libraries(text);
         let deck = Deck { top, libraries, bench: Some(Default::default()), ..Default::default() };
-        let sim = PySimulator { deck, backend: None, save_currents: false };
+        let sim = PySimulator { deck, backend: None };
         Py::new(py, PyClassInitializer::from(sim).add_subclass(Self {}))
     }
 

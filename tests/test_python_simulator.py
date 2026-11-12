@@ -1545,3 +1545,40 @@ def test_p3_035_a_circuit_is_netlisted_and_stored_as_its_whole_deck(tmp_path):
     c.save(path)
     assert open(path).read() == text
     assert ps.Testbench.load(path).netlist("ngspice") == c.netlist("ngspice")
+
+
+@pytest.mark.needs("ngspice")
+def test_p3_036_save_currents_is_written_by_netlist_and_keeps_the_saves():
+    """ZERO-LEDGER P3-036: `save_currents` was applied at a run only, where it replaced the `save()`
+    list with `all @all[i]` (no ngspice vector: "unrecognized variable"). It is ngspice's `.options
+    savecurrents` (manual 11.7.3), in the deck `netlist()` writes too, beside the saves. Oracle:
+    ngspice-45 on that deck saves v(out) and each resistor's current (research/impl/evidence/P3-036:
+    `i(@r1[i])` = 0.25 mA for 1 V over 1k + 3k)."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("div", ["in", "out"])
+    d.R("1", "in", "out", 1e3)
+    d.R("2", "out", d.gnd, 3e3)
+    tb = ps.Testbench(d)
+    tb.V("in", "in", "0", 1.0)
+    tb.with_backend("ngspice")
+    tb.save("v(out)")
+    assert tb.save_currents is False
+    tb.save_currents = True
+    assert tb.save_currents is True
+    lines = [l.lower() for l in tb.netlist("ngspice").splitlines()]
+    assert ".options savecurrents" in lines
+    assert ".save v(out)" in lines
+    op = tb.operating_point()
+    assert op["out"] == pytest.approx(0.75, rel=1e-9)
+    # 1 V over 1k + 3k: 0.25 mA through each resistor (ngspice names the vector `i(@r1[i])`).
+    assert op.branches == ["i(@r1[i])", "i(@r2[i])"]
+    assert op["i(@r1[i])"] == pytest.approx(2.5e-4, rel=1e-9)
+    # Off again: the option goes, the saves stay.
+    tb.save_currents = False
+    lines = [l.lower() for l in tb.netlist("ngspice").splitlines()]
+    assert ".save v(out)" in lines and not any("savecurrents" in l for l in lines)
+    # A target with no such option leaves it out with a note (W0024).
+    tb.save_currents = True
+    with pytest.warns(UserWarning, match="W0024"):
+        assert "savecurrents" not in tb.netlist("ltspice").lower()

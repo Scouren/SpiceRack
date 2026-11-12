@@ -61,5 +61,9 @@ pub(super) fn espice() -> DialectDef {
         // Nor is a log or list `.dc` axis: refused until ESPice's own
         // `dec`/`poi` card is written (ZERO-LEDGER P4-099).
         .refuse(Construct::DcLogList, Code::W0038)
-    // --- S3
+        // --- S3
+        // --- S4
+        // ESPice 0.3.0 has no `savecurrents` ("ignoring unsupported option",
+        // run): no number changes without it (ZERO-LEDGER P3-036).
+        .option_cosmetic("savecurrents")
 }

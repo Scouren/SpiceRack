@@ -64,7 +64,7 @@ total = nz["onoise_total"][0]     # V rms over the band (ngspice, ESPice)
 ```
 
 Branch currents are not saved unless you ask: `tb.save("I(Vin)")`, or
-`sim.save_currents = True` on a `Circuit` simulator. `res.nodes` and
+`tb.save_currents = True` (every device's currents on ngspice, `.options savecurrents`). `res.nodes` and
 `res.branches` list what came back, on every result (`op.nodes` is sorted).
 An operating point reads a vector by the simulator's spelling too:
 `op["v(vout)"]` is `op["vout"]`, `op["I(Vin)"]` is `op["i(vin)"]`.
