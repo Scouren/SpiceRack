@@ -8,8 +8,8 @@
 //! R49 (3), (5); the lead's Q3–Q6 answers.
 //!
 //! Contents: `pub(super) const UNROLL_MAX: usize`, `pub(super) const MARK: &str`, `pub(super) enum Target`,
-//! `pub(super) enum Op`, `pub(super) fn plan(&[Block], cards: bool) -> Result<Vec<Vec<Op>>,
-//! ir::Code>`
+//! `pub(super) enum Op`, `pub(super) fn plan(&[Block], card_kinds: &[(String, usize)]) ->
+//! Result<Vec<Vec<Op>>, ir::Code>`
 
 use super::args::{
     alter, alterparam, assignments, class_of, is_number, known, repeat_count, subst,
@@ -71,6 +71,8 @@ pub(super) enum Op {
     /// `meas …` in its exact case (the script's one analysis of its kind ran before it, and
     /// the deck has no card a `run` stands for: lead's Q5).
     Meas { rest: String, cmd: Cmd },
+    /// `reset`: every class back to the design's own (A28: `Reset { restores: ALL }`).
+    Reset { cmd: Cmd },
     /// A command kept as its own opaque.
     Opaque {
         class: ir::OpaqueClass,
@@ -93,8 +95,6 @@ pub(super) enum Op {
 /// What the walk keeps between commands.
 #[derive(Clone, Debug, Default)]
 struct Interp {
-    /// Targets changed since the last `reset` (an alter's, an option's): what it would restore.
-    live: Vec<String>,
     /// `alterparam`s waiting for a `reset`: their placeholder id, target and value.
     pending: Vec<(usize, Target, String, Cmd)>,
     /// Whether each placeholder was applied by a `reset`.
@@ -110,8 +110,8 @@ struct Interp {
     runs: Vec<String>,
     /// The analysis words run so far.
     seen: Vec<String>,
-    /// Whether the deck has a dot-card analysis.
-    cards: bool,
+    /// Each dot-card analysis: its keyword, and how many script statements stand before it.
+    card_kinds: Vec<(String, usize)>,
     /// Whether `quit` ended the script.
     quit: bool,
     /// Operations produced so far (the unroll bound).
@@ -130,8 +130,13 @@ enum SetKind {
 }
 
 /// Each statement's operations, or the whole script's `Script` code.
-pub(super) fn plan(blocks: &[Block], cards: bool) -> Result<Vec<Vec<Op>>, ir::Code> {
+pub(super) fn plan(
+    blocks: &[Block],
+    card_kinds: &[(String, usize)],
+) -> Result<Vec<Vec<Op>>, ir::Code> {
+    let cards = !card_kinds.is_empty();
     let mut it = Interp {
+        card_kinds: card_kinds.to_vec(),
         resets: blocks
             .iter()
             .any(|b| b.nodes.as_ref().is_ok_and(|n| has_reset(n))),
@@ -140,7 +145,6 @@ pub(super) fn plan(blocks: &[Block], cards: bool) -> Result<Vec<Vec<Op>>, ir::Co
             .filter_map(|b| b.nodes.as_ref().ok())
             .flat_map(|n| analysis_words(n, 1))
             .collect(),
-        cards,
         ..Interp::default()
     };
     let mut out = Vec::with_capacity(blocks.len());
@@ -267,7 +271,7 @@ impl Interp {
             return Ok(());
         }
         match w {
-            "run" => {}
+            "run" => self.seen.push("run".to_string()),
             "quit" => {
                 self.quit = true;
                 out.push(opaque(ir::OpaqueClass::Inert, DISPLAY));
@@ -291,7 +295,6 @@ impl Interp {
                 let rest = subst(c.rest(), env)?;
                 match alter(&rest, w == "altermod") {
                     Ok((target, value)) => {
-                        self.live.push(format!("{target:?}"));
                         out.push(Op::Alter {
                             target,
                             value,
@@ -316,11 +319,8 @@ impl Interp {
             }
             "reset" => {
                 self.changed = true;
-                if !self.live.is_empty() {
-                    // ponytail: a reset with state to restore waits for A27's restore row
-                    out.push(opaque(ir::OpaqueClass::Unread, FORM));
-                    self.live.clear();
-                }
+                // every class back to the design's own (A28); the waiting alterparams after it
+                out.push(Op::Reset { cmd: c.clone() });
                 for (id, target, value, cmd) in std::mem::take(&mut self.pending) {
                     self.applied[id] = true;
                     out.push(Op::Alter { target, value, cmd });
@@ -350,8 +350,7 @@ impl Interp {
                     .next()
                     .unwrap_or("")
                     .to_ascii_lowercase();
-                let once = self.runs.iter().filter(|w| **w == kind).count() == 1;
-                if !self.cards && once && self.seen.contains(&kind) {
+                if self.meas_exact(&kind) {
                     out.push(Op::Meas {
                         rest: subst(c.rest(), env)?,
                         cmd: c.clone(),
@@ -367,6 +366,30 @@ impl Interp {
             _ => out.push(opaque(ir::OpaqueClass::InvalidInSource, NO_COMMAND)),
         }
         Ok(())
+    }
+
+    /// Whether a `meas` of `kind` here measures exactly the deck's one analysis of that kind
+    /// (lead's Q5, "the cards a `run` stands for"): with no card of the kind, the script's one
+    /// command of it, run before; with one card of it standing before the script, no command
+    /// of it and the script's one `run`, run before. Both read the same once written (the card
+    /// then a command at its place).
+    fn meas_exact(&self, kind: &str) -> bool {
+        let count = |list: &[String], w: &str| list.iter().filter(|x| *x == w).count();
+        let cards: Vec<usize> = self
+            .card_kinds
+            .iter()
+            .filter(|(k, _)| k == kind)
+            .map(|&(_, at)| at)
+            .collect();
+        match cards.as_slice() {
+            [] => count(&self.runs, kind) == 1 && self.seen.iter().any(|w| w == kind),
+            [0] => {
+                count(&self.runs, kind) == 0
+                    && count(&self.runs, "run") == 1
+                    && self.seen.iter().any(|w| w == "run")
+            }
+            _ => false,
+        }
     }
 
     /// `option`, `set`: simulator options are state from here; display variables are inert.
@@ -393,11 +416,14 @@ impl Interp {
             SetKind::Simulator => {
                 self.changed = true;
                 let keys = assignments(&subst(c.rest(), env)?);
-                for (k, _) in keys
+                // a frontend variable survives `reset` (it is global, not the circuit's), while a
+                // `Reset` restores every option: with a reset in the script it is ngspice's own
+                let frontend = keys
                     .iter()
-                    .filter(|(k, _)| !FRONTEND_KEYS.contains(&k.as_str()))
-                {
-                    self.live.push(format!("option {k}"));
+                    .any(|(k, _)| FRONTEND_KEYS.contains(&k.as_str()));
+                if frontend && self.resets {
+                    out.push(opaque(ir::OpaqueClass::Private, OWN));
+                    return Ok(());
                 }
                 out.push(Op::State {
                     keys,
@@ -469,16 +495,33 @@ fn law(template: &[Op], words: &[String], applied: &[bool]) -> Option<(Target, V
         return None;
     }
     let kept: Vec<Op> = settle(template.to_vec(), applied);
+    // a parameter is set by `alterparam` and applied by the `reset` after it: the pass is
+    // [Reset, Alter(param)], the loop's body keeps the Reset (it restores, a parameter stays)
+    let (lead, kept) = match kept.as_slice() {
+        [
+            Op::Reset { .. },
+            Op::Alter {
+                target: Target::Param(_),
+                ..
+            },
+            ..,
+        ] => (Some(kept[0].clone()), kept[1..].to_vec()),
+        _ => (None, kept),
+    };
     let (first, rest) = kept.split_first()?;
     let Op::Alter { target, value, .. } = first else {
         return None;
     };
+    if matches!(target, Target::Param(_)) != lead.is_some() {
+        return None;
+    }
+    let rest: Vec<Op> = lead.into_iter().chain(rest.iter().cloned()).collect();
     if value != MARK || !words.iter().all(|w| is_number(w)) {
         return None;
     }
     rest.iter()
         .all(|op| !reads_mark(op))
-        .then(|| (target.clone(), rest.to_vec()))
+        .then(|| (target.clone(), rest))
 }
 
 /// Whether an operation reads the template's marker outside a display command.
@@ -497,7 +540,7 @@ fn analysis_words(nodes: &[Node], times: usize) -> Vec<String> {
     let mut out = Vec::new();
     for n in nodes {
         match n {
-            Node::Cmd(c) if ANALYSES.contains(&c.word().as_str()) => {
+            Node::Cmd(c) if ANALYSES.contains(&c.word().as_str()) || c.word() == "run" => {
                 out.extend(std::iter::repeat_n(c.word(), times));
             }
             Node::Foreach { body, .. } | Node::Repeat { body, .. } => {

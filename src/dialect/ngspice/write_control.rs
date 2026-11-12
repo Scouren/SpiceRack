@@ -16,10 +16,10 @@
 //! `device.c:1249-1420`, `inp.c:1735-1857`, `control.c:462-466`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`,
+//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`, `RESET_PART`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
-//! `pub(super) fn load`, `loop_`, `alter`
+//! `pub(super) fn load`, `loop_`, `alter`, `reset`
 
 use super::codes::Row;
 use super::expr_write;
@@ -29,8 +29,8 @@ use crate::ir;
 /// What this area's writer spells: exactly its reader's image (L5).
 pub(super) const FEATURES: ir::FeatureSet = super::read_control::FEATURES;
 
-/// An `Alter` of a parameter where another alter or a `FromHere` state item holds: the
-/// `reset` ngspice needs to apply an `alterparam` would drop it (S1).
+/// A parameter alter not right after a `Reset` (or a parameter loop whose body does not start
+/// with one): ngspice applies an `alterparam` only at a `reset` (S2).
 pub(super) const PARAM_RESET: ir::Code = ir::Code::new(b'W', 1401);
 /// A loop ngspice's `foreach` cannot spell: not a sweep over a list of numbers.
 pub(super) const LOOP_FORM: ir::Code = ir::Code::new(b'W', 1402);
@@ -46,6 +46,9 @@ pub(super) const LOAD_SOURCE: ir::Code = ir::Code::new(b'W', 1404);
 /// own (ngspice binds a `.model`'s type word to them at load time), so no ngspice text states
 /// the list.
 pub(super) const LOAD_MODULES: ir::Code = ir::Code::new(b'W', 1405);
+
+/// A partial restore (`Reset` of fewer than every class): ngspice's `reset` restores all.
+pub(super) const RESET_PART: ir::Code = ir::Code::new(b'W', 1406);
 
 /// This area's codes, `W1400–W1499`.
 pub(super) const CODES: &[Row] = &[
@@ -74,6 +77,12 @@ pub(super) const CODES: &[Row] = &[
         "ngspice loads a compiled OSDI binary, never a Verilog-A source.",
     ),
     refusal(
+        RESET_PART,
+        "a restore of some classes only",
+        "ngspice-45 runcoms2.c:172-240 (com_rset rebuilds the circuit)",
+        "ngspice's reset restores every alter, script option, temperature and save at once.",
+    ),
+    refusal(
         LOAD_MODULES,
         "a load that lists its modules",
         "ngspice-45 inp.c:791-797 (pre_osdi takes a path), osdi/osdiregistry.c",
@@ -91,7 +100,7 @@ pub(super) const CODES: &[Row] = &[
 )]
 pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
     design.items(scope).iter().any(|&item| match item.kind {
-        ir::ItemKind::Alter | ir::ItemKind::Loop => true,
+        ir::ItemKind::Alter | ir::ItemKind::Loop | ir::ItemKind::Reset => true,
         ir::ItemKind::Option => {
             design.row::<ir::OptionRow>(item.index).holds == ir::Applies::FromHere
         }
@@ -116,19 +125,28 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             if !alter_value(design, &a) {
                 refuse(ALTER_VALUE);
             }
-            // ponytail: refused, not re-issued after the reset; re-issue the survivors and fold
-            // them on read when a pass first needs it (lead's Q1 answer)
-            if a.target.kind == ir::TargetKind::Param && live_before(design, item) {
+            if a.target.kind == ir::TargetKind::Param && !after_reset(design, item) {
                 refuse(PARAM_RESET);
             }
         }
         ir::ItemKind::Loop => match sweep(design, item) {
             None => refuse(LOOP_FORM),
-            Some(s) if s.target.kind == ir::TargetKind::Param && live_before(design, item) => {
-                refuse(PARAM_RESET);
+            Some(s) if s.target.kind == ir::TargetKind::Param => {
+                let l: ir::Loop = design.row(item.index);
+                let first = design.items(l.body).first();
+                if first.is_none_or(|i| i.kind != ir::ItemKind::Reset) {
+                    refuse(PARAM_RESET);
+                }
             }
             Some(_) => {}
         },
+        // ponytail: only ngspice's whole `reset`; a partial restore (VACASK `clear saves`)
+        // needs re-issuing the survivors after it and folding them on read
+        ir::ItemKind::Reset
+            if design.row::<ir::Reset>(item.index).restores != ir::ResetSet::ALL =>
+        {
+            refuse(RESET_PART);
+        }
         ir::ItemKind::Load => {
             if design.row::<ir::item::Load>(item.index).kind != ir::LoadKind::Osdi {
                 refuse(LOAD_SOURCE);
@@ -153,7 +171,25 @@ pub(super) fn load(w: &mut Out<'_>, item: ir::ItemRef) {
     w.script(&cmd);
 }
 
-/// A sweep `Loop`: `foreach <name> <values>`, the target set from the variable, the body, `end`.
+/// A `Reset` (every class: admits): the parameter alters listed right after it as
+/// `alterparam`, then `reset`, which applies them (`inp.c:1735-1857`).
+pub(super) fn reset(w: &mut Out<'_>, item: ir::ItemRef) {
+    let d = w.design;
+    let (items, at) = siblings(d, item);
+    for &next in &items[at + 1..] {
+        let Some(a) = param_alter(d, next) else {
+            break;
+        };
+        let mut value = String::new();
+        expr_write::value(d, a.value, &mut value);
+        let value: String = value.split_whitespace().collect();
+        w.script(&set_command(d, &a.target, &value));
+    }
+    w.script("reset");
+}
+
+/// A sweep `Loop`: `foreach <name> <values>`, the target set from the variable, the body, `end`
+/// (a parameter's `alterparam`: the body's leading `Reset` applies it).
 pub(super) fn loop_(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let l: ir::Loop = d.row(item.index);
@@ -176,10 +212,14 @@ pub(super) fn loop_(w: &mut Out<'_>, item: ir::ItemRef) {
     w.open_script(l.body, "end".to_string());
 }
 
-/// An `Alter`: `alter`, `altermod`, or `alterparam` + `reset`.
+/// An `Alter`: `alter`, `altermod`; a parameter's `alterparam` is written by the `Reset`
+/// before it (admits), since ngspice applies it at that reset.
 pub(super) fn alter(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let a: ir::Alter = d.row(item.index);
+    if a.target.kind == ir::TargetKind::Param {
+        return;
+    }
     let mut value = String::new();
     expr_write::value(d, a.value, &mut value);
     let value: String = value.split_whitespace().collect();
@@ -215,7 +255,7 @@ fn set_command(d: &ir::Design, t: &ir::Target, value: &str) -> String {
         ir::TargetKind::ElementValue | ir::TargetKind::SourceDc => format!("alter {a} {value}"),
         ir::TargetKind::DeviceParam => format!("alter @{a}[{}]={value}", d.str(t.b)),
         ir::TargetKind::ModelParam => format!("altermod {a} {}={value}", d.str(t.b)),
-        ir::TargetKind::Param => format!("alterparam {a}={value}\nreset"),
+        ir::TargetKind::Param => format!("alterparam {a}={value}"),
         other => unreachable!("ngspice write: FEATURES lacks an alter or loop of {other:?}"),
     }
 }
@@ -240,55 +280,38 @@ fn alter_value(d: &ir::Design, a: &ir::Alter) -> bool {
     a.target.kind == ir::TargetKind::Param || matches!(d.expr(a.value), ir::Expr::Num(_))
 }
 
-/// Whether a target a `reset` would restore is live where `item` sets a parameter: an alter
-/// of another kind or a `FromHere` state item listed before it in any enclosing scope, or
-/// anywhere in an enclosing loop's body or the item's own loop body (a later pass's `reset`
-/// sees it).
-fn live_before(d: &ir::Design, item: ir::ItemRef) -> bool {
-    let Some(&(_, mut scope)) = d.reachable().iter().find(|(i, _)| *i == item) else {
-        return false;
-    };
-    if item.kind == ir::ItemKind::Loop && live_in(d, d.row::<ir::Loop>(item.index).body) {
-        return true;
-    }
-    let mut at = item;
-    // Bounded: each step goes one scope outward; a file's top scope has no parent.
-    while !scope.is_none() {
-        let sc = d.scope(scope);
-        if sc.kind == ir::ScopeKind::Loop && (live(d, sc.owner) || live_in(d, scope)) {
-            return true;
-        }
-        let before = d.items(scope).iter().take_while(|&&i| i != at);
-        if before.copied().any(|i| live(d, i)) {
-            return true;
-        }
-        at = sc.owner;
-        scope = sc.parent;
-    }
-    false
+/// The items of `item`'s scope and its index there.
+// ponytail: a scan of `reachable` per call (quadratic in a deck's items); keep a scope index
+// on `Out` if a corpus deck makes it show
+fn siblings(d: &ir::Design, item: ir::ItemRef) -> (&[ir::ItemRef], usize) {
+    let scope = d
+        .reachable()
+        .iter()
+        .find(|(i, _)| *i == item)
+        .map(|&(_, s)| s)
+        .expect("ngspice write: the item is reachable");
+    let items = d.items(scope);
+    let at = items
+        .iter()
+        .position(|&i| i == item)
+        .expect("an item of its scope");
+    (items, at)
 }
 
-/// Whether `scope` or a loop body in it holds a live item.
-fn live_in(d: &ir::Design, scope: ir::ScopeId) -> bool {
-    d.items(scope).iter().any(|&i| {
-        live(d, i) || (i.kind == ir::ItemKind::Loop && live_in(d, d.row::<ir::Loop>(i.index).body))
-    })
+/// `i` as a parameter alter.
+fn param_alter(d: &ir::Design, i: ir::ItemRef) -> Option<ir::Alter> {
+    let a: ir::Alter = (i.kind == ir::ItemKind::Alter).then(|| d.row(i.index))?;
+    (a.target.kind == ir::TargetKind::Param).then_some(a)
 }
 
-/// Whether `i` makes a target a `reset` restores live: an alter of anything but a parameter, a
-/// `FromHere` option or environment.
-fn live(d: &ir::Design, i: ir::ItemRef) -> bool {
-    match i.kind {
-        ir::ItemKind::Alter => d.row::<ir::Alter>(i.index).target.kind != ir::TargetKind::Param,
-        ir::ItemKind::Option => d.row::<ir::OptionRow>(i.index).holds == ir::Applies::FromHere,
-        ir::ItemKind::Env => d.row::<ir::Env>(i.index).holds == ir::Applies::FromHere,
-        ir::ItemKind::Loop => {
-            let l: ir::Loop = d.row(i.index);
-            l.kind == ir::LoopKind::Sweep
-                && d.detail::<ir::plan::SweepLoop>(l.detail).target.kind != ir::TargetKind::Param
-        }
-        _ => false,
-    }
+/// Whether a parameter alter stands right after a `Reset`, other parameter alters between.
+fn after_reset(d: &ir::Design, item: ir::ItemRef) -> bool {
+    let (items, at) = siblings(d, item);
+    let before = items[..at]
+        .iter()
+        .rev()
+        .find(|&&i| param_alter(d, i).is_none());
+    before.is_some_and(|i| i.kind == ir::ItemKind::Reset)
 }
 
 /// How many loops enclose `item`'s body, itself included (a made-up variable's number).

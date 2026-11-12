@@ -41,6 +41,7 @@ const READ: &[&str] = &[
     "hash_line",
     "in_branch",
     "inert_commands",
+    "meas_card_run",
     "meas_command",
     "meas_command_unread",
     "no_command",
@@ -49,6 +50,7 @@ const READ: &[&str] = &[
     "pre_osdi",
     "private_commands",
     "repeat",
+    "reset_restores",
     "run_no_cards",
     "run_with_cards",
     "save_command",
@@ -73,11 +75,16 @@ const WRITE: &[&str] = &[
     "script_mixed",
     "script_option",
     "script_param_loop",
+    "script_reset",
 ];
 
 /// The fixtures and decks that fail today, by name, with the test that fails and why. Strict
 /// both ways: a listed one that passes fails the test until its line goes.
-const PENDING: &[(&str, &str, &str)] = &[];
+const PENDING: &[(&str, &str, &str)] = &[(
+    "save_command",
+    "fixpoint",
+    "ng-outputs: a script save as Save { holds: FromHere } (A28) and its script spelling; today a WholeRun save, whose SaveWholeRun the row lacks",
+)];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in
@@ -142,6 +149,14 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
     for name in READ {
         let path = format!("{name}.sp");
         let (first, _) = read_deck(&path, &text("read", name, "sp"));
+        let mut legal = first.clone();
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut legal, row(), &mut diags);
+        if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
+            eprintln!("{name}: the read is refused for writing: {diags:?}");
+            failed.push(*name);
+            continue;
+        }
         let once = write_entry(&first);
         let (second, _) = read_deck(&path, &once);
         if !first.eq_ignoring_spans(&second) || write_entry(&second) != once {
@@ -259,10 +274,16 @@ fn script_items_ngspice_cannot_spell_are_refused() {
             "W1402",
         ),
         (
-            "a parameter alter after a live alter",
+            "a parameter alter not right after a reset",
             "  param p = 1\n  alter (element_value r1) value=2k\n  alter (param p) value=3",
             "W1401",
         ),
+        (
+            "a parameter loop whose body does not start with a reset",
+            "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op",
+            "W1401",
+        ),
+        ("a partial reset", "  reset values saves", "W1406"),
     ];
     for (why, items, code) in REFUSED {
         let mut design = parse_ir(why, &format!("file \"r.sp\" deck\n{items}\n"));
@@ -292,6 +313,7 @@ fn plan_text(seed: u64) -> String {
         "(model_param nch vth0)",
         "(param p)",
     ];
+    const RESET: &str = "reset values options temp tnom saves";
     const VALUES: [&str; 6] = ["1k", "2.2k", "0.5", "10u", "-1", "3meg"];
     let mut out = String::from("file \"g.sp\" deck\n  title \"g\"\n  param p = 1k\n");
     let item = |depth: usize, out: &mut String, next: &mut dyn FnMut(u64) -> u64| {
@@ -301,11 +323,16 @@ fn plan_text(seed: u64) -> String {
             1 => out.push_str(&format!(
                 "{pad}analysis tran stop=5u print_step=1u cap=ngspice_rule\n"
             )),
-            _ => out.push_str(&format!(
-                "{pad}alter {} value={}\n",
-                TARGETS[next(5) as usize],
-                VALUES[next(6) as usize]
-            )),
+            _ => {
+                let t = TARGETS[next(5) as usize];
+                if t == "(param p)" {
+                    out.push_str(&format!("{pad}{RESET}\n"));
+                }
+                out.push_str(&format!(
+                    "{pad}alter {t} value={}\n",
+                    VALUES[next(6) as usize]
+                ));
+            }
         }
     };
     for _ in 0..1 + next(6) {
@@ -315,16 +342,24 @@ fn plan_text(seed: u64) -> String {
         }
         let name = if next(2) == 0 { " name=v" } else { "" };
         let values: Vec<&str> = (0..1 + next(3)).map(|_| VALUES[next(6) as usize]).collect();
+        let t = TARGETS[next(5) as usize];
         out.push_str(&format!(
-            "  loop sweep keep_last{name} {} (list values=[{}])\n",
-            TARGETS[next(5) as usize],
+            "  loop sweep keep_last{name} {t} (list values=[{}])\n",
             values.join(", ")
         ));
+        if t == "(param p)" {
+            out.push_str(&format!("    {RESET}\n"));
+        }
         for _ in 0..1 + next(3) {
             if next(4) == 0 {
+                let t = TARGETS[next(5) as usize];
+                let lead = if t == "(param p)" {
+                    format!("      {RESET}\n")
+                } else {
+                    String::new()
+                };
                 out.push_str(&format!(
-                    "    loop sweep keep_last {} (list values=[{}])\n      analysis op\n",
-                    TARGETS[next(5) as usize],
+                    "    loop sweep keep_last {t} (list values=[{}])\n{lead}      analysis op\n",
                     VALUES[next(6) as usize]
                 ));
             } else {
