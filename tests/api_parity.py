@@ -183,7 +183,7 @@ PARITY = {
     "pwl": (FEATURES["pwl"], tw_source(["Vin in 0 0 PWL(0 0 1e-6 1)"]), "ng §4.1.3 PWL", None),
     "pwl_repeat": (FEATURES["pwl_repeat"], tw_source(["Vin in 0 0 PWL(0 0 1e-6 1) r=0"]), "ng §4.1.4 PWL repeat", None),
     "exp": (FEATURES["exp"], tw_source(["Vin in 0 0 EXP(0 1 0 1e-6 5e-6 1e-6)"]), "ng §4.1.5 EXP", None),
-    "sffm": (FEATURES["sffm"], tw_source(["Vin in 0 0 SFFM(0 1 1e6 2 1e4)"]), "ng §4.1.6 SFFM", None),
+    "sffm": (FEATURES["sffm"], tw_source(["Vin in 0 0 SFFM(0 1 1e4 2 1e6)"]), "ng §4.1.5 SFFM(VO VA FM MDI FC); ngspice-45 run (evidence/P3-021/py/fixed.out)", "P3-021"),
     "am": (FEATURES["am"], tw_source(["Vin in 0 0 AM(0 0 1 1e4 1e6 0)"]), "source.rs AM (ngspice-45 vsrcload.c)", None),
     "am_phases": (FEATURES["am_phases"], tw_source(["Vin in 0 0 AM(0 0 1 1e4 1e6 0 0 90)"]), "ng §4.1.6 (AM(VO VMO VMA FM FC TD PHASEM PHASEC)); ngspice-45 run (evidence/P8-060/ng/am.log)", "P8-060"),
     "trnoise": (FEATURES["trnoise"], tw_source(["Vin in 0 0 TRNOISE(1e-3 1e-9 0 0)"]), "ng §4.1.7 TRNOISE", None),

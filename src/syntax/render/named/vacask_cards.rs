@@ -525,10 +525,13 @@ impl W<'_, '_> {
                     a[0], a[1], a[2], a[3], a[5]
                 )
             }
-            WaveKind::Sffm => format!(
-                "type=\"fm\" sinedc={} ampl={} freq={} modindex={} modfreq={}",
-                a[0], a[1], a[2], a[3], a[4]
-            ),
+            WaveKind::Sffm => {
+                let [fc, fs] = self.sffm_slots(w, tok)?;
+                format!(
+                    "type=\"fm\" sinedc={} ampl={} freq={} modindex={} modfreq={}",
+                    a[0], a[1], a[fc], a[3], a[fs]
+                )
+            }
             // ngspice-45's order (`Wave::args`) as VACASK's `type="am"`
             // (`lib/devvisrc.cpp`): modindex VMA/VMO; VACASK holds the
             // value at `delay` before it, ngspice 0, so a delayed AM is

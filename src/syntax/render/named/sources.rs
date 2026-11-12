@@ -7,13 +7,14 @@
 //!
 //! Contents:
 //! - `W::wave(&mut self, letter, w, tok) -> Option<String>`
+//! - `W::sffm_slots(&mut self, w, tok) -> Option<[usize; 2]>`
 //! - `W::port(&mut self, tok, own, port, nodes, value, ac) -> Option<String>`
 //! - `fn assert_held(w: &Wave)`
 //! - `W::wave_b(&mut self, tok, n, letter, nodes, w, value) -> Option<(String, String)>`
 
 use super::W;
 use super::vacask::q;
-use crate::syntax::behaviour::NamedRules;
+use crate::syntax::behaviour::{NamedRules, NetlistRules};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Num, Val, Wave, WaveKind};
@@ -137,10 +138,13 @@ impl W<'_, '_> {
                 a[0], a[1], a[2], a[3], a[4], a[5]
             ),
             // pp.684-685: SFFM is a sine carrier with fmmodindex/fmmodfreq.
-            WaveKind::Sffm => format!(
-                "type=sine sinedc={} ampl={} freq={} fmmodindex={} fmmodfreq={}",
-                a[0], a[1], a[2], a[3], a[4]
-            ),
+            WaveKind::Sffm => {
+                let [fc, fs] = self.sffm_slots(w, tok)?;
+                format!(
+                    "type=sine sinedc={} ampl={} freq={} fmmodindex={} fmmodfreq={}",
+                    a[0], a[1], a[fc], a[3], a[fs]
+                )
+            }
             WaveKind::Trnoise | WaveKind::Trrandom => {
                 self.ask(Construct::NoiseWave, tok);
                 return None;
@@ -152,6 +156,29 @@ impl W<'_, '_> {
                 return None;
             }
         })
+    }
+
+    /// Where SFFM `w` holds its carrier and its modulation frequency:
+    /// `[2, 4]`, SPICE3's order (VO VA FC MDI FS), or `[4, 2]` in a deck
+    /// read by ngspice's rules (VO VA FM MDI FC). `None`, refused (W0108),
+    /// for an ngspice SFFM that SPICE3's form would run otherwise
+    /// ([`Wave::spice3_sffm`]): Spectre's FM sine (`[CMP]` pp.684-685)
+    /// and VACASK's `fm` (run) are SPICE3's, the offset at time zero and
+    /// no limit on the index.
+    ///
+    /// # Panics
+    /// When `w` is not an SFFM.
+    pub(super) fn sffm_slots(&mut self, w: &Wave, tok: u32) -> Option<[usize; 2]> {
+        assert_eq!(w.kind, WaveKind::Sffm, "an SFFM wave");
+        assert_eq!(w.args.len(), 5, "an SFFM holds five values");
+        if self.rd.b.netlist_rules != NetlistRules::Ngspice {
+            return Some([2, 4]);
+        }
+        if !w.spice3_sffm() {
+            self.refuse(Code::W0108, tok);
+            return None;
+        }
+        Some([4, 2])
     }
 
     /// The behavioural source that carries a source card's wave where the

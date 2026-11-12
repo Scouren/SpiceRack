@@ -17,7 +17,8 @@ use super::args::Num;
 use super::model::{Card, Value, dec};
 
 /// A waveform's text (`SIN(0 1 1000 0 0 0)`) and the DC value SPICE takes
-/// for a card that gives none: the value at t=0 (AM starts at 0), and 0 for
+/// for a card that gives none: the value at t=0 (AM and SFFM start at 0:
+/// ngspice-45 `vsrcload.c:272,307`), and 0 for
 /// TRNOISE and TRRANDOM, which add to it.
 pub(super) struct Wave {
     text: String,
@@ -91,7 +92,11 @@ macro_rules! pymethods_with_waves {
                 slf: PyRefMut<'_, Self>, name: &str, positive: &str, negative: &str,
                 offset: Num, amplitude: Num, carrier_frequency: Num, modulation_index: Num, signal_frequency: Num, dc: Option<Num>, ac: Option<Num>, ac_phase: Option<Num>,
             ) -> PyResult<()> {
-                let wf = Wave::new("SFFM", &[&offset, &amplitude, &carrier_frequency, &modulation_index, &signal_frequency], offset.value());
+                // ngspice-45's `SFFM(VO VA FM MDI FC)` (manual §4.1.5;
+                // `vsrcload.c:228-280`): the signal frequency third, the
+                // carrier fifth; 0 up to time zero whatever the offset, so
+                // the card's DC value is 0, as AM's.
+                let wf = Wave::new("SFFM", &[&offset, &amplitude, &signal_frequency, &modulation_index, &carrier_frequency], Value::Num(0.0));
                 Self::place_wave(slf, $current, name, positive, negative, wf, dc, ac, ac_phase);
                 Ok(())
             }

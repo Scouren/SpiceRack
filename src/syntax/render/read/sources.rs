@@ -15,7 +15,7 @@
 
 use super::{Card, Comp, Deck, Rd, Val};
 use crate::syntax::ast::{NONE, Node, Tag};
-use crate::syntax::behaviour::{CardRules, SourceRules};
+use crate::syntax::behaviour::{CardRules, NetlistRules, SourceRules};
 use crate::syntax::device::Primitive as Element;
 
 /// A waveform value: a number or an expression (without delimiters).
@@ -162,7 +162,12 @@ impl<'a> Rd<'a> {
             }
         }
         if !dc_given && let Some(w) = &wf {
-            value = w.at_zero();
+            // ngspice's SFFM is 0 up to time zero, at an operating point
+            // too, whatever its offset (`vsrcload.c:272`; ngspice-45, run:
+            // `V2 a 0 SFFM(0.5 1 200 4 10k)` is 0 V at `.op`).
+            let ngspice = self.b.netlist_rules == NetlistRules::Ngspice;
+            let zero = w.kind == WaveKind::Sffm && ngspice;
+            value = if zero { Val::Num(0.0) } else { w.at_zero() };
         }
         if repeat.is_some() || delay.is_some() {
             let Some(w) = &mut wf else { return None };

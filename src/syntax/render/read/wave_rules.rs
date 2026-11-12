@@ -14,7 +14,7 @@
 //! - `Rd::pwl_relative(&self, vals: &[u32]) -> Option<Vec<Num>>`
 //! - `Wave::counted(&self) -> bool`, `Wave::pulses(&self) -> Option<Wave>`
 //! - `Wave::cycled(&self) -> bool`, `Wave::sin_cycles(&self, t: &str) -> Option<String>`
-//! - `Wave::ngspice_sffm(&self) -> bool`,
+//! - `Wave::ngspice_sffm(&self) -> bool`, `Wave::spice3_sffm(&self) -> bool`,
 //!   `Wave::sffm_of(&self, t: &str, num: impl Fn(&Num) -> String) -> String`
 
 use super::{Num, Rd, Wave, WaveKind};
@@ -88,6 +88,27 @@ impl Wave {
             return false;
         };
         vo == 0.0 && fc != 0.0 && (0.0..=fc / fs).contains(&mdi)
+    }
+
+    /// Whether SPICE3's SFFM runs this wave, held in ngspice's order (VO VA
+    /// FM MDI FC), as ngspice-45 defines it: [`Wave::ngspice_sffm`] of the
+    /// two frequencies swapped, its three conditions read from the other
+    /// side. An offset is SPICE3's value at time zero, where ngspice is 0;
+    /// SPICE3 does not limit MDI; an FC of 0 is a 0 Hz carrier there. By
+    /// run: ngspice-45's `SFFM(0.5 1 200 4 10k)` starts a transient at 0 V,
+    /// Xyce 7.10's and VACASK's `(0.5 1 10k 4 200)` at 0.5 V; `SFFM(0 1 200
+    /// 80 10k)` is 0.9995 V at 213.7 µs on ngspice, -0.0957 V as Xyce's and
+    /// VACASK's `(0 1 10k 80 200)`. False also when one of the four is an
+    /// expression.
+    ///
+    /// # Panics
+    /// When the wave is not an SFFM.
+    pub(in crate::syntax::render) fn spice3_sffm(&self) -> bool {
+        assert_eq!(self.kind, WaveKind::Sffm, "an SFFM wave");
+        assert_eq!(self.args.len(), 5, "an SFFM holds five values");
+        let mut spice3 = self.clone();
+        spice3.args.swap(2, 4);
+        spice3.ngspice_sffm()
     }
 
     /// SPICE3's `SFFM(VO VA FC MDI FS)` as an expression of the target's
