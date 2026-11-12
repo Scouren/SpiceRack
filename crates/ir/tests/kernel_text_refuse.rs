@@ -146,6 +146,16 @@ fn a_text_that_states_an_invalid_design_is_refused() {
             "file \"f0.sp\" deck\n  analysis four fundamental=g15 periods=1 (i im (g19))\n  param ok = 1\n",
             1,
         ),
+        // RunArgumentClass (R68/A42): a transient's stop that reads the temperature
+        (
+            "file \"f0.sp\" deck\n  analysis tran stop=(1u * $temp) print_step=1n cap=none\n  param ok = 1\n",
+            1,
+        ),
+        // FieldDomain (R68/A42): an analysis's output with a part
+        (
+            "file \"f0.sp\" deck\n  analysis tf (v db (out)) source=v1\n  param ok = 1\n",
+            1,
+        ),
         // trailing words: the line is skipped whole
         ("file \"f0.sp\" deck\n  param p = 1 2\n  param ok = 1\n", 1),
         // DefinitionCycle: a parameter reading itself, and one reading through a second

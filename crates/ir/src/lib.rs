@@ -69,12 +69,11 @@ pub mod feature;
 pub mod form;
 #[cfg(any(test, feature = "gen"))]
 mod gen_expr;
-#[cfg(any(test, feature = "gen"))]
-mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
 mod item_facts_defs;
+mod item_facts_scopes;
 pub mod item_text;
 pub mod link;
 pub mod literal;
@@ -123,6 +122,7 @@ pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 
 // run owner
+#[macro_use]
 pub mod analysis;
 mod analysis_facts;
 pub mod build_run;

@@ -8,6 +8,8 @@
 //!
 //! Contents: tests only.
 
+use spicerack_ir::AcPart;
+use spicerack_ir::dc_ac::Tf;
 use spicerack_ir::dc_ac::{Ac, Dc};
 use spicerack_ir::diag::violation_code;
 use spicerack_ir::measure::{MeasureParam, MeasureWhen};
@@ -144,9 +146,38 @@ const BROKEN: &[Fixture] = &[
         let values = b.exprs(&v);
         raw_loop(b, s, LoopKind::Table, TableLoop { columns, values });
     }),
+    // R68/A42 (1), ruled for every loop row: the plan is evaluated before any analysis runs
+    ("a table loop's value reads the temperature", Violation::RunArgumentClass, |b, s| {
+        let columns = b.targets(&[Target::TEMP]);
+        let v = [b.temp()];
+        let values = b.exprs(&v);
+        raw_loop(b, s, LoopKind::Table, TableLoop { columns, values });
+    }),
+    ("a monte carlo loop's runs read the temperature", Violation::RunArgumentClass, |b, s| {
+        let runs = b.temp();
+        let mc = MonteCarlo { runs, seed: NO, samples: List::EMPTY, variations: Variations::Process, sampler: Sampler::Random, nominal: false };
+        raw_loop(b, s, LoopKind::MonteCarlo, mc);
+    }),
     ("monte carlo without runs", Violation::FieldDomain, |b, s| {
         let mc = MonteCarlo { runs: NO, seed: NO, samples: List::EMPTY, variations: Variations::Process, sampler: Sampler::Random, nominal: false };
         raw_loop(b, s, LoopKind::MonteCarlo, mc);
+    }),
+    // R68/A42 (1): an analysis's own argument and a sweep's range read no temperature
+    ("tran stop reads the temperature", Violation::RunArgumentClass, |b, s| {
+        let t = b.temp();
+        let tr = Tran { stop: t, ..tran(b) };
+        raw(b, s, AnalysisKind::Tran, tr);
+    }),
+    ("a sweep loop's range reads the temperature", Violation::RunArgumentClass, |b, s| {
+        let (x, y, z) = (b.temp(), b.num(2.0), b.num(1.0));
+        let sweep = SweepSpec::lin_step(x, y, z);
+        raw_loop(b, s, LoopKind::Sweep, SweepLoop { target: Target::TEMP, sweep });
+    }),
+    // R68/A42 (3): an analysis's output carries no part
+    ("a transfer function's output with a part", Violation::FieldDomain, |b, s| {
+        let output = b.probe_v(&["out"]).with_part(AcPart::Db);
+        let source = b.name("v1");
+        raw(b, s, AnalysisKind::Tf, Tf { output, source });
     }),
     ("nine nested loops", Violation::FieldDomain, |b, s| {
         let mut scope = s;
@@ -215,6 +246,13 @@ const BROKEN: &[Fixture] = &[
         let p = Ref::unresolved(b.name("p"));
         let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, mean: NO, spread: NO }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
+    }),
+    // R68/A42 (3), ruled for Fourier: its outputs are transient vectors, a part means nothing
+    ("a fourier output with a part", Violation::FieldDomain, |b, s| {
+        let (f, h, p) = (b.num(1e3), b.num(9.0), b.num(1.0));
+        let o = [b.probe_v(&["out"]).with_part(AcPart::Db)];
+        let outputs = b.probes(&o);
+        raw(b, s, AnalysisKind::Four, Four { fundamental: f, harmonics: h, periods: p, grid: NO, outputs });
     }),
     ("fourier with no count and no nfreqs option", Violation::FieldDomain, |b, s| {
         let (f, p) = (b.num(1e3), b.num(1.0));

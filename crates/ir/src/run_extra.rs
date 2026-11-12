@@ -379,11 +379,18 @@ pub enum RunExtra {
     /// A transient whose print step is given (`print_step` set; VACASK has no output interval,
     /// R67/A41). `TranSimulatorStep`'s twin: each transient sets exactly one.
     TranPrintStep,
+    /// An analysis's own argument (a DC axis's sweep range included) or a sweep loop's range
+    /// that reads a parameter (R68/A42: ngspice substitutes it; VACASK rejects a circuit
+    /// parameter there).
+    AnalysisParamArgument,
+    /// A periodic steady state with its harmonic count, point count, iteration limit or
+    /// steady-state coefficient absent (R68/A42: ngspice's `.pss` reads every argument).
+    PssArgumentOmitted,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 168] = [
+    pub const ALL: [RunExtra; 170] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -552,6 +559,8 @@ impl RunExtra {
         RunExtra::DcAxisUnnamed,
         RunExtra::LoopUnnamed,
         RunExtra::TranPrintStep,
+        RunExtra::AnalysisParamArgument,
+        RunExtra::PssArgumentOmitted,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

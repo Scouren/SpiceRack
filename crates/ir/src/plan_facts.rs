@@ -22,9 +22,7 @@
 use crate::analysis::{Analysis, AnalysisKind};
 #[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
-use crate::analysis_facts::{
-    detail_get, dump_of, fault_of, features_of, handles_of, parse_of, report,
-};
+use crate::analysis_facts::{dump_of, fault_of, features_of, handles_of, parse_of, report};
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
@@ -42,7 +40,7 @@ use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
     TargetKind, TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
-    target_refs_into, target_valid,
+    target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_ref, gen_target, target_kinds};
@@ -50,8 +48,8 @@ use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
 use crate::run_names::{names, names_of};
 use crate::run_words::{
-    get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
-    take_word, trim_lead, word, write_ref,
+    get, loop_depth, put_expr, put_flag, put_name, take_enum, take_expr, take_name, take_word,
+    trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -97,37 +95,13 @@ impl RowFacts for Loop {
                 }
             }
             LoopKind::Table => {
-                let Some(t) = detail_get::<TableLoop>(design, row.detail) else {
+                let Some(t) = crate::circuit_text::get_row::<TableLoop>(design, row.detail) else {
                     return;
                 };
                 let start = t.columns.start as usize;
                 let end = (start + t.columns.len as usize).min(design.run.targets.len());
                 for target in &mut design.run.targets[start.min(end)..end] {
                     target_refs(target, f);
-                }
-            }
-            LoopKind::MonteCarlo => {}
-        }
-    }
-
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        // `map_refs`'s order
-        match self.kind {
-            LoopKind::Sweep => {
-                if let Some(d) =
-                    <SweepLoop as crate::design::DetailRow>::rows(design).get(self.detail as usize)
-                {
-                    target_refs_into(&d.target, out);
-                }
-            }
-            LoopKind::Table => {
-                let Some(t) = detail_get::<TableLoop>(design, self.detail) else {
-                    return;
-                };
-                let start = t.columns.start as usize;
-                let end = (start + t.columns.len as usize).min(design.run.targets.len());
-                for target in &design.run.targets[start.min(end)..end] {
-                    target_refs_into(target, out);
                 }
             }
             LoopKind::MonteCarlo => {}
@@ -162,6 +136,13 @@ impl RowFacts for Loop {
         if self.kind == LoopKind::Sweep && !one_run(design, self.body) {
             add(RunExtra::SweepBodyNotOne);
         }
+        // R68/A42: every loop row's expression field is evaluated before any analysis runs, as
+        // an analysis's own argument (ruled for table and Monte Carlo rows too)
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        if crate::analysis_facts::run_arguments_read_param(design, &handles) {
+            add(RunExtra::AnalysisParamArgument);
+        }
         by_loop!(self.kind, features_of(design, self.detail, set));
     }
 
@@ -172,6 +153,9 @@ impl RowFacts for Loop {
         if loop_depth(design, self.body) > LOOP_DEPTH_MAX {
             report(design, at, Violation::FieldDomain, out);
         }
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        crate::analysis_facts::check_run_arguments(design, at, &handles, out);
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -277,8 +261,11 @@ impl RowFacts for Loop {
             4,
         )
         .expect("a naming feature is in the set");
-        let detail = by_loop!(kind, gen_of(g, scope, b, features))
-            .expect("a possible loop kind's detail generates");
+        // R68/A42: a loop row's fields are drawn as an analysis's own arguments
+        let detail = crate::analysis_facts::run_arguments(g, features, |g| {
+            by_loop!(kind, gen_of(g, scope, b, features))
+        })
+        .expect("a possible loop kind's detail generates");
         let row = |body| Loop {
             kind,
             after,
@@ -344,10 +331,6 @@ impl RowFacts for Alter {
         let mut row: Alter = design.row(at.index);
         target_refs(&mut row.target, f);
         design.editor().set(at.index, row);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        target_refs_into(&self.target, out);
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
@@ -420,7 +403,7 @@ impl RowFacts for Alter {
 impl RowFacts for Elaborate {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         for &r in get(&design.run.refs, self.circuits).unwrap_or(&[]) {
-            out.push(Handle::Ref(r));
+            out.push(Handle::Ref(r, DefKind::Subckt));
         }
     }
 
@@ -430,14 +413,6 @@ impl RowFacts for Elaborate {
         let end = (start + row.circuits.len as usize).min(design.run.refs.len());
         for r in &mut design.run.refs[start.min(end)..end] {
             f(r, DefKind::Subckt);
-        }
-    }
-
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        let start = self.circuits.start as usize;
-        let end = (start + self.circuits.len as usize).min(design.run.refs.len());
-        for r in &design.run.refs[start.min(end)..end] {
-            out.push((*r, DefKind::Subckt));
         }
     }
 
@@ -457,7 +432,7 @@ impl RowFacts for Elaborate {
             if k > 0 {
                 out.push(' ');
             }
-            write_ref(out, design, ctx, r, DefKind::Subckt);
+            crate::text_expr::write_ref(design, r, DefKind::Subckt, ctx, out);
         }
         out.push(')');
     }
@@ -478,7 +453,7 @@ impl RowFacts for Elaborate {
         if !words.expect(")", diags) {
             return ItemRef::NONE;
         }
-        let circuits = pool(&mut b.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut b.design.run.refs, &refs);
         b.push(scope, Elaborate { circuits }, words.span())
     }
 
@@ -496,7 +471,7 @@ impl RowFacts for Elaborate {
         let refs: Vec<Ref> = (0..n)
             .map(|_| gen_ref(g, b, Some(DefKind::Subckt)))
             .collect();
-        let circuits = pool(&mut b.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut b.design.run.refs, &refs);
         b.push(scope, Elaborate { circuits }, Span::NONE)
     }
 }

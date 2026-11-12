@@ -252,6 +252,8 @@ fn each_kernel_invariant_has_its_fixture() {
         Violation::DetailRow,
         Violation::DuplicateElement,
         Violation::InstancePortCount,
+        // run-owned (run_check.rs has its fixtures)
+        Violation::RunArgumentClass,
     ];
     let kernel: Vec<Violation> = Violation::ALL
         .into_iter()

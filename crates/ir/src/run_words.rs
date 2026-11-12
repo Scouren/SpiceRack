@@ -15,12 +15,12 @@
 //! Contents:
 //! - words: `pub(crate) fn word`, `pub(crate) fn member`, `pub(crate) fn put_word`,
 //!   `pub(crate) fn put_flag`, `pub(crate) fn trim_lead`, `pub(crate) fn put_expr`, `pub(crate) fn put_exprs`,
-//!   `pub(crate) fn put_name`, `pub(crate) fn put_names`, `pub(crate) fn put_ref`, `pub(crate) fn write_ref`,
-//!   `pub(crate) fn put_value`, `pub(crate) fn take_word`, `pub(crate) fn take_enum`,
+//!   `pub(crate) fn put_name`, `pub(crate) fn put_names`, `pub(crate) fn put_ref`,
+//!   `pub(crate) fn take_word`, `pub(crate) fn take_enum`,
 //!   `pub(crate) fn take_key`, `pub(crate) fn take_expr`, `pub(crate) fn take_exprs`,
 //!   `pub(crate) fn take_name`, `pub(crate) fn take_names`, `pub(crate) fn open`,
 //!   `pub(crate) fn close`
-//! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
+//! - pools: `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
 //!   `pub(crate) fn is_one`, `pub(crate) fn is_zero`,
 //!   `pub(crate) fn loop_depth`, `pub(crate) fn gen_name` (gen)
@@ -33,7 +33,7 @@ use crate::design::Design;
 use crate::diag::Diags;
 use crate::expr::{Expr, Literal, NumForm};
 use crate::feature::{Feature, FeatureSet};
-use crate::id::{ExprId, ExprList, List, NameId, NameList, POOL_MAX, Ref, ScopeId};
+use crate::id::{ExprId, ExprList, List, NameId, NameList, Ref, ScopeId};
 use crate::item::{DefKind, ScopeKind};
 use crate::run_extra::RunExtra;
 use crate::text::Words;
@@ -93,7 +93,7 @@ pub(crate) fn put_expr(out: &mut String, design: &Design, ctx: &Ctx, key: &str, 
     if !e.is_none() {
         put_word(out, key);
         out.push('=');
-        put_value(out, design, ctx, e);
+        crate::text_expr::write_value(design, e, ctx, out);
     }
 }
 
@@ -130,31 +130,14 @@ pub(crate) fn put_names(out: &mut String, design: &Design, key: &str, list: Name
         out.push_str(key);
         out.push('=');
     }
-    out.push('(');
-    for (i, &n) in design.names(list).iter().enumerate() {
-        if i > 0 {
-            out.push(' ');
-        }
-        text_expr::write_name(design.str(n), out);
-    }
-    out.push(')');
+    text_expr::write_names(design, list, out);
 }
 
 /// ` name`, ` name?` or ` name#k` for a reference (the kernel's spelling; a resolved reference
 /// is bare unless lookup from `ctx.scope` binds another definition: `name#k`, A9).
 pub(crate) fn put_ref(out: &mut String, design: &Design, ctx: &Ctx, r: Ref, kind: DefKind) {
     out.push(' ');
-    write_ref(out, design, ctx, r, kind);
-}
-
-/// A reference, as `put_ref` writes it, without the leading space.
-pub(crate) fn write_ref(out: &mut String, design: &Design, ctx: &Ctx, r: Ref, kind: DefKind) {
     text_expr::write_ref(design, r, kind, ctx, out);
-}
-
-/// A field value: an atom as is, any other expression in parentheses.
-pub(crate) fn put_value(out: &mut String, design: &Design, ctx: &Ctx, e: ExprId) {
-    text_expr::write_value(design, e, ctx, out);
 }
 
 /// Consumes `w` when it is the next word.
@@ -267,27 +250,6 @@ pub(crate) fn close(words: &mut Words<'_>, diags: &mut Diags) -> bool {
 }
 
 // ---- pools ----
-
-/// Appends `items` to a run pool; the empty list is `List::EMPTY` (so a built list and a
-/// parsed one compare equal). Asserts `POOL_MAX`.
-pub(crate) fn pool<T: Copy>(pool: &mut Vec<T>, items: &[T]) -> List<T> {
-    if items.is_empty() {
-        return List::EMPTY;
-    }
-    let start = pool.len();
-    assert!(
-        start + items.len() <= POOL_MAX,
-        "a run pool holds at most POOL_MAX elements"
-    );
-    pool.extend_from_slice(items);
-    let list = List {
-        start: start as u32,
-        len: items.len() as u32,
-        pool: Default::default(),
-    };
-    assert!(list.start as usize + list.len as usize == pool.len());
-    list
-}
 
 /// The elements of `list`, or `None` when its range overruns the pool (a `HandleRange`).
 pub(crate) fn get<T>(pool: &[T], list: List<T>) -> Option<&[T]> {

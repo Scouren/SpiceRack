@@ -299,6 +299,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a subcircuit instance whose terminals do not match its definition's ports",
             "an instance connects one net per port of the subcircuit it is bound to; ngspice and HSPICE refuse another count, and VACASK's own reading (internal nodes for missing trailing terminals) is kept Private by its reader.",
         ),
+        Violation::RunArgumentClass => (
+            "an analysis argument or sweep range that reads the temperature or the circuit",
+            "an analysis's own arguments and a sweep's range are evaluated before the run: ngspice reads the card once with no temperature, VACASK rejects `$temp` there when the analysis runs; neither means it (R68).",
+        ),
         Violation::StringOrListField => (
             "a typed field that holds a string or a list",
             "a row's own expression field is a number, except the fields its row names as strings (a model's version, an alter's value, a private option's value); a list is a value only of a parameter, a formal's default or a parameter list.",

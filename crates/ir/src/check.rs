@@ -112,6 +112,11 @@ pub enum Violation {
     /// refuse the deck, VACASK gives missing trailing terminals internal nodes). The circuit
     /// owner's row check. `arg`: the terminal count.
     InstancePortCount,
+    /// An analysis's own argument (an expression field of its row, a DC axis's sweep range
+    /// included) or a sweep loop's range whose class is `Temp` or above (R68/A42: ngspice
+    /// evaluates the card once before the run, VACASK rejects `$temp` there). The run owner's
+    /// row check. `arg`: the root.
+    RunArgumentClass,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -122,7 +127,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::InstancePortCount as usize + 1] = [
+    pub const ALL: [Violation; Violation::RunArgumentClass as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -145,6 +150,7 @@ impl Violation {
         Violation::StringOrListBody,
         Violation::StringOrListField,
         Violation::InstancePortCount,
+        Violation::RunArgumentClass,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -264,7 +270,7 @@ fn probe_classes(out: &mut Out<'_>) {
                 Handle::Exprs(l) => roots.extend_from_slice(d.exprs(l)),
                 Handle::ExprDyn(_)
                 | Handle::Name(_)
-                | Handle::Ref(_)
+                | Handle::Ref(..)
                 | Handle::Names(_)
                 | Handle::Scope(_)
                 | Handle::Text(_)
@@ -407,14 +413,20 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         }
         handles.clear();
         strings.clear();
-        let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
             row.string_roots(d, &mut strings);
-            row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
+        // the references `map_refs` visits, read off the handles (M5: no copy of the design)
+        let refs: Vec<(crate::Ref, DefKind)> = handles
+            .iter()
+            .filter_map(|h| match *h {
+                Handle::Ref(r, kind) => Some((r, kind)),
+                _ => None,
+            })
+            .collect();
         for (r, kind) in refs {
             if !r.is_resolved() {
                 continue;
@@ -470,7 +482,7 @@ fn handle(out: &mut Out<'_>, item: ItemRef, h: Handle, bad: &[bool], walk: &mut 
         }
         Handle::Expr(e) => expression(out, item, e, false, bad, walk),
         Handle::ExprDyn(e) => expression(out, item, e, true, bad, walk),
-        Handle::Ref(_) => {} // references are reached through `map_refs`
+        Handle::Ref(..) => {} // references are reached through `map_refs`
         Handle::Scope(s) => {
             if !s.is_none() && s.index() >= d.scopes.len() {
                 out.report(Violation::HandleRange, item, s.0);
