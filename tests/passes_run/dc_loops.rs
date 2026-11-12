@@ -4,9 +4,11 @@
 //!
 //! The source's sweep continues from point to point (`Dc::restart` false) and the rule
 //! converts only a restarting one, so the test sets `restart` on the read design: the stand-in
-//! for a source that restarts. The divider is linear, its one operating point the same however
-//! a point starts, so the two runs still compare. Tolerance: 2·(RELTOL·swing + VNTOL) with
-//! RELTOL 1e-3, VNTOL 1e-6 V (`common/cmp.rs`'s DC rule).
+//! for a source that restarts. The axis is a diode's area, a device parameter by the reader's
+//! one kind per meaning (a resistor's `r` is an element value, which no row converts). The
+//! circuit (a resistor into a diode) has one operating point, the same however a point starts,
+//! so the two runs still compare. Tolerance: 2·(RELTOL·|v| + VNTOL) with RELTOL 1e-3, VNTOL
+//! 1e-6 V (`common/cmp.rs`'s DC rule).
 //!
 //! And R72's reason for converting only a restarting DC: `decks/bistable_dc.sp` (a continued
 //! `.dc`) and `decks/bistable_loop.sp` (the same values by `foreach`/`alter`/`op`) on ngspice-45
@@ -61,6 +63,16 @@ pub fn dc_loops_give_the_points_vacask_gives() {
     assert_eq!(dc.len(), 1, "one DC analysis");
     let detail = design.row::<ir::Analysis>(dc[0].index).detail;
     let mut row = design.detail::<ir::dc_ac::Dc>(detail);
+    let kinds: Vec<_> = design
+        .dc_axes(row.axes)
+        .iter()
+        .map(|x| x.target.kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        [ir::plan::TargetKind::DeviceParam],
+        "the axis the rows name"
+    );
     row.restart = true;
     design.editor().set_detail(detail, row);
     let read = diags.len();
@@ -92,21 +104,19 @@ pub fn dc_loops_give_the_points_vacask_gives() {
         .collect();
     assert_eq!(target.len(), 3, "one op plot a pass:\n{written}");
     for (k, (x, y)) in source.iter().zip(&target).enumerate() {
-        let tol = 2.0 * (1e-3 * 1.0 + 1e-6);
+        let tol = 2.0 * (1e-3 * x.abs() + 1e-6);
         assert!(
             (x - y).abs() <= tol,
             "point {k}: VACASK {x}, ngspice {y}\n{written}"
         );
     }
-    for (k, (x, want)) in source.iter().zip([0.5, 1.0 / 3.0, 0.25]).enumerate() {
-        assert!(
-            (x - want).abs() <= 1e-9,
-            "point {k}: VACASK {x}, the divider {want}"
-        );
-    }
+    assert!(
+        source[0] > source[1] && source[1] > source[2],
+        "the area moved the point: {source:?}"
+    );
 }
 
-/// The rows over the laws' own set (`pass_laws/sets.rs`): some generated design converts.
+/// The rows over the laws' own set (`gen_sets.rs`): some generated design converts.
 pub fn dc_axes_to_loops_convert_generated_designs(seeds: std::ops::Range<u64>, size: Size) {
     // the laws' own set (`pass_laws.rs` GEN_SETS): restarting DC analyses with source and list
     // axes beside the row's; the laws mean something for the rows only if some design converts
