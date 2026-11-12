@@ -33,7 +33,7 @@ use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+use crate::item::{ItemKind, Role, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 use crate::wave::WaveKind;
@@ -363,6 +363,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
     if case_clash(design) {
         *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
+    let untitled = |f| {
+        let file = design.file(f);
+        file.role == Role::Deck
+            && !design
+                .items(file.top)
+                .iter()
+                .any(|i| i.kind == ItemKind::Title)
+    };
+    if design.files().any(untitled) {
+        *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
     }
     crate::element::design_features(design, set);
     crate::analysis::design_features(design, set);

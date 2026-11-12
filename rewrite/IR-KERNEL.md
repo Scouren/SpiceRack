@@ -284,6 +284,9 @@ item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still
 `Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
 leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+`Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
+top scope lists no `Title`. The generator titles every deck when the set lacks it, and makes
+only libraries when the set has neither it nor `Item(Title)`.
 
 **A12 K3 (2026-11-12): `OpaqueClass::Hint` (R19).** Tunes its own simulator's solver (a
 convergence aid, a step-control knob) and names no accuracy target. Appended after `Script`, so
