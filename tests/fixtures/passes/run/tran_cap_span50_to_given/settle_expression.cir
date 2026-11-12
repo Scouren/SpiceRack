@@ -1,0 +1,7 @@
+ceiling read-back: tmax {1u/50}
+* settle (R77): ngspice-45 -b -r, ASCII raw: the three decks (20n, 2e-8, {1u/50}) give byte-identical Values (62 points, the same time grid)
+v1 a 0 dc 1
+r1 a b 1k
+c1 b 0 1p
+.tran 1n 1u 0 {1u/50}
+.end
