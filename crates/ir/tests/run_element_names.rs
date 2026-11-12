@@ -8,8 +8,6 @@
 
 use spicerack_ir::{Design, Diags, ElementUse, NameId, dump, parse};
 
-// ---- private ----
-
 /// Two instance levels: `x1` (of `outer`) in the top, `x2` (of `inner`) in `outer`'s body,
 /// `r1` and the net `n` in `inner`'s.
 const DECK: &str = "file \"t.sp\" deck
@@ -23,6 +21,8 @@ const DECK: &str = "file \"t.sp\" deck
   alter (element_value r1 path=(x1 x2)) value=2k
   analysis noise (v (out)) source=v1 (lin start=1 stop=2 step=1)
 ";
+
+// ---- private ----
 
 fn read(text: &str) -> Design {
     let mut d = Design::new();

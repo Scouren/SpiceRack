@@ -23,7 +23,8 @@
 //! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
 //! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`); crate:
-//!   `pub(crate) fn design_features(&Design, &mut FeatureSet)`
+//!   `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
+//!   `pub(crate) fn feature_items(&Design, &mut Vec<(Feature, ItemRef)>)`
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
@@ -31,7 +32,7 @@ use crate::dc_ac::{
 use crate::design::ItemRow;
 use crate::design::{Design, DetailRow};
 use crate::feature::{Feature, FeatureSet};
-use crate::id::{NameId, Ref};
+use crate::id::{ItemRef, NameId, Ref};
 use crate::item::ItemKind;
 use crate::measure::{
     MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen,
@@ -314,14 +315,23 @@ impl AnalysisKinds {
     }
 }
 
-/// The run owner's features of the whole design, which no single row carries (A9): several
-/// analyses in one run (`SeveralAnalyses`), a loop whose body does not hold every analysis
-/// (`LoopScoped`), and the state items after a run item in listed order (`OptionMidRun`,
-/// `EnvMidRun`, `NodeSetMidRun`, `WholeRunMidRun`: `state_order::state_order_features`), and a
-/// file top's other items between run items (`RunInterleaved`: `interleaved_features`). Called once
-/// by `features_used` and `check_legal` (which reports them at `Span::NONE`). One pass over the
-/// scopes and items: O(scopes + items).
+/// The run owner's features of the whole design, which no single row carries alone (A9), as
+/// `feature_items` lists them, gathered into `set`. Called once by `features_used` and
+/// `check_legal`.
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
+    let mut out = Vec::new();
+    feature_items(design, &mut out);
+    for (f, _) in out {
+        *set = set.with(f);
+    }
+}
+
+/// Appends each design-level run feature at the item that carries it: `SeveralAnalyses` at
+/// each analysis after the first in run order (`state_order::run_walks`); `LoopScoped` at a
+/// loop whose body does not hold every analysis; the mid-run state features at the state item
+/// (`state_order::state_order_features`); `RunInterleaved` at the item between two run items
+/// (`state_order::interleaved_features`). O(scopes + items).
+pub(crate) fn feature_items(design: &Design, out: &mut Vec<(Feature, ItemRef)>) {
     let n = design.scopes.len();
     // Analyses per scope subtree: a scope's own, then added into its parent, children first
     // (a child scope always has a higher id than its parent).
@@ -347,16 +357,25 @@ pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
         .map(|f| below[design.file(f).top.index()])
         .sum();
     if total > 1 {
-        *set = set.with(Feature::Run(RunExtra::SeveralAnalyses));
+        let analyses = crate::state_order::run_walks(design)
+            .into_iter()
+            .flat_map(|(_, order)| order)
+            .map(|(item, _)| item)
+            .filter(|i| i.kind == ItemKind::Analysis);
+        out.extend(
+            analyses
+                .skip(1)
+                .map(|i| (Feature::Run(RunExtra::SeveralAnalyses), i)),
+        );
     }
-    crate::state_order::state_order_features(design, set);
-    crate::state_order::interleaved_features(design, set);
+    crate::state_order::state_order_features(design, out);
+    crate::state_order::interleaved_features(design, out);
     for items in &design.scope_items {
-        for item in items {
+        for &item in items {
             if item.kind == ItemKind::Loop {
                 let body = Loop::table(design).get(item.index).body;
                 if below[body.index()] < total {
-                    *set = set.with(Feature::Run(RunExtra::LoopScoped));
+                    out.push((Feature::Run(RunExtra::LoopScoped), item));
                 }
             }
         }

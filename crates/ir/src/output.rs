@@ -233,7 +233,7 @@ impl RowFacts for Save {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let Some(holds) =
-            crate::option::gen_holds(g, b, scope, features, RunExtra::SaveMidRun, save_mode)
+            crate::state_gen::gen_holds(g, b, scope, features, RunExtra::SaveMidRun, save_mode)
         else {
             return ItemRef::NONE;
         };

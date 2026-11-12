@@ -307,7 +307,7 @@ impl RowFacts for Analysis {
             && features.contains(Feature::Run(RunExtra::FourHarmonicsOption))
             && g.chance(2)
         {
-            crate::option::gen_nfreqs(g, scope, b, features);
+            crate::state_gen::gen_nfreqs(g, scope, b, features);
         }
         // The name first: the text, and so the parse, interns it before the detail's names.
         let name = if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {

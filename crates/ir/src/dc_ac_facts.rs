@@ -19,13 +19,14 @@
 //!
 //! Cites: `crates/ir/src/dc_ac.rs` docs; `rewrite/IR-RUN.md` §2.
 //!
-//! Contents: `DetailFacts` for `Dc`, `Ac`, `Noise`, `Tf`, `DcXf`, `Xf`, `Sens`, `SensAc`
-//! (`Pz`, `Sp`, `Net`, `Disto`, `TimedOp`: `network_facts.rs`); `pub(crate) fn output_valid`
+//! Contents: `DetailFacts` for `Dc`, `Ac`, `Noise`, `Tf` (`DcXf`, `Xf`, `Sens`, `SensAc`:
+//! `xf_facts.rs`; `Pz`, `Sp`, `Net`, `Disto`, `TimedOp`: `network_facts.rs`);
+//! `pub(crate) fn output_valid`
 
 use crate::analysis_facts::DetailFacts;
 use crate::build::Builder;
 use crate::check::Violation;
-use crate::dc_ac::{Ac, Dc, DcAxis, DcXf, Noise, NoiseRef, Sens, SensAc, Tf, Xf};
+use crate::dc_ac::{Ac, Dc, DcAxis, Noise, NoiseRef, Tf};
 use crate::design::Design;
 use crate::diag::Diags;
 use crate::facts::Handle;
@@ -382,198 +383,6 @@ impl DetailFacts for Tf {
         Some(Tf {
             output,
             source: g.fresh_name(b),
-        })
-    }
-}
-
-impl DetailFacts for DcXf {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-    }
-    fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        probe_features(&self.output, set);
-    }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(output_valid(&self.output))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        Some(DcXf {
-            output: parse_probe(words, scope, b, diags)?,
-        })
-    }
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        _scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> Option<Self> {
-        Some(DcXf {
-            output: gen_probe(g, b, features, true),
-        })
-    }
-}
-
-impl DetailFacts for Sens {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-    }
-    fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        probe_features(&self.output, set);
-    }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(output_valid(&self.output))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        Some(Sens {
-            output: parse_probe(words, scope, b, diags)?,
-        })
-    }
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        _scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> Option<Self> {
-        Some(Sens {
-            output: gen_probe(g, b, features, true),
-        })
-    }
-}
-
-impl DetailFacts for Xf {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-        sweep_handles(&self.sweep, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-        r.sweep(&mut self.sweep);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-    }
-    fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        probe_features(&self.output, set);
-        sweep_features(&self.sweep, SweepUse::Freq, set);
-    }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-        dump_sweep(design, ctx, &self.sweep, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let output = parse_probe(words, scope, b, diags)?;
-        Some(Xf {
-            output,
-            sweep: parse_sweep(words, scope, b, diags)?,
-        })
-    }
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        _scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> Option<Self> {
-        let output = gen_probe(g, b, features, true);
-        Some(Xf {
-            output,
-            sweep: gen_sweep(g, b, features, SweepUse::Freq),
-        })
-    }
-}
-
-impl DetailFacts for SensAc {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-        sweep_handles(&self.sweep, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-        r.sweep(&mut self.sweep);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-    }
-    fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        probe_features(&self.output, set);
-        sweep_features(&self.sweep, SweepUse::Freq, set);
-    }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-        dump_sweep(design, ctx, &self.sweep, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let output = parse_probe(words, scope, b, diags)?;
-        Some(SensAc {
-            output,
-            sweep: parse_sweep(words, scope, b, diags)?,
-        })
-    }
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        _scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> Option<Self> {
-        let output = gen_probe(g, b, features, true);
-        Some(SensAc {
-            output,
-            sweep: gen_sweep(g, b, features, SweepUse::Freq),
         })
     }
 }
