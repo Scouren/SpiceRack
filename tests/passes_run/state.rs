@@ -6,7 +6,8 @@
 //! `FromHere` item holds for the analyses after it until a later one of the same thing or a
 //! `Reset` of its class; where both set one thing, the `FromHere` one in force wins (the model's
 //! choice: the passes never convert such an item, so either choice compares the same).
-//! Saves add up. Loops are not unrolled: an analysis in a loop body is one execution.
+//! A next-only condition holds for the next analysis alone and wins there. Saves add up. Loops
+//! are not unrolled: an analysis in a loop body is one execution.
 //!
 //! Contents: `pub enum Thing`, `pub type State`, `pub fn states(&ir::Design) -> Vec<(ir::ItemRef, State)>`
 
@@ -39,7 +40,10 @@ pub fn states(design: &ir::Design) -> Vec<(ir::ItemRef, State)> {
         let mut whole: BTreeMap<Thing, u32> = BTreeMap::new();
         let mut whole_saves = Vec::new();
         for &item in &order {
+            let next_only = item.kind == ir::ItemKind::NodeSet
+                && design.row::<ir::NodeSet>(item.index).next_only;
             match holds(design, item) {
+                _ if next_only => {}
                 Some(ir::Applies::WholeRun) if item.kind == ir::ItemKind::Save => {
                     whole_saves.push(item.index)
                 }
@@ -52,10 +56,18 @@ pub fn states(design: &ir::Design) -> Vec<(ir::ItemRef, State)> {
             }
         }
         let mut here: BTreeMap<Thing, u32> = BTreeMap::new();
+        let mut next: BTreeMap<Thing, u32> = BTreeMap::new();
         let mut here_saves: Vec<u32> = Vec::new();
         for &item in &order {
             match (item.kind, holds(design, item)) {
                 (ir::ItemKind::Save, Some(ir::Applies::FromHere)) => here_saves.push(item.index),
+                (ir::ItemKind::NodeSet, Some(_))
+                    if design.row::<ir::NodeSet>(item.index).next_only =>
+                {
+                    for (t, v) in things(design, item) {
+                        next.insert(t, v);
+                    }
+                }
                 (_, Some(ir::Applies::FromHere)) => {
                     for (t, v) in things(design, item) {
                         here.insert(t, v);
@@ -71,6 +83,7 @@ pub fn states(design: &ir::Design) -> Vec<(ir::ItemRef, State)> {
                 (ir::ItemKind::Analysis, _) => {
                     let mut state = whole.clone();
                     state.extend(here.iter().map(|(t, v)| (t.clone(), *v)));
+                    state.extend(std::mem::take(&mut next));
                     let mut saves: Vec<u32> =
                         whole_saves.iter().chain(&here_saves).copied().collect();
                     saves.sort_unstable();
@@ -127,7 +140,7 @@ fn things(design: &ir::Design, item: ir::ItemRef) -> Vec<(Thing, u32)> {
         ir::ItemKind::NodeSet => {
             let n = design.row::<ir::NodeSet>(item.index);
             let ids = |l| design.names(l).iter().map(|x: &ir::NameId| x.0).collect();
-            let key = format!("{:?} {:?} {}", n.kind, n.applies, n.next_only);
+            let key = format!("{:?} {:?}", n.kind, n.applies);
             vec![(Thing::Node(key, ids(n.node), ids(n.reference)), n.value.0)]
         }
         _ => Vec::new(),

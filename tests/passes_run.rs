@@ -32,6 +32,8 @@ const PENDING_PAIRS: &[&str] = &[
     "tran_cap_span50_to_given",
     "tran_cap_span10_to_given",
     "tran_cap_none_to_given",
+    "ic_beyond_next_to_next_only",
+    "ic_next_only_to_beyond",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -58,6 +60,16 @@ fn whole_run_to_from_here_keeps_the_state_at_every_analysis() {
 #[test]
 fn whole_run_save_to_from_here_keeps_the_saves_at_every_analysis() {
     keeps_state("whole_run_save_to_from_here", ir::RunExtra::SaveWholeRun);
+}
+
+#[test]
+fn ic_beyond_next_to_next_only_keeps_the_state_at_every_analysis() {
+    keeps_state("ic_beyond_next_to_next_only", ir::RunExtra::IcBeyondNext);
+}
+
+#[test]
+fn ic_next_only_to_beyond_keeps_the_state_at_every_analysis() {
+    keeps_state("ic_next_only_to_beyond", ir::RunExtra::IcNextOnly);
 }
 
 #[test]
@@ -243,14 +255,22 @@ fn keeps_state(name: &str, feature: ir::RunExtra) {
             after, before,
             "{name} seed {seed}: the state at an analysis changed"
         );
-        let mut refs_after = refs(&design);
-        let mut refs_before = refs_before;
-        refs_after.sort_by_key(|a| (a.0.kind as u8, a.0.index));
-        refs_before.sort_by_key(|a| (a.0.kind as u8, a.0.index));
-        assert_eq!(
-            refs_after, refs_before,
-            "{name} seed {seed}: a reference moved"
-        );
+        // every item kept holds the same references; an item added or dropped holds none
+        let refs_after = refs(&design);
+        let all = || refs_before.iter().chain(&refs_after);
+        for (item, r) in all() {
+            let changed = all().any(|(i, x)| i == item && x != r);
+            assert!(
+                !changed,
+                "{name} seed {seed}: {item:?}'s references changed"
+            );
+            let kept = refs_before.iter().any(|(i, _)| i == item)
+                && refs_after.iter().any(|(i, _)| i == item);
+            assert!(
+                kept || r.is_empty(),
+                "{name} seed {seed}: {item:?} came or went"
+            );
+        }
     }
     assert!(ran > 0, "{name}: no generated design had the feature");
     eprintln!("{name}: {ran} generated designs");

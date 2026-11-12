@@ -8,7 +8,8 @@
 //!   `Run(RunInterleaved)`: a moved item may land after a circuit item that follows an earlier
 //!   output item (`run_items_together` removes it). An item not listed in its walk's top scope,
 //!   or a walk whose first run item is not, keeps the feature with `STATE_ELSEWHERE` (a move
-//!   across files or out of a body would change what includes it).
+//!   across files or out of a body would change what includes it), and so does a next-only
+//!   node set (it holds for the analysis after it: a move would change which).
 //! - `whole_run_to_from_here` removes `Run(StateWholeRun)` and `whole_run_save_to_from_here`
 //!   removes `Run(SaveWholeRun)`: a `WholeRun` option, `Env` or node set (or save) standing before
 //!   every run item becomes `FromHere` (requires `Run(StateFromHere)`, `Run(SaveFromHere)`).
@@ -28,7 +29,8 @@
 //! `pub fn whole_run_to_from_here(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn whole_run_save_to_from_here(&mut ir::Design, &mut ir::Diags)`,
 //! `pub const STATE_ELSEWHERE: ir::Code`, `pub const MID_RUN: ir::Code`,
-//! `pub const RESET_RESTORES: ir::Code`, `pub const FROM_HERE_SAME: ir::Code`
+//! `pub const RESET_RESTORES: ir::Code`, `pub const FROM_HERE_SAME: ir::Code`; to the group:
+//! `pub(super) fn walks(&ir::Design) -> Vec<(ir::ScopeId, Vec<(ir::ItemRef, ir::ScopeId)>)>`
 
 use std::collections::{HashMap, HashSet};
 
@@ -56,7 +58,10 @@ pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
             if holds(design, item) != Some(ir::Applies::WholeRun) {
                 continue;
             }
-            match in_place && scope == top {
+            // a next-only condition holds for the analysis after it: a move would change which
+            let next_only = item.kind == ir::ItemKind::NodeSet
+                && design.row::<ir::NodeSet>(item.index).next_only;
+            match in_place && scope == top && !next_only {
                 true => moved.push(item),
                 false => diags.push_at(STATE_ELSEWHERE, design, item, 0),
             }
@@ -100,11 +105,9 @@ pub fn whole_run_save_to_from_here(design: &mut ir::Design, diags: &mut ir::Diag
     to_from_here(design, diags, &[ir::ItemKind::Save]);
 }
 
-// ---- private ----
-
 /// Every walk: (its top scope, its items in listed order with their listing scopes). Decks
 /// first, then each file no walk reached. Explicit stack; each scope entered once per walk.
-fn walks(design: &ir::Design) -> Vec<(ir::ScopeId, Vec<(ir::ItemRef, ir::ScopeId)>)> {
+pub(super) fn walks(design: &ir::Design) -> Vec<(ir::ScopeId, Vec<(ir::ItemRef, ir::ScopeId)>)> {
     let files: Vec<ir::FileId> = design.files().collect();
     let deck = |f: &ir::FileId| design.file(*f).role == ir::Role::Deck;
     let starts: Vec<ir::FileId> = files
@@ -159,6 +162,8 @@ fn walks(design: &ir::Design) -> Vec<(ir::ScopeId, Vec<(ir::ItemRef, ir::ScopeId
     }
     out
 }
+
+// ---- private ----
 
 /// Whether the item is a run item for listed order (A14): an analysis, loop or alter.
 fn is_run(kind: ir::ItemKind) -> bool {

@@ -19,10 +19,11 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod run_items_together`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod ic_next_only`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
+pub mod ic_next_only;
 pub mod run_items_together;
 pub mod tran_ceiling_given;
 pub mod whole_run_state_first;
@@ -83,6 +84,23 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[],
         run: tc::tran_cap_none_to_given,
     },
+    Pass {
+        name: "ic_beyond_next_to_next_only",
+        removes: ir::Feature::Run(ir::RunExtra::IcBeyondNext),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Run(ir::RunExtra::IcNextOnly))
+            .with(ir::Feature::Run(ir::RunExtra::StateFromHere))
+            .with(ir::Feature::Run(ir::RunExtra::NodeSetMidRun)),
+        notes: &[ic_next_only::IC_KEPT],
+        run: ic_next_only::ic_beyond_next_to_next_only,
+    },
+    Pass {
+        name: "ic_next_only_to_beyond",
+        removes: ir::Feature::Run(ir::RunExtra::IcNextOnly),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::IcBeyondNext)),
+        notes: &[ic_next_only::IC_KEPT],
+        run: ic_next_only::ic_next_only_to_beyond,
+    },
     // after `whole_run_state_first`: a move may interleave
     Pass {
         name: "run_items_together",
@@ -137,6 +155,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a transient under ngspice's step ceiling with no print step",
             cite: "rewrite/AMEND-A12.md A24; R47",
             explain: "ngspice's default ceiling is the smaller of the print step and a fiftieth of the span; this transient leaves the print step to the simulator, so the ceiling has no value to state and the analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        ic_next_only::IC_KEPT,
+        ir::Info {
+            title: "an initial condition or node set whose reach the target cannot state",
+            cite: "rewrite/AMEND-A12.md A22",
+            explain: "The target states a condition either for the next analysis only or for every analysis after it, not this one's way. The rule copies or re-labels a deck's conditions together, and here it cannot: a condition or an analysis stands in a body or loop, a value holds a random draw, one node is set both for the whole run and from a point on, or a next-only condition precedes an analysis that is not the last. The condition is refused.",
             kind: ir::Kind::Note,
         },
     ),

@@ -1,0 +1,4 @@
+file "a.sp" deck
+  analysis op
+  nodeset ic every_op node=(a) value=2
+  analysis op

@@ -1,0 +1,4 @@
+file "a.sp" deck
+  nodeset ic every_op next_only node=(a) value=2
+  analysis op
+  analysis op
