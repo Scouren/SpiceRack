@@ -10,14 +10,27 @@
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/dc_loops.rs"]
+mod dc_loops;
+#[path = "passes_run/gen_sets.rs"]
+mod gen_sets;
 #[path = "passes_run/loops.rs"]
 mod loops;
 #[path = "passes_run/names.rs"]
 mod names;
 #[path = "passes_run/params.rs"]
 mod params;
+#[allow(dead_code)]
+#[path = "common/sim.rs"]
+mod sim;
 #[path = "passes_run/state.rs"]
 mod state;
+#[allow(dead_code)]
+#[path = "test_import_suite/tube.rs"]
+mod tube;
+#[allow(dead_code)]
+#[path = "test_cross_sim/vacask.rs"]
+mod vacask;
 #[path = "passes_run/walk.rs"]
 mod walk;
 
@@ -30,6 +43,10 @@ use spicerack::passes;
 /// The run passes whose simulator proof (a pair deck naming it in `proves =`) is to come:
 /// compared by name with the decks, both ways.
 const PENDING_PAIRS: &[&str] = &[
+    // proven on both simulators by `passes_run/dc_loops.rs`, not a pair deck: the pair harness
+    // compares one DC plot with one, and the rule writes one op plot a pass
+    "dc_axis_device_param_to_loop",
+    "dc_axis_model_param_to_loop",
     "whole_run_option_first",
     "whole_run_env_first",
     "whole_run_node_set_first",
@@ -98,6 +115,16 @@ fn whole_run_save_to_from_here_keeps_the_saves_at_every_analysis() {
 #[test]
 fn save_set_to_all_keeps_the_saves_at_every_analysis() {
     keeps_state("save_set_to_all", ir::RunExtra::SaveAnalysisSet);
+}
+
+#[test]
+fn dc_axes_to_loops_convert_generated_designs() {
+    dc_loops::dc_axes_to_loops_convert_generated_designs(SEEDS, SIZE);
+}
+
+#[test]
+fn dc_loops_give_the_points_vacask_gives() {
+    dc_loops::dc_loops_give_the_points_vacask_gives();
 }
 
 #[test]

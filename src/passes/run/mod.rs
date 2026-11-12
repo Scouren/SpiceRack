@@ -19,10 +19,11 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod dc_axes_to_loops`, `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
+pub mod dc_axes_to_loops;
 pub mod ic_next_only;
 pub mod loop_end;
 pub mod names_dropped;
@@ -220,6 +221,21 @@ pub(super) const PASSES: &[Pass] = &[
         &[sweep_forms::FREQ_LIST_KEPT],
         sweep_forms::sweep_freq_list_to_lin_points,
     ),
+    // after the sweep rows: a loop's values are listed from the forms they leave
+    Pass {
+        name: "dc_axis_device_param_to_loop",
+        removes: ir::Feature::Run(RunExtra::DcAxisDeviceParam),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_axis_device_param_to_loop,
+    },
+    Pass {
+        name: "dc_axis_model_param_to_loop",
+        removes: ir::Feature::Run(RunExtra::DcAxisModelParam),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_axis_model_param_to_loop,
+    },
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
@@ -359,6 +375,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        dc_axes_to_loops::DC_AXIS_KEPT,
+        ir::Info {
+            title: "a DC axis over a device or model parameter the target cannot sweep",
+            cite: "rewrite/IR-RUN.md §1; INV-semantics 8.09",
+            explain: "The target's DC analysis sweeps a source, an element's value or the temperature, so this axis would become a loop of operating points. That is exact only for an analysis that restarts each point (a loop's points start afresh, a continued sweep from the previous point), that stands at its run's top with no analysis after it (the loop keeps its last value), whose peeled axes a loop can sweep, over values stated as decimal literals (no log grid). One of these fails, so the analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        dc_axes_to_loops::AS_LOOPS,
+        ir::Info {
+            title: "a DC analysis written as loops of operating points",
+            cite: "rewrite/IR-RUN.md §1; rewrite/AMEND-A12.md A32",
+            explain: "The source's one DC plot over every axis is written as one plot per pass of these loops, outermost slowest: an operating point each, or a DC over the axes left inside. The peeled axes' swept vectors are not written; their values at each pass are the loops' lists, in order. The note's argument is the analysis's name: its results are given back under it.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         run_items_together::HOLDS_RUN_ITEMS,
         ir::Info {
             title: "a circuit item between run items that holds run items",
@@ -368,6 +402,28 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
 ];
+
+/// What a `dc_axes_to_loops` row's output may add: list sweep loops that keep their last value
+/// over the kinds of target a DC axis has, their names, an operating point in their bodies.
+const DC_LOOPS: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Loop))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Loop,
+        ir::ItemKind::Analysis,
+    ))
+    .with(ir::Feature::Placed(ir::ScopeKind::Loop, ir::ItemKind::Loop))
+    .with(ir::Feature::Analysis(ir::AnalysisKind::Op))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Run(RunExtra::LoopKeepLast))
+    .with(ir::Feature::Run(RunExtra::SweepLoopList))
+    .with(ir::Feature::Run(RunExtra::LoopOverOp))
+    .with(ir::Feature::Run(RunExtra::LoopNamed))
+    .with(ir::Feature::Run(RunExtra::LoopUnnamed))
+    .with(ir::Feature::Run(RunExtra::LoopParam))
+    .with(ir::Feature::Run(RunExtra::LoopSourceDc))
+    .with(ir::Feature::Run(RunExtra::LoopElementValue))
+    .with(ir::Feature::Run(RunExtra::LoopDeviceParam))
+    .with(ir::Feature::Run(RunExtra::LoopModelParam));
 
 // ---- private ----
 

@@ -33,6 +33,9 @@ use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::passes::{self, GROUPS, Pass};
 
+#[path = "passes_run/gen_sets.rs"]
+mod gen_sets;
+
 /// The seeds every law draws designs from (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..96;
 
@@ -151,6 +154,14 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
             .with(ir::Feature::Binary(ir::BinOp::Add))
             .with(ir::Feature::Binary(ir::BinOp::Mul)),
+    ),
+    (
+        "dc_axis_device_param_to_loop",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisDeviceParam),
+    ),
+    (
+        "dc_axis_model_param_to_loop",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisModelParam),
     ),
     (
         "tran_cap_ngspice_to_given",

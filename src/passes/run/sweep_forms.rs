@@ -31,7 +31,8 @@
 //! Contents: `pub fn sweep_dc_lin_points_to_step(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn sweep_dc_list_to_step(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn sweep_freq_list_to_lin_points(&mut ir::Design, &mut ir::Diags)`,
-//! `pub const SWEEP_KEPT: ir::Code`, `pub const FREQ_LIST_KEPT: ir::Code`
+//! `pub const SWEEP_KEPT: ir::Code`, `pub const FREQ_LIST_KEPT: ir::Code`,
+//! `pub(super) fn values(&ir::Design, &ir::SweepSpec) -> Option<Vec<ir::Literal>>`
 
 use super::names_dropped::of_kind;
 use crate::ir;
@@ -45,6 +46,8 @@ pub const FREQ_LIST_KEPT: ir::Code = ir::Code::new(b'U', 414);
 const NG_DC_FUZZ: f64 = f64::EPSILON * 1e3;
 /// The most points a rewritten axis may have (the count model's bound).
 const POINTS_MAX: u64 = 1 << 24;
+/// The most values [`values`] lists (a loop is written value by value).
+const VALUES_MAX: u64 = 100_000;
 
 /// A decimal `m · 10^e`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -123,6 +126,55 @@ pub fn sweep_freq_list_to_lin_points(design: &mut ir::Design, diags: &mut ir::Di
         ac.sweep = ir::SweepSpec::lin_points(f, f, points);
         editor.set_detail(a.detail, ac);
     }
+}
+
+/// The values of a linear or listed sweep as decimal literals, in run order: a list's own
+/// literals, a linear sweep's `start + i·step` (by count, the step `(stop − start)/(n − 1)` when
+/// it terminates; by step, every grid value at or before `stop`), at most `VALUES_MAX`; `None`
+/// for a log sweep, a value that is no literal, or a grid past the bound.
+pub(super) fn values(design: &ir::Design, s: &ir::SweepSpec) -> Option<Vec<ir::Literal>> {
+    if s.end != ir::SweepEnd::Grid || s.bounds != ir::SweepBounds::StartStop {
+        return None;
+    }
+    if s.kind == ir::SweepKind::List {
+        let v: Option<Vec<ir::Literal>> = design
+            .exprs(s.values)
+            .iter()
+            .map(|&e| literal(design, e).and_then(dec).and_then(lit))
+            .collect();
+        return v.filter(|v| !v.is_empty() && v.len() <= VALUES_MAX as usize);
+    }
+    if s.kind != ir::SweepKind::Lin {
+        return None;
+    }
+    let start = dec(literal(design, s.start)?)?;
+    let stop = dec(literal(design, s.stop)?)?;
+    let (step, n) = match s.step.is_none() {
+        true => {
+            let n = literal(design, s.points)?.value();
+            if !(1.0..=VALUES_MAX as f64).contains(&n) || n.fract() != 0.0 {
+                return None;
+            }
+            let n = n as u64;
+            match n {
+                1 => (Dec { m: 0, e: 0 }, 1),
+                _ => (div(sub(stop, start)?, n - 1)?, n),
+            }
+        }
+        false => {
+            let step = dec(literal(design, s.step)?)?;
+            let (span, by, _) = align(sub(stop, start)?, step)?;
+            if by == 0 || (span != 0 && span.signum() != by.signum()) {
+                return None;
+            }
+            let n = u64::try_from(span / by).ok()? + 1;
+            (step, n)
+        }
+    };
+    if n > VALUES_MAX {
+        return None;
+    }
+    (0..n).map(|i| lit(add(start, mul(step, i)?)?)).collect()
 }
 
 // ---- private ----
@@ -295,7 +347,7 @@ fn lit(d: Dec) -> Option<ir::Literal> {
     }
     let m = i64::try_from(m).ok()?;
     match e {
-        -18..=0 => Some(plain(m, u8::try_from(-e).ok()?)),
+        -6..=0 => Some(plain(m, u8::try_from(-e).ok()?)),
         _ => Some(ir::Literal {
             mantissa: m,
             frac: 0,
