@@ -206,7 +206,15 @@ pub(crate) fn generate_model(
     } else {
         r.g.below(3)
     };
-    let values: Vec<ExprId> = (0..count).map(|_| r.ex()).collect();
+    // a parameter list's value may be a string or a list (A25 item 4)
+    let values: Vec<ExprId> = (0..count)
+        .map(|_| {
+            (r.g.root_str, r.g.root_list) = (true, true);
+            let value = r.ex();
+            (r.g.root_str, r.g.root_list) = (false, false);
+            value
+        })
+        .collect();
     for value in values {
         let key = r.g.fresh_name(r.b);
         pairs.push((r.b.design().str(key).to_owned(), value));

@@ -14,7 +14,8 @@
 //! Contents (crate-private): `pub(crate) enum Field`, `pub(crate) enum Side`,
 //! `pub(crate) trait Choice` (`Choice::get`, `Choice::set`, `Choice::words`),
 //! `pub(crate) trait Fields` (`Fields::BLANK`, `Fields::fields`), its impls for every circuit row,
-//! `pub(crate) fn element_map_exprs`, `pub(crate) fn model_map_exprs`
+//! `pub(crate) fn element_map_exprs`, `pub(crate) fn model_map_exprs`,
+//! `pub(crate) fn element_map_names`
 
 use crate::circuit_text::get_row;
 use crate::controlled::{
@@ -295,6 +296,58 @@ pub(crate) fn model_map_exprs(
     map_params(design, row.params, f);
     f(&mut row.version, ExprUse::Constant);
     design.editor().set(index, row);
+}
+
+/// Calls `f` on each element name the element at `index` uses by name (A32), in field order,
+/// each a slice of one stored in place: a coupling's inductors, a current-controlled source's
+/// or switch's sensing element, a current-controlled polynomial's controls. A `NONE` name is
+/// no use; a voltage-controlled polynomial's controls and every terminal are nets.
+pub(crate) fn element_map_names(design: &mut Design, index: u32, f: &mut dyn FnMut(&mut [NameId])) {
+    let e: Element = design.row(index);
+    let list = match e.kind.detail() {
+        DetailKind::Coupling => get_row::<Coupling>(design, e.detail).map(|c| c.inductors),
+        DetailKind::Poly => get_row::<Poly>(design, e.detail)
+            .filter(|p| p.control == Quantity::Current)
+            .map(|p| p.controls),
+        DetailKind::Controlled => {
+            if let Some(mut c) = get_row::<Controlled>(design, e.detail)
+                && c.sense != NameId::NONE
+            {
+                f(std::slice::from_mut(&mut c.sense));
+                design.editor().set_detail(e.detail, c);
+            }
+            None
+        }
+        DetailKind::Switch => {
+            if let Some(mut s) = get_row::<Switch>(design, e.detail)
+                && s.sense != NameId::NONE
+            {
+                f(std::slice::from_mut(&mut s.sense));
+                design.editor().set_detail(e.detail, s);
+            }
+            None
+        }
+        DetailKind::None
+        | DetailKind::Passive
+        | DetailKind::Source
+        | DetailKind::Table
+        | DetailKind::Behav
+        | DetailKind::Laplace
+        | DetailKind::FreqTable
+        | DetailKind::Delay
+        | DetailKind::Semi
+        | DetailKind::Line => None,
+    };
+    if let Some(list) = list {
+        let start = list.start as usize;
+        let end = start + list.len as usize;
+        assert!(end <= design.name_pool.len(), "a name list in range");
+        for name in &mut design.name_pool[start..end] {
+            if *name != NameId::NONE {
+                f(std::slice::from_mut(name));
+            }
+        }
+    }
 }
 
 // ---- private ----
