@@ -1,0 +1,6 @@
+# codes:
+file "meas_card_run.sp" deck
+  title "meas_card_run"
+  comment " oracle: lead's Q5: a script meas after the one run that runs the deck's one card of its kind (the card before the script) is the deck's .meas: written as a script the card is a command before it (corpus measure/buggy-meas-tran.sp)"
+  analysis tran stop=5u print_step=1u cap=ngspice_rule
+  measure mx tran stat max (v (b)) (bound) (bound)

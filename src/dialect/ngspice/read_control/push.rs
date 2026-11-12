@@ -33,6 +33,8 @@ pub(super) enum Ready {
     Load(String),
     /// A `save` or `meas` command the outputs area reads: which, its words, its opaque text.
     Output(bool, Vec<String>, String),
+    /// `reset`: every class restored.
+    Reset,
     /// An opaque: class, code, text.
     Opaque(ir::OpaqueClass, ir::Code, String),
     /// A loop: its variable, target, values and body.
@@ -60,6 +62,7 @@ pub(super) fn ready(lw: &mut Lower<'_, '_>, st: Stmt, ops: &[Op]) -> Vec<Ready> 
             | Op::Meas { cmd, .. }
             | Op::Opaque { cmd, .. }
             | Op::Pending { cmd, .. }
+            | Op::Reset { cmd }
             | Op::Loop { cmd, .. } => cmd,
         };
         match one(lw, st, op) {
@@ -113,6 +116,9 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
                     lw.b.opaque(scope, "ngspice", f.class, text, span);
                     lw.diags.push(f.code, span, 0);
                 }
+            }
+            Ready::Reset => {
+                lw.b.reset(scope, ir::ResetSet::ALL, span);
             }
             Ready::Opaque(class, code, text) => {
                 lw.b.opaque(scope, "ngspice", *class, text, span);
@@ -179,6 +185,7 @@ fn one(
         }
         Op::Opaque { class, code, cmd } => Ready::Opaque(*class, *code, cmd.opaque_text()),
         Op::Pending { .. } => unreachable!("plan settles every pending alterparam"),
+        Op::Reset { .. } => Ready::Reset,
         Op::Loop {
             var,
             target,

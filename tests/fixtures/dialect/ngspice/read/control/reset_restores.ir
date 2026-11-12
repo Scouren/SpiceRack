@@ -1,0 +1,8 @@
+# codes:
+file "reset_restores.sp" deck
+  title "reset_restores"
+  comment " oracle: S3-CONTROL S1: reset rebuilds the circuit from the deck, dropping alter, altermod, script option and save (runcoms2.c:172-240; settle/state_reset.sp): Reset of every class (A28)"
+  alter (element_value r1) value=2k
+  analysis op
+  reset values options temp tnom saves
+  analysis op

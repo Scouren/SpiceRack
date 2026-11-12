@@ -4,4 +4,5 @@ file "foreach_alterparam.sp" deck
   comment " oracle: S3-CONTROL S2, S5: foreach + alterparam + reset with nothing else live: one target set from the variable (settle/state_alterparam.sp)"
   param p = 1k
   loop sweep keep_last name=val (param p) (list values=[1k, 3k])
+    reset values options temp tnom saves
     analysis op
