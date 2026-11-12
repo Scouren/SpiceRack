@@ -30,6 +30,7 @@ mod tests {
         Builder, CircuitExtra as X, Design, DeviceLibrary, ElemKind, ExprId, Feature, FeatureSet,
         ModelFamily, NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind, features_used,
     };
+    use spicerack_ir::{DefKind, LoadKind};
 
     type Case = fn(&mut Builder<'_>, ScopeId, bool);
 
@@ -976,6 +977,23 @@ mod tests {
             });
             with_wave(b, t, w);
         }),
+        (X::PwlPeriodJump, |b, t, on| {
+            // A24: VACASK's periodic PWL only extrapolates (vc-sources W2202)
+            let r = pwl(b);
+            let at = n(b, 1);
+            let repeat = if on {
+                PwlRepeat::Period
+            } else {
+                PwlRepeat::From
+            };
+            let w = b.wave(Pwl {
+                repeat,
+                repeat_at: at,
+                join: PwlJoin::Jump,
+                ..r
+            });
+            with_wave(b, t, w);
+        }),
         (X::PwlFile, |b, t, on| {
             let r = pwl(b);
             let r = if on {
@@ -1608,5 +1626,32 @@ mod tests {
         assert!(with.contains(Feature::Circuit(X::BuiltinMaster)));
         assert!(with.contains(Feature::Circuit(X::ModelWithoutLibrary)));
         assert!(!line_with(None).contains(Feature::Circuit(X::BuiltinMaster)));
+    }
+
+    /// R44 (A24): a model of a user module takes its code from a `Load`, never from a family's
+    /// library, so it needs none; a resistor model with no library still does.
+    #[test]
+    fn a_module_model_needs_no_library() {
+        let with = |family: ModelFamily| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            let load = b.load(top, LoadKind::VerilogA, "x.va", Span::NONE);
+            let module = b.name("x");
+            let def = b.define(DefKind::Module, module, top, load);
+            let name = b.name("m");
+            let mut row = model(name, family, Polarity::None);
+            if family == ModelFamily::Module {
+                row.module = Ref { name: module, def };
+            }
+            b.model(top, row, Span::NONE);
+            let h = b.head("n1", &["a", "0"], Some("m"), &[], ExprId::NONE);
+            b.instance(top, ElemKind::ModuleModel, h, Span::NONE);
+            features_used(&d).contains(Feature::Circuit(X::ModelWithoutLibrary))
+        };
+        assert!(!with(ModelFamily::Module));
+        assert!(!with(ModelFamily::CodeModel));
+        assert!(!with(ModelFamily::Other));
+        assert!(with(ModelFamily::Resistor));
     }
 }

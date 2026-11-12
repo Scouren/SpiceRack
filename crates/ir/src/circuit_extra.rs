@@ -122,6 +122,9 @@ pub enum CircuitExtra {
     PwlJoinRampWidth,
     /// A PWL repeat joined by VACASK's periodic law (`PwlJoin::Extrapolate`, va; A22).
     PwlJoinExtrapolate,
+    /// A periodic PWL joined by a jump (`PwlRepeat::Period` with `PwlJoin::Jump`, ng/sp `pwlperiod`;
+    /// VACASK lacks it: its periodic PWL only extrapolates; A24).
+    PwlPeriodJump,
     /// PWL points in a file (`Pwl::file`, 5.12).
     PwlFile,
     // controlled sources
@@ -249,7 +252,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 104] = [
+    pub const ALL: [CircuitExtra; 105] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -301,6 +304,7 @@ impl CircuitExtra {
         CircuitExtra::PwlJoinRamp,
         CircuitExtra::PwlJoinRampWidth,
         CircuitExtra::PwlJoinExtrapolate,
+        CircuitExtra::PwlPeriodJump,
         CircuitExtra::PwlFile,
         CircuitExtra::TableExact,
         CircuitExtra::TableNgspiceRounded,
