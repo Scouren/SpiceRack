@@ -45,7 +45,7 @@ impl<'d> Editor<'d> {
     /// The ordered item list of `scope`. An item taken out of every list is dead (its row stays,
     /// unreachable); an item must not appear in two lists.
     pub fn items_mut(&mut self, scope: ScopeId) -> &mut Vec<ItemRef> {
-        self.design.classes.take();
+        self.design.derived_changed();
         self.design.element_names.take();
         assert!(
             scope.index() < self.design.scope_items.len(),
@@ -57,7 +57,7 @@ impl<'d> Editor<'d> {
     /// Replaces the row at `index` of `R`'s table; the span is kept. Asserts the index is in
     /// range and the row's handles are.
     pub fn set<R: ItemRow>(&mut self, index: u32, row: R) {
-        self.design.classes.take();
+        self.design.derived_changed();
         self.design.element_names.take();
         R::table_mut(self.design).set(index, row)
     }
@@ -66,7 +66,7 @@ impl<'d> Editor<'d> {
     /// index is in range and the row's handles are. A detail row shared by two headers is a bug
     /// of the pass that shared it: the builder gives each header its own.
     pub fn set_detail<D: DetailRow>(&mut self, index: u32, row: D) {
-        self.design.classes.take();
+        self.design.derived_changed();
         let rows = D::rows_mut(self.design);
         assert!((index as usize) < rows.len(), "a detail index in range");
         rows[index as usize] = row;
@@ -76,7 +76,7 @@ impl<'d> Editor<'d> {
     /// order (one exhaustive dispatch to `RowFacts::map_exprs`, which stores them back): the
     /// door a pass uses to point a row at a new expression (A23). Asserts `item` is in range.
     pub fn map_exprs(&mut self, item: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
-        self.design.classes.take();
+        self.design.derived_changed();
         let rows = for_kind!(item.kind, R => R::table(self.design).len());
         assert!((item.index as usize) < rows, "an item in range");
         for_kind!(item.kind, R => R::map_exprs(self.design, item, f))
@@ -87,7 +87,7 @@ impl<'d> Editor<'d> {
     /// them back). For the linker and for passes that renumber definitions. Asserts `item` is in
     /// range.
     pub fn map_refs(&mut self, item: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        self.design.classes.take();
+        self.design.derived_changed();
         let rows = for_kind!(item.kind, R => R::table(self.design).len());
         assert!((item.index as usize) < rows, "an item in range");
         for_kind!(item.kind, R => R::map_refs(self.design, item, f))

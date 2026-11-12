@@ -118,9 +118,17 @@ header. `mod.rs` chains the four in `GROUPS`.
 
 **Order is meaning.** `legalize` loops: the features the design uses and the target lacks;
 every pass in `GROUPS` order, then the group's own order, that removes one of them and whose
-`requires` the target has, runs (the first such pass per feature per round), then `ir::check`;
+`requires` are legal for the target, runs (the first such pass per feature per round), then `ir::check`;
 repeat until nothing is missing or a round changes nothing (bounded by the pass count + 1,
-asserted). Then `ir::check_legal` reports what is left: one `U0001` row per item that carries
+asserted). A feature is legal for the target (A32, `passes::legal`) when the target has it, or
+a registered pass removes it and that pass's `requires` are legal in turn: the least fixed
+point, computed once per call, so a chain (`round_half_even_to_away` then
+`round_half_away_to_floor`) runs for a target with neither rounding, an inverse pair
+(`powabs_to_pow`, `pow_to_powabs`) supports nothing for a target with neither, and a chain whose
+last link the target cannot take runs nothing (no half-converted design). The bound holds: each
+link of a chain is one pass, the fixed point admits no cycle, so the missing set settles within
+one round per link. P3 is unchanged: a pass still states every feature its output adds. Then
+`ir::check_legal` reports what is left: one `U0001` row per item that carries
 a feature. A pass may produce input for the passes after it, never rely on one after it:
 `structure` first (every other pass walks the scopes, names and definitions it settles), then
 `expr` (wave and run passes read fields it has substituted, such as the transient leaves), then
@@ -194,14 +202,19 @@ laws run on.
 - `tests/dialect_laws.rs`: for every row of `BUILTIN`, the laws of REWRITE-PLAN §4.2 that apply
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
-  row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
+  row.write.features(), size)`; seeds are fixed and printed on failure. L5 and L6 compare by meaning in normal form (both sides written as IR text and read back,
+  then `eq_meaning`: a reader's push order is its text's, not the generator's). L4 reads: `write` is
   total over a design `legalize` accepted. A generated design the row refuses is shrunk to what
   it admits (A25, R48): the items its refusals name (`Diag::item`) are dropped from their
   listing scopes, then the items `ir::check` no longer accepts, to a fixpoint bounded by the item
   count, and the laws run on the rest; a refusal at no item skips the seed, counted by code in
   the failure text. A law that runs on no design fails. The reach list: every `Item`, `Elem`,
   `Wave`, `Analysis` and `Family` kind of the writer's features is used by some admitted design
-  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list. So a writer's `admits`
+  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list of (row, kind, covering
+  property, why) (R55): the covering property is a seeded test in the owning area's test file
+  that builds admissible designs of the kind through the builder and checks write, read back
+  and `eq_meaning`, with floors on designs run and designs holding the kind; the law fails when
+  the name is empty or no file under `tests/` defines `fn <name>(` (a text search). So a writer's `admits`
   pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden

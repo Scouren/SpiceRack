@@ -18,7 +18,7 @@
 //! use spicerack_ir::measure::MeasureTrigTarg;
 //! use spicerack_ir::plan::SweepLoop;
 //! use spicerack_ir::tran::{StepCap, StepCeiling, Tran};
-//! use spicerack_ir::{AnalysisKinds, NameId};
+//! use spicerack_ir::{AnalysisKinds, Applies, NameId};
 //! use spicerack_ir::{
 //!     AnalysisKind, Design, Edge, Event, ExprId, ItemKind, List, LoopEnd, Role, Span, SweepSpec,
 //!     TargetKind,
@@ -51,7 +51,7 @@
 //! b.analysis(body, None, tran, span);
 //!
 //! let (out, i1) = (b.probe_v(&["out"]), b.probe_i(&["v1"]));
-//! b.save(top, AnalysisKinds::ALL, &[out, i1], span);
+//! b.save(top, AnalysisKinds::ALL, Applies::WholeRun, &[out, i1], span);
 //!
 //! let (half, one) = (b.num(0.5), b.num(1.0));
 //! let vin = b.probe_v(&["in"]);
@@ -75,7 +75,7 @@
 //!   `Builder::probe_vdiff`, `Builder::probe_i`, `Builder::probe_terminal`,
 //!   `Builder::probe_param`, `Builder::probe_power`, `Builder::probe_expr`
 //! - items: `Builder::analysis`, `Builder::op`, `Builder::dc_inc`, `Builder::loop_`,
-//!   `Builder::alter`, `Builder::option`, `Builder::option_private`, `Builder::env`,
+//!   `Builder::alter`, `Builder::reset`, `Builder::option`, `Builder::option_private`, `Builder::env`,
 //!   `Builder::node_set`, `Builder::save`, `Builder::print`, `Builder::measure`,
 //!   `Builder::statistics`, `Builder::elaborate`
 
@@ -93,6 +93,7 @@ use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList,
 };
 use crate::probe::{Probe, ProbeKind, ProbeList};
+use crate::reset::{Reset, ResetSet};
 use crate::run_words::{loop_depth, pool};
 use crate::span::Span;
 use crate::stats::{Correlation, CorrelationList, Statistics, Vary, VaryList};
@@ -313,10 +314,22 @@ impl Builder<'_> {
         )
     }
 
-    /// From here on, `target` holds `value`. Asserts `value` is not `NONE`.
+    /// From here on, `target` holds `value`. Asserts `value` is not `NONE` and the target is no
+    /// `Temp` or `Option` (a `FromHere` `Env` or option row states those, A28).
     pub fn alter(&mut self, scope: ScopeId, target: Target, value: ExprId, span: Span) -> ItemRef {
         assert!(!value.is_none(), "an alter has a value");
+        assert!(
+            !matches!(target.kind, TargetKind::Temp | TargetKind::Option),
+            "an alter of the temperature or an option is an Env or option row"
+        );
         self.push(scope, Alter { target, value }, span)
+    }
+
+    /// From here on, the classes in `restores` hold the design's own value again (A27, A28).
+    /// Asserts at least one class.
+    pub fn reset(&mut self, scope: ScopeId, restores: ResetSet, span: Span) -> ItemRef {
+        assert!(!restores.is_empty(), "a reset of no class");
+        self.push(scope, Reset { restores }, span)
     }
 
     /// A portable option; `value` `NONE` for a flag. Asserts `key` is not `Private` and that
@@ -420,18 +433,24 @@ impl Builder<'_> {
     }
 
     /// A member of the save set, kept by the analyses in `analyses` (`AnalysisKinds::ALL`: every
-    /// analysis). Asserts at least one probe and at least one analysis kind.
+    /// analysis), from where `holds` says (`WholeRun`: a `.save` card). Asserts at least one probe and at least one analysis kind.
     pub fn save(
         &mut self,
         scope: ScopeId,
         analyses: AnalysisKinds,
+        holds: Applies,
         probes: &[Probe],
         span: Span,
     ) -> ItemRef {
         assert!(!probes.is_empty(), "a save of no probe");
         assert!(!analyses.is_empty(), "a save for no analysis");
         let probes = self.probes(probes);
-        self.push(scope, Save { analyses, probes }, span)
+        let row = Save {
+            analyses,
+            holds,
+            probes,
+        };
+        self.push(scope, row, span)
     }
 
     /// A printed table of `analysis`'s results. Asserts at least one probe.

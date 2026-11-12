@@ -28,12 +28,12 @@ mod law_harness;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use law_harness::{
-    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers, write_all,
-    writers,
+    PARAMS, SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers,
+    same_meaning, write_all, writers,
 };
 use spicerack::dialect::{self, DialectRow, Read, Write};
 use spicerack::ir;
-use spicerack::ir::r#gen::generate;
+use spicerack::ir::r#gen::{Params, generate};
 
 /// The seeds every generated law runs (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..64;
@@ -49,9 +49,13 @@ const SEARCH_MAX: u64 = 1024;
 /// The seeds the reach list draws from: more than a law's, since it asks for every kind once.
 const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 
-/// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
-/// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str)] = &[];
+/// The kinds a row claims and no admitted generated design reaches (R55): (row, feature as
+/// `Debug` prints it, the covering property, why). The covering property is a seeded test in
+/// the owning area's test file that builds admissible designs of the kind through the builder
+/// and checks write, read back and `eq_meaning`, with floors on designs run and designs
+/// holding the kind; its function name must be found as `fn <name>` in a file under `tests/`.
+/// Strict both ways (`reach_every_kind_the_row_claims`).
+const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).
@@ -126,8 +130,8 @@ fn l1_an_empty_text_is_one_file_with_no_item() {
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
     laws("l3", |row, writer| {
         let mut tally = Tally::new();
-        for seed in SEEDS.take(8) {
-            let design = match admitted(seed, row, writer) {
+        for (seed, params) in cases(SEEDS.take(8)) {
+            let design = match admitted(seed, params, row, writer) {
                 Ok(d) => d,
                 Err(code) => {
                     tally.skip(code);
@@ -146,7 +150,7 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
                     .collect()
             });
             if !threads.iter().all(|t| *t == once) {
-                return Err(format!("seed {seed}: the threads differ"));
+                return Err(format!("seed {seed} {params:?}: the threads differ"));
             }
         }
         tally.some()
@@ -165,8 +169,8 @@ fn l5_read_of_write_is_the_design() {
             return Ok(());
         }
         let mut tally = Tally::new();
-        for seed in SEEDS {
-            let design = match admitted(seed, row, writer) {
+        for (seed, params) in cases(SEEDS) {
+            let design = match admitted(seed, params, row, writer) {
                 Ok(d) => d,
                 Err(code) => {
                     tally.skip(code);
@@ -175,11 +179,11 @@ fn l5_read_of_write_is_the_design() {
             };
             tally.admit();
             let back = read_all(row, &write_all(&design, row));
-            // By meaning (R28): real literals equal by value, whatever their form; the IR text
-            // is only the failure's evidence.
-            if !back.eq_meaning(&design) {
+            // By meaning (R28), in normal form (each side through the IR text): real literals
+            // equal by value, ids in canonical order; the IR text is the failure's evidence.
+            if !same_meaning(&back, &design) {
                 return Err(format!(
-                    "seed {seed}:\n{}\nread back as\n{}",
+                    "seed {seed} {params:?}:\n{}\nread back as\n{}",
                     canonical(&design),
                     canonical(&back)
                 ));
@@ -206,7 +210,7 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
             let once = read_text(row, text).0;
             let twice = read_all(row, &write_all(&once, row));
             assert!(
-                twice.eq_meaning(&once),
+                same_meaning(&twice, &once),
                 "{} corpus text {k} (by meaning, R28):\n{}\nread back as\n{}",
                 row.name,
                 canonical(&once),
@@ -256,8 +260,8 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
     laws("l8", |row, writer| {
         let mut tally = Tally::new();
-        for seed in SEEDS {
-            let design = match admitted(seed, row, writer) {
+        for (seed, params) in cases(SEEDS) {
+            let design = match admitted(seed, params, row, writer) {
                 Ok(d) => d,
                 Err(code) => {
                     tally.skip(code);
@@ -276,7 +280,9 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             let mut diags = ir::Diags::new();
             let again = dialect::write(&permuted, permuted.find_file(&path), row, &mut diags);
             if again != first {
-                return Err(format!("seed {seed}: the file is written otherwise"));
+                return Err(format!(
+                    "seed {seed} {params:?}: the file is written otherwise"
+                ));
             }
         }
         tally.some()
@@ -291,8 +297,8 @@ fn reach_every_kind_the_row_claims() {
     let mut unreached: Vec<(String, String)> = Vec::new();
     for (row, writer) in writers() {
         let mut seen = ir::FeatureSet::EMPTY;
-        for seed in REACH_SEEDS {
-            if let Ok(design) = admitted(seed, row, writer) {
+        for (seed, params) in cases(REACH_SEEDS) {
+            if let Ok(design) = admitted(seed, params, row, writer) {
                 seen = seen.union(ir::features_used(&design));
             }
         }
@@ -303,12 +309,78 @@ fn reach_every_kind_the_row_claims() {
     }
     let known: Vec<(String, String)> = KNOWN_REACH
         .iter()
-        .map(|(r, f)| (r.to_string(), f.to_string()))
+        .map(|(r, f, _, _)| (r.to_string(), f.to_string()))
         .collect();
     assert_eq!(
         unreached, known,
         "kinds claimed and never reached, against KNOWN_REACH"
     );
+    let uncovered = uncovered(KNOWN_REACH, &test_sources());
+    assert!(
+        uncovered.is_empty(),
+        "KNOWN_REACH rows with no covering property:\n{}",
+        uncovered.join("\n")
+    );
+}
+
+/// The covering-property check's self-test: an empty name and a name no test file defines are
+/// refused; a name that is defined passes.
+#[test]
+fn a_known_unreached_kind_names_a_covering_property_that_exists() {
+    let sources = test_sources();
+    let rows: &[(&str, &str, &str, &str)] = &[
+        ("x", "Item(Loop)", "", "no name"),
+        (
+            "x",
+            "Item(Save)",
+            "no_such_covering_property_anywhere",
+            "missing",
+        ),
+        (
+            "x",
+            "Item(Env)",
+            "reach_every_kind_the_row_claims",
+            "defined",
+        ),
+    ];
+    let found = uncovered(rows, &sources);
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert!(
+        found[0].contains("Item(Loop)") && found[1].contains("Item(Save)"),
+        "{found:?}"
+    );
+}
+
+/// The rows of `rows` whose covering property is empty or not defined (`fn <name>` in no
+/// source of `sources`: a text search, enough to name a test by its function).
+fn uncovered(rows: &[(&str, &str, &str, &str)], sources: &[String]) -> Vec<String> {
+    let defined = |name: &str| sources.iter().any(|t| t.contains(&format!("fn {name}(")));
+    rows.iter()
+        .filter(|(_, _, name, _)| name.is_empty() || !defined(name))
+        .map(|(row, kind, name, _)| format!("{row} {kind}: covering property `{name}` not found"))
+        .collect()
+}
+
+/// The text of every `.rs` file under `tests/`.
+fn test_sources() -> Vec<String> {
+    let mut out = Vec::new();
+    let mut todo = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests")];
+    // Bounded by the tree: each directory is read once.
+    while let Some(dir) = todo.pop() {
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                todo.push(p);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                out.extend(std::fs::read_to_string(&p).ok());
+            }
+        }
+    }
+    assert!(!out.is_empty(), "test_sources: the tests/ tree");
+    out
 }
 
 /// The self-test of shrink to admitted (A25): a row whose `admits` refuses every item but
@@ -332,7 +404,7 @@ fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
         diags.rows().iter().any(|d| dialect::refuses(d.code))
     };
     let keeps_a_capacitor = |seed: u64| {
-        admitted(seed, row, &Panicky).is_ok_and(|d| {
+        admitted(seed, Params::Untyped, row, &Panicky).is_ok_and(|d| {
             d.reachable().iter().any(|(i, _)| {
                 i.kind == ir::ItemKind::Element
                     && d.row::<ir::Element>(i.index).kind == ir::ElemKind::Capacitor
@@ -350,8 +422,8 @@ fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
 /// panic is the failure (with its seed).
 fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> Result<(), String> {
     let mut tally = Tally::new();
-    for seed in seeds {
-        let design = match admitted(seed, row, writer) {
+    for (seed, params) in cases(seeds) {
+        let design = match admitted(seed, params, row, writer) {
             Ok(d) => d,
             Err(code) => {
                 tally.skip(code);
@@ -366,7 +438,7 @@ fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> R
             }
         }));
         if wrote.is_err() {
-            return Err(format!("seed {seed}: the writer panicked"));
+            return Err(format!("seed {seed} {params:?}: the writer panicked"));
         }
         let refusals: Vec<_> = diags
             .rows()
@@ -374,10 +446,18 @@ fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> R
             .filter(|d| dialect::refuses(d.code))
             .collect();
         if !refusals.is_empty() {
-            return Err(format!("seed {seed}: {refusals:?}"));
+            return Err(format!("seed {seed} {params:?}: {refusals:?}"));
         }
     }
     tally.some()
+}
+
+/// Every (seed, setting) of `seeds` under both generator settings (A28: untyped parameters
+/// drawn, and none); a law and the reach list run over all of them.
+fn cases(seeds: impl Iterator<Item = u64> + Clone) -> impl Iterator<Item = (u64, Params)> {
+    PARAMS
+        .into_iter()
+        .flat_map(move |p| seeds.clone().map(move |s| (s, p)))
 }
 
 /// Whether `f` is a kind the reach list covers.
