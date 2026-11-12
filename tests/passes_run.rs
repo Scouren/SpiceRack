@@ -13,6 +13,8 @@ mod memcap;
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/continuation.rs"]
+mod continuation;
 #[path = "passes_run/dc_loops.rs"]
 mod dc_loops;
 #[allow(dead_code)] // `sources_only` is the laws'
@@ -124,6 +126,11 @@ fn save_set_to_all_keeps_the_saves_at_every_analysis() {
 #[test]
 fn dc_axes_to_loops_convert_generated_designs() {
     dc_loops::dc_axes_to_loops_convert_generated_designs(SEEDS, SIZE);
+}
+
+#[test]
+fn continuation_is_a_fact_of_each_sweep_level() {
+    continuation::continuation_is_a_fact_of_each_sweep_level();
 }
 
 #[test]
