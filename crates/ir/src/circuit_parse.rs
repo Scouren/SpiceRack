@@ -60,7 +60,7 @@ pub(crate) fn parse_element(
     if name == NameId::NONE {
         return ItemRef::NONE;
     }
-    let terminals = canonical(words.names(b, diags));
+    let terminals = words.names(b, diags);
     let mut head = Element {
         kind,
         name,
@@ -148,7 +148,7 @@ pub(crate) fn parse_model(
                 Some("p") => m.polarity = Polarity::P,
                 _ => words.error(diags),
             },
-            "params" => m.params = canonical(words.params(scope, b, diags)),
+            "params" => m.params = words.params(scope, b, diags),
             "bin_of" => m.bin_of = words.name(b, diags),
             "ako" => m.ako = words.reference(b, diags),
             "module" => m.module = words.reference(b, diags),
@@ -221,7 +221,7 @@ impl Cx<'_, '_, '_> {
                         continue;
                     }
                     "params" => {
-                        h.params = canonical(self.words.params(self.scope, self.b, self.diags));
+                        h.params = self.words.params(self.scope, self.b, self.diags);
                         continue;
                     }
                     "mult" => {
@@ -250,8 +250,8 @@ impl Cx<'_, '_, '_> {
         match field {
             Field::Expr(e) | Field::Dyn(e) => *e = self.words.value(self.scope, self.b, self.diags),
             Field::Name(n) => *n = self.words.name(self.b, self.diags),
-            Field::Names(l) => *l = canonical(self.words.names(self.b, self.diags)),
-            Field::Exprs(l) => *l = canonical(self.words.exprs(self.scope, self.b, self.diags)),
+            Field::Names(l) => *l = self.words.names(self.b, self.diags),
+            Field::Exprs(l) => *l = self.words.exprs(self.scope, self.b, self.diags),
             Field::Count(c) => match self.words.next().and_then(|w| w.parse::<u8>().ok()) {
                 Some(v) => *c = v,
                 None => self.words.error(self.diags),
@@ -309,10 +309,4 @@ impl Cx<'_, '_, '_> {
             }
         }
     }
-}
-
-/// An empty list as `List::EMPTY`, whatever start the builder gave it: every circuit producer
-/// writes an empty list that way, so `parse(dump(d))` keeps it equal.
-fn canonical<T>(list: List<T>) -> List<T> {
-    if list.len == 0 { List::EMPTY } else { list }
 }
