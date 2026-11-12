@@ -61,6 +61,8 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// the owning area's test file that builds admissible designs of the kind through the builder
 /// and checks write, read back and `eq_meaning`, with floors on designs run and designs
 /// holding the kind; its function name must be found as `fn <name>` in a file under `tests/`.
+/// A row whose reason starts with `interim` names a fixture fixpoint in its place: accepted and
+/// printed on every run until the dialect's gate (S3.5 ngspice, S4.5 VACASK), which fails on it.
 /// Strict both ways (`reach_every_kind_the_row_claims`).
 const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[];
 
@@ -328,6 +330,11 @@ fn reach_every_kind_the_row_claims() {
         "KNOWN_REACH rows with no covering property:\n{}",
         uncovered.join("\n")
     );
+    // Interim rows (a fixture fixpoint standing in for the seeded property) pass here and are
+    // printed on every run; the dialect gates (S3.5, S4.5) fail on any.
+    for (row, kind, name, _) in KNOWN_REACH.iter().filter(|r| r.3.starts_with("interim")) {
+        eprintln!("interim covering property: {row} {kind}: {name}");
+    }
 }
 
 /// The covering-property check's self-test: an empty name and a name no test file defines are
