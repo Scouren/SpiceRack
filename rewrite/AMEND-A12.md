@@ -29,6 +29,7 @@ reader can decide it statically for a library.
   | comparisons, `And`, `Or`, `Not`, the bit operators and shifts | Int |
   | `Ternary` | the chosen branch's |
   | `ToInt` | Int |
+  | `SgnZeroPos` (addendum: VACASK `sgn`, runs e1, f4; −1 below zero, +1 otherwise) | its operand's |
   | everything else (`Div`, `DivTyped` of a real, every other `Func`, every leaf, `Draw`) | Real |
 
 - `BinOp::DivTyped(a, b)`: both Int → the quotient truncated toward zero, Int (`b == 0` a domain

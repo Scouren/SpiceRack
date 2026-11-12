@@ -185,6 +185,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The writers live in `text_expr.rs` and are re-exported from `text` (`text::write_value`, …), together with `Ctx`. `write_names`, `write_exprs` and `write_params` were added as the mirrors of `Words::names`, `exprs` and `params`; `write_params` asserts every value is set (a head default without a value is the `Subckt` row's own spelling).
 - A10: `link` and `item_text::dump_subckt` use the subcircuit's body as the lookup scope of its head defaults. Tests: `kernel_link::a_subckt_default_reads_its_sibling_head_parameter` (red with the rule reverted), `kernel_text::a_subckt_default_reading_a_sibling_needs_no_mark`.
 
+
+
 ## The spine's additions and the canonical empty list
 
 - `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
@@ -208,6 +210,13 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `map_refs` (A9) visits, in this fixed order: an analysis's DC axes' targets; a sweep loop's target or a table loop's columns; an alter's target; a statistics block's process then mismatch variations, then each correlation's two ends. An element target's `a` is a name, never visited.
 - `design_features` sets `SeveralAnalyses`, `OptionMidRun` and `LoopScoped` (reported at `Span::NONE`); `NodeSetInSubckt` and `LoopNested` are set per row from its scope.
 - Generators choose a kind whose detail they can build before interning anything (a failed attempt would leave a stray name), build in the parse's order (names and lists exactly where the text puts them), require `Expr(Num)` (`Gen::expr` asserts it), leave loop bodies to the kernel, and keep a non-string alter value free of strings.
+
+## The spine's additions and the canonical empty list
+
+- `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
+- An empty list is always `List::EMPTY` (start 0): every `Builder` list constructor (`names`, `name_ids`, `exprs`, `params`, and through them every row and expression list) returns it for an empty slice, and `check` reports any other empty range as `HandleRange`. Equality therefore no longer depends on how an empty list was made (the circuit owner's report; its `canonical()` in circuit_parse.rs can go).
+- `check_legal` agrees with `features_used` by construction: both take the design-level features from `feature::design_level` (the case clash and both owners' `design_features`). A generated property checks it: for 40 designs × 20 random subsets, the set of reported `arg`s equals `features_used(d).minus(legal)`.
+
 
 ## The spine's two text requests
 
@@ -238,4 +247,24 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `kernel_gen::the_full_set_runs_every_property`: under `FeatureSet::ALL`, 400 seeds are valid, stay within the set and round-trip through IR text; up to 4,000 seeds between them use every feature but `Func(Ddt)` and `Func(Idt)`, named in the test. A `ddt`/`idt` makes its tree class `Circuit`, so it only ever counts as `FuncDyn`, and no valid design holds the non-dynamic pair. The pair stays in the enum: it is an index any writer's `FEATURES` may list, and nothing sets it.
 - The generator makes `Extra::CaseSensitiveNames` (`Gen::case_ok`): when the set has it, one fresh name in 16 is the upper-case twin of the previous index (`G4` after `g4`). Before this, no generator made it.
+
+
+## Amendment A14, run owner
+
+- `NodeSet` already had a field `applies: IcScope` (which operating points hold an `Ic`), so A14's mode is named `holds: Applies` on all three state rows, the last field of each (IR text: a trailing `whole_run` word). `FromHere` is the default of every builder method and of IR text without the word: it is the meaning state items had before A14, so existing text and tests keep it; a reader of whole-run state (ngspice) pushes rows with `WholeRun`.
+- Listed order for the mid-run features is one walk per deck file (items depth first, each body right after its item, an `Include` read in place once per walk); files no deck includes are walked alone. `OptionMidRun`, `EnvMidRun`, `NodeSetMidRun` mark a `FromHere` item after a run item, `WholeRunMidRun` (one member for the three kinds) a `WholeRun` one; all are set by `design_features` (reported at `Span::NONE`). `RunItemNested` is set per row (an analysis, option or `Env` in a subcircuit or section body), so it is reported at its item.
+- The generator treats "a run item exists anywhere" as "after a run item" (generation follows listed order), and refuses a nested analysis, option or `Env` without `RunItemNested`.
+
+## Amendment A15 and generator cost, run owner
+
+- R30's pick rule is `Event::skip_initial: bool` beside `count` and `last`: a crossing is picked exactly one of the three ways (checked); `skip_initial` states ngspice's default with no `RISE`/`FALL`/`CROSS` (the first crossing after the first interval) and is never read or written as `CROSS=1`. `Event::until` is the search's upper limit (`NONE`: the analysis's end). `Event` grows to 44 bytes. Features `MeasSkipInitial`, `MeasUntil`, `MeasStatAt` (for `Stat::MinAt`/`MaxAt`), `ProbeAllBranchI`.
+- The placement members (`NodeSetInSubckt`, `LoopNested`, `RunItemNested`) land under their old names; the kernel owner migrates them to `Feature::Placed` (A15 K1).
+- The run generators are O(1) per row (measured: `throughput N all` builds ~420k items/s from 50k to 250k items and 373k at 10^6, against 170 s for 10^6 before): the "an analysis exists" guards read the table's length (generation appends, so no row is dead), "inside every loop" is `loop_depth(scope) == loops.len()`, a generated periodic small-signal analysis follows its `Hb`/`Pss` directly (`base_just_before`), and the probe, part and target kinds a set allows come from `const` tables rather than per-call feature sets. Enum words in parse compare against one reused buffer (parse 42 → 51 MB/s on the full set).
+
+## A12 K1 addendum: `Sgn` Real, `Func::SgnZeroPos`
+
+- Withdrawn: "`Sgn` is Int-valued" above. As ruled, the IR's `Sgn` (−1, 0, 1) is Real whatever its operand; VACASK's `sgn` is `SgnZeroPos`, appended last to `Func` (text `sgn_zero_pos`), tagged with its operand's type.
+- −0.0 is tested as `Neg(0)`: a literal has no sign of zero, so IR text `-0` reads as the literal 0.
+- `Func::ALL` and `ItemKind::ALL` are sized by their last member (`[Func; Func::SgnZeroPos as usize + 1]`), so a member appended moves no hand-written length.
+- `kernel_gen`'s full-set reach carries one known gap as a marker: `Run(LoopOverOp)` (A12 R2) is not yet generated by the run owner.
 

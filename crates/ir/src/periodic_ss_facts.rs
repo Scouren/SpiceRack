@@ -9,7 +9,7 @@
 
 use crate::analysis_facts::DetailFacts;
 #[cfg(any(test, feature = "gen"))]
-use crate::analysis_facts::base_before;
+use crate::analysis_facts::base_just_before;
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::dc_ac_facts::output_valid;
@@ -381,5 +381,5 @@ fn gen_side(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> (ExprId,
 #[cfg(any(test, feature = "gen"))]
 fn after_base(b: &Builder<'_>, scope: ScopeId) -> Option<()> {
     let design = b.design();
-    base_before(design, scope, design.items(scope).len()).then_some(())
+    base_just_before(design, scope).then_some(())
 }

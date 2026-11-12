@@ -91,7 +91,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::McLatinHypercube, "  loop monte_carlo runs=10 latin_hypercube\n    analysis op", M),
     (RunExtra::McNominal, "  loop monte_carlo runs=10 nominal\n    analysis op", M),
     (RunExtra::McMismatch, "  loop monte_carlo runs=10 mismatch\n    analysis op", M),
-    (RunExtra::OptionMidRun, "  analysis op\n  option klu", "  option klu\n  analysis op"),
+    (RunExtra::OptionMidRun, "  analysis op\n  option klu", "  analysis op\n  option klu whole_run"),
     (RunExtra::IcEveryOp, "  nodeset ic every_op node=(a) value=1", S),
     (RunExtra::IcNextOnly, "  nodeset ic transient next_only node=(a) value=1", S),
     (RunExtra::IcDifferential, "  nodeset ic transient node=(a) reference=(b) value=1", S),
@@ -136,6 +136,14 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::VaryPercent, "  statistics process (p gauss percent spread=1)", ST),
     (RunExtra::VaryMean, "  statistics process (p gauss mean=2 spread=1)", ST),
     (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
+    (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
+    (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
+    (RunExtra::WholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
+    (RunExtra::RunItemNested, "  subckt s ()\n    analysis op", "  if (1)\n    analysis op"),
+    (RunExtra::ProbeAllBranchI, "  save (all_branch_i)", P),
+    (RunExtra::MeasStatAt, "  measure m tran stat min_at (v (a)) (bound) (bound)", "  measure m tran stat min (v (a)) (bound) (bound)"),
+    (RunExtra::MeasUntil, "  measure m tran when (cross rise (v (a)) value=1 count=1 until=1u)", MW),
+    (RunExtra::MeasSkipInitial, "  measure m tran when (cross rise skip_initial (v (a)) value=1)", MW),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
@@ -204,4 +212,22 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Run(RunExtra::TranCapNone))
         .with(Feature::Run(RunExtra::TranUic));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
+}
+
+#[test]
+fn listed_order_reads_an_include_in_place() {
+    // A14: a whole-run option in an included library comes after the deck's analysis when the
+    // include stands after it, and before it when the include stands first.
+    let used = |deck: &str| {
+        let text = format!(
+            "file \"t.sp\" deck\n{deck}\nfile \"lib.sp\" library\n  option klu whole_run\n"
+        );
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        parse(&text, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
+        features_used(&d).contains(Feature::Run(RunExtra::WholeRunMidRun))
+    };
+    assert!(used("  analysis op\n  include \"lib.sp\""));
+    assert!(!used("  include \"lib.sp\"\n  analysis op"));
 }

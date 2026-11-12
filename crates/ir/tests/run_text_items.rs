@@ -18,10 +18,10 @@ use spicerack_ir::measure::{
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::{
-    AcPart, AnalysisKind, BinOp, Builder, Design, Diags, Edge, Event, ExprId, FileId, IcScope,
-    List, Literal, LoopEnd, NodeSet, NodeSetKind, NumForm, OptionKey, PrintView, Probe, Ref, Role,
-    ScopeId, Span, Stat, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, dump, link,
-    parse,
+    AcPart, AnalysisKind, Applies, BinOp, Builder, Design, Diags, Edge, Env, Event, ExprId, FileId,
+    IcScope, List, Literal, LoopEnd, NodeSet, NodeSetKind, NumForm, OptionKey, OptionRow,
+    PrintView, Probe, Ref, Role, ScopeId, Span, Stat, Statistics, SweepSpec, Target, TargetKind,
+    Vary, VaryDist, dump, link, parse,
 };
 
 const NO: ExprId = ExprId::NONE;
@@ -105,9 +105,10 @@ fn sweep(
 fn loops_alters_and_state() {
     let text = "file \"t.sp\" deck
   env temp=85 tnom=27
+  env temp=27 whole_run
   option rel_tol value=1m
   option klu
-  option private timeint.reltol xyce value=1m
+  option private timeint.reltol xyce value=1m whole_run
   loop sweep keep_last name=sw1 (param r) (lin start=1k stop=10k step=1k)
     alter (device_param r1 r path=(x1)) value=2k
     analysis op
@@ -116,18 +117,36 @@ fn loops_alters_and_state() {
   alter (option private tran_rmax vacask) value=10
   alter (option rel_tol) value=1m
   nodeset ic transient node=(x1 n) value=1
-  nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5
+  nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5 whole_run
   nodeset device every_op node=(c1) value=0
   elaborate (div amp)
 ";
     case(text, |b, top| {
         let (t, tn) = (n(b, "85"), n(b, "27"));
         b.env(top, t, tn, Span::NONE);
+        let t = n(b, "27");
+        b.push(
+            top,
+            Env {
+                temp: t,
+                tnom: NO,
+                holds: Applies::WholeRun,
+            },
+            Span::NONE,
+        );
         let v = n(b, "1m");
         b.option(top, OptionKey::RelTol, v, Span::NONE);
         b.option(top, OptionKey::Klu, NO, Span::NONE);
-        let v = n(b, "1m");
-        b.option_private(top, "xyce", "timeint.reltol", v, Span::NONE);
+        let value = n(b, "1m");
+        let (private, dialect) = (b.name("timeint.reltol"), b.name("xyce"));
+        let row = OptionRow {
+            key: OptionKey::Private,
+            private,
+            dialect,
+            value,
+            holds: Applies::WholeRun,
+        };
+        b.push(top, row, Span::NONE);
         b.name("sw1"); // the text names the loop before its target
         let r = b.target(TargetKind::Param, &[], "r", None);
         let s = sweep(b, SweepSpec::lin_step, ["1k", "10k", "1k"]);
@@ -193,6 +212,7 @@ fn loops_alters_and_state() {
             node,
             reference,
             value,
+            holds: Applies::WholeRun,
         };
         b.push(top, row, Span::NONE);
         let v = n(b, "0");
@@ -212,7 +232,7 @@ fn loops_alters_and_state() {
 fn outputs_measures_and_statistics() {
     let text = "file \"t.sp\" deck
   save (v (out)) (i mag (v1))
-  save analysis=tran (all_v) (i_terminal terminal=2 (m1)) (param (m1) (gm)) (power (r1)) (expr expr=(v(a) * 2))
+  save analysis=tran (all_v) (all_branch_i) (i_terminal terminal=2 (m1)) (param (m1) (gm)) (power (r1)) (expr expr=(v(a) * 2))
   print hb hb_time (v (out))
   measure tdel tran trig_targ (cross rise (v (in)) value=0.5 count=1) (cross fall last (v (out)) value=0.5 delay=1n)
   measure tw tran when (cross cross (v (a)) value=(v(b)) count=2)
@@ -220,6 +240,8 @@ fn outputs_measures_and_statistics() {
   measure d1 tran deriv (v (out)) (at value=1u)
   measure a1 tran stat avg (v (out)) (bound) (at value=1u)
   measure p1 tran param value=(tdel * 2)
+  measure s1 tran stat max_at (v (out)) (bound) (bound)
+  measure w2 tran when (cross rise skip_initial (v (a)) value=0.5 until=1u)
   statistics process (vth gauss spread=1m) (tox unif percent mean=1n spread=10) mismatch (vth log_normal spread=1m) process_correlate (vth tox cc=0.5) truncate=4
 ";
     case(text, |b, top| {
@@ -229,6 +251,7 @@ fn outputs_measures_and_statistics() {
         ];
         b.save(top, None, &p, Span::NONE);
         let all = Probe::category(spicerack_ir::ProbeKind::AllV);
+        let branches = Probe::category(spicerack_ir::ProbeKind::AllBranchI);
         let it = b.probe_terminal(&["m1"], 2);
         let pp = b.probe_param(&["m1"], "gm");
         let pw = b.probe_power(&["r1"]);
@@ -239,7 +262,7 @@ fn outputs_measures_and_statistics() {
         b.save(
             top,
             Some(AnalysisKind::Tran),
-            &[all, it, pp, pw, pe],
+            &[all, branches, it, pp, pw, pe],
             Span::NONE,
         );
         let o = b.probe_v(&["out"]);
@@ -315,6 +338,30 @@ fn outputs_measures_and_statistics() {
             "p1",
             AnalysisKind::Tran,
             MeasureParam { value },
+            Span::NONE,
+        );
+        b.name("s1");
+        let signal = b.probe_v(&["out"]);
+        let row = MeasureStat {
+            stat: Stat::MaxAt,
+            signal,
+            from: Event::BOUND,
+            to: Event::BOUND,
+        };
+        b.measure(top, "s1", AnalysisKind::Tran, row, Span::NONE);
+        b.name("w2");
+        let a = b.probe_v(&["a"]);
+        let (h, u) = (n(b, "0.5"), n(b, "1u"));
+        let at = Event {
+            skip_initial: true,
+            until: u,
+            ..Event::cross(a, Edge::Rise, h, NO)
+        };
+        b.measure(
+            top,
+            "w2",
+            AnalysisKind::Tran,
+            MeasureWhen { at },
             Span::NONE,
         );
         let vth = Ref::unresolved(b.name("vth"));

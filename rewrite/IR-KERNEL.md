@@ -271,9 +271,9 @@ value Int or Real (`eval::eval_typed -> Value { number, int }`; `eval` keeps ret
 number; `Bindings::param_value` passes a typed parameter, defaulting to `param` as Real):
 `Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
 `Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
-chosen branch's; `ToInt` Int; `Sgn` Int iff its operand is (run f2 printed `sgn(-3)/2` as 0, so
-the run overrides the amendment's table, R5); everything else Real. An Int beyond ±2⁵³ is a
-domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`. An Int
+chosen branch's; `ToInt` Int; `SgnZeroPos` (−1 for `x < 0`, +1 otherwise, −0.0 included:
+VACASK's `sgn`, runs e1, f4) its operand's; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
 **A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
