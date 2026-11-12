@@ -17,7 +17,7 @@
 //! `pub struct Gen`, `Gen::below(&mut self, u32) -> u32`, `Gen::chance(&mut self, u32) -> bool`,
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr` (in `gen_expr.rs`),
-//! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
+//! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`, crate: `Gen::pick_model_for`,
 //! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::new(u64, &FeatureSet, Size) -> Gen`, `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
 //! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
@@ -25,6 +25,7 @@
 use crate::build::Builder;
 use crate::class::ExprClass;
 use crate::design::Design;
+use crate::element::ElemKind;
 use crate::expr::{ExprTag, Literal, NumForm};
 use crate::facts::RowFacts;
 use crate::feature::{Extra, Feature, FeatureSet};
@@ -65,6 +66,9 @@ pub struct Gen {
     /// The definitions of each kind seen so far, in definition order (`pick_def`'s index,
     /// caught up from the design's table on each call: definitions are only appended).
     pub(crate) by_kind: Vec<Vec<DefId>>,
+    /// Per element kind, the models generated so far of a family it takes (R48 d: an element
+    /// names a model that exists; appended by the circuit owner's model generator).
+    pub(crate) models_for: Vec<Vec<DefId>>,
     /// The dynamic class of each definition generated so far, by `DefId` (`Constant` when not
     /// noted): a constant-class tree reads only constant-class definitions (R14).
     pub(crate) def_class: Vec<ExprClass>,
@@ -260,6 +264,28 @@ impl Gen {
     /// An existing definition of `kind` visible from `scope`, chosen at random (up to eight
     /// draws among that kind's definitions), or `NONE` when the draws find none visible.
     pub fn pick_def(&mut self, design: &Design, scope: ScopeId, kind: DefKind) -> DefId {
+        self.pick_from(design, scope, None, kind)
+    }
+
+    /// As [`Gen::pick_def`], among the models generated for a family `kind` takes
+    /// (`Gen::models_for`, R48 d).
+    pub(crate) fn pick_model_for(
+        &mut self,
+        design: &Design,
+        scope: ScopeId,
+        kind: ElemKind,
+    ) -> DefId {
+        self.pick_from(design, scope, Some(kind), DefKind::Model)
+    }
+
+    /// `pick_def`'s draws, among `kind`'s definitions, or the models for `models` when given.
+    fn pick_from(
+        &mut self,
+        design: &Design,
+        scope: ScopeId,
+        models: Option<ElemKind>,
+        kind: DefKind,
+    ) -> DefId {
         let seen: usize = self.by_kind.iter().map(Vec::len).sum();
         for (k, def) in design.definitions().iter().enumerate().skip(seen) {
             self.by_kind[def.kind as usize].push(DefId(k as u32));
@@ -275,10 +301,17 @@ impl Gen {
             at = design.scope(at).parent;
         }
         // a few random draws among this kind's definitions, kept if visible: O(depth) per read
-        let n = self.by_kind[kind as usize].len() as u32;
+        let list = |g: &Gen| match models {
+            Some(e) => g.models_for[e as usize].len(),
+            None => g.by_kind[kind as usize].len(),
+        };
+        let n = list(self) as u32;
         for _ in 0..if n == 0 { 0 } else { 8 } {
             let k = self.below(n) as usize;
-            let def = self.by_kind[kind as usize][k];
+            let def = match models {
+                Some(e) => self.models_for[e as usize][k],
+                None => self.by_kind[kind as usize][k],
+            };
             let at = design.def(def).scope;
             let enclosing = !self.enclosing_ok && design.in_enclosing_subckt(scope, at);
             if chain.contains(&at) && !enclosing {
@@ -327,6 +360,7 @@ impl Gen {
             scope: ScopeId::NONE,
             formals: Vec::new(),
             by_kind: vec![Vec::new(); DefKind::COUNT],
+            models_for: vec![Vec::new(); ElemKind::COUNT],
             def_class: Vec::new(),
             class: ExprClass::Constant,
             dynamic: false,

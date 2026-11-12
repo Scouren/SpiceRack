@@ -158,6 +158,14 @@ versioned family but `Module` and `Other`) states its `version` (`check`, round 
 would be each simulator's own default). The generator draws it from `circuit_tables::VERSIONS`,
 ngspice-45's accepted versions per family with their source lines (its vocabulary, not a rule).
 
+(2026-11-12, R48 d.) A generated element that names a model mostly names one the design
+defines and the element sees, of a family its kind takes (`circuit_gen_head::takes`, the
+generator's data: the IR admits any non-builtin family, C5). When none is visible, a model of
+such a family is drawn first, in the element's scope, seven times in eight; and a visible one
+is named seven times in eight, the rest staying an unresolved name (an absent kit is legal).
+Property: `circuit_gen::a_named_model_mostly_exists`, a floor of 0.6 bound per kind over 1000
+seeds (the generator before this bound none of the sources and about half of the rest).
+
 - `ModelFamily` is the **equation family**, a closed enum (`Resistor`, `Capacitor`, `Diode`,
   `GummelPoon`, `Vbic`, `Hicum`, `Mos1`, `Mos2`, `Mos3`, `Mos6`, `Mos9`, `Bsim3`, `Bsim4`,
   `BsimSoi`, `Hisim2`, `HisimHv`, `Psp103`, `Vdmos`, `JfetShichman`, `JfetParkerSkellern`,
