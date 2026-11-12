@@ -10,7 +10,7 @@
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
 //! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
-//! `RowFacts::map_exprs`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
+//! `RowFacts::map_exprs`, `RowFacts::map_element_names`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum ExprUse`, `pub enum Handle`,
 //! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
 //! type)
@@ -56,6 +56,14 @@ pub trait RowFacts: ItemRow {
     /// pools. Default: no root, for a row with no expression field; `kernel_gen`'s drift property
     /// fails a row whose `handles` lists a root this does not visit.
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let _ = (design, at, f);
+    }
+
+    /// Calls `f` once per by-name element reference the item `at` holds outside its
+    /// expressions, in field order: a single name as a slice of one, a path as its slice of the
+    /// name pool, in place (A32). The kernel adds `Expr::I` and resolves each segment's scope
+    /// (`Editor::map_element_uses`). Default: none, for a row that names no element.
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
         let _ = (design, at, f);
     }
 
@@ -238,6 +246,10 @@ macro_rules! for_kind {
             }
             $crate::ItemKind::Elaborate => {
                 type $R = $crate::plan::Elaborate;
+                $body
+            }
+            $crate::ItemKind::Reset => {
+                type $R = $crate::reset::Reset;
                 $body
             }
         }

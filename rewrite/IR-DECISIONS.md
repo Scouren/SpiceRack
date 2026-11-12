@@ -415,3 +415,41 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `gen::Params { Untyped, TypedOnly }` and `generate_with(seed, features, size, params)`; `generate` is `generate_with(…, Params::Untyped)`, so no caller changes. The setting reaches the row generators as `Gen::params`. The kernel's rows draw no untyped parameter list (a subcircuit's head parameters are formals, typed by the row), so the setting's effect is the circuit owner's element and model generators; they honour it in their files.
 
+
+## Amendments A27 and A28, run owner (R49)
+
+- "From here X is v" has one form, the state item: a `FromHere` `OptionRow` for an option, and a `FromHere` `Env` for the temperature or the nominal temperature (a script's `option tnom=`). `check` refuses an `Alter` of `TargetKind::Temp` or `Option` (`FieldDomain`), and `Builder::alter` asserts the same. Both kinds stay for loop and DC-axis targets; the generator never picks them for an alter. `RunExtra::AlterTemp` and `AlterOption` are removed. Rename: an alter of the temperature is now `Env` (`StateFromHere`, `EnvMidRun`); an alter of an option is now `OptionRow` (`StateFromHere`, `OptionMidRun`).
+- `Reset { restores: ResetSet }` is a new run item: `ItemKind::Reset`, appended after `Elaborate`, its kernel arms written by the run owner on the lead's go-ahead, as for `Elaborate`. Its row is in `reset.rs`. `ResetSet` is a `u8` set of `Restorable { Values, Options, Temp, Tnom, Saves }`, never empty (checked). Text: `reset <class> …` in declaration order. One feature per class (`ResetValues` … `ResetSaves`). The row states what "earlier" means: run order, includes in place, and inside a loop body every earlier pass's items too. There is no class for parameters: no simulator restores them (R18).
+- `Save.holds: Applies` (`Save` 12 → 16 bytes). The builder's `save` takes it, `WholeRun` for a card. Text: `from_here` after `analysis=`. Features `SaveFromHere`, `SaveWholeRun`, and `SaveMidRun` for a `FromHere` save after a run item. A `WholeRun` save there sets `WholeRunMidRun`, as every `WholeRun` state item does, so a `.save` card after an analysis now sets it too.
+- `Loop.name`'s doc: the loop's own name in its dialect (Spectre's or VACASK's statement name, ngspice's `foreach` variable).
+- Oracle: the feature table with a neighbour for each new member, three new `check` rows, the IR text round trip, and builder asserts. The tests were not committed red before the bodies. Instead, with the bodies stubbed out (no reset features, no `from_here` text, a save's mode ignored by the listed-order walk), the feature table, the text test and the walk test each failed on exactly the stubbed members.
+- Reach over 4,000 full-set seeds: every new member is in 1,868 seeds or more. The scaling gate (`throughput -- scaling`) passes: build ratio 4.20 at 4× items, bound 8.
+
+## A28: the definition cycle
+
+- Withdrawn: A11's "what the worklist cannot order is `Circuit`". A definition on or behind a cycle rises to the fixpoint of its direct class and its reads' classes (each class rises at most twice). The cycle itself is `DefinitionCycle`, reported before `ProbeContext` in `check`'s last pass, on an otherwise valid design, since the graph reads definitions through their rows.
+- The cycle test is two worklists over the read graph: a definition that neither settles is on a cycle, or between two (reported too; no generated or corpus design has one). `class.rs`'s graph, `kahn` and `order` are shared by the class table and the cycle test.
+
+## `CaseSensitiveNames` per namespace (ruled)
+
+- Replaces the pool-wide `case_clash`. `case::case_clashes` returns the live items that bring a second spelling; `features_used` sets the feature when there is one, and `check_legal` reports it at each such item, so the two still agree. A net clash against a global net is reported at the item naming the local net (the global's `Global` item is the first spelling's).
+- Nets are what the kernel can name without the owners' rows beyond `Element.terminals`: element terminals, subcircuit ports (in the body), global nets. A net named only in a probe or an analysis (`v(A)` beside a terminal `a`) is not yet in the namespace: no reader has produced one, and adding it means walking every probe.
+
+## Round 7b doors 2 and 3
+
+- `items_mut` stays public; its doc says what it does not maintain (the index), and `StaleDefinition` makes a bypass fail. `remove_item` removes only the item's own definitions from the index: definitions inside its dead body are unreachable by any lookup from a live scope, so `check` (live scopes only) leaves them. `remove_item` scans the definitions table, O(definitions) per call; a pass removing many items pays that per item (a per-item index of definitions, when one does).
+- `move_item` re-parents the item's body scopes and asserts both scopes are in one file (a scope's `file` is not rewritten).
+- `rename_def` leaves bound references' names to the pass (else `RefTarget`).
+
+## A32 applied (the element-name door)
+
+- `map_element_uses` takes the item's listing scope (`(scope, item, f)`, changed from the first proposal before any body): finding it per item would scan every list.
+- Three phases per item: the row's paths are copied (the row's walk holds `&mut Design`), the pass answers each segment with the design readable (`walk_path`), and a second walk stores the names in the same order. A segment after `NONE` is still offered to the pass with `scope: NONE`, so it can note the reference.
+- The drift property A32 asks for ("every use listed resolves, every resolved reference is listed") needs `check` to resolve element references, which it does not today; until the owners' rows land, the tests pin the kernel's `Expr::I` part and the path walk by hand.
+
+## The class of a call (ruled)
+
+- `class::class_nodes` is the one walk that decides which rows a tree's class reads; `tree_class`, `tree_class_with` (the generator's table), the definition graph, the feature count, the forms and `check`'s last pass go through it. `formals_read` decides, per call, which arguments' formals the body reads (a walk of the body per call node; no cache: bodies are small and the classes are cached above it). `node_class` is gone (no caller left).
+- The generator no longer tracks a class node by node: it computes the finished tree's class with `tree_class_with` over its own definition table, which is exact by construction and O(tree).
+- The inlining property no longer excludes inlinings that drop a dynamic argument.
+

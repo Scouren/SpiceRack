@@ -16,12 +16,14 @@
 //! Contents: `pub enum ExprClass`, `pub fn expr_class(&Design, ExprId) -> ExprClass`; crate:
 //! `pub(crate) fn def_classes(&Design) -> &[ExprClass]`,
 //! `pub(crate) fn tree_class(&Design, ExprId, &[ExprClass]) -> ExprClass`,
-//! `pub(crate) fn node_class(&Design, ExprId, &[ExprClass]) -> ExprClass`
+//! `pub(crate) fn tree_class_with(&Design, ExprId, &dyn Fn(DefId) -> ExprClass) -> ExprClass`,
+//! `pub(crate) fn class_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
+//! `pub(crate) fn tree_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
+//! `pub(crate) fn cycle_defs(&Design) -> Vec<usize>`,
 
 use crate::design::Design;
 use crate::expr::{Expr, Func};
-use crate::feature::ExprWalk;
-use crate::id::{DefId, ExprId};
+use crate::id::{DefId, ExprId, NameId};
 use crate::item::{DefKind, ItemKind};
 
 /// The dynamic class of an expression (R14, A11): `Circuit` when it, or a parameter or user
@@ -41,6 +43,11 @@ pub enum ExprClass {
 
 /// The class of `e` (see the module header). O(its tree) once the design's definition classes
 /// are cached; the first call after a mutation computes them, O(design).
+///
+/// An unbound parameter read counts as `Constant` by assumption, not knowledge (A33): the reader
+/// that left it unbound asserts a parameter will bind it (R4), and its class is known only once
+/// one does. The one signal carried today is `Extra::FormalNotConstant`, for a subcircuit
+/// default holding such a read.
 pub fn expr_class(design: &Design, e: ExprId) -> ExprClass {
     tree_class(design, e, def_classes(design))
 }
@@ -49,22 +56,39 @@ pub fn expr_class(design: &Design, e: ExprId) -> ExprClass {
 /// table sized by the design (so a row may call it per expression). An out-of-range or `NONE`
 /// root is `Constant`. Explicit stack (C11).
 pub(crate) fn tree_class(design: &Design, root: ExprId, table: &[ExprClass]) -> ExprClass {
-    let mut class = ExprClass::Constant;
-    let mut seen: std::collections::HashSet<u32, std::hash::BuildHasherDefault<crate::names::Fx>> =
-        Default::default();
-    let mut stack = vec![root];
-    let mut kids = Vec::new();
-    while let Some(e) = stack.pop() {
-        if e.is_none() || e.index() >= design.expr_count() || !seen.insert(e.0) {
-            continue;
-        }
-        class = class.max(node_class(design, e, table));
-        kids.clear();
-        design.children(e, &mut kids);
-        // children have lower ids, so the walk ends on any table contents
-        stack.extend(kids.iter().copied().filter(|k| *k < e));
-    }
-    class
+    tree_class_with(design, root, &|d| table[d.index()])
+}
+
+/// As [`tree_class`], with each definition's class from `def_class` (the generator's own table).
+pub(crate) fn tree_class_with(
+    design: &Design,
+    root: ExprId,
+    def_class: &dyn Fn(DefId) -> ExprClass,
+) -> ExprClass {
+    let mut nodes = Vec::new();
+    class_nodes(design, root, &mut nodes);
+    nodes
+        .iter()
+        .map(|&e| {
+            let read = dependency(design, e).map_or(ExprClass::Constant, def_class);
+            leaf_class(design, e).max(read)
+        })
+        .max()
+        .unwrap_or(ExprClass::Constant)
+}
+
+/// The rows of the tree under `root` its class reads, each once: every row but the arguments
+/// of a user call whose formal the function's body never reads (the lead's ruling on A28's
+/// finding a: a call is its body with each formal read taking its argument's class, so an
+/// unread argument adds nothing). Explicit stack (C11); descends only to lower ids.
+pub(crate) fn class_nodes(design: &Design, root: ExprId, out: &mut Vec<ExprId>) {
+    walk_small(design, root, out, true);
+}
+
+/// The rows of the tree under `root`, each once, with no table sized by the design (so a row
+/// may call it per expression: O(its tree)). Explicit stack (C11); descends only to lower ids.
+pub(crate) fn tree_nodes(design: &Design, root: ExprId, out: &mut Vec<ExprId>) {
+    walk_small(design, root, out, false);
 }
 
 /// The class of every definition, by `DefId` (`Constant` for kinds an expression does not read),
@@ -73,25 +97,92 @@ pub(crate) fn def_classes(design: &Design) -> &[ExprClass] {
     design.classes.get_or_init(|| compute(design))
 }
 
-/// The class one expression row contributes: its own leaf or function, or the definition it
-/// reads (a formal-argument read contributes nothing).
-pub(crate) fn node_class(design: &Design, e: ExprId, table: &[ExprClass]) -> ExprClass {
-    let read = dependency(design, e).map_or(ExprClass::Constant, |d| table[d.index()]);
-    leaf_class(design, e).max(read)
+/// The definitions on a reference cycle (A28): those neither a deps-first nor a readers-first
+/// worklist can settle (a definition between two cycles counts too). O(definitions + reads).
+pub(crate) fn cycle_defs(design: &Design) -> Vec<usize> {
+    let (_, deps, readers) = graph(design);
+    let forward = kahn(&deps, &readers);
+    let backward = kahn(&readers, &deps);
+    (0..deps.len())
+        .filter(|&k| !forward[k] && !backward[k])
+        .collect()
 }
 
 // ---- private ----
 
-/// The class table: each definition's direct class from its own expressions, then the
-/// dependency-ordered maximum over what it reads; what the worklist cannot order is `Circuit`.
-fn compute(design: &Design) -> Vec<ExprClass> {
+/// [`class_nodes`] (`read_only`: a user call's unread arguments skipped) or [`tree_nodes`]. Its
+/// seen-set grows with the tree, never with the design: a design-sized table here made every
+/// call's `formals_read` O(expressions), and `check` quadratic.
+fn walk_small(design: &Design, root: ExprId, out: &mut Vec<ExprId>, read_only: bool) {
+    let mut seen: std::collections::HashSet<u32, std::hash::BuildHasherDefault<crate::names::Fx>> =
+        Default::default();
+    let mut stack = vec![root];
+    let mut kids = Vec::new();
+    while let Some(e) = stack.pop() {
+        if e.is_none() || e.index() >= design.expr_count() || !seen.insert(e.0) {
+            continue;
+        }
+        out.push(e);
+        kids.clear();
+        design.children(e, &mut kids);
+        if read_only
+            && let Expr::UserCall(r, _) = design.expr(e)
+            && let Some(read) = formals_read(design, r.def)
+        {
+            // only the arguments whose formal the body reads (an argument past the formals is
+            // `check`'s arity violation, and reads as unread)
+            let mut k = 0;
+            kids.retain(|_| {
+                k += 1;
+                read.get(k - 1).copied().unwrap_or(false)
+            });
+        }
+        // children have lower ids, so the walk ends on any table contents
+        stack.extend(kids.iter().copied().filter(|k| *k < e));
+    }
+}
+
+/// Whether the body of user function `def` reads each of its formals, by position; `None` when
+/// `def` is no function this design defines (then every argument counts).
+fn formals_read(design: &Design, def: DefId) -> Option<Vec<bool>> {
+    let d = design.defs[def.index_checked(design.defs.len())?];
+    if d.kind != DefKind::Func
+        || d.item.kind != ItemKind::Func
+        || d.item.index as usize >= design.funcs.len()
+    {
+        return None;
+    }
+    let f: crate::item::Func = design.row(d.item.index);
+    let mut nodes = Vec::new();
+    tree_nodes(design, f.body, &mut nodes);
+    let reads: Vec<NameId> = nodes
+        .iter()
+        .filter_map(|&e| match design.expr(e) {
+            Expr::Param(r) if r.def == def => Some(r.name),
+            _ => None,
+        })
+        .collect();
+    Some(
+        design
+            .names(f.args)
+            .iter()
+            .map(|n| reads.contains(n))
+            .collect(),
+    )
+}
+
+/// Each definition's direct class, the definitions it reads (one entry per read), and its
+/// readers.
+fn graph(design: &Design) -> (Vec<ExprClass>, Vec<Vec<usize>>, Vec<Vec<usize>>) {
     let n = design.defs.len();
     let mut direct = vec![ExprClass::Constant; n];
     let mut deps: Vec<Vec<usize>> = vec![Vec::new(); n];
-    let mut walk = ExprWalk::new(design);
+    let mut nodes = Vec::new();
     for k in 0..n {
         for root in roots(design, DefId(k as u32)) {
-            for &e in walk.tree(design, root) {
+            nodes.clear();
+            class_nodes(design, root, &mut nodes);
+            for &e in &nodes {
                 direct[k] = direct[k].max(leaf_class(design, e));
                 if let Some(d) = dependency(design, e) {
                     deps[k].push(d.index());
@@ -99,20 +190,42 @@ fn compute(design: &Design) -> Vec<ExprClass> {
             }
         }
     }
-    // Kahn: a definition is final once every definition it reads is
-    let mut waiting: Vec<usize> = deps.iter().map(Vec::len).collect();
     let mut readers: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (k, ds) in deps.iter().enumerate() {
         for &d in ds {
             readers[d].push(k);
         }
     }
-    let mut class = direct.clone();
+    (direct, deps, readers)
+}
+
+/// Which nodes a worklist settles when a node is ready once every node it waits on (`on`) is
+/// settled (`waiters` the reverse edges): Kahn's algorithm, bounded by the edges.
+fn kahn(on: &[Vec<usize>], waiters: &[Vec<usize>]) -> Vec<bool> {
+    let n = on.len();
+    let mut waiting: Vec<usize> = on.iter().map(Vec::len).collect();
     let mut done = vec![false; n];
     let mut ready: Vec<usize> = (0..n).filter(|&k| waiting[k] == 0).collect();
     while let Some(k) = ready.pop() {
         done[k] = true;
-        class[k] = deps[k].iter().fold(direct[k], |c, &d| c.max(class[d]));
+        for &u in &waiters[k] {
+            waiting[u] -= 1;
+            if waiting[u] == 0 {
+                ready.push(u);
+            }
+        }
+    }
+    done
+}
+
+/// The settled definitions in an order where each follows what it reads.
+fn order(deps: &[Vec<usize>], readers: &[Vec<usize>]) -> Vec<usize> {
+    let n = deps.len();
+    let mut waiting: Vec<usize> = deps.iter().map(Vec::len).collect();
+    let mut out = Vec::new();
+    let mut ready: Vec<usize> = (0..n).filter(|&k| waiting[k] == 0).collect();
+    while let Some(k) = ready.pop() {
+        out.push(k);
         for &u in &readers[k] {
             waiting[u] -= 1;
             if waiting[u] == 0 {
@@ -120,9 +233,30 @@ fn compute(design: &Design) -> Vec<ExprClass> {
             }
         }
     }
-    for k in 0..n {
-        if !done[k] {
-            class[k] = ExprClass::Circuit; // on or behind a reference cycle
+    out
+}
+
+/// The class table: each definition's direct class from its own expressions, then the
+/// dependency-ordered maximum over what it reads. A definition on or behind a reference cycle
+/// (which `check` reports as `DefinitionCycle`, A28) takes the most its direct class and the
+/// classes it reads give, propagated by a worklist (each class rises at most twice), so a cycle
+/// does not make every reader `Circuit`.
+fn compute(design: &Design) -> Vec<ExprClass> {
+    let (direct, deps, readers) = graph(design);
+    let n = direct.len();
+    let done = kahn(&deps, &readers);
+    let mut class = direct.clone();
+    // the settled ones in dependency order
+    for k in order(&deps, &readers) {
+        class[k] = deps[k].iter().fold(direct[k], |c, &d| c.max(class[d]));
+    }
+    // the rest: rise to the fixpoint
+    let mut work: Vec<usize> = (0..n).filter(|&k| !done[k]).collect();
+    while let Some(k) = work.pop() {
+        let next = deps[k].iter().fold(direct[k], |c, &d| c.max(class[d]));
+        if next > class[k] {
+            class[k] = next;
+            work.extend(readers[k].iter().copied().filter(|&u| !done[u]));
         }
     }
     class

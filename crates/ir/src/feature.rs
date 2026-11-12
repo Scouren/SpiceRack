@@ -23,21 +23,21 @@
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
 //! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
-//!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
+//!   `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
 //!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
 //!   `form`: `pub enum Form`, `pub fn root_form(&Design, ExprId, ExprUse) -> Form`
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
-use crate::class::{ExprClass, def_classes, node_class};
+use crate::class::def_classes;
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::form::{DYNAMIC, STATIC, body_forms, form_feature, form_of};
 pub use crate::form::{Form, root_form};
-use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
+use crate::id::{DefId, ExprId, ItemRef, ScopeId};
 use crate::item::{ItemKind, Role, ScopeKind};
 use crate::model::ModelFamily;
 use crate::option_key::OptionKey;
@@ -410,16 +410,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
     for (item, scope) in design.reachable() {
         item_features(design, item, scope, &mut walk, &mut set);
     }
+    // two spellings of one name in one namespace (at the item: `check_legal`)
+    if !crate::case::case_clashes(design).is_empty() {
+        set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
     design_level(design, &mut set);
     set
 }
 
-/// The features of the whole design, no item's: the case clash and each owner's
+/// The features of the whole design, no item's: each owner's
 /// `design_features` hook (A9). `check_legal` reports these at `Span::NONE`.
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
-    if case_clash(design) {
-        *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
-    }
     let untitled = |f| {
         let file = design.file(f);
         file.role == Role::Deck
@@ -484,12 +485,7 @@ pub(crate) fn item_features(
     for (root, use_) in roots_with_use(design, &handles) {
         let nodes = walk.tree(design, root);
         // the one form decision (A26): the field's use and the tree's class (R14, A19)
-        let table = def_classes(design);
-        let class = nodes
-            .iter()
-            .map(|&e| node_class(design, e, table))
-            .max()
-            .unwrap_or(ExprClass::Constant);
+        let class = crate::class::tree_class(design, root, def_classes(design));
         // A28 (R51): a function body counts in its callers' forms, every other root in its own
         let forms = if item.kind == ItemKind::Func {
             let bits = body_forms(design).get(&root).copied().unwrap_or(0);
@@ -522,13 +518,6 @@ pub(crate) fn item_features(
             }
         }
     }
-}
-
-/// Whether two interned names differ only in ASCII case (a case-folding target merges them).
-pub(crate) fn case_clash(design: &Design) -> bool {
-    let mut seen = std::collections::HashSet::new();
-    (0..design.names.len())
-        .any(|k| !seen.insert(design.names.str(NameId(k as u32)).to_ascii_lowercase()))
 }
 
 impl ExprWalk {
