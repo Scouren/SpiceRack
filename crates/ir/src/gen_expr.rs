@@ -145,6 +145,12 @@ impl Gen {
             ExprTag::TStop,
             ExprTag::Tnom,
         ];
+        // A33: under `typed_params` a parameter read is the operand of a dynamic `ToReal` or
+        // `ToInt` the set allows (or is not drawn)
+        let typed = [Func::ToReal, Func::ToInt].into_iter().find(|f| {
+            features.contains(Feature::Expr(ExprTag::Call))
+                && features.contains(Feature::FuncDyn(*f))
+        });
         let tag = if std::mem::take(need_probe) {
             probes[self.below(probes.len() as u32) as usize]
         } else {
@@ -152,6 +158,7 @@ impl Gen {
                 .into_iter()
                 .filter(|t| features.contains(Feature::Expr(*t)))
                 .filter(|t| !matches!(t, ExprTag::Param | ExprTag::Tnom) || self.param_reads)
+                .filter(|t| *t != ExprTag::Param || !self.typed_params || typed.is_some())
                 .chain(probes.iter().copied().filter(|_| dynamic))
                 .collect();
             leaves[self.below(leaves.len() as u32) as usize]
@@ -187,7 +194,13 @@ impl Gen {
                 let w = self.word();
                 b.string(w)
             }
-            ExprTag::Param => self.param_read(b),
+            ExprTag::Param => {
+                let read = self.param_read(b);
+                match typed {
+                    Some(f) if self.typed_params => b.call(f, &[read]),
+                    _ => read,
+                }
+            }
             ExprTag::Temp => b.temp(),
             ExprTag::TStep => b.tstep(),
             ExprTag::TStop => b.tstop(),
@@ -415,5 +428,58 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_typed_parameter_read_is_wrapped_or_not_drawn() {
+        // A33 (oracle: the tree's own rows): under `typed_params` every `Param` row is the
+        // operand of a `ToReal` or `ToInt` call the set allows dynamically (`ToInt` missing:
+        // only `ToReal`), with a floor of reads drawn; with neither allowed, no `Param` row
+        use crate::expr::{Expr, Func};
+        use crate::feature::Feature;
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        let only_real =
+            FeatureSet::ALL.minus(FeatureSet::EMPTY.with(Feature::FuncDyn(Func::ToInt)));
+        let neither = only_real.minus(FeatureSet::EMPTY.with(Feature::FuncDyn(Func::ToReal)));
+        let mut wrapped_reads = 0;
+        for (set, wrapper) in [(only_real, Some(Func::ToReal)), (neither, None)] {
+            for seed in 0..200u64 {
+                let mut d = Design::new();
+                let mut b = d.builder();
+                let (_, top) = b.file("t.sp", Role::Deck);
+                let mut g = Gen::new(seed, &set, size);
+                g.scope = top;
+                g.typed_params = true;
+                for _ in 0..10 {
+                    let e = g.expr(&mut b, &set, Reads::Circuit);
+                    let des = b.design();
+                    let mut nodes = Vec::new();
+                    crate::class::tree_nodes(des, e, &mut nodes);
+                    let mut operands = Vec::new();
+                    for &n in &nodes {
+                        if let Expr::Call(f, _) = des.expr(n)
+                            && Some(f) == wrapper
+                        {
+                            des.children(n, &mut operands);
+                        }
+                    }
+                    for &n in &nodes {
+                        if let Expr::Param(_) = des.expr(n) {
+                            assert!(operands.contains(&n), "seed {seed}: an untyped read");
+                            wrapped_reads += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            wrapped_reads >= 50,
+            "only {wrapped_reads} typed reads drawn"
+        );
     }
 }
