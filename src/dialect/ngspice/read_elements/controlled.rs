@@ -286,6 +286,7 @@ fn behav(
         rpar: ir::ExprId::NONE,
         output,
         tc_base,
+        tc_law: ir::passive::TcLaw::Direct,
     };
     let span = lw.span(st.node);
     lw.b.behav(st.scope, K::Behav, h, row, span);

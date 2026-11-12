@@ -26,6 +26,8 @@ pub(super) fn card(d: &ir::Design, e: &ir::Element) -> String {
             let b = d.behav(e);
             s.push_str(" q=");
             bv(d, b.expr, &mut s);
+            kv(d, "tc1", b.tc1, &mut s);
+            kv(d, "tc2", b.tc2, &mut s);
             mult(d, e, &mut s);
         }
         K::Coupling => {
