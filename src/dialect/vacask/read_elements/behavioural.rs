@@ -1,7 +1,7 @@
 //! The behavioural source `name (p n) v=|potential=|i=|flow=<expr>` → a `Behav` row (VD
 //! dev-builtin-behavioral: `v=`/`potential=` a voltage, `i=`/`flow=` a current from p through
-//! the source to n). One that reads a parameter waits for A21's `ToReal` (run b1: a parameter is
-//! real-typed there; R41 Q1): `Unread`. `expr=`, `declarations=`, `discipline=`, a second
+//! the source to n). A parameter read is `ToReal(p)` there (run b1: real-typed;
+//! R40/A21, `expr_read`'s behavioural context). `expr=`, `declarations=`, `discipline=`, a second
 //! parameter list: `Private` (§5 G14).
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.2 (behavioural); VD dev-builtin-behavioral.
@@ -11,7 +11,7 @@
 use super::super::expr_read::{self, Context};
 use super::super::read::{self, Lower};
 use crate::ir;
-use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::ast::Node;
 
 /// `name (p n) v=|potential=|i=|flow=<expr>`.
 pub(in crate::dialect::vacask) fn source(
@@ -33,9 +33,14 @@ pub(in crate::dialect::vacask) fn source(
             );
         }
     };
-    if nodes.len() != 2 || reads_name(l, entries[0].1) {
-        // A parameter read is real-typed there (run b1): `Unread` until A21's `ToReal`.
-        return read::unread(l, n);
+    if nodes.len() != 2 {
+        // "A behavioral source instance takes exactly two terminals" (VD).
+        return read::opaque(
+            l,
+            n,
+            ir::OpaqueClass::InvalidInSource,
+            Some(super::super::codes::PRIVATE),
+        );
     }
     let value = entries[0].1;
     let expr = match expr_read::expr(l, value, Context::Behavioural) {
@@ -51,55 +56,10 @@ pub(in crate::dialect::vacask) fn source(
         rpar: ir::ExprId::NONE,
         output,
         tc_base: ir::passive::TcBase::Tnom,
+        tc_law: ir::passive::TcLaw::Direct,
     };
     let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
     let head = l.b.head(name, &nodes, None, &[], ir::ExprId::NONE);
     let span = l.span(n);
     l.b.behav(l.scope, ir::ElemKind::Behav, head, row, span);
-}
-
-// ---- private ----
-
-/// Whether the expression at `node` names a parameter (an identifier that is no constant and
-/// no special leaf).
-fn reads_name(l: &Lower<'_, '_, '_>, node: u32) -> bool {
-    let ast = &l.cst.ast;
-    let mut todo = vec![node];
-    // Bounded: each node of the (acyclic) expression tree is taken once.
-    while let Some(x) = todo.pop() {
-        if x == NONE {
-            continue;
-        }
-        let n = Node(x);
-        match ast.tag(n) {
-            Tag::Ident | Tag::Word => {
-                let name = match ast.tag(n) {
-                    Tag::Word => ast.name(crate::syntax::ast::Name(ast.rhs(n))),
-                    _ => ast.name(crate::syntax::ast::Name(ast.lhs(n))),
-                };
-                let constant = super::super::tables::CONSTANTS
-                    .iter()
-                    .any(|(c, _)| *c == name);
-                if !constant && !name.starts_with('$') {
-                    return true;
-                }
-            }
-            Tag::Unary | Tag::Paren | Tag::Delimited => todo.push(ast.lhs(n)),
-            Tag::Binary => todo.extend([ast.lhs(n), ast.rhs(n)]),
-            Tag::Ternary => {
-                let at = ast.rhs(n);
-                todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
-            }
-            Tag::Call | Tag::Probe => {
-                // `v(a)`, `i(x)` name nodes and instances, not parameters.
-                let callee = ast.name(crate::syntax::ast::Name(ast.lhs(n)));
-                if callee != "v" && callee != "i" {
-                    let at = ast.rhs(n);
-                    todo.extend((0..ast.extra(at + 1)).map(|k| ast.extra(at + 2 + k)));
-                }
-            }
-            _ => {}
-        }
-    }
-    false
 }

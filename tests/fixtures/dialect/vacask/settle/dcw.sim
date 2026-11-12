@@ -1,0 +1,13 @@
+a source with a DC value and a pulse (R42): the writers' text for dcw.cir
+load "spice/resistor.osdi"
+model res sp_resistor
+model vs vsource
+v1 (a 0) vs type="dc" dc=-6 val0=0 val1=1 delay=1u rise=1u fall=1u width=2u period=10u
+r1 (a 0) res r=1k
+control
+  analysis op1 op
+  alter instance("v1") type="pulse"
+  analysis tr1 tran stop=5u step=10n maxstep=10n
+  alter instance("v1") type="dc"
+  analysis op2 op
+endc

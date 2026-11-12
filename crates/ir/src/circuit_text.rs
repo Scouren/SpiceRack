@@ -171,6 +171,7 @@ pub(crate) const FAMILY_WORDS: [&str; ModelFamily::COUNT] = [
     "ccvs",
     "cccs",
     "mutual",
+    "tline_ideal",
     "code_model",
     "module",
     "other",

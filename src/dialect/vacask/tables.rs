@@ -104,6 +104,9 @@ pub(super) const DYNAMIC_FUNCS: &[ir::Func] = &[
     ir::Func::Atanh,
     ir::Func::Hypot,
     ir::Func::SgnZeroPos,
+    ir::Func::Ddt,
+    ir::Func::Idt,
+    ir::Func::ToReal,
 ];
 
 /// The binary operators of VACASK's behavioural sources (no bit operators).
@@ -159,8 +162,8 @@ pub(super) const SPICE_FILES: &[(&str, ir::ModelFamily)] = &[
 
 /// VACASK's own device files at the top of its module directory, and their families; the first
 /// file of a family that has no `spice/` file is its default (VD dev-builtin, the store's
-/// `lib/vacask/mod` listing). `tline_ideal.osdi` and `opamp.osdi` implement no equation family:
-/// a `load` of either is a user module's.
+/// `lib/vacask/mod` listing). `tline_ideal.osdi` is the ideal line's family (R39, A20);
+/// `opamp.osdi` implements no equation family: a `load` of it is a user module's.
 pub(super) const OWN_FILES: &[(&str, ir::ModelFamily)] = &[
     ("psp103v4.osdi", ir::ModelFamily::Psp103),
     ("bsimbulk106.osdi", ir::ModelFamily::BsimBulk),
@@ -173,6 +176,7 @@ pub(super) const OWN_FILES: &[(&str, ir::ModelFamily)] = &[
     ("diode.osdi", ir::ModelFamily::Diode),
     ("bsim3v3.osdi", ir::ModelFamily::Bsim3),
     ("bsim4v8.osdi", ir::ModelFamily::Bsim4),
+    ("tline_ideal.osdi", ir::ModelFamily::TlineIdeal),
 ];
 
 /// The family the library file `path` (as a `load` writes it) implements, or `None` for any

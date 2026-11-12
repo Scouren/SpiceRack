@@ -11,7 +11,7 @@ file "masters.sim" deck
   device_library resistor
   element resistor r0 (a 0) model=late value=1k
   model late resistor
-  element resistor r9 (a 0) model=libres value=2k
+  element resistor r9 (a 0) model=libres#7 value=2k
   subckt outer (p)
     model own resistor
     element resistor r1 (p 0) model=own value=1k

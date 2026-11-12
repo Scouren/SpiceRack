@@ -439,7 +439,7 @@ impl Builder<'_> {
             row.family
         );
         assert!(
-            model_ok(&row),
+            model_ok(self.design(), &row),
             "{:?}: polarity outside its domain",
             row.family
         );

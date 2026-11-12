@@ -1,5 +1,3 @@
 # Known failures of this directory: <fixture> <why>. A line goes the day its cause is fixed.
-masters every instance Unread until Lower::declared (vacask-plan) lands
-passives every instance Unread until Lower::declared (vacask-plan) lands
-semis every instance Unread until Lower::declared (vacask-plan) lands; ModelWithoutLibrary set on Module-family models (ir-circuit, reported)
-behavioural v()/i() Private in Context::Behavioural (expr_read, vacask-plan); ElementWithoutModel set on Behav, which takes no master on VACASK (ir-circuit, reported)
+semis the user-module model qm sets ModelWithoutLibrary, so legalize refuses the round trip (ir-circuit A24, R44)
+behavioural a Behav sets ElementWithoutModel, though VACASK's b source takes no master (VD dev-builtin-behavioral), so legalize refuses the round trip (IR gap, reported)

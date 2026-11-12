@@ -28,8 +28,9 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.2 (instance, `$mfactor`, R C L, behavioural); VD
 //! cir-instance, cir-mfactor, dev-builtin-behavioral.
 //!
-//! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `NOISY`,
-//! `Declared`, `declare`, `instance`, `instance_in`
+//! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `NO_PARENS`,
+//! `DUPLICATE`, `NOISY`,
+//! `Declared`, `declare`, `instance`
 //! (crate-private)
 
 mod behavioural;
@@ -81,6 +82,10 @@ pub(super) const NOT_FORMAL: ir::Code = ir::Code::new(b'R', 2004);
 pub(super) const NO_MFACTOR: ir::Code = ir::Code::new(b'R', 2005);
 /// An instance whose terminal count is not its master's.
 pub(super) const TERMINALS: ir::Code = ir::Code::new(b'P', 2104);
+/// An instance whose terminals are not in parentheses.
+pub(super) const NO_PARENS: ir::Code = ir::Code::new(b'P', 2107);
+/// An instance name already defined in its scope.
+pub(super) const DUPLICATE: ir::Code = ir::Code::new(b'R', 2101);
 /// A `noisy=` that is not the literal 0 or 1.
 pub(super) const NOISY: ir::Code = ir::Code::new(b'P', 2106);
 
@@ -120,6 +125,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             cite: "VD cir-instance (Unconnected terminal handling); run fwd; RULINGS R41 (Q3)",
             explain: "VACASK connects the trailing terminals an OSDI or subcircuit instance leaves out to internal nodes; the IR has no terminal for an own internal node, so the statement is kept as VACASK's text (more terminals than the master has is VACASK's error).",
             kind: ir::Kind::Note,
+        },
+    ),
+    (
+        NO_PARENS,
+        ir::Info {
+            title: "an instance whose terminals are not in parentheses",
+            cite: "VD cir-instance (`name (node1 node2 ...) master`); run np (\"Parser syntax error, unexpected identifier, expecting (\")",
+            explain: "VACASK reads an instance's terminals only in parentheses; a SPICE-style line is VACASK's syntax error.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        DUPLICATE,
+        ir::Info {
+            title: "an instance name defined twice in one scope",
+            cite: "run dup (\"An instance with name 'r1' already exists.\")",
+            explain: "VACASK refuses a second instance of one name in a scope; the first is kept.",
+            kind: ir::Kind::Refusal,
         },
     ),
     (
@@ -181,23 +204,21 @@ const SEMI: ir::semi::Semi = ir::semi::Semi {
 };
 
 /// The masters of every file (one walk before lowering; `Lower::declared`).
-#[allow(dead_code, reason = "the spine calls it once Lower::declared lands")]
 pub(super) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> Declared {
     masters::declare(csts)
 }
 
 /// `name (nodes) master params`, and a behavioural source (no master).
-///
-/// Until the spine carries the declared-master table (`Lower::declared`, asked of
-/// vacask-plan) every instance is `Unread`; `instance_in` is the body.
 pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
-    read::unread(l, n);
-}
-
-/// The body of `instance`, given every file's declared masters.
-#[allow(dead_code, reason = "instance calls it once Lower::declared lands")]
-pub(super) fn instance_in(l: &mut Lower<'_, '_, '_>, n: Node, declared: &Declared) {
+    // `name (nodes) …`: the terminal list's parentheses are VACASK's syntax (run np: "expecting (").
+    let first = l.cst.ast.main_token(n) as usize;
+    if l.cst.tokens.tags().get(first + 1) != Some(&crate::syntax::token::Tag::LParen) {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(NO_PARENS));
+    }
     let h = super::bind::head(l, n);
+    if defined_here(l, &h.name) {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(DUPLICATE));
+    }
     let (name, nodes) = (h.name, h.terminals);
     let mut entries = Vec::new();
     for &f in &h.args {
@@ -210,7 +231,7 @@ pub(super) fn instance_in(l: &mut Lower<'_, '_, '_>, n: Node, declared: &Declare
     let Some(master) = h.master else {
         return behavioural::source(l, n, &name, &nodes, &entries);
     };
-    match masters::find(l, declared, &master) {
+    match masters::find(l, l.declared, &master) {
         Found::Enclosing => read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(ENCLOSING)),
         Found::Nowhere => unresolved(l, n, &name, &nodes, &master, &entries),
         Found::Here(Master::Subckt { ports, params }) => {
@@ -221,6 +242,15 @@ pub(super) fn instance_in(l: &mut Lower<'_, '_, '_>, n: Node, declared: &Declare
 }
 
 // ---- private ----
+
+/// Whether an element named `name` already stands in the current scope.
+fn defined_here(l: &Lower<'_, '_, '_>, name: &str) -> bool {
+    let d = l.b.design();
+    d.items(l.scope)
+        .iter()
+        .filter(|at| at.kind == ir::ItemKind::Element)
+        .any(|at| d.str(d.row::<ir::Element>(at.index).name) == name)
+}
 
 /// Checks every value of `entries` in `ctx` (A2: before the first push).
 fn check(l: &Lower<'_, '_, '_>, entries: &[(String, u32)], ctx: Context) -> Result<(), Refusal> {

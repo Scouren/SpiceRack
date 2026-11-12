@@ -7,8 +7,12 @@
 //! only in an `mc` loop, once per call site (RUN g2); `M_*`/`P_*` are the literals VACASK
 //! documents; `$temp`, `$tnom` the leaves; a `-` directly before a number is that negative
 //! literal; a unary `+` is its operand. A construct with no IR meaning (vectors, indexing,
-//! `$scale`, vector and type functions) makes the whole statement `Private`; what VACASK rejects
-//! (`inf`, `nan`, a probe in a parameter) makes it `InvalidInSource`. The tree is checked before
+//! `$scale`, vector and type functions, `idt(x, ic)`) makes the whole statement `Private`; what
+//! VACASK rejects (`inf`, `nan`, a probe, `ddt` or `idt` in a parameter: run bp2) makes it
+//! `InvalidInSource`. In a behavioural source (VD dev-builtin-behavioral) `v(n)`, `v(a, b)`,
+//! `i(inst)`, `ddt(x)`, `idt(x)` and `$abstime` read the circuit (run bp1), every function counts
+//! in dynamic form (A19), and a parameter read is `to_real` of it (R40: the source reads every
+//! free identifier as a real; run b1). The tree is checked before
 //! any row is pushed, so a refused statement leaves no orphan rows. Explicit stacks (C11).
 //!
 //! Cites: VD expr-operators, expr-functions, expr-special, expr-constants,
@@ -17,6 +21,7 @@
 //! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`,
 //! `PROBE_IN_PARAM`, `check_expr`, `expr` (crate-private)
 
+use super::name;
 use super::number;
 use super::read::Lower;
 use super::tables;
@@ -46,7 +51,7 @@ pub(super) struct Refusal {
 pub(super) const NOT_A_NUMBER: ir::Code = ir::Code::new(b'P', 2001);
 /// `inf` or `nan` as a value.
 pub(super) const NOT_FINITE: ir::Code = ir::Code::new(b'P', 2002);
-/// `v()` or `i()` outside a behavioural source.
+/// `v()`, `i()`, `ddt()`, `idt()` or `$abstime` outside a behavioural source.
 pub(super) const PROBE_IN_PARAM: ir::Code = ir::Code::new(b'P', 2006);
 
 /// What a parameter expression uses: every node VACASK's parameter language reads into.
@@ -63,6 +68,9 @@ pub(super) const FEATURES: ir::FeatureSet = dynamic(static_funcs(ir::FeatureSet:
     .with(ir::Feature::Expr(ir::ExprTag::Temp))
     .with(ir::Feature::Expr(ir::ExprTag::Tnom))
     .with(ir::Feature::Expr(ir::ExprTag::Draw))
+    .with(ir::Feature::Expr(ir::ExprTag::V))
+    .with(ir::Feature::Expr(ir::ExprTag::I))
+    .with(ir::Feature::Expr(ir::ExprTag::Time))
     .with(ir::Feature::Extra(ir::Extra::IntLiteral))
     .with(ir::Feature::Unary(ir::UnOp::Neg))
     .with(ir::Feature::Unary(ir::UnOp::Not))
@@ -115,8 +123,8 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         PROBE_IN_PARAM,
         ir::Info {
             title: "a circuit probe outside a behavioural source",
-            cite: "VD dev-builtin-behavioral (node and branch accessors)",
-            explain: "`v()` and `i()` read the circuit only in a behavioural source's expression; elsewhere VACASK rejects them.",
+            cite: "VD dev-builtin-behavioral (node and branch accessors); DIALECT-VACASK Appendix A run bp2",
+            explain: "`v()`, `i()`, `ddt()`, `idt()` and `$abstime` read the circuit only in a behavioural source's expression; elsewhere VACASK rejects them (`ddt` in a parameter: \"Function 'ddt' not found.\").",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -127,7 +135,8 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
 /// # Errors
 /// As [`expr`].
 pub(super) fn check_expr(l: &Lower<'_, '_, '_>, node: u32, ctx: Context) -> Result<(), Refusal> {
-    check(l, node, ctx, reads_temp(l, node), 0)
+    let dynamic = ctx == Context::Behavioural || reads_temp(l, node);
+    check(l, node, ctx, dynamic, 0)
 }
 
 /// The expression at CST node `node`, read in `ctx` into rows, each parameter read recorded
@@ -141,7 +150,7 @@ pub(super) fn expr(
     ctx: Context,
 ) -> Result<ir::ExprId, Refusal> {
     check_expr(l, node, ctx)?;
-    Ok(build(l, node))
+    Ok(build(l, node, ctx))
 }
 
 // ---- private ----
@@ -236,6 +245,8 @@ fn function(name: &str) -> Option<(ir::Func, usize)> {
         "fmod" => (F::Fmod, 2),
         "min" => (F::Min, 2),
         "max" => (F::Max, 2),
+        "ddt" => (F::Ddt, 1),
+        "idt" => (F::Idt, 1),
         _ => return None,
     })
 }
@@ -362,11 +373,19 @@ fn check(
         Tag::Call | Tag::Probe => {
             let name = name_of(l, n);
             let args = call_args(l, n);
-            if name == "v" || name == "i" {
-                return match ctx {
-                    Context::Param => Err(refuse(PROBE_IN_PARAM, InvalidInSource)),
-                    Context::Behavioural => Err(private),
-                };
+            if matches!(name.as_str(), "v" | "i" | "ddt" | "idt") && ctx == Context::Param {
+                return Err(refuse(PROBE_IN_PARAM, InvalidInSource));
+            }
+            let names = args
+                .iter()
+                .all(|&a| matches!(ast.tag(Node(a)), Tag::Ident | Tag::Word | Tag::Str));
+            match (name.as_str(), args.len()) {
+                ("v", 1 | 2) | ("i", 1) if names => return Ok(()),
+                ("v" | "i", _) => return Err(private),
+                ("ddt" | "idt", 1) => return down(args[0]),
+                // `idt(x, ic)` starts from `ic` (run bp3); the IR's `Idt` from 0.
+                ("ddt" | "idt", _) => return Err(private),
+                _ => {}
             }
             let want = match (function(&name), draw(&name), name.as_str()) {
                 (Some((_, k)), _, _) => k,
@@ -385,7 +404,7 @@ fn check(
 }
 
 /// Builds the checked subtree at `node`.
-fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
+fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
     let n = Node(node);
     let ast = &l.cst.ast;
     match ast.tag(n) {
@@ -414,7 +433,10 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
                 _ => {
                     let e = l.b.param_ref(&super::name::unquote(&name));
                     l.reads.push((e, l.scope, l.stmt));
-                    e
+                    match ctx {
+                        Context::Param => e,
+                        Context::Behavioural => l.b.call(ir::Func::ToReal, &[e]),
+                    }
                 }
             }
         }
@@ -427,7 +449,7 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
                 literal.mantissa = -literal.mantissa;
                 return l.b.literal(literal);
             }
-            let x = build(l, operand);
+            let x = build(l, operand, ctx);
             match op.as_str() {
                 "-" => l.b.unary(ir::UnOp::Neg, x),
                 "!" => l.b.unary(ir::UnOp::Not, x),
@@ -437,8 +459,8 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
         }
         Tag::Binary => {
             let (op, left, right) = (token(l, n), ast.lhs(n), ast.rhs(n));
-            let a = build(l, left);
-            let b = build(l, right);
+            let a = build(l, left, ctx);
+            let b = build(l, right, ctx);
             match binary(&op) {
                 Some(op) => l.b.binary(op, a, b),
                 None => l.b.call(ir::Func::Pow, &[a, b]),
@@ -447,15 +469,29 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
         Tag::Ternary => {
             let at = ast.rhs(n);
             let (c, t, e) = (ast.lhs(n), ast.extra(at), ast.extra(at + 1));
-            let c = build(l, c);
-            let t = build(l, t);
-            let e = build(l, e);
+            let c = build(l, c, ctx);
+            let t = build(l, t, ctx);
+            let e = build(l, e, ctx);
             l.b.ternary(c, t, e)
         }
-        Tag::Paren | Tag::Delimited => build(l, ast.lhs(n)),
+        Tag::Paren | Tag::Delimited => build(l, ast.lhs(n), ctx),
         _ => {
             let name = name_of(l, n);
-            let args: Vec<ir::ExprId> = call_args(l, n).into_iter().map(|a| build(l, a)).collect();
+            let raw = call_args(l, n);
+            match name.as_str() {
+                "v" => {
+                    let net = node_name(l, raw[0]);
+                    let reference = raw.get(1).map(|&r| node_name(l, r));
+                    let reference = reference.filter(|r| r != name::GROUND);
+                    return l.b.v(&net, reference.as_deref());
+                }
+                "i" => {
+                    let element = super::read::field_name(l.cst, raw[0]);
+                    return l.b.i(&element);
+                }
+                _ => {}
+            }
+            let args: Vec<ir::ExprId> = raw.into_iter().map(|a| build(l, a, ctx)).collect();
             if let Some((func, _)) = function(&name) {
                 return l.b.call(func, &args);
             }
@@ -476,6 +512,15 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
                 }
             }
         }
+    }
+}
+
+/// The net a `v()` argument names: a `ground` name is `0` (VD cir-nodes).
+fn node_name(l: &Lower<'_, '_, '_>, arg: u32) -> String {
+    let net = super::read::field_name(l.cst, arg);
+    match l.grounds.contains(&net) {
+        true => name::GROUND.to_string(),
+        false => net,
     }
 }
 
