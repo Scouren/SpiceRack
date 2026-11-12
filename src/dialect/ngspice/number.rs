@@ -53,7 +53,38 @@ const DIGITS_MAX: usize = 18;
 /// The number at the start of `text` under `grammar`, or `None` when `text` does not start with
 /// one (no digit) or its value is not a finite double (`1e999`).
 pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan> {
-    todo!()
+    let bytes = text.as_bytes();
+    let mut at = 0;
+    let mut digits = String::new();
+    let mut frac = 0usize;
+    while at < bytes.len() && bytes[at].is_ascii_digit() {
+        digits.push(bytes[at] as char);
+        at += 1;
+    }
+    if at < bytes.len() && bytes[at] == b'.' {
+        at += 1;
+        while at < bytes.len() && bytes[at].is_ascii_digit() {
+            digits.push(bytes[at] as char);
+            frac += 1;
+            at += 1;
+        }
+    }
+    if digits.is_empty() {
+        return None;
+    }
+    let (exponent, after) = exponent(bytes, at, grammar);
+    at = after;
+    let (scale, after) = scale(bytes, at, grammar);
+    at = after;
+    at = tail(bytes, at, grammar);
+    let (literal, rounded) = literal(&digits, frac, exponent, scale)?;
+    debug_assert!(literal.is_valid(), "scan builds valid literals");
+    debug_assert!(at <= text.len(), "a scan takes bytes of the text");
+    Some(Scan {
+        literal,
+        len: at,
+        rounded,
+    })
 }
 
 /// A card value's whole token read as `INPevaluate` reads it with `gobble` set: an optional
@@ -79,7 +110,32 @@ pub(super) fn card(token: &str) -> Option<Scan> {
 /// a power it has no letter for: 10⁻², 10¹⁵), `mil` (Mil, `Inp` only; under `Numparam` `mil`
 /// reads as milli, so the exact value is spelled in exponent form).
 pub(super) fn spell(lit: ir::Literal, grammar: Grammar, out: &mut String) {
-    todo!()
+    assert!(lit.is_valid(), "spell: a valid literal");
+    let start = out.len();
+    if lit.form == ir::NumForm::Mil && grammar == Grammar::Numparam {
+        // 25.4e-6 = 254e-7: the same exact decimal, in a form numparam reads.
+        let mantissa = i128::from(lit.mantissa) * 254;
+        digits_into(mantissa, u32::from(lit.frac), out);
+        out.push_str("e-7");
+        return;
+    }
+    digits_into(i128::from(lit.mantissa), u32::from(lit.frac), out);
+    match lit.form {
+        ir::NumForm::Plain => {}
+        ir::NumForm::Exponent => {
+            out.push('e');
+            out.push_str(&lit.exp10.to_string());
+        }
+        ir::NumForm::Scale => match letter(lit.exp10) {
+            Some(l) => out.push_str(l),
+            None => {
+                out.push('e');
+                out.push_str(&lit.exp10.to_string());
+            }
+        },
+        ir::NumForm::Mil => out.push_str("mil"),
+    }
+    debug_assert!(out.len() > start, "a literal spells at least one digit");
 }
 
 // ---- private ----

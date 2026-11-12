@@ -283,9 +283,9 @@ fn global_drops_ground_and_funcs_bind_their_formals() {
 
 #[test]
 fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
-    // INV 2.06 (a .param reading the circuit), manual §2.4 (ports), parse.rs P0004 (a stray
-    // closer), the stub areas (S3.1-S3.4: Unread).
-    let text = "t\n.param p={v(a)}\n.subckt s a a\n.ends\n.ends\nR1 a b 1k\n.model m nmos\n.tran 1n 1u\n.control\nrun\n.endc\n.title x\n.global gnd\n";
+    // INV 2.06 (a .param reading the circuit), manual §2.4 (ports, a head default), parse.rs
+    // P0004 (a stray closer or `.elseif`), the stub areas (S3.1-S3.4: Unread).
+    let text = "t\n.param p={v(a)}\n.subckt s a a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\nR1 a b 1k\n.model m nmos\n.tran 1n 1u\n.control\nrun\n.endc\n.title x\n.global gnd\n";
     let (d, diags) = deck(text);
     let top = d.file(d.entry()).top;
     assert_eq!(d.items(top)[0].kind, ItemKind::Title);
@@ -295,11 +295,15 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
     use OpaqueClass::{Inert, InvalidInSource as Bad, Unread};
     assert_eq!(
         classes,
-        [Bad, Bad, Bad, Unread, Unread, Unread, Unread, Unread, Inert]
+        [
+            Bad, Bad, Bad, Bad, Bad, Unread, Unread, Unread, Unread, Unread, Inert
+        ]
     );
     let c = codes_of(&diags);
     let want = [
         codes::PARAM_READS_CIRCUIT,
+        codes::MALFORMED,
+        codes::MALFORMED,
         codes::MALFORMED,
         codes::MALFORMED,
         codes::UNREAD,
@@ -311,7 +315,7 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
     ];
     assert_eq!(c, want);
     assert_eq!(
-        opaque(&d, top, 7).1,
+        opaque(&d, top, 9).1,
         ".control\nrun\n.endc",
         "a block is one statement"
     );

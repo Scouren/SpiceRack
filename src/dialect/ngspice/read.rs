@@ -105,12 +105,75 @@ struct Frame<'a> {
 
 /// Every file of `src` into `out`, in `src`'s order; then the bind step.
 pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
-    todo!()
+    assert!(!src.files().is_empty(), "ngspice read: a file to read");
+    let lex = lexicon();
+    let mut names = Folder::default();
+    let mut pending = Vec::new();
+    for (k, (path, text)) in src.files().iter().enumerate() {
+        let role = if k < src.entries().len() {
+            src.form()
+        } else {
+            ir::Role::Library
+        };
+        let shifted;
+        let (text, shift) = if role == ir::Role::Library {
+            shifted = format!("\n{text}");
+            (shifted.as_str(), 1)
+        } else {
+            (text.as_str(), 0)
+        };
+        let toks = tokenize(text, lex);
+        let ast = parse(&toks, lex);
+        let (file, top) = out.file(path, role);
+        let winners = declare(&ast, &toks);
+        let mut lw = Lower {
+            b: &mut *out,
+            diags: &mut *diags,
+            names: &mut names,
+            ast: &ast,
+            toks: &toks,
+            src,
+            path,
+            file,
+            role,
+            pending: &mut pending,
+            winners: &winners,
+            shift,
+            frames: Vec::new(),
+            framed: false,
+        };
+        lower(&mut lw, top);
+    }
+    bind(out, &pending);
 }
 
 /// The files `text` names, in text order: each `.include` path and `.lib` call's file.
 pub(super) fn references(text: &str) -> Vec<Reference> {
-    todo!()
+    let lex = lexicon();
+    let toks = tokenize(text, lex);
+    let ast = parse(&toks, lex);
+    let mut out = Vec::new();
+    let mut stack: Vec<Node> = ast
+        .fields(ast.root())
+        .iter()
+        .rev()
+        .map(|&n| Node(n))
+        .collect();
+    // Bounded: each statement is visited once.
+    while let Some(n) = stack.pop() {
+        match ast.tag(n) {
+            Tag::Include | Tag::LibCall => {
+                if let Some(&p) = ast.fields(n).first() {
+                    out.push(Reference::File(unquote(&joined(&toks, &ast, Node(p)))));
+                }
+            }
+            _ => {
+                stack.extend(next(&ast, n));
+                stack.extend(body(&ast, n).iter().rev().map(|&s| Node(s)));
+            }
+        }
+    }
+    out
 }
 
 impl<'a, 'd> Lower<'a, 'd> {

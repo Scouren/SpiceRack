@@ -187,7 +187,15 @@ pub(super) fn eval_of(design: &ir::Design, e: ir::ExprId) -> Eval {
 /// Appends `e` as an expression of its evaluator. Asserts every node is one ngspice spells
 /// (the spine wrote only a design legal for `FEATURES`).
 pub(super) fn expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
-    todo!()
+    let eval = eval_of(design, e);
+    let mut tasks = vec![Task::Expr(e, Role::Root, Pos::START)];
+    // Bounded: each task pops once and pushes only the tasks of a node's children.
+    while let Some(t) = tasks.pop() {
+        match t {
+            Task::Text(s) => out.push_str(s),
+            Task::Expr(x, role, pos) => node(design, eval, x, role, pos, out, &mut tasks),
+        }
+    }
 }
 
 /// Appends `e` as a card value: a non-negative number or a parameter name bare, a negative

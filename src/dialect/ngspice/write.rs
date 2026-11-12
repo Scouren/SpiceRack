@@ -45,7 +45,46 @@ pub(super) fn write(
     out: &mut String,
     diags: &mut ir::Diags,
 ) {
-    todo!()
+    debug_assert!(
+        ir::features_used(design).minus(super::FEATURES).is_empty(),
+        "ngspice write: a design legal for FEATURES (the spine checks it)"
+    );
+    let f = design.file(file);
+    let items = design.items(f.top);
+    let deck = f.role == ir::Role::Deck;
+    let mut first = 0;
+    if deck {
+        if let Some(&t) = items.first().filter(|t| t.kind == ir::ItemKind::Title) {
+            let title: ir::item::Title = design.row(t.index);
+            out.push_str(design.text(title.text));
+            first = 1;
+        }
+        out.push('\n');
+    }
+    let start = out.len();
+    let mut w = Out {
+        design,
+        out,
+        diags,
+        frames: Vec::new(),
+    };
+    let tail = if deck { ".end\n" } else { "" };
+    w.frames.push(Frame {
+        items: &items[first..],
+        at: 0,
+        tail: tail.to_string(),
+    });
+    // Bounded: each step writes one item or closes one frame.
+    while let Some(f) = w.frames.last_mut() {
+        let Some(&item) = f.items.get(f.at) else {
+            let f = w.frames.pop().expect("a frame is open");
+            w.out.push_str(&f.tail);
+            continue;
+        };
+        f.at += 1;
+        dispatch(&mut w, item);
+    }
+    assert!(w.out.len() >= start, "the writer only appends");
 }
 
 impl<'a> Out<'a> {

@@ -24,7 +24,7 @@ use super::expr_read::{self, Tree};
 use super::read::{Def, Lower, Stmt};
 use super::read_run;
 use crate::ir;
-use crate::syntax::ast::{Ast, Node, Tag};
+use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::token::Tokens;
 
 /// A `.subckt` head: name, ports as written, and `(name, value text)` defaults.
@@ -130,6 +130,10 @@ pub(super) fn section(lw: &mut Lower<'_, '_>, st: Stmt) {
 /// `.if (c)` … `.elseif (c)` … `.else` … `.endif`: one `If`, a branch per clause, each body
 /// scheduled in order. A condition is a numparam expression (a single `=` is equality, B28).
 pub(super) fn if_chain(lw: &mut Lower<'_, '_>, st: Stmt) {
+    if lw.ast.rhs(st.node) == NONE {
+        // an `.elseif` with no `.if` open (the parser's P0004): no block
+        return malformed(lw, st);
+    }
     let mut branches = vec![st.node];
     // Bounded: a chain's branches are distinct nodes.
     for _ in 0..lw.ast.len() {
@@ -144,12 +148,7 @@ pub(super) fn if_chain(lw: &mut Lower<'_, '_>, st: Stmt) {
             trees.push(None);
             continue;
         }
-        let Some(&cond) = lw
-            .ast
-            .fields(br)
-            .first()
-            .filter(|c| **c != crate::syntax::ast::NONE)
-        else {
+        let Some(&cond) = lw.ast.fields(br).first().filter(|c| **c != NONE) else {
             return malformed(lw, st);
         };
         match parameter(&lw.text(Node(cond))) {
@@ -337,7 +336,7 @@ fn head(lw: &Lower<'_, '_>, n: Node) -> Option<Head> {
                 in_params = true;
             }
             Tag::Word if !in_params => h.ports.push(lw.text(f)),
-            Tag::Assign => {
+            Tag::Assign if lw.ast.rhs(f) != NONE => {
                 in_params = true;
                 let key = lw.text(Node(lw.ast.lhs(f)));
                 let value = lw.text(Node(lw.ast.rhs(f)));
@@ -355,7 +354,7 @@ fn assignments(lw: &Lower<'_, '_>, n: Node) -> Option<Vec<(String, String)>> {
     let mut out = Vec::new();
     for &f in lw.ast.fields(n) {
         let f = Node(f);
-        if lw.ast.tag(f) != Tag::Assign || lw.ast.rhs(f) == crate::syntax::ast::NONE {
+        if lw.ast.tag(f) != Tag::Assign || lw.ast.rhs(f) == NONE {
             return None;
         }
         let key = lw.text(Node(lw.ast.lhs(f)));

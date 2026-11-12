@@ -97,7 +97,30 @@ struct Parser<'t> {
 
 /// The tree of `text` under the evaluator ngspice reads it with, or the reason it has none.
 pub(super) fn parse(text: &str) -> Result<Tree, Fail> {
-    todo!()
+    let eval = if expr_lex::dynamic(text) {
+        Eval::Behavioural
+    } else {
+        Eval::Numparam
+    };
+    let toks = expr_lex::lex(text, eval)?;
+    let mut p = Parser {
+        eval,
+        toks: &toks,
+        nodes: Vec::new(),
+        paren: Vec::new(),
+        collapsed: Vec::new(),
+        out: Vec::new(),
+        ops: Vec::new(),
+        rounded: false,
+    };
+    let root = p.run()?;
+    debug_assert!(root < p.nodes.len(), "the root is a node");
+    Ok(Tree {
+        nodes: p.nodes,
+        root,
+        eval,
+        rounded: p.rounded,
+    })
 }
 
 impl Tree {
