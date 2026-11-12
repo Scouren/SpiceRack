@@ -4,7 +4,7 @@
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const PULSE_LAWS_DIFFER`,
 //! `pub(crate) const GIVEN_ZERO_LEFT`, `pub(crate) const EXP_TD2_LEFT`,
 //! `pub(crate) const SFFM_LAW_LEFT`, `pub(crate) const GIVEN_ZERO_KEPT`,
-//! `pub(crate) const AM_PRE_LEFT`
+//! `pub(crate) const AM_PRE_LEFT`, `pub(crate) const PULSE_FROM_PARAMS`
 
 use crate::ir;
 
@@ -25,6 +25,9 @@ pub(crate) const GIVEN_ZERO_KEPT: ir::Code = ir::Code::new(b'U', 205);
 
 /// An AM that is not zero at its delay, which ngspice's AM is before it.
 pub(crate) const AM_PRE_LEFT: ir::Code = ir::Code::new(b'U', 206);
+
+/// A derived pulse field written as a literal from a parameter's value.
+pub(crate) const PULSE_FROM_PARAMS: ir::Code = ir::Code::new(b'U', 207);
 
 /// The group's catalogue rows (`U0200..=U0299`).
 pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
@@ -79,6 +82,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an AM source whose value before its delay the target cannot state",
             cite: "rewrite/IR-CIRCUIT.md §3; rewrite/DIALECT-NGSPICE.md (SFFM, AM)",
             explain: "This AM holds its value at the delay before the delay and at the operating point (VACASK). The target's AM is zero there, so the two agree only when that value is zero: a literal offset of 0 and a carrier phase of 0 (or an amplitude of 0). Here the offset or the phase is not, so the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        PULSE_FROM_PARAMS,
+        ir::Info {
+            title: "a pulse field computed from a parameter's value",
+            cite: "rewrite/RULINGS.md R79",
+            explain: "The source's single pulse or step was written as a pulse that does not repeat before the last stop; its period (and a step's width and fall) is a number computed from this parameter's value. Editing the parameter in the written deck does not change that number.",
             kind: ir::Kind::Note,
         },
     ),
