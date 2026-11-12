@@ -75,7 +75,10 @@ fn p1_066_an_ngspice_level_xyce_has_no_device_for_is_refused() {
 /// `.dc` then `.tran` writes the transient plot alone (104 points), `.tran`
 /// then `.ac` the AC plot alone, two `.dc` cards one plot of 9 points for
 /// sweeps of 3 and 3, `.ac` then `.noise` the noise plot alone; an `.op`
-/// before a `.tran` is not run (RG `.OP`), which stays a note. Checks: 5 + 3.
+/// before a `.tran` is not run (RG `.OP`), which stays a note. A one-tone
+/// `.hb` is one of these analyses too (S4-rf-hb-one-tone: Xyce runs one of
+/// `.hb`, `.tran`, `.ac`, `.dc` a deck): an HSPICE deck's `.hb` beside its
+/// `.tran` is refused. Checks: 6 + 3.
 #[test]
 fn p1_066_a_second_analysis_for_xyce_is_refused() {
     let cite = "Xyce 7.10.0 run: of two analysis cards the last alone is run";
@@ -97,6 +100,10 @@ fn p1_066_a_second_analysis_for_xyce_is_refused() {
         let codes = oracle::refusal(&deck(cards), ng, xy);
         assert!(codes.contains(&Code::W0321), "{cards}: {codes:?}");
     }
+    // An HSPICE deck's one-tone `.hb` beside its `.tran`.
+    let hb = deck(".hb tones=1k nharms=5\n.tran 10u 1m");
+    let codes = oracle::refusal(&hb, Dialect::Hspice, xy);
+    assert!(codes.contains(&Code::W0321), "{hb}: {codes:?}");
     // One sweeping analysis is written: alone, with an `.op` (noted), with
     // its `.four`, and a two-source `.dc` (one card).
     for cards in [

@@ -58,7 +58,7 @@ impl W<'_, '_> {
     /// The notes of `tb`'s outputs Xyce writes no vector for: an `.op`
     /// beside another analysis, each `.noise`'s integrated noise, a saved
     /// or printed ngspice `@dev[param]` (W0052). A second sweeping analysis
-    /// (`.dc`, `.ac`, `.sp`, `.tran`, `.noise`) of a deck that is not
+    /// (`.dc`, `.ac`, `.sp`, `.tran`, `.noise`, `.hb`) of a deck that is not
     /// Xyce's own is refused (W0321): Xyce runs the last card alone.
     pub(super) fn xyce_drops(&mut self, tb: &Tb) {
         assert_eq!(
@@ -75,6 +75,7 @@ impl W<'_, '_> {
                     | Ana::Sp(..)
                     | Ana::Tran { .. }
                     | Ana::Noise { .. }
+                    | Ana::Hb { .. }
             )
         };
         // A Xyce deck is written as read: what its cards run is Xyce's.
