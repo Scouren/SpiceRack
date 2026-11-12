@@ -13,22 +13,36 @@
 //! `.dc V1 0 5 0.1`, `.tran 1n 1u uic`, `.save v(out) i(v1)` and
 //! `.meas tran tdel trig v(in) val=0.5 rise=1 targ v(out) val=0.5 rise=1`:
 //!
-//! ```ignore
-//! let n = |b: &mut Builder<'_>, text: &str| b.literal(read_number(text)); // the reader's scanner
-//! let (t85, t27) = (n(&mut b, "85"), n(&mut b, "27"));
+//! ```
+//! use spicerack_ir::dc_ac::{Dc, DcAxis};
+//! use spicerack_ir::measure::MeasureTrigTarg;
+//! use spicerack_ir::plan::SweepLoop;
+//! use spicerack_ir::tran::{StepCap, Tran};
+//! use spicerack_ir::{
+//!     AnalysisKind, Design, Edge, Event, ExprId, ItemKind, List, LoopEnd, Role, Span, SweepSpec,
+//!     TargetKind,
+//! };
+//!
+//! let mut design = Design::new();
+//! let mut b = design.builder();
+//! let top = b.file("deck.sp", Role::Deck).1;
+//! let span = Span::NONE;
+//! // A reader passes the literal it read (`b.literal`); a built number is `b.num`.
+//! let (t85, t27) = (b.num(85.0), b.num(27.0));
 //! b.env(top, t85, t27, span); // Xyce's default tnom, filled by the reader
 //!
 //! let r = b.target(TargetKind::Param, &[], "r", None);
-//! let step = SweepSpec::lin_step(n(&mut b, "1k"), n(&mut b, "10k"), n(&mut b, "1k"));
-//! let (_, body) = b.loop_(top, None, SweepLoop { target: r, sweep: step }, LoopEnd::Restore, span);
+//! let step = SweepSpec::lin_step(b.num(1e3), b.num(1e4), b.num(1e3));
+//! let row = SweepLoop { target: r, sweep: step };
+//! let (_, body) = b.loop_(top, None, row, LoopEnd::Restore, span);
 //!
 //! let v1 = b.target(TargetKind::SourceDc, &[], "V1", None);
-//! let sweep = SweepSpec::lin_step(n(&mut b, "0"), n(&mut b, "5"), n(&mut b, "0.1"));
+//! let sweep = SweepSpec::lin_step(b.num(0.0), b.num(5.0), b.num(0.1));
 //! let axes = b.dc_axes(&[DcAxis { target: v1, sweep }]);
 //! b.analysis(body, None, Dc { axes, restart: false }, span);
 //!
 //! let tran = Tran {
-//!     stop: n(&mut b, "1u"), print_step: n(&mut b, "1n"), record_start: ExprId::NONE,
+//!     stop: b.num(1e-6), print_step: b.num(1e-9), record_start: ExprId::NONE,
 //!     max_step: ExprId::NONE, initial_step: ExprId::NONE, cap: StepCap::SpanOver10,
 //!     noise_fmax: ExprId::NONE, noise_fmin: ExprId::NONE, noise_seed: ExprId::NONE,
 //!     segments: List::EMPTY, uic: true, startup: false,
@@ -38,11 +52,14 @@
 //! let (out, i1) = (b.probe_v(&["out"]), b.probe_i(&["v1"]));
 //! b.save(top, None, &[out, i1], span);
 //!
-//! let (half, one) = (n(&mut b, "0.5"), n(&mut b, "1"));
+//! let (half, one) = (b.num(0.5), b.num(1.0));
 //! let vin = b.probe_v(&["in"]);
 //! let trig = Event::cross(vin, Edge::Rise, half, one);
 //! let targ = Event::cross(out, Edge::Rise, half, one);
 //! b.measure(body, "tdel", AnalysisKind::Tran, MeasureTrigTarg { trig, targ }, span);
+//!
+//! let kinds: Vec<ItemKind> = design.items(body).iter().map(|i| i.kind).collect();
+//! assert_eq!(kinds, [ItemKind::Analysis, ItemKind::Analysis, ItemKind::Measure]);
 //! ```
 //!
 //! Cites: `rewrite/IR-RUN.md` §1–§6; `rewrite/IR-KERNEL.md` C2, C5, C9, C10, C13, A4.
