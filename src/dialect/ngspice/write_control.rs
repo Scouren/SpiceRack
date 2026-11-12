@@ -16,7 +16,7 @@
 //! `device.c:1249-1420`, `inp.c:1735-1857`, `control.c:462-466`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`, `RESET_PART`,
+//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`, `RESET_PART`, `ALTER_TARGET`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn load`, `loop_`, `alter`, `reset`
@@ -50,6 +50,12 @@ pub(super) const LOAD_MODULES: ir::Code = ir::Code::new(b'W', 1405);
 /// A partial restore (`Reset` of fewer than every class): ngspice's `reset` restores all.
 pub(super) const RESET_PART: ir::Code = ir::Code::new(b'W', 1406);
 
+/// An alter or loop target `alter <name> <value>` does not set as the IR means it: an element
+/// value of a name that is no R, C or L, a source DC of one that is no V or I (the reader's
+/// image, `read_control/args.rs` `alter`; a bare alter of another device sets its own default
+/// parameter, `spiceif.c:951`).
+pub(super) const ALTER_TARGET: ir::Code = ir::Code::new(b'W', 1407);
+
 /// This area's codes, `W1400–W1499`.
 pub(super) const CODES: &[Row] = &[
     refusal(
@@ -81,6 +87,12 @@ pub(super) const CODES: &[Row] = &[
         "a restore of some classes only",
         "ngspice-45 runcoms2.c:172-240 (com_rset rebuilds the circuit)",
         "ngspice's reset restores every alter, script option, temperature and save at once.",
+    ),
+    refusal(
+        ALTER_TARGET,
+        "an alter of an element value or source DC by a name of another device",
+        "ngspice-45 device.c:1249-1420, spiceif.c:951 (a bare alter sets the device's default parameter)",
+        "an element value is an R's, C's or L's, a source DC a V's or I's; another letter's default parameter means something else.",
     ),
     refusal(
         LOAD_MODULES,
@@ -132,6 +144,9 @@ pub(super) fn admits(
             if !alter_value(design, &a) {
                 refuse(ALTER_VALUE);
             }
+            if !bare_target(design, &a.target) {
+                refuse(ALTER_TARGET);
+            }
             if a.target.kind == ir::TargetKind::Param && !applied(design, next) {
                 refuse(PARAM_RESET);
             }
@@ -145,6 +160,7 @@ pub(super) fn admits(
                     refuse(PARAM_RESET);
                 }
             }
+            Some(s) if !bare_target(design, &s.target) => refuse(ALTER_TARGET),
             Some(_) => {}
         },
         // ponytail: only ngspice's whole `reset`; a partial restore (VACASK `clear saves`)
@@ -239,6 +255,21 @@ const fn refusal(
             kind: ir::Kind::Refusal,
         },
     )
+}
+
+/// Whether a bare `alter <name>` sets `t` as the IR means it: an element value of an R, C or L,
+/// a source DC of a V or I; every other kind by its own form.
+fn bare_target(d: &ir::Design, t: &ir::Target) -> bool {
+    let letter = d
+        .str(t.a.name)
+        .as_bytes()
+        .first()
+        .map(u8::to_ascii_lowercase);
+    match t.kind {
+        ir::TargetKind::ElementValue => matches!(letter, Some(b'r' | b'c' | b'l')),
+        ir::TargetKind::SourceDc => matches!(letter, Some(b'v' | b'i')),
+        _ => true,
+    }
 }
 
 /// The command(s) that set `target` to `value` (a number or `$var`).

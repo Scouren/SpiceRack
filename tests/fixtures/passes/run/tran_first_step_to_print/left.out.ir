@@ -1,0 +1,4 @@
+file "a.sp" deck
+  analysis tran stop=10u initial_step=1n cap=span_over50
+  analysis tran stop=10u print_step=2n initial_step=1n max_step=1u
+  analysis tran stop=10u max_step=1u

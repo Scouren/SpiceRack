@@ -1,0 +1,14 @@
+elaborate_top: a divider at the top joined by a subcircuit's parallel resistor through one elaborate (v(2) = 10 * 4.5k/5.5k = 8.1818): VACASK keeps the top's own elements beside the named body
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (1 0) vsource dc=10.0
+r1 (1 2) resistor r=1k
+r2 (2 0) resistor r=9k
+subckt par2()
+  rp2 (2 0) resistor r=9k
+ends
+control
+  elaborate circuit("par2")
+  analysis op1 op
+endc

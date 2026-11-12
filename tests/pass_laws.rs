@@ -66,14 +66,7 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     (
         "given_zero_to_as_given",
         sources_only(
-            &[
-                ir::WaveKind::Pulse,
-                ir::WaveKind::Sin,
-                ir::WaveKind::Exp,
-                ir::WaveKind::Sffm,
-                ir::WaveKind::Am,
-                ir::WaveKind::TrRandom,
-            ],
+            ZERO_RULE_WAVES,
             ir::Feature::Circuit(ir::CircuitExtra::GivenZeroAsGiven),
         ),
     ),
@@ -85,16 +78,16 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
         ),
     ),
     (
+        "am_pre_hold_to_zero",
+        sources_only(
+            &[ir::WaveKind::Am],
+            ir::Feature::Circuit(ir::CircuitExtra::AmPreZero),
+        ),
+    ),
+    (
         "as_given_to_given_zero",
         sources_only(
-            &[
-                ir::WaveKind::Pulse,
-                ir::WaveKind::Sin,
-                ir::WaveKind::Exp,
-                ir::WaveKind::Sffm,
-                ir::WaveKind::Am,
-                ir::WaveKind::TrRandom,
-            ],
+            ZERO_RULE_WAVES,
             ir::Feature::Circuit(ir::CircuitExtra::GivenZeroSpiceDefault),
         ),
     ),
@@ -129,6 +122,18 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ("hoist_enclosing_refs", HOIST_SET),
     ("hoist_enclosing_refs_default", HOIST_SET),
     (
+        "tran_print_step_to_simulator",
+        ir::FeatureSet::EMPTY
+            .with(ir::Feature::Item(ir::ItemKind::Title))
+            .with(ir::Feature::Item(ir::ItemKind::Analysis))
+            .with(ir::Feature::Expr(ir::ExprTag::Num))
+            .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
+            .with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed))
+            .with(ir::Feature::Run(ir::RunExtra::TranPrintStep))
+            .with(ir::Feature::Run(ir::RunExtra::TranMaxStep))
+            .with(ir::Feature::Run(ir::RunExtra::TranCapNgspice)),
+    ),
+    (
         "tran_cap_ngspice_to_given",
         ir::FeatureSet::EMPTY
             .with(ir::Feature::Item(ir::ItemKind::Title))
@@ -160,6 +165,16 @@ const HOIST_SET: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
     .with(ir::Feature::Binary(ir::BinOp::Add))
     .with(ir::Feature::Binary(ir::BinOp::Mul));
+
+/// The waves with a zero rule (`GivenZero`).
+const ZERO_RULE_WAVES: &[ir::WaveKind] = &[
+    ir::WaveKind::Pulse,
+    ir::WaveKind::Sin,
+    ir::WaveKind::Exp,
+    ir::WaveKind::Sffm,
+    ir::WaveKind::Am,
+    ir::WaveKind::TrRandom,
+];
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);

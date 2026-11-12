@@ -3,7 +3,8 @@
 //!
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const PULSE_LAWS_DIFFER`,
 //! `pub(crate) const GIVEN_ZERO_LEFT`, `pub(crate) const EXP_TD2_LEFT`,
-//! `pub(crate) const SFFM_LAW_LEFT`, `pub(crate) const GIVEN_ZERO_KEPT`
+//! `pub(crate) const SFFM_LAW_LEFT`, `pub(crate) const GIVEN_ZERO_KEPT`,
+//! `pub(crate) const AM_PRE_LEFT`
 
 use crate::ir;
 
@@ -21,6 +22,9 @@ pub(crate) const SFFM_LAW_LEFT: ir::Code = ir::Code::new(b'U', 204);
 
 /// An as-given wave ngspice's zero rule would read otherwise.
 pub(crate) const GIVEN_ZERO_KEPT: ir::Code = ir::Code::new(b'U', 205);
+
+/// An AM that is not zero at its delay, which ngspice's AM is before it.
+pub(crate) const AM_PRE_LEFT: ir::Code = ir::Code::new(b'U', 206);
 
 /// The group's catalogue rows (`U0200..=U0299`).
 pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
@@ -66,6 +70,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a wave ngspice's zero rule would read otherwise",
             cite: "rewrite/AMEND-A12.md A17; rewrite/IR-CIRCUIT.md §3",
             explain: "ngspice reads a zero rise, fall, width, period, frequency or time constant as its default (TSTEP, TSTOP or a fraction of it), and an omitted field as its default; the source reads such a field as it holds it and has no default. The rule is relabelled only when every such field is a literal other than zero and every other field is given. This wave holds a zero, an expression that may be zero, or an omitted field, so the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        AM_PRE_LEFT,
+        ir::Info {
+            title: "an AM source whose value before its delay the target cannot state",
+            cite: "rewrite/IR-CIRCUIT.md §3; rewrite/DIALECT-NGSPICE.md (SFFM, AM)",
+            explain: "This AM holds its value at the delay before the delay and at the operating point (VACASK). The target's AM is zero there, so the two agree only when that value is zero: a literal offset of 0 and a carrier phase of 0 (or an amplitude of 0). Here the offset or the phase is not, so the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

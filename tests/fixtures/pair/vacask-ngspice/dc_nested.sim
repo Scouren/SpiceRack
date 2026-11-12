@@ -1,0 +1,13 @@
+dc_nested: (from runrules keep_nested.sim) a DC sweep of a divider's source by point count, 0 to 5 V in 20 intervals (21 values, step 0.25), and a nested sweep over listed values of the load's source (0, 0.5, 1, 1.5 V)
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource dc=0.0
+v2 (low 0) vsource dc=0.0
+r1 (in out) resistor r=1k
+r2 (out low) resistor r=3k
+control
+  sweep s2 instance="v2" parameter="dc" values=[0.0, 0.5, 1.0, 1.5]
+    sweep s1 instance="v1" parameter="dc" from=0.0 to=5.0 mode="lin" points=20
+      analysis dc1 op
+endc

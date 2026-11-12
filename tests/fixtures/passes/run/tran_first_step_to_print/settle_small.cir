@@ -1,0 +1,7 @@
+first step settle: print step 1n, stop 10u, a sine (no breakpoint)
+* settle (R73): ngspice-45 -b -r, second time point: small 1.000000000000000e-11, large 1.000000000000000e-09
+v1 a 0 dc 0 sin(0 1 100k)
+r1 a b 1k
+c1 b 0 1n
+.tran 1n 10u
+.end

@@ -1,0 +1,3 @@
+file "a.sp" deck
+  param a = $tstep * 2
+  analysis tran stop=10u initial_step=1n max_step=1u

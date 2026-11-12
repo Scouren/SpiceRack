@@ -13,12 +13,16 @@ mod memcap;
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/first_step.rs"]
+mod first_step;
 #[path = "passes_run/loops.rs"]
 mod loops;
 #[path = "passes_run/names.rs"]
 mod names;
 #[path = "passes_run/params.rs"]
 mod params;
+#[path = "passes_run/print_step.rs"]
+mod print_step;
 #[path = "passes_run/state.rs"]
 mod state;
 #[path = "passes_run/walk.rs"]
@@ -54,6 +58,9 @@ const PENDING_PAIRS: &[&str] = &[
     "analysis_name_given",
     "dc_axis_name_given",
     "loop_name_given",
+    "tran_print_step_to_simulator",
+    "tran_simulator_step_to_print",
+    "tran_first_step_to_print",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
 ];
@@ -96,6 +103,11 @@ fn whole_run_to_from_here_keeps_the_state_at_every_analysis() {
 #[test]
 fn whole_run_save_to_from_here_keeps_the_saves_at_every_analysis() {
     keeps_state("whole_run_save_to_from_here", ir::RunExtra::SaveWholeRun);
+}
+
+#[test]
+fn save_set_to_all_keeps_the_saves_at_every_analysis() {
+    keeps_state("save_set_to_all", ir::RunExtra::SaveAnalysisSet);
 }
 
 #[test]
