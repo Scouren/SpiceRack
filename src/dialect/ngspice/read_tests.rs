@@ -489,3 +489,14 @@ fn a_blank_line_one_is_an_empty_title() {
     assert_eq!(d.text(t.text), "");
     assert_eq!(write(&d), "\n.param a=1\n.end\n");
 }
+
+#[test]
+fn width_and_probe_cards_reach_the_output_area() {
+    // ngspice's lexicon has no `.probe` keyword, so both arrive as plain cards; the dispatch
+    // sends them to `read_outputs::card` (its stub: `Unread` with `P1001`), not the run area.
+    let (d, diags) = deck("t\n.width out=80\n.probe v(a)\n");
+    let top = d.file(d.entry()).top;
+    assert_eq!(opaque(&d, top, 1).0, OpaqueClass::Unread);
+    assert_eq!(opaque(&d, top, 2).0, OpaqueClass::Unread);
+    assert_eq!(diags.len(), 2);
+}
