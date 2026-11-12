@@ -304,6 +304,10 @@ pub enum Func {
     Pwl,
     /// `x` truncated toward zero, of Int type (A12 K1: VACASK's `int`). `Trunc` stays Real.
     ToInt,
+    /// −1 for `x < 0`, +1 otherwise (zero and −0.0 included), of its operand's type (A12 K1
+    /// addendum: VACASK's `sgn`, DIALECT-VACASK Appendix A runs e1, f4). `Sgn` is −1, 0, 1 and
+    /// Real.
+    SgnZeroPos,
 }
 
 /// A statistical distribution of a draw. Outside sampling a draw's value is a simulator rule;
@@ -466,7 +470,7 @@ impl UnOp {
 
 impl Func {
     /// Every function, in declaration order.
-    pub const ALL: [Func; 44] = [
+    pub const ALL: [Func; Func::SgnZeroPos as usize + 1] = [
         Func::Abs,
         Func::Sqrt,
         Func::SqrtAbs,
@@ -511,6 +515,7 @@ impl Func {
         Func::Idt,
         Func::Pwl,
         Func::ToInt,
+        Func::SgnZeroPos,
     ];
     /// Function count.
     pub const COUNT: usize = Self::ALL.len();
@@ -551,7 +556,8 @@ impl Func {
             | Func::Ramp
             | Func::Ddt
             | Func::Idt
-            | Func::ToInt => (1, 1),
+            | Func::ToInt
+            | Func::SgnZeroPos => (1, 1),
             Func::Pow
             | Func::PowAbs
             | Func::PowRe

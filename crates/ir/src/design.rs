@@ -74,7 +74,7 @@ use crate::model::Model;
 use crate::names::{FxMap, Names, Texts};
 use crate::option::{Env, NodeSet, OptionRow};
 use crate::output::{Measure, Print, Save};
-use crate::plan::{Alter, Loop};
+use crate::plan::{Alter, Elaborate, Loop};
 use crate::scope::{Def, File, Scope};
 use crate::span::Span;
 use crate::stats::Statistics;
@@ -123,6 +123,7 @@ pub struct Design {
     pub(crate) saves: Table<Save>,
     pub(crate) prints: Table<Print>,
     pub(crate) measures: Table<Measure>,
+    pub(crate) elaborates: Table<Elaborate>,
     // detail tables, owned by the circuit and run owners
     pub(crate) circuit: CircuitDetails,
     pub(crate) run: RunDetails,
@@ -205,6 +206,7 @@ item_rows! {
     Save => Save, saves;
     Print => Print, prints;
     Measure => Measure, measures;
+    Elaborate => Elaborate, elaborates;
 }
 
 impl Design {
@@ -247,6 +249,7 @@ impl Design {
             saves: Table::new(),
             prints: Table::new(),
             measures: Table::new(),
+            elaborates: Table::new(),
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
             classes: std::sync::OnceLock::new(),

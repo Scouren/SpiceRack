@@ -27,7 +27,7 @@ use crate::dc_ac::{
 use crate::design::ItemRow;
 use crate::design::{Design, DetailRow};
 use crate::feature::{Feature, FeatureSet};
-use crate::id::NameId;
+use crate::id::{NameId, Ref};
 use crate::item::{ItemKind, ScopeKind};
 use crate::measure::{
     MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen,
@@ -151,6 +151,7 @@ pub struct RunDetails {
     pub(crate) targets: Vec<Target>,
     pub(crate) varies: Vec<Vary>,
     pub(crate) correlations: Vec<Correlation>,
+    pub(crate) refs: Vec<Ref>,
 }
 
 /// A run detail row: the kernel's [`DetailRow`] plus the header kind whose rows live in its

@@ -48,10 +48,8 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-// definition phase: bodies are todo!(); remove when they land
-#![allow(unused_variables, dead_code)]
 
-// first: its `todo_facts!` macro is textually scoped to the modules declared after it
+// first: its `for_kind!` macro is textually scoped to the modules declared after it
 #[macro_use]
 pub mod facts;
 
@@ -120,6 +118,7 @@ mod analysis_facts;
 pub mod build_run;
 pub mod dc_ac;
 mod dc_ac_facts;
+mod loop_facts;
 pub mod measure;
 mod measure_facts;
 mod network_facts;
@@ -159,7 +158,9 @@ pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
 pub use option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 pub use option_key::{OptionClass, OptionKey};
 pub use output::{Measure, Print, PrintView, Save};
-pub use plan::{Alter, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
+pub use plan::{
+    Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
+};
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
 pub use run_extra::RunExtra;
 pub use span::Span;
