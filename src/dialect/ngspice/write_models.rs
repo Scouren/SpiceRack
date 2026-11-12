@@ -42,6 +42,12 @@ pub(super) const CODES: &[Row] = &[
         "BSIM3, BSIM4 and HiSIM-HV pick their device by the version's prefix; a family with one device and no version parameter runs one version; a family with a version parameter needs the row's version (none would be ngspice's default, which the row does not state).",
     ),
     refusal(
+        TYPE_WORD,
+        "a code model or module name ngspice reads otherwise",
+        "ngspice-45 inpdomod.c default branch, inptyplk.c",
+        "the type word of a code model must be one of the pinned build's code models (devhelp), and a module's must be no type word, built-in device or code model: ngspice looks those up first, and an unknown word is \"Unknown model type - ignored\" (run).",
+    ),
+    refusal(
         PARAM,
         "a model parameter ngspice's device lacks",
         "ngspice-45 inpgmod.c create_model",
@@ -63,6 +69,8 @@ pub(super) const CODES: &[Row] = &[
 
 /// A version ngspice has no device for, or a version on a family ngspice runs one way.
 const VERSION: Code = Code::new(b'W', 1202);
+/// A code model ngspice's build lacks, or a module whose name ngspice reads as something else.
+const TYPE_WORD: Code = Code::new(b'W', 1206);
 /// A parameter the device's tables lack (or `level`, a field).
 const PARAM: Code = Code::new(b'W', 1203);
 /// A bin ngspice does not bin.
@@ -80,6 +88,16 @@ pub(super) fn admits(
     let m: ir::Model = design.row(item.index);
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     let named = matches!(m.family, F::CodeModel | F::Module);
+    // the type word names a code model or a module only by what ngspice has loaded: a word
+    // the reader would read as the other kind (or as a built-in) has no spelling here
+    let word_ok = match m.family {
+        F::CodeModel => families::code_model(design.str(m.word)),
+        F::Module => families::module_word(design.str(m.module.name)),
+        _ => true,
+    };
+    if !word_ok {
+        refuse(TYPE_WORD);
+    }
     if !named && families::card(m.family, m.polarity).is_none() {
         // a family ngspice lacks is a feature FEATURES lacks: `check_legal` refused it
         return;
