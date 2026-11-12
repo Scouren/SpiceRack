@@ -49,12 +49,7 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
                 });
             }
             let axes = lw.b.dc_axes(&rows);
-            lw.b.analysis(
-                scope,
-                None,
-                Dc { axes },
-                span,
-            );
+            lw.b.analysis(scope, None, Dc { axes }, span);
         }
         Card::Ac(s) => {
             let sweep = emit_sweep(lw, st, s);

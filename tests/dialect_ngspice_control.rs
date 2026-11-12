@@ -299,7 +299,7 @@ fn script_items_ngspice_cannot_spell_are_refused() {
         ("a load naming its modules", "  load osdi \"a.osdi\" modules=(m1)", "W1405"),
         ("a Verilog-A load", "  load veriloga \"a.va\"", "W1404"),
         ("a loop over an expression", "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op", "W1402"),
-        ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3\n  analysis op", "W1401"),
+        ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3 at_reset\n  analysis op", "W1401"),
         ("a parameter loop whose body does not start with a reset", "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op", "W1401"),
         ("a partial reset", "  reset values saves", "W1406"),
         ("an element-value alter of a G", "  alter (element_value g1) value=2", "W1407"),
