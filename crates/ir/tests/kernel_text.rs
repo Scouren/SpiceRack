@@ -471,3 +471,23 @@ fn spans_name_the_file_block_of_their_line() {
     let top_a = d.file(spicerack_ir::FileId(0)).top;
     assert_eq!(d.span_of(d.items(top_a)[0]).file, spicerack_ir::FileId(0));
 }
+
+#[test]
+fn every_opaque_class_has_its_word() {
+    // oracle: the inverse; the `hint` word of A12 K3 is pinned by hand
+    for c in OpaqueClass::ALL {
+        let mut d = Design::new();
+        {
+            let mut b = d.builder();
+            let (_, top) = b.file("o.sp", Role::Deck);
+            b.opaque(top, "vacask", c, "x", Span::NONE);
+        }
+        let text = write(&d);
+        let (back, diags) = read(&text);
+        assert!(diags.is_empty(), "{c:?}: {:?}", diags.rows());
+        assert_eq!(write(&back), text, "{c:?}");
+    }
+    let (d, diags) = read("file \"o.sp\" deck\n  opaque vacask hint \"x\"\n");
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    assert!(write(&d).contains(" hint "));
+}

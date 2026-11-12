@@ -237,6 +237,11 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
                 diags.push(INERT_DROPPED, span, 0);
                 dropped.push((item, scope));
             }
+            // a solver hint (A12 K3): another family leaves it out with the class's own note
+            ir::OpaqueClass::Hint => {
+                diags.push(ir::diag::opaque_code(ir::OpaqueClass::Hint), span, 0);
+                dropped.push((item, scope));
+            }
             ir::OpaqueClass::Unread
             | ir::OpaqueClass::Private
             | ir::OpaqueClass::InvalidInSource

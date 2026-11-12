@@ -24,6 +24,7 @@
 //!
 //! Contents: `pub(super) const FEATURES`, `pub(super) const CODES`, `pub(super) const UNTYPED`,
 //! `INVALID`, `INERT`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
 //! `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
 //! words (`Ctx`, `Want`, `probe_word`) are `read_outputs/probe.rs`, the measures
 //! `read_outputs/meas.rs`
@@ -35,6 +36,7 @@ use probe::build;
 pub(super) use probe::{Ctx, Want, probe_word};
 
 use super::codes::Row;
+use super::expr_read::Fail;
 use super::read::{Lower, Stmt};
 use super::tables;
 use crate::ir::{self, AnalysisKind, Code, Feature, ItemKind, RunExtra};
@@ -167,6 +169,36 @@ pub(super) fn unwrap(text: &str) -> &str {
         }
     }
     t
+}
+
+/// One output named inside another card (`.four 1k v(a)`, `.tf v(out) vin`, `.noise v(out)
+/// vin`): `v(a)`, `v(a,b)` (the difference) or `i(e)`, no part. The run area calls it so one
+/// reader spells probes; `analysis` is the analysis the output belongs to. `Err` is the class and
+/// code of the `Opaque` the calling statement becomes. Appends only names.
+#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe(
+    lw: &mut Lower<'_, '_>,
+    st: Stmt,
+    text: &str,
+    analysis: ir::AnalysisKind,
+) -> Result<ir::Probe, Fail> {
+    let _ = (st, analysis); // one spelling in every analysis output
+    let fail = |no| match no {
+        No::Untyped => Fail {
+            code: UNTYPED,
+            class: ir::OpaqueClass::Unread,
+        },
+        No::Invalid => Fail {
+            code: INVALID,
+            class: ir::OpaqueClass::InvalidInSource,
+        },
+    };
+    let mut wants =
+        probe_word(&text.split_whitespace().collect::<String>(), Ctx::Output).map_err(fail)?;
+    if wants.len() != 1 {
+        return Err(fail(No::Untyped));
+    }
+    Ok(build(lw, &wants.remove(0)))
 }
 
 // ---- private ----

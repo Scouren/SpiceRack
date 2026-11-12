@@ -223,7 +223,8 @@ C1 out 0 1u
 fn generated_outputs_the_writer_admits_read_back_as_themselves() {
     // Oracle: law L5 on this area's rows. Designs of one output item over this area's features
     // (ir::gen, valid by construction); each one `legalize` admits is written and read back,
-    // and its IR text must be the original's. Every item form must be admitted at least once.
+    // and must mean the original (`eq_meaning`: a literal form ngspice has no letter for is
+    // respelled, R28). Every item form must be admitted at least once.
     use ir::{ExprTag as T, Feature as F, ItemKind as K, RunExtra as X};
     let row = row();
     let set = [
@@ -265,14 +266,25 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
         let mut design = ir::r#gen::generate(seed, &set, size);
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row, &mut diags);
-        if diags.rows().iter().any(|r| dialect::refuses(r.code)) {
+        let titled = design
+            .items(design.file(design.entry()).top)
+            .first()
+            .map(|i| i.kind)
+            == Some(ir::ItemKind::Title);
+        // a deck with no title reads back with an empty one (the structure area's rule, not
+        // this area's)
+        if !titled || diags.rows().iter().any(|r| dialect::refuses(r.code)) {
             continue;
         }
         let want = dump(&design);
         let text = dialect::write(&design, design.entry(), row, &mut diags);
         let path = design.str(design.file(design.entry()).path).to_string();
         let (back, _) = read_deck(&path, &text);
-        assert_eq!(dump(&back), want, "seed {seed}:\n{text}");
+        assert!(
+            back.eq_meaning(&design),
+            "seed {seed}:\n{text}\n{want}\n{}",
+            dump(&back)
+        );
         for form in [
             "save ",
             "print ",

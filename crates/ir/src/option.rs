@@ -166,7 +166,7 @@ impl RowFacts for OptionRow {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Option(self.key));
         // `OptionMidRun` is a fact of the whole design: `analysis::design_features`.
     }

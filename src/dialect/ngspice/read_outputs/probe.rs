@@ -19,6 +19,8 @@ pub(in crate::dialect::ngspice) enum Ctx {
     Print(AnalysisKind),
     /// `.meas <kind>`.
     Meas(AnalysisKind),
+    /// An output named inside an analysis card (`.four`, `.tf`, `.noise`): real values.
+    Output,
 }
 
 /// A probe read but not yet appended: its kind, part and path segments as written.
@@ -41,7 +43,12 @@ pub(in crate::dialect::ngspice) fn probe_word(word: &str, ctx: Ctx) -> Result<Ve
             .strip_suffix(']')
             .and_then(|r| r.split_once('['))
             .ok_or(No::Untyped)?;
-        if dev.is_empty() || q.is_empty() || q.contains(['[', ']']) || complex(ctx) {
+        if dev.is_empty()
+            || q.is_empty()
+            || q.contains(['[', ']'])
+            || complex(ctx)
+            || ctx == Ctx::Output
+        {
             return Err(No::Untyped);
         }
         return Ok(vec![want(
@@ -162,8 +169,8 @@ fn voltage(head: &str, args: &[&str], ctx: Ctx) -> Result<Vec<Want>, No> {
             .iter()
             .map(|n| want(ProbeKind::V, AcPart::None, node(n), Vec::new()))
             .collect()),
-        Ctx::Print(kind) => {
-            let part = match (kind == AnalysisKind::Ac, head) {
+        Ctx::Print(_) | Ctx::Output => {
+            let part = match (ctx == Ctx::Print(AnalysisKind::Ac), head) {
                 (_, "v") => AcPart::None,
                 (true, "vm") => AcPart::Mag,
                 (true, "vp") => AcPart::PhaseRad,

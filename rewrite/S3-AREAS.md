@@ -59,7 +59,9 @@ first push (a refusal leaves no row: emit expressions only after every one parse
 Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `diags`. Helpers:
 `w.line(text)`, `w.open(scope, tail)` (writes a scope's items next, then `tail`). Free functions:
 `expr_write::value(design, e, out)` (bare number or name, else `{…}`), `expr_write::expr`
-(the expression alone, in the evaluator its tree implies), `number::spell(lit, Grammar, out)`,
+(the expression alone, in the evaluator its tree implies), `expr_write::expr_in(design, e, eval, out)`
+(in a given evaluator: a B source's field is always the B-source parser's),
+`expr_write::spells_in(design, e, eval) -> bool` (every node spellable there; for `admits`), `number::spell(lit, Grammar, out)`,
 `name::letter(kind)` (the letter of a kind whose letter does not depend on its detail).
 
 ## Open points the areas inherit (reported to the lead with the S3.0 report)
@@ -72,8 +74,7 @@ Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `dia
   `name` nearest `scope` outward (`Design::lookup`) and calls `Builder::bind_ref(item, k, def)`;
   no definition leaves it unresolved (R4). Each slot expects one kind (`map_refs` states it);
   queue that kind.
-- More of `Lower` for the areas: `lw.is_model(word)` (any `.model` of any file, folded);
-  `lw.subckt_formals(st, name) -> Option<Vec<String>>` (the folded head parameters of the
+- More of `Lower` for the areas: `lw.subckt_formals(st, name) -> Option<Vec<String>>` (the folded head parameters of the
   `.subckt name` visible from `st`'s block, else a top-level one of an earlier file);
   `lw.measure_reads(mark)` with `mark = lw.pending()` taken before the `lw.expr` calls of a
   `.meas … param=` (those reads bind to a measure of the name first, then to a parameter).

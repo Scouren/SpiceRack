@@ -20,8 +20,14 @@ meaning: an `Alter` changes the circuit for every run item after it. This is the
 | `Analysis` | header `{ kind: AnalysisKind, name: NameId, detail: u32 }` + one detail table per kind | `name` is Spectre's and VACASK's statement name, `NONE` in SPICE |
 | `Loop` | `{ target: Target, over: SweepSpec or table, body: ScopeId }`; opens a scope of kind `Loop` holding run items | covers `.step` (the first `.step` is the innermost loop), Spectre `sweep { }`, VACASK `sweep`, an unrolled ngspice loop, and a table of states (HSPICE `.alter` blocks, Xyce `.DATA` + `.STEP DATA=`): a table is a list of parameter names and rows of values |
 | `Alter` | `{ target: Target, value: ExprId }` | everything after it runs on the changed circuit |
+| `Elaborate` (A12 R1) | `{ circuits: RefList }` (`DefKind::Subckt` references) | the named subcircuits' bodies are the top circuit for every run item after it, until the next `Elaborate` (VACASK repeated `elaborate circuit(…)`) |
 | `Target` | a small row `{ kind, a: NameId, b: NameId }` | `Temp`, `Param(name)`, `SourceDc(element)`, `ElementValue(element)`, `DeviceParam(element, param)`, `ModelParam(model, param)`, `Option(key)`. Temperature is its own kind on every simulator, never a parameter named `temp` |
 | `SweepSpec` | `{ kind: Lin \| Dec \| Oct \| List, start, stop, step, points, values: ExprList, end: SweepEnd }` | a set of values with one pinned reading: `Lin` by `step` or by `points` = the number of values (Spectre's `lin=4` is 5 values: its reader adds one, its writer subtracts: spelling, not conversion); `Dec`/`Oct`: `points` per decade or octave; `end: Grid \| OnStop` (LTspice ends a log sweep on the stop value even off the grid, `INV-semantics.md` 8.06, 8.07). Shared by `Loop`, DC axes, AC, noise |
+
+A `Loop` of kind `Sweep` whose body is exactly one `Op` uses `RunExtra::LoopOverOp` (A12 R2,
+RULINGS R20): it is not a `Dc` (one result over the grid, each point continued from the last,
+against one result per value); a target that spells both the same lacks the feature and a pass
+converts.
 
 ## 2. Analyses (`analysis.rs`)
 

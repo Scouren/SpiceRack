@@ -7,13 +7,23 @@
 //! crate (kernel, circuit, run; `rewrite/IR-KERNEL.md` §10) each add rows and methods in their
 //! own files.
 //!
-//! ```ignore
+//! A caller reads a source into a design, checks it, and writes it. Here the reader and the
+//! writer are the crate's own IR text (`parse`, `dump`); a dialect's reader and writer take the
+//! same places, and its `FEATURES` the place of `FeatureSet::ALL`.
+//!
+//! ```
+//! use spicerack_ir::{Design, Diags, FeatureSet, check, check_legal, dump, parse};
+//!
+//! let source = "file \"rc.sp\" deck\n  param rval = 1k\n  param half = rval / 2\n";
 //! let mut design = Design::new();
 //! let mut diags = Diags::new();
-//! reader.read(&sources, &mut design.builder(), &mut diags);
+//! parse(source, &mut design.builder(), &mut diags);
 //! check(&design, &mut diags);
-//! check_legal(&design, &writer_features, &mut diags);
-//! writer.write(&design, design.entry(), &mut text, &mut diags);
+//! check_legal(&design, &FeatureSet::ALL, &mut diags);
+//! assert!(diags.is_empty());
+//! let mut text = String::new();
+//! dump(&design, design.entry(), &mut text);
+//! assert_eq!(text, source);
 //! ```
 //!
 //! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addenda A1–A7);
@@ -38,10 +48,8 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-// definition phase: bodies are todo!(); remove when they land
-#![allow(unused_variables, dead_code)]
 
-// first: its `todo_facts!` macro is textually scoped to the modules declared after it
+// first: its `for_kind!` macro is textually scoped to the modules declared after it
 #[macro_use]
 pub mod facts;
 
@@ -64,6 +72,7 @@ pub mod item;
 pub mod item_facts;
 pub mod item_text;
 pub mod link;
+pub mod literal;
 pub mod names;
 pub mod scope;
 pub mod span;
@@ -86,6 +95,8 @@ mod circuit_parse;
 mod circuit_text;
 pub mod controlled;
 pub mod element;
+pub mod letter;
+pub mod library;
 pub mod line;
 pub mod model;
 pub mod passive;
@@ -96,6 +107,8 @@ pub mod wave;
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, NO_ROW};
+pub use letter::spice_letter;
+pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 
@@ -105,6 +118,7 @@ mod analysis_facts;
 pub mod build_run;
 pub mod dc_ac;
 mod dc_ac_facts;
+mod loop_facts;
 pub mod measure;
 mod measure_facts;
 mod network_facts;
@@ -130,7 +144,7 @@ pub use class::{ExprClass, expr_class};
 pub use design::{Design, DetailRow, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
-pub use eval::{Bindings, Domain, eval};
+pub use eval::{Bindings, Domain, Value, eval, eval_typed};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
 pub use facts::{Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};
@@ -144,7 +158,9 @@ pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
 pub use option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 pub use option_key::{OptionClass, OptionKey};
 pub use output::{Measure, Print, PrintView, Save};
-pub use plan::{Alter, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
+pub use plan::{
+    Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
+};
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
 pub use run_extra::RunExtra;
 pub use span::Span;

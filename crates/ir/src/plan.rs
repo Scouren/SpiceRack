@@ -23,10 +23,10 @@
 //! Contents:
 //! - `pub struct Loop`, `pub enum LoopKind`, `pub enum LoopEnd`, `pub struct SweepLoop`,
 //!   `pub struct TableLoop`, `pub struct MonteCarlo`, `pub enum Variations`, `pub enum Sampler`,
-//!   `pub struct Alter`, `pub struct Target`, `pub enum TargetKind`, `pub type TargetList`,
+//!   `pub struct Alter`, `pub struct Elaborate`, `pub type RefList`, `pub struct Target`, `pub enum TargetKind`, `pub type TargetList`,
 //!   `pub const LOOP_DEPTH_MAX`; on each enum: `ALL`, `COUNT`
 //! - `Target::TEMP`, `TargetKind::def_kind(self) -> Option<DefKind>`,
-//!   `Design::targets(&self, TargetList) -> &[Target]`
+//!   `Design::targets(&self, TargetList) -> &[Target]`, `Design::refs(&self, RefList) -> &[Ref]`
 //! - the run rows' target facts: `pub(crate) TargetKind::reads_b`,
 //!   `pub(crate) TargetKind::has_path`, `pub(crate) enum TargetUse`,
 //!   `pub(crate) fn target_handles`, `pub(crate) fn target_refs`, `pub(crate) fn target_valid`,
@@ -171,6 +171,20 @@ pub struct Alter {
     pub value: ExprId,
 }
 
+/// From here on, the top circuit is the named subcircuits' bodies, together (VACASK repeated
+/// `elaborate circuit(…)`, A12 R1), until the next `Elaborate`. Before the first, the top circuit
+/// is the deck's top scope as written.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Elaborate {
+    /// The subcircuits, at least one, each a `DefKind::Subckt` reference the linker binds; a
+    /// range into the run owner's reference pool.
+    pub circuits: RefList,
+}
+
+/// An ordered list of references (an `Elaborate`'s circuits), a range into the run owner's
+/// reference pool.
+pub type RefList = List<Ref>;
+
 /// What a loop, an alter or a DC axis acts on (IR-RUN §1). Temperature is its own kind on every
 /// simulator, never a parameter named `temp` (`INV-semantics.md` 4.04).
 ///
@@ -244,6 +258,7 @@ const _: () = assert!(size_of::<SweepLoop>() == 52);
 const _: () = assert!(size_of::<TableLoop>() == 16);
 const _: () = assert!(size_of::<MonteCarlo>() == 20);
 const _: () = assert!(size_of::<Alter>() == 28);
+const _: () = assert!(size_of::<Elaborate>() == 8);
 const _: () = assert!(size_of::<Target>() == 24);
 
 impl Target {
@@ -339,6 +354,11 @@ impl Design {
     /// The targets of a list. Asserts the range is inside the target pool.
     pub fn targets(&self, list: TargetList) -> &[Target] {
         get(&self.run.targets, list).expect("a target list inside the target pool")
+    }
+
+    /// The references of a list. Asserts the range is inside the reference pool.
+    pub fn refs(&self, list: RefList) -> &[Ref] {
+        get(&self.run.refs, list).expect("a reference list inside the reference pool")
     }
 }
 

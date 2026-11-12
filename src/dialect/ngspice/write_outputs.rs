@@ -14,11 +14,13 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const UNSPELLABLE`,
 //! `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
-//! `pub(super) fn save`, `print`, `measure`, `pub(super) fn probe(&ir::Design, &ir::Probe, Ctx) -> Option<String>`
+//! `pub(super) fn save`, `print`, `measure`,
+//! `pub(super) fn probe(&ir::Design, &ir::Probe, &mut String)`, `pub(super) fn probe_admits(&ir::Design, &ir::Probe) -> bool`
 
 use super::codes::Row;
 use super::expr_write;
 use super::read_outputs::{self, Ctx};
+use super::tables::Eval;
 use super::write::Out;
 use crate::ir::measure::{MeasureFind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen};
 use crate::ir::{
@@ -129,7 +131,7 @@ pub(super) fn measure(w: &mut Out<'_>, item: ir::ItemRef) {
 /// A probe as ngspice spells it in `ctx`, or `None` for a kind or part it has no word for. A
 /// measure's real part is `v(…)`: its `vr(…)` saves nothing in a batch run (`gettok_iv` takes
 /// `vr` for the vector; run: "can't parse 'vr'", the analysis does not run).
-pub(super) fn probe(design: &ir::Design, p: &ir::Probe, ctx: Ctx) -> Option<String> {
+fn spell(design: &ir::Design, p: &ir::Probe, ctx: Ctx) -> Option<String> {
     let path =
         |l: ir::NameList| -> Vec<&str> { design.names(l).iter().map(|&n| design.str(n)).collect() };
     let a = path(p.a);
@@ -154,6 +156,24 @@ pub(super) fn probe(design: &ir::Design, p: &ir::Probe, ctx: Ctx) -> Option<Stri
         ProbeKind::Param => format!("@{}[{}]", element(&a)?, path(p.b).first()?),
         _ => return None,
     })
+}
+
+/// Appends one output named inside another card (`.four`, `.tf`, `.noise`) as ngspice spells
+/// it there: `v(a)`, `v(a,b)`, `i(e)`. Asserts [`probe_admits`] (the run area refuses first).
+#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe(design: &ir::Design, probe: &ir::Probe, out: &mut String) {
+    assert!(
+        probe_admits(design, probe),
+        "ngspice write: an admitted analysis output"
+    );
+    out.push_str(&spelled(design, probe, Ctx::Output));
+}
+
+/// Whether an analysis output has an ngspice spelling that reads back as it (the run area's
+/// `admits` calls it for `.four`, `.tf`, `.noise` outputs).
+#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe_admits(design: &ir::Design, probe: &ir::Probe) -> bool {
+    reads_back(design, probe, Ctx::Output)
 }
 
 // ---- private ----
@@ -197,10 +217,11 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
     let complex = matches!(m.analysis, AnalysisKind::Ac | AnalysisKind::Sp);
     let signal = |p: &ir::Probe| p.kind != ProbeKind::Vdiff && reads_back(d, p, ctx);
     let value = |e: ir::ExprId| constant(d, e);
-    let cross = |e: &Event| {
+    // a `when` threshold may be one `v(x)` or `i(x)`; a trigger's `val=` is a number
+    let cross = |e: &Event, when: bool| {
         e.kind == EventKind::Cross
             && signal(&e.signal)
-            && (value(e.value) || (!complex && threshold(d, e.value).is_some()))
+            && (value(e.value) || (when && !complex && threshold(d, e.value).is_some()))
             && (e.count.is_none() || value(e.count))
             && (e.delay.is_none() || (tran && value(e.delay)))
     };
@@ -210,12 +231,12 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
     let body = match m.kind {
         MeasureKind::TrigTarg => {
             let r: MeasureTrigTarg = d.detail(m.detail);
-            (cross(&r.trig) || at(&r.trig)) && (cross(&r.targ) || at(&r.targ))
+            (cross(&r.trig, false) || at(&r.trig)) && (cross(&r.targ, false) || at(&r.targ))
         }
-        MeasureKind::When => cross(&d.detail::<MeasureWhen>(m.detail).at),
+        MeasureKind::When => cross(&d.detail::<MeasureWhen>(m.detail).at, true),
         MeasureKind::Find => {
             let r: MeasureFind = d.detail(m.detail);
-            signal(&r.find) && (cross(&r.at) || at(&r.at))
+            signal(&r.find) && (cross(&r.at, true) || at(&r.at))
         }
         MeasureKind::Stat => {
             let r: MeasureStat = d.detail(m.detail);
@@ -229,7 +250,7 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
 
 /// Whether `p` spelled in `ctx` reads back as one probe of its kind, part and paths.
 fn reads_back(d: &ir::Design, p: &ir::Probe, ctx: Ctx) -> bool {
-    let Some(text) = probe(d, p, ctx) else {
+    let Some(text) = spell(d, p, ctx) else {
         return false;
     };
     if read_outputs::words(&text) != [text.clone()] {
@@ -244,9 +265,11 @@ fn reads_back(d: &ir::Design, p: &ir::Probe, ctx: Ctx) -> bool {
     }
 }
 
-/// Whether `e` is a value numparam reads (no circuit, no temperature) whose literals spell.
+/// Whether `e` is a value numparam reads (no circuit, no temperature) and spells.
 fn constant(d: &ir::Design, e: ir::ExprId) -> bool {
-    !e.is_none() && ir::expr_class(d, e) == ExprClass::Constant && expr_write::literals_spell(d, e)
+    !e.is_none()
+        && ir::expr_class(d, e) == ExprClass::Constant
+        && expr_write::spells_in(d, e, Eval::Numparam)
 }
 
 /// A threshold that reads the circuit as `v(n)` or `i(e)` (one name, no dots), if it is one.
@@ -279,7 +302,7 @@ fn probes(d: &ir::Design, list: ir::ProbeList, ctx: Ctx, t: &mut String) {
 
 /// A probe the writer was handed (admitted).
 fn spelled(d: &ir::Design, p: &ir::Probe, ctx: Ctx) -> String {
-    probe(d, p, ctx).expect("ngspice write: an admitted probe")
+    spell(d, p, ctx).expect("ngspice write: an admitted probe")
 }
 
 /// A trigger or target clause: `at=v` or `sig val=v [td=d] edge=n|last`.
