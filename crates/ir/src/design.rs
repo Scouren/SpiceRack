@@ -11,15 +11,23 @@
 //! Typed access to a row of any kind is generic over [`ItemRow`] (`design.row::<Subckt>(i)`,
 //! `builder.push(scope, row, span)`, `editor.set(i, row)`): one accessor per kind, written once.
 //!
-//! ```ignore
+//! ```
+//! use spicerack_ir::{Design, Diags, ItemKind, item::Subckt, parse};
+//!
+//! let mut design = Design::new();
+//! let text = "file \"a.sp\" deck\n  subckt div (a b)\n    param k = 1\n";
+//! parse(text, &mut design.builder(), &mut Diags::new());
+//! let mut ports = 0;
 //! for file in design.files() {
 //!     for &item in design.items(design.file(file).top) {
-//!         match item.kind {
-//!             ItemKind::Subckt => { let s: Subckt = design.row(item.index); /* … */ }
-//!             // one arm per kind, no `_` arm
+//!         // a writer matches every kind with no `_` arm; this example reads one
+//!         if item.kind == ItemKind::Subckt {
+//!             let s: Subckt = design.row(item.index);
+//!             ports += design.names(s.ports).len();
 //!         }
 //!     }
 //! }
+//! assert_eq!(ports, 2);
 //! ```
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §4, C3, C4, C5, C13; `REWRITE-PLAN.md` §3.2.
@@ -58,14 +66,15 @@ use crate::id::{
     Ref, ScopeId, TextId,
 };
 use crate::item::{
-    Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Role,
-    Section, Subckt, Title,
+    Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Section,
+    Subckt, Title,
 };
+use crate::library::DeviceLibrary;
 use crate::model::Model;
 use crate::names::{FxMap, Names, Texts};
 use crate::option::{Env, NodeSet, OptionRow};
 use crate::output::{Measure, Print, Save};
-use crate::plan::{Alter, Loop};
+use crate::plan::{Alter, Elaborate, Loop};
 use crate::scope::{Def, File, Scope};
 use crate::span::Span;
 use crate::stats::Statistics;
@@ -102,6 +111,7 @@ pub struct Design {
     pub(crate) params: Table<Param>,
     pub(crate) funcs: Table<Func>,
     pub(crate) models: Table<Model>,
+    pub(crate) device_libraries: Table<DeviceLibrary>,
     pub(crate) statistics: Table<Statistics>,
     pub(crate) elements: Table<Element>,
     pub(crate) analyses: Table<Analysis>,
@@ -113,6 +123,7 @@ pub struct Design {
     pub(crate) saves: Table<Save>,
     pub(crate) prints: Table<Print>,
     pub(crate) measures: Table<Measure>,
+    pub(crate) elaborates: Table<Elaborate>,
     // detail tables, owned by the circuit and run owners
     pub(crate) circuit: CircuitDetails,
     pub(crate) run: RunDetails,
@@ -183,6 +194,7 @@ item_rows! {
     Param => Param, params;
     Func => Func, funcs;
     Model => Model, models;
+    DeviceLibrary => DeviceLibrary, device_libraries;
     Statistics => Statistics, statistics;
     Element => Element, elements;
     Analysis => Analysis, analyses;
@@ -194,6 +206,7 @@ item_rows! {
     Save => Save, saves;
     Print => Print, prints;
     Measure => Measure, measures;
+    Elaborate => Elaborate, elaborates;
 }
 
 impl Design {
@@ -224,6 +237,7 @@ impl Design {
             params: Table::new(),
             funcs: Table::new(),
             models: Table::new(),
+            device_libraries: Table::new(),
             statistics: Table::new(),
             elements: Table::new(),
             analyses: Table::new(),
@@ -235,6 +249,7 @@ impl Design {
             saves: Table::new(),
             prints: Table::new(),
             measures: Table::new(),
+            elaborates: Table::new(),
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
             classes: std::sync::OnceLock::new(),
@@ -253,14 +268,16 @@ impl Design {
         Editor { design: self }
     }
 
-    /// The file a run starts from: the first `Deck` file, else file 0; `FileId::NONE` for a
-    /// design with no file (a caller that needs a file asserts).
+    /// The file a run starts from: file 0, whatever its role; `FileId::NONE` for a design with
+    /// no file (a caller that needs a file asserts). One rule, no heuristic: a reader creates
+    /// the entry first (the `Read` contract), IR text's first `file` block is file 0, and a
+    /// builder decides its own order.
     pub fn entry(&self) -> FileId {
         if self.files.is_empty() {
-            return FileId::NONE;
+            FileId::NONE
+        } else {
+            FileId(0)
         }
-        let deck = self.files.iter().position(|f| f.role == Role::Deck);
-        FileId(deck.unwrap_or(0) as u16)
     }
 
     /// Every file, in id order.

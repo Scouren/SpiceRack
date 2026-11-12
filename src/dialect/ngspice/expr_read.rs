@@ -23,7 +23,7 @@
 //!
 //! Contents: `pub(super) struct Tree`, `pub(super) struct Fail`,
 //! `pub(super) fn parse_in(&str, Eval) -> Result<Tree, Fail>`,
-//! `Tree::rounded(&self) -> bool`, `Fail::invalid() -> Fail`, `Fail::unread() -> Fail`,
+//! `Tree::notes(&self) -> &[ir::Code]`, `Fail::invalid() -> Fail`, `Fail::unread() -> Fail`,
 //! `Tree::emit(&self, b, names, scope, pending) -> ir::ExprId`
 
 use super::codes;
@@ -37,7 +37,7 @@ use crate::ir;
 pub(super) struct Tree {
     nodes: Vec<N>,
     root: usize,
-    rounded: bool,
+    notes: Vec<ir::Code>,
 }
 
 /// Why an expression has no tree: the code and the class of the `Opaque` its statement becomes.
@@ -91,7 +91,7 @@ struct Parser<'t> {
     collapsed: Vec<bool>,
     out: Vec<usize>,
     ops: Vec<Frame>,
-    rounded: bool,
+    notes: Vec<ir::Code>,
 }
 
 /// The tree of `text` under `eval` (the declare step's choice: a dependence on `temper` or the
@@ -106,21 +106,22 @@ pub(super) fn parse_in(text: &str, eval: Eval) -> Result<Tree, Fail> {
         collapsed: Vec::new(),
         out: Vec::new(),
         ops: Vec::new(),
-        rounded: false,
+        notes: Vec::new(),
     };
     let root = p.run()?;
     debug_assert!(root < p.nodes.len(), "the root is a node");
     Ok(Tree {
         nodes: p.nodes,
         root,
-        rounded: p.rounded,
+        notes: p.notes,
     })
 }
 
 impl Tree {
-    /// Whether a number in it was rounded to 18 significant digits (a note, A3).
-    pub(super) fn rounded(&self) -> bool {
-        self.rounded
+    /// The notes its reading gives (a number rounded to 18 digits, A3; a three-argument call of
+    /// a two-argument numparam function read by its first and last argument), each once.
+    pub(super) fn notes(&self) -> &[ir::Code] {
+        &self.notes
     }
 
     /// Appends the reachable nodes as expression rows (children first) and returns the root's
@@ -386,9 +387,18 @@ impl Parser<'_> {
 
     /// Appends a leaf and pushes it as an operand.
     fn leaf(&mut self, n: N, rounded: bool) {
-        self.rounded |= rounded;
+        if rounded {
+            self.note(codes::ROUNDED);
+        }
         let k = self.push(n);
         self.out.push(k);
+    }
+
+    /// Records a note once.
+    fn note(&mut self, code: ir::Code) {
+        if !self.notes.contains(&code) {
+            self.notes.push(code);
+        }
     }
 
     /// Appends a node; returns its index.
@@ -536,10 +546,27 @@ impl Parser<'_> {
         let Tok::Ident(word) = &self.toks[name] else {
             unreachable!("a call is named by an identifier")
         };
+        // numparam hands a function its first and last argument (`formula`: `v` the first, `u`
+        // the last), so a two-argument one called with three reads the first and the third
+        // (run: `{limit(3,0,2)}` = 5, a draw of 3 ± 2)
+        let named = tables::named(self.eval, word);
+        let two = match named {
+            Some(Named::Func(f)) => f.arity() == (2, 2),
+            Some(Named::Draw(d)) => d.arity() == (2, 2),
+            _ => false,
+        };
+        let picked;
+        let args = if self.eval == Eval::Numparam && two && args.len() == 3 {
+            self.note(codes::FIRST_LAST);
+            picked = [args[0], args[2]];
+            &picked[..]
+        } else {
+            args
+        };
         let within = |(min, max): (u8, u8)| {
             args.len() >= usize::from(min) && (max == u8::MAX || args.len() <= usize::from(max))
         };
-        let node = match tables::named(self.eval, word) {
+        let node = match named {
             Some(Named::Func(f)) if within(f.arity()) => N::Call(f, args.to_vec()),
             Some(Named::Draw(d)) if within(d.arity()) => N::Draw(d, args.to_vec()),
             Some(Named::Ternary) if args.len() == 3 => N::Tern(args[0], args[1], args[2]),

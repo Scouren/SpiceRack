@@ -4,18 +4,17 @@
 //! Builder pushes in, rows out through `design.source(&e)`.
 //!
 //! The three slots are independent (INV-semantics 5.13): `.op`/`.dc` read `dc`, `.ac` reads
-//! `ac_mag`/`ac_phase_deg`, the transient reads `wave` (or `dc` when there is none). `dc` is
-//! always present: each reader writes its own simulator's rule for a missing DC (the wave's
-//! t = 0 value with phase included, 5.32; 0 for ngspice SFFM, AM, TRNOISE, TRRANDOM; VACASK,
-//! which ignores `dc=` on a waveform type, writes the waveform's t = 0 value), never a rule of
-//! another simulator.
+//! `ac_mag`/`ac_phase_deg`, the transient reads `wave` (or `dc` when there is none). Where the
+//! DC comes from is `dc_rule` (AMEND-A12 C4): `Given` (`dc` holds it: a reader writes its
+//! simulator's value, 0 for ngspice SFFM, AM, TRNOISE, TRRANDOM) or `WaveAtZero` (the wave's
+//! t = 0 value, phase included, 5.32; `dc` `NONE`), never a rule of another simulator.
 //!
 //! Cites: `rewrite/IR-CIRCUIT.md` §1, §2 (sources); `rewrite/INV-constructs.md` D12–D15, D58,
 //! D97, D109–D111, D127, D129, E1, E2, E24, E26, E37; `rewrite/INV-semantics.md` 5.13, 5.14,
 //! 5.16–5.21, 5.32.
 //!
 //! Contents:
-//! - `pub struct Source`, `pub struct PortSpec`, `pub struct Distof`
+//! - `pub enum DcRule` (`ALL`, `COUNT`), `pub struct Source`, `pub struct PortSpec`, `pub struct Distof`
 //! - `Design::source(&self, &Element) -> Source`
 
 use crate::design::Design;
@@ -23,14 +22,27 @@ use crate::element::{DetailKind, Element};
 use crate::id::{ExprId, ExprList};
 use crate::wave::WaveRef;
 
+/// Where a source's DC value comes from (AMEND-A12 C4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum DcRule {
+    /// `Source::dc` holds it (the literal 0 where the simulator's rule is 0).
+    Given,
+    /// It is the waveform's value at t = 0; `Source::dc` is `NONE` and `wave` is set. ngspice
+    /// has it for SIN, PULSE, EXP and PWL; VACASK for every wave (VACASK ignores `dc=` on a
+    /// waveform type, 5.13).
+    WaveAtZero,
+}
+
 /// The detail row of an independent source (`ElemKind::VSource`, `ISource`, `Port`). Values
 /// are volts for a voltage source and a port (the EMF, see [`PortSpec`]), amperes for a current
 /// source.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Source {
-    /// The value `.op` and `.dc` use (V or A). Never `NONE`: the reader writes its simulator's
-    /// value for a card that gives none (Xyce bare V is 0, 5.14). Native: all. Evidence: E1,
-    /// D12, 5.13, 5.14, 5.32.
+    /// The value `.op` and `.dc` use (V or A); `NONE` exactly when `dc_rule` is `WaveAtZero`.
+    /// A reader writes its simulator's value for a card that gives none and whose rule is not
+    /// the wave at t = 0 (Xyce bare V is 0, 5.14). Native: all. Evidence: E1, D12, 5.13, 5.14,
+    /// 5.32; AMEND-A12 C4.
     pub dc: ExprId,
     /// AC stimulus magnitude (V or A). `NONE`: no AC stimulus. `ac` alone is magnitude 1,
     /// written by the reader (5.14). May be an expression (lt, ng, xy; E26). Native: all.
@@ -62,6 +74,8 @@ pub struct Source {
     pub port: u32,
     /// Row in the distortion table (ng `distof1`/`distof2`), or `NO_ROW`. Evidence: D58, 5.21.
     pub distof: u32,
+    /// Where the DC value comes from (AMEND-A12 C4).
+    pub dc_rule: DcRule,
 }
 
 /// The port data of an RF port. The source slots of a port hold the EMF: the open-circuit
@@ -99,9 +113,17 @@ pub struct Distof {
     pub f2_phase_deg: ExprId,
 }
 
-const _: () = assert!(size_of::<Source>() == 56);
+const _: () = assert!(size_of::<DcRule>() == 1);
+const _: () = assert!(size_of::<Source>() == 60);
 const _: () = assert!(size_of::<PortSpec>() == 20);
 const _: () = assert!(size_of::<Distof>() == 16);
+
+impl DcRule {
+    /// Every member, in declaration order.
+    pub const ALL: [DcRule; 2] = [DcRule::Given, DcRule::WaveAtZero];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
 
 impl Design {
     /// The source row of a voltage source, current source or port. Asserts the kind.

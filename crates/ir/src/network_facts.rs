@@ -54,7 +54,7 @@ impl DetailFacts for Pz {
         };
         domain_unless(input && set(self.out_p) && set(self.out_n))
     }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+    fn dump(&self, design: &Design, _ctx: &Ctx, out: &mut String) {
         put_word(out, &word(self.input));
         put_word(out, &word(self.transfer));
         put_word(out, &word(self.find));

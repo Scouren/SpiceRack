@@ -90,7 +90,7 @@ pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan> {
 /// A card value's whole token read as `INPevaluate` reads it with `gobble` set: an optional
 /// sign, the number, and the rest of the token ignored (`1k5` is 1000, `10v` is 10). `None` when
 /// the token does not start with a number after its sign.
-#[cfg_attr(not(test), expect(dead_code, reason = "S3.1's card values call it"))]
+#[allow(dead_code, reason = "S3.1's card values call it")]
 pub(super) fn card(token: &str) -> Option<Scan> {
     let (negative, rest) = match token.as_bytes().first() {
         Some(b'-') => (true, &token[1..]),
@@ -121,7 +121,8 @@ pub(super) fn spell(lit: ir::Literal, grammar: Grammar, out: &mut String) {
     }
     digits_into(i128::from(lit.mantissa), u32::from(lit.frac), out);
     match lit.form {
-        ir::NumForm::Plain => {}
+        // an `Int` literal (A12, outside FEATURES: `Extra::IntLiteral`) is its digits, as Plain
+        ir::NumForm::Plain | ir::NumForm::Int => {}
         ir::NumForm::Exponent => {
             out.push('e');
             out.push_str(&lit.exp10.to_string());

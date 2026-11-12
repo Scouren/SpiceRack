@@ -286,3 +286,22 @@ fn a_ten_thousand_deep_nest_reads_and_writes_without_recursion() {
     let (b, _) = read(&text).expect("deep written");
     assert!(a.eq_ignoring_spans(&b));
 }
+
+#[test]
+fn a_field_ngspice_hands_the_b_source_parser_is_written_and_checked_in_its_grammar() {
+    // inpcom.c inp_bsource_compat: a B source's expression is the B-source parser's even when
+    // constant. `{2**3}` and `pow(-2,3)` there: PowAbs spells (`**`), C's `Pow` does not (B `pow`
+    // is |x|^y: ptfuncs.c PTpower).
+    let (d, e) = read("2**3+1").expect("constant");
+    let mut out = String::new();
+    expr_write::expr_in(&d, e, Eval::Behavioural, &mut out);
+    assert_eq!(out, "2 ** 3 + 1");
+    assert!(expr_write::spells_in(&d, e, Eval::Behavioural));
+    let (d, e) = read("pow(0-2,3)").expect("numparam pow");
+    assert!(!expr_write::spells_in(&d, e, Eval::Behavioural));
+    assert!(expr_write::spells_in(&d, e, Eval::Numparam));
+    let (d, e) = read("v(a)*2").expect("a probe");
+    assert!(!expr_write::spells_in(&d, e, Eval::Numparam));
+    let (d, e) = read("2mil").expect("numparam milli");
+    assert!(expr_write::spells_in(&d, e, Eval::Behavioural));
+}

@@ -20,7 +20,7 @@ use crate::facts::{Handle, RowFacts};
 use crate::feature::{Extra, Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ItemRef, NameId, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{
     Comment, DefKind, Func, Global, If, Include, Load, Opaque, Param, Section, Subckt, Title,
 };
@@ -29,19 +29,19 @@ use crate::text::Words;
 use crate::text_expr::Ctx;
 
 impl RowFacts for Title {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Text(self.text));
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
         // no invariant beyond the handles
     }
 
@@ -70,19 +70,19 @@ impl RowFacts for Title {
 }
 
 impl RowFacts for Comment {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Text(self.text));
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
         // no invariant beyond the handles
     }
 
@@ -111,21 +111,21 @@ impl RowFacts for Comment {
 }
 
 impl RowFacts for Include {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.path), Handle::Name(self.section)]);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         if !self.section.is_none() {
             *set = set.with(Feature::Extra(Extra::IncludeSection));
         }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if self.path.is_none() {
             field_domain(design, at, out);
         }
@@ -156,19 +156,19 @@ impl RowFacts for Include {
 }
 
 impl RowFacts for Global {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Names(self.nets));
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let nets = design.names(self.nets);
         if nets.is_empty() || nets.contains(&NameId::GROUND) || !distinct(nets) {
             field_domain(design, at, out);
@@ -200,19 +200,19 @@ impl RowFacts for Global {
 }
 
 impl RowFacts for Load {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Name(self.path));
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if self.path.is_none() {
             field_domain(design, at, out);
         }
@@ -243,19 +243,19 @@ impl RowFacts for Load {
 }
 
 impl RowFacts for Opaque {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.dialect), Handle::Text(self.text)]);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let no_dialect = self.dialect.is_none() || design.str(self.dialect).is_empty();
         if no_dialect || design.text(self.text).is_empty() {
             out.push(
@@ -291,7 +291,7 @@ impl RowFacts for Opaque {
 }
 
 impl RowFacts for Subckt {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([
             Handle::Name(self.name),
             Handle::Names(self.ports),
@@ -300,15 +300,23 @@ impl RowFacts for Subckt {
         ]);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
-        // no feature beyond the kind
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        // A12 K2: a head default that reads a parameter
+        let defaults = design
+            .params(self.params)
+            .iter()
+            .map(|p| p.1)
+            .filter(|e| !e.is_none());
+        if defaults.into_iter().any(|e| reads_param(design, e)) {
+            *set = set.with(Feature::Extra(Extra::FormalReadsParam));
+        }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let ports = design.names(self.ports);
         let params: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
         if self.name.is_none() || !distinct(ports) || !distinct(&params) {
@@ -341,7 +349,7 @@ impl RowFacts for Subckt {
 }
 
 impl RowFacts for Section {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([
             Handle::Name(self.name),
             Handle::Name(self.library),
@@ -349,17 +357,17 @@ impl RowFacts for Section {
         ]);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         if !self.library.is_none() {
             *set = set.with(Feature::Extra(Extra::SectionLibrary));
         }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if self.name.is_none() {
             field_domain(design, at, out);
         }
@@ -400,15 +408,15 @@ impl RowFacts for If {
         }
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let branches = design.branches(self.branches);
         let else_early = branches.iter().rev().skip(1).any(|b| b.cond.is_none());
         if branches.is_empty() || else_early {
@@ -441,19 +449,19 @@ impl RowFacts for If {
 }
 
 impl RowFacts for Param {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.name), Handle::Expr(self.value)]);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if self.name.is_none() || self.value.is_none() {
             field_domain(design, at, out);
         }
@@ -484,7 +492,7 @@ impl RowFacts for Param {
 }
 
 impl RowFacts for Func {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         // a function may be called from an expression that reads the circuit
         out.extend([
             Handle::Name(self.name),
@@ -493,15 +501,15 @@ impl RowFacts for Func {
         ]);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if self.name.is_none() || self.body.is_none() || !distinct(design.names(self.args)) {
             field_domain(design, at, out);
         }
@@ -540,6 +548,25 @@ fn field_domain(design: &Design, at: ItemRef, out: &mut Diags) {
         design.span_of(at),
         at.index,
     );
+}
+
+/// Whether the tree under `root` holds a `Param` read. Explicit stack (C11); descends only to
+/// lower ids, so it ends on any table contents.
+fn reads_param(design: &Design, root: ExprId) -> bool {
+    let mut stack = vec![root];
+    let mut kids = Vec::new();
+    while let Some(e) = stack.pop() {
+        if e.index() >= design.expr_count() {
+            continue;
+        }
+        if let crate::expr::Expr::Param(_) = design.expr(e) {
+            return true;
+        }
+        kids.clear();
+        design.children(e, &mut kids);
+        stack.extend(kids.iter().copied().filter(|k| *k < e));
+    }
+    false
 }
 
 /// Whether no name appears twice. O(n²): lists are short (ports, arguments, nets).

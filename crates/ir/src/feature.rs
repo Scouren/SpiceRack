@@ -30,10 +30,10 @@ use crate::circuit_extra::CircuitExtra;
 use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::id::{ExprId, ItemRef, NameId, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
+use crate::item::{ItemKind, Role, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 use crate::wave::WaveKind;
@@ -103,6 +103,19 @@ pub enum Extra {
     /// Two names of the design that differ only in ASCII case: a case-folding target would
     /// merge them.
     CaseSensitiveNames,
+    /// A literal of form `Int` anywhere in the design (A12 K1: typed arithmetic).
+    IntLiteral,
+    /// An item holds a reference bound to a definition in the body of a subcircuit enclosing
+    /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
+    /// resolves in the own scope, then the top, never an enclosing subcircuit).
+    EnclosingRef,
+    /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
+    /// only a formal whose default folds to a constant).
+    FormalReadsParam,
+    /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
+    /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
+    /// empty one are the same text there).
+    DeckWithoutTitle,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -231,7 +244,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 8] = [
+    pub const ALL: [Extra; Extra::DeckWithoutTitle as usize + 1] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -240,6 +253,10 @@ impl Extra {
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
+        Extra::IntLiteral,
+        Extra::EnclosingRef,
+        Extra::FormalReadsParam,
+        Extra::DeckWithoutTitle,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -347,6 +364,17 @@ pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
     if case_clash(design) {
         *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
     }
+    let untitled = |f| {
+        let file = design.file(f);
+        file.role == Role::Deck
+            && !design
+                .items(file.top)
+                .iter()
+                .any(|i| i.kind == ItemKind::Title)
+    };
+    if design.files().any(untitled) {
+        *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
+    }
     crate::element::design_features(design, set);
     crate::analysis::design_features(design, set);
 }
@@ -386,6 +414,7 @@ pub(crate) fn item_features(
         | ItemKind::Param
         | ItemKind::Func
         | ItemKind::Model
+        | ItemKind::DeviceLibrary
         | ItemKind::Statistics
         | ItemKind::Element
         | ItemKind::Analysis
@@ -396,10 +425,34 @@ pub(crate) fn item_features(
         | ItemKind::NodeSet
         | ItemKind::Save
         | ItemKind::Print
-        | ItemKind::Measure => None,
+        | ItemKind::Measure
+        | ItemKind::Elaborate => None,
     };
     if let Some(extra) = placed {
         *set = set.with(Feature::Extra(extra));
+    }
+    // A12 K2: a resolved reference (in the row or in its expressions) into an enclosing
+    // subcircuit's body
+    let mut refs: Vec<DefId> = handles
+        .iter()
+        .filter_map(|h| match h {
+            Handle::Ref(r) => Some(r.def),
+            _ => None,
+        })
+        .collect();
+    for root in expr_roots(design, &handles) {
+        for &e in walk.tree(design, root) {
+            if let Expr::Param(r) | Expr::UserCall(r, _) = design.expr(e) {
+                refs.push(r.def);
+            }
+        }
+    }
+    let enclosing = refs.iter().any(|&d| {
+        d.index_checked(design.defs.len())
+            .is_some_and(|k| design.in_enclosing_subckt(scope, design.defs[k].scope))
+    });
+    if enclosing {
+        *set = set.with(Feature::Extra(Extra::EnclosingRef));
     }
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);
@@ -410,6 +463,11 @@ pub(crate) fn item_features(
             .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
+            if let Expr::Num(n) = design.expr(e)
+                && design.num(n).form == NumForm::Int
+            {
+                *set = set.with(Feature::Extra(Extra::IntLiteral));
+            }
             let f = match design.expr(e) {
                 Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
                 Expr::Call(func, _) => Feature::Func(func),

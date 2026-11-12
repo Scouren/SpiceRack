@@ -164,11 +164,6 @@ impl Names {
     pub(crate) fn len(&self) -> usize {
         self.ends.len()
     }
-
-    /// Always false: ground is interned at construction. Here for clippy's `len` rule.
-    pub(crate) fn is_empty(&self) -> bool {
-        self.ends.is_empty()
-    }
 }
 
 impl Texts {

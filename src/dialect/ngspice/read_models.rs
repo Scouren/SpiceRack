@@ -6,7 +6,7 @@
 //! - the type word picks the family: `INPdomodel`'s level switches for `npn pnp njf pjf nmf pmf
 //!   nhfet phfet nmos pmos nsoi psoi` (`INPfindLev`: the first `level` of the line, `(int)(v +
 //!   0.5)`; above 99 or below 0 ngspice runs level 1 instead: `InvalidInSource`), the diode's own
-//!   `level` model parameter (1 or 3; any other runs neither family, `diotemp.c:210`), one family
+//!   `level` model parameter (1 or 3; any other runs neither family, `diotemp.c:210`: `Private`), one family
 //!   for `r res c l sw csw urc ltra txl cpl`, `vdmos` with `pchan` (`inpcom.c`
 //!   `inp_vdmos_model`), else `INPtypelook`: a code model, a built-in device name (`Unread`), or
 //!   an OSDI module (`Module`);
@@ -49,11 +49,14 @@ use crate::ir::{self, Code, Feature, Info, Kind, ModelFamily as F, OpaqueClass, 
 use crate::syntax::ast::{NONE, Node, Tag};
 
 /// What this area adds to `FEATURES`, the image of its reader: models, inside subcircuits too,
-/// bins, and a string (a model's version).
+/// bins, with no device library, and a string (a model's version). A model in an `.if` branch (R33) joins as
+/// `Placed(Branch, Model)` when the kernel's placement class lands (AMEND-A12 A15).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ir::ItemKind::Model),
     Feature::Extra(ir::Extra::LocalModel),
     Feature::Circuit(ir::CircuitExtra::ModelBin),
+    // ngspice's devices are built in: no model needs a `DeviceLibrary` (A12 C5)
+    Feature::Circuit(ir::CircuitExtra::ModelWithoutLibrary),
     Feature::Expr(ir::ExprTag::Str),
 ]);
 
@@ -68,14 +71,14 @@ pub(super) const CODES: &[Row] = &[
     note(
         NO_DEVICE,
         "a model card ngspice has no device for",
-        "ngspice-45 inpdomod.c, inpfindl.c, diotemp.c:210",
+        "ngspice-45 inpdomod.c, inpfindl.c",
         "ngspice ignores the card or runs another level than written; it is kept as text (InvalidInSource).",
     ),
     note(
         UNREAD,
         "a model card form with no IR rule yet",
         "rewrite/S3-AREAS.md",
-        "a level or version in braces, a flag word, a device name or ako: as type word, a MESA level, a sequence or temperature value, a model in an .if branch: kept as text (Unread).",
+        "a level or version in braces, a flag word, a device name as type word, a MESA level, a sequence or temperature value: kept as text (Unread).",
     ),
     note(
         CIDER,
@@ -102,6 +105,12 @@ pub(super) const CODES: &[Row] = &[
         "each value is set in turn; the last one is kept.",
     ),
     note(
+        DIODE_LEVEL,
+        "a diode level ngspice runs as neither family",
+        "ngspice-45 diotemp.c:210, diosetup.c:301",
+        "a level other than 1 and 3 scales the breakdown current by the area as level 3 does, without its geometry; kept as text (Private).",
+    ),
+    note(
         DUPLICATE,
         "a model defined twice in one scope",
         "ngspice-45 inpmkmod.c INPmakeMod",
@@ -112,8 +121,8 @@ pub(super) const CODES: &[Row] = &[
 /// A `.model` card with no name or no type word: `InvalidInSource`.
 const MALFORMED: Code = Code::new(b'P', 1201);
 /// A card ngspice has no device for: a level its switch lacks or above 99 or below 0 (it runs
-/// level 1 instead), a diode level other than 1 and 3, a BSIM3, BSIM4 or HiSIM-HV version no
-/// prefix matches, `poly`: `InvalidInSource`.
+/// level 1 instead), a BSIM3, BSIM4 or HiSIM-HV version no
+/// prefix matches, `poly`, `ako:`: `InvalidInSource`.
 const NO_DEVICE: Code = Code::new(b'P', 1202);
 /// A card form the reader has no rule for yet: `Unread`.
 const UNREAD: Code = Code::new(b'P', 1203);
@@ -125,6 +134,8 @@ const IGNORED: Code = Code::new(b'P', 1205);
 const POLARITY: Code = Code::new(b'P', 1206);
 /// A parameter given twice: ngspice sets the last value.
 const REPEATED: Code = Code::new(b'P', 1207);
+/// A diode level other than 1 and 3: ngspice runs it as neither family, `Private`.
+const DIODE_LEVEL: Code = Code::new(b'P', 1208);
 /// A model its scope defines already: ngspice keeps the first; this one is `Inert`.
 const DUPLICATE: Code = Code::new(b'R', 1201);
 
@@ -183,10 +194,6 @@ const fn note(code: Code, title: &'static str, cite: &'static str, explain: &'st
 
 /// The card validated whole, then pushed; or why not.
 fn read(lw: &mut Lower<'_, '_>, st: Stmt) -> Result<(), Refusal> {
-    if matches!(lw.ast.tag(st.container), Tag::If | Tag::Else) {
-        // the definition would sit in the branch scope, out of the parent's lookup
-        return Err(unread());
-    }
     let card = parts(lw, st.node).ok_or((OpaqueClass::InvalidInSource, MALFORMED))?;
     let name = lw.names.fold(&card.name);
     // looked up, not interned: a refused card leaves no row, names included
@@ -305,8 +312,13 @@ fn head(lw: &Lower<'_, '_>, card: &Card, notes: &mut Vec<Code>) -> Result<Head, 
     if let Some(p) = vdmos(card)? {
         return Ok(Head::Family(F::Vdmos, p));
     }
-    if !card.flags.is_empty() || word == "ako" || word.starts_with("ako:") {
-        // a flag (`pmos` after `nmos` would set the polarity again) or PSPICE's `ako:`
+    if word == "ako" || word.starts_with("ako:") {
+        // PSPICE's derived model: the default mode reads `ako:x` as a type word it lacks (run:
+        // "Unknown model type ako:q1 - ignored"); the PSPICE-compat flavour reads it later
+        return Err((OpaqueClass::InvalidInSource, NO_DEVICE));
+    }
+    if !card.flags.is_empty() {
+        // a flag: `pmos` after `nmos` would set the polarity again
         return Err(unread());
     }
     if families::levelled(word) {
@@ -332,7 +344,8 @@ fn head(lw: &Lower<'_, '_>, card: &Card, notes: &mut Vec<Code>) -> Result<Head, 
         return match level(lw, card, false)? {
             None | Some(1) => Ok(Head::Family(F::Diode, Polarity::None)),
             Some(3) => Ok(Head::Family(F::DiodeLevel3, Polarity::None)),
-            Some(_) => Err((OpaqueClass::InvalidInSource, NO_DEVICE)),
+            // ngspice runs it, as neither family (diotemp.c:210): only ngspice computes it
+            Some(_) => Err((OpaqueClass::Private, DIODE_LEVEL)),
         };
     }
     if let Some(f) = families::fixed(word) {

@@ -11,8 +11,8 @@
 //!
 //! ```
 //! use spicerack_ir::passive::Passive;
-//! use spicerack_ir::source::Source;
-//! use spicerack_ir::wave::Pulse;
+//! use spicerack_ir::source::{DcRule, Source};
+//! use spicerack_ir::wave::{Pulse, PulseLaw};
 //! use spicerack_ir::{
 //!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, NameId,
 //!     NumForm, Polarity, Ref, Role, Span, NO_ROW,
@@ -23,7 +23,7 @@
 //! let (_, top) = b.file("rc.sp", Role::Deck);
 //! let span = Span::NONE;
 //!
-//! // `R1 a b 1k` (an ngspice reader: the letter is the kind, the digits as written)
+//! // `R1 a b 1k` (an ngspice reader: the kind from the letter, the whole name folded, A13)
 //! let one_k = b.literal(Literal { mantissa: 1, frac: 0, exp10: 3, form: NumForm::Scale });
 //! let head = b.head("r1", &["a", "b"], None, &[], ExprId::NONE);
 //! b.passive(top, ElemKind::Resistor, head, Passive { value: one_k, ..Passive::PLAIN }, span);
@@ -33,13 +33,14 @@
 //! let (edge, width, period) = (b.num(1e-9), b.num(5e-6), b.num(10e-6));
 //! let wave = b.wave(Pulse {
 //!     v1: zero, v2: one, delay: zero, rise: edge, fall: edge, width, period,
-//!     cycles: ExprId::NONE,
+//!     cycles: ExprId::NONE, law: PulseLaw::Spice,
 //! });
 //! let head = b.head("v1", &["in", "0"], None, &[], ExprId::NONE);
 //! let source = Source {
 //!     dc: zero, ac_mag: ExprId::NONE, ac_phase_deg: ExprId::NONE, tc1: ExprId::NONE,
 //!     tc2: ExprId::NONE, pac_mag: ExprId::NONE, pac_phase_deg: ExprId::NONE, wave,
 //!     noise_psd: List::EMPTY, parasitics: NO_ROW, port: NO_ROW, distof: NO_ROW,
+//!     dc_rule: DcRule::Given,
 //! };
 //! b.source(top, ElemKind::VSource, head, source, span);
 //!
@@ -101,7 +102,7 @@ use crate::wave::{WaveRef, WaveRow};
 /// that binds the master itself.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ElemHead {
-    /// The element's name, without a type letter.
+    /// The element's whole name (A13), unique in its scope.
     pub name: NameId,
     /// Terminals in the kind's role order.
     pub terminals: NameList,

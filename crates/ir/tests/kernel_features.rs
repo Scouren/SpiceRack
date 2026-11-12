@@ -3,15 +3,16 @@
 //! `Extra` beside a legal neighbour that does not set it, `check_legal`'s refusals, and the
 //! kernel's code table.
 //!
-//! Oracles: the inverse (`from_index(index(f)) == f` for all 496); spec examples (the expected
+//! Oracles: the inverse (`from_index(index(f)) == f` for every index); spec examples (the expected
 //! feature sets are written out in each test); a legal neighbour per `Extra`.
 //!
 //! Contents: none (tests only).
 
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
-    BinOp, Code, Design, Diags, Dist, DrawPer, DrawWhen, ExprTag, Extra, Feature, FeatureSet, Func,
-    ItemKind, Kind, LoadKind, OpaqueClass, Role, Span, UnOp, Violation, check_legal, features_used,
+    AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
+    ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass, OptionKey,
+    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -33,7 +34,26 @@ fn set(fs: &[Feature]) -> FeatureSet {
 
 #[test]
 fn index_and_from_index_are_inverses() {
-    assert_eq!(Feature::COUNT, 502); // A11: three more `Func` members, each twice (plain, Dyn)
+    // the count follows the enums it is built from: a member added to any of them moves it,
+    // and no hand edit here is needed (the inverse below shows each index is one feature)
+    let groups = [
+        ItemKind::ALL.len(),
+        ElemKind::ALL.len(),
+        WaveKind::ALL.len(),
+        AnalysisKind::ALL.len(),
+        ExprTag::ALL.len(),
+        2 * Func::ALL.len(),
+        2 * BinOp::ALL.len(),
+        2 * UnOp::ALL.len(),
+        Dist::ALL.len(),
+        DrawWhen::ALL.len(),
+        DrawPer::ALL.len(),
+        Extra::ALL.len(),
+        CircuitExtra::ALL.len(),
+        RunExtra::ALL.len(),
+        OptionKey::ALL.len(),
+    ];
+    assert_eq!(Feature::COUNT as usize, groups.iter().sum::<usize>());
     let mut seen = vec![false; Feature::COUNT as usize];
     for i in 0..Feature::COUNT {
         let f = Feature::from_index(i);
@@ -41,7 +61,10 @@ fn index_and_from_index_are_inverses() {
         assert!(!std::mem::replace(&mut seen[i as usize], true));
     }
     assert_eq!(Feature::Item(ItemKind::Title).index(), 0);
-    assert_eq!(Feature::Item(ItemKind::Measure).index(), 22);
+    assert_eq!(
+        Feature::Item(ItemKind::Measure).index(),
+        ItemKind::Measure as u16
+    );
     // the groups in declaration order: the last feature is the last option key
     let last = Feature::from_index(Feature::COUNT - 1);
     assert!(matches!(last, Feature::Option(_)), "{last:?}");
@@ -131,7 +154,7 @@ fn features_of_a_hand_built_deck() {
 fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
-    let cases: [(Extra, Build, Build); 8] = [
+    let cases: [(Extra, Build, Build); Extra::COUNT] = [
         (
             Extra::NestedSubckt,
             |b, top| {
@@ -216,6 +239,87 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.global(top, &["vdd", "vss"], Span::NONE);
             },
         ),
+        (
+            Extra::IntLiteral,
+            |b, top| {
+                let three = spicerack_ir::Literal {
+                    mantissa: 3,
+                    frac: 0,
+                    exp10: 0,
+                    form: spicerack_ir::NumForm::Int,
+                };
+                let v = b.literal(three);
+                b.param(top, "k", v, Span::NONE);
+            },
+            |b, top| {
+                let v = b.num(3.0);
+                b.param(top, "k", v, Span::NONE);
+            },
+        ),
+        (
+            Extra::EnclosingRef,
+            |b, top| {
+                // outer body defines p; the inner subckt's param reads it: an enclosing body
+                let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
+                let one = b.num(1.0);
+                b.param(outer, "p", one, Span::NONE);
+                let (_, inner) = b.subckt(outer, "inner", &[], &[], Span::NONE);
+                let read = b.param_ref("p");
+                let p = b.design().lookup(
+                    outer,
+                    spicerack_ir::DefKind::Param,
+                    b.design().find_name("p"),
+                );
+                b.resolve(read, p);
+                b.param(inner, "q", read, Span::NONE);
+            },
+            |b, top| {
+                // the neighbour reads its own subcircuit's p and the top's t
+                let one = b.num(1.0);
+                b.param(top, "t", one, Span::NONE);
+                let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
+                let (_, inner) = b.subckt(outer, "inner", &[], &[], Span::NONE);
+                let two = b.num(2.0);
+                b.param(inner, "p", two, Span::NONE);
+                let own = b.param_ref("p");
+                let p = b.design().lookup(
+                    inner,
+                    spicerack_ir::DefKind::Param,
+                    b.design().find_name("p"),
+                );
+                b.resolve(own, p);
+                let at_top = b.param_ref("t");
+                let t =
+                    b.design()
+                        .lookup(top, spicerack_ir::DefKind::Param, b.design().find_name("t"));
+                b.resolve(at_top, t);
+                let sum = b.binary(BinOp::Add, own, at_top);
+                b.param(inner, "q", sum, Span::NONE);
+            },
+        ),
+        (
+            Extra::FormalReadsParam,
+            |b, top| {
+                let one = b.num(1.0);
+                b.param(top, "w0", one, Span::NONE);
+                let read = b.param_ref("w0");
+                b.subckt(top, "s", &[], &[("w", read)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+            },
+        ),
+        (
+            Extra::DeckWithoutTitle,
+            |b, top| {
+                b.comment(top, "no title", Span::NONE);
+            },
+            |b, top| {
+                b.title(top, "", Span::NONE);
+                b.comment(top, "titled", Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         if extra == Extra::LocalModel {
@@ -284,6 +388,17 @@ fn the_kernel_code_table() {
         assert_eq!(code, Code::new(b'S', k as u16 + 1));
         assert_eq!(diag::info(code).expect("S row").kind, Kind::Note);
     }
+    // A12 K3: Hint is appended, so the codes before it keep their numbers
+    let hint = diag::info(Code::new(b'S', 6)).expect("S0006 is Hint");
+    assert_eq!(diag::opaque_code(OpaqueClass::Hint), Code::new(b'S', 6));
+    assert_eq!(hint.kind, Kind::Note);
+    assert_ne!(
+        hint.explain,
+        diag::info(diag::opaque_code(OpaqueClass::Inert))
+            .expect("S0003")
+            .explain,
+        "its own note, not Inert's"
+    );
     assert_eq!(diag::info(UNSUPPORTED).expect("U row").kind, Kind::Refusal);
     assert!(diag::info(TEXT_SYNTAX).is_some());
     assert_eq!(diag::info(Code::new(b'W', 1)), None, "another owner's code");
@@ -387,4 +502,16 @@ fn used_with(f: impl FnOnce(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeI
     }
     spicerack_ir::link(&mut d, &mut Diags::new());
     features_used(&d)
+}
+
+#[test]
+fn a_library_without_a_title_is_no_deck_without_one() {
+    // the legal neighbour of DeckWithoutTitle's other side: only a `Deck` file needs a title
+    let mut d = Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("lib.sp", Role::Library);
+        b.comment(top, "a library", Span::NONE);
+    }
+    assert!(!features_used(&d).contains(Feature::Extra(Extra::DeckWithoutTitle)));
 }

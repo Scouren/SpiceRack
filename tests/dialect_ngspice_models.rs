@@ -27,6 +27,7 @@ use spicerack::ir;
 const READ: &[&str] = &[
     "bins",
     "bjt",
+    "branch",
     "bsim_version",
     "bsim_version_invalid",
     "code_module",
@@ -128,14 +129,14 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         ),
     ];
     for (line, code) in cases {
-        let mut design = parse_ir(&format!("file \"t.sp\" deck\n  {line}\n"));
+        let mut design = parse_ir(&format!("file \"t.sp\" deck\n  title \"t\"\n  {line}\n"));
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
         let got: Vec<String> = diags.rows().iter().map(|d| d.code.to_string()).collect();
         assert_eq!(got, [code], "{line}");
     }
     // and admits a card of each kind it spells
-    let fine = "file \"t.sp\" deck\n  model a mos1 polarity=n params=(vto=1 kp=2)\n  model b.1 bsim4 polarity=p params=(lmin=1 toxe=2) bin_of=b version=\"4.5\"\n  model c vbic polarity=n version=\"1.2\"\n  model d diode params=(m=0.3)\n";
+    let fine = "file \"t.sp\" deck\n  title \"t\"\n  model a mos1 polarity=n params=(vto=1 kp=2)\n  model b.1 bsim4 polarity=p params=(lmin=1 toxe=2) bin_of=b version=\"4.5\"\n  model c vbic polarity=n version=\"1.2\"\n  model d diode params=(m=0.3)\n";
     let mut design = parse_ir(fine);
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut design, row(), &mut diags);
@@ -145,7 +146,9 @@ fn admits_refuses_what_ngspice_cannot_spell() {
 #[test]
 fn written_models_run_on_ngspice_to_the_original_numbers() {
     // Oracle: ngspice-45 on the deck as written; the read → write image must print the same
-    // value (the writer spells the reader's digits, so the doubles are the same).
+    // value (the writer spells the reader's digits, so the doubles are the same). A silent
+    // BSIM3, BSIM4 or B4SOI card is written with its device's default version (b3set.c:84,
+    // b4set.c:205, b4soiset.c:124): the same numbers show the explicit default is the silent one.
     let cases: &[(&str, &str)] = &[
         (
             ".model mm nmos vto=0.5 kp=1e-4 lambda=0.02",

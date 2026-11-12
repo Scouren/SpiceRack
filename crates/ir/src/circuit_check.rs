@@ -15,7 +15,8 @@
 //!
 //! Contents (crate-private): `pub(crate) struct Verdict`, `pub(crate) fn verdict`,
 //! `pub(crate) fn check_element`, `pub(crate) fn check_model`, `pub(crate) fn model_ok`,
-//! `pub(crate) fn detail_len`, `pub(crate) fn has_polarity`
+//! `pub(crate) fn detail_len`, `pub(crate) fn has_polarity`, `pub(crate) fn builtin_kind`,
+//! `pub(crate) fn builtin_fits`, `pub(crate) fn bound_family`
 
 use crate::check::Violation;
 use crate::circuit_text::get_row;
@@ -23,10 +24,12 @@ use crate::controlled::{DelayLaw, OutKind, Quantity, TableLaw};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
+use crate::expr::Expr;
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::IcMode;
-use crate::wave::{PwlJoin, PwlRepeat, WaveKind, WaveRef};
+use crate::source::DcRule;
+use crate::wave::{PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
 /// What is wrong with an element beyond its terminal count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,6 +51,11 @@ pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
     if e.kind.needs_model() && !named
         || e.kind.master_kind().is_none() && e.kind != ElemKind::Unresolved && named
         || e.kind == ElemKind::Unresolved && e.model.def != DefId::NONE
+    {
+        v.domain = false;
+    }
+    if let Some(family) = bound_family(design, e.model)
+        && !builtin_fits(e.kind, family)
     {
         v.domain = false;
     }
@@ -98,10 +106,55 @@ pub(crate) fn model_ok(m: &Model) -> bool {
     let wants_word = matches!(m.family, ModelFamily::CodeModel | ModelFamily::Other);
     let wants_module = m.family == ModelFamily::Module;
     let polar = m.family == ModelFamily::Other || has_polarity(m.family);
-    (m.word != NameId::NONE) == wants_word
+    (builtin_kind(m.family).is_none() || m.params.is_empty())
+        && (m.word != NameId::NONE) == wants_word
         && (m.module.name != NameId::NONE) == wants_module
         && (m.polarity != Polarity::None || !has_polarity(m.family))
         && (m.polarity == Polarity::None || polar)
+}
+
+/// The element kind a builtin family's model serves (AMEND-A12 C5), or `None` for every other
+/// family.
+pub(crate) fn builtin_kind(f: ModelFamily) -> Option<ElemKind> {
+    match f {
+        ModelFamily::SourceV => Some(ElemKind::VSource),
+        ModelFamily::SourceI => Some(ElemKind::ISource),
+        ModelFamily::Vcvs => Some(ElemKind::Vcvs),
+        ModelFamily::Vccs => Some(ElemKind::Vccs),
+        ModelFamily::Ccvs => Some(ElemKind::Ccvs),
+        ModelFamily::Cccs => Some(ElemKind::Cccs),
+        ModelFamily::Mutual => Some(ElemKind::Coupling),
+        _ => None, // every other family serves the kinds its own docs name
+    }
+}
+
+/// Whether an element of `kind` may name a model of `family`: a builtin family serves only its
+/// kind, and a source or linear controlled source names only its builtin (a coupling may also
+/// name a core).
+pub(crate) fn builtin_fits(kind: ElemKind, family: ModelFamily) -> bool {
+    let only_builtin = matches!(
+        kind,
+        ElemKind::VSource
+            | ElemKind::ISource
+            | ElemKind::Vcvs
+            | ElemKind::Vccs
+            | ElemKind::Cccs
+            | ElemKind::Ccvs
+    );
+    match builtin_kind(family) {
+        Some(k) => k == kind,
+        None => !only_builtin,
+    }
+}
+
+/// The family of the model `r` is bound to, if it is bound to a model row (total: a bad
+/// definition index is the kernel's `HandleRange`).
+pub(crate) fn bound_family(design: &Design, r: crate::id::Ref) -> Option<ModelFamily> {
+    let def = design.definitions().get(r.def.0 as usize)?;
+    (def.item.kind == crate::item::ItemKind::Model)
+        .then(|| get_item::<Model>(design, def.item.index))
+        .flatten()
+        .map(|m| m.family)
 }
 
 /// The row count of `kind`'s table (0 for `DetailKind::None`).
@@ -196,6 +249,13 @@ pub(crate) fn has_polarity(f: ModelFamily) -> bool {
         | F::Urc
         | F::HspiceW
         | F::CoreJilesAtherton
+        | F::SourceV
+        | F::SourceI
+        | F::Vcvs
+        | F::Vccs
+        | F::Ccvs
+        | F::Cccs
+        | F::Mutual
         | F::CodeModel
         | F::Module
         | F::Other => false,
@@ -247,7 +307,8 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
             let par = side::<crate::passive::Parasitics>(design, s.parasitics, v);
             let port = side::<crate::source::PortSpec>(design, s.port, v);
             let dis = side::<crate::source::Distof>(design, s.distof, v);
-            some(s.dc)
+            (s.dc_rule == DcRule::Given) == some(s.dc)
+                && (s.dc_rule == DcRule::Given || s.wave != WaveRef::NONE)
                 && paired(s.ac_mag, s.ac_phase_deg)
                 && paired(s.pac_mag, s.pac_phase_deg)
                 && (s.port != NO_ROW) == (e.kind == ElemKind::Port)
@@ -370,8 +431,10 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
     }
     let all = |e: &[ExprId]| e.iter().all(|&x| some(x));
     match w.kind {
-        WaveKind::Pulse => side::<Pulse>(design, w.index, v)
-            .is_none_or(|p| all(&[p.v1, p.v2, p.delay, p.rise, p.fall, p.width, p.period])),
+        WaveKind::Pulse => side::<Pulse>(design, w.index, v).is_none_or(|p| {
+            all(&[p.v1, p.v2, p.delay, p.rise, p.fall, p.width, p.period])
+                && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
+        }),
         WaveKind::Sin => side::<Sin>(design, w.index, v).is_none_or(|s| {
             all(&[
                 s.offset,
@@ -433,4 +496,18 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
             ]) && p.bits != NameId::NONE
         }),
     }
+}
+
+/// Whether `e` is a literal at or below zero (VACASK's pulse needs `rise > 0`; an expression's
+/// sign is not known before evaluation, so only a literal is judged here).
+fn nonpositive_literal(design: &Design, e: ExprId) -> bool {
+    match design.expr(e) {
+        Expr::Num(k) => design.num(k).value() <= 0.0,
+        _ => false,
+    }
+}
+
+/// Row `index` of `R`'s item table, or `None` when out of range.
+fn get_item<R: crate::design::ItemRow>(design: &Design, index: u32) -> Option<R> {
+    R::table(design).rows.get(index as usize).copied()
 }

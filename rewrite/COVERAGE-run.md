@@ -11,7 +11,7 @@ result-side fact (backend, harness), outside the netlist IR.
 ## INV-constructs §G (analyses)
 
 - G1 → `AnalysisKind::Op`; HSPICE `.OP format time` / timed form → `AnalysisKind::TimedOp`; Xyce `.op` beside another analysis: reader rule (keeps what Xyce runs), `Extra::SeveralAnalyses`.
-- G2 → `AnalysisKind::Dc`, `dc_ac::Dc { axes }`, `DcAxis { target: TargetKind::SourceDc, sweep: SweepKind::Lin }`; HSPICE `START= STOP= STEP=`: spelling.
+- G2 → `AnalysisKind::Dc` (a VACASK `sweep` + `op` is a `Loop` around an `Op`: `RunExtra::LoopOverOp`, R20), `dc_ac::Dc { axes }`, `DcAxis { target: TargetKind::SourceDc, sweep: SweepKind::Lin }`; HSPICE `START= STOP= STEP=`: spelling.
 - G3 → `SweepKind::{Dec, Oct, List}` on a `DcAxis`; `Extra::{SweepDec, SweepOct, SweepList}`; ngspice `foreach` lowering is a pass.
 - G4 → `plan::Target` / `TargetKind::{Temp, Param, SourceDc, ElementValue, DeviceParam, ModelParam}`; Xyce's "bare name, parameter wins": reader rule; `Extra::DcAxis*`.
 - G5 → `AnalysisKind::Ac`, `dc_ac::Ac { sweep }`; Spectre `lin=`/VACASK `points` count steps: reader adds one (`SweepSpec::points` = values); Spectre AC over `dev=/param=` at one `freq=` → `Loop` over the target around a one-point `Ac`.
@@ -175,7 +175,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - K6 → reader rule: batch order is the run order the reader writes (ngspice reverse order, 8.04).
 - K7 → writer lowering of `Loop`/`Alter` (a pass or the ngspice writer).
 - K8 → writer rule.
-- K9 → `options` → `OptionRow`; `sweep` → `Loop`; `analysis` → `Analysis`; `save` → `Save`; `alter` → `Alter`; `elaborate`: gap G-ELABORATE; `var`: `Param`; `abort`/`print`/`postprocess` → `Opaque` `Script`.
+- K9 → `options` → `OptionRow`; `sweep` → `Loop`; `analysis` → `Analysis`; `save` → `Save`; `alter` → `Alter`; `elaborate` → `ItemKind::Elaborate` (A12 R1); `var`: `Param`; `abort`/`print`/`postprocess` → `Opaque` `Script`.
 - K10 → `Opaque` `Script`.
 - K11 → `Alter` (`Param` for `__topinst__`, `DeviceParam` for an instance, expression values allowed).
 - K12 → `alter` → `Alter`; `altergroup`: gap G-ALTERCARD; `set` → `OptionRow`; `assert check checklimit info shell`: `Opaque` `Inert`; `paramset` → `LoopKind::Table`; `paramtest`: Private.
@@ -183,7 +183,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - K14 → `LoopKind::Table`, `TableLoop { columns, values }`.
 - K15 → `LoopKind::Table` (the LTspice writer spells it as `table()`; its reader reads it back as a table only when the idiom is exact).
 - K16 → order in the scope is the plan (no epochs table); the invariants are `check`'s.
-- K17 → gap G-ELABORATE.
+- K17 → `ItemKind::Elaborate`, `plan::Elaborate { circuits }` (A12 R1).
 - K18 → `clear saves` → reader rule (union of saves, N3) with a note; `clear options` → `Alter`s back to the defaults (reader rule).
 - K19 → `Alter` with `TargetKind::DeviceParam` and a string value (`Extra::AlterString`); a topology flip under `@if`: kernel `If` re-evaluated after the alter (11.08).
 - K20 → as K12.
@@ -290,7 +290,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - G-PSSKNOBS (G33): ngspice `sciter`, `steadycoeff` (accuracy hints). Proposal: Private options on the deck until a second simulator has them.
 - G-LTTRAN (G39, G50, G43): LTspice `.tran` `steady`, `nodiscard`, `step`, `convreport`, `savestate`; HSPICE `.lin gdcalc`. Proposal: `Tran` flags when a second target has a meaning for them; until then the statement is Private.
 - G-ALTERCARD (G46, K12, K13, 13.03): HSPICE `.alter` blocks that re-state element or model cards, Spectre `altergroup` (defaults first). Proposal: an `Alter` variant whose target is an element or model and whose value is a replacement item (`ItemRef` to an element/model row in a side scope), with a `reset: bool` for altergroup's defaulting.
-- G-ELABORATE (K9, K17): VACASK repeated `elaborate` (another circuit). Proposal: a run item `Elaborate { circuit: Ref }` (DefKind::Subckt) that switches the top-level circuit for every run item after it.
+- G-ELABORATE (K9, K17): closed by A12 R1: `ItemKind::Elaborate { circuits }`, references of `DefKind::Subckt`, the top circuit for every run item after it.
 - G-FILEVALUES (G47, H20): values read from a data file (LTspice `file=`, HSPICE `.load`). Proposal: the kit's `Role::Data` files (`INV-constructs.md` L27) and `SweepSpec::List` filled from them at read.
 - G-SCHEDULE (G54, 8.25): Xyce's `schedule()` max step. Proposal: a kernel `Func::Schedule` (piecewise-constant in time) in `Tran::max_step`, which may then read `Time`.
 - G-SLOTS (G59, G60): VACASK `store=`/`nodeset="slot"`/`writeop` (named solution slots). Proposal: Private until a second simulator has slots.

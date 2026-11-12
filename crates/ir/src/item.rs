@@ -51,6 +51,9 @@ pub enum ItemKind {
     // ---- definitions (circuit, run) ----
     /// A device model. Row `model::Model` (circuit).
     Model,
+    /// A simulator's own implementation of an equation family, made available. Row
+    /// `library::DeviceLibrary` (circuit; AMEND-A12 C5, delegated to the circuit owner).
+    DeviceLibrary,
     /// A statistics block (process and mismatch variations). Row `stats::Statistics` (run).
     Statistics,
     // ---- circuit ----
@@ -76,6 +79,9 @@ pub enum ItemKind {
     Print,
     /// A measurement. Row `output::Measure` (run).
     Measure,
+    /// The named subcircuits' bodies become the top circuit from here on (A12 R1). Row
+    /// `plan::Elaborate` (run).
+    Elaborate,
 }
 
 /// What a scope is; it fixes which item kind owns it (checked).
@@ -144,6 +150,10 @@ pub enum OpaqueClass {
     InvalidInSource,
     /// Data-dependent control flow (a script).
     Script,
+    /// Tunes its own simulator's solver (a convergence aid, a step-control knob) and names no
+    /// accuracy target (A12 K3, R19): its own family copies it; another family leaves it out
+    /// with this class's note, since the numbers may move within the solver's tolerance.
+    Hint,
 }
 
 /// What a `Load` brings in.
@@ -293,7 +303,7 @@ const _: () = assert!(size_of::<Func>() == 16);
 
 impl ItemKind {
     /// Every kind, in declaration order (the order of `Feature::Item` indices).
-    pub const ALL: [ItemKind; 23] = [
+    pub const ALL: [ItemKind; ItemKind::Elaborate as usize + 1] = [
         ItemKind::Title,
         ItemKind::Comment,
         ItemKind::Include,
@@ -306,6 +316,7 @@ impl ItemKind {
         ItemKind::Param,
         ItemKind::Func,
         ItemKind::Model,
+        ItemKind::DeviceLibrary,
         ItemKind::Statistics,
         ItemKind::Element,
         ItemKind::Analysis,
@@ -317,6 +328,7 @@ impl ItemKind {
         ItemKind::Save,
         ItemKind::Print,
         ItemKind::Measure,
+        ItemKind::Elaborate,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
@@ -359,12 +371,13 @@ impl Role {
 
 impl OpaqueClass {
     /// Every class, in declaration order (the order of the `S` codes).
-    pub const ALL: [OpaqueClass; 5] = [
+    pub const ALL: [OpaqueClass; 6] = [
         OpaqueClass::Unread,
         OpaqueClass::Private,
         OpaqueClass::Inert,
         OpaqueClass::InvalidInSource,
         OpaqueClass::Script,
+        OpaqueClass::Hint,
     ];
     /// Class count.
     pub const COUNT: usize = Self::ALL.len();

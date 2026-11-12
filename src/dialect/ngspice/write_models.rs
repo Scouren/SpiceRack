@@ -14,7 +14,7 @@
 //! `inp_vdmos_model`; `rewrite/DIALECT-NGSPICE.md` §4; `rewrite/RULINGS.md` R21.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
+//! `pub(super) fn admits(&ir::Design, ir::ItemRef, ir::ScopeId, &mut ir::Diags)`,
 //! `pub(super) fn model(w: &mut Out<'_>, item: ir::ItemRef)`
 
 use super::codes::Row;
@@ -22,6 +22,7 @@ use super::expr_write;
 use super::families;
 use super::number::{self, Grammar};
 use super::read_models;
+use super::tables::Eval;
 use super::write::Out;
 use crate::ir::{self, Code, Info, Kind, ModelFamily as F};
 
@@ -60,12 +61,6 @@ pub(super) const CODES: &[Row] = &[
         "ngspice-45 inpcom.c inp_fix_param_values",
         "a literal ngspice spells in another form, a string or version it cannot quote, or a value that reads the temperature or the circuit.",
     ),
-    refusal(
-        PLACEMENT,
-        "a model in an .if branch",
-        "rewrite/S3-AREAS.md",
-        "the reader keeps such a card as text; the IR's definition in a branch scope has no ngspice reading yet.",
-    ),
 ];
 
 /// A family ngspice has no device for.
@@ -78,17 +73,17 @@ const PARAM: Code = Code::new(b'W', 1203);
 const BIN: Code = Code::new(b'W', 1204);
 /// A value ngspice reads back as another value, or one that reads the run.
 const VALUE: Code = Code::new(b'W', 1205);
-/// A model in an `.if` branch.
-const PLACEMENT: Code = Code::new(b'W', 1206);
 
 /// Appends a refusal for a `Model` ngspice cannot run as the row says (R21).
-pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
+pub(super) fn admits(
+    design: &ir::Design,
+    item: ir::ItemRef,
+    _scope: ir::ScopeId,
+    diags: &mut ir::Diags,
+) {
     let m: ir::Model = design.row(item.index);
     let span = design.span_of(item);
     let mut refuse = |code| diags.push(code, span, 0);
-    if in_branch(design, item) {
-        refuse(PLACEMENT);
-    }
     let named = matches!(m.family, F::CodeModel | F::Module);
     if !named && families::card(m.family, m.polarity).is_none() {
         refuse(FAMILY);
@@ -229,62 +224,16 @@ fn spell(d: &ir::Design, e: ir::ExprId, out: &mut String) {
     }
 }
 
-/// Whether [`spell`] writes `e` so that the reader reads it back as itself.
+/// Whether [`spell`] writes `e` so that the reader reads it back as itself: every literal
+/// (R28), a string with no quote or line break, an expression numparam spells that reads
+/// neither the temperature nor the circuit.
 fn value_spells(d: &ir::Design, e: ir::ExprId) -> bool {
     match d.expr(e) {
-        ir::Expr::Num(n) => {
-            let lit = d.num(n);
-            // a scale ngspice has no letter for would read back as an exponent literal
-            lit.form != ir::NumForm::Scale || ![-2, 15].contains(&lit.exp10)
-        }
+        ir::Expr::Num(_) => true,
         ir::Expr::Str(s) => !d.str(s).contains(['"', '\n', '\r']),
         _ => {
             ir::expr_class(d, e) < ir::ExprClass::Temp
-                && expr_write::literals_spell(d, e)
-                && !holds(d, e, |x| matches!(x, ir::Expr::Str(_) | ir::Expr::List(_)))
+                && expr_write::spells_in(d, e, Eval::Numparam)
         }
     }
-}
-
-/// Whether a node of `e`'s tree satisfies `pred`.
-fn holds(d: &ir::Design, e: ir::ExprId, pred: impl Fn(ir::Expr) -> bool) -> bool {
-    let mut stack = vec![e];
-    let mut seen = vec![false; d.expr_count()];
-    // Bounded: each row is visited once.
-    while let Some(x) = stack.pop() {
-        if std::mem::replace(&mut seen[x.index()], true) {
-            continue;
-        }
-        let row = d.expr(x);
-        if pred(row) {
-            return true;
-        }
-        stack.extend(children(d, row));
-    }
-    false
-}
-
-/// The children of an expression row.
-fn children(d: &ir::Design, row: ir::Expr) -> Vec<ir::ExprId> {
-    match row {
-        ir::Expr::Call(_, args)
-        | ir::Expr::UserCall(_, args)
-        | ir::Expr::Draw(_, _, _, args)
-        | ir::Expr::List(args) => d.exprs(args).to_vec(),
-        ir::Expr::Unary(_, a) => vec![a],
-        ir::Expr::Binary(_, a, b) => vec![a, b],
-        ir::Expr::Ternary(c, t, o) => vec![c, t, o],
-        _ => Vec::new(),
-    }
-}
-
-/// Whether `item` is listed in an `.if` branch's scope.
-// ponytail: one scan of the design per model; pass the listing scope (as write_structure's
-// admits gets it) when ng-scaffold's write.rs hands it over.
-fn in_branch(design: &ir::Design, item: ir::ItemRef) -> bool {
-    design
-        .reachable()
-        .into_iter()
-        .find(|(i, _)| *i == item)
-        .is_some_and(|(_, scope)| design.scope(scope).kind == ir::ScopeKind::Branch)
 }

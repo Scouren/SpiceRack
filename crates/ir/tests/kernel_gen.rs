@@ -1,7 +1,8 @@
-//! The generator's properties over the kernel's kinds: every generated design passes `check`
-//! and uses only the requested features (for the kernel set and for 20 random subsets); IR
-//! text round-trips it exactly (`parse(dump(d))` equals `d`, 2,000 seeds); the same seed gives
-//! the same bytes. The owners' kinds join the set when their rows generate (M5).
+//! The generator's properties: every generated design passes `check` and uses only the
+//! requested features (for the kernel set and for 20 random subsets); IR text round-trips it
+//! exactly (`parse(dump(d))` equals `d`, 2,000 seeds); the same seed gives the same bytes. Over
+//! every feature (`FeatureSet::ALL`, M5), 400 seeds are valid and round-trip, and 4,000 between
+//! them use every feature a valid design can hold.
 //!
 //! Oracles: the checker (tested against hand-broken designs in `check_tests`); the inverse
 //! (text, tested against hand-built rows in `kernel_text`); byte compare. Seeds are fixed and
@@ -175,6 +176,51 @@ fn the_same_seed_gives_the_same_bytes() {
     let a = text_of(&generate(1, &set, SIZE));
     let b = text_of(&generate(2, &set, SIZE));
     assert_ne!(a, b, "different seeds give different designs");
+}
+
+#[test]
+fn the_full_set_runs_every_property() {
+    // M5: the owners' kinds generate, so the properties run over every feature
+    let set = FeatureSet::ALL;
+    let mut reached = FeatureSet::EMPTY;
+    for seed in 0..400u64 {
+        let d = generate(seed, &set, SIZE);
+        if !valid_and_within(&d, &set) {
+            let small = shrink(seed, &set, |d| valid_and_within(d, &set));
+            panic!(
+                "seed {seed}: invalid; smallest failing size {small:?}\n{}",
+                text_of(&d)
+            );
+        }
+        if !round_trips(&d) {
+            let small = shrink(seed, &set, round_trips);
+            panic!(
+                "seed {seed}: parse(dump(d)) differs; smallest failing size {small:?}\n{}",
+                text_of(&d)
+            );
+        }
+    }
+    // a `ddt`/`idt` makes its tree read the circuit (class `Circuit`), so it only ever counts as
+    // `FuncDyn`: no valid design holds these two
+    let unreachable = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)];
+    // known gap, a marker: the run owner's generator does not yet make a sweep loop over one
+    // `Op` (A12 R2); remove the member here when it does, or this test fails
+    let not_yet = [Feature::Run(spicerack_ir::RunExtra::LoopOverOp)];
+    let goal = unreachable
+        .iter()
+        .chain(&not_yet)
+        .fold(FeatureSet::ALL, |s, f| s.minus(FeatureSet::EMPTY.with(*f)));
+    // reaching the rare kinds takes more seeds than the properties need; stops once reached
+    for seed in 0..4000u64 {
+        if goal.minus(reached).is_empty() {
+            break;
+        }
+        reached = reached.union(features_used(&generate(seed, &set, SIZE)));
+    }
+    let missing: Vec<Feature> = FeatureSet::ALL.minus(reached).iter().collect();
+    let mut want: Vec<Feature> = unreachable.iter().chain(&not_yet).copied().collect();
+    want.sort_by_key(|f| f.index());
+    assert_eq!(missing, want, "features no seed generated");
 }
 
 #[test]

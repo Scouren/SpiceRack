@@ -284,8 +284,10 @@ fn global_drops_ground_and_funcs_bind_their_formals() {
 #[test]
 fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
     // INV 2.06 (a .param reading the circuit), manual §2.4 (ports, a head default), parse.rs
-    // P0004 (a stray closer or `.elseif`), the stub areas (S3.1-S3.4: Unread).
-    let text = "t\n.param p={v(a)}\n.subckt s a a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\nR1 a b 1k\n.model m nmos\n.tran 1n 1u\n.control\nrun\n.endc\n.title x\n.global gnd\n";
+    // P0004 (a stray closer or `.elseif`) and P0001 (a statement led by a number: Verbatim);
+    // `.title` (no rule yet). Only statements the spine and the structure area own: the areas'
+    // cards (elements, models, analyses, outputs, `.control`) are their own tests'.
+    let text = "t\n.param p={v(a)}\n.subckt s a a\nX1 a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\n5 a b\n.title x\n.global gnd\n";
     let (d, diags) = deck(text);
     let top = d.file(d.entry()).top;
     assert_eq!(d.items(top)[0].kind, ItemKind::Title);
@@ -293,12 +295,7 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
         .map(|k| opaque(&d, top, k).0)
         .collect();
     use OpaqueClass::{Inert, InvalidInSource as Bad, Unread};
-    assert_eq!(
-        classes,
-        [
-            Bad, Bad, Bad, Bad, Bad, Unread, Unread, Unread, Unread, Unread, Inert
-        ]
-    );
+    assert_eq!(classes, [Bad, Bad, Bad, Bad, Bad, Unread, Unread, Inert]);
     let c = codes_of(&diags);
     let want = [
         codes::PARAM_READS_CIRCUIT,
@@ -308,16 +305,13 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
         codes::MALFORMED,
         codes::UNREAD,
         codes::UNREAD,
-        codes::UNREAD,
-        codes::UNREAD,
-        codes::UNREAD,
         codes::GLOBAL_GROUND,
     ];
     assert_eq!(c, want);
     assert_eq!(
-        opaque(&d, top, 9).1,
-        ".control\nrun\n.endc",
-        "a block is one statement"
+        opaque(&d, top, 2).1,
+        ".subckt s a a\nX1 a\n.ends",
+        "a block is one statement, its body in it"
     );
     round_trip(text);
 }
@@ -326,10 +320,10 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
 fn a_strict_read_refuses_unread_statements() {
     // SPINE §3, RULINGS R10: Policy::Strict turns each Unread into a refusal.
     let row = dialect::by_name("ngspice").expect("row");
-    let src = Sources::one("d.sp", "t\nR1 a b 1k\n");
+    let src = Sources::one("d.sp", "t\n5 a b\n");
     assert!(dialect::transpile(&src, row, row, Policy::Strict).is_err());
     let ok = dialect::transpile(&src, row, row, Policy::Lenient).expect("lenient");
-    assert_eq!(ok.text, "t\nR1 a b 1k\n.end\n");
+    assert_eq!(ok.text, "t\n5 a b\n.end\n");
 }
 
 #[test]
@@ -368,9 +362,9 @@ fn any_bytes_read_returns_and_checks_clean() {
 
 #[test]
 fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
-    // R21 (`Write::admits`): a literal ngspice reads back otherwise (no centi letter; numparam
-    // reads `mil` as milli: xpressn.c parseunit), a head parameter with no default (manual
-    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once).
+    // R21 (`Write::admits`): never a literal (R28: respelled exactly), a head parameter with no default (manual
+    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once),
+    // a string value (numparam has none).
     let mut d = ir::Design::new();
     {
         let mut b = d.builder();
@@ -393,19 +387,105 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
         b.comment(top, "two\nlines", ir::Span::NONE);
         let t = b.temp();
         b.if_(top, &[t], ir::Span::NONE);
+        let text = b.string("4.8.3");
+        b.param(top, "v", text, ir::Span::NONE);
     }
     let row = dialect::by_name("ngspice").expect("row");
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut d, row, &mut diags);
-    let mut got = codes_of(&diags);
+    // the admits rows; `U0001` for `Expr(Str)` also comes until the model area's FEATURES add it
+    let mut got: Vec<ir::Code> = codes_of(&diags)
+        .into_iter()
+        .filter(|c| c.letter == b'W')
+        .collect();
     got.sort();
     let mut want = vec![
-        codes::LITERAL_FORM,
-        codes::LITERAL_FORM,
         codes::NO_DEFAULT,
         codes::LINE_BREAK,
         codes::READS_RUN,
+        codes::TEXT_VALUE,
     ];
     want.sort();
     assert_eq!(got, want);
+}
+
+#[test]
+fn a_row_reference_queued_by_an_area_binds_to_a_definition_pushed_later() {
+    // R3 (the reader binds by ngspice's rule: the nearest definition outward), A11
+    // (`Builder::bind_ref`): an instance before its `.subckt`, as an X card standing first.
+    let mut d = ir::Design::new();
+    let (item, sub) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("d.sp", ir::Role::Deck);
+        let head = b.head("x1", &["a"], Some("s"), &[], ir::ExprId::NONE);
+        let item = b.instance(top, ir::ElemKind::Instance, head, ir::Span::NONE);
+        let (sub, _) = b.subckt(top, "s", &["p"], &[], ir::Span::NONE);
+        (item, sub)
+    };
+    let mut b = d.builder();
+    let name = b.design().find_name("s");
+    let top = b.design().file(b.design().entry()).top;
+    let rows = [super::read::RowRef {
+        item,
+        k: 0,
+        scope: top,
+        kind: ir::DefKind::Subckt,
+        name,
+    }];
+    super::read::bind_rows(&mut b, &rows);
+    let e: ir::Element = d.row(item.index);
+    assert_eq!(d.def(e.model.def).item, sub);
+}
+
+#[test]
+fn a_read_in_a_measure_binds_to_a_measure_before_a_parameter() {
+    // ngspice-45 measure.c do_measure: every other measure runs first and enters its result with
+    // nupa_add_param, so inside `.meas ... param=` a measure hides a `.param` of its name; outside
+    // one the `.param` is read.
+    let mut d = ir::Design::new();
+    let mut b = d.builder();
+    let (_, top) = b.file("d.sp", ir::Role::Deck);
+    let one = b.num(1.0);
+    let p = b.param(top, "x", one, ir::Span::NONE);
+    let c = b.comment(top, "stands in for a measure item", ir::Span::NONE);
+    let x = b.name("x");
+    let m = b.define(ir::DefKind::Measure, x, top, c);
+    let inside = b.param_ref("x");
+    let outside = b.param_ref("x");
+    let pending = [(inside, top), (outside, top)];
+    super::read::bind_reads(&mut b, &pending, &[(0, 1)]);
+    let def = |e| match b.design().expr(e) {
+        ir::Expr::Param(r) => r.def,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(def(inside), m);
+    assert_eq!(b.design().def(def(outside)).item, p);
+}
+
+#[test]
+fn a_subckts_formals_are_known_from_any_enclosing_block() {
+    // inpcom.c found_mult_param: an X line's m= is the multiplier unless the subcircuit declares
+    // m; the declare step answers for a .subckt defined anywhere in the enclosing blocks.
+    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
+    let text = "t\n.subckt outer a\n.subckt inner b params: M=1 w=2\n.ends\n.ends\n.subckt top c m=3\n.ends\n";
+    let toks = crate::syntax::tokenize(text, lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    let d = super::declare::declare(&ast, &toks);
+    let root = ast.root();
+    assert_eq!(d.formals(root, "TOP"), Some(&["m".to_string()][..]));
+    assert_eq!(d.formals(root, "inner"), None, "inner is outer's");
+    let outer = crate::syntax::ast::Node(ast.fields(root)[1]);
+    let want = ["m".to_string(), "w".to_string()];
+    assert_eq!(d.formals(outer, "inner"), Some(&want[..]));
+}
+
+#[test]
+fn a_blank_line_one_is_an_empty_title() {
+    // INV 14.12: line 1 of a deck is its title whatever it holds, so every ngspice deck has one.
+    let (d, _) = deck("\n.param a=1\n");
+    let top = d.file(d.entry()).top;
+    let t: ir::item::Title = d.row(d.items(top)[0].index);
+    assert_eq!(d.items(top)[0].kind, ItemKind::Title);
+    assert_eq!(d.text(t.text), "");
+    assert_eq!(write(&d), "\n.param a=1\n.end\n");
 }
