@@ -21,6 +21,8 @@ use spicerack::dialect::{self, DialectRow, Policy, Sources};
 use spicerack::ir;
 use spicerack::ir::ItemRow as _;
 
+use spicerack::result::RawData;
+
 use crate::files::PairFile;
 use crate::sim::{self, Ran};
 use crate::{Cell, cmp, laws, plots};
@@ -168,8 +170,14 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     for (k, v) in &pair.tightened {
         tol.tighten(k, *v).expect("pair_file checked it");
     }
-    if let Err(why) = cmp::compare(&a, &b, tol) {
-        fails.insert(4, fail("mismatch", why));
+    match cmp::compare(&a, &b, tol) {
+        Err(why) => {
+            fails.insert(4, fail("mismatch", why));
+        }
+        Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
+            eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
+        }
+        Ok(()) => {}
     }
     if let Err(why) = plots::names(&a, &b, &spine.devices) {
         fails.insert(5, fail("missing-vector", why));
@@ -459,6 +467,35 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
             format!("{}/{:?}/{note}/{word}", design.str(o.dialect), o.class)
         })
         .collect()
+}
+
+/// How much of step 4's tolerance a passing pair uses (`PAIR_MARGINS=1`, triage): the smallest
+/// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
+/// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
+/// below it (the worst vector, its value and the tolerance there).
+fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
+    let at = |f: f64| {
+        let mut t = cmp::Tol::of(&[src, written]);
+        for (k, d) in [("reltol", 1e-3), ("vntol", 1e-6), ("abstol", 1e-12)] {
+            t.tighten(k, d * f)
+                .expect("a fraction of the default tightens");
+        }
+        cmp::compare(a, b, t)
+    };
+    let (mut lo, mut hi) = (0.0f64, 1.0f64);
+    // Bounded: seven halvings take the bracket under 1 %.
+    for _ in 0..7 {
+        let mid = (lo + hi) / 2.0;
+        match at(mid) {
+            Ok(()) => hi = mid,
+            Err(_) => lo = mid,
+        }
+    }
+    let below = at(lo).err().unwrap_or_else(|| "passes at 0: exact".into());
+    format!(
+        "uses {:.0} % of the tolerance; below it: {below}",
+        hi * 100.0
+    )
 }
 
 /// Step 4's verdict when a run gave no plots: whose run, and why.
