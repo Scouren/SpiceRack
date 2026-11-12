@@ -124,6 +124,8 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         ("model a bsim4 polarity=n", "W1202"),
         ("model a b3_soi_dd polarity=n", "W1202"),
         ("model a hicum2 polarity=n", "W1202"),
+        // a module's version is no field ngspice has (its reader keeps `version=` a parameter)
+        ("model a module module=m version=\"1.0\"", "W1202"),
         ("model a mos1 polarity=n params=(vto=1 bogus=2)", "W1203"),
         ("model a.1 mos1 polarity=n bin_of=a", "W1204"),
         (
