@@ -12,9 +12,10 @@ use super::{N, R};
 use crate::build::Builder;
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_features::dc_at_zero;
-use crate::circuit_features::reads_circuit;
+use crate::class::ExprClass;
 use crate::controlled::{Behav, OutKind};
 use crate::element::{ElemKind, NO_ROW};
+use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::Gen;
 use crate::r#gen::Reads;
 use crate::id::{ItemRef, ScopeId};
@@ -27,9 +28,22 @@ use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::span::Span;
 use crate::wave::WaveRef;
 
-/// Pushes one random device library into `scope` (always possible).
-pub(crate) fn generate_library(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>) -> ItemRef {
-    let family = ModelFamily::ALL[g.below(ModelFamily::COUNT as u32) as usize];
+/// Pushes one random device library of a family `features` holds into `scope` (A25), or
+/// returns `ItemRef::NONE` when it holds none.
+pub(crate) fn generate_library(
+    g: &mut Gen,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+) -> ItemRef {
+    let families: Vec<ModelFamily> = ModelFamily::ALL
+        .into_iter()
+        .filter(|&f| features.contains(Feature::Family(f)))
+        .collect();
+    if families.is_empty() {
+        return ItemRef::NONE;
+    }
+    let family = families[g.below(families.len() as u32) as usize];
     let path = if g.chance(2) {
         NameId::NONE
     } else {
@@ -46,6 +60,9 @@ impl R<'_, '_> {
             Reads::Constant
         };
         let value = self.g.expr(self.b, self.f, reads);
+        // the class the generator tracked while drawing it, exact (ir-kernel 6e35638d; later draws
+        // overwrite it): `expr_class` here would recompute the design's table after every push
+        let dynamic = self.g.class == ExprClass::Circuit;
         let ic_mode = if kind == ElemKind::Resistor {
             IcMode::None
         } else {
@@ -58,7 +75,6 @@ impl R<'_, '_> {
         };
         // a circuit-valued element's coefficient needs a base (and a capacitor's a law) the set
         // allows (A15 C2)
-        let dynamic = reads_circuit(self.b.design(), value);
         let cap = kind == ElemKind::Capacitor;
         let bases = [
             (TcBase::Tnom, X::TcBaseTnom),
