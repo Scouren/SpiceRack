@@ -95,6 +95,11 @@ impl Gen {
             // hand the value up, building every frame it completes
             loop {
                 let Some(top) = stack.last_mut() else {
+                    // the tree's class by the kernel's rule, with this generator's own table
+                    let table = &self.def_class;
+                    self.class = crate::class::tree_class_with(b.design(), value, &|d| {
+                        table.get(d.index()).copied().unwrap_or(ExprClass::Constant)
+                    });
                     return value;
                 };
                 top.kids.push(value);

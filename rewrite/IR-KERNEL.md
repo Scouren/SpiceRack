@@ -465,6 +465,14 @@ in the item's listing scope, each next in the body of the master of the instance
 its old name or else its new one; `ScopeId::NONE` after a non-instance or an unresolved master
 (never guessed). `Design::element_uses()` is the read-only twin over every live item.
 
+**Round 7b (2026-11-12): the class of a call (A28's finding, ruled).** A user call's class is
+its body's, each formal read taking its argument's class: an argument whose formal the body
+never reads adds nothing (ngspice substitutes the body textually; on any simulator such an
+argument does not change the value). One walk carries the rule (`class::class_nodes`: a tree's
+rows but those arguments) for the class table, `expr_class`, the feature count, the forms and
+`check`; the generator computes its tree's class with it at the end. Inlining then changes no
+root's class.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

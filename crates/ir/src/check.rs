@@ -208,8 +208,6 @@ fn probe_classes(out: &mut Out<'_>) {
     let d = out.design;
     let table = crate::class::def_classes(d);
     let mut handles = Vec::new();
-    // one stamped walk for the whole pass: no per-field table (O(design) in all)
-    let mut walk = ExprWalk::new(d);
     for (item, _) in d.reachable() {
         handles.clear();
         for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
@@ -229,12 +227,7 @@ fn probe_classes(out: &mut Out<'_>) {
             }
         }
         for e in roots {
-            let class = walk
-                .tree(d, e)
-                .iter()
-                .map(|&n| crate::class::node_class(d, n, table))
-                .max()
-                .unwrap_or(ExprClass::Constant);
+            let class = crate::class::tree_class(d, e, table);
             if class == ExprClass::Circuit {
                 out.report(Violation::ProbeContext, item, e.0);
             }
