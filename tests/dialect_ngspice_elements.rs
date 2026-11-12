@@ -32,6 +32,7 @@ const READ: &[&str] = &[
     "defaults_duplicates",
     "diode_bjt",
     "instance",
+    "instance_ports",
     "lines",
     "mosfet_jfet_mesfet",
     "mosfet_soi3",
