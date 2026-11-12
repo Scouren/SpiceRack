@@ -30,7 +30,7 @@ use crate::diag::{Diags, TEXT_SYNTAX};
 use crate::expr::Literal;
 use crate::id::{DefId, ExprId, ExprList, FileId, NameId, NameList, ParamList, Ref, ScopeId};
 use crate::span::Span;
-use crate::text_lex::{Mark, lex_literal, lex_mark, lex_name, name_byte, unquote};
+use crate::text_lex::{RefMark, lex_literal, lex_mark, lex_name, name_byte, unquote};
 use crate::text_parse::parse_expr;
 
 /// The IR text reader's cursor over one statement line (after its indentation). A word is a
@@ -170,9 +170,9 @@ impl<'t> Words<'t> {
         let (mark, q) = lex_mark(self.text, q, self.end);
         self.pos = q;
         let def = match mark {
-            Mark::Bare => DefId::NONE,
-            Mark::Held => DefId::HELD,
-            Mark::Def(k) => DefId(k),
+            RefMark::Bare => DefId::NONE,
+            RefMark::Held => DefId::HELD,
+            RefMark::Def(k) => DefId(k),
         };
         Ref {
             name: b.name(&name),

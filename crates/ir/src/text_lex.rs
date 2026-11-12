@@ -5,12 +5,12 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (A4), §7.3 (A3), §9.
 //!
-//! Contents: crate: `pub(crate) enum Mark`,
+//! Contents: crate: `pub(crate) enum RefMark`,
 //! `pub(crate) fn lex_literal(&str) -> Option<Literal>`, `pub(crate) fn number_parts(&str) -> Option<(&str, i32, NumForm)>`,
 //! `pub(crate) fn lex_name(&str, usize, usize) -> Option<(Cow<'_, str>, usize)>`,
 //! `pub(crate) fn unquote(&str, usize, usize) -> Option<(Cow<'_, str>, usize)>`,
-//! `pub(crate) fn lex_mark(&str, usize, usize) -> (Mark, usize)`,
-//! `pub(crate) fn apply_mark(&mut Builder<'_>, ExprId, Mark)`,
+//! `pub(crate) fn lex_mark(&str, usize, usize) -> (RefMark, usize)`,
+//! `pub(crate) fn apply_mark(&mut Builder<'_>, ExprId, RefMark)`,
 //! `pub(crate) fn number_end(&[u8], usize, usize) -> usize`,
 //! `pub(crate) fn ident_or_quoted(&str, usize, usize) -> Option<(Cow<'_, str>, usize)>`,
 //! `pub(crate) fn name_byte(u8) -> bool`
@@ -24,7 +24,7 @@ use crate::literal::{self, Decimal};
 
 /// How a reference was marked in the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Mark {
+pub(crate) enum RefMark {
     /// `name`: unresolved, for the linker.
     Bare,
     /// `name?`: held unresolved through the link.
@@ -129,10 +129,10 @@ pub(crate) fn unquote(text: &str, at: usize, end: usize) -> Option<(Cow<'_, str>
 }
 
 /// The mark glued after a reference's name: `?`, `#digits`, or none.
-pub(crate) fn lex_mark(text: &str, at: usize, end: usize) -> (Mark, usize) {
+pub(crate) fn lex_mark(text: &str, at: usize, end: usize) -> (RefMark, usize) {
     let s = text.as_bytes();
     if at < end && s[at] == b'?' {
-        return (Mark::Held, at + 1);
+        return (RefMark::Held, at + 1);
     }
     if at < end && s[at] == b'#' {
         let n = s[at + 1..end]
@@ -140,19 +140,19 @@ pub(crate) fn lex_mark(text: &str, at: usize, end: usize) -> (Mark, usize) {
             .take_while(|c| c.is_ascii_digit())
             .count();
         if let Ok(k) = text[at + 1..at + 1 + n].parse::<u32>() {
-            return (Mark::Def(k), at + 1 + n);
+            return (RefMark::Def(k), at + 1 + n);
         }
     }
-    (Mark::Bare, at)
+    (RefMark::Bare, at)
 }
 
 /// Applies a mark to a `Param` or `UserCall` expression row (raw: `name#k` may name a
 /// definition that comes later in the text; `check` validates it).
-pub(crate) fn apply_mark(b: &mut Builder<'_>, e: ExprId, mark: Mark) {
+pub(crate) fn apply_mark(b: &mut Builder<'_>, e: ExprId, mark: RefMark) {
     let def = match mark {
-        Mark::Bare => return,
-        Mark::Held => DefId::HELD,
-        Mark::Def(k) => DefId(k),
+        RefMark::Bare => return,
+        RefMark::Held => DefId::HELD,
+        RefMark::Def(k) => DefId(k),
     };
     let x = &mut b.design.exprs;
     let i = e.index();
