@@ -77,6 +77,10 @@ const REFUSED: &[(&str, &str)] = &[
         "  measure m ac when (cross rise (v re (a)) value=(v(b)) count=1)",
     ),
     (
+        "dc window from high to low (ngspice swaps it)",
+        "  measure m dc stat avg (v (a)) (at value=0.8) (at value=0.2)",
+    ),
+    (
         "delay outside tran",
         "  measure m dc when (cross rise (v (a)) value=1 count=1 delay=1)",
     ),
@@ -146,7 +150,7 @@ fn outputs_ngspice_cannot_spell_are_refused() {
     // dotcards.c; meas: com_measure2.c get_value, measure_parse_when, do_measure's analysis
     // check), so these IR rows have no ngspice text that reads back to them.
     for (why, item) in REFUSED {
-        let mut design = parse_ir(&format!("file \"r.sp\" deck\n{item}\n"));
+        let mut design = parse_ir(&format!("file \"r.sp\" deck\n  title \"r\"\n{item}\n"));
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
         let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
@@ -325,6 +329,31 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
         "when ",
     ];
     assert_eq!(seen.into_iter().collect::<Vec<_>>(), all);
+}
+
+#[test]
+fn dc_measures_read_and_written_run_on_ngspice_to_the_original_values() {
+    // Oracle: ngspice-45 on the original deck (a dc window given high to low is swapped).
+    let deck = "meas dc round trip
+V1 a 0 0
+R1 a b 1k
+R2 b 0 1k
+.dc v1 0 1 0.05
+.meas dc s1 avg v(b) from=0.8 to=0.2
+.meas dc s2 max v(b) to=0.5
+.meas dc w when v(b)=0.3
+.end
+";
+    let (design, _) = read_deck("dc.sp", deck);
+    let written = write_entry(&design);
+    assert_ne!(written, deck, "the measures are written, not copied");
+    let want = ngspice_measures(deck);
+    assert_eq!(
+        want.len(),
+        3,
+        "every measure of the original ran:\n{want:?}"
+    );
+    assert_eq!(ngspice_measures(&written), want, "{written}");
 }
 
 /// The ngspice row.
