@@ -213,8 +213,6 @@ run_fields! {
 }
 
 impl DetailFacts for MeasureTrigTarg {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         event_features(design, &self.trig, set);
         event_features(design, &self.targ, set);
@@ -241,8 +239,6 @@ impl DetailFacts for MeasureTrigTarg {
 }
 
 impl DetailFacts for MeasureWhen {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         event_features(design, &self.at, set);
     }
@@ -263,8 +259,6 @@ impl DetailFacts for MeasureWhen {
 }
 
 impl DetailFacts for MeasureFind {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         probe_features(&self.find, set);
         event_features(design, &self.at, set);
@@ -291,8 +285,6 @@ impl DetailFacts for MeasureFind {
 }
 
 impl DetailFacts for MeasureDeriv {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         probe_features(&self.signal, set);
         event_features(design, &self.at, set);
@@ -319,8 +311,6 @@ impl DetailFacts for MeasureDeriv {
 }
 
 impl DetailFacts for MeasureStat {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(
             set,
@@ -362,8 +352,6 @@ impl DetailFacts for MeasureStat {
 }
 
 impl DetailFacts for MeasureParam {
-    table_facts!();
-
     fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(!self.value.is_none())

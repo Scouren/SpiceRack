@@ -45,8 +45,6 @@ run_fields! {
 }
 
 impl DetailFacts for SweepLoop {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         target_features(&self.target, TargetUse::Loop, set);
         sweep_features(&self.sweep, SweepUse::Loop, set);
@@ -70,8 +68,6 @@ impl DetailFacts for SweepLoop {
 }
 
 impl DetailFacts for TableLoop {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         for t in get(&design.run.targets, self.columns).unwrap_or(&[]) {
             target_features(t, TargetUse::Loop, set);
@@ -113,8 +109,6 @@ impl DetailFacts for TableLoop {
 }
 
 impl DetailFacts for MonteCarlo {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         let mut add = |on: bool, x: RunExtra| {
             if on {

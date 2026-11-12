@@ -47,8 +47,6 @@ run_fields! {
 }
 
 impl DetailFacts for Pz {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.input == PzInput::Source, RunExtra::PzSourceInput);
     }
@@ -107,8 +105,6 @@ impl DetailFacts for Pz {
 }
 
 impl DetailFacts for Sp {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(set, self.ports.len > 0, RunExtra::SpPorts);
@@ -140,8 +136,6 @@ impl DetailFacts for Sp {
 }
 
 impl DetailFacts for Net {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -177,8 +171,6 @@ impl DetailFacts for Net {
 }
 
 impl DetailFacts for Disto {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
@@ -206,8 +198,6 @@ impl DetailFacts for Disto {
 }
 
 impl DetailFacts for TimedOp {
-    table_facts!();
-
     fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(self.times.len > 0)

@@ -127,7 +127,7 @@ pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 // run owner
 #[macro_use]
 pub mod analysis;
-// before the detail rows' facts: its `run_fields!`, `run_choices!`, `table_facts!`
+// before the detail rows' facts: its `run_fields!`, `run_choices!`
 #[macro_use]
 mod run_fields;
 mod analysis_facts;

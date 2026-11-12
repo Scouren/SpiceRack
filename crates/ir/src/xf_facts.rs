@@ -33,8 +33,6 @@ run_fields! {
 }
 
 impl DetailFacts for DcXf {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -55,8 +53,6 @@ impl DetailFacts for DcXf {
 }
 
 impl DetailFacts for Sens {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -77,8 +73,6 @@ impl DetailFacts for Sens {
 }
 
 impl DetailFacts for Xf {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -102,8 +96,6 @@ impl DetailFacts for Xf {
 }
 
 impl DetailFacts for SensAc {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);

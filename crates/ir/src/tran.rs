@@ -165,8 +165,6 @@ run_fields! {
 }
 
 impl DetailFacts for Tran {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         // R67/A41: exactly one of the twins
         flag(set, self.print_step.is_none(), RunExtra::TranSimulatorStep);
@@ -279,8 +277,6 @@ impl DetailFacts for Tran {
 }
 
 impl DetailFacts for Four {
-    table_facts!();
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(set, !is_one(design, self.periods), RunExtra::FourPeriods);
         flag(set, !self.grid.is_none(), RunExtra::FourGrid);

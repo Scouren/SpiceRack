@@ -1,7 +1,7 @@
 //! The run detail rows' fields as data: each row lists its fields once, in IR-text order, with
 //! their key and their kind of value. A row in, a walk over its fields out; `DetailFacts`'
-//! `handles`, `map_exprs`, `map_names`, `dump` and `parse` are written once over that walk
-//! (`table_facts!`) instead of once per row type. `features`, `fault` and `generate` stay with
+//! `handles`, `map_exprs`, `map_names`, `dump` and `parse` are written once over that walk (the
+//! trait's default methods) instead of once per row type. `features`, `fault` and `generate` stay with
 //! each row: they hold its domain rules.
 //!
 //! The circuit owner's table (`circuit_fields.rs`) is the same idea for another text: circuit
@@ -20,7 +20,7 @@
 //! `pub(crate) fn field_handles`, `pub(crate) fn field_exprs`, `pub(crate) fn field_names`,
 //! `pub(crate) fn field_dump`, `pub(crate) fn field_parse`, the defaults `N`, `NN`, `EL`, `NL`,
 //! `PROBE`, `SWEEP`; macros (textually scoped: `#[macro_use]` in `lib.rs`) `run_choices!`,
-//! `run_fields!`, `table_facts!`
+//! `run_fields!`
 
 use crate::build::Builder;
 use crate::dc_ac::{DcAxis, DcAxisList};
@@ -46,7 +46,6 @@ use crate::tran::{StepCap, StepCeiling};
 
 /// One field of a run detail row, borrowed mutably, by its text form. A keyed form with an
 /// empty key is positional.
-#[allow(dead_code)] // ponytail: the forms of the families still by hand; goes with the last one
 pub(crate) enum RunField<'a> {
     /// ` key=v`, left out at `NONE`.
     Expr(&'a mut ExprId),
@@ -57,9 +56,8 @@ pub(crate) enum RunField<'a> {
     Name(&'a mut NameId),
     /// As `Name`, an element's name (`map_names` visits it).
     Element(&'a mut NameId),
-    /// ` key=(a b)` (positional ` (a b)`), left out when empty: nets.
-    Names(&'a mut NameList),
-    /// As `Names`, each an element's name (`map_names` visits each).
+    /// ` key=(a b)` (positional ` (a b)`), left out when empty: element names (`map_names`
+    /// visits each).
     Elements(&'a mut NameList),
     /// ` key`, a bare word, when true.
     Word(&'a mut bool),
@@ -110,7 +108,6 @@ pub(crate) const NN: NameId = NameId::NONE;
 /// An empty expression list.
 pub(crate) const EL: ExprList = List::EMPTY;
 /// An empty name list.
-#[allow(dead_code)] // as `RunField`
 pub(crate) const NL: NameList = List::EMPTY;
 /// A probe every reader overwrites.
 pub(crate) const PROBE: Probe = Probe {
@@ -179,38 +176,6 @@ macro_rules! run_fields {
     (@key $f:ident) => { stringify!($f) };
 }
 
-/// The table-made `DetailFacts` methods (`handles`, `map_exprs`, `map_names`, `dump`, `parse`),
-/// inside an `impl DetailFacts for Row` whose row implements `RunFields`.
-macro_rules! table_facts {
-    () => {
-        fn handles(&self, _design: &$crate::design::Design, out: &mut Vec<$crate::facts::Handle>) {
-            $crate::run_fields::field_handles(self, _design, out);
-        }
-        fn map_exprs(&mut self, r: &mut $crate::run_exprs::Roots<'_>) {
-            $crate::run_fields::field_exprs(self, r);
-        }
-        fn map_names(&mut self, r: &mut $crate::run_names::Names<'_>) {
-            $crate::run_fields::field_names(self, r);
-        }
-        fn dump(
-            &self,
-            design: &$crate::design::Design,
-            ctx: &$crate::text_expr::Ctx,
-            out: &mut String,
-        ) {
-            $crate::run_fields::field_dump(self, design, ctx, out);
-        }
-        fn parse(
-            words: &mut $crate::text::Words<'_>,
-            scope: $crate::id::ScopeId,
-            b: &mut $crate::build::Builder<'_>,
-            diags: &mut $crate::diag::Diags,
-        ) -> Option<Self> {
-            $crate::run_fields::field_parse(words, scope, b, diags)
-        }
-    };
-}
-
 /// Appends every handle of `row`'s fields, in field order (a choice or a word has none).
 pub(crate) fn field_handles<R: RunFields>(row: &R, design: &Design, out: &mut Vec<Handle>) {
     let mut row = *row;
@@ -218,7 +183,7 @@ pub(crate) fn field_handles<R: RunFields>(row: &R, design: &Design, out: &mut Ve
         RunField::Expr(e) => out.push(Handle::Expr(*e)),
         RunField::Exprs(l) => out.push(Handle::Exprs(*l)),
         RunField::Name(n) | RunField::Element(n) => out.push(Handle::Name(*n)),
-        RunField::Names(l) | RunField::Elements(l) => out.push(Handle::Names(*l)),
+        RunField::Elements(l) => out.push(Handle::Names(*l)),
         RunField::Word(_) | RunField::Choice(_) | RunField::Optional(_) => {}
         RunField::Probe(p) => probe_handles(p, out),
         RunField::Sweep(s) => sweep_handles(s, out),
@@ -265,7 +230,6 @@ pub(crate) fn field_exprs<R: RunFields>(row: &mut R, r: &mut Roots<'_>) {
         }
         RunField::Name(_)
         | RunField::Element(_)
-        | RunField::Names(_)
         | RunField::Elements(_)
         | RunField::Word(_)
         | RunField::Choice(_)
@@ -289,7 +253,6 @@ pub(crate) fn field_names<R: RunFields>(row: &mut R, r: &mut Names<'_>) {
         RunField::Expr(_)
         | RunField::Exprs(_)
         | RunField::Name(_)
-        | RunField::Names(_)
         | RunField::Word(_)
         | RunField::Choice(_)
         | RunField::Optional(_)
@@ -304,7 +267,7 @@ pub(crate) fn field_dump<R: RunFields>(row: &R, design: &Design, ctx: &Ctx, out:
         RunField::Expr(e) => put_expr(out, design, ctx, key, *e),
         RunField::Exprs(l) => put_exprs(out, design, ctx, key, *l),
         RunField::Name(n) | RunField::Element(n) => put_name(out, design, key, *n),
-        RunField::Names(l) | RunField::Elements(l) => put_names(out, design, key, *l),
+        RunField::Elements(l) => put_names(out, design, key, *l),
         RunField::Word(on) => put_flag(out, *on, key),
         RunField::Choice(c) if key.is_empty() => put_word(out, &c.word()),
         RunField::Choice(c) => put_word(out, &format!("{key}={}", c.word())),
@@ -386,7 +349,7 @@ fn read(
             *n = take_name(words, key, b, diags);
             true
         }
-        RunField::Names(l) | RunField::Elements(l) => {
+        RunField::Elements(l) => {
             *l = take_names(words, key, b, diags);
             true
         }

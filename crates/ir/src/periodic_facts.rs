@@ -51,8 +51,6 @@ run_fields! {
 }
 
 impl DetailFacts for Hb {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.tones.len > 1, RunExtra::HbMultiTone);
         flag(set, !self.intermod.is_none(), RunExtra::HbIntermod);
@@ -112,8 +110,6 @@ impl DetailFacts for Hb {
 }
 
 impl DetailFacts for Pss {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.mode == PssMode::Driven, RunExtra::PssDriven);
         flag(

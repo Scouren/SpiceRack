@@ -52,8 +52,6 @@ run_fields! {
 }
 
 impl DetailFacts for Pac {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
@@ -85,8 +83,6 @@ impl DetailFacts for Pac {
 }
 
 impl DetailFacts for Pnoise {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -124,8 +120,6 @@ impl DetailFacts for Pnoise {
 }
 
 impl DetailFacts for Pxf {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -161,8 +155,6 @@ impl DetailFacts for Pxf {
 }
 
 impl DetailFacts for Pstb {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
@@ -197,8 +189,6 @@ impl DetailFacts for Pstb {
 }
 
 impl DetailFacts for Stb {
-    table_facts!();
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
