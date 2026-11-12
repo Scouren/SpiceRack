@@ -106,6 +106,7 @@ pub mod passive;
 pub mod semi;
 pub mod source;
 pub mod wave;
+pub mod wave_eval;
 
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
@@ -114,6 +115,7 @@ pub use letter::{spice_letter, spice_letters};
 pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
+pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 
 // run owner
 pub mod analysis;
