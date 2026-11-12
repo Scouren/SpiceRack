@@ -216,10 +216,13 @@ pub(in super::super) fn read(
             let title = usize::from(lw.role == ir::Role::Deck);
             for l in lw.toks.source().lines().skip(title) {
                 let l = l.trim_start().to_ascii_lowercase();
-                let named = l.contains("nfreqs") || l.contains("fourgridsize");
-                if named && l.starts_with(".opt") {
+                // only nfreqs gives the count; fourgridsize is the grid, which stays the
+                // deck's option (`Four.grid` none either way)
+                let card = l.starts_with(".opt");
+                let named = l.contains("nfreqs");
+                if named && card {
                     by_option = true;
-                } else if named && !l.starts_with('*') {
+                } else if (named || l.contains("fourgridsize")) && !card && !l.starts_with('*') {
                     by_script = true;
                 }
             }
