@@ -228,7 +228,32 @@ pub(super) fn default_of(key: &str) -> Option<&'static str> {
 /// An instance of a model of a builtin source or coupling module (the spine routes it here,
 /// `read::instance_area`), as one `Element` or one `Opaque`.
 pub(super) fn source(l: &mut Lower<'_, '_, '_>, n: Node) {
+    // VACASK's instance syntax and names (the devices area's codes, one meaning): the terminals
+    // in parentheses (run np: "expecting ("), one instance per name in a scope (run dup: "An
+    // instance with name 'v4' already exists.").
+    let first = l.cst.ast.main_token(n) as usize;
+    if l.cst.tokens.tags().get(first + 1) != Some(&crate::syntax::token::Tag::LParen) {
+        return read::opaque(
+            l,
+            n,
+            ir::OpaqueClass::InvalidInSource,
+            Some(read_elements::NO_PARENS),
+        );
+    }
     let h = l.cst.ast.header(n);
+    let name = read::field_name(l.cst, h.name);
+    let d = l.b.design();
+    let taken = d.items(l.scope).iter().any(|at| {
+        at.kind == ir::ItemKind::Element && d.str(d.row::<ir::Element>(at.index).name) == name
+    });
+    if taken {
+        return read::opaque(
+            l,
+            n,
+            ir::OpaqueClass::InvalidInSource,
+            Some(read_elements::DUPLICATE),
+        );
+    }
     let master = read::field_name(l.cst, h.master);
     // The master as VACASK binds it (vc-devices' declared table: own subckt, then the top).
     let module = match read_elements::find(l, l.declared, &master) {

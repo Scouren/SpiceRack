@@ -16,3 +16,6 @@ m2 () m k=0.5 ind1="l1" ind2="l2" $mfactor=2
 m3 (a 0) m k=0.5 ind1="l1" ind2="l2"
 v9 (a 0) vsource type="exp" td2=1u tau1=1u
 v10 (a 0) vsource type="exp" td2=1u tau1=0 tau2=1u
+v12 (a 0) vsource dc=1
+v12 (a 0) vsource dc=2
+v11 a 0 vsource dc=1

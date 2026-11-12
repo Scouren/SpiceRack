@@ -64,7 +64,12 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// A row whose reason starts with `interim` names a fixture fixpoint in its place: accepted and
 /// printed on every run until the dialect's gate (S3.5 ngspice, S4.5 VACASK), which fails on it.
 /// Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[];
+const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[(
+    "vacask",
+    "Wave(Am)",
+    "property_am_and_mutual_round_trip",
+    "VACASK's AM fixes the modulation offset at 1 (W2201 until A31's AmModOffset lands); the generator draws mod_offset freely, so no admitted design holds an Am",
+)];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).

@@ -4,8 +4,10 @@
 # "Parameter 'foo' not found.", a vsource has two terminals (VD), an unknown `type`, a PWL with
 # an odd count (VD), "Peer instance '' not found." (cccs without ctlinst; mutual without
 # ind2), "Parameter '$mfactor' not found." (mutual), a mutual with terminals, an exp time
-# constant absent (its default 0) or 0: "NaN found in vector" at the first analysis (src-r-tau).
-# codes: P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004
+# constant absent (its default 0) or 0: "NaN found in vector" at the first analysis (src-r-tau);
+# a second instance of a name in one scope ("An instance with name 'v4' already exists.", run
+# dup, R2101) and terminals without parentheses (run np, P2107): the devices area's codes.
+# codes: R2101 P2107 S0004 S0004 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004
 file "refused.sim" deck
   title "refused sources"
   model vsource source_v
@@ -25,3 +27,6 @@ file "refused.sim" deck
   opaque vacask invalid "m3 (a 0) m k=0.5 ind1=\"l1\" ind2=\"l2\""
   opaque vacask invalid "v9 (a 0) vsource type=\"exp\" td2=1u tau1=1u"
   opaque vacask invalid "v10 (a 0) vsource type=\"exp\" td2=1u tau1=0 tau2=1u"
+  element vsource v12 (a 0) model=vsource dc=1i
+  opaque vacask invalid "v12 (a 0) vsource dc=2"
+  opaque vacask invalid "v11 a 0 vsource dc=1"
