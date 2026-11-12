@@ -48,6 +48,8 @@ impl RowFacts for Param {
         if in_body && constant {
             *set = set.with(Feature::Extra(Extra::SubcktConstantParam));
         }
+        // A25 item 4: a value by type
+        crate::item_facts::value_type(design, self.value, set);
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
