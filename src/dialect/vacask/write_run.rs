@@ -64,9 +64,11 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// The first and last index into `design.items(top)` of the control block's items, for the
 /// spine's `control` … `endc` (VD cmd-overview: one block per file; run x1): from the first run
 /// item to the last, widened over the control-command opaques next to them (a `print` before
-/// the first analysis); with no run item, the first and last control-command opaque of class
-/// Private, Inert or Hint. A command word alone is no proof: outside a block `print …` is an
-/// instance named `print` (another area's opaque, of class Unread or InvalidInSource).
+/// the first analysis), across comments; with no run item, the first and last control-command
+/// opaque of class Private, Inert or Hint (the classes only this area gives a command line). A
+/// command word alone is no proof: outside a block `print …` or `save v(…)` is another area's
+/// opaque (Unread, or InvalidInSource: run fx). So a block that holds only refused statements
+/// reads back as refused statements at the top: VACASK rejects both.
 pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
     let items = design.items(top);
     let command = |k: usize| command_opaque(design, items[k]);
@@ -97,7 +99,7 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
                 c,
                 ir::OpaqueClass::Private | ir::OpaqueClass::Inert | ir::OpaqueClass::Hint
             )
-        }) || command(*k) == Some(ir::OpaqueClass::InvalidInSource) && reserved(design, items[*k])
+        })
     };
     let first = (0..items.len()).find(own)?;
     let last = (0..items.len()).rfind(own)?;
@@ -232,22 +234,6 @@ fn command_opaque(design: &ir::Design, at: ir::ItemRef) -> Option<ir::OpaqueClas
         .next()
         .unwrap_or("");
     (design.str(row.dialect) == "vacask" && COMMANDS.contains(&head)).then_some(row.class)
-}
-
-/// Whether opaque `at` starts with a word VACASK reads as a control statement only (`analysis`,
-/// `sweep`, `save` are reserved in a control block, VD input-reserved; `options`, `mc`,
-/// `endmc`, `alter`, `elaborate` are no instance names an area reads as invalid).
-fn reserved(design: &ir::Design, at: ir::ItemRef) -> bool {
-    let row: ir::item::Opaque = design.row(at.index);
-    let head = design
-        .text(row.text)
-        .split_whitespace()
-        .next()
-        .unwrap_or("");
-    matches!(
-        head,
-        "analysis" | "sweep" | "save" | "options" | "mc" | "endmc" | "alter" | "elaborate"
-    )
 }
 
 /// Whether `at`'s own names spell (settle names, names_quoted, names_chain): an analysis's, a
