@@ -2,4 +2,5 @@
 file "script_set_var.sp" deck
   title "script_set_var"
   comment " oracle: S3-CONTROL V2: a set number is reprinted with %G (variable.c:41-56; settle/subst.sp): a typed command reading it makes the script Script"
+  element resistor r1 (a 0) value=1k
   opaque ngspice script ".control\nset x = 2k\nalter r1 $x\nop\n.endc"

@@ -11,7 +11,7 @@
 #       __topinst__", every op at a=1 (corpus test/test_cblock.sim). Owner: the VACASK reader
 #       (an AlterParam target), or the IR (a device alter naming no element), then the ngspice
 #       writer (alterparam and reset).
-alter_toplevel 4 target-fails finding=F7 # ngspice reports "Error: no such device or model name __topinst__" (its own error report fails the run); the numbers differ too: -0.005 vs -0.01
+alter_toplevel 2 refused:W1408 finding=F7 # the ngspice writer refuses the alter of a device the design does not hold (settle alter_missing_device.sp: ngspice reports and runs on at the old value); goes when the VACASK reader reads it as a parameter alter (f84873bc), then refused W1401 (no reset follows)
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
 tran_rc_pulse 2 refused:U0001:Run(TranInitialStep)+Run(TranSimulatorStep) pass=tran_explicit_cap # VACASK's tran step forms

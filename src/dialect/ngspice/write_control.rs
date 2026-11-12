@@ -16,9 +16,10 @@
 //! `device.c:1249-1420`, `inp.c:1735-1857`, `control.c:462-466`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`, `RESET_PART`, `ALTER_TARGET`,
+//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`, `LOAD_MODULES`, `RESET_PART`, `ALTER_TARGET`, `TARGET_MISSING`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, ir::ItemRef, &mut ir::Diags)`,
+//! `pub(super) fn missing_targets(&ir::Design, &mut ir::Diags)`,
 //! `pub(super) fn load`, `loop_`, `alter`, `reset`
 
 use super::codes::Row;
@@ -55,6 +56,13 @@ pub(super) const RESET_PART: ir::Code = ir::Code::new(b'W', 1406);
 /// image, `read_control/args.rs` `alter`; a bare alter of another device sets its own default
 /// parameter, `spiceif.c:951`).
 pub(super) const ALTER_TARGET: ir::Code = ir::Code::new(b'W', 1407);
+
+/// An alter, loop or DC axis whose element or model no statement of the design defines (an
+/// unbound model, an element name no element has): ngspice prints "no such device or model
+/// name" and runs on at the old value (settle `alter_missing_device.sp`, F7), or aborts the DC
+/// analysis ("… is not in the circuit", `dc_missing_source.sp`). Here in `admits` (R21) until
+/// the IR states an alter's effect as a feature (R70, A43); the branch goes with it.
+pub(super) const TARGET_MISSING: ir::Code = ir::Code::new(b'W', 1408);
 
 /// This area's codes, `W1400–W1499`.
 pub(super) const CODES: &[Row] = &[
@@ -93,6 +101,12 @@ pub(super) const CODES: &[Row] = &[
         "an alter of an element value or source DC by a name of another device",
         "ngspice-45 device.c:1249-1420, spiceif.c:951 (a bare alter sets the device's default parameter)",
         "an element value is an R's, C's or L's, a source DC a V's or I's; another letter's default parameter means something else.",
+    ),
+    refusal(
+        TARGET_MISSING,
+        "an alter of a device or model the design does not hold",
+        "ngspice-45 run (settle alter_missing_device.sp: 'no such device or model name', the old value kept, exit 0)",
+        "ngspice reports the alter and runs every later analysis at the old value: a wrong number; refused.",
     ),
     refusal(
         LOAD_MODULES,
@@ -147,6 +161,7 @@ pub(super) fn admits(
             if !bare_target(design, &a.target) {
                 refuse(ALTER_TARGET);
             }
+
             if a.target.kind == ir::TargetKind::Param && !applied(design, next) {
                 refuse(PARAM_RESET);
             }
@@ -180,6 +195,59 @@ pub(super) fn admits(
             }
         }
         _ => {}
+    }
+}
+
+/// A [`TARGET_MISSING`] refusal at each alter, sweep loop and DC axis whose element or model
+/// the design does not hold: one walk to collect the element names, one over the items
+/// (`write::admits` calls it once).
+pub(super) fn missing_targets(design: &ir::Design, diags: &mut ir::Diags) {
+    let items = design.reachable();
+    let names: std::collections::HashSet<String> = items
+        .iter()
+        .filter(|(i, _)| i.kind == ir::ItemKind::Element)
+        .map(|(i, _)| {
+            let e: ir::Element = design.row(i.index);
+            design.str(e.name).to_ascii_lowercase()
+        })
+        .collect();
+    // a model of that name in any file of the design (ngspice inlines every include first)
+    let models: std::collections::HashSet<String> = design
+        .definitions()
+        .iter()
+        .filter(|d| d.kind == ir::DefKind::Model)
+        .map(|d| design.str(d.name).to_ascii_lowercase())
+        .collect();
+    // ponytail: an element of that name anywhere; the target's instance path is not followed
+    let held = |t: &ir::Target| match t.kind {
+        // `altermod` takes a model or an instance of it (corpus vdmos/…-quasisat.sp: `mn1`)
+        ir::TargetKind::ModelParam => {
+            let name = design.str(t.a.name).to_ascii_lowercase();
+            !t.a.def.is_none() || models.contains(&name) || names.contains(&name)
+        }
+        ir::TargetKind::ElementValue | ir::TargetKind::SourceDc | ir::TargetKind::DeviceParam => {
+            names.contains(&design.str(t.a.name).to_ascii_lowercase())
+        }
+        _ => true,
+    };
+    for &(item, _) in &items {
+        let targets: Vec<ir::Target> = match item.kind {
+            ir::ItemKind::Alter => vec![design.row::<ir::Alter>(item.index).target],
+            ir::ItemKind::Loop => sweep(design, item).map(|s| s.target).into_iter().collect(),
+            ir::ItemKind::Analysis => {
+                let a: ir::Analysis = design.row(item.index);
+                if a.kind == ir::AnalysisKind::Dc {
+                    let dc: ir::dc_ac::Dc = design.detail(a.detail);
+                    design.dc_axes(dc.axes).iter().map(|x| x.target).collect()
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        };
+        if !targets.iter().all(held) {
+            diags.push_at(TARGET_MISSING, design, item, 0);
+        }
     }
 }
 

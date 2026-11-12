@@ -2,6 +2,9 @@
 file "alter_forms.sp" deck
   title "alter_forms"
   comment " oracle: S3-CONTROL S4: device.c:1249-1420 com_alter_common (bare value: the principal parameter, spiceif.c:951; dev p v, dev p = v, @dev[p] = v); names fold (inpcom.c:1775)"
+  element resistor r1 (a 0) value=1k
+  element vsource v1 (a 0) dc=1
+  element capacitor c1 (a 0) value=1p
   alter (element_value r1) value=2k
   alter (element_value r1) value=3k
   alter (source_dc v1) value=1.5

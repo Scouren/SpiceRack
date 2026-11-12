@@ -2,6 +2,7 @@
 file "wrapped.sp" deck
   title "wrapped"
   comment " oracle: settle/wrap_analysis_{1,2,3,4}.sp ({a}+{b} and 'a'+'b': 'Bad syntax!'; 'a+{b}' and {a+'b'}: 'Syntax error: letter [{]', fatal)"
+  element vsource v1 (n 0) dc=1
   param a = 1
   param b = 2
   opaque ngspice invalid ".dc v1 0 {a}+{b} 1"
