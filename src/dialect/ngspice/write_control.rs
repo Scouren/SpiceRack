@@ -91,7 +91,7 @@ pub(super) const CODES: &[Row] = &[
 ];
 
 /// Whether `scope`'s run plan needs the script form: among its run items (loop bodies
-/// included) an `Alter`, a `Loop`, a `FromHere` state item, or a script command kept as its
+/// included) an `Alter`, a `Loop`, a `Reset`, a `FromHere` state item or save, or a script command kept as its
 /// own `.control` pair (a display command's place among the analyses is kept only by a
 /// script). A whole-script `Script` opaque does not: its deck keeps its cards (R49 (3)).
 #[allow(
@@ -105,6 +105,7 @@ pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
             design.row::<ir::OptionRow>(item.index).holds == ir::Applies::FromHere
         }
         ir::ItemKind::Env => design.row::<ir::Env>(item.index).holds == ir::Applies::FromHere,
+        ir::ItemKind::Save => design.row::<ir::Save>(item.index).holds == ir::Applies::FromHere,
         ir::ItemKind::Opaque => {
             let o: ir::item::Opaque = design.row(item.index);
             o.class != ir::OpaqueClass::Script

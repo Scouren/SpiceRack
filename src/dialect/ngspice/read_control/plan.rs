@@ -67,7 +67,11 @@ pub(super) enum Op {
     /// `pre_osdi path`.
     Load { path: String, cmd: Cmd },
     /// `save …` in its exact case (before the first analysis, no `reset` in the script).
-    Save { rest: String, cmd: Cmd },
+    Save {
+        rest: String,
+        holds: ir::Applies,
+        cmd: Cmd,
+    },
     /// `meas …` in its exact case (the script's one analysis of its kind ran before it, and
     /// the deck has no card a `run` stands for: lead's Q5).
     Meas { rest: String, cmd: Cmd },
@@ -110,6 +114,8 @@ struct Interp {
     runs: Vec<String>,
     /// The analysis words run so far.
     seen: Vec<String>,
+    /// Whether the deck has a dot-card analysis.
+    cards: bool,
     /// Each dot-card analysis: its keyword, and how many script statements stand before it.
     card_kinds: Vec<(String, usize)>,
     /// Whether `quit` ended the script.
@@ -137,6 +143,7 @@ pub(super) fn plan(
     let cards = !card_kinds.is_empty();
     let mut it = Interp {
         card_kinds: card_kinds.to_vec(),
+        cards,
         resets: blocks
             .iter()
             .any(|b| b.nodes.as_ref().is_ok_and(|n| has_reset(n))),
@@ -331,16 +338,24 @@ impl Interp {
                 SetKind::Display => out.push(opaque(ir::OpaqueClass::Inert, DISPLAY)),
                 _ => out.push(opaque(ir::OpaqueClass::Private, OWN)),
             },
+            // with no card a script save holds from where it stands (A28); with cards, before the
+            // script's first analysis and with no reset in it, it is the deck's `.save` (Q6),
+            // any other a state change the cards' runs would see (R49 (3))
             "save" => {
-                if self.analysed || self.resets {
+                let holds = if !self.cards {
+                    ir::Applies::FromHere
+                } else if !self.analysed && !self.resets {
+                    ir::Applies::WholeRun
+                } else {
                     self.changed = true;
                     out.push(opaque(ir::OpaqueClass::Unread, FORM));
-                } else {
-                    out.push(Op::Save {
-                        rest: subst(c.rest(), env)?,
-                        cmd: c.clone(),
-                    });
-                }
+                    return Ok(());
+                };
+                out.push(Op::Save {
+                    rest: subst(c.rest(), env)?,
+                    holds,
+                    cmd: c.clone(),
+                });
             }
             // ponytail: Unread until the outputs area's entry points for the exact case (Q5)
             "meas" => {

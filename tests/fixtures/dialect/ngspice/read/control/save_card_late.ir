@@ -1,0 +1,6 @@
+# codes: P1404
+file "save_card_late.sp" deck
+  title "save_card_late"
+  comment " oracle: R49 (3): with a dot card, a script save after an analysis is a state change the cards' runs see: the whole script Script"
+  analysis op
+  opaque ngspice script ".control\ntran 1u 5u\nsave v(b)\n.endc"
