@@ -17,11 +17,7 @@ const DIR: &str = "tests/fixtures/dialect/vacask/write";
 const SETTLE: &str = "tests/fixtures/dialect/vacask/settle";
 
 /// Settle decks whose round trip fails today, by name, and why. Strict both ways.
-const SETTLE_KNOWN: &[(&str, &str)] = &[
-    // legalize refuses Circuit(ElementWithoutModel) on a behavioural source, a kind that names
-    // no model; ir-circuit's fix (the lead's note on R52) removes it.
-    ("bp1.sim", "ElementWithoutModel on Behav"),
-];
+const SETTLE_KNOWN: &[(&str, &str)] = &[];
 
 // ---- private ----
 

@@ -33,7 +33,7 @@ const KERNEL_SIZE: Size = Size {
 };
 
 /// The run owner's item kinds.
-const RUN_KINDS: [ItemKind; 11] = [
+const RUN_KINDS: [ItemKind; 12] = [
     ItemKind::Statistics,
     ItemKind::Analysis,
     ItemKind::Loop,
@@ -45,6 +45,7 @@ const RUN_KINDS: [ItemKind; 11] = [
     ItemKind::Print,
     ItemKind::Measure,
     ItemKind::Elaborate,
+    ItemKind::Reset,
 ];
 
 // ---- private ----

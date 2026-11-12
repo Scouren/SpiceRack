@@ -143,7 +143,8 @@ Each line: question → choice → why.
     `tests/fixtures/dialect/ir/read/{worked,kernel}.ir`. Its first run found three IR-text
     reader holes (KNOWN): `ir::parse` pushes an element row `check` refuses instead of a `P9001`
     for a second element of one name (X0016), a key of another kind (`dc=` on a resistor,
-    X0015) and a terminal count out of range (X0006).
+    X0015) and a terminal count out of range (X0006). All three refused (one `P9001`, nothing
+    pushed) since ir-circuit ed8baf22 (ir-rewrite bdcae2e3); the `ir` entry is gone.
 
 35. A25 (R48) in the laws → shrink to admitted in `tests/common/laws.rs` (included by
     `dialect_laws.rs` by path; a one-file folder fails check_style.py, `common/` is the house
@@ -165,6 +166,26 @@ Each line: question → choice → why.
     follows. The shrink self-test searches its seed (bounded, 1,024) instead of relying on the
     generator's stream (round 5 changed it). A rule's rows share one file; a fixture folder is a
     row's name (SPINE §4).
+
+38. R55 → `KNOWN_REACH` rows are (row, kind, covering property, why); the reach law also fails a
+    row whose property is empty or not defined as `fn <name>(` in any file under `tests/` (a text
+    search: it names a test, it does not run it). Self-test with an empty, a missing and a defined
+    name.
+
+39. L5/L6 in normal form → `same_meaning(a, b)` (`tests/common/laws.rs`): each side written as IR
+    text and read back, then `eq_meaning`. `eq_meaning` compares tables id for id, and a
+    multi-file reader pushes in its text's order (VACASK creates every file first), so 62 of 64
+    VACASK seeds failed on id order alone (vacask-plan's finding). Request for ir-kernel: an
+    order-insensitive `eq_meaning`, or the normal form as a kernel function, then this goes.
+
+40. A32 → `passes::legal(passes, target)`, the least fixed point of "in the target, or removed by a
+    pass whose `requires` are legal", computed once per `legalize`; a pass runs when its
+    `requires` are legal. `legalize` is `legalize_with(registry)`, the tests drive stubs (a
+    comment → global → param chain; an inverse pair; a chain the target cannot finish). Planted:
+    `requires ⊆ target` again turns the chain test red.
+41. A28 in the laws → the generated laws and the reach list run under both `ir::gen::Params`
+    (`Untyped`, `TypedOnly`; `cases()`), the reach list over their union; the failure text names
+    the setting. The `ScopeOwner` workaround is gone (kernel 7100faa1: check walks live scopes).
 
 ## Requests (ruled by the lead)
 

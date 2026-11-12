@@ -12,8 +12,9 @@
 //! Cites: `rewrite/IR-RUN.md` §4; `rewrite/INV-constructs.md` H1–H5, H10, H22, H28;
 //! `rewrite/INV-semantics.md` 9.03, 9.04, 9.07, 9.08.
 //!
-//! IR text: `save [analysis=<kind>|analysis=(<kind> …)] <probe> …` (no `analysis=` when it is
-//! for every analysis; one kind bare, several in declaration order in parentheses); `print <kind> [hb_time] <probe> …`; measures: `measure_facts.rs`.
+//! IR text: `save [analysis=<kind>|analysis=(<kind> …)] [from_here] <probe> …` (no `analysis=`
+//! when it is for every analysis; one kind bare, several in declaration order in parentheses;
+//! `from_here` for `Applies::FromHere`, A27); `print <kind> [hb_time] <probe> …`; measures: `measure_facts.rs`.
 //!
 //! Contents: `pub struct Save`, `pub struct Print`, `pub enum PrintView`, `pub struct Measure`;
 //! `PrintView::ALL`, `PrintView::COUNT`; `RowFacts` for `Save` and `Print` (`Measure`'s:
@@ -32,6 +33,7 @@ use crate::r#gen::Gen;
 use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::measure::MeasureKind;
+use crate::option::Applies;
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
 use crate::probe::{
@@ -57,6 +59,11 @@ pub struct Save {
     /// governs the operating point, its sweeps and the transient, not AC; A22). Never empty
     /// (checked).
     pub analyses: AnalysisKinds,
+    /// Where it holds from (A27): `WholeRun` for a SPICE `.save` card (every analysis of the
+    /// run, wherever the card stands; the builder's default), `FromHere` for VACASK's `save`
+    /// and an ngspice script `save` (the analyses after it in run order; saves add up, and a
+    /// `Reset` of `Saves` drops the earlier `FromHere` ones).
+    pub holds: Applies,
     /// The quantities, at least one.
     pub probes: ProbeList,
 }
@@ -97,7 +104,7 @@ pub struct Measure {
     pub detail: u32,
 }
 
-const _: () = assert!(size_of::<Save>() == 12);
+const _: () = assert!(size_of::<Save>() == 16);
 const _: () = assert!(size_of::<Print>() == 12);
 const _: () = assert!(size_of::<Measure>() == 12);
 
@@ -134,6 +141,7 @@ impl RowFacts for Save {
             n > 1 && self.analyses != AnalysisKinds::ALL,
             RunExtra::SaveAnalysisSet,
         );
+        flag(set, true, save_mode(self.holds));
         list_features(design, self.probes, set);
     }
 
@@ -156,6 +164,7 @@ impl RowFacts for Save {
             };
             put_word(out, &format!("analysis={kinds}"));
         }
+        put_flag(out, self.holds == Applies::FromHere, "from_here");
         dump_list(design, ctx, self.probes, out);
         trim_lead(out, at);
     }
@@ -188,10 +197,20 @@ impl RowFacts for Save {
             }
             analyses = AnalysisKinds::of(&kinds);
         }
+        let holds = if take_word(words, "from_here") {
+            Applies::FromHere
+        } else {
+            Applies::WholeRun
+        };
         let Some(probes) = parse_list(words, scope, b, diags) else {
             return ItemRef::NONE;
         };
-        b.push(scope, Save { analyses, probes }, words.span())
+        let row = Save {
+            analyses,
+            holds,
+            probes,
+        };
+        b.push(scope, row, words.span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -207,6 +226,11 @@ impl RowFacts for Save {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
+        let Some(holds) =
+            crate::option::gen_holds(g, b, scope, features, RunExtra::SaveMidRun, save_mode)
+        else {
+            return ItemRef::NONE;
+        };
         let probes = gen_list(g, b, features);
         let n = AnalysisKind::COUNT as u32;
         let (a, c) = (g.below(n), g.below(n - 1));
@@ -217,7 +241,12 @@ impl RowFacts for Save {
             1 if has(features, RunExtra::SaveAnalysisSet) => AnalysisKinds::of(&[first, second]),
             _ => AnalysisKinds::ALL,
         };
-        b.push(scope, Save { analyses, probes }, Span::NONE)
+        let row = Save {
+            analyses,
+            holds,
+            probes,
+        };
+        b.push(scope, row, Span::NONE)
     }
 }
 
@@ -363,4 +392,12 @@ fn gen_list(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> ProbeLis
     let n = 1 + g.below(2) as usize;
     let probes: Vec<Probe> = (0..n).map(|_| gen_probe(g, b, features, false)).collect();
     b.probes(&probes)
+}
+
+/// The feature of a save's mode (A27).
+const fn save_mode(holds: Applies) -> RunExtra {
+    match holds {
+        Applies::FromHere => RunExtra::SaveFromHere,
+        Applies::WholeRun => RunExtra::SaveWholeRun,
+    }
 }

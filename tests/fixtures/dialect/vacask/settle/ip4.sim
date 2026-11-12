@@ -1,0 +1,8 @@
+intparam in a parameter
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters p=2.7 q=$intparam(p)
+r1 (n 0) res r=q
+control
+  print instance("r1")
+endc

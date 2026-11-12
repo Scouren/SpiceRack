@@ -118,9 +118,17 @@ header. `mod.rs` chains the four in `GROUPS`.
 
 **Order is meaning.** `legalize` loops: the features the design uses and the target lacks;
 every pass in `GROUPS` order, then the group's own order, that removes one of them and whose
-`requires` the target has, runs (the first such pass per feature per round), then `ir::check`;
+`requires` are legal for the target, runs (the first such pass per feature per round), then `ir::check`;
 repeat until nothing is missing or a round changes nothing (bounded by the pass count + 1,
-asserted). Then `ir::check_legal` reports what is left: one `U0001` row per item that carries
+asserted). A feature is legal for the target (A32, `passes::legal`) when the target has it, or
+a registered pass removes it and that pass's `requires` are legal in turn: the least fixed
+point, computed once per call, so a chain (`round_half_even_to_away` then
+`round_half_away_to_floor`) runs for a target with neither rounding, an inverse pair
+(`powabs_to_pow`, `pow_to_powabs`) supports nothing for a target with neither, and a chain whose
+last link the target cannot take runs nothing (no half-converted design). The bound holds: each
+link of a chain is one pass, the fixed point admits no cycle, so the missing set settles within
+one round per link. P3 is unchanged: a pass still states every feature its output adds. Then
+`ir::check_legal` reports what is left: one `U0001` row per item that carries
 a feature. A pass may produce input for the passes after it, never rely on one after it:
 `structure` first (every other pass walks the scopes, names and definitions it settles), then
 `expr` (wave and run passes read fields it has substituted, such as the transient leaves), then
@@ -194,14 +202,23 @@ laws run on.
 - `tests/dialect_laws.rs`: for every row of `BUILTIN`, the laws of REWRITE-PLAN §4.2 that apply
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
-  row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
+  row.write.features(), size)`; seeds are fixed and printed on failure. L5 and L6 compare by meaning in normal form (both sides written as IR text and read back,
+  then `eq_meaning`: a reader's push order is its text's, not the generator's). L4 reads: `write` is
   total over a design `legalize` accepted. A generated design the row refuses is shrunk to what
   it admits (A25, R48): the items its refusals name (`Diag::item`) are dropped from their
   listing scopes, then the items `ir::check` no longer accepts, to a fixpoint bounded by the item
   count, and the laws run on the rest; a refusal at no item skips the seed, counted by code in
   the failure text. A law that runs on no design fails. The reach list: every `Item`, `Elem`,
   `Wave`, `Analysis` and `Family` kind of the writer's features is used by some admitted design
-  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list. So a writer's `admits`
+  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list of (row, kind, covering
+  property, why) (R55): the covering property is a seeded test in the owning area's test file
+  that builds admissible designs of the kind through the builder and checks write, read back
+  and `eq_meaning`, with floors on designs run and designs holding the kind; the law fails when
+  the name is empty or no file under `tests/` defines `fn <name>(` (a text search). A row whose
+  reason starts with `interim` names a fixture fixpoint instead: the reach law passes it and
+  prints it on every run; the trunk merge takes such rows as they are; the dialect gates (S3.5
+  for ngspice, S4.5 for VACASK) fail on any `interim` row, by then each kind being reached by
+  the generated laws or covered by its seeded property. So a writer's `admits`
   pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
@@ -213,6 +230,45 @@ laws run on.
   a subcircuit, an element, an analysis); a refusal when `PASSES` cannot remove a feature a stub
   writer lacks; `Policy::Strict` refusing an `Unread`; the facade's message format; the route
   override.
+
+## 8a. The pair test (`tests/test_pair.rs`, from the trunk merge)
+
+One binary, one cell per (source, target) pair it lists (`ngspice→vacask`, `vacask→ngspice`
+first). A listed cell whose two rows are not both in `BUILTIN` with the sides it needs fails: it
+never skips, so the binary lands with the trunk. The harness is the spine's (`dialect::read`
+strict for authored decks, lenient for corpus decks; one `dialect::legalize`; `dialect::write`
+per file); `tests/test_cross_sim/sim.rs` and `cmp.rs` move to `tests/common/` and are shared.
+
+**Oracles, per deck, in this order; the first failure names the component** (REWRITE-PLAN
+§7.4): 1 read (no refusal, `ir::check` clean, no `Unread` under strict) → the source reader;
+2 legalize (no refusal, unless the cell's list expects it with its code) → a pass or a
+`FEATURES`; 3 the target text read back by the target's reader `eq_meaning` the legalized design
+→ the target dialect; 4 numbers: the source simulator on the source deck and the target simulator
+on the written text, every vector of every plot at the tolerances of `tests/common/cmp.rs` →
+the target writer, or the simulators; 5 names: every source vector has its counterpart under
+the run's rename map; 6 the written bytes equal under 1 and 8 jobs.
+
+**Tolerances** are stated once, in `cmp.rs`, each with the arithmetic that derives it from the
+simulators' own (RELTOL, VNTOL, ABSTOL, the transient's step control): op/dc/ac within
+2·(RELTOL·swing + floor), RELTOL 1e-3, floor VNTOL 1e-6 V or ABSTOL + GMIN·Vmax; a transient
+within 1e-2 of the swing + 2·VNTOL in a 1 % time tube. A deck may tighten them, never loosen.
+
+**A deck, added without touching the harness** (the owners of the facts add them: each pass's
+simulator proof is a pair deck; each dialect area adds one deck for its statements):
+- `tests/fixtures/pair/<cell>/<deck>.<ext>`: the source deck in the source dialect's own
+  extension (`.sp`, `.sim`), with its analyses; nothing else is needed for the defaults.
+- optional `tests/fixtures/pair/<cell>/<deck>.pair`: one `key = value` a line, `#` comments:
+  `owner = <agent or area>`, `proves = <pass or statement>`, and tightenings only:
+  `reltol = <≤ 1e-3>`, `vntol = <≤ 1e-6>`, `abstol = <≤ the default>`, `tube = <≤ 0.01>`,
+  `vectors = <name> …` (compare these only; default: every vector). A key that would loosen a
+  tolerance fails the deck.
+- expected failures in `tests/fixtures/pair/<cell>.txt`, one a line:
+  `<deck> <step 1..6> <class> <proof>` (the classes and proof forms of the cross-sim lists),
+  compared by name both ways: a listed deck that passes, or fails at another step, fails.
+
+The merge tier runs every deck in `tests/fixtures/pair/`; under `--features corpus` the cells
+add the corpora the old cross-sim cells run (spice-bench for ngspice→vacask, the VACASK corpus
+for vacask→ngspice). `tests/fixtures/pair/` is no golden input.
 
 ## 9. Gate to leave the slice
 

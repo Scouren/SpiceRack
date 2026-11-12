@@ -25,7 +25,8 @@
 //! Contents:
 //! - `pub mod expr`, `pub mod run`, `pub mod structure`, `pub mod waves`
 //! - `pub struct Pass`, `pub struct Group`, `pub static GROUPS: &[Group]`
-//! - `pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir::Diags)`
+//! - `pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir::Diags)`,
+//!   `pub fn legal(passes: &[&Pass], target: &ir::FeatureSet) -> ir::FeatureSet`
 //! - `pub fn all() -> impl Iterator<Item = &'static Pass>`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
 pub mod expr;
@@ -94,24 +95,75 @@ pub static GROUPS: &[Group] = &[
 ];
 
 /// Rounds of: the features `design` uses and `target` lacks; every pass, in [`GROUPS`] order,
-/// that removes one of them and whose `requires` `target` has, run (the first such pass per
-/// feature per round) and then `ir::check`ed, until nothing is missing or a round changes
-/// nothing. Then `ir::check_legal` reports what is left: one `U0001` row per (item, feature) at
-/// the item. A check violation after a pass is that pass's bug (a debug assertion).
+/// that removes one of them and whose `requires` are legal for the target (A32: [`legal`]), run
+/// (the first such pass per feature per round) and then `ir::check`ed, until nothing is
+/// missing or a round changes nothing. Then `ir::check_legal` reports what is left: one
+/// `U0001` row per (item, feature) at the item. A check violation after a pass is that pass's
+/// bug (a debug assertion).
+///
+/// The bound: a round that changes something runs at least one pass, and a pass runs only on a
+/// feature legal for the target, whose chain of passes ends in the target's own features after
+/// at most one link per pass (the least fixed point admits no cycle: a pass is legal only
+/// through passes already legal); so the missing set settles within one round per link, at
+/// most one more than the number of passes.
 ///
 /// # Panics
-/// When the rounds do not settle within one more than the number of passes (passes that undo
-/// each other).
+/// When the rounds do not settle within that bound (passes that undo each other).
 pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir::Diags) {
-    let bound = all().count() + 1;
+    let passes: Vec<&Pass> = all().collect();
+    legalize_with(&passes, design, target, diags);
+}
+
+/// The features legal for `target` under `passes` (A32): the least fixed point of "the target
+/// has it, or a pass removes it whose `requires` are all legal". Two passes that remove each
+/// other's output (`powabs_to_pow`, `pow_to_powabs`) make neither legal for a target with
+/// neither feature. Bounded: each round adds a feature or stops, at most one round per pass.
+pub fn legal(passes: &[&Pass], target: &ir::FeatureSet) -> ir::FeatureSet {
+    let mut legal = *target;
+    for _ in 0..=passes.len() {
+        let before = legal;
+        for p in passes {
+            if !legal.contains(p.removes) && p.requires.minus(legal).is_empty() {
+                legal = legal.with(p.removes);
+            }
+        }
+        if legal == before {
+            return legal;
+        }
+    }
+    panic!("legal: no fixed point within one round per pass");
+}
+
+/// Every registered pass, in the order [`legalize`] tries them.
+pub fn all() -> impl Iterator<Item = &'static Pass> {
+    GROUPS.iter().flat_map(|g| g.passes.iter())
+}
+
+/// The catalogue row of a pass code (`U0100..=U0499`), or `None` for any other code.
+pub fn info(code: ir::Code) -> Option<ir::Info> {
+    let rows = GROUPS.iter().flat_map(|g| g.codes.iter());
+    rows.copied().find(|(c, _)| *c == code).map(|(_, i)| i)
+}
+
+// ---- private ----
+
+/// [`legalize`] over `passes` (the registry, or a test's stubs).
+fn legalize_with(
+    passes: &[&Pass],
+    design: &mut ir::Design,
+    target: &ir::FeatureSet,
+    diags: &mut ir::Diags,
+) {
+    let legal = legal(passes, target);
+    let bound = passes.len() + 1;
     let mut missing = ir::features_used(design).minus(*target);
     let mut rounds = 0;
     while !missing.is_empty() {
         assert!(rounds < bound, "legalize: the passes do not settle");
         rounds += 1;
         let mut open = missing;
-        for pass in all() {
-            if !open.contains(pass.removes) || !pass.requires.minus(*target).is_empty() {
+        for pass in passes {
+            if !open.contains(pass.removes) || !pass.requires.minus(legal).is_empty() {
                 continue;
             }
             open = open.minus(ir::FeatureSet::EMPTY.with(pass.removes));
@@ -132,17 +184,6 @@ pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir
         missing = left;
     }
     ir::check_legal(design, target, diags);
-}
-
-/// Every registered pass, in the order [`legalize`] tries them.
-pub fn all() -> impl Iterator<Item = &'static Pass> {
-    GROUPS.iter().flat_map(|g| g.passes.iter())
-}
-
-/// The catalogue row of a pass code (`U0100..=U0499`), or `None` for any other code.
-pub fn info(code: ir::Code) -> Option<ir::Info> {
-    let rows = GROUPS.iter().flat_map(|g| g.codes.iter());
-    rows.copied().find(|(c, _)| *c == code).map(|(_, i)| i)
 }
 
 #[cfg(test)]
@@ -188,6 +229,153 @@ mod tests {
                 assert!(a.1 < b.0 || b.1 < a.0, "ranges {a:?} and {b:?} overlap");
             }
         }
+    }
+
+    // A32's oracle: stub passes over comments, globals and params, on hand-written IR text.
+    fn comment_to_global(d: &mut ir::Design, _: &mut ir::Diags) {
+        replace(d, ir::ItemKind::Comment, |b, scope, k| {
+            b.global(scope, &[&format!("g{k}")], ir::Span::NONE);
+        });
+    }
+
+    fn global_to_param(d: &mut ir::Design, _: &mut ir::Diags) {
+        replace(d, ir::ItemKind::Global, |b, scope, k| {
+            let one = b.num(1.0);
+            b.param(scope, &format!("p{k}"), one, ir::Span::NONE);
+        });
+    }
+
+    fn global_to_comment(d: &mut ir::Design, _: &mut ir::Diags) {
+        replace(d, ir::ItemKind::Global, |b, scope, _| {
+            b.comment(scope, "back", ir::Span::NONE);
+        });
+    }
+
+    /// Drops every item of `kind` and appends `make`'s item to its scope instead.
+    fn replace(
+        d: &mut ir::Design,
+        kind: ir::ItemKind,
+        make: impl Fn(&mut ir::Builder<'_>, ir::ScopeId, usize),
+    ) {
+        let found: Vec<(ir::ItemRef, ir::ScopeId)> = d
+            .reachable()
+            .into_iter()
+            .filter(|(i, _)| i.kind == kind)
+            .collect();
+        let mut editor = d.editor();
+        for (k, (item, scope)) in found.iter().enumerate() {
+            editor.items_mut(*scope).retain(|i| i != item);
+            make(&mut editor.builder(), *scope, k);
+        }
+    }
+
+    fn stub(
+        name: &'static str,
+        removes: ir::ItemKind,
+        requires: ir::ItemKind,
+        run: fn(&mut ir::Design, &mut ir::Diags),
+    ) -> Pass {
+        Pass {
+            name,
+            removes: ir::Feature::Item(removes),
+            requires: ir::FeatureSet::EMPTY.with(ir::Feature::Item(requires)),
+            notes: &[],
+            run,
+        }
+    }
+
+    fn without(kinds: &[ir::ItemKind]) -> ir::FeatureSet {
+        kinds.iter().fold(ir::FeatureSet::ALL, |s, &k| {
+            s.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(k)))
+        })
+    }
+
+    fn run_on(passes: &[&Pass], target: &ir::FeatureSet) -> (String, Vec<ir::Code>) {
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(
+            "file \"a.sp\" deck\n  title \"t\"\n  comment \"c\"\n",
+            &mut design.builder(),
+            &mut diags,
+        );
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        legalize_with(passes, &mut design, target, &mut diags);
+        let mut out = String::new();
+        ir::dump(&design, design.entry(), &mut out);
+        (out, diags.rows().iter().map(|d| d.code).collect())
+    }
+
+    #[test]
+    fn a_chain_of_two_passes_runs_both_and_ends_legal() {
+        let a = stub(
+            "a",
+            ir::ItemKind::Comment,
+            ir::ItemKind::Global,
+            comment_to_global,
+        );
+        let b = stub(
+            "b",
+            ir::ItemKind::Global,
+            ir::ItemKind::Param,
+            global_to_param,
+        );
+        let target = without(&[ir::ItemKind::Comment, ir::ItemKind::Global]);
+        let (out, codes) = run_on(&[&a, &b], &target);
+        assert_eq!(out, "file \"a.sp\" deck\n  title \"t\"\n  param p0 = 1\n");
+        assert!(codes.is_empty(), "{codes:?}");
+    }
+
+    #[test]
+    fn an_inverse_pair_with_neither_feature_runs_nothing_and_refuses() {
+        let a = stub(
+            "a",
+            ir::ItemKind::Comment,
+            ir::ItemKind::Global,
+            comment_to_global,
+        );
+        let back = stub(
+            "back",
+            ir::ItemKind::Global,
+            ir::ItemKind::Comment,
+            global_to_comment,
+        );
+        let target = without(&[ir::ItemKind::Comment, ir::ItemKind::Global]);
+        let legal = legal(&[&a, &back], &target);
+        assert!(!legal.contains(ir::Feature::Item(ir::ItemKind::Comment)));
+        assert!(!legal.contains(ir::Feature::Item(ir::ItemKind::Global)));
+        let (out, codes) = run_on(&[&a, &back], &target);
+        assert_eq!(
+            out, "file \"a.sp\" deck\n  title \"t\"\n  comment \"c\"\n",
+            "nothing ran"
+        );
+        assert_eq!(codes, [ir::diag::UNSUPPORTED]);
+    }
+
+    #[test]
+    fn a_chain_whose_last_link_the_target_cannot_take_runs_nothing() {
+        let a = stub(
+            "a",
+            ir::ItemKind::Comment,
+            ir::ItemKind::Global,
+            comment_to_global,
+        );
+        let b = stub(
+            "b",
+            ir::ItemKind::Global,
+            ir::ItemKind::Param,
+            global_to_param,
+        );
+        let target = without(&[
+            ir::ItemKind::Comment,
+            ir::ItemKind::Global,
+            ir::ItemKind::Param,
+        ]);
+        let (out, codes) = run_on(&[&a, &b], &target);
+        assert_eq!(
+            out, "file \"a.sp\" deck\n  title \"t\"\n  comment \"c\"\n",
+            "no half-converted design"
+        );
+        assert_eq!(codes, [ir::diag::UNSUPPORTED]);
     }
 
     #[test]

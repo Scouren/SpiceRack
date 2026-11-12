@@ -1,0 +1,23 @@
+intparam and realparam in a behavioural source (R56: $realparam(p) reads as to_real(p) and is written back as the bare p)
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters pi=3 pr=2.7 pw=3.0 pn=-2.7
+b1 (n1 0) v=$intparam(pi)/2
+b2 (n2 0) v=$intparam(pr)
+b3 (n3 0) v=$intparam(pw)/2
+b4 (n4 0) v=$intparam(pn)
+b5 (n5 0) v=$realparam(pi)/2
+b6 (n6 0) v=pi/2
+b7 (n7 0) v=sin(pi)
+b8 (n8 0) v=$intparam(pr)/2
+r1 (n1 0) res r=1
+r2 (n2 0) res r=1
+r3 (n3 0) res r=1
+r4 (n4 0) res r=1
+r5 (n5 0) res r=1
+r6 (n6 0) res r=1
+r7 (n7 0) res r=1
+r8 (n8 0) res r=1
+control
+  analysis op1 op
+endc

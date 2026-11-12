@@ -21,6 +21,7 @@ use spicerack_ir::{
     NodeSet, NodeSetKind, OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId,
     ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
 };
+use spicerack_ir::{Reset, ResetSet};
 
 type Fixture = (&'static str, Violation, fn(&mut Builder<'_>, ScopeId));
 
@@ -114,16 +115,28 @@ const BROKEN: &[Fixture] = &[
         let p = Probe { terminal: u8::MAX, ..b.probe_terminal(&["m1"], 1) };
         save(b, s, p);
     }),
+    ("alter of the temperature", Violation::FieldDomain, |b, s| {
+        let v = b.num(85.0);
+        b.push(s, Alter { target: Target::TEMP, value: v }, Span::NONE);
+    }),
+    ("alter of an option", Violation::FieldDomain, |b, s| {
+        let v = b.num(1e-3);
+        let target = b.target_option(OptionKey::RelTol, None);
+        b.push(s, Alter { target, value: v }, Span::NONE);
+    }),
+    ("reset of no class", Violation::FieldDomain, |b, s| {
+        b.push(s, Reset { restores: ResetSet::EMPTY }, Span::NONE);
+    }),
     ("save of nothing", Violation::FieldDomain, |b, s| {
-        b.push(s, Save { analyses: AnalysisKinds::ALL, probes: List::EMPTY }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::ALL, holds: Applies::WholeRun, probes: List::EMPTY }, Span::NONE);
     }),
     ("save for no analysis", Violation::FieldDomain, |b, s| {
         let probes = b.probes(&[Probe::category(ProbeKind::AllV)]);
-        b.push(s, Save { analyses: AnalysisKinds::EMPTY, probes }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::EMPTY, holds: Applies::WholeRun, probes }, Span::NONE);
     }),
     ("save list past its pool", Violation::HandleRange, |b, s| {
         let probes = List { start: 0, len: 4, pool: Default::default() };
-        b.push(s, Save { analyses: AnalysisKinds::ALL, probes }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::ALL, holds: Applies::WholeRun, probes }, Span::NONE);
     }),
     ("table loop with a partial row", Violation::FieldDomain, |b, s| {
         let columns = b.targets(&[Target::TEMP, Target::TEMP]);
@@ -307,6 +320,7 @@ fn save(b: &mut Builder<'_>, s: ScopeId, p: Probe) {
         s,
         Save {
             analyses: AnalysisKinds::ALL,
+            holds: Applies::WholeRun,
             probes,
         },
         Span::NONE,
@@ -363,7 +377,8 @@ fn a_valid_run_reports_nothing() {
             LoopEnd::Restore,
             Span::NONE,
         );
-        b.alter(body, Target::TEMP, one, Span::NONE);
+        let r1 = b.target(TargetKind::ElementValue, &[], "r1", None);
+        b.alter(body, r1, one, Span::NONE);
         let tr = tran(b);
         b.analysis(body, Some("t1"), tr, Span::NONE);
         pss(b, body);
@@ -380,7 +395,7 @@ fn a_valid_run_reports_nothing() {
             Span::NONE,
         );
         let p = b.probe_v(&["out"]);
-        b.save(s, AnalysisKinds::ALL, &[p], Span::NONE);
+        b.save(s, AnalysisKinds::ALL, Applies::WholeRun, &[p], Span::NONE);
         let half = b.num(0.5);
         let at = Event::cross(p, Edge::Rise, half, one);
         b.measure(

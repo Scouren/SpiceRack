@@ -225,7 +225,7 @@ impl Builder<'_> {
 
     /// Appends one expression row. Asserts `EXPRS_MAX` and that the columns stay parallel.
     pub(crate) fn expr_row(&mut self, tag: ExprTag, sub: u8, a: u32, b: u32) -> ExprId {
-        self.design.classes.take();
+        self.design.derived_changed();
         let x = &mut self.design.exprs;
         assert!(x.tags.len() < EXPRS_MAX, "at most EXPRS_MAX expressions");
         x.tags.push(tag);
