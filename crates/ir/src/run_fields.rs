@@ -30,18 +30,19 @@ use crate::facts::Handle;
 use crate::id::{ExprId, ExprList, List, NameId, NameList, ScopeId};
 use crate::measure::{Event, dump_event, event_handles, parse_event};
 use crate::plan::{Target, dump_target, parse_target, target_handles};
-use crate::probe::{AcPart, Probe, ProbeKind, dump_probe, parse_probe, probe_handles};
+use crate::probe::{AcPart, Probe, ProbeKind, ProbeList, dump_probe, parse_probe, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_names::Names;
 use crate::run_words::{
-    get, put_expr, put_exprs, put_flag, put_name, put_names, put_word, take_exprs, take_key,
-    take_name, take_names, take_word,
+    get, put_expr, put_exprs, put_flag, put_name, put_names, put_word, take_enum, take_exprs,
+    take_key, take_name, take_names, take_word, word,
 };
 use crate::sweep::{
     SweepBounds, SweepEnd, SweepKind, SweepSpec, dump_sweep, parse_sweep, sweep_handles,
 };
 use crate::text::Words;
 use crate::text_expr::Ctx;
+use crate::tran::{StepCap, StepCeiling};
 
 /// One field of a run detail row, borrowed mutably, by its text form. A keyed form with an
 /// empty key is positional.
@@ -76,6 +77,10 @@ pub(crate) enum RunField<'a> {
     Event(&'a mut Event),
     /// DC axes, each its own fields (`DcAxis`'s table), one after another while a `(` follows.
     DcAxes(&'a mut DcAxisList),
+    /// Probes, one after another while a `(` follows.
+    Probes(&'a mut ProbeList),
+    /// A transient's step ceiling, required: ` max_step=v` or ` cap=word`.
+    Ceiling(&'a mut StepCeiling),
 }
 
 /// A closed enum field seen through its IR-text words (`run_words::word`).
@@ -222,6 +227,16 @@ pub(crate) fn field_handles<R: RunFields>(row: &R, design: &Design, out: &mut Ve
                 field_handles(axis, design, out);
             }
         }
+        RunField::Probes(l) => {
+            for p in get(&design.run.probes, *l).unwrap_or(&[]) {
+                probe_handles(p, out);
+            }
+        }
+        RunField::Ceiling(c) => {
+            if let StepCeiling::Given(e) = c {
+                out.push(Handle::Expr(*e));
+            }
+        }
     });
 }
 
@@ -234,6 +249,12 @@ pub(crate) fn field_exprs<R: RunFields>(row: &mut R, r: &mut Roots<'_>) {
         RunField::Sweep(s) => r.sweep(s),
         RunField::Event(e) => r.event(e),
         RunField::DcAxes(l) => r.dc_axes(*l),
+        RunField::Probes(l) => r.probes(*l),
+        RunField::Ceiling(c) => {
+            if let StepCeiling::Given(e) = c {
+                r.expr(e);
+            }
+        }
         RunField::Name(_)
         | RunField::Element(_)
         | RunField::Names(_)
@@ -254,6 +275,8 @@ pub(crate) fn field_names<R: RunFields>(row: &mut R, r: &mut Names<'_>) {
         RunField::Event(e) => r.event(e),
         RunField::Target(t) => r.target(t),
         RunField::DcAxes(l) => r.dc_axes(*l),
+        RunField::Probes(l) => r.probes(*l),
+        RunField::Ceiling(_) => {}
         RunField::Expr(_)
         | RunField::Exprs(_)
         | RunField::Name(_)
@@ -289,6 +312,15 @@ pub(crate) fn field_dump<R: RunFields>(row: &R, design: &Design, ctx: &Ctx, out:
             for axis in design.dc_axes(*l) {
                 field_dump(axis, design, ctx, out);
             }
+        }
+        RunField::Probes(l) => {
+            for p in design.probes(*l) {
+                dump_probe(design, ctx, p, out);
+            }
+        }
+        RunField::Ceiling(StepCeiling::Given(e)) => put_expr(out, design, ctx, "max_step", *e),
+        RunField::Ceiling(StepCeiling::Rule(cap)) => {
+            put_word(out, &format!("cap={}", word(*cap)));
         }
     });
 }
@@ -388,6 +420,40 @@ fn read(
             }
             *l = b.dc_axes(&axes);
             true
+        }
+        RunField::Probes(l) => {
+            let mut probes = Vec::new();
+            // each round consumes a probe or returns
+            while words.peek() == Some("(") {
+                let Some(p) = parse_probe(words, scope, b, diags) else {
+                    return false;
+                };
+                probes.push(p);
+            }
+            *l = b.probes(&probes);
+            true
+        }
+        RunField::Ceiling(c) => {
+            let given = if take_key(words, "max_step") {
+                words.value(scope, b, diags)
+            } else {
+                ExprId::NONE
+            };
+            if !given.is_none() {
+                *c = StepCeiling::Given(given);
+                true
+            } else if take_key(words, "cap") {
+                match take_enum(words, &StepCap::ALL, diags) {
+                    Some(cap) => {
+                        *c = StepCeiling::Rule(cap);
+                        true
+                    }
+                    None => false,
+                }
+            } else {
+                words.error(diags);
+                false
+            }
         }
     }
 }
