@@ -440,6 +440,7 @@ mod tests {
                 phase_c_deg: v,
                 mod_time: AmModTime::CarrierPhase,
                 pre: PreDelay::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             Wave::TrNoise(TrNoise {
                 na: v,
@@ -456,6 +457,7 @@ mod tests {
                 p1: v,
                 p2: v,
                 kind: TrRandomKind::Poisson,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             Wave::Pattern(Pattern {
                 high: v,

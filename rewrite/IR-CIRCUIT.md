@@ -51,7 +51,7 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 | linear controlled | VCVS, VCCS, CCCS, CCVS | `Controlled { gain, sense: NameId }` | terminals (out+, out−, ctl+, ctl−) or (out+, out−) + the sensing element's name |
 | polynomial | one kind, `output: V \| I`, `control: Voltage \| Current` | `Poly { dimension, controls: NameList, coeffs: ExprList }` | stays `Poly`; expanding it is a pass |
 | table | one kind | `Table { input: ExprId, points: ExprList, law: TableLaw, output }` | linear between points, ends held; ngspice's native TABLE rounds corners: its own law |
-| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr, tc_base }` (`tc_base: TcBase`, A15 C2: `Fixed27` only with a coefficient) | positive current flows from the first terminal through the source to the second |
+| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr, tc_base }` (`tc_base: TcBase`, A15 C2: `Fixed27` only with a coefficient; `tc_law: TcLaw`, A17: `Reciprocal` only on a `ChargeCapacitor` with a coefficient, ngspice `C … q=` dividing the charge by the polynomial) | positive current flows from the first terminal through the source to the second |
 | Laplace | one kind | `Laplace { num: ExprList, den: ExprList, output }` | terminals (out+, out−, in+, in−); coefficients in ascending powers of `s`, absolute gain already applied |
 | semiconductors | diode, BJT, MOSFET, JFET, MESFET | `Semi { area, flags, ic, temp_abs, dtemp }` or none | terminal ranges: BJT 3–5, MOSFET 3–7, diode 2–3 (thermal); everything else is a named instance parameter |
 | switches | voltage switch, current switch | `Switch { initial: SwitchState, sense: NameId }` | the initial state seeds the operating point only |
@@ -100,25 +100,39 @@ frequencies in hertz, phases in degrees.
 | `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
 | `Pattern` | `bits levels delay rise fall sample repeats repeat_start` | 5.22 |
 
-**The zero rule** (AMEND-A12 A17, R35). `Pulse`, `Sin`, `Exp` and `Sffm` carry
-`given_zero: GivenZero::{AsGiven, SpiceDefault}` (features `GivenZeroAsGiven`,
+**The zero rule** (AMEND-A12 A17, R35). `Pulse`, `Sin`, `Exp`, `Sffm`, `Am` and `TrRandom`
+carry `given_zero: GivenZero::{AsGiven, SpiceDefault}` (features `GivenZeroAsGiven`,
 `GivenZeroSpiceDefault`). Under `AsGiven` every field below is present and means what it holds.
-Under `SpiceDefault` (ngspice, `vsrcload.c:110-226`, `:404-432`) a field below that evaluates to
-zero after parameter substitution, or that the card omits (`NONE`), means its default:
+Under `SpiceDefault` (ngspice-45; table and source lines from the ngspice sources slice,
+`vsrcload.c` unless named, `isrcload.c` the same but for SFFM) a field below that the card omits
+is `NONE` and means its default; a **both** field also means its default when it evaluates to
+zero after parameter substitution, an **omit** field keeps a given 0.
 
-| Wave | Field | Default |
-|---|---|---|
-| `Pulse` | `rise`, `fall` | TSTEP |
-| `Pulse` | `width`, `period` | TSTOP |
-| `Sin` | `freq` | 1/TSTOP |
-| `Exp` | `td1`, `tau1`, `tau2` | TSTEP |
-| `Exp` | `td2` | `td1` + TSTEP |
-| `Sffm` | `carrier_freq` | 500/TSTOP |
+| Wave | Field | Rule | Default | Source |
+|---|---|---|---|---|
+| `Pulse` | `delay` | omit | 0 | :106 |
+| `Pulse` | `rise`, `fall` | both | TSTEP | :108, :111 |
+| `Pulse` | `width`, `period` | both | TSTOP | :114, :117 |
+| `Sin` | `freq` | both | 1/TSTOP | :181 |
+| `Sin` | `delay`, `damping`, `phase_deg` | omit | 0 | :184, :186, :173 |
+| `Exp` | `td1`, `tau1`, `tau2` | both | TSTEP | :204, :207, :213 |
+| `Exp` | `td2` | both | `td1` (after its own rule) + TSTEP | :210 |
+| `Sffm` | `signal_freq` | omit | 5/TSTOP | :237 |
+| `Sffm` | `mod_index` | omit | 90, then clamped to [0, fc/fm] | :239, :256-266 |
+| `Sffm` | `carrier_freq` | both | 500/TSTOP | :241 |
+| `Sffm` | `delay`, `phase_m_deg`, `phase_c_deg` | omit | 0 | :244-248 |
+| `Am` | `mod_index` | omit | 1 | :290 |
+| `Am` | `mod_freq`, `carrier_freq` | omit | 5/TSTOP, 500/TSTOP | :292, :294 |
+| `Am` | `delay`, `phase_m_deg`, `phase_c_deg` | omit | 0 | :296-300 |
+| `TrRandom` | `td`, `p1`, `p2` | omit | 0, 1, 0 | `vsrcpar.c:262-278` |
 
-A field holds what the card holds: an expression, a literal 0, or `NONE` when omitted. No reader
-copies a default in; a pass that converts `SpiceDefault` to `AsGiven` writes the `TStep` and
-`TStop` leaves (an expression `x` becomes `x == 0 ? TStep : x`). The table is A17's reading; the
-ngspice sources slice sends it with source lines, and a difference changes this table only.
+`Pulse.cycles` is a count above 0 and unlimited otherwise (`:124-138`); PWL has no defaults;
+TRNOISE's optional fields are 0 when omitted and already optional (`vsrcpar.c:223-249`). A field
+holds what the card holds: an expression, a literal 0, or `NONE` when omitted. No reader copies
+a default in; a pass that converts `SpiceDefault` to `AsGiven` writes the defaults with the
+`TStep` and `TStop` leaves (a both field `x` becomes `x == 0 ? TStep : x`). ngspice's
+I-source SFFM has no delay (`isrcload.c:205-252`; its 6th value is PHM, the 7th PHC): the
+ngspice reader writes `delay` 0 and `pre: HoldDelayValue`.
 
 ## 4. Models (`model.rs`)
 

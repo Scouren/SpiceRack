@@ -362,8 +362,10 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
                 ElemKind::FluxInductor => Some(OutKind::Flux),
                 _ => None,
             };
+            let tc = some(b.tc1) || some(b.tc2);
             some(b.expr)
-                && (b.tc_base == TcBase::Tnom || some(b.tc1) || some(b.tc2))
+                && (b.tc_base == TcBase::Tnom || tc)
+                && (b.tc_law == TcLaw::Direct || tc && e.kind == ElemKind::ChargeCapacitor)
                 && match want {
                     Some(o) => b.output == o,
                     None => !matches!(b.output, OutKind::Charge | OutKind::Flux),
@@ -443,23 +445,28 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
         return true;
     }
     let all = |e: &[ExprId]| e.iter().all(|&x| some(x));
+    // A17: `req` always present; `def` present under `AsGiven`, may be omitted under
+    // `SpiceDefault` (IR-CIRCUIT §3's table)
+    let fits = |rule: GivenZero, req: &[ExprId], def: &[ExprId]| {
+        all(req) && (rule == GivenZero::SpiceDefault || all(def))
+    };
     match w.kind {
         WaveKind::Pulse => side::<Pulse>(design, w.index, v).is_none_or(|p| {
-            // A17: under ngspice's zero rule the defaulted fields may be absent
-            all(&[p.v1, p.v2, p.delay])
-                && (p.given_zero == GivenZero::SpiceDefault
-                    || all(&[p.rise, p.fall, p.width, p.period]))
-                && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
+            fits(
+                p.given_zero,
+                &[p.v1, p.v2],
+                &[p.delay, p.rise, p.fall, p.width, p.period],
+            ) && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
         }),
         WaveKind::Sin => side::<Sin>(design, w.index, v).is_none_or(|s| {
-            all(&[s.offset, s.amplitude, s.delay, s.damping, s.phase_deg])
-                && (s.given_zero == GivenZero::SpiceDefault || some(s.freq))
-                && paired(s.amplitude2, s.freq2)
+            fits(
+                s.given_zero,
+                &[s.offset, s.amplitude],
+                &[s.freq, s.delay, s.damping, s.phase_deg],
+            ) && paired(s.amplitude2, s.freq2)
         }),
-        WaveKind::Exp => side::<Exp>(design, w.index, v).is_none_or(|x| {
-            all(&[x.v1, x.v2])
-                && (x.given_zero == GivenZero::SpiceDefault || all(&[x.td1, x.tau1, x.td2, x.tau2]))
-        }),
+        WaveKind::Exp => side::<Exp>(design, w.index, v)
+            .is_none_or(|x| fits(x.given_zero, &[x.v1, x.v2], &[x.td1, x.tau1, x.td2, x.tau2])),
         WaveKind::Pwl => side::<Pwl>(design, w.index, v).is_none_or(|p| {
             let never = p.repeat == PwlRepeat::Never;
             p.points.len().is_multiple_of(2)
@@ -469,33 +476,30 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 && some(p.join_width) == (p.join == PwlJoin::RampWidth)
         }),
         WaveKind::Sffm => side::<Sffm>(design, w.index, v).is_none_or(|s| {
-            all(&[
-                s.offset,
-                s.amplitude,
+            let def = [
+                s.carrier_freq,
                 s.mod_index,
                 s.signal_freq,
                 s.delay,
                 s.phase_c_deg,
                 s.phase_m_deg,
-            ]) && (s.given_zero == GivenZero::SpiceDefault || some(s.carrier_freq))
+            ];
+            fits(s.given_zero, &[s.offset, s.amplitude], &def)
         }),
         WaveKind::Am => side::<Am>(design, w.index, v).is_none_or(|a| {
-            all(&[
-                a.offset,
-                a.amplitude,
-                a.mod_offset,
+            let def = [
                 a.mod_index,
                 a.mod_freq,
                 a.carrier_freq,
                 a.delay,
                 a.phase_m_deg,
                 a.phase_c_deg,
-            ])
+            ];
+            fits(a.given_zero, &[a.offset, a.amplitude, a.mod_offset], &def)
         }),
         WaveKind::TrNoise => side::<TrNoise>(design, w.index, v).is_none_or(|t| all(&[t.na, t.nt])),
-        WaveKind::TrRandom => {
-            side::<TrRandom>(design, w.index, v).is_none_or(|t| all(&[t.ts, t.td, t.p1, t.p2]))
-        }
+        WaveKind::TrRandom => side::<TrRandom>(design, w.index, v)
+            .is_none_or(|t| fits(t.given_zero, &[t.ts], &[t.td, t.p1, t.p2])),
         WaveKind::Pattern => side::<Pattern>(design, w.index, v).is_none_or(|p| {
             all(&[
                 p.high,

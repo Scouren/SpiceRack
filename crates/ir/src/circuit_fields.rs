@@ -183,6 +183,7 @@ fields! {
     Behav {
         expr: Dyn = N, tc1: Expr = N, tc2: Expr = N, temp_abs: Expr = N, dtemp: Expr = N,
         rpar: Expr = N, output: Choice = OutKind::Voltage, tc_base: Choice = TcBase::Tnom,
+        tc_law: Choice = TcLaw::Direct,
     }
     Laplace {
         num: Exprs = EL, den: Exprs = EL, input: Dyn = N, output: Choice = Quantity::Voltage,
@@ -231,12 +232,16 @@ fields! {
         offset: Expr = N, amplitude: Expr = N, mod_offset: Expr = N, mod_index: Expr = N,
         mod_freq: Expr = N, carrier_freq: Expr = N, delay: Expr = N, phase_m_deg: Expr = N,
         phase_c_deg: Expr = N, mod_time: Choice = AmModTime::Delay, pre: Choice = PreDelay::Offset,
+        given_zero: Choice = GivenZero::AsGiven,
     }
     TrNoise {
         na: Expr = N, nt: Expr = N, nalpha: Expr = N, namp: Expr = N, rts_amp: Expr = N,
         rts_capture: Expr = N, rts_emission: Expr = N,
     }
-    TrRandom { ts: Expr = N, td: Expr = N, p1: Expr = N, p2: Expr = N, kind: Choice = TrRandomKind::Uniform }
+    TrRandom {
+        ts: Expr = N, td: Expr = N, p1: Expr = N, p2: Expr = N, kind: Choice = TrRandomKind::Uniform,
+        given_zero: Choice = GivenZero::AsGiven,
+    }
     Pattern {
         high: Expr = N, low: Expr = N, delay: Expr = N, rise: Expr = N, fall: Expr = N,
         sample: Expr = N, bits: Name = NN, repeats: Expr = N, repeat_start: Expr = N,
