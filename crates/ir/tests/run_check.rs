@@ -14,7 +14,7 @@ use spicerack_ir::measure::{MeasureParam, MeasureWhen};
 use spicerack_ir::periodic::{FreqAxis, Hb, HbTruncate, Pac, Pss, PssMode};
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
-use spicerack_ir::tran::{StepCap, Tran};
+use spicerack_ir::tran::{Four, StepCap, Tran};
 use spicerack_ir::{
     Alter, Analysis, AnalysisKind, Applies, Builder, Design, Diags, Edge, Elaborate, Env, Event,
     ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet,
@@ -74,7 +74,7 @@ const BROKEN: &[Fixture] = &[
     ("driven pss with an oscillator node", Violation::FieldDomain, |b, s| {
         let (f, t) = (b.num(1e6), b.num(1e-6));
         let osc_p = b.name("out");
-        let row = Pss { mode: PssMode::Driven, uic: false, fundamental: f, tstab: t, harmonics: NO, points: NO, osc_p, osc_n: NameId::NONE };
+        let row = Pss { mode: PssMode::Driven, uic: false, fundamental: f, tstab: t, harmonics: NO, points: NO, osc_p, osc_n: NameId::NONE, sc_iter: NO, steady_coeff: NO };
         raw(b, s, AnalysisKind::Pss, row);
     }),
     ("absolute pac with a relative harmonic", Violation::FieldDomain, |b, s| {
@@ -185,6 +185,12 @@ const BROKEN: &[Fixture] = &[
         let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, mean: NO, spread: NO }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
     }),
+    ("fourier with no count and no nfreqs option", Violation::FieldDomain, |b, s| {
+        let (f, p) = (b.num(1e3), b.num(1.0));
+        let o = [b.probe_v(&["out"])];
+        let outputs = b.probes(&o);
+        raw(b, s, AnalysisKind::Four, Four { fundamental: f, harmonics: NO, periods: p, grid: NO, outputs });
+    }),
     ("elaborate of no circuit", Violation::FieldDomain, |b, s| {
         b.push(s, Elaborate { circuits: List::EMPTY }, Span::NONE);
     }),
@@ -246,6 +252,8 @@ fn pss(b: &mut Builder<'_>, s: ScopeId) {
         points: NO,
         osc_p: NameId::NONE,
         osc_n: NameId::NONE,
+        sc_iter: NO,
+        steady_coeff: NO,
     };
     b.analysis(s, None, row, Span::NONE);
 }
@@ -376,6 +384,19 @@ fn a_valid_run_reports_nothing() {
         }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
         b.elaborate(s, &["top2"], Span::NONE);
+        let ten = b.num(10.0);
+        b.option(s, OptionKey::NFreqs, ten, Span::NONE);
+        let (f, p) = (b.num(1e3), b.num(1.0));
+        let o = [b.probe_v(&["out"])];
+        let outputs = b.probes(&o);
+        let four = Four {
+            fundamental: f,
+            harmonics: NO,
+            periods: p,
+            grid: NO,
+            outputs,
+        };
+        b.analysis(body, None, four, Span::NONE);
     });
     assert!(got.is_empty(), "{got:?}");
 }

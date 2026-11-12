@@ -141,6 +141,12 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::MeasStatAt, "  measure m tran stat min_at (v (a)) (bound) (bound)", "  measure m tran stat min (v (a)) (bound) (bound)"),
     (RunExtra::MeasUntil, "  measure m tran when (cross rise (v (a)) value=1 count=1 until=1u)", MW),
     (RunExtra::MeasSkipInitial, "  measure m tran when (cross rise skip_initial (v (a)) value=1)", MW),
+    (RunExtra::AnalysisNamed, "  analysis op name=o1", "  analysis op"),
+    (RunExtra::PssScIter, "  analysis pss driven fundamental=1meg tstab=1u sc_iter=50", PSS),
+    (RunExtra::PssSteadyCoeff, "  analysis pss driven fundamental=1meg tstab=1u steady_coeff=1m", PSS),
+    (RunExtra::FourHarmonicsOption, "  option n_freqs value=10\n  analysis four fundamental=1k periods=1 (v (out))", "  option n_freqs value=10\n  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"),
+    (RunExtra::StateFromHere, "  env temp=1", "  env temp=1 whole_run"),
+    (RunExtra::StateWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
@@ -207,7 +213,8 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Analysis(AnalysisKind::Tran))
         .with(Feature::Option(OptionKey::Klu))
         .with(Feature::Run(RunExtra::TranCapNone))
-        .with(Feature::Run(RunExtra::TranUic));
+        .with(Feature::Run(RunExtra::TranUic))
+        .with(Feature::Run(RunExtra::StateFromHere));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
 

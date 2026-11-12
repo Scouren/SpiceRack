@@ -36,7 +36,8 @@ Applies::{FromHere, WholeRun}`. `FromHere` (the default) holds for the run items
 `WholeRun` holds for every run item of its deck wherever it stands, and among `WholeRun` items
 that set the same thing the last in listed order holds (an `Include` read as the items of the
 file it names, in place). An `Env` sets what it names: `temp` and `tnom` are each optional, not
-both absent. A run item is its deck's wherever it stands (R26): an analysis, option or `Env`
+both absent. Each mode has its feature (`StateFromHere`, `StateWholeRun`), wherever the item
+stands. A run item is its deck's wherever it stands (R26): an analysis, option or `Env`
 inside a subcircuit or section body is `Feature::Placed(Subckt | Section, kind)` (A15 K1, kernel;
 it replaced `RunExtra::RunItemNested`); a `NodeSet` in a subcircuit keeps its own meaning (nodes
 local to each instance) and is `Placed(Subckt, NodeSet)` (was `NodeSetInSubckt`); a loop in a
@@ -70,8 +71,12 @@ Decisions:
   (Spectre `ac dev= param=`) is a `Loop` over that target around the analysis.
 - `Noise { out_p, out_n, source: NameId, sweep, points_per_summary }`; `Tf { output: Probe,
   source }`; `Pz { in_p, in_n, out_p, out_n, transfer: Vol \| Cur, find: Poles \| Zeros \| Both }`.
-- `Four { fundamental, outputs: probes, harmonics }` (the harmonic count is a field here, not an
-  option).
+- `Four { fundamental, outputs: probes, harmonics }`: the harmonic count is a field; absent, the
+  deck's `OptionKey::NFreqs` gives it (ngspice, A16; checked: the design sets one). A reader
+  states its simulator's default in the field when the deck sets no option.
+- `Pss` carries ngspice's `sc_iter` and `steady_coeff` as their own optional fields (A16), not
+  as any other simulator's knob. A named analysis is `RunExtra::AnalysisNamed` (ngspice cannot
+  spell a name).
 - `Hb { tones: ExprList, harmonics: ExprList }`: several tones from the start (the one-tone
   restriction is a writer's feature).
 - Each simulator's "what the same analysis means" differences in `INV-semantics.md` category 8

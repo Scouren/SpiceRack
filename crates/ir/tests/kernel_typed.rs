@@ -2,7 +2,7 @@
 //! on every value, `DivTyped` and `ToInt`, the `IntLiteral` feature, and their IR-text spelling.
 //!
 //! Oracles: the tag table of AMEND-A12 K1 at hand-worked points; VACASK's printed values for runs
-//! i1, t3, f2 and f4 (DIALECT-VACASK Appendix A) as spec examples, VACASK's `sgn` being
+//! i1, t3, f2, f4 and b1 (DIALECT-VACASK Appendix A) as spec examples, VACASK's `sgn` being
 //! `SgnZeroPos` (−1 below zero, +1 otherwise, its operand's type); the IR's `Sgn` is Real, as
 //! ruled (`sgn(3i) /: 2i` is 0.5); the inverse for the text spelling.
 //!
@@ -208,6 +208,9 @@ fn every_row_of_the_tag_table() {
         "SgnZeroPos: its operand's"
     );
     assert_eq!(call(Func::SgnZeroPos, &[real(30, 1)]), r(1.0));
+    // A21: ToReal is the value, tagged Real; of a Real, the identity
+    assert_eq!(call(Func::ToReal, &[int(3)]), r(3.0), "ToReal(3i)");
+    assert_eq!(call(Func::ToReal, &[real(35, 1)]), r(3.5), "ToReal(3.5)");
     // run e1: −0.0 is not below zero (a literal has no sign of zero, so it is `Neg(0)`)
     let neg_zero = ev(|bl| {
         let z = bl.literal(Literal::ZERO);
@@ -288,6 +291,8 @@ fn vacask_runs_i1_t3_f2() {
   param f4c = sgn_zero_pos(0) /: 2i
   param f4d = sgn_zero_pos(3i) /: 2i
   param f4f = sgn(3i) /: 2i
+  param b1a = to_real(3i) /: 2i
+  param b1b = to_int(to_real(3i)) /: 2i
 ";
     let mut d = Design::new();
     let mut diags = Diags::new();
@@ -320,6 +325,8 @@ fn vacask_runs_i1_t3_f2() {
         ("f4c", 0.5),
         ("f4d", 0.0),
         ("f4f", 0.5),
+        ("b1a", 1.5),
+        ("b1b", 1.0),
     ];
     let top = d.file(d.entry()).top;
     for (name, value) in want {

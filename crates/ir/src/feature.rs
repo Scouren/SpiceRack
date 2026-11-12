@@ -460,13 +460,22 @@ pub(crate) fn item_features(
     if enclosing {
         *set = set.with(Feature::Extra(Extra::EnclosingRef));
     }
+    // A19 (R38): a field that may read the circuit counts the dynamic form whatever its class
+    let circuit_fields: Vec<ExprId> = handles
+        .iter()
+        .filter_map(|h| match h {
+            Handle::ExprDyn(e) => Some(*e),
+            _ => None,
+        })
+        .collect();
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);
         // the Dyn features are class >= Temp (R14, A11): transitive through reads
         let table = def_classes(design);
-        let dynamic = nodes
-            .iter()
-            .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
+        let dynamic = circuit_fields.contains(&root)
+            || nodes
+                .iter()
+                .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
             if let Expr::Num(n) = design.expr(e)
