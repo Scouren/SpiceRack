@@ -1,19 +1,27 @@
 //! What several expression passes read of a design: a node's children (the `Expr` view's
-//! operands), the values each definition takes, the live rows, whether a tag is observable, the
+//! operands), the values each definition takes, the live rows, whether a value may hold a draw, whether a tag is observable, the
 //! notes at items left carrying a feature, and the plain decimal literals the passes build.
 //!
 //! Cites: `crates/ir/src/expr.rs` (`Expr`, `Literal`); the brief's operand rule (a pass never
 //! duplicates an operand holding a `Draw`).
 //!
-//! Contents: `pub(super) fn kids(&ir::Design, ir::ExprId, &mut Vec<ir::ExprId>)`,
+//! Contents: `pub(super) struct Draws` (`Draws::new`, `Draws::holds`),
+//! `pub(super) fn kids(&ir::Design, ir::ExprId, &mut Vec<ir::ExprId>)`,
 //! `pub(super) fn plain(&mut ir::Builder<'_>, i64, u8) -> ir::ExprId`,
 //! `pub(super) fn def_values(&ir::Design) -> Vec<Vec<ir::ExprId>>`,
 //! `pub(super) fn instance(&ir::Design, ir::ItemRef) -> Option<(ir::ItemRef, ir::ParamList)>`,
 //! `pub(super) fn live(&ir::Design) -> Vec<ir::ExprId>`, `pub(super) fn reads_tags(&ir::Design) -> bool`,
 //! `pub(super) fn note_left(&ir::Design, &mut ir::Diags, ir::Feature, ir::Code)`,
-//! `pub(super) fn binary_form(ir::BinOp, bool) -> ir::Feature`, `pub(super) fn func_form(ir::Func, bool) -> ir::Feature`
+//! `pub(super) fn binary_form(ir::BinOp, bool) -> ir::Feature`, `pub(super) fn func_form(ir::Func, bool) -> ir::Feature`,
+//! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`
 
 use crate::ir;
+
+/// Which definitions' values may hold a draw (a parameter whose value, or a function whose
+/// body, reads one, transitively), for the design as it stood when built.
+pub(super) struct Draws {
+    defs: Vec<bool>,
+}
 
 /// Appends the operands of `e` in evaluation order (a leaf has none).
 pub(super) fn kids(design: &ir::Design, e: ir::ExprId, out: &mut Vec<ir::ExprId>) {
@@ -48,6 +56,57 @@ pub(super) fn plain(b: &mut ir::Builder<'_>, mantissa: i64, frac: u8) -> ir::Exp
         exp10: 0,
         form: ir::NumForm::Plain,
     })
+}
+
+impl Draws {
+    /// The table for `design`: a definition holds a draw when its value (a parameter's, a head
+    /// default's, an instance's actual for it, a function's body) does; a fixpoint over the
+    /// definitions, bounded by their count.
+    pub(super) fn new(design: &ir::Design) -> Draws {
+        let defs = design.definitions();
+        let mut table = Draws {
+            defs: vec![false; defs.len()],
+        };
+        let values = def_values(design);
+        for _ in 0..=defs.len() {
+            let mut changed = false;
+            for (d, roots) in values.iter().enumerate() {
+                if !table.defs[d] && roots.iter().any(|&e| table.holds(design, e)) {
+                    table.defs[d] = true;
+                    changed = true;
+                }
+            }
+            if !changed {
+                return table;
+            }
+        }
+        unreachable!("each round marks a definition or ends")
+    }
+
+    /// Whether the tree under `e` holds a draw or reads a definition that may. O(its tree).
+    pub(super) fn holds(&self, design: &ir::Design, e: ir::ExprId) -> bool {
+        let mut stack = vec![e];
+        let mut out = Vec::new();
+        for _ in 0..=design.expr_count() {
+            let Some(e) = stack.pop() else { return false };
+            if e.is_none() {
+                continue;
+            }
+            match design.expr(e) {
+                ir::Expr::Draw(..) => return true,
+                ir::Expr::Param(r) | ir::Expr::UserCall(r, _)
+                    if r.is_resolved() && self.defs[r.def.index()] =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+            out.clear();
+            kids(design, e, &mut out);
+            stack.extend_from_slice(&out);
+        }
+        unreachable!("a tree has fewer nodes than the table")
+    }
 }
 
 /// Every expression that gives each definition its value, by `DefId`: a parameter's value, a
@@ -180,4 +239,18 @@ pub(super) fn func_form(f: ir::Func, dynamic: bool) -> ir::Feature {
         true => ir::Feature::FuncDyn(f),
         false => ir::Feature::Func(f),
     }
+}
+
+/// The value of a literal, or of a literal under negations (`-1` is `Neg(1)` in some readers).
+pub(super) fn literal(design: &ir::Design, e: ir::ExprId) -> Option<f64> {
+    let mut sign = 1.0;
+    let mut at = e;
+    for _ in 0..=design.expr_count() {
+        match design.expr(at) {
+            ir::Expr::Num(n) => return Some(sign * design.num(n).value()),
+            ir::Expr::Unary(ir::UnOp::Neg, a) => (sign, at) = (-sign, a),
+            _ => return None,
+        }
+    }
+    unreachable!("a chain of negations is shorter than the table")
 }
