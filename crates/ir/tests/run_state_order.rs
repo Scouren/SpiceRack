@@ -241,3 +241,109 @@ fn check_legal_reports_a_design_level_run_feature_at_its_item() {
         "the option after the analysis, the param between"
     );
 }
+
+#[test]
+fn a_parameter_alter_at_reset_holds_from_the_next_full_reset() {
+    // R70/A43 (the lead's ruling): an `AtReset` alter of a parameter holds from the first full
+    // reset after it, never before; a partial reset does not apply it (a definition: no dialect
+    // writes a partial reset after one, ngspice's is all or nothing). A full reset undoes the
+    // device alters before it (ngspice's `reset` re-reads the deck) and applies the waiting
+    // parameter alter instead. An `AtOnce` one holds from where it stands. Expected items
+    // worked by hand (the top's index of the holder, `None` = the definition's own value).
+    let d = read(
+        "file \"t.sp\" deck
+  param p = 1
+  element resistor r1 (a 0) value=1k
+  alter (element_value r1) value=2k
+  alter (param p) value=2 at_reset
+  analysis op
+  reset values
+  analysis op
+  reset values options temp tnom saves
+  analysis op
+  alter (param p) value=3
+  analysis op
+",
+    );
+    let p = d.lookup(
+        d.file(d.entry()).top,
+        spicerack_ir::DefKind::Param,
+        d.find_name("p"),
+    );
+    // 0 p, 1 r1, 2 device alter, 3 parameter alter at reset, 4 op, 5 partial reset, 6 op,
+    // 7 full reset, 8 op, 9 parameter alter at once, 10 op
+    assert_eq!(
+        at_analyses(&d, Setting::Param(p)),
+        [None, None, Some(3), Some(9)],
+        "the parameter"
+    );
+    let r1 = d.find_name("r1");
+    assert_eq!(
+        at_analyses(&d, Setting::Device(r1, spicerack_ir::NameId::NONE)),
+        [Some(2), None, None, None],
+        "the device: undone by a reset of values, partial or full"
+    );
+}
+
+#[cfg(feature = "gen")]
+#[test]
+fn a_generated_parameter_in_force_stands_before_and_is_applied() {
+    // R70/A43 over generated walks (the evaluator's rule exercised with partial resets the
+    // generator draws): what `in_force` names for a parameter is an alter of it that stands
+    // before the point, and an `AtReset` one has a full reset between it and the point.
+    // Oracle: those two invariants, read off the walk, not the rule's own loop.
+    use spicerack_ir::r#gen::{Size, generate};
+    use spicerack_ir::plan::{Alter, AlterEffect, TargetKind};
+    use spicerack_ir::reset::{Reset, ResetSet};
+    let size = Size {
+        items: 40,
+        scope_depth: 3,
+        expr_depth: 3,
+        files: 1,
+    };
+    let (mut checked, mut partial_after) = (0, 0);
+    for seed in 0..300u64 {
+        let d = generate(seed, &spicerack_ir::FeatureSet::ALL, size);
+        for (_, order) in run_walks(&d) {
+            let alters: Vec<(usize, Alter)> = order
+                .iter()
+                .enumerate()
+                .filter(|(_, (i, _))| i.kind == ItemKind::Alter)
+                .map(|(k, (i, _))| (k, d.row::<Alter>(i.index)))
+                .filter(|(_, a)| a.target.kind == TargetKind::Param && !a.target.a.def.is_none())
+                .collect();
+            let reset_at = |k: usize| {
+                let (i, _) = order[k];
+                (i.kind == ItemKind::Reset).then(|| d.row::<Reset>(i.index).restores)
+            };
+            for &(k, a) in &alters {
+                let later = (k + 1..order.len()).filter_map(reset_at);
+                partial_after += usize::from(
+                    a.effect == AlterEffect::AtReset && later.clone().any(|r| r != ResetSet::ALL),
+                );
+            }
+            for at in 0..order.len() {
+                for &(_, a) in &alters {
+                    let held = in_force(&d, &order, at, Setting::Param(a.target.a.def));
+                    if held == ItemRef::NONE {
+                        continue;
+                    }
+                    let k = order[..at].iter().position(|(i, _)| *i == held);
+                    let k = k.expect("the holder stands before the point");
+                    let row: Alter = d.row(held.index);
+                    assert_eq!(row.target.a.def, a.target.a.def, "seed {seed}");
+                    if row.effect == AlterEffect::AtReset {
+                        let full = (k + 1..at).filter_map(reset_at).any(|r| r == ResetSet::ALL);
+                        assert!(full, "seed {seed}: applied with no full reset between");
+                    }
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked > 50, "{checked} points checked");
+    assert!(
+        partial_after > 0,
+        "the generator drew a partial reset after an at-reset alter"
+    );
+}

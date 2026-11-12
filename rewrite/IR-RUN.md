@@ -71,6 +71,11 @@ Decisions:
   `steady_coeff` absent is `RunExtra::PssArgumentOmitted`. The generator draws these arguments
   constant, a parameter read and a bound call only with the feature, outputs without a part,
   and all four `Pss` arguments without the feature.)
+  (R70/A43: `Alter::effect: AlterEffect { AtOnce, AtReset }` says when a parameter alter takes
+  effect for the analyses after it: at once, every other state kept (VACASK re-elaborates), or at
+  the next reset (ngspice `alterparam`); `RunExtra::AlterParamAtOnce` / `AlterParamAtReset`, one
+  per parameter alter; `AtReset` on any other target is `FieldDomain`. `link::unbound_targets`
+  lists the run items' targets that provably name nothing, for the spine's strict refusal.)
   (`INV-semantics.md` 8.01–8.03): every field named, none inferred from another, `NONE` is not 0.
   Each simulator reads the positional `.tran` fields differently (Xyce's first is an initial-step
   guess, ngspice's a print step that also caps the step, HSPICE's extra fields are segments): the

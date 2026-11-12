@@ -188,6 +188,9 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     // of its four optional arguments
     (RunExtra::AnalysisParamArgument, "  param k = 1\n  analysis tran stop=(1u * k) print_step=1n cap=none", "  param k = 1\n  analysis tran stop=1u print_step=1n cap=none"),
     (RunExtra::PssArgumentOmitted, "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10", PF),
+    // R70/A43: when a parameter alter takes effect
+    (RunExtra::AlterParamAtOnce, AL, "  alter (param p) value=1 at_reset"),
+    (RunExtra::AlterParamAtReset, "  alter (param p) value=1 at_reset", AL),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";

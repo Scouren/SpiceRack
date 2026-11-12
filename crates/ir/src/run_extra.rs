@@ -386,11 +386,22 @@ pub enum RunExtra {
     /// A periodic steady state with its harmonic count, point count, iteration limit or
     /// steady-state coefficient absent (R68/A42: ngspice's `.pss` reads every argument).
     PssArgumentOmitted,
+    /// A parameter alter that takes effect where it stands (`AlterEffect::AtOnce`; VACASK: the
+    /// pair deck `alter_toplevel.sim`, `pair-test` b213ada2, gives the new value at the next
+    /// operating point).
+    /// `AlterParamAtReset`'s twin: each parameter alter sets exactly one (R70/A43).
+    AlterParamAtOnce,
+    /// A parameter alter that takes effect at the next reset (`AlterEffect::AtReset`;
+    /// ngspice's `alterparam`). R58's evidence, ngspice-45 settle runs (`step2-ngspice`
+    /// d8221c3e): `alter_param_noreset.sp` prints v(n) = 1.00000000e+00 before and after
+    /// `alterparam a=2`, silently; `alter_param_reset.sp` prints 1.00000000e+00 then
+    /// 2.00000000e+00 once a `reset` stands between.
+    AlterParamAtReset,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 170] = [
+    pub const ALL: [RunExtra; 172] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -561,6 +572,8 @@ impl RunExtra {
         RunExtra::TranPrintStep,
         RunExtra::AnalysisParamArgument,
         RunExtra::PssArgumentOmitted,
+        RunExtra::AlterParamAtOnce,
+        RunExtra::AlterParamAtReset,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

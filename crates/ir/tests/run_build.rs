@@ -212,7 +212,13 @@ fn state_items_hold_their_fields() {
     let mut b = d.builder();
     let (v, t85, t27) = (b.num(1e-3), b.num(85.0), b.num(27.0));
     let r1 = b.target(TargetKind::ElementValue, &[], "r1", None);
-    let al = b.alter(top, r1, t85, Span::NONE);
+    let al = b.alter(
+        top,
+        r1,
+        t85,
+        spicerack_ir::plan::AlterEffect::AtOnce,
+        Span::NONE,
+    );
     let op = b.option(top, OptionKey::RelTol, v, Span::NONE);
     let fl = b.option(top, OptionKey::Klu, ExprId::NONE, Span::NONE);
     let pr = b.option_private(top, "xyce", "timeint.reltol", v, Span::NONE);
@@ -230,7 +236,8 @@ fn state_items_hold_their_fields() {
         d.row::<Alter>(al.index),
         Alter {
             target: r1,
-            value: t85
+            value: t85,
+            effect: spicerack_ir::plan::AlterEffect::AtOnce,
         }
     );
     let o: OptionRow = d.row(op.index);
@@ -512,5 +519,11 @@ fn an_alter_of_the_temperature_asserts() {
     let (mut d, top) = deck();
     let mut b = d.builder();
     let v = b.num(85.0);
-    b.alter(top, Target::TEMP, v, Span::NONE);
+    b.alter(
+        top,
+        Target::TEMP,
+        v,
+        spicerack_ir::plan::AlterEffect::AtOnce,
+        Span::NONE,
+    );
 }
