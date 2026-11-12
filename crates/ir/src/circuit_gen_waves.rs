@@ -14,8 +14,8 @@ use crate::expr::{Literal, NumForm};
 use crate::feature::Feature;
 use crate::id::{ExprId, NameId};
 use crate::wave::{
-    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
-    Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
+    Am, AmModTime, Exp, GivenZero, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat,
+    Sffm, SffmLaw, Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
 };
 
 impl R<'_, '_> {
@@ -46,6 +46,11 @@ impl R<'_, '_> {
                         }
                         _ => true,
                     }
+                    && (!matches!(
+                        k,
+                        WaveKind::Pulse | WaveKind::Sin | WaveKind::Exp | WaveKind::Sffm
+                    ) || self.has(X::GivenZeroAsGiven)
+                        || self.has(X::GivenZeroSpiceDefault))
                     && (self.has(X::DcGivenWithWave) || self.has(dc_at_zero(k)))
             })
             .collect();
@@ -63,6 +68,7 @@ impl R<'_, '_> {
                     (PulseLaw::Spice, Some(X::PulseSpice)),
                     (PulseLaw::Vacask, Some(X::PulseVacask)),
                 ]);
+                let given_zero = self.zero_rule();
                 let [v1, v2, delay]: [ExprId; 3] = std::array::from_fn(|_| self.ex());
                 // VACASK requires `rise > 0`: a positive literal
                 let rise = if law == PulseLaw::Vacask {
@@ -74,9 +80,10 @@ impl R<'_, '_> {
                         form: NumForm::Plain,
                     })
                 } else {
-                    self.ex()
+                    self.defaulted(given_zero)
                 };
-                let [fall, width, period]: [ExprId; 3] = std::array::from_fn(|_| self.ex());
+                let [fall, width, period]: [ExprId; 3] =
+                    std::array::from_fn(|_| self.defaulted(given_zero));
                 let cycles = self.opt(X::PulseCycles);
                 self.b.wave(Pulse {
                     v1,
@@ -88,12 +95,15 @@ impl R<'_, '_> {
                     period,
                     cycles,
                     law,
+                    given_zero,
                 })
             }
             WaveKind::Sin => {
                 let pre = self.pre(X::SinPreOffset, X::SinPreHold, X::SinPreZero);
-                let [offset, amplitude, freq, delay, damping, phase_deg]: [ExprId; 6] =
-                    std::array::from_fn(|_| self.ex());
+                let given_zero = self.zero_rule();
+                let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
+                let freq = self.defaulted(given_zero);
+                let [delay, damping, phase_deg]: [ExprId; 3] = std::array::from_fn(|_| self.ex());
                 let cycles = self.opt(X::SinCycles);
                 let tone = self.maybe(X::SinSecondTone);
                 let amplitude2 = if tone { self.ex() } else { N };
@@ -109,6 +119,7 @@ impl R<'_, '_> {
                     amplitude2,
                     freq2,
                     pre,
+                    given_zero,
                 })
             }
             WaveKind::Exp => {
@@ -116,8 +127,10 @@ impl R<'_, '_> {
                     (TdFrom::Zero, Some(X::ExpTd2FromZero)),
                     (TdFrom::Td1, Some(X::ExpTd2FromTd1)),
                 ]);
-                let [v1, v2, td1, tau1, td2, tau2]: [ExprId; 6] =
-                    std::array::from_fn(|_| self.ex());
+                let given_zero = self.zero_rule();
+                let [v1, v2]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
+                let [td1, tau1, td2, tau2]: [ExprId; 4] =
+                    std::array::from_fn(|_| self.defaulted(given_zero));
                 self.b.wave(Exp {
                     v1,
                     v2,
@@ -126,6 +139,7 @@ impl R<'_, '_> {
                     td2,
                     tau2,
                     td2_from,
+                    given_zero,
                 })
             }
             WaveKind::Pwl => {
@@ -138,16 +152,11 @@ impl R<'_, '_> {
                     (SffmLaw::Ngspice, Some(X::SffmNgspice)),
                 ]);
                 let pre = self.pre(X::SffmPreOffset, X::SffmPreHold, X::SffmPreZero);
-                let [
-                    offset,
-                    amplitude,
-                    carrier_freq,
-                    mod_index,
-                    signal_freq,
-                    delay,
-                    phase_c_deg,
-                    phase_m_deg,
-                ]: [ExprId; 8] = std::array::from_fn(|_| self.ex());
+                let given_zero = self.zero_rule();
+                let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
+                let carrier_freq = self.defaulted(given_zero);
+                let [mod_index, signal_freq, delay, phase_c_deg, phase_m_deg]: [ExprId; 5] =
+                    std::array::from_fn(|_| self.ex());
                 self.b.wave(Sffm {
                     offset,
                     amplitude,
@@ -159,6 +168,7 @@ impl R<'_, '_> {
                     phase_m_deg,
                     law,
                     pre,
+                    given_zero,
                 })
             }
             WaveKind::Am => {
@@ -298,6 +308,25 @@ impl R<'_, '_> {
             file,
             repeat,
             join,
+        }
+    }
+
+    /// The zero rule of a pulse, sine, exponential or SFFM, from the set (A17; `wave_kind`
+    /// admitted the wave only when one member is in it).
+    fn zero_rule(&mut self) -> GivenZero {
+        self.pick(&[
+            (GivenZero::AsGiven, Some(X::GivenZeroAsGiven)),
+            (GivenZero::SpiceDefault, Some(X::GivenZeroSpiceDefault)),
+        ])
+    }
+
+    /// A field with a default under `rule`: under `SpiceDefault` sometimes omitted, else an
+    /// expression.
+    fn defaulted(&mut self, rule: GivenZero) -> ExprId {
+        if rule == GivenZero::SpiceDefault && self.g.chance(3) {
+            N
+        } else {
+            self.ex()
         }
     }
 }

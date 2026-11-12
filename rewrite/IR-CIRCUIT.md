@@ -33,22 +33,25 @@ field and say which dialect needs it in its doc.
 
 Header as IR-KERNEL §6, with A13 (R23): `name` is the element's whole name as its dialect
 spells it (ngspice: letter included, folded), unique in its scope across kinds; the SPICE card
-letter is the neutral fact `letter::spice_letter(design, element)`, and a name that does not
-begin with it is `CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
+letter is the neutral fact `letter::spice_letter(design, element)` (the canonical letter, which a
+rename pass uses); `letter::spice_letters` lists every letter a SPICE card may give the element
+(a voltage `Behav` B or E and a current one B or G, as ngspice and HSPICE read `E … vol=` and
+`G … cur=`; a `Port` P or V), and a name that begins with none of them is
+`CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
 renames). Two elements of one name in one scope are `Violation::DuplicateElement`
 (`element::design_check`). For every `ElemKind` document the terminal roles in order, the allowed
 terminal count (fixed or a range), whether `model` is required, and its detail row.
 
 | Family | Kinds | Detail row (owner file) | Decisions |
 |---|---|---|---|
-| passives | resistor, capacitor, inductor | `Passive` (`passive.rs`) | `value` (Ω, F, H; `NONE` when only the model gives it), `ic` + `ic_mode`, `tc1`, `tc2`, `temp_abs`, `dtemp` (two fields: Xyce and VACASK have both, HSPICE only the offset), `noisy`, `parasitics` (row or `NONE`: `rser lser rpar cpar rlshunt`, LTspice's; the builders take them too) |
+| passives | resistor, capacitor, inductor | `Passive` (`passive.rs`) | `value` (Ω, F, H; `NONE` when only the model gives it), `ic` + `ic_mode`, `tc1`, `tc2`, `temp_abs`, `dtemp` (two fields: Xyce and VACASK have both, HSPICE only the offset), `noisy`, `parasitics` (row or `NONE`: `rser lser rpar cpar rlshunt`, LTspice's; the builders take them too); for a value that reads the circuit, `tc_base: TcBase::{Tnom, Fixed27}` (ngspice measures its `tc1`/`tc2` from 27 °C whatever `tnom` is, `asrcload.c:41`) and, on a capacitor, `tc_law: TcLaw::{Direct, Reciprocal}` (ngspice divides by the polynomial, `inpcom.c:6747`); `Fixed27` and `Reciprocal` elsewhere are `FieldDomain` (A15 C2) |
 | charge capacitor | charge-defined capacitor | `Behav` with `OutKind::Charge` | one construct, five spellings (`INV-constructs` D5) |
 | coupling | coupling | `Coupling { inductors: NameList, k: ExprId }` | no terminals; every listed pair is coupled by `k`; `k` may be an expression |
-| sources | voltage source, current source, RF port | `Source` (`source.rs`) | three independent slots: `dc` (what `.op`/`.dc` read) with `dc_rule: DcRule::{Given, WaveAtZero}` (A12 C4: `dc` is `NONE` exactly under `WaveAtZero`, the wave's t = 0 value; ngspice has `WaveAtZero` for SIN, PULSE, EXP, PWL, VACASK for every wave, and VACASK lacks `Given` with a wave: features `DcGivenWithWave`, `DcAtZero<Wave>`), `ac_mag` + `ac_phase_deg` (`NONE` = no AC stimulus), `wave` (`NONE` = the transient holds `dc`); `distof1`, `distof2`; `tc1`, `tc2` (Spectre scales the whole waveform); `parasitics`; port fields `port_index`, `z0`, with the value convention pinned as the EMF behind `z0` (Spectre's user value is half of it: its reader doubles) |
+| sources | voltage source, current source, RF port | `Source` (`source.rs`) | three independent slots: `dc` (what `.op`/`.dc` read) with `dc_rule: DcRule::{Given, WaveAtZero}` (A12 C4: `dc` is `NONE` exactly under `WaveAtZero`, the wave's t = 0 value; ngspice and VACASK have `WaveAtZero` for every wave (R36: ngspice's operating point runs the wave's own law at t = 0, `vsrcload.c:73-86`; SFFM and AM give 0 there because their law is 0 up to the delay, a random wave its offset), and VACASK lacks `Given` with a wave: features `DcGivenWithWave`, `DcAtZero<Wave>`), `ac_mag` + `ac_phase_deg` (`NONE` = no AC stimulus), `wave` (`NONE` = the transient holds `dc`); `distof1`, `distof2`; `tc1`, `tc2` (Spectre scales the whole waveform); `parasitics`; port fields `port_index`, `z0`, with the value convention pinned as the EMF behind `z0` (Spectre's user value is half of it: its reader doubles) |
 | linear controlled | VCVS, VCCS, CCCS, CCVS | `Controlled { gain, sense: NameId }` | terminals (out+, out−, ctl+, ctl−) or (out+, out−) + the sensing element's name |
 | polynomial | one kind, `output: V \| I`, `control: Voltage \| Current` | `Poly { dimension, controls: NameList, coeffs: ExprList }` | stays `Poly`; expanding it is a pass |
 | table | one kind | `Table { input: ExprId, points: ExprList, law: TableLaw, output }` | linear between points, ends held; ngspice's native TABLE rounds corners: its own law |
-| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr }` | positive current flows from the first terminal through the source to the second |
+| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr, tc_base }` (`tc_base: TcBase`, A15 C2: `Fixed27` only with a coefficient) | positive current flows from the first terminal through the source to the second |
 | Laplace | one kind | `Laplace { num: ExprList, den: ExprList, output }` | terminals (out+, out−, in+, in−); coefficients in ascending powers of `s`, absolute gain already applied |
 | semiconductors | diode, BJT, MOSFET, JFET, MESFET | `Semi { area, flags, ic, temp_abs, dtemp }` or none | terminal ranges: BJT 3–5, MOSFET 3–7, diode 2–3 (thermal); everything else is a named instance parameter |
 | switches | voltage switch, current switch | `Switch { initial: SwitchState, sense: NameId }` | the initial state seeds the operating point only |
@@ -56,7 +59,29 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 | modules | code model, Verilog-A module, subcircuit instance, unresolved master | none | `model` names the master; `Ref.def == NONE` for the unresolved kind is legal and is what a Spectre reader produces without the kit |
 
 `mult` is the header's field for every kind: a reader lowers `m=` (and VACASK `$mfactor`) to it,
-never to a parameter named `m`.
+never to a parameter named `m`. How it multiplies is the header's `mult_law` (AMEND-A12 A15 C1,
+R31): `MultLaw::Parallel` (every kind: `mult` whole copies in parallel; through the hierarchy
+multiplicities compose by multiplication) or, on an `Instance` with a `mult` only,
+`MultLaw::NgspiceAppend` (ngspice's `m` on an X line, ngspice-45 `inpcom.c:4124-4198`
+`inp_fix_subckt_multiplier` and `4208-4250`; exact list and runs from the ngspice elements
+slice): when the subcircuit does not declare `m`, the instance's `mult` is appended as `m={m}`
+to every element of the body, after its own `m=`, so it replaces that element's own `mult` (the
+last one wins: an inner `R1 p q 1k m=5` under `X … m=2` runs as 500 Ω, v(f) = 0.6667), and
+nested `Instance`s pass it on the same way. ngspice leaves untouched the cards whose letter is
+in "vehaknopstuwy" and a B card whose output is `v=`: by kind `VSource` and `Port` (V), `Vcvs`,
+`Delay` and the voltage-output `Poly`, `Table`, `Laplace`, `FreqTable` (E), `Ccvs` and the
+voltage-output current-controlled `Poly` (H), `CodeModel` (A), `Coupling` (K), `ModuleModel`
+(N), `LossyLine` (O), `CoupledLines` (P), `VSwitch` (S), `LosslessLine` (T), `RcLine` (U),
+`ISwitch` (W), `SingleLossyLine` (Y), and `Behav` with `OutKind::Voltage`. Every other kind is
+multiplied: R, C, L (with the charge- and flux-defined forms and a circuit-valued R), `ISource`
+(`i` is not in the list), `Vccs`, `Cccs` and every current-output G/F form, a current `Behav`,
+D, Q, M, J, Z (`Mesfet`, `Igbt`), and nested `Instance`s (X). `Module` and `Unresolved` are no
+ngspice cards. Runs (ngspice-45): `X1 … m=2` over `R1 p q 1k` gives v(b) = 0.6667 (500 Ω). A
+subcircuit that declares `m` in its head (`params: m=1`) triggers nothing: `m` is an ordinary
+parameter (v(d) = 0.5, R stays 1k), so the ngspice reader puts it in the instance's `params`
+and leaves `mult` `NONE`. HSPICE compatibility mode (`newcompat.hs`) writes `m={m*<old>}`, a
+product: that is `Parallel`, not this law. Features: `MultInstanceParallel`,
+`MultInstanceNgspiceAppend` (they replace `MultInstance`).
 
 ## 3. Waveforms (`wave.rs`)
 
@@ -66,14 +91,34 @@ frequencies in hertz, phases in degrees.
 
 | Wave | Fields | Decisions (evidence in `INV-semantics.md` §5) |
 |---|---|---|
-| `Pulse` | `v1 v2 delay rise fall width period cycles law` | `cycles == NONE` means unlimited; a zero `rise` means an ideal edge (5.04, 5.05); `law: PulseLaw::{Spice, Vacask}` (A12 C1: VACASK needs `rise > 0`, `fall <= 0` is no falling edge, `period <= 0` one pulse) |
-| `Sin` | `offset amplitude freq delay damping phase_deg cycles pre` | `phase_deg` is the phase at `t = delay`; `pre` says what the source is before the delay (5.06, 5.07) |
-| `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
+| `Pulse` | `v1 v2 delay rise fall width period cycles law given_zero` | `cycles` above 0 is a count, `NONE` or any other value unlimited (A17); a zero `rise` under `AsGiven` is an ideal edge (5.04, 5.05); `law: PulseLaw::{Spice, Vacask}` (A12 C1: VACASK needs `rise > 0`, `fall <= 0` is no falling edge, `period <= 0` one pulse) |
+| `Sin` | `offset amplitude freq delay damping phase_deg cycles pre given_zero` | `phase_deg` is the phase at `t = delay`; `pre` says what the source is before the delay: ngspice `HoldDelayValue` (A17, from `vsrcload.c`); Xyce and HSPICE as their slices confirm (5.06, 5.07) |
+| `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from given_zero` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
 | `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; a deck with no `t = 0` point gets the one its simulator implies (HSPICE ramps from the DC value, ngspice holds the first value: the reader writes the point) (5.09–5.11) |
-| `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0) (5.01, 5.02) |
+| `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre given_zero` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0 for t ≤ delay, the delay included) (5.01, 5.02) |
 | `Am` | the general formula of 5.03 with every term a field, `pre` | each dialect's AM is a restriction of it |
-| `TrNoise`, `TrRandom` | ngspice's fields | time domain only |
+| `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
 | `Pattern` | `bits levels delay rise fall sample repeats repeat_start` | 5.22 |
+
+**The zero rule** (AMEND-A12 A17, R35). `Pulse`, `Sin`, `Exp` and `Sffm` carry
+`given_zero: GivenZero::{AsGiven, SpiceDefault}` (features `GivenZeroAsGiven`,
+`GivenZeroSpiceDefault`). Under `AsGiven` every field below is present and means what it holds.
+Under `SpiceDefault` (ngspice, `vsrcload.c:110-226`, `:404-432`) a field below that evaluates to
+zero after parameter substitution, or that the card omits (`NONE`), means its default:
+
+| Wave | Field | Default |
+|---|---|---|
+| `Pulse` | `rise`, `fall` | TSTEP |
+| `Pulse` | `width`, `period` | TSTOP |
+| `Sin` | `freq` | 1/TSTOP |
+| `Exp` | `td1`, `tau1`, `tau2` | TSTEP |
+| `Exp` | `td2` | `td1` + TSTEP |
+| `Sffm` | `carrier_freq` | 500/TSTOP |
+
+A field holds what the card holds: an expression, a literal 0, or `NONE` when omitted. No reader
+copies a default in; a pass that converts `SpiceDefault` to `AsGiven` writes the `TStep` and
+`TStop` leaves (an expression `x` becomes `x == 0 ? TStep : x`). The table is A17's reading; the
+ngspice sources slice sends it with source lines, and a difference changes this table only.
 
 ## 4. Models (`model.rs`)
 
@@ -87,11 +132,25 @@ Ref }`.
   `Module`, …: fix the list from `INV-constructs` §F and D68). A level number is a dialect's
   spelling of a family: readers map (type word, level) → family, writers map back. There is no
   "neutral level".
+- Every model sets `Feature::Family(family)` (A15 K5, R32): a target that has no such family
+  lacks the feature, so its refusal is a feature, not an `admits` check; a version of a family
+  a target lacks stays the dialect's own check.
 - `ModelFamily::Other` carries the type word as written for a family the IR does not know; a
   writer of another dialect refuses it.
 - Parameter names in `params` are lowercase and are the family's own names (the model's
   published names); a dialect's renames live in that dialect's tables, not here.
 - Bins: one `Model` per bin, `bin_of` naming the base; a Spectre model group is a run of them.
+  A bin group has a definition (AMEND-A12 A15 C4, R33): pushing the first `Model` with
+  `bin_of = X` into a scope where no `DefKind::Model` `X` exists also defines `X` there, its
+  `Def.item` the first bin's row (`Builder::model` and the IR-text reader both do it, so the round
+  trip holds). An instance that names the group (`nch`, where only `nch.1`, `nch.2`, … exist)
+  binds to that definition, and the simulator picks the bin by geometry. A consumer tells a group
+  from a plain model by its definition: `design.row::<Model>(def.item.index).name != def.name` (the
+  row it points at is a bin whose `bin_of` is the definition's name). A plain model of the
+  group's name in the same scope is a duplicate definition: a reader keeps its simulator's
+  winner before it pushes.
+- `ModelFamily::Mesa` (A15 C3): ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4,
+  `inpdomod.c`); the level is a parameter of the device.
 
 ## 4a. Device libraries (`library.rs`, AMEND-A12 C5, R17)
 

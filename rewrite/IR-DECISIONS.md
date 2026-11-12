@@ -270,6 +270,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - Reach under the kernel's full-set harness (4,000 seeds, `FeatureSet::ALL`) is part of the run owner's gate. A kind that needs a predecessor gets it from its own generator, not from the kernel happening to pick it next: an `Hb`/`Pss` generator follows itself, half the time, with one periodic small-signal analysis; a sweep loop with `LoopOverOp` in the set starts its body, half the time, with an `Op`; both count in the size budget. Measured over seeds 0..4000: every run item kind, analysis kind, `RunExtra` member and option key now appears in at least 48 seeds (before: `LoopOverOp` 1, the periodic kinds 6–11). `run_gen` checks reach again on seeds 50,000..54,000.
 
+
 ## A12 K2 addendum: `Extra::DeckWithoutTitle`
 
 - A design-level feature (`feature::design_level`, beside the case clash): it is a fact of a file, not of an item. `check_legal` reports it at `Span::NONE`.
@@ -285,3 +286,15 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `Pss::sc_iter` and `Pss::steady_coeff` are appended (`Pss` 28 → 36 bytes), written `sc_iter=` and `steady_coeff=` after the oscillator nodes. `Four::harmonics` may be `NONE`; `check`'s invariant for it: the design sets an `OptionKey::NFreqs` (O(options) per such `Four`). `OptionKey` gains `NFreqs` and `FourGridSize` (class `Output`, not flags), inserted before `Private`. `AnalysisNamed` is set per row; analysis names are generated only with it.
 - The generator gives a count-less `Four` its predecessor itself: half the time, an `Analysis` generator that picked `Four` first pushes an `nfreqs` option (mode by the same mid-run rules), and `Four` drops its count when an `nfreqs` option is among the last 16. Reach over the harness's 4,000 seeds: every run feature in at least 41 (`FourHarmonicsOption` was in 3 without it).
 - Follow-up (ng-run): one feature per `holds` member, `StateFromHere` and `StateWholeRun`, set per row wherever the item stands (the `*MidRun` members keep their meaning: after a run item). So a `FromHere` item before every run item is visible to a target that spells only `WholeRun`, and a pass relabels it exactly. The generator picks only a mode whose feature is in the set.
+
+## A15 K2 applied
+
+- Both are row facts (`Subckt::features`, `If::features`). `IfConditionDynamic` reads each condition's class through `class::tree_class`, a walk sized by the tree, not the design: `expr_class` (now built on it) allocated an expression-table stamp per call, quadratic when a row calls it per expression.
+- The generator: `Gen::constant_only` keeps a tree non-dynamic around `If` conditions; a formal always gets a default unless the set has `FormalWithoutDefault`, and a set with neither literals nor that feature makes subcircuits without formals.
+
+## A15 K3 applied
+
+- The transitive `ProbeContext` is `check`'s last pass (`probe_classes`), run only when nothing else was reported: `class::compute` reads parameter rows and expression pools without range checks, and `check` must not panic on any input. A broken design reports its structural faults first and this one on the next check. `arg` is the field's root expression.
+- The generator's reads go through `Gen::may_read`: a constant tree reads only constant definitions, a dynamic one under `Reads::Constant` none above `Temp`. Titles and comments draw from `Gen::line_word`.
+
+- Reach under the kernel's full-set harness (4,000 seeds, `FeatureSet::ALL`) is part of the run owner's gate. A kind that needs a predecessor gets it from its own generator, not from the kernel happening to pick it next: an `Hb`/`Pss` generator follows itself, half the time, with one periodic small-signal analysis; a sweep loop with `LoopOverOp` in the set starts its body, half the time, with an `Op`; both count in the size budget. Measured over seeds 0..4000: every run item kind, analysis kind, `RunExtra` member and option key now appears in at least 48 seeds (before: `LoopOverOp` 1, the periodic kinds 6–11). `run_gen` checks reach again on seeds 50,000..54,000.

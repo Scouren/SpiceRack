@@ -13,7 +13,7 @@
 //! `rewrite/INV-semantics.md` 6.02–6.18, 6.31–6.33.
 //!
 //! Contents:
-//! - `pub enum IcMode` (`ALL`, `COUNT`)
+//! - `pub enum IcMode`, `pub enum TcBase`, `pub enum TcLaw` (each `ALL`, `COUNT`)
 //! - `pub struct Passive`, `Passive::PLAIN`, `pub struct Parasitics`, `pub struct Coupling`
 //! - `Design::passive(&self, &Element) -> Passive`,
 //!   `Design::coupling(&self, &Element) -> Coupling`
@@ -35,6 +35,28 @@ pub enum IcMode {
     UicOnly,
     /// Held during the operating point that starts the transient. Xyce, LTspice.
     InOp,
+}
+
+/// Where a behavioural temperature coefficient's ΔT counts from (AMEND-A12 A15 C2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum TcBase {
+    /// ΔT = T − tnom: the rule of every simulator for a constant-valued element.
+    Tnom,
+    /// ΔT = T − 27 °C whatever `tnom` is: ngspice's B source and its circuit-valued R/C/L
+    /// (`asrcload.c:41`). Only on a row with a behavioural value and a coefficient.
+    Fixed27,
+}
+
+/// How a circuit-valued capacitor's temperature factor applies (AMEND-A12 A15 C2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum TcLaw {
+    /// The capacitance is multiplied by 1 + tc1·ΔT + tc2·ΔT².
+    Direct,
+    /// ngspice: the B source behind a circuit-valued capacitor divides by that polynomial
+    /// (`inpcom.c:6747`). Only on a capacitor whose value reads the circuit, with a coefficient.
+    Reciprocal,
 }
 
 /// The detail row of a resistor, capacitor or inductor (`ElemKind::Resistor`, `Capacitor`,
@@ -87,6 +109,10 @@ pub struct Passive {
     /// sp `isnoisy=no`, hs `NOISE=0`, and for an ngspice behavioural R/C/L without `noisy=1`
     /// (6.14). Evidence: D82, 6.17.
     pub noisy: bool,
+    /// Where `tc1`/`tc2`'s ΔT counts from; `Tnom` for every constant-valued element.
+    pub tc_base: TcBase,
+    /// How the temperature factor of a circuit-valued capacitor applies; `Direct` elsewhere.
+    pub tc_law: TcLaw,
 }
 
 /// LTspice part parasitics, attached to a capacitor, an inductor, a voltage source or
@@ -128,6 +154,20 @@ const _: () = assert!(size_of::<Passive>() == 44);
 const _: () = assert!(size_of::<Parasitics>() == 20);
 const _: () = assert!(size_of::<Coupling>() == 12);
 
+impl TcBase {
+    /// Every member, in declaration order.
+    pub const ALL: [TcBase; 2] = [TcBase::Tnom, TcBase::Fixed27];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl TcLaw {
+    /// Every member, in declaration order.
+    pub const ALL: [TcLaw; 2] = [TcLaw::Direct, TcLaw::Reciprocal];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
 impl IcMode {
     /// Every member, in declaration order.
     pub const ALL: [IcMode; 3] = [IcMode::None, IcMode::UicOnly, IcMode::InOp];
@@ -151,6 +191,8 @@ impl Passive {
         parasitics: NO_ROW,
         ic_mode: IcMode::None,
         noisy: true,
+        tc_base: TcBase::Tnom,
+        tc_law: TcLaw::Direct,
     };
 }
 

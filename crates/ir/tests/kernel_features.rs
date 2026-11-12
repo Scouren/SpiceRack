@@ -11,8 +11,8 @@
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
     AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
-    ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass, OptionKey,
-    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
+    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass,
+    OptionKey, Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -52,6 +52,8 @@ fn index_and_from_index_are_inverses() {
         CircuitExtra::ALL.len(),
         RunExtra::ALL.len(),
         OptionKey::ALL.len(),
+        spicerack_ir::ModelFamily::ALL.len(),
+        (spicerack_ir::ScopeKind::ALL.len() - 1) * ItemKind::ALL.len(),
     ];
     assert_eq!(Feature::COUNT as usize, groups.iter().sum::<usize>());
     let mut seen = vec![false; Feature::COUNT as usize];
@@ -65,9 +67,12 @@ fn index_and_from_index_are_inverses() {
         Feature::Item(ItemKind::Measure).index(),
         ItemKind::Measure as u16
     );
-    // the groups in declaration order: the last feature is the last option key
+    // the groups in declaration order: the last feature is the last placement (A15 K1)
     let last = Feature::from_index(Feature::COUNT - 1);
-    assert!(matches!(last, Feature::Option(_)), "{last:?}");
+    assert_eq!(
+        last,
+        Feature::Placed(spicerack_ir::ScopeKind::Loop, ItemKind::Elaborate)
+    );
     assert_ne!(
         Feature::Func(Func::Sin).index(),
         Feature::FuncDyn(Func::Sin).index()
@@ -320,6 +325,31 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.comment(top, "titled", Span::NONE);
             },
         ),
+        (
+            Extra::FormalWithoutDefault,
+            |b, top| {
+                b.subckt(top, "s", &[], &[("w", ExprId::NONE)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+            },
+        ),
+        (
+            Extra::IfConditionDynamic,
+            |b, top| {
+                let t = b.temp();
+                let lim = b.num(100.0);
+                let hot = b.binary(BinOp::Gt, t, lim);
+                b.if_(top, &[hot], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                let zero = b.literal(spicerack_ir::Literal::ZERO);
+                let yes = b.binary(BinOp::Gt, one, zero);
+                b.if_(top, &[yes], Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         if extra == Extra::LocalModel {
@@ -426,4 +456,43 @@ fn a_library_without_a_title_is_no_deck_without_one() {
         b.comment(top, "a library", Span::NONE);
     }
     assert!(!features_used(&d).contains(Feature::Extra(Extra::DeckWithoutTitle)));
+}
+
+#[test]
+fn placement_is_enclosure_at_any_depth() {
+    // A15 K1 (R27, ruled "enclosed"): Placed(S, K) for each scope kind S on the item's chain,
+    // File excluded; spec examples worked by hand
+    use spicerack_ir::ScopeKind as S;
+    let placed = |s: S, k: ItemKind| Feature::Placed(s, k);
+    let used = used(|b, top| {
+        let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
+        let one = b.num(1.0);
+        let (_, branches) = b.if_(outer, &[one], Span::NONE);
+        let branch = b.design().branches(branches)[0].body;
+        let (_, inner) = b.subckt(branch, "inner", &[], &[], Span::NONE);
+        let two = b.num(2.0);
+        b.param(inner, "p", two, Span::NONE);
+    });
+    let got: Vec<Feature> = used
+        .iter()
+        .filter(|f| matches!(f, Feature::Placed(..)))
+        .collect();
+    let mut want = vec![
+        placed(S::Subckt, ItemKind::If),
+        placed(S::Subckt, ItemKind::Subckt),
+        placed(S::Branch, ItemKind::Subckt),
+        placed(S::Subckt, ItemKind::Param),
+        placed(S::Branch, ItemKind::Param),
+    ];
+    want.sort_by_key(|f| f.index());
+    assert_eq!(got, want, "the outer subckt in the top sets nothing");
+    // the helper
+    let set = FeatureSet::placed(S::Loop, &[ItemKind::Loop, ItemKind::Analysis]);
+    assert_eq!(
+        set.iter().collect::<Vec<_>>(),
+        vec![
+            placed(S::Loop, ItemKind::Analysis),
+            placed(S::Loop, ItemKind::Loop)
+        ]
+    );
 }
