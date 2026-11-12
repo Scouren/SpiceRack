@@ -13,7 +13,8 @@
 //! Contents: `RowFacts` for `Title`, `Comment`, `Include`, `Global`, `Load`, `Opaque`, `Subckt`,
 //! `Section`, `If` (`Param` and `Func`: `item_facts_defs.rs`); crate:
 //! `pub(crate) fn field_domain(&Design, ItemRef, &mut Diags)`,
-//! `pub(crate) fn distinct(&[NameId]) -> bool`, `pub(crate) fn reads_dependent(&Design, ExprId) -> bool`
+//! `pub(crate) fn distinct(&[NameId]) -> bool`, `pub(crate) fn reads_dependent(&Design, ExprId) -> bool`,
+//! `pub(crate) fn value_type(&Design, ExprId, &mut FeatureSet)`
 
 use crate::build::Builder;
 use crate::check::Violation;
@@ -364,6 +365,10 @@ impl RowFacts for Subckt {
         if design.params(self.params).iter().any(|p| p.1.is_none()) {
             *set = set.with(Feature::Extra(Extra::FormalWithoutDefault));
         }
+        // A25 item 4: a default by type
+        for p in design.params(self.params) {
+            value_type(design, p.1, set);
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -556,6 +561,19 @@ pub(crate) fn reads_dependent(design: &Design, root: ExprId) -> bool {
         stack.extend(kids.iter().copied().filter(|k| *k < e));
     }
     false
+}
+
+/// Adds `Extra::StringValue` or `Extra::ListValue` when the value `e` (a `Param`'s, or a
+/// `Subckt` head default) is a string or a list at its root (A25 item 4). `NONE`: nothing.
+pub(crate) fn value_type(design: &Design, e: ExprId, set: &mut FeatureSet) {
+    if e.is_none() || e.index() >= design.expr_count() {
+        return;
+    }
+    match design.expr(e) {
+        crate::expr::Expr::Str(_) => *set = set.with(Feature::Extra(Extra::StringValue)),
+        crate::expr::Expr::List(_) => *set = set.with(Feature::Extra(Extra::ListValue)),
+        _ => {}
+    }
 }
 
 // ---- private ----

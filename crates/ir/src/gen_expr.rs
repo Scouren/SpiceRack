@@ -67,14 +67,23 @@ impl Gen {
         self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
         self.long_literals = features.contains(Feature::Extra(crate::feature::Extra::LongLiteral));
         let mut need_probe = dynamic;
+        // A25 item 4: a string or a list stands at the root only where the field asks for one
+        let mut at_root = *features;
+        if !self.root_str {
+            at_root = at_root.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::Str)));
+        }
+        if !self.root_list {
+            at_root = at_root.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::List)));
+        }
         let mut stack: Vec<Frame> = Vec::new();
         // depth-first, building each row after its children, left to right: a caller's order
         loop {
             let depth = stack.len();
+            let here = if depth == 0 { &at_root } else { features };
             let node = if depth + 1 >= self.size.expr_depth as usize || self.chance(3) {
                 None
             } else {
-                self.operator(b, features, dynamic)
+                self.operator(b, here, dynamic)
             };
             let mut value = match node {
                 Some((node, need)) if need > 0 => {
@@ -90,7 +99,7 @@ impl Gen {
                     self.class = self.class.max(self.own_class(&node));
                     build(b, node, Vec::new())
                 }
-                Some(_) | None => self.leaf(b, features, &probes, dynamic, &mut need_probe),
+                Some(_) | None => self.leaf(b, here, &probes, dynamic, &mut need_probe),
             };
             // hand the value up, building every frame it completes
             loop {
@@ -210,7 +219,20 @@ impl Gen {
                 b.v(&net, self.chance(2).then_some(reference.as_str()))
             }
             ExprTag::I => {
-                let e = self.fresh();
+                // A32: half the time an item of this scope, when it is an element (one draw,
+                // O(1): a scan per leaf would make the build quadratic in a flat scope)
+                let items = b.design().items(self.scope);
+                let pick = (!items.is_empty() && self.chance(2))
+                    .then(|| items[self.below(items.len() as u32) as usize])
+                    .filter(|i| i.kind == crate::item::ItemKind::Element);
+                let e = match pick {
+                    Some(i) => {
+                        let d = b.design();
+                        d.str(d.row::<crate::element::Element>(i.index).name)
+                            .to_string()
+                    }
+                    None => self.fresh(),
+                };
                 b.i(&e)
             }
             ExprTag::Time => b.time(),

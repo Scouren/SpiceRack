@@ -249,12 +249,11 @@ impl R<'_, '_> {
     }
 
     pub(super) fn behav(&mut self, kind: ElemKind) -> Behav {
-        // A33: without `BehavUntypedParam` a behavioural source's expression reads no parameter
-        let bare = kind == ElemKind::Behav && !self.has(X::BehavUntypedParam);
-        let reads = self.g.param_reads;
-        self.g.param_reads = reads && !bare;
+        // A33: without `BehavUntypedParam` a behavioural source's parameter reads are typed
+        // (`ToReal`/`ToInt` built at the leaf, or none when the set has neither)
+        self.g.typed_params = kind == ElemKind::Behav && !self.has(X::BehavUntypedParam);
         let expr = self.dy();
-        self.g.param_reads = reads;
+        self.g.typed_params = false;
         // a charge-defined capacitor's coefficient also needs a law the set has (A17)
         let charge = kind == ElemKind::ChargeCapacitor;
         let law_ok = self.has(X::TcLawDirect) || self.has(X::TcLawReciprocal);
