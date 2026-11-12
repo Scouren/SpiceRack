@@ -12,8 +12,10 @@
 //! `pub fn run_walks(&Design) -> Vec<(ScopeId, Vec<(ItemRef, ScopeId)>)>`,
 //! `pub fn in_force(&Design, &[(ItemRef, ScopeId)], usize, Setting) -> ItemRef`; crate:
 //! `pub(crate) fn state_order_features`, `pub(crate) fn interleaved_features`,
-//! `pub(crate) fn four_counts`,
+//! `pub(crate) fn design_check`, `pub(crate) fn node_set_mix`,
 //! `pub(crate) fn run_append_ok` (gen)
+
+use std::collections::{HashMap, HashSet};
 
 use crate::analysis_facts::report;
 use crate::check::Violation;
@@ -56,6 +58,9 @@ pub enum Setting {
     /// The nominal temperature (`Env::tnom`).
     Tnom,
 }
+
+/// A node set's identity for `node_set_mix`: its kind, node path and reference path.
+type NodeKey = (u8, Vec<NameId>, Vec<NameId>);
 
 /// The longest run of items `run_append_ok` reads back before it refuses (O(1) per call).
 #[cfg(any(test, feature = "gen"))]
@@ -280,33 +285,74 @@ pub(crate) fn interleaved_features(design: &Design, out: &mut Vec<(Feature, Item
     }
 }
 
-/// Reports `FieldDomain` at each Fourier analysis with no harmonic count (`Four::harmonics`
-/// `NONE`) where no `nfreqs` option is in force (`in_force`, A16, A28): a `WholeRun` one in its
-/// walk, or a `FromHere` one before it with no `Reset` of options between. One pass per walk:
-/// O(items + scopes), not per analysis.
-pub(crate) fn four_counts(design: &Design, out: &mut Diags) {
-    let nfreqs = |item: ItemRef| sets(design, item, Setting::Option(OptionKey::NFreqs));
+/// The run owner's design-level invariants, called once by `check`: `four_counts` and
+/// `node_set_mix`.
+pub(crate) fn design_check(design: &Design, out: &mut Diags) {
+    four_counts(design, out);
+    node_set_mix(design, out);
+}
+
+/// Reports `FieldDomain` (the node-set mix) at the later item of each pair of a `next_only`
+/// node set and a standing one (`next_only` false) of the same kind, node and reference that
+/// are both in force at one analysis: the standing one `WholeRun` anywhere in the walk, or
+/// `FromHere` before that analysis, and the analysis the first after the `next_only` one. No
+/// simulator states both (ngspice's are standing, VACASK's next-only), so no precedence
+/// between them is stated: refused until the first simulator that has both decides it.
+/// One pass per walk (the first pass of a loop body), O(items) with a hash per node set.
+pub(crate) fn node_set_mix(design: &Design, out: &mut Diags) {
     for (_, order) in run_walks(design) {
-        let whole = order
-            .iter()
-            .any(|&(i, _)| nfreqs(i) == Some(Applies::WholeRun));
-        let mut live = false;
-        for &(item, _) in &order {
-            if nfreqs(item) == Some(Applies::FromHere) {
-                live = true;
-            } else if item.kind == ItemKind::Reset
-                && Reset::table(design)
-                    .get(item.index)
-                    .restores
-                    .contains(Restorable::Options)
-            {
-                live = false;
-            } else if item.kind == ItemKind::Analysis
-                && !whole
-                && !live
-                && count_from_option(design, item)
-            {
-                report(design, item, Violation::FieldDomain, out);
+        let key = |item: ItemRef| {
+            let row = NodeSet::table(design).get(item.index);
+            let names = |l| design.names(l).to_vec();
+            ((row.kind as u8, names(row.node), names(row.reference)), row)
+        };
+        // the last `WholeRun` standing item of each key, by walk position
+        let mut whole: HashMap<NodeKey, usize> = HashMap::new();
+        for (k, &(item, _)) in order.iter().enumerate() {
+            if item.kind == ItemKind::NodeSet {
+                let (id, row) = key(item);
+                if !row.next_only && row.holds == Applies::WholeRun {
+                    whole.insert(id, k);
+                }
+            }
+        }
+        let mut standing: HashSet<NodeKey> = HashSet::new();
+        // next-only items waiting for their analysis: (key, position, the later item if a
+        // standing one of the key is in force there too)
+        let mut pending: Vec<(NodeKey, usize, ItemRef)> = Vec::new();
+        let mut reported: HashSet<ItemRef> = HashSet::new();
+        for (k, &(item, _)) in order.iter().enumerate() {
+            if item.kind == ItemKind::NodeSet {
+                let (id, row) = key(item);
+                if row.next_only {
+                    let clash = if standing.contains(&id) {
+                        item
+                    } else {
+                        ItemRef::NONE
+                    };
+                    pending.push((id, k, clash));
+                } else {
+                    if row.holds == Applies::FromHere {
+                        for p in pending.iter_mut().filter(|p| p.0 == id) {
+                            p.2 = item;
+                        }
+                    }
+                    standing.insert(id);
+                }
+            } else if item.kind == ItemKind::Analysis {
+                for (id, at, clash) in pending.drain(..) {
+                    let later_whole = whole.get(&id).filter(|&&w| w > at).map(|&w| order[w].0);
+                    let second = if clash != ItemRef::NONE {
+                        Some(clash)
+                    } else {
+                        later_whole
+                    };
+                    if let Some(s) = second
+                        && reported.insert(s)
+                    {
+                        report(design, s, Violation::FieldDomain, out);
+                    }
+                }
             }
         }
     }
@@ -336,6 +382,38 @@ pub(crate) fn run_append_ok(design: &Design, scope: ScopeId, features: &FeatureS
 }
 
 // ---- private ----
+
+/// Reports `FieldDomain` at each Fourier analysis with no harmonic count (`Four::harmonics`
+/// `NONE`) where no `nfreqs` option is in force (`in_force`, A16, A28): a `WholeRun` one in its
+/// walk, or a `FromHere` one before it with no `Reset` of options between. One pass per walk:
+/// O(items + scopes), not per analysis.
+fn four_counts(design: &Design, out: &mut Diags) {
+    let nfreqs = |item: ItemRef| sets(design, item, Setting::Option(OptionKey::NFreqs));
+    for (_, order) in run_walks(design) {
+        let whole = order
+            .iter()
+            .any(|&(i, _)| nfreqs(i) == Some(Applies::WholeRun));
+        let mut live = false;
+        for &(item, _) in &order {
+            if nfreqs(item) == Some(Applies::FromHere) {
+                live = true;
+            } else if item.kind == ItemKind::Reset
+                && Reset::table(design)
+                    .get(item.index)
+                    .restores
+                    .contains(Restorable::Options)
+            {
+                live = false;
+            } else if item.kind == ItemKind::Analysis
+                && !whole
+                && !live
+                && count_from_option(design, item)
+            {
+                report(design, item, Violation::FieldDomain, out);
+            }
+        }
+    }
+}
 
 /// Whether `item` is a Fourier analysis that takes its count from the option.
 fn count_from_option(design: &Design, item: ItemRef) -> bool {

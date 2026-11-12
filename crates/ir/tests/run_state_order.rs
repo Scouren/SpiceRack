@@ -169,3 +169,43 @@ fn a_fourier_count_comes_from_the_nfreqs_option_in_force_in_its_walk() {
     let reset = format!("file \"t.sp\" deck\n  option n_freqs value=10\n  reset options\n{four}");
     assert_eq!(faults(&reset), 1, "{reset}");
 }
+
+#[test]
+fn a_next_only_and_a_standing_condition_of_one_node_at_one_analysis_are_refused() {
+    // no simulator states both (ngspice's are standing, VACASK's next-only): refused
+    let next = "  nodeset ic transient next_only node=(a) value=1\n";
+    let card = "  nodeset ic transient node=(a) value=2 whole_run\n";
+    let script = "  nodeset ic transient node=(a) value=2\n";
+    let op = "  analysis op\n";
+    let deck = |lines: &[&str]| format!("file \"t.sp\" deck\n{}", lines.concat());
+    assert_eq!(faults(&deck(&[card, next, op])), 1, "a card anywhere");
+    assert_eq!(
+        faults(&deck(&[next, op, card])),
+        1,
+        "a card after it still holds"
+    );
+    assert_eq!(
+        faults(&deck(&[script, next, op])),
+        1,
+        "a script one before it"
+    );
+    assert_eq!(
+        faults(&deck(&[next, script, op])),
+        1,
+        "a script one before its analysis"
+    );
+    assert_eq!(
+        faults(&deck(&[next, op, script, op])),
+        0,
+        "a script one after its analysis"
+    );
+    assert_eq!(
+        faults(&deck(&[card, next])),
+        0,
+        "no analysis: nothing is in force"
+    );
+    let other = "  nodeset ic transient node=(b) value=2 whole_run\n";
+    assert_eq!(faults(&deck(&[other, next, op])), 0, "another node");
+    let guess = "  nodeset nodeset every_op node=(a) value=2 whole_run\n";
+    assert_eq!(faults(&deck(&[guess, next, op])), 0, "another kind");
+}

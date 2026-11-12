@@ -141,8 +141,8 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
-    // the run owner's: a Fourier analysis's count from the `nfreqs` option in force (A16, A28)
-    crate::state_order::four_counts(design, out.diags);
+    // the run owner's: a Fourier count's option in force, the node-set mix (A16, A28)
+    crate::state_order::design_check(design, out.diags);
     // the class table reads definitions through their rows, so it runs on a design whose
     // handles hold (A15 K3)
     if out.diags.len() == before {

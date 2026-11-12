@@ -103,7 +103,9 @@ pub struct NodeSet {
     /// serves every solve).
     pub applies: IcScope,
     /// Whether it applies to the next analysis only (VACASK's analysis-line `ic=[…]` and
-    /// `nodeset=[…]`), instead of to every analysis after it.
+    /// `nodeset=[…]`), instead of to every analysis after it. A next-only and a standing one of
+    /// the same kind, node and reference both in force at one analysis are refused (checked,
+    /// `state_order::node_set_mix`): no simulator states both, so none decides which holds.
     pub next_only: bool,
     /// The node: the instance path then the net, relative to the item's scope (a subcircuit
     /// body: each instance's own nodes). `Device`: the element's path. Empty only for
@@ -572,8 +574,12 @@ impl RowFacts for NodeSet {
             IcScope::Transient
         };
         let next_only = next && (!beyond || g.chance(3));
-        let all =
-            kind == NodeSetKind::Nodeset && has(features, RunExtra::NodesetAll) && g.chance(3);
+        // a next-only node set on every node beside a standing one would be the refused mix
+        // (`state_order::node_set_mix`); fresh node names never meet
+        let all = kind == NodeSetKind::Nodeset
+            && !next_only
+            && has(features, RunExtra::NodesetAll)
+            && g.chance(3);
         let node = if all {
             crate::id::List::EMPTY
         } else {
