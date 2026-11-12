@@ -209,6 +209,15 @@ three meanings, so the node states them: `Expr::Draw(Dist, DrawWhen, DrawPer, Ex
 `DrawPer::{Reference, CallSite, Instance, Run}`. Converting one to another (the two-layer
 parameter idiom, Spectre's `statistics` block) is a pass.
 
+**A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
+`map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind))` (each `Ref` the row holds, with the
+kind it expects). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
+exact name from the item's scope outward. It is the neutral rule: builders call it when they are
+done, the IR text parser runs it after the whole text (so a hand-written fixture may name a
+definition that comes later), and a dialect reader never calls it, because a reader binds by its
+own simulator's rule. In IR text a reference is a bare `name`; `name?` is deliberately
+unresolved; `name#k` appears only when the lookup would bind another definition.
+
 ### 7.3 Addendum A3 (2026-11-11): a number is a decimal literal, not a double
 
 Ruling on `INV-semantics.md` 1.08 (the sources conflicted). Two simulators do not compute the
