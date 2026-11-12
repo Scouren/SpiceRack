@@ -14,6 +14,9 @@ use crate::passes::Pass;
 pub(crate) const PASSES: &[Pass] = &[
     row("given_zero_to_as_given", X::Circuit(C::GivenZeroSpiceDefault), &[X::Circuit(C::GivenZeroAsGiven), X::Expr(T::TStep), X::Expr(T::TStop), X::Expr(T::Ternary), X::Expr(T::Binary), X::Expr(T::Num), X::Binary(O::Eq), X::Binary(O::Div), X::Binary(O::Add), X::BinaryDyn(O::Eq), X::BinaryDyn(O::Div), X::BinaryDyn(O::Add)], &[GIVEN_ZERO_LEFT], given_zero_to_as_given::given_zero_to_as_given),
     row("pulse_spice_to_vacask", X::Circuit(C::PulseSpice), &[X::Circuit(C::PulseVacask)], &[PULSE_LAWS_DIFFER], pulse_spice_to_vacask::pulse_spice_to_vacask),
+    // before as_given_to_given_zero: the laws agree only on an as-given pulse
+    row("pulse_vacask_to_spice", X::Circuit(C::PulseVacask), &[X::Circuit(C::PulseSpice)], &[PULSE_LAWS_DIFFER], pulse_spice_to_vacask::pulse_vacask_to_spice),
+    row("as_given_to_given_zero", X::Circuit(C::GivenZeroAsGiven), &[X::Circuit(C::GivenZeroSpiceDefault)], &[GIVEN_ZERO_KEPT], as_given_to_given_zero::as_given_to_given_zero),
     row("exp_td2_relative", X::Circuit(C::ExpTd2FromZero), &[X::Circuit(C::ExpTd2FromTd1), X::Expr(T::Num)], &[EXP_TD2_LEFT], exp_td2_relative::exp_td2_relative),
     row("exp_td2_absolute", X::Circuit(C::ExpTd2FromTd1), &[X::Circuit(C::ExpTd2FromZero), X::Expr(T::Binary), X::Binary(O::Add), X::BinaryDyn(O::Add)], &[EXP_TD2_LEFT], exp_td2_absolute::exp_td2_absolute),
     row("sffm_ngspice_to_spice3", X::Circuit(C::SffmNgspice), &[X::Circuit(C::SffmSpice3), X::Expr(T::Num)], &[SFFM_LAW_LEFT], sffm_ngspice_to_spice3::sffm_ngspice_to_spice3),
