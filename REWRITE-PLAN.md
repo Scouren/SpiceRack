@@ -1,8 +1,9 @@
 # SpiceRack rewrite plan: one IR, one contract per dialect
 
-Status: plan for approval (2026-11-11). Nothing here is implemented. Written against `main`
-(f7fbf3b, 0.2.0) and the integration head `p7-integrate` (1059821, 596 commits ahead of `main`,
-never pushed). Method: the house `rewrite-clean` (old code kept alive as the oracle, one slice at
+Status (2026-11-11): go given; phase 1 of §8.3 (the IR crate's definitions) is running on branch
+`ir-rewrite`, worktree `../SpiceRack-ir`, where this file and `rewrite/` are tracked. `main` is
+untouched and nothing is pushed. Written against `main` (f7fbf3b, 0.2.0) and the integration head
+`p7-integrate` (1059821, 596 commits ahead of `main`, never pushed). Method: the house `rewrite-clean` (old code kept alive as the oracle, one slice at
 a time, four gated phases per slice) and `codebase-clean-code` (data, owners, spines, seams,
 drills). Every count below was measured on 1059821 unless it says otherwise.
 
@@ -36,8 +37,9 @@ writer misspelled valid IR (checked against the real simulator, no reader involv
 lacks a fact (the only cross-dialect class, and each one becomes a normal-form rule). §7.4 is the
 triage procedure; each step is one command.
 
-**What I need from you** (§10): freeze the row team on the old architecture, confirm the base
-branch, the dialect set, the fate of the `DialectDef` plugin API, and the byte-fidelity policy.
+**What I need from you** (§10): freeze the row team on the old architecture; and say so if you
+disagree with a default (the base branch, the dialect set, dropping the `DialectDef` plugin API,
+bytes not preserved). I proceed on the defaults.
 
 ## 1. Diagnosis: how it drifted
 
@@ -239,7 +241,7 @@ through `ir::Builder` and `&Design` accessors.
 ### 3.3 Content and normal form
 
 The construct inventory (`INV-constructs.md`, built from the code and the seven research dossiers:
-about 440 rows in twelve areas) is the coverage checklist. Each row maps to an IR node, a
+537 rows in twelve areas, plus today's 47 × 9 capability matrix) is the coverage checklist. Each row maps to an IR node, a
 normal-form rule, or a named `Opaque` class; a row with no home is a hole in the IR. The node set:
 
 | Area | Nodes |

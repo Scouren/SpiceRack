@@ -126,6 +126,89 @@ comparisons, logical and bitwise, shifts. `UnOp`: `Neg`, `Not`, `BitNot`.
 (C `f64` semantics, the ternary evaluates only its chosen branch, explicit stack). It is the
 oracle for every expression rule; it is not used by writers.
 
+### 7.1 Addendum A1 (2026-11-11): native meanings, exactly
+
+The round-trip law (`read_d(write_d(x))` equals `x`, REWRITE-PLAN §4.2 L5) must hold exactly, so
+on its own dialect a reader and a writer are inverse tables between spellings and nodes. That
+fixes four things:
+
+1. **One member per native meaning; never an idiom.** ngspice's B-source `ln` is `|x|`'s
+   logarithm. Encoding it as the tree `Ln(Abs(x))` breaks the law (written `ln(abs(x))`, it reads
+   back as `LnAbs(Abs(x))`). So it is its own member. A reader may still expand *sugar* into a
+   tree when its own writer spells that tree back to the same tree (Xyce `sign(x, y)` →
+   `Mul(Abs(x), Sgn(y))`; LTspice's boolean `a ^ b` → `Ne(Gt(a, 0.5), Gt(b, 0.5))`).
+2. **`Func` members this adds** (evidence: `rewrite/INV-semantics.md` 2.04–2.10, when it lands;
+   `INV-constructs.md` C16, C20, C21, C53):
+   - `Pow`: the signed real power; a negative base with a whole exponent is exact, with a
+     fractional exponent it is a domain error (HSPICE, LTspice, Spectre, VACASK).
+   - `PowAbs`: `|x|^y` (ngspice `**`, `^`, `pow` in a B source).
+   - `PowRe`: the real part of the complex power, `|x|^y·cos(πy)` for `x < 0` (Xyce `**`, `pow`,
+     `pwr`); equal to `Pow` wherever `Pow` is defined.
+   - `Ln`, `Log10`, `Sqrt`, `Exp`: real functions, domain errors outside their domains.
+   - `LnAbs`, `SqrtAbs`: of `|x|` (ngspice B source `ln`/`log`, `sqrt`).
+   - `ExpLin14`: `exp(x)` up to 14, the tangent line beyond (ngspice B source `exp`).
+   - `RoundHalfEven` (ngspice `nint`), `RoundHalfAway` (Xyce, HSPICE, LTspice, Spectre, VACASK),
+     `Trunc`, `Floor`, `Ceil`; `Fmod` takes the dividend's sign; `Clamp(x, lo, hi)`.
+   There is no `limit`, `pwr`, `pwrs`, `if`, `nint`, `log` or named constant in the IR: readers
+   map each to the member (or draw, or literal) its own simulator means.
+3. **Operators.** `And`, `Or`, `Not` read "nonzero is true" and yield 0 or 1. There is no logical
+   XOR (each reader expands it with its own truth rule). `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
+   `Shl`, `Shr` are VACASK's integer operators. `IntDiv` truncates toward zero (ngspice `\`).
+4. **Leaves for what a dialect leaves to the analysis.** `TStep` and `TStop` (the transient's
+   step and stop: ngspice's meaning of a given-zero PULSE rise or a defaulted SFFM carrier) and
+   `Tnom`, beside `Time`, `Temp`, `Freq`. A pass substitutes numbers when the design has one
+   transient; the reader never looks for the analysis.
+
+**Legality is per context.** Every simulator has functions and operators that are legal in a
+parameter and illegal in an expression that reads the circuit (or the reverse). So the feature
+enum also has `FuncDyn(Func)`, `BinaryDyn(BinOp)`, `UnaryDyn(UnOp)`: the member used inside an
+expression that holds a `V`, `I`, `Time` or `Freq` leaf. `features_used` sets the plain or the
+`Dyn` feature by that test.
+
+### 7.2 Addendum A2 (2026-11-11): row facts, and what a draw means
+
+**Row facts.** The kernel's generic code (`check`, `features_used`, `text::dump`/`parse`, `gen`,
+passes that renumber) must read rows it does not own. Each row's owner states what the kernel
+needs, in the row's own file, through one trait declared in the kernel (`facts.rs`):
+
+```rust
+/// What the kernel's generic code needs from an item row. Implemented by the row's owner, in
+/// the row's file; the kernel reaches every kind through one exhaustive dispatch.
+pub trait RowFacts: ItemRow {
+    /// Appends every handle the row and its detail rows hold.
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+    /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
+    /// kind and its `Extra`s. The kernel adds the expression features from `handles`.
+    fn features(&self, design: &Design, set: &mut FeatureSet);
+    /// Appends the violations of the row's own invariants (counts, a detail row present exactly
+    /// when the kind has one, field domains). Handle ranges are the kernel's check.
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags);
+    /// Writes the row as IR text: its statement, without indentation and without its body.
+    fn dump(&self, design: &Design, out: &mut String);
+    /// Reads one IR-text statement of this kind and pushes it into `scope`.
+    fn parse(words: &mut Words<'_>, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ItemRef;
+    /// Pushes one random valid row of this kind that uses only `features`.
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>, features: &FeatureSet) -> ItemRef;
+}
+
+pub enum Handle { Expr(ExprId), Name(NameId), Ref(Ref), Names(NameList), Exprs(ExprList),
+                  Params(ParamList), Scope(ScopeId), Text(TextId) }
+```
+
+`Words` is the IR text reader's cursor (`text.rs`), `Gen` the generator's state (`gen.rs`); both
+are kernel types the owners use. Per-kind constant facts the owners' `check` needs
+(`ElemKind::terminals() -> (u8, u8)`, `ElemKind::has_detail()`, `ElemKind::needs_model()`) are
+`const fn`s in the owner's file.
+
+**A draw states when and how often it is drawn.** The same `agauss(…)` is a fresh sample at
+every reference on ngspice even in a plain run, the mean outside a sampling run on Xyce and
+HSPICE, one sample per call site per scope on VACASK (`INV-semantics.md` 12.02, 12.03). Those are
+three meanings, so the node states them: `Expr::Draw(Dist, DrawWhen, DrawPer, ExprList)` with
+`DrawWhen::{Always, Sampling}` (outside a sampling run a `Sampling` draw is its nominal) and
+`DrawPer::{Reference, CallSite, Instance, Run}`. Converting one to another (the two-layer
+parameter idiom, Spectre's `statistics` block) is a pass.
+
 ## 8. Features (`feature.rs`, kernel)
 
 Every kind is a feature: `enum Feature { Item(ItemKind), Elem(ElemKind), Wave(WaveKind),
