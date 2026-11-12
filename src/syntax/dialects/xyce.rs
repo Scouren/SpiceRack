@@ -200,6 +200,38 @@ pub(super) fn xyce() -> DialectDef {
         .kept_word("ypowergridbranch", Construct::PrivateText)
         .kept_word("ypowergridbusshunt", Construct::PrivateText)
         .kept_word("ypowergridtransformer", Construct::PrivateText)
+        // P4-065: the rest of Xyce's own devices. Behavioural digital
+        // devices: every `U` line (RG 7.10 §2.3.28) and the deprecated `Y`
+        // types (§2.3.29: NOT or INV, BUF, AND, NAND, OR, NOR, XOR, NXOR,
+        // ADD, DFF, JKFF, TFF, DLTCH). The memristor (§2.3.32). The power
+        // grid's generator bus by its long name (§2.3.31; `ypggb` above is
+        // its short one). And the devices Xyce 7.10 runs that its guide
+        // does not list (its device count names each): the ADC and DAC
+        // interfaces, the external device, the IBIS buffer, the
+        // anti-windup limiter, the neuron population.
+        .kept_word("u", Construct::PrivateText)
+        .kept_word("ynot", Construct::PrivateText)
+        .kept_word("yinv", Construct::PrivateText)
+        .kept_word("ybuf", Construct::PrivateText)
+        .kept_word("yand", Construct::PrivateText)
+        .kept_word("ynand", Construct::PrivateText)
+        .kept_word("yor", Construct::PrivateText)
+        .kept_word("ynor", Construct::PrivateText)
+        .kept_word("yxor", Construct::PrivateText)
+        .kept_word("ynxor", Construct::PrivateText)
+        .kept_word("yadd", Construct::PrivateText)
+        .kept_word("ydff", Construct::PrivateText)
+        .kept_word("yjkff", Construct::PrivateText)
+        .kept_word("ytff", Construct::PrivateText)
+        .kept_word("ydltch", Construct::PrivateText)
+        .kept_word("ymemristor", Construct::PrivateText)
+        .kept_word("ypowergridgenbus", Construct::PrivateText)
+        .kept_word("yadc", Construct::PrivateText)
+        .kept_word("ydac", Construct::PrivateText)
+        .kept_word("yext", Construct::PrivateText)
+        .kept_word("yibis", Construct::PrivateText)
+        .kept_word("yawl", Construct::PrivateText)
+        .kept_word("yneuronpop", Construct::PrivateText)
         .kept_word(".sens", Construct::XyceSens)
         // The dot rules: `.LIN` (RG `.LIN`) is the S-parameter analysis over
         // the deck's `.AC` sweep.

@@ -279,3 +279,64 @@ fn s4_tr_cdl_kept_element_names_its_code() {
     let plain = format!("{rc}.end\n");
     assert!(!write(&plain, xy, Dialect::Cdl).contains("* error:"));
 }
+
+// ZERO-LEDGER P4-065: Xyce's own devices. Behavioural digital devices (RG
+// 7.10 §2.3.28 `U`, §2.3.29 the deprecated `Y` types), the memristor
+// (§2.3.32), the power grid's generator bus by its long name (§2.3.31),
+// and the devices Xyce 7.10's device count names that its guide does not
+// list (ADC, DAC, external, IBIS, anti-windup limiter, neuron population).
+// Oracle: the guide's sections, and runs (research/impl/evidence/P4-065):
+// Xyce 7.10 runs the corpus deck of each, ngspice-45 stops on each
+// ("Unable to find definition of model", "model name is not found",
+// "Undefined parameter"). No other simulator has them, so each target
+// refuses the line as Xyce's own (W0039), never as text it could not read
+// (W0001); Xyce gets it back as written. Checks: 138 refusals, 23 lines,
+// 1 neighbour.
+#[test]
+fn p4_065_xyce_private_devices() {
+    let xy = Dialect::Xyce;
+    let cite = "Xyce RG 7.10 §2.3.28, §2.3.29, §2.3.31, §2.3.32: Xyce's own devices";
+    let rc = "* t\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n";
+    let lines = [
+        "UINV1 INV dp 0 a b DMOD",
+        "YNOT n1 a b DMOD",
+        "YINV n2 a b DMOD",
+        "YBUF n3 a b DMOD",
+        "YAND n4 a b c DMOD",
+        "YNAND n5 a b c DMOD",
+        "YOR n6 a b c DMOD",
+        "YNOR n7 a b c DMOD",
+        "YXOR n8 a b c DMOD",
+        "YNXOR n9 a b c DMOD",
+        "YADD n10 a b c s co DMOD",
+        "YDFF n11 pr cl ck a q qb DMOD",
+        "YJKFF n12 pr cl ck a b q qb DMOD",
+        "YTFF n13 a ck q qb DMOD",
+        "YDLTCH n14 pr cl en a q qb DMOD",
+        "ymemristor mr1 a b mrm1",
+        "YPowerGridGenBus pvb2 a 0 b 0 VM=1.045 p=0.4",
+        "YADC adc1 a 0 simpleADC R=1T WIDTH=2",
+        "YDAC dac1 a 0 simpleDAC",
+        "YEXT y1 a b externcode=xyce netlist=inner.cir",
+        "YIBIS buffer1 a 0 b 0 FILE=at16245.ibs Model=AT16245_IN",
+        "YAWL awl1 a b T=1 UL=0.5 LL=-0.5",
+        "yneuronpop pop1 a b np1",
+    ];
+    for line in lines {
+        let deck = format!("{rc}{line}\n.end\n");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Ltspice,
+            Dialect::Spectre,
+            Dialect::Vacask,
+        ] {
+            assert_eq!(refusals(&deck, xy, to), [Code::W0039], "{to:?}: {line}");
+        }
+        oracle::spec_example(cite, &deck, xy, xy, &[line]);
+    }
+    // The legal neighbour: the same circuit without the device is written.
+    let plain = format!("{rc}.op\n.end\n");
+    assert!(write(&plain, xy, Dialect::Ngspice).contains(".op"));
+}
