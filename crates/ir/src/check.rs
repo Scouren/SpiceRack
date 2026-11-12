@@ -29,7 +29,7 @@ use crate::span::Span;
 #[repr(u8)]
 pub enum Violation {
     /// A handle in some row, list or pool is neither `NONE` (where `NONE` is allowed) nor in its
-    /// table's range, or a list's range overruns its pool. `arg`: the handle's value.
+    /// table's range, a list's range overruns its pool, or an empty list is not `List::EMPTY`. `arg`: the handle's value.
     HandleRange,
     /// The scope tree is not a forest of file scopes: a cycle, a scope that reaches no `File`
     /// scope, a file scope with a parent, or an item in two lists. `arg`: the scope.
@@ -263,7 +263,9 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
     for (i, &tag) in x.tags.iter().enumerate() {
         let (sub, a, b) = (x.subs[i] as usize, x.a[i], x.b[i]);
         let names = d.names.len() as u32;
-        let in_pool = |start: u32, len: u32| start as usize + len as usize <= d.expr_pool.len();
+        let in_pool = |start: u32, len: u32| {
+            start as usize + len as usize <= d.expr_pool.len() && (len > 0 || start == 0)
+        };
         let (range_ok, arity_ok) = match tag {
             ExprTag::Num => (
                 match x.nums.get(a as usize) {
@@ -389,7 +391,10 @@ fn handle(
     walk: &mut ExprWalk,
 ) {
     let d = out.design;
-    let in_pool = |start: u32, len: u32, pool: usize| start as usize + len as usize <= pool;
+    // a list lies in its pool, and an empty one is `List::EMPTY` (start 0)
+    let in_pool = |start: u32, len: u32, pool: usize| {
+        start as usize + len as usize <= pool && (len > 0 || start == 0)
+    };
     match h {
         Handle::Name(n) => name(out, span, n),
         Handle::Names(l) => {

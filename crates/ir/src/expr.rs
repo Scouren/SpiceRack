@@ -242,6 +242,14 @@ pub enum Func {
     RoundHalfEven,
     /// −1, 0 or 1 by the sign of `x`.
     Sgn,
+    /// The half-maximum step: 0 for `x < 0`, 0.5 at `x == 0`, 1 for `x > 0` (ngspice B-source
+    /// `u`, `ptfuncs.c` `PTustep`).
+    StepHalf,
+    /// The signed power: `−pow(−x, y)` for `x < 0`, else `pow(x, y)`; `x == 0, y < 0` is a
+    /// domain error (ngspice B-source `pwr`, `PTpwr`).
+    PowSigned,
+    /// `x·x`, one multiplication (ngspice numparam `sqr`, `xpressn.c`).
+    Sqr,
     /// Sine.
     Sin,
     /// Cosine.
@@ -489,7 +497,7 @@ impl UnOp {
 
 impl Func {
     /// Every function, in declaration order.
-    pub const ALL: [Func; 40] = [
+    pub const ALL: [Func; 43] = [
         Func::Abs,
         Func::Sqrt,
         Func::SqrtAbs,
@@ -509,6 +517,9 @@ impl Func {
         Func::RoundHalfAway,
         Func::RoundHalfEven,
         Func::Sgn,
+        Func::StepHalf,
+        Func::PowSigned,
+        Func::Sqr,
         Func::Sin,
         Func::Cos,
         Func::Tan,
@@ -565,12 +576,15 @@ impl Func {
             | Func::Acosh
             | Func::Atanh
             | Func::Step
+            | Func::StepHalf
+            | Func::Sqr
             | Func::Ramp
             | Func::Ddt
             | Func::Idt => (1, 1),
             Func::Pow
             | Func::PowAbs
             | Func::PowRe
+            | Func::PowSigned
             | Func::Min
             | Func::Max
             | Func::Atan2
