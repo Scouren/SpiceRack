@@ -9,9 +9,9 @@
 //! own).
 //!
 //! And each instance's master and `type` word, so a `sweep` can tell an independent source's DC
-//! value from a device parameter (R64: `Declared::source`).
+//! value from a device parameter (R64: `Declared::source`, `Declared::has_instance`).
 //!
-//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`
+//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`, `Declared::has_instance`
 //! (crate-private to the dialect)
 
 use std::collections::HashMap;
@@ -29,8 +29,9 @@ pub(in crate::dialect::vacask) struct Declared {
     parent: HashMap<Holder, Holder>,
     /// `(holder, name)` → a subcircuit's own holder; the first declaration wins.
     bodies: HashMap<(Holder, String), Holder>,
-    /// `(holder, instance name)` → its master's name and its `type="…"` word, if given.
-    instances: HashMap<(Holder, String), (String, Option<String>)>,
+    /// `(holder, instance name)` → its master's name (`None`: a behavioural source) and its
+    /// `type="…"` word, if given.
+    instances: HashMap<(Holder, String), Inst>,
 }
 
 /// What an instance of a `vsource` or `isource` model is, for a sweep of its `dc` (R64).
@@ -67,6 +68,9 @@ pub(in crate::dialect::vacask) enum Found {
     Nowhere,
 }
 
+/// An instance's master name (`None`: a behavioural source) and its `type="…"` word.
+type Inst = (Option<String>, Option<String>);
+
 /// Which scope holds a declaration: the top of every file (VACASK's include is textual), or a
 /// subcircuit, by its file and its statement's start byte (the IR item's span start).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -91,7 +95,7 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
             match ast.tag(n) {
                 Tag::Instance => {
                     let h = ast.header(n);
-                    if h.master != crate::syntax::ast::NONE {
+                    if h.name != crate::syntax::ast::NONE {
                         let key = (holder, read::field_name(cst, h.name));
                         let wave = ast
                             .fields(n)
@@ -100,7 +104,8 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                             .filter(|&f| ast.tag(f) == Tag::Assign)
                             .find(|&f| read::field_name(cst, ast.lhs(f)) == "type")
                             .map(|f| read::field_name(cst, ast.rhs(f)));
-                        let master = read::field_name(cst, h.master);
+                        let master = (h.master != crate::syntax::ast::NONE)
+                            .then(|| read::field_name(cst, h.master));
                         out.instances.entry(key).or_insert((master, wave));
                     }
                 }
@@ -180,15 +185,8 @@ impl Declared {
         path: &[String],
         element: &str,
     ) -> Option<Source> {
-        let own_or_top = |h: Holder, name: &str| [h, Holder::Top].map(|x| (x, name.to_string()));
-        let mut at = Holder::Top;
-        // Bounded by the path's length.
-        for inst in path {
-            let (m, _) = self.instances.get(&(at, inst.clone()))?;
-            at = *own_or_top(at, m).iter().find_map(|k| self.bodies.get(k))?;
-        }
-        let (m, wave) = self.instances.get(&(at, element.to_string()))?;
-        match own_or_top(at, m).iter().find_map(|k| self.defs.get(k))? {
+        let (at, (master, wave)) = self.instance(path, element)?;
+        match self.master(at, master.as_deref()?)? {
             Master::Model(word) if word == "vsource" || word == "isource" => {
                 Some(match wave.as_deref() {
                     None | Some("dc") => Source::Dc,
@@ -197,6 +195,35 @@ impl Declared {
             }
             _ => None,
         }
+    }
+
+    /// Whether some file declares the instance `path:element`, as VACASK finds a run
+    /// statement's `instance=` (settle run/nosuch_alter, nosuch_sweep: "Instance not found.").
+    pub(in crate::dialect::vacask) fn has_instance(&self, path: &[String], element: &str) -> bool {
+        self.instance(path, element).is_some()
+    }
+
+    /// The holder and entry of instance `path:element`: each path step an instance whose master
+    /// is a subcircuit, found by VACASK's rule.
+    fn instance(&self, path: &[String], element: &str) -> Option<(Holder, &Inst)> {
+        let mut at = Holder::Top;
+        // Bounded by the path's length.
+        for inst in path {
+            let (m, _) = self.instances.get(&(at, inst.clone()))?;
+            let m = m.as_deref()?;
+            at = *[at, Holder::Top]
+                .iter()
+                .find_map(|&h| self.bodies.get(&(h, m.to_string())))?;
+        }
+        let entry = self.instances.get(&(at, element.to_string()))?;
+        Some((at, entry))
+    }
+
+    /// The master `name` seen from `at`: the holder's own, then the top's.
+    fn master(&self, at: Holder, name: &str) -> Option<&Master> {
+        [at, Holder::Top]
+            .iter()
+            .find_map(|&h| self.defs.get(&(h, name.to_string())))
     }
 }
 

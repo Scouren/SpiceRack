@@ -15,8 +15,6 @@ control
     analysis dc2 op
   sweep vm instance="v1" parameter="mag" values=[1, 2]
     analysis dc3 op
-  sweep vu instance="u1" parameter="dc" values=[1, 2]
-    analysis dc4 op
   sweep vl instance="v1" parameter="dc" values=[1, 2]
     analysis t1 tran stop=1m
 endc

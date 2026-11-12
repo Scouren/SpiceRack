@@ -138,7 +138,8 @@ pub(super) fn range(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
 }
 
 /// ` instance="x1:r1" parameter="r"`, ` instance="x1:v1" parameter="dc"` (a source's DC value,
-/// R64), ` model="m" parameter="p"`, ` option="name"`.
+/// R64), ` instance="__topinst__" parameter="p"` (a top-level parameter, R70),
+/// ` model="m" parameter="p"`, ` option="name"`.
 pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
     let element = |out: &mut String| {
         let mut path = name_of(d, t.path);
@@ -154,6 +155,11 @@ pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
             element(out);
             out.push_str(" parameter=");
             quote(d.str(t.b), out);
+        }
+        // R70: the top-level instance is the design, its parameters the top level's.
+        ir::TargetKind::Param => {
+            out.push_str(" instance=\"__topinst__\" parameter=");
+            quote(d.str(t.a.name), out);
         }
         ir::TargetKind::SourceDc => {
             out.push_str(" instance=");

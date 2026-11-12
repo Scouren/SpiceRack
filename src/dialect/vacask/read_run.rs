@@ -16,19 +16,21 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.4; R43, A22; VD cmd-overview, cmd-sweep,
 //! cmd-analysis-mc.
 //!
-//! Circuit variables: `variables.rs`.
+//! Circuit variables: `variables.rs`; the top-level instance `__topinst__`: `top.rs`.
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `TARGET_UNFOUND`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
 mod options;
 mod plan;
 mod sweep;
+mod top;
 mod variables;
 
+use top::{TOP_INSTANCE, bind_top_param, top_param};
 use variables::check_value;
 
 use super::codes::UNCLOSED;
@@ -131,6 +133,10 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::LoopScoped))
 .with(ir::Feature::Run(ir::RunExtra::LoopTemp))
 .with(ir::Feature::Run(ir::RunExtra::LoopSourceDc))
+// R70: `instance="__topinst__"` sweeps and alters a top-level parameter
+.with(ir::Feature::Run(ir::RunExtra::LoopParam))
+.with(ir::Feature::Run(ir::RunExtra::DcAxisParam))
+.with(ir::Feature::Run(ir::RunExtra::AlterParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopDeviceParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopModelParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopOption))
@@ -177,6 +183,8 @@ pub(super) const SWEEP_WAVE: ir::Code = ir::Code::new(b'P', 2314);
 pub(super) const SOURCE_SWEEP_WAVE: ir::Code = ir::Code::new(b'W', 2307);
 /// A sweep of a source's DC value whose element is no independent source found from the top.
 pub(super) const SOURCE_SWEEP_NAME: ir::Code = ir::Code::new(b'W', 2309);
+/// A sweep or alter target naming no instance or top-level parameter VACASK finds.
+pub(super) const TARGET_UNFOUND: ir::Code = ir::Code::new(b'W', 2312);
 /// A transfer or noise analysis whose output is no node or node pair.
 pub(super) const OUTPUT_FORM: ir::Code = ir::Code::new(b'W', 2311);
 /// An `mc` loop inside another.
@@ -317,6 +325,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "a sweep of the DC value of a source VACASK would not find",
         "R64; VD cmd-sweep (instance= is a hierarchical instance name)",
         "VACASK finds a swept instance by its path from the top; a source-DC target whose path or name names no independent source there reads back as a device parameter of an unknown instance.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        TARGET_UNFOUND,
+        "a sweep or alter of an instance or top-level parameter VACASK would not find",
+        "R70; settle run/nosuch_alter, nosuch_sweep, top_nosuch (\"Instance not found.\", \"Sweep 'sn': instance 'nosuch' not found.\", \"Parameter 'zz' not found.\")",
+        "VACASK finds a run statement's instance by its path from the top and a parameter of `__topinst__` among the top level's; a target naming neither is VACASK's error (an alter stops the run; a sweep fails its analysis with exit code 0).",
         ir::Kind::Refusal,
     ),
     row(

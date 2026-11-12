@@ -1,0 +1,16 @@
+# Oracle: R70, A43; settle run/top_alter (VACASK re-elaborates after `alter
+# instance("__topinst__") a=2.0`: op2 is -5e-3 A where op1 is -1e-2 A) and run/top_sweep: the
+# top-level instance is the design, so its parameter is the IR's parameter target, bound to the
+# top-level `a`.
+# codes:
+file "top_instance.sim" deck
+  title "the top-level instance"
+  model vsource source_v
+  param a = 1.0
+  element vsource v1 (in 0) model=vsource dc=10.0
+  analysis op name=op1
+  alter (param a) value=2.0
+  analysis op name=op2
+  analysis dc name=d1 (param a) (list values=[1i, 2i, 4i]) name=sa
+  loop sweep name=sb (param a) (list values=[1i, 2i])
+    analysis tran name=t1 stop=1u cap=span_over50

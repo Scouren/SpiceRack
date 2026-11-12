@@ -89,10 +89,16 @@ pub(super) fn alter(w: &mut Writer<'_, '_>, row: ir::Alter) {
             out.push_str("alter model(");
             quote(d.str(t.a.name), out);
         }
+        // R70: the top-level instance is the design, its parameters the top level's.
+        ir::TargetKind::Param => out.push_str("alter instance(\"__topinst__\""),
         k => unreachable!("FEATURES lacks an alter of kind {k:?}"),
     }
     out.push_str(") ");
-    name::spell(d.str(t.b), Place::Other, out);
+    let key = match t.kind {
+        ir::TargetKind::Param => t.a.name,
+        _ => t.b,
+    };
+    name::spell(d.str(key), Place::Other, out);
     out.push('=');
     write_expr(d, row.value, out);
     out.push('\n');
