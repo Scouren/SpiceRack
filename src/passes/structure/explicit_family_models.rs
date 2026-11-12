@@ -4,10 +4,17 @@
 //! n2). One model per (file or section, family): at the top of the element's file, or in its
 //! innermost library section when the design already places models there (a section is read
 //! alone; a model elsewhere in a section, a subcircuit or a branch would be a placement,
-//! `Feature::Placed`, the design may not have had), first after a leading title, named by the family's IR-text word (`resistor`,
-//! `source_v`, …) or that word and `_<n>` when the design already holds the name. A family that
-//! needs a library and has none gets one (`libraries.rs`), so the pass leaves no
-//! `ModelWithoutLibrary` a target without it would refuse.
+//! `Feature::Placed`, the design may not have had), first after a leading title, named by the
+//! family's IR-text word (`resistor`, `source_v`, …) or that word and `_<n>` when the design
+//! already holds the name. A family that needs a library and has none gets one
+//! (`libraries.rs`), so the pass leaves no `ModelWithoutLibrary` a target without it would
+//! refuse.
+//!
+//! Why the file's top serves every scope of the file: the IR's lookup is lexical (a scope, then
+//! its parents, up to the file's top), and a target that looks in the element's own subcircuit
+//! and then the top (VACASK's rule) finds it the same way, nested subcircuits included. No
+//! scope between can shadow it: its name is one the design holds nowhere, in any case, so no
+//! definition of that name stands between the element and the top (A32).
 //!
 //! Requires `Item(Model)`, `Item(DeviceLibrary)`, the families it names, and
 //! `Circuit(BuiltinMaster)` (a source or coupling now naming its builtin). A kind that names no
