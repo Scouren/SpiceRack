@@ -13,7 +13,7 @@
 //! `device.c:1249-1420`, `inp.c:1735-1857`, `control.c:462-466`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`,
+//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn load`, `loop_`, `alter`
@@ -35,6 +35,10 @@ pub(super) const LOOP_FORM: ir::Code = ir::Code::new(b'W', 1402);
 /// numparam), or a parameter alter whose value has no one-token spelling.
 pub(super) const ALTER_VALUE: ir::Code = ir::Code::new(b'W', 1403);
 
+/// A Verilog-A load: ngspice loads compiled OSDI binaries only (`pre_osdi`); compiling the
+/// source is the backend's (OpenVAF).
+pub(super) const LOAD_SOURCE: ir::Code = ir::Code::new(b'W', 1404);
+
 /// This area's codes, `W1400–W1499`.
 pub(super) const CODES: &[Row] = &[
     refusal(
@@ -54,6 +58,12 @@ pub(super) const CODES: &[Row] = &[
         "an alter value ngspice cannot read",
         "ngspice-45 device.c:1249-1420 (ft_getpnames), inp.c:1761 (gettok)",
         "an alter takes one number; an alterparam one token.",
+    ),
+    refusal(
+        LOAD_SOURCE,
+        "a Verilog-A source load",
+        "ngspice-45 inp.c:791-797 (pre_osdi), osdi/osdiregistry.c",
+        "ngspice loads a compiled OSDI binary, never a Verilog-A source.",
     ),
 ];
 
@@ -100,6 +110,11 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             }
         }
         ir::ItemKind::Loop if sweep(design, item).is_none() => refuse(LOOP_FORM),
+        ir::ItemKind::Load
+            if design.row::<ir::item::Load>(item.index).kind != ir::LoadKind::Osdi =>
+        {
+            refuse(LOAD_SOURCE);
+        }
         _ => {}
     }
 }
