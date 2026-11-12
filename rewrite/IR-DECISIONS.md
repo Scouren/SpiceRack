@@ -190,3 +190,26 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
 - An empty list is always `List::EMPTY` (start 0): every `Builder` list constructor (`names`, `name_ids`, `exprs`, `params`, and through them every row and expression list) returns it for an empty slice, and `check` reports any other empty range as `HandleRange`. Equality therefore no longer depends on how an empty list was made (the circuit owner's report; its `canonical()` in circuit_parse.rs can go).
 - `check_legal` agrees with `features_used` by construction: both take the design-level features from `feature::design_level` (the case clash and both owners' `design_features`). A generated property checks it: for 40 designs × 20 random subsets, the set of reported `arg`s equals `features_used(d).minus(legal)`.
+
+## A11 applied (kernel)
+
+- The class lives in a new kernel file, `class.rs` (`ExprClass`, `expr_class`; crate `def_classes`, `node_class`). The per-definition table is cached in `Design::classes` (a `std::sync::OnceLock`, so `Design` stays `Sync`). `Design::builder()`/`editor()` and every mutating `Builder`/`Editor` method clear it, and it is not part of equality. `expr_class` costs O(its tree) once the table is built, and O(design) the first time after a mutation.
+- A formal-argument read (a `Param` expression bound to its `Func`) is not a dependency: its class is the call's argument's, which the caller's own tree holds. A user call is a dependency on its `Func`.
+- `ProbeContext` stays direct, as ruled. Making it transitive (a parameter whose value reads the circuit through another parameter) is open.
+- The generator follows R14. It decides a tree's class up front: a dynamic tree starts from `Temp` (or a probe under `Reads::Circuit`); a constant tree holds neither and reads only definitions the generator noted as constant (`Gen::def_class`, set by each row's generator for the definitions it pushes). `Ddt`/`Idt` appear only in a dynamic tree under `Reads::Circuit`. The expression generator moved to `gen_expr.rs` (gen.rs passed 500 lines).
+- `bind_ref` asserts the slot's kind, not the name (a reader may bind by its own case rule; `check`'s `RefTarget` then judges the name).
+- kernel_store.rs passed 500 lines: its structure tests (`reachable`, the empty list, `bind_ref`) moved to `tests/kernel_structure.rs`.
+
+## Implementation, run owner
+
+- One crate-private trait `DetailFacts` (in `analysis_facts.rs`) carries a detail row's handles, features, field fault, text and generator; each header kind (`Analysis`, `Loop`, `Measure`) reaches its 22, 3 and 6 detail types through one exhaustive macro dispatch (`by_detail!`, `by_loop!`, `by_measure!`).
+- Compound values (probe, target, sweep, event, variation) are parenthesized groups of their own fields in IR text; enum members are the snake case of their names; a `bool` is a bare word; a first-member enum is written only where its doc says so. The kernel's keyword for `NodeSet` is `nodeset`.
+- The builder's pool appends (`probes`, `targets`, `dc_axes`, `varies`, `correlations`) do not check field domains, as `push` does not (`check`'s `FieldDomain`); the typed value constructors (`probe_v`, `target`, …) assert theirs. The empty list is `List::EMPTY` (a built and a parsed design compare equal).
+- `map_refs` (A9) visits, in this fixed order: an analysis's DC axes' targets; a sweep loop's target or a table loop's columns; an alter's target; a statistics block's process then mismatch variations, then each correlation's two ends. An element target's `a` is a name, never visited.
+- `design_features` sets `SeveralAnalyses`, `OptionMidRun` and `LoopScoped` (reported at `Span::NONE`); `NodeSetInSubckt` and `LoopNested` are set per row from its scope.
+- Generators choose a kind whose detail they can build before interning anything (a failed attempt would leave a stray name), build in the parse's order (names and lists exactly where the text puts them), require `Expr(Num)` (`Gen::expr` asserts it), leave loop bodies to the kernel, and keep a non-string alter value free of strings.
+
+## The spine's two text requests
+
+- `text::parse` gives every span (an item's, a `TEXT_SYNTAX` row's) the file of the block its line sits in (`FileId::NONE` for a `file` line itself), with byte offsets into the whole text handed to `parse`. `Words` carries the line's file in a crate field, so every reader's `line_span()`/`span()` is right without a change on the owners' side.
+- `Design::entry` is total: `FileId::NONE` for a design with no file; a caller that needs a file asserts.

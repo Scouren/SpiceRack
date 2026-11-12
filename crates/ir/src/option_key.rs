@@ -231,12 +231,110 @@ impl OptionKey {
     /// What the key changes (the grouping of the declaration). `Private` is `Accuracy`: a
     /// writer cannot know it changes nothing.
     pub const fn class(self) -> OptionClass {
-        todo!()
+        use OptionKey as K;
+        match self {
+            K::RelTol
+            | K::AbsTol
+            | K::VnTol
+            | K::ChgTol
+            | K::TrTol
+            | K::PivTol
+            | K::PivRel
+            | K::MaxOrd
+            | K::MethodTrap
+            | K::MethodGear
+            | K::MethodEuler
+            | K::Itl1
+            | K::Itl2
+            | K::Itl4
+            | K::GminSteps
+            | K::SrcSteps
+            | K::NoOpIter
+            | K::MaxStep
+            | K::Private => OptionClass::Accuracy,
+            K::Gmin
+            | K::GminDc
+            | K::GminTran
+            | K::Rshunt
+            | K::Gshunt
+            | K::Cshunt
+            | K::Rseries
+            | K::Scale
+            | K::DefL
+            | K::DefW
+            | K::DefAd
+            | K::DefAs => OptionClass::Equations,
+            K::Klu | K::Sparse | K::Seed | K::Search | K::Autostop => OptionClass::Path,
+            K::Interp
+            | K::Acct
+            | K::NoAcct
+            | K::List
+            | K::NoMod
+            | K::NoPage
+            | K::Node
+            | K::Opts
+            | K::Warn
+            | K::MaxWarns
+            | K::NoRefValue
+            | K::KeepOpInfo
+            | K::NoInit => OptionClass::Output,
+        }
     }
 
     /// Whether the key is given with no value (`OptionRow::value` is `NONE`).
     pub const fn is_flag(self) -> bool {
-        todo!()
+        use OptionKey as K;
+        match self {
+            K::MethodTrap
+            | K::MethodGear
+            | K::MethodEuler
+            | K::NoOpIter
+            | K::Klu
+            | K::Sparse
+            | K::Autostop
+            | K::Interp
+            | K::Acct
+            | K::NoAcct
+            | K::List
+            | K::NoMod
+            | K::NoPage
+            | K::Node
+            | K::Opts
+            | K::Warn
+            | K::NoRefValue
+            | K::KeepOpInfo
+            | K::NoInit => true,
+            K::RelTol
+            | K::AbsTol
+            | K::VnTol
+            | K::ChgTol
+            | K::TrTol
+            | K::PivTol
+            | K::PivRel
+            | K::MaxOrd
+            | K::Itl1
+            | K::Itl2
+            | K::Itl4
+            | K::GminSteps
+            | K::SrcSteps
+            | K::MaxStep
+            | K::Gmin
+            | K::GminDc
+            | K::GminTran
+            | K::Rshunt
+            | K::Gshunt
+            | K::Cshunt
+            | K::Rseries
+            | K::Scale
+            | K::DefL
+            | K::DefW
+            | K::DefAd
+            | K::DefAs
+            | K::Seed
+            | K::Search
+            | K::MaxWarns
+            | K::Private => false,
+        }
     }
 }
 

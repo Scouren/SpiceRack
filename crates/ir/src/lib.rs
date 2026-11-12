@@ -48,12 +48,15 @@ pub mod facts;
 pub mod build;
 pub mod build_expr;
 pub mod check;
+pub mod class;
 pub mod design;
 pub mod diag;
 pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
+#[cfg(any(test, feature = "gen"))]
+mod gen_expr;
 #[cfg(any(test, feature = "gen"))]
 mod gen_rows;
 pub mod id;
@@ -100,16 +103,24 @@ pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 
 // run owner
 pub mod analysis;
+mod analysis_facts;
 pub mod build_run;
 pub mod dc_ac;
+mod dc_ac_facts;
 pub mod measure;
+mod measure_facts;
+mod network_facts;
 pub mod option;
 pub mod option_key;
 pub mod output;
 pub mod periodic;
+mod periodic_facts;
+mod periodic_ss_facts;
 pub mod plan;
+mod plan_facts;
 pub mod probe;
 pub mod run_extra;
+mod run_words;
 pub mod stats;
 pub mod sweep;
 pub mod tran;
@@ -117,6 +128,7 @@ pub mod tran;
 pub use analysis::{Analysis, AnalysisKind, RunDetail, RunDetails};
 pub use build::Builder;
 pub use check::{Violation, check, check_legal};
+pub use class::{ExprClass, expr_class};
 pub use design::{Design, DetailRow, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
