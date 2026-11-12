@@ -123,6 +123,11 @@ fn dc_axes_to_loops_convert_generated_designs() {
 }
 
 #[test]
+fn a_loop_of_ops_is_no_continued_sweep() {
+    dc_loops::a_loop_of_ops_is_no_continued_sweep();
+}
+
+#[test]
 fn dc_loops_give_the_points_vacask_gives() {
     dc_loops::dc_loops_give_the_points_vacask_gives();
 }

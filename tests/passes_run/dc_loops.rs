@@ -8,7 +8,12 @@
 //! a point starts, so the two runs still compare. Tolerance: 2·(RELTOL·swing + VNTOL) with
 //! RELTOL 1e-3, VNTOL 1e-6 V (`common/cmp.rs`'s DC rule).
 //!
+//! And R72's reason for converting only a restarting DC: `decks/bistable_dc.sp` (a continued
+//! `.dc`) and `decks/bistable_loop.sp` (the same values by `foreach`/`alter`/`op`) on ngspice-45
+//! give other numbers for one bistable circuit (-2 V and 0 V at v(in) = 0).
+//!
 //! Contents: `pub fn dc_loops_give_the_points_vacask_gives()`,
+//! `pub fn a_loop_of_ops_is_no_continued_sweep()`,
 //! `pub fn dc_axes_to_loops_convert_generated_designs(Range<u64>, Size)`
 
 use std::path::Path;
@@ -128,6 +133,31 @@ pub fn dc_axes_to_loops_convert_generated_designs(seeds: std::ops::Range<u64>, s
         eprintln!("{name}: {converted} analyses converted");
         assert!(converted > 0, "{name}: no generated design converted");
     }
+}
+
+/// R72's run: a continued `.dc` and a loop of operating points disagree on a bistable circuit.
+pub fn a_loop_of_ops_is_no_continued_sweep() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
+    let run = |name: &str| {
+        let path = dir.join(name);
+        let text = std::fs::read_to_string(&path).expect("the deck");
+        plots(sim::run(Sim::Ngspice, &path, &text, &[], 30))
+    };
+    let dc = run("bistable_dc.sp");
+    let swept = column(&dc[0], "out");
+    let ops: Vec<f64> = run("bistable_loop.sp")
+        .iter()
+        .filter(|p| p.plot_name.eq_ignore_ascii_case("operating point"))
+        .map(|p| column(p, "out")[0])
+        .collect();
+    assert_eq!((swept.len(), ops.len()), (7, 7), "seven points each");
+    // v(in) = 0 V, the fifth point: the continued sweep holds the lower branch, the op from
+    // the initial guess lands on the middle root
+    assert!(
+        (swept[4] + 2.0).abs() < 1e-3,
+        "the .dc holds -2 V: {swept:?}"
+    );
+    assert!(ops[4].abs() < 1e-3, "the op finds 0 V: {ops:?}");
 }
 
 // ---- private ----

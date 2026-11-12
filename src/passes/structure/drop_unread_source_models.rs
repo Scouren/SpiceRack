@@ -10,7 +10,10 @@
 //! element uses them (21 decks of its corpus; `test/test_inductor.sim` declares both and
 //! instantiates only the current source). `drop_builtin_models` runs first in the group and
 //! unbinds every source that names one, so what is left is read by nothing else in practice; a
-//! model still read keeps the feature with a `SOURCE_MODEL_READ` note.
+//! model still read keeps the feature with a `SOURCE_MODEL_READ` note. "Reads" is every
+//! reference a reachable item binds to the model (`Design::item_refs`): an element's master, an
+//! alter of a model parameter, a sweep loop or DC axis over one. A model nothing names moves no
+//! number, so the drop is exact.
 //!
 //! Cites: `rewrite/IR-CIRCUIT.md` §4a; AMEND-A12 C5.
 //!

@@ -17,7 +17,9 @@
 //! Exact only when:
 //! - the analysis restarts every point from the initial guess (`Dc::restart`): a loop's
 //!   operating points each start afresh, where a continued sweep starts from the previous
-//!   point (a bistable circuit settles elsewhere, `INV-semantics.md` 8.09);
+//!   point (a bistable circuit settles elsewhere, `INV-semantics.md` 8.09; R72; run, ngspice-45,
+//!   `tests/passes_run/decks/bistable_{dc,loop}.sp`: at v(in) = 0 the `.dc` gives -2 V and the
+//!   loop of ops 0 V);
 //! - it stands in its walk's top and no analysis follows it in the walk: the loops keep their
 //!   last values, which no later analysis then sees;
 //! - every peeled axis has a target a loop sweeps (no temperature, option or subcircuit

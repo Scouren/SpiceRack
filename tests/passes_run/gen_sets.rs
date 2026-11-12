@@ -7,6 +7,8 @@ use spicerack::ir;
 
 /// A deck of restarting DC analyses with an axis of `axis` among source and list axes: the
 /// designs `dc_axes_to_loops` converts (over every feature a competing continued sweep wins).
+/// The naming members are needed: without `AnalysisNamed` or `AnalysisUnnamed` the generator
+/// makes no analysis at all (`analysis_facts.rs`), so a set without them reaches nothing.
 pub const fn dc_loops(axis: ir::RunExtra) -> ir::FeatureSet {
     ir::FeatureSet::EMPTY
         .with(ir::Feature::Item(ir::ItemKind::Title))
