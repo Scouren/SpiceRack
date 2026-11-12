@@ -359,7 +359,7 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// outward, the reader's rule (R3); left unresolved when none is found (R4). The one way an
     /// area binds a row's reference (a master or model defined later, or in a later file of
     /// the same scope chain): `Builder::bind_ref` in `bind`.
-    #[expect(dead_code, reason = "the element and model areas call it (S3.1, S3.2)")]
+    #[allow(dead_code, reason = "the element and model areas call it (S3.1, S3.2)")]
     pub(super) fn refer(
         &mut self,
         item: ir::ItemRef,
@@ -382,7 +382,7 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// step binds each to a measure of its name first, then to a parameter (ngspice-45
     /// `measure.c` `do_measure`: every other measure runs first and enters its result with
     /// `nupa_add_param`, so a measure, even a later one, hides a `.param` of its name).
-    #[expect(dead_code, reason = "the output area calls it (S3.3b)")]
+    #[allow(dead_code, reason = "the output area calls it (S3.3b)")]
     pub(super) fn measure_reads(&mut self, mark: usize) {
         assert!(
             mark <= self.pending.len(),
@@ -394,7 +394,7 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// The head parameter names (folded, `name::key`) of the `.subckt name` ngspice binds from
     /// `st`'s block: the nearest block outward in this file, else a top-level `.subckt` of an
     /// earlier file of the read; `None` when none is visible.
-    #[expect(dead_code, reason = "the element area calls it (S3.1a)")]
+    #[allow(dead_code, reason = "the element area calls it (S3.1a)")]
     pub(super) fn subckt_formals(&self, st: Stmt, name: &str) -> Option<Vec<String>> {
         if let Some(f) = self.declared.formals(st.container, name) {
             return Some(f.to_vec());
