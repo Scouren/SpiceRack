@@ -518,3 +518,37 @@ fn a_source_whose_value_reads_the_circuit_is_refused_with_the_sources_code() {
     let codes: Vec<String> = codes_of(&diags).iter().map(|c| c.to_string()).collect();
     assert!(codes.contains(&"W1150".to_string()), "{codes:?}");
 }
+
+#[test]
+fn a_hash_line_is_a_script_statement_and_the_script_is_in_file_order() {
+    // inp.c inp_spsource (`commands || prefix("*#", dd->line)`): a `*#` line outside a block is
+    // a script command; ngspice joins it and every block in deck order (R49). Not a comment.
+    let text = "t\n*# echo first\n.op\n.subckt s a\n*#echo inner\n.ends\n.control\nrun\n*# in\n.endc\n* plain\n";
+    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
+    let toks = crate::syntax::tokenize(text, lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    let s = super::declare::script(&ast, &toks);
+    assert_eq!(
+        s.text,
+        [
+            "*# echo first",
+            "*#echo inner",
+            ".control\nrun\n*# in\n.endc"
+        ]
+    );
+    assert!(s.card_analysis, ".op is a dot-card analysis");
+    let toks = crate::syntax::tokenize("t\n.control\nop\n.endc\n", lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    assert!(
+        !super::declare::script(&ast, &toks).card_analysis,
+        "a script's op is no card"
+    );
+    let (d, _) = deck(text);
+    let top = d.file(d.entry()).top;
+    use ItemKind::{Analysis, Comment, Opaque, Subckt, Title};
+    assert_eq!(
+        kinds(&d, top),
+        [Title, Opaque, Analysis, Subckt, Opaque, Comment]
+    );
+    assert_eq!(opaque(&d, top, 1).1, "*# echo first");
+}

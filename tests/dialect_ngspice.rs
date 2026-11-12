@@ -46,7 +46,7 @@ const READ: &[&str] = &[
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["expr_parens", "numbers", "structure"];
+const WRITE: &[&str] = &["expr_parens", "numbers", "script_pairs", "structure"];
 
 // ---- private ----
 

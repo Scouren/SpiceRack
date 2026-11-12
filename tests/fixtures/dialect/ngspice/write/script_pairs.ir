@@ -1,0 +1,7 @@
+# oracle: R49/A27 (one script region per run of commands; ngspice joins every .control block in file order, inp.c inp_spsource), ng-control's Q3 spec
+file "script_pairs.sp" deck
+  title "script_pairs"
+  opaque ngspice unread ".control\nset x=1\n.endc"
+  opaque ngspice unread ".control\necho a\necho b\n.endc\n"
+  param p = 1
+  opaque ngspice unread ".control\nrun\n.endc"
