@@ -1,0 +1,13 @@
+# Verbatim from dialect-ngspice:tests/fixtures/dialect/ngspice/read/sources/pulse.ir (ng-sources), the IR its pulse.sp reads to; the values its run printed are in tests/wave_eval.rs.
+# codes: P1001
+file "pulse.sp" deck
+  title "pulse"
+  comment " oracle: vsrcload.c PULSE (positional V1 V2 TD TR TF PW PER NP; a zero or omitted TR, TF is TSTEP, PW, PER TSTOP, evaluated after numparam: run z=0, rise 1u under .tran 1u); A17 (a field holds what the card holds)"
+  param z = 0
+  param tr = 1u
+  element vsource V1 (a 0) wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=1n width=5u period=10u given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V2 (b 0) wave=pulse(v1=0 v2=1 delay=0 rise=z fall=z width=5u period=10u given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V3 (c 0) wave=pulse(v1=0 v2=1 given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V4 (d 0) wave=pulse(v1=0 v2=1 delay=0 rise=tr fall=tr width=1u period=2u cycles=3 given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V5 (e 0) dc=0.5 wave=pulse(v1=1 v2=2 delay=-1u rise=0 fall=0 width=0 period=0 given_zero=spice_default)
+  opaque ngspice unread ".control\ntran 1u 20u\nprint v(a)[3] v(b)[3] v(c)[3] v(d)[3] v(e)[3] v(a)[10] v(b)[10] v(c)[10] v(d)[10] v(e)[10] v(d)[40]\nop\nprint v(a) v(e)\n.endc"

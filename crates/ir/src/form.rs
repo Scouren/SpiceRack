@@ -11,7 +11,7 @@
 //! `pub(crate) fn form_of(ExprUse, ExprClass) -> Form`,
 //! `pub(crate) fn form_feature(Expr, bool) -> Option<Feature>`, `STATIC`, `DYNAMIC`
 
-use crate::class::{ExprClass, def_classes, node_class};
+use crate::class::{ExprClass, def_classes};
 use crate::design::Design;
 use crate::expr::Expr;
 use crate::facts::ExprUse;
@@ -131,11 +131,7 @@ fn compute_forms(design: &Design) -> crate::names::FxMap<ExprId, u8> {
         design.item_handles(item, &mut handles);
         for (root, use_) in roots_with_use(design, &handles) {
             let nodes = walk.tree(design, root).to_vec();
-            let class = nodes
-                .iter()
-                .map(|&e| node_class(design, e, table))
-                .max()
-                .unwrap_or(ExprClass::Constant);
+            let class = crate::class::tree_class(design, root, table);
             let form = match form_of(use_, class) {
                 Form::Dynamic => DYNAMIC,
                 Form::Static | Form::Both => STATIC,

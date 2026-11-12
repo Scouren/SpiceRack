@@ -15,7 +15,6 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Elem(Resistor)", FIXPOINT, ELEMENTS),
     ("ngspice", "Elem(Capacitor)", FIXPOINT, ELEMENTS),
     ("ngspice", "Elem(Inductor)", FIXPOINT, ELEMENTS),
-    ("ngspice", "Elem(ISource)", FIXPOINT, SOURCES),
     ("ngspice", "Elem(Port)", FIXPOINT, SOURCES),
     ("ngspice", "Elem(Table)", FIXPOINT, ELEMENTS),
     ("ngspice", "Wave(Pulse)", FIXPOINT, SOURCES),
@@ -26,21 +25,12 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Wave(Am)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrNoise)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrRandom)", FIXPOINT, SOURCES),
-    ("ngspice", "Analysis(Dc)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Noise)", FIXPOINT, RUN),
     ("ngspice", "Analysis(SensAc)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Disto)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Pss)", FIXPOINT, RUN),
-    ("ngspice", "Family(Vbic)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(Hicum2)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(Bsim3)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(Bsim4)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(B3SoiFd)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(B3SoiDd)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(B4Soi)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(Hisim2)", FIXPOINT, VERSIONED),
-    ("ngspice", "Family(HisimHv)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
+    ("ngspice", "Family(CodeModel)", FIXPOINT, CODE_MODELS),
 ];
 
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
@@ -51,4 +41,4 @@ const ELEMENTS: &str =
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, noise, sens, disto, pss)";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
-const VERSIONED: &str = "interim: dialect_ngspice_models' fixtures (bjt, mos_levels, bins, polarity_default, bsim_version, b3soi_fd, b3soi_dd, hisim2); no valid version drawn before ir-circuit b6888c35";
+const CODE_MODELS: &str = "interim: dialect_ngspice_models' fixture code_module; the generator's code-model words never name one of the build's code models (W1206)";

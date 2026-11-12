@@ -15,6 +15,7 @@
 //!
 //! Contents:
 //! - `pub enum ModelFamily`, `pub enum Polarity`; on each: `ALL`, `COUNT`
+//! - `ModelFamily::word(self) -> &'static str`, `ModelFamily::library_free(self) -> bool`
 //! - `pub struct Model`
 //! - `RowFacts` for `Model`
 
@@ -356,6 +357,19 @@ impl ModelFamily {
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
+
+    /// The family's IR-text word (`model m <word>`, `device_library <word>`): the one spelling
+    /// the IR reader takes for it (A32: the structure passes read it here).
+    pub const fn word(self) -> &'static str {
+        crate::circuit_text::FAMILY_WORDS[self as usize]
+    }
+
+    /// Whether a model of this family needs no `DeviceLibrary` on any target, so that it never
+    /// sets `ModelWithoutLibrary`: the builtins of A12 C5 but the ideal line (A20, VACASK loads
+    /// it), and `Module`, `CodeModel` and `Other`, whose code is a `Load` or unbound (R44, A24).
+    pub fn library_free(self) -> bool {
+        crate::circuit_tables::library_free(self)
+    }
 }
 
 impl Polarity {

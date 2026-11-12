@@ -58,6 +58,8 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Elem(K::Poly),
     Feature::Elem(K::Table),
     Feature::Elem(K::Behav),
+    // a B source reads a parameter untyped (A33, R56)
+    Feature::Circuit(X::BehavUntypedParam),
     Feature::Elem(K::Diode),
     Feature::Elem(K::Bjt),
     Feature::Elem(K::Mosfet),
