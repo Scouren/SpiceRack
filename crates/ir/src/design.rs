@@ -173,7 +173,7 @@ pub trait DetailRow: Copy + 'static {
 }
 
 macro_rules! item_rows {
-    ($($row:ty => $kind:ident, $field:ident;)*) => {
+    (() $($kind:ident => $row:ty, $field:ident;)*) => {
         $(
             impl ItemRow for $row {
                 const KIND: ItemKind = ItemKind::$kind;
@@ -193,34 +193,7 @@ macro_rules! item_rows {
     };
 }
 
-item_rows! {
-    Title => Title, titles;
-    Comment => Comment, comments;
-    Include => Include, includes;
-    Global => Global, globals;
-    Load => Load, loads;
-    Opaque => Opaque, opaques;
-    Subckt => Subckt, subckts;
-    Section => Section, sections;
-    If => If, ifs;
-    Param => Param, params;
-    Func => Func, funcs;
-    Model => Model, models;
-    DeviceLibrary => DeviceLibrary, device_libraries;
-    Statistics => Statistics, statistics;
-    Element => Element, elements;
-    Analysis => Analysis, analyses;
-    Loop => Loop, loops;
-    Alter => Alter, alters;
-    OptionRow => Option, options;
-    Env => Env, envs;
-    NodeSet => NodeSet, node_sets;
-    Save => Save, saves;
-    Print => Print, prints;
-    Measure => Measure, measures;
-    Elaborate => Elaborate, elaborates;
-    Reset => Reset, resets;
-}
+with_item_kinds!(item_rows!());
 
 impl Design {
     /// An empty design: no file, the name `0` interned as [`NameId::GROUND`].

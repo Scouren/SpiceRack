@@ -122,6 +122,7 @@ pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 
 // run owner
+#[macro_use]
 pub mod analysis;
 mod analysis_facts;
 pub mod build_run;

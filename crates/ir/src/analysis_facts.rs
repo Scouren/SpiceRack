@@ -96,30 +96,16 @@ const PERIODIC: [AnalysisKind; 4] = [
 /// without one). Exhaustive: a new kind fails to compile here.
 macro_rules! by_detail {
     ($kind:expr, $none:expr, $f:ident ( $($a:expr),* )) => {
+        with_analysis_details!(by_detail_arms!($kind, $none, $f, ($($a),*)))
+    };
+}
+
+/// `by_detail!`'s match over the list of `with_analysis_details!`.
+macro_rules! by_detail_arms {
+    (($kind:expr, $none:expr, $f:ident, $args:tt) $($v:ident => $row:ty, $field:ident;)*) => {
         match $kind {
             AnalysisKind::Op | AnalysisKind::DcInc => $none,
-            AnalysisKind::Dc => $f::<Dc>($($a),*),
-            AnalysisKind::Ac => $f::<Ac>($($a),*),
-            AnalysisKind::Tran => $f::<Tran>($($a),*),
-            AnalysisKind::Noise => $f::<Noise>($($a),*),
-            AnalysisKind::Tf => $f::<Tf>($($a),*),
-            AnalysisKind::DcXf => $f::<DcXf>($($a),*),
-            AnalysisKind::Xf => $f::<Xf>($($a),*),
-            AnalysisKind::Sens => $f::<Sens>($($a),*),
-            AnalysisKind::SensAc => $f::<SensAc>($($a),*),
-            AnalysisKind::Pz => $f::<Pz>($($a),*),
-            AnalysisKind::Sp => $f::<Sp>($($a),*),
-            AnalysisKind::Net => $f::<Net>($($a),*),
-            AnalysisKind::Four => $f::<Four>($($a),*),
-            AnalysisKind::Disto => $f::<Disto>($($a),*),
-            AnalysisKind::Hb => $f::<Hb>($($a),*),
-            AnalysisKind::Pss => $f::<Pss>($($a),*),
-            AnalysisKind::Pac => $f::<Pac>($($a),*),
-            AnalysisKind::Pnoise => $f::<Pnoise>($($a),*),
-            AnalysisKind::Pxf => $f::<Pxf>($($a),*),
-            AnalysisKind::Pstb => $f::<Pstb>($($a),*),
-            AnalysisKind::Stb => $f::<Stb>($($a),*),
-            AnalysisKind::TimedOp => $f::<TimedOp>($($a),*),
+            $(AnalysisKind::$v => $f::<$row> $args,)*
         }
     };
 }

@@ -12,7 +12,7 @@
 //! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
 //! `RowFacts::map_exprs`, `RowFacts::map_element_names`, `RowFacts::string_roots`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum ExprUse`, `pub enum Handle`,
-//! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
+//! `macro for_kind`, `macro with_item_kinds` (crate-internal: the one list of item kinds and the one exhaustive dispatch from an `ItemKind` to its row
 //! type)
 
 use crate::build::Builder;
@@ -168,111 +168,54 @@ pub enum Handle {
 /// `generate`) goes through it, so a new kind is one arm here.
 macro_rules! for_kind {
     ($kind:expr, $R:ident => $body:expr) => {
+        with_item_kinds!(for_kind_arms!($kind, $R, $body))
+    };
+}
+
+/// The one list of item kinds: each `ItemKind` member, its row type and its `Design` table,
+/// handed to the callback `$cb` after `$args` (`for_kind!`'s arms, `design.rs`'s `ItemRow`
+/// impls). A new kind is one line here; every other site is a compile error until it agrees.
+macro_rules! with_item_kinds {
+    ($cb:ident ! $args:tt) => {
+        $cb! { $args
+            Title => $crate::item::Title, titles;
+            Comment => $crate::item::Comment, comments;
+            Include => $crate::item::Include, includes;
+            Global => $crate::item::Global, globals;
+            Load => $crate::item::Load, loads;
+            Opaque => $crate::item::Opaque, opaques;
+            Subckt => $crate::item::Subckt, subckts;
+            Section => $crate::item::Section, sections;
+            If => $crate::item::If, ifs;
+            Param => $crate::item::Param, params;
+            Func => $crate::item::Func, funcs;
+            Model => $crate::model::Model, models;
+            DeviceLibrary => $crate::library::DeviceLibrary, device_libraries;
+            Statistics => $crate::stats::Statistics, statistics;
+            Element => $crate::element::Element, elements;
+            Analysis => $crate::analysis::Analysis, analyses;
+            Loop => $crate::plan::Loop, loops;
+            Alter => $crate::plan::Alter, alters;
+            Option => $crate::option::OptionRow, options;
+            Env => $crate::option::Env, envs;
+            NodeSet => $crate::option::NodeSet, node_sets;
+            Save => $crate::output::Save, saves;
+            Print => $crate::output::Print, prints;
+            Measure => $crate::output::Measure, measures;
+            Elaborate => $crate::plan::Elaborate, elaborates;
+            Reset => $crate::reset::Reset, resets;
+        }
+    };
+}
+
+/// `for_kind!`'s match over the list of `with_item_kinds!`.
+macro_rules! for_kind_arms {
+    (($kind:expr, $R:ident, $body:expr) $($k:ident => $row:ty, $field:ident;)*) => {
         match $kind {
-            $crate::ItemKind::Title => {
-                type $R = $crate::item::Title;
+            $($crate::ItemKind::$k => {
+                type $R = $row;
                 $body
-            }
-            $crate::ItemKind::Comment => {
-                type $R = $crate::item::Comment;
-                $body
-            }
-            $crate::ItemKind::Include => {
-                type $R = $crate::item::Include;
-                $body
-            }
-            $crate::ItemKind::Global => {
-                type $R = $crate::item::Global;
-                $body
-            }
-            $crate::ItemKind::Load => {
-                type $R = $crate::item::Load;
-                $body
-            }
-            $crate::ItemKind::Opaque => {
-                type $R = $crate::item::Opaque;
-                $body
-            }
-            $crate::ItemKind::Subckt => {
-                type $R = $crate::item::Subckt;
-                $body
-            }
-            $crate::ItemKind::Section => {
-                type $R = $crate::item::Section;
-                $body
-            }
-            $crate::ItemKind::If => {
-                type $R = $crate::item::If;
-                $body
-            }
-            $crate::ItemKind::Param => {
-                type $R = $crate::item::Param;
-                $body
-            }
-            $crate::ItemKind::Func => {
-                type $R = $crate::item::Func;
-                $body
-            }
-            $crate::ItemKind::Model => {
-                type $R = $crate::model::Model;
-                $body
-            }
-            $crate::ItemKind::DeviceLibrary => {
-                type $R = $crate::library::DeviceLibrary;
-                $body
-            }
-            $crate::ItemKind::Statistics => {
-                type $R = $crate::stats::Statistics;
-                $body
-            }
-            $crate::ItemKind::Element => {
-                type $R = $crate::element::Element;
-                $body
-            }
-            $crate::ItemKind::Analysis => {
-                type $R = $crate::analysis::Analysis;
-                $body
-            }
-            $crate::ItemKind::Loop => {
-                type $R = $crate::plan::Loop;
-                $body
-            }
-            $crate::ItemKind::Alter => {
-                type $R = $crate::plan::Alter;
-                $body
-            }
-            $crate::ItemKind::Option => {
-                type $R = $crate::option::OptionRow;
-                $body
-            }
-            $crate::ItemKind::Env => {
-                type $R = $crate::option::Env;
-                $body
-            }
-            $crate::ItemKind::NodeSet => {
-                type $R = $crate::option::NodeSet;
-                $body
-            }
-            $crate::ItemKind::Save => {
-                type $R = $crate::output::Save;
-                $body
-            }
-            $crate::ItemKind::Print => {
-                type $R = $crate::output::Print;
-                $body
-            }
-            $crate::ItemKind::Measure => {
-                type $R = $crate::output::Measure;
-                $body
-            }
-            $crate::ItemKind::Elaborate => {
-                type $R = $crate::plan::Elaborate;
-                $body
-            }
-            $crate::ItemKind::Reset => {
-                type $R = $crate::reset::Reset;
-                $body
-            }
+            })*
         }
     };
 }
