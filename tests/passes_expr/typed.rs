@@ -6,6 +6,7 @@
 use spicerack::ir;
 use spicerack::passes;
 
+use super::bindings::Point;
 use super::compare::{ANY, code, keeps_boundary_values, keeps_every_root_value, notes};
 
 // ---- private ----
@@ -250,4 +251,45 @@ fn a_dead_call_row_does_not_widen_a_formals_tag() {
     let mut out = String::new();
     ir::dump(&design, design.entry(), &mut out);
     assert!(out.contains("func f(x) = x * x"), "{out}");
+}
+
+/// The environment of a rule that decides by the tag table must bind a resolved read the way
+/// the table reads it: by its definition. `sqr(p)` with `p = 0.5` (Real) is written `p * p`,
+/// right for every value `p` takes; bound by name to a large Int instead (`follow` off, as
+/// the generated comparison did for `sqr_to_mul`: round9's ir-next seed 131, a subckt formal
+/// whose default is Real), the product leaves the Int range where `sqr` is Real. So the
+/// comparison follows definitions for those rules (the RULES test's `FOLLOW`).
+#[test]
+fn a_tag_deciding_rule_is_compared_with_reads_bound_by_their_definitions() {
+    let text = "file \"p.sp\" deck\n  param p = 0.5\n  param r = sqr(p)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    let old = design.row::<ir::item::Param>(1).value;
+    let pass = passes::all()
+        .find(|p| p.name == "sqr_to_mul")
+        .expect("registered");
+    (pass.run)(&mut design, &mut diags);
+    let new = design.row::<ir::item::Param>(1).value;
+    assert_ne!(old, new, "the rule wrote p * p");
+    let at = |trial: u64, follow: bool| Point {
+        design: &design,
+        trial,
+        follow,
+        depth: std::cell::Cell::new(0),
+    };
+    let differs = |follow: bool| {
+        (0..4096u64).any(|t| {
+            let (a, b) = (
+                ir::eval_typed(&design, old, &at(t, follow)),
+                ir::eval_typed(&design, new, &at(t, follow)),
+            );
+            a.map(|v| v.number.to_bits()) != b.map(|v| v.number.to_bits())
+        })
+    };
+    assert!(
+        differs(false),
+        "bound by name, some trial's Int squares out of range"
+    );
+    assert!(!differs(true), "bound by the definition, the two agree");
 }
