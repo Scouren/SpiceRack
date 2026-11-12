@@ -17,3 +17,6 @@ pub struct Model {
 }
 
 const _: () = assert!(size_of::<Model>() == 4);
+
+// circuit: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(Model);

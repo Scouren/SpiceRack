@@ -28,15 +28,20 @@
 //! | `V` | 0 | net `NameId` | reference net `NameId` (`NONE`: ground) |
 //! | `I` | 0 | element `NameId` | 0 |
 //! | `Time`, `Temp`, `Freq`, `TStep`, `TStop`, `Tnom` | 0 | 0 | 0 |
-//! | `Draw` | `Dist` | `ExprList.start` | `ExprList.len` |
+//! | `Draw` | `Dist` + `DrawWhen` + `DrawPer`, packed | `ExprList.start` | `ExprList.len` |
 //! | `List` | 0 | `ExprList.start` | `ExprList.len` |
 //!
-//! Cites: `rewrite/IR-KERNEL.md` §7 and Addendum A1; `DESIGN-neutral-expressions.md` §2;
+//! A `Draw`'s `sub` byte packs three enums: bits 0–3 the `Dist`, bit 4 the `DrawWhen`, bits 5–6
+//! the `DrawPer`, bit 7 zero.
+//!
+//! Cites: `rewrite/IR-KERNEL.md` §7, Addenda A1 and A2 (draws); `rewrite/INV-semantics.md` 12.02,
+//! 12.03; `DESIGN-neutral-expressions.md` §2;
 //! `rewrite/INV-constructs.md` C8–C30, C51–C53, C61–C76.
 //!
 //! Contents:
 //! - `pub enum ExprTag`, `pub enum Expr`, `pub enum BinOp`, `pub enum UnOp`, `pub enum Func`,
-//!   `pub enum Dist`; on each enum but `Expr`: `ALL`, `COUNT`
+//!   `pub enum Dist`, `pub enum DrawWhen`, `pub enum DrawPer`; on each enum but `Expr`: `ALL`,
+//!   `COUNT`
 //! - `Func::arity(self) -> (u8, u8)`, `Func::reads_circuit(self) -> bool`,
 //!   `Dist::arity(self) -> (u8, u8)`, `Expr::tag(self) -> ExprTag`
 //! - `pub(crate) struct Exprs`, `pub(crate) struct UserCall`
@@ -122,8 +127,8 @@ pub enum Expr {
     TStop,
     /// The nominal temperature.
     Tnom,
-    /// A distribution and its arguments.
-    Draw(Dist, ExprList),
+    /// A distribution, when it is drawn, how often, and its arguments.
+    Draw(Dist, DrawWhen, DrawPer, ExprList),
     /// The elements.
     List(ExprList),
 }
@@ -293,6 +298,33 @@ pub enum Dist {
     Limit,
 }
 
+/// When a draw yields a sample rather than its nominal (`INV-semantics.md` 12.02).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum DrawWhen {
+    /// A sample in every run, a plain one too (ngspice: `agauss` draws even outside Monte Carlo).
+    Always,
+    /// A sample only in a sampling run (Monte Carlo, Xyce `.SAMPLING`); otherwise its nominal,
+    /// the distribution's mean (Xyce and HSPICE `agauss`).
+    Sampling,
+}
+
+/// How often a draw yields a new sample, when it samples (`INV-semantics.md` 12.03).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum DrawPer {
+    /// At every reference: each evaluation of the expression draws anew (ngspice: a one-layer
+    /// `.param` redraws wherever it is read, hence the two-layer idiom).
+    Reference,
+    /// Once per call site per scope (VACASK).
+    CallSite,
+    /// Once per element instance (Xyce `.SAMPLING useExpr=true` in an instance value; Spectre's
+    /// `mismatch`).
+    Instance,
+    /// Once per run, shared by every reader (Spectre's `process`).
+    Run,
+}
+
 /// The expression rows (SoA). Invariant: the four columns have equal length; every child id is
 /// lower than its parent's.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -316,6 +348,7 @@ const _: () = assert!(size_of::<ExprTag>() == 1);
 const _: () = assert!(size_of::<ExprTag>() + 1 + 2 * size_of::<u32>() == 10);
 const _: () = assert!(size_of::<UserCall>() == 16);
 const _: () = assert!(Func::COUNT <= u8::MAX as usize);
+const _: () = assert!(Dist::COUNT <= 16 && DrawWhen::COUNT <= 2 && DrawPer::COUNT <= 4);
 
 impl ExprTag {
     /// Every tag, in declaration order.
@@ -459,4 +492,23 @@ impl Dist {
     pub const fn arity(self) -> (u8, u8) {
         todo!()
     }
+}
+
+impl DrawWhen {
+    /// Every member, in declaration order.
+    pub const ALL: [DrawWhen; 2] = [DrawWhen::Always, DrawWhen::Sampling];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl DrawPer {
+    /// Every member, in declaration order.
+    pub const ALL: [DrawPer; 4] = [
+        DrawPer::Reference,
+        DrawPer::CallSite,
+        DrawPer::Instance,
+        DrawPer::Run,
+    ];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
 }

@@ -3,7 +3,7 @@
 //! out (`features_used`, one scan); legalization compares that set with the target's.
 //!
 //! Every kind is a feature (`Item`, `Elem`, `Wave`, `Analysis`, `Expr`, `Func`, `Binary`,
-//! `Unary`, `Dist`); a function or operator used inside an expression that holds a `V`, `I`,
+//! `Unary`, `Dist`, and a draw's `DrawWhen` and `DrawPer`); a function or operator used inside an expression that holds a `V`, `I`,
 //! `Time` or `Freq` leaf is its `*Dyn` feature instead (Addendum A1: legality is per context);
 //! `Extra` lists the features that are fields, not kinds. Feature indices are dense, in that
 //! order, so a set is `Feature::COUNT` bits.
@@ -27,7 +27,7 @@
 use crate::analysis::AnalysisKind;
 use crate::design::Design;
 use crate::element::ElemKind;
-use crate::expr::{BinOp, Dist, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, UnOp};
 use crate::item::ItemKind;
 use crate::wave::WaveKind;
 
@@ -58,6 +58,10 @@ pub enum Feature {
     UnaryDyn(UnOp),
     /// A statistical draw's distribution.
     Dist(Dist),
+    /// When a draw samples (Addendum A2).
+    DrawWhen(DrawWhen),
+    /// How often a draw samples (Addendum A2).
+    DrawPer(DrawPer),
     /// A field-level feature.
     Extra(Extra),
 }
@@ -114,6 +118,8 @@ impl Feature {
         + 2 * BinOp::COUNT
         + 2 * UnOp::COUNT
         + Dist::COUNT
+        + DrawWhen::COUNT
+        + DrawPer::COUNT
         + Extra::COUNT) as u16;
 
     /// The dense index: the variant's offset (the counts of the variants before it, in
@@ -193,7 +199,9 @@ impl FeatureSet {
     }
 }
 
-/// Every feature the design uses, in one scan over its reachable items and their expressions.
+/// Every feature the design uses, in one scan over its reachable items: per item, its
+/// `Feature::Item`, its row's `RowFacts::features` (one exhaustive dispatch over `ItemKind`), and
+/// the expression features of the expressions in its `RowFacts::handles`.
 /// An expression's functions and operators count as `*Dyn` when the expression holds a `V`,
 /// `I`, `Time` or `Freq` leaf.
 pub fn features_used(design: &Design) -> FeatureSet {

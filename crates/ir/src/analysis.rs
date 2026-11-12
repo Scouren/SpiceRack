@@ -34,3 +34,6 @@ impl AnalysisKind {
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
 }
+
+// run: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(Analysis);

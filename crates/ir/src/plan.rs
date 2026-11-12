@@ -22,3 +22,7 @@ pub struct Alter {} // run: to define
 
 const _: () = assert!(size_of::<Loop>() == 4);
 const _: () = assert!(size_of::<Alter>() == 0);
+
+// run: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(Loop);
+todo_facts!(Alter);

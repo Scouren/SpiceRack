@@ -12,3 +12,6 @@
 pub struct Statistics {} // run: to define
 
 const _: () = assert!(size_of::<Statistics>() == 0);
+
+// run: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(Statistics);

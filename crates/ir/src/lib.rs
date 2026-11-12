@@ -19,7 +19,8 @@
 //! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addendum A1).
 //!
 //! Contents: the modules below, and re-exports of `Design`, `ItemRow`, `Builder`, `Editor`, the
-//! handles of `id`, `Span`, `Table`, the kernel enums of `item` and `expr`, `Feature`,
+//! handles of `id`, `Span`, `Table`, the kernel enums of `item` and `expr`, `RowFacts`,
+//! `Handle`, `Feature`,
 //! `FeatureSet`, `Extra`, `features_used`, `check`, `check_legal`, `Violation`, the diagnostic
 //! rows of `diag`, `eval`, `Bindings`, `Domain`, `dump`, `parse`.
 
@@ -27,6 +28,10 @@
 #![warn(missing_docs)]
 // definition phase: bodies are todo!(); remove when they land
 #![allow(unused_variables, dead_code)]
+
+// first: its `todo_facts!` macro is textually scoped to the modules declared after it
+#[macro_use]
+pub mod facts;
 
 pub mod build;
 pub mod check;
@@ -68,7 +73,8 @@ pub use design::{Design, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
 pub use eval::{Bindings, Domain, eval};
-pub use expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
+pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
+pub use facts::{Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};
 pub use id::{
     BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, ParamList, Ref,

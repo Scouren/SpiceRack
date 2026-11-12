@@ -47,6 +47,7 @@ use crate::build::Builder;
 use crate::edit::Editor;
 use crate::element::{CircuitDetails, Element};
 use crate::expr::{Expr, Exprs};
+use crate::facts::RowFacts;
 use crate::id::{
     BranchList, DefId, ExprId, ExprList, FileId, ItemRef, NameId, NameList, ParamList, ScopeId,
     TextId,
@@ -138,6 +139,11 @@ macro_rules! item_rows {
                     &mut design.$field
                 }
             }
+            // every item row has its facts (A2): the kernel's dispatch over `ItemKind` relies on it
+            const _: () = {
+                fn has_facts<R: RowFacts>() {}
+                let _ = has_facts::<$row>;
+            };
         )*
     };
 }

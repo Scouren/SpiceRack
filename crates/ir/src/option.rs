@@ -22,3 +22,8 @@ pub struct NodeSet {} // run: to define
 const _: () = assert!(size_of::<OptionRow>() == 0);
 const _: () = assert!(size_of::<Env>() == 0);
 const _: () = assert!(size_of::<NodeSet>() == 0);
+
+// run: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(OptionRow);
+todo_facts!(Env);
+todo_facts!(NodeSet);

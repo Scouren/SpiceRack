@@ -22,3 +22,8 @@ pub struct Measure {} // run: to define
 const _: () = assert!(size_of::<Save>() == 0);
 const _: () = assert!(size_of::<Print>() == 0);
 const _: () = assert!(size_of::<Measure>() == 0);
+
+// run: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(Save);
+todo_facts!(Print);
+todo_facts!(Measure);

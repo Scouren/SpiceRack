@@ -16,7 +16,7 @@
 //! `pub fn eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`
 
 use crate::design::Design;
-use crate::expr::Dist;
+use crate::expr::{Dist, DrawPer, DrawWhen};
 use crate::id::{ExprId, NameId, Ref};
 
 /// What an expression reads from outside itself. Every method returns `None` when the value is
@@ -42,9 +42,9 @@ pub trait Bindings {
     fn tstop(&self) -> Option<f64>;
     /// The nominal temperature, °C.
     fn tnom(&self) -> Option<f64>;
-    /// A draw's value given its evaluated arguments (the nominal, or a sample: the caller's
-    /// rule). `args.len()` is within `dist.arity()`.
-    fn draw(&self, dist: Dist, args: &[f64]) -> Option<f64>;
+    /// A draw's value given its evaluated arguments: the nominal or a sample, by the caller's run
+    /// context and the draw's `when` and `per`. `args.len()` is within `dist.arity()`.
+    fn draw(&self, dist: Dist, when: DrawWhen, per: DrawPer, args: &[f64]) -> Option<f64>;
 }
 
 /// Why an expression has no value. Each carries the row where evaluation stopped.

@@ -49,7 +49,7 @@
 //!   `Builder::resolve(&mut self, ExprId, DefId)`
 
 use crate::design::{Design, ItemRow};
-use crate::expr::{BinOp, Dist, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, UnOp};
 #[cfg(doc)]
 use crate::id::Ref;
 use crate::id::{
@@ -192,8 +192,9 @@ impl<'d> Builder<'d> {
         todo!()
     }
 
-    /// A statistical draw. Asserts the argument count is within `dist.arity()`.
-    pub fn draw(&mut self, dist: Dist, args: &[ExprId]) -> ExprId {
+    /// A statistical draw: when it samples and how often are the source simulator's rule, made
+    /// explicit. Asserts the argument count is within `dist.arity()`.
+    pub fn draw(&mut self, dist: Dist, when: DrawWhen, per: DrawPer, args: &[ExprId]) -> ExprId {
         todo!()
     }
 

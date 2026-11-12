@@ -12,6 +12,7 @@
 //! Contents:
 //! - `pub enum ItemKind`, `pub enum ScopeKind`, `pub enum DefKind`, `pub enum Role`,
 //!   `pub enum OpaqueClass`, `pub enum LoadKind`; on each: `ALL`, `COUNT`
+//! - `RowFacts` for every row below (`todo_facts!` placeholders, A2)
 //! - `pub struct Title`, `pub struct Comment`, `pub struct Include`, `pub struct Global`,
 //!   `pub struct Load`, `pub struct Opaque`, `pub struct Subckt`, `pub struct Section`,
 //!   `pub struct If`, `pub struct Branch`, `pub struct Param`, `pub struct Func`
@@ -371,3 +372,16 @@ impl LoadKind {
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
 }
+
+// definition phase: each line becomes the row's `impl RowFacts` (A2)
+todo_facts!(Title);
+todo_facts!(Comment);
+todo_facts!(Include);
+todo_facts!(Global);
+todo_facts!(Load);
+todo_facts!(Opaque);
+todo_facts!(Subckt);
+todo_facts!(Section);
+todo_facts!(If);
+todo_facts!(Param);
+todo_facts!(Func);

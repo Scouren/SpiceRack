@@ -68,3 +68,6 @@ impl ElemKind {
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
 }
+
+// circuit: to define — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
+todo_facts!(Element);

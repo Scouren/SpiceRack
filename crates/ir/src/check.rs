@@ -78,7 +78,10 @@ impl Violation {
     pub const COUNT: usize = Self::ALL.len();
 }
 
-/// Appends one `X` row per violation found. Appends nothing for a valid design. O(rows).
+/// Appends one `X` row per violation found. Appends nothing for a valid design. O(rows). The
+/// kernel checks the scope tree, definitions, expressions and the ranges of every handle a row
+/// lists in `RowFacts::handles`; each row's own invariants are its `RowFacts::check` (one
+/// exhaustive dispatch over `ItemKind`).
 pub fn check(design: &Design, diags: &mut Diags) {
     todo!()
 }
