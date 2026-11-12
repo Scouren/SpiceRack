@@ -63,7 +63,8 @@ Each line: question → choice → why.
     design's files (the `Sources` path is not used) → IR text is self-describing.
 22. L1's "statement count in = out" → not asserted for `ir` (no statement counter the IR exposes);
     L1 asserts the read returns, L2 that `check` adds no `X` row, and the empty-text case that ""
-    and "\n" read as one file with no item and no row. L6's corpus for `ir` is a kernel-kinds text
+    (zero bytes, R46; "\n" is each dialect's own fixture) reads as one file with no item and no
+    row. L6's corpus for `ir` is a kernel-kinds text
     and the worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous
     with one row.
 23. `Write::admits` (AMEND-A12 S1) → default empty; `dialect::legalize` calls it last; `write`'s debug
