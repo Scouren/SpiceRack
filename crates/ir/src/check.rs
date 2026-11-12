@@ -107,6 +107,11 @@ pub enum Violation {
     /// the statement `Private` (with a census count) until a deck of a pair needs it. `arg`: the
     /// root.
     StringOrListField,
+    /// A subcircuit instance whose terminal count differs from the port count of the
+    /// definition it is bound to (the lead's R61/A36, `vc-devices`' finding: ngspice and HSPICE
+    /// refuse the deck, VACASK gives missing trailing terminals internal nodes). The circuit
+    /// owner's row check. `arg`: the terminal count.
+    InstancePortCount,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -117,7 +122,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::StringOrListField as usize + 1] = [
+    pub const ALL: [Violation; Violation::InstancePortCount as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -139,6 +144,7 @@ impl Violation {
         Violation::CallArity,
         Violation::StringOrListBody,
         Violation::StringOrListField,
+        Violation::InstancePortCount,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();

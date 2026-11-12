@@ -251,6 +251,7 @@ fn each_kernel_invariant_has_its_fixture() {
         Violation::TerminalCount,
         Violation::DetailRow,
         Violation::DuplicateElement,
+        Violation::InstancePortCount,
     ];
     let kernel: Vec<Violation> = Violation::ALL
         .into_iter()
