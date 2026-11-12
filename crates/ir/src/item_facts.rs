@@ -1,0 +1,560 @@
+//! The kernel rows' facts (A2): for each of the 11 rows of `item.rs`, the handles it holds, its
+//! references (none), the features it adds beyond its kind, its own invariants, and its IR text
+//! and generator. The kernel's generic walks reach these through `for_kind!`. Split from
+//! `item.rs` so that file keeps its rows and enums.
+//!
+//! A kernel row's own invariants are `FieldDomain` (a name that must be set, distinct ports,
+//! arguments, parameters and global nets, ground never global, `else` only last) and
+//! `OpaqueEmpty`; handle ranges and empty names are the kernel's `check`.
+//!
+//! Cites: `rewrite/IR-KERNEL.md` §5, §7.2 (A2, A4, A5), §9.
+//!
+//! Contents: `RowFacts` for `Title`, `Comment`, `Include`, `Global`, `Load`, `Opaque`, `Subckt`,
+//! `Section`, `If`, `Param`, `Func`
+
+use crate::build::Builder;
+use crate::check::Violation;
+use crate::design::Design;
+use crate::diag::{Diags, violation_code};
+use crate::facts::{Handle, RowFacts};
+use crate::feature::{Extra, Feature, FeatureSet};
+#[cfg(any(test, feature = "gen"))]
+use crate::r#gen::Gen;
+use crate::id::{ItemRef, NameId, Ref, ScopeId};
+use crate::item::{
+    Comment, DefKind, Func, Global, If, Include, Load, Opaque, Param, Section, Subckt, Title,
+};
+use crate::text::Words;
+
+impl RowFacts for Title {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.push(Handle::Text(self.text));
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        // no invariant beyond the handles
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Comment {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.push(Handle::Text(self.text));
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        // no invariant beyond the handles
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Include {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.extend([Handle::Name(self.path), Handle::Name(self.section)]);
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        if !self.section.is_none() {
+            *set = set.with(Feature::Extra(Extra::IncludeSection));
+        }
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        if self.path.is_none() {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Global {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.push(Handle::Names(self.nets));
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        let nets = design.names(self.nets);
+        if nets.is_empty() || nets.contains(&NameId::GROUND) || !distinct(nets) {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Load {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.push(Handle::Name(self.path));
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        if self.path.is_none() {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Opaque {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.extend([Handle::Name(self.dialect), Handle::Text(self.text)]);
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        let no_dialect = self.dialect.is_none() || design.str(self.dialect).is_empty();
+        if no_dialect || design.text(self.text).is_empty() {
+            out.push(
+                violation_code(Violation::OpaqueEmpty),
+                design.span_of(at),
+                at.index,
+            );
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Subckt {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.extend([
+            Handle::Name(self.name),
+            Handle::Names(self.ports),
+            Handle::Params(self.params),
+            Handle::Scope(self.body),
+        ]);
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        let ports = design.names(self.ports);
+        let params: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
+        if self.name.is_none() || !distinct(ports) || !distinct(&params) {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Section {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.extend([
+            Handle::Name(self.name),
+            Handle::Name(self.library),
+            Handle::Scope(self.body),
+        ]);
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        if !self.library.is_none() {
+            *set = set.with(Feature::Extra(Extra::SectionLibrary));
+        }
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        if self.name.is_none() {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for If {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.push(Handle::Branches(self.branches));
+        for branch in design.branches(self.branches) {
+            out.push(Handle::Scope(branch.body));
+            if !branch.cond.is_none() {
+                out.push(Handle::Expr(branch.cond));
+            }
+        }
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        let branches = design.branches(self.branches);
+        let else_early = branches.iter().rev().skip(1).any(|b| b.cond.is_none());
+        if branches.is_empty() || else_early {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Param {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        out.extend([Handle::Name(self.name), Handle::Expr(self.value)]);
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        if self.name.is_none() || self.value.is_none() {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+impl RowFacts for Func {
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        // a function may be called from an expression that reads the circuit
+        out.extend([
+            Handle::Name(self.name),
+            Handle::Names(self.args),
+            Handle::ExprDyn(self.body),
+        ]);
+    }
+
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn features(&self, design: &Design, set: &mut FeatureSet) {
+        // no feature beyond the kind
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+        if self.name.is_none() || self.body.is_none() || !distinct(design.names(self.args)) {
+            field_domain(design, at, out);
+        }
+    }
+
+    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
+    fn dump(&self, design: &Design, out: &mut String) {
+        todo!()
+    }
+
+    fn parse(
+        words: &mut Words<'_>,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        diags: &mut Diags,
+    ) -> ItemRef {
+        todo!()
+    }
+
+    #[cfg(any(test, feature = "gen"))]
+    fn generate(
+        g: &mut Gen,
+        scope: ScopeId,
+        b: &mut Builder<'_>,
+        features: &FeatureSet,
+    ) -> ItemRef {
+        todo!()
+    }
+}
+
+// ---- private ----
+
+/// Appends `FieldDomain` at `at` (`arg`: the row's index in its table).
+fn field_domain(design: &Design, at: ItemRef, out: &mut Diags) {
+    out.push(
+        violation_code(Violation::FieldDomain),
+        design.span_of(at),
+        at.index,
+    );
+}
+
+/// Whether no name appears twice. O(n²): lists are short (ports, arguments, nets).
+fn distinct(names: &[NameId]) -> bool {
+    names
+        .iter()
+        .enumerate()
+        .all(|(k, n)| !names[..k].contains(n))
+}

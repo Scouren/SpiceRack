@@ -110,7 +110,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - R17. HSPICE `.noise` takes the deck's AC frequencies; Xyce refers input noise to the source's AC magnitude → `Noise::ac_sweep: bool`, `Noise::input_ref: NoiseRef::{Unit, SourceAc}`.
 - R18. A Spectre statistics `correlate param=[a b c]` → its pairs (`Correlation { a, b, cc }`), which write back as pairs (the law holds on the IR). `Vary::mean` (`NONE` = the parameter's value) is added for table forms that state a centre (Xyce `means=`).
 - R19. "Analysis kind or none" fields (IR-RUN §6) → `Save { analysis, every_analysis: bool }`; `Print` always names its kind (`.print` requires one).
-- R20. Item count of `Extra` → the run owner adds 118 members; with the kernel's 8 the `u8` repr leaves the circuit owner 130. If the two owners' regions together pass 256, `Extra` needs `#[repr(u16)]` (kernel).
+- R20. Item count of `Extra` → the run owner adds 119 members; with the kernel's 8 the `u8` repr leaves the circuit owner 129. If the two owners' regions together pass 256, `Extra` needs `#[repr(u16)]` (kernel).
+- R21. A device's initial state stated outside the device (VACASK's transient `ic` entry, Xyce `.INITCOND`; circuit cross-request D6) → `NodeSetKind::Device`, `node` the element path; an instance's own `IC=` stays the circuit owner's field. The HB drive of a source (5.20) and Spectre `xfmag` stay on the source side (gaps G-HBDRIVE, G-XFMAG, for the circuit owner's ruling); `Hb` and `Xf` refer to no source field.
 
 ## Addendum A6 (one detail door)
 
@@ -124,4 +125,30 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `Feature::Option(OptionKey)` comes after `DrawPer` in index order and counts `OptionKey::COUNT` (49); `OptionKey::Private` is one feature, and whether a private option belongs to the writer's own dialect is the writer's check.
 - `DefKind::Measure` is appended last (no earlier `DefKind` moves). `Builder::resolve` accepts a `Param`-tag expression bound to a `Measure`; `link` tries `Param`, then `Measure`, for `Param`-tag expressions reached from a `Measure` item's handles; `check`'s `RefTarget` reports a `Param`-tag expression bound to a `Measure` anywhere outside a `Measure` item.
 - **Note for the run owner (Implementation phase):** `Builder::measure` (`build_run.rs`) is a defining push: it must call `define(DefKind::Measure, name, scope, item)` for the measure it pushes. Not edited by the kernel.
-- `Extra` is `#[repr(u8)]` with 202 members (8 + 76 + 118); its doc says passing 256 needs `#[repr(u16)]` (`Feature::index` is already `u16`).
+- Instead of the width note (lead's A7 revision): `Extra` is split by owner, for good. Three `#[repr(u8)]` enums with `ALL`/`COUNT`: the kernel's `Extra` (8 members) stays in `feature.rs`; `CircuitExtra` (76) is in the new circuit-owned `circuit_extra.rs`; `RunExtra` (119, after the run follow-up's `IcDevice`) is in the new run-owned `run_extra.rs`. Every member, name and doc moved unchanged. `Feature` is `{ …, DrawPer, Extra(Extra), Circuit(CircuitExtra), Run(RunExtra), Option(OptionKey) }`, with index offsets in that order. The owner regions and their markers are gone from `feature.rs`.
+- File map (IR-KERNEL §10) as amended by A7: circuit owner += `circuit_extra.rs`; run owner += `run_extra.rs`; `feature.rs` holds only kernel members. An owner adds a feature without touching a kernel file.
+- Merge of the run follow-up (6c74d081): the only conflict was here, R20 vs this file's later sections; I kept the run owner's R20/R21 and the kernel's A6/A7 sections.
+
+## Addendum A8 (= the A7 revision above)
+
+- A8 (merge the run owner's follow-up 6c74d081, then split `Extra` into `Extra` / `CircuitExtra` / `RunExtra`) is what the A7 bullets above record: merged in dc870504 (the only conflict was this file; both sides kept), split in d0e0c80. The file map has `circuit_extra.rs` (circuit) and `run_extra.rs` (run). The `Extra` doc's 256 note is gone; each enum is `#[repr(u8)]`, and the largest, `RunExtra`, has 119 members.
+
+## Implementation, kernel M1 (storage core)
+
+- `build.rs` passed 500 code lines → the expression constructors moved to a new kernel file, `build_expr.rs` (one `impl Builder` block, split along its transform). `expr_row` and `assert_expr` are crate-visible helpers there.
+- `Builder::push` asserts the scope and the table's capacity, not the row's handles. Checking handles would call the owners' `RowFacts::handles`, which are placeholders until they land, and `check` covers it. The doc now says so; nothing in a signature changed.
+- `Builder::string("")` is legal: a `Str` value may be empty, while a name may not. `Names::intern_any` (crate) interns without the non-empty assertion; `Names::intern` keeps it.
+- `Ref::is_resolved` is false for the crate-private `DefId::HELD` as well as for `NONE`.
+- `Literal::value` formats `m e k` and parses it with Rust's decimal parser, which rounds correctly (half to even): the reference rule, with no hand-written float arithmetic. `Literal::from_f64` takes the shortest round-trip digits from `{:e}` and places them on the engineering exponent (the multiple of 3 at or below the decimal exponent).
+- One exhaustive dispatch from `ItemKind` to its row type, `for_kind!(kind, R => body)`, lives in `facts.rs` (crate-internal macro, declared first). `span_of`, `Editor::map_refs` and the row comparison of `eq_ignoring_spans` use it; M2–M4 use it too.
+
+## Implementation, kernel M2 (eval, features, check, diag, link)
+
+- The 11 kernel rows' `RowFacts` live in a new kernel file, `item_facts.rs` (`item.rs` would pass 500 lines). In M2 they implement `handles`, `map_refs` (none hold a `Ref`), `features` (`IncludeSection`, `SectionLibrary`) and `check` (`FieldDomain`, `OpaqueEmpty`); `dump`, `parse` and `generate` land in M3 and M4.
+- Handle kinds of the kernel rows: an `If`'s conditions and a `Param`'s value are `Handle::Expr` (constant in time); a `Func` body is `Handle::ExprDyn` (a function may be called from a circuit-reading expression); a `Subckt`'s head defaults come through `Handle::Params`, read as constant.
+- Reachability is read from the scope table (each non-file scope's `owner`), not from rows: `Design::reachable` (crate) walks files in id order and each item's bodies right after it, entering each scope once, so it is total and needs no `RowFacts`. Every expression walk (`ExprWalk`, crate) visits a row once per walk and descends only to lower existing ids, so it terminates on any table contents. `Design::children` reads the raw columns and skips an out-of-pool list.
+- `check` runs four passes (files and scopes, definitions, expression rows, reachable items). Classification where the variant docs overlap: a list that overruns its pool, a `sub` byte outside its enum and a `Num` without its literal are `HandleRange`; a ternary pair that overruns the pool and a count outside the arity are `ExprArity`. `ScopeOwner` is reported once per scope, from the scope's side (owner kind, owner listed in the parent, owner's handles naming the scope). Rows the expression pass flags are not decoded by the item pass.
+- A formal-argument read is bound to its function's definition, whose name is the function's, not the argument's: `RefTarget` accepts it when the function row's arguments hold the read's name. A `Param` or `Measure` target must carry the read's name.
+- Placement `Extra`s (`NestedSubckt`, `LocalModel`, `LocalFunc`, `ParamInBranch`, `LoadInBranch`) look at every enclosing scope, not only the nearest. `CaseSensitiveNames` is design-level, over every interned name (paths and strings included); `check_legal` reports it with `Span::NONE`.
+- `link` binds row references by `Design::lookup` from the item's scope; for expressions in a row, also from the item's scope. Consequence: a subcircuit head default that reads a sibling head parameter is looked up from the subcircuit's enclosing scope and stays unresolved (legal). Recorded as a limit, not changed.
+- `eval`: `Ddt`/`Idt` are `Unbound` before their arguments are evaluated; a user call whose argument count differs from its function's is `Unbound`; the bitwise operators accept integer values below 9.2e18 in magnitude.
