@@ -94,6 +94,7 @@ mod circuit_fields;
 #[cfg(any(test, feature = "gen"))]
 mod circuit_gen;
 mod circuit_parse;
+mod circuit_tables;
 mod circuit_text;
 pub mod controlled;
 pub mod element;

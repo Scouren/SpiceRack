@@ -14,7 +14,7 @@ mod circuit_common;
 #[cfg(test)]
 mod tests {
 
-    use super::circuit_common::{behav, deck, k, model, n, port, semi, source};
+    use super::circuit_common::{behav, deck, k, line, model, n, port, semi, source};
     use spicerack_ir::controlled::{Controlled, OutKind};
     use spicerack_ir::passive::{IcMode, Parasitics, Passive};
     use spicerack_ir::semi::InitialState;
@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn capacitor_with_ic_parasitics_and_noise() {
         let text = "file \"t.sp\" deck\n  element capacitor c1 (a 0) value=1p ic=0.5 \
-                parasitics=(rser=1m cpar=1) ic_mode=in_op noisy=false\n";
+                parasitics=(rser=1m cpar=1) ic_mode=in_op\n  element resistor r1 (a b) value=1k noisy=false\n";
         same(text, |b, top| {
             let h = head(b, "c1", &["a", "0"]);
             let value = k(b, 1, -12);
@@ -99,10 +99,18 @@ mod tests {
                 ic,
                 parasitics: par,
                 ic_mode: IcMode::InOp,
-                noisy: false,
                 ..Passive::PLAIN
             };
             b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
+            // A19: a noiseless element is a resistor (or circuit-valued)
+            let h = head(b, "r1", &["a", "b"]);
+            let value = k(b, 1, 3);
+            let row = Passive {
+                value,
+                noisy: false,
+                ..Passive::PLAIN
+            };
+            b.passive(top, ElemKind::Resistor, h, row, Span::NONE);
         });
     }
 
@@ -557,6 +565,36 @@ mod tests {
                 ..behav(q, OutKind::Charge)
             };
             b.behav(top, ElemKind::ChargeCapacitor, h, row, Span::NONE);
+        });
+    }
+
+    /// A20: VACASK's ideal line as a library, a parameterless model and a line naming it.
+    #[test]
+    fn a_lossless_line_naming_the_ideal_line_model() {
+        let text = "file \"t.sp\" deck\n  device_library tline_ideal\n  model tl tline_ideal\n  \
+                    element lossless_line t1 (a 0 b 0) model=tl z0=50 td=1n\n";
+        same(text, |b, top| {
+            let lib = spicerack_ir::DeviceLibrary {
+                path: spicerack_ir::NameId::NONE,
+                family: ModelFamily::TlineIdeal,
+            };
+            b.device_library(top, lib, Span::NONE);
+            let name = b.name("tl");
+            b.model(
+                top,
+                model(name, ModelFamily::TlineIdeal, Polarity::None),
+                Span::NONE,
+            );
+            let h = b.head("t1", &["a", "0", "b", "0"], Some("tl"), &[], ExprId::NONE);
+            let z0 = n(b, 50);
+            let td = k(b, 1, -9);
+            b.line(
+                top,
+                ElemKind::LosslessLine,
+                h,
+                spicerack_ir::line::Line { z0, td, ..line() },
+                Span::NONE,
+            );
         });
     }
 }
