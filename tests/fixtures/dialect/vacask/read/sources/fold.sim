@@ -1,0 +1,14 @@
+dc and a wave by type alters
+model vsource vsource
+v1 (a 0) vsource type="dc" dc=-6 val0=0 val1=1 rise=1u fall=1u width=1u period=4u
+v2 (b 0) vsource dc=2 val0=1
+v3 (c 0) vsource type="sine" ampl=1
+control
+  analysis op1 op
+  alter instance("v1") type="pulse"
+  analysis tr1 tran stop=6u step=10n
+  alter instance("v1") type="dc"
+  analysis op2 op
+  alter instance("v3") type="dc"
+  analysis op3 op
+endc

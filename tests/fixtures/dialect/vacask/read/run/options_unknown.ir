@@ -1,0 +1,7 @@
+# Oracle: run e6 (`options foo=1`: "Parameter 'foo' not found."). The whole statement is
+# refused, no row of it kept.
+# codes: P2320 S0004
+file "options_unknown.sim" deck
+  title "an option VACASK does not have"
+  opaque vacask invalid "options reltol=1e-4 foo=1"
+  analysis op name=op1

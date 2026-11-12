@@ -1,0 +1,13 @@
+# Oracle: R19 (solver knobs are one Hint per options line; accuracy targets VACASK alone has
+# are Private); DIALECT-VACASK §3.4 options row (tran_fs, tran_rmax hints; tolscale private;
+# rawfile and debug output only); R43 / A22 (only trap and euler are typed methods: `gear` is
+# Private). Each group stands where its first key stood. `op_skipinitial=0` is no flag: a hint.
+# codes: P2301 S0002 S0003 S0006 S0006
+file "options_split.sim" deck
+  title "one options line, four classes"
+  option rel_tol value=1e-4
+  opaque vacask hint "options tran_fs=0.1 tran_rmax=10"
+  opaque vacask inert "options rawfile=\"ascii\" op_debug=1"
+  opaque vacask private "options tolscale=2 tran_method=\"gear\""
+  option abs_tol value=1p
+  opaque vacask hint "options op_skipinitial=0"

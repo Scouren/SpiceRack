@@ -1,0 +1,12 @@
+a formal that reads a parameter is dependent
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters q=5
+subckt s(a)
+  parameters x=q*2
+  r1 (a 0) res r=x
+ends
+x1 (n) s x=7
+control
+  print instance("x1:r1")
+endc

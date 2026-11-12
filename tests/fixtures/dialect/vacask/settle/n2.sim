@@ -1,0 +1,13 @@
+mfactor on subckt instance, undeclared
+load "spice/resistor.osdi"
+model vsource vsource
+model res sp_resistor
+subckt s(a)
+  r1 (a 0) res r=1k
+ends
+v1 (n 0) vsource dc=1
+x1 (n) s $mfactor=2
+control
+  analysis op1 op
+  print instance("v1")
+endc

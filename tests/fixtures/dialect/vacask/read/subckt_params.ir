@@ -1,0 +1,12 @@
+# Oracle: VD cir-subckt (a value that folds to a constant at parse time is a default an instance
+# may override; one that reads a parameter is dependent); DIALECT-VACASK Appendix A runs c1
+# (`2*3`, `M_PI`, `sqrt(4)` overridable, `q*2` not), t2. Formals go to the head in order; the
+# dependent entries stay in the body as local parameters. VD cir-subckt-nested (nesting).
+# codes:
+file "subckt_params.sim" deck
+  title "formals and locals"
+  param q = 5i
+  subckt s (a b) x=(2i * 3i) y=3.141592653589793 z=(sqrt(4i)) u=7i
+    param w = q * 2i
+    param v = x + 1i
+    subckt inner (c) k=1i

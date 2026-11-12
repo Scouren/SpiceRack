@@ -1,0 +1,13 @@
+acsp two ports, series 100 ohm, z0 50
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (p1 0) vsource dc=0 mag=1
+rs1 (p1 a) res r=50
+v2 (p2 0) vsource dc=0 mag=1
+rs2 (p2 b) res r=50
+rm (a b) res r=100
+control
+  options rawfile="ascii"
+  analysis s2 acsp ports=["v1", "rs1", "v2", "rs2"] values=[1k]
+endc

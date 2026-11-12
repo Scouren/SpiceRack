@@ -1,0 +1,15 @@
+alter and elaborate
+subckt a (p)
+ends
+subckt b (p)
+ends
+control
+  alter instance("r1", "r2") r=2k
+  alter instance("x1:r1") r=3k
+  alter model("res") tc=1m
+  elaborate circuit("a", "b")
+  elaborate circuit
+  elaborate changes
+  elaborate circuit("a") topdef="t"
+  analysis op1 op
+endc

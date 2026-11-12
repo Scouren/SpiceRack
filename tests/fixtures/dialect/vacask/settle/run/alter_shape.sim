@@ -1,0 +1,11 @@
+interleaved alter
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+r2 (a 0) res r=1k
+control
+  alter instance("r1", r=2k "r2")
+  analysis op1 op
+endc

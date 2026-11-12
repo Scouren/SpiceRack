@@ -1,0 +1,12 @@
+sweep restore
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  options rawfile="ascii"
+  sweep s instance="v1" parameter="dc" values=[2, 3]
+    analysis dc1 op
+  analysis op2 op
+endc

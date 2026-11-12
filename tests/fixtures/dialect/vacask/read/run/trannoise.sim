@@ -1,0 +1,6 @@
+transient noise
+control
+  analysis tn1 tran stop=1m noisefmax=5k noiseseed=3
+  analysis tn2 tran stop=1m noisefmax=5k noisefmin=10
+  analysis tn3 tran stop=1m noisefmax=5k noisemode="sde"
+endc

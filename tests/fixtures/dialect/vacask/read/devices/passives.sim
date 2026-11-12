@@ -1,0 +1,17 @@
+resistors capacitors inductors
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model r sp_resistor
+model c sp_capacitor
+model l sp_inductor
+r1 (n1 0) r r=1k tc1=0.01 tc2=0.001
+r2 (n2 0) r resistance=1k tce=1 noise=0
+r3 (n3 0) r r=1k temp=77 tc=0.01 w=2u l=1u
+r4 (n4 0) r r=1k dtemp=10 scale=2 $mfactor=2
+rc1 (c1 0) r r=1e12
+c1 (c1 0) c c=1n tc1=0.01 $mfactor=2
+l1 (l1 0) l inductance=1m temp=77 scale=3
+rb (n1 0) r r=1k bogus=1
+rn (n1 0) r r=1k noisy=2
+rt (n1) r r=1k

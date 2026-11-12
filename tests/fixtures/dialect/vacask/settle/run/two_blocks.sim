@@ -1,0 +1,16 @@
+two control blocks
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1
+control
+  analysis op1 op
+endc
+r1 (a 0) res r=1k
+control
+  analysis op2 op
+endc

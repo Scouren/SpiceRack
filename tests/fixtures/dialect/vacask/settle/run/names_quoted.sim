@@ -1,0 +1,9 @@
+a quoted analysis name
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  analysis 'a b' op
+endc

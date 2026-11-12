@@ -1,0 +1,9 @@
+builtin models
+model vs vsource
+model is isource
+model e vcvs
+model g vccs
+model h ccvs
+model f cccs
+model k mutual
+model vs2 vsource dc=1

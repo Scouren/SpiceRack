@@ -1,0 +1,9 @@
+exp: td2 from delay, dc at t = 0
+model vsource vsource
+v1 (a 0) vsource type="exp" val0=0 val1=1 delay=1u td2=2u tau1=1u tau2=0.5u
+v2 (b 0) vsource type="exp" dc=3 val0=2 val1=1 td2=1u tau1=1u tau2=1u delay=-1u
+control
+  options rawfile="ascii"
+  analysis op1 op
+  analysis tr1 tran stop=6u step=1n maxstep=3n
+endc

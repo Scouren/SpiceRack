@@ -1,0 +1,9 @@
+forward ref
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters a=b*2
+parameters b=3
+r1 (n 0) res r=a
+control
+  print instance("r1")
+endc

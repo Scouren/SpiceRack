@@ -1,0 +1,6 @@
+tline_ideal written
+load "tline_ideal.osdi"
+model tl tline_ideal
+t1 (a 0 b 0) tl z0=75 td=2n
+t2 (a 0 c 0) tl f=100meg nl=0.5
+t3 (a 0 d 0) tl $mfactor=2

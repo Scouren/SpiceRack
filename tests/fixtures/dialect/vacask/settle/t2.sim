@@ -1,0 +1,12 @@
+dependent override
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s(a)
+  parameters x=1 
+  parameters y=x*2
+  r1 (a 0) res r=y
+ends
+x1 (n) s y=5
+control
+  print instance("x1:r1")
+endc

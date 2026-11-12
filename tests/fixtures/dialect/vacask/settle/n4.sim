@@ -1,0 +1,9 @@
+case
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters A=1 a=2
+R1 (N 0) res r=A
+r1 (n 0) res r=a
+control
+  print instance("R1","r1")
+endc

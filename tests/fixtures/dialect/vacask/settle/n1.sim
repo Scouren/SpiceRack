@@ -1,0 +1,15 @@
+Nested param visibility
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters q=5
+subckt outer(a)
+  parameters p=7
+  subckt inner(b)
+    r1 (b 0) res r=p+q
+  ends
+  xi (a) inner
+ends
+x1 (n) outer p=9
+control
+  print instance("x1:xi:r1")
+endc

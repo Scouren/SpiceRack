@@ -1,0 +1,9 @@
+duplicate param
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters a=1
+parameters a=2
+r1 (n 0) res r=a
+control
+  print instance("r1")
+endc

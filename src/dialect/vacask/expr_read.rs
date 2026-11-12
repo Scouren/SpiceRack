@@ -1,0 +1,568 @@
+//! A VACASK expression (a CST subtree) → an IR expression tree, by VACASK's own meaning of each
+//! operator and function (`rewrite/DIALECT-VACASK.md` §3.3; runs e1, i1, t3, f1–f3):
+//! `**` and `pow` are `Pow` (signed); `/` is `DivTyped` (A12 K1); `^` is `BitXor`;
+//! `log` and `ln` are `Ln`; `round` is `RoundHalfAway`; `integer` is `Trunc`, `int` is `ToInt`;
+//! `sgn(x)` is `SgnZeroPos` (typed as its operand: run f4) and `sign(x, y)` the sugar
+//! `abs(x) * (y >= 0 ? 1 : -1)` (always real; zero counts as positive, R13); `agauss`, `gauss`, `aunif`, `unif` are draws that sample
+//! only in an `mc` loop, once per call site (RUN g2); `M_*`/`P_*` are the literals VACASK
+//! documents; `$temp`, `$tnom` the leaves; a `-` directly before a number is that negative
+//! literal; a unary `+` is its operand. A construct with no IR meaning (vectors, indexing,
+//! `$scale`, vector and type functions) makes the whole statement `Private`; what
+//! VACASK rejects (`inf`, `nan`, a probe, `ddt` or `idt` in a parameter: run bp2) makes it
+//! `InvalidInSource`. In a behavioural source (VD dev-builtin-behavioral) `v(n)`, `v(a, b)`,
+//! `i(inst)`, `ddt(x)`, `idt(x)` and `$abstime` read the circuit (run bp1), every function counts
+//! in dynamic form (A19), and a parameter read is `to_real` of it (R40: the source reads every
+//! free identifier as a real; run b1). The tree is checked before
+//! any row is pushed, so a refused statement leaves no orphan rows. Explicit stacks (C11).
+//!
+//! Cites: VD expr-operators, expr-functions, expr-special, expr-constants,
+//! dev-builtin-behavioral (Functions); R13 (sugar).
+//!
+//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `CALL_ARITY`, `PARAM_READ_ARG`,
+//! `PROBE_IN_PARAM`, `check_expr`, `expr` (crate-private)
+
+use super::name;
+use super::number;
+use super::read::Lower;
+use super::tables;
+use crate::ir;
+use crate::syntax::ast::{Name, Node, Tag};
+
+/// Where an expression stands: a behavioural source's may read the circuit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Context {
+    /// A parameter, a model or instance parameter, a condition, a formal's default.
+    Param,
+    /// A behavioural source's `v=`/`i=` (S4.1).
+    #[allow(dead_code, reason = "read_elements (S4.1) reads behavioural sources")]
+    Behavioural,
+}
+
+/// Why an expression is not read: the statement becomes an `Opaque` of `class`, with `code`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Refusal {
+    /// The diagnostic.
+    pub(super) code: ir::Code,
+    /// The statement's class.
+    pub(super) class: ir::OpaqueClass,
+}
+
+/// A number token VACASK does not read.
+pub(super) const NOT_A_NUMBER: ir::Code = ir::Code::new(b'P', 2001);
+/// `inf` or `nan` as a value.
+pub(super) const NOT_FINITE: ir::Code = ir::Code::new(b'P', 2002);
+/// An integer literal past 32 bits, which VACASK wraps (run iw1).
+pub(super) const WIDE_INT: ir::Code = ir::Code::new(b'P', 2009);
+/// A function called with another number of arguments than it takes (runs ca1, ca2).
+pub(super) const CALL_ARITY: ir::Code = ir::Code::new(b'P', 2011);
+/// A `$intparam`/`$realparam` whose argument is not one identifier (run ip2: "$intparam()
+/// requires a single identifier argument.").
+pub(super) const PARAM_READ_ARG: ir::Code = ir::Code::new(b'P', 2010);
+/// `v()`, `i()`, `ddt()`, `idt()`, `$intparam()`, `$realparam()` or `$abstime` outside a
+/// behavioural source.
+pub(super) const PROBE_IN_PARAM: ir::Code = ir::Code::new(b'P', 2006);
+
+/// What a parameter expression uses: every node VACASK's parameter language reads into.
+pub(super) const FEATURES: ir::FeatureSet = dynamic(static_funcs(ir::FeatureSet::EMPTY))
+    .with(ir::Feature::UnaryDyn(ir::UnOp::Neg))
+    .with(ir::Feature::UnaryDyn(ir::UnOp::Not))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Expr(ir::ExprTag::Str))
+    .with(ir::Feature::Expr(ir::ExprTag::Param))
+    .with(ir::Feature::Expr(ir::ExprTag::Call))
+    .with(ir::Feature::Expr(ir::ExprTag::Unary))
+    .with(ir::Feature::Expr(ir::ExprTag::Binary))
+    .with(ir::Feature::Expr(ir::ExprTag::Ternary))
+    .with(ir::Feature::Expr(ir::ExprTag::Temp))
+    .with(ir::Feature::Expr(ir::ExprTag::Tnom))
+    .with(ir::Feature::Expr(ir::ExprTag::Draw))
+    .with(ir::Feature::Expr(ir::ExprTag::V))
+    .with(ir::Feature::Expr(ir::ExprTag::I))
+    .with(ir::Feature::Expr(ir::ExprTag::Time))
+    .with(ir::Feature::Extra(ir::Extra::IntLiteral))
+    .with(ir::Feature::Extra(ir::Extra::LongLiteral))
+    .with(ir::Feature::Unary(ir::UnOp::Neg))
+    .with(ir::Feature::Unary(ir::UnOp::Not))
+    .with(ir::Feature::Unary(ir::UnOp::BitNot))
+    .with(ir::Feature::Binary(ir::BinOp::Add))
+    .with(ir::Feature::Binary(ir::BinOp::Sub))
+    .with(ir::Feature::Binary(ir::BinOp::Mul))
+    .with(ir::Feature::Binary(ir::BinOp::DivTyped))
+    .with(ir::Feature::Binary(ir::BinOp::Eq))
+    .with(ir::Feature::Binary(ir::BinOp::Ne))
+    .with(ir::Feature::Binary(ir::BinOp::Lt))
+    .with(ir::Feature::Binary(ir::BinOp::Le))
+    .with(ir::Feature::Binary(ir::BinOp::Gt))
+    .with(ir::Feature::Binary(ir::BinOp::Ge))
+    .with(ir::Feature::Binary(ir::BinOp::And))
+    .with(ir::Feature::Binary(ir::BinOp::Or))
+    .with(ir::Feature::Binary(ir::BinOp::BitAnd))
+    .with(ir::Feature::Binary(ir::BinOp::BitOr))
+    .with(ir::Feature::Binary(ir::BinOp::BitXor))
+    .with(ir::Feature::Binary(ir::BinOp::Shl))
+    .with(ir::Feature::Binary(ir::BinOp::Shr))
+    .with(ir::Feature::Dist(ir::Dist::AbsGauss))
+    .with(ir::Feature::Dist(ir::Dist::RelGauss))
+    .with(ir::Feature::Dist(ir::Dist::AbsUnif))
+    .with(ir::Feature::Dist(ir::Dist::RelUnif))
+    // A draw in a field of dynamic form (an instance's `r=agauss(…)`: run g2).
+    .with(ir::Feature::DistDyn(ir::Dist::AbsGauss))
+    .with(ir::Feature::DistDyn(ir::Dist::RelGauss))
+    .with(ir::Feature::DistDyn(ir::Dist::AbsUnif))
+    .with(ir::Feature::DistDyn(ir::Dist::RelUnif))
+    .with(ir::Feature::DrawWhen(ir::DrawWhen::Sampling))
+    .with(ir::Feature::DrawPer(ir::DrawPer::CallSite));
+
+/// This area's rows.
+pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
+    (
+        NOT_A_NUMBER,
+        ir::Info {
+            title: "a number VACASK does not read",
+            cite: "VD input-numbers; INV-semantics 1.05-1.07",
+            explain: "VACASK reads digits, a point, an exponent or one scale and letters after the scale only (`1k5`, `1e3k`, `1d3` are no numbers), and at most 18 significant digits are kept here. The statement is kept as text and the deck refused.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        NOT_FINITE,
+        ir::Info {
+            title: "an infinite or NaN value",
+            cite: "VD input-numbers (special values); IR-KERNEL C9 (the NaN gate)",
+            explain: "VACASK reads `inf` and `nan`; the IR holds only finite numbers. The statement is kept as text and the deck refused.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        WIDE_INT,
+        ir::Info {
+            title: "an integer literal past 32 bits",
+            cite: "DIALECT-VACASK Appendix A run iw1",
+            explain: "VACASK's integers are 32 bits and a wider literal wraps (`2147483648` is -2147483648, `99999999999` is 1215752191); the IR's integer does not wrap. Write it with a point to make it real.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        CALL_ARITY,
+        ir::Info {
+            title: "a function called with another number of arguments than it takes",
+            cite: "DIALECT-VACASK Appendix A runs ca1, ca2; IR-KERNEL CallArity (X0019)",
+            explain: "VACASK rejects such a call (\"Function 'sin' accepts at most 1 argument(s).\", \"Function 'atan2' requires at least 2 argument(s)).\"); the statement is kept as text and the deck refused.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        PARAM_READ_ARG,
+        ir::Info {
+            title: "a parameter read function whose argument is not one identifier",
+            cite: "DIALECT-VACASK Appendix A run ip2",
+            explain: "VACASK's `$intparam(p)` and `$realparam(p)` take one parameter's name: \"$intparam() requires a single identifier argument.\"",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        PROBE_IN_PARAM,
+        ir::Info {
+            title: "a circuit probe outside a behavioural source",
+            cite: "VD dev-builtin-behavioral (node and branch accessors); DIALECT-VACASK Appendix A run bp2",
+            explain: "`v()`, `i()`, `ddt()`, `idt()` and `$abstime` read the circuit only in a behavioural source's expression; elsewhere VACASK rejects them (`ddt` in a parameter: \"Function 'ddt' not found.\").",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+];
+
+/// Checks the expression at CST node `node` without pushing a row.
+///
+/// # Errors
+/// As [`expr`].
+pub(super) fn check_expr(l: &Lower<'_, '_, '_>, node: u32, ctx: Context) -> Result<(), Refusal> {
+    let dynamic = ctx == Context::Behavioural || reads_temp(l, node);
+    check(l, node, ctx, dynamic, 0)
+}
+
+/// The expression at CST node `node`, read in `ctx` into rows, each parameter read recorded
+/// for binding from `l.scope`.
+///
+/// # Errors
+/// The statement's class and code when any part has no IR meaning.
+pub(super) fn expr(
+    l: &mut Lower<'_, '_, '_>,
+    node: u32,
+    ctx: Context,
+) -> Result<ir::ExprId, Refusal> {
+    check_expr(l, node, ctx)?;
+    Ok(build(l, node, ctx))
+}
+
+// ---- private ----
+
+/// `set` with every dynamic function's and operator's feature.
+const fn dynamic(set: ir::FeatureSet) -> ir::FeatureSet {
+    let mut out = set;
+    let mut i = 0;
+    while i < tables::DYNAMIC_FUNCS.len() {
+        out = out.with(ir::Feature::FuncDyn(tables::DYNAMIC_FUNCS[i]));
+        i += 1;
+    }
+    let mut k = 0;
+    while k < tables::DYNAMIC_BINARY.len() {
+        out = out.with(ir::Feature::BinaryDyn(tables::DYNAMIC_BINARY[k]));
+        k += 1;
+    }
+    out
+}
+
+/// `set` with every static function's feature.
+const fn static_funcs(set: ir::FeatureSet) -> ir::FeatureSet {
+    let mut out = set;
+    let mut i = 0;
+    while i < tables::STATIC_FUNCS.len() {
+        out = out.with(ir::Feature::Func(tables::STATIC_FUNCS[i]));
+        i += 1;
+    }
+    out
+}
+
+/// Whether the expression at `node` reads `$temp` directly: then the IR classes it dynamic (R14),
+/// whose functions are VACASK's behavioural set.
+fn reads_temp(l: &Lower<'_, '_, '_>, node: u32) -> bool {
+    let ast = &l.cst.ast;
+    let mut todo = vec![node];
+    // Bounded: each node of the (acyclic) expression tree is taken once.
+    while let Some(x) = todo.pop() {
+        if x == crate::syntax::ast::NONE {
+            continue;
+        }
+        let n = Node(x);
+        match ast.tag(n) {
+            Tag::Ident | Tag::Word if name_of(l, n) == "$temp" => return true,
+            Tag::Unary | Tag::Paren | Tag::Delimited => todo.push(ast.lhs(n)),
+            Tag::Binary => todo.extend([ast.lhs(n), ast.rhs(n)]),
+            Tag::Ternary => {
+                let at = ast.rhs(n);
+                todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
+            }
+            Tag::Call | Tag::Probe => todo.extend(call_args(l, n)),
+            _ => {}
+        }
+    }
+    false
+}
+
+/// A refusal of class `class` with code `code`.
+const fn refuse(code: ir::Code, class: ir::OpaqueClass) -> Refusal {
+    Refusal { code, class }
+}
+
+/// A call's arguments (`extra [close, n, args…]`).
+fn call_args(l: &Lower<'_, '_, '_>, n: Node) -> Vec<u32> {
+    let ast = &l.cst.ast;
+    let at = ast.rhs(n);
+    let count = ast.extra(at + 1);
+    (0..count).map(|k| ast.extra(at + 2 + k)).collect()
+}
+
+/// The name a call, an identifier or a word holds.
+fn name_of(l: &Lower<'_, '_, '_>, n: Node) -> String {
+    let ast = &l.cst.ast;
+    match ast.tag(n) {
+        Tag::Word => ast.name(Name(ast.rhs(n))).to_string(),
+        Tag::Ident | Tag::Call | Tag::Probe => ast.name(Name(ast.lhs(n))).to_string(),
+        _ => l.cst.tokens.text(ast.main_token(n)).to_string(),
+    }
+}
+
+/// The token text at node `n`'s main token.
+fn token(l: &Lower<'_, '_, '_>, n: Node) -> String {
+    l.cst.tokens.text(l.cst.ast.main_token(n)).to_string()
+}
+
+/// Whether the node at `x` is a literal zero (`0`, `0.0`, `-0`).
+fn is_zero(l: &Lower<'_, '_, '_>, x: u32) -> bool {
+    let ast = &l.cst.ast;
+    let n = match ast.tag(Node(x)) == Tag::Unary && token(l, Node(x)) == "-" {
+        true => Node(ast.lhs(Node(x))),
+        false => Node(x),
+    };
+    is_number(l, n)
+        && number::lex(&token(l, n)).is_ok_and(|v| v.long.is_none() && v.literal.mantissa == 0)
+}
+
+/// Whether `n` is a number node directly (a negative literal's operand).
+fn is_number(l: &Lower<'_, '_, '_>, n: Node) -> bool {
+    l.cst.ast.tag(n) == Tag::Num
+}
+
+/// Checks the subtree at `node` (depth bounded by the parser's `DEPTH_MAX`).
+fn check(
+    l: &Lower<'_, '_, '_>,
+    node: u32,
+    ctx: Context,
+    dynamic: bool,
+    depth: u32,
+) -> Result<(), Refusal> {
+    use ir::OpaqueClass::{InvalidInSource, Private};
+    let private = refuse(super::codes::PRIVATE, Private);
+    let ast = &l.cst.ast;
+    let n = Node(node);
+    if node == crate::syntax::ast::NONE || depth > crate::syntax::DEPTH_MAX {
+        return Err(refuse(NOT_A_NUMBER, InvalidInSource));
+    }
+    let down = |k: u32| check(l, k, ctx, dynamic, depth + 1);
+    match ast.tag(n) {
+        Tag::Num => number::lex(&token(l, n)).map(|_| ()).map_err(|e| match e {
+            number::NotANumber::Grammar => refuse(NOT_A_NUMBER, InvalidInSource),
+            number::NotANumber::NotFinite => refuse(NOT_FINITE, InvalidInSource),
+            number::NotANumber::IntRange => refuse(WIDE_INT, Private),
+        }),
+        Tag::Str => Ok(()),
+        Tag::Ident | Tag::Word => {
+            let name = name_of(l, n);
+            match name.as_str() {
+                "$scale" => Err(private),
+                "$abstime" if ctx == Context::Param => Err(refuse(PROBE_IN_PARAM, InvalidInSource)),
+                s if s.eq_ignore_ascii_case("inf") || s.eq_ignore_ascii_case("nan") => {
+                    Err(refuse(NOT_FINITE, InvalidInSource))
+                }
+                _ => Ok(()),
+            }
+        }
+        Tag::Unary => match token(l, n).as_str() {
+            "~" if dynamic => Err(private),
+            "-" | "+" | "!" | "~" => down(ast.lhs(n)),
+            _ => Err(private),
+        },
+        Tag::Binary => {
+            let op = token(l, n);
+            if op != "**" && tables::binary(&op).is_none() {
+                return Err(private);
+            }
+            if dynamic && matches!(op.as_str(), "&" | "|" | "^" | "<<" | ">>") {
+                return Err(private);
+            }
+            down(ast.lhs(n))?;
+            down(ast.rhs(n))
+        }
+        Tag::Ternary => {
+            let at = ast.rhs(n);
+            down(ast.lhs(n))?;
+            down(ast.extra(at))?;
+            down(ast.extra(at + 1))
+        }
+        Tag::Paren | Tag::Delimited => down(ast.lhs(n)),
+        Tag::Call | Tag::Probe => {
+            let name = name_of(l, n);
+            let args = call_args(l, n);
+            let behavioural_only = matches!(
+                name.as_str(),
+                "v" | "i" | "ddt" | "idt" | "$intparam" | "$realparam"
+            );
+            if behavioural_only && ctx == Context::Param {
+                return Err(refuse(PROBE_IN_PARAM, InvalidInSource));
+            }
+            let names = args
+                .iter()
+                .all(|&a| matches!(ast.tag(Node(a)), Tag::Ident | Tag::Word | Tag::Str));
+            match (name.as_str(), args.len()) {
+                ("v", 1 | 2) | ("i", 1) if names => return Ok(()),
+                ("v" | "i", _) => return Err(private),
+                // R56: `$intparam(p)` is `to_int(p)`, `$realparam(p)` `to_real(p)` (runs ip1,
+                // ip2); VACASK takes one identifier only.
+                ("$intparam" | "$realparam", 1) if names => return Ok(()),
+                ("$intparam" | "$realparam", _) => {
+                    return Err(refuse(PARAM_READ_ARG, InvalidInSource));
+                }
+                ("ddt" | "idt", 1) => return down(args[0]),
+                // `idt(x, ic)` starts from `ic` (run bp3; A28: `Idt`'s second operand).
+                ("idt", 2) => return args.iter().try_for_each(|&a| down(a)),
+                ("ddt" | "idt", _) => return Err(private),
+                _ => {}
+            }
+            let want = match (tables::function(&name), tables::draw(&name), name.as_str()) {
+                (Some((_, k)), _, _) => k,
+                (_, Some(d), _) => usize::from(d.arity().0),
+                (_, _, "sgn") => 1,
+                (_, _, "sign") => 2,
+                _ => return Err(private),
+            };
+            // A call of another argument count: "Function 'sin' accepts at most 1 argument(s)."
+            // (runs ca1, ca2; the IR's CallArity X0019).
+            if args.len() != want {
+                return Err(refuse(CALL_ARITY, InvalidInSource));
+            }
+            if dynamic && tables::DYNAMIC_LACKS.contains(&name.as_str()) {
+                return Err(private);
+            }
+            args.iter().try_for_each(|&a| down(a))
+        }
+        _ => Err(private),
+    }
+}
+
+/// Builds the checked subtree at `node`.
+fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
+    let n = Node(node);
+    let ast = &l.cst.ast;
+    match ast.tag(n) {
+        Tag::Num => {
+            let number = number::lex(&token(l, n)).expect("checked");
+            number::push(l.b, &number, false)
+        }
+        Tag::Str => {
+            let text = token(l, n);
+            let inner = text
+                .strip_prefix('"')
+                .and_then(|t| t.strip_suffix('"'))
+                .unwrap_or(&text);
+            l.b.string(&unescape(inner))
+        }
+        Tag::Ident | Tag::Word => {
+            let name = name_of(l, n);
+            if let Some((_, value)) = tables::CONSTANTS.iter().find(|(c, _)| *c == name) {
+                let literal = number::lex(value).expect("a documented constant").literal;
+                return l.b.literal(literal);
+            }
+            match name.as_str() {
+                "$temp" => l.b.temp(),
+                "$tnom" => l.b.tnom(),
+                "$abstime" => l.b.time(),
+                _ => {
+                    let e = l.b.param_ref(&super::name::unquote(&name));
+                    l.reads.push((e, l.scope, l.stmt));
+                    match ctx {
+                        Context::Param => e,
+                        Context::Behavioural => l.b.call(ir::Func::ToReal, &[e]),
+                    }
+                }
+            }
+        }
+        Tag::Unary => {
+            let (op, operand) = (token(l, n), ast.lhs(n));
+            if op == "-" && is_number(l, Node(operand)) {
+                let number = number::lex(&token(l, Node(operand))).expect("checked");
+                return number::push(l.b, &number, true);
+            }
+            let x = build(l, operand, ctx);
+            match op.as_str() {
+                "-" => l.b.unary(ir::UnOp::Neg, x),
+                "!" => l.b.unary(ir::UnOp::Not, x),
+                "~" => l.b.unary(ir::UnOp::BitNot, x),
+                _ => x,
+            }
+        }
+        Tag::Binary => {
+            let (op, left, right) = (token(l, n), ast.lhs(n), ast.rhs(n));
+            let a = build(l, left, ctx);
+            let b = build(l, right, ctx);
+            match tables::binary(&op) {
+                Some(op) => l.b.binary(op, a, b),
+                None => l.b.call(ir::Func::Pow, &[a, b]),
+            }
+        }
+        Tag::Ternary => {
+            let at = ast.rhs(n);
+            let (c, t, e) = (ast.lhs(n), ast.extra(at), ast.extra(at + 1));
+            let c = build(l, c, ctx);
+            let t = build(l, t, ctx);
+            let e = build(l, e, ctx);
+            l.b.ternary(c, t, e)
+        }
+        Tag::Paren | Tag::Delimited => build(l, ast.lhs(n), ctx),
+        _ => {
+            let name = name_of(l, n);
+            let raw = call_args(l, n);
+            match name.as_str() {
+                "v" => {
+                    let net = node_name(l, raw[0]);
+                    let reference = raw.get(1).map(|&r| node_name(l, r));
+                    let reference = reference.filter(|r| r != name::GROUND);
+                    return l.b.v(&net, reference.as_deref());
+                }
+                "i" => {
+                    let element = super::read::field_name(l.cst, raw[0]);
+                    return l.b.i(&element);
+                }
+                "$intparam" | "$realparam" => {
+                    let p = super::read::field_name(l.cst, raw[0]);
+                    let e = l.b.param_ref(&super::name::unquote(&p));
+                    l.reads.push((e, l.scope, l.stmt));
+                    let func = match name.as_str() {
+                        "$intparam" => ir::Func::ToInt,
+                        _ => ir::Func::ToReal,
+                    };
+                    return l.b.call(func, &[e]);
+                }
+                _ => {}
+            }
+            // A literal-0 initial value is the absent one (A28: one row per meaning).
+            let raw = match (name.as_str(), raw.as_slice()) {
+                ("idt", [x, ic]) if is_zero(l, *ic) => vec![*x],
+                _ => raw,
+            };
+            let args: Vec<ir::ExprId> = raw.into_iter().map(|a| build(l, a, ctx)).collect();
+            if let Some((func, _)) = tables::function(&name) {
+                return l.b.call(func, &args);
+            }
+            if let Some(dist) = tables::draw(&name) {
+                return l
+                    .b
+                    .draw(dist, ir::DrawWhen::Sampling, ir::DrawPer::CallSite, &args);
+            }
+            // `sgn(x)` is `SgnZeroPos(x)` (typed as `x`: run f4); `sign(x, y)` is `abs(x) * (y >= 0 ? 1 : -1)` (always real): zero counts as
+            // positive (runs e1, f1, f4; R13 sugar: each operand once, read back the same).
+            let last = *args.last().expect("checked arity");
+            match name.as_str() {
+                "sgn" => l.b.call(ir::Func::SgnZeroPos, &[last]),
+                _ => {
+                    let mag = l.b.call(ir::Func::Abs, &[args[0]]);
+                    let sign = nonnegative_sign(l, last);
+                    l.b.binary(ir::BinOp::Mul, mag, sign)
+                }
+            }
+        }
+    }
+}
+
+/// The net a `v()` argument names: a `ground` name is `0` (VD cir-nodes).
+fn node_name(l: &Lower<'_, '_, '_>, arg: u32) -> String {
+    let net = super::read::field_name(l.cst, arg);
+    match l.grounds.contains(&net) {
+        true => name::GROUND.to_string(),
+        false => net,
+    }
+}
+
+/// `x >= 0 ? 1 : -1`, the integers as VACASK types them.
+fn nonnegative_sign(l: &mut Lower<'_, '_, '_>, x: ir::ExprId) -> ir::ExprId {
+    let int = |b: &mut ir::Builder<'_>, v: i64| {
+        b.literal(ir::Literal {
+            mantissa: v,
+            frac: 0,
+            exp10: 0,
+            form: ir::NumForm::Int,
+        })
+    };
+    let zero = int(l.b, 0);
+    let cond = l.b.binary(ir::BinOp::Ge, x, zero);
+    let one = int(l.b, 1);
+    let minus = int(l.b, -1);
+    l.b.ternary(cond, one, minus)
+}
+
+/// A VACASK string's text with `\"`, `\\` and `\n` read (VD input-strings).
+fn unescape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match (c, c == '\\') {
+            (_, true) => match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some(other) => out.push(other),
+                None => out.push('\\'),
+            },
+            (c, false) => out.push(c),
+        }
+    }
+    out
+}

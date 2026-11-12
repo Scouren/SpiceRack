@@ -1,0 +1,3 @@
+# Files of $VACASK_CORPUS with a byte outside every token and ignorable gap
+# (tests/dialect_vacask/probe.rs): `path line: text`, sorted. Each is a known hole in the
+# front end the reader reads through, removed when it is fixed.

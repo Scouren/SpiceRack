@@ -1,0 +1,6 @@
+section tt
+  parameters vth=0.4
+endsection
+section ff
+  parameters vth=0.3
+endsection

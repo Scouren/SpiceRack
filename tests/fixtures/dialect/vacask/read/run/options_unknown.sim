@@ -1,0 +1,5 @@
+an option VACASK does not have
+control
+  options reltol=1e-4 foo=1
+  analysis op1 op
+endc

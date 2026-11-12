@@ -1,0 +1,1 @@
+# Known failures of this directory: <fixture> <why>. A line goes the day its cause is fixed.

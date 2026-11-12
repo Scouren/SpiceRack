@@ -1,0 +1,11 @@
+step cap
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  options rawfile="ascii"
+  analysis tq tran stop=10m step=1u
+  analysis tw tran stop=10m start=6m step=1u
+endc

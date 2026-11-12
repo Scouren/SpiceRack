@@ -1,0 +1,21 @@
+resistor capacitor inductor against ngspice-45 R C L (R41 a); run own
+load "resistor.osdi"
+load "capacitor.osdi"
+load "inductor.osdi"
+model is isource
+model r resistor
+model c capacitor
+model l inductor
+i1 (0 n1) is dc=1m mag=1
+r1 (n1 0) r r=1.5k
+i6 (0 n6) is dc=1m mag=1
+r6 (n6 0) r r=1k $mfactor=2
+i7 (0 c1) is mag=1
+rc1 (c1 0) r r=1e12
+c1 (c1 0) c c=1n $mfactor=2
+i9 (0 l1) is mag=1
+l1 (l1 0) l l=1m $mfactor=2
+control
+  options temp=50 tnom=27 reltol=1e-9 rawfile="ascii"
+  analysis ac1 ac from=1k to=1k mode="lin" points=1
+endc

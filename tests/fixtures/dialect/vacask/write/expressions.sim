@@ -1,0 +1,19 @@
+expressions
+parameters a=1
+parameters b=2
+parameters p1=-2 ** 2
+parameters p2=2 ** 3 ** 2
+parameters p3=(2 ** 3) ** 2
+parameters p4=-(a ** 2)
+parameters p5=-a ** 2
+parameters p6=a - (b - a)
+parameters p7=(a + b) * a
+parameters p8=a ? b ? 1 : 2 : 3
+parameters p9=(a ? b : 1) ? 2 : 3
+parameters p10=a - -2
+parameters p11=-(2)
+parameters p12=ln(a) + log10(b) + round(a) + integer(b) + min(a, b) + fmod(a, b)
+parameters p13=agauss(5, 1, 1)
+parameters p14=$temp - $tnom
+parameters p15=1.5e-3 + 100u + 1meg + 2mil + 0.050000
+parameters p16=!a && ~b | a ^ b & a << 1

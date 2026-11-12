@@ -1,0 +1,9 @@
+# Oracle: VD dev-vacask (tline_ideal.osdi holds the module `tline_ideal`); R39/A20 (its model is
+# a parameterless model of TlineIdeal, its load a DeviceLibrary); params.txt (`z0` is an
+# instance parameter of tline_ideal: on a model line Private P2102, R41 Q4).
+# codes: P2102 S0002
+file "tline_model.sim" deck
+  title "tline model"
+  device_library tline_ideal
+  model t tline_ideal
+  opaque vacask private "model t2 tline_ideal z0=50"

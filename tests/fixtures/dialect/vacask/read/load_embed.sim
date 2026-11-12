@@ -1,0 +1,11 @@
+loads and embedded files
+load "spice/resistor.osdi"
+load "mydev.osdi"
+load "nl2.va"
+load "all.osdi" map=["*", "lib_*"]
+embed "nl2.va" <<<FILE
+module nl2(a); inout a; endmodule
+>>>FILE
+embed "plot.py" <<<FILE
+print(1)
+>>>FILE

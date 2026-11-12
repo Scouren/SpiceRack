@@ -1,0 +1,7 @@
+# Oracle: DIALECT-VACASK Appendix A run n3 ("Parameter redefinition."); INV-semantics 3.01.
+# The first definition is kept, the second refused (R2001), in a subcircuit's head too.
+# codes: R2001 R2001
+file "redefined.sim" deck
+  title "a parameter defined twice"
+  param a = 1i
+  subckt s (p) x=1i

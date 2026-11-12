@@ -1,0 +1,10 @@
+# Oracle: VD cir-hier "Scope" (a subcircuit's instance reads its own parameters, then the
+# top's) with read.rs's binding; VD dev-builtin-src (pulse defaults). An expression in a wave
+# field is kept as written.
+# codes:
+file "scope.sim" deck
+  title "sources in a subcircuit"
+  param a = 2i
+  model vsource source_v
+  subckt s (p n) b=3i
+    element vsource v1 (p n) model=vsource wave=pulse(v1=0 v2=(a * b) delay=0 rise=(a * 1n) fall=0 width=0 period=0 law=vacask) dc_rule=wave_at_zero

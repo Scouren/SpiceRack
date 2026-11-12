@@ -1,0 +1,7 @@
+sources in a subcircuit
+parameters a=2
+model vsource vsource
+subckt s (p n)
+  parameters b=3
+  v1 (p n) vsource type="pulse" val1=a*b rise=a*1n
+ends

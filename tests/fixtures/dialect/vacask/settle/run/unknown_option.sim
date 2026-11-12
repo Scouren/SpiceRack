@@ -1,0 +1,14 @@
+unknown option
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  options foo=1
+  analysis op1 op
+endc

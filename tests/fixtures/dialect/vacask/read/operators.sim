@@ -1,0 +1,4 @@
+operators
+parameters a=1 b=2 c=3
+parameters p1=-2**2 p2=2**3**2 p3=a+b*c p4=(a+b)*c p5=a-b-c p6=a-(b-c) p7=-a**2 p8=-(a**2)
+parameters p9=a?b?1:2:3 p10=a==b||b!=c&&a<=c p11=!a p12=~a p13=a&b|c^a p14=a<<b>>c p15=+a p16=a/b

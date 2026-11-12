@@ -1,0 +1,12 @@
+# Oracle: VD expr-vectors (vector values), expr-special (`$scale`), expr-functions (`isinf`):
+# no IR node states them (DIALECT-VACASK §5 G13, G15); the statement is kept as text. An
+# expression of `$temp` is dynamic (R14), whose functions are VACASK's behavioural set: `round`
+# is not among them (VD dev-builtin-behavioral, Functions).
+# codes: P2003 P2003 P2003 P2003 S0002 S0002 S0002 S0002
+file "private_expr.sim" deck
+  title "expressions with no IR meaning"
+  opaque vacask private "parameters v=[1, 2]"
+  opaque vacask private "parameters s=$scale*2"
+  opaque vacask private "parameters t=isinf(1)"
+  opaque vacask private "parameters r=round($temp)"
+  param u = 3i

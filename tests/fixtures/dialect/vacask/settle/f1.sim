@@ -1,0 +1,7 @@
+sign and misc
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (n 0) res r=1
+control
+  print ("sign30", sign(3,0), "sign3m0", sign(3,-0.0), "sign3m1", sign(-3,-1), "min", min(2,3), "lit2dot", 2./3, "hex", 0x10/3, "e", 1e3/7, "M", 1M, "x", 2x, "mil", 1mil, "u100", 100u)
+endc

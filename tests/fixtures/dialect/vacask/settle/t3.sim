@@ -1,0 +1,12 @@
+int param overridden by real
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s(a)
+  parameters x=1
+  r1 (a 0) res r=x/2+10
+ends
+x1 (n) s x=3
+x2 (n) s x=3.0
+control
+  print instance("x1:r1","x2:r1")
+endc

@@ -1,0 +1,5 @@
+ddt in a parameter is no function
+parameters p=ddt(1)
+control
+  print (p)
+endc

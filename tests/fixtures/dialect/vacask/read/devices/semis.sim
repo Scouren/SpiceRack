@@ -1,0 +1,20 @@
+diodes transistors and an unproven module
+load "spice/resistor.osdi"
+load "spice/diode.osdi"
+load "spice/mos1.osdi"
+load "spice/bjt.osdi"
+model vs vsource
+model r sp_resistor
+model dmod sp_diode is=1e-14 n=1.05 rs=10 cjo=1p
+model mn sp_mos1 vto=0.7 kp=100u lambda=0.02 gamma=0.4
+model mp sp_mos1 type=-1 vto=-0.7 kp=50u
+model qm sp_bjt bf=100 is=1e-15
+rd1 (vdd d1) r r=10k
+d1 (d1 0) dmod area=2 dtemp=5
+rm (vdd dm1) r r=10k
+m1 (dm1 vdd 0 0) mn w=10u l=2u ad=1p
+rp (dp1 0) r r=10k
+m2 (dp1 0 vdd vdd) mp w=20u l=2u temp=40 $mfactor=2
+rq (vdd c1) r r=10k
+q1 (c1 vdd 0 0) qm area=1.5 $mfactor=2
+m3 (dm1 vdd 0) mn

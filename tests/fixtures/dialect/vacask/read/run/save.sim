@@ -1,0 +1,7 @@
+save directives
+control
+  save default v(a) i(v1) p(r1, i) v('x1:n')
+  save full
+  save dv(a)
+  clear saves
+endc

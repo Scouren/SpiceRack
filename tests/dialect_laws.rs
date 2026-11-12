@@ -55,15 +55,27 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "ngspice",
         "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
     ),
+    (
+        "l5",
+        "vacask",
+        "seed 2 Untyped: an unnamed analysis is written under an invented name (`acxf1`): goes with A35's features (AnalysisUnnamed, DcAxisUnnamed, LoopUnnamed; R59)",
+    ),
+    ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the
 /// test function). Its name must be defined under `tests/`.
 #[cfg(feature = "corpus")]
-const L6_ELSEWHERE: &[(&str, &str)] = &[(
-    "ngspice",
-    "every_example_deck_reads_checks_legalizes_and_round_trips",
-)];
+const L6_ELSEWHERE: &[(&str, &str)] = &[
+    (
+        "ngspice",
+        "every_example_deck_reads_checks_legalizes_and_round_trips",
+    ),
+    (
+        "vacask",
+        "every_corpus_file_reads_cleanly_and_is_a_fixpoint",
+    ),
+];
 
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;

@@ -40,7 +40,7 @@
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
-//!   `pub mod ngspice`
+//!   `pub mod ngspice`, `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)`
@@ -52,6 +52,7 @@ pub mod facade;
 pub mod irtext;
 pub mod ngspice;
 mod sources;
+pub mod vacask;
 
 pub use sources::{DEPTH_MAX, Reference, Sources};
 
@@ -116,6 +117,12 @@ pub static BUILTIN: &[DialectRow] = &[
         text_family: "ngspice",
         read: Some(&ngspice::NGSPICE),
         write: Some(&ngspice::NGSPICE),
+    },
+    DialectRow {
+        name: "vacask",
+        text_family: "vacask",
+        read: Some(&vacask::VACASK),
+        write: Some(&vacask::VACASK),
     },
 ];
 
@@ -349,6 +356,7 @@ pub fn info(code: ir::Code) -> Option<ir::Info> {
         .find(|(c, _)| *c == code)
         .map(|(_, i)| *i);
     spine
+        .or_else(|| vacask::info(code))
         .or_else(|| passes::info(code))
         .or_else(|| ir::diag::info(code))
         .or_else(|| ngspice::info(code))

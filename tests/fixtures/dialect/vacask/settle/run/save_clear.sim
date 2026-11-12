@@ -1,0 +1,16 @@
+clear saves
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+control
+  options rawfile="ascii"
+  save v(a)
+  analysis op1 op
+  clear saves
+  analysis op2 op
+  save v(b)
+  analysis op3 op
+endc

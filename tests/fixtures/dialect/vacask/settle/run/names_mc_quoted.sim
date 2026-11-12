@@ -1,0 +1,11 @@
+quoted mc
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  mc 'm 1' samples=2
+    analysis op1 op
+  endmc
+endc

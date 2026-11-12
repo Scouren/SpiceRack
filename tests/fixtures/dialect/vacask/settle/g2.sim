@@ -1,0 +1,9 @@
+agauss in netlist param outside mc
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters g=agauss(5, 1, 1)
+r1 (n 0) res r=g
+r2 (n 0) res r=agauss(5,1,1)
+control
+  print instance("r1","r2")
+endc

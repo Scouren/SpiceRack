@@ -1,0 +1,6 @@
+pulse rise zero
+model vsource vsource
+v1 (a 0) vsource type="pulse" val0=0 val1=1 rise=0 width=1u period=4u
+control
+  analysis tr tran stop=10u step=10n
+endc
