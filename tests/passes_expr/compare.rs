@@ -2,7 +2,7 @@
 //! each root it changed evaluated before and after (`ir::eval_typed`) under the same bindings.
 //!
 //! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`, `pub fn keeps_values_over`,
-//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`
+//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -27,6 +27,10 @@ const SEEDS: std::ops::Range<u64> = 0..200;
 /// The rules that stop reading some operands (their doc states it: R12, an operand's error is
 /// not carried once the operand is no longer read).
 const DROPS: &[&str] = &["sampling_draws_to_nominal"];
+
+/// The rules after which an operand is evaluated only where it is read (`inline_funcs`: ngspice's
+/// textual rule), so an error the original raised need not be raised (R12).
+const LAZY: &[&str] = &["inline_funcs"];
 
 /// Bindings per generated design.
 const TRIALS: u64 = 8;
@@ -64,8 +68,7 @@ pub fn keeps_values_over(
         let mut diags = ir::Diags::new();
         (p.run)(&mut design, &mut diags);
         let after = roots(&design);
-        assert_eq!(before.len(), after.len(), "seed {seed}: the roots stay");
-        for (&old, &new) in before.iter().zip(&after) {
+        for (old, new) in pairs(&before, &after) {
             if old == new {
                 continue;
             }
@@ -79,6 +82,11 @@ pub fn keeps_values_over(
                 };
                 let was = ir::eval_typed(&design, old, &env);
                 if DROPS.contains(&name) && dropped(&design, was, new) {
+                    continue;
+                }
+                // R12: the copy reads an argument where the body does; the call bound every
+                // argument first, so its error need not be the copy's
+                if LAZY.contains(&name) && was.is_err() {
                     continue;
                 }
                 let got = differ(&design, was, ir::eval_typed(&design, new, &env));
@@ -101,9 +109,8 @@ pub fn keeps_boundary_values(name: &str, text: &str, tags: &[u8]) -> usize {
     let before = roots(&design);
     (pass(name).run)(&mut design, &mut diags);
     let after = roots(&design);
-    let changed: Vec<(ir::ExprId, ir::ExprId)> = before
+    let changed: Vec<(ir::ExprId, ir::ExprId)> = pairs(&before, &after)
         .into_iter()
-        .zip(after)
         .filter(|(a, b)| a != b)
         .collect();
     assert!(!changed.is_empty(), "{name}: the pass changed no root");
@@ -159,13 +166,32 @@ pub fn typed(name: &str, hit: fn(ir::Expr) -> bool) -> usize {
 }
 
 /// Every expression root of every reachable item, in `map_exprs` order.
-pub fn roots(design: &ir::Design) -> Vec<ir::ExprId> {
+pub fn roots(design: &ir::Design) -> Vec<(ir::ItemRef, Vec<ir::ExprId>)> {
     let mut copy = design.clone();
-    let mut out = Vec::new();
     let items: Vec<ir::ItemRef> = copy.reachable().into_iter().map(|(i, _)| i).collect();
     let mut editor = copy.editor();
+    let mut out = Vec::new();
     for item in items {
-        editor.map_exprs(item, &mut |e, _| out.push(*e));
+        let mut row = Vec::new();
+        editor.map_exprs(item, &mut |e, _| row.push(*e));
+        out.push((item, row));
+    }
+    out
+}
+
+/// The (before, after) root pairs of the items reachable in both (a pass may take items out:
+/// `inline_funcs` drops the functions it inlined), field by field.
+pub fn pairs(
+    before: &[(ir::ItemRef, Vec<ir::ExprId>)],
+    after: &[(ir::ItemRef, Vec<ir::ExprId>)],
+) -> Vec<(ir::ExprId, ir::ExprId)> {
+    let mut out = Vec::new();
+    for (item, new) in after {
+        let Some((_, old)) = before.iter().find(|(i, _)| i == item) else {
+            continue;
+        };
+        assert_eq!(old.len(), new.len(), "an item keeps its fields");
+        out.extend(old.iter().copied().zip(new.iter().copied()));
     }
     out
 }

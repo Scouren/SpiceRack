@@ -434,3 +434,20 @@ fn long_literal_to_shortest_keeps_every_value() {
         [code(111), code(111)]
     );
 }
+
+#[test]
+fn inline_funcs_keeps_every_value() {
+    // oracle: eval_typed of the call (its arguments bound once, the body in a frame) against
+    // the copy with the arguments substituted, at the boundary set and on generated designs
+    let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  func g(u) = u * u - 1\n  func f(a, b) = @g(a) / (b + 2) + a\n  param r = @f(x, y) + @g(y)\n  element behav b1 (n 0) expr=(@f(x, y) * v(n))\n";
+    let points = keeps_boundary_values("inline_funcs", text, ANY);
+    let call = |e| matches!(e, ir::Expr::UserCall(..));
+    let generated = keeps_generated_values("inline_funcs", call, true);
+    eprintln!("inline_funcs: {points} boundary points, {generated} generated roots");
+    assert!(generated > 0);
+    assert_eq!(
+        notes("inline_funcs", "refused"),
+        [code(113), code(113), code(113)]
+    );
+    assert_eq!(notes("drop_unused_funcs", "plain"), [code(114)]);
+}

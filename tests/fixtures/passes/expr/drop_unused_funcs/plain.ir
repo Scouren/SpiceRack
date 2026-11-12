@@ -1,0 +1,4 @@
+file "d.sp" deck
+  func g(y) = y + 1
+  func f(x) = x * 2
+  param a = @f(2)

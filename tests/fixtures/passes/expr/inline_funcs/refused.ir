@@ -1,0 +1,5 @@
+file "d.sp" deck
+  func f(x) = x * x
+  param a = @f(draw:abs_gauss:always:reference(1, 0.1, 3))
+  func r(x) = @r(x) + 1
+  element behav b1 (n 0) expr=(@r(v(n)))
