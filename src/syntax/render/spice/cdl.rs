@@ -115,8 +115,17 @@ impl W<'_, '_> {
                 // An element kept as text no rule read: a comment, as a
                 // card with no form is.
                 Comp::Raw(n) => {
-                    self.note(Code::W0021, self.rd.main(n));
-                    format!("* error: W0001 {}", info(Code::W0001).title)
+                    let at = self.rd.main(n);
+                    self.note(Code::W0021, at);
+                    // The comment names the kept line's own refusal: a
+                    // device only its source simulator has (W0039), as
+                    // every SPICE target refuses it.
+                    let code = match self.rd.kept_construct(at) {
+                        Construct::PrivateText => Code::W0039,
+                        // else: text of another family no rule read.
+                        _ => Code::W0001,
+                    };
+                    format!("* error: {code:?} {}", info(code).title)
                 }
             });
         }

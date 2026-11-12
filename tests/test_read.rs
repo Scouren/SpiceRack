@@ -19,7 +19,7 @@ mod oracle;
 
 use oracle::{refusal, write};
 use spicerack::backend::Dialect;
-use spicerack::syntax::diag::Code;
+use spicerack::syntax::diag::{Code, Kind, info};
 
 // ---- private ----
 
@@ -27,6 +27,13 @@ use spicerack::syntax::diag::Code;
 /// panics on a refusal.
 fn notes(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
     oracle::notes(&oracle::written(text, from, to))
+}
+
+/// The refusal codes (no notes) of `text` (read as `from`) for `to`, in
+/// source order; panics when `to` writes the deck.
+fn refusals(text: &str, from: Dialect, to: Dialect) -> Vec<Code> {
+    let codes = refusal(text, from, to).into_iter();
+    codes.filter(|&c| info(c).kind == Kind::Refusal).collect()
 }
 
 #[test]
@@ -249,4 +256,26 @@ fn p6_006_ltspice_savebias_loadstate_savestate() {
     // The legal neighbour: the circuit without a state card is written.
     let plain = format!("{rc}.op\n.end\n");
     assert!(write(&plain, lt, Dialect::Ngspice).contains(".op"));
+}
+
+// S4-tr-cdl-kept-code: a kept element's CDL comment names the code the
+// SPICE targets refuse the same line with. `yneuron` is Xyce's own device
+// (RG 7.10 Table 2-1, `Y` devices; W0039's catalogue row), so ngspice
+// refuses the deck W0039 and CDL's comment names W0039, never W0001 (text
+// no rule read). Oracle: the other writer's refusal of the same deck (two
+// writers of one reader's plan), as the record's `xyce/NEURON/CS_Patch.cir`
+// shows it (ngspice W0039 at line 53). The legal neighbour: the deck
+// without the device is written with no comment. Checks: 5.
+#[test]
+fn s4_tr_cdl_kept_element_names_its_code() {
+    let xy = Dialect::Xyce;
+    let rc = "* t\nI1 0 a 1n\nR1 b 0 100\n";
+    let deck = format!("{rc}yneuron n1 a b np\n.end\n");
+    assert_eq!(refusals(&deck, xy, Dialect::Ngspice), [Code::W0039]);
+    let w = oracle::written(&deck, xy, Dialect::Cdl);
+    assert!(w.text.contains("* error: W0039 "), "{}", w.text);
+    assert!(!w.text.contains("W0001"), "{}", w.text);
+    assert!(oracle::notes(&w).contains(&Code::W0021));
+    let plain = format!("{rc}.end\n");
+    assert!(!write(&plain, xy, Dialect::Cdl).contains("* error:"));
 }
