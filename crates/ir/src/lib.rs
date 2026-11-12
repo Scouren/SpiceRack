@@ -95,6 +95,7 @@ mod analysis_facts;
 pub mod build_run;
 pub mod dc_ac;
 mod dc_ac_facts;
+mod loop_facts;
 pub mod measure;
 mod measure_facts;
 mod network_facts;

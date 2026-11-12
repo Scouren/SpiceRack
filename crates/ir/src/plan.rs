@@ -358,7 +358,7 @@ impl Design {
 
     /// The references of a list. Asserts the range is inside the reference pool.
     pub fn refs(&self, list: RefList) -> &[Ref] {
-        todo!()
+        get(&self.run.refs, list).expect("a reference list inside the reference pool")
     }
 }
 
@@ -587,6 +587,3 @@ pub(crate) fn gen_ref(g: &mut Gen, b: &mut Builder<'_>, kind: Option<DefKind>) -
     }
     Ref::unresolved(g.fresh_name(b))
 }
-
-// run: A12 definition step — replaced by the row's `impl RowFacts` in `plan_facts.rs`
-todo_facts!(Elaborate);

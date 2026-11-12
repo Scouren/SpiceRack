@@ -396,8 +396,8 @@ fn references_in_detail_rows_and_pools_are_linked() {
     }
     assert!(unbound.is_empty(), "{unbound:?}");
     assert_eq!(
-        bound, 8,
-        "sweep 1, dc axis 1, table columns 2, varies 2, correlation ends 2"
+        bound, 9,
+        "sweep 1, dc axis 1, table columns 2, varies 2, correlation ends 2, elaborate 1"
     );
     let mut out = String::new();
     dump(&d, FileId(0), &mut out);
