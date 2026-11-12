@@ -53,8 +53,10 @@ const READ: &[&str] = &[
     "reset_restores",
     "run_no_cards",
     "run_with_cards",
+    "save_card",
+    "save_card_late",
     "save_command",
-    "save_later_unread",
+    "save_later",
     "script_effect",
     "script_flow",
     "script_set_var",
@@ -80,11 +82,7 @@ const WRITE: &[&str] = &[
 
 /// The fixtures and decks that fail today, by name, with the test that fails and why. Strict
 /// both ways: a listed one that passes fails the test until its line goes.
-const PENDING: &[(&str, &str, &str)] = &[(
-    "save_command",
-    "fixpoint",
-    "ng-outputs: a script save as Save { holds: FromHere } (A28) and its script spelling; today a WholeRun save, whose SaveWholeRun the row lacks",
-)];
+const PENDING: &[(&str, &str, &str)] = &[];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in
@@ -107,6 +105,13 @@ const DECKS: &[(&str, &str)] = &[
         "options\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k tc1=0.01\nC1 b 0 1n\n.control\noption reltol=1e-4\nset temp=60\ntran 0.1u 20u\nrepeat 2\nop\nend\n.endc\n.end\n",
     ),
 ];
+
+/// Decks with dot-card analyses, run by the row's stated runner `ngspice -b -r` (R49 (1)): the
+/// raw file is the cards' run after the script, which every script state change reaches.
+const CARD_DECKS: &[(&str, &str)] = &[(
+    "save_card",
+    "save card\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.op\n.control\nsave v(b)\nrun\nprint v(b)\n.endc\n.end\n",
+)];
 
 // ---- private ----
 
@@ -215,6 +220,27 @@ fn a_written_deck_runs_on_ngspice_to_the_original_vectors() {
             got == want,
             "{name}: the written deck runs to other vectors (both kept in {})\n{written}",
             dir.display()
+        );
+    }
+}
+
+#[test]
+fn a_written_card_deck_runs_on_ngspice_to_the_original_raw_file() {
+    // Oracle: ngspice-45 `-b -r` on the original deck: the saved vectors of the cards' run
+    // after the script (main.c:1547-1555); a script save before the first analysis is the
+    // deck's .save (lead's Q6), written as the card.
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("dialect_ngspice_control");
+    std::fs::create_dir_all(&dir).expect("a scratch directory");
+    for (name, deck) in CARD_DECKS {
+        let (design, _) = read_deck(&format!("{name}.sp"), deck);
+        let written = write_entry(&design);
+        assert_ne!(&written, deck, "{name}: written, not copied");
+        let want = raw_r(&dir, &format!("{name}_original"), deck);
+        let got = raw_r(&dir, &format!("{name}_written"), &written);
+        assert!(got == want, "{name}: another raw file\n{written}");
+        assert!(
+            String::from_utf8_lossy(&want).contains("No. Variables: 1"),
+            "{name}: the save keeps one vector"
         );
     }
 }
@@ -496,4 +522,29 @@ fn raw(dir: &Path, stem: &str, deck: &str) -> Vec<u8> {
         at += 1;
     }
     kept
+}
+
+/// The raw file `ngspice -b -r` writes for `deck`, ASCII (`SPICE_ASCIIRAWFILE`, ivars.c), without
+/// its `Date:` lines.
+fn raw_r(dir: &Path, stem: &str, deck: &str) -> Vec<u8> {
+    let cir = dir.join(format!("{stem}.cir"));
+    let out = dir.join(format!("{stem}.raw"));
+    let _ = std::fs::remove_file(&out);
+    std::fs::write(&cir, deck).expect("the deck");
+    let run = std::process::Command::new("ngspice")
+        .env("SPICE_ASCIIRAWFILE", "1")
+        .arg("-b")
+        .arg("-r")
+        .arg(&out)
+        .arg(&cir)
+        .output()
+        .expect("ngspice runs (nix develop .#testing)");
+    assert!(run.status.success(), "{stem}: ngspice failed");
+    let bytes = std::fs::read(&out).unwrap_or_else(|e| panic!("{stem}: no raw file: {e}"));
+    let text = String::from_utf8_lossy(&bytes);
+    text.lines()
+        .filter(|l| !l.starts_with("Date:"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .into_bytes()
 }

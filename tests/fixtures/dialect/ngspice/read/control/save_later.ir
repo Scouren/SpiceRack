@@ -1,0 +1,7 @@
+# codes:
+file "save_later.sp" deck
+  title "save_later"
+  comment " oracle: A28: a script save after an analysis holds from there (settle/state_save_reset.sp: op2 after the reset saves everything again)"
+  analysis op
+  save from_here (v (b))
+  analysis tran stop=5u print_step=1u cap=ngspice_rule

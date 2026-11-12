@@ -1,0 +1,6 @@
+# codes:
+file "save_card.sp" deck
+  title "save_card"
+  comment " oracle: lead's Q6: with a dot card, a script save before the script's first analysis and with no reset in it is the deck's .save (the cards run at run and after the script, inp.c, main.c:1547-1555)"
+  analysis op
+  save (v (b))

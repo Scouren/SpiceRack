@@ -31,8 +31,9 @@ pub(super) enum Ready {
     Env(Option<Value>, Option<Value>),
     /// A load.
     Load(String),
-    /// A `save` or `meas` command the outputs area reads: which, its words, its opaque text.
-    Output(bool, Vec<String>, String),
+    /// A `save` (with the holds the script gives it) or, with none, a `meas` command the
+    /// outputs area reads: its words, its opaque text.
+    Output(Option<ir::Applies>, Vec<String>, String),
     /// `reset`: every class restored.
     Reset,
     /// An opaque: class, code, text.
@@ -106,10 +107,9 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
             Ready::Output(save, words, text) => {
                 // the outputs area validates before it pushes; a refusal is this command's opaque
                 let inner = Stmt { scope, ..st };
-                let done = if *save {
-                    read_outputs::save_command(lw, inner, words)
-                } else {
-                    read_outputs::meas_command(lw, inner, words)
+                let done = match save {
+                    Some(holds) => read_outputs::save_command(lw, inner, words, *holds),
+                    None => read_outputs::meas_command(lw, inner, words),
                 };
                 if let Err(no) = done {
                     let f = read_outputs::fail(no);
@@ -179,9 +179,11 @@ fn one(
         ),
         Op::State { keys, .. } => return state(keys),
         Op::Load { path, .. } => Ready::Load(path.clone()),
-        Op::Save { rest, cmd } => Ready::Output(true, read_outputs::words(rest), cmd.opaque_text()),
+        Op::Save { rest, holds, cmd } => {
+            Ready::Output(Some(*holds), read_outputs::words(rest), cmd.opaque_text())
+        }
         Op::Meas { rest, cmd } => {
-            Ready::Output(false, read_outputs::words(rest), cmd.opaque_text())
+            Ready::Output(None, read_outputs::words(rest), cmd.opaque_text())
         }
         Op::Opaque { class, code, cmd } => Ready::Opaque(*class, *code, cmd.opaque_text()),
         Op::Pending { .. } => unreachable!("plan settles every pending alterparam"),
