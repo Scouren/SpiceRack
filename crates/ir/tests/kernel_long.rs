@@ -162,7 +162,15 @@ fn check_refuses_a_long_literal_that_fits() {
 fn every_zero_spelling_reads_to_one_literal_and_writes_back_to_it() {
     // the audit's -0 finding: every spelling of a zero reads to the one zero of its type and
     // writes back to that zero's own spelling, which reads to the same literal (oracle: the
-    // round trip, spelling by spelling)
+    // round trip, spelling by spelling). The design (one zero) settled by two runs, 2026-11-12:
+    // ngspice-45 has no `atan2` (numparam "Formula() error", the B source "no such function
+    // 'atan2'") and prints `v = 0.000000e+00` for a source of `{-0}`, `{-(0)}`, `{0}`,
+    // `{0*(-1)}` and B sources `V=-0`, `V=-(0)`, `V=0*(-1)` alike. VACASK (36be560): a control
+    // variable `-0.0` prints `-0` and `0.0` prints `0`, but no value differs: atan2 gives `0`
+    // for `(-0.0, -1.0)` and `-0` for `(0.0, -1.0)` (its atan2 is atan(y/x) with no +pi when
+    // x < 0 <= y: `(1.0, -1.0)` gives -0.785398, C gives 2.35619), `1/(-0)` is "Division by
+    // zero.", and a resistor of `1k*(4+atan2(-0.0, -1.0))` reads 4000 like the +0 forms. No
+    // number either simulator computes sees a zero's sign; only VACASK's `print` shows it.
     let mut wrong = Vec::new();
     for word in [
         "-0",

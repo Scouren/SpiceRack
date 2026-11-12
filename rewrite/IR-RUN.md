@@ -71,6 +71,17 @@ Decisions:
   `steady_coeff` absent is `RunExtra::PssArgumentOmitted`. The generator draws these arguments
   constant, a parameter read and a bound call only with the feature, outputs without a part,
   and all four `Pss` arguments without the feature.)
+  (R70/A43: `Alter::effect: AlterEffect { AtOnce, AtReset }` says when a parameter alter takes
+  effect for the analyses after it: at once, every other state kept (VACASK re-elaborates), or at
+  the next reset (ngspice `alterparam`); `RunExtra::AlterParamAtOnce` / `AlterParamAtReset`, one
+  per parameter alter; `AtReset` on any other target is `FieldDomain`. `link::unbound_targets`
+  lists the run items' targets that provably name nothing, for the spine's strict refusal.)
+  (R75: each DC axis carries `afresh`: the solve right after that axis advances starts from the
+  initial guess instead of the previous point (`dc_ac::dc_seeds` is the reference: the outermost
+  axis that advanced decides, the first point is the initial guess). Innermost `afresh` is
+  `RunExtra::DcRestart` (was `Dc::restart`); each axis above it is `DcOuterAfresh` (ngspice's
+  nested `.dc`) or `DcOuterCarries` (VACASK's default; `continuation=0` is afresh), exactly one.
+  Runs: step3-runrules 8379e74f, `tests/passes_run/decks/latch*`.)
   (`INV-semantics.md` 8.01–8.03): every field named, none inferred from another, `NONE` is not 0.
   Each simulator reads the positional `.tran` fields differently (Xyce's first is an initial-step
   guess, ngspice's a print step that also caps the step, HSPICE's extra fields are segments): the

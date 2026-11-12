@@ -38,9 +38,9 @@ use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
-    Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
-    TargetKind, TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
-    target_valid,
+    Alter, AlterEffect, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop,
+    TableLoop, TargetKind, TargetUse, dump_target, parse_target, target_features, target_handles,
+    target_refs, target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_ref, gen_target, target_kinds};
@@ -338,12 +338,21 @@ impl RowFacts for Alter {
         if !self.value.is_none() && matches!(design.expr(self.value), Expr::Str(_)) {
             *set = set.with(Feature::Run(RunExtra::AlterString));
         }
+        // R70/A43: each parameter alter states when it takes effect
+        if self.target.kind.is_parameter() {
+            *set = set.with(Feature::Run(match self.effect {
+                AlterEffect::AtOnce => RunExtra::AlterParamAtOnce,
+                AlterEffect::AtReset => RunExtra::AlterParamAtReset,
+            }));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         // A28: the temperature and options change through `Env` and `OptionRow`
         let state = matches!(self.target.kind, TargetKind::Temp | TargetKind::Option);
-        if !target_valid(&self.target) || self.value.is_none() || state {
+        // only a parameter alter waits for a reset (R70)
+        let effect = self.effect == AlterEffect::AtOnce || self.target.kind.is_parameter();
+        if !target_valid(&self.target) || self.value.is_none() || state || !effect {
             report(design, at, Violation::FieldDomain, out);
         }
     }
@@ -352,6 +361,7 @@ impl RowFacts for Alter {
         let at = out.len();
         dump_target(design, ctx, &self.target, out);
         put_expr(out, design, ctx, "value", self.value);
+        put_flag(out, self.effect == AlterEffect::AtReset, "at_reset");
         trim_lead(out, at);
     }
 
@@ -365,7 +375,20 @@ impl RowFacts for Alter {
             return ItemRef::NONE;
         };
         let value = take_expr(words, "value", scope, b, diags);
-        b.push(scope, Alter { target, value }, words.span())
+        let effect = if take_word(words, "at_reset") {
+            AlterEffect::AtReset
+        } else {
+            AlterEffect::AtOnce
+        };
+        b.push(
+            scope,
+            Alter {
+                target,
+                value,
+                effect,
+            },
+            words.span(),
+        )
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -396,7 +419,24 @@ impl RowFacts for Alter {
             let no_str = features.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::Str)));
             g.expr(b, &no_str, Reads::Constant)
         };
-        b.push(scope, Alter { target, value }, Span::NONE)
+        // R70/A43: a parameter alter's effect, by which twin the set holds (both: a coin)
+        let at_once = features.contains(Feature::Run(RunExtra::AlterParamAtOnce));
+        let at_reset = features.contains(Feature::Run(RunExtra::AlterParamAtReset));
+        let effect = match (at_once, at_reset) {
+            _ if !target.kind.is_parameter() => AlterEffect::AtOnce,
+            (true, true) if g.chance(2) => AlterEffect::AtReset,
+            (false, true) => AlterEffect::AtReset,
+            _ => AlterEffect::AtOnce,
+        };
+        b.push(
+            scope,
+            Alter {
+                target,
+                value,
+                effect,
+            },
+            Span::NONE,
+        )
     }
 }
 

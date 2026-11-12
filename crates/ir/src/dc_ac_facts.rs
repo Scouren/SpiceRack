@@ -4,7 +4,7 @@
 //! IR text (after `analysis <kind> [name=n]`; fields in declaration order):
 //!
 //! ```text
-//! dc       <target> <sweep> [name=n] { <target> <sweep> [name=n] } [restart]
+//! dc       <target> <sweep> [name=n] [afresh] { <target> <sweep> [name=n] [afresh] }
 //! ac       <sweep>
 //! noise    <probe> source=n <sweep> [points_per_summary=v] [ac_sweep] [source_ac]
 //! tf       <probe> source=n          dc_xf <probe>          xf <probe> <sweep>
@@ -98,7 +98,13 @@ impl DetailFacts for Dc {
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         let axes = get(&design.run.dc_axes, self.axes).unwrap_or(&[]);
         flag(set, axes.len() > 1, RunExtra::DcNested);
-        flag(set, self.restart, RunExtra::DcRestart);
+        if let Some((inner, outer)) = axes.split_first() {
+            flag(set, inner.afresh, RunExtra::DcRestart);
+            for axis in outer {
+                flag(set, axis.afresh, RunExtra::DcOuterAfresh);
+                flag(set, !axis.afresh, RunExtra::DcOuterCarries);
+            }
+        }
         for axis in axes {
             flag(set, !axis.name.is_none(), RunExtra::DcAxisNamed);
             flag(set, axis.name.is_none(), RunExtra::DcAxisUnnamed);
@@ -123,8 +129,8 @@ impl DetailFacts for Dc {
             dump_target(design, ctx, &axis.target, out);
             dump_sweep(design, ctx, &axis.sweep, out);
             put_name(out, design, "name", axis.name);
+            put_flag(out, axis.afresh, "afresh");
         }
-        put_flag(out, self.restart, "restart");
     }
 
     fn parse(
@@ -138,16 +144,16 @@ impl DetailFacts for Dc {
             let target = parse_target(words, b, diags)?;
             let sweep = parse_sweep(words, scope, b, diags)?;
             let name = take_name(words, "name", b, diags);
+            let afresh = take_word(words, "afresh");
             axes.push(DcAxis {
                 target,
                 sweep,
                 name,
+                afresh,
             });
         }
-        let restart = take_word(words, "restart");
         Some(Dc {
             axes: b.dc_axes(&axes),
-            restart,
         })
     }
 
@@ -158,13 +164,14 @@ impl DetailFacts for Dc {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let n = if has(features, RunExtra::DcNested) && g.chance(3) {
+        let outer = [RunExtra::DcOuterCarries, RunExtra::DcOuterAfresh].map(|x| has(features, x));
+        let n = if has(features, RunExtra::DcNested) && outer.contains(&true) && g.chance(3) {
             2
         } else {
             1
         };
         let mut axes = Vec::with_capacity(n);
-        for _ in 0..n {
+        for k in 0..n {
             let target = gen_target(g, b, features, TargetUse::Dc)?;
             let sweep = gen_sweep(g, b, features, SweepUse::Dc);
             // after the sweep: the text interns the name after the sweep's values
@@ -176,16 +183,20 @@ impl DetailFacts for Dc {
                 RunExtra::DcAxisUnnamed,
                 3,
             )?;
+            let afresh = match (k, outer) {
+                (0, _) => has(features, RunExtra::DcRestart) && g.chance(2),
+                (_, [true, true]) => g.chance(2),
+                (_, [carries, _]) => !carries,
+            };
             axes.push(DcAxis {
                 target,
                 sweep,
                 name,
+                afresh,
             });
         }
-        let restart = has(features, RunExtra::DcRestart) && g.chance(2);
         Some(Dc {
             axes: b.dc_axes(&axes),
-            restart,
         })
     }
 }

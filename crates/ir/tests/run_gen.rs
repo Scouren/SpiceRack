@@ -378,3 +378,78 @@ fn a_set_without_the_r68_features_draws_neither() {
         "{analyses} analyses, {psses} pss"
     );
 }
+
+#[test]
+fn every_generated_parameter_alter_states_one_effect() {
+    // R70/A43: `AlterParamAtOnce` and `AlterParamAtReset` split the parameter alters exactly; a
+    // set with only one of them draws only that one (VACASK's and ngspice's laws)
+    use spicerack_ir::plan::{Alter, AlterEffect};
+    let [now, later] = [RunExtra::AlterParamAtOnce, RunExtra::AlterParamAtReset];
+    let without = |x: RunExtra| run_set().minus(FeatureSet::EMPTY.with(Feature::Run(x)));
+    let mut seen = [0usize; 3];
+    for (k, set) in [run_set(), without(later), without(now)].iter().enumerate() {
+        for seed in 0..400u64 {
+            let d = generate(seed, set, SIZE);
+            let used = features_used(&d);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Alter {
+                    continue;
+                }
+                let row: Alter = d.row(item.index);
+                if !row.target.kind.is_parameter() {
+                    assert_eq!(row.effect, AlterEffect::AtOnce, "seed {seed}, set {k}");
+                    continue;
+                }
+                assert!(k != 1 || row.effect == AlterEffect::AtOnce, "seed {seed}");
+                assert!(k != 2 || row.effect == AlterEffect::AtReset, "seed {seed}");
+                seen[k] += 1;
+            }
+            let x = if k == 1 { later } else { now };
+            assert!(
+                k == 0 || !used.contains(Feature::Run(x)),
+                "seed {seed}, set {k}: {x:?}"
+            );
+        }
+    }
+    assert!(
+        seen.iter().all(|&n| n > 10),
+        "parameter alters per set: {seen:?}"
+    );
+}
+
+#[test]
+fn every_generated_outer_dc_axis_states_one_continuation() {
+    // R75: `DcOuterCarries` and `DcOuterAfresh` split the axes above the innermost exactly; a set
+    // with only one of them draws only that one (ngspice's set holds the afresh twin only)
+    use spicerack_ir::dc_ac::Dc;
+    let [carries, afresh] = [RunExtra::DcOuterCarries, RunExtra::DcOuterAfresh];
+    let without = |x: RunExtra| run_set().minus(FeatureSet::EMPTY.with(Feature::Run(x)));
+    let mut seen = [0usize; 3];
+    for (k, set) in [run_set(), without(afresh), without(carries)]
+        .iter()
+        .enumerate()
+    {
+        for seed in 0..400u64 {
+            let d = generate(seed, set, SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Analysis {
+                    continue;
+                }
+                let row: spicerack_ir::Analysis = d.row(item.index);
+                if row.kind != AnalysisKind::Dc {
+                    continue;
+                }
+                let dc: Dc = d.detail(row.detail);
+                for axis in &d.dc_axes(dc.axes)[1..] {
+                    assert!(
+                        k != 1 || !axis.afresh,
+                        "seed {seed}: only the carrying twin"
+                    );
+                    assert!(k != 2 || axis.afresh, "seed {seed}: only the afresh twin");
+                    seen[k] += 1;
+                }
+            }
+        }
+    }
+    assert!(seen.iter().all(|&n| n > 10), "outer axes per set: {seen:?}");
+}

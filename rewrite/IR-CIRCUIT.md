@@ -196,7 +196,8 @@ seeds (the generator before this bound none of the sources and about half of the
 ## 3a. Invariants every simulator holds (AMEND-A12 A19, R38)
 
 `check` reports `FieldDomain` (the generator never makes one): a passive with no value and no
-model; `ac` on a capacitor or inductor; `noisy == false` on a capacitor or inductor whose value
+model; `ac` or `tce` on a capacitor or inductor (R74: Xyce 7.10 refuses `TCE` on C and L, VACASK's
+sp_capacitor and sp_inductor have none); `noisy == false` on a capacitor or inductor whose value
 does not read the circuit; an instance parameter whose key names one of the row's own typed
 fields (`circuit_check::typed_key`: the detail row's IR field names from the field table, `m`
 and `mult`, and `temp` where the row has `temp_abs`; a kind without a detail row, such as a

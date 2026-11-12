@@ -79,7 +79,7 @@ const BROKEN: &[Fixture] = &[
         raw(b, s, AnalysisKind::Ac, Ac { sweep: sw });
     }),
     ("dc with no axis", Violation::FieldDomain, |b, s| {
-        raw(b, s, AnalysisKind::Dc, Dc { axes: List::EMPTY, restart: false });
+        raw(b, s, AnalysisKind::Dc, Dc { axes: List::EMPTY });
     }),
     ("hb with fewer harmonics than tones", Violation::FieldDomain, |b, s| {
         let t = [b.num(1e9), b.num(2e9)];
@@ -119,12 +119,12 @@ const BROKEN: &[Fixture] = &[
     }),
     ("alter of the temperature", Violation::FieldDomain, |b, s| {
         let v = b.num(85.0);
-        b.push(s, Alter { target: Target::TEMP, value: v }, Span::NONE);
+        b.push(s, Alter { target: Target::TEMP, value: v, effect: spicerack_ir::plan::AlterEffect::AtOnce }, Span::NONE);
     }),
     ("alter of an option", Violation::FieldDomain, |b, s| {
         let v = b.num(1e-3);
         let target = b.target_option(OptionKey::RelTol, None);
-        b.push(s, Alter { target, value: v }, Span::NONE);
+        b.push(s, Alter { target, value: v, effect: spicerack_ir::plan::AlterEffect::AtOnce }, Span::NONE);
     }),
     ("reset of no class", Violation::FieldDomain, |b, s| {
         b.push(s, Reset { restores: ResetSet::EMPTY }, Span::NONE);
@@ -179,6 +179,12 @@ const BROKEN: &[Fixture] = &[
         let source = b.name("v1");
         raw(b, s, AnalysisKind::Tf, Tf { output, source });
     }),
+    // R70/A43: only a parameter alter waits for a reset
+    ("a device alter that waits for a reset", Violation::FieldDomain, |b, s| {
+        let v = b.num(1.0);
+        let t = b.target(TargetKind::DeviceParam, &[], "r1", Some("r"));
+        b.push(s, Alter { target: t, value: v, effect: spicerack_ir::plan::AlterEffect::AtReset }, Span::NONE);
+    }),
     ("nine nested loops", Violation::FieldDomain, |b, s| {
         let mut scope = s;
         for _ in 0..9 {
@@ -189,13 +195,13 @@ const BROKEN: &[Fixture] = &[
         }
     }),
     ("alter without a value", Violation::FieldDomain, |b, s| {
-        b.push(s, Alter { target: Target::TEMP, value: NO }, Span::NONE);
+        b.push(s, Alter { target: Target::TEMP, value: NO, effect: spicerack_ir::plan::AlterEffect::AtOnce }, Span::NONE);
     }),
     ("parameter target with an instance path", Violation::FieldDomain, |b, s| {
         let mut t = b.target(TargetKind::Param, &[], "p", None);
         t.path = b.names(&["x1"]);
         let v = b.num(1.0);
-        b.push(s, Alter { target: t, value: v }, Span::NONE);
+        b.push(s, Alter { target: t, value: v, effect: spicerack_ir::plan::AlterEffect::AtOnce }, Span::NONE);
     }),
     ("private option without a dialect", Violation::FieldDomain, |b, s| {
         let private = b.name("tran_rmax");
@@ -416,7 +422,13 @@ fn a_valid_run_reports_nothing() {
             Span::NONE,
         );
         let r1 = b.target(TargetKind::ElementValue, &[], "r1", None);
-        b.alter(body, r1, one, Span::NONE);
+        b.alter(
+            body,
+            r1,
+            one,
+            spicerack_ir::plan::AlterEffect::AtOnce,
+            Span::NONE,
+        );
         let tr = tran(b);
         b.analysis(body, Some("t1"), tr, Span::NONE);
         pss(b, body);

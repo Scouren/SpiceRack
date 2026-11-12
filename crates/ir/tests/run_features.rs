@@ -30,7 +30,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::TranNoise, "  analysis tran stop=1u print_step=1n noise_fmax=1g noise_fmin=1meg cap=none", T),
     (RunExtra::TranSegments, "  analysis tran stop=1u print_step=1n segments=[1n, 2u] cap=none", T),
     (RunExtra::DcNested, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (source_dc v2) (lin start=0 stop=1 step=1)", D),
-    (RunExtra::DcRestart, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) restart", D),
+    (RunExtra::DcRestart, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) afresh", D),
     (RunExtra::DcAxisTemp, "  analysis dc (temp) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcAxisParam, "  analysis dc (param p) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcAxisSubcktParam, "  analysis dc (subckt_param div r) (lin start=0 stop=1 step=1)", D),
@@ -188,11 +188,19 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     // of its four optional arguments
     (RunExtra::AnalysisParamArgument, "  param k = 1\n  analysis tran stop=(1u * k) print_step=1n cap=none", "  param k = 1\n  analysis tran stop=1u print_step=1n cap=none"),
     (RunExtra::PssArgumentOmitted, "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10", PF),
+    // R70/A43: when a parameter alter takes effect
+    (RunExtra::AlterParamAtOnce, AL, "  alter (param p) value=1 at_reset"),
+    (RunExtra::AlterParamAtReset, "  alter (param p) value=1 at_reset", AL),
+    // R75: an axis above the innermost carries the last solve into its next step, or not
+    (RunExtra::DcOuterCarries, D2, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1]) afresh"),
+    (RunExtra::DcOuterAfresh, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1]) afresh", D2),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
 const PF: &str = "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10 steady_coeff=1m";
 const D: &str = "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1)";
+const D2: &str =
+    "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1])";
 const A: &str = "  analysis ac (lin start=1 stop=2 step=1)";
 const N: &str = "  analysis noise (v (out)) source=v1 (lin start=1 stop=2 step=1)";
 const SP: &str = "  analysis sp (lin start=1 stop=2 step=1)";
