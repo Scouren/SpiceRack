@@ -144,6 +144,36 @@ mod tests {
         assert!(missing.is_empty(), "{missing:?}");
     }
 
+    /// A28 item 5: under `Params::TypedOnly` every generated element has an empty instance
+    /// parameter list and every model an empty parameter list, over the full feature set, and the
+    /// designs still check clean (oracle: the rows themselves and `check`).
+    #[test]
+    fn typed_only_generates_no_parameter_list() {
+        use spicerack_ir::r#gen::{Params, generate_with};
+        let mut models = 0;
+        for seed in 0..300u64 {
+            let d = generate_with(seed, &FeatureSet::ALL, SIZE, Params::TypedOnly);
+            for (item, _) in d.reachable() {
+                match item.kind {
+                    ItemKind::Element => {
+                        let e: spicerack_ir::Element = d.row(item.index);
+                        assert!(e.params.is_empty(), "seed {seed}: element params");
+                    }
+                    ItemKind::Model => {
+                        models += 1;
+                        let m: spicerack_ir::Model = d.row(item.index);
+                        assert!(m.params.is_empty(), "seed {seed}: model params");
+                    }
+                    _ => {}
+                }
+            }
+            let mut diags = Diags::new();
+            check(&d, &mut diags);
+            assert_eq!(codes(&diags), Vec::new(), "seed {seed}");
+        }
+        assert!(models > 50, "the property saw {models} models");
+    }
+
     /// The generator's version vocabulary: a model of a versioned family draws its version from
     /// the standard's published versions where a simulator's list is known. Oracle: ngspice-45's
     /// accepted versions per family as `ng-models` read them (parser/inpdomod.c, b3v32set.c:86-92,
