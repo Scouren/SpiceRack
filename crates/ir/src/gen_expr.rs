@@ -145,6 +145,12 @@ impl Gen {
             ExprTag::TStop,
             ExprTag::Tnom,
         ];
+        // A33: under `typed_params` a parameter read is the operand of a dynamic `ToReal` or
+        // `ToInt` the set allows (or is not drawn)
+        let typed = [Func::ToReal, Func::ToInt].into_iter().find(|f| {
+            features.contains(Feature::Expr(ExprTag::Call))
+                && features.contains(Feature::FuncDyn(*f))
+        });
         let tag = if std::mem::take(need_probe) {
             probes[self.below(probes.len() as u32) as usize]
         } else {
@@ -152,6 +158,7 @@ impl Gen {
                 .into_iter()
                 .filter(|t| features.contains(Feature::Expr(*t)))
                 .filter(|t| !matches!(t, ExprTag::Param | ExprTag::Tnom) || self.param_reads)
+                .filter(|t| *t != ExprTag::Param || !self.typed_params || typed.is_some())
                 .chain(probes.iter().copied().filter(|_| dynamic))
                 .collect();
             leaves[self.below(leaves.len() as u32) as usize]
@@ -187,7 +194,13 @@ impl Gen {
                 let w = self.word();
                 b.string(w)
             }
-            ExprTag::Param => self.param_read(b),
+            ExprTag::Param => {
+                let read = self.param_read(b);
+                match typed {
+                    Some(f) if self.typed_params => b.call(f, &[read]),
+                    _ => read,
+                }
+            }
             ExprTag::Temp => b.temp(),
             ExprTag::TStep => b.tstep(),
             ExprTag::TStop => b.tstop(),
