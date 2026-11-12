@@ -250,7 +250,18 @@ impl FeatureSet {
 
     /// Every feature: all `Feature::COUNT` bits (the IR-text writer's set: IR text spells
     /// everything).
-    pub const ALL: FeatureSet = FeatureSet::EMPTY; // red placeholder: the test comes first
+    pub const ALL: FeatureSet = FeatureSet::first(Feature::COUNT as usize);
+
+    /// The set of the first `n` feature indices.
+    const fn first(n: usize) -> FeatureSet {
+        let mut words = [0u64; WORDS];
+        let mut i = 0;
+        while i < n {
+            words[i / 64] |= 1 << (i % 64);
+            i += 1;
+        }
+        FeatureSet { words }
+    }
 
     /// This set and `f`.
     pub const fn with(self, f: Feature) -> FeatureSet {

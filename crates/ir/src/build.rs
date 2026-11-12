@@ -1,7 +1,9 @@
 //! The append-only door: a reader's or builder's calls in, new rows out. Readers, the Python and
 //! Rust builders and the IR text parser all build through it; nothing here reads source text.
 //!
-//! Every value goes through its constructor once, at this edge: a reader's number is the
+//! An empty list is always `List::EMPTY` (start 0), whichever constructor made it, so equal
+//! designs compare equal; `check` reports any other empty range. Every value goes through its
+//! constructor once, at this edge: a reader's number is the
 //! [`Literal`] it read (digits in, no floating arithmetic in a reader, Addendum A3), checked
 //! against the literal's invariants; a built number (`num`) is refused unless finite (the NaN
 //! gate, C9) and becomes its shortest literal; names unless non-empty, handles unless in range, capacities asserted
@@ -109,6 +111,9 @@ impl<'d> Builder<'d> {
 
     /// Interns each name and appends the list.
     pub fn names(&mut self, names: &[&str]) -> NameList {
+        if names.is_empty() {
+            return NameList::EMPTY;
+        }
         let start = self.design.name_pool.len();
         assert!(
             start + names.len() <= POOL_MAX,
@@ -144,6 +149,9 @@ impl<'d> Builder<'d> {
     /// Interns each name and appends the pairs. Asserts the names are distinct; a value may be
     /// `NONE` only where the receiving field says so.
     pub fn params(&mut self, params: &[(&str, ExprId)]) -> ParamList {
+        if params.is_empty() {
+            return ParamList::EMPTY;
+        }
         let count = self.design.exprs.tags.len();
         let start = self.design.param_pool.len();
         assert!(
@@ -521,6 +529,9 @@ impl Builder<'_> {
 
 /// Appends `items` to `pool` and returns their range. Asserts `POOL_MAX`.
 fn pooled<T: Copy>(pool: &mut Vec<T>, items: &[T]) -> List<T> {
+    if items.is_empty() {
+        return List::EMPTY; // the one empty list: equality does not depend on how it was made
+    }
     let start = pool.len();
     assert!(
         start + items.len() <= POOL_MAX,
