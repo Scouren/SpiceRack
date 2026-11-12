@@ -106,7 +106,9 @@ pub(super) const PASSES: &[Pass] = &[
     Pass {
         name: "formal_defaults_to_instances",
         removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
+            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,
@@ -116,7 +118,7 @@ pub(super) const PASSES: &[Pass] = &[
     Pass {
         name: "formal_defaults_to_instances_default",
         removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
-        requires: ir::FeatureSet::EMPTY,
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,

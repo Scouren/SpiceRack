@@ -427,6 +427,59 @@ fn name_with_letter_keeps_what_every_reference_names() {
     eprintln!("name_with_letter: {ran} generated designs, {renamed} renames");
 }
 
+/// Moving and re-pointing definitions keeps every read: for every item listed before and
+/// after `splice_elaborate` or `constant_param_to_formal`, its row references and its
+/// expressions' parameter reads bind the same definitions (`ir::check` clean: no stale entry).
+#[test]
+fn splice_and_constant_params_keep_what_every_read_binds() {
+    let rows = [
+        (
+            "splice_elaborate",
+            ir::Feature::Item(ir::ItemKind::Elaborate),
+        ),
+        (
+            "constant_param_to_formal",
+            ir::Feature::Extra(ir::Extra::SubcktConstantParam),
+        ),
+    ];
+    for (name, feature) in rows {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        let mut ran = 0;
+        for seed in SEEDS {
+            let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+            if !ir::features_used(&design).contains(feature) {
+                continue;
+            }
+            ran += 1;
+            let refs_before = refs(&design);
+            let reads_before = param_reads(&design);
+            let mut diags = ir::Diags::new();
+            (pass.run)(&mut design, &mut diags);
+            let mut found = ir::Diags::new();
+            ir::check(&design, &mut found);
+            assert!(found.is_empty(), "{name} seed {seed}: {:?}", found.rows());
+            let refs_after = refs(&design);
+            for (item, r) in &refs_after {
+                if let Some((_, b)) = refs_before.iter().find(|(i, _)| i == item) {
+                    assert_eq!(r, b, "{name} seed {seed}: {item:?} rebound");
+                }
+            }
+            let reads_after = param_reads(&design);
+            let kept = |reads: &[(ir::ItemRef, ir::DefId)]| -> Vec<(ir::ItemRef, ir::DefId)> {
+                let both = |i: &ir::ItemRef| refs_after.iter().any(|(j, _)| j == i);
+                reads.iter().copied().filter(|(i, _)| both(i)).collect()
+            };
+            assert_eq!(
+                kept(&reads_after),
+                kept(&reads_before),
+                "{name} seed {seed}: a read rebound"
+            );
+        }
+        assert!(ran > 0, "{name}: no generated design");
+        eprintln!("{name}: {ran} generated designs");
+    }
+}
+
 #[test]
 fn legalize_gives_every_model_less_element_a_model_and_a_library() {
     let text = "file \"a.sp\" deck\n  element resistor r1 (a 0) value=1k\n  element vsource v1 (a 0) dc=1\n  element lossless_line t1 (a 0 b 0) z0=50 td=1n\n";
