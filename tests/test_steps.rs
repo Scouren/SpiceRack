@@ -429,3 +429,84 @@ fn p5_107_a_step_that_runs_down_is_its_points_on_spectre() {
     let head = "sweep1_rr sweep param=rr start=1k stop=3k step=1k {";
     oracle::spec_example(cite, &up, Dialect::Xyce, Dialect::Spectre, &[head]);
 }
+
+/// ZERO-LEDGER P3-115. Oracle: Xyce 7.10 running the source deck (its
+/// `.dc` sweeps a parameter the top declares: RG 7.10 `.DC`), each point
+/// the divider's closed form v(out) = rr / (1k + rr), met by LTspice
+/// 26.1.1 on the written deck (unless CI's `LTSPICE_CI_PENDING_MIRROR`
+/// marker says it is absent). LTspice's `.dc` sweeps an independent
+/// source or `temp` (help `.DC`; 26.1.1 on the card as read: "No such
+/// instance." for a parameter and `R2:R`, "DC sweep source must be an
+/// independent source." for a resistor), so the axis is `.step param`
+/// beside `.op` (help `.STEP`), the card the writer gives the equal Xyce
+/// `.step`; what has no such form is refused (W0015), the Python API's
+/// `.dc` over a resistor too. A source's and the temperature's `.dc` stay
+/// LTspice's own. By hand: research/impl/evidence/P3-115/run.txt.
+/// Tolerance: a linear solve of three elements; LTspice's raw file holds
+/// single floats (6e-8).
+#[test]
+fn p3_115_a_dc_over_a_parameter_is_a_step_on_ltspice() {
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let meets = |on: Dialect, text: &str, want: &[f64]| {
+        let got = outs(on, text);
+        let near = got.len() == want.len() && got.iter().zip(want).all(|(g, w)| tol.within(*g, *w));
+        assert!(near, "{on:?}: v(out) = {got:?}, want {want:?}\n{text}");
+    };
+    let ltspice = std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_none();
+    let dc = |cards: &str| format!("{DIVIDER}{cards}\n.end\n");
+    let cite = "LTspice help .DC (an independent source or temp), .STEP (param <name>)";
+    // The card, v(out) at its points, LTspice's step. The third grid
+    // ends short of its stop value: Xyce's three points, as a list.
+    let cases: [(&str, [f64; 3], &str); 3] = [
+        (
+            ".dc rr 1k 3k 1k",
+            [0.5, 2.0 / 3.0, 0.75],
+            ".step param rr 1000 3000 1000",
+        ),
+        (
+            ".dc rr list 1k 5k 9k",
+            [0.5, 5.0 / 6.0, 0.9],
+            ".step param rr list 1k 5k 9k",
+        ),
+        (
+            ".dc rr 1k 10k 4k",
+            [0.5, 5.0 / 6.0, 0.9],
+            ".step param rr list 1k 5k 9k",
+        ),
+    ];
+    for (card, want, step) in cases {
+        let deck = dc(card);
+        meets(Dialect::Xyce, &deck, &want);
+        let lines = [step, ".op"];
+        let text = oracle::spec_example(cite, &deck, Dialect::Xyce, Dialect::Ltspice, &lines);
+        assert!(!text.lines().any(|l| l.starts_with(".dc")), "{text}");
+        if ltspice {
+            meets(Dialect::Ltspice, &text, &want);
+        }
+    }
+    // No LTspice form: a resistor, a device's parameter, a parameter
+    // outside a source's axis, beside a `.step`, beside another analysis.
+    let refused = [
+        ".dc R2 1k 3k 1k",
+        ".dc R2:R 1k 3k 1k",
+        ".dc V1 1 2 1 rr 1k 3k 1k",
+        ".step vv 1 2 1\n.dc rr 1k 3k 1k",
+        ".dc rr 1k 3k 1k\n.op",
+    ];
+    for cards in refused {
+        let codes = oracle::refusal(&dc(cards), Dialect::Xyce, Dialect::Ltspice);
+        assert_eq!(codes, [Code::W0015], "{cards}");
+    }
+    // The Python API's card: ngspice's `.dc` takes a resistor.
+    let given = Lang::NGSPICE_GIVEN;
+    let codes = oracle::refusal(&dc(".dc R2 1k 3k 1k"), given, Dialect::Ltspice);
+    assert_eq!(codes, [Code::W0015], "the Python API's card");
+    // The legal neighbours: LTspice's own sweep variables, as read.
+    for card in [".dc V1 1 2 1", ".dc temp 27 127 50"] {
+        let text = oracle::write(&dc(card), Dialect::Xyce, Dialect::Ltspice);
+        assert!(text.lines().any(|l| l == card), "no `{card}`\n{text}");
+    }
+}

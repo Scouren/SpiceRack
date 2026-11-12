@@ -148,3 +148,30 @@ def test_p3_037_a_stepped_source_steps_its_own_dc_value():
     assert ".step Vdd 1 3 1" in tb.netlist("ltspice").splitlines()
     ops = tb.operating_point()
     assert [op["out"] for op in ops] == pytest.approx([0.5, 1.0, 1.5], rel=1e-6)
+
+
+def test_p3_115_a_dc_sweep_of_a_resistor_is_refused_on_ltspice():
+    """ZERO-LEDGER P3-115. LTspice's `.dc` sweeps an independent source or `temp` (help `.DC`): on
+    `.dc Rl 1k 3k 1k` LTspice 26.1.1 stops, "DC sweep source must be an independent source."
+    (research/impl/evidence/P3-115/run.txt), which the backend reported as a failed simulation. The
+    card is refused when the deck is written. Oracle for the neighbour: the divider's closed form,
+    V(out) = Vin * 3k / (1k + 3k) at Vin = 1, 2, 3 V."""
+    if pending_mirror():
+        return
+    mod = ps()
+
+    def bench():
+        c = mod.Circuit("div")
+        c.V("in", "in", "0", 1.0)
+        c.R("1", "in", "out", 1e3)
+        c.R("l", "out", "0", 3e3)
+        tb = mod.Testbench(c)
+        tb.with_backend("ltspice")
+        return tb
+
+    tb = bench()
+    tb.add_dc(Rl=slice(1e3, 3e3, 1e3))
+    with pytest.raises(mod.Error, match="W0015"):
+        tb.netlist("ltspice")
+    dc = bench().dc(Vin=slice(1.0, 3.0, 1.0))
+    assert dc["out"] == pytest.approx([0.75, 1.5, 2.25], rel=1e-6)

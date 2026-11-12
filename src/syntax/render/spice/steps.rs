@@ -3,7 +3,9 @@
 //! cards keep the order the source's simulator ran its loops in, whether
 //! a card is a range or a list. On LTspice a range ends on its stop
 //! value, so one whose grid ends short of it is written as the list of
-//! its points.
+//! its points. On LTspice, whose `.dc` sweeps a source or the
+//! temperature, a Xyce deck's `.dc` over a parameter is a `.step` of it
+//! beside `.op` (`W::dc_step`).
 //!
 //! Cites: Xyce RG 7.10 §2.1.36 (`.STEP`: "the first .STEP line … will be
 //! the innermost loop"; lin, dec, oct or a list), p.155; LTspice help
@@ -12,10 +14,12 @@
 //! UG `.TEMP t1 t2 …`. Run on Xyce 7.10 and LTspice 26.1.1
 //! (`research/impl/evidence/P5-100/RESULTS.txt`): a range and a list
 //! loop in card order, in either order; LTspice's grid
-//! (`research/impl/evidence/P5-099/RESULTS.txt`).
+//! (`research/impl/evidence/P5-099/RESULTS.txt`); LTspice help `.DC`
+//! and Xyce RG 7.10 `.DC` (a parameter's sweep, run on both:
+//! `research/impl/evidence/P3-115/run.txt`).
 //!
 //! Contents:
-//! - `W::step_cards(&mut self, tb: &Tb)`
+//! - `W::step_cards(&mut self, tb: &Tb)`, `W::dc_step(&self, tb: &mut Tb)`
 
 use super::W;
 use super::bench::Tb;
@@ -23,8 +27,8 @@ use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
-use crate::syntax::render::read::step_points;
-use crate::syntax::render::swept::{Swept, step_makes, step_swept};
+use crate::syntax::render::read::{Ana, DcSweep, step_points};
+use crate::syntax::render::swept::{Swept, step_makes, step_swept, swept};
 
 impl W<'_, '_> {
     /// The deck's `.step` cards in read order, ranges and lists as they
@@ -43,6 +47,56 @@ impl W<'_, '_> {
         for (_, line) in &cards {
             self.o.token(line, Space::Line);
         }
+    }
+
+    /// Folds a Xyce deck's one analysis, a `.dc` of one axis over a
+    /// parameter its top declares, as LTspice runs it: the axis a `.step`
+    /// of the parameter ([`W::step_cards`] writes it as a deck's own) and
+    /// the analysis an `.op`. LTspice's `.dc` sweeps an independent
+    /// source or `temp` (26.1.1: "No such instance." for a parameter),
+    /// and `.step param` beside `.op` ran Xyce's points
+    /// (`research/impl/evidence/P3-115/run.txt`). Left as read, for the
+    /// analysis writer to refuse (W0015): a deck with another analysis
+    /// (LTspice steps each one), a `.step` of its own (the axis is the
+    /// innermost loop wherever its card stands), a `.meas dc` (it reads
+    /// the sweep), a second circuit state, a `.dc` of two axes or more.
+    // ponytail: one axis; a parameter outside a source's axis is `.step
+    // param` beside the source's `.dc` (it ran) when a deck needs it.
+    pub(super) fn dc_step(&self, tb: &mut Tb) {
+        // Paired with `plan`'s own check: a token a run.
+        tb.plan.check();
+        let lt = self.b.analysis_form == AnalysisForm::Ltspice;
+        let xyce = self.rd.b.analysis_form == AnalysisForm::Xyce;
+        let alone = tb.steps.is_empty() && tb.step_lists.is_empty() && !tb.measures_dc();
+        if !(lt && xyce && alone && tb.plan.single_epoch()) {
+            return;
+        }
+        let ([run], [tok]) = (tb.plan.runs.as_mut_slice(), tb.plan.run_tok.as_slice()) else {
+            return;
+        };
+        let (src, sweep) = match &*run {
+            Ana::Dc(sweeps) if sweeps.len() == 1 => {
+                let (src, a, b, c) = &sweeps[0];
+                (src.clone(), DcSweep::Lin(*a, *b, *c))
+            }
+            Ana::DcAxes(axes) if axes.len() == 1 => (axes[0].src.clone(), axes[0].sweep.clone()),
+            // Any other analysis, and a `.dc` of two axes or more.
+            _ => return,
+        };
+        if swept(self.rd, self.deck, &self.names, &src) != Swept::Param {
+            return;
+        }
+        match sweep {
+            DcSweep::Lin(a, b, c) => tb.steps.push((None, src, [a, b, c], *tok)),
+            DcSweep::Log(s) => {
+                let nums = [s.start, s.stop, f64::from(s.points)];
+                tb.steps.push((Some(s.variation), src, nums, *tok));
+            }
+            DcSweep::List(values) => tb.step_lists.push((src, values, *tok)),
+        }
+        *run = Ana::Op;
+        let steps = tb.steps.len() + tb.step_lists.len();
+        assert_eq!(steps, 1, "dc_step: the axis is the deck's one `.step`");
     }
 }
 

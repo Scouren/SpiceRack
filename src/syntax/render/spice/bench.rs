@@ -157,6 +157,8 @@ impl W<'_, '_> {
 
     /// The deck's testbench statements, folded in read order: once per
     /// deck, by the spine (`spice::write`), which hands it to every step.
+    /// An LTspice target's `.dc` over a parameter is folded as the `.step`
+    /// it runs as (`W::dc_step`, `steps.rs`).
     pub(super) fn fold(&self) -> Tb {
         let mut tb = Tb::default();
         // The plan's cards (the analyses) in read order: `plan` builds
@@ -182,6 +184,7 @@ impl W<'_, '_> {
         if let Some(cap) = tb.step_cap {
             tb.plan.runs.iter_mut().for_each(|a| a.cap_step(cap));
         }
+        self.dc_step(&mut tb);
         tb
     }
 

@@ -101,7 +101,7 @@ macro_rules! rows_w_spice {
             W0015 Refusal {
                 title: "an analysis the target lacks",
                 cite: "ngspice manual ch.11; HSPICE UG; Xyce RG Table 6-1; LTspice help",
-                explain: "The target has no analysis of this kind. Run it on a simulator that has one, or drop it from the deck.",
+                explain: "The target has no analysis of this kind, or its `.dc` does not sweep what the card names: ngspice's sweeps a source, a resistor or `temp`; LTspice's an independent source or `temp` (a Xyce `.dc` over one parameter that is the deck's only analysis is written for LTspice as `.step param` beside `.op`). Run it on a simulator that has one, sweep a source, step a parameter the device reads, or drop it from the deck.",
             }
             /// A `.step` sweep the target has no card for (it would run
             /// once), or one ngspice's control script has no command for.

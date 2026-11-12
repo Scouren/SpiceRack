@@ -3,7 +3,8 @@
 //! `.sens`, `.pz`, `.sp`, `.four`, and the refusal of one the target lacks.
 //!
 //! Cites: ngspice manual §11.1-§11.3 (analyses); HSPICE `.DC`, `START=`;
-//! Xyce RG `.DC`, `.STEP`, Table 6-1; LTspice help `.tran`.
+//! Xyce RG `.DC`, `.STEP`, Table 6-1; LTspice help `.tran`, `.DC` (its
+//! sweep variable: an independent source or `temp`).
 //!
 //! Contents:
 //! - `W::analysis(&mut self, a: &Ana, tok: u32) -> String`
@@ -14,6 +15,7 @@ use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::read::{Ana, Card, Comp};
+use crate::syntax::render::swept::{Swept, swept};
 
 impl W<'_, '_> {
     /// `a`'s card (HSPICE's `.tran` with a step cap and `.noise` take two
@@ -75,6 +77,9 @@ impl W<'_, '_> {
                     }
                     _ => return String::new(),
                 };
+                if !axes.iter().all(|ax| self.ltspice_dc(&ax.src, tok)) {
+                    return String::new();
+                }
                 let mut s = String::from(".dc");
                 for ax in axes {
                     s.push_str(&dc_axis(self, ax, hspice));
@@ -273,7 +278,8 @@ impl W<'_, '_> {
     }
 
     /// A Xyce deck's `.dc` sweep variable `src` as an ngspice or ESPice
-    /// target reads it; any other pair writes it as read. Xyce sweeps a
+    /// target reads it; an LTspice target's is [`W::ltspice_dc`]'s (`None`
+    /// where that refuses); any other pair writes it as read. Xyce sweeps a
     /// device parameter (`R1:R`) and a `.param`, which wins over a source
     /// of its name (Xyce RG §2.1.3); ngspice sweeps a source, a resistor
     /// by its name or `temp` (ngspice manual §11.3.2); ESPice sweeps a
@@ -281,6 +287,9 @@ impl W<'_, '_> {
     /// another device parameter, and a parameter for ngspice, is an
     /// analysis the target lacks (W0015): `None`.
     fn dc_source(&mut self, src: &str, tok: u32) -> Option<String> {
+        if !self.ltspice_dc(src, tok) {
+            return None;
+        }
         let to = self.b.analysis_form;
         let family = matches!(to, AnalysisForm::Ngspice | AnalysisForm::Espice);
         if self.rd.b.analysis_form != AnalysisForm::Xyce || !family {
@@ -301,5 +310,32 @@ impl W<'_, '_> {
             self.refuse(Code::W0015, tok);
         }
         found
+    }
+
+    /// Whether an LTspice target's `.dc` sweeps `src`, the sweep variable
+    /// of another SPICE dialect's deck: an independent source or `temp`
+    /// (LTspice help `.DC`; 26.1.1, run: "DC sweep source must be an
+    /// independent source." for a resistor, "No such instance." for a
+    /// parameter and for `R1:R`, `research/impl/evidence/P3-115/run.txt`).
+    /// Refused (W0015), `false`: a top R, C or L, another device, a
+    /// device's parameter, and a Xyce deck's parameter, which wins over a
+    /// source of its name there (the one `W::dc_step` did not fold into a
+    /// `.step`). `true` on any other target, for an LTspice, Spectre or
+    /// VACASK deck's own variable, and for a name the top does not hold.
+    fn ltspice_dc(&mut self, src: &str, tok: u32) -> bool {
+        let lt = self.b.analysis_form == AnalysisForm::Ltspice;
+        let own = self.rd.b.analysis_form == AnalysisForm::Ltspice || self.rd.named();
+        if !lt || own || src.is_empty() {
+            return true;
+        }
+        let lacks = match swept(self.rd, self.deck, &self.names, src) {
+            Swept::Value(_) | Swept::Other => true,
+            Swept::Param => self.rd.b.analysis_form == AnalysisForm::Xyce,
+            Swept::Temp | Swept::Source { .. } | Swept::Unseen => false,
+        };
+        if lacks {
+            self.refuse(Code::W0015, tok);
+        }
+        !lacks
     }
 }
