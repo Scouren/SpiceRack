@@ -21,7 +21,13 @@
 //! field    = name | ref | "(" [ name { " " name } ] ")" | key "=" value
 //! value    = atom | "(" expr ")" | "(" [ name { " " name } ] ")"
 //! atom     = number | string | ref | leaf
-//! number   = Rust `{:?}` of the f64 (shortest round trip): 1000.0, 1e-6, -2.5
+//! number   = ["-"] digits ["." digits] [ "e" ["-"] digits | scale | "mil" ]
+//!            the literal as stored (Addendum A3): the mantissa's digits with `frac` of them
+//!            after the point (trailing zeros kept: 0.050000), then the form: `e<exp10>`
+//!            (Exponent), a scale letter (Scale), `mil`, or nothing (Plain). Lossless: the
+//!            text rebuilds the literal field by field; `1k` and `1e3` stay distinct.
+//! scale    = a(−18) f(−15) p(−12) n(−9) u(−6) m(−3) c(−2) k(3) meg(6) g(9) t(12) peta(15)
+//!            (lower case, one spelling each)
 //! string   = '"' { char | '\"' | '\\' | '\n' } '"'
 //! name     = bare | "`" { char | "\`" | "\\" } "`"
 //! bare     = [A-Za-z0-9_.$]+ in a name position; [A-Za-z_][A-Za-z0-9_.$]* in an expression
@@ -61,6 +67,8 @@
 //! add     = mul { (" + " | " - ") mul }
 //! mul     = unary { (" * " | " / " | " // ") unary }    (`//` is IntDiv)
 //! unary   = ("-" | "!" | "~") unary | primary
+//!           (a "-" glued to a digit where a unary may stand is a negative literal's sign; the
+//!           `Neg` of a literal is written "-(…)": `-1.5` and `-(1.5)` are two trees)
 //! primary = atom | "(" expr ")" | "[" [ expr { ", " expr } ] "]"
 //!         | func "(" args ")"                  snake case of `Func`: pow_abs, round_half_even, …
 //!         | "@" ref "(" args ")"               a user function call
@@ -78,10 +86,10 @@
 //! ```text
 //! file "rc.sp" deck
 //!   title "rc divider"
-//!   param rval = 1000.0
+//!   param rval = 1k
 //!   subckt div (in out gnd) r=rval
 //!     element resistor r1 (in out) value=r
-//!     element resistor r2 (out gnd) value=(r / 2.0)
+//!     element resistor r2 (out gnd) value=(r / 2)
 //!   element instance x1 (a b 0) model=div
 //!   element vsource v1 (a 0) dc=1.8
 //!   analysis op
@@ -108,7 +116,7 @@
 //! `Words::key(&mut self) -> Option<&'t str>`,
 //! `Words::name(&mut self, &mut Builder<'_>, &mut Diags) -> NameId`,
 //! `Words::names(&mut self, &mut Builder<'_>, &mut Diags) -> NameList`,
-//! `Words::number(&mut self, &mut Diags) -> Option<f64>`,
+//! `Words::number(&mut self, &mut Diags) -> Option<Literal>`,
 //! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
 //! `Words::reference(&mut self, DefKind, ScopeId, &mut Builder<'_>, &mut Diags) -> Ref`,
 //! `Words::value(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
@@ -124,6 +132,7 @@ use crate::design::Design;
 use crate::diag::Diags;
 #[cfg(doc)]
 use crate::diag::TEXT_SYNTAX;
+use crate::expr::Literal;
 use crate::id::{ExprId, ExprList, FileId, NameId, NameList, ParamList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::span::Span;
@@ -200,8 +209,8 @@ impl<'t> Words<'t> {
         todo!()
     }
 
-    /// A number in `dump`'s spelling (any Rust-parsable finite `f64` is accepted).
-    pub fn number(&mut self, diags: &mut Diags) -> Option<f64> {
+    /// A number in the grammar's spelling, as its literal (no floating arithmetic).
+    pub fn number(&mut self, diags: &mut Diags) -> Option<Literal> {
         todo!()
     }
 

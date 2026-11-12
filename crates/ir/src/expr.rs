@@ -9,7 +9,10 @@
 //! trees. Operators are binary rows; every named function, including the power laws, is a
 //! [`Func`] call (so `x**y` and `pow(x, y)` of one simulator are one node).
 //!
-//! Semantics are real IEEE-754 doubles with C's library functions. A result that is not finite,
+//! A number is a decimal literal as written (Addendum A3): a [`Literal`] in the literal side
+//! table, never a double; each simulator computes its own double from the digits. Semantics
+//! (the evaluator, the passes) compute with [`Literal::value`], the correctly rounded value, on
+//! real IEEE-754 doubles with C's library functions. A result that is not finite,
 //! or an argument outside the domain each member states, is a domain error (`eval::Domain`); a
 //! constant expression is never folded by this crate.
 //!
@@ -17,7 +20,7 @@
 //!
 //! | tag | `sub` | `a` | `b` |
 //! |---|---|---|---|
-//! | `Num` | 0 | low 32 bits of the `f64` | high 32 bits |
+//! | `Num` | 0 | `NumId` of the literal | 0 |
 //! | `Str` | 0 | `NameId` of the string | 0 |
 //! | `Param` | 0 | `NameId` | `DefId` (`NONE`: unresolved) |
 //! | `Call` | `Func` | `ExprList.start` | `ExprList.len` |
@@ -34,26 +37,30 @@
 //! A `Draw`'s `sub` byte packs three enums: bits 0–3 the `Dist`, bit 4 the `DrawWhen`, bits 5–6
 //! the `DrawPer`, bit 7 zero.
 //!
-//! Cites: `rewrite/IR-KERNEL.md` §7, Addenda A1 and A2 (draws); `rewrite/INV-semantics.md` 12.02,
+//! Cites: `rewrite/IR-KERNEL.md` §7, Addenda A1, A2 (draws) and A3 (literals);
+//! `rewrite/INV-semantics.md` 1.08, 1.09; `rewrite/INV-semantics.md` 12.02,
 //! 12.03; `DESIGN-neutral-expressions.md` §2;
 //! `rewrite/INV-constructs.md` C8–C30, C51–C53, C61–C76.
 //!
 //! Contents:
 //! - `pub enum ExprTag`, `pub enum Expr`, `pub enum BinOp`, `pub enum UnOp`, `pub enum Func`,
-//!   `pub enum Dist`, `pub enum DrawWhen`, `pub enum DrawPer`; on each enum but `Expr`: `ALL`,
-//!   `COUNT`
+//!   `pub enum Dist`, `pub enum DrawWhen`, `pub enum DrawPer`, `pub enum NumForm`; on each enum
+//!   but `Expr`: `ALL`, `COUNT`
+//! - `pub struct Literal`, `Literal::ZERO`, `Literal::value(self) -> f64`,
+//!   `Literal::from_f64(f64) -> Literal`, `Literal::eq_value(self, Literal) -> bool`,
+//!   `Literal::is_valid(self) -> bool`
 //! - `Func::arity(self) -> (u8, u8)`, `Func::reads_circuit(self) -> bool`,
 //!   `Dist::arity(self) -> (u8, u8)`, `Expr::tag(self) -> ExprTag`
 //! - `pub(crate) struct Exprs`, `pub(crate) struct UserCall`
 
-use crate::id::{ExprId, ExprList, NameId, Ref};
+use crate::id::{ExprId, ExprList, NameId, NumId, Ref};
 
 /// An expression row's tag. Each tag's `sub`, `a` and `b` are read as the table in the module
 /// header says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum ExprTag {
-    /// A finite number (C9). SI base units where the field states one.
+    /// A decimal literal ([`Literal`]); SI base units where the field states one.
     Num,
     /// A string value (a model `version="4.8"`, a file name).
     Str,
@@ -95,8 +102,8 @@ pub enum ExprTag {
 /// `Design::exprs`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Expr {
-    /// A finite number.
-    Num(f64),
+    /// A decimal literal (`Design::num`).
+    Num(NumId),
     /// A string.
     Str(NameId),
     /// A parameter read: name and binding.
@@ -325,6 +332,42 @@ pub enum DrawPer {
     Run,
 }
 
+/// A decimal literal, as written: `mantissa × 10^(exp10 − frac)` (`Mil`: that times 25.4e-6).
+/// The IR states the number; the double is each simulator's own arithmetic on these digits.
+///
+/// Invariants (asserted by `Builder::literal`, checked by `check`): `|mantissa| < 10¹⁸`;
+/// `frac <= 18`; `Plain` and `Mil` have `exp10 == 0`; a `Scale` has an `exp10` some scale letter
+/// states (−18, −15, −12, −9, −6, −3, −2, 3, 6, 9, 12, 15); zero is the one literal
+/// [`Literal::ZERO`]; `value()` is finite. Equality (`==`) is field by field (law L5): `1k` and
+/// `1e3` differ; [`Literal::eq_value`] compares meanings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Literal {
+    /// Every digit as one integer, sign included (`-0.050000`: −50000).
+    pub mantissa: i64,
+    /// Digits after the decimal point, trailing zeros counted (`0.050000`: 6).
+    pub frac: u8,
+    /// The exponent, or the scale suffix's power of ten (`100u`: −6).
+    pub exp10: i16,
+    /// How the source wrote the power of ten.
+    pub form: NumForm,
+}
+
+/// How a literal wrote its power of ten. A writer keeps the form where its dialect has it
+/// (its own letter for a `Scale`), else spells `e<exp10>`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum NumForm {
+    /// No exponent and no suffix (`0.05`); `exp10` is 0.
+    Plain,
+    /// An exponent (`1e-4`, `2.5E3`); also a suffix combined with an exponent (`1e3k`, folded by
+    /// the reader).
+    Exponent,
+    /// A scale suffix (`100u`, `1meg`); `exp10` is the suffix's power of ten.
+    Scale,
+    /// The `mil` suffix: the digits times 25.4e-6 m; `exp10` is 0.
+    Mil,
+}
+
 /// The expression rows (SoA). Invariant: the four columns have equal length; every child id is
 /// lower than its parent's.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -335,6 +378,8 @@ pub(crate) struct Exprs {
     pub(crate) b: Vec<u32>,
     /// The `UserCall` side table.
     pub(crate) calls: Vec<UserCall>,
+    /// The literal side table (`NumId`).
+    pub(crate) nums: Vec<Literal>,
 }
 
 /// A user-function call's payload (two words do not hold a reference and a list).
@@ -347,6 +392,7 @@ pub(crate) struct UserCall {
 const _: () = assert!(size_of::<ExprTag>() == 1);
 const _: () = assert!(size_of::<ExprTag>() + 1 + 2 * size_of::<u32>() == 10);
 const _: () = assert!(size_of::<UserCall>() == 16);
+const _: () = assert!(size_of::<Literal>() == 16);
 const _: () = assert!(Func::COUNT <= u8::MAX as usize);
 const _: () = assert!(Dist::COUNT <= 16 && DrawWhen::COUNT <= 2 && DrawPer::COUNT <= 4);
 
@@ -511,4 +557,52 @@ impl DrawPer {
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
+}
+
+impl NumForm {
+    /// Every form, in declaration order.
+    pub const ALL: [NumForm; 4] = [
+        NumForm::Plain,
+        NumForm::Exponent,
+        NumForm::Scale,
+        NumForm::Mil,
+    ];
+    /// Form count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl Literal {
+    /// Zero: the only literal whose mantissa is 0.
+    pub const ZERO: Literal = Literal {
+        mantissa: 0,
+        frac: 0,
+        exp10: 0,
+        form: NumForm::Plain,
+    };
+
+    /// The correctly rounded double of the exact decimal value (round half to even), what the
+    /// reference evaluator and the passes compute with. Not any simulator's arithmetic.
+    pub fn value(self) -> f64 {
+        todo!()
+    }
+
+    /// The shortest decimal that reads back to `value` under [`Literal::value`], in engineering
+    /// form: a `Scale` when the power of ten is a multiple of 3 that a scale letter states
+    /// (`1e-4` → mantissa 100, `Scale`, exp10 −6), `Plain` for powers 0, `Exponent` with an exp10
+    /// that is a multiple of 3 otherwise; zero is [`Literal::ZERO`]. Asserts `value` is finite
+    /// (the NaN gate, C9). For built numbers only: a reader passes the digits it read.
+    pub fn from_f64(value: f64) -> Literal {
+        todo!()
+    }
+
+    /// Whether the two literals state the same exact decimal number (`1k` and `1e3`; `Mil`
+    /// compared after its factor). Exact: no rounding to a double.
+    pub fn eq_value(self, other: Literal) -> bool {
+        todo!()
+    }
+
+    /// Whether the literal meets every invariant on [`Literal`].
+    pub fn is_valid(self) -> bool {
+        todo!()
+    }
 }

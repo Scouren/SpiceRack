@@ -73,12 +73,12 @@ pub use design::{Design, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
 pub use eval::{Bindings, Domain, eval};
-pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
+pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
 pub use facts::{Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};
 pub use id::{
-    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, ParamList, Ref,
-    ScopeId, TextId,
+    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, NumId, ParamList,
+    Ref, ScopeId, TextId,
 };
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
 pub use span::Span;

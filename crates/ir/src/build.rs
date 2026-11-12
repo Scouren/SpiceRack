@@ -1,8 +1,10 @@
 //! The append-only door: a reader's or builder's calls in, new rows out. Readers, the Python and
 //! Rust builders and the IR text parser all build through it; nothing here reads source text.
 //!
-//! Every value goes through its constructor once, at this edge: numbers are refused unless finite
-//! (the NaN gate, C9), names unless non-empty, handles unless in range, capacities asserted
+//! Every value goes through its constructor once, at this edge: a reader's number is the
+//! [`Literal`] it read (digits in, no floating arithmetic in a reader, Addendum A3), checked
+//! against the literal's invariants; a built number (`num`) is refused unless finite (the NaN
+//! gate, C9) and becomes its shortest literal; names unless non-empty, handles unless in range, capacities asserted
 //! (C10). These are asserts: a reader must turn a bad number into a diagnostic and an `Opaque`
 //! before it calls here. Every item push takes the scope it goes into and its [`Span`] (last),
 //! appends the row, appends the item to the scope's list, and returns the [`ItemRef`].
@@ -36,7 +38,7 @@
 //!   `Builder::name_ids(&mut self, &[NameId]) -> NameList`,
 //!   `Builder::exprs(&mut self, &[ExprId]) -> ExprList`,
 //!   `Builder::params(&mut self, &[(&str, ExprId)]) -> ParamList`
-//! - expressions: `Builder::num`, `Builder::string`, `Builder::param_ref`, `Builder::call`,
+//! - expressions: `Builder::literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`, `Builder::call`,
 //!   `Builder::user_call`, `Builder::unary`, `Builder::binary`, `Builder::ternary`, `Builder::v`,
 //!   `Builder::i`, `Builder::time`, `Builder::temp`, `Builder::freq`, `Builder::tstep`,
 //!   `Builder::tstop`, `Builder::tnom`, `Builder::draw`, `Builder::list` (each `-> ExprId`)
@@ -49,7 +51,7 @@
 //!   `Builder::resolve(&mut self, ExprId, DefId)`
 
 use crate::design::{Design, ItemRow};
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, Literal, UnOp};
 #[cfg(doc)]
 use crate::id::Ref;
 use crate::id::{
@@ -112,7 +114,15 @@ impl<'d> Builder<'d> {
 
     // ---- expressions ----
 
-    /// A number. Asserts it is finite (the NaN gate, C9).
+    /// A number as a reader read it. Asserts `Literal::is_valid` (a reader rounds a literal
+    /// past 18 significant digits, with a note, and folds `1e3k` into `Exponent`, before it
+    /// calls).
+    pub fn literal(&mut self, literal: Literal) -> ExprId {
+        todo!()
+    }
+
+    /// A built number (Python, Schemify, passes), stored as `Literal::from_f64(value)`. Asserts
+    /// it is finite (the NaN gate, C9).
     pub fn num(&mut self, value: f64) -> ExprId {
         todo!()
     }

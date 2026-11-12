@@ -36,9 +36,11 @@
 //!   `Design::names(&self, NameList) -> &[NameId]`, `Design::exprs(&self, ExprList) -> &[ExprId]`,
 //!   `Design::params(&self, ParamList) -> &[(NameId, ExprId)]`,
 //!   `Design::branches(&self, BranchList) -> &[Branch]`, `Design::text(&self, TextId) -> &str`,
-//!   `Design::expr(&self, ExprId) -> Expr`, `Design::expr_count(&self) -> usize`,
+//!   `Design::expr(&self, ExprId) -> Expr`, `Design::num(&self, NumId) -> Literal`,
+//!   `Design::expr_count(&self) -> usize`,
 //!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
-//!   `Design::eq_ignoring_spans(&self, &Design) -> bool`
+//!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
+//!   `Design::eq_meaning(&self, &Design) -> bool`
 
 use std::collections::HashMap;
 
@@ -46,11 +48,11 @@ use crate::analysis::{Analysis, RunDetails};
 use crate::build::Builder;
 use crate::edit::Editor;
 use crate::element::{CircuitDetails, Element};
-use crate::expr::{Expr, Exprs};
+use crate::expr::{Expr, Exprs, Literal};
 use crate::facts::RowFacts;
 use crate::id::{
-    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, NameId, NameList, ParamList, ScopeId,
-    TextId,
+    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, NameId, NameList, NumId, ParamList,
+    ScopeId, TextId,
 };
 use crate::item::{
     Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Section,
@@ -267,6 +269,11 @@ impl Design {
         todo!()
     }
 
+    /// The literal of a `Num` expression. Asserts `num` is in range.
+    pub fn num(&self, num: NumId) -> Literal {
+        todo!()
+    }
+
     /// Expression row count; ids `0..expr_count()` are valid.
     pub fn expr_count(&self) -> usize {
         todo!()
@@ -282,9 +289,16 @@ impl Design {
         todo!()
     }
 
-    /// Structural equality: every table, pool, list and id equal, spans ignored. The `≅` of law
-    /// L5 before its case rule.
+    /// Structural equality: every table, pool, list and id equal, literals field by field
+    /// (`1k` ≠ `1e3`), spans ignored. The `≅` of law L5 before its case rule.
     pub fn eq_ignoring_spans(&self, other: &Design) -> bool {
+        todo!()
+    }
+
+    /// As [`Design::eq_ignoring_spans`], but two literals are equal when their exact decimal
+    /// values are (`Literal::eq_value`: `1k` = `1e3`). For the differential harness
+    /// (REWRITE-PLAN §7.3), which compares meanings across dialects.
+    pub fn eq_meaning(&self, other: &Design) -> bool {
         todo!()
     }
 }

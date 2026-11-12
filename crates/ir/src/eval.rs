@@ -2,7 +2,8 @@
 //! It is the oracle for every expression rule (each `Func`, `BinOp`, `UnOp` member's doc is its
 //! specification); writers never call it, and nothing folds constants with it.
 //!
-//! C semantics on IEEE-754 doubles; the ternary, `And` and `Or` evaluate only what they select;
+//! A `Num` evaluates to its `Literal::value()`, the correctly rounded double (not any
+//! simulator's arithmetic, Addendum A3). C semantics on IEEE-754 doubles; the ternary, `And` and `Or` evaluate only what they select;
 //! a non-finite intermediate is a domain error. The walk is an explicit stack (C11): depth is
 //! bounded by memory, not by the thread's stack. A user call binds its formal arguments (the
 //! `Param` reads whose def is the function's) to the evaluated arguments; call nesting deeper

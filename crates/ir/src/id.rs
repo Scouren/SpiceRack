@@ -11,7 +11,8 @@
 //!
 //! Contents:
 //! - `pub struct NameId`, `NameId::GROUND`, `pub struct FileId`, `pub struct ScopeId`,
-//!   `pub struct ExprId`, `pub struct DefId`, `pub struct TextId`; on each: `NONE`,
+//!   `pub struct ExprId`, `pub struct DefId`, `pub struct TextId`, `pub struct NumId`; on each:
+//!   `NONE`,
 //!   `index(self) -> usize`, `is_none(self) -> bool`
 //! - `pub struct ItemRef`, `ItemRef::NONE`, `ItemRef::new(kind, index) -> ItemRef`
 //! - `pub struct Ref`, `Ref::unresolved(name) -> Ref`, `Ref::is_resolved(self) -> bool`
@@ -161,6 +162,13 @@ handle!(
     DefId,
     u32,
     "d"
+);
+handle!(
+    /// A decimal literal in the design's literal table (`Design::num`); one per `Num`
+    /// expression row, so at most [`EXPRS_MAX`].
+    NumId,
+    u32,
+    "k"
 );
 handle!(
     /// A run of uninterned text (`Opaque`, `Comment` and `Title` bodies), appended once.

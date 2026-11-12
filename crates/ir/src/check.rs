@@ -43,8 +43,11 @@ pub enum Violation {
     /// A resolved `Ref` names a definition of a kind the referring field does not accept, or
     /// whose name differs. `arg`: the definition.
     RefTarget,
-    /// A `Num` row is NaN or infinite (the NaN gate was bypassed). `arg`: the expression.
+    /// A literal's value is not finite (`1e400`). `arg`: the expression.
     NonFinite,
+    /// A literal breaks an invariant of `Literal` (mantissa range, `frac`, an `exp10` its form
+    /// does not allow, a non-canonical zero). `arg`: the expression.
+    LiteralShape,
     /// A name used by a row is empty. `arg`: the name.
     EmptyName,
     /// A `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt` appears in an expression whose field may not
@@ -59,7 +62,7 @@ pub enum Violation {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; 13] = [
+    pub const ALL: [Violation; 14] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -69,6 +72,7 @@ impl Violation {
         Violation::DetailRow,
         Violation::RefTarget,
         Violation::NonFinite,
+        Violation::LiteralShape,
         Violation::EmptyName,
         Violation::ProbeContext,
         Violation::DuplicateDef,

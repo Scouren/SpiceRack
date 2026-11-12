@@ -14,13 +14,14 @@
 //!
 //! Contents: `pub struct Size`, `pub fn generate(u64, &FeatureSet, Size) -> Design`,
 //! `pub struct Gen`, `Gen::below(&mut self, u32) -> u32`, `Gen::chance(&mut self, u32) -> bool`,
-//! `Gen::number(&mut self) -> f64`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
+//! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr(&mut self, &mut Builder<'_>, &FeatureSet, Reads) -> ExprId`,
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
 //! `Gen::budget(&self) -> u32`, `pub enum Reads`
 
 use crate::build::Builder;
 use crate::design::Design;
+use crate::expr::Literal;
 use crate::feature::FeatureSet;
 use crate::id::{DefId, ExprId, NameId, ScopeId};
 use crate::item::DefKind;
@@ -80,9 +81,10 @@ impl Gen {
         todo!()
     }
 
-    /// A random finite number, spread over magnitudes (`1e-15..1e9`, either sign, and 0) so
-    /// number spelling is exercised.
-    pub fn number(&mut self) -> f64 {
+    /// A random valid literal: every `NumForm`, magnitudes `1e-15..1e9`, either sign, zero,
+    /// trailing zeros in `frac`, so every writer's number spelling and the literal round trip are
+    /// exercised.
+    pub fn literal(&mut self) -> Literal {
         todo!()
     }
 
