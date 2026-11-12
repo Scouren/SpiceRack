@@ -74,23 +74,7 @@ const WRITE: &[&str] = &[
 
 /// The fixtures and decks that fail today, by name, with the test that fails and why. Strict
 /// both ways: a listed one that passes fails the test until its line goes.
-const PENDING: &[(&str, &str, &str)] = &[
-    (
-        "option_commands",
-        "fixpoint",
-        "ng-run: a FromHere option as a script `option` (after A27's one form)",
-    ),
-    (
-        "script_option",
-        "write",
-        "ng-run: a FromHere option as a script `option` (after A27's one form)",
-    ),
-    (
-        "options",
-        "simulator",
-        "ng-run: a FromHere option as a script `option` (after A27's one form)",
-    ),
-];
+const PENDING: &[(&str, &str, &str)] = &[];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in
