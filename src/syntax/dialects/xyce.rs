@@ -186,6 +186,14 @@ pub(super) fn xyce() -> DialectDef {
         .kept_word(".embeddedsampling", Construct::PrivateText)
         .kept_word(".result", Construct::PrivateText)
         .kept_word(".preprocess", Construct::PrivateText)
+        // Its optimization analysis (ZERO-LEDGER P4-065): `.ROL` with its
+        // `.ROL_DC` sweep and `.ROL_OBJ` objectives. Not in the RG; Xyce
+        // 7.10 reads the card ("No objectives have been defined for
+        // optimization, please include .ROL_OBJ lines"), ngspice-45 stops
+        // on it.
+        .kept_word(".rol", Construct::PrivateText)
+        .kept_word(".rol_dc", Construct::PrivateText)
+        .kept_word(".rol_obj", Construct::PrivateText)
         .kept_word("yneuron", Construct::PrivateText)
         .kept_word("ysynapse", Construct::PrivateText)
         .kept_word("yrom", Construct::PrivateText)

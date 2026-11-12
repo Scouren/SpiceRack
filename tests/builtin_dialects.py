@@ -572,6 +572,10 @@ def xyce(d):
         .kept_word(".embeddedsampling", Construct.PrivateText)
         .kept_word(".result", Construct.PrivateText)
         .kept_word(".preprocess", Construct.PrivateText)
+        # Its optimization analysis (Xyce 7.10 run, `.ROL`: P4-065).
+        .kept_word(".rol", Construct.PrivateText)
+        .kept_word(".rol_dc", Construct.PrivateText)
+        .kept_word(".rol_obj", Construct.PrivateText)
         .kept_word("yneuron", Construct.PrivateText)
         .kept_word("ysynapse", Construct.PrivateText)
         .kept_word("yrom", Construct.PrivateText)
@@ -787,6 +791,15 @@ def ltspice(d):
         .kept_word("&", Construct.PrivateText)
         # P4-067: every `A` line (LTspice help, A. Special Functions).
         .kept_word("a", Construct.PrivateText)
+        # Its own cards (`.softstart`: LTspice 26.1.1 run; help, `.MACHINE`: P4-067).
+        .kept_word(".softstart", Construct.PrivateText)
+        .kept_word(".machine", Construct.PrivateText)
+        .kept_word(".mach", Construct.PrivateText)
+        .kept_word(".state", Construct.PrivateText)
+        .kept_word(".rule", Construct.PrivateText)
+        .kept_word(".output", Construct.PrivateText)
+        .kept_word(".endmachine", Construct.PrivateText)
+        .kept_word(".endmach", Construct.PrivateText)
         # Its state files (LTspice help, `.SAVESTATE`, `.LOADSTATE`, `.SAVEBIAS`: P6-006).
         .kept_word(".savestate", Construct.PrivateText)
         .kept_word(".loadstate", Construct.PrivateText)
