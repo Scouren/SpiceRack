@@ -11,7 +11,7 @@
 //! Contents: `PARAMS` (its catalogue row is in `read_sources::CODES`, the area's one table),
 //! `admits`, `source` (crate-private)
 
-use super::expr_write::write_expr;
+use super::expr_write::{string, write_expr};
 use super::number;
 use super::read_sources::default_of;
 use super::write::Writer;
@@ -277,16 +277,4 @@ fn param(w: &mut Writer<'_, '_>, key: &str, value: ir::ExprId) {
 fn is_default(design: &ir::Design, e: ir::ExprId, text: &str) -> bool {
     let want = number::lex(text).expect("a default literal").literal;
     matches!(design.expr(e), ir::Expr::Num(n) if design.num(n) == want)
-}
-
-/// `"text"`, `"` and `\` escaped.
-fn string(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        if matches!(c, '"' | '\\') {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out.push('"');
 }

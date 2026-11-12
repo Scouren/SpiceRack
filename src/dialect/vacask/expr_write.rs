@@ -11,7 +11,7 @@
 //!
 //! Cites: VD expr-operators, expr-functions, expr-special; `rewrite/DIALECT-VACASK.md` §4.
 //!
-//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admits` (crate-private)
+//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admits`, `string` (crate-private)
 
 use super::name::{self, Place};
 use super::number;
@@ -104,6 +104,22 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             diags.push_at(code, design, at, 0);
         }
     }
+}
+
+/// `"text"`, with `"`, `\\` and a line break escaped: VACASK reads `\"`, `\\`, `\n` back and
+/// ends a string at a raw line break (settle str_escapes, unclosed_q1). The dialect's one
+/// string quoter.
+pub(super) fn string(text: &str, out: &mut String) {
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
 }
 
 // ---- private ----
@@ -340,20 +356,6 @@ fn function(func: ir::Func) -> &'static str {
         F::Idt => "idt",
         other => unreachable!("FEATURES lacks {other:?}"),
     }
-}
-
-/// `"text"`, with `"`, `\\` and newlines escaped (VD input-strings).
-fn string(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
 }
 
 #[cfg(test)]

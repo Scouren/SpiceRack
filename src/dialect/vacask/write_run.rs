@@ -17,6 +17,7 @@
 mod analyses;
 mod plan;
 
+pub(super) use super::expr_write::string as quote;
 use super::read_run::{
     MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM, RESET_CLASS,
     SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, identifier,
@@ -156,18 +157,6 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             diags.push_at(RESET_CLASS, design, at, 0);
         }
     }
-}
-
-/// `text` as a VACASK string (`"…"`, `"` and `\` escaped).
-pub(super) fn quote(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        if c == '"' || c == '\\' {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out.push('"');
 }
 
 /// The hierarchical name of `path` (`x1:r1`).

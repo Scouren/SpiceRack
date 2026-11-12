@@ -19,7 +19,7 @@
 //! dev-builtin-behavioral (Functions); R13 (sugar).
 //!
 //! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `CALL_ARITY`, `PARAM_READ_ARG`,
-//! `PROBE_IN_PARAM`, `check_expr`, `expr`, `names_read` (crate-private)
+//! `PROBE_IN_PARAM`, `check_expr`, `expr`, `names_read`, `unescape` (crate-private)
 
 use super::name;
 use super::number;
@@ -225,6 +225,25 @@ pub(super) fn names_read(l: &Lower<'_, '_, '_>, node: u32) -> Vec<String> {
         }
     }
     unreachable!("an expression tree holds at most every node once")
+}
+
+/// A VACASK string's text with its escapes read: `\n`, `\t`, and any other `\c` as `c` (settle
+/// str_escapes: `\q` is q).
+pub(super) fn unescape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match (c, c == '\\') {
+            (_, true) => match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some(other) => out.push(other),
+                None => out.push('\\'),
+            },
+            (c, false) => out.push(c),
+        }
+    }
+    out
 }
 
 // ---- private ----
@@ -560,22 +579,4 @@ fn nonnegative_sign(l: &mut Lower<'_, '_, '_>, x: ir::ExprId) -> ir::ExprId {
     let one = int(l.b, 1);
     let minus = int(l.b, -1);
     l.b.ternary(cond, one, minus)
-}
-
-/// A VACASK string's text with `\"`, `\\` and `\n` read (VD input-strings).
-fn unescape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars();
-    while let Some(c) = chars.next() {
-        match (c, c == '\\') {
-            (_, true) => match chars.next() {
-                Some('n') => out.push('\n'),
-                Some('t') => out.push('\t'),
-                Some(other) => out.push(other),
-                None => out.push('\\'),
-            },
-            (c, false) => out.push(c),
-        }
-    }
-    out
 }

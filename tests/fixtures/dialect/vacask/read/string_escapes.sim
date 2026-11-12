@@ -1,0 +1,3 @@
+string escapes in a path
+include "a\\b \"c\".inc"
+include "t\qx.inc"

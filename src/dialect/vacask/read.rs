@@ -350,10 +350,8 @@ pub(super) fn field_name(cst: &Cst<'_>, field: u32) -> String {
         Tag::Ident => super::name::unquote(ast.name(Name(ast.lhs(n)))),
         Tag::Str => {
             let t = cst.tokens.text(ast.main_token(n));
-            t.strip_prefix('"')
-                .and_then(|t| t.strip_suffix('"'))
-                .unwrap_or(t)
-                .to_string()
+            let inner = t.strip_prefix('"').and_then(|t| t.strip_suffix('"'));
+            super::expr_read::unescape(inner.unwrap_or(t))
         }
         _ => super::name::unquote(cst.tokens.text(ast.main_token(n))),
     }

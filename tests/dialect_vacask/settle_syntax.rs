@@ -65,3 +65,12 @@ fn star_a_statement_vacask_has_no_syntax_for_is_rejected_except_outside_an_inclu
         assert!(says(&r, "Running analysis 'op1'."), "{deck}");
     }
 }
+
+#[test]
+fn str_escapes_a_string_reads_backslash_escapes_and_holds_no_line_break() {
+    // Item 6c: `\"`, `\\`, `\n`, `\t` are a quote, a backslash, a line break and a tab; any other
+    // escaped character is itself (`\q` is q); a raw line break ends the string with an error
+    // (settle unclosed_q1). One quoter writes `"`, `\` and a line break escaped.
+    let r = run("vacask", "str_escapes.sim");
+    assert!(says(&r, "[q\"q] [b\\b] [n\nn] [t\tt] [xqx]"));
+}

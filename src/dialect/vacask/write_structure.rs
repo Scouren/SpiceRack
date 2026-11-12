@@ -10,7 +10,7 @@
 //! `load`, `device_library`, `admits`,
 //! `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` (crate-private)
 
-use super::expr_write::write_expr;
+use super::expr_write::{string, write_expr};
 use super::name::{self, Place};
 use super::tables;
 use super::write::Writer;
@@ -260,18 +260,3 @@ pub(super) fn opaque(w: &mut Writer<'_, '_>, row: ir::item::Opaque) {
 }
 
 // ---- private ----
-
-/// `"text"`, `"` and `\\` escaped.
-fn string(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' | '\\' => {
-                out.push('\\');
-                out.push(c);
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-}
