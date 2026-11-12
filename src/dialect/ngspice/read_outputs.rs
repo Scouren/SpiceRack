@@ -48,6 +48,8 @@ use crate::syntax::ast::Tag;
 /// The IR rows this area reads (and its writer spells).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Save),
+    Feature::Run(RunExtra::SaveWholeRun),
+    Feature::Run(RunExtra::SaveFromHere),
     Feature::Item(ItemKind::Print),
     Feature::Item(ItemKind::Measure),
     Feature::Run(RunExtra::ProbeVdiff),
@@ -134,7 +136,7 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     } else {
         let words = words(&lw.rest(st.node));
         match kw.as_str() {
-            ".save" => save(lw, st, &words),
+            ".save" => save(lw, st, &words, ir::Applies::WholeRun),
             ".print" => print(lw, st, &words),
             // inp_probe (inpc_probe.c) adds `.save all` to a deck with no save and 0 V and E
             // sources at the devices it names: not a save, not typed
@@ -215,13 +217,14 @@ pub(super) fn probe(
 
 /// A script's `save word …` before its first analysis (the control area calls it then):
 /// `com_save` reads each word by `copynode`, as `.save` reads it by `gettoks`, except a
-/// `v(a,b)`, which `copynode` reads as one name `a,b` (not typed). Pushes one `Save` or none.
+/// `v(a,b)`, which `copynode` reads as one name `a,b` (not typed). Pushes one `Save` that holds
+/// from where it stands (`Applies::FromHere`, A27), or none.
 #[allow(dead_code, reason = "the control area calls it (S3.4)")]
 pub(super) fn save_command(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
     if words.iter().any(|w| w.contains('(') && w.contains(',')) {
         return Err(No::Untyped);
     }
-    save(lw, st, words)
+    save(lw, st, words, ir::Applies::FromHere)
 }
 
 /// A script's `meas kind name …` (the control area calls it when the script holds one analysis
@@ -268,19 +271,13 @@ pub(super) fn fail(no: No) -> Fail {
 
 // ---- private ----
 
-/// `.save word …`: one `Save` for every analysis.
-fn save(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
+/// `.save word …` (`WholeRun`: a dot card holds for the whole run wherever it stands, A27) or a
+/// script's `save word …` (`FromHere`): one `Save` for every analysis.
+fn save(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String], holds: ir::Applies) -> Result<(), No> {
     let wants = probes(words, Ctx::Save)?;
     let probes: Vec<ir::Probe> = wants.iter().map(|w| build(lw, w)).collect();
     let span = lw.span(st.node);
-    // a `.save` holds for the whole run wherever it stands, as ngspice's other dot cards (A27)
-    lw.b.save(
-        st.scope,
-        ir::AnalysisKinds::ALL,
-        ir::Applies::WholeRun,
-        &probes,
-        span,
-    );
+    lw.b.save(st.scope, ir::AnalysisKinds::ALL, holds, &probes, span);
     Ok(())
 }
 

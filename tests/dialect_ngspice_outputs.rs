@@ -41,10 +41,11 @@ const READ: &[&str] = &[
     "probe_unread",
     "save_all",
     "save_probes",
+    "save_script",
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["measure", "print", "save"];
+const WRITE: &[&str] = &["measure", "print", "save", "save_script"];
 
 /// IR designs `legalize` refuses for ngspice with `W1350`, each with why.
 const REFUSED: &[(&str, &str)] = &[
@@ -241,6 +242,7 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
     let set = [
         F::Item(K::Title),
         F::Item(K::Save),
+        F::Run(X::SaveWholeRun),
         F::Item(K::Print),
         F::Item(K::Measure),
         F::Expr(T::Num),

@@ -52,16 +52,17 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     }
 }
 
-/// A `Save`: `.save p …`.
+/// A `Save`: `.save p …` for the whole run, a script's `save p …` from where it stands (the
+/// control area reads it back through `read_outputs::save_command`; `SaveMidRun` is not in
+/// `FEATURES`, so it stands before every run item).
 pub(super) fn save(w: &mut Out<'_>, item: ir::ItemRef) {
     debug_assert!(spellable(w.design, item), "ngspice write: an admitted save");
     let s: ir::Save = w.design.row(item.index);
-    let mut t = ".save".to_string();
-    for word in save_words(w.design, s.probes).expect("ngspice write: an admitted save") {
-        t.push(' ');
-        t.push_str(&word);
+    let words = save_words(w.design, s.probes).expect("ngspice write: an admitted save");
+    match s.holds {
+        ir::Applies::WholeRun => w.line(&format!(".save {}", words.join(" "))),
+        ir::Applies::FromHere => w.script(&format!("save {}", words.join(" "))),
     }
-    w.line(&t);
 }
 
 /// A `Print`: `.print kind p …`.
