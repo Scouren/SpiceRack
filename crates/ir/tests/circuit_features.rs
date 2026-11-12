@@ -1798,4 +1798,31 @@ mod tests {
             );
         }));
     }
+
+    /// A31 as ruled after vc-sources' gap: `AmModOffset` fires for every modulating offset but
+    /// the real literal 1 (VACASK's reader fills that one and its writer spells none): `1`
+    /// (Plain) no, `1i` (Int) yes, `1.5` yes.
+    #[test]
+    fn the_am_offset_is_free_only_as_the_real_literal_one() {
+        use spicerack_ir::{Literal, NumForm};
+        let with = |offset: Literal| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            let mut r = am(&mut b, AmModTime::Delay, PreDelay::Zero);
+            r.mod_offset = b.literal(offset);
+            let w = b.wave(r);
+            with_wave(&mut b, top, w);
+            features_used(&d).contains(Feature::Circuit(X::AmModOffset))
+        };
+        let lit = |mantissa: i64, frac: u8, form: NumForm| Literal {
+            mantissa,
+            frac,
+            exp10: 0,
+            form,
+        };
+        assert!(!with(lit(1, 0, NumForm::Plain)), "1");
+        assert!(with(lit(1, 0, NumForm::Int)), "1i");
+        assert!(with(lit(15, 1, NumForm::Plain)), "1.5");
+    }
 }
