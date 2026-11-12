@@ -60,6 +60,10 @@ impl R<'_, '_> {
             Reads::Constant
         };
         let value = self.g.expr(self.b, self.f, reads);
+        // ponytail: `reads_circuit` recomputes the design's class table after every push, O(design)
+        // per passive in the generator only (test code); `Gen::class` would be O(1) once it is exact
+        // (it over-states a tree whose zero-arity operator gave way to a probe leaf)
+        let dynamic = reads_circuit(self.b.design(), value);
         let ic_mode = if kind == ElemKind::Resistor {
             IcMode::None
         } else {
@@ -72,7 +76,6 @@ impl R<'_, '_> {
         };
         // a circuit-valued element's coefficient needs a base (and a capacitor's a law) the set
         // allows (A15 C2)
-        let dynamic = reads_circuit(self.b.design(), value);
         let cap = kind == ElemKind::Capacitor;
         let bases = [
             (TcBase::Tnom, X::TcBaseTnom),
