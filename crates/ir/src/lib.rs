@@ -57,8 +57,14 @@ pub mod element;
 pub mod line;
 pub mod model;
 pub mod passive;
+pub mod semi;
 pub mod source;
 pub mod wave;
+
+pub use build_circuit::ElemHead;
+pub use element::{DetailKind, DetailRow, ElemKind, Element, NO_ROW};
+pub use model::{Model, ModelFamily, Polarity};
+pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 
 // run owner
 pub mod analysis;
