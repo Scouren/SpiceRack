@@ -1,0 +1,9 @@
+# Oracle: VD dev-builtin-mutual (no terminals; k 0 by default; ind1, ind2 the inductors by
+# instance name) and run src-mutual (`print instance` of a mutual with no k: k = 0). The
+# inductors are the devices area's; a by-name reference is not bound.
+# codes:
+file "mutual.sim" deck
+  title "mutual"
+  model m mutual
+  element coupling m1 () model=m inductors=(l1 l2) k=0.95
+  element coupling m2 () model=m inductors=(l1 l3) k=0

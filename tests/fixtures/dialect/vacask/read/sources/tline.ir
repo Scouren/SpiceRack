@@ -1,0 +1,17 @@
+# Oracle: R39, A20 (tline_ideal is a LosslessLine naming a model of the ideal-line family; its
+# load a DeviceLibrary) and run t3 (a step into a matched 50 Ω line, the far end's arrival):
+# td=2n 2.0 ns; f=100M 10 ns (nl 1); f=100M nl=0.5 5 ns; neither td nor f: nl/f with f's
+# default 1 kHz and nl 1 (no arrival in 20 ns), so the reader fills f=1k nl=1; td and f both:
+# td wins (2.0 ns), f dropped with the note P2206.
+# KNOWN-FAIL A20: the family word and the model master on lossless_line wait for ir-circuit's
+# A20 commit (the words below are A20's proposal).
+# codes: P2206
+file "tline.sim" deck
+  title "tline_ideal"
+  device_library tline_ideal
+  model tl tline_ideal
+  element lossless_line t1 (a 0 b 0) model=tl z0=50i td=2n
+  element lossless_line t2 (a 0 c 0) model=tl z0=50i freq=100M nl=1
+  element lossless_line t3 (a 0 d 0) model=tl z0=50i freq=100M nl=0.5
+  element lossless_line t4 (a 0 e 0) model=tl z0=50i freq=1k nl=1
+  element lossless_line t5 (a 0 g 0) model=tl z0=50i td=2n

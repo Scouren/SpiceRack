@@ -1,0 +1,15 @@
+# Oracle: VD dev-builtin-src (PWL) and run src-pwl: before the first point the first value
+# holds (1 at 0 and 0.5u for wave=[1u,1, 2u,3]), so the reader writes the point (0, y1) the IR
+# asks for (IR-CIRCUIT §3 Pwl) when the first time is a literal above 0 and the wave does not
+# repeat; `delay` shifts it; `period` > 0 repeats (PwlRepeat::Period) by VACASK's law, the
+# line through (xN, yN) and (period + x1, y1) on [xN, period) and [0, x1) (PwlJoin::Extrapolate;
+# a ramp yN → y1 when x1 = 0: 0.5 at 1.5u and 3.5u); `file=` names the points.
+# codes:
+file "pwl.sim" deck
+  title "pwl"
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=pwl(points=[0i, 0i, 1u, 1i]) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=pwl(points=[0, 1i, 1u, 1i, 2u, 3i] delay=1u) dc_rule=wave_at_zero
+  element vsource v3 (c 0) model=vsource wave=pwl(points=[0i, 0i, 1u, 1i] repeat_at=2u repeat=period join=extrapolate) dc_rule=wave_at_zero
+  element vsource v4 (d 0) model=vsource wave=pwl(points=[1u, 1i, 2u, 3i] repeat_at=4u repeat=period join=extrapolate) dc_rule=wave_at_zero
+  element vsource v5 (e 0) model=vsource wave=pwl(file=points.txt) dc_rule=wave_at_zero

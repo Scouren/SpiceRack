@@ -1,0 +1,17 @@
+# Oracle: VD dev-builtin-src (Common parameters, DC, Small-Signal Excitation: `type` "dc" by
+# default, `dc` 0, `mag` 0, `phase` 0, AC only) and run src-dump (`print instance` of a bare
+# vsource lists those defaults). No mag and no phase: no AC stimulus (NONE, VACASK's 0); either
+# given: both, the other at VACASK's default. `$mfactor` → mult (VD cir-mfactor).
+# codes:
+file "dc_ac.sim" deck
+  title "dc and ac"
+  model vsource source_v
+  model isource source_i
+  element vsource v1 (a 0) model=vsource dc=1i
+  element vsource v2 (b 0) model=vsource dc=0
+  element vsource v3 (c 0) model=vsource dc=2.5
+  element vsource v4 (d 0) model=vsource dc=1i ac_mag=1i ac_phase_deg=0
+  element vsource v5 (e 0) model=vsource dc=0 ac_mag=2i ac_phase_deg=45i
+  element vsource v6 (f 0) model=vsource dc=0 ac_mag=0 ac_phase_deg=30i
+  element isource i1 (a 0) model=isource mult=2i dc=1m
+  element vsource v7 (gnd 0) model=vsource dc=-1i

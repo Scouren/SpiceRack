@@ -1,0 +1,9 @@
+# Oracle: VD dev-builtin-src (Exp: val0 0, val1 1, delay 0, td2 0, tau1 0, tau2 0; td2
+# measured from delay) and run src-exp (the formula at 0.5u 2u 3.5u 5u: 0, 0.632121, 0.285794,
+# 0). TdFrom::Td1 (A12 C2).
+# codes:
+file "exp.sim" deck
+  title "exp"
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=exp(v1=0 v2=1 td1=0 tau1=0 td2=1u tau2=0 td2_from=td1) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=exp(v1=0i v2=1i td1=1u tau1=1u td2=2u tau2=0.5u td2_from=td1) dc_rule=wave_at_zero

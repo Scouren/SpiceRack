@@ -1,0 +1,8 @@
+refused: rise0
+model vsource vsource
+model f cccs
+v0 (a 0) vsource dc=1
+v1 (a 0) vsource type="pulse" rise=0
+control
+  analysis op1 op
+endc

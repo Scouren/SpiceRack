@@ -1,0 +1,26 @@
+# Oracle: VD dev-builtin-src, -vcvs, -cccs, -mutual (each parameter's name and default: a field
+# at VACASK's default, the same literal the reader fills, is left out; `type` first, then the
+# wave's parameters in VD's order, then mag, phase, $mfactor); DIALECT-VACASK §4 (literals,
+# names); run src-pwl (the first point at 0 holds as VACASK holds y1).
+file "sources.sim" deck
+  title "sources written"
+  model vsource source_v
+  model isource source_i
+  model e vcvs
+  model f cccs
+  model m mutual
+  element vsource v1 (a 0) model=vsource dc=1i
+  element vsource v2 (b 0) model=vsource dc=0 ac_mag=1i ac_phase_deg=0
+  element vsource v3 (b 0) model=vsource dc=0 ac_mag=0 ac_phase_deg=30i
+  element isource i1 (c 0) model=isource mult=2i wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=0 width=1u period=0 law=vacask) dc_rule=wave_at_zero
+  element vsource v4 (d 0) model=vsource wave=sin(offset=0 amplitude=2i freq=1k delay=0 damping=0 phase_deg=90i pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource v5 (e 0) model=vsource wave=exp(v1=0 v2=1 td1=1u tau1=1u td2=2u tau2=0.5u td2_from=td1) dc_rule=wave_at_zero
+  element vsource v6 (g 0) model=vsource wave=pwl(points=[0, 1i, 1u, 1i, 2u, 3i] delay=1u) dc_rule=wave_at_zero
+  element vsource v7 (h 0) model=vsource wave=pwl(points=[1u, 1i, 2u, 3i] repeat_at=4u repeat=period join=extrapolate) dc_rule=wave_at_zero
+  element vsource v8 (k 0) model=vsource wave=pwl(file=points.txt) dc_rule=wave_at_zero
+  element vsource v9 (l 0) model=vsource wave=am(offset=0 amplitude=1 mod_offset=1 mod_index=0.7 mod_freq=1k carrier_freq=10k delay=0 phase_m_deg=0 phase_c_deg=0 pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource v10 (n 0) model=vsource wave=sffm(offset=0.5 amplitude=1 carrier_freq=1k mod_index=0.5 signal_freq=1k delay=20u phase_c_deg=0 phase_m_deg=45i pre=hold_delay_value) dc_rule=wave_at_zero
+  element vcvs e1 (o 0 a 0) model=e gain=1
+  element vcvs e2 (o 0 a 0) model=e gain=10i
+  element cccs f1 (0 o2) model=f gain=2i sense=v1
+  element coupling m1 () model=m inductors=(l1 l2) k=0.5
