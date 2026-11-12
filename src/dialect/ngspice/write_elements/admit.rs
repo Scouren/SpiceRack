@@ -83,8 +83,14 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> bool {
         K::Resistor | K::Capacitor | K::Inductor => passive_ok(d, e),
         K::ChargeCapacitor => {
             let b = d.behav(e);
-            let tc =
-                b.tc1.is_none() && b.tc2.is_none() && b.temp_abs.is_none() && b.dtemp.is_none();
+            // a charge's tc: from 27 C, dividing the charge (the B rewrite's reciproctc=1)
+            let tc = (b.tc1.is_none() && b.tc2.is_none())
+                || (b.tc_base == ir::passive::TcBase::Fixed27
+                    && b.tc_law == ir::passive::TcLaw::Reciprocal
+                    && [b.tc1, b.tc2]
+                        .iter()
+                        .all(|&t| t.is_none() || tc_spells(d, t)));
+            let tc = tc && b.temp_abs.is_none() && b.dtemp.is_none();
             no_params && e.model.name.is_none() && tc && b_ok(d, b.expr)
         }
         K::Coupling => no_params && e.mult.is_none(),

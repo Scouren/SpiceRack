@@ -16,7 +16,7 @@
 //! dropped (note `DROPPED`); `tc1`/`tc2` are measured from 27 °C whatever `tnom`
 //! (`asrcload.c:41`: `TcBase::Fixed27`), directly on an R (`reciproctc=1` on a current is the
 //! resistance's factor) and an L, reciprocally on a C (`reciproctc=1`: C/(1+tc1·ΔT+…),
-//! `TcLaw::Reciprocal`; R31); on a value that reads only the temperature, on a charge, or a
+//! `TcLaw::Reciprocal`; R31; a charge's too, A17); on a value that reads only the temperature, or a
 //! number `eval_tc` rounds to 9 digits they are `Unread` (`TC_BASE`); a first `{…}` that is not
 //! the value is `Private` (`FIRST_BRACE`). A C with `q=` is a `ChargeCapacitor`.
 //!
@@ -358,7 +358,7 @@ fn dynamic(
                     Err(e) => return lw.opaque(st, e.class, e.code),
                 };
                 let circuit = reads_circuit(&text);
-                if charge || !circuit || rounds(&v) {
+                if !circuit || rounds(&v) {
                     return lw.opaque(st, ir::OpaqueClass::Unread, TC_BASE);
                 }
                 let slot = if key == "tc1" { &mut tc1 } else { &mut tc2 };
@@ -378,17 +378,34 @@ fn dynamic(
     }
     let h = head(lw, st, &card);
     let e = lw.expr(st, &tree, st.scope);
+    let mut put = |v: &Option<Val>| v.as_ref().map_or(ir::ExprId::NONE, |v| emit(lw, st, v));
+    let (tc1, tc2) = (put(&tc1), put(&tc2));
+    let tc = !tc1.is_none() || !tc2.is_none();
+    let tc_base = if tc {
+        ir::passive::TcBase::Fixed27
+    } else {
+        ir::passive::TcBase::Tnom
+    };
+    // a C's B source divides by the factor (`reciproctc=1`), the charge form too (A17)
+    let reciprocal = |yes: bool| {
+        if tc && yes {
+            ir::passive::TcLaw::Reciprocal
+        } else {
+            ir::passive::TcLaw::Direct
+        }
+    };
     let span = lw.span(st.node);
     if charge {
         let row = ir::controlled::Behav {
             expr: e,
-            tc1: ir::ExprId::NONE,
-            tc2: ir::ExprId::NONE,
+            tc1,
+            tc2,
             temp_abs: ir::ExprId::NONE,
             dtemp: ir::ExprId::NONE,
             rpar: ir::ExprId::NONE,
             output: ir::controlled::OutKind::Charge,
-            tc_base: ir::passive::TcBase::Tnom,
+            tc_base,
+            tc_law: reciprocal(true),
         };
         lw.b.behav(st.scope, K::ChargeCapacitor, h, row, span);
         return;
@@ -398,24 +415,13 @@ fn dynamic(
         b'c' => K::Capacitor,
         _ => K::Inductor,
     };
-    let mut put = |v: &Option<Val>| v.as_ref().map_or(ir::ExprId::NONE, |v| emit(lw, st, v));
-    let (tc1, tc2) = (put(&tc1), put(&tc2));
-    let tc = !tc1.is_none() || !tc2.is_none();
     let row = ir::passive::Passive {
         value: e,
         tc1,
         tc2,
         noisy,
-        tc_base: if tc {
-            ir::passive::TcBase::Fixed27
-        } else {
-            ir::passive::TcBase::Tnom
-        },
-        tc_law: if tc && kind == K::Capacitor {
-            ir::passive::TcLaw::Reciprocal
-        } else {
-            ir::passive::TcLaw::Direct
-        },
+        tc_base,
+        tc_law: reciprocal(kind == K::Capacitor),
         ..ir::passive::Passive::PLAIN
     };
     lw.b.passive(st.scope, kind, h, row, span);

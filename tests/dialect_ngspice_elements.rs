@@ -34,6 +34,7 @@ const READ: &[&str] = &[
     "instance",
     "lines",
     "mosfet_jfet_mesfet",
+    "mosfet_soi3",
     "osdi_codemodel",
     "rcl_dynamic",
     "rcl_dynamic_refused",
@@ -104,6 +105,22 @@ print v(a) v(b) v(e) v(g) v(f) v(h2) v(p) v(h) v(bi) v(t) v(d) v(x) v(k) v(q) v(
 const SIM_NETS: &[&str] = &[
     "a", "b", "e", "g", "f", "h2", "p", "h", "bi", "t", "d", "x", "k", "q", "vb",
 ];
+
+/// A six-terminal SOI3 MOSFET (`soi3.c:30`), apart: its model does not converge beside `SIM`'s
+/// `.temp`.
+const SOI3: &str = "soi3
+V1 in 0 1
+Rd in d 100k
+M1 d in 0 bg 0 t nsoi l=1u w=10u
+Rt t 0 1meg
+Rb bg 0 1meg
+.model nsoi nsoi level=60 tb=1e-7 tof=1e-8 tob=1e-7
+.control
+op
+print v(d) v(t)
+.endc
+.end
+";
 
 // ---- private ----
 
@@ -179,8 +196,8 @@ fn written_elements_run_on_ngspice_to_the_original_operating_point() {
         written, SIM,
         "the cards are written by the writer, not copied"
     );
-    let want = ngspice_op(SIM);
-    let got = ngspice_op(&written);
+    let want = ngspice_op(SIM, SIM_NETS);
+    let got = ngspice_op(&written, SIM_NETS);
     assert_eq!(got.len(), SIM_NETS.len(), "{written}");
     for (k, net) in SIM_NETS.iter().enumerate() {
         let (w, g) = (want[k], got[k]);
@@ -202,6 +219,21 @@ fn known(name: &str, design: &ir::Design) -> bool {
         "{name} passes: remove its KNOWN marker ({why})"
     );
     true
+}
+
+#[test]
+fn a_six_terminal_soi3_card_runs_on_ngspice_after_the_round_trip() {
+    // Oracle: ngspice-45 on the deck as written (soi3.c: six terminals; the four-node card
+    // aborts this build in spbuild.c:267, so only the six-node form is run).
+    let (design, _) = read_deck("soi3.sp", SOI3);
+    let written = write_entry(&design);
+    assert!(written.contains("M1 d in 0 bg 0 t nsoi"), "{written}");
+    let nets = &["d", "t"];
+    assert_eq!(
+        ngspice_op(&written, nets),
+        ngspice_op(SOI3, nets),
+        "{written}"
+    );
 }
 
 /// The ngspice row.
@@ -285,8 +317,8 @@ fn parse_ir(text: &str) -> ir::Design {
     design
 }
 
-/// The `print v(…)` values of `deck` run by `ngspice -b`, in `SIM_NETS` order.
-fn ngspice_op(deck: &str) -> Vec<f64> {
+/// The `print v(…)` values of `deck` run by `ngspice -b`, in `nets` order.
+fn ngspice_op(deck: &str, nets: &[&str]) -> Vec<f64> {
     let dir = tempfile::tempdir().expect("a temp dir");
     let path = dir.path().join("deck.cir");
     std::fs::write(&path, deck).expect("the deck is written");
@@ -296,8 +328,7 @@ fn ngspice_op(deck: &str) -> Vec<f64> {
         .output()
         .expect("ngspice runs (nix develop .#testing provides it; unsupported fails)");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    SIM_NETS
-        .iter()
+    nets.iter()
         .map(|net| {
             let key = format!("v({net}) = ");
             let line = stdout

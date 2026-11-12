@@ -77,6 +77,7 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 | `m` on an X line | the multiplicity unless the subcircuit declares `m`; it overrides an inner `m` (6.01) | `mult` on the instance, the effective `mult` on inner elements |
 | R/C/L whose value reads the circuit | ngspice runs it as a B source: keeps `tc1`, `tc2`, `m`, drops `dtemp` and thermal noise (6.14) | the kind and flags that state exactly that |
 | model levels | ngspice's own table; above 99 it silently runs level 1 (7.01, 7.02) | `ModelFamily` by (type word, level); a level ngspice would not run as written is `InvalidInSource` |
+| SOI3 `M` card (`nsoi`/`psoi` level 60) | six terminals d, fg, s, bg, bulk, thermal (`soi3.c:30`); the node count is `get_number_terminals`'s (items before the first `k=v`/`off` from the fifth), so all six are read. With four or five nodes the pinned build aborts in `spbuild.c:267` (`spGetElement` assertion, exit 134; run) instead of an error | the card as written: the node count needs the model's family, known only at bind time (fixture `elements/mosfet_soi3`) |
 | analyses in one deck | run in reverse card order in batch mode (8.04) | run items in the order ngspice runs them |
 | `.temp` list | ngspice runs 27 °C and says so (4.02) | `Env` 27 with a note |
 | `.control` | `alterparam` needs `reset`; a dot-card analysis runs after the script and at each `run` (13.01) | run items in run order; display commands `Inert` |
