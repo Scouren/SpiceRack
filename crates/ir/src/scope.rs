@@ -13,7 +13,8 @@
 //! `Design::lookup(&self, ScopeId, DefKind, NameId) -> DefId`,
 //! `Design::find_file(&self, &str) -> FileId`,
 //! `Design::reachable(&self) -> Vec<(ItemRef, ScopeId)>`; crate:
-//! `Design::bodies(&self) -> HashMap<ItemRef, Vec<ScopeId>>`
+//! `Design::bodies(&self) -> HashMap<ItemRef, Vec<ScopeId>>`,
+//! `Design::in_enclosing_subckt(&self, ScopeId, ScopeId) -> bool`
 
 use std::collections::HashMap;
 
@@ -142,5 +143,30 @@ impl Design {
             }
         }
         bodies
+    }
+
+    /// Whether a definition that lives in `def_scope`, read from `scope`, lies in the body of a
+    /// subcircuit enclosing `scope`'s own subcircuit (A12 K2 `EnclosingRef`): outward past the
+    /// nearest `Subckt` scope and short of a file's top. False when `def_scope` is not on
+    /// `scope`'s chain, or `scope` is in no subcircuit. O(scope depth).
+    pub(crate) fn in_enclosing_subckt(&self, scope: ScopeId, def_scope: ScopeId) -> bool {
+        let mut chain: Vec<ScopeId> = Vec::new();
+        let mut at = scope;
+        // bounded by the scope count: each step moves to a parent
+        for _ in 0..=self.scopes.len() {
+            if at.is_none() || at.index() >= self.scopes.len() {
+                break;
+            }
+            chain.push(at);
+            at = self.scopes[at.index()].parent;
+        }
+        let kind = |s: ScopeId| self.scopes[s.index()].kind;
+        let Some(own) = chain.iter().position(|&s| kind(s) == ScopeKind::Subckt) else {
+            return false;
+        };
+        let Some(pos) = chain.iter().position(|&s| s == def_scope) else {
+            return false;
+        };
+        pos > own && chain[pos..].iter().any(|&s| kind(s) == ScopeKind::Subckt)
     }
 }

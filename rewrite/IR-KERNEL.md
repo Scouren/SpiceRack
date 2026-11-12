@@ -276,6 +276,15 @@ the run overrides the amendment's table, R5); everything else Real. An Int beyon
 domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
+**A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
+resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressions) bound to a
+definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
+item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
+(so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
+`Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
+generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
+leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

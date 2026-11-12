@@ -32,7 +32,7 @@ use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::id::{ExprId, ItemRef, NameId, ScopeId};
+use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
@@ -412,6 +412,29 @@ pub(crate) fn item_features(
     };
     if let Some(extra) = placed {
         *set = set.with(Feature::Extra(extra));
+    }
+    // A12 K2: a resolved reference (in the row or in its expressions) into an enclosing
+    // subcircuit's body
+    let mut refs: Vec<DefId> = handles
+        .iter()
+        .filter_map(|h| match h {
+            Handle::Ref(r) => Some(r.def),
+            _ => None,
+        })
+        .collect();
+    for root in expr_roots(design, &handles) {
+        for &e in walk.tree(design, root) {
+            if let Expr::Param(r) | Expr::UserCall(r, _) = design.expr(e) {
+                refs.push(r.def);
+            }
+        }
+    }
+    let enclosing = refs.iter().any(|&d| {
+        d.index_checked(design.defs.len())
+            .is_some_and(|k| design.in_enclosing_subckt(scope, design.defs[k].scope))
+    });
+    if enclosing {
+        *set = set.with(Feature::Extra(Extra::EnclosingRef));
     }
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);

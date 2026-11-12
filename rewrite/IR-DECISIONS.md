@@ -223,3 +223,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The Int zero (`0i`) is a valid literal beside `Literal::ZERO`; `eq_value` separates Int from real literals of one value (also `Design::eq_meaning`).
 - `Literal` and `NumForm` moved to `literal.rs` (expr.rs passed 500 lines), re-exported from `expr`.
 - The generator makes Int literals only when the set has `Extra::IntLiteral` (`Gen::int_literals`, set by `expr`); `DivTyped` and `ToInt` follow the `Binary`/`Func` features as every member does.
+
+## A12 K2 applied (two features of scope)
+
+- `EnclosingRef` counts every resolved reference an item holds: its row `Ref`s and the `Param`/`UserCall` nodes of its expressions; an unresolved (`HELD` or `NONE`) one is not bound anywhere and does not count. The test is on the item's own scope chain (`Design::in_enclosing_subckt`, crate-private), so a subckt's head defaults (read in the subckt's parent scope) count against the parent's subcircuit.
+- `FormalReadsParam` is a `Subckt` row fact (its `features`), not a design-level hook: it depends on the row's own defaults only.
+- The generator: `Gen::enclosing_ok` filters `pick_def`'s draws; `Gen::param_reads` is cleared around a subckt's head defaults when the set lacks `FormalReadsParam`, and `leaf()` then drops `Param`.
+

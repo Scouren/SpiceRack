@@ -75,6 +75,11 @@ pub struct Gen {
     /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
     /// `expr` from its feature set).
     pub(crate) int_literals: bool,
+    /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
+    /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
+    /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
+    pub(crate) enclosing_ok: bool,
+    pub(crate) param_reads: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -123,6 +128,8 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         dynamic: false,
         reads: Reads::Constant,
         int_literals: false,
+        enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
+        param_reads: true,
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -229,7 +236,9 @@ impl Gen {
         for _ in 0..if n == 0 { 0 } else { 8 } {
             let k = self.below(n) as usize;
             let def = self.by_kind[kind as usize][k];
-            if chain.contains(&design.def(def).scope) {
+            let at = design.def(def).scope;
+            let enclosing = !self.enclosing_ok && design.in_enclosing_subckt(scope, at);
+            if chain.contains(&at) && !enclosing {
                 return def;
             }
         }

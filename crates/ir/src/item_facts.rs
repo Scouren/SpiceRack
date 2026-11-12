@@ -20,7 +20,7 @@ use crate::facts::{Handle, RowFacts};
 use crate::feature::{Extra, Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ItemRef, NameId, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{
     Comment, DefKind, Func, Global, If, Include, Load, Opaque, Param, Section, Subckt, Title,
 };
@@ -305,7 +305,15 @@ impl RowFacts for Subckt {
     }
 
     fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
-        // no feature beyond the kind
+        // A12 K2: a head default that reads a parameter
+        let defaults = design
+            .params(self.params)
+            .iter()
+            .map(|p| p.1)
+            .filter(|e| !e.is_none());
+        if defaults.into_iter().any(|e| reads_param(design, e)) {
+            *set = set.with(Feature::Extra(Extra::FormalReadsParam));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
@@ -540,6 +548,25 @@ fn field_domain(design: &Design, at: ItemRef, out: &mut Diags) {
         design.span_of(at),
         at.index,
     );
+}
+
+/// Whether the tree under `root` holds a `Param` read. Explicit stack (C11); descends only to
+/// lower ids, so it ends on any table contents.
+fn reads_param(design: &Design, root: ExprId) -> bool {
+    let mut stack = vec![root];
+    let mut kids = Vec::new();
+    while let Some(e) = stack.pop() {
+        if e.index() >= design.expr_count() {
+            continue;
+        }
+        if let crate::expr::Expr::Param(_) = design.expr(e) {
+            return true;
+        }
+        kids.clear();
+        design.children(e, &mut kids);
+        stack.extend(kids.iter().copied().filter(|k| *k < e));
+    }
+    false
 }
 
 /// Whether no name appears twice. O(n²): lists are short (ports, arguments, nets).
