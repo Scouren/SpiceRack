@@ -10,6 +10,8 @@
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/loops.rs"]
+mod loops;
 #[path = "passes_run/params.rs"]
 mod params;
 #[path = "passes_run/state.rs"]
@@ -127,6 +129,58 @@ fn loop_ends_keep_every_parameter_value() {
             "{name}: plain"
         );
         assert_eq!(params::values(&design), before, "{name}: plain");
+    }
+}
+
+/// `loop_end` over 300 seeded designs of the shape it converts (`passes_run/loops.rs`): the
+/// value each parameter holds at each analysis (`passes_run/params.rs`) is unchanged, with
+/// floors on the loops converted in each direction.
+#[test]
+fn loop_ends_keep_every_parameter_value_on_their_shape() {
+    for (name, feature) in [
+        ("loop_restore_to_keep_last", ir::RunExtra::LoopRestore),
+        ("loop_keep_last_to_restore", ir::RunExtra::LoopKeepLast),
+    ] {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        let (mut ran, mut converted, mut alters) = (0, 0, 0);
+        for seed in 1..=300u64 {
+            let text = loops::design(seed);
+            let mut design = ir::Design::new();
+            let mut diags = ir::Diags::new();
+            ir::parse(&text, &mut design.builder(), &mut diags);
+            assert!(diags.is_empty(), "seed {seed}: {:?}\n{text}", diags.rows());
+            if !ir::features_used(&design).contains(ir::Feature::Run(feature)) {
+                continue;
+            }
+            ran += 1;
+            let before = params::values(&design);
+            let count = |d: &ir::Design| {
+                d.reachable()
+                    .iter()
+                    .filter(|(i, _)| i.kind == ir::ItemKind::Alter)
+                    .count()
+            };
+            let alters_before = count(&design);
+            (pass.run)(&mut design, &mut diags);
+            let mut found = ir::Diags::new();
+            ir::check(&design, &mut found);
+            assert!(found.is_empty(), "{name} seed {seed}: {:?}", found.rows());
+            assert_eq!(
+                params::values(&design),
+                before,
+                "{name} seed {seed}\n{text}"
+            );
+            converted +=
+                usize::from(!ir::features_used(&design).contains(ir::Feature::Run(feature)));
+            alters += count(&design) - alters_before;
+        }
+        assert!(
+            ran >= 100 && converted >= 50,
+            "{name}: {ran} designs, {converted} converted"
+        );
+        eprintln!(
+            "{name}: {ran} seeded designs, {converted} fully converted, {alters} alters added"
+        );
     }
 }
 
