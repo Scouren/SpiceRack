@@ -23,6 +23,7 @@ use spicerack_ir::{
     OptionRow, PrintView, Probe, Ref, Role, ScopeId, Span, Stat, Statistics, SweepSpec, Target,
     TargetKind, Vary, VaryDist, dump, link, parse,
 };
+use spicerack_ir::{ResetSet, Restorable};
 
 const NO: ExprId = ExprId::NONE;
 
@@ -114,8 +115,9 @@ fn loops_alters_and_state() {
     analysis op
   loop table (param a) (temp) values=[1, 27, 2, 85]
   loop monte_carlo runs=100 seed=7 samples=[1, 3] all latin_hypercube nominal
-  alter (option private tran_rmax vacask) value=10
-  alter (option rel_tol) value=1m
+  alter (model_param nch vth0) value=10
+  reset values options temp tnom saves
+  reset saves
   nodeset ic transient node=(x1 n) value=1
   nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5 whole_run
   nodeset device every_op node=(c1) value=0
@@ -187,12 +189,11 @@ fn loops_alters_and_state() {
             nominal: true,
         };
         b.loop_(top, None, mc, LoopEnd::Restore, Span::NONE);
-        let opt = b.target_option(OptionKey::Private, Some(("vacask", "tran_rmax")));
+        let m = b.target(TargetKind::ModelParam, &[], "nch", Some("vth0"));
         let v = n(b, "10");
-        b.alter(top, opt, v, Span::NONE);
-        let opt = b.target_option(OptionKey::RelTol, None);
-        let v = n(b, "1m");
-        b.alter(top, opt, v, Span::NONE);
+        b.alter(top, m, v, Span::NONE);
+        b.reset(top, ResetSet::ALL, Span::NONE);
+        b.reset(top, ResetSet::of(&[Restorable::Saves]), Span::NONE);
         let v = n(b, "1");
         b.node_set(
             top,
@@ -233,6 +234,7 @@ fn outputs_measures_and_statistics() {
     let text = "file \"t.sp\" deck
   save (v (out)) (i mag (v1))
   save analysis=(op dc tran) (v (b))
+  save from_here (v (c))
   save analysis=tran (all_v) (all_branch_i) (i_terminal terminal=2 (m1)) (param (m1) (gm)) (power (r1)) (expr expr=(v(a) * 2))
   print hb hb_time (v (out))
   measure tdel tran trig_targ (cross rise (v (in)) value=0.5 count=1) (cross fall last (v (out)) value=0.5 delay=1n)
@@ -250,10 +252,18 @@ fn outputs_measures_and_statistics() {
             b.probe_v(&["out"]),
             b.probe_i(&["v1"]).with_part(AcPart::Mag),
         ];
-        b.save(top, AnalysisKinds::ALL, &p, Span::NONE);
+        b.save(top, AnalysisKinds::ALL, Applies::WholeRun, &p, Span::NONE);
         let vb = b.probe_v(&["b"]);
         let some = AnalysisKinds::of(&[AnalysisKind::Op, AnalysisKind::Dc, AnalysisKind::Tran]);
-        b.save(top, some, &[vb], Span::NONE);
+        b.save(top, some, Applies::WholeRun, &[vb], Span::NONE);
+        let vc = b.probe_v(&["c"]);
+        b.save(
+            top,
+            AnalysisKinds::ALL,
+            Applies::FromHere,
+            &[vc],
+            Span::NONE,
+        );
         let all = Probe::category(spicerack_ir::ProbeKind::AllV);
         let branches = Probe::category(spicerack_ir::ProbeKind::AllBranchI);
         let it = b.probe_terminal(&["m1"], 2);
@@ -266,6 +276,7 @@ fn outputs_measures_and_statistics() {
         b.save(
             top,
             AnalysisKinds::of(&[AnalysisKind::Tran]),
+            Applies::WholeRun,
             &[all, branches, it, pp, pw, pe],
             Span::NONE,
         );

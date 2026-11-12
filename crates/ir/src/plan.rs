@@ -5,8 +5,8 @@
 //!
 //! Run items are ordinary items of a scope, in order (IR-RUN §1). An `Alter` changes the circuit
 //! for every run item after it, in its scope and in every scope nested after it, until another
-//! `Alter` of the same target; a reader whose simulator discards alters (ngspice `reset`) emits
-//! the restoring alters itself. A `Loop` runs its body once per value (or row, or sample); the
+//! `Alter` of the same target, or a `Reset` of its class (`reset.rs`: ngspice's `reset` is a
+//! `Reset`, never restoring alters that copy the cards' values; A27, A28). A `Loop` runs its body once per value (or row, or sample); the
 //! body holds exactly the run items the loop wraps, so "which analyses a `.step` wraps" is the
 //! body (Xyce, LTspice: every analysis of the deck; HSPICE `SWEEP`: one), and the first
 //! `.step` line is the innermost loop (Xyce, LTspice; ESPice: the last). What the target holds
@@ -66,8 +66,10 @@ pub struct Loop {
     pub kind: LoopKind,
     /// What the swept targets hold after the last pass (`INV-semantics.md` 13.03).
     pub after: LoopEnd,
-    /// The statement's name (Spectre `sw1 sweep`, `mc1 montecarlo`; VACASK `sweep name`), or
-    /// `NONE` (SPICE `.step`).
+    /// The loop's own name in its dialect (A27): Spectre's and VACASK's statement name
+    /// (`sw1 sweep`, `mc1 montecarlo`, `sweep name`), ngspice's `foreach` variable (so a command
+    /// in the body that reads `$v` stays valid text where a writer puts it); `NONE` when it has
+    /// none (SPICE `.step`).
     pub name: NameId,
     /// Row in the kind's detail table; always present.
     pub detail: u32,
@@ -162,7 +164,10 @@ pub enum Sampler {
 }
 
 /// From here on, `target` holds `value` (IR-RUN §1). Changes only the named target: a Spectre
-/// `altergroup`, which first defaults every parameter of the device, is not an `Alter`.
+/// `altergroup`, which first defaults every parameter of the device, is not an `Alter`. Never
+/// of `TargetKind::Temp` or `TargetKind::Option` (checked; A28): "from here the temperature, the
+/// nominal temperature or an option is v" is one row, a `FromHere` `Env` or `OptionRow`; those
+/// target kinds are for loops and DC axes.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Alter {
     /// What changes.
@@ -533,7 +538,10 @@ pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<Target
         .into_iter()
         .filter(|&k| {
             let ok = target_extra(used, k).is_none_or(|x| features.contains(Feature::Run(x)));
-            ok && (k != TargetKind::Option || any_key)
+            // A28: an alter of the temperature or an option is an `Env` or option row
+            let state =
+                used == TargetUse::Alter && matches!(k, TargetKind::Temp | TargetKind::Option);
+            ok && !state && (k != TargetKind::Option || any_key)
         })
         .collect()
 }
@@ -581,13 +589,13 @@ const fn target_extra(used: TargetUse, kind: TargetKind) -> Option<RunExtra> {
         (TargetUse::Loop, K::DeviceParam) => Some(X::LoopDeviceParam),
         (TargetUse::Loop, K::ModelParam) => Some(X::LoopModelParam),
         (TargetUse::Loop, K::Option) => Some(X::LoopOption),
-        (TargetUse::Alter, K::Temp) => Some(X::AlterTemp),
+        (TargetUse::Alter, K::Temp) => None, // refused by `check` (A28)
         (TargetUse::Alter, K::Param) => Some(X::AlterParam),
         (TargetUse::Alter, K::SubcktParam) => Some(X::AlterSubcktParam),
         (TargetUse::Alter, K::SourceDc) => Some(X::AlterSourceDc),
         (TargetUse::Alter, K::ElementValue) => Some(X::AlterElementValue),
         (TargetUse::Alter, K::DeviceParam) => Some(X::AlterDeviceParam),
         (TargetUse::Alter, K::ModelParam) => Some(X::AlterModelParam),
-        (TargetUse::Alter, K::Option) => Some(X::AlterOption),
+        (TargetUse::Alter, K::Option) => None, // refused by `check` (A28)
     }
 }
