@@ -55,6 +55,10 @@ reader can decide it statically for a library.
   n1, m1).
 - `Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` reference. VACASK lets an
   instance override only a formal whose default folds to a constant (runs c1, t2).
+- `Extra::DeckWithoutTitle`: a file of role `Deck` whose top scope holds no `Title` item.
+  ngspice and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and
+  an empty one are the same text there (law L5). The generator gives every deck a `Title` when
+  the set lacks it; the spine's pass adds an empty title.
 
 ### K3. `OpaqueClass::Hint` (R19)
 
