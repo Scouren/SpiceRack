@@ -2,7 +2,7 @@
 //! each root it changed evaluated before and after (`ir::eval_typed`) under the same bindings.
 //!
 //! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`, `pub fn keeps_values_over`,
-//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`
+//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -158,6 +158,18 @@ pub fn typed(name: &str, hit: fn(ir::Expr) -> bool) -> usize {
     n
 }
 
+/// Every expression root of every reachable item, in `map_exprs` order.
+pub fn roots(design: &ir::Design) -> Vec<ir::ExprId> {
+    let mut copy = design.clone();
+    let mut out = Vec::new();
+    let items: Vec<ir::ItemRef> = copy.reachable().into_iter().map(|(i, _)| i).collect();
+    let mut editor = copy.editor();
+    for item in items {
+        editor.map_exprs(item, &mut |e, _| out.push(*e));
+    }
+    out
+}
+
 // ---- private ----
 
 /// Whether `was` is an error raised at a row the new tree no longer reads.
@@ -202,18 +214,6 @@ fn int_capable(e: ir::Expr) -> bool {
             | ir::Expr::Unary(ir::UnOp::Neg, _)
             | ir::Expr::Call(Min | Max | SgnZeroPos | ToInt, _)
     )
-}
-
-/// Every expression root of every reachable item, in `map_exprs` order.
-fn roots(design: &ir::Design) -> Vec<ir::ExprId> {
-    let mut copy = design.clone();
-    let mut out = Vec::new();
-    let items: Vec<ir::ItemRef> = copy.reachable().into_iter().map(|(i, _)| i).collect();
-    let mut editor = copy.editor();
-    for item in items {
-        editor.map_exprs(item, &mut |e, _| out.push(*e));
-    }
-    out
 }
 
 /// Whether the tree under `root` holds a node `hit` accepts (bounded by the row count).

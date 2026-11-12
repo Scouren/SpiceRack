@@ -16,10 +16,11 @@ mod bindings;
 #[path = "passes_expr/compare.rs"]
 mod compare;
 
-use spicerack::ir;
+use spicerack::{ir, passes};
 
 use compare::{
-    ANY, code, keeps_boundary_values, keeps_generated_values, keeps_values_over, notes, typed,
+    ANY, code, keeps_boundary_values, keeps_generated_values, keeps_values_over, notes, roots,
+    typed,
 };
 
 /// Each rule of the powers, roundings and ternaries: its rows, the texts whose roots it
@@ -374,4 +375,89 @@ fn the_draw_rules_keep_the_nominal_run_and_say_what_changes() {
         notes("sampling_draws_to_nominal", "monte_carlo"),
         [code(110)]
     );
+}
+
+#[test]
+fn atan2_and_hypot_errors_are_measured_not_exact() {
+    // oracle: eval_typed of atan2 / hypot themselves; the rules are not registered (the lead
+    // rules on them): this measures how far each is from exact, in ulp, and where it fails
+    type Rule = fn(&mut ir::Design, &mut ir::Diags);
+    let rules: [(&str, &str, Rule); 2] = [
+        (
+            "atan2_to_atan",
+            "atan2(y, x)",
+            passes::expr::atan2_to_atan::atan2_to_atan,
+        ),
+        (
+            "hypot_to_sqrt",
+            "hypot(x, y)",
+            passes::expr::hypot_to_sqrt::hypot_to_sqrt,
+        ),
+    ];
+    let mut h = 0x9E37_79B9_7F4A_7C15u64;
+    let mut values = bindings::boundary();
+    for _ in 0..400 {
+        h ^= h << 13;
+        h ^= h >> 7;
+        h ^= h << 17;
+        let exp = (h % 600) as i32 - 300;
+        let sign = if h & (1 << 40) == 0 { 1.0 } else { -1.0 };
+        values.push(sign * (1.0 + (h >> 12) as f64 / (1u64 << 52) as f64) * 10f64.powi(exp));
+    }
+    for (name, body, run) in rules {
+        let text =
+            format!("file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = {body}\n");
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(&text, &mut design.builder(), &mut diags);
+        let old = roots(&design);
+        run(&mut design, &mut diags);
+        let new = roots(&design);
+        let (old, new) = (old[2], new[2]);
+        assert_ne!(old, new, "{name} rewrote the root");
+        let (mut worst, mut worst_mid, mut lost, mut zeros, mut flips) = (0u64, 0u64, 0, 0, 0);
+        for &x in &values {
+            for &y in &values {
+                let env = bindings::Pair {
+                    design: &design,
+                    x: ir::Value::real(x),
+                    y: ir::Value::real(y),
+                };
+                match (ir::eval(&design, old, &env), ir::eval(&design, new, &env)) {
+                    (Ok(a), Ok(b)) if a == b && a.to_bits() != b.to_bits() => zeros += 1,
+                    (Ok(a), Ok(b)) if a.is_sign_negative() != b.is_sign_negative() => flips += 1,
+                    (Ok(a), Ok(b)) => {
+                        let d = ulps(a, b);
+                        worst = worst.max(d);
+                        let mid = |v: f64| (1e-150..1e150).contains(&v.abs());
+                        if mid(x) && mid(y) {
+                            worst_mid = worst_mid.max(d);
+                        }
+                    }
+                    (Err(_), Err(_)) => {}
+                    _ => lost += 1,
+                }
+            }
+        }
+        eprintln!(
+            "{name}: {} points; at most {worst_mid} ulp with both operands nonzero within 1e±150, \
+             {worst} ulp anywhere, {zeros} with a zero's sign lost, {flips} of opposite sign (±π at a signed zero), \
+             {lost} with a value on one side only",
+            values.len() * values.len()
+        );
+        // the bound measured where the squares and the quotient are normal (1e±150)
+        assert!(
+            worst_mid <= 1,
+            "{name}: {worst_mid} ulp in the normal range"
+        );
+    }
+}
+
+/// The distance of two doubles in units in the last place (ordered bit patterns).
+fn ulps(a: f64, b: f64) -> u64 {
+    let key = |f: f64| {
+        let k = f.to_bits() as i64;
+        if k < 0 { i64::MIN - k } else { k }
+    };
+    key(a).abs_diff(key(b))
 }
