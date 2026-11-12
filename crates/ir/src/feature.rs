@@ -92,6 +92,9 @@ pub enum Feature {
     /// is `Placed(Branch, Subckt)` and `Placed(Subckt, Subckt)`. `File` is never the scope kind:
     /// every target lets an item stand in a file's top.
     Placed(ScopeKind, ItemKind),
+    /// A statistical draw's distribution, in an expression of the dynamic form (A28): its
+    /// static twin is `Dist`.
+    DistDyn(Dist),
 }
 
 /// Which of a function's or operator's two features a root counts (`Func` or `FuncDyn`, and so
@@ -166,7 +169,7 @@ pub(crate) struct ExprWalk {
 
 const WORDS: usize = (Feature::COUNT as usize).div_ceil(64);
 /// The member count of each `Feature` group, in declaration order.
-const COUNTS: [usize; 20] = [
+const COUNTS: [usize; 21] = [
     ItemKind::COUNT,
     ElemKind::COUNT,
     WaveKind::COUNT,
@@ -187,6 +190,7 @@ const COUNTS: [usize; 20] = [
     OptionKey::COUNT,
     ModelFamily::COUNT,
     PLACED,
+    Dist::COUNT,
 ];
 /// The `Placed` group: every scope kind but `File`, by every item kind.
 const PLACED: usize = (ScopeKind::COUNT - 1) * ItemKind::COUNT;
@@ -209,7 +213,8 @@ impl Feature {
         + RunExtra::COUNT
         + OptionKey::COUNT
         + ModelFamily::COUNT
-        + PLACED) as u16;
+        + PLACED
+        + Dist::COUNT) as u16;
 
     /// The dense index: the variant's offset (the counts of the variants before it, in
     /// declaration order) plus the member's position in its `ALL`.
@@ -241,6 +246,7 @@ impl Feature {
                 );
                 (19, (s as usize - 1) * ItemKind::COUNT + k as usize)
             }
+            Feature::DistDyn(m) => (20, m as usize),
         };
         assert!(
             member < COUNTS[group],
@@ -284,6 +290,7 @@ impl Feature {
                 ScopeKind::ALL[1 + i / ItemKind::COUNT],
                 ItemKind::ALL[i % ItemKind::COUNT],
             ),
+            20 => Feature::DistDyn(Dist::ALL[i]),
             _ => unreachable!(),
         }
     }
