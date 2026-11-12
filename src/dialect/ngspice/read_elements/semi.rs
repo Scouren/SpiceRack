@@ -11,10 +11,14 @@
 //! and the model fourth. An unlabeled number after the model is the area (Q, J; M rejects it:
 //! "no unlabeled parameter permitted on mosfet"; on Z it depends on the model, `Unread`). `off`
 //! is the first guess; `ic=a,b,…` the device order (applied only under `uic`, INV 8.21:
-//! `IcMode::UicOnly`); `area=`, `temp=`, `dtemp=` are fields on D, Q, J (`dio.c`, `bjt.c`,
-//! `jfet.c` take them); on M and Z they are the model's own instance parameters (BSIM4 has no
-//! `temp`), kept by name; `m` is the multiplicity; every other `k=v` is an instance parameter by
-//! its own name.
+//! `IcMode::UicOnly`); `area=`, `temp=`, `dtemp=` are the fields (`dio.c`, `bjt.c`, `jfet.c`,
+//! `mes.c` area; every MOS, HFET and HiSIM that takes `temp`/`dtemp` gives it the instance
+//! temperature: run mm, MOS1 `temp=50`; BSIM4 and MES have none, "unknown parameter", a fact of
+//! the bound model the reader does not know); `m` is the multiplicity; a key given twice keeps
+//! the last (run: `temp=50 temp=60` is 60); `area` on M and the IR's own names `mult`,
+//! `temp_abs`, `ic_mode`, `initial` are no ngspice key ("unknown parameter", runs mm:
+//! `InvalidInSource`; A19 keeps a typed field's name out of the parameters); every other `k=v` is
+//! an instance parameter by its own name.
 //!
 //! `S n+ n- c+ c- model [on|off]` (`inp2s.c`: the fifth token is the model; an unlabeled number
 //! is ignored, `Unread`); `W n+ n- vctl model [on|off]` (`inp2w.c`). Neither takes `m`.
@@ -51,7 +55,6 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
     }
     card.nodes = items[..at].iter().map(|i| i.text.clone()).collect();
     card.model = Some(items[at].text.clone());
-    let typed = matches!(letter, b'd' | b'q' | b'j');
     let mut rest = &items[at + 1..];
     let (mut area, mut temp, mut dtemp) = (None, None, None);
     let mut ic: Vec<Val> = Vec::new();
@@ -105,8 +108,13 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
             "ic" => !std::mem::replace(&mut ic, vals.clone()).is_empty(),
             "m" => card.mult.replace(one()).is_some(),
             "area" if letter != b'm' => area.replace(one()).is_some(),
-            "temp" if typed => temp.replace(one()).is_some(),
-            "dtemp" if typed => dtemp.replace(one()).is_some(),
+            "temp" => temp.replace(one()).is_some(),
+            "dtemp" => dtemp.replace(one()).is_some(),
+            // no ngspice device has these keys ("unknown parameter", runs mm), and a
+            // parameter may not bear a typed field's name (A19): no MOS takes `area`
+            "area" | "mult" | "temp_abs" | "ic_mode" | "initial" => {
+                return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
+            }
             _ => {
                 card.param(&it.text, one());
                 false

@@ -234,7 +234,7 @@ fn save(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
     let wants = probes(words, Ctx::Save)?;
     let probes: Vec<ir::Probe> = wants.iter().map(|w| build(lw, w)).collect();
     let span = lw.span(st.node);
-    lw.b.save(st.scope, None, &probes, span);
+    lw.b.save(st.scope, ir::AnalysisKinds::ALL, &probes, span);
     Ok(())
 }
 

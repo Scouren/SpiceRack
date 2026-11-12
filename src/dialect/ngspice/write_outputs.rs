@@ -186,7 +186,7 @@ fn spellable(d: &ir::Design, item: ir::ItemRef) -> bool {
     match item.kind {
         ir::ItemKind::Save => {
             let s: ir::Save = d.row(item.index);
-            s.every_analysis && save_words(d, s.probes).is_some()
+            s.analyses == ir::AnalysisKinds::ALL && save_words(d, s.probes).is_some()
         }
         ir::ItemKind::Print => {
             let p: ir::Print = d.row(item.index);
