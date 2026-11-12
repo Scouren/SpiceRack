@@ -15,13 +15,13 @@ use spicerack_ir::{
     Role, Span, UnOp, eval,
 };
 
-// ---- private ----
-
 /// Bindings with fixed values: every read answers a number derived from what it names, or
 /// `None` when the test asks for an unbound context.
 struct Fixed {
     bound: bool,
 }
+
+const BOUND: Fixed = Fixed { bound: true };
 
 impl Bindings for Fixed {
     fn param(&self, param: Ref) -> Option<f64> {
@@ -59,7 +59,7 @@ impl Bindings for Fixed {
     }
 }
 
-const BOUND: Fixed = Fixed { bound: true };
+// ---- private ----
 
 /// Builds one expression in a fresh design and evaluates it.
 fn ev(build: impl FnOnce(&mut Builder<'_>) -> ExprId) -> Result<f64, Domain> {

@@ -18,8 +18,6 @@ use crate::link::link;
 use crate::scope::Def;
 use crate::span::Span;
 
-// ---- private ----
-
 /// A small valid deck: a param, a subcircuit with a body param, an if, a func, a load with
 /// its module, an include, a global, a comment and a title.
 struct Base {
@@ -28,6 +26,8 @@ struct Base {
     sub_body: crate::id::ScopeId,
     one: ExprId,
 }
+
+// ---- private ----
 
 fn base() -> Base {
     let mut d = Design::new();
