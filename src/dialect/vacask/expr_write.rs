@@ -422,6 +422,7 @@ mod tests {
             masters: &mut masters,
             declared: &declared,
             folds: &folds,
+            elements: Default::default(),
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,

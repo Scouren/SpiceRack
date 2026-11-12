@@ -12,10 +12,11 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.1; `DIALECT-NGSPICE.md` §3 (the same four steps).
 //!
 //! Contents: `Cst`, `Lower` (`Lower::span`, `Lower::text`, `Lower::start`, `Lower::body`,
-//! `Lower::comments_until`, `Lower::bind_master_later`), `references`, `read`, `unread`, `opaque`,
+//! `Lower::comments_until`, `Lower::bind_master_later`, `Lower::element_here`), `references`,
+//! `read`, `unread`, `opaque`,
 //! `statement_text`, `field_name`, `unclosed` (crate-private)
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::bind;
 use super::codes;
@@ -74,6 +75,8 @@ pub(super) struct Lower<'a, 'b, 's> {
     /// Each source a `type` alter reaches and the alters that are framing (R42: `fold::folds`).
     #[allow(dead_code, reason = "read_sources (S4.2) and read_run (S4.3) read it")]
     pub(super) folds: &'a fold::Folds,
+    /// Each scope's element names and how many of its items they cover (`Lower::element_here`).
+    pub(super) elements: HashMap<ir::ScopeId, (usize, HashSet<ir::NameId>)>,
     /// `parameters` entries a subcircuit's head took (their `Assign` nodes).
     pub(super) taken: HashSet<u32>,
     /// The next token whose leading gap has not been searched for comments.
@@ -120,6 +123,25 @@ impl Lower<'_, '_, '_> {
             scope: self.scope,
             span: self.stmt,
         });
+    }
+
+    /// Whether an element named `name` already stands in the current scope (run dup). A scope's
+    /// item list only grows, so its names are indexed once, as it grows: a read stays linear in
+    /// its instances (a scan of the scope per instance was quadratic: the scaling step).
+    pub(super) fn element_here(&mut self, name: &str) -> bool {
+        let d = self.b.design();
+        let items = d.items(self.scope);
+        let (seen, names) = self.elements.entry(self.scope).or_default();
+        assert!(*seen <= items.len(), "a scope's item list only grows");
+        for at in items[*seen..]
+            .iter()
+            .filter(|at| at.kind == ir::ItemKind::Element)
+        {
+            names.insert(d.row::<ir::Element>(at.index).name);
+        }
+        *seen = items.len();
+        let id = d.find_name(name);
+        !id.is_none() && names.contains(&id)
     }
 
     /// The start byte (in the file's own text) of statement `n`.
@@ -286,6 +308,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             masters: &mut masters,
             declared: &declared,
             folds: &folds,
+            elements: Default::default(),
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,

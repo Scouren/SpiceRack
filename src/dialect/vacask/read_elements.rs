@@ -294,7 +294,7 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(NO_PARENS));
     }
     let h = super::bind::head(l, n);
-    if defined_here(l, &h.name) {
+    if l.element_here(&h.name) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(DUPLICATE));
     }
     let (name, nodes) = (h.name, h.terminals);
@@ -331,15 +331,6 @@ pub(super) fn repeated(entries: &[(String, u32)]) -> bool {
 }
 
 // ---- private ----
-
-/// Whether an element named `name` already stands in the current scope.
-fn defined_here(l: &Lower<'_, '_, '_>, name: &str) -> bool {
-    let d = l.b.design();
-    d.items(l.scope)
-        .iter()
-        .filter(|at| at.kind == ir::ItemKind::Element)
-        .any(|at| d.str(d.row::<ir::Element>(at.index).name) == name)
-}
 
 /// Checks every value of `entries` in `ctx` (A2: before the first push).
 fn check(l: &Lower<'_, '_, '_>, entries: &[(String, u32)], ctx: Context) -> Result<(), Refusal> {
