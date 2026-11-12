@@ -44,6 +44,12 @@ pub(super) const CODES: &[Row] = &[
         "numparam evaluates a dot card's braces once before the run, with no temper; refused.",
     ),
     refusal(
+        NODESET_FROM_HERE,
+        "an initial condition or node set that holds from its place on",
+        "ngspice-45 frontend/commands.c (no ic or nodeset command); rewrite/RULINGS.md R24",
+        "ngspice sets a node's condition only with its .ic and .nodeset cards, which hold for the whole run; refused.",
+    ),
+    refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
         "ngspice-45 dctrcurv.c:89-149, inp2dot.c dot_pss",
@@ -62,9 +68,13 @@ const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 /// A card value that reads the temperature: numparam evaluates a dot card's `{…}` once, before
 /// the run, with no `temper` (`inpcom.c` `inp_fix_temper_in_param` rewrites `.param` only).
 const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
+/// An initial condition or node set that holds from its place on: ngspice's script has no
+/// command that sets one (`commands.c`), and its `.ic`/`.nodeset` cards hold for the whole run.
+const NODESET_FROM_HERE: ir::Code = ir::Code::new(b'W', 1303);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300`, `W1301`) or a value that reads the temperature (`W1302`).
+/// (R21): a card form (`W1300`, `W1301`), a value that reads the temperature (`W1302`), a node set
+/// that holds from its place on (`W1303`).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     let mut values = Vec::new();
@@ -75,7 +85,14 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             let e: ir::Env = design.row(item.index);
             values.extend([e.temp, e.tnom]);
         }
-        ir::ItemKind::NodeSet => values.push(design.row::<ir::NodeSet>(item.index).value),
+        ir::ItemKind::NodeSet => {
+            let n: ir::NodeSet = design.row(item.index);
+            values.push(n.value);
+            // no script command sets a node's condition (commands.c): only the whole-run card
+            if n.holds == ir::Applies::FromHere {
+                refuse(NODESET_FROM_HERE);
+            }
+        }
         _ => {}
     }
     if item.kind != ir::ItemKind::Analysis {
