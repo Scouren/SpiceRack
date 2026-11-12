@@ -132,3 +132,12 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 ## Addendum A8 (= the A7 revision above)
 
 - A8 (merge the run owner's follow-up 6c74d081, then split `Extra` into `Extra` / `CircuitExtra` / `RunExtra`) is what the A7 bullets above record: merged in dc870504 (the only conflict was this file; both sides kept), split in d0e0c80. The file map has `circuit_extra.rs` (circuit) and `run_extra.rs` (run). The `Extra` doc's 256 note is gone; each enum is `#[repr(u8)]`, and the largest, `RunExtra`, has 119 members.
+
+## Implementation, kernel M1 (storage core)
+
+- `build.rs` passed 500 code lines → the expression constructors moved to a new kernel file, `build_expr.rs` (one `impl Builder` block, split along its transform). `expr_row` and `assert_expr` are crate-visible helpers there.
+- `Builder::push` asserts the scope and the table's capacity, not the row's handles. Checking handles would call the owners' `RowFacts::handles`, which are placeholders until they land, and `check` covers it. The doc now says so; nothing in a signature changed.
+- `Builder::string("")` is legal: a `Str` value may be empty, while a name may not. `Names::intern_any` (crate) interns without the non-empty assertion; `Names::intern` keeps it.
+- `Ref::is_resolved` is false for the crate-private `DefId::HELD` as well as for `NONE`.
+- `Literal::value` formats `m e k` and parses it with Rust's decimal parser, which rounds correctly (half to even): the reference rule, with no hand-written float arithmetic. `Literal::from_f64` takes the shortest round-trip digits from `{:e}` and places them on the engineering exponent (the multiple of 3 at or below the decimal exponent).
+- One exhaustive dispatch from `ItemKind` to its row type, `for_kind!(kind, R => body)`, lives in `facts.rs` (crate-internal macro, declared first). `span_of`, `Editor::map_refs` and the row comparison of `eq_ignoring_spans` use it; M2–M4 use it too.

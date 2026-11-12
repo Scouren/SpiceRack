@@ -12,7 +12,9 @@
 //! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
 //! `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum Handle`,
-//! `macro todo_facts` (crate-internal: the definition phase's placeholder impl)
+//! `macro todo_facts` (crate-internal: the definition phase's placeholder impl),
+//! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
+//! type)
 
 use crate::build::Builder;
 use crate::design::{Design, ItemRow};
@@ -135,6 +137,109 @@ macro_rules! todo_facts {
                 features: &$crate::FeatureSet,
             ) -> $crate::ItemRef {
                 todo!()
+            }
+        }
+    };
+}
+
+/// The one exhaustive dispatch from an `ItemKind` to its row type: `for_kind!(kind, R => body)`
+/// evaluates `body` with `R` naming the kind's row type (`ItemRow + RowFacts`). Every generic
+/// walk of the kernel (`span_of`, `map_refs`, `check`, `features_used`, `dump`, `parse`,
+/// `generate`) goes through it, so a new kind is one arm here.
+macro_rules! for_kind {
+    ($kind:expr, $R:ident => $body:expr) => {
+        match $kind {
+            $crate::ItemKind::Title => {
+                type $R = $crate::item::Title;
+                $body
+            }
+            $crate::ItemKind::Comment => {
+                type $R = $crate::item::Comment;
+                $body
+            }
+            $crate::ItemKind::Include => {
+                type $R = $crate::item::Include;
+                $body
+            }
+            $crate::ItemKind::Global => {
+                type $R = $crate::item::Global;
+                $body
+            }
+            $crate::ItemKind::Load => {
+                type $R = $crate::item::Load;
+                $body
+            }
+            $crate::ItemKind::Opaque => {
+                type $R = $crate::item::Opaque;
+                $body
+            }
+            $crate::ItemKind::Subckt => {
+                type $R = $crate::item::Subckt;
+                $body
+            }
+            $crate::ItemKind::Section => {
+                type $R = $crate::item::Section;
+                $body
+            }
+            $crate::ItemKind::If => {
+                type $R = $crate::item::If;
+                $body
+            }
+            $crate::ItemKind::Param => {
+                type $R = $crate::item::Param;
+                $body
+            }
+            $crate::ItemKind::Func => {
+                type $R = $crate::item::Func;
+                $body
+            }
+            $crate::ItemKind::Model => {
+                type $R = $crate::model::Model;
+                $body
+            }
+            $crate::ItemKind::Statistics => {
+                type $R = $crate::stats::Statistics;
+                $body
+            }
+            $crate::ItemKind::Element => {
+                type $R = $crate::element::Element;
+                $body
+            }
+            $crate::ItemKind::Analysis => {
+                type $R = $crate::analysis::Analysis;
+                $body
+            }
+            $crate::ItemKind::Loop => {
+                type $R = $crate::plan::Loop;
+                $body
+            }
+            $crate::ItemKind::Alter => {
+                type $R = $crate::plan::Alter;
+                $body
+            }
+            $crate::ItemKind::Option => {
+                type $R = $crate::option::OptionRow;
+                $body
+            }
+            $crate::ItemKind::Env => {
+                type $R = $crate::option::Env;
+                $body
+            }
+            $crate::ItemKind::NodeSet => {
+                type $R = $crate::option::NodeSet;
+                $body
+            }
+            $crate::ItemKind::Save => {
+                type $R = $crate::output::Save;
+                $body
+            }
+            $crate::ItemKind::Print => {
+                type $R = $crate::output::Print;
+                $body
+            }
+            $crate::ItemKind::Measure => {
+                type $R = $crate::output::Measure;
+                $body
             }
         }
     };

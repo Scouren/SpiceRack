@@ -389,6 +389,11 @@ pub(crate) struct UserCall {
     pub(crate) args: ExprList,
 }
 
+/// The powers of ten a scale letter states (A3): a `Scale` literal's `exp10` is one of these.
+const SCALES: [i16; 12] = [-18, -15, -12, -9, -6, -3, -2, 3, 6, 9, 12, 15];
+/// `|mantissa|` is below this (10^18).
+const MANTISSA_BOUND: u64 = 1_000_000_000_000_000_000;
+
 const _: () = assert!(size_of::<ExprTag>() == 1);
 const _: () = assert!(size_of::<ExprTag>() + 1 + 2 * size_of::<u32>() == 10);
 const _: () = assert!(size_of::<UserCall>() == 16);
@@ -425,7 +430,26 @@ impl ExprTag {
 impl Expr {
     /// The row tag this view decodes.
     pub const fn tag(self) -> ExprTag {
-        todo!()
+        match self {
+            Expr::Num(_) => ExprTag::Num,
+            Expr::Str(_) => ExprTag::Str,
+            Expr::Param(_) => ExprTag::Param,
+            Expr::Call(..) => ExprTag::Call,
+            Expr::UserCall(..) => ExprTag::UserCall,
+            Expr::Unary(..) => ExprTag::Unary,
+            Expr::Binary(..) => ExprTag::Binary,
+            Expr::Ternary(..) => ExprTag::Ternary,
+            Expr::V(..) => ExprTag::V,
+            Expr::I(_) => ExprTag::I,
+            Expr::Time => ExprTag::Time,
+            Expr::Temp => ExprTag::Temp,
+            Expr::Freq => ExprTag::Freq,
+            Expr::TStep => ExprTag::TStep,
+            Expr::TStop => ExprTag::TStop,
+            Expr::Tnom => ExprTag::Tnom,
+            Expr::Draw(..) => ExprTag::Draw,
+            Expr::List(_) => ExprTag::List,
+        }
     }
 }
 
@@ -512,13 +536,54 @@ impl Func {
     /// The argument count range `(min, max)`; `max == u8::MAX` means unbounded (`Pwl`: 3, 5, 7,
     /// …). The one fact table `check` and the parsers use; exhaustive over members.
     pub const fn arity(self) -> (u8, u8) {
-        todo!()
+        match self {
+            Func::Abs
+            | Func::Sqrt
+            | Func::SqrtAbs
+            | Func::Exp
+            | Func::ExpLin14
+            | Func::Ln
+            | Func::LnAbs
+            | Func::Log10
+            | Func::Floor
+            | Func::Ceil
+            | Func::Trunc
+            | Func::RoundHalfAway
+            | Func::RoundHalfEven
+            | Func::Sgn
+            | Func::Sin
+            | Func::Cos
+            | Func::Tan
+            | Func::Asin
+            | Func::Acos
+            | Func::Atan
+            | Func::Sinh
+            | Func::Cosh
+            | Func::Tanh
+            | Func::Asinh
+            | Func::Acosh
+            | Func::Atanh
+            | Func::Step
+            | Func::Ramp
+            | Func::Ddt
+            | Func::Idt => (1, 1),
+            Func::Pow
+            | Func::PowAbs
+            | Func::PowRe
+            | Func::Min
+            | Func::Max
+            | Func::Atan2
+            | Func::Hypot
+            | Func::Fmod => (2, 2),
+            Func::Clamp => (3, 3),
+            Func::Pwl => (3, u8::MAX),
+        }
     }
 
     /// Whether the function reads the circuit's time history (`Ddt`, `Idt`), so it is legal only
     /// where an expression may read the circuit.
     pub const fn reads_circuit(self) -> bool {
-        todo!()
+        matches!(self, Func::Ddt | Func::Idt)
     }
 }
 
@@ -536,7 +601,10 @@ impl Dist {
 
     /// The argument count range `(min, max)`, as each member's doc lists them.
     pub const fn arity(self) -> (u8, u8) {
-        todo!()
+        match self {
+            Dist::AbsGauss | Dist::RelGauss => (3, 3),
+            Dist::AbsUnif | Dist::RelUnif | Dist::Limit => (2, 2),
+        }
     }
 }
 
@@ -583,7 +651,13 @@ impl Literal {
     /// The correctly rounded double of the exact decimal value (round half to even), what the
     /// reference evaluator and the passes compute with. Not any simulator's arithmetic.
     pub fn value(self) -> f64 {
-        todo!()
+        let (m, k) = self.exact();
+        // Rust's decimal parser rounds correctly (round half to even), the IR's reference rule
+        let v: f64 = format!("{m}e{k}")
+            .parse()
+            .expect("a decimal literal parses");
+        debug_assert!(!v.is_nan(), "a decimal is never NaN");
+        v
     }
 
     /// The shortest decimal that reads back to `value` under [`Literal::value`], in engineering
@@ -592,17 +666,92 @@ impl Literal {
     /// that is a multiple of 3 otherwise; zero is [`Literal::ZERO`]. Asserts `value` is finite
     /// (the NaN gate, C9). For built numbers only: a reader passes the digits it read.
     pub fn from_f64(value: f64) -> Literal {
-        todo!()
+        assert!(value.is_finite(), "a built number is finite");
+        if value == 0.0 {
+            return Literal::ZERO;
+        }
+        // shortest round-trip digits: `d.ddde±x`
+        let sci = format!("{:e}", value.abs());
+        let (digits, x) = sci.split_once('e').expect("`{:e}` has an exponent");
+        let x: i32 = x.parse().expect("`{:e}`'s exponent is an integer");
+        let digits: String = digits.chars().filter(|c| *c != '.').collect();
+        let n = digits.len() as i32;
+        let m: i64 = digits.parse().expect("at most 17 significant digits");
+        // value = m × 10^p; engineering exponent e3 = the multiple of 3 at or below x
+        let p = x - (n - 1);
+        let e3 = x.div_euclid(3) * 3;
+        let (mantissa, frac) = if p >= e3 {
+            (m * 10i64.pow((p - e3) as u32), 0)
+        } else {
+            (m, (e3 - p) as u8)
+        };
+        assert!(
+            mantissa.unsigned_abs() < MANTISSA_BOUND,
+            "17 digits and two zeros stay under 10^18"
+        );
+        let form = if e3 == 0 {
+            NumForm::Plain
+        } else if SCALES.contains(&(e3 as i16)) {
+            NumForm::Scale
+        } else {
+            NumForm::Exponent
+        };
+        let sign = if value < 0.0 { -1 } else { 1 };
+        Literal {
+            mantissa: sign * mantissa,
+            frac,
+            exp10: e3 as i16,
+            form,
+        }
     }
 
     /// Whether the two literals state the same exact decimal number (`1k` and `1e3`; `Mil`
     /// compared after its factor). Exact: no rounding to a double.
     pub fn eq_value(self, other: Literal) -> bool {
-        todo!()
+        self.normal() == other.normal()
     }
 
     /// Whether the literal meets every invariant on [`Literal`].
     pub fn is_valid(self) -> bool {
-        todo!()
+        let shape = self.mantissa.unsigned_abs() < MANTISSA_BOUND
+            && self.frac <= 18
+            && match self.form {
+                NumForm::Plain | NumForm::Mil => self.exp10 == 0,
+                NumForm::Scale => SCALES.contains(&self.exp10),
+                NumForm::Exponent => true,
+            }
+            && (self.mantissa != 0 || self == Literal::ZERO);
+        shape && self.value().is_finite()
+    }
+}
+
+// ---- private ----
+
+impl Literal {
+    /// The exact value as `m × 10^k` (`Mil` folded in: 25.4e-6 = 254 × 10^-7).
+    fn exact(self) -> (i128, i32) {
+        let k = self.exp10 as i32 - self.frac as i32;
+        match self.form {
+            NumForm::Mil => (self.mantissa as i128 * 254, k - 7),
+            NumForm::Plain | NumForm::Exponent | NumForm::Scale => (self.mantissa as i128, k),
+        }
+    }
+
+    /// The exact value with trailing zeros moved into the power: equal decimals give equal pairs.
+    fn normal(self) -> (i128, i32) {
+        let (mut m, mut k) = self.exact();
+        if m == 0 {
+            return (0, 0);
+        }
+        // at most 21 digits (an 18-digit mantissa times 254)
+        for _ in 0..24 {
+            if m % 10 != 0 {
+                break;
+            }
+            m /= 10;
+            k += 1;
+        }
+        debug_assert!(m % 10 != 0, "every trailing zero moved");
+        (m, k)
     }
 }

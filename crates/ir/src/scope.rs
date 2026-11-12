@@ -65,11 +65,28 @@ impl Design {
     /// The definition of `kind` named `name` visible from `scope`: the innermost along the
     /// parent chain, or `NONE`. O(scope depth) hash lookups.
     pub fn lookup(&self, scope: ScopeId, kind: DefKind, name: NameId) -> DefId {
-        todo!()
+        assert!(scope.index() < self.scopes.len(), "a scope id in range");
+        let mut at = scope;
+        // bounded by the scope count: each step moves to a parent
+        for _ in 0..=self.scopes.len() {
+            if at.is_none() {
+                return DefId::NONE;
+            }
+            if let Some(&def) = self.def_index.get(&(at, kind, name)) {
+                return def;
+            }
+            at = self.scopes[at.index()].parent;
+        }
+        unreachable!("the scope tree is acyclic")
     }
 
     /// The file whose path is `path`, or `NONE`. O(files), at most [`crate::id::FILES_MAX`].
     pub fn find_file(&self, path: &str) -> FileId {
-        todo!()
+        let name = self.names.get(path);
+        if name.is_none() {
+            return FileId::NONE;
+        }
+        let at = self.files.iter().position(|f| f.path == name);
+        at.map_or(FileId::NONE, |i| FileId(i as u16))
     }
 }
