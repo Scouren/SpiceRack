@@ -63,7 +63,8 @@ Each line: question → choice → why.
     design's files (the `Sources` path is not used) → IR text is self-describing.
 22. L1's "statement count in = out" → not asserted for `ir` (no statement counter the IR exposes);
     L1 asserts the read returns, L2 that `check` adds no `X` row, and the empty-text case that ""
-    and "\n" read as one file with no item and no row. L6's corpus for `ir` is a kernel-kinds text
+    (zero bytes, R46; "\n" is each dialect's own fixture) reads as one file with no item and no
+    row. L6's corpus for `ir` is a kernel-kinds text
     and the worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous
     with one row.
 23. `Write::admits` (AMEND-A12 S1) → default empty; `dialect::legalize` calls it last; `write`'s debug
@@ -126,6 +127,38 @@ Each line: question → choice → why.
     "Items carrying the feature" are `check_legal(ALL − removes)`'s `U0001` rows for it; a note
     counts when it is one of `Pass::notes` at the same span. Planted bugs: a no-op `deck_title`
     turned P2 and the fixtures red; `requires: EMPTY` turned P3 red.
+
+33. Pass fixtures state their notes (A26) → a sidecar `<case>.notes` beside `<case>.out.ir`: the
+    codes the pass appended, one a line, in order (`U0101`), `#` comments. Absent means "the
+    pass appends nothing"; a pass that appends a row with no sidecar fails, and so does a
+    sidecar listing what it did not append. A sidecar over a header line: `.out.ir` stays the
+    exact canonical text `dump` writes.
+34. L1/L2 on card-shaped text → `tests/dialect_mutants.rs` (its own binary: `dialect_laws.rs` is at
+    the 500-line cap), 32 seeded token mutants per fixture deck (`tests/fixtures/dialect/<row>/
+    read/**`, the corpus under `--features corpus`): a `k=v` duplicated, a key renamed to another
+    key of the deck, a token dropped, two tokens swapped, a line duplicated or moved. Each mutant
+    is read by the row's reader and checked apart (not through `dialect::read`, whose debug
+    assertion would hide the `X` code); a panic is caught; each distinct failure is reported once
+    with its deck, seed and the mutant shrunk line by line. The `ir` row's decks are new:
+    `tests/fixtures/dialect/ir/read/{worked,kernel}.ir`. Its first run found three IR-text
+    reader holes (KNOWN): `ir::parse` pushes an element row `check` refuses instead of a `P9001`
+    for a second element of one name (X0016), a key of another kind (`dc=` on a resistor,
+    X0015) and a terminal count out of range (X0006).
+
+35. A25 (R48) in the laws → shrink to admitted in `tests/common/laws.rs` (included by
+    `dialect_laws.rs` by path; a one-file folder fails check_style.py, `common/` is the house
+    place): a refused generated design loses the items its refusals name, then what `check` no
+    longer accepts, to a fixpoint; a refusal at no item (or at an item a pass made) skips the
+    seed, counted by code. Kernel surprise: dropping a scope-owning item with `items_mut` (the
+    editor's "dead item" door) makes `check` report `ScopeOwner` at no item for the dead body;
+    the harness ignores that row when the scope's owner is unlisted (request: `check` skips
+    scopes whose owner is dead, or reports at the owner). Self-test: a stub whose `admits`
+    refuses every non-element admits 0 of 64 as generated; shrunk, L4 sees its planted writer
+    panic on a capacitor. The reach list over 512 seeds (64 left 2 waves and 16 families unreached
+    for `ir`; 512 reaches every kind): `KNOWN_REACH` empty. L4's own item-kind check is replaced
+    by the reach list.
+36. P2 by item → `Diag::item`; self-test: a pass noting the first comment and leaving all fails P2
+    (by span it passed: generated spans are all `NONE`).
 
 ## Requests (ruled by the lead)
 

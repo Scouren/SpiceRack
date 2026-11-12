@@ -18,7 +18,7 @@
 //! Cites: VD expr-operators, expr-functions, expr-special, expr-constants,
 //! dev-builtin-behavioral (Functions); R13 (sugar).
 //!
-//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`,
+//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`,
 //! `PROBE_IN_PARAM`, `check_expr`, `expr` (crate-private)
 
 use super::name;
@@ -51,6 +51,8 @@ pub(super) struct Refusal {
 pub(super) const NOT_A_NUMBER: ir::Code = ir::Code::new(b'P', 2001);
 /// `inf` or `nan` as a value.
 pub(super) const NOT_FINITE: ir::Code = ir::Code::new(b'P', 2002);
+/// An integer literal past 32 bits, which VACASK wraps (run iw1).
+pub(super) const WIDE_INT: ir::Code = ir::Code::new(b'P', 2009);
 /// `v()`, `i()`, `ddt()`, `idt()` or `$abstime` outside a behavioural source.
 pub(super) const PROBE_IN_PARAM: ir::Code = ir::Code::new(b'P', 2006);
 
@@ -72,6 +74,7 @@ pub(super) const FEATURES: ir::FeatureSet = dynamic(static_funcs(ir::FeatureSet:
     .with(ir::Feature::Expr(ir::ExprTag::I))
     .with(ir::Feature::Expr(ir::ExprTag::Time))
     .with(ir::Feature::Extra(ir::Extra::IntLiteral))
+    .with(ir::Feature::Extra(ir::Extra::LongLiteral))
     .with(ir::Feature::Unary(ir::UnOp::Neg))
     .with(ir::Feature::Unary(ir::UnOp::Not))
     .with(ir::Feature::Unary(ir::UnOp::BitNot))
@@ -116,6 +119,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an infinite or NaN value",
             cite: "VD input-numbers (special values); IR-KERNEL C9 (the NaN gate)",
             explain: "VACASK reads `inf` and `nan`; the IR holds only finite numbers. The statement is kept as text and the deck refused.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        WIDE_INT,
+        ir::Info {
+            title: "an integer literal past 32 bits",
+            cite: "DIALECT-VACASK Appendix A run iw1",
+            explain: "VACASK's integers are 32 bits and a wider literal wraps (`2147483648` is -2147483648, `99999999999` is 1215752191); the IR's integer does not wrap. Write it with a point to make it real.",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -332,9 +344,11 @@ fn check(
     }
     let down = |k: u32| check(l, k, ctx, dynamic, depth + 1);
     match ast.tag(n) {
-        Tag::Num => number::lex(&token(l, n))
-            .map(|_| ())
-            .map_err(|_| refuse(NOT_A_NUMBER, InvalidInSource)),
+        Tag::Num => number::lex(&token(l, n)).map(|_| ()).map_err(|e| match e {
+            number::NotANumber::Grammar => refuse(NOT_A_NUMBER, InvalidInSource),
+            number::NotANumber::NotFinite => refuse(NOT_FINITE, InvalidInSource),
+            number::NotANumber::IntRange => refuse(WIDE_INT, Private),
+        }),
         Tag::Str => Ok(()),
         Tag::Ident | Tag::Word => {
             let name = name_of(l, n);
@@ -409,8 +423,8 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
     let ast = &l.cst.ast;
     match ast.tag(n) {
         Tag::Num => {
-            let literal = number::lex(&token(l, n)).expect("checked").literal;
-            l.b.literal(literal)
+            let number = number::lex(&token(l, n)).expect("checked");
+            number::push(l.b, &number, false)
         }
         Tag::Str => {
             let text = token(l, n);
@@ -443,11 +457,8 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
         Tag::Unary => {
             let (op, operand) = (token(l, n), ast.lhs(n));
             if op == "-" && is_number(l, Node(operand)) {
-                let mut literal = number::lex(&token(l, Node(operand)))
-                    .expect("checked")
-                    .literal;
-                literal.mantissa = -literal.mantissa;
-                return l.b.literal(literal);
+                let number = number::lex(&token(l, Node(operand))).expect("checked");
+                return number::push(l.b, &number, true);
             }
             let x = build(l, operand, ctx);
             match op.as_str() {

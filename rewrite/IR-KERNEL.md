@@ -371,6 +371,36 @@ generated item (every kind of all three owners, since round 4), an identity
 rule changes no id, a wrapping rule changes every visited root and no `eval` value, and `check`
 finds nothing after either.
 
+**A18 (2026-11-12): a literal keeps digits its mantissa cannot hold (R37).** `NumForm::Long`: the
+significand as written (`[-]digits[.digits]`) lives in the design's long-literal pool beside the
+literal table; the row (still 16 bytes) holds its pool index in `mantissa`, the power in `exp10`,
+and the form that power was written in (`Plain`, `Exponent`, `Scale`) in `frac`. One bound
+decides long against short, `literal::exceeds_mantissa(significant_digits(..))`: more than 18
+significant digits, leading zeros not counted and trailing zeros as written counted (`0.000123`
+is 3 digits, `1.2300` is 5), the count a short mantissa holds; the lexer, `Builder::long_literal`
+and `check` call it, so no value has two rows. Value: the correctly rounded double of the digits
+(`Design::literal_value`). Equality: exact decimal equality, digits and power after stripping
+zeros, never the doubles (`Design::literal_eq`, and `eq_meaning` through it); an `Int` equals
+only an `Int`; `eq_ignoring_spans` compares the digits as written. The bare row's
+`Literal::value`, `eq_value` and `text::write_literal` assert "not Long", and `is_valid` is
+false for it; every generic caller goes through the design (`literal_value`, `literal_eq`,
+`long_digits`, `text::write_num`). IR text spells the digits as written, then the power in its
+form. `Extra::LongLiteral` marks one; the generator makes them only when the set has it.
+
+**A26 (2026-11-12): the expression door takes a form.** `pub enum Form { Static, Dynamic }` and
+`root_form(design, root, use) -> Form`: `Dynamic` when the root's field may read the circuit
+(`ExprUse::Circuit`) or its tree is of class `Temp` or above; the one decision, which
+`features_used` makes through the same private rule. `rewrite_exprs_in(design, form, rule)` is
+`rewrite_exprs` restricted to the roots of one form (decided before the pass appends anything):
+a root of the other form keeps its id, and a subtree shared by roots of both forms is rewritten
+for the one and kept for the other. Property: with a wrapping rule of `-(-e)`, the other form's
+`Neg` feature is never added, its roots keep their ids, and every root keeps its value.
+
+**A25 (2026-11-12): a row names its item (R48).** `Diag.item: ItemRef` (`ItemRef::NONE` when a
+row is about no item) and `Diags::push_at(code, design, item, arg)`, which takes the span from
+the item. `check`, `check_legal` and every row's own check push at the item, so a design built
+with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

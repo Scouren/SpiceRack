@@ -10,27 +10,38 @@
 //!
 //! An integer literal is `NumForm::Int` (A12 K1); every other form is real, and the writer
 //! spells a whole `Plain` number with a trailing point (`2.`) so that VACASK reads it real.
+//! VACASK's integers are 32 bits and wrap (run iw1: `2147483648` is −2147483648,
+//! `99999999999` is 1215752191): an integer literal past `i32` is refused here (`IntRange`).
+//! A real with more significant digits than a mantissa holds is a `Long` literal, its digits
+//! kept as written (A18, R37): VACASK rounds them correctly (run lr1, ties to even).
 //!
 //! Cites: VD input-numbers; `rewrite/INV-semantics.md` 1.01–1.07, 1.13; `IR-KERNEL.md` A3.
 //!
-//! Contents: `Number`, `NotANumber`, `lex`, `spell` (crate-private)
+//! Contents: `Number`, `NotANumber`, `lex`, `push`, `spell`, `int_fits` (crate-private)
 
 use crate::ir;
 
 /// A number as VACASK reads it.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) struct Number {
-    /// The digits as written.
+    /// The digits as written; for a long one, only its `exp10` and written `form` are read.
     pub(super) literal: ir::Literal,
     /// VACASK types it integer (digits only, or hex).
     pub(super) int: bool,
+    /// A long literal's significand as written (`digits[.digits]`, no sign), or `None`.
+    pub(super) long: Option<String>,
 }
 
 /// Why a token is no VACASK number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum NotANumber {
-    /// Not VACASK's grammar (`1k5`, `1e3k`, `1d3`), or more than 18 significant digits.
+    /// Not VACASK's grammar (`1k5`, `1e3k`, `1d3`), or more than 18 digits after the point
+    /// with no more than 18 significant ones.
     Grammar,
+    /// An integer past `i32`, which VACASK wraps to 32 bits (run iw1).
+    IntRange,
+    /// A long literal whose value is not finite.
+    NotFinite,
 }
 
 /// The most digits a literal's mantissa holds (`|mantissa| < 10^18`, A3).
@@ -78,9 +89,10 @@ pub(super) fn lex(text: &str) -> Result<Number, NotANumber> {
     if let Some(hex) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
         let ok = !hex.is_empty() && hex.len() <= 15 && hex.bytes().all(|b| b.is_ascii_hexdigit());
         let value = i64::from_str_radix(hex, 16).map_err(|_| NotANumber::Grammar)?;
-        return match ok {
-            true => Ok(int_literal(value)),
-            false => Err(NotANumber::Grammar),
+        return match (ok, int_fits(value)) {
+            (true, true) => Ok(int_literal(value)),
+            (true, false) => Err(NotANumber::IntRange),
+            (false, _) => Err(NotANumber::Grammar),
         };
     }
     let mut at = 0;
@@ -109,12 +121,41 @@ pub(super) fn lex(text: &str) -> Result<Number, NotANumber> {
         Some(b'e' | b'E') => (exponent(&rest[1..])?, ir::NumForm::Exponent),
         Some(_) => scale(rest)?,
     };
+    let int = !point && form == ir::NumForm::Plain;
     let significant = digits.trim_start_matches('0').len();
-    if significant > DIGITS_MAX || frac > DIGITS_MAX {
+    if int && significant > DIGITS_MAX {
+        return Err(NotANumber::IntRange);
+    }
+    if ir::literal::exceeds_mantissa(significant) {
+        let whole = &digits[..digits.len() - frac];
+        let significand = match frac {
+            0 => whole.to_string(),
+            _ => format!("{whole}.{}", &digits[digits.len() - frac..]),
+        };
+        let finite = format!("{significand}e{exp10}")
+            .parse::<f64>()
+            .is_ok_and(f64::is_finite);
+        if !finite {
+            return Err(NotANumber::NotFinite);
+        }
+        let literal = ir::Literal {
+            exp10,
+            form,
+            ..ir::Literal::ZERO
+        };
+        return Ok(Number {
+            literal,
+            int,
+            long: Some(significand),
+        });
+    }
+    if frac > DIGITS_MAX {
         return Err(NotANumber::Grammar);
     }
     let mantissa: i64 = digits.parse().map_err(|_| NotANumber::Grammar)?;
-    let int = !point && form == ir::NumForm::Plain;
+    if int && !int_fits(mantissa) {
+        return Err(NotANumber::IntRange);
+    }
     let literal = ir::Literal {
         mantissa,
         frac: u8::try_from(frac).expect("checked above"),
@@ -127,15 +168,52 @@ pub(super) fn lex(text: &str) -> Result<Number, NotANumber> {
         false => literal,
     };
     match literal.is_valid() {
-        true => Ok(Number { literal, int }),
+        true => Ok(Number {
+            literal,
+            int,
+            long: None,
+        }),
         false => Err(NotANumber::Grammar),
     }
+}
+
+/// Pushes number `n` (negated when `negative`) as a literal row.
+pub(super) fn push(b: &mut ir::Builder<'_>, n: &Number, negative: bool) -> ir::ExprId {
+    match &n.long {
+        Some(digits) => {
+            let sign = if negative { "-" } else { "" };
+            b.long_literal(&format!("{sign}{digits}"), n.literal.exp10, n.literal.form)
+        }
+        None => {
+            let mut literal = n.literal;
+            if negative {
+                literal.mantissa = -literal.mantissa;
+            }
+            b.literal(literal)
+        }
+    }
+}
+
+/// Whether integer `value` is one of VACASK's (32 bits: run iw1).
+pub(super) fn int_fits(value: i64) -> bool {
+    i32::try_from(value).is_ok()
 }
 
 /// Appends VACASK's spelling of `literal`: its digits, then `e<exp10>` (Exponent), VACASK's
 /// letter for the power (Scale; `meg` for 10⁶, never `M`; a power VACASK has no letter for as
 /// `e<exp10>`), `mil` (Mil), or nothing (Plain). A negative mantissa is spelled with its `-`.
-pub(super) fn spell(literal: ir::Literal, out: &mut String) {
+/// A long literal (of `design`) is its significand as written, with a point when it has none
+/// and its power is plain (else VACASK reads an integer), then its power the same way.
+pub(super) fn spell(design: &ir::Design, literal: ir::Literal, out: &mut String) {
+    if let Some((digits, written)) = design.long_digits(literal) {
+        out.push_str(digits);
+        match written {
+            ir::NumForm::Plain if !digits.contains('.') => out.push('.'),
+            ir::NumForm::Plain => {}
+            _ => power(literal.exp10, written, out),
+        }
+        return;
+    }
     if literal.mantissa < 0 {
         out.push('-');
     }
@@ -156,11 +234,8 @@ pub(super) fn spell(literal: ir::Literal, out: &mut String) {
         ir::NumForm::Plain if literal.frac == 0 => out.push('.'),
         ir::NumForm::Plain => {}
         ir::NumForm::Mil => out.push_str("mil"),
-        ir::NumForm::Exponent => out.push_str(&format!("e{}", literal.exp10)),
-        ir::NumForm::Scale => match SCALE_LETTERS.iter().find(|(p, _)| *p == literal.exp10) {
-            Some((_, letter)) => out.push_str(letter),
-            None => out.push_str(&format!("e{}", literal.exp10)),
-        },
+        form @ (ir::NumForm::Exponent | ir::NumForm::Scale) => power(literal.exp10, form, out),
+        ir::NumForm::Long => unreachable!("long_digits spells a Long literal"),
     }
 }
 
@@ -176,6 +251,17 @@ fn int_literal(value: i64) -> Number {
             form: ir::NumForm::Int,
         },
         int: true,
+        long: None,
+    }
+}
+
+/// A power of ten written as `form`: `e<exp10>`, or VACASK's letter (`e<exp10>` for a power it
+/// has no letter for).
+fn power(exp10: i16, form: ir::NumForm, out: &mut String) {
+    let letter = SCALE_LETTERS.iter().find(|(p, _)| *p == exp10);
+    match (form, letter) {
+        (ir::NumForm::Scale, Some((_, letter))) => out.push_str(letter),
+        _ => out.push_str(&format!("e{exp10}")),
     }
 }
 
@@ -244,11 +330,25 @@ mod tests {
             ("3m", lit(3, 0, -3, Scale), false),
         ];
         for &(text, want, int) in cases {
-            assert_eq!(lex(text), Ok(Number { literal: want, int }), "{text}");
+            let n = Number {
+                literal: want,
+                int,
+                long: None,
+            };
+            assert_eq!(lex(text), Ok(n), "{text}");
         }
-        for bad in ["1k5", "1e3k", "1d3", "12345678901234567890", "1x2"] {
+        for bad in ["1k5", "1e3k", "1d3", "1x2"] {
             assert_eq!(lex(bad), Err(NotANumber::Grammar), "{bad}");
         }
+        // Run iw1: VACASK's integers are 32 bits.
+        for wide in ["2147483648", "12345678901234567890", "0x80000000"] {
+            assert_eq!(lex(wide), Err(NotANumber::IntRange), "{wide}");
+        }
+        assert!(lex("2147483647").is_ok());
+        // A18: more than 18 significant digits of a real are kept as written.
+        let long = lex("1.0000000000000001110223k").expect("a long literal");
+        assert_eq!(long.long.as_deref(), Some("1.0000000000000001110223"));
+        assert_eq!((long.literal.exp10, long.literal.form), (3, Scale));
     }
 
     /// Oracle: the same table read back (`spell` then `lex` gives the literal).
@@ -267,9 +367,10 @@ mod tests {
             (lit(2, 0, 0, Plain), "2."),
             (ir::Literal::ZERO, "0."),
         ];
+        let design = ir::Design::new();
         for (l, want) in cases {
             let mut out = String::new();
-            spell(l, &mut out);
+            spell(&design, l, &mut out);
             assert_eq!(out, want, "{l:?}");
         }
     }

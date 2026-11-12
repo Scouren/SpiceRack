@@ -1,0 +1,9 @@
+file "rc.sp" deck
+  title "rc divider"
+  param rval = 1k
+  subckt div (in out gnd) r=rval
+    element resistor r1 (in out) value=r
+    element resistor r2 (out gnd) value=(r / 2)
+  element instance x1 (a b 0) model=div
+  element vsource v1 (a 0) dc=1.8
+  analysis op

@@ -183,7 +183,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             _ => None,
         };
         if let Some(code) = refused {
-            diags.push(code, design.span_of(at), 0);
+            diags.push_at(code, design, at, 0);
         }
     }
 }
