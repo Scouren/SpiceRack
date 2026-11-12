@@ -44,11 +44,18 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l7",
-    "ngspice",
-    "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l5",
+        "ngspice",
+        "seed 11 Untyped: a head default bound lexically to an outer parameter (`g28=(acos(atanh(g5)))`, g5 the top's) reads back unbound (`g5?`, R53: ngspice reads a default where the instance stands); R53's deferred case, a feature ngspice lacks, for the lead",
+    ),
+    (
+        "l7",
+        "ngspice",
+        "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
+    ),
+];
 
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;
