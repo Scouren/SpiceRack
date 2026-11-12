@@ -208,3 +208,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `map_refs` (A9) visits, in this fixed order: an analysis's DC axes' targets; a sweep loop's target or a table loop's columns; an alter's target; a statistics block's process then mismatch variations, then each correlation's two ends. An element target's `a` is a name, never visited.
 - `design_features` sets `SeveralAnalyses`, `OptionMidRun` and `LoopScoped` (reported at `Span::NONE`); `NodeSetInSubckt` and `LoopNested` are set per row from its scope.
 - Generators choose a kind whose detail they can build before interning anything (a failed attempt would leave a stray name), build in the parse's order (names and lists exactly where the text puts them), require `Expr(Num)` (`Gen::expr` asserts it), leave loop bodies to the kernel, and keep a non-string alter value free of strings.
+
+## The spine's two text requests
+
+- `text::parse` gives every span (an item's, a `TEXT_SYNTAX` row's) the file of the block its line sits in (`FileId::NONE` for a `file` line itself), with byte offsets into the whole text handed to `parse`. `Words` carries the line's file in a crate field, so every reader's `line_span()`/`span()` is right without a change on the owners' side.
+- `Design::entry` is total: `FileId::NONE` for a design with no file; a caller that needs a file asserts.

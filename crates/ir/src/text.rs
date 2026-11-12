@@ -292,7 +292,9 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
     }
 }
 
-/// Reads one or more `file` blocks into `b`. Total: a line it cannot read appends a
+/// Reads one or more `file` blocks into `b`. Every span it makes (an item's, a `TEXT_SYNTAX`
+/// row's) names the file block its line sits in (`FileId::NONE` for a `file` line itself) and
+/// holds byte offsets into `text`, the whole text handed to `parse`, not into its block. Total: a line it cannot read appends a
 /// `diag::TEXT_SYNTAX` row (span: the line's bytes in `text`, file `NONE`) and is skipped; what
 /// it can read is still built. Each item line goes to its kind's `RowFacts::parse` by its keyword
 /// (one exhaustive dispatch over `ItemKind`); then `link` binds every reference, `name?` ones
@@ -313,11 +315,17 @@ pub fn parse(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
             skip_deeper = None;
         }
         let before = diags.len();
+        // the line's file: the block it sits in (a `file` line itself is in none)
+        let file = match stack.first() {
+            Some(&top) if depth > 0 => b.design().scope(top).file,
+            Some(_) | None => FileId::NONE,
+        };
         let mut w = Words {
             text,
             pos: at,
             end,
             line: at,
+            file,
         };
         let failed = statement(
             &mut w,
@@ -489,6 +497,7 @@ fn if_conditions(
             pos: at,
             end,
             line: at,
+            file: w.file,
         };
         match (d == depth).then(|| line.next()).flatten() {
             Some("elif") => {
