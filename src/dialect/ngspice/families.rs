@@ -420,6 +420,7 @@ mod tests {
             "Ccvs",
             "Cccs",
             "Mutual",
+            "TlineIdeal",
             "CodeModel",
             "Module",
             "Other",
