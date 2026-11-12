@@ -19,13 +19,14 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod dc_axes_to_loops`, `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
 
 mod codes;
 pub mod dc_axes_to_loops;
+pub mod device_ic;
 pub mod ic_next_only;
 pub mod loop_end;
 pub mod names_dropped;
@@ -146,6 +147,18 @@ pub(super) const PASSES: &[Pass] = &[
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranPrintStep)),
         notes: &[fs::FIRST_STEP_KEPT, fs::NO_STEP_VALUE],
         run: fs::tran_first_step_to_print,
+    },
+    Pass {
+        name: "device_ic_to_tran_ic",
+        removes: ir::Feature::Circuit(ir::CircuitExtra::IcUicOnly),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Item(ir::ItemKind::NodeSet))
+            .with(ir::Feature::Run(RunExtra::IcNextOnly))
+            .with(ir::Feature::Run(RunExtra::IcDifferential))
+            .with(ir::Feature::Run(RunExtra::NodeSetFromHere))
+            .with(ir::Feature::Run(RunExtra::NodeSetMidRun)),
+        notes: &[device_ic::DEVICE_IC_KEPT],
+        run: device_ic::device_ic_to_tran_ic,
     },
     Pass {
         name: "ic_beyond_next_to_next_only",

@@ -1,0 +1,7 @@
+floating cap ic=2 without uic
+* settle (device_ic_to_tran_ic): ngspice-45 -b -r: v(a), v(b) 0 throughout
+r1 a 0 1k
+r2 b 0 2k
+c1 a b 1u ic=2
+.tran 10u 3m
+.end

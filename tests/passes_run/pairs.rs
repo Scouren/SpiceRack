@@ -39,6 +39,7 @@ pub const PENDING_PAIRS: &[&str] = &[
     "tran_print_step_to_simulator",
     "tran_simulator_step_to_print",
     "tran_first_step_to_print",
+    "device_ic_to_tran_ic",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
 ];

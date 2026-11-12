@@ -1,0 +1,12 @@
+cap ic as an instance parameter under icmode uic
+// settle (device_ic_to_tran_ic): VACASK: "Parameter 'ic' not found." (sp_capacitor has no ic)
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+r1 (a 0) res r=1k
+c1 (a 0) cap c=1u ic=2
+control
+  options rawfile="ascii"
+  analysis tr tran stop=1m step=10u maxstep=10u icmode="uic"
+endc
