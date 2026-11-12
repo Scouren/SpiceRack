@@ -17,8 +17,10 @@ use crate::design::Design;
 use crate::element::{DetailKind, ElemKind};
 use crate::model::{Model, ModelFamily};
 
-/// The generator's version vocabulary: per family, the model standard's versions a simulator is
-/// known to accept, so a generated design names a device that exists. Data, not a `check` rule
+/// The generator's version vocabulary: per family, the model standard's versions (what another
+/// simulator must match, not a simulator's version parameter: HiSIM2 2.8.0 where ngspice's
+/// parameter is 280, B3SOI-FD/DD 2.1 and -PD 2.2.3 and B4SOI 4.4.0 by ngspice's device
+/// descriptions where its parameter's default is 2.0 or 4.4) a simulator is known to accept, so a generated design names a device that exists. Data, not a `check` rule
 /// (a version outside it is legal IR; a dialect's `admits` decides what it runs). A versioned
 /// family without a row draws a fresh string. Provenance: ngspice-45 (tarball sha256
 /// f1aad8ab…, `src/spicelib/`), as `ng-models` read it: parser/inpdomod.c (dispatch by level
@@ -44,12 +46,12 @@ pub(crate) const VERSIONS: [(ModelFamily, &[&str]); 12] = [
         ],
     ),
     (ModelFamily::HisimHv, &["1.24", "2.20"]),
-    (ModelFamily::Hisim2, &["280"]),
+    (ModelFamily::Hisim2, &["2.8.0"]),
     (ModelFamily::Hicum2, &["2.4.0"]),
-    (ModelFamily::B4Soi, &["4.4"]),
-    (ModelFamily::B3SoiFd, &["2.0"]),
-    (ModelFamily::B3SoiDd, &["2.0"]),
-    (ModelFamily::B3SoiPd, &["2.0"]),
+    (ModelFamily::B4Soi, &["4.4.0"]),
+    (ModelFamily::B3SoiFd, &["2.1"]),
+    (ModelFamily::B3SoiDd, &["2.1"]),
+    (ModelFamily::B3SoiPd, &["2.2.3"]),
     (ModelFamily::Vbic, &["1.2", "1.3"]),
     (ModelFamily::Psp103, &["103.4"]),
     (ModelFamily::BsimBulk, &["106"]),

@@ -264,7 +264,8 @@ mod tests {
     /// accepted versions per family as `ng-models` read them (parser/inpdomod.c, b3v32set.c:86-92,
     /// b3check.c:49, b4v5check.c:64-69, b4v6check.c:815, b4v7check.c:834, b4check.c:68-70,
     /// hsmhvset.c:76-81, hsmhv2set.c:136-150, hsm2set.c:132-138, hicum2setup.c:45, b4soiset.c:124,
-    /// b3soi{fd,dd,pd}set.c:69, vbicsetup.c:360), and VACASK 36be560's as `vc-devices` read them
+    /// b3soi{fd,dd,pd}set.c:69, vbicsetup.c:360; the model standards' versions by ngspice's device
+    /// descriptions where its parameter differs: HiSIM 2.8.0, B3SOI-FD/DD 2.1, -PD 2.2.3, B4SOI 4.4.0), and VACASK 36be560's as `vc-devices` read them
     /// (VBIC 1.3, PSP 103.4, BSIM-BULK 106: module files), written here by hand.
     #[test]
     fn a_versioned_model_draws_a_published_version() {
@@ -281,12 +282,12 @@ mod tests {
                 ],
             ),
             (ModelFamily::HisimHv, &["1.24", "2.20"]),
-            (ModelFamily::Hisim2, &["280"]),
+            (ModelFamily::Hisim2, &["2.8.0"]),
             (ModelFamily::Hicum2, &["2.4.0"]),
-            (ModelFamily::B4Soi, &["4.4"]),
-            (ModelFamily::B3SoiFd, &["2.0"]),
-            (ModelFamily::B3SoiDd, &["2.0"]),
-            (ModelFamily::B3SoiPd, &["2.0"]),
+            (ModelFamily::B4Soi, &["4.4.0"]),
+            (ModelFamily::B3SoiFd, &["2.1"]),
+            (ModelFamily::B3SoiDd, &["2.1"]),
+            (ModelFamily::B3SoiPd, &["2.2.3"]),
             (ModelFamily::Vbic, &["1.2", "1.3"]),
             (ModelFamily::Psp103, &["103.4"]),
             (ModelFamily::BsimBulk, &["106"]),
