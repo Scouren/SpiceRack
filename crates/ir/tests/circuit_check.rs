@@ -1175,7 +1175,7 @@ mod tests {
             );
             let mut d = Design::new();
             let mut diags = Diags::new();
-            spicerack_ir::parse(&text, &mut d.builder(), &mut diags);
+            spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
             assert!(diags.is_empty(), "{:?}", diags.rows());
             spicerack_ir::link(&mut d, &mut diags);
             let mut out = Diags::new();

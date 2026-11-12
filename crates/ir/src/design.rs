@@ -54,7 +54,6 @@
 //!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
 //!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
 //!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
-//!   (crate)
 
 use crate::analysis::{Analysis, RunDetails};
 use crate::build::Builder;
@@ -497,11 +496,24 @@ impl Design {
 }
 
 impl Design {
-    /// Appends the child ids of `e` to `out` (operands, arguments, list elements), in order.
-    /// Total over any table contents: reads the raw columns and skips a list or a pair that does
-    /// not lie in its pool (`check` reports those), so the kernel's walks never panic on a
-    /// broken design. Does not check that a child is below `e`; the walks do.
-    pub(crate) fn children(&self, e: ExprId, out: &mut Vec<ExprId>) {
+    /// Appends the child ids of `e` to `out` (operands, arguments, list elements), in
+    /// evaluation order: a ternary's condition, then its two arms; a leaf appends nothing; an
+    /// out-of-range `e` appends nothing. Total over any table contents: reads the raw columns and
+    /// skips a list or a pair that does not lie in its pool (`check` reports those), so a walk
+    /// never panics on a broken design. Does not check that a child is below `e`. The one walk
+    /// to build on: an exhaustive match over `Expr` elsewhere repeats it.
+    ///
+    /// ```
+    /// use spicerack_ir::{BinOp, Design};
+    /// let mut d = Design::new();
+    /// let mut b = d.builder();
+    /// let (one, two) = (b.num(1.0), b.num(2.0));
+    /// let sum = b.binary(BinOp::Add, one, two);
+    /// let mut kids = Vec::new();
+    /// d.children(sum, &mut kids);
+    /// assert_eq!(kids, [one, two]);
+    /// ```
+    pub fn children(&self, e: ExprId, out: &mut Vec<ExprId>) {
         let x = &self.exprs;
         let i = e.index();
         if i >= x.tags.len() {

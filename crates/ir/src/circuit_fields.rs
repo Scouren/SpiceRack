@@ -15,7 +15,7 @@
 //! `pub(crate) trait Choice` (`Choice::get`, `Choice::set`, `Choice::words`),
 //! `pub(crate) trait Fields` (`Fields::BLANK`, `Fields::fields`), its impls for every circuit row,
 //! `pub(crate) fn element_map_exprs`, `pub(crate) fn model_map_exprs`,
-//! `pub(crate) fn element_map_names`
+//! `pub(crate) fn element_map_names`, `pub(crate) fn is_behavioural(&Design, ItemRef) -> bool`
 
 use crate::circuit_text::get_row;
 use crate::controlled::{
@@ -27,7 +27,8 @@ use crate::element::MultLaw;
 use crate::element::NO_ROW;
 use crate::element::{DetailKind, Element};
 use crate::facts::ExprUse;
-use crate::id::{ExprId, ExprList, List, NameId, NameList, ParamList};
+use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, ParamList};
+use crate::item::ItemKind;
 use crate::line::Line;
 use crate::model::Model;
 use crate::model::Polarity;
@@ -257,7 +258,9 @@ fields! {
 
 /// Calls `f` on every expression root of the element at `index`, in `element_handles`' order
 /// (`params`' values, `mult`, then the detail row's fields with their side and wave rows in
-/// place), and stores back what `f` changed (A23). Asserts `index` is in range.
+/// place), and stores back what `f` changed (A23). A `Behav` row's `expr` is reported
+/// `ExprUse::Behavioural` (R66); `roots_with_use` reads the same from the handles through
+/// `is_behavioural`. Asserts `index` is in range.
 pub(crate) fn element_map_exprs(
     design: &mut Design,
     index: u32,
@@ -275,7 +278,17 @@ pub(crate) fn element_map_exprs(
         DetailKind::Controlled => map_row::<Controlled>(design, row.detail, f),
         DetailKind::Poly => map_row::<Poly>(design, row.detail, f),
         DetailKind::Table => map_row::<TableSource>(design, row.detail, f),
-        DetailKind::Behav => map_row::<Behav>(design, row.detail, f),
+        // R66: the row's one `Dyn` field is its expression, the behavioural evaluator's own
+        DetailKind::Behav => map_row::<Behav>(design, row.detail, &mut |e, u| {
+            f(
+                e,
+                if u == ExprUse::Circuit {
+                    ExprUse::Behavioural
+                } else {
+                    u
+                },
+            )
+        }),
         DetailKind::Laplace => map_row::<Laplace>(design, row.detail, f),
         DetailKind::FreqTable => map_row::<FreqTable>(design, row.detail, f),
         DetailKind::Delay => map_row::<Delay>(design, row.detail, f),
@@ -348,6 +361,16 @@ pub(crate) fn element_map_names(design: &mut Design, index: u32, f: &mut dyn FnM
             }
         }
     }
+}
+
+/// Whether `item` is an element whose detail is a `Behav` row (a behavioural source, a
+/// charge-defined capacitor, a flux-defined inductor): its one `Handle::ExprDyn` is the
+/// behavioural evaluator's expression (R66). `false` for any other item, `ItemRef::NONE`
+/// included, and for an element out of range (`check` reports it).
+pub(crate) fn is_behavioural(design: &Design, item: ItemRef) -> bool {
+    item.kind == ItemKind::Element
+        && (item.index as usize) < design.elements.len()
+        && design.row::<Element>(item.index).kind.detail() == DetailKind::Behav
 }
 
 // ---- private ----

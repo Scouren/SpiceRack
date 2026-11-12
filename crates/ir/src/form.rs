@@ -1,10 +1,11 @@
 //! The form a root counts its functions, operators and draws in (A26, A28; R14, R51): a design
 //! and a root in, `Static`, `Dynamic` or (for a function body) `Both` out. A root counts dynamic
-//! when its field may read the circuit or its tree is of class `Temp` or above; a function body
+//! when its tree is of class `Temp` or above or its field is a behavioural source's own
+//! expression (R66, A40), static otherwise (a passive's constant value too); a function body
 //! counts in the forms of the roots that call it, transitively (it has no evaluator of its own).
 //! `features_used` and the passes' `rewrite_exprs_in` read the same rule. Split from `feature.rs`.
 //!
-//! Cites: `rewrite/AMEND-A12.md` A19, A26, A28; `rewrite/RULINGS.md` R14, R38, R51.
+//! Cites: `rewrite/AMEND-A12.md` A19, A26, A28, A40; `rewrite/RULINGS.md` R14, R38, R51, R66.
 //!
 //! Contents: `pub enum Form`, `pub fn root_form(&Design, ExprId, ExprUse) -> Form`; crate:
 //! `pub(crate) fn body_forms(&Design) -> &FxMap<ExprId, u8>`,
@@ -23,10 +24,11 @@ use crate::item::ItemKind;
 /// on: R14, A19, A26): a pass that removes one feature rewrites only the roots of its form.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Form {
-    /// The root stands in a constant-in-time field and reads nothing of class `Temp` or above.
+    /// The root reads nothing of class `Temp` or above and is no behavioural source's own
+    /// expression.
     Static,
-    /// The root stands in a field that may read the circuit, or it or what it reads is of class
-    /// `Temp` or above.
+    /// The root, or what it reads, is of class `Temp` or above, or it is a behavioural source's
+    /// own expression (R66).
     Dynamic,
     /// A function body called from roots of both forms (A28, R51): it counts in both, and no
     /// one-form pass rewrites it.
@@ -39,8 +41,9 @@ pub(crate) const STATIC: u8 = 1;
 pub(crate) const DYNAMIC: u8 = 2;
 
 /// The form a root counts its functions and operators in, given how its field reads (`use`, as
-/// `RowFacts::map_exprs` reports it): `Dynamic` for a field that may read the circuit or a tree of
-/// class `Temp` or above (A19, R14), else `Static`. The one decision: `features_used` makes it
+/// `RowFacts::map_exprs` reports it): `Dynamic` for a tree of class `Temp` or above (R14) or a
+/// behavioural source's own expression (`ExprUse::Behavioural`, R66), else `Static`, a constant
+/// root in any other field that may read the circuit included. The one decision: `features_used` makes it
 /// through the same rule. O(the tree) once the definitions' classes are cached.
 pub fn root_form(design: &Design, root: ExprId, use_: ExprUse) -> Form {
     // A28 (R51): a function body has no evaluator of its own; it is its callers' forms
@@ -64,9 +67,9 @@ pub(crate) fn body_forms(design: &Design) -> &crate::names::FxMap<ExprId, u8> {
     design.forms.get_or_init(|| compute_forms(design))
 }
 
-/// The form decision itself, shared by `root_form` and `features_used` (A26).
+/// The form decision itself, shared by `root_form` and `features_used` (A26, R66).
 pub(crate) fn form_of(use_: ExprUse, class: ExprClass) -> Form {
-    if use_ == ExprUse::Circuit || class >= ExprClass::Temp {
+    if use_ == ExprUse::Behavioural || class >= ExprClass::Temp {
         Form::Dynamic
     } else {
         Form::Static
@@ -129,7 +132,7 @@ fn compute_forms(design: &Design) -> crate::names::FxMap<ExprId, u8> {
         }
         handles.clear();
         design.item_handles(item, &mut handles);
-        for (root, use_) in roots_with_use(design, &handles) {
+        for (root, use_) in roots_with_use(design, item, &handles) {
             let nodes = walk.tree(design, root).to_vec();
             let class = crate::class::tree_class(design, root, table);
             let form = match form_of(use_, class) {
