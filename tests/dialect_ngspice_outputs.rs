@@ -37,6 +37,7 @@ const READ: &[&str] = &[
     "print_ac_parts",
     "print_invalid",
     "print_tran",
+    "probe_unread",
     "save_all",
     "save_probes",
 ];
