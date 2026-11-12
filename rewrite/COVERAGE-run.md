@@ -109,7 +109,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - H21 → `Measure` expressions read earlier measures by name (needs kernel request K2: `DefKind::Measure`).
 - H22 → gap G-PRINTFMT.
 - H23 → `ProbeKind::{ITerminal, Power, Param}`; Y-device paths `{YTRANSLINE!ERIC:len}`: gap G-YNAMES.
-- H24 → Private (Xyce operating-point files, `.INITCOND`: device IC is the circuit owner's).
+- H24 → `.INITCOND` → `NodeSet { kind: Device }`; `.DCOP input=/output=`, `.SAVE TYPE=IC`: Private (state files).
 - H25 → gap G-PORTOUT (VACASK `yin zin yout zout opdefault opfull`).
 - H26 → `r1:1` → `ITerminal`; `r1:oppoint`/`r1:all`: gap G-PORTOUT-like, category of one device: `ProbeKind::Param` per quantity (reader expands only when its list is known; else Private).
 - H27 → `probe::Probe { kind, part, terminal, a, b, expr }`; terminal index in the element kind's order; unspellable output dropped with a note: writer rule.
@@ -271,10 +271,16 @@ result-side fact (backend, harness), outside the netlist IR.
 - 13.07 → `LoopKind::Table` (`TableLoop { columns, values }`); inner analyses keep their own rows and names.
 - 13.08 → `Measure` in a loop body (one row per step); per-analysis source alters and control loops are writer lowerings.
 
-## INV-semantics rows 5.13, 5.20, 5.21 (sources, read for the analyses that use them)
+## INV-semantics rows 5.13, 5.15, 5.20, 5.21, 6.06 and the circuit owner's cross-requests
 
 - 5.13 → circuit owner (three source slots); the run half's part is which slot an analysis reads: `AnalysisKind` fixes it (DC kinds read `dc`, small-signal kinds `ac`, `Tran`/`Hb`/`Pss` the waveform), stated in the circuit owner's source doc.
-- 5.20 → circuit owner (per-tone HB drive on the source); `Hb::tones` gives the tone indices it refers to.
+- 5.20 → gap G-HBDRIVE (circuit owner's G8): the per-tone drive belongs on the source, referring to `Hb::tones` by index.
+- 5.15 → `Tran::startup` (IR-RUN §2 chose a field over the reader's PWL lowering; lowering is a pass).
+- 6.06 → `OptionKey::Scale` (the fields it multiplies are in its doc; folding is a pass).
+- D6 (circuit cross-request) → VACASK's device entry of the tran `ic` list → `NodeSet { kind: NodeSetKind::Device }`.
+- D88 → `NodeSet` in a `Subckt` scope, path relative to the body.
+- D76 `step(…)` in an LTspice source (circuit G4) → `LoopKind::Table` column with `TargetKind::ElementValue`/`DeviceParam`, one row per step (reader rule).
+- D129 Spectre `xfmag` (circuit G13) → gap G-XFMAG: `Xf` reads each source's transfer magnitude; the field is the source's (circuit owner), `Xf` names none.
 - 5.21 → circuit owner (`distof1`/`distof2` on the source); `Disto` reads them.
 
 ## Gaps and proposals
@@ -302,5 +308,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - G-VARIATION (J11, J15): HSPICE `.variation` blocks. Proposal: read into `Statistics` (global → `process`, local → `mismatch`); Private until its argument meanings are cited.
 - G-KEEPNODE (I23): LTspice `.keepnode`. Proposal: read into a `Save` of `V` probes.
 - G-TOLSCALE, G-ERRPRESET (10.02, 10.03): VACASK `tolscale`, Spectre `errpreset`. Proposal: Private (applying them at read is a conversion; a pass may expand them into the keys they scale).
+- G-HBDRIVE (5.20, circuit G8): the per-tone HB drive of a source. Proposal: the circuit owner's `HbDrive { tone (index into `Hb::tones`), harmonic, mag, phase_deg }` side row on the source; `Hb` stays as is.
+- G-XFMAG (circuit G13): Spectre `xfmag` on a source. Proposal: a source field (circuit owner); `Xf` unchanged.
 - K1 (I6): the per-key writer legality needs `Feature::Option(OptionKey)` (kernel change request).
 - K2 (H21, 9.08): measures read earlier measures by name; needs `DefKind::Measure` so the linker binds them (kernel change request).
