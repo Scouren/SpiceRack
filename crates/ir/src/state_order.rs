@@ -15,6 +15,7 @@ use crate::id::{FileId, ScopeId};
 use crate::item::ScopeKind;
 use crate::item::{ItemKind, Role};
 use crate::option::{Applies, Env, NodeSet, OptionRow};
+use crate::output::Save;
 use crate::run_extra::RunExtra;
 
 /// How a file top's item counts for `RunInterleaved`.
@@ -73,6 +74,11 @@ pub(crate) fn state_order_features(design: &Design, set: &mut FeatureSet) {
                 Some((
                     NodeSet::table(design).get(item.index).holds,
                     RunExtra::NodeSetMidRun,
+                ))
+            } else if item.kind == ItemKind::Save {
+                Some((
+                    Save::table(design).get(item.index).holds,
+                    RunExtra::SaveMidRun,
                 ))
             } else {
                 None
@@ -172,7 +178,8 @@ const fn listed(kind: ItemKind) -> Listed {
         | ItemKind::Save
         | ItemKind::Print
         | ItemKind::Measure
-        | ItemKind::Elaborate => Listed::Run,
+        | ItemKind::Elaborate
+        | ItemKind::Reset => Listed::Run,
         ItemKind::Comment | ItemKind::Opaque => Listed::Neutral,
         ItemKind::Title
         | ItemKind::Include

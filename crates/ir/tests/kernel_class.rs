@@ -204,3 +204,22 @@ fn a_field_that_may_read_the_circuit_counts_its_operators_dynamic() {
         "a constant parameter is static"
     );
 }
+
+#[test]
+fn a_draw_counts_in_its_roots_form() {
+    // A28: a draw's distribution is two features by form, as a function is (ngspice's numparam
+    // has the draws, its B-source parser none)
+    let read = |text: &str| {
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        spicerack_ir::parse(text, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        features_used(&d)
+    };
+    let draw = "draw:rel_unif:sampling:instance(1, 2)";
+    let rel = spicerack_ir::Dist::RelUnif;
+    let static_ = read(&format!("file \"t.sp\" deck\n  param p = {draw}\n"));
+    assert!(static_.contains(Feature::Dist(rel)) && !static_.contains(Feature::DistDyn(rel)));
+    let dynamic = read(&format!("file \"t.sp\" deck\n  param p = {draw} + $temp\n"));
+    assert!(dynamic.contains(Feature::DistDyn(rel)) && !dynamic.contains(Feature::Dist(rel)));
+}

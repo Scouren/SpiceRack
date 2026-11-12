@@ -39,7 +39,7 @@
 //!   `dump`, `parse`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
-//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
+//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `Reset`, `ResetSet`, `Restorable`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
 //!   `EventKind`, `MeasureKind`, `Stat`, `Env`, `IcScope`, `NodeSet`, `NodeSetKind`,
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
@@ -56,6 +56,7 @@ pub mod facts;
 pub mod build;
 pub mod build_expr;
 pub mod check;
+mod check_scopes;
 pub mod class;
 pub mod design;
 pub mod diag;
@@ -63,6 +64,7 @@ pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
+pub mod form;
 #[cfg(any(test, feature = "gen"))]
 mod gen_expr;
 #[cfg(any(test, feature = "gen"))]
@@ -134,6 +136,7 @@ mod periodic_ss_facts;
 pub mod plan;
 mod plan_facts;
 pub mod probe;
+pub mod reset;
 mod run_exprs;
 pub mod run_extra;
 mod run_words;
@@ -167,6 +170,7 @@ pub use plan::{
     Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
 };
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
+pub use reset::{Reset, ResetSet, Restorable};
 pub use rewrite::{rewrite_exprs, rewrite_exprs_in};
 pub use run_extra::RunExtra;
 pub use span::Span;
@@ -183,3 +187,5 @@ pub mod r#gen;
 // `check`'s fixtures need the crate-private tables; last, after `gen`, for check_style.py
 #[cfg(test)]
 mod check_tests;
+#[cfg(test)]
+mod form_tests;

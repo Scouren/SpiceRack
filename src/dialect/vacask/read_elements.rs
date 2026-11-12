@@ -183,6 +183,51 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        super::write_elements::MASTERLESS,
+        ir::Info {
+            title: "an element whose master VACASK would not find from its place",
+            cite: "VD cir-masters (Scope: the own subcircuit, then the toplevel); VD cir-instance (an instance's kind is its master's)",
+            explain: "VACASK knows what an instance is only from its master; a master no file defines where VACASK looks would read back as an unresolved instance, so the design has no VACASK spelling.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        super::write_elements::PORTS,
+        ir::Info {
+            title: "a subcircuit instance whose terminal count is not its subcircuit's",
+            cite: "VD cir-instance (Unconnected terminal handling); run fwd",
+            explain: "VACASK connects the terminals an instance leaves out to internal nodes and refuses extra ones; the IR states neither, so the design has no VACASK spelling.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        super::write_elements::BEHAV_FIELD,
+        ir::Info {
+            title: "a behavioural source with a temperature or parallel-resistance field",
+            cite: "VD dev-builtin-behavioral (parameters: v/potential, i/flow, expr, declarations, evaluation, discipline)",
+            explain: "VACASK's behavioural source takes its expression only; tc1, tc2, temp, dtemp and rpar have no VACASK spelling on it.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        write_models::UNPROVEN,
+        ir::Info {
+            title: "a model of a family no run proved a VACASK module implements",
+            cite: "RULINGS R41 (a); families::PROVEN and its settle decks",
+            explain: "VACASK's module is read as that family only on a run against the family's reference device; until then a model of the family has no VACASK spelling (it would read back as a user module).",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        super::write_elements::KIND,
+        ir::Info {
+            title: "an element whose kind is not its master's",
+            cite: "VD cir-instance (an instance places its master); families::kind",
+            explain: "VACASK knows an instance's kind only from its master's module; an element of another kind than its model's family gives has no VACASK spelling.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
         write_models::LACKED,
         ir::Info {
             title: "a parameter the VACASK module does not have",
@@ -459,13 +504,8 @@ fn zero_one(l: &Lower<'_, '_, '_>, value: u32) -> Option<bool> {
     let lit = super::number::lex(l.cst.tokens.text(ast.main_token(Node(value))))
         .ok()?
         .literal;
-    let int = |v| ir::Literal {
-        mantissa: v,
-        frac: 0,
-        exp10: 0,
-        form: ir::NumForm::Int,
-    };
-    match (lit.eq_value(int(0)), lit.eq_value(int(1))) {
+    // By value: `noisy=0.` is the integer 0 to VACASK (run t1).
+    match (lit.value() == 0.0, lit.value() == 1.0) {
         (true, _) => Some(false),
         (_, true) => Some(true),
         _ => None,
