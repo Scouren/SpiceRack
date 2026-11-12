@@ -23,6 +23,10 @@ pub(super) const DIV_TYPED: ir::BinOp = ir::BinOp::Div;
 pub(super) const TO_INT: ir::Func = ir::Func::Trunc;
 
 /// A12 K3: `OpaqueClass::Hint`, a solver knob. Until it lands a hint is `Private`.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "read_run (S4.3) reads solver knobs as hints")
+)]
 pub(super) const HINT: ir::OpaqueClass = ir::OpaqueClass::Private;
 
 /// A12 C5: the item `DeviceLibrary{family, path}`. Until it lands a `load` of a library file

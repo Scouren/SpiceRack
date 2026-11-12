@@ -6,7 +6,7 @@ file "structure.sim" deck
   comment " one line"
   comment " two\n lines "
   param a = 1
-  param 'q.r' = a + 2
+  param `q.r` = a + 2
   include "lib.inc" section=tt
   include "plain.inc"
   load osdi "mydev.osdi"

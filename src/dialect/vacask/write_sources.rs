@@ -13,6 +13,7 @@ use crate::ir;
 /// The parameters of one source-like `Element`.
 ///
 /// Stub (S4.2): `FEATURES` lacks every row this writes, so `legalize` refused the design first.
+#[expect(dead_code, reason = "write_elements (S4.1) calls it")]
 pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let _ = w;
     unreachable!("S4.2: no VACASK writer yet for {at:?} (FEATURES lacks it)");

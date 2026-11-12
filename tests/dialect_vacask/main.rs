@@ -9,6 +9,7 @@
 //!
 //! Contents: tests only.
 
+mod corpus;
 mod probe;
 mod read;
 mod settle;

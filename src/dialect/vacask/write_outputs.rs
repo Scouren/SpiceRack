@@ -13,6 +13,7 @@ use crate::ir;
 /// One `Save` row as its `save` line.
 ///
 /// Stub (S4.3): `FEATURES` lacks every row this writes, so `legalize` refused the design first.
+#[expect(dead_code, reason = "write_run (S4.3) calls it")]
 pub(super) fn save(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let _ = w;
     unreachable!("S4.3: no VACASK writer yet for {at:?} (FEATURES lacks it)");

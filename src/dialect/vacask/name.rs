@@ -41,16 +41,43 @@ const RESERVED: &[&str] = &[
 
 /// The name `text` (a name token as written) spells.
 pub(super) fn unquote(text: &str) -> String {
-    let _ = text;
-    todo!("S4.0: name::unquote")
+    let mut out = String::with_capacity(text.len());
+    let mut quoted = false;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match (c, quoted) {
+            ('\'', true) if chars.peek() == Some(&'\'') => {
+                chars.next();
+                out.push('\'');
+            }
+            ('\'', _) => quoted = !quoted,
+            (c, _) => out.push(c),
+        }
+    }
+    out
 }
 
 /// Appends `name` as VACASK reads it back: bare when it is an identifier (a letter, `_` or `$`,
 /// then letters, digits, `_`, `$`) and no reserved word, or at a [`Place::Node`] a
 /// non-negative integer; else `'…'` with each `'` doubled.
 pub(super) fn spell(name: &str, place: Place, out: &mut String) {
-    let _ = (name, place, out, RESERVED);
-    todo!("S4.0: name::spell")
+    let ident = name
+        .bytes()
+        .next()
+        .is_some_and(|b| b.is_ascii_alphabetic() || b == b'_' || b == b'$')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
+        && !RESERVED.contains(&name);
+    let number =
+        place == Place::Node && !name.is_empty() && name.bytes().all(|b| b.is_ascii_digit());
+    if ident || number {
+        out.push_str(name);
+        return;
+    }
+    out.push('\'');
+    out.push_str(&name.replace('\'', "''"));
+    out.push('\'');
 }
 
 #[cfg(test)]

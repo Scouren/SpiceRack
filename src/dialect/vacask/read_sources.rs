@@ -21,6 +21,7 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[];
 /// The detail of a source, controlled source, coupling or line instance.
 ///
 /// Stub (S4.2): an `Unread` opaque of the statement.
+#[expect(dead_code, reason = "read_elements (S4.1) calls it")]
 pub(super) fn source(l: &mut Lower<'_, '_, '_>, n: Node) {
     read::unread(l, n);
 }
