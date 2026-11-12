@@ -399,7 +399,10 @@ for the one and kept for the other. Property: with a wrapping rule of `-(-e)`, t
 **A25 (2026-11-12): a row names its item (R48).** `Diag.item: ItemRef` (`ItemRef::NONE` when a
 row is about no item) and `Diags::push_at(code, design, item, arg)`, which takes the span from
 the item. `check`, `check_legal` and every row's own check push at the item, so a design built
-with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes.
+with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes. `FormalNotConstant` counts a `$tnom` default (VACASK run c3). `Extra::SubcktConstantParam`: a `Param`
+listed in a `Subckt` body whose value is a constant (no parameter read, no `$tnom`, class
+`Constant`; VACASK reads it as a formal). The generator lists no `Param` in a subcircuit body
+unless the set has it.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

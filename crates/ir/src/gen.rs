@@ -396,7 +396,12 @@ fn candidates(
             ItemKind::If => opens && exprs,
             ItemKind::Loop => opens,
             ItemKind::Func => exprs,
-            ItemKind::Param => exprs,
+            // A25: a constant local of a subcircuit only when the set has it
+            ItemKind::Param => {
+                exprs
+                    && (d.scope(scope).kind != ScopeKind::Subckt
+                        || has(Feature::Extra(Extra::SubcktConstantParam)))
+            }
             ItemKind::Comment
             | ItemKind::Load
             | ItemKind::Model
