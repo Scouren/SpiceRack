@@ -55,7 +55,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     if e.kind.detail() != ir::DetailKind::Source || spells(design, &e) {
         return;
     }
-    diags.push(UNSPELLED, design.span_of(item), 0);
+    diags.push_at(UNSPELLED, design, item, 0);
 }
 
 /// One source card.

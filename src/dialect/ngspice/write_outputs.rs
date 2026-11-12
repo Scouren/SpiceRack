@@ -48,7 +48,7 @@ pub(super) const CODES: &[Row] = &[(
 /// Appends a refusal when `item` has no ngspice card that reads back as it (R21).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     if !spellable(design, item) {
-        diags.push(UNSPELLABLE, design.span_of(item), 0);
+        diags.push_at(UNSPELLABLE, design, item, 0);
     }
 }
 

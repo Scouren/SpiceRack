@@ -23,13 +23,23 @@ use spicerack::ir;
 const MUTANTS: u64 = 32;
 
 /// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l1-mutants",
-    "ir",
-    "ir::parse pushes element rows ir::check refuses (X0016 a second element of one name, X0015 \
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l1-mutants",
+        "ir",
+        "ir::parse pushes element rows ir::check refuses (X0016 a second element of one name, X0015 \
      a key of another kind, X0006 a terminal count out of range) instead of a P9001; reported to \
      the circuit owner",
-)];
+    ),
+    (
+        "l1-mutants",
+        "ngspice",
+        "elements: two B cards of one name push two elements (X0016); a J card with fewer than its \
+         nodes (`jfet_mes_hfet` read as a card, ` j1 njf beta=1e-4`) indexes past its words in \
+         read_elements/semi.rs; run: `.options fourgridsize=400` with `.four` pushes a key of \
+         another kind (X0015); reported to ng-elements and ng-run",
+    ),
+];
 
 /// splitmix64.
 struct Rng(u64);

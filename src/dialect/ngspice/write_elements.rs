@@ -49,7 +49,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         return write_sources::admits(design, item, diags);
     }
     if !admit::spellable(design, &e) {
-        diags.push(UNSPELLABLE, design.span_of(item), 0);
+        diags.push_at(UNSPELLABLE, design, item, 0);
     }
 }
 

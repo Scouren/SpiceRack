@@ -18,7 +18,7 @@
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
 //! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
-//! `MISSING_FILE`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
+//! `MISSING_FILE`, `TEXT_VALUE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, write_control,
@@ -70,6 +70,10 @@ pub(super) const MISSING_FILE: Code = Code::new(b'R', 1003);
 /// A string or list value where ngspice reads an expression (a `.param`, head default, `.if`
 /// or `.func`): numparam has no string or vector values.
 pub(super) const TEXT_VALUE: Code = Code::new(b'W', 1006);
+/// A structure value (a `.param`, head default, `.func` body, `.if` condition) holding a node
+/// the evaluator its class picks cannot spell: a draw in a value that reads the temperature (the
+/// B-source parser has no `unif`).
+pub(super) const UNSPELLED_VALUE: Code = Code::new(b'W', 1007);
 
 /// The S3.0 rows.
 pub(super) const CODES: &[Row] = &[
@@ -132,6 +136,12 @@ pub(super) const CODES: &[Row] = &[
         "a string or list where ngspice reads an expression",
         "ngspice-45 xpressn.c formula",
         "a .param, head default, .if condition or .func body is a number expression; refused.",
+    ),
+    refusal(
+        UNSPELLED_VALUE,
+        "a structure value its evaluator cannot spell",
+        "ngspice-45 xpressn.c, inpptree.c",
+        "a value that reads the temperature is written for the B-source parser, which has no draw function; refused.",
     ),
     row(
         FIRST_LAST,

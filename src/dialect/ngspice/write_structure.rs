@@ -10,8 +10,7 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) fn title`, `comment`,
 //! `include`, `global`, `opaque`, `subckt`, `section`, `if_`, `param`, `func` (each
-//! `(w: &mut Out<'_>, item: ir::ItemRef)`); `pub(super) fn admits(&ir::Design, ir::ItemRef,
-//! ir::ScopeId, &mut ir::Diags)`
+//! `(w: &mut Out<'_>, item: ir::ItemRef)`); `pub(super) fn admits(&ir::Design, &mut ir::Diags)`
 
 use super::codes;
 use super::expr_write;
@@ -227,38 +226,37 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
     w.line(&text);
 }
 
-/// Appends a refusal for a structure item ngspice cannot spell for a reason no feature states
-/// (R21): a string or list value where numparam reads an expression (`W1006`). Placements,
-/// formals without a default, dynamic `.if` conditions and line breaks are features or
-/// invariants now (A15), not refusals.
-pub(super) fn admits(
-    d: &ir::Design,
-    item: ir::ItemRef,
-    _scope: ir::ScopeId,
-    diags: &mut ir::Diags,
-) {
-    let value = match item.kind {
-        ItemKind::Param => vec![d.row::<ir::item::Param>(item.index).value],
-        ItemKind::Func => vec![d.row::<ir::item::Func>(item.index).body],
-        ItemKind::Subckt => {
-            let s: ir::item::Subckt = d.row(item.index);
-            d.params(s.params)
-                .iter()
-                .map(|&(_, v)| v)
-                .filter(|v| !v.is_none())
-                .collect()
+/// Appends a refusal for any item but a model whose expressions hold a string or a list
+/// (`W1006`): `FEATURES` holds `Expr(Str)` for a model's version string only, and no feature
+/// states where a string stands; and for a structure item whose value holds a node the
+/// evaluator its class picks cannot spell (`W1007`: a draw in a value that reads `temper`). Placements, formals without a default, dynamic `.if`
+/// conditions and line breaks are features or invariants (A15), not refusals.
+pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+    // ponytail: the roots through the pass door on a copy (the kernel has no read-only twin of
+    // `Editor::map_exprs`); goes when A25 item 4 makes a string's use a feature
+    let mut copy = design.clone();
+    let mut ed = copy.editor();
+    for (item, _) in design.reachable() {
+        if item.kind == ItemKind::Model {
+            continue;
         }
-        ItemKind::If => {
-            let i: ir::item::If = d.row(item.index);
-            d.branches(i.branches)
-                .iter()
-                .map(|b| b.cond)
-                .filter(|c| !c.is_none())
-                .collect()
+        let structure = matches!(
+            item.kind,
+            ItemKind::Param | ItemKind::Func | ItemKind::Subckt | ItemKind::If
+        );
+        let (mut text, mut unspelled) = (false, false);
+        ed.map_exprs(item, &mut |e, _| {
+            if e.is_none() {
+                return;
+            }
+            text |= expr_write::holds_text(design, *e);
+            let eval = expr_write::eval_of(design, *e);
+            unspelled |= structure && !expr_write::spells_in(design, *e, eval);
+        });
+        if text {
+            diags.push_at(codes::TEXT_VALUE, design, item, 0);
+        } else if unspelled {
+            diags.push_at(codes::UNSPELLED_VALUE, design, item, 0);
         }
-        _ => Vec::new(),
-    };
-    if value.iter().any(|&e| expr_write::holds_text(d, e)) {
-        diags.push(codes::TEXT_VALUE, d.span_of(item), 0);
     }
 }

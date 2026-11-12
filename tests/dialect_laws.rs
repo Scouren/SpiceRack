@@ -43,29 +43,14 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l3",
-        "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
-    ),
-    (
-        "l4",
-        "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
-    ),
-    (
         "l5",
         "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
+        "R28 against L5: numparam reads `mil` as milli, so a Mil literal in a numparam expression is respelled exactly in exponent form (5128.59mil -> 1302661.86e-7, seed 0): the same number, another form, and L5 compares forms; for the lead to rule",
     ),
     (
         "l7",
         "ngspice",
         "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
-    ),
-    (
-        "l8",
-        "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
     ),
 ];
 
@@ -74,7 +59,33 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 
 /// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
 /// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str)] = &[];
+const KNOWN_REACH: &[(&str, &str)] = &[
+    // ngspice: every admitted design over REACH_SEEDS drops these by an area's admits refusal
+    // (reported to the areas with the S3 integration report)
+    ("ngspice", "Item(Measure)"),
+    ("ngspice", "Elem(Resistor)"),
+    ("ngspice", "Elem(Capacitor)"),
+    ("ngspice", "Elem(VSource)"),
+    ("ngspice", "Elem(ISource)"),
+    ("ngspice", "Elem(Port)"),
+    ("ngspice", "Elem(Table)"),
+    ("ngspice", "Wave(Pulse)"),
+    ("ngspice", "Wave(Sin)"),
+    ("ngspice", "Wave(Exp)"),
+    ("ngspice", "Wave(Pwl)"),
+    ("ngspice", "Wave(Sffm)"),
+    ("ngspice", "Wave(Am)"),
+    ("ngspice", "Wave(TrNoise)"),
+    ("ngspice", "Wave(TrRandom)"),
+    ("ngspice", "Analysis(Dc)"),
+    ("ngspice", "Analysis(Ac)"),
+    ("ngspice", "Analysis(Noise)"),
+    ("ngspice", "Analysis(SensAc)"),
+    ("ngspice", "Analysis(Sp)"),
+    ("ngspice", "Analysis(Four)"),
+    ("ngspice", "Analysis(Pss)"),
+    ("ngspice", "Family(Mesa)"),
+];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).

@@ -73,8 +73,7 @@ pub(super) fn admits(
     diags: &mut ir::Diags,
 ) {
     let m: ir::Model = design.row(item.index);
-    let span = design.span_of(item);
-    let mut refuse = |code| diags.push(code, span, 0);
+    let mut refuse = |code| diags.push_at(code, design, item, 0);
     let named = matches!(m.family, F::CodeModel | F::Module);
     if !named && families::card(m.family, m.polarity).is_none() {
         // a family ngspice lacks is a feature FEATURES lacks: `check_legal` refused it
