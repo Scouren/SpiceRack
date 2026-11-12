@@ -440,16 +440,21 @@ impl W<'_, '_> {
         }
     }
 
-    /// The text a block keeps, a line each; off VACASK, a VACASK script
-    /// line (`Rd::vacask_script`, noted by `checks`) is left out.
+    /// Whether the statement kept as text at token `tok` (its first) is
+    /// left out: another language's text whose construct the target omits
+    /// (`Rd::kept_construct`: a VACASK script line off VACASK, an inert
+    /// statement). `checks` notes each one.
+    fn omitted(&self, tok: u32) -> bool {
+        let cell = self.cells[self.rd.kept_construct(tok) as usize];
+        self.rd.text_lang(tok) != self.lang && matches!(cell, Action::Spell(Alt::Omit(_)))
+    }
+
+    /// The text a block keeps, a line each; a statement the target omits
+    /// ([`W::omitted`]) is left out.
     fn kept(&mut self, raw: &[Raw]) {
         for &r in raw {
             let (Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) = r;
-            let omit = matches!(
-                self.cells[Construct::VacaskScript as usize],
-                Action::Spell(Alt::Omit(_))
-            );
-            if omit && self.rd.vacask_script(self.rd.main(n)) {
+            if self.omitted(self.rd.main(n)) {
                 continue;
             }
             match r {

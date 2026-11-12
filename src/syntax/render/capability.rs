@@ -127,6 +127,10 @@ pub enum Construct {
     /// Analyses on more than one circuit state: a parameter changed
     /// between two of them (`read::epochs::Plan`; VACASK `alter`).
     Epochs,
+    /// A statement kept as text that its own simulator runs to the same
+    /// numbers without (a `kept_word` row names it: ngspice `.width`,
+    /// LTspice `.wave`, a line Xyce reads past): left out off its family.
+    InertText,
 }
 
 /// What a writer does with a construct.
@@ -330,6 +334,7 @@ mod tests {
                 "HspiceWLine",
                 "VacaskElaborate",
                 "Epochs",
+                "InertText",
             ]
         );
         for (i, c) in crate::syntax::lang::CONSTRUCTS.into_iter().enumerate() {
@@ -422,7 +427,7 @@ mod tests {
         }
     }
 
-    const CONSTRUCTS: [Construct; 45] = [
+    const CONSTRUCTS: [Construct; 46] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -468,5 +473,6 @@ mod tests {
         Construct::Measure,
         Construct::HspiceWLine,
         Construct::Epochs,
+        Construct::InertText,
     ];
 }

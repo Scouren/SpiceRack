@@ -478,6 +478,9 @@ impl W<'_, '_> {
                     let lines: Vec<String> = at
                         .raw
                         .iter()
+                        .filter(|&&(Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n))| {
+                            !self.omitted(self.rd.main(n))
+                        })
                         .flat_map(|&r| match r {
                             Raw::Line(n) => vec![self.rd.line(n)],
                             Raw::Lines(n) => self.rd.lines(n),

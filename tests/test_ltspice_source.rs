@@ -16,6 +16,7 @@ mod oracle;
 
 use oracle::{At, Tol, write};
 use spicerack::backend::Dialect;
+use spicerack::syntax::diag::Code;
 
 // ---- private ----
 
@@ -79,4 +80,48 @@ fn p5_006_an_ltspice_capacitors_units_are_one_scaled_capacitor() {
     // LTspice keeps its own card.
     let lt = write(deck, Dialect::Ltspice, Dialect::Ltspice);
     assert!(lt.lines().any(|l| l == "C1 o1 0 1u x2"), "{lt}");
+}
+
+/// Ledger P4-073 (spec S4-rf-inert-text). LTspice help, `.WAVE`: the card
+/// writes the named nodes to a .wav file. LTspice 26.1.1 ran this deck
+/// with the card and without it to the same V(out) = 0.632122881442 at
+/// 1 ms and wrote `out.wav`
+/// (research/impl/evidence/S4-rf-inert-text/RESULTS.txt §3). No other
+/// simulator has the card, so it is left out with a note (W0336), and each
+/// simulator runs the written deck to the closed form: 1 µF from 1 kΩ,
+/// τ = 1 ms, 1 − e^(−1) at 1 ms.
+#[test]
+fn p4_073_an_ltspice_wave_card_is_left_out() {
+    let plain = "t\nV1 in 0 PULSE(0 1 0 1n 1n 1 2)\nR1 in out 1k\nC1 out 0 1u\n\
+        .tran 0 5m 0 10u\n.end\n";
+    let wave = plain.replace(".end\n", ".wave out.wav 16 44100 V(out)\n.end\n");
+    // The integrator's error at a 10 µs step: RELTOL (1e-3).
+    let tol = Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    for d in [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Xyce,
+        Dialect::Vacask,
+    ] {
+        let w = oracle::written(&wave, Dialect::Ltspice, d);
+        assert_eq!(w.text, write(plain, Dialect::Ltspice, d), "{d:?}");
+        assert!(oracle::notes(&w).contains(&Code::W0336), "{d:?}");
+        let plots = oracle::run(d, &w.text);
+        let got = oracle::value(&plots, "out", At::Time(1e-3));
+        assert!(tol.within(got, 0.632_121), "{d:?}: {got}\n{}", w.text);
+    }
+    // Spectre and HSPICE run nowhere here: the same text as the deck
+    // without the card.
+    for d in [Dialect::Spectre, Dialect::Hspice] {
+        let w = oracle::written(&wave, Dialect::Ltspice, d);
+        assert_eq!(w.text, write(plain, Dialect::Ltspice, d), "{d:?}");
+        assert!(oracle::notes(&w).contains(&Code::W0336), "{d:?}");
+    }
+    // LTspice keeps its own card.
+    let lt = write(&wave, Dialect::Ltspice, Dialect::Ltspice);
+    let kept = lt.lines().any(|l| l == ".wave out.wav 16 44100 V(out)");
+    assert!(kept, "{lt}");
 }

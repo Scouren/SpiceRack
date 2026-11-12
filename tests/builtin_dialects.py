@@ -175,6 +175,9 @@ def ngspice(d):
         .builtin_device("NUMD")
         .builtin_device("NUMD2")
         .builtin_device("NUMOS")
+        # The kept words (manual §11.6.7 `.width`, §2.13 `.csparam`: P4-071).
+        .kept_word(".width", Construct.InertText)
+        .kept_word(".csparam", Construct.InertText)
         # The capability column.
         .refuse(Construct.ForeignText, Code.W0001)
         .refuse(Construct.PrivateText, Code.W0039)
@@ -220,7 +223,8 @@ def ngspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .spell(Construct.Epochs, Alt.ControlScript))
+        .spell(Construct.Epochs, Alt.ControlScript)
+        .omit(Construct.InertText, Code.W0336))
 
 
 def espice(d):
@@ -432,7 +436,8 @@ def hspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .spell(Construct.Epochs, Alt.AlterBlocks))
+        .spell(Construct.Epochs, Alt.AlterBlocks)
+        .omit(Construct.InertText, Code.W0336))
 
 
 XYCE_UNPROTECTED = Quoting(escapes=False,
@@ -582,6 +587,12 @@ def xyce(d):
         .kept_word("ypowergridbusshunt", Construct.PrivateText)
         .kept_word("ypowergridtransformer", Construct.PrivateText)
         .kept_word(".sens", Construct.XyceSens)
+        # Lines a Xyce run reads past or only files (RG §2.1.34, §6.1.4; runs: P4-072).
+        .kept_word(".save", Construct.InertText)
+        .kept_word(".dcop", Construct.InertText)
+        .kept_word(".objective", Construct.InertText)
+        .kept_word(".probe", Construct.InertText)
+        .kept_word(".ends", Construct.InertText)
         # The dot rules (RG `.LIN`, `.PREPROCESS`: P6-014).
         .dot_rule("lin", DotRule.SParams)
         .dot_rule("preprocess", DotRule.Preprocess)
@@ -633,7 +644,8 @@ def xyce(d):
         .refuse(Construct.UnmappedOption, Code.W0017)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .spell(Construct.Epochs, Alt.StatesData))
+        .spell(Construct.Epochs, Alt.StatesData)
+        .omit(Construct.InertText, Code.W0336))
 
 
 LTSPICE_OPERATORS = [
@@ -751,6 +763,8 @@ def ltspice(d):
         .kept_word(".savestate", Construct.PrivateText)
         .kept_word(".loadstate", Construct.PrivateText)
         .kept_word(".savebias", Construct.PrivateText)
+        # A .wav file request (LTspice help, `.WAVE`: P4-073).
+        .kept_word(".wave", Construct.InertText)
         # The dot rules (LTspice help, `.backanno`).
         .dot_rule("backanno", DotRule.Note(Code.W0036))
         # The capability column.
@@ -798,7 +812,8 @@ def ltspice(d):
         .native(Construct.UnmappedOption)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
-        .spell(Construct.Epochs, Alt.StatesTable))
+        .spell(Construct.Epochs, Alt.StatesTable)
+        .omit(Construct.InertText, Code.W0336))
 
 
 SPECTRE_SCALES = [
@@ -1083,7 +1098,8 @@ def spectre(d):
         .native(Construct.UnmappedOption)
         .native(Construct.Statistics)
         .spell(Construct.Measure, Alt.SpiceRegion)
-        .native(Construct.Epochs))
+        .native(Construct.Epochs)
+        .omit(Construct.InertText, Code.W0336))
 
 
 VACASK_SCALES = [
@@ -1416,7 +1432,8 @@ def vacask(d):
         .refuse(Construct.UnmappedOption, Code.W0017)
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .refuse(Construct.Measure, Code.W0109)
-        .native(Construct.Epochs))
+        .native(Construct.Epochs)
+        .omit(Construct.InertText, Code.W0336))
 
 
 def cdl(d):
@@ -1476,7 +1493,8 @@ def cdl(d):
         .native(Construct.UnmappedOption)
         .native(Construct.Statistics)
         .native(Construct.Measure)
-        .omit(Construct.Epochs, Code.W0028))
+        .omit(Construct.Epochs, Code.W0028)
+        .omit(Construct.InertText, Code.W0028))
 
 
 def verilog(d):
@@ -1536,7 +1554,8 @@ def verilog(d):
         .native(Construct.UnmappedOption)
         .native(Construct.Statistics)
         .native(Construct.Measure)
-        .omit(Construct.Epochs, Code.W0029))
+        .omit(Construct.Epochs, Code.W0029)
+        .omit(Construct.InertText, Code.W0029))
 
 
 def ngspice_given(d):

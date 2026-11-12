@@ -82,7 +82,9 @@ impl W<'_, '_> {
         let cdl = self.b.writer == Writer::Cdl;
         for &tok in other.iter().filter(|_| !cdl) {
             let c = self.rd.kept_construct(tok);
-            if !asked.contains(&c) {
+            // Each statement left out is noted where it stood (`unparsed`
+            // reads the notes), a refusal once a construct.
+            if self.omitted(tok) || !asked.contains(&c) {
                 asked.push(c);
                 self.ask(c, tok);
             }
@@ -132,7 +134,13 @@ impl W<'_, '_> {
         if !self.pair.foreign_text {
             return;
         }
-        let drops = [Code::W0021, Code::W0023, Code::W0024, Code::W0028];
+        let drops = [
+            Code::W0021,
+            Code::W0023,
+            Code::W0024,
+            Code::W0028,
+            Code::W0336,
+        ];
         let mut dropped: Vec<(u32, u32)> = self
             .diags
             .iter()

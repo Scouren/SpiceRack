@@ -51,7 +51,14 @@ macro_rules! rows_s4 {
             // slot W0334
             // slot W0335
             // W0336–W0375: spec-rf (specific refusals).
-            // slot W0336
+            /// A statement kept as text that its own simulator runs to the same
+            /// numbers without (a print width, a file request, a line it reads
+            /// past): left out off its family.
+            W0336 Note {
+                title: "a statement that changes no number of the run, not written",
+                cite: "ngspice-45 manual §11.6.7 (`.width`: the characters a printed row holds), §2.13 (`.csparam`: a parameter as a vector for `.control` scripts); LTspice help, `.WAVE` (nodes written to a .wav file); Xyce RG 7.10 §2.1.34 (`.SAVE`: the operating point stored in a file), §6.1.4 (\"Xyce does not support the .PROBE statement\"); Xyce 7.10 runs: \"Unrecognized dot line will be ignored\" (`.DCOP`, `.OBJECTIVE`, `.PROBE/CSD`), \"Subcircuit .ENDS without .SUBCKT, ignoring\"; ngspice-45, LTspice 26.1.1 and Xyce 7.10 each give the same numbers with the line and without it",
+                explain: "The statement sets how its own simulator prints or files its results (ngspice's `.width` and `.csparam`, LTspice's `.wave`, Xyce's `.SAVE`), or is a line that simulator reads past with a warning (Xyce: `.DCOP`, `.OBJECTIVE`, `.PROBE`, an `.ENDS` with no `.SUBCKT` open). The circuit and its analyses run to the same numbers without it, and it is the source dialect's text, so a target of another family gets the deck without it. Ask the target for the file or the print layout with its own statement (HSPICE has `.WIDTH` and `.SAVE`).",
+            }
             // slot W0337
             // slot W0338
             // slot W0339
