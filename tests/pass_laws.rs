@@ -47,10 +47,10 @@ const SIZE: Size = Size {
 /// is not listed for fails, and so does a listed pass that passes.
 const KNOWN: &[(&str, &str, &str)] = &[(
     "p3",
-    "given_zero_to_as_given",
-    "on its GEN_SETS set, seed 45: the output adds FuncDyn(Log10), BinaryDyn(BitXor), \
-     BinaryDyn(Shr): an expression it moves into a wave field changes class (static to \
-     dynamic) and its requires do not name the Dyn twins; with pass-expr",
+    "exp_td2_absolute",
+    "on its GEN_SETS set, seed 3: the output adds FuncDyn(Sgn): td2 becomes td1 + td2, a root \
+     whose form is the more dynamic of the two, so the functions of the static one count in \
+     their Dyn twins, which its requires do not name; with the waves owner",
 )];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
@@ -77,6 +77,27 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
                 ir::WaveKind::TrRandom,
             ],
             ir::Feature::Circuit(ir::CircuitExtra::GivenZeroAsGiven),
+        ),
+    ),
+    (
+        "exp_td2_relative",
+        sources_only(
+            &[ir::WaveKind::Exp],
+            ir::Feature::Circuit(ir::CircuitExtra::ExpTd2FromTd1),
+        ),
+    ),
+    (
+        "exp_td2_absolute",
+        sources_only(
+            &[ir::WaveKind::Exp],
+            ir::Feature::Circuit(ir::CircuitExtra::ExpTd2FromZero),
+        ),
+    ),
+    (
+        "sffm_spice3_to_ngspice",
+        sources_only(
+            &[ir::WaveKind::Sffm],
+            ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
     ),
     (
