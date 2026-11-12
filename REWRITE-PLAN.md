@@ -193,8 +193,8 @@ owns every buffer (`&mut String` out, a reusable `Design`).
 
 ### 3.1 Principles
 
-1. **Meaning, not spelling.** Values are `f64` or expression trees; devices are kinds with
-   terminal roles and named fields; waveforms are structs with named fields (`Sffm{offset,
+1. **Meaning, not spelling.** Values are decimal literals or expression trees; devices are kinds
+   with terminal roles and named fields; waveforms are structs with named fields (`Sffm{offset,
    amplitude, carrier, mod_index, signal}`), never "the card's values in the card's order".
 2. **A pinned normal form** (§3.3): defaults, units, operator meaning, grouping, argument order,
    name identity. One node per meaning, the most specific one: a `POLY` source stays `Poly`;
@@ -269,13 +269,16 @@ with one read rule and one write rule that never meet:
 | `r_model_multiplies` (Xyce model `R` scales, ngspice's is the resistance) | lowers to `r_scale` or `r_default` | two distinct parameters | spells its own; pass folds the other |
 | `pulse_as_pwl`, `sin_cycles_as_b` | fills `ncycles` | optional field | feature `PulseCycles` or pass `pulse_cycles_to_pwl` |
 | duplicate `.param` (ngspice/HSPICE last wins, Xyce first) | keeps the winner by its own rule | one definition | nothing to do |
-| `Numbers::{Read,Given}`, ngspice arithmetic | ngspice reads with `INPevaluate` (kept: `unit::ngspice_value`) | the `f64` the source simulator computes | spells the shortest text its simulator reads back to that `f64` (`unit::ngspice_spelling`, kept) |
+| `Numbers::{Read,Given}`, `NumberReading`, ngspice arithmetic (`100u` is 9.999999999999999e-5 there) | reads the digits, the point and the exponent or scale; no floating arithmetic | the decimal literal as written (mantissa, fraction digits, exponent, form), not a double | spells the same digits in its syntax; its simulator then computes what it computed from the original, so same-simulator runs stay bit-identical and `100u` stays `100u` everywhere |
 | LTspice PWL `+t` relative times | accumulates | absolute times | — |
 | `xyce_m_rename`, ESPice ignoring `m` on X | lowers multiplicity to `Instance.mult` | a field, not a parameter named `m` | spells it; ESPice's writer lacks the feature |
 
-The full list (every "silent wrong number" row of ledger Phase 3 and the settle files, with its
-evidence and side) is `rewrite/INV-semantics.md`; it becomes the "Normal form" chapter of the IR
-reference and each rule gets one reader fixture and one writer fixture per dialect it touches.
+The full list is `rewrite/INV-semantics.md`: 239 traps in 15 categories (141 touch both sides,
+62 the reader only, 21 the writer only, 15 the run side), each with its evidence (a real run, a
+source read, or a manual only) and every Phase 3 ledger row mapped. It becomes the "Normal form"
+chapter of the IR reference and each rule gets one reader fixture and one writer fixture per
+dialect it touches. Its Appendix D shows what today's switches bundle: `NetlistRules` alone
+stands for nine unrelated meanings, `ExprEval` for seven.
 
 ### 3.4 `Opaque` and strictness
 

@@ -209,6 +209,46 @@ three meanings, so the node states them: `Expr::Draw(Dist, DrawWhen, DrawPer, Ex
 `DrawPer::{Reference, CallSite, Instance, Run}`. Converting one to another (the two-layer
 parameter idiom, Spectre's `statistics` block) is a pass.
 
+### 7.3 Addendum A3 (2026-11-11): a number is a decimal literal, not a double
+
+Ruling on `INV-semantics.md` 1.08 (the sources conflicted). Two simulators do not compute the
+same double from the same digits: ngspice multiplies an integer mantissa by one power of ten
+(`100u` is 9.999999999999999e-5, `0.050000` is not `0.05`), VACASK multiplies `stod(mantissa)` by
+the scale, the others round the decimal correctly. Storing "the double" forces a choice between
+the source simulator's image (exact on the same simulator, 17-digit monsters everywhere else) and
+the rounded decimal (pretty, and one ulp off on the same simulator, which is enough to move
+ngspice's time steps: 1.09). So the IR stores neither. It stores what the deck says:
+
+```rust
+/// A decimal literal, as written: `mantissa × 10^(exp10 − frac)` (`Mil`: that times 25.4e-6).
+/// The IR states the number; the double is each simulator's own arithmetic on these digits.
+pub struct Literal {
+    pub mantissa: i64,   // every digit as one integer, sign included; |mantissa| < 10^18
+    pub frac: u8,        // digits after the decimal point (`0.050000`: mantissa 50000, frac 6)
+    pub exp10: i16,      // the exponent, or the scale suffix's power of ten
+    pub form: NumForm,   // Plain (exp10 == 0), Exponent (`1e-4`), Scale (`100u`), Mil
+}
+```
+
+- `Expr::Num(NumId)`; literals live in a side table of the design (`Design::num(NumId) ->
+  Literal`), the expression row holding the index. `Literal::value() -> f64` is the correctly
+  rounded value (what the reference evaluator and the passes compute with).
+- `Builder::literal(Literal) -> ExprId` is what readers call: digits in, no floating arithmetic
+  anywhere in a reader. `Builder::num(f64) -> ExprId` is for built numbers (Python, Schemify,
+  passes): the shortest decimal that reads back to the double, in engineering form (`1e-4` →
+  mantissa 100, `Scale`, exp10 −6), asserted finite (the NaN gate, C9). Zero is one literal
+  (mantissa 0, frac 0, exp10 0, `Plain`).
+- A writer spells the same digits and the same form in its own syntax (its suffix letter for a
+  `Scale` it has; `e<exp10>` for one it lacks; `Mil` only where the dialect has `mil`). On the
+  same simulator the text has the same digits as the original, so the simulator computes the same
+  double: bit-identical runs without emulating anyone's arithmetic. Across simulators the reader
+  sees `100u` and the target gets `100u`.
+- Law L5 compares literals field by field. The differential harness (REWRITE-PLAN §7.3) compares
+  them by value (`mantissa × 10^(exp10 − frac)` as exact decimals), since `1k` and `1e3` mean one
+  number.
+- A literal with more than 18 significant digits is rounded to 18 by the reader, with a note; a
+  suffix followed by an exponent or the reverse (`1e3k`) is folded into `Exponent`.
+
 ## 8. Features (`feature.rs`, kernel)
 
 Every kind is a feature: `enum Feature { Item(ItemKind), Elem(ElemKind), Wave(WaveKind),
