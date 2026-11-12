@@ -84,9 +84,10 @@ pub struct Passive {
     /// Temperature coefficient 2 (1/K²), with `tc1`'s law. `NONE`: the model's, or 0.
     /// Evidence: 6.12.
     pub tc2: ExprId,
-    /// Exponential temperature coefficient (%/K): value × 1.01^(tce·ΔT); when given it takes
-    /// precedence over `tc1`/`tc2` (ng, xy). `NONE`: none. Native: ng xy va lt; hs and sp have
-    /// none. Evidence: 6.13, D112.
+    /// Exponential temperature coefficient (%/K) of a resistor: value × 1.01^(tce·ΔT); when
+    /// given it takes precedence over `tc1`/`tc2` (ng, xy). `NONE`: none; always `NONE` on C
+    /// and L (checked, R74: Xyce 7.10 refuses it there, D112 notwithstanding; VACASK's C and L
+    /// have none). Native: ng xy va lt; hs and sp have none. Evidence: 6.13.
     pub tce: ExprId,
     /// The instance's absolute temperature (°C), replacing the circuit temperature for this
     /// element. `NONE`: the circuit temperature. Native: ng xy va (`temp=`). Evidence: D2, D112.

@@ -874,7 +874,7 @@ mod tests {
                 Span::NONE,
             );
         }
-        let cases: [(&str, Case); 9] = [
+        let cases: [(&str, Case); 11] = [
             ("a resistor with no value and no model", |b, top| {
                 let r = b.detail(Passive::PLAIN);
                 push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
@@ -887,6 +887,27 @@ mod tests {
                     ..Passive::PLAIN
                 });
                 push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            }),
+            // R74: tce is a resistor's on every dialect we run (ngspice res.c; VACASK
+            // sp_capacitor and sp_inductor list no tce; Xyce 7.10 "Unrecognized parameter TCE
+            // for device C1" and L1)
+            ("an exponential coefficient on a capacitor", |b, top| {
+                let one = n(b, 1);
+                let c = b.detail(Passive {
+                    value: one,
+                    tce: one,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            }),
+            ("an exponential coefficient on an inductor", |b, top| {
+                let one = n(b, 1);
+                let l = b.detail(Passive {
+                    value: one,
+                    tce: one,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Inductor, &["a", "0"], None, l);
             }),
             ("a noiseless constant inductor", |b, top| {
                 let one = n(b, 1);

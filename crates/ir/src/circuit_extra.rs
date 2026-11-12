@@ -53,7 +53,9 @@ pub enum CircuitExtra {
     // passive and instance fields
     /// An R, C or L whose `value` reads the circuit (ngspice runs it as a B source, 6.14, 6.16).
     PassiveDynamicValue,
-    /// An R, C or L with `noisy == false` (D82, 6.17).
+    /// A resistor (or a circuit-valued element, ngspice's behavioural rewrite, 6.14) with
+    /// `noisy == false` (D82, 6.17); a constant C or L has no thermal noise to switch off
+    /// (`check`, A19).
     PassiveNoiseless,
     /// A resistor's AC resistance (`Passive::ac`, ng only, 6.17).
     PassiveAc,
@@ -61,7 +63,10 @@ pub enum CircuitExtra {
     PassiveScale,
     /// Instance `tc1`/`tc2` on an R, C or L (6.12).
     PassiveTc,
-    /// The exponential coefficient `tce` (6.13).
+    /// A resistor's exponential coefficient `tce` (6.13). A resistor's by domain (R74): ngspice
+    /// takes it on R only (res.c against cap.c and ind.c), VACASK's sp_capacitor and
+    /// sp_inductor list no `tce` (print instance, 36be560), and Xyce 7.10 refuses it on C and L
+    /// ("Unrecognized parameter TCE for device C1"); `check` reports it elsewhere.
     PassiveTce,
     /// An instance's absolute temperature (`temp_abs` on `Passive`, `Semi`, `Behav`).
     InstanceTemp,

@@ -249,6 +249,9 @@ fn detail_verdict(design: &Design, e: &Element, classes: Classes<'_>, v: &mut Ve
                 && (some(p.ic) == (p.ic_mode != IcMode::None))
                 && !(resistor && some(p.ic))
                 && (resistor || !some(p.ac))
+                // R74: `tce` is a resistor's on every dialect run (ngspice res.c; VACASK's
+                // sp_capacitor and sp_inductor list none; Xyce 7.10 refuses it on C and L)
+                && (resistor || !some(p.tce))
                 && match par {
                     None => true,
                     Some(_) if resistor => false,

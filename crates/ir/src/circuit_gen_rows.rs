@@ -100,7 +100,12 @@ impl R<'_, '_> {
         };
         let tc1 = if tc { self.ex() } else { N };
         let tc2 = if tc && self.g.chance(2) { self.ex() } else { N };
-        let tce = self.opt(X::PassiveTce);
+        // R74: a resistor's only
+        let tce = if kind == ElemKind::Resistor {
+            self.opt(X::PassiveTce)
+        } else {
+            N
+        };
         let temp_abs = self.opt(X::InstanceTemp);
         let dtemp = self.opt(X::InstanceDtemp);
         let ac = if kind == ElemKind::Resistor {
