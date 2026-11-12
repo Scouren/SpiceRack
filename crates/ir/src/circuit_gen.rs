@@ -18,7 +18,7 @@
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::{builtin_kind, has_polarity};
+use crate::circuit_check::{builtin_kind, has_polarity, versioned};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
@@ -51,13 +51,14 @@ const NONE_REF: Ref = Ref {
 };
 
 /// The builtin families and the kinds they serve (AMEND-A12 C5).
-const BUILTINS: [(ModelFamily, ElemKind); 6] = [
+const BUILTINS: [(ModelFamily, ElemKind); 7] = [
     (ModelFamily::SourceV, ElemKind::VSource),
     (ModelFamily::SourceI, ElemKind::ISource),
     (ModelFamily::Vcvs, ElemKind::Vcvs),
     (ModelFamily::Vccs, ElemKind::Vccs),
     (ModelFamily::Ccvs, ElemKind::Ccvs),
     (ModelFamily::Cccs, ElemKind::Cccs),
+    (ModelFamily::TlineIdeal, ElemKind::LosslessLine),
 ];
 
 /// The generator's state for one row.
@@ -228,7 +229,11 @@ pub(crate) fn generate_model(
     } else {
         NONE_REF
     };
-    let version = if r.g.chance(4) { r.ex() } else { ExprId::NONE };
+    let version = if versioned(family) && r.g.chance(4) {
+        r.ex()
+    } else {
+        ExprId::NONE
+    };
     let word = if matches!(family, ModelFamily::CodeModel | ModelFamily::Other) {
         r.g.fresh_name(r.b)
     } else {

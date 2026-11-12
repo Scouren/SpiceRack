@@ -24,6 +24,7 @@ use crate::plan::{
     MonteCarlo, Sampler, SweepLoop, TableLoop, TargetUse, Variations, dump_target, parse_target,
     target_features, target_handles, target_valid,
 };
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 use crate::run_words::{
     get, put_expr, put_exprs, put_flag, put_word, take_expr, take_exprs, take_word, word,
@@ -38,6 +39,10 @@ impl DetailFacts for SweepLoop {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         target_handles(&self.target, out);
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
@@ -84,6 +89,10 @@ impl DetailFacts for TableLoop {
             target_handles(t, out);
         }
         out.push(Handle::Exprs(self.values));
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.exprs(self.values);
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {
@@ -155,6 +164,12 @@ impl DetailFacts for MonteCarlo {
             Handle::Expr(self.seed),
             Handle::Exprs(self.samples),
         ]);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.expr(&mut self.runs);
+        r.expr(&mut self.seed);
+        r.exprs(self.samples);
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {

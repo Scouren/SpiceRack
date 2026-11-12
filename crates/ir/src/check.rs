@@ -161,6 +161,8 @@ fn probe_classes(out: &mut Out<'_>) {
     let d = out.design;
     let table = crate::class::def_classes(d);
     let mut handles = Vec::new();
+    // one stamped walk for the whole pass: no per-field table (O(design) in all)
+    let mut walk = ExprWalk::new(d);
     for (item, _) in d.reachable() {
         handles.clear();
         for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
@@ -180,7 +182,13 @@ fn probe_classes(out: &mut Out<'_>) {
             }
         }
         for e in roots {
-            if crate::class::tree_class(d, e, table) == ExprClass::Circuit {
+            let class = walk
+                .tree(d, e)
+                .iter()
+                .map(|&n| crate::class::node_class(d, n, table))
+                .max()
+                .unwrap_or(ExprClass::Constant);
+            if class == ExprClass::Circuit {
                 out.report(Violation::ProbeContext, d.span_of(item), e.0);
             }
         }
@@ -399,9 +407,6 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
     let d = out.design;
     let mut walk = ExprWalk::new(d);
     let mut handles = Vec::new();
-    // `map_refs` reaches a row's references through `&mut Design`, and `check` only reads: it
-    // reads them from one copy of the design (O(design), once per check; A9)
-    let mut scratch = d.clone();
     for (item, scope) in d.reachable() {
         if (item.index as usize) >= table_len(d, item.kind) {
             continue; // reported with the scope's list
@@ -411,7 +416,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
-            R::map_refs(&mut scratch, item, &mut |r, kind| refs.push((*r, kind)));
+            row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
         let span = d.span_of(item);

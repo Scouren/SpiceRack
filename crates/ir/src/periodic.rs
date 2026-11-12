@@ -71,6 +71,12 @@ pub struct Pss {
     pub osc_p: NameId,
     /// `Autonomous`: its negative node (ground: `NameId::GROUND`); `NONE` when driven.
     pub osc_n: NameId,
+    /// ngspice's shooting iteration limit (`.pss`'s `sc_iter`, `inp2dot.c` `dot_pss`), or `NONE`
+    /// when not given. Another simulator's similar knob is not this field (A16).
+    pub sc_iter: ExprId,
+    /// ngspice's steady-state coefficient (`.pss`'s `steady_coeff`, `inp2dot.c` `dot_pss`), or
+    /// `NONE` when not given (A16).
+    pub steady_coeff: ExprId,
 }
 
 /// Whether a PSS is driven or free-running.
@@ -171,7 +177,7 @@ pub enum FreqAxis {
 }
 
 const _: () = assert!(size_of::<Hb>() == 24);
-const _: () = assert!(size_of::<Pss>() == 28);
+const _: () = assert!(size_of::<Pss>() == 36);
 const _: () = assert!(size_of::<Pac>() == 40);
 const _: () = assert!(size_of::<Pnoise>() == 68);
 const _: () = assert!(size_of::<Pxf>() == 64);

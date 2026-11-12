@@ -36,13 +36,13 @@ result-side fact (backend, harness), outside the netlist IR.
 - G24 → `LoopKind::Sweep`, `plan::SweepLoop { target, sweep }`, nesting by scope (first `.step` innermost: reader rule); LTspice end/sort → `SweepEnd::OnStop` + reader rule; cap 4096 points: reader's refusal; `Extra::{LoopParam, LoopTemp, …}`.
 - G25 → `SweepKind::List` on a `SweepLoop`; HSPICE `.temp t1 t2 …` → `Loop` over `Target::TEMP`.
 - G26 → `plan::Alter` items in order + `Loop`s; `LoopKind::Table` for HSPICE `.alter` blocks of parameters, Xyce `.DATA`, LTspice `table()`; `Extra::{AlterParam, …, LoopTable}`.
-- G27 → `Analysis::name`, `Loop::name`.
+- G27 → `Analysis::name` (`RunExtra::AnalysisNamed`, A16), `Loop::name`.
 - G28 → the nodes become typed fields (`Noise::output`, `Pz::out_p`/`out_n`, `Pss::osc_p`/`osc_n`).
 - G29 → `Loop` body scope holding the inner run items (any depth up to `LOOP_DEPTH_MAX`).
 - G30 → item order in the scope; `Extra::SeveralAnalyses`.
 - G31 → writer refusals (W0040, W0031) keyed by the `Extra::Sweep*` features.
 - G32 → `AnalysisKind` (24 members); `SpectreSweep`/`SpectreMonteCarlo` → `LoopKind::{Sweep, MonteCarlo}`; `TranNoise` → `Tran::noise_*`; `Fourier` → `Four`.
-- G33 → `periodic::Pss { fundamental, tstab, points, harmonics, osc_p, osc_n, uic }`; ngspice `sciter`, `steadycoeff`: gap G-PSSKNOBS.
+- G33 → `periodic::Pss { fundamental, tstab, points, harmonics, osc_p, osc_n, uic, sc_iter, steady_coeff }` (A16).
 - G34 → `Sp::noise` (`Extra::SpNoise`).
 - G35 → `Disto`; HSPICE `.DISTO Rload`: Private (another quantity).
 - G36 → `Env::temp` (expression allowed); a list → `Loop` over `Target::TEMP`; ngspice's one-temperature rule: reader rule (4.02).
@@ -86,7 +86,7 @@ result-side fact (backend, harness), outside the netlist IR.
 
 ## INV-constructs §H (outputs)
 
-- H1 → `output::Save { analysis, every_analysis, probes }`; HSPICE `.probe kind …` → `every_analysis: false`; `.option post` → the save set (reader rule); Xyce `.SAVE`: Private (state file).
+- H1 → `output::Save { analyses: AnalysisKinds, probes }`; HSPICE `.probe kind …` → one kind; VACASK `save` → op, dc and tran (A22); `.option post` → the save set (reader rule); Xyce `.SAVE`: Private (state file).
 - H2 → `output::Print { analysis, view, probes }`; Xyce-only kinds `homotopy es pce mpde* ac_ic tranadjoint hb_ic hb_startup`: Private; `PRECISION=`/formats: gap G-PRINTFMT.
 - H3 → `probe::Probe` kinds `V, Vdiff, I, Param, Power, Expr, AllV, AllI, …`; `V(*)` → `AllV`; Xyce `n(…)` → `Param`; lead currents → `ITerminal`; Spectre `dev:p`/`inst:index` → `ITerminal`; VACASK `default`/`full` → categories (reader rule).
 - H4 → `output::Measure` + `measure::{MeasureTrigTarg, MeasureWhen, MeasureFind, MeasureDeriv, MeasureStat, MeasureParam}`; Xyce FFT measures: Private.
@@ -136,7 +136,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - I16 → `Save` of `ProbeKind::AllI` (reader rule).
 - I17 → `OptionKey::Search` (class `Path`).
 - I18 → `OptionKey::Private` with its dialect.
-- I19 → `Four::harmonics`.
+- I19 → `OptionKey::NFreqs` (A16; `Four::harmonics` absent reads it), `OptionKey::FourGridSize`.
 - I20 → `NodeSet { kind: Nodeset, node: empty }` (`Extra::NodesetAll`).
 - I21 → keys where shared (`AbsTol VnTol RelTol ChgTol TrTol Gmin MethodTrap/Gear Itl1 Itl2 Itl4 GminSteps SrcSteps MaxStep Cshunt`); the rest Private (`ptrantau solver plot* gfloat numdgt measdgt logopinfo …`); `gshunt` → `Gshunt`; `temp`/`tnom` → `Env`.
 - I22 → `GminDc`, `GminTran`, `Gshunt`, `Search`, `Acct`; `POST`/`PROBE` → the save set (reader rule); the rest Private.
@@ -289,7 +289,7 @@ result-side fact (backend, harness), outside the netlist IR.
 
 - G-SENS (G10, G12, 8.12): Spectre `sens … to … for …` and Xyce `.SENS` (objective, parameter list, analyses) are Private. Proposal: a `SensSpec` row `{ outputs: ProbeList, params: TargetList (empty = all), of: AnalysisKind }` replacing `Sens`/`SensAc` when a second dialect's form is typed.
 - G-SAMPLING (G17, G52): Xyce `.SAMPLING`/`.EMBEDDEDSAMPLING`/`.PCE` are Private. Proposal: `.SAMPLING` reads into `Statistics` (`Vary` with `mean`) + `LoopKind::MonteCarlo`; uniform bounds need `VaryDist::UnifBounds { lo = mean, hi = spread }` or two fields; PCE stays Private.
-- G-PSSKNOBS (G33): ngspice `sciter`, `steadycoeff` (accuracy hints). Proposal: Private options on the deck until a second simulator has them.
+- G-PSSKNOBS (G33): closed by A16 (`Pss::sc_iter`, `Pss::steady_coeff`).
 - G-LTTRAN (G39, G50, G43): LTspice `.tran` `steady`, `nodiscard`, `step`, `convreport`, `savestate`; HSPICE `.lin gdcalc`. Proposal: `Tran` flags when a second target has a meaning for them; until then the statement is Private.
 - G-ALTERCARD (G46, K12, K13, 13.03): HSPICE `.alter` blocks that re-state element or model cards, Spectre `altergroup` (defaults first). Proposal: an `Alter` variant whose target is an element or model and whose value is a replacement item (`ItemRef` to an element/model row in a side scope), with a `reset: bool` for altergroup's defaulting.
 - G-ELABORATE (K9, K17): closed by A12 R1: `ItemKind::Elaborate { circuits }`, references of `DefKind::Subckt`, the top circuit for every run item after it.
