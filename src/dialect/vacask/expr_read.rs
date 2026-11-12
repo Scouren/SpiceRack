@@ -7,7 +7,7 @@
 //! only in an `mc` loop, once per call site (RUN g2); `M_*`/`P_*` are the literals VACASK
 //! documents; `$temp`, `$tnom` the leaves; a `-` directly before a number is that negative
 //! literal; a unary `+` is its operand. A construct with no IR meaning (vectors, indexing,
-//! `$scale`, vector and type functions, `idt(x, ic)`) makes the whole statement `Private`; what
+//! `$scale`, vector and type functions) makes the whole statement `Private`; what
 //! VACASK rejects (`inf`, `nan`, a probe, `ddt` or `idt` in a parameter: run bp2) makes it
 //! `InvalidInSource`. In a behavioural source (VD dev-builtin-behavioral) `v(n)`, `v(a, b)`,
 //! `i(inst)`, `ddt(x)`, `idt(x)` and `$abstime` read the circuit (run bp1), every function counts
@@ -266,6 +266,17 @@ fn token(l: &Lower<'_, '_, '_>, n: Node) -> String {
     l.cst.tokens.text(l.cst.ast.main_token(n)).to_string()
 }
 
+/// Whether the node at `x` is a literal zero (`0`, `0.0`, `-0`).
+fn is_zero(l: &Lower<'_, '_, '_>, x: u32) -> bool {
+    let ast = &l.cst.ast;
+    let n = match ast.tag(Node(x)) == Tag::Unary && token(l, Node(x)) == "-" {
+        true => Node(ast.lhs(Node(x))),
+        false => Node(x),
+    };
+    is_number(l, n)
+        && number::lex(&token(l, n)).is_ok_and(|v| v.long.is_none() && v.literal.mantissa == 0)
+}
+
 /// Whether `n` is a number node directly (a negative literal's operand).
 fn is_number(l: &Lower<'_, '_, '_>, n: Node) -> bool {
     l.cst.ast.tag(n) == Tag::Num
@@ -351,7 +362,8 @@ fn check(
                     return Err(refuse(PARAM_READ_ARG, InvalidInSource));
                 }
                 ("ddt" | "idt", 1) => return down(args[0]),
-                // `idt(x, ic)` starts from `ic` (run bp3); the IR's `Idt` from 0.
+                // `idt(x, ic)` starts from `ic` (run bp3; A28: `Idt`'s second operand).
+                ("idt", 2) => return args.iter().try_for_each(|&a| down(a)),
                 ("ddt" | "idt", _) => return Err(private),
                 _ => {}
             }
@@ -466,6 +478,11 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
                 }
                 _ => {}
             }
+            // A literal-0 initial value is the absent one (A28: one row per meaning).
+            let raw = match (name.as_str(), raw.as_slice()) {
+                ("idt", [x, ic]) if is_zero(l, *ic) => vec![*x],
+                _ => raw,
+            };
             let args: Vec<ir::ExprId> = raw.into_iter().map(|a| build(l, a, ctx)).collect();
             if let Some((func, _)) = tables::function(&name) {
                 return l.b.call(func, &args);
