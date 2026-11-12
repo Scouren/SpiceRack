@@ -9,13 +9,23 @@
 //! exactly when `needs_model` (and only when `master_kind` allows one), capacities. A reader
 //! turns a card that would fail these into a diagnostic and an `Opaque` before it calls.
 //!
-//! ```ignore
+//! ```
+//! use spicerack_ir::passive::Passive;
+//! use spicerack_ir::source::Source;
+//! use spicerack_ir::wave::Pulse;
+//! use spicerack_ir::{
+//!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, NameId,
+//!     NumForm, Polarity, Ref, Role, Span, NO_ROW,
+//! };
+//!
+//! let mut design = Design::new();
 //! let mut b = design.builder();
 //! let (_, top) = b.file("rc.sp", Role::Deck);
+//! let span = Span::NONE;
 //!
-//! // `R1 a b 1k` (ngspice reader: the type letter is the kind, the digits as written)
+//! // `R1 a b 1k` (an ngspice reader: the letter is the kind, the digits as written)
 //! let one_k = b.literal(Literal { mantissa: 1, frac: 0, exp10: 3, form: NumForm::Scale });
-//! let head = b.head("1", &["a", "b"], None, &[], ExprId::NONE);
+//! let head = b.head("r1", &["a", "b"], None, &[], ExprId::NONE);
 //! b.passive(top, ElemKind::Resistor, head, Passive { value: one_k, ..Passive::PLAIN }, span);
 //!
 //! // `V1 in 0 PULSE(0 1 0 1n 1n 5u 10u)`: no DC given, so ngspice's rule (the t = 0 value)
@@ -25,30 +35,36 @@
 //!     v1: zero, v2: one, delay: zero, rise: edge, fall: edge, width, period,
 //!     cycles: ExprId::NONE,
 //! });
-//! let head = b.head("1", &["in", "0"], None, &[], ExprId::NONE);
-//! b.source(top, ElemKind::VSource, head, Source {
+//! let head = b.head("v1", &["in", "0"], None, &[], ExprId::NONE);
+//! let source = Source {
 //!     dc: zero, ac_mag: ExprId::NONE, ac_phase_deg: ExprId::NONE, tc1: ExprId::NONE,
 //!     tc2: ExprId::NONE, pac_mag: ExprId::NONE, pac_phase_deg: ExprId::NONE, wave,
 //!     noise_psd: List::EMPTY, parasitics: NO_ROW, port: NO_ROW, distof: NO_ROW,
-//! }, span);
+//! };
+//! b.source(top, ElemKind::VSource, head, source, span);
 //!
 //! // `X1 in out div m=2`: the reader binds `div` by its own rule; `m` is the multiplicity
+//! b.subckt(top, "div", &["p", "n"], &[], span);
+//! let div_def = b.design().definitions()[0];
 //! let two = b.num(2.0);
-//! let div = b.name("div");
-//! let master = Ref { name: div, def: div_def };
 //! let terminals = b.names(&["in", "out"]);
-//! let name = b.name("1");
+//! let name = b.name("x1");
+//! let master = Ref { name: div_def.name, def: spicerack_ir::DefId(0) };
 //! let head = ElemHead { name, terminals, model: master, params: List::EMPTY, mult: two };
 //! b.instance(top, ElemKind::Instance, head, span);
 //!
 //! // `.model dmod d (is=1e-14 n=1.05)`: (type word, level) → family by the reader's table
 //! let params = { let is = b.num(1e-14); let n = b.num(1.05); b.params(&[("is", is), ("n", n)]) };
 //! let name = b.name("dmod");
+//! let none = Ref::unresolved(NameId::NONE);
 //! b.model(top, Model {
-//!     name, params, bin_of: NameId::NONE, ako: Ref::unresolved(NameId::NONE),
-//!     module: Ref::unresolved(NameId::NONE), version: ExprId::NONE, word: NameId::NONE,
-//!     family: ModelFamily::Diode, polarity: Polarity::None,
+//!     name, params, bin_of: NameId::NONE, ako: none, module: none, version: ExprId::NONE,
+//!     word: NameId::NONE, family: ModelFamily::Diode, polarity: Polarity::None,
 //! }, span);
+//!
+//! let mut diags = Diags::new();
+//! check(&design, &mut diags);
+//! assert!(diags.is_empty());
 //! ```
 //!
 //! Cites: `rewrite/IR-CIRCUIT.md` §2–§5; `rewrite/IR-KERNEL.md` §6, C9, C10, C13;
