@@ -1,0 +1,13 @@
+dc_pulse_fields: a dc-type source that also carries pulse fields, with no alter of its type: VACASK runs it at its dc (2 V) in the op and the transient alike, the pulse fields dead; a conversion that writes `dc 2 pulse(...)` would run the pulse on ngspice
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=2.0 type="dc" val0=0.0 val1=1.0 delay=1n rise=1n fall=1n width=5n period=20n
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1p
+control
+  analysis op1 op
+  analysis tran1 tran stop=40n step=0.1n maxstep=0.1n
+endc
