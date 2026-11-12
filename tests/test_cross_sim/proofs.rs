@@ -238,3 +238,134 @@ fn p1_066_gm6_and_vreg_are_ngspices_own() {
         );
     }
 }
+
+/// ZERO-LEDGER P1-066. Seven decks are the BSIM3 comparator behind binned
+/// model cards (`nmos.1`…`nmos.4`, every parameter default) or `.options
+/// parser scale`; Xyce and ngspice each give them the baseline's run, so
+/// their difference is S-BSIM3-DEFAULT-CAPMOD's (LTspice sides with Xyce).
+/// Oracle: the comments the harness blessed from the two simulators: each
+/// of the seven leaves the tube at `COMPARATOR/comparator.cir`'s sample,
+/// value and tolerance, character for character; and the lines citing the
+/// proof are the 23 below, by name. Checks: 7 + 1.
+#[test]
+fn p1_066_the_binned_comparators_are_the_capmod_family() {
+    const BINNED: [&str; 7] = [
+        "Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale.cir",
+        "Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScaleRef.cir",
+        "Certification_Tests/ISSUE_239/bsim3_test2.cir",
+        "Certification_Tests/ISSUE_239/bsim3_test2Ref.cir",
+        "MODEL_BINNING/comparatorBinning.cir",
+        "MODEL_BINNING/comparatorBinning_forGlobal.cir",
+        "MODEL_BINNING/globalPar_comparatorBinning.cir",
+    ];
+    const FAMILY: [&str; 16] = [
+        "COMPARATOR/comparator.cir",
+        "MODEL_BINNING/comparatorBaseline.cir",
+        "MODEL_BINNING/comparatorBaseline_forGlobal.cir",
+        "MODEL_BINNING/globalPar_comparatorBaseline.cir",
+        "Nonlinear/ConvergenceTests/NLStrategy2.cir",
+        "Nonlinear/ConvergenceTests/NLStrategy5.cir",
+        "Nonlinear/ConvergenceTests/NLStrategy6.cir",
+        "Nonlinear/ConvergenceTests/Nox0.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod1.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod2.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod3.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod4.cir",
+        "Nonlinear/ConvergenceTests/XyceTests.cir",
+        "OP/comparator_op.cir",
+        "POWER/power_bsim3_gear.cir",
+        "POWER/power_bsim3_trap.cir",
+    ];
+    let dir = env!("CARGO_MANIFEST_DIR");
+    let file = format!("{dir}/tests/fixtures/cross_sim/xyce-ngspice.txt");
+    let list = std::fs::read_to_string(&file).unwrap_or_else(|e| panic!("{file}: {e}"));
+    let cites = " simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md ";
+    // What the harness observed, after the class: `# tran V(1): … (tol …)`.
+    let observed = |deck: &str| {
+        let start = format!("{deck}{cites}");
+        list.lines().find_map(|l| l.strip_prefix(start.as_str()))
+    };
+    let baseline = observed(FAMILY[0]).expect("the family's own line");
+    assert!(
+        baseline.starts_with("# tran V(1): -0.376285159"),
+        "{baseline}"
+    );
+    for deck in BINNED {
+        assert_eq!(observed(deck), Some(baseline), "{deck}");
+    }
+    let cited: BTreeSet<&str> = list
+        .lines()
+        .filter(|l| l.contains(cites))
+        .filter_map(|l| l.split_whitespace().next())
+        .collect();
+    let want: BTreeSet<&str> = FAMILY.iter().chain(&BINNED).copied().collect();
+    assert_eq!(
+        cited, want,
+        "the lines citing proof/s-bsim3-default-capmod.md"
+    );
+}
+
+/// ZERO-LEDGER P1-066. Oracle: the CMC reference table beside each deck
+/// (`<deck>.reference`, `Freq N(coll)` in V²/Hz): the output noise at 1 kHz
+/// is sqrt(N(coll)) of the first row. Xyce 7.10.0's value is the
+/// reference's; ngspice-45's hicum2 is 2.45 %, 5.99 % and 3.48 % under it
+/// at biases 2, 3 and 4 of the six model cards that turn self-heating on
+/// (`flsh=1`). The lines of `ngspice-xyce` that cite the proof are those 18
+/// decks, by name. Checks: 18 × 2 + 1.
+#[test]
+fn p1_066_hicum_noise_with_self_heating_is_ngspices() {
+    /// `cmcqa/hicum/hicum_noise_npn_<card>_ac_<bias>.sp`: the cards with
+    /// `flsh=1`.
+    const CARDS: [&str; 6] = [
+        "cornoise",
+        "full_sh",
+        "full_subcoupl",
+        "full_subcoupl_peri_bias",
+        "full_subcoupl_peri_con",
+        "full_subtran",
+    ];
+    /// Bias; `onoise_spectrum` at 1 kHz in V/√Hz on ngspice-45 and on Xyce
+    /// 7.10.0 (2026-11-11, `full_subcoupl`; the cards agree to 11 digits);
+    /// how far ngspice is under the reference.
+    const AT_1K: [(u32, f64, f64, f64); 3] = [
+        (2, 1.1523105743045234e-10, 1.1809686702025586e-10, 0.02454),
+        (3, 1.5281348231615892e-10, 1.6257564393229386e-10, 0.05993),
+        (4, 1.5613271234089656e-10, 1.617558963376606e-10, 0.03483),
+    ];
+    let root = std::env::var("SPICE_BENCH").expect("$SPICE_BENCH (nix develop .#testing)");
+    let mut want = BTreeSet::new();
+    for card in CARDS {
+        for (bias, ngspice, xyce, under) in AT_1K {
+            let deck = format!("cmcqa/hicum/hicum_noise_npn_{card}_ac_{bias}.sp");
+            let path = format!("{root}/{deck}.reference");
+            let table = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+            let row = table
+                .lines()
+                .find(|r| r.starts_with("1000 "))
+                .expect("the 1 kHz row");
+            let cell = row.split_whitespace().nth(1).expect("N(coll)");
+            let reference = cell.parse::<f64>().expect("a number").sqrt();
+            assert!(
+                (xyce / reference - 1.0).abs() < 5e-4,
+                "{deck}: Xyce {xyce} against the reference {reference}"
+            );
+            let off = 1.0 - ngspice / reference;
+            assert!(
+                (off - under).abs() < 1e-4,
+                "{deck}: ngspice is {off} under the reference"
+            );
+            want.insert(deck);
+        }
+    }
+    let cites =
+        " simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md ";
+    let dir = env!("CARGO_MANIFEST_DIR");
+    let file = format!("{dir}/tests/fixtures/cross_sim/ngspice-xyce.txt");
+    let list = std::fs::read_to_string(&file).unwrap_or_else(|e| panic!("{file}: {e}"));
+    let cited: BTreeSet<String> = list
+        .lines()
+        .filter(|l| l.contains(cites))
+        .filter_map(|l| l.split_whitespace().next().map(str::to_string))
+        .collect();
+    assert_eq!(cited, want, "the lines citing proof/hicum-l2-noise-sh.md");
+}

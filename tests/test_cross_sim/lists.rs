@@ -249,4 +249,26 @@ mod tests {
             assert!(proof.contains(&row), "{file}: no row {row}");
         }
     }
+
+    #[test]
+    fn p1_066_the_subckt_family_is_refined_by_hand() {
+        // `SUBCKT/subckt_a0`…`a4` are `subckt_a5`'s inverter chain and
+        // meet at its step, TMAX 100 ps, which the harness does not
+        // refine to. Oracle: the list's own lines, and the proof file's
+        // rows (Xyce 7.10.0 and ngspice-45 at TSTOP/300000, every vector
+        // through the comparer), matched by deck. Checks: 9 + 9.
+        let by_hand = "simulator-differs:refinement:by-hand";
+        let dir = env!("CARGO_MANIFEST_DIR");
+        let file = format!("{dir}/tests/fixtures/cross_sim/proof/refined-by-hand.md");
+        let proof = std::fs::read_to_string(&file).expect("the proof file");
+        let list = listed("xyce-ngspice");
+        for x in [
+            "a0", "a1", "a1_dup", "a2", "a2_dup", "a3", "a3_hs", "a4", "a4_hs",
+        ] {
+            let deck = format!("SUBCKT/subckt_{x}.cir");
+            assert_eq!(list.get(&deck).map(String::as_str), Some(by_hand), "{deck}");
+            let row = format!("| {deck} | 100 ps (TSTOP/300000) |");
+            assert!(proof.contains(&row), "{file}: no row {row}");
+        }
+    }
 }
