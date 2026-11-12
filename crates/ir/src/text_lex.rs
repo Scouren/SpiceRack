@@ -21,6 +21,7 @@ use crate::build::Builder;
 use crate::expr::{ExprTag, Literal, NumForm};
 use crate::id::{DefId, ExprId};
 use crate::literal::{self, Decimal};
+use crate::text_expr::LETTERS;
 
 /// How a reference was marked in the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,22 +33,6 @@ pub(crate) enum RefMark {
     /// `name#k`: bound to definition `k`.
     Def(u32),
 }
-
-/// The scale letters, longest first (as `text_expr`'s writer spells them).
-const SCALES: [(&str, i16); 12] = [
-    ("peta", 15),
-    ("meg", 6),
-    ("a", -18),
-    ("f", -15),
-    ("p", -12),
-    ("n", -9),
-    ("u", -6),
-    ("m", -3),
-    ("c", -2),
-    ("k", 3),
-    ("g", 9),
-    ("t", 12),
-];
 
 /// A literal as one word: `[-]digits[.digits]` then `e<int>`, a scale letter, `mil`, `i`, or
 /// nothing. A short literal only; `None` for anything else, a `Long` literal included.
@@ -78,7 +63,7 @@ pub(crate) fn number_parts(word: &str) -> Option<(&str, i32, NumForm)> {
     } else if let Some(e) = rest.strip_prefix('e') {
         (e.parse::<i16>().ok()?, NumForm::Exponent)
     } else {
-        (SCALES.iter().find(|s| s.0 == rest)?.1, NumForm::Scale)
+        (LETTERS.iter().find(|s| s.1 == rest)?.0, NumForm::Scale)
     };
     Some((&word[..word.len() - rest.len()], i32::from(exp10), form))
 }

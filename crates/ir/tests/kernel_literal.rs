@@ -323,3 +323,103 @@ fn a_decimal_is_the_correctly_rounded_value_of_its_digits() {
         assert!(got == want, "case {k}: {s}e{exp10}: {got} against {want}");
     }
 }
+
+#[test]
+fn the_dialects_spellings_are_the_shared_digits_and_power() {
+    // the dialects' audit, row 7, writer half. Oracle: the spellings the two dialects' own tests
+    // pin (ir-spine `src/dialect/vacask/number.rs` `spell_reads_back`, `src/dialect/ngspice/
+    // number.rs` `spelling_*` and `a_long_literal_spells_*`), each dialect's letter table as
+    // plain data (vacask `SCALE_LETTERS`; ngspice `letter`, inpeval.c: no centi, no peta)
+    use NumForm::{Exponent, Int, Mil, Plain, Scale};
+    use spicerack_ir::literal::{write_digits, write_power};
+    const VACASK: &[(i16, &str)] = &[
+        (-18, "a"),
+        (-15, "f"),
+        (-12, "p"),
+        (-9, "n"),
+        (-6, "u"),
+        (-3, "m"),
+        (3, "k"),
+        (6, "meg"),
+        (9, "G"),
+        (12, "T"),
+    ];
+    const NGSPICE: &[(i16, &str)] = &[
+        (12, "t"),
+        (9, "g"),
+        (6, "meg"),
+        (3, "k"),
+        (-3, "m"),
+        (-6, "u"),
+        (-9, "n"),
+        (-12, "p"),
+        (-15, "f"),
+        (-18, "a"),
+    ];
+    // what each dialect keeps of its own: VACASK's point on a real whole number, `mil`, and an
+    // `Int` spelled as its digits
+    let vacask = |l: Literal| {
+        let mut out = String::new();
+        write_digits(i128::from(l.mantissa), l.frac, &mut out);
+        match l.form {
+            Int => {}
+            Plain if l.frac == 0 => out.push('.'),
+            Mil => out.push_str("mil"),
+            form => write_power(l.exp10, form, VACASK, &mut out),
+        }
+        out
+    };
+    let ngspice = |l: Literal| {
+        let mut out = String::new();
+        write_digits(i128::from(l.mantissa), l.frac, &mut out);
+        match l.form {
+            Mil => out.push_str("mil"),
+            form => write_power(l.exp10, form, NGSPICE, &mut out),
+        }
+        out
+    };
+    let vacask_cases = [
+        (lit(25, 1, 0, Plain), "2.5"),
+        (lit(5, 1, 0, Plain), "0.5"),
+        (lit(1, 0, -3, Exponent), "1e-3"),
+        (lit(100, 0, -6, Scale), "100u"),
+        (lit(1, 0, 6, Scale), "1meg"),
+        (lit(1, 0, 0, Mil), "1mil"),
+        (lit(7, 0, -2, Scale), "7e-2"),
+        (lit(-2, 0, 0, Int), "-2"),
+        (lit(2, 0, 0, Plain), "2."),
+        (Literal::ZERO, "0."),
+    ];
+    let ngspice_cases = [
+        (lit(3, 0, -2, Scale), "3e-2"),
+        (lit(5, 3, 0, Plain), "0.005"),
+        (lit(7, 0, 12, Scale), "7t"),
+        (lit(15, 1, -3, Exponent), "1.5e-3"),
+        (
+            lit(27500000000000003, 0, -19, Exponent),
+            "27500000000000003e-19",
+        ),
+        (lit(2, 0, 0, Mil), "2mil"),
+    ];
+    let mut wrong = Vec::new();
+    for (l, want) in vacask_cases {
+        if vacask(l) != want {
+            wrong.push(format!("vacask {l:?}: {} not {want}", vacask(l)));
+        }
+    }
+    for (l, want) in ngspice_cases {
+        if ngspice(l) != want {
+            wrong.push(format!("ngspice {l:?}: {} not {want}", ngspice(l)));
+        }
+    }
+    // ngspice's numparam `mil`: 25.4e-6 folded into the digits (2 mil = 508e-7), its own rule
+    let mut folded = String::new();
+    write_digits(2 * 254, 0, &mut folded);
+    write_power(-7, Exponent, NGSPICE, &mut folded);
+    assert_eq!(folded, "508e-7");
+    // a long literal: its significand as written, then its power in its written form
+    let mut long = String::from("1.234567890123456789");
+    write_power(-6, Scale, NGSPICE, &mut long);
+    assert_eq!(long, "1.234567890123456789u");
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

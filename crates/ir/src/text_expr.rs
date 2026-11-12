@@ -13,7 +13,7 @@
 //! Contents: `pub struct Ctx` (`Ctx::detached`), `pub fn write_expr`, `pub fn write_value`,
 //! `pub fn write_literal`, `pub fn write_num`, `pub fn write_name`, `pub fn write_string`, `pub fn write_ref`,
 //! `pub fn write_names`, `pub fn write_exprs`, `pub fn write_params`;
-//! crate: `pub(crate) fn binary_prec(BinOp) -> u8`, `pub(crate) fn func_text(Func) -> &'static str`
+//! crate: `pub(crate) const LETTERS`, `pub(crate) fn binary_prec(BinOp) -> u8`, `pub(crate) fn func_text(Func) -> &'static str`
 
 use crate::design::Design;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, Func, Literal, NumForm, UnOp};
@@ -34,20 +34,21 @@ pub struct Ctx {
     pub formals: DefId,
 }
 
-/// The scale letters of IR text, longest first so `meg`/`mil`/`peta` win over `m`/`p`.
-const SCALES: [(&str, i16); 12] = [
-    ("peta", 15),
-    ("meg", 6),
-    ("a", -18),
-    ("f", -15),
-    ("p", -12),
-    ("n", -9),
-    ("u", -6),
-    ("m", -3),
-    ("c", -2),
-    ("k", 3),
-    ("g", 9),
-    ("t", 12),
+/// The scale letters of IR text and their powers, longest first so `meg`/`peta` win over
+/// `m`/`p` when read (`text_lex`); one per power, so the writer's choice is the table's.
+pub(crate) const LETTERS: [(i16, &str); 12] = [
+    (15, "peta"),
+    (6, "meg"),
+    (-18, "a"),
+    (-15, "f"),
+    (-12, "p"),
+    (-9, "n"),
+    (-6, "u"),
+    (-3, "m"),
+    (-2, "c"),
+    (3, "k"),
+    (9, "g"),
+    (12, "t"),
 ];
 
 /// Binding power of each binary operator (higher binds tighter); the ternary is 1, unary 12.
@@ -225,20 +226,7 @@ pub fn write_literal(l: Literal, out: &mut String) {
         l.form != NumForm::Long,
         "a Long literal is spelled from the design"
     );
-    if l.mantissa < 0 {
-        out.push('-');
-    }
-    let digits = l.mantissa.unsigned_abs().to_string();
-    let frac = l.frac as usize;
-    if frac == 0 {
-        out.push_str(&digits);
-    } else {
-        let padded = format!("{digits:0>width$}", width = frac + 1);
-        let (int, dec) = padded.split_at(padded.len() - frac);
-        out.push_str(int);
-        out.push('.');
-        out.push_str(dec);
-    }
+    crate::literal::write_digits(i128::from(l.mantissa), l.frac, out);
     write_power(l.form, l.exp10, out);
 }
 
@@ -395,17 +383,15 @@ pub(crate) fn func_text(f: Func) -> &'static str {
 /// Appends a power of ten in its written form: `e<exp10>`, a scale letter, `mil`, `i`, or nothing.
 fn write_power(form: NumForm, exp10: i16, out: &mut String) {
     match form {
-        NumForm::Plain => {}
-        NumForm::Exponent => out.push_str(&format!("e{exp10}")),
-        NumForm::Scale => {
-            let letter = SCALES
-                .iter()
-                .find(|s| s.1 == exp10)
-                .expect("a Scale literal's exp10 has a letter");
-            out.push_str(letter.0);
-        }
         NumForm::Mil => out.push_str("mil"),
         NumForm::Int => out.push('i'),
+        NumForm::Plain | NumForm::Exponent | NumForm::Scale => {
+            assert!(
+                form != NumForm::Scale || LETTERS.iter().any(|l| l.0 == exp10),
+                "a Scale literal's exp10 has a letter"
+            );
+            crate::literal::write_power(exp10, form, &LETTERS, out)
+        }
         NumForm::Long => unreachable!("a power is written in a short form"),
     }
 }

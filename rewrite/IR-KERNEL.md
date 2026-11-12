@@ -357,6 +357,12 @@ power exactly, as an `Exponent` (none for `Mil`); a real zero is `Literal::ZERO`
 zero `0i`; `None` for a shape, power or value no literal states. IR text reads its numbers
 through it (`text_lex::number_parts` splits the word). Oracles: hand-worked cases, and Rust's
 decimal parser on 10^4 random significands (`tests/kernel_literal.rs`).
+The writer half: `literal::write_digits(mantissa: i128, frac, out)` (the sign, the digits, the
+point) and `literal::write_power(exp10, form, letters, out)` (nothing, `e<exp10>`, or the letter
+a dialect's own `letters` table holds for a `Scale` power, `e<exp10>` when it holds none); `Mil`,
+`Int` and a point on a whole number stay each dialect's. IR text writes through both, its letter
+table `text_expr::LETTERS` shared with its lexer. Oracle: the spellings the ngspice and VACASK
+dialects' own tests pin, from their letter tables.
 
 **The builder's undo (2026-11-12, the dialects' audit row 5).** `Builder::mark() -> Mark` and
 `Builder::truncate(Mark)` (`mark.rs`): a mark holds every table's length (the kernel's, the 26
