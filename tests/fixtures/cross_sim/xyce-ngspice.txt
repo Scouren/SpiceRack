@@ -249,10 +249,10 @@ Certification_Tests/ISSUE_494/test_c4.cir mismatch # op V(2): 0.0163934426229508
 Certification_Tests/ISSUE_494/test_c5.cir mismatch # op V(2): 0.016393442622950817+0i vs 0.0625+0i at 0 (tol 3.479e-5)
 Certification_Tests/ISSUE_494/test_c6.cir target-fails # no raw file .cross_sim_out.raw: 
 Certification_Tests/MOS1_Invert_Cascade/inverter_cascade_15.cir mismatch # tran OUT10: 5.400871058082966 leaves the tube at t=0.00002258431523806645 (tol 5.401e-2)
-CircuitSim90/BJT/vreg.cir simulator-differs:third-simulator reason=S-XYCE-OUTLIER-3RD proof=s-xyce-outlier-3rd.md # dc V(1): 0.5630442895063699+0i vs 0.5569616049493347+0i at 2 (tol 1.468e-3)
+CircuitSim90/BJT/vreg.cir simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # dc V(1): 0.5630442895063699+0i vs 0.5569616049493347+0i at 2 (tol 1.468e-3)
 CircuitSim90/MOS2/cram.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VD#branch: -0.001361806923229818 leaves the tube at t=0.000000301 (tol 2.160e-5)
 CircuitSim90/MOS2/g1310.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VIN#branch: -0.0004793557776083115 leaves the tube at t=0.000000019136000000000003 (tol 5.451e-6)
-CircuitSim90/MOS2/gm6.cir mismatch # tran V(13): -0.000000000000000000000083308381649482 leaves the tube at t=0 (tol 9.094e-3)
+CircuitSim90/MOS2/gm6.cir simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # tran V(13): -0.000000000000000000000083308381649482 leaves the tube at t=0 (tol 9.094e-3)
 CircuitSim90/MOS2/mux8.cir mismatch # tran V220#branch: 0.0006794012844957967 leaves the tube at t=0.00000850506497194321 (tol 1.263e-5)
 CircuitSim90/MOS2/ring.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran V(10): 3.142914960606579 leaves the tube at t=0.0000000019570539291314028 (tol 3.143e-2)
 CircuitSim90/MOS2/slowlatch.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VC#branch: -0.00003208714534869549 leaves the tube at t=0.000000020004375000000005 (tol 5.669e-7)

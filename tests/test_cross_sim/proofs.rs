@@ -170,3 +170,71 @@ fn p1_066_hsa_stops_on_the_hspice_cards_espice_reads() {
         "target-fails lines that quote a card: {left:?}"
     );
 }
+
+/// ZERO-LEDGER P1-066. Oracle: ngspice-45 and ESPice on one text, the
+/// original `circuitsim90/MOS2/gm6.sp` (no writer between them): v(13), the
+/// node between two off MOSFETs, is 0.409 V on ngspice and 0 V on ESPice,
+/// as `proof/s-ngspice-outlier-3rd.md` records (Xyce and VACASK give 0 V
+/// on the decks written for them). The lines that cite the proof are the
+/// five below, by name. Checks: 2 + 3.
+#[test]
+fn p1_066_gm6_and_vreg_are_ngspices_own() {
+    const SECS: u64 = 60;
+    let root = std::env::var("SPICE_BENCH").expect("$SPICE_BENCH (nix develop .#testing)");
+    let path = format!("{root}/circuitsim90/MOS2/gm6.sp");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    // v(13) of the run's one-point plot (the `.op`).
+    let v13 = |sim: Sim| -> f64 {
+        let plots = match run(sim, Path::new(&path), &text, &[], SECS) {
+            Ran::Plots(p) => p,
+            Ran::Failed(e) => panic!("{sim:?} on gm6: {e}"),
+            Ran::Timeout => panic!("{sim:?} on gm6: past {SECS} s"),
+        };
+        let op = plots
+            .iter()
+            .find(|p| !p.is_complex && p.re(0).len() == 1)
+            .unwrap_or_else(|| panic!("{sim:?}: no operating-point plot"));
+        let at = op
+            .variables
+            .iter()
+            .position(|v| matches!(v.name.to_ascii_lowercase().as_str(), "v(13)" | "13"))
+            .unwrap_or_else(|| panic!("{sim:?}: no v(13) among {:?}", op.variables));
+        op.re(at)[0]
+    };
+    let ngspice = v13(Sim::Ngspice);
+    assert!(
+        (ngspice - 0.408_986_547_625_635_85).abs() < 1e-6,
+        "ngspice v(13) = {ngspice}"
+    );
+    let espice = v13(Sim::Espice);
+    assert!(espice.abs() < 1e-6, "ESPice v(13) = {espice}");
+    let cites = " simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md ";
+    for (cell, want) in [
+        (
+            "ngspice-xyce",
+            ["circuitsim90/BJT/vreg.sp", "circuitsim90/MOS2/gm6.sp"],
+        ),
+        (
+            "ngspice-vacask",
+            ["circuitsim90/BJT/vreg.sp", "circuitsim90/MOS2/gm6.sp"],
+        ),
+        (
+            "xyce-ngspice",
+            ["CircuitSim90/BJT/vreg.cir", "CircuitSim90/MOS2/gm6.cir"],
+        ),
+    ] {
+        let dir = env!("CARGO_MANIFEST_DIR");
+        let file = format!("{dir}/tests/fixtures/cross_sim/{cell}.txt");
+        let list = std::fs::read_to_string(&file).unwrap_or_else(|e| panic!("{file}: {e}"));
+        let cited: BTreeSet<String> = list
+            .lines()
+            .filter(|l| l.contains(cites))
+            .filter_map(|l| l.split_whitespace().next().map(str::to_string))
+            .collect();
+        let want: BTreeSet<String> = want.iter().map(|d| d.to_string()).collect();
+        assert_eq!(
+            cited, want,
+            "{cell}: the lines citing proof/s-ngspice-outlier-3rd.md"
+        );
+    }
+}

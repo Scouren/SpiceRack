@@ -1,6 +1,6 @@
-circuitsim90/BJT/vreg.sp mismatch # dc v(2): 0.5586759973994992 vs 0.5652145450319832 at 2 (tol 4.595e-3; 2/16 points out)
+circuitsim90/BJT/vreg.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # dc v(2): 0.5586759973994992 vs 0.5652145450319832 at 2 (tol 4.595e-3; 2/16 points out)
 circuitsim90/MOS2/ab_opamp.sp mismatch # tran v(203): -0.09578908027965216 leaves the tube at t=1.2028e-5 (tol 9.622e-4; target there -0.0855473)
-circuitsim90/MOS2/gm6.sp mismatch # tran v(13): 0.40898654762563585 leaves the tube at t=0 (tol 9.111e-3; target there -8.33e-23)
+circuitsim90/MOS2/gm6.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # tran v(13): 0.40898654762563585 leaves the tube at t=0 (tol 9.111e-3; target there -8.33e-23)
 circuitsim90/MOS2/nand.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS2/pump.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS2/ring.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(2): 0.51398545047556 leaves the tube at t=0.00000009053104541064522 (tol 3.055e-2)

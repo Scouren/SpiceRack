@@ -1,7 +1,7 @@
-circuitsim90/BJT/vreg.sp mismatch # dc v(2): 0.5586759973994992+0i vs 0.5651719649161091+0i at 2 (tol 4.595e-3)
+circuitsim90/BJT/vreg.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # dc v(2): 0.5586759973994992+0i vs 0.5651719649161091+0i at 2 (tol 4.595e-3)
 circuitsim90/MOS2/ab_ac.sp mismatch # ac v(18): -2923.888930836546+0.0248810538697466i vs -2836.018098941056+0.023435298285597393i at 1 (tol 5.848e0)
 circuitsim90/MOS2/cram.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 95 step(s) tried.
-circuitsim90/MOS2/gm6.sp mismatch # op v(13): 0.40898654762563585+0i vs 0+0i at 0 (tol 8.200e-4)
+circuitsim90/MOS2/gm6.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # op v(13): 0.40898654762563585+0i vs 0+0i at 0 (tol 8.200e-4)
 circuitsim90/MOS2/hussamp.sp target-fails # no raw file op1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 147 step(s) tried.
 circuitsim90/MOS2/mux8.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 87 step(s) tried.
 circuitsim90/MOS2/ring.sp mismatch # tran v(2): 1.5267320280194356 leaves the tube at t=0.00000008005055142853478 (tol 3.055e-2)
