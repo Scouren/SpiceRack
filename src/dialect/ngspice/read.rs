@@ -177,6 +177,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         lower(&mut lw, top);
     }
     bind(out, &pending, &measured, &rows);
+    // checks that need each element's bound model
+    super::read_elements::bound(out.design(), diags);
 }
 
 /// The files `text` names, in text order: each `.include` path and `.lib` call's file.
