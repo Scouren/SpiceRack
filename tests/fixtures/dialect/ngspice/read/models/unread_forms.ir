@@ -1,9 +1,10 @@
-# codes: P1203 P1203 P1203 P1203 P1203
+# codes: P1203 P1203 P1203 P1203 P1203 P1209
 file "unread_forms.sp" deck
   title "unread_forms"
-  comment " oracle: INPfindLev (a level in braces is numparam's before the card is read), inptyplk.c (a device name as type word), create_model (a bare flag)"
+  comment " oracle: INPfindLev (a level in braces is numparam's before the card is read), inptyplk.c (a device name as type word), create_model (a bare flag), circuit_tables::VERSIONS (HICUM 2.3 is no version of the vocabulary: P1209)"
   opaque ngspice unread ".model mb nmos level={lv}"
   opaque ngspice unread ".model mc bsim4 level=54"
   opaque ngspice unread ".model me nmos level=1 pmos"
   opaque ngspice unread ".model mf cpl r=0.1 0 0.1"
   opaque ngspice unread ".model mg nmos vto={v(a)}"
+  opaque ngspice unread ".model mh npn level=8 version=2.3"
