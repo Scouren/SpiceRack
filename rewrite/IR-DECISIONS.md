@@ -128,3 +128,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Instead of the width note (lead's A7 revision): `Extra` is split by owner, for good. Three `#[repr(u8)]` enums with `ALL`/`COUNT`: the kernel's `Extra` (8 members) stays in `feature.rs`; `CircuitExtra` (76) is in the new circuit-owned `circuit_extra.rs`; `RunExtra` (119, after the run follow-up's `IcDevice`) is in the new run-owned `run_extra.rs`. Every member, name and doc moved unchanged. `Feature` is `{ …, DrawPer, Extra(Extra), Circuit(CircuitExtra), Run(RunExtra), Option(OptionKey) }`, with index offsets in that order. The owner regions and their markers are gone from `feature.rs`.
 - File map (IR-KERNEL §10) as amended by A7: circuit owner += `circuit_extra.rs`; run owner += `run_extra.rs`; `feature.rs` holds only kernel members. An owner adds a feature without touching a kernel file.
 - Merge of the run follow-up (6c74d081): the only conflict was here, R20 vs this file's later sections; I kept the run owner's R20/R21 and the kernel's A6/A7 sections.
+
+## Addendum A8 (= the A7 revision above)
+
+- A8 (merge the run owner's follow-up 6c74d081, then split `Extra` into `Extra` / `CircuitExtra` / `RunExtra`) is what the A7 bullets above record: merged in dc870504 (the only conflict was this file; both sides kept), split in d0e0c80. The file map has `circuit_extra.rs` (circuit) and `run_extra.rs` (run). The `Extra` doc's 256 note is gone; each enum is `#[repr(u8)]`, and the largest, `RunExtra`, has 119 members.
