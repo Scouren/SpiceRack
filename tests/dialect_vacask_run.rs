@@ -47,12 +47,7 @@ const KNOWN: &[(&str, &str)] = &[];
 
 /// Writer fixtures that fail for a cause outside this area, each with its cause; strict both
 /// ways.
-const KNOWN_WRITE: &[(&str, &str)] = &[(
-    "generated",
-    "its unnamed analyses, DC axes and loop are AnalysisUnnamed, DcAxisUnnamed, LoopUnnamed \
-     (A35, R59), which VACASK lacks and no pass yet removes: legalize refuses them until the \
-     run group's naming rows land and W2301/W2302 go",
-)];
+const KNOWN_WRITE: &[(&str, &str)] = &[];
 
 /// Settle decks the round trip cannot run yet, each with its cause; strict both ways.
 const KNOWN_TRIP: &[(&str, &str)] = &[];
