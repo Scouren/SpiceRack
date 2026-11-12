@@ -4,7 +4,8 @@
 //! - P1: `ir::check` is clean after it;
 //! - P2: every item still carrying `removes` (by `ir::check_legal`, per `Diag::item`) has a
 //!   coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
-//!   generated item has none), and every other item has lost it;
+//!   generated item has none), and every other item has lost it; a feature `check_legal`
+//!   reports at no item (design-level) is noted by any note of the pass;
 //! - P3: its output uses nothing outside its input's features plus `requires`;
 //! - P4: running it twice equals running it once (IR text equal);
 //! - P5: on a design without the feature nothing changes (IR text equal).
@@ -244,10 +245,15 @@ fn p2_on(pass: &Pass) -> Result<(), String> {
         let mut diags = ir::Diags::new();
         (pass.run)(&mut design, &mut diags);
         for item in carrying(&design, pass.removes) {
+            // interim, until `check_legal` reports the run owner's design-level features at
+            // their items (ir-run `feature_items`, the kernel's switch): a feature reported at
+            // no item is noted by any note of the pass. Remove with that hash: P2 by item then
+            // covers them.
+            let design_level = item.index == u32::MAX;
             let noted = diags
                 .rows()
                 .iter()
-                .any(|d| d.item == item && pass.notes.contains(&d.code));
+                .any(|d| (design_level || d.item == item) && pass.notes.contains(&d.code));
             if !noted {
                 return Err(format!(
                     "seed {seed}: the item {item:?} keeps it with no note"

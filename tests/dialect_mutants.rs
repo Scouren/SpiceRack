@@ -22,6 +22,10 @@ use spicerack::ir;
 /// Mutants per deck (the merge tier).
 const MUTANTS: u64 = 32;
 
+/// The most reads one shrink makes (each a reader run on a candidate); past it the smallest
+/// mutant reached is reported, marked as not minimal (a large fixture shrank for minutes).
+const SHRINK_STEPS: usize = 400;
+
 /// The rows that fail today: (law, row, why). Strict both ways.
 const KNOWN: &[(&str, &str, &str)] = &[];
 
@@ -69,6 +73,27 @@ fn a_mutant_that_breaks_the_reader_is_caught_and_shrunk() {
     let seed = found.expect("some seed duplicates the beta line");
     let small = shrink(&mutate(text, seed), &breaks);
     assert_eq!(small, "beta b=2\nbeta b=2\n");
+}
+
+#[test]
+fn a_shrink_that_hits_its_bound_says_it_is_not_minimal() {
+    // Every candidate stays bad but only a line-by-line walk could tell: on a text of more lines
+    // than the bound, the shrink stops and says so.
+    let text: String = (0..SHRINK_STEPS + 50)
+        .map(|k| format!("line{k} a=1\n"))
+        .collect();
+    let reads = std::cell::Cell::new(0);
+    let bad = |t: &str| {
+        reads.set(reads.get() + 1);
+        t.contains("line0 ").then(|| "bad".to_string())
+    };
+    let small = shrink(&text, &bad);
+    assert!(
+        small.ends_with("bound)\n"),
+        "{}",
+        &small[small.len().saturating_sub(80)..]
+    );
+    assert!(reads.get() <= SHRINK_STEPS, "{} reads", reads.get());
 }
 
 /// Every mutant of every fixture deck of `row`, read and checked; each distinct failure (by
@@ -135,17 +160,25 @@ fn bad_read(row: &DialectRow, text: &str) -> Option<String> {
 }
 
 /// The text with lines removed one at a time while it stays bad: the smallest failing mutant
-/// this greedy walk finds. Bounded: at most one removal per line per sweep, sweeps until none.
+/// this greedy walk finds. Bounded: at most [`SHRINK_STEPS`] reads; at the bound the smallest
+/// text reached is returned with a line saying it is not minimal.
 fn shrink(text: &str, bad: &dyn Fn(&str) -> Option<String>) -> String {
     let mut lines: Vec<&str> = text.lines().collect();
     let join = |ls: &[&str]| ls.iter().map(|l| format!("{l}\n")).collect::<String>();
     let mut changed = true;
     let mut sweeps = 0;
+    let mut steps = 0;
     while changed && sweeps <= lines.len() {
         changed = false;
         sweeps += 1;
         let mut i = lines.len();
         while i > 0 {
+            if steps == SHRINK_STEPS {
+                let note =
+                    format!("(not minimal: the shrink stopped at its {SHRINK_STEPS}-read bound)\n");
+                return join(&lines) + &note;
+            }
+            steps += 1;
             i -= 1;
             let mut fewer = lines.clone();
             fewer.remove(i);

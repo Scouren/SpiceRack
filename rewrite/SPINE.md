@@ -147,8 +147,9 @@ any other edge, a pass of one group importing another group included.
 **Laws** (`tests/pass_laws.rs`, generic over `GROUPS`, failing passes compared by name with a
 strict `KNOWN` list; a law that runs on no generated design for a pass fails for it), over
 generated designs that use the pass's `removes` and over ones that do not: P1 `ir::check` is
-clean after it; P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has a note of the
-pass at it, every other has lost it; P3 the output uses nothing outside the input's features
+clean after it (so a pass that drops a defining item through `items_mut` instead of
+`Editor::remove_item` fails P1 on the stale definition, X0018: intended); P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has a note of the
+pass at it, every other has lost it (a feature `check_legal` reports at no item, design-level, is noted by any note of the pass); P3 the output uses nothing outside the input's features
 plus `requires`; P4 running it twice equals running it once (IR text equal); P5 on a design
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
 simulator on both forms) is each pass's own test.
