@@ -31,7 +31,9 @@ use crate::ir;
 pub(super) const FEATURES: ir::FeatureSet = super::read_control::FEATURES;
 
 /// A parameter alter not right before a `Reset` (or a parameter loop whose body does not start
-/// with one): ngspice applies an `alterparam` only at a `reset` (S2).
+/// with one): ngspice applies an `alterparam` only at a `reset` (S2; settle
+/// `alter_param_noreset.sp`: the next op runs at the old value, silently). Here in `admits`
+/// (R21) until the IR states an alter's effect as a feature (R70, A43); the branch goes with it.
 pub(super) const PARAM_RESET: ir::Code = ir::Code::new(b'W', 1401);
 /// A loop ngspice's `foreach` cannot spell: not a sweep over a list of numbers.
 pub(super) const LOOP_FORM: ir::Code = ir::Code::new(b'W', 1402);
