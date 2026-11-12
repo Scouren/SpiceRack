@@ -28,12 +28,12 @@ mod law_harness;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use law_harness::{
-    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers,
+    PARAMS, SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers,
     same_meaning, write_all, writers,
 };
 use spicerack::dialect::{self, DialectRow, Read, Write};
 use spicerack::ir;
-use spicerack::ir::r#gen::generate;
+use spicerack::ir::r#gen::{Params, generate};
 
 /// The seeds every generated law runs (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..64;
@@ -173,8 +173,8 @@ fn l1_an_empty_text_is_one_file_with_no_item() {
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
     laws("l3", |row, writer| {
         let mut tally = Tally::new();
-        for seed in SEEDS.take(8) {
-            let design = match admitted(seed, row, writer) {
+        for (seed, params) in cases(SEEDS.take(8)) {
+            let design = match admitted(seed, params, row, writer) {
                 Ok(d) => d,
                 Err(code) => {
                     tally.skip(code);
@@ -193,7 +193,7 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
                     .collect()
             });
             if !threads.iter().all(|t| *t == once) {
-                return Err(format!("seed {seed}: the threads differ"));
+                return Err(format!("seed {seed} {params:?}: the threads differ"));
             }
         }
         tally.some()
@@ -212,8 +212,8 @@ fn l5_read_of_write_is_the_design() {
             return Ok(());
         }
         let mut tally = Tally::new();
-        for seed in SEEDS {
-            let design = match admitted(seed, row, writer) {
+        for (seed, params) in cases(SEEDS) {
+            let design = match admitted(seed, params, row, writer) {
                 Ok(d) => d,
                 Err(code) => {
                     tally.skip(code);
@@ -226,7 +226,7 @@ fn l5_read_of_write_is_the_design() {
             // equal by value, ids in canonical order; the IR text is the failure's evidence.
             if !same_meaning(&back, &design) {
                 return Err(format!(
-                    "seed {seed}:\n{}\nread back as\n{}",
+                    "seed {seed} {params:?}:\n{}\nread back as\n{}",
                     canonical(&design),
                     canonical(&back)
                 ));
@@ -303,8 +303,8 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
     laws("l8", |row, writer| {
         let mut tally = Tally::new();
-        for seed in SEEDS {
-            let design = match admitted(seed, row, writer) {
+        for (seed, params) in cases(SEEDS) {
+            let design = match admitted(seed, params, row, writer) {
                 Ok(d) => d,
                 Err(code) => {
                     tally.skip(code);
@@ -323,7 +323,9 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             let mut diags = ir::Diags::new();
             let again = dialect::write(&permuted, permuted.find_file(&path), row, &mut diags);
             if again != first {
-                return Err(format!("seed {seed}: the file is written otherwise"));
+                return Err(format!(
+                    "seed {seed} {params:?}: the file is written otherwise"
+                ));
             }
         }
         tally.some()
@@ -338,8 +340,8 @@ fn reach_every_kind_the_row_claims() {
     let mut unreached: Vec<(String, String)> = Vec::new();
     for (row, writer) in writers() {
         let mut seen = ir::FeatureSet::EMPTY;
-        for seed in REACH_SEEDS {
-            if let Ok(design) = admitted(seed, row, writer) {
+        for (seed, params) in cases(REACH_SEEDS) {
+            if let Ok(design) = admitted(seed, params, row, writer) {
                 seen = seen.union(ir::features_used(&design));
             }
         }
@@ -445,7 +447,7 @@ fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
         diags.rows().iter().any(|d| dialect::refuses(d.code))
     };
     let keeps_a_capacitor = |seed: u64| {
-        admitted(seed, row, &Panicky).is_ok_and(|d| {
+        admitted(seed, Params::Untyped, row, &Panicky).is_ok_and(|d| {
             d.reachable().iter().any(|(i, _)| {
                 i.kind == ir::ItemKind::Element
                     && d.row::<ir::Element>(i.index).kind == ir::ElemKind::Capacitor
@@ -463,8 +465,8 @@ fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
 /// panic is the failure (with its seed).
 fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> Result<(), String> {
     let mut tally = Tally::new();
-    for seed in seeds {
-        let design = match admitted(seed, row, writer) {
+    for (seed, params) in cases(seeds) {
+        let design = match admitted(seed, params, row, writer) {
             Ok(d) => d,
             Err(code) => {
                 tally.skip(code);
@@ -479,7 +481,7 @@ fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> R
             }
         }));
         if wrote.is_err() {
-            return Err(format!("seed {seed}: the writer panicked"));
+            return Err(format!("seed {seed} {params:?}: the writer panicked"));
         }
         let refusals: Vec<_> = diags
             .rows()
@@ -487,10 +489,18 @@ fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> R
             .filter(|d| dialect::refuses(d.code))
             .collect();
         if !refusals.is_empty() {
-            return Err(format!("seed {seed}: {refusals:?}"));
+            return Err(format!("seed {seed} {params:?}: {refusals:?}"));
         }
     }
     tally.some()
+}
+
+/// Every (seed, setting) of `seeds` under both generator settings (A28: untyped parameters
+/// drawn, and none); a law and the reach list run over all of them.
+fn cases(seeds: impl Iterator<Item = u64> + Clone) -> impl Iterator<Item = (u64, Params)> {
+    PARAMS
+        .into_iter()
+        .flat_map(move |p| seeds.clone().map(move |s| (s, p)))
 }
 
 /// Whether `f` is a kind the reach list covers.

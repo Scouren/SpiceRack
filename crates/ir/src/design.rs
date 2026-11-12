@@ -40,7 +40,7 @@
 //!   `Design::files(&self) -> impl Iterator<Item = FileId>`, `Design::file(&self, FileId) -> File`,
 //!   `Design::scope(&self, ScopeId) -> Scope`, `Design::items(&self, ScopeId) -> &[ItemRef]`,
 //!   `Design::row<R: ItemRow>(&self, u32) -> R`, `Design::span_of(&self, ItemRef) -> Span`,
-//!   `Design::item_handles(&self, ItemRef, &mut Vec<Handle>)`,
+//!   `Design::item_handles(&self, ItemRef, &mut Vec<Handle>)`; crate: `Design::derived_changed(&mut self)`;
 //!   `Design::literal_value(&self, Literal) -> f64`, `Design::literal_eq(&self, Literal, Literal) -> bool`,
 //!   `Design::long_digits(&self, Literal) -> Option<(&str, NumForm)>`,
 //!   `Design::item_refs(&self, ItemRef, &mut Vec<(Ref, DefKind)>)`,
@@ -79,6 +79,7 @@ use crate::names::{FxMap, Names, Texts};
 use crate::option::{Env, NodeSet, OptionRow};
 use crate::output::{Measure, Print, Save};
 use crate::plan::{Alter, Elaborate, Loop};
+use crate::reset::Reset;
 use crate::scope::{Def, File, Scope};
 use crate::span::Span;
 use crate::stats::Statistics;
@@ -128,12 +129,16 @@ pub struct Design {
     pub(crate) prints: Table<Print>,
     pub(crate) measures: Table<Measure>,
     pub(crate) elaborates: Table<Elaborate>,
+    pub(crate) resets: Table<Reset>,
     // detail tables, owned by the circuit and run owners
     pub(crate) circuit: CircuitDetails,
     pub(crate) run: RunDetails,
     /// The dynamic class of each definition (`class::def_classes`), computed on demand and
     /// cleared by every `Builder` and `Editor` mutation. Not part of equality.
     pub(crate) classes: std::sync::OnceLock<Vec<ExprClass>>,
+    /// The forms each function body counts in (`feature::body_forms`, A28): bit 1 static, bit 2
+    /// dynamic, by body expression. Computed on demand and cleared with `classes`.
+    pub(crate) forms: std::sync::OnceLock<crate::names::FxMap<ExprId, u8>>,
     /// The first element of each whole name in each scope (`Builder::element_named`), built on
     /// demand, extended by every element push and cleared where `editor` hands out its door and
     /// by each Editor mutation that can move or rename an element. Not part of equality.
@@ -215,6 +220,7 @@ item_rows! {
     Print => Print, prints;
     Measure => Measure, measures;
     Elaborate => Elaborate, elaborates;
+    Reset => Reset, resets;
 }
 
 impl Design {
@@ -258,22 +264,24 @@ impl Design {
             prints: Table::new(),
             measures: Table::new(),
             elaborates: Table::new(),
+            resets: Table::new(),
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
             classes: std::sync::OnceLock::new(),
+            forms: std::sync::OnceLock::new(),
             element_names: std::sync::OnceLock::new(),
         }
     }
 
     /// The append-only door for readers and builders.
     pub fn builder(&mut self) -> Builder<'_> {
-        self.classes.take();
+        self.derived_changed();
         Builder { design: self }
     }
 
     /// The door for passes: replace rows and item lists, append through a builder.
     pub fn editor(&mut self) -> Editor<'_> {
-        self.classes.take();
+        self.derived_changed();
         self.element_names.take();
         Editor { design: self }
     }
@@ -539,6 +547,15 @@ impl Design {
 impl Default for Design {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Design {
+    /// Forgets what is derived from the expressions and definitions (the class and form caches):
+    /// every door and every mutation that can change a class calls it.
+    pub(crate) fn derived_changed(&mut self) {
+        self.classes.take();
+        self.forms.take();
     }
 }
 

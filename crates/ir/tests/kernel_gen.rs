@@ -200,16 +200,13 @@ fn the_full_set_runs_every_property() {
             );
         }
     }
-    // a `ddt`/`idt` makes its tree read the circuit (class `Circuit`), so it only ever counts as
-    // `FuncDyn`: no valid design holds these two
-    // and a title stands only in a deck's top, so no placement of one exists (A15 K1)
+    // a title stands only in a deck's top, so no placement of one exists (A15 K1)
     let titles = ScopeKind::ALL[1..]
         .iter()
         .map(|&s| Feature::Placed(s, ItemKind::Title));
-    let unreachable: Vec<Feature> = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)]
-        .into_iter()
-        .chain(titles)
-        .collect();
+    // (A28, R51: an uncalled function body counts static, so `Func(Ddt)` and `Func(Idt)` are
+    // reached through one; they were unreachable while a body counted dynamic always)
+    let unreachable: Vec<Feature> = titles.collect();
     // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
     let not_yet: [Feature; 0] = [];
     let goal = unreachable

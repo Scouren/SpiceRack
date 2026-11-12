@@ -240,6 +240,10 @@ macro_rules! for_kind {
                 type $R = $crate::plan::Elaborate;
                 $body
             }
+            $crate::ItemKind::Reset => {
+                type $R = $crate::reset::Reset;
+                $body
+            }
         }
     };
 }

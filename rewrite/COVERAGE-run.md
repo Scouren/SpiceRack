@@ -167,7 +167,7 @@ result-side fact (backend, harness), outside the netlist IR.
 
 ## INV-constructs §K (control and scripting)
 
-- K1 → read into rows: analyses → `Analysis`; `pre_osdi` → kernel `Load`; `alterparam`+`reset` → `Alter`; display lines → `Opaque` `Inert`; circuit-changing unread lines → refusal; the block itself is `Opaque` `Script` when unread.
+- K1 → read into rows: analyses → `Analysis`; `pre_osdi` → kernel `Load`; `alterparam`+`reset` → `Alter` of `Param` placed after a `Reset { values options temp tnom saves }` (A28); display lines → `Opaque` `Inert`; circuit-changing unread lines → refusal; the block itself is `Opaque` `Script` when unread.
 - K2 → `Opaque` `Inert`.
 - K3 → `Opaque` `Inert`.
 - K4 → `alterparam` → `Alter` (`Param`, `SubcktParam`); `alter` → `Alter` (`DeviceParam`/`ElementValue`); `altermod` → `Alter` (`ModelParam`); `option` → `Alter` (`TargetKind::Option`) or `OptionRow` mid-run; `set temp=` → `Alter` of `Target::TEMP`; `let @dev[p]` → `Alter` `DeviceParam`; `source`: refusal.
@@ -184,7 +184,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - K15 → `LoopKind::Table` (the LTspice writer spells it as `table()`; its reader reads it back as a table only when the idiom is exact).
 - K16 → order in the scope is the plan (no epochs table); the invariants are `check`'s.
 - K17 → `ItemKind::Elaborate`, `plan::Elaborate { circuits }` (A12 R1).
-- K18 → `clear saves` → reader rule (union of saves, N3) with a note; `clear options` → `Alter`s back to the defaults (reader rule).
+- K18 → VACASK `clear saves` → `Reset { saves }` (A28, vc-run's run sv2); `save` → `Save { holds: FromHere }`; `clear options` → `Reset { options }` when a run shows it drops the control block's options (reader rule until then).
 - K19 → `Alter` with `TargetKind::DeviceParam` and a string value (`Extra::AlterString`); a topology flip under `@if`: kernel `If` re-evaluated after the alter (11.08).
 - K20 → as K12.
 
@@ -264,7 +264,7 @@ result-side fact (backend, harness), outside the netlist IR.
 
 - 13.01 → scripts lowered to items by the reader; order of items is the plan; only state changes enter (`Alter`, `OptionRow`, `Loop`).
 - 13.02 → `Alter` + `Loop`; data-dependent logic: `Opaque` `Script` (refused at the source).
-- 13.03 → `LoopEnd::{Restore, KeepLast}`; alters persist until re-altered (reader emits restores for ngspice `reset`); `altergroup`: gap G-ALTERCARD.
+- 13.03 → `LoopEnd::{Restore, KeepLast}`; alters persist until re-altered or a `Reset` of their class (ngspice `reset`, A28); `altergroup`: gap G-ALTERCARD.
 - 13.04 → the loop's body is the set of analyses it wraps; nesting by scope (outer → inner).
 - 13.05 → `SweepEnd::OnStop`; LTspice sorting/dedup: reader rule into an explicit `List`.
 - 13.06 → `TargetKind::{SourceDc, ElementValue, DeviceParam, Temp}`.
