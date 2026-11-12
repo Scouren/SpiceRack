@@ -115,7 +115,9 @@ pub fn render_text(
 }
 
 /// `file` of `kit` (its entry) and every kit file it reaches through `from`'s references,
-/// through `transpile`, leniently, in today's types.
+/// through `transpile`, leniently, in today's types: one read and one `legalize` of the kit per
+/// call (today's `render_kit` writes one file per call; a caller of the spine writes them all
+/// after one `legalize`).
 ///
 /// # Errors
 /// The refusal, as today's `Diags`.

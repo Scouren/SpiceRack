@@ -24,14 +24,16 @@ Each line: question → choice → why.
 8. `Policy::Strict` → `dialect::read` pushes `STRICT_UNREAD` (`S0101`, the spine's own table, ruling 1)
    at each `Opaque` row of class `Unread` (scanning the `Opaque` table). `S0001` (the reader's note)
    stays a note.
-9. Text family → the spine refuses another family's `Opaque` (`U0001`, `arg` =
-   `Feature::Item(Opaque)`) before the writer runs; `ANY_FAMILY = "*"` marks the IR text writer,
-   which spells every dialect's → one rule in the spine instead of one loop per writer. Until
-   `Design::reachable()` is public (ruling 5) an `Opaque` counts for the file being written by its
-   span's file (`Span::NONE` counts as that file); then by `design.scope(scope).file`.
-10. `write` on any refusal (foreign opaque, features left after `legalize`) → the writer is not called,
-    the text is empty → a writer only ever sees legal IR (rule 4). `transpile` does not write after
-    a read that refused.
+9. Text family (R11) → `dialect::legalize` (once per design and target, in place) walks every reachable
+   item: another family's `Opaque` of class `Inert` is removed from its scope with an `INERT_DROPPED`
+   note (`S0102`), any other class is refused (`U0001`, `arg` = `Feature::Item(Opaque)`) at the item;
+   `ANY_FAMILY = "*"` (the IR text writer) skips the step. The walk is a private stand-in for
+   `Design::reachable()` (Subckt, Section, If, Loop bodies; files in id order), swapped when the
+   kernel makes it public (ruling 5).
+10. `write` (R11) → calls the writer only; legality is the caller's contract (debug assertions:
+    features inside the writer's set, no foreign `Opaque`). `transpile` = read → refused? → legalize →
+    refused? → write of the entry. The facade's `render_kit` keeps today's one-file-per-call shape:
+    one read and one legalize per call.
 11. `legalize`'s leftovers (ruling 2) → passes run to the fixpoint, then `ir::check_legal(design,
     target)` appends one `U0001` per (item, feature) at the item: that is the leftover report. `write`
     calls the writer only when nothing is left.
