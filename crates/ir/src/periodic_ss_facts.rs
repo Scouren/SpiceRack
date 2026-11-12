@@ -10,47 +10,50 @@
 use crate::analysis_facts::DetailFacts;
 #[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::base_just_before;
+#[cfg(any(test, feature = "gen"))]
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::dc_ac_facts::output_valid;
 use crate::design::Design;
-use crate::diag::Diags;
-use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-use crate::id::{ExprId, ScopeId};
+use crate::id::ExprId;
+#[cfg(any(test, feature = "gen"))]
+use crate::id::ScopeId;
 use crate::periodic::{FreqAxis, Pac, Pnoise, Pstb, Pxf, Stb};
-use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
-use crate::run_exprs::Roots;
+use crate::probe::probe_features;
 use crate::run_extra::RunExtra;
-use crate::run_names::Names;
+use crate::run_fields::{N, NN, PROBE, SWEEP};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
-use crate::run_words::{
-    domain_unless, flag, put_expr, put_flag, put_name, take_expr, take_name, take_word,
-};
+use crate::run_words::{domain_unless, flag};
 #[cfg(any(test, feature = "gen"))]
 use crate::sweep::gen_sweep;
-use crate::sweep::{SweepUse, dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
-use crate::text::Words;
-use crate::text_expr::Ctx;
+use crate::sweep::{SweepUse, sweep_features, sweep_valid};
+
+run_choices!(FreqAxis);
+
+run_fields! {
+    Pac { sweep: Sweep("") = SWEEP, sidebands: Expr = N, relharm: Expr = N, axis: Optional("") = FreqAxis::Absolute }
+    Pnoise {
+        output: Probe("") = PROBE, source: Element = NN, sweep: Sweep("") = SWEEP,
+        sidebands: Expr = N, relharm: Expr = N, axis: Optional("") = FreqAxis::Absolute,
+    }
+    Pxf {
+        output: Probe("") = PROBE, sweep: Sweep("") = SWEEP, sidebands: Expr = N, relharm: Expr = N,
+        axis: Optional("") = FreqAxis::Absolute,
+    }
+    Pstb {
+        probe: Element = NN, sweep: Sweep("") = SWEEP, sidebands: Expr = N, relharm: Expr = N,
+        axis: Optional("") = FreqAxis::Absolute,
+    }
+    Stb { probe: Element = NN, sweep: Sweep("") = SWEEP }
+}
 
 impl DetailFacts for Pac {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        sweep_handles(&self.sweep, out);
-        out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
-    }
+    table_facts!();
 
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.sweep(&mut self.sweep);
-        r.expr(&mut self.sidebands);
-        r.expr(&mut self.relharm);
-    }
-
-    fn map_names(&mut self, _r: &mut Names<'_>) {
-        // no element name
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
@@ -61,25 +64,6 @@ impl DetailFacts for Pac {
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep) && axis_ok(self.axis, self.relharm))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_sweep(design, ctx, &self.sweep, out);
-        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let sweep = parse_sweep(words, scope, b, diags)?;
-        let (sidebands, relharm, axis) = parse_side(words, scope, b, diags);
-        Some(Pac {
-            sweep,
-            sidebands,
-            relharm,
-            axis,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -101,24 +85,8 @@ impl DetailFacts for Pac {
 }
 
 impl DetailFacts for Pnoise {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-        out.push(Handle::Name(self.source));
-        sweep_handles(&self.sweep, out);
-        out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
-    }
+    table_facts!();
 
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-        r.sweep(&mut self.sweep);
-        r.expr(&mut self.sidebands);
-        r.expr(&mut self.relharm);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-        r.one(&mut self.source);
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -131,31 +99,6 @@ impl DetailFacts for Pnoise {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         let ok = output_valid(&self.output) && !self.source.is_none();
         domain_unless(ok && sweep_valid(&self.sweep) && axis_ok(self.axis, self.relharm))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-        put_name(out, design, "source", self.source);
-        dump_sweep(design, ctx, &self.sweep, out);
-        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let output = parse_probe(words, scope, b, diags)?;
-        let source = take_name(words, "source", b, diags);
-        let sweep = parse_sweep(words, scope, b, diags)?;
-        let (sidebands, relharm, axis) = parse_side(words, scope, b, diags);
-        Some(Pnoise {
-            output,
-            source,
-            sweep,
-            sidebands,
-            relharm,
-            axis,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -181,22 +124,8 @@ impl DetailFacts for Pnoise {
 }
 
 impl DetailFacts for Pxf {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-        sweep_handles(&self.sweep, out);
-        out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
-    }
+    table_facts!();
 
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-        r.sweep(&mut self.sweep);
-        r.expr(&mut self.sidebands);
-        r.expr(&mut self.relharm);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -209,28 +138,6 @@ impl DetailFacts for Pxf {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         let ok = output_valid(&self.output) && sweep_valid(&self.sweep);
         domain_unless(ok && axis_ok(self.axis, self.relharm))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-        dump_sweep(design, ctx, &self.sweep, out);
-        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let output = parse_probe(words, scope, b, diags)?;
-        let sweep = parse_sweep(words, scope, b, diags)?;
-        let (sidebands, relharm, axis) = parse_side(words, scope, b, diags);
-        Some(Pxf {
-            output,
-            sweep,
-            sidebands,
-            relharm,
-            axis,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -254,21 +161,8 @@ impl DetailFacts for Pxf {
 }
 
 impl DetailFacts for Pstb {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        out.push(Handle::Name(self.probe));
-        sweep_handles(&self.sweep, out);
-        out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
-    }
+    table_facts!();
 
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.sweep(&mut self.sweep);
-        r.expr(&mut self.sidebands);
-        r.expr(&mut self.relharm);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.one(&mut self.probe);
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
@@ -280,28 +174,6 @@ impl DetailFacts for Pstb {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         let ok = !self.probe.is_none() && sweep_valid(&self.sweep);
         domain_unless(ok && axis_ok(self.axis, self.relharm))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_name(out, design, "probe", self.probe);
-        dump_sweep(design, ctx, &self.sweep, out);
-        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let probe = take_name(words, "probe", b, diags);
-        let sweep = parse_sweep(words, scope, b, diags)?;
-        let (sidebands, relharm, axis) = parse_side(words, scope, b, diags);
-        Some(Pstb {
-            probe,
-            sweep,
-            sidebands,
-            relharm,
-            axis,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -325,39 +197,13 @@ impl DetailFacts for Pstb {
 }
 
 impl DetailFacts for Stb {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        out.push(Handle::Name(self.probe));
-        sweep_handles(&self.sweep, out);
-    }
+    table_facts!();
 
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.sweep(&mut self.sweep);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.one(&mut self.probe);
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(!self.probe.is_none() && sweep_valid(&self.sweep))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_name(out, design, "probe", self.probe);
-        dump_sweep(design, ctx, &self.sweep, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let probe = take_name(words, "probe", b, diags);
-        Some(Stb {
-            probe,
-            sweep: parse_sweep(words, scope, b, diags)?,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -379,35 +225,6 @@ impl DetailFacts for Stb {
 /// A relative axis names its harmonic; an absolute one none.
 fn axis_ok(axis: FreqAxis, relharm: ExprId) -> bool {
     (axis == FreqAxis::Relative) != relharm.is_none()
-}
-
-fn dump_side(
-    design: &Design,
-    ctx: &Ctx,
-    sidebands: ExprId,
-    relharm: ExprId,
-    axis: FreqAxis,
-    out: &mut String,
-) {
-    put_expr(out, design, ctx, "sidebands", sidebands);
-    put_expr(out, design, ctx, "relharm", relharm);
-    put_flag(out, axis == FreqAxis::Relative, "relative");
-}
-
-fn parse_side(
-    words: &mut Words<'_>,
-    scope: ScopeId,
-    b: &mut Builder<'_>,
-    diags: &mut Diags,
-) -> (ExprId, ExprId, FreqAxis) {
-    let sidebands = take_expr(words, "sidebands", scope, b, diags);
-    let relharm = take_expr(words, "relharm", scope, b, diags);
-    let axis = if take_word(words, "relative") {
-        FreqAxis::Relative
-    } else {
-        FreqAxis::Absolute
-    };
-    (sidebands, relharm, axis)
 }
 
 #[cfg(any(test, feature = "gen"))]
