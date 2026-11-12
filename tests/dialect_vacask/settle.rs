@@ -355,7 +355,7 @@ fn bp_behavioural_probes_and_integrals() {
     }
     // bp2: ddt reads the circuit only in a behavioural source.
     assert!(says(&run("vacask", "bp2.sim"), "Function 'ddt' not found."));
-    // bp3: idt(x, ic) starts from ic (the IR's Idt starts from 0: no IR form).
+    // bp3: idt(x, ic) starts from ic (A28: Idt's second operand).
     let r = run("vacask", "bp3.sim");
     assert!(
         close(at(&raw(&r, "op1.raw"), "f", 0.0), 3.0, 1e-12),

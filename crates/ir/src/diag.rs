@@ -279,6 +279,14 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "two elements of one name in one scope",
             "an element's name is its whole name and is unique in its scope across kinds (A13, R23), so a by-name reference names one element.",
         ),
+        Violation::DefinitionCycle => (
+            "definitions that read one another in a cycle",
+            "a parameter or function reads itself through its own value (a formal's default bound to the formal is the smallest); every simulator refuses it.",
+        ),
+        Violation::StaleDefinition => (
+            "a definition the index holds for an item no scope lists",
+            "a pass took an item out of a list, or moved it, without the editor's remove_item or move_item: a lookup would still find its definition.",
+        ),
     }
 }
 
