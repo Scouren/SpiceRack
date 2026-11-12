@@ -161,8 +161,6 @@ pub enum CircuitExtra {
     // semiconductors and switches
     /// A semiconductor area factor (`Semi::area`).
     SemiArea,
-    /// A semiconductor first guess (`Semi::initial` not `Unset`).
-    SemiInitial,
     /// A semiconductor first guessed off (`InitialState::Off`; A24 ruling).
     SemiInitialOff,
     /// A semiconductor first guessed on (`InitialState::On`: Spectre `region=on`; ngspice lacks
@@ -257,7 +255,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 107] = [
+    pub const ALL: [CircuitExtra; 106] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -327,7 +325,6 @@ impl CircuitExtra {
         CircuitExtra::FreqDbLogFreq,
         CircuitExtra::DelaySampled,
         CircuitExtra::SemiArea,
-        CircuitExtra::SemiInitial,
         CircuitExtra::SemiInitialOff,
         CircuitExtra::SemiInitialOn,
         CircuitExtra::DiodeThermal,

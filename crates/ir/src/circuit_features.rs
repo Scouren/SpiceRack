@@ -160,8 +160,10 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
                 if some(s.area) {
                     add(X::SemiArea);
                 }
-                if s.initial != InitialState::Unset {
-                    add(X::SemiInitial);
+                match s.initial {
+                    InitialState::Unset => {}
+                    InitialState::Off => add(X::SemiInitialOff),
+                    InitialState::On => add(X::SemiInitialOn),
                 }
                 if some(s.temp_abs) {
                     add(X::InstanceTemp);

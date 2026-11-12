@@ -333,6 +333,8 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - A12 C3 → `Sffm.pre: PreDelay`; `CircuitExtra::{SffmPreOffset, SffmPreHold, SffmPreZero}`
 - A12 C4 → `Source.dc_rule: DcRule::{Given, WaveAtZero}` (`dc` `NONE` exactly under `WaveAtZero`, which needs a wave); `CircuitExtra::DcGivenWithWave` and `DcAtZero{Pulse, Sin, Exp, Pwl, Sffm, Am, TrNoise, TrRandom, Pattern}` (5.13, E1, E38)
 - A15 (R31) → C1 `Element.mult_law: MultLaw::{Parallel, NgspiceAppend}` (`CircuitExtra::{MultInstanceParallel, MultInstanceNgspiceAppend}`, the kinds ngspice leaves untouched in IR-CIRCUIT §2); C2 `TcBase::{Tnom, Fixed27}` on `Passive` and `Behav`, `TcLaw::{Direct, Reciprocal}` on `Passive` (`CircuitExtra::{TcBaseTnom, TcBaseFixed27, TcLawDirect, TcLawReciprocal}`; gf180's 324 behavioural-resistor decks)
+- A24 ruling → `SemiInitial` split into `SemiInitialOff` and `SemiInitialOn` (ngspice semis take `off` only; Spectre's diode `region=on`); `SwitchInitial` stays one
+- Unmeasured, no feature now (A24 ruling, R18): `TrRandomKind` per member, `FreqUnit` per member, `AmModTime::Delay`: check at Xyce, HSPICE, Spectre, LTspice
 - A25 → a `DeviceLibrary` uses `Feature::Family(family)`; the generator draws a library only of a family the set holds
 - A24 (R44, R45) → `library_free` exempts `Module`, `CodeModel`, `Other`; `DeviceLibrary.path` is spelling (no check or feature reads it); `CircuitExtra::PwlPeriodJump`
 - A22 (R42) → `Pwl` holds its first value before the first point and its last after the last; no reader writes a point; `PwlJoin::Extrapolate` is VACASK's periodic law (docs; `check` and the generator never assumed a point at 0)
