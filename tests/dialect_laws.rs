@@ -48,7 +48,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 10 Untyped: a FromHere Env tnom={expression} is written as a script `option tnom={…}` and reads back a Private opaque (the frontend's option takes no numparam braces): control and run (ng-control, ng-run)",
+        "seed 11 Untyped: a head default bound lexically to an outer parameter (`g28=(acos(atanh(g5)))`, g5 the top's) reads back unbound (`g5?`, R53: ngspice reads a default where the instance stands); R53's deferred case, a feature ngspice lacks, for the lead",
     ),
     (
         "l7",

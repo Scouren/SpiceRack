@@ -45,6 +45,7 @@ const READ: &[&str] = &[
     "meas_command",
     "meas_command_unread",
     "no_command",
+    "option_brace",
     "option_commands",
     "osdi_late",
     "pre_osdi",
