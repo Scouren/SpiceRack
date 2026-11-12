@@ -26,6 +26,7 @@ mod options;
 mod plan;
 mod sweep;
 
+use super::codes::UNCLOSED;
 use super::read::{self, Lower};
 use super::read_outputs;
 use crate::ir;
@@ -399,6 +400,13 @@ pub(super) fn control(l: &mut Lower<'_, '_, '_>, n: Node) {
         let start = l.start(s);
         l.comments_until(start, true);
         l.stmt = l.span(s);
+        if read::unclosed(l.cst, s) {
+            for sw in sweeps.drain(..) {
+                read::opaque(l, sw, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
+            }
+            read::opaque(l, s, ir::OpaqueClass::InvalidInSource, Some(UNCLOSED));
+            continue;
+        }
         let word = head(l, s);
         let private = mc.is_some_and(|(_, p)| p);
         if word == "sweep" && !private {

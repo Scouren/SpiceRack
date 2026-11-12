@@ -13,7 +13,7 @@
 //!
 //! Contents: `Cst`, `Lower` (`Lower::span`, `Lower::text`, `Lower::start`, `Lower::body`,
 //! `Lower::comments_until`, `Lower::bind_master_later`), `references`, `read`, `unread`, `opaque`,
-//! `statement_text`, `field_name` (crate-private)
+//! `statement_text`, `field_name`, `unclosed` (crate-private)
 
 use std::collections::HashSet;
 
@@ -345,11 +345,57 @@ pub(super) fn field_name(cst: &Cst<'_>, field: u32) -> String {
     }
 }
 
+/// Whether leaf statement `n` leaves a `(`, `[` or `{` open at its end, closes one it did not
+/// open, or holds a string a line break ended (the tokenizer joins lines while a bracket is
+/// open, as VACASK does: settle unclosed_*; `syntax::scan::string_end` stops at the line).
+pub(super) fn unclosed(cst: &Cst<'_>, n: Node) -> bool {
+    let tags = cst.tokens.tags();
+    let mut depth = [0i32; 3];
+    // Bounded by the token count: one step per token of the statement.
+    for (i, &tag) in tags.iter().enumerate().skip(cst.ast.main_token(n) as usize) {
+        let k = match tag {
+            Tok::EndOfStatement => break,
+            Tok::LParen | Tok::RParen => 0,
+            Tok::LBracket | Tok::RBracket => 1,
+            Tok::LBrace | Tok::RBrace => 2,
+            Tok::String => {
+                let t = cst.tokens.text(i as u32).as_bytes();
+                let escapes = t.iter().rev().skip(1).take_while(|&&b| b == b'\\').count();
+                // An embed's `<<<MARK … >>>MARK` body is a string token too, and has no quotes.
+                let open = t.first() == Some(&b'"') && (t.len() < 2 || t.last() != Some(&b'"'));
+                if open || (t.first() == Some(&b'"') && escapes % 2 == 1) {
+                    return true;
+                }
+                continue;
+            }
+            _ => continue,
+        };
+        let open = matches!(tag, Tok::LParen | Tok::LBracket | Tok::LBrace);
+        depth[k] += if open { 1 } else { -1 };
+        if depth[k] < 0 {
+            return true;
+        }
+    }
+    depth != [0; 3]
+}
+
 // ---- private ----
 
 /// One statement's dispatch: by its CST tag, and for a `Card` by its head word.
 fn statement(l: &mut Lower<'_, '_, '_>, n: Node) {
     let ast = &l.cst.ast;
+    let leaf = !matches!(
+        ast.tag(n),
+        Tag::Title | Tag::Section | Tag::Subckt | Tag::If | Tag::Else | Tag::Control
+    );
+    if leaf && unclosed(l.cst, n) {
+        return opaque(
+            l,
+            n,
+            ir::OpaqueClass::InvalidInSource,
+            Some(codes::UNCLOSED),
+        );
+    }
     match ast.tag(n) {
         Tag::Title => read_structure::title(l, n),
         Tag::Include => read_structure::include(l, n),

@@ -458,6 +458,35 @@ fn fwd_an_instance_with_too_many_terminals_is_rejected_a_short_one_runs() {
 }
 
 #[test]
+fn unclosed_a_bracket_joins_lines_until_it_closes_and_an_unclosed_one_is_rejected() {
+    // P2012: VACASK reads on across line breaks while (, [ or { is open (p2, b2, c2 run), and
+    // rejects a statement whose bracket or string never closes (pair agent's paren deck).
+    for (deck, message) in [
+        (
+            "p1",
+            "Parser syntax error, unexpected =, expecting identifier or integer or )",
+        ),
+        (
+            "b1",
+            "Parser syntax error, unexpected identifier, expecting ] or \",\"",
+        ),
+        (
+            "c1",
+            "Parser syntax error, unexpected identifier, expecting } or \",\"",
+        ),
+        ("q1", "Syntax error, unexpected newline in string literal."),
+        ("e1", "Parser syntax error, unexpected identifier"),
+    ] {
+        let r = run("vacask", &format!("unclosed_{deck}.sim"));
+        assert!(says(&r, message), "{deck}");
+    }
+    for deck in ["p2", "b2", "c2"] {
+        let r = run("vacask", &format!("unclosed_{deck}.sim"));
+        assert!(says(&r, "Running analysis 'op1'."), "{deck}");
+    }
+}
+
+#[test]
 fn ip_parameter_reads_in_a_behavioural_source() {
     // ip1: `$intparam` truncates toward zero to an integer (2.7 → 2, −2.7 → −2, integer
     // division after it); `$realparam(p)` and a bare `p` are the real (R56).

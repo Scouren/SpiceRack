@@ -1,0 +1,8 @@
+bracket: newline inside
+model vsource vsource
+parameters v=[1,
+ 2]
+v1 (in 0) vsource dc=1.0
+control
+  analysis op1 op
+endc
