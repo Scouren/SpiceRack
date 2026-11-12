@@ -153,6 +153,32 @@ pub fn link(design: &mut Design, diags: &mut Diags) {
 /// root by root in `RowFacts::handles` order and left to right within a root (A38: the spine's
 /// strict read refuses the ones not `held`). O(expressions).
 pub fn unbound_reads(design: &Design) -> Vec<UnboundRead> {
-    let _ = design;
-    Vec::new()
+    let mut out = Vec::new();
+    let (mut handles, mut nodes) = (Vec::new(), Vec::new());
+    for (item, _) in design.reachable() {
+        handles.clear();
+        design.item_handles(item, &mut handles);
+        let mut seen = std::collections::HashSet::new();
+        for root in expr_roots(design, &handles) {
+            nodes.clear();
+            crate::class::tree_nodes(design, root, &mut nodes);
+            // children are built before parents, left to right: ascending ids are source order
+            nodes.sort_unstable();
+            for &e in &nodes {
+                if let Expr::Param(r) = design.expr(e)
+                    && !r.is_resolved()
+                    && seen.insert(e)
+                {
+                    let held = item.kind == ItemKind::Subckt;
+                    out.push(UnboundRead {
+                        item,
+                        expr: e,
+                        name: r.name,
+                        held,
+                    });
+                }
+            }
+        }
+    }
+    out
 }

@@ -501,6 +501,12 @@ neither. Both stand beside `FormalNotConstant`, which any read still sets. The g
 each kind of read in a default only when the set holds its feature (`Gen::bound_reads`,
 `Gen::unbound_reads`; a read neither allows is a literal).
 
+**R63/A38 (2026-11-12): the unbound reads.** `link::unbound_reads(&Design) -> Vec<UnboundRead>`:
+every `Expr::Param` row no definition is bound to, item by item in `reachable` order and left to
+right, each `UnboundRead { item, expr, name, held }`. `held` marks a `Subckt` head default's read,
+which each instance's scope looks up (A29, IR text `name?`). The spine's strict read refuses
+the others.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
