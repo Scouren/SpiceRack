@@ -1,0 +1,21 @@
+[package]
+name = "spicerack-ir"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.95"
+description = "SpiceRack's dialect-neutral semantic IR: tables, builder, check, features, text form"
+license = "MIT"
+publish = false
+
+[lib]
+name = "spicerack_ir"
+path = "src/lib.rs"
+
+[features]
+# The random design generator (`gen.rs`) for the root crate's dialect-law tests.
+gen = []
+
+[dependencies]
+
+# Its own workspace until slice S2 wires it into the root crate.
+[workspace]

@@ -1,0 +1,85 @@
+//! SpiceRack's dialect-neutral semantic IR: appends from a reader or a builder in, a `Design`
+//! (owned tables of typed rows) out, read by writers and rewritten by passes. Meaning, not
+//! spelling: no token, no source text and no dialect tag lives here except in an `Opaque` item.
+//!
+//! Doors (C13): readers and builders get [`Builder`] (append only), writers get `&`[`Design`]
+//! (read only), passes get [`Editor`]. Table fields are crate-private; the three owners of this
+//! crate (kernel, circuit, run; `rewrite/IR-KERNEL.md` §10) each add rows and methods in their
+//! own files.
+//!
+//! ```ignore
+//! let mut design = Design::new();
+//! let mut diags = Diags::new();
+//! reader.read(&sources, &mut design.builder(), &mut diags);
+//! check(&design, &mut diags);
+//! check_legal(&design, &writer_features, &mut diags);
+//! writer.write(&design, design.entry(), &mut text, &mut diags);
+//! ```
+//!
+//! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addendum A1).
+//!
+//! Contents: the modules below, and re-exports of `Design`, `ItemRow`, `Builder`, `Editor`, the
+//! handles of `id`, `Span`, `Table`, the kernel enums of `item` and `expr`, `Feature`,
+//! `FeatureSet`, `Extra`, `features_used`, `check`, `check_legal`, `Violation`, the diagnostic
+//! rows of `diag`, `eval`, `Bindings`, `Domain`, `dump`, `parse`.
+
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+// definition phase: bodies are todo!(); remove when they land
+#![allow(unused_variables, dead_code)]
+
+pub mod build;
+pub mod check;
+pub mod design;
+pub mod diag;
+pub mod edit;
+pub mod eval;
+pub mod expr;
+pub mod feature;
+pub mod id;
+pub mod item;
+pub mod names;
+pub mod scope;
+pub mod span;
+pub mod table;
+pub mod text;
+
+// circuit owner
+pub mod build_circuit;
+pub mod controlled;
+pub mod element;
+pub mod line;
+pub mod model;
+pub mod passive;
+pub mod source;
+pub mod wave;
+
+// run owner
+pub mod analysis;
+pub mod build_run;
+pub mod option;
+pub mod output;
+pub mod plan;
+pub mod stats;
+
+pub use build::Builder;
+pub use check::{Violation, check, check_legal};
+pub use design::{Design, ItemRow};
+pub use diag::{Code, Diag, Diags, Info, Kind};
+pub use edit::Editor;
+pub use eval::{Bindings, Domain, eval};
+pub use expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
+pub use feature::{Extra, Feature, FeatureSet, features_used};
+pub use id::{
+    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, ParamList, Ref,
+    ScopeId, TextId,
+};
+pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
+pub use span::Span;
+pub use table::Table;
+pub use text::{dump, parse};
+
+// `gen` is a reserved word in edition 2024; this line is last so check_style.py, which does
+// not read the raw identifier as a module, sees no import after it.
+#[cfg(any(test, feature = "gen"))]
+pub mod r#gen;
