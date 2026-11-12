@@ -24,11 +24,7 @@ use spicerack::dialect::{self, DialectRow, Sources};
 use spicerack::ir;
 
 /// The decks that fail today: (deck relative to `examples/`, step, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "Monte_Carlo/OpWien.sp",
-    "legalize",
-    "elements: W1100 twice, an element the reader makes and the writer has no card for (`R2 4 6 R = 'res + 0.033 * res*V(r2)'`, `C2 …`, behavioural R/C), L5's image; with ng-elements",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// The step names, in order.
 const STEPS: [&str; 4] = ["read", "check", "legalize", "round_trip"];

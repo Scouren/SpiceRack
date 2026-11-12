@@ -127,6 +127,36 @@ reader can produce must be writable: law L5) and nothing else. Each feature it l
 or a citation row (`tests/fixtures/dialect/ngspice/citations.toml`: the manual clause or the run
 that shows ngspice has no form for it).
 
+### `admits` refusals, classed (R21; the lead rules on the candidates after the trunk)
+
+What `Write::admits` still refuses on ngspice, at dialect-ngspice's trunk candidate. Class: **I**
+invalid on every simulator (an IR invariant candidate), **F** valid elsewhere but not on ngspice
+(a feature candidate), **N** ngspice's own rule (stays an `admits` refusal).
+
+| Code | Refused | Class | Candidate, or why it stays | Owner |
+|---|---|---|---|---|
+| W1006 | a string or list in any expression but a model's | F | the kernel's string/list contexts (A25 item 4: ngspice takes a string as `.param` value, formal default, instance actual) | ir-kernel (in its queue) |
+| W1007 | an expression its evaluator cannot spell: a draw in a value that reads the temperature or the circuit | N | R52's approximation; stays until a deck needs the three-form split (`DistDyn`) | spine dialect |
+| W1100 | an element ngspice has no card for though its features are in `FEATURES` | N | the card forms (manual §3) | ng-elements |
+| W1150 | a source ngspice's positional card cannot spell | N | the V/I card's fixed order | ng-sources |
+| W1202 | a version ngspice has no device for; a version on a module or code model; (interim) a versioned family with none | N | the device table; the missing-version arm goes with ir-circuit b6888c35's invariant | ng-models |
+| W1203 | a model parameter the device's tables lack | N | the device tables | ng-models |
+| W1204 | a bin ngspice does not bin | N | the binning families | ng-models |
+| W1205 | a model value ngspice reads back as another value | N | numparam's card grammar | ng-models |
+| W1300 | a `.four` count other than ngspice's default (only `nfreqs` sets it) | F | a feature (count by option), with ir-run's per-kind state split | ir-run |
+| W1301 | an analysis field with no position on ngspice's card | F | a feature per field form | ir-run |
+| W1302 | a dot-card value that reads the temperature | N | numparam evaluates a dot card once, before the run | ng-run |
+| W1303 | a node set that holds from its place on | F | a feature (`NodeSetFromHere`, ir-run 7f9aed10's split); ngspice has no script command for it | ir-run |
+| W1350 | an output ngspice has no card or command for | N | the output grammar | ng-outputs |
+| W1401 | a parameter alter whose `reset` would drop another alter or a from-here state | N | ngspice's `alterparam` applies only through `reset` | ng-control |
+| W1402 | a loop that is no sweep over a list of numbers | N | `foreach` reads words | ng-control |
+| W1403 | an alter value that is no number, or no one-token spelling | N | `alter` reads the frontend's grammar | ng-control |
+| W1404 | a Verilog-A load | F | waits for a second dialect that spells it (ngspice loads OSDI only) | lead |
+| W1405 | a load that names its modules | F | `LoadModules`; waits for a second dialect | lead |
+| W1406 | a partial restore (a `Reset` of fewer than every class) | F | waits for a second dialect (ngspice's `reset` restores all) | lead |
+
+No code is class I today.
+
 ## 5. Diagnostics
 
 `codes.rs`: this dialect's own table in its own range (`P1xxx` reading, `R1xxx` binding, `W1xxx`
