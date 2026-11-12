@@ -14,7 +14,7 @@
 //! - `pub(super) fn hspice() -> DialectDef`
 
 use crate::syntax::behaviour::{
-    AnalysisForm, CardRules, EndRule, ExprEval, LoadForm, NetlistRules, ValueQuoting,
+    AnalysisForm, CardRules, DotRule, EndRule, ExprEval, LoadForm, NetlistRules, ValueQuoting,
 };
 use crate::syntax::def::{Devices, DialectDef, Keywords};
 use crate::syntax::diag::Code;
@@ -159,6 +159,10 @@ pub(super) fn hspice() -> DialectDef {
         .vacask_analysis("hb")
         .vacask_analysis("hbac")
         .vacask_analysis("hbnoise")
+        // The dot rules: `.HB` of one tone is read as an analysis (HSPICE
+        // RF `.HB TONES=f NHARMS=k`, cmdref E-2010.12 p.115; `.HB f k` as
+        // ESPice's HSPICE decks write it).
+        .dot_rule("hb", DotRule::Hb)
         // The kept words: HSPICE's StatEye, digital vector files, timing
         // checks and power report (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`,
         // `.POWER`), which no other simulator has; its RF shooting-Newton
@@ -245,4 +249,6 @@ pub(super) fn hspice() -> DialectDef {
         // ponytail: HSPICE has Xyce's `.SAVE` and ngspice's `.WIDTH` as its
         // own cards; a copy cell for those words when a deck needs them.
         .omit(Construct::InertText, Code::W0336)
+        // HSPICE RF's `.HB TONES=f NHARMS=k` (cmdref E-2010.12 p.115).
+        .native(Construct::HarmonicBalance)
 }

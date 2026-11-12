@@ -131,6 +131,9 @@ pub enum Construct {
     /// numbers without (a `kept_word` row names it: ngspice `.width`,
     /// LTspice `.wave`, a line Xyce reads past): left out off its family.
     InertText,
+    /// A harmonic balance of one tone (`read::hb`: Xyce `.HB`, HSPICE
+    /// `.HB TONES=`, Spectre `hb`, VACASK `analysis … hb`).
+    HarmonicBalance,
 }
 
 /// What a writer does with a construct.
@@ -335,6 +338,7 @@ mod tests {
                 "VacaskElaborate",
                 "Epochs",
                 "InertText",
+                "HarmonicBalance",
             ]
         );
         for (i, c) in crate::syntax::lang::CONSTRUCTS.into_iter().enumerate() {
@@ -427,7 +431,7 @@ mod tests {
         }
     }
 
-    const CONSTRUCTS: [Construct; 46] = [
+    const CONSTRUCTS: [Construct; 47] = [
         Construct::ForeignText,
         Construct::PrivateText,
         Construct::XyceSens,
@@ -474,5 +478,6 @@ mod tests {
         Construct::HspiceWLine,
         Construct::Epochs,
         Construct::InertText,
+        Construct::HarmonicBalance,
     ];
 }

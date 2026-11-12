@@ -301,8 +301,9 @@ py_enum!(PyAlt, "Alt", Alt, units = &[
     }
 });
 
-py_enum!(PyDotRule, "DotRule", DotRule, units = &[DotRule::SParams, DotRule::Preprocess],
-    covers = [SParams, Preprocess] | DotRule::Note(_), data = ["Note"] {
+py_enum!(PyDotRule, "DotRule", DotRule,
+    units = &[DotRule::SParams, DotRule::Preprocess, DotRule::Hb],
+    covers = [SParams, Preprocess, Hb] | DotRule::Note(_), data = ["Note"] {
     #[staticmethod]
     #[pyo3(name = "Note")]
     fn note(code: PyCode) -> Self {

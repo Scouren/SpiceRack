@@ -1,11 +1,12 @@
 //! A testbench analysis → its Spectre statement: `dc` (a `sweep` around it
 //! per further SPICE axis, a log or list axis as `values=[…]`), `ac`,
-//! `tran`, `noise`, `xf`, `sens`, `sp`, `fourier`, `pz`, `montecarlo`, and
+//! `tran`, `noise`, `xf`, `sens`, `sp`, `fourier`, `pz`, `hb`, `montecarlo`, and
 //! a Spectre analysis as read.
 //!
 //! Cites: Spectre Reference 19.1 `[REF]` p.64 (`dc`), p.43 (`ac`),
 //! pp.416-417 (`tran`), pp.181-182 (`noise`), pp.438-439 (`xf`), p.524
-//! (`sens`), pp.387-389 (`sp`), pp.406-410 (`sweep`, `values=`), p.174
+//! (`sens`), pp.387-389 (`sp`), pp.406-410 (`sweep`, `values=`), pp.90-91
+//! (`hb`: `fundfreqs`, `maxharms`), p.174
 //! (`montecarlo`); Spectre Reference 5.0 `[CMP]` pp.323-325 (`fourier`),
 //! p.790 (`pz`).
 //!
@@ -179,6 +180,15 @@ impl W<'_, '_> {
                     self.path(bare_node(o1)),
                     self.path(bare_node(o2))
                 )
+            }
+            // `[REF]` pp.90-91: `fundfreqs` the fundamentals, `maxharms`
+            // the harmonics of each; one tone here.
+            Ana::Hb { tone, harms } => {
+                if !matches!(self.ask(Construct::HarmonicBalance, tok), Action::Native) {
+                    return None;
+                }
+                assert!(*tone > 0.0 && *harms > 0, "`read::hb`: a tone, a count");
+                format!("hb1 hb fundfreqs=[{}] maxharms=[{harms}]", n(self, *tone))
             }
             // `[REF]` p.174: every parameter precedes the brace; the names
             // as written.

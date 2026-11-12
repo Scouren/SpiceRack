@@ -354,12 +354,14 @@ impl Rd<'_> {
                     .push(crate::syntax::diag::Diag::new(code, self.main(n), 0));
                 true
             }
-            Some(DotRule::SParams) if scope == Scope::Top && self.testbench_peg(n) => {
+            Some(DotRule::SParams | DotRule::Hb)
+                if scope == Scope::Top && self.testbench_peg(n) =>
+            {
                 acc.bench.push(super::Bench::Card(n));
                 true
             }
             Some(DotRule::Preprocess) => self.preprocess(n, acc),
-            Some(DotRule::Note(_) | DotRule::SParams) | None => false,
+            Some(DotRule::Note(_) | DotRule::SParams | DotRule::Hb) | None => false,
         };
         let grew = acc.bench.len() + acc.notes.len() - (bench + notes);
         assert!(grew <= usize::from(placed), "placed once, or left as read");

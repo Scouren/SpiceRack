@@ -224,7 +224,8 @@ def ngspice(d):
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
         .spell(Construct.Epochs, Alt.ControlScript)
-        .omit(Construct.InertText, Code.W0336))
+        .omit(Construct.InertText, Code.W0336)
+        .refuse(Construct.HarmonicBalance, Code.W0015))
 
 
 def espice(d):
@@ -259,7 +260,9 @@ def espice(d):
         .refuse(Construct.Step, Code.W0016)
         .refuse(Construct.StepList, Code.W0016)
         .refuse(Construct.DcLogList, Code.W0038)
-        .option_cosmetic("savecurrents"))
+        .option_cosmetic("savecurrents")
+        # ESPice 0.3.0 runs `.hb tones=f nharms=k` (run).
+        .native(Construct.HarmonicBalance))
 
 
 HSPICE_QUOTED = Quoting(escapes=False,
@@ -376,6 +379,8 @@ def hspice(d):
         .vacask_analysis("hb")
         .vacask_analysis("hbac")
         .vacask_analysis("hbnoise")
+        # The dot rules (cmdref p.115 `.HB TONES= NHARMS=`; ESPice's `.hb f k`).
+        .dot_rule("hb", DotRule.Hb)
         # The kept words (HSPICE UG `.STATEYE`, `.VEC`, `.CHECK`, `.POWER`, RF and noise analyses, W element).
         .kept_word(".stateye", Construct.PrivateText)
         .kept_word(".vec", Construct.PrivateText)
@@ -438,7 +443,8 @@ def hspice(d):
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
         .spell(Construct.Epochs, Alt.AlterBlocks)
-        .omit(Construct.InertText, Code.W0336))
+        .omit(Construct.InertText, Code.W0336)
+        .native(Construct.HarmonicBalance))
 
 
 XYCE_UNPROTECTED = Quoting(escapes=False,
@@ -627,6 +633,7 @@ def xyce(d):
         # The dot rules (RG `.LIN`, `.PREPROCESS`: P6-014).
         .dot_rule("lin", DotRule.SParams)
         .dot_rule("preprocess", DotRule.Preprocess)
+        .dot_rule("hb", DotRule.Hb)
         # The `.model` levels Xyce numbers its own way (RG `J`: level 2).
         .level_alias("njf", 2, None)
         .level_alias("pjf", 2, None)
@@ -676,7 +683,8 @@ def xyce(d):
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .native(Construct.Measure)
         .spell(Construct.Epochs, Alt.StatesData)
-        .omit(Construct.InertText, Code.W0336))
+        .omit(Construct.InertText, Code.W0336)
+        .native(Construct.HarmonicBalance))
 
 
 LTSPICE_OPERATORS = [
@@ -856,7 +864,8 @@ def ltspice(d):
         .native(Construct.Measure)
         .spell(Construct.Epochs, Alt.StatesTable)
         .omit(Construct.InertText, Code.W0336)
-        .option_cosmetic("savecurrents"))
+        .option_cosmetic("savecurrents")
+        .refuse(Construct.HarmonicBalance, Code.W0015))
 
 
 SPECTRE_SCALES = [
@@ -1142,7 +1151,8 @@ def spectre(d):
         .native(Construct.Statistics)
         .spell(Construct.Measure, Alt.SpiceRegion)
         .native(Construct.Epochs)
-        .omit(Construct.InertText, Code.W0336))
+        .omit(Construct.InertText, Code.W0336)
+        .native(Construct.HarmonicBalance))
 
 
 VACASK_SCALES = [
@@ -1476,7 +1486,8 @@ def vacask(d):
         .lift(Construct.Statistics, Rule.StatisticsDraws)
         .refuse(Construct.Measure, Code.W0109)
         .native(Construct.Epochs)
-        .omit(Construct.InertText, Code.W0336))
+        .omit(Construct.InertText, Code.W0336)
+        .native(Construct.HarmonicBalance))
 
 
 def cdl(d):
@@ -1537,7 +1548,8 @@ def cdl(d):
         .native(Construct.Statistics)
         .native(Construct.Measure)
         .omit(Construct.Epochs, Code.W0028)
-        .omit(Construct.InertText, Code.W0028))
+        .omit(Construct.InertText, Code.W0028)
+        .native(Construct.HarmonicBalance))
 
 
 def verilog(d):
@@ -1598,7 +1610,8 @@ def verilog(d):
         .native(Construct.Statistics)
         .native(Construct.Measure)
         .omit(Construct.Epochs, Code.W0029)
-        .omit(Construct.InertText, Code.W0029))
+        .omit(Construct.InertText, Code.W0029)
+        .native(Construct.HarmonicBalance))
 
 
 def ngspice_given(d):

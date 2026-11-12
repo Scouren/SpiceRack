@@ -81,4 +81,6 @@ pub(super) fn cdl() -> DialectDef {
         // --- S4
         // CDL leaves all kept text out (`ForeignText`'s cell; never asked).
         .omit(Construct::InertText, Code::W0028)
+        // CDL writes no analysis (never asked, as `Tf`).
+        .native(Construct::HarmonicBalance)
 }

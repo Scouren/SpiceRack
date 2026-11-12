@@ -109,6 +109,14 @@ pub(in crate::syntax::render) enum Ana {
     /// Four nodes, the transfer and pole-zero keywords.
     Pz([String; 4], &'static str, &'static str),
     Four(f64, Vec<String>),
+    /// A harmonic balance of one tone (`hb::Rd::hb_card`): the fundamental
+    /// in hertz and the harmonics above DC. The phasors' convention is the
+    /// simulator's (Xyce's spectrum is two-sided: half a peak phasor at
+    /// plus and minus the tone).
+    Hb {
+        tone: f64,
+        harms: u16,
+    },
     /// Spectre's `montecarlo` over one analysis (`[REF]` p.174), from a
     /// given deck's `spectre` region: its name, `numruns`, `seed`,
     /// `variations` (`None`: Spectre's default, `process`, p.166), and the
@@ -166,6 +174,8 @@ pub(super) enum Card {
     PzNodes([String; 4], &'static str),
     /// `.four f outs`.
     Four(u32, Vec<String>),
+    /// `.hb` of one tone: the tone in hertz, the harmonics above DC.
+    Hb(f64, u16),
     Options,
     Temp(u32),
     /// `.ic`/`.nodeset`: `(node item, value)`s.
@@ -282,7 +292,8 @@ impl<'a> Rd<'a> {
             | Card::Sens(..)
             | Card::Pz(_)
             | Card::PzNodes(..)
-            | Card::Four(..) => return None,
+            | Card::Four(..)
+            | Card::Hb(..) => return None,
         })
     }
 
@@ -341,6 +352,7 @@ impl<'a> Rd<'a> {
         let lt = self.b.card_rules == CardRules::Ltspice;
         match self.tag(n) {
             _ if self.dot_rule(&kind) == Some(DotRule::SParams) => self.xyce_lin(n),
+            _ if self.dot_rule(&kind) == Some(DotRule::Hb) => self.hb_card(n),
             Tag::Options => self.options_ok(n).then_some(Card::Options),
             Tag::Temp => match items {
                 [v] if self.val_ok(*v) && self.tag(*v) != Tag::Seq => Some(Card::Temp(*v)),

@@ -3,12 +3,13 @@
 //! `temp` option or a source's own `dc`: `W::step_what`; the first `.step`
 //! nearest it: the innermost loop),
 //! and the analyses, initial conditions on each transient's line and
-//! nodesets on every `analysis` line; a Spectre `montecarlo` as an `mc`
+//! nodesets on every `analysis` line but an `hb`'s; a Spectre `montecarlo` as an `mc`
 //! loop around its inner analysis.
 //!
 //! Cites: VACASK `share/doc/vacask/demo` (`analysis`, `sweep`, `options`,
 //! `var`), `docs/cmd-sweep.md` (a sweep of an instance parameter, an
-//! option, a variable), `docs/cmd-analysis-mc.md` (`mc`; as the old VACASK
+//! option, a variable), `docs/cmd-analysis-hb.md` (`hb`: `freq`, `nharm`),
+//! `docs/cmd-analysis-mc.md` (`mc`; as the old VACASK
 //! writer probed them); Xyce RG 7.10 `.STEP` (a bare device name is its
 //! default parameter); Spectre Reference 19.1 pp.165-174 (`montecarlo`).
 //!
@@ -154,8 +155,12 @@ impl W<'_, '_> {
             // (`W::dc_alters`), a transient its waveform.
             let tran = spectre_kind(a) == Some("tran")
                 || matches!(a, Ana::MonteCarlo { inner: (_, k), .. } if k.eq_ignore_ascii_case("tran"));
-            if !alters.is_empty() && tran == dc_types {
-                dc_types = !tran;
+            // A harmonic balance reads the waveform too (the tone is the
+            // source's sine), and its `nodeset` names a stored solution
+            // (`docs/cmd-analysis-hb.md`), not nodes.
+            let hb = matches!(a, Ana::Hb { .. });
+            if !alters.is_empty() && (tran || hb) == dc_types {
+                dc_types = !(tran || hb);
                 for line in alter_lines(&alters, dc_types) {
                     self.line(&format!("  {line}"));
                 }
@@ -179,7 +184,7 @@ impl W<'_, '_> {
                     true => self.node_list("ic", &tb.ics, &held),
                     false => String::new(),
                 };
-                let nodeset = if on { nodeset.as_str() } else { "" };
+                let nodeset = if on && !hb { nodeset.as_str() } else { "" };
                 self.line(&format!("  {l}{ic}{nodeset}"));
             }
         }
@@ -329,6 +334,15 @@ impl W<'_, '_> {
                 };
                 let ports = self.acsp_ports().join(", ");
                 out.push(format!("analysis {} acsp ports=[{ports}] {f}", name("sp")));
+            }
+            // `docs/cmd-analysis-hb.md`: `freq` the fundamental, `nharm`
+            // the harmonics; DC is row 0, the phasors one-sided.
+            Ana::Hb { tone, harms } => {
+                if !matches!(self.ask(Construct::HarmonicBalance, tok), Action::Native) {
+                    return vec![];
+                }
+                let (id, f) = (name("hb"), num(*tone));
+                out.push(format!("analysis {id} hb freq=[{f}] nharm={harms}"));
             }
             Ana::MonteCarlo { .. } => unreachable!("written by vacask_mc"),
             Ana::Spectre { kind, .. } => {
@@ -537,6 +551,7 @@ fn spectre_kind(a: &Ana) -> Option<&'static str> {
         Ana::Sens(..) => "sens",
         Ana::Pz(..) => "pz",
         Ana::Four(..) => "fourier",
+        Ana::Hb { .. } => "hb",
         Ana::MonteCarlo { .. } | Ana::Spectre { .. } => return None,
     })
 }

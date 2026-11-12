@@ -266,6 +266,9 @@ pub(super) fn xyce() -> DialectDef {
         // (ZERO-LEDGER P6-014); its `REPLACEGROUND TRUE` stays the kept
         // word above.
         .dot_rule("preprocess", DotRule::Preprocess)
+        // `.HB f` of one tone (RG §2.1.13) is read as an analysis, its
+        // harmonics the deck's `.OPTIONS HBINT NUMFREQ=` (Table 2-14).
+        .dot_rule("hb", DotRule::Hb)
         // The `.model` levels Xyce numbers its own way. Its JFET level 2
         // is the Shockley model with THETA and DELTA (RG 7.10 §2.3.19,
         // Table 2-87); ngspice's level 2 is Parker-Skellern (manual
@@ -333,4 +336,6 @@ pub(super) fn xyce() -> DialectDef {
         // A statement another dialect's simulator runs to the same numbers
         // without (its `kept_word` rows) is left out, noted.
         .omit(Construct::InertText, Code::W0336)
+        // `.HB f` with `.OPTIONS HBINT NUMFREQ=k` (RG §2.1.13, Table 2-14).
+        .native(Construct::HarmonicBalance)
 }

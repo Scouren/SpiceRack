@@ -265,4 +265,7 @@ pub(super) fn ngspice() -> DialectDef {
         // A statement another dialect's simulator runs to the same numbers
         // without (its `kept_word` rows) is left out, noted.
         .omit(Construct::InertText, Code::W0336)
+        // ngspice has no harmonic balance: ngspice-45 "unimplemented dot
+        // command '.hb'"; its periodic analysis is `.pss` (manual ch.11).
+        .refuse(Construct::HarmonicBalance, Code::W0015)
 }

@@ -20,7 +20,8 @@
 //! leaves out a line its own simulator rejects (P0010, P0011), `values`,
 //! `shapes`, `elements`, `devices` and `sources` read element cards,
 //! `cards`, `testbench`, `outputs` and `options` dot cards (`model_cards`
-//! the model card an instance uses, `preprocess` Xyce's `.PREPROCESS`),
+//! the model card an instance uses, `preprocess` Xyce's `.PREPROCESS`,
+//! `hb` a `.hb` card of one tone),
 //! `control` a `.control` block's lines
 //! (`unroll` its loops; `controlled` is E/F/G/H), `epochs` the run plan; `walk` steps a
 //! block's branches for the writers, and drops them, on a heap stack.
@@ -57,6 +58,7 @@ mod dispatch;
 mod elements;
 pub(in crate::syntax::render) mod epochs;
 mod funcs;
+mod hb;
 mod model_cards;
 mod named;
 mod named_bench;

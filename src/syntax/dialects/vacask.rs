@@ -435,4 +435,6 @@ pub(super) fn vacask() -> DialectDef {
         // A statement another dialect's simulator runs to the same numbers
         // without (its `kept_word` rows) is left out, noted.
         .omit(Construct::InertText, Code::W0336)
+        // `analysis … hb freq=[f] nharm=k` (`docs/cmd-analysis-hb.md`).
+        .native(Construct::HarmonicBalance)
 }

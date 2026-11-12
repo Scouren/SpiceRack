@@ -251,4 +251,7 @@ pub(super) fn ltspice() -> DialectDef {
         // run) and saves every device current without it (ZERO-LEDGER
         // P3-036).
         .option_cosmetic("savecurrents")
+        // LTspice has no harmonic balance (help, "Dot Commands": seven
+        // analyses, none of them `.HB`).
+        .refuse(Construct::HarmonicBalance, Code::W0015)
 }

@@ -114,6 +114,7 @@ impl Rd<'_> {
             ),
             Card::PzNodes(nodes, tf) => Ana::Pz(nodes.clone(), tf, "pz"),
             Card::Four(f, outs) => Ana::Four(num(*f)?, outs.clone()),
+            &Card::Hb(tone, harms) => Ana::Hb { tone, harms },
             // The testbench's other cards ([`Rd::bench_card`]).
             Card::Options
             | Card::Temp(_)

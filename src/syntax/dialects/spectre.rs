@@ -347,4 +347,6 @@ pub(super) fn spectre() -> DialectDef {
         // A statement another dialect's simulator runs to the same numbers
         // without (its `kept_word` rows) is left out, noted.
         .omit(Construct::InertText, Code::W0336)
+        // `hb` with `fundfreqs=[f] maxharms=[k]` (Reference 19.1 pp.90-91).
+        .native(Construct::HarmonicBalance)
 }

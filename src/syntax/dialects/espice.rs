@@ -66,4 +66,9 @@ pub(super) fn espice() -> DialectDef {
         // ESPice 0.3.0 has no `savecurrents` ("ignoring unsupported option",
         // run): no number changes without it (ZERO-LEDGER P3-036).
         .option_cosmetic("savecurrents")
+        // ESPice 0.3.0 runs `.hb tones=f nharms=k` (both tokenizers: the
+        // closed form of an RC low-pass to 15 digits, one-sided phasors;
+        // `research/impl/evidence/S4-rf-hb-one-tone`), where ngspice's
+        // cell refuses.
+        .native(Construct::HarmonicBalance)
 }

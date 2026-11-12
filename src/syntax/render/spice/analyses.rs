@@ -1,10 +1,13 @@
 //! A testbench analysis → its SPICE-family card: `.op`, `.dc` (log and
 //! list axes in the target's form), `.ac`, `.tran`, `.noise`, `.tf`,
-//! `.sens`, `.pz`, `.sp`, `.four`, and the refusal of one the target lacks.
+//! `.sens`, `.pz`, `.sp`, `.four`, `.hb` (one tone), and the refusal of one
+//! the target lacks.
 //!
 //! Cites: ngspice manual §11.1-§11.3 (analyses); HSPICE `.DC`, `START=`;
-//! Xyce RG `.DC`, `.STEP`, Table 6-1; LTspice help `.tran`, `.DC` (its
-//! sweep variable: an independent source or `temp`).
+//! Xyce RG `.DC`, `.STEP`, Table 6-1, §2.1.13 (`.HB`), Table 2-14
+//! (`NUMFREQ`); HSPICE cmdref E-2010.12 p.115 (`.HB TONES= NHARMS=`);
+//! LTspice help `.tran`, `.DC` (its sweep variable: an independent source
+//! or `temp`).
 //!
 //! Contents:
 //! - `W::analysis(&mut self, a: &Ana, tok: u32) -> String`
@@ -240,6 +243,23 @@ impl W<'_, '_> {
                     ".sp {} {} {} {}",
                     sw.variation, sw.points, sw.start, sw.stop
                 ),
+                _ => String::new(),
+            },
+            // One tone. Xyce's `.HB f` takes its harmonics from `.OPTIONS
+            // HBINT NUMFREQ=` (a Xyce deck's own card is written with its
+            // options, so only another source's count is written here);
+            // HSPICE's and ESPice's card is `.HB TONES=f NHARMS=k`.
+            Ana::Hb { tone, harms } => match self.ask(Construct::HarmonicBalance, tok) {
+                Action::Native => {
+                    assert!(*tone > 0.0 && *harms > 0, "`read::hb`: a tone, a count");
+                    let f = num(self, *tone);
+                    let own = self.rd.b.analysis_form == AnalysisForm::Xyce;
+                    match self.b.analysis_form {
+                        AnalysisForm::Xyce if own => format!(".hb {f}"),
+                        AnalysisForm::Xyce => format!(".hb {f}\n.options hbint numfreq={harms}"),
+                        _ => format!(".hb tones={f} nharms={harms}"),
+                    }
+                }
                 _ => String::new(),
             },
             // No SPICE statement is Spectre's `montecarlo`: ngspice's Monte

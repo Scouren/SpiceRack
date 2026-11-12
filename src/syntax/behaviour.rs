@@ -221,6 +221,11 @@ pub enum DotRule {
     /// `REPLACEGROUND FALSE` states the default; `REPLACEGROUND TRUE`
     /// stays the card's kept text.
     Preprocess,
+    /// A harmonic balance of one tone, an analysis, when the card's
+    /// testbench rule reads it by its own form (`read::hb`): Xyce's `.HB f`
+    /// with `.OPTIONS HBINT NUMFREQ=` under Xyce's card rules, HSPICE's
+    /// `.HB TONES=f NHARMS=k` or `.HB f k` under HSPICE's.
+    Hb,
 }
 
 /// The writer layout.

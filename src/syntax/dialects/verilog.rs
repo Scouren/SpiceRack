@@ -81,4 +81,6 @@ pub(super) fn verilog() -> DialectDef {
         // --- S4
         // Structural Verilog writes no kept text (never asked).
         .omit(Construct::InertText, Code::W0029)
+        // Structural Verilog writes no analysis (never asked, as `Tf`).
+        .native(Construct::HarmonicBalance)
 }

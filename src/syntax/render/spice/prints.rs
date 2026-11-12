@@ -98,8 +98,9 @@ fn runs(a: &Ana, kind: &str) -> bool {
         Ana::Pz(..) => k == "pz",
         // Its inner analysis's kind, which the fold does not keep.
         Ana::MonteCarlo { .. } => true,
-        // Refused on every SPICE target (`read::spectre_refusal`).
-        Ana::Op | Ana::Spectre { .. } => false,
+        // Refused on every SPICE target (`read::spectre_refusal`); ngspice
+        // has no harmonic balance (`Construct::HarmonicBalance`).
+        Ana::Op | Ana::Spectre { .. } | Ana::Hb { .. } => false,
     }
 }
 
