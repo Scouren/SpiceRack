@@ -182,4 +182,9 @@ fn a_default_never_reads_its_own_formal() {
     let mut diags = Diags::new();
     spicerack_ir::check(&lone, &mut diags);
     assert!(diags.is_empty(), "no cycle: {:?}", diags.rows());
+    // an unbound read in a default is not constant (A29): the formal is FormalNotConstant
+    let used = spicerack_ir::features_used(&lone);
+    assert!(used.contains(spicerack_ir::Feature::Extra(
+        spicerack_ir::Extra::FormalNotConstant
+    )));
 }

@@ -409,16 +409,22 @@ fn a_definition_cycle_is_its_own_violation() {
     // A28: `subckt s` whose formal `t` defaults to a read of `t` (bound to the formal itself, a
     // cycle of one), and a body parameter that reads `t`: one DefinitionCycle at the formal, no
     // ProbeContext at the reader
+    // (link never makes it, A29; a reader that binds by its own rule can, as the ngspice
+    // reader once did)
     let mut d = Design::new();
     {
         let mut b = d.builder();
         let (_, top) = b.file("t.sp", Role::Deck);
         let read = b.param_ref("t");
         let (_, body) = b.subckt(top, "s", &[], &[("t", read)], Span::NONE);
+        let formal = b
+            .design()
+            .lookup(body, DefKind::Param, b.design().find_name("t"));
+        b.resolve(read, formal);
         let inner = b.param_ref("t");
+        b.resolve(inner, formal);
         b.param(body, "k", inner, Span::NONE);
     }
-    link(&mut d, &mut Diags::new());
     assert_eq!(violations(&d), vec![Violation::DefinitionCycle]);
     // its neighbour: the default reads a top parameter of another name
     let mut ok = Design::new();

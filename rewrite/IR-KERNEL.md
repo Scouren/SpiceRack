@@ -240,7 +240,14 @@ holds, `name?` for an unresolved reference the lookup would bind, `name#k` other
 
 **A10 (2026-11-12): a subcircuit's head defaults are looked up from its body.** The neutral lookup
 scope of a `Subckt` row's expressions is its body scope, not the scope that lists it, so
-`r=rval w=(2*r)` binds `r` to the sibling head parameter and then looks outward. `link`, the
+`r=rval w=(2*r)` binds `r` to the sibling head parameter and then looks outward. Amended by
+A29 (R53): a read in a formal's default binds to a sibling formal of that name (declared earlier
+or later), never to the formal itself; any other read is either bound to the definition visible
+from where the subcircuit is defined (a dialect that evaluates defaults there; `link`'s neutral
+rule) or left unbound (a dialect that evaluates them where the instance stands: ngspice), and an
+unbound read in a default is looked up, by name, from the scope of each instance that omits the
+actual. An unbound read in a default makes the formal `FormalNotConstant`. A cycle among
+defaults is `DefinitionCycle`. `link`, the
 writer's bare-or-`#k` test and `parse` (through `link`) use the body for that row; every other row
 keeps its listing scope. Why: ngspice sorts head parameters by dependency, HSPICE and Spectre read
 them in the body, and a lookup from the parent would dump the common case as `r#k`.
