@@ -23,7 +23,7 @@ pub(super) fn loop_(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let name = match row.name.is_none() {
         false => d.str(row.name).to_string(),
         true => {
-            w.diags.push(SWEEP_NAME_MADE, d.span_of(at), 0);
+            w.diags.push_at(SWEEP_NAME_MADE, d, at, 0);
             sweep_name(sweeps_before(d, at) + 1)
         }
     };

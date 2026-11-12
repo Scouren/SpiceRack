@@ -93,7 +93,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             false => row.analyses == base,
         };
         if !spelled {
-            diags.push(SAVE_CATEGORY, design.span_of(at), 0);
+            diags.push_at(SAVE_CATEGORY, design, at, 0);
         }
     }
 }

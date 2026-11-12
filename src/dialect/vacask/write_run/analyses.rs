@@ -18,11 +18,10 @@ use crate::ir;
 pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
     let row: ir::Analysis = d.row(at.index);
-    let span = d.span_of(at);
     let name = match row.name.is_none() {
         false => d.str(row.name).to_string(),
         true => {
-            w.diags.push(ANALYSIS_NAME_MADE, span, 0);
+            w.diags.push_at(ANALYSIS_NAME_MADE, d, at, 0);
             generated(d, at, row.kind)
         }
     };
@@ -37,7 +36,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
             match axis.name.is_none() {
                 false => name::spell(d.str(axis.name), Place::Other, w.out),
                 true => {
-                    w.diags.push(SWEEP_NAME_MADE, span, 0);
+                    w.diags.push_at(SWEEP_NAME_MADE, d, at, 0);
                     w.out.push_str(&sweep_name(base + k + 1));
                 }
             }
@@ -253,6 +252,7 @@ fn minus_one(d: &ir::Design, e: ir::ExprId, out: &mut String) {
         ir::Expr::Num(n) if d.num(n).form == ir::NumForm::Int => {
             let lit = d.num(n);
             number::spell(
+                d,
                 ir::Literal {
                     mantissa: lit.mantissa - 1,
                     ..lit
