@@ -42,14 +42,14 @@ use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, Tabl
 use crate::design::{Design, DetailRow};
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::facts::Handle;
-use crate::id::{ExprId, ExprList, NameId, NameList, ParamList, Ref};
+use crate::id::{ExprId, NameId};
 use crate::item::DefKind;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, Parasitics, Passive};
 use crate::semi::{Semi, Switch};
 use crate::source::{Distof, PortSpec, Source};
-use crate::text_expr::{self, Ctx};
+use crate::text::{self, Ctx};
 use crate::wave::{Am, Exp, Pattern, Pulse, Pwl, Sffm, Sin, TrNoise, TrRandom, WaveKind, WaveRef};
 
 /// The IR-text word of every `ElemKind`, in `ALL` order.
@@ -172,10 +172,6 @@ pub(crate) const WAVE_WORDS: [&str; WaveKind::COUNT] = [
     "pulse", "sin", "exp", "pwl", "sffm", "am", "trnoise", "trrandom", "pattern",
 ];
 
-// ponytail: a detached context until A9 passes the item's `Ctx` to `dump` (then resolved
-// references are written bare where lookup binds them, instead of `name#k`).
-const CTX: Ctx = Ctx::detached();
-
 /// Row `index` of `D`'s table, or `None` when out of range (the walks are total over any table
 /// contents: a bad index is `check`'s report, never a panic).
 pub(crate) fn get_row<D: DetailRow>(design: &Design, index: u32) -> Option<D> {
@@ -226,7 +222,7 @@ pub(crate) fn model_handles(m: &Model, out: &mut Vec<Handle>) {
 
 /// Writes `element <kind> <name> (<terminals>) …` (module header). Asserts the detail index is
 /// in range (`dump` is total over designs that pass `check`).
-pub(crate) fn dump_element(e: &Element, design: &Design, out: &mut String) {
+pub(crate) fn dump_element(e: &Element, design: &Design, ctx: &Ctx, out: &mut String) {
     let (lo, hi) = e.kind.terminals();
     let count = e.terminals.len();
     assert!(
@@ -238,45 +234,41 @@ pub(crate) fn dump_element(e: &Element, design: &Design, out: &mut String) {
     out.push(' ');
     write_name(design, e.name, out);
     out.push(' ');
-    write_names(design, e.terminals, out);
+    text::write_names(design, e.terminals, out);
     if e.model.name != NameId::NONE {
         out.push_str(" model=");
         // the unresolved kind is never linked: any kind writes its name the same way
-        write_ref(
-            design,
-            e.model,
-            e.kind.master_kind().unwrap_or(DefKind::Subckt),
-            out,
-        );
+        let kind = e.kind.master_kind().unwrap_or(DefKind::Subckt);
+        text::write_ref(design, e.model, kind, ctx, out);
     }
     if !e.params.is_empty() {
         out.push_str(" params=");
-        write_params(design, e.params, out);
+        text::write_params(design, e.params, ctx, out);
     }
     if e.mult != ExprId::NONE {
         out.push_str(" mult=");
-        write_value(design, e.mult, out);
+        text::write_value(design, e.mult, ctx, out);
     }
     match e.kind.detail() {
         DetailKind::None => assert!(e.detail == NO_ROW, "{:?} has a detail row", e.kind),
-        DetailKind::Passive => dump_row::<Passive>(design, e.detail, out),
-        DetailKind::Coupling => dump_row::<Coupling>(design, e.detail, out),
-        DetailKind::Source => dump_row::<Source>(design, e.detail, out),
-        DetailKind::Controlled => dump_row::<Controlled>(design, e.detail, out),
-        DetailKind::Poly => dump_row::<Poly>(design, e.detail, out),
-        DetailKind::Table => dump_row::<TableSource>(design, e.detail, out),
-        DetailKind::Behav => dump_row::<Behav>(design, e.detail, out),
-        DetailKind::Laplace => dump_row::<Laplace>(design, e.detail, out),
-        DetailKind::FreqTable => dump_row::<FreqTable>(design, e.detail, out),
-        DetailKind::Delay => dump_row::<Delay>(design, e.detail, out),
-        DetailKind::Semi => dump_row::<Semi>(design, e.detail, out),
-        DetailKind::Switch => dump_row::<Switch>(design, e.detail, out),
-        DetailKind::Line => dump_row::<Line>(design, e.detail, out),
+        DetailKind::Passive => dump_row::<Passive>(design, e.detail, ctx, out),
+        DetailKind::Coupling => dump_row::<Coupling>(design, e.detail, ctx, out),
+        DetailKind::Source => dump_row::<Source>(design, e.detail, ctx, out),
+        DetailKind::Controlled => dump_row::<Controlled>(design, e.detail, ctx, out),
+        DetailKind::Poly => dump_row::<Poly>(design, e.detail, ctx, out),
+        DetailKind::Table => dump_row::<TableSource>(design, e.detail, ctx, out),
+        DetailKind::Behav => dump_row::<Behav>(design, e.detail, ctx, out),
+        DetailKind::Laplace => dump_row::<Laplace>(design, e.detail, ctx, out),
+        DetailKind::FreqTable => dump_row::<FreqTable>(design, e.detail, ctx, out),
+        DetailKind::Delay => dump_row::<Delay>(design, e.detail, ctx, out),
+        DetailKind::Semi => dump_row::<Semi>(design, e.detail, ctx, out),
+        DetailKind::Switch => dump_row::<Switch>(design, e.detail, ctx, out),
+        DetailKind::Line => dump_row::<Line>(design, e.detail, ctx, out),
     }
 }
 
 /// Writes `model <name> <family> …` (module header).
-pub(crate) fn dump_model(m: &Model, design: &Design, out: &mut String) {
+pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String) {
     write_name(design, m.name, out);
     out.push(' ');
     out.push_str(FAMILY_WORDS[m.family as usize]);
@@ -289,7 +281,7 @@ pub(crate) fn dump_model(m: &Model, design: &Design, out: &mut String) {
     }
     if !m.params.is_empty() {
         out.push_str(" params=");
-        write_params(design, m.params, out);
+        text::write_params(design, m.params, ctx, out);
     }
     if m.bin_of != NameId::NONE {
         out.push_str(" bin_of=");
@@ -297,15 +289,15 @@ pub(crate) fn dump_model(m: &Model, design: &Design, out: &mut String) {
     }
     if m.ako.name != NameId::NONE {
         out.push_str(" ako=");
-        write_ref(design, m.ako, DefKind::Model, out);
+        text::write_ref(design, m.ako, DefKind::Model, ctx, out);
     }
     if m.module.name != NameId::NONE {
         out.push_str(" module=");
-        write_ref(design, m.module, DefKind::Module, out);
+        text::write_ref(design, m.module, DefKind::Module, ctx, out);
     }
     if m.version != ExprId::NONE {
         out.push_str(" version=");
-        write_value(design, m.version, out);
+        text::write_value(design, m.version, ctx, out);
     }
     if m.word != NameId::NONE {
         out.push_str(" word=");
@@ -351,16 +343,16 @@ fn wave_handles(design: &Design, w: WaveRef, out: &mut Vec<Handle>) {
 }
 
 /// Writes ` key=value` for every field of row `index` of `D`'s table not at its default.
-fn dump_row<D: Fields + DetailRow>(design: &Design, index: u32, out: &mut String) {
+fn dump_row<D: Fields + DetailRow>(design: &Design, index: u32, ctx: &Ctx, out: &mut String) {
     let mut row = D::rows(design)[index as usize];
-    row.fields(&mut |key, field| dump_field(design, key, field, out));
+    row.fields(&mut |key, field| dump_field(design, key, field, ctx, out));
 }
 
 /// Writes `(fields)` of a side or wave row, with no space after `(`.
-fn dump_nested<D: Fields + DetailRow>(design: &Design, index: u32, out: &mut String) {
+fn dump_nested<D: Fields + DetailRow>(design: &Design, index: u32, ctx: &Ctx, out: &mut String) {
     out.push('(');
     let start = out.len();
-    dump_row::<D>(design, index, out);
+    dump_row::<D>(design, index, ctx, out);
     if out[start..].starts_with(' ') {
         out.remove(start);
     }
@@ -368,7 +360,7 @@ fn dump_nested<D: Fields + DetailRow>(design: &Design, index: u32, out: &mut Str
 }
 
 /// Writes ` key=value` for one field, or nothing at its default.
-fn dump_field(design: &Design, key: &str, field: Field<'_>, out: &mut String) {
+fn dump_field(design: &Design, key: &str, field: Field<'_>, ctx: &Ctx, out: &mut String) {
     let at_default = match &field {
         Field::Expr(e) | Field::Dyn(e) => **e == ExprId::NONE,
         Field::Name(n) => **n == NameId::NONE,
@@ -387,78 +379,34 @@ fn dump_field(design: &Design, key: &str, field: Field<'_>, out: &mut String) {
     out.push_str(key);
     out.push('=');
     match field {
-        Field::Expr(e) | Field::Dyn(e) => write_value(design, *e, out),
+        Field::Expr(e) | Field::Dyn(e) => text::write_value(design, *e, ctx, out),
         Field::Name(n) => write_name(design, *n, out),
-        Field::Names(l) => write_names(design, *l, out),
-        Field::Exprs(l) => write_exprs(design, *l, out),
+        Field::Names(l) => text::write_names(design, *l, out),
+        Field::Exprs(l) => text::write_exprs(design, *l, ctx, out),
         Field::Count(c) => out.push_str(&c.to_string()),
         Field::Flag(_) => out.push_str("false"),
         Field::Choice(c) => out.push_str(c.words()[c.get()]),
-        Field::Side(i, Side::Parasitics) => dump_nested::<Parasitics>(design, *i, out),
-        Field::Side(i, Side::Port) => dump_nested::<PortSpec>(design, *i, out),
-        Field::Side(i, Side::Distof) => dump_nested::<Distof>(design, *i, out),
+        Field::Side(i, Side::Parasitics) => dump_nested::<Parasitics>(design, *i, ctx, out),
+        Field::Side(i, Side::Port) => dump_nested::<PortSpec>(design, *i, ctx, out),
+        Field::Side(i, Side::Distof) => dump_nested::<Distof>(design, *i, ctx, out),
         Field::Wave(w) => {
             out.push_str(WAVE_WORDS[w.kind as usize]);
             match w.kind {
-                WaveKind::Pulse => dump_nested::<Pulse>(design, w.index, out),
-                WaveKind::Sin => dump_nested::<Sin>(design, w.index, out),
-                WaveKind::Exp => dump_nested::<Exp>(design, w.index, out),
-                WaveKind::Pwl => dump_nested::<Pwl>(design, w.index, out),
-                WaveKind::Sffm => dump_nested::<Sffm>(design, w.index, out),
-                WaveKind::Am => dump_nested::<Am>(design, w.index, out),
-                WaveKind::TrNoise => dump_nested::<TrNoise>(design, w.index, out),
-                WaveKind::TrRandom => dump_nested::<TrRandom>(design, w.index, out),
-                WaveKind::Pattern => dump_nested::<Pattern>(design, w.index, out),
+                WaveKind::Pulse => dump_nested::<Pulse>(design, w.index, ctx, out),
+                WaveKind::Sin => dump_nested::<Sin>(design, w.index, ctx, out),
+                WaveKind::Exp => dump_nested::<Exp>(design, w.index, ctx, out),
+                WaveKind::Pwl => dump_nested::<Pwl>(design, w.index, ctx, out),
+                WaveKind::Sffm => dump_nested::<Sffm>(design, w.index, ctx, out),
+                WaveKind::Am => dump_nested::<Am>(design, w.index, ctx, out),
+                WaveKind::TrNoise => dump_nested::<TrNoise>(design, w.index, ctx, out),
+                WaveKind::TrRandom => dump_nested::<TrRandom>(design, w.index, ctx, out),
+                WaveKind::Pattern => dump_nested::<Pattern>(design, w.index, ctx, out),
             }
         }
     }
 }
 
-// The kernel's IR-text writers (`text_expr.rs`) and the list forms the `Words` readers read.
-
+/// A name in a name position (the kernel's writer takes the text).
 fn write_name(design: &Design, name: NameId, out: &mut String) {
-    text_expr::write_name(design.str(name), out);
-}
-
-fn write_names(design: &Design, list: NameList, out: &mut String) {
-    out.push('(');
-    for (k, &n) in design.names(list).iter().enumerate() {
-        if k > 0 {
-            out.push(' ');
-        }
-        write_name(design, n, out);
-    }
-    out.push(')');
-}
-
-fn write_ref(design: &Design, r: Ref, kind: DefKind, out: &mut String) {
-    text_expr::write_ref(design, r, kind, &CTX, out);
-}
-
-fn write_value(design: &Design, e: ExprId, out: &mut String) {
-    text_expr::write_value(design, e, &CTX, out);
-}
-
-fn write_exprs(design: &Design, list: ExprList, out: &mut String) {
-    out.push('[');
-    for (k, &e) in design.exprs(list).iter().enumerate() {
-        if k > 0 {
-            out.push_str(", ");
-        }
-        text_expr::write_expr(design, e, &CTX, out);
-    }
-    out.push(']');
-}
-
-fn write_params(design: &Design, list: ParamList, out: &mut String) {
-    out.push('(');
-    for (k, &(name, value)) in design.params(list).iter().enumerate() {
-        if k > 0 {
-            out.push(' ');
-        }
-        write_name(design, name, out);
-        out.push('=');
-        write_value(design, value, out);
-    }
-    out.push(')');
+    text::write_name(design.str(name), out);
 }

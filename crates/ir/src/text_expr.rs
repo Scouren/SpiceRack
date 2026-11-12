@@ -11,12 +11,13 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9 (text), §7.2 (A4: references), §7.3 (A3: literals).
 //!
 //! Contents: `pub struct Ctx` (`Ctx::detached`), `pub fn write_expr`, `pub fn write_value`,
-//! `pub fn write_literal`, `pub fn write_name`, `pub fn write_string`, `pub fn write_ref`;
+//! `pub fn write_literal`, `pub fn write_name`, `pub fn write_string`, `pub fn write_ref`,
+//! `pub fn write_names`, `pub fn write_exprs`, `pub fn write_params`;
 //! crate: `pub(crate) fn binary_prec(BinOp) -> u8`, `pub(crate) fn func_text(Func) -> &'static str`
 
 use crate::design::Design;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, Func, Literal, NumForm, UnOp};
-use crate::id::{DefId, ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{DefId, ExprId, ExprList, ItemRef, NameList, ParamList, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 
 /// Where an expression or reference is written: the scope its item sits in (for the A4 rule:
@@ -267,6 +268,49 @@ pub fn write_ref(design: &Design, r: Ref, kind: DefKind, ctx: &Ctx, out: &mut St
     write_name(design.str(r.name), out);
     let would_bind = (!ctx.scope.is_none()).then(|| design.lookup(ctx.scope, kind, r.name));
     mark(r, would_bind, out);
+}
+
+/// Appends a parenthesized, blank-separated name list, `(a b c)` (what `Words::names` reads).
+pub fn write_names(design: &Design, list: NameList, out: &mut String) {
+    out.push('(');
+    for (k, &n) in design.names(list).iter().enumerate() {
+        if k > 0 {
+            out.push(' ');
+        }
+        write_name(design.str(n), out);
+    }
+    out.push(')');
+}
+
+/// Appends a bracketed expression list, `[e1, e2]` (what `Words::exprs` reads).
+pub fn write_exprs(design: &Design, list: ExprList, ctx: &Ctx, out: &mut String) {
+    out.push('[');
+    for (k, &e) in design.exprs(list).iter().enumerate() {
+        if k > 0 {
+            out.push_str(", ");
+        }
+        write_expr(design, e, ctx, out);
+    }
+    out.push(']');
+}
+
+/// Appends a parenthesized `key=value` list, `(w=1u l=(2 * lmin))` (what `Words::params`
+/// reads). Every value must be set: a list with a missing value has no spelling here.
+pub fn write_params(design: &Design, list: ParamList, ctx: &Ctx, out: &mut String) {
+    out.push('(');
+    for (k, &(name, value)) in design.params(list).iter().enumerate() {
+        assert!(
+            !value.is_none(),
+            "a parameter list written by write_params has every value"
+        );
+        if k > 0 {
+            out.push(' ');
+        }
+        write_name(design.str(name), out);
+        out.push('=');
+        write_value(design, value, ctx, out);
+    }
+    out.push(')');
 }
 
 /// The binding power of a binary operator (higher binds tighter; the ternary is 1, unary 12).

@@ -18,12 +18,14 @@
 //!   `pub struct Analysis`, `pub struct RunDetails`
 //! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
-//! - `RowFacts` for `Analysis` (`todo_facts!` placeholder, A2)
+//! - `RowFacts` for `Analysis` (`todo_facts!` placeholder, A2); crate:
+//!   `pub(crate) fn design_features(&Design, &mut FeatureSet)`
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
 };
 use crate::design::{Design, DetailRow};
+use crate::feature::FeatureSet;
 use crate::id::NameId;
 use crate::measure::{
     MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen,
@@ -258,3 +260,10 @@ impl AnalysisKind {
 
 // run: implementation phase — replace this line with the row's `impl RowFacts` (IR-KERNEL A2)
 todo_facts!(Analysis);
+
+/// The run owner's features of the whole design, which no single row carries: several analyses
+/// in one deck, an option after a run item (A9). Called once by `features_used` and by
+/// `check_legal`. Empty until the run owner fills it.
+pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
+    let _ = (design, set);
+}

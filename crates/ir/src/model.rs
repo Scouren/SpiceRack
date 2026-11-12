@@ -330,30 +330,32 @@ impl Polarity {
 }
 
 impl RowFacts for Model {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         crate::circuit_text::model_handles(self, out)
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // A real body: A4's contract for this row. A `NONE` name is no reference.
-        if self.ako.name != NameId::NONE {
-            f(&mut self.ako, DefKind::Model);
+        let mut row: Model = design.row(at.index);
+        if row.ako.name != NameId::NONE {
+            f(&mut row.ako, DefKind::Model);
         }
-        if self.module.name != NameId::NONE {
-            f(&mut self.module, DefKind::Module);
+        if row.module.name != NameId::NONE {
+            f(&mut row.module, DefKind::Module);
         }
+        design.editor().set(at.index, row);
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         crate::circuit_features::model_features(self, set)
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         crate::circuit_check::check_model(self, design, at, out)
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        crate::circuit_text::dump_model(self, design, out)
+    fn dump(&self, design: &Design, ctx: &crate::text_expr::Ctx, out: &mut String) {
+        crate::circuit_text::dump_model(self, design, ctx, out)
     }
 
     fn parse(

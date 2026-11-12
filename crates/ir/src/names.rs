@@ -15,11 +15,12 @@
 //! - `pub(crate) struct Names`: `Names::new() -> Names`, `Names::intern(&mut self, &str) -> NameId`,
 //!   `Names::intern_any(&mut self, &str) -> NameId`, `Names::get(&self, &str) -> NameId`, `Names::str(&self, NameId) -> &str`,
 //!   `Names::len(&self) -> usize`, `Names::is_empty(&self) -> bool`
+//! - `pub(crate) struct Fx` (a `Hasher`), `pub(crate) type FxMap<K, V>`
 //! - `pub(crate) struct Texts`: `Texts::new() -> Texts`, `Texts::push(&mut self, &str) -> TextId`,
 //!   `Texts::str(&self, TextId) -> &str`, `Texts::len(&self) -> usize`
 
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{BuildHasherDefault, Hasher};
 
 use crate::id::{BYTES_MAX, NAMES_MAX};
 use crate::id::{NameId, TextId};
@@ -33,10 +34,19 @@ pub(crate) struct Names {
     /// End offset of each name in `bytes`.
     pub(crate) ends: Vec<u32>,
     /// Hash of the bytes → the most recently interned name with that hash.
-    pub(crate) buckets: HashMap<u64, NameId>,
+    pub(crate) buckets: FxMap<u64, NameId>,
     /// Per name: the previously interned name with the same hash, or `NONE`.
     pub(crate) next: Vec<NameId>,
 }
+
+/// FxHash (rustc's multiply-rotate hash) for the crate's lookup-only maps: fast on short keys,
+/// not DoS-resistant, which no design needs. No map that uses it is iterated, so the hash never
+/// reaches an output (§1, determinism).
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Fx(u64);
+
+/// A `HashMap` hashed by [`Fx`].
+pub(crate) type FxMap<K, V> = HashMap<K, V, BuildHasherDefault<Fx>>;
 
 /// The text pool. Same layout as [`Names`] without the lookup.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -47,13 +57,49 @@ pub(crate) struct Texts {
     pub(crate) ends: Vec<u32>,
 }
 
+impl Hasher for Fx {
+    fn finish(&self) -> u64 {
+        // the multiply leaves the low bits, which choose the bucket, poorly mixed: rotate the
+        // well-mixed high bits down (as rustc-hash 2 does)
+        self.0.rotate_left(26)
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for chunk in bytes.chunks(8) {
+            let mut word = [0u8; 8];
+            word[..chunk.len()].copy_from_slice(chunk);
+            self.add(u64::from_le_bytes(word));
+        }
+    }
+
+    fn write_u8(&mut self, n: u8) {
+        self.add(n as u64);
+    }
+
+    fn write_u16(&mut self, n: u16) {
+        self.add(n as u64);
+    }
+
+    fn write_u32(&mut self, n: u32) {
+        self.add(n as u64);
+    }
+
+    fn write_u64(&mut self, n: u64) {
+        self.add(n);
+    }
+
+    fn write_usize(&mut self, n: usize) {
+        self.add(n as u64);
+    }
+}
+
 impl Names {
     /// An interner holding only `"0"` (id 0, [`NameId::GROUND`]).
     pub(crate) fn new() -> Names {
         let mut names = Names {
             bytes: String::new(),
             ends: Vec::new(),
-            buckets: HashMap::new(),
+            buckets: FxMap::default(),
             next: Vec::new(),
         };
         let ground = names.intern("0");
@@ -159,9 +205,16 @@ impl Texts {
 
 // ---- private ----
 
-/// The lookup key of a name's bytes (SipHash with fixed keys: deterministic across runs).
+/// The lookup key of a name's bytes (`Fx`: deterministic across runs).
 fn hash(name: &str) -> u64 {
-    let mut h = DefaultHasher::new();
-    name.hash(&mut h);
+    let mut h = Fx::default();
+    h.write(name.as_bytes());
+    h.write_u8(0xFF); // a terminator, so "a" and "a\0" differ
     h.finish()
+}
+
+impl Fx {
+    fn add(&mut self, word: u64) {
+        self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(0x517C_C1B7_2722_0A95);
+    }
 }

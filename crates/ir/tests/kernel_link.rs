@@ -111,3 +111,29 @@ fn a_bound_reference_is_kept_and_calls_bind_to_functions() {
     };
     assert_eq!(def, f_def);
 }
+
+#[test]
+fn a_subckt_default_reads_its_sibling_head_parameter() {
+    // A10: `subckt s () r=1 w=(2 * r)` beside an outer `r`: `w`'s `r` is the sibling, not the outer
+    let mut d = Design::new();
+    let (top, read, sub) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("top.sp", Role::Deck);
+        let five = b.num(5.0);
+        b.param(top, "r", five, Span::NONE);
+        let one = b.num(1.0);
+        let read = b.param_ref("r");
+        let two = b.num(2.0);
+        let w = b.binary(BinOp::Mul, two, read);
+        let (sub, _) = b.subckt(top, "s", &[], &[("r", one), ("w", w)], Span::NONE);
+        (top, read, sub)
+    };
+    link(&mut d, &mut Diags::new());
+    let def = bound(&d, read);
+    assert_eq!(
+        d.def(def).item,
+        sub,
+        "bound to the subckt's own head parameter"
+    );
+    assert_ne!(def, param_def(&d, top, "r"), "the outer `r` is shadowed");
+}

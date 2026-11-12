@@ -283,12 +283,24 @@ mod tests {
 
     #[test]
     fn unresolved_master_stays_unresolved() {
+        let build = |b: &mut Builder<'_>, top: ScopeId| {
+            let h = b.head("u1", &["a"], Some("cell"), &[], ExprId::NONE);
+            b.instance(top, ElemKind::Unresolved, h, Span::NONE);
+        };
+        // canonical: an unresolved reference that lookup would not bind is written bare
         same(
-            "file \"t.sp\" deck\n  element unresolved u1 (a) model=cell?\n",
-            |b, top| {
-                let h = b.head("u1", &["a"], Some("cell"), &[], ExprId::NONE);
-                b.instance(top, ElemKind::Unresolved, h, Span::NONE);
-            },
+            "file \"t.sp\" deck\n  element unresolved u1 (a) model=cell\n",
+            build,
         );
+        // the hand-written `name?` form reads the same rows
+        let mut parsed = Design::new();
+        let mut diags = Diags::new();
+        let text = "file \"t.sp\" deck\n  element unresolved u1 (a) model=cell?\n";
+        parse(text, &mut parsed.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        let mut want = Design::new();
+        let top = deck(&mut want);
+        build(&mut want.builder(), top);
+        assert!(parsed.eq_ignoring_spans(&want));
     }
 }

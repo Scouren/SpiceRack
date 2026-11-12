@@ -33,22 +33,20 @@ impl RowFacts for Title {
         out.push(Handle::Text(self.text));
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         // no invariant beyond the handles
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_title` with the item's context instead
-        item_text::dump_title(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_title(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -76,22 +74,20 @@ impl RowFacts for Comment {
         out.push(Handle::Text(self.text));
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         // no invariant beyond the handles
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_comment` with the item's context instead
-        item_text::dump_comment(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_comment(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -119,26 +115,24 @@ impl RowFacts for Include {
         out.extend([Handle::Name(self.path), Handle::Name(self.section)]);
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         if !self.section.is_none() {
             *set = set.with(Feature::Extra(Extra::IncludeSection));
         }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         if self.path.is_none() {
             field_domain(design, at, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_include` with the item's context instead
-        item_text::dump_include(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_include(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -166,25 +160,23 @@ impl RowFacts for Global {
         out.push(Handle::Names(self.nets));
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         let nets = design.names(self.nets);
         if nets.is_empty() || nets.contains(&NameId::GROUND) || !distinct(nets) {
             field_domain(design, at, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_global` with the item's context instead
-        item_text::dump_global(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_global(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -212,24 +204,22 @@ impl RowFacts for Load {
         out.push(Handle::Name(self.path));
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         if self.path.is_none() {
             field_domain(design, at, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_load` with the item's context instead
-        item_text::dump_load(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_load(self, design, &item_text::modules_of(design, ctx.item), out);
     }
 
     fn parse(
@@ -257,15 +247,15 @@ impl RowFacts for Opaque {
         out.extend([Handle::Name(self.dialect), Handle::Text(self.text)]);
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         let no_dialect = self.dialect.is_none() || design.str(self.dialect).is_empty();
         if no_dialect || design.text(self.text).is_empty() {
             out.push(
@@ -276,10 +266,8 @@ impl RowFacts for Opaque {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_opaque` with the item's context instead
-        item_text::dump_opaque(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_opaque(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -312,15 +300,15 @@ impl RowFacts for Subckt {
         ]);
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         let ports = design.names(self.ports);
         let params: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
         if self.name.is_none() || !distinct(ports) || !distinct(&params) {
@@ -328,10 +316,8 @@ impl RowFacts for Subckt {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_subckt` with the item's context instead
-        item_text::dump_subckt(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_subckt(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -363,26 +349,24 @@ impl RowFacts for Section {
         ]);
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         if !self.library.is_none() {
             *set = set.with(Feature::Extra(Extra::SectionLibrary));
         }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         if self.name.is_none() {
             field_domain(design, at, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_section` with the item's context instead
-        item_text::dump_section(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_section(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -416,15 +400,15 @@ impl RowFacts for If {
         }
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         let branches = design.branches(self.branches);
         let else_early = branches.iter().rev().skip(1).any(|b| b.cond.is_none());
         if branches.is_empty() || else_early {
@@ -432,10 +416,8 @@ impl RowFacts for If {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_if` with the item's context instead
-        item_text::dump_if(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_if(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -463,24 +445,22 @@ impl RowFacts for Param {
         out.extend([Handle::Name(self.name), Handle::Expr(self.value)]);
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         if self.name.is_none() || self.value.is_none() {
             field_domain(design, at, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_param` with the item's context instead
-        item_text::dump_param(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_param(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
@@ -513,24 +493,22 @@ impl RowFacts for Func {
         ]);
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // no reference field
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         if self.name.is_none() || self.body.is_none() || !distinct(design.names(self.args)) {
             field_domain(design, at, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
-        // `item_text::dump_func` with the item's context instead
-        item_text::dump_func(self, design, ItemRef::NONE, &Ctx::detached(), out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        item_text::dump_func(self, design, ctx.item, ctx, out);
     }
 
     fn parse(
