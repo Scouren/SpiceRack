@@ -252,12 +252,8 @@ fn type_literal(l: &Lower<'_, '_, '_>, value: u32) -> Option<ir::Polarity> {
     }
     let number = super::number::lex(l.cst.tokens.text(ast.main_token(Node(at)))).ok()?;
     let lit = number.literal;
-    let one = lit.eq_value(ir::Literal {
-        mantissa: 1,
-        frac: 0,
-        exp10: 0,
-        form: ir::NumForm::Int,
-    });
+    // By value: `type=1.` is the integer 1 to VACASK (run t1); `eq_value` keeps Int apart.
+    let one = lit.value() == 1.0;
     match (one, negative) {
         (true, false) => Some(ir::Polarity::N),
         (true, true) => Some(ir::Polarity::P),

@@ -42,16 +42,10 @@ const SETTLE: &str = "tests/fixtures/dialect/vacask/settle/run";
 
 /// Reader fixtures that fail for a cause outside this area, each with its cause; strict both
 /// ways.
-const KNOWN: &[(&str, &str)] = &[(
-    "alter_shape",
-    "fold.rs:267 (vacask-plan's) reads the key of a string field after an assignment: a NONE index",
-)];
+const KNOWN: &[(&str, &str)] = &[];
 
 /// Settle decks the round trip cannot run yet, each with its cause; strict both ways.
-const KNOWN_TRIP: &[(&str, &str)] = &[(
-    "alter_shape",
-    "fold.rs:267 (vacask-plan's) reads the key of a string field after an assignment: a NONE index",
-)];
+const KNOWN_TRIP: &[(&str, &str)] = &[];
 
 /// One VACASK run: what it printed after its banner, its raw files (each without its clock
 /// line, sorted by name) and the directory it ran in.
