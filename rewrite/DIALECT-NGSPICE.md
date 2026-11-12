@@ -59,11 +59,15 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 |---|---|---|
 | numbers | digits, point, exponent `e`/`d`, one scale (`t g meg k m u n p f a`, `mil`), then an ignored unit tail (1.01–1.07) | `Literal` with the digits as written (R1); no floating arithmetic |
 | `**`, `^`, `pow` | `\|x\|^y`, left associative; unary minus binds looser (2.02–2.04) | `PowAbs`, tree as grouped |
-| `log`/`ln`/`sqrt`/`exp` in a B source | of `\|x\|`; `exp` linear past 14 (2.07) | `LnAbs`, `SqrtAbs`, `ExpLin14`; in `{}` the plain members |
+| `log`/`ln`/`sqrt`/`exp` in a B source | the real functions, an error outside the domain; `exp` exact (corrected, R12: ngspice-45 `ptfuncs.c:275-326` PTexp/PTlog/PTsqrt; runs `B V=ln(-v(c))` "out of range for ln", `exp(20*v(c))` = 4.85e8; INV 2.07 was manual-only; `ExpLin14` is `ngbehavior=ps`, a flavour) | `Ln`, `Sqrt`, `Exp` |
 | which evaluator | an expression holding `v(`, `i(`, `time`, `temper`, `hertz` is the B-source evaluator's wherever it stands (2.06) | the member chosen by that test |
-| ternary | numparam reads `a?b?c:d:e` as `a?c:e` (2.13) | the tree ngspice evaluates; deeper nests it cannot read are `InvalidInSource` |
-| `nint`, `int`, `%`, `\` | half to even; truncate; C `fmod`; truncated divide (2.10–2.12) | `RoundHalfEven`, `Trunc`, `Fmod`, `IntDiv` |
+| ternary | numparam reads a bare ternary in a then-branch by its then, recursively: `a?b?c:d:e` is `a?c:e` (runs `{1?0?4:8:16}` = 4, `{1?1?1?2:3:4:5}` = 2, `{1?x?2:y?6:7:5}` = 2 for all x, y; corrected: INV 2.13's "deeper nests have no reading"); such a collapsed ternary as a bare else-branch has none (run `{1?2:0?1?3:4:5}` = 3, C and the rule give 2) | the collapsed tree; the else case `InvalidInSource` (`P1004`) |
+| `nint`, `int`, `%`, `\` | half to even; truncate; C `fmod`; `\` is `trunc(\|a/b\|)` (corrected: `xpressn.c` operate `x = trunc(fabs(x / y))`; run `{(-7)\2}` = 3; INV 2.11's `-7\2` = −3 is `0-(7\2)`) | `RoundHalfEven`, `Trunc`, `Fmod`, sugar `Trunc(Abs(Div(a, b)))` (R13) |
 | `limit`, `agauss`, `gauss`, `aunif`, `unif` | draws, a fresh sample at every reference even in a plain run (12.01–12.03) | `Draw` with `DrawWhen::Always`, `DrawPer::Reference` |
+| the two grammars | numparam (`xpressn.c` fetchoperator): `^`/`**` < `* / % \` < `+ -` < every comparison at one level (`{0==1<2}` = 1) < `&&` < `\|\|` < `:` < `?`, all left-associative, `!` on the atom, a leading `-` is `0 - …`; B source (`inpptree-parser.y`): C levels, `^` above unary minus (`2*-2**2` = 8 in braces, −8 in a B source) | one tree per evaluator's parse |
+| `-` after a binary operator (numparam) | the sign of the next number only; before anything else ngspice errors (`{2*-q}`: "wrongly determined negation") or negates a later number (`{2*-q+1}` = 5) | a negative literal; else `InvalidInSource`, `P1011` |
+| numbers | numparam `sscanf` + `parseunit`: no `d` exponent, `mil` is milli + tail (`{2mil}` = 2e-3); card values and B sources `INPevaluate` (`2mil` = 5.08e-5, `1d3` = 1000) | `number.rs`: two grammars |
+| B `u`, `pwr`, `u2`; numparam `sqr`, `pwr`, `pow` | `u` is 0.5 at 0 (PTustep); B `pwr` is sgn·\|x\|^y (PTpwr), B `pow` \|x\|^y; numparam `pwr` is `pow(fabs(x), y)`, `pow` C's `pow` (xpressn.c mathfunction); `u2` clamps to [0, 1] (PTustep2) | `StepHalf`, `PowSigned` (B), `PowAbs` (numparam `pwr`, B `pow`), `Pow` (numparam `pow`), `Sqr` (A11); `u2` → `min(max(x, 0), 1)` (R13) |
 | duplicate `.param` | the last definition wins (3.01) | one `Param`: the winner |
 | PULSE/EXP given zeros | a given zero rise, fall or tau is TSTEP; width and period TSTOP (5.05) | the `TStep`/`TStop` leaf in the field |
 | SFFM, AM | ngspice's argument order and law; 0 until the delay, at the operating point too (5.01–5.03) | named fields, `SffmLaw::Ngspice`, `PreDelay::Zero` |
@@ -90,8 +94,10 @@ order; each arm calls its area function. The writer:
   `e<exp>`); a number built from a double is already an engineering-form literal;
 - spells an expression with ngspice's precedence and the fewest parentheses that read back as
   the same tree, in `{}` where ngspice needs them;
-- prefixes an element name with its kind's letter (IR names carry none); two IR names that fold
-  to one ngspice name are not its problem: the legalizer's rename pass ran, or `check_legal`
+- writes an element's name as it is: the IR name is the whole name, letter included (R23,
+  AMEND-A12 §A13; a name not beginning with its kind's letter is
+  `CircuitExtra::NameWithoutLetter`, which `FEATURES` lacks and a pass renames); two IR names that
+  fold to one ngspice name are not its problem: the legalizer's rename pass ran, or `check_legal`
   stopped the write;
 - writes a run plan with loops or alters as one `.control` script (ngspice's native form of
   them), and plain analyses as dot cards in the order that makes ngspice run them in IR order;

@@ -1,6 +1,6 @@
 //! Element cards (sub-slice S3.1, a stub until it lands): an `Element` item → its ngspice card.
 //!
-//! **Contract for S3.1.** `pub(super) fn element(w: &mut Out<'_>, item: ir::ItemRef)`: the letter from the kind and detail (`name::letter`, then the detail for the controlled-source families) before the IR name; nodes in ngspice's order; values with `expr_write::value` (or the B-source form with no braces); a `VSource`/`ISource` goes to `write_sources::source`.
+//! **Contract for S3.1.** `pub(super) fn element(w: &mut Out<'_>, item: ir::ItemRef)`: the IR name as it is, letter included (R23; a name not starting with its kind's letter is `CircuitExtra::NameWithoutLetter`, absent from FEATURES: A13); nodes in ngspice's order; values with `expr_write::value` (or the B-source form with no braces); a `VSource`/`ISource` goes to `write_sources::source`.
 //! Each function writes one item of a design legal for `FEATURES` (the spine checked it), sees
 //! only the IR, and never learns a source. It spells exactly the rows its area adds to
 //! `FEATURES` and asserts it is not handed another. Codes: `W1100–W1199` (`codes.rs`).

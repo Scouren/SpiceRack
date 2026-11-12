@@ -17,7 +17,8 @@ use super::tables;
 use super::write::Out;
 use crate::ir::{self, Extra, Feature, FeatureSet, ItemKind};
 
-/// The structure items and placements ngspice spells: the kernel items but `Load` (an OSDI
+/// The structure items and placements ngspice spells (A13: `CircuitExtra::NameWithoutLetter`
+/// stays out of the union when the circuit owner adds it): the kernel items but `Load` (an OSDI
 /// load is a `.control` command, S3.4), nested subcircuits and subcircuit-local functions
 /// (manual §2.4.3, B3, B6), and library calls (A11). Not: a `.param` or load in an `.if` branch
 /// (manual §2.15), a section inside a library wrapper (Spectre's), names that differ only in

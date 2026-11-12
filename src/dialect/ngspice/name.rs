@@ -2,10 +2,10 @@
 //! folds case (it lowercases a deck before reading it), so `VDD` and `vdd` are one name: the
 //! reader hands the builder the first spelling it saw (REWRITE-PLAN §3.1 principle 7). A node
 //! named `gnd` is node `0` (ngspice replaces the whole word on every card: `inpcom.c`
-//! `inp_fix_gnd_name`). IR element names carry no letter (IR-KERNEL §6): the writer puts the
-//! kind's letter back.
+//! `inp_fix_gnd_name`). An element's IR name is its whole name, letter included (R23); the
+//! letter table lets the element area pick a card's kind from its first letter.
 //!
-//! In: names as a deck spells them; an `ElemKind`. Out: the folded spelling; the letter.
+//! In: names as a deck spells them; an `ElemKind`. Out: the folded spelling; its letter.
 //!
 //! Cites: `rewrite/INV-semantics.md` 3.02, 11.01, 11.03, 11.11; ngspice-45 `inpcom.c`
 //! (`inp_casefix`, `inp_fix_gnd_name`); ngspice manual §3.1 (element letters).

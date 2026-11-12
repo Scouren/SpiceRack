@@ -65,10 +65,12 @@ Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `dia
 ## Open points the areas inherit (reported to the lead with the S3.0 report)
 
 - A row `Ref` to a definition pushed later (an instance before its `.subckt`, a model in a later
-  file) cannot be bound through `Builder`: the late-binding door is an IR request.
-- `ir::Expr::I(name)` names an element without its letter (IR-KERNEL §6), so `i(vdd)` reads as
-  `I("dd")` and the writer spells `i(v…)`; S3.0 reads only `i(v…)` and makes any other `i()` an
-  `Unread`. A probe of an inductor or a controlled source's branch needs the kind (an IR request).
-- The `*Dyn` features follow the IR's test (V, I, Time, Freq), while ngspice also sends an
-  expression holding `temper` to the B-source parser: a `temper`-only expression is spelled by
-  the B-source rows but counted as plain features.
+  file) is bound in `read.rs`'s `bind` step, the one place that binds: today it resolves the
+  queued parameter reads and user calls with `Builder::resolve`; S3.1/S3.2 queue their row
+  references there (item, slot `k` in `RowFacts::map_refs` order, the scope, the kind) and
+  `bind` calls `Builder::bind_ref(item, k, def)` (A11) with the same nearest-scope lookup.
+- Element names (R23, AMEND-A12 §A13): the IR name is the whole folded name, letter included;
+  `i(vdd)` is `I("vdd")` and every `i(<element>)` reads. The writer writes names as they are;
+  `CircuitExtra::NameWithoutLetter` stays out of `FEATURES`.
+- The evaluator class is `ir::expr_class` (A11, R14: transitive, `Temp` counts); the writer
+  decides numparam or B source by it.

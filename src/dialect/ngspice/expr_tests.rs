@@ -129,6 +129,7 @@ fn numparam_and_b_source_values_are_ngspices() {
         ("8/4/2", 1.0),
         ("1||0&&0", 1.0),
         ("v(c)+1>=2", 1.0),
+        ("u2(0.5*v(c))", 0.5),
     ];
     for (text, want) in cases {
         let got = value(text);
@@ -188,14 +189,13 @@ fn what_ngspice_rejects_or_the_ir_lacks_is_coded() {
         class: ir::OpaqueClass::Unread,
     };
     // runs: `{2*-q}` "wrongly determined negation", `{5-+2}`, `{!-1}`, `1k5` in braces
-    for text in [
-        "2*-q", "5-+2", "!-1", "1k5", "(1", "1)", "1 2", "min(1)", "1?2",
-    ] {
+    assert_eq!(fail("2*-q"), invalid(codes::NEGATION));
+    for text in ["5-+2", "!-1", "1k5", "(1", "1)", "1 2", "min(1)", "1?2"] {
         assert_eq!(fail(text), invalid(codes::EXPR_INVALID), "{text}");
     }
     assert_eq!(fail("1?2:0?1?3:4:5"), invalid(codes::TERNARY_NEST));
     // no IR member: B `u` (0.5 at 0), `pwr` (sgn·|x|^y), numparam `sqr`, `i()` of no V source
-    for text in ["u(v(a))", "pwr(v(a),3)", "sqr(2)", "i(r1)*2", "\"s\""] {
+    for text in ["u(v(a))", "pwr(v(a),3)", "sqr(2)", "\"s\""] {
         assert_eq!(fail(text), unread, "{text}");
     }
 }
@@ -236,6 +236,8 @@ fn the_writer_spells_the_fewest_parentheses_that_read_back() {
         ("i(vdd)*temper", "i(vdd) * temper"),
         ("f(a, b)+1", "f(a, b) + 1"),
         ("{1+x}*2", "(1 + x) * 2"),
+        ("u2(v(a))", "min(max(v(a), 0), 1)"),
+        ("i(R1)*2", "i(R1) * 2"),
     ];
     for (text, want) in cases {
         assert_eq!(written(text), want, "{text}");

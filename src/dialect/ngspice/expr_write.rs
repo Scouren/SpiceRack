@@ -259,7 +259,7 @@ fn node(
             out.push(')');
         }
         ir::Expr::I(e) => {
-            out.push_str("i(v");
+            out.push_str("i(");
             out.push_str(d.str(e));
             out.push(')');
         }

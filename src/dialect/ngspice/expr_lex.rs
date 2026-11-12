@@ -176,11 +176,8 @@ fn ident_or_probe(text: &str, k: usize) -> Result<(Tok, usize), Fail> {
     let tok = match (word.as_bytes()[0].to_ascii_lowercase(), args.as_slice()) {
         (b'v', [n]) => Tok::V(n.to_string(), None),
         (b'v', [n, m]) => Tok::V(n.to_string(), Some(m.to_string())),
-        // ngspice's `i()` reads a voltage source's branch; IR names drop the letter (§6)
-        (b'i', [e]) => match e.strip_prefix(['v', 'V']) {
-            Some(rest) if !rest.is_empty() => Tok::I(rest.to_string()),
-            _ => return Err(Fail::unread()),
-        },
+        // an element's IR name is its whole name, letter included (R23)
+        (b'i', [e]) => Tok::I(e.to_string()),
         _ => return Err(Fail::invalid()),
     };
     Ok((tok, close + 1 - k))

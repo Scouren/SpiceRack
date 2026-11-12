@@ -17,7 +17,7 @@
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`, `ROUNDED`,
-//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
+//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
 //! `MISSING_FILE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
@@ -36,7 +36,7 @@ pub(super) const UNREAD: Code = Code::new(b'P', 1001);
 /// numparam `-` before a non-number): `InvalidInSource`.
 pub(super) const EXPR_INVALID: Code = Code::new(b'P', 1002);
 /// An expression using a function or form the IR has no member for (B `u`, `u2`, `pwr`,
-/// numparam `sqr`, a string, `i()` of no voltage source): `Unread`.
+/// numparam `sqr`, a string): `Unread`.
 pub(super) const EXPR_NO_MEMBER: Code = Code::new(b'P', 1003);
 /// A numparam then-branch ternary nested past `a?b?c:d:e`: `InvalidInSource`.
 pub(super) const TERNARY_NEST: Code = Code::new(b'P', 1004);
@@ -54,6 +54,9 @@ pub(super) const UNCLOSED: Code = Code::new(b'P', 1008);
 pub(super) const BRANCH_DEF: Code = Code::new(b'P', 1009);
 /// A `.global` naming only ground (`0`, `gnd`): it changes nothing; `Inert`.
 pub(super) const GLOBAL_GROUND: Code = Code::new(b'P', 1010);
+/// A numparam `-` after a binary operator before anything but a number (`{2*-q}`: ngspice's
+/// "wrongly determined negation", or a later number negated instead): `InvalidInSource`.
+pub(super) const NEGATION: Code = Code::new(b'P', 1011);
 /// A `.param` the same scope defines again later: ngspice keeps the last (INV 3.01); this one
 /// is `Inert`.
 pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);

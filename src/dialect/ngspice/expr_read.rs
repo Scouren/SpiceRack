@@ -252,7 +252,10 @@ impl Parser<'_> {
                     Tok::Op(Op::Minus) if numparam && !start => {
                         // numparam: the sign of the number after an operator, else an error
                         let Some(Tok::Num(lit, r)) = self.toks.get(k).cloned() else {
-                            return Err(Fail::invalid());
+                            return Err(Fail {
+                                code: codes::NEGATION,
+                                class: ir::OpaqueClass::InvalidInSource,
+                            });
                         };
                         k += 1;
                         let neg = ir::Literal {
@@ -551,6 +554,18 @@ impl Parser<'_> {
             Some(Named::Func(f)) if within(f.arity()) => N::Call(f, args.to_vec()),
             Some(Named::Draw(d)) if within(d.arity()) => N::Draw(d, args.to_vec()),
             Some(Named::Ternary) if args.len() == 3 => N::Tern(args[0], args[1], args[2]),
+            // B `u2(x)` (PTustep2: 0, x, 1) is `min(max(x, 0), 1)` (sugar, R13)
+            Some(Named::Clamp01) if args.len() == 1 => {
+                let zero = self.push(N::Num(ir::Literal::ZERO));
+                let max = self.push(N::Call(ir::Func::Max, vec![args[0], zero]));
+                let one = self.push(N::Num(ir::Literal {
+                    mantissa: 1,
+                    frac: 0,
+                    exp10: 0,
+                    form: ir::NumForm::Plain,
+                }));
+                N::Call(ir::Func::Min, vec![max, one])
+            }
             Some(_) => return Err(Fail::invalid()),
             None if tables::no_member(self.eval, word) => return Err(Fail::unread()),
             None => N::User(word.clone(), args.to_vec()),

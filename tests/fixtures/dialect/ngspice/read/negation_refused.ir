@@ -1,4 +1,4 @@
-# codes: P1002
+# codes: P1011
 file "negation_refused.sp" deck
   title "negation_refused"
   comment " oracle: xpressn.c formula (a - after an operator negates the next number only), run {2*-q}: \"wrongly determined negation\""

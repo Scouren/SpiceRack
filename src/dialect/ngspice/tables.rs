@@ -48,6 +48,8 @@ pub(super) enum Named {
     Draw(Dist),
     /// `ternary_fcn(c, a, b)`: the conditional.
     Ternary,
+    /// B `u2(x)`: `min(max(x, 0), 1)` (`PTustep2`).
+    Clamp01,
 }
 
 /// Every function name and its meaning, per evaluator. The first row of a member for an
@@ -111,6 +113,7 @@ pub(super) const FUNCS: &[(&str, Named, Eval)] = &[
     ("floor", Named::Func(Func::Floor), Eval::Behavioural),
     ("uramp", Named::Func(Func::Ramp), Eval::Behavioural),
     ("ddt", Named::Func(Func::Ddt), Eval::Behavioural),
+    ("u2", Named::Clamp01, Eval::Behavioural),
     ("ternary_fcn", Named::Ternary, Eval::Numparam),
     ("ternary_fcn", Named::Ternary, Eval::Behavioural),
     ("agauss", Named::Draw(Dist::AbsGauss), Eval::Numparam),
@@ -121,11 +124,10 @@ pub(super) const FUNCS: &[(&str, Named, Eval)] = &[
 ];
 
 /// Function names ngspice has whose meaning no IR member states: B `u` (0.5 at 0, `PTustep`),
-/// `u2` (a clamp to [0, 1]), `pwr` (`sgn(x)·|x|^y`, `PTpwr`), `eq0`…`le0`, `pwl`,
+/// `pwr` (`sgn(x)·|x|^y`, `PTpwr`), `eq0`…`le0`, `pwl`,
 /// `pwl_derivative`; numparam `sqr`. An expression using one is `Unread`.
 pub(super) const NO_MEMBER: &[(&str, Eval)] = &[
     ("u", Eval::Behavioural),
-    ("u2", Eval::Behavioural),
     ("pwr", Eval::Behavioural),
     ("eq0", Eval::Behavioural),
     ("ne0", Eval::Behavioural),
