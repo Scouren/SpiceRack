@@ -18,5 +18,5 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("vacask", "Elem(Inductor)", "proven_device_kinds_round_trip", "as Elem(Capacitor)"),
     ("vacask", "Elem(Coupling)", "property_am_and_mutual_round_trip", "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused"),
     ("vacask", "Elem(Diode)", "proven_device_kinds_round_trip", "as Elem(Capacitor)"),
-    ("vacask", "Elem(ModuleModel)", "every_reader_fixture_is_a_fixpoint_of_write_and_read", "interim: an instance of a user module needs its Load and a model of that module (W2104, W2102 on Gen's names); covered by the devices' semis fixture until a covering property builds one"),
+    ("vacask", "Elem(ModuleModel)", "proven_device_kinds_round_trip", "an instance of a user module needs its Load, a model of that module (W2104) and the module's own parameter names (W2102 on Gen's names)"),
 ];
