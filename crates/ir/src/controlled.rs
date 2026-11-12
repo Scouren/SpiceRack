@@ -24,7 +24,7 @@
 //!   Delay`
 
 use crate::design::Design;
-use crate::element::Element;
+use crate::element::{DetailKind, Element};
 use crate::id::{ExprId, ExprList, NameId, NameList};
 
 /// A source's output or control quantity: a voltage across two nets or a current.
@@ -317,36 +317,71 @@ impl DelayLaw {
 impl Design {
     /// The row of a `Vcvs`, `Vccs`, `Cccs` or `Ccvs`. Asserts the kind.
     pub fn controlled(&self, element: &Element) -> Controlled {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Controlled,
+            "{:?} has no Controlled row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a `Poly`. Asserts the kind.
     pub fn poly(&self, element: &Element) -> Poly {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Poly,
+            "{:?} has no Poly row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a `Table`. Asserts the kind.
     pub fn table_source(&self, element: &Element) -> TableSource {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Table,
+            "{:?} has no Table row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a `Behav`, `ChargeCapacitor` or `FluxInductor`. Asserts the kind.
     pub fn behav(&self, element: &Element) -> Behav {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Behav,
+            "{:?} has no Behav row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a `Laplace`. Asserts the kind.
     pub fn laplace(&self, element: &Element) -> Laplace {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Laplace,
+            "{:?} has no Laplace row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a `FreqTable`. Asserts the kind.
     pub fn freq_table(&self, element: &Element) -> FreqTable {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::FreqTable,
+            "{:?} has no FreqTable row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The row of a `Delay`. Asserts the kind.
     pub fn delay(&self, element: &Element) -> Delay {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Delay,
+            "{:?} has no Delay row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 }

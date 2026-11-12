@@ -560,7 +560,7 @@ impl DetailKind {
 
 impl RowFacts for Element {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
-        todo!()
+        crate::circuit_text::element_handles(self, design, out)
     }
 
     fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -574,16 +574,15 @@ impl RowFacts for Element {
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {
-        todo!()
+        crate::circuit_features::element_features(self, design, set)
     }
 
     fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
-        todo!()
+        crate::circuit_check::check_element(self, design, at, out)
     }
 
-    #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        crate::circuit_text::dump_element(self, design, out)
     }
 
     fn parse(
@@ -592,7 +591,7 @@ impl RowFacts for Element {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        crate::circuit_parse::parse_element(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -602,6 +601,6 @@ impl RowFacts for Element {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::circuit_gen::generate_element(g, scope, b, features)
     }
 }

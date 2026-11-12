@@ -331,7 +331,7 @@ impl Polarity {
 
 impl RowFacts for Model {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
-        todo!()
+        crate::circuit_text::model_handles(self, out)
     }
 
     fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -345,16 +345,15 @@ impl RowFacts for Model {
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {
-        todo!()
+        crate::circuit_features::model_features(self, set)
     }
 
     fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
-        todo!()
+        crate::circuit_check::check_model(self, design, at, out)
     }
 
-    #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        crate::circuit_text::dump_model(self, design, out)
     }
 
     fn parse(
@@ -363,7 +362,7 @@ impl RowFacts for Model {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        crate::circuit_parse::parse_model(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -373,6 +372,6 @@ impl RowFacts for Model {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::circuit_gen::generate_model(g, scope, b, features)
     }
 }

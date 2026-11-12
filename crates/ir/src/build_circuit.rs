@@ -67,11 +67,13 @@
 //! - `Builder::model(&mut self, ScopeId, Model, Span) -> ItemRef`
 
 use crate::build::Builder;
-use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
-use crate::element::ElemKind;
-use crate::id::{ExprId, ItemRef, NameId, NameList, ParamList, Ref, ScopeId};
+use crate::circuit_check::{model_ok, verdict};
+use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, OutKind, Poly, TableSource};
+use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
+use crate::id::{ExprId, ItemRef, List, NameId, NameList, ParamList, Ref, ScopeId};
+use crate::item::DefKind;
 use crate::line::Line;
-use crate::model::Model;
+use crate::model::{Model, ModelFamily};
 use crate::passive::{Coupling, Passive};
 use crate::semi::{Semi, Switch};
 use crate::source::Source;
@@ -109,14 +111,36 @@ impl Builder<'_> {
         params: &[(&str, ExprId)],
         mult: ExprId,
     ) -> ElemHead {
-        todo!()
+        let name = self.name(name);
+        let terminals = if terminals.is_empty() {
+            List::EMPTY
+        } else {
+            self.names(terminals)
+        };
+        let model = Ref::unresolved(master.map_or(NameId::NONE, |m| self.name(m)));
+        let params = if params.is_empty() {
+            List::EMPTY
+        } else {
+            self.params(params)
+        };
+        ElemHead {
+            name,
+            terminals,
+            model,
+            params,
+            mult,
+        }
     }
 
     // ---- low tier ----
 
     /// Appends a waveform row and returns its reference. Asserts as `detail`.
     pub fn wave<W: WaveRow>(&mut self, row: W) -> WaveRef {
-        todo!()
+        let index = self.detail(row);
+        WaveRef {
+            kind: W::KIND,
+            index,
+        }
     }
 
     /// Appends an element header with an already pushed `detail` row (`NO_ROW` for a kind
@@ -130,7 +154,34 @@ impl Builder<'_> {
         detail: u32,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        let (lo, hi) = kind.terminals();
+        let count = head.terminals.len();
+        assert!(
+            count >= lo as usize && count <= hi as usize,
+            "{kind:?}: terminal count {count} outside {lo}..={hi}"
+        );
+        let named = head.model.name != NameId::NONE;
+        assert!(!kind.needs_model() || named, "{kind:?} needs a master");
+        assert!(
+            kind.master_kind().is_some() || kind == ElemKind::Unresolved || !named,
+            "{kind:?} names no master"
+        );
+        let row = Element {
+            kind,
+            name: head.name,
+            terminals: head.terminals,
+            model: head.model,
+            params: head.params,
+            mult: head.mult,
+            detail,
+        };
+        let v = verdict(self.design(), &row);
+        assert!(
+            v.rows,
+            "{kind:?}: detail row {detail} missing, misplaced or out of range"
+        );
+        assert!(v.domain, "{kind:?}: a field is outside its domain");
+        self.push(scope, row, span)
     }
 
     // ---- one push per family ----
@@ -144,7 +195,12 @@ impl Builder<'_> {
         row: Passive,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Passive,
+            "{kind:?} is not a passive kind"
+        );
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A coupling (no terminals).
@@ -155,7 +211,8 @@ impl Builder<'_> {
         row: Coupling,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        let detail = self.detail(row);
+        self.element(scope, ElemKind::Coupling, head, detail, span)
     }
 
     /// A voltage source, current source or port. Asserts `kind` is one of them, and that
@@ -168,7 +225,16 @@ impl Builder<'_> {
         row: Source,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Source,
+            "{kind:?} is not a source kind"
+        );
+        assert!(
+            (row.port != NO_ROW) == (kind == ElemKind::Port),
+            "a port row belongs exactly to a Port"
+        );
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A `Vcvs`, `Vccs`, `Cccs` or `Ccvs`. Asserts the kind, and that `sense` is set exactly on
@@ -181,12 +247,23 @@ impl Builder<'_> {
         row: Controlled,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Controlled,
+            "{kind:?} is not a linear controlled kind"
+        );
+        let current = matches!(kind, ElemKind::Cccs | ElemKind::Ccvs);
+        assert!(
+            (row.sense != NameId::NONE) == current,
+            "{kind:?}: sense set exactly on Cccs/Ccvs"
+        );
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A polynomial source.
     pub fn poly(&mut self, scope: ScopeId, head: ElemHead, row: Poly, span: Span) -> ItemRef {
-        todo!()
+        let detail = self.detail(row);
+        self.element(scope, ElemKind::Poly, head, detail, span)
     }
 
     /// A table source.
@@ -197,7 +274,8 @@ impl Builder<'_> {
         row: TableSource,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        let detail = self.detail(row);
+        self.element(scope, ElemKind::Table, head, detail, span)
     }
 
     /// A `Behav`, `ChargeCapacitor` or `FluxInductor`. Asserts the kind and that
@@ -211,12 +289,24 @@ impl Builder<'_> {
         row: Behav,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Behav,
+            "{kind:?} is not a behavioural kind"
+        );
+        let fits = match kind {
+            ElemKind::ChargeCapacitor => row.output == OutKind::Charge,
+            ElemKind::FluxInductor => row.output == OutKind::Flux,
+            _ => !matches!(row.output, OutKind::Charge | OutKind::Flux),
+        };
+        assert!(fits, "output {:?} does not fit {kind:?}", row.output);
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A Laplace source.
     pub fn laplace(&mut self, scope: ScopeId, head: ElemHead, row: Laplace, span: Span) -> ItemRef {
-        todo!()
+        let detail = self.detail(row);
+        self.element(scope, ElemKind::Laplace, head, detail, span)
     }
 
     /// A frequency-table source.
@@ -227,12 +317,14 @@ impl Builder<'_> {
         row: FreqTable,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        let detail = self.detail(row);
+        self.element(scope, ElemKind::FreqTable, head, detail, span)
     }
 
     /// A delay element.
     pub fn delay(&mut self, scope: ScopeId, head: ElemHead, row: Delay, span: Span) -> ItemRef {
-        todo!()
+        let detail = self.detail(row);
+        self.element(scope, ElemKind::Delay, head, detail, span)
     }
 
     /// A diode, BJT, MOSFET, JFET, MESFET or IGBT. Asserts the kind.
@@ -244,7 +336,12 @@ impl Builder<'_> {
         row: Semi,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Semi,
+            "{kind:?} is not a semiconductor kind"
+        );
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A voltage or current switch. Asserts the kind, and that `sense` is set exactly on an
@@ -257,7 +354,16 @@ impl Builder<'_> {
         row: Switch,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Switch,
+            "{kind:?} is not a switch kind"
+        );
+        assert!(
+            (row.sense != NameId::NONE) == (kind == ElemKind::ISwitch),
+            "{kind:?}: sense set exactly on an ISwitch"
+        );
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A line element. Asserts the kind.
@@ -269,7 +375,12 @@ impl Builder<'_> {
         row: Line,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::Line,
+            "{kind:?} is not a line kind"
+        );
+        let detail = self.detail(row);
+        self.element(scope, kind, head, detail, span)
     }
 
     /// A kind with no detail row: a code model, a module instance, a subcircuit instance or an
@@ -281,12 +392,34 @@ impl Builder<'_> {
         head: ElemHead,
         span: Span,
     ) -> ItemRef {
-        todo!()
+        assert!(
+            kind.detail() == DetailKind::None,
+            "{kind:?} has a detail row"
+        );
+        self.element(scope, kind, head, NO_ROW, span)
     }
 
     /// A model; defines `DefKind::Model` `row.name` in `scope`. Asserts `word` is set exactly
     /// for `CodeModel` and `Other`, `module` named exactly for `Module`.
     pub fn model(&mut self, scope: ScopeId, row: Model, span: Span) -> ItemRef {
-        todo!()
+        let code = matches!(row.family, ModelFamily::CodeModel | ModelFamily::Other);
+        assert!(
+            (row.word != NameId::NONE) == code,
+            "{:?}: word set exactly for CodeModel and Other",
+            row.family
+        );
+        assert!(
+            (row.module.name != NameId::NONE) == (row.family == ModelFamily::Module),
+            "{:?}: module named exactly for Module",
+            row.family
+        );
+        assert!(
+            model_ok(&row),
+            "{:?}: polarity outside its domain",
+            row.family
+        );
+        let item = self.push(scope, row, span);
+        self.define(DefKind::Model, row.name, scope, item);
+        item
     }
 }
