@@ -1,0 +1,10 @@
+r param has_noise
+load "resistor.osdi"
+model res resistor has_noise=1
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  print model("res")
+  analysis op1 op
+endc

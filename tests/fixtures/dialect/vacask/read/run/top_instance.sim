@@ -1,0 +1,13 @@
+the top-level instance
+model vsource vsource
+parameters a=1.0
+v1 (in 0) vsource dc=10.0
+control
+  analysis op1 op
+  alter instance("__topinst__") a=2.0
+  analysis op2 op
+  sweep sa instance="__topinst__" parameter="a" values=[1, 2, 4]
+    analysis d1 op
+  sweep sb instance="__topinst__" parameter="a" values=[1, 2]
+    analysis t1 tran stop=1u
+endc

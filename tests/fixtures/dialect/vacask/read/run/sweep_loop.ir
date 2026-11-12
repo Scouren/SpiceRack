@@ -5,6 +5,13 @@
 # codes:
 file "sweep_loop.sim" deck
   title "sweeps around analyses other than op"
+  device_library resistor
+  model res resistor
+  subckt s (p)
+    element resistor r1 (p 0) model=res value=1k
+  element instance x1 (n) model=s
+  element resistor r1 (n 0) model=res value=1k
+  element resistor r2 (n 0) model=res value=1k
   loop sweep name=s1 (device_param r1 r) (lin start=1k stop=2k step=500i)
     analysis tran name=t1 stop=1m cap=span_over50
   loop sweep name=s2 (temp) (list values=[0i, 50i])

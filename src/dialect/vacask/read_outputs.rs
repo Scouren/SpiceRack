@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.4 (save, ic, nodeset); VD cmd-save, cmd-analysis-op.
 //!
-//! Contents: `FEATURES`, `CODES`, `SAVE_FORM`, `NodeEntry`, `save`, `node_list`, `node_sets`
+//! Contents: `FEATURES`, `CODES`, `SAVE_FORM`, `SAVE_PART`, `NodeEntry`, `save`, `node_list`, `node_sets`
 //! (crate-private)
 
 use super::read::{self, Lower};
@@ -47,17 +47,30 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
 
 /// A save directive no probe kind states (`full`, an analysis's own directive).
 pub(super) const SAVE_FORM: ir::Code = ir::Code::new(b'P', 2308);
+/// A `save` of parts only (`vdb(n)`, `vr(n)`, `vm(n)`), which VACASK takes and ignores.
+pub(super) const SAVE_PART: ir::Code = ir::Code::new(b'P', 2317);
 
 /// This area's rows.
-pub(super) const CODES: &[(ir::Code, ir::Info)] = &[(
-    SAVE_FORM,
-    ir::Info {
-        title: "a save directive no probe kind states, kept as its text",
-        cite: "VD cmd-save, cmd-analysis-*; run e5; R43",
-        explain: "`full` saves every unknown, collapsed device-internal nodes included; `dv`, `di`, `tf`, `zin`, `yin`, `n`, `nc`, `opdefault`, `opfull` are one analysis's own outputs. The line is kept as text.",
-        kind: ir::Kind::Note,
-    },
-)];
+pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
+    (
+        SAVE_FORM,
+        ir::Info {
+            title: "a save directive no probe kind states, kept as its text",
+            cite: "VD cmd-save, cmd-analysis-*; run e5; R43",
+            explain: "`full` saves every unknown, collapsed device-internal nodes included; `dv`, `di`, `tf`, `zin`, `yin`, `n`, `nc`, `opdefault`, `opfull` are one analysis's own outputs. The line is kept as text.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        SAVE_PART,
+        ir::Info {
+            title: "a save of parts only, which changes no saved vector",
+            cite: "R68; settle run/part_ac_save_db, part_ac_save_real, part_noise_save_mag (VACASK 36be560)",
+            explain: "VACASK accepts `save vdb(n)`, `save vr(n)` and `save vm(n)` and writes the raw file it would without them; a part is post-processing, so the line moves no number.",
+            kind: ir::Kind::Note,
+        },
+    ),
+];
 
 /// One entry of an `ic=`/`nodeset=` list: a node (a path), the second node of a difference
 /// (empty for ground), and the value's CST node.
@@ -87,6 +100,13 @@ pub(super) fn save(l: &mut Lower<'_, '_, '_>, n: Node) {
     let Some(directives) = directives(l, n) else {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
     };
+    // Settle run/part_ac_save_db, part_ac_save_real, part_noise_save_mag: VACASK takes `vdb(n)`,
+    // `vr(n)`, `vm(n)` and changes no saved vector (R68: a part is post-processing).
+    let part =
+        |(w, a): &(String, Vec<String>)| matches!(w.as_str(), "vdb" | "vr" | "vm") && a.len() == 1;
+    if directives.iter().all(part) {
+        return read::opaque(l, n, ir::OpaqueClass::Inert, Some(SAVE_PART));
+    }
     let mut probes = Vec::with_capacity(directives.len());
     for (word, args) in &directives {
         let path = |s: &String| -> Vec<String> { s.split(':').map(str::to_string).collect() };
@@ -214,6 +234,12 @@ fn directives(l: &Lower<'_, '_, '_>, n: Node) -> Option<Vec<(String, Vec<String>
         .find(|&i| tags[i] == Tok::EndOfStatement)
         .unwrap_or(tags.len());
     let text = |i: usize| tokens.text(i as u32);
+    // `save ( … )`: the directives in one pair of parentheses, over lines (settle run/save_paren:
+    // the same raw file as the line without them; corpus test/test_resistor.sim).
+    let (first, end) = match end > first + 1 && text(first) == "(" && text(end - 1) == ")" {
+        true => (first + 1, end - 1),
+        false => (first, end),
+    };
     let mut out = Vec::new();
     let mut i = first;
     // Bounded: each pass moves past at least one token.

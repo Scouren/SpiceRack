@@ -26,6 +26,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Wave(TrRandom)", FIXPOINT, SOURCES),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
     ("ngspice", "Family(CodeModel)", "code_models_of_the_build_round_trip_by_meaning", CODE_MODELS),
+    ("vacask", "Item(NodeSet)", VC_RUN_FIXPOINT, VC_ARGS),
     ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
     ("vacask", "Elem(Capacitor)", "proven_device_kinds_round_trip", "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which W2104 still finds missing on 333 of 341 generated capacitors and 327 of 331 diodes over 512 seeds"),
     ("vacask", "Elem(VSource)", "property_am_and_mutual_round_trip", VC_SOURCES),
@@ -34,8 +35,13 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("vacask", "Wave(Pulse)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Sin)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Pwl)", VC_FIXPOINT, VC_SOURCES_INTERIM),
-    ("vacask", "Wave(Sffm)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", VC_SOURCES),
+    ("vacask", "Analysis(Dc)", VC_RUN_FIXPOINT, VC_ARGS),
+    ("vacask", "Analysis(Ac)", VC_RUN_FIXPOINT, VC_ARGS),
+    ("vacask", "Analysis(Noise)", VC_RUN_FIXPOINT, VC_ARGS),
+    ("vacask", "Analysis(Xf)", VC_RUN_FIXPOINT, VC_ARGS),
+    ("vacask", "Analysis(Sp)", VC_RUN_FIXPOINT, VC_ARGS),
+    ("vacask", "Analysis(Stb)", VC_RUN_FIXPOINT, VC_ARGS),
 ];
 
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
@@ -47,5 +53,7 @@ const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, s
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
 const VC_SOURCES: &str = "W2104 for sources (law L5 seed 1): VACASK takes a source's kind from its master, and the generator names a source's model with a fresh name no model statement defines, so every generated source is refused";
-const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl, am_fm); W2104 for sources refuses every generated one (its model is a fresh name), until the generator gives a source a model of its builtin family (R48 d) or the sources property draws every wave";
+const VC_RUN_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
+const VC_ARGS: &str = "interim: dialect_vacask_run's fixtures (ac, small_signal, sweep_op, op_nodeset); W2313 refuses an analysis argument or sweep range reading a parameter or the temperature, which the generator draws freely: goes when A42's invariant and feature reach the generator";
+const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl); the generator names a source's model with a fresh name: waits for the generator binding it";
 const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";

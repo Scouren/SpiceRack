@@ -1,0 +1,10 @@
+# Oracle: settle plain_include (a library included without `section=` is read whole, and
+# VACASK rejects a statement it has no syntax for there): the `*` line of a file no include
+# reads by section is invalid in source, P2013, not the skipped text of P2014.
+# codes: P2013 S0004
+file "plain_include.sim" deck
+  title "a library included whole"
+  include "plain_include--lib.lib"
+file "plain_include--lib.lib" library
+  opaque vacask invalid "* star outside"
+  param p = 2i

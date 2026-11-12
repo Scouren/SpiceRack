@@ -1,0 +1,9 @@
+# Oracle: settle run/part_ac_save_db, part_ac_save_real, part_noise_save_mag (VACASK 36be560
+# takes `save vdb(b)`, `vr(b)`, `vm(b)` and writes the raw file it would without them): a save
+# of parts only moves no number, Inert, P2317 (R68: a part is post-processing).
+# codes: P2317 P2317 S0003 S0003
+file "save_part.sim" deck
+  title "saves of parts"
+  opaque vacask inert "save vdb(b)"
+  opaque vacask inert "save vr(b) vm(b)"
+  analysis op name=op1

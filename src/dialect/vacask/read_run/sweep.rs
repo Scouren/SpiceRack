@@ -3,12 +3,13 @@
 //! small-signal analyses (`from`/`to` with `step`, or `mode="lin|dec|oct"` with `points`, or
 //! `values=[…]`). A lin `points` counts intervals (VD cmd-sweep, cmd-analysis-ac), so the IR's
 //! count is one more; targets `instance=`/`parameter=` (a device parameter, hierarchical names
-//! split at `:`; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
+//! split at `:`; an instance no file declares is VACASK's error, settle run/nosuch_sweep;
+//! `instance="__topinst__"` is the top-level parameter `parameter=`, R70; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
 //! of a waveform source, whose `dc` VACASK ignores, Private: settle run/sweep_source), `model=`/`parameter=` (bound to the top level's model), `option="temp"` (the
 //! temperature), `option=` a typed key or VACASK's own option by name. The principal parameter,
 //! `continuation=0`, values by a variable's name and a sweep of a variable are Private (R43).
 //!
-//! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`,
+//! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`, `check_arg`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
 
 use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, check_value, string};
@@ -40,6 +41,7 @@ pub(super) struct Spec {
 /// A sweep target, as names.
 pub(super) enum Aim {
     Device(Vec<String>, String, String),
+    Param(String),
     Source(Vec<String>, String),
     Model(String, String),
     Temp,
@@ -94,6 +96,25 @@ pub(super) fn check(l: &Lower<'_, '_, '_>, nodes: &[u32]) -> Result<(), Why> {
     Ok(())
 }
 
+/// Checks each analysis argument or sweep-range node of `nodes` that is given ([`check`]), and
+/// refuses one that reads `$temp`, `$tnom` or a top-level parameter: VACASK sees only circuit
+/// variables and constants there and fails the analysis (R68, A42; settle run/temp_*,
+/// param_tran: "Variable or constant … not defined.", exit code 0), P2316.
+pub(super) fn check_arg(l: &Lower<'_, '_, '_>, nodes: &[u32]) -> Result<(), Why> {
+    check(l, nodes)?;
+    for &node in nodes.iter().filter(|&&x| x != NONE) {
+        let read = expr_read::names_read(l, node);
+        let bad = |n: &String| n == "$temp" || n == "$tnom" || super::top_param(l, n);
+        if read.iter().any(bad) {
+            return Err(Why {
+                class: ir::OpaqueClass::InvalidInSource,
+                code: Some(super::ARG_READS),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// The elements of a `[…]` vector node, or `None` for any other node.
 pub(super) fn vector(l: &Lower<'_, '_, '_>, node: u32) -> Option<Vec<u32>> {
     let ast = &l.cst.ast;
@@ -124,7 +145,7 @@ pub(super) fn range(
         if !alone || items.is_empty() {
             return Err(private(code));
         }
-        check(l, &items)?;
+        check_arg(l, &items)?;
         return Ok(Spec { values, ..none });
     }
     if from == NONE || to == NONE {
@@ -144,7 +165,7 @@ pub(super) fn range(
     if step == NONE && points == NONE {
         return Err(private(code));
     }
-    check(l, &[from, to, step, points])?;
+    check_arg(l, &[from, to, step, points])?;
     Ok(Spec {
         kind,
         from,
@@ -214,6 +235,20 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
         (Some(i), _, _, Some(p)) => {
             let mut path: Vec<String> = i.split(':').map(str::to_string).collect();
             let element = path.pop().expect("split gives one part");
+            if path.is_empty() && element == super::TOP_INSTANCE {
+                return match super::top_param(l, &p) {
+                    true => Ok(Sweep {
+                        name,
+                        aim: Aim::Param(p),
+                        spec: range(l, &pairs, SWEEP_FORM)?,
+                        span: l.span(s),
+                    }),
+                    false => Err(BAD),
+                };
+            }
+            if !l.declared.has_instance(&path, &element) {
+                return Err(BAD);
+            }
             match (p.as_str(), l.declared.source(&path, &element)) {
                 ("dc", Some(Source::Dc)) => Aim::Source(path, element),
                 ("dc", Some(Source::Wave)) => return Err(private(SWEEP_WAVE)),
@@ -267,6 +302,10 @@ pub(super) fn target(l: &mut Lower<'_, '_, '_>, aim: &Aim) -> ir::Target {
         Aim::Device(path, element, param) => {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();
             l.b.target(ir::TargetKind::DeviceParam, &path, element, Some(param))
+        }
+        Aim::Param(name) => {
+            let t = l.b.target(ir::TargetKind::Param, &[], name, None);
+            super::bind_top_param(l, t)
         }
         Aim::Source(path, element) => {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();

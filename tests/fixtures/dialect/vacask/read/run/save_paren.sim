@@ -1,0 +1,8 @@
+a save list in parentheses
+control
+  save (
+    v(b)
+    i(v1)
+  )
+  analysis op1 op
+endc

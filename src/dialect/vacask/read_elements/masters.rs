@@ -9,12 +9,12 @@
 //! own).
 //!
 //! And each instance's master and `type` word, so a `sweep` can tell an independent source's DC
-//! value from a device parameter (R64: `Declared::source`).
+//! value from a device parameter (R64: `Declared::source`, `Declared::has_instance`, `Declared::by_section`).
 //!
-//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`
+//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`, `Declared::has_instance`, `Declared::by_section`
 //! (crate-private to the dialect)
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::super::read::{self, Cst, Lower};
 use crate::ir;
@@ -29,8 +29,17 @@ pub(in crate::dialect::vacask) struct Declared {
     parent: HashMap<Holder, Holder>,
     /// `(holder, name)` → a subcircuit's own holder; the first declaration wins.
     bodies: HashMap<(Holder, String), Holder>,
-    /// `(holder, instance name)` → its master's name and its `type="…"` word, if given.
-    instances: HashMap<(Holder, String), (String, Option<String>)>,
+    /// `(holder, instance name)` → its master's name (`None`: a behavioural source) and its
+    /// `type="…"` word, if given.
+    instances: HashMap<(Holder, String), Inst>,
+    /// The subcircuits an `elaborate circuit("…")` of a control block names: their instances
+    /// join the top level (VD cir-elaboration; corpus demo/bsim3-ptm/amp.sim sweeps `vin` of
+    /// the elaborated `namp`).
+    elaborated: Vec<String>,
+    /// The file names (the path's last part) some `include "…" section=…` names: such a file is
+    /// read by section, so its text outside every section is skipped (settle
+    /// star_outside_section); a file included whole reads it all (settle plain_include).
+    section_included: HashSet<String>,
 }
 
 /// What an instance of a `vsource` or `isource` model is, for a sweep of its `dc` (R64).
@@ -67,6 +76,9 @@ pub(in crate::dialect::vacask) enum Found {
     Nowhere,
 }
 
+/// An instance's master name (`None`: a behavioural source) and its `type="…"` word.
+type Inst = (Option<String>, Option<String>);
+
 /// Which scope holds a declaration: the top of every file (VACASK's include is textual), or a
 /// subcircuit, by its file and its statement's start byte (the IR item's span start).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -91,7 +103,7 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
             match ast.tag(n) {
                 Tag::Instance => {
                     let h = ast.header(n);
-                    if h.master != crate::syntax::ast::NONE {
+                    if h.name != crate::syntax::ast::NONE {
                         let key = (holder, read::field_name(cst, h.name));
                         let wave = ast
                             .fields(n)
@@ -100,7 +112,8 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                             .filter(|&f| ast.tag(f) == Tag::Assign)
                             .find(|&f| read::field_name(cst, ast.lhs(f)) == "type")
                             .map(|f| read::field_name(cst, ast.rhs(f)));
-                        let master = read::field_name(cst, h.master);
+                        let master = (h.master != crate::syntax::ast::NONE)
+                            .then(|| read::field_name(cst, h.master));
                         out.instances.entry(key).or_insert((master, wave));
                     }
                 }
@@ -134,6 +147,29 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                     out.bodies.entry(key.clone()).or_insert(own);
                     out.defs.entry(key).or_insert(master);
                     todo.extend(ast.body(n).iter().map(|&b| (b, own)));
+                }
+                Tag::Include => {
+                    let fields = ast.fields(n);
+                    let by_section = fields.iter().any(|&f| {
+                        ast.tag(Node(f)) == Tag::Assign
+                            && read::field_name(cst, ast.lhs(Node(f))) == "section"
+                    });
+                    if let (Some(&path), true) = (fields.first(), by_section) {
+                        let path = read::field_name(cst, path);
+                        out.section_included.insert(file_name(&path).to_string());
+                    }
+                }
+                Tag::Control => {
+                    for &b in ast.body(n) {
+                        let b = Node(b);
+                        let head = cst.tokens.text(ast.main_token(b));
+                        if ast.tag(b) == Tag::Card && head == "elaborate" {
+                            let names = ast.fields(b).iter().skip(1);
+                            let strings = names.filter(|&&f| ast.tag(Node(f)) == Tag::Str);
+                            out.elaborated
+                                .extend(strings.map(|&f| read::field_name(cst, f)));
+                        }
+                    }
                 }
                 Tag::Section | Tag::If | Tag::Else => {
                     todo.extend(ast.body(n).iter().map(|&b| (b, holder)));
@@ -180,15 +216,8 @@ impl Declared {
         path: &[String],
         element: &str,
     ) -> Option<Source> {
-        let own_or_top = |h: Holder, name: &str| [h, Holder::Top].map(|x| (x, name.to_string()));
-        let mut at = Holder::Top;
-        // Bounded by the path's length.
-        for inst in path {
-            let (m, _) = self.instances.get(&(at, inst.clone()))?;
-            at = *own_or_top(at, m).iter().find_map(|k| self.bodies.get(k))?;
-        }
-        let (m, wave) = self.instances.get(&(at, element.to_string()))?;
-        match own_or_top(at, m).iter().find_map(|k| self.defs.get(k))? {
+        let (at, (master, wave)) = self.instance(path, element)?;
+        match self.master(at, master.as_deref()?)? {
             Master::Model(word) if word == "vsource" || word == "isource" => {
                 Some(match wave.as_deref() {
                     None | Some("dc") => Source::Dc,
@@ -197,6 +226,52 @@ impl Declared {
             }
             _ => None,
         }
+    }
+
+    /// Whether some file declares the instance `path:element`, as VACASK finds a run
+    /// statement's `instance=` (settle run/nosuch_alter, nosuch_sweep: "Instance not found.").
+    pub(in crate::dialect::vacask) fn has_instance(&self, path: &[String], element: &str) -> bool {
+        self.instance(path, element).is_some()
+    }
+
+    /// The holder and entry of instance `path:element`: each path step an instance whose master
+    /// is a subcircuit, found by VACASK's rule.
+    fn instance(&self, path: &[String], element: &str) -> Option<(Holder, &Inst)> {
+        let mut at = Holder::Top;
+        // Bounded by the path's length.
+        for inst in path {
+            let (m, _) = self.instances.get(&(at, inst.clone()))?;
+            let m = m.as_deref()?;
+            at = *[at, Holder::Top]
+                .iter()
+                .find_map(|&h| self.bodies.get(&(h, m.to_string())))?;
+        }
+        if let Some(entry) = self.instances.get(&(at, element.to_string())) {
+            return Some((at, entry));
+        }
+        // An elaborated subcircuit's instances stand at the top level too.
+        if !path.is_empty() || at != Holder::Top {
+            return None;
+        }
+        self.elaborated.iter().find_map(|sub| {
+            let own = *self.bodies.get(&(Holder::Top, sub.clone()))?;
+            self.instances
+                .get(&(own, element.to_string()))
+                .map(|e| (own, e))
+        })
+    }
+
+    /// Whether some include names the file at `path` with `section=` (matched by its last part:
+    /// ponytail: two libraries of one name in two directories count as one).
+    pub(in crate::dialect::vacask) fn by_section(&self, path: &str) -> bool {
+        self.section_included.contains(file_name(path))
+    }
+
+    /// The master `name` seen from `at`: the holder's own, then the top's.
+    fn master(&self, at: Holder, name: &str) -> Option<&Master> {
+        [at, Holder::Top]
+            .iter()
+            .find_map(|&h| self.defs.get(&(h, name.to_string())))
     }
 }
 
@@ -220,4 +295,9 @@ fn holder(l: &Lower<'_, '_, '_>) -> Holder {
         }
     }
     Holder::Top
+}
+
+/// The last part of `path` (after the last `/`).
+fn file_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }

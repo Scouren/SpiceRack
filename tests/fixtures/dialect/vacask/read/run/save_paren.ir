@@ -1,0 +1,8 @@
+# Oracle: settle run/save_paren and save_line (VACASK 36be560 writes the same raw file for
+# `save (` … `)` over lines as for the line without the parentheses; corpus
+# test/test_resistor.sim): the directives in one pair of parentheses.
+# codes:
+file "save_paren.sim" deck
+  title "a save list in parentheses"
+  save analysis=(op dc tran) from_here (v (b)) (i (v1))
+  analysis op name=op1

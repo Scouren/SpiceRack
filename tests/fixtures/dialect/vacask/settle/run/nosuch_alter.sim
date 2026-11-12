@@ -1,0 +1,13 @@
+alter of no instance
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters a=1.0
+v1 (in 0) vsource dc=10.0
+r1 (in 0) resistor r=1k*a
+control
+  options rawfile="ascii"
+  analysis op1 op
+  alter instance("nosuch") r=2
+  analysis op2 op
+endc

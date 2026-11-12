@@ -15,8 +15,8 @@
 //! Contents: `mc`, `statement` (crate-private)
 
 use super::{
-    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, bare_name,
-    check_value, string,
+    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, TOP_INSTANCE, VARIABLE, assign,
+    bare_name, bind_top_param, check_value, string, top_param,
 };
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::fold;
@@ -183,10 +183,32 @@ fn alter(l: &mut Lower<'_, '_, '_>, n: Node) {
             return read::opaque(l, n, r.class, Some(r.code));
         }
     }
+    // R70: `__topinst__` is the design itself, its parameters the top level's; an instance or a
+    // top-level parameter no file declares is VACASK's error (settle run/nosuch_alter,
+    // top_nosuch: "Instance not found.", "Parameter 'zz' not found.").
+    let known = |l: &Lower<'_, '_, '_>, name: &str, key: &str| match name == TOP_INSTANCE {
+        true => top_param(l, key),
+        false => {
+            let mut path: Vec<String> = name.split(':').map(str::to_string).collect();
+            let element = path.pop().expect("split gives one part");
+            l.declared.has_instance(&path, &element)
+        }
+    };
+    if word == "instance"
+        && !names
+            .iter()
+            .all(|n| pairs.iter().all(|(k, _)| known(l, n, k)))
+    {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
+    }
     let span = l.stmt;
     for name in &names {
         for (key, v) in &pairs {
             let target = match word.as_str() {
+                "instance" if name == TOP_INSTANCE => {
+                    let t = l.b.target(ir::TargetKind::Param, &[], key, None);
+                    bind_top_param(l, t)
+                }
                 "instance" => {
                     let mut path: Vec<&str> = name.split(':').collect();
                     let element = path.pop().expect("split gives one part");

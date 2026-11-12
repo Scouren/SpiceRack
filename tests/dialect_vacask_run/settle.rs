@@ -302,3 +302,78 @@ fn part_vacask_writes_no_part_of_a_small_signal_output() {
         );
     }
 }
+
+#[test]
+fn top_instance_its_alter_and_sweep_set_a_top_level_parameter() {
+    // R70: `alter instance("__topinst__") a=2.0` re-elaborates (r = 1k·a: op1 -1e-2 A, op2
+    // -5e-3 A); a sweep of it moves the same parameter (-1e-2, -5e-3, -2.5e-3 A).
+    let r = settle("top_alter.sim");
+    assert!(
+        close(value(&raw(&r, "op1.raw"), "v1:flow(br)", 0), -1e-2, 1e-12),
+        "{}",
+        r.out
+    );
+    assert!(
+        close(value(&raw(&r, "op2.raw"), "v1:flow(br)", 0), -5e-3, 1e-12),
+        "{}",
+        r.out
+    );
+    let r = settle("top_sweep.sim");
+    let d1 = raw(&r, "d1.raw");
+    for (k, i) in [-1e-2, -5e-3, -2.5e-3].into_iter().enumerate() {
+        assert!(close(value(&d1, "v1:flow(br)", k), i, 1e-12), "{}", r.out);
+    }
+}
+
+#[test]
+fn nosuch_a_target_naming_nothing_is_vacasks_error() {
+    // R70: an alter of no instance or no parameter stops the run; a sweep of no instance fails
+    // its analysis (and VACASK still exits 0).
+    for (deck, message) in [
+        ("nosuch_alter.sim", "Instance not found."),
+        (
+            "nosuch_sweep.sim",
+            "Sweep 'sn': instance 'nosuch' not found.",
+        ),
+        ("top_nosuch.sim", "Parameter 'zz' not found."),
+        ("dev_nosuch.sim", "Parameter 'zz' not found."),
+    ] {
+        let r = settle(deck);
+        assert!(r.out.contains(message), "{deck}: {}", r.out);
+    }
+}
+
+#[test]
+fn save_paren_a_parenthesized_save_list_is_the_line_without_them() {
+    // V1: `save (` newline `v(b)` comment `i(v1)` newline `)` writes the raw file of
+    // `save v(b) i(v1)`.
+    let a = settle("save_paren.sim");
+    let b = settle("save_line.sim");
+    assert_eq!(
+        vectors(&raw(&a, "op1.raw")),
+        ["b", "v1:flow(br)"],
+        "{}",
+        a.out
+    );
+    assert_eq!(a.raws, b.raws);
+}
+
+#[test]
+fn corpus_forms_this_vacask_rejects() {
+    // V2, V3: corpus decks of a newer VACASK, rejected by 36be560: a `;`-separated list
+    // (test/test_opnodeset.sim, test_tranic.sim, demo/spice/vdmossh.sim) and the shipped
+    // resistor's `has_noise` (test/test_ac.sim, test_acxf.sim, test_noise.sim).
+    let r = settle("list_semicolon.sim");
+    assert!(
+        r.out
+            .contains("Parser syntax error, unexpected ;, expecting ] or \",\""),
+        "{}",
+        r.out
+    );
+    let r = settle("resistor_has_noise.sim");
+    assert!(
+        r.out.contains("Parameter 'has_noise' not found."),
+        "{}",
+        r.out
+    );
+}
