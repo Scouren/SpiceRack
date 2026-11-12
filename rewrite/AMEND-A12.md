@@ -156,3 +156,32 @@ kind beside the name.
   second), reported through a design-level check hook of the circuit owner
   (`pub(crate) fn design_check(design, out)` in `element.rs`, called once by `check`, as
   `design_features` is).
+
+# Amendment A14: state that holds for the whole run, and what order means (R24–R26)
+
+Source: the ngspice run area (`ng-run`), from `cktdojob.c`, `cktnewan.c`, `analysis.c`, `inp.c`
+and runs: ngspice's batch mode runs the analyses of a deck by type rank (AC, DC, OP, TRAN, PZ,
+TF, DISTO, NOISE, SENS, PSS, SP), reverse card order only inside one type (so
+`INV-semantics.md` 8.04 is wrong); every state card (`.options`, `.temp`, `.ic`, `.nodeset`)
+holds for the whole deck wherever it stands; a run card inside a `.subckt` body is the deck's.
+
+- **R24, run owner.** `Option`, `Env` and `NodeSet` rows gain `applies: Applies::{FromHere,
+  WholeRun}`. `FromHere`: the item holds for the run items after it (a script, a control block).
+  `WholeRun`: it holds for every run item of its deck wherever it stands; among `WholeRun` items
+  that set the same thing (an option key, `temp`, `tnom`, one node's condition) the last in
+  listed order holds. "Listed order" reads an `Include` as the items of the file it names, in
+  place. Features, so that each target can refuse or legalize what it lacks: a `FromHere` state
+  item after a run item (today's `OptionMidRun`, and its `Env` and `NodeSet` twins); a
+  `WholeRun` state item after a run item (a target whose state is positional cannot spell it in
+  place; a pass moves it before the first run item when both are in one file). `Env`'s `temp`
+  and `tnom` are each optional: an `Env` sets what it names.
+- **R25, IR-RUN §1.** Run items are listed in the order their source lists them. Analyses with
+  no `Alter`, no loop boundary and no `FromHere` state item between them are independent: their
+  order changes no number, only the order of the results, which is a run fact of the dialect
+  that ran them (S12), not a property of the design. No reader permutes run items; no writer
+  reorders them. `DIALECT-NGSPICE.md` §3's "run items in the order ngspice runs them" is
+  withdrawn.
+- **R26, run owner.** A run item is its deck's wherever it stands: a scope does not scope an
+  analysis, an option or an `Env`. Feature `RunExtra::RunItemNested`: such an item listed
+  outside its file's top scope and the `If` chains of it. (A `NodeSet` inside a subcircuit keeps
+  its own, different meaning, `NodeSetInSubckt`: nodes local to each instance.)
