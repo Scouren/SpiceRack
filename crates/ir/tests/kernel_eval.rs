@@ -8,7 +8,7 @@
 //!
 //! Contents: none (tests only).
 
-use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI, SQRT_2};
 
 use spicerack_ir::{
     BinOp, Bindings, Builder, Design, Dist, Domain, DrawPer, DrawWhen, ExprId, Func, NameId, Ref,
@@ -114,7 +114,7 @@ fn power_laws_differ_at_a_negative_base() {
     exact(call(Func::Pow, &[-2.0, 3.0]), -8.0); // (−1)³·2³
     out_of_domain(call(Func::Pow, &[-8.0, 1.0 / 3.0])); // fractional power of a negative
     out_of_domain(call(Func::Pow, &[0.0, -1.0])); // 0 to a negative power
-    near(call(Func::Pow, &[2.0, 0.5]), 1.414_213_562_373_095_1); // √2
+    near(call(Func::Pow, &[2.0, 0.5]), SQRT_2); // √2
     exact(call(Func::PowAbs, &[-2.0, 3.0]), 8.0); // |−2|³
     near(call(Func::PowAbs, &[-8.0, 1.0 / 3.0]), 2.0); // |−8|^(1/3)
     out_of_domain(call(Func::PowAbs, &[0.0, -1.0]));

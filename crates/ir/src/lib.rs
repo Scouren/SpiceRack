@@ -56,6 +56,7 @@ pub mod expr;
 pub mod feature;
 pub mod id;
 pub mod item;
+pub mod item_facts;
 pub mod link;
 pub mod names;
 pub mod scope;
