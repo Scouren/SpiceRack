@@ -201,6 +201,8 @@ fn columns_of(d: &mut Design) -> Vec<&mut dyn Column> {
         classes: _,
         forms: _,
         element_names: _,
+        #[cfg(any(test, feature = "gen"))]
+            class_computes: _,
     } = d;
     let mut out: Vec<&mut dyn Column> = vec![
         files,

@@ -50,7 +50,7 @@
 //!   `Design::branches(&self, BranchList) -> &[Branch]`, `Design::text(&self, TextId) -> &str`,
 //!   `Design::detail<D: DetailRow>(&self, u32) -> D`,
 //!   `Design::expr(&self, ExprId) -> Expr`, `Design::num(&self, NumId) -> Literal`,
-//!   `Design::expr_count(&self) -> usize`,
+//!   `Design::expr_count(&self) -> usize`, `Design::class_computes(&self) -> u32` (gen),
 //!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
 //!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
 //!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
@@ -142,6 +142,10 @@ pub struct Design {
     /// demand, extended by every element push and cleared where `editor` hands out its door and
     /// by each Editor mutation that can move or rename an element. Not part of equality.
     pub(crate) element_names: std::sync::OnceLock<crate::names::FxMap<(ScopeId, NameId), ItemRef>>,
+    /// How many times the definition classes were computed (`class::def_classes`): a count a
+    /// test reads instead of a clock (`Design::class_computes`). Not part of equality.
+    #[cfg(any(test, feature = "gen"))]
+    pub(crate) class_computes: crate::class::Computes,
 }
 
 /// A row type that is an item: it names its kind and its table. Implemented here for every
@@ -242,6 +246,8 @@ impl Design {
             classes: std::sync::OnceLock::new(),
             forms: std::sync::OnceLock::new(),
             element_names: std::sync::OnceLock::new(),
+            #[cfg(any(test, feature = "gen"))]
+            class_computes: crate::class::Computes::default(),
         }
     }
 
@@ -417,6 +423,16 @@ impl Design {
     /// `None` for a short literal. A writer spells the digits, then `exp10` in that form.
     pub fn long_digits(&self, l: Literal) -> Option<(&str, NumForm)> {
         (l.form == NumForm::Long).then(|| (self.long_text(l), NumForm::ALL[l.frac as usize]))
+    }
+
+    /// How many times this design computed its definition classes (behind the `gen` feature):
+    /// the test hook that holds the builder and `check` to one computation per design state, a
+    /// count instead of a clock (the round-4 regression recomputed them after every push).
+    #[cfg(any(test, feature = "gen"))]
+    pub fn class_computes(&self) -> u32 {
+        self.class_computes
+            .0
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Expression row count; ids `0..expr_count()` are valid.
