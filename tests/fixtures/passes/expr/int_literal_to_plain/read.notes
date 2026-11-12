@@ -1,0 +1,6 @@
+U0118  # n: read by q /: 2i
+U0118  # q: a typed division
+U0118  # g: its body flows into to_int
+U0118  # s: to_int reads @g(3i)
+U0118  # t: a bit operator
+U0118  # u: to_real reads 2i

@@ -1,0 +1,4 @@
+file "d.sp" deck
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=2n width=5n period=20n given_zero=spice_default)
+  element vsource v2 (b 0) dc=0 wave=sin(offset=0 amplitude=1 freq=1k delay=0 damping=0 phase_deg=0 given_zero=spice_default)
+  element vsource v3 (c 0) dc=0 wave=exp(v1=0 v2=1 td1=1n tau1=2n td2=5n tau2=3n given_zero=spice_default)

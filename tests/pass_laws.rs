@@ -75,6 +75,27 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
         ),
     ),
     (
+        "pulse_vacask_to_spice",
+        sources_only(
+            &[ir::WaveKind::Pulse],
+            ir::Feature::Circuit(ir::CircuitExtra::PulseSpice),
+        ),
+    ),
+    (
+        "as_given_to_given_zero",
+        sources_only(
+            &[
+                ir::WaveKind::Pulse,
+                ir::WaveKind::Sin,
+                ir::WaveKind::Exp,
+                ir::WaveKind::Sffm,
+                ir::WaveKind::Am,
+                ir::WaveKind::TrRandom,
+            ],
+            ir::Feature::Circuit(ir::CircuitExtra::GivenZeroSpiceDefault),
+        ),
+    ),
+    (
         "exp_td2_relative",
         sources_only(
             &[ir::WaveKind::Exp],
@@ -102,50 +123,8 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
     ),
-    (
-        "hoist_enclosing_refs",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Subckt))
-            .with(ir::Feature::Item(ir::ItemKind::Param))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Subckt,
-            ))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Param,
-            ))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Expr(ir::ExprTag::Param))
-            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
-            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
-            .with(ir::Feature::Binary(ir::BinOp::Add))
-            .with(ir::Feature::Binary(ir::BinOp::Mul)),
-    ),
-    (
-        "hoist_enclosing_refs_default",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Subckt))
-            .with(ir::Feature::Item(ir::ItemKind::Param))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Subckt,
-            ))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Param,
-            ))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Expr(ir::ExprTag::Param))
-            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
-            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
-            .with(ir::Feature::Binary(ir::BinOp::Add))
-            .with(ir::Feature::Binary(ir::BinOp::Mul)),
-    ),
+    ("hoist_enclosing_refs", HOIST_SET),
+    ("hoist_enclosing_refs_default", HOIST_SET),
     (
         "tran_cap_ngspice_to_given",
         ir::FeatureSet::EMPTY
@@ -157,6 +136,27 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             .with(ir::Feature::Run(ir::RunExtra::TranRecordStart)),
     ),
 ];
+
+/// `hoist_enclosing_refs`' set (both rows): a subcircuit in a subcircuit reading its parent.
+const HOIST_SET: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Title))
+    .with(ir::Feature::Item(ir::ItemKind::Subckt))
+    .with(ir::Feature::Item(ir::ItemKind::Param))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Subckt,
+        ir::ItemKind::Subckt,
+    ))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Subckt,
+        ir::ItemKind::Param,
+    ))
+    .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Expr(ir::ExprTag::Param))
+    .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
+    .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
+    .with(ir::Feature::Binary(ir::BinOp::Add))
+    .with(ir::Feature::Binary(ir::BinOp::Mul));
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);

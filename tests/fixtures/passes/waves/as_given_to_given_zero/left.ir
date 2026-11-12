@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param f = 1k
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 rise=0 fall=2n width=5n period=20n)
+  element vsource v2 (b 0) dc=0 wave=sin(offset=0 amplitude=1 freq=f delay=0 damping=0 phase_deg=0)
