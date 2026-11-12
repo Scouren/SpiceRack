@@ -1,0 +1,6 @@
+# Oracle: VD dev-builtin (a builtin's model line is `model <name> <builtin>`, no parameters).
+file "builtin_models.sim" deck
+  title "builtin models"
+  model vs source_v
+  model e vcvs
+  model k mutual

@@ -1,0 +1,9 @@
+# Oracle: the `spice/resistor.va` header (`tc1` is spelled `model_tc1` on sp_resistor's model
+# line); R17/R41 (the module word follows the design's library: resistor.osdi → `resistor`,
+# a variant path keeps its own file); a p-type model is `type=-1`.
+file "models_rcl.sim" deck
+  title "models"
+  device_library resistor
+  device_library inductor path="inductor.osdi"
+  model r resistor params=(tc1=0.01 rsh=10i)
+  model l inductor

@@ -1,0 +1,17 @@
+# Oracle: settle devices_prc, devices_own (R41 a: sp_resistor, sp_capacitor, sp_inductor,
+# resistor, capacitor, inductor equal ngspice-45's R, C, L to every printed digit); the
+# `spice/resistor.va` header (`model_tc1` is the model's `tc1`; `res` an alias of `model_r`);
+# VD cir-instance (`tc1` on a model line is an instance default: Private P2102, R41 Q4); S 7.11
+# (an unknown parameter is a hard error: P2103); run mod (no load of an inductor file: P2101);
+# R41 a (sp_mos1 unproven: a user module, its module named and unbound, its `type` its own).
+# codes: P2101 P2102 P2103 S0002 S0002 S0004
+file "models_rcl.sim" deck
+  title "models of the proven passives and of an unproven module"
+  device_library resistor
+  device_library capacitor path="capacitor.osdi"
+  model r resistor params=(tc1=0.01 rsh=10i res=1k)
+  opaque vacask private "model rn sp_resistor tc1=0.01"
+  opaque vacask invalid "model rb sp_resistor bogus=1"
+  model c capacitor
+  opaque vacask private "model l sp_inductor"
+  model nm module params=(type=-1i vto=0.7) module=sp_mos2

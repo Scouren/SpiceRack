@@ -1,0 +1,9 @@
+models of the proven passives and of an unproven module
+load "spice/resistor.osdi"
+load "capacitor.osdi"
+model r sp_resistor model_tc1=0.01 rsh=10 res=1k
+model rn sp_resistor tc1=0.01
+model rb sp_resistor bogus=1
+model c capacitor
+model l sp_inductor
+model nm sp_mos2 type=-1 vto=0.7
