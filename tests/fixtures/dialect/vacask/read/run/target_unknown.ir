@@ -1,15 +1,21 @@
 # Oracle: settle run/nosuch_alter ("Instance not found."), top_nosuch ("Parameter 'zz' not
 # found."), nosuch_sweep ("Sweep 'sn': instance 'nosuch' not found.", the analysis failed with
-# exit code 0): a target VACASK does not find is invalid in source (P2320), and a sweep's
-# analysis with it.
-# codes: P2320 P2320 P2320 P2320 S0004 S0004 S0004 S0004 S0004 S0004
+# exit code 0), dev_nosuch ("Parameter 'zz' not found." on a shipped module's instance): a
+# target VACASK does not find is invalid in source (P2320), and a sweep's analysis with it; a
+# shipped module's own parameter is a device parameter.
+# codes: P2320 P2320 P2320 P2320 P2320 S0004 S0004 S0004 S0004 S0004 S0004 S0004
 file "target_unknown.sim" deck
   title "targets that name nothing"
   model vsource source_v
   param a = 1.0
   element vsource v1 (in 0) model=vsource dc=10.0
+  device_library resistor
+  model res resistor
+  element resistor r1 (in 0) model=res value=1k
   opaque vacask invalid "alter instance(\"nosuch\") r=2"
   opaque vacask invalid "alter instance(\"__topinst__\") zz=2.0"
+  opaque vacask invalid "alter instance(\"r1\") zz=2.0"
+  alter (device_param r1 dtemp) value=5i
   opaque vacask invalid "sweep sn instance=\"nosuch\" parameter=\"r\" values=[1, 2]"
   opaque vacask invalid "analysis d1 op"
   opaque vacask invalid "sweep sz instance=\"__topinst__\" parameter=\"zz\" values=[1, 2]"

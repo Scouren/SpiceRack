@@ -2,9 +2,10 @@
 # L do: ΔT = T − tnom, the direct law, `scale` multiplies R); the `spice/*.va` aliases (`r`
 # for `resistance`, `tc1` for `tc`, `noise` for `noisy`, `l` for `inductance`); S 7.11 (an
 # unknown parameter: InvalidInSource P2103); `noisy=2` has no IR field (Private P2106); run fwd
-# (a terminal left unconnected: Private P2104, R41 Q3). The numbers are settle devices_prc's
+# (a terminal left unconnected: Private P2104, R41 Q3); settle fwd_module (one too many:
+# "Too many terminals specified at instantiation.", InvalidInSource P2109). The numbers are settle devices_prc's
 # (whose simulator round trip the settle test runs).
-# codes: P2103 P2104 P2106 S0002 S0002 S0004
+# codes: P2103 P2104 P2106 P2109 S0002 S0002 S0004 S0004
 file "passives.sim" deck
   title "resistors capacitors inductors"
   device_library resistor
@@ -23,3 +24,4 @@ file "passives.sim" deck
   opaque vacask invalid "rb (n1 0) r r=1k bogus=1"
   opaque vacask private "rn (n1 0) r r=1k noisy=2"
   opaque vacask private "rt (n1) r r=1k"
+  opaque vacask invalid "rl (n1 n2 0) r r=1k"
