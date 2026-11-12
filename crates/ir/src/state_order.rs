@@ -12,9 +12,13 @@
 //! `pub fn run_walks(&Design) -> Vec<(ScopeId, Vec<(ItemRef, ScopeId)>)>`,
 //! `pub fn in_force(&Design, &[(ItemRef, ScopeId)], usize, Setting) -> ItemRef`; crate:
 //! `pub(crate) fn state_order_features`, `pub(crate) fn interleaved_features`,
+//! `pub(crate) fn four_counts`,
 //! `pub(crate) fn run_append_ok` (gen)
 
+use crate::analysis_facts::report;
+use crate::check::Violation;
 use crate::design::{Design, ItemRow};
+use crate::diag::Diags;
 use crate::feature::Feature;
 #[cfg(any(test, feature = "gen"))]
 use crate::feature::FeatureSet;
@@ -276,6 +280,38 @@ pub(crate) fn interleaved_features(design: &Design, out: &mut Vec<(Feature, Item
     }
 }
 
+/// Reports `FieldDomain` at each Fourier analysis with no harmonic count (`Four::harmonics`
+/// `NONE`) where no `nfreqs` option is in force (`in_force`, A16, A28): a `WholeRun` one in its
+/// walk, or a `FromHere` one before it with no `Reset` of options between. One pass per walk:
+/// O(items + scopes), not per analysis.
+pub(crate) fn four_counts(design: &Design, out: &mut Diags) {
+    let nfreqs = |item: ItemRef| sets(design, item, Setting::Option(OptionKey::NFreqs));
+    for (_, order) in run_walks(design) {
+        let whole = order
+            .iter()
+            .any(|&(i, _)| nfreqs(i) == Some(Applies::WholeRun));
+        let mut live = false;
+        for &(item, _) in &order {
+            if nfreqs(item) == Some(Applies::FromHere) {
+                live = true;
+            } else if item.kind == ItemKind::Reset
+                && Reset::table(design)
+                    .get(item.index)
+                    .restores
+                    .contains(Restorable::Options)
+            {
+                live = false;
+            } else if item.kind == ItemKind::Analysis
+                && !whole
+                && !live
+                && count_from_option(design, item)
+            {
+                report(design, item, Violation::FieldDomain, out);
+            }
+        }
+    }
+}
+
 /// Whether a run item appended to `scope` keeps a design without `RunInterleaved` without it:
 /// always when the set has the feature or `scope` is no file top; else when no other item
 /// follows the top's last run item. Reads back at most `SCAN_MAX` items and refuses when that
@@ -300,6 +336,14 @@ pub(crate) fn run_append_ok(design: &Design, scope: ScopeId, features: &FeatureS
 }
 
 // ---- private ----
+
+/// Whether `item` is a Fourier analysis that takes its count from the option.
+fn count_from_option(design: &Design, item: ItemRef) -> bool {
+    let row = crate::analysis::Analysis::table(design).get(item.index);
+    row.kind == crate::analysis::AnalysisKind::Four
+        && crate::analysis_facts::detail_get::<crate::tran::Four>(design, row.detail)
+            .is_some_and(|f| f.harmonics.is_none())
+}
 
 /// The mode of `item` when it is a state item that sets `what`, else `None`.
 fn sets(design: &Design, item: ItemRef, what: Setting) -> Option<Applies> {

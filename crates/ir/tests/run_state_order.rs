@@ -140,3 +140,32 @@ fn a_walk_reads_bodies_in_place_and_the_classes_are_the_irs() {
     assert_eq!(listed(ItemKind::Opaque), Listed::Neutral);
     assert_eq!(listed(ItemKind::Param), Listed::Other);
 }
+
+/// `check`'s rows for `text` (the IR text of a whole design).
+fn faults(text: &str) -> usize {
+    let d = read(text);
+    let mut diags = Diags::new();
+    spicerack_ir::check(&d, &mut diags);
+    diags.len()
+}
+
+#[test]
+fn a_fourier_count_comes_from_the_nfreqs_option_in_force_in_its_walk() {
+    // spine's L8 finding (seed 41): an option in an unrelated file gives the count nothing,
+    // whatever the file order
+    let four = "  analysis tran stop=1u print_step=1n cap=none\n  analysis four fundamental=1k periods=1 (v (out))\n";
+    let lib = "file \"l.sp\" library\n  option n_freqs value=10 whole_run\n";
+    let alone = format!("file \"t.sp\" deck\n{four}{lib}");
+    assert_eq!(faults(&alone), 1, "{alone}");
+    let included = format!("file \"t.sp\" deck\n  include \"l.sp\"\n{four}{lib}");
+    assert_eq!(faults(&included), 0, "{included}");
+    let reversed = format!("{lib}file \"t.sp\" deck\n  include \"l.sp\"\n{four}");
+    assert_eq!(faults(&reversed), 0, "{reversed}");
+    // a from-here option holds after it, and a reset of options ends it
+    let before = format!("file \"t.sp\" deck\n  option n_freqs value=10\n{four}");
+    assert_eq!(faults(&before), 0, "{before}");
+    let after = format!("file \"t.sp\" deck\n{four}  option n_freqs value=10\n");
+    assert_eq!(faults(&after), 1, "{after}");
+    let reset = format!("file \"t.sp\" deck\n  option n_freqs value=10\n  reset options\n{four}");
+    assert_eq!(faults(&reset), 1, "{reset}");
+}
