@@ -66,6 +66,10 @@ pub struct Gen {
     /// The definitions of each kind seen so far, in definition order (`pick_def`'s index,
     /// caught up from the design's table on each call: definitions are only appended).
     pub(crate) by_kind: Vec<Vec<DefId>>,
+    /// The elements generated so far, by name scope (`Design::name_scope`, R82): each one's name,
+    /// kind and listing scope, in creation order (a run target draws from its item's name scope;
+    /// an element in an `if` branch may reuse the name of one in a sibling branch).
+    pub(crate) elements: crate::names::FxMap<ScopeId, Vec<(NameId, ElemKind, ScopeId)>>,
     /// Per element kind, the models generated so far of a family it takes (R48 d: an element
     /// names a model that exists; appended by the circuit owner's model generator).
     pub(crate) models_for: Vec<Vec<DefId>>,
@@ -368,6 +372,7 @@ impl Gen {
             scope: ScopeId::NONE,
             formals: Vec::new(),
             by_kind: vec![Vec::new(); DefKind::COUNT],
+            elements: crate::names::FxMap::default(),
             models_for: vec![Vec::new(); ElemKind::COUNT],
             def_class: Vec::new(),
             class: ExprClass::Constant,

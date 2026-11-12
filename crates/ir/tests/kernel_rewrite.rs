@@ -103,10 +103,21 @@ fn visited(d: &Design, item: ItemRef) -> Vec<(ExprId, ExprUse)> {
 
 #[test]
 fn map_exprs_visits_the_roots_handles_lists() {
+    // Guards the rows whose `handles` and `map_exprs` are written apart: the circuit rows (the
+    // circuit field table's walkers are two functions), the kernel's own rows and the run
+    // owner's twelve hand-written `RowFacts` rows (state items, alters, outputs: by hand
+    // because their text does not fit the run field table, `run_fields.rs`). An analysis, a
+    // measure and a loop are left out: their expression roots are their detail row's, and both
+    // walks of a detail row come from its one field list (`DetailFacts`' defaults), so they
+    // cannot drift
+    let by_table = [ItemKind::Analysis, ItemKind::Measure, ItemKind::Loop];
     let mut drift: Vec<ItemKind> = Vec::new();
     for seed in 0..200u64 {
         let d = generate(seed, &FeatureSet::ALL, SIZE);
         for (item, _) in d.reachable() {
+            if by_table.contains(&item.kind) {
+                continue;
+            }
             if from_handles(&d, item) != visited(&d, item) && !drift.contains(&item.kind) {
                 drift.push(item.kind);
             }

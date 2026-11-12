@@ -1,0 +1,18 @@
+an element in an @if branch (the other branch holds one of the same name), altered by name from the top level
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+parameters sel=1
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+@if sel==1
+  r2 (b 0) res r=1k
+@else
+  r2 (b 0) res r=2k
+@end
+control
+  options rawfile="ascii"
+  analysis op1 op
+  alter instance("r2") r=3k
+  analysis op2 op
+endc

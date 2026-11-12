@@ -29,7 +29,7 @@ use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::placeable;
 use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, Ref, ScopeId};
-use crate::item::{DefKind, ItemKind};
+use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::letter::letter_of;
 use crate::model::ModelFamily;
 use crate::passive::{Coupling, IcMode};
@@ -98,7 +98,18 @@ pub(crate) fn generate_element(
     if kinds.is_empty() {
         return ItemRef::NONE;
     }
-    let kind = kinds[r.g.below(kinds.len() as u32) as usize];
+    // R82: in an `if` branch, three times in four a twin of an element of a sibling branch (its kind,
+    // and its name when the SPICE letter allows)
+    let twins: Vec<(NameId, ElemKind)> = siblings(&r, scope)
+        .into_iter()
+        .filter(|(_, k)| kinds.contains(k))
+        .collect();
+    let twin = (!twins.is_empty() && !r.g.chance(4))
+        .then(|| twins[r.g.below(twins.len() as u32) as usize]);
+    let kind = match twin {
+        Some((_, k)) => k,
+        None => kinds[r.g.below(kinds.len() as u32) as usize],
+    };
     // R48 (d): an element that names a model mostly names one the design defines, so a model
     // of a family the kind takes is drawn first when none is visible (before the element
     // interns a name: `dump` writes the model's line first)
@@ -136,7 +147,19 @@ pub(crate) fn generate_element(
     } else {
         Quantity::Current
     };
-    let name = match letter_of(kind, out, ctl) {
+    let letter = letter_of(kind, out, ctl);
+    let spelled = |n: NameId| {
+        let first =
+            r.b.design()
+                .str(n)
+                .bytes()
+                .next()
+                .map(|c| c.to_ascii_lowercase());
+        letter.is_none_or(|l| first == Some(l.to_ascii_lowercase()))
+    };
+    let twin = twin.map(|(n, _)| n).filter(|&n| spelled(n));
+    let name = match letter {
+        _ if twin.is_some() => twin.expect("a twin"),
         Some(l) if !r.has(X::NameWithoutLetter) || r.g.chance(2) => {
             let text = format!("{}{}", char::from(l.to_ascii_lowercase()), r.g.fresh());
             r.b.name(&text)
@@ -194,6 +217,11 @@ pub(crate) fn generate_element(
         mult_law,
     };
     let detail = r.detail(kind, two_terminal, out, ctl);
+    let at = r.b.design().name_scope(scope);
+    r.g.elements
+        .entry(at)
+        .or_default()
+        .push((name, kind, scope));
     r.b.element(scope, kind, head, detail, Span::NONE)
 }
 
@@ -495,4 +523,28 @@ impl R<'_, '_> {
         let n = 1 + self.g.below(2);
         (self.exprs(n), mode)
     }
+}
+
+/// The elements of the sibling branches of `scope`'s `if` (none outside a branch), as (name,
+/// kind), leaving out a name this branch already holds (R82: two exclusive branches may each
+/// hold an element of one name; `check`'s `DuplicateElement` is per listing scope).
+fn siblings(r: &R<'_, '_>, scope: ScopeId) -> Vec<(NameId, ElemKind)> {
+    let d = r.b.design();
+    let s = d.scope(scope);
+    if s.kind != ScopeKind::Branch {
+        return Vec::new();
+    }
+    let Some(all) = r.g.elements.get(&d.name_scope(scope)) else {
+        return Vec::new();
+    };
+    let here = |n: NameId| all.iter().any(|&(m, _, at)| at == scope && m == n);
+    all.iter()
+        .filter(|&&(n, _, at)| {
+            let sibling = at != scope
+                && d.scope(at).kind == ScopeKind::Branch
+                && d.scope(at).owner == s.owner;
+            sibling && !here(n)
+        })
+        .map(|&(n, k, _)| (n, k))
+        .collect()
 }

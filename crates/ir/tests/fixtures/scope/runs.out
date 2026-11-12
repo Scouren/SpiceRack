@@ -1,0 +1,9 @@
+R82: an element inside a library section or an `if` branch, altered by name from the top level.
+ngspice-45 -b and vacask, nix develop .#testing (light lane). The divider r1 = 1k over r2 = 1k
+gives v(b) = 0.5; after `alter r2 3k` / `alter instance("r2") r=3k` it gives 0.75.
+
+ngspice section.cir:  v(b) = 5.000000e-01   then   v(b) = 7.500000e-01
+ngspice if.cir:       v(b) = 5.000000e-01   then   v(b) = 7.500000e-01
+vacask section.sim:   op1 b = 5.000000000000000e-01   op2 b = 7.500000000000000e-01
+vacask if.sim:        op1 b = 5.000000000000000e-01   op2 b = 7.500000000000000e-01
+(if.cir and if.sim hold an `r2` in each branch; the alter reaches the one the condition keeps.)
