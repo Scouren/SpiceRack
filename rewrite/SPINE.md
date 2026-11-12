@@ -145,9 +145,15 @@ plus `requires`; P4 running it twice equals running it once (IR text equal); P5 
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
 simulator on both forms) is each pass's own test.
 
+**Files and rows.** A pass registry row is one `Pass`; a rule whose rows share their code (12
+rows for `fold_constant_bitops`, one per operator; two for `substitute_tran_leaves`, `TStep` and
+`TStop`) keeps them in one file, the rule's: the file is named for the rule, each row's
+`Pass::name` is the row's own, and the row's fixtures live in its own folder.
+
 **Fixtures.** `tests/fixtures/passes/<group>/<pass>/<case>.ir` and `<case>.out.ir`, and
 `<case>.notes` when the pass appends a row (A26: the codes it appends, one a line, in order,
-`#` comments): the pass laws read each case, run its pass, compare the codes with `.notes`
+`#` comments): the pass laws read each case, run the row named `<pass>` (the folder is the row's name, not its file's),
+compare the codes with `.notes`
 (a case whose pass appends a row and has no `.notes` fails), check, and compare the written
 text; a folder naming no registered pass fails. The golden walk excludes `tests/fixtures/passes/`.
 

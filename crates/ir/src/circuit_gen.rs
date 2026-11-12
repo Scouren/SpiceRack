@@ -464,7 +464,11 @@ impl R<'_, '_> {
                 let (ic, ic_mode) = self.ic_list();
                 let temp_abs = self.opt(X::InstanceTemp);
                 let dtemp = self.opt(X::InstanceDtemp);
-                let initial = self.initial(X::SemiInitial);
+                let initial = self.pick(&[
+                    (InitialState::Unset, None),
+                    (InitialState::Off, Some(X::SemiInitialOff)),
+                    (InitialState::On, Some(X::SemiInitialOn)),
+                ]);
                 self.b.detail(Semi {
                     area,
                     ic,

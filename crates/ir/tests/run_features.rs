@@ -19,7 +19,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::SeveralAnalyses, "  analysis op\n  analysis op", "  analysis op"),
     (RunExtra::TranSimulatorStep, "  analysis tran stop=1u cap=none", T),
     (RunExtra::TranRecordStart, "  analysis tran stop=1u record_start=1n print_step=1n cap=none", T),
-    (RunExtra::TranMaxStep, "  analysis tran stop=1u print_step=1n max_step=1n cap=none", T),
+    (RunExtra::TranMaxStep, "  analysis tran stop=1u print_step=1n max_step=1n", T),
     (RunExtra::TranInitialStep, "  analysis tran stop=1u print_step=1n initial_step=1n cap=none", T),
     (RunExtra::TranCapNone, T, "  analysis tran stop=1u print_step=1n cap=span_over10"),
     (RunExtra::TranCapNgspice, "  analysis tran stop=1u print_step=1n cap=ngspice_rule", T),
@@ -38,11 +38,24 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::DcAxisDeviceParam, "  analysis dc (device_param m1 w) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcAxisModelParam, "  analysis dc (model_param nch vth0) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcAxisOption, "  analysis dc (option gmin) (lin start=0 stop=1 step=1)", D),
-    (RunExtra::SweepLinPoints, "  analysis ac (lin start=1 stop=2 points=2)", A),
-    (RunExtra::SweepDec, "  analysis ac (dec start=1 stop=10 points=2)", A),
-    (RunExtra::SweepOct, "  analysis ac (oct start=1 stop=10 points=2)", A),
-    (RunExtra::SweepLog, "  analysis ac (log start=1 stop=10 points=2)", A),
-    (RunExtra::SweepList, "  analysis ac (list values=[1, 2])", A),
+    (RunExtra::SweepDcLinStep, D, "  analysis dc (source_dc v1) (list values=[1])"),
+    (RunExtra::SweepDcLinPoints, "  analysis dc (source_dc v1) (lin start=1 stop=2 points=2)", D),
+    (RunExtra::SweepDcDec, "  analysis dc (source_dc v1) (dec start=1 stop=10 points=2)", D),
+    (RunExtra::SweepDcOct, "  analysis dc (source_dc v1) (oct start=1 stop=10 points=2)", D),
+    (RunExtra::SweepDcLog, "  analysis dc (source_dc v1) (log start=1 stop=10 points=2)", D),
+    (RunExtra::SweepDcList, "  analysis dc (source_dc v1) (list values=[1, 2])", D),
+    (RunExtra::SweepLoopLinStep, LL, L),
+    (RunExtra::SweepLoopLinPoints, "  loop sweep (temp) (lin start=1 stop=2 points=2)\n    analysis op", L),
+    (RunExtra::SweepLoopDec, "  loop sweep (temp) (dec start=1 stop=10 points=2)\n    analysis op", L),
+    (RunExtra::SweepLoopOct, "  loop sweep (temp) (oct start=1 stop=10 points=2)\n    analysis op", L),
+    (RunExtra::SweepLoopLog, "  loop sweep (temp) (log start=1 stop=10 points=2)\n    analysis op", L),
+    (RunExtra::SweepLoopList, L, LL),
+    (RunExtra::SweepFreqLinStep, A, "  analysis ac (dec start=1 stop=10 points=2)"),
+    (RunExtra::SweepFreqLinPoints, "  analysis ac (lin start=1 stop=2 points=2)", A),
+    (RunExtra::SweepFreqDec, "  analysis ac (dec start=1 stop=10 points=2)", A),
+    (RunExtra::SweepFreqOct, "  analysis ac (oct start=1 stop=10 points=2)", A),
+    (RunExtra::SweepFreqLog, "  analysis ac (log start=1 stop=10 points=2)", A),
+    (RunExtra::SweepFreqList, "  analysis ac (list values=[1, 2])", A),
     (RunExtra::SweepEndOnStop, "  analysis ac (lin on_stop start=1 stop=2 step=1)", A),
     (RunExtra::SweepCenterSpan, "  analysis ac (lin center_span start=1 stop=2 step=1)", A),
     (RunExtra::NoiseSummary, "  analysis noise (v (out)) source=v1 (lin start=1 stop=2 step=1) points_per_summary=5", N),
@@ -153,6 +166,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::RunInterleaved, "  analysis op\n  param p = 1\n  save (v (out))", "  analysis op\n  comment \"c\"\n  opaque ngspice private \".x\"\n  save (v (out))\n  param p = 1"),
     (RunExtra::IcBeyondNext, S, "  nodeset ic transient next_only node=(a) value=1"),
     (RunExtra::SaveAnalysisSet, "  save analysis=(op dc tran) (v (out))", "  save analysis=tran (v (out))"),
+    (RunExtra::PssOscDiff, "  analysis pss autonomous fundamental=1meg tstab=1u osc_p=out osc_n=ref", "  analysis pss autonomous fundamental=1meg tstab=1u osc_p=out osc_n=0"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
@@ -164,6 +178,7 @@ const F: &str = "  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"
 const H: &str = "  analysis hb tones=[1g] harmonics=[5] truncate=box";
 const PSS: &str = "  analysis pss driven fundamental=1meg tstab=1u";
 const L: &str = "  loop sweep (temp) (list values=[1])\n    analysis op";
+const LL: &str = "  loop sweep (temp) (lin start=0 stop=1 step=1)\n    analysis op";
 const M: &str = "  loop monte_carlo runs=10\n    analysis op";
 const AL: &str = "  alter (temp) value=1";
 const S: &str = "  nodeset ic transient node=(a) value=1";
@@ -240,4 +255,15 @@ fn listed_order_reads_an_include_in_place() {
     };
     assert!(used("  analysis op\n  include \"lib.sp\""));
     assert!(!used("  include \"lib.sp\"\n  analysis op"));
+}
+
+#[test]
+fn a_sweep_form_counts_for_its_use_only() {
+    let dc = features("  analysis dc (source_dc v1) (dec start=1 stop=10 points=2)");
+    let has = |x| dc.contains(Feature::Run(x));
+    assert!(has(RunExtra::SweepDcDec));
+    assert!(!has(RunExtra::SweepFreqDec) && !has(RunExtra::SweepLoopDec));
+    let lp = features("  loop sweep (temp) (dec start=1 stop=10 points=2)\n    analysis op");
+    assert!(lp.contains(Feature::Run(RunExtra::SweepLoopDec)));
+    assert!(!lp.contains(Feature::Run(RunExtra::SweepDcDec)));
 }

@@ -352,6 +352,15 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `DetailFacts::map_exprs(&mut self, &mut Roots)` is required, so every detail kind writes its own roots. `exprs_of::<D>` reads the detail row, visits it, and stores it back. Analysis, Loop and Measure dispatch through it; Alter, OptionRow, Env, NodeSet, Save, Print and Statistics write their own fields. Elaborate keeps the default because it holds no expression.
 - Oracle: the kernel's drift property (`kernel_rewrite`). It went red on a swapped event order (`count`/`delay`) before it was trusted green.
 
+## Amendment A24, run owner (R47)
+
+- `Tran { max_step, cap }` becomes `Tran { ceiling: StepCeiling }`, where `StepCeiling` is `Given(ExprId)` or `Rule(StepCap)` (8 bytes; `Tran` 44 → 48). `check` refuses a `Given` that is `NONE` or the literal 0 (any form), and a `record_start` that is the literal 0, as `FieldDomain`. The text writes the ceiling where `cap=` stood, after the segments: `max_step=v` or `cap=<rule>`, exactly one. A `tran` line with only `cap=` keeps its text; a `max_step=` line loses its `cap=`. The generator fills these two fields with a nonzero literal: the generator's own literal, a 0 replaced by 1.
+- The sweep form class is 18 `RunExtra` members, `Sweep{Dc,Loop,Freq}{LinStep,LinPoints,Dec,Oct,Log,List}`. Each sweep sets its (use, form) member: a DC axis is `Dc`, a sweep loop `Loop`, every other analysis's sweep `Freq`. They replace `SweepLinPoints`, `SweepDec`, `SweepOct`, `SweepLog` and `SweepList`; lin by step had no member before. `SweepEndOnStop` and `SweepCenterSpan` stay as they are, orthogonal. `gen_sweep` takes the use and picks only forms in the set; an analysis or sweep loop whose sweep has no form there is not generated (`sweep_possible`).
+- `PssOscDiff`: an autonomous `Pss` whose `osc_n` is not `NameId::GROUND`.
+- Rename table for the dialect owners. `SweepLinPoints` → `SweepDcLinPoints` | `SweepLoopLinPoints` | `SweepFreqLinPoints`, by the sweep's use; the same for `Dec`, `Oct`, `Log` and `List`. New: `Sweep{Dc,Loop,Freq}LinStep`, which every lin-by-step sweep now sets. `Tran.max_step` and `Tran.cap` → `Tran.ceiling`.
+- Reach over 4,000 full-set seeds: the least-reached run feature is in 45 seeds (`DcAxisParam`); `PssOscDiff` 47; every sweep member 67 or more.
+- The generator's cost is no longer linear under `FeatureSet::ALL`: 10⁵ items 1.2 s, 3·10⁵ 9.9 s, 10⁶ 105 s. The kernel set alone is still linear (10⁶ in 1.8 s). The change came in with ir-circuit 67dae602: on the same machine, ir-run 163ee90d built 3·10⁵ in 1.2 s and 67dae602 in 9.5 s. This A24 part adds nothing measurable: the red commit 8f2334d1 built 3·10⁵ in 10.5 s, the bodies 9.9 s.
+
 ## A18 applied (long literals)
 
 - The significands live in a dedicated pool (`Exprs::long`), not the text pool the proposal named: `eq_meaning` compares the text pool exactly, so long digits there would make two spellings of one decimal unequal. `eq_ignoring_spans` compares the long pool exactly; `eq_meaning` compares each literal pair by exact decimal value.
@@ -369,4 +378,23 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 ## A25 item 1 applied (`Diag.item`)
 
 - `check`'s report takes the item instead of a span; non-item rows (expression rows, definitions' own faults at `Span::NONE`, the design-level features) pass `ItemRef::NONE`. The owners' row checks (`item_facts::field_domain`, the opaque check, `element::design_check`, `circuit_check`, `analysis_facts::report`) push at the item too; `Diags::push(code, span, arg)` stays for a reader's syntax rows and sets no item.
+
+## A25 items 2, 3, 5 applied
+
+- `FormalNotConstant` counts `$tnom` through the row's tree walk (`item_facts::reads_dependent`, which replaced `reads_param`), not through the class: `$tnom` is a constant of the run, and only a head default reading it is dependent (VACASK run c3).
+- `SubcktConstantParam` is a `Param` row fact for a `Param` listed directly in a `Subckt` body. A `Param` in a branch inside a body is not one, since VACASK's `parameters` at that place is the branch's. The generator lists no `Param` in a subcircuit body when the set lacks it; dependent locals are dropped there too, a simplification that costs no reachable feature under `FeatureSet::ALL`.
+- A generated `Load`'s path ends in `.va` for `VerilogA` and `.osdi` for `Osdi`. The `DeviceLibrary` path half is the circuit owner's generator, in its round-5 head.
+- Item 4 (string or list values) waits for `ng-scaffold`'s and `vacask-plan`'s answers on the contexts each accepts.
+
+## The generator's tracked class is the tree's
+
+- `Gen::class` now adds a node's own class (a circuit-reading function, a user function's noted class) when the node is built, not when it is chosen. A node chosen and then abandoned for a leaf (a tree that still owed its probe) no longer raises it. `gen_expr::tests::the_tracked_class_is_the_trees` pins it against `expr_class`. Found by the circuit owner: a generator choice that read `g.class` built a design check refused. `Gen::new` is the constructor `generate` and the test share.
+
+## The scaling gate
+
+- `cargo run --release --features gen --example throughput -- scaling` measures build, dump, parse and check over `FeatureSet::ALL` at 1e5 and 4e5 items (best of two runs) and exits 1 when a ratio exceeds 8: a linear phase measures 4.4 to 4.9 here, a quadratic one about 16. It is a release binary, not a test: a debug-build test at sizes cheap enough for the suite cannot tell a quadratic term from cache effects, and a release-only test would skip in debug. It goes in the merge tier beside the gate's commands (IR-PERF.md, How it is measured). On 68c6be2d it is red on build (13.6), the circuit regression.
+
+## The element-name index (R23)
+
+- `Builder::element_named(scope, name) -> Option<ItemRef>`: the first element of that whole name listed in `scope`, from an index on `Design` (`element_names`, lookup only) built on first use in O(items). It is extended by `Builder::push` itself whenever the row is an `Element`, so IR text (which pushes through the low tier) and `Builder::element` both keep it. It is cleared where `editor()` hands out its door and in `Editor::items_mut` and `Editor::set`, the mutations that can move or rename an element, as the class cache is. It takes `&mut self` because the builder's design is `&mut`; it reads only.
 

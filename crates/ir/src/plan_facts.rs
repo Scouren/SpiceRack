@@ -241,7 +241,12 @@ impl RowFacts for Loop {
         let targets = !target_kinds(features, TargetUse::Loop).is_empty();
         // the kernel fills the body: without `SweepBodyNotOne` no sweep loop is safe to open
         let kinds: Vec<LoopKind> = [
-            (LoopKind::Sweep, targets && has(RunExtra::SweepBodyNotOne)),
+            (
+                LoopKind::Sweep,
+                targets
+                    && has(RunExtra::SweepBodyNotOne)
+                    && crate::sweep::sweep_possible(features, crate::sweep::SweepUse::Loop),
+            ),
             (LoopKind::Table, targets && has(RunExtra::LoopTable)),
             (LoopKind::MonteCarlo, has(RunExtra::LoopMonteCarlo)),
         ]

@@ -134,6 +134,10 @@ pub struct Design {
     /// The dynamic class of each definition (`class::def_classes`), computed on demand and
     /// cleared by every `Builder` and `Editor` mutation. Not part of equality.
     pub(crate) classes: std::sync::OnceLock<Vec<ExprClass>>,
+    /// The first element of each whole name in each scope (`Builder::element_named`), built on
+    /// demand, extended by every element push and cleared where `editor` hands out its door and
+    /// by each Editor mutation that can move or rename an element. Not part of equality.
+    pub(crate) element_names: std::sync::OnceLock<crate::names::FxMap<(ScopeId, NameId), ItemRef>>,
 }
 
 /// A row type that is an item: it names its kind and its table. Implemented here for every
@@ -257,6 +261,7 @@ impl Design {
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
             classes: std::sync::OnceLock::new(),
+            element_names: std::sync::OnceLock::new(),
         }
     }
 
@@ -269,6 +274,7 @@ impl Design {
     /// The door for passes: replace rows and item lists, append through a builder.
     pub fn editor(&mut self) -> Editor<'_> {
         self.classes.take();
+        self.element_names.take();
         Editor { design: self }
     }
 

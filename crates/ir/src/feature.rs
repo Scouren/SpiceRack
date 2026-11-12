@@ -123,8 +123,8 @@ pub enum Extra {
     /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
     /// resolves in the own scope, then the top, never an enclosing subcircuit).
     EnclosingRef,
-    /// A `Subckt` head default that is not a constant: it holds a `Param` read, or its class is
-    /// `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
+    /// A `Subckt` head default that is not a constant: it holds a `Param` read or `$tnom` (A25,
+    /// VACASK run c3), or its class is `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
     /// default folds to a constant; it was `FormalReadsParam`).
     FormalNotConstant,
     /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
@@ -140,6 +140,10 @@ pub enum Extra {
     /// mantissa. A writer that spells them verbatim lists it; another target gets the pass that
     /// writes the correctly rounded shortest double.
     LongLiteral,
+    /// A `Param` listed in a `Subckt` body whose value is a constant (no parameter read, no
+    /// `$tnom`, class `Constant`): VACASK reads `parameters x=1` there as a formal, ngspice's
+    /// `.param` there is none (A25, R48). A structure pass makes it a formal.
+    SubcktConstantParam,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -287,7 +291,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::LongLiteral as usize + 1] = [
+    pub const ALL: [Extra; Extra::SubcktConstantParam as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -298,6 +302,7 @@ impl Extra {
         Extra::FormalWithoutDefault,
         Extra::IfConditionDynamic,
         Extra::LongLiteral,
+        Extra::SubcktConstantParam,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
