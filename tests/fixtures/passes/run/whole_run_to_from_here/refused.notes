@@ -1,0 +1,3 @@
+U0402  # rel_tol: a reset restores options
+U0402  # abs_tol: a reset restores options
+U0401  # the env after the first analysis

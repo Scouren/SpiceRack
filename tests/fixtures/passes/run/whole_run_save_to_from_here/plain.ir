@@ -1,0 +1,4 @@
+file "a.sp" deck
+  save (v (out))
+  save analysis=tran (all_v)
+  analysis op

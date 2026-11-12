@@ -1,0 +1,4 @@
+file "a.sp" deck
+  save from_here (v (out))
+  save analysis=tran from_here (all_v)
+  analysis op

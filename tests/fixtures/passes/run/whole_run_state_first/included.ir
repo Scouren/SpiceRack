@@ -1,0 +1,5 @@
+file "a.sp" deck
+  analysis op
+  include "s.inc"
+file "s.inc" library
+  option rel_tol value=1m whole_run
