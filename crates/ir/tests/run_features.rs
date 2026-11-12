@@ -211,7 +211,11 @@ fn features(lines: &str) -> FeatureSet {
     let mut d = Design::new();
     let mut diags = Diags::new();
     parse(&text, &mut d.builder(), &mut diags);
-    assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
+    assert!(
+        diags.is_empty(),
+        "the deck reads with no diagnostic before any feature is looked at\n{text}: {:?}",
+        diags.rows()
+    );
     features_used(&d)
 }
 
@@ -288,16 +292,36 @@ fn a_sweep_form_counts_for_its_use_only() {
     assert!(!lp.contains(Feature::Run(RunExtra::SweepDcDec)));
 }
 
+/// Whether `lines` (read with no diagnostic: `features` asserts it before any feature is
+/// looked at) set `MeasCircuitThreshold` for a crossing at `value`.
+fn threshold_reads_circuit(before: &str, value: &str) -> bool {
+    let lines =
+        format!("{before}  measure m tran when (cross rise (v (a)) value=({value}) count=1)");
+    features(&lines).contains(Feature::Run(RunExtra::MeasCircuitThreshold))
+}
+
 #[test]
-fn a_threshold_reads_the_circuit_through_a_function_or_a_parameter() {
-    // R14: the class is transitive; a threshold of class Circuit through a user function's
-    // body or a parameter is `MeasCircuitThreshold` as a direct `v(b)` is
-    let has = |lines: &str| features(lines).contains(Feature::Run(RunExtra::MeasCircuitThreshold));
-    let when =
-        |value: &str| format!("  measure m tran when (cross rise (v (a)) value=({value}) count=1)");
-    assert!(has(&format!("  func f(x) = x * v(b)\n{}", when("@f(1)"))));
-    assert!(has(&format!("  param p = v(b)\n{}", when("p"))));
-    // neighbours: a constant function and a constant parameter
-    assert!(!has(&format!("  func f(x) = x * 2\n{}", when("@f(1)"))));
-    assert!(!has(&format!("  param p = 2\n{}", when("p"))));
+fn a_threshold_reads_the_circuit_through_a_user_function() {
+    // R14: the class is transitive through a user function's body
+    assert!(
+        threshold_reads_circuit("  func f(x) = x * v(b)\n", "@f(1)"),
+        "a threshold @f(1) with f's body reading v(b) is MeasCircuitThreshold"
+    );
+    assert!(
+        !threshold_reads_circuit("  func f(x) = x * 2\n", "@f(1)"),
+        "a constant function's threshold is not"
+    );
+}
+
+#[test]
+fn a_threshold_reads_the_circuit_through_a_parameter() {
+    // R14: the class is transitive through a parameter of class Circuit
+    assert!(
+        threshold_reads_circuit("  param p = v(b)\n", "p"),
+        "a threshold p with p = v(b) is MeasCircuitThreshold"
+    );
+    assert!(
+        !threshold_reads_circuit("  param p = 2\n", "p"),
+        "a constant parameter's threshold is not"
+    );
 }
