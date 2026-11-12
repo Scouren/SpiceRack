@@ -16,6 +16,7 @@
 //! - `pub struct Code`, `Code::new(u8, u16) -> Code`, `pub enum Kind`, `pub struct Info`,
 //!   `pub struct Diag`, `pub struct Diags`
 //! - `Diags::new() -> Diags`, `Diags::push(&mut self, Code, Span, u32)`,
+//!   `Diags::push_at(&mut self, Code, &Design, ItemRef, u32)`,
 //!   `Diags::rows(&self) -> &[Diag]`, `Diags::len(&self) -> usize`,
 //!   `Diags::is_empty(&self) -> bool`
 //! - `pub const UNSUPPORTED: Code`, `pub const TEXT_SYNTAX: Code`,
@@ -25,6 +26,8 @@
 use std::fmt;
 
 use crate::check::Violation;
+use crate::design::Design;
+use crate::id::ItemRef;
 use crate::item::OpaqueClass;
 use crate::span::Span;
 
@@ -69,6 +72,9 @@ pub struct Diag {
     pub code: Code,
     /// Where; `Span::NONE` for built input.
     pub span: Span,
+    /// The item the row is about, `ItemRef::NONE` when it is about none (A25, R48: a built or
+    /// generated design has no spans, and its user is still told which item).
+    pub item: ItemRef,
     /// The code's argument.
     pub arg: u32,
 }
@@ -87,7 +93,8 @@ pub const UNSUPPORTED: Code = Code::new(b'U', 1);
 pub const TEXT_SYNTAX: Code = Code::new(b'P', 9001);
 
 const _: () = assert!(size_of::<Code>() == 4);
-const _: () = assert!(size_of::<Diag>() == 20);
+// A25: the item (8 bytes) beside code, span and arg
+const _: () = assert!(size_of::<Diag>() == 28);
 
 impl Code {
     /// A code. Asserts `letter` is ASCII uppercase and `number` in `1..=9999`.
@@ -115,7 +122,17 @@ impl Diags {
 
     /// Appends one row.
     pub fn push(&mut self, code: Code, span: Span, arg: u32) {
-        self.rows.push(Diag { code, span, arg });
+        self.rows.push(Diag {
+            code,
+            span,
+            item: ItemRef::NONE,
+            arg,
+        });
+    }
+
+    /// Appends a row about `item`, its span taken from the item (`Span::NONE` for `NONE`).
+    pub fn push_at(&mut self, code: Code, design: &Design, item: ItemRef, arg: u32) {
+        todo!()
     }
 
     /// Every row, in append order.
