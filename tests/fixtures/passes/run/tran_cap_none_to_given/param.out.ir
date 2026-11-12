@@ -1,0 +1,3 @@
+file "a.sp" deck
+  param s = 1u
+  analysis tran stop=s print_step=1n max_step=s
