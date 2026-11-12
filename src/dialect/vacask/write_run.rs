@@ -11,7 +11,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-overview, cmd-sweep, cmd-analysis-*.
 //!
-//! Contents: `analysis`, `control_span`, `admits` (crate-private), and for the children
+//! Contents: `analysis`, `control_span`, `admit` (crate-private), and for the children
 //! `quote`, `name_of`, `fold_alters`, `body`
 
 mod analyses;
@@ -121,41 +121,44 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
 /// node set no analysis line that takes its list follows (W2308: VACASK states `ic=` and
 /// `nodeset=` on an analysis only); an `mc` loop inside another (W2310: VD cmd-analysis-mc, no
 /// nesting); a transfer or noise analysis whose output is no node or node pair (W2311).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, scope) in design.reachable() {
-        if output_unspelled(design, at) {
-            diags.push_at(OUTPUT_FORM, design, at, 0);
+pub(super) fn admit(
+    design: &ir::Design,
+    at: ir::ItemRef,
+    scope: ir::ScopeId,
+    diags: &mut ir::Diags,
+) {
+    if output_unspelled(design, at) {
+        diags.push_at(OUTPUT_FORM, design, at, 0);
+    }
+    if is_mc(design, at) && within_mc(design, scope) {
+        diags.push_at(MC_NESTED, design, at, 0);
+    }
+    if at.kind == ir::ItemKind::NodeSet && !on_an_analysis(design, scope, at) {
+        diags.push_at(NODE_SET_PLACE, design, at, 0);
+    }
+    if at.kind == ir::ItemKind::Option
+        && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
+    {
+        diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+    }
+    if !names_spelled(design, at) {
+        diags.push_at(NAME_SPELLING, design, at, 0);
+    }
+    for t in swept_targets(design, at) {
+        if t.kind != ir::TargetKind::SourceDc {
+            continue;
         }
-        if is_mc(design, at) && within_mc(design, scope) {
-            diags.push_at(MC_NESTED, design, at, 0);
-        }
-        if at.kind == ir::ItemKind::NodeSet && !on_an_analysis(design, scope, at) {
-            diags.push_at(NODE_SET_PLACE, design, at, 0);
-        }
-        if at.kind == ir::ItemKind::Option
-            && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
-        {
-            diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
-        }
-        if !names_spelled(design, at) {
-            diags.push_at(NAME_SPELLING, design, at, 0);
-        }
-        for t in swept_targets(design, at) {
-            if t.kind != ir::TargetKind::SourceDc {
-                continue;
+        match source_of(design, t) {
+            None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
+            Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
+                diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
             }
-            match source_of(design, t) {
-                None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
-                Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
-                    diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
-                }
-                Some(_) => {}
-            }
+            Some(_) => {}
         }
-        let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
-        if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
-            diags.push_at(RESET_CLASS, design, at, 0);
-        }
+    }
+    let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
+    if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
+        diags.push_at(RESET_CLASS, design, at, 0);
     }
 }
 

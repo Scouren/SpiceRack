@@ -7,7 +7,7 @@
 //! Cites: VD input-include, cir-subckt, cir-nodes, cir-conditional, cir-loading.
 //!
 //! Contents: `NO_LIBRARY`, `LOAD_KIND`, `CODES`, `title`, `comment`, `include`, `section`, `section_end`,
-//! `load`, `device_library`, `admits`,
+//! `load`, `device_library`, `admit`,
 //! `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` (crate-private)
 
 use super::expr_write::{string, write_expr};
@@ -139,34 +139,31 @@ pub(super) fn device_library(w: &mut Writer<'_, '_>, row: ir::DeviceLibrary) {
 /// Appends a refusal for what no feature states and VACASK cannot spell: a load whose kind its
 /// extension does not state; a device library VACASK cannot name (a constant local parameter
 /// of a subcircuit is `Extra::SubcktConstantParam`, which `FEATURES` lacks: A25).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, _) in design.reachable() {
-        let refused = match at.kind {
-            ir::ItemKind::Load => {
-                let row: ir::item::Load = design.row(at.index);
-                let va = design.str(row.path).ends_with(".va");
-                (va != (row.kind == ir::LoadKind::VerilogA)).then_some(LOAD_KIND)
-            }
-            ir::ItemKind::DeviceLibrary => {
-                let row: ir::DeviceLibrary = design.row(at.index);
-                let default = tables::default_file(row.family);
-                // VACASK names a library by its file: the family's default, or a file it
-                // ships for that family (a variant), which reads back as this row.
-                let spelled = match row.path.is_none() {
-                    true => default.is_some(),
-                    false => {
-                        let path = design.str(row.path);
-                        tables::library(path) == Some(row.family)
-                            && default.as_deref() != Some(path)
-                    }
-                };
-                (!spelled).then_some(NO_LIBRARY)
-            }
-            _ => None,
-        };
-        if let Some(code) = refused {
-            diags.push_at(code, design, at, 0);
+pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags) {
+    let refused = match at.kind {
+        ir::ItemKind::Load => {
+            let row: ir::item::Load = design.row(at.index);
+            let va = design.str(row.path).ends_with(".va");
+            (va != (row.kind == ir::LoadKind::VerilogA)).then_some(LOAD_KIND)
         }
+        ir::ItemKind::DeviceLibrary => {
+            let row: ir::DeviceLibrary = design.row(at.index);
+            let default = tables::default_file(row.family);
+            // VACASK names a library by its file: the family's default, or a file it
+            // ships for that family (a variant), which reads back as this row.
+            let spelled = match row.path.is_none() {
+                true => default.is_some(),
+                false => {
+                    let path = design.str(row.path);
+                    tables::library(path) == Some(row.family) && default.as_deref() != Some(path)
+                }
+            };
+            (!spelled).then_some(NO_LIBRARY)
+        }
+        _ => None,
+    };
+    if let Some(code) = refused {
+        diags.push_at(code, design, at, 0);
     }
 }
 

@@ -11,7 +11,7 @@
 //!
 //! Cites: R42; VD cmd-alter, dev-builtin-src; DIALECT-VACASK §6.1, §6.2.
 //!
-//! Contents: `Fold`, `Folds` (`Folds::of`, `Folds::is_framing`), `NO_FOLD`, `CODES`, `folds`, `given`, `wave_word`, `admits`
+//! Contents: `Fold`, `Folds` (`Folds::of`, `Folds::is_framing`), `NO_FOLD`, `CODES`, `folds`, `given`, `wave_word`, `Admits` (`Admits::see`, `Admits::finish`)
 //! (crate-private)
 
 use std::collections::{HashMap, HashSet};
@@ -38,6 +38,20 @@ pub(super) struct Folds {
     framing: HashSet<(ir::FileId, u32)>,
     /// The alters each walk consumed, by source, before the verdicts are final.
     consumed: Vec<(ir::FileId, u32, String)>,
+}
+
+/// Appends [`NO_FOLD`] for each `Given` source with a wave the alternation cannot state: not at
+/// the entry file's top, or in a design whose run has no transient, an analysis below the top or
+/// of another kind. Fed item by item by the dialect's one `admits` walk ([`Admits::see`]), judged
+/// at its end ([`Admits::finish`]): the verdict needs every analysis.
+#[derive(Debug, Default)]
+pub(super) struct Admits {
+    /// Some analysis is a transient.
+    tran: bool,
+    /// Some analysis is of a kind the alternation does not cover, or below the entry's top.
+    unrunnable: bool,
+    /// Each source that needs a fold, and whether it stands at the entry file's top.
+    pending: Vec<(ir::ItemRef, bool)>,
 }
 
 /// A `Given` source with a wave whose alternation VACASK cannot state.
@@ -165,32 +179,34 @@ pub(super) fn wave_word(kind: ir::WaveKind) -> Option<&'static str> {
     })
 }
 
-/// Appends [`NO_FOLD`] for each `Given` source with a wave the alternation cannot state: not at
-/// the entry file's top, or in a design whose run has no transient, an analysis below the top or
-/// of another kind.
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    let entry = design.file(design.entry()).top;
-    let mut tran = false;
-    let mut runnable = true;
-    for (at, scope) in design.reachable() {
-        if at.kind != ir::ItemKind::Analysis {
-            continue;
+impl Admits {
+    /// Takes item `at`, listed in `scope`, into the verdict.
+    pub(super) fn see(&mut self, design: &ir::Design, at: ir::ItemRef, scope: ir::ScopeId) {
+        let entry = design.file(design.entry()).top;
+        match at.kind {
+            ir::ItemKind::Analysis => {
+                let row: ir::Analysis = design.row(at.index);
+                match kind_of(row.kind) {
+                    Some(Kind::Tran) => self.tran = true,
+                    Some(Kind::Dc) => {}
+                    None => self.unrunnable = true,
+                }
+                self.unrunnable |= scope != entry;
+            }
+            ir::ItemKind::Element if needs_fold(design, at) => {
+                self.pending.push((at, scope == entry));
+            }
+            _ => {}
         }
-        let row: ir::Analysis = design.row(at.index);
-        match kind_of(row.kind) {
-            Some(Kind::Tran) => tran = true,
-            Some(Kind::Dc) => {}
-            None => runnable = false,
-        }
-        runnable &= scope == entry;
     }
-    for (at, scope) in design.reachable() {
-        if at.kind != ir::ItemKind::Element || !needs_fold(design, at) {
-            continue;
-        }
-        let spelled = scope == entry && tran && runnable && given_wave(design, at).is_some();
-        if !spelled {
-            diags.push_at(NO_FOLD, design, at, 0);
+
+    /// The refusals, once every item was seen.
+    pub(super) fn finish(self, design: &ir::Design, diags: &mut ir::Diags) {
+        for (at, top) in self.pending {
+            let spelled = top && self.tran && !self.unrunnable && given_wave(design, at).is_some();
+            if !spelled {
+                diags.push_at(NO_FOLD, design, at, 0);
+            }
         }
     }
 }

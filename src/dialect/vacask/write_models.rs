@@ -6,7 +6,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cir-masters; R21 (`admits`).
 //!
-//! Contents: `UNSPELLED`, `LIBRARIES`, `UNPROVEN`, `LACKED` (their rows are in `read_elements::CODES`), `admits`, `model`, `word` (crate-private)
+//! Contents: `UNSPELLED`, `LIBRARIES`, `UNPROVEN`, `LACKED` (their rows are in `read_elements::CODES`), `admit`, `model`, `word` (crate-private)
 
 use super::expr_write::write_expr;
 use super::families::{self, Name};
@@ -70,44 +70,39 @@ pub(super) fn word(d: &ir::Design, row: &ir::Model) -> String {
 
 /// Appends a refusal for each reachable model VACASK cannot spell for a reason no feature
 /// states (R21): a name holding white space, or a parameter its module lacks.
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, _) in design.reachable() {
-        if at.kind != ir::ItemKind::Model {
-            continue;
+pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags) {
+    let row: ir::Model = design.row(at.index);
+    let module = word(design, &row);
+    if module.is_empty() {
+        diags.push_at(LIBRARIES, design, at, 0);
+    }
+    // A family no run proved VACASK's module implements reads back as a user module (R41 a).
+    if row.family != ir::ModelFamily::Module && !families::PROVEN.contains(&module.as_str()) {
+        diags.push_at(UNPROVEN, design, at, 0);
+    }
+    if [design.str(row.name), module.as_str()]
+        .iter()
+        .any(|n| n.chars().any(char::is_whitespace))
+    {
+        diags.push_at(UNSPELLED, design, at, 0);
+    }
+    let module_family = row.family == ir::ModelFamily::Module;
+    let mut lacked = design.params(row.params).iter().any(|&(key, _)| {
+        let key = design.str(key);
+        let written = match module_family {
+            true => key.to_string(),
+            false => families::model_name_out(&module, key),
+        };
+        match families::model_name_in(&module, &written) {
+            Name::Ir(back) => !module_family && back != key,
+            Name::Misplaced | Name::Unknown => true,
         }
-        let row: ir::Model = design.row(at.index);
-        let module = word(design, &row);
-        if module.is_empty() {
-            diags.push_at(LIBRARIES, design, at, 0);
-        }
-        // A family no run proved VACASK's module implements reads back as a user module (R41 a).
-        if row.family != ir::ModelFamily::Module && !families::PROVEN.contains(&module.as_str()) {
-            diags.push_at(UNPROVEN, design, at, 0);
-        }
-        if [design.str(row.name), module.as_str()]
-            .iter()
-            .any(|n| n.chars().any(char::is_whitespace))
-        {
-            diags.push_at(UNSPELLED, design, at, 0);
-        }
-        let module_family = row.family == ir::ModelFamily::Module;
-        let mut lacked = design.params(row.params).iter().any(|&(key, _)| {
-            let key = design.str(key);
-            let written = match module_family {
-                true => key.to_string(),
-                false => families::model_name_out(&module, key),
-            };
-            match families::model_name_in(&module, &written) {
-                Name::Ir(back) => !module_family && back != key,
-                Name::Misplaced | Name::Unknown => true,
-            }
-        });
-        // A user module's `version=` is one of its parameters to the reader.
-        lacked |= !row.version.is_none() && module_family;
-        lacked |= !row.version.is_none()
-            && families::model_name_in(&module, "version") != Name::Ir("version".into());
-        if lacked {
-            diags.push_at(LACKED, design, at, 0);
-        }
+    });
+    // A user module's `version=` is one of its parameters to the reader.
+    lacked |= !row.version.is_none() && module_family;
+    lacked |= !row.version.is_none()
+        && families::model_name_in(&module, "version") != Name::Ir("version".into());
+    if lacked {
+        diags.push_at(LACKED, design, at, 0);
     }
 }

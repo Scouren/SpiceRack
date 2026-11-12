@@ -9,7 +9,7 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD dev-builtin-src, -vcvs, -cccs, -mutual.
 //!
 //! Contents: `PARAMS` (its catalogue row is in `read_sources::CODES`, the area's one table),
-//! `admits`, `source` (crate-private)
+//! `admit`, `source` (crate-private)
 
 use super::expr_write::{string, write_expr};
 use super::number;
@@ -72,31 +72,26 @@ pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
 /// states (R21): a source-like element with instance parameters or a `mutual` with a multiplicity (`PARAMS`: VACASK's
 /// builtins take only their own parameters, and `mutual` no `$mfactor`).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags) {
     use ir::ElemKind as K;
-    for (at, _) in design.reachable() {
-        if at.kind != ir::ItemKind::Element {
-            continue;
-        }
-        let e: ir::Element = design.row(at.index);
-        let source_like = matches!(
-            e.kind,
-            K::VSource
-                | K::ISource
-                | K::Vcvs
-                | K::Vccs
-                | K::Cccs
-                | K::Ccvs
-                | K::Coupling
-                | K::LosslessLine
-        );
-        if source_like && !e.params.is_empty() {
-            diags.push_at(PARAMS, design, at, 0);
-        }
-        if e.kind == K::Coupling && !e.mult.is_none() {
-            // `MultOther` covers lines (VACASK's tline_ideal takes `$mfactor`), not `mutual`.
-            diags.push_at(PARAMS, design, at, 0);
-        }
+    let e: ir::Element = design.row(at.index);
+    let source_like = matches!(
+        e.kind,
+        K::VSource
+            | K::ISource
+            | K::Vcvs
+            | K::Vccs
+            | K::Cccs
+            | K::Ccvs
+            | K::Coupling
+            | K::LosslessLine
+    );
+    if source_like && !e.params.is_empty() {
+        diags.push_at(PARAMS, design, at, 0);
+    }
+    if e.kind == K::Coupling && !e.mult.is_none() {
+        // `MultOther` covers lines (VACASK's tline_ideal takes `$mfactor`), not `mutual`.
+        diags.push_at(PARAMS, design, at, 0);
     }
 }
 

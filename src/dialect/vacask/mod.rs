@@ -77,17 +77,46 @@ impl Write for Vacask {
         &FEATURES
     }
 
-    /// What no feature states, each area's own check (`write_structure::admits` and each
-    /// writer area's `admits`).
+    /// What no feature states, each area's own check: one walk over the reachable items, each
+    /// judged by the areas that spell its kind (one exhaustive match), the expression check on
+    /// every item, and the R42 fold judged once every analysis was seen.
     fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
-        write_structure::admits(design, diags);
-        expr_write::admits(design, diags);
-        fold::admits(design, diags);
-        write_elements::admits(design, diags);
-        write_models::admits(design, diags);
-        write_sources::admits(design, diags);
-        write_run::admits(design, diags);
-        write_outputs::admits(design, diags);
+        use ir::ItemKind as K;
+        let mut handles = Vec::new();
+        let mut folds = fold::Admits::default();
+        for (at, scope) in design.reachable() {
+            expr_write::admit(design, at, &mut handles, diags);
+            folds.see(design, at, scope);
+            match at.kind {
+                K::Load | K::DeviceLibrary => write_structure::admit(design, at, diags),
+                K::Model => write_models::admit(design, at, diags),
+                K::Element => {
+                    write_elements::admit(design, at, scope, diags);
+                    write_sources::admit(design, at, diags);
+                }
+                K::Analysis | K::Loop | K::NodeSet | K::Option | K::Reset => {
+                    write_run::admit(design, at, scope, diags);
+                }
+                K::Save => write_outputs::admit(design, at, diags),
+                K::Title
+                | K::Comment
+                | K::Include
+                | K::Global
+                | K::Opaque
+                | K::Subckt
+                | K::Section
+                | K::If
+                | K::Param
+                | K::Func
+                | K::Statistics
+                | K::Alter
+                | K::Env
+                | K::Print
+                | K::Measure
+                | K::Elaborate => {}
+            }
+        }
+        folds.finish(design, diags);
     }
 
     /// One file of a legal design (`write.rs`).
