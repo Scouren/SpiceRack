@@ -313,7 +313,9 @@ pub(super) fn binnable(family: F) -> bool {
     matches!(family, F::Bsim3 | F::Bsim4 | F::Hisim2 | F::HisimHv)
 }
 
-/// Whether `word` (lowercase) is an XSPICE code model of the pinned build.
+/// Whether `word` (lowercase) is an XSPICE code model of the pinned build. Limit: a user
+/// library loaded with ngspice's `codemodel` command is invisible here, so its models read as
+/// modules (no corpus deck uses the command: `rewrite/DIALECT-NGSPICE.md` §3).
 pub(super) fn code_model(word: &str) -> bool {
     CODE_MODELS.split_whitespace().any(|w| w == word)
 }
