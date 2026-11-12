@@ -1,0 +1,5 @@
+# codes:
+file "print_ac_parts.sp" deck
+  title "print_ac_parts"
+  comment " oracle: ngspice-45 dotcards.c fixem (vm mag, vp ph in radians, vdb db, vr real); run: .print ac vm(a) vp(x1.n) vdb(x1.n) vr(x1.n) printed 1, 0, -6.02, 0.5"
+  print ac (v mag (a)) (v phase_rad (a)) (vdiff db (a) (b)) (v re (a)) (v (a))

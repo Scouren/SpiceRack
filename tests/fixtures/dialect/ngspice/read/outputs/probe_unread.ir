@@ -1,0 +1,6 @@
+# codes: P1350 P1350
+file "probe_unread.sp" deck
+  title "probe_unread"
+  comment " oracle: ngspice-45 inpc_probe.c inp_probe: .probe is commented out, a deck with no save gets .save all, and 0 V sources (I()) or E sources (Vd()) are added at the devices it names; not a save"
+  opaque ngspice unread ".probe v(a)"
+  opaque ngspice unread ".probe alli"
