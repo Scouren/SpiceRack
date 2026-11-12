@@ -388,3 +388,49 @@ fn dcw_a_dc_source_with_type_alters_is_spices_dc_value_and_waveform() {
         assert!(close(at(&tran, "a", t), measure(m), 1e-6), "{m}: {}", r.out);
     }
 }
+
+#[test]
+fn iw1_integers_are_32_bits_and_wrap() {
+    let r = run("vacask", "iw1.sim");
+    let got: Vec<f64> = resistances(&r).into_iter().map(|x| x.1).collect();
+    // The dump prints six digits: 2147483647, then each wrapped mod 2^32 (99999999999 is
+    // 1215752191).
+    let want = [2.14748e9, -2.14748e9, 1.0, -2.14748e9, 0.0, 1.21575e9];
+    assert_eq!(got.len(), want.len(), "{}", r.out);
+    for (g, w) in got.iter().zip(want) {
+        assert!(close(*g, w, 1e-5 * w.abs().max(1.0)), "{got:?}: {}", r.out);
+    }
+}
+
+#[test]
+fn lr1_a_long_literal_is_rounded_correctly() {
+    // A18: more significant digits than a double holds; VACASK rounds the decimal to nearest,
+    // ties to even (a and c are ties, b is just above one). Oracle: Rust's correctly rounded
+    // parse of the same digits.
+    let r = run("vacask", "lr1.sim");
+    let op = raw(&r, "op1.raw");
+    let cases = [
+        (
+            "a",
+            "1.00000000000000011102230246251565404236316680908203125",
+        ),
+        (
+            "b",
+            "1.000000000000000111022302462515654042363166809082031251",
+        ),
+        (
+            "c",
+            "1.00000000000000033306690738754696212708950042724609375",
+        ),
+        ("d", "123456789012345678901234567890e-29"),
+    ];
+    for (node, digits) in cases {
+        let want: f64 = digits.parse().unwrap();
+        assert_eq!(
+            at(&op, node, 0.0).to_bits(),
+            want.to_bits(),
+            "{node}: {}",
+            r.out
+        );
+    }
+}

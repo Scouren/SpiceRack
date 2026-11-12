@@ -363,7 +363,7 @@ pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
         exp10: 0,
         form: NumForm::Plain,
     };
-    matches!(design.expr(e), Expr::Num(k) if design.num(k).eq_value(one))
+    matches!(design.expr(e), Expr::Num(k) if design.literal_eq(design.num(k), one))
 }
 
 /// How many `Loop` scopes enclose `scope`, itself included. Bounded by the scope count.
