@@ -395,7 +395,6 @@ impl FeatureSet {
 
     /// The members, in index order.
     pub fn iter(&self) -> impl Iterator<Item = Feature> + use<> {
-        // A real body: `todo!()` does not satisfy an `impl Iterator` return.
         let set = *self;
         (0..Feature::COUNT)
             .filter(move |&i| set.words[i as usize / 64] >> (i % 64) & 1 == 1)

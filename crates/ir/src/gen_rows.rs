@@ -126,7 +126,10 @@ pub(crate) fn gen_subckt(
             let value = f.contains(Feature::Expr(ExprTag::Num))
                 && (!f.contains(Feature::Extra(Extra::FormalWithoutDefault)) || g.chance(2));
             let e = if value {
-                g.expr(b, f, Reads::Constant)
+                value_roots(g, f, true);
+                let e = g.expr(b, f, Reads::Constant);
+                value_roots(g, f, false);
+                e
             } else {
                 ExprId::NONE
             };
@@ -181,7 +184,9 @@ pub(crate) fn gen_param(
     b: &mut Builder<'_>,
     f: &FeatureSet,
 ) -> ItemRef {
+    value_roots(g, f, true);
     let value = g.expr(b, f, Reads::Constant);
+    value_roots(g, f, false);
     let class = g.class;
     let name = g.fresh();
     let item = b.param(scope, &name, value, Span::NONE);
@@ -208,4 +213,13 @@ pub(crate) fn gen_func(
     let item = b.func(scope, &name, &args, body, Span::NONE);
     g.note(DefId((b.design().definitions().len() - 1) as u32), class);
     item
+}
+
+// ---- private ----
+
+/// Lets the next expression be a string or a list at its root as the set allows (A25 item 4:
+/// a parameter's value, a formal's default), or takes that back.
+fn value_roots(g: &mut Gen, f: &FeatureSet, on: bool) {
+    g.root_str = on && f.contains(Feature::Extra(Extra::StringValue));
+    g.root_list = on && f.contains(Feature::Extra(Extra::ListValue));
 }

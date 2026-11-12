@@ -381,15 +381,18 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
     let d = out.design;
     let mut walk = ExprWalk::new(d);
     let mut handles = Vec::new();
+    let mut strings = Vec::new();
     for (item, scope) in d.reachable() {
         if (item.index as usize) >= table_len(d, item.kind) {
             continue; // reported with the scope's list
         }
         handles.clear();
+        strings.clear();
         let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
+            row.string_roots(d, &mut strings);
             row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
@@ -407,6 +410,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         }
         for h in handles.clone() {
             handle(out, item, h, bad, &mut walk);
+            typed_roots(out, item, h, &strings);
         }
     }
 }
@@ -462,6 +466,36 @@ fn handle(out: &mut Out<'_>, item: ItemRef, h: Handle, bad: &[bool], walk: &mut 
             if !in_pool(l.start, l.len, d.branch_pool.len()) {
                 out.report(Violation::HandleRange, item, l.start);
             }
+        }
+    }
+}
+
+/// A25 item 4: a function body, and a typed field's root (a `Param`'s value aside), is neither
+/// a list nor a string, but a string where the row's `RowFacts::string_roots` names it. Out of
+/// range handles are skipped (`handle` reports them).
+fn typed_roots(out: &mut Out<'_>, item: ItemRef, h: Handle, strings: &[ExprId]) {
+    let d = out.design;
+    let roots: &[ExprId] = match &h {
+        Handle::Expr(e) | Handle::ExprDyn(e) => std::slice::from_ref(e),
+        Handle::Exprs(l) if l.start as usize + l.len as usize <= d.expr_pool.len() => d.exprs(*l),
+        _ => return,
+    };
+    if item.kind == ItemKind::Param {
+        return; // a value of any type (`Extra::StringValue`, `ListValue`)
+    }
+    for &e in roots {
+        if e.is_none() || e.index() >= d.expr_count() {
+            continue;
+        }
+        let (string, list) = match d.expr(e) {
+            Expr::Str(_) => (true, false),
+            Expr::List(_) => (false, true),
+            _ => continue,
+        };
+        if item.kind == ItemKind::Func {
+            out.report(Violation::StringOrListBody, item, e.0);
+        } else if list || (string && !strings.contains(&e)) {
+            out.report(Violation::StringOrListField, item, e.0);
         }
     }
 }

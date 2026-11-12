@@ -67,3 +67,46 @@ fn a_current_read_is_an_element_use_and_is_renamed() {
     d.editor().map_element_uses(top, param, &mut |_| None);
     assert!(d.eq_ignoring_spans(&before));
 }
+
+#[cfg(feature = "gen")]
+#[test]
+fn every_listed_use_is_spelled_in_its_item() {
+    // A32 soundness, the lead's property 1 (oracle: the IR text): renaming one listed use
+    // through the door, and nothing else, changes the design's dump; a use the walk listed but
+    // the item does not spell would leave the text as it was
+    use spicerack_ir::FeatureSet;
+    use spicerack_ir::r#gen::{Size, generate};
+    let size = Size {
+        items: 30,
+        scope_depth: 3,
+        expr_depth: 4,
+        files: 1,
+    };
+    let mut checked = 0;
+    for seed in 0..500u64 {
+        let d = generate(seed, &FeatureSet::ALL, size);
+        let before = text(&d);
+        let mut per_item = std::collections::HashMap::new();
+        for (item, _) in d.element_uses() {
+            *per_item.entry(item).or_insert(0usize) += 1;
+        }
+        for (item, scope) in d.reachable() {
+            for k in 0..per_item.get(&item).copied().unwrap_or(0) {
+                let mut e = d.clone();
+                let marker = e.builder().name("zz_marker");
+                let mut seen = 0;
+                e.editor().map_element_uses(scope, item, &mut |_| {
+                    seen += 1;
+                    (seen == k + 1).then_some(marker)
+                });
+                assert_ne!(
+                    text(&e),
+                    before,
+                    "seed {seed}: use {k} of {item:?} is not spelled"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked >= 100, "only {checked} uses checked");
+}

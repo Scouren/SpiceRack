@@ -453,3 +453,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The generator no longer tracks a class node by node: it computes the finished tree's class with `tree_class_with` over its own definition table, which is exact by construction and O(tree).
 - The inlining property no longer excludes inlinings that drop a dynamic argument.
 
+## Round 7b: check's scaling, the A33 hook, strings and lists
+
+- The scaling gate failed at cdc69867. Check went from 0.115 s to 1.201 s at 4x items, a ratio of 10.49 against the bound of 8. The cause was `class::formals_read`: it built an `ExprWalk`, a table sized by the design, once per user call node. `element_uses`' `current_reads` built one per item. Both now walk with `class::tree_nodes`, whose seen set grows with the tree only. The rule: a walk that a row or a node may call builds no table sized by the design.
+- `Gen::typed_params` is a flag on the existing leaf, not a new draw. The read keeps its class, and the wrapper adds none.
+- Strings and lists by type are root tests, by the ruling's words ("a string as the value"). A ternary of two strings is not a `StringValue`. The typed-field invariant also covers `Handle::Exprs` roots. Both owners stated their vector fields are lists of scalar roots, so a list root there is as wrong as in an `Expr` field.
+- Exceptions are a row method (`RowFacts::string_roots`), not a kernel table of field names. The kernel does not know an owner's fields, and a row's exception holds wherever it is checked. `Param`'s value is the kernel's own exemption, by kind.
+
