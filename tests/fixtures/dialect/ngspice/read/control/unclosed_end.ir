@@ -1,0 +1,7 @@
+# codes: P1411 P1406
+file "unclosed_end.sp" deck
+  title "unclosed_end"
+  comment " oracle: settle/unclosed_end.sp: in a block the file ends before closing, .end is a command ngspice has none of (no such command) and the script goes on after it: InvalidInSource at its place"
+  analysis op
+  opaque ngspice invalid ".control\n.end\n.endc"
+  opaque ngspice inert ".control\necho after\n.endc"

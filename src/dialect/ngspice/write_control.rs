@@ -29,7 +29,7 @@ use crate::ir;
 /// What this area's writer spells: exactly its reader's image (L5).
 pub(super) const FEATURES: ir::FeatureSet = super::read_control::FEATURES;
 
-/// A parameter alter not right after a `Reset` (or a parameter loop whose body does not start
+/// A parameter alter not right before a `Reset` (or a parameter loop whose body does not start
 /// with one): ngspice applies an `alterparam` only at a `reset` (S2).
 pub(super) const PARAM_RESET: ir::Code = ir::Code::new(b'W', 1401);
 /// A loop ngspice's `foreach` cannot spell: not a sweep over a list of numbers.
@@ -132,7 +132,7 @@ pub(super) fn admits(
             if !alter_value(design, &a) {
                 refuse(ALTER_VALUE);
             }
-            if a.target.kind == ir::TargetKind::Param && !after_reset(design, item) {
+            if a.target.kind == ir::TargetKind::Param && !before_reset(design, item) {
                 refuse(PARAM_RESET);
             }
         }
@@ -178,20 +178,9 @@ pub(super) fn load(w: &mut Out<'_>, item: ir::ItemRef) {
     w.script(&cmd);
 }
 
-/// A `Reset` (every class: admits): the parameter alters listed right after it as
-/// `alterparam`, then `reset`, which applies them (`inp.c:1735-1857`).
-pub(super) fn reset(w: &mut Out<'_>, item: ir::ItemRef) {
-    let d = w.design;
-    let (items, at) = siblings(d, item);
-    for &next in &items[at + 1..] {
-        let Some(a) = param_alter(d, next) else {
-            break;
-        };
-        let mut value = String::new();
-        expr_write::value(d, a.value, &mut value);
-        let value: String = value.split_whitespace().collect();
-        w.script(&set_command(d, &a.target, &value));
-    }
+/// A `Reset` (every class: admits): `reset`, which also applies the `alterparam`s written
+/// right before it (`inp.c:1735-1857`).
+pub(super) fn reset(w: &mut Out<'_>, _item: ir::ItemRef) {
     w.script("reset");
 }
 
@@ -219,14 +208,11 @@ pub(super) fn loop_(w: &mut Out<'_>, item: ir::ItemRef) {
     w.open_script(l.body, "end".to_string());
 }
 
-/// An `Alter`: `alter`, `altermod`; a parameter's `alterparam` is written by the `Reset`
-/// before it (admits), since ngspice applies it at that reset.
+/// An `Alter`: `alter`, `altermod`, or a parameter's `alterparam`, which the `Reset` right
+/// after it applies (admits).
 pub(super) fn alter(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let a: ir::Alter = d.row(item.index);
-    if a.target.kind == ir::TargetKind::Param {
-        return;
-    }
     let mut value = String::new();
     expr_write::value(d, a.value, &mut value);
     let value: String = value.split_whitespace().collect();
@@ -311,14 +297,13 @@ fn param_alter(d: &ir::Design, i: ir::ItemRef) -> Option<ir::Alter> {
     (a.target.kind == ir::TargetKind::Param).then_some(a)
 }
 
-/// Whether a parameter alter stands right after a `Reset`, other parameter alters between.
-fn after_reset(d: &ir::Design, item: ir::ItemRef) -> bool {
+/// Whether a parameter alter stands right before a `Reset`, other parameter alters between.
+fn before_reset(d: &ir::Design, item: ir::ItemRef) -> bool {
     let (items, at) = siblings(d, item);
-    let before = items[..at]
+    let after = items[at + 1..]
         .iter()
-        .rev()
         .find(|&&i| param_alter(d, i).is_none());
-    before.is_some_and(|i| i.kind == ir::ItemKind::Reset)
+    after.is_some_and(|i| i.kind == ir::ItemKind::Reset)
 }
 
 /// How many loops enclose `item`'s body, itself included (a made-up variable's number).
