@@ -28,8 +28,8 @@ mod law_harness;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use law_harness::{
-    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers, write_all,
-    writers,
+    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers,
+    same_meaning, write_all, writers,
 };
 use spicerack::dialect::{self, DialectRow, Read, Write};
 use spicerack::ir;
@@ -190,9 +190,9 @@ fn l5_read_of_write_is_the_design() {
             };
             tally.admit();
             let back = read_all(row, &write_all(&design, row));
-            // By meaning (R28): real literals equal by value, whatever their form; the IR text
-            // is only the failure's evidence.
-            if !back.eq_meaning(&design) {
+            // By meaning (R28), in normal form (each side through the IR text): real literals
+            // equal by value, ids in canonical order; the IR text is the failure's evidence.
+            if !same_meaning(&back, &design) {
                 return Err(format!(
                     "seed {seed}:\n{}\nread back as\n{}",
                     canonical(&design),
@@ -221,7 +221,7 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
             let once = read_text(row, text).0;
             let twice = read_all(row, &write_all(&once, row));
             assert!(
-                twice.eq_meaning(&once),
+                same_meaning(&twice, &once),
                 "{} corpus text {k} (by meaning, R28):\n{}\nread back as\n{}",
                 row.name,
                 canonical(&once),
