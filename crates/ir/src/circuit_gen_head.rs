@@ -67,7 +67,8 @@ impl R<'_, '_> {
             | ElemKind::Vcvs
             | ElemKind::Vccs
             | ElemKind::Cccs
-            | ElemKind::Ccvs => {
+            | ElemKind::Ccvs
+            | ElemKind::LosslessLine => {
                 if !self.has(X::BuiltinMaster) || bare && !self.g.chance(4) {
                     return NONE_REF;
                 }

@@ -120,7 +120,7 @@ pub enum CircuitExtra {
     PwlJoinRamp,
     /// A PWL repeat that ramps over a width (`PwlJoin::RampWidth`, sp).
     PwlJoinRampWidth,
-    /// A PWL repeat whose wrap extrapolates the first segment (`PwlJoin::Extrapolate`, va).
+    /// A PWL repeat joined by VACASK's periodic law (`PwlJoin::Extrapolate`, va; A22).
     PwlJoinExtrapolate,
     /// PWL points in a file (`Pwl::file`, 5.12).
     PwlFile,
@@ -218,8 +218,8 @@ pub enum CircuitExtra {
     ElementWithoutModel,
     /// A model whose family has no `DeviceLibrary` of that family in the design (design-level; A12 C5).
     ModelWithoutLibrary,
-    /// An independent or linear controlled source that names a model, or a coupling bound to
-    /// the builtin `Mutual` model: ngspice has no model for these (AMEND-A12 C5; a pass drops
+    /// An independent or linear controlled source or a lossless line that names a model (A20),
+    /// or a coupling bound to the builtin `Mutual` model: ngspice has no model for these (AMEND-A12 C5; a pass drops
     /// the model and unbinds the element).
     BuiltinMaster,
     // A13 (R23)

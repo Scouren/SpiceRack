@@ -9,9 +9,9 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
-//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
-//! `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
-//! `RowFacts::generate`), `pub enum Handle`,
+//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
+//! `RowFacts::map_exprs`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
+//! `RowFacts::generate`), `pub enum ExprUse`, `pub enum Handle`,
 //! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
 //! type)
 
@@ -42,6 +42,22 @@ pub trait RowFacts: ItemRow {
     /// and a pass that renumbers definitions rewrites through it. Must not change anything but
     /// the references `f` changes.
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+
+    /// Appends every `Ref` the item `at` owns, with the kind its field expects, in `map_refs`'s
+    /// order, changing nothing: the read-only twin for readers (`check`) that hold `&Design`
+    /// (M5). `kernel_gen`'s drift property holds the two lists equal for every generated item.
+    fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>);
+
+    /// Calls `f` on every expression root the item `at` owns, exactly the roots `handles` lists
+    /// and in its order (`NONE` roots included): a single `Expr`/`ExprDyn` field, each element of
+    /// an `Exprs` list, each value of a `Params` list; `use` is `Circuit` for an `ExprDyn` field,
+    /// else `Constant`. Stores back what `f` changed and nothing else (A23: the passes' door,
+    /// `rewrite_exprs`). An associated function, so a row reaches roots in detail rows and
+    /// pools. Default: no root, for a row with no expression field; `kernel_gen`'s drift property
+    /// fails a row whose `handles` lists a root this does not visit.
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let _ = (design, at, f);
+    }
 
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
     /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features; `at` is the item, `scope` the
@@ -75,6 +91,16 @@ pub trait RowFacts: ItemRow {
     #[cfg(any(test, feature = "gen"))]
     fn generate(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>, features: &FeatureSet)
     -> ItemRef;
+}
+
+/// How an expression root's field reads (A23): `Circuit` for a [`Handle::ExprDyn`] field, a
+/// field that may read the circuit; `Constant` for every other root.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExprUse {
+    /// A field constant in time (`Handle::Expr`, an `Exprs` element, a `Params` value).
+    Constant,
+    /// A field that may read the circuit (`Handle::ExprDyn`).
+    Circuit,
 }
 
 /// One handle a row holds, typed by its table. `NONE` handles are listed too: whether `NONE` is

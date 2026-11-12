@@ -14,12 +14,13 @@
 //! `Editor::items_mut(&mut self, ScopeId) -> &mut Vec<ItemRef>`,
 //! `Editor::set<R: ItemRow>(&mut self, u32, R)`,
 //! `Editor::set_detail<D: DetailRow>(&mut self, u32, D)`,
+//! `Editor::map_exprs(&mut self, ItemRef, &mut dyn FnMut(&mut ExprId, ExprUse))`,
 //! `Editor::map_refs(&mut self, ItemRef, &mut dyn FnMut(&mut Ref, DefKind))`
 
 use crate::build::Builder;
 use crate::design::{Design, DetailRow, ItemRow};
-use crate::facts::RowFacts;
-use crate::id::{ItemRef, Ref, ScopeId};
+use crate::facts::{ExprUse, RowFacts};
+use crate::id::{ExprId, ItemRef, Ref, ScopeId};
 use crate::item::DefKind;
 
 /// Rewrites one design. Holds it mutably for its lifetime.
@@ -67,6 +68,16 @@ impl<'d> Editor<'d> {
         let rows = D::rows_mut(self.design);
         assert!((index as usize) < rows.len(), "a detail index in range");
         rows[index as usize] = row;
+    }
+
+    /// Calls `f` on every expression root `item` owns, with how its field reads, in `handles`'
+    /// order (one exhaustive dispatch to `RowFacts::map_exprs`, which stores them back): the
+    /// door a pass uses to point a row at a new expression (A23). Asserts `item` is in range.
+    pub fn map_exprs(&mut self, item: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        self.design.classes.take();
+        let rows = for_kind!(item.kind, R => R::table(self.design).len());
+        assert!((item.index as usize) < rows, "an item in range");
+        for_kind!(item.kind, R => R::map_exprs(self.design, item, f))
     }
 
     /// Calls `f` on every `Ref` `item` owns (header, detail rows, pools) with the kind its field
