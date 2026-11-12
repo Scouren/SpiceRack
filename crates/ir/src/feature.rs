@@ -139,6 +139,11 @@ pub enum Extra {
     /// `$tnom`, class `Constant`): VACASK reads `parameters x=1` there as a formal, ngspice's
     /// `.param` there is none (A25, R48). A structure pass makes it a formal.
     SubcktConstantParam,
+    /// A `Param`'s value, or a `Subckt` head default, whose root is a string (A25 item 4: a
+    /// value by type; a string in an element's or model's parameter list is `Expr(Str)` alone).
+    StringValue,
+    /// A `Param`'s value, or a `Subckt` head default, whose root is a list (A25 item 4).
+    ListValue,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -290,7 +295,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::SubcktConstantParam as usize + 1] = [
+    pub const ALL: [Extra; Extra::ListValue as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -302,6 +307,8 @@ impl Extra {
         Extra::IfConditionDynamic,
         Extra::LongLiteral,
         Extra::SubcktConstantParam,
+        Extra::StringValue,
+        Extra::ListValue,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

@@ -97,6 +97,13 @@ pub enum Violation {
     /// (the lead's ruling on A28's finding b: no simulator we know accepts one). `arg`: the call's
     /// expression.
     CallArity,
+    /// A function body whose root is a string or a list (A25 item 4: a body is a number).
+    /// `arg`: the root.
+    StringOrListBody,
+    /// A typed field (a `Handle::Expr` or `Handle::ExprDyn` of a row other than a `Param`'s
+    /// value) whose root is a list, or a string where the row's `RowFacts::string_roots` does not
+    /// name it (A25 item 4). `arg`: the root.
+    StringOrListField,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -107,7 +114,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::CallArity as usize + 1] = [
+    pub const ALL: [Violation; Violation::StringOrListField as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -127,6 +134,8 @@ impl Violation {
         Violation::DefinitionCycle,
         Violation::StaleDefinition,
         Violation::CallArity,
+        Violation::StringOrListBody,
+        Violation::StringOrListField,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();

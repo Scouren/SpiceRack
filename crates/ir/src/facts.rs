@@ -10,7 +10,7 @@
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
 //! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
-//! `RowFacts::map_exprs`, `RowFacts::map_element_names`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
+//! `RowFacts::map_exprs`, `RowFacts::map_element_names`, `RowFacts::string_roots`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum ExprUse`, `pub enum Handle`,
 //! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
 //! type)
@@ -65,6 +65,13 @@ pub trait RowFacts: ItemRow {
     /// (`Editor::map_element_uses`). Default: none, for a row that names no element.
     fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
         let _ = (design, at, f);
+    }
+
+    /// Appends the roots of the row's typed fields that may hold a string (A25 item 4: a model's
+    /// version, an alter's value, a private option's value); `check` refuses a string root in
+    /// any other `Handle::Expr` or `Handle::ExprDyn` but a `Param`'s value. Default: none.
+    fn string_roots(&self, design: &Design, out: &mut Vec<ExprId>) {
+        let _ = (design, out);
     }
 
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis

@@ -97,6 +97,15 @@ pub struct Gen {
     pub(crate) both_forms: bool,
     /// Whether rows draw untyped parameter lists (A28; the owners' row generators read it).
     pub(crate) params: Params,
+    /// Whether a parameter read is drawn typed (A33, set by the circuit owner around a
+    /// behavioural expression when the set lacks `CircuitExtra::BehavUntypedParam`): wrapped in
+    /// `ToReal` or `ToInt`, whichever the set allows in the dynamic form, or not drawn.
+    pub(crate) typed_params: bool,
+    /// Whether the expression being built may be a string, or a list, at its root (A25 item 4:
+    /// set around a parameter's value, a formal's default and a parameter list's value, as the
+    /// set allows; every other field is a number).
+    pub(crate) root_str: bool,
+    pub(crate) root_list: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -325,6 +334,9 @@ impl Gen {
             constant_only: false,
             dyn_form: false,
             both_forms: false,
+            typed_params: false,
+            root_str: false,
+            root_list: false,
             params: Params::Untyped,
         }
     }
