@@ -192,9 +192,10 @@ pub enum RunExtra {
     OptionMidRun,
     /// An initial condition held in every operating point (Xyce).
     IcEveryOp,
-    /// An initial condition or node set for the next analysis only (VACASK).
+    /// An initial condition or node set for the next analysis only (VACASK), for every
+    /// `NodeSetKind`.
     IcNextOnly,
-    /// An initial condition across two nodes (VACASK).
+    /// An initial condition or node set across two nodes (VACASK), for every `NodeSetKind`.
     IcDifferential,
     /// A node set on every node (ngspice `.nodeset all=`).
     NodesetAll,
@@ -339,7 +340,8 @@ pub enum RunExtra {
     /// measure, elaborate.
     RunInterleaved,
     /// An initial condition or node set that holds beyond the next analysis (`next_only`
-    /// false; VACASK's are an analysis's own list; A22). `IcNextOnly`'s twin.
+    /// false; VACASK's are an analysis's own list; A22), for every `NodeSetKind`. `IcNextOnly`'s
+    /// twin.
     IcBeyondNext,
     /// A save for two or more analysis kinds but not every one (VACASK's `save` limits the
     /// operating point, its sweeps and the transient, not AC; A22). One kind is
