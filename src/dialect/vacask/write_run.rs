@@ -5,7 +5,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-overview, cmd-sweep.
 //!
-//! Contents: `admits`, `analysis` (crate-private)
+//! Contents: `admits`, `analysis`, `control_span` (crate-private)
 
 use super::write::Writer;
 use crate::ir;
@@ -16,6 +16,21 @@ use crate::ir;
 pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let _ = w;
     unreachable!("S4.3: no VACASK writer yet for {at:?} (FEATURES lacks it)");
+}
+
+/// The first and last index into `design.items(top)` of a control-block item (a run kind, or a
+/// `vacask` Opaque whose head word is a control command): the spine writes `control` before
+/// the first, the items between at depth 1, and `endc` after the last (VD cmd-overview: one
+/// control block per file; run x1). `None` when the file has none.
+///
+/// Stub (S4.3): `None` until the reader produces control items.
+#[expect(
+    dead_code,
+    reason = "the spine calls it once vacask-plan's change lands"
+)]
+pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
+    let _ = (design, top);
+    None
 }
 
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
