@@ -22,6 +22,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "common/known_reach.rs"]
 mod known_reach;
 #[path = "common/laws.rs"]

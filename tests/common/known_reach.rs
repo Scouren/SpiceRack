@@ -25,7 +25,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Wave(TrNoise)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrRandom)", FIXPOINT, SOURCES),
     ("ngspice", "Analysis(Dc)", FIXPOINT, RUN),
-    ("ngspice", "Analysis(Noise)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(SensAc)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Four)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Pss)", FIXPOINT, RUN),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
@@ -51,7 +51,7 @@ const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 const ELEMENTS: &str =
     "interim: dialect_ngspice_elements' fixtures (resistor, capacitor_inductor, controlled)";
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
-const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, four, noise, pss)";
+const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, sens, four, pss)";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
 const VC_SOURCES: &str = "W2104 for sources (law L5 seed 1): VACASK takes a source's kind from its master, and the generator names a source's model with a fresh name no model statement defines, so every generated source is refused";

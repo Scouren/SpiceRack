@@ -10,8 +10,8 @@
 //! Contents: tests only.
 
 use spicerack_ir::{
-    Design, Diags, ItemKind, ItemRef, Listed, OptionKey, Setting, in_force, listed, parse,
-    run_walks,
+    Design, Diags, ItemKind, ItemRef, Listed, OptionKey, Setting, in_force, listed,
+    parse_unchecked, run_walks,
 };
 
 // ---- private ----
@@ -19,7 +19,7 @@ use spicerack_ir::{
 fn read(text: &str) -> Design {
     let mut d = Design::new();
     let mut diags = Diags::new();
-    parse(text, &mut d.builder(), &mut diags);
+    parse_unchecked(text, &mut d.builder(), &mut diags);
     assert!(diags.is_empty(), "{:?}", diags.rows());
     d
 }

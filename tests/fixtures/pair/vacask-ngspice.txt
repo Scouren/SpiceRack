@@ -22,7 +22,7 @@ ac_rc 2 refused:U0001:Extra(IntLiteral) finding=F3 # Extra(IntLiteral) at `point
 int_literal 2 refused:U0001:Extra(IntLiteral) finding=F3 # Extra(IntLiteral) at `dc=5`
 tran_rc_pulse 2 refused:U0001:Circuit(GivenZeroAsGiven)+Circuit(PulseVacask)+Run(TranInitialStep)+Run(TranSimulatorStep) pass=pulse_vacask_to_spice # Circuit(PulseVacask); also Circuit(GivenZeroAsGiven) (F4), Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
 tran_sine 2 refused:U0001:Circuit(GivenZeroAsGiven)+Run(TranInitialStep)+Run(TranSimulatorStep) finding=F4 # Circuit(GivenZeroAsGiven); also Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
-param_div 2 refused:U0001,W1007:BinaryDyn(DivTyped) finding=F5 # BinaryDyn(DivTyped) at `r=rbase*num/den`
+param_div 2 refused:U0001,W1007:Binary(DivTyped) finding=F5 # Binary(DivTyped) at `r=rbase*num/den` (static since R66/A40: a constant tree); W1007 still refuses it
 expr_resistor 4 target-fails finding=F6 # ngspice: "unknown parameter (resistor)" on `r1 in 0 {...} resistor`
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # Extra(CaseSensitiveNames): r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Circuit(GivenZeroAsGiven)+Circuit(PulseVacask)+Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314); also F4 and pulse_vacask_to_spice

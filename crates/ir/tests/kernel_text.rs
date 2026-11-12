@@ -183,7 +183,13 @@ fn write(d: &Design) -> String {
 fn params(exprs: &[&str]) -> String {
     let mut text = String::from("file \"e.sp\" deck\n");
     for (k, e) in exprs.iter().enumerate() {
-        text.push_str(&format!("  param p{k} = {e}\n"));
+        // a parameter holds no probe (`ProbeContext`): one that reads the circuit or the time
+        // stands in a behavioural source, whose expression may
+        let line = match ["v(", "i(", "$time", "$freq"].iter().any(|p| e.contains(p)) {
+            true => format!("  element behav b{k} (a 0) expr=({e}) output=current\n"),
+            false => format!("  param p{k} = {e}\n"),
+        };
+        text.push_str(&line);
     }
     text
 }

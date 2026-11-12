@@ -62,15 +62,24 @@ impl Bindings for Fixed {
 
 // ---- private ----
 
-/// The (root, use) list `handles` implies for `item`.
+/// The (root, use) list `handles` implies for `item`: a behavioural element's one `ExprDyn` is
+/// its expression (R66).
 fn from_handles(d: &Design, item: ItemRef) -> Vec<(ExprId, ExprUse)> {
     let mut handles = Vec::new();
     d.item_handles(item, &mut handles);
+    let behavioural = item.kind == ItemKind::Element
+        && d.row::<spicerack_ir::Element>(item.index).kind.detail()
+            == spicerack_ir::element::DetailKind::Behav;
+    let dyn_use = if behavioural {
+        ExprUse::Behavioural
+    } else {
+        ExprUse::Circuit
+    };
     let mut out = Vec::new();
     for h in handles {
         match h {
             Handle::Expr(e) => out.push((e, ExprUse::Constant)),
-            Handle::ExprDyn(e) => out.push((e, ExprUse::Circuit)),
+            Handle::ExprDyn(e) => out.push((e, dyn_use)),
             Handle::Exprs(l) => out.extend(d.exprs(l).iter().map(|&e| (e, ExprUse::Constant))),
             Handle::Params(l) => out.extend(d.params(l).iter().map(|p| (p.1, ExprUse::Constant))),
             Handle::Name(_)
@@ -315,8 +324,9 @@ fn a_rewrite_of_one_form_keeps_the_other() {
 
 #[test]
 fn the_form_decision_is_the_feature_count_s() {
-    // A26: a root counts dynamic when its field may read the circuit or its class is Temp or
-    // above: root_form is what features_used counts (oracle: the A19 and R14 spec examples)
+    // A26, R66: a root counts dynamic when its class is Temp or above or it is a behavioural
+    // source's expression: root_form is what features_used counts (oracle: the R14 and R66
+    // spec examples)
     let read = |text: &str| {
         let mut d = Design::new();
         spicerack_ir::parse(text, &mut d.builder(), &mut Diags::new());
@@ -334,8 +344,13 @@ fn the_form_decision_is_the_feature_count_s() {
         vec![Form::Static, Form::Dynamic],
         "a constant, then $temp"
     );
-    // the same constant in a field that may read the circuit counts dynamic
-    assert_eq!(root_form(&d, roots[0].0, ExprUse::Circuit), Form::Dynamic);
+    // R66: the same constant in a field that may read the circuit counts static, in a
+    // behavioural source's expression dynamic
+    assert_eq!(root_form(&d, roots[0].0, ExprUse::Circuit), Form::Static);
+    assert_eq!(
+        root_form(&d, roots[0].0, ExprUse::Behavioural),
+        Form::Dynamic
+    );
 }
 
 #[test]

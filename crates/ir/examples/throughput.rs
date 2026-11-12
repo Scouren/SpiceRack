@@ -4,9 +4,10 @@
 //! linear. Run:
 //! `cargo run --release --features gen --example throughput [items] [feature-set]`, where the
 //! set is `kernel` (default) or `all`; or `… --example throughput scaling`, which measures every
-//! phase over the full set at `SCALE_N` and `4 × SCALE_N` items and exits 1 when a phase's
-//! time ratio exceeds `SCALE_BOUND` (merge tier: a linear phase measures about 4 to 5 here, the
-//! cache included; a quadratic one about 16).
+//! phase over the full set at `SCALE_N` and `4 × SCALE_N` items, each the fastest of
+//! `SCALE_RUNS` runs (load can only inflate a time, so the minimum does not flake), and exits 1
+//! when a phase's time ratio exceeds `SCALE_BOUND` (merge tier: a linear phase measures about 4
+//! to 5 here, the cache included; a quadratic one about 16).
 //!
 //! Contents: none (a measurement binary).
 
@@ -17,6 +18,8 @@ use spicerack_ir::{Design, Diags, Feature, FeatureSet, dump, parse};
 
 /// The scaling gate's smaller size; the larger is four times it.
 const SCALE_N: u32 = 100_000;
+/// Runs per size in the scaling gate; each phase keeps its fastest.
+const SCALE_RUNS: u32 = 5;
 /// The largest time ratio a phase may show between `4 × SCALE_N` and `SCALE_N` items. Linear is
 /// 4 (about 4 to 5 with cache effects); quadratic is 16. Generous so as not to flake on a
 /// loaded machine, tight enough that a quadratic step fails.
@@ -73,18 +76,20 @@ fn main() {
     );
 }
 
-/// The scaling gate: each phase over the full set at `SCALE_N` and `4 × SCALE_N` (best of two
-/// runs each); prints the ratios and returns 1 when one exceeds `SCALE_BOUND`.
+/// The scaling gate: each phase over the full set at `SCALE_N` and `4 × SCALE_N` (the fastest
+/// of `SCALE_RUNS` runs each: a minimum is what a loaded machine cannot inflate, so the gate does
+/// not flake); prints the ratios and returns 1 when one exceeds `SCALE_BOUND`.
 fn scaling() -> i32 {
     let set = every_feature();
     let best = |n: u32| {
-        let (a, b) = (measure(n, &set), measure(n, &set));
-        [
-            a.build.min(b.build),
-            a.dump.min(b.dump),
-            a.parse.min(b.parse),
-            a.check.min(b.check),
-        ]
+        let mut t = [f64::INFINITY; 4];
+        for _ in 0..SCALE_RUNS {
+            let p = measure(n, &set);
+            for (k, s) in [p.build, p.dump, p.parse, p.check].into_iter().enumerate() {
+                t[k] = t[k].min(s);
+            }
+        }
+        t
     };
     let (small, large) = (best(SCALE_N), best(4 * SCALE_N));
     let mut fail = 0;
@@ -92,7 +97,7 @@ fn scaling() -> i32 {
         let ratio = large[k] / small[k];
         let verdict = if ratio > SCALE_BOUND { "FAIL" } else { "ok" };
         println!(
-            "{name:5} {:.3} s -> {:.3} s at {}x items: ratio {ratio:.2} (bound {SCALE_BOUND}) {verdict}",
+            "{name:5} {:.3} s -> {:.3} s at {}x items, fastest of {SCALE_RUNS} runs: ratio {ratio:.2} (bound {SCALE_BOUND}) {verdict}",
             small[k], large[k], 4
         );
         if ratio > SCALE_BOUND {

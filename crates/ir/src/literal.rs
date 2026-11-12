@@ -9,7 +9,8 @@
 //! `Literal::value(self) -> f64`, `Literal::from_f64(f64) -> Literal`,
 //! `Literal::eq_value(self, Literal) -> bool`, `Literal::is_valid(self) -> bool`; crate:
 //! `Literal::shape_ok(self) -> bool`, `Literal::finite(self) -> bool`; `pub fn significant_digits(&str) -> usize`,
-//! `pub const fn exceeds_mantissa(usize) -> bool`; crate: `long_ok`, `long_violation`,
+//! `pub const fn exceeds_mantissa(usize) -> bool`, `pub enum Decimal`,
+//! `pub fn decimal(&str, i32, NumForm) -> Option<Decimal<'_>>`; crate: `long_ok`, `long_violation`,
 //! `long_shape_ok`, `long_finite`,
 //! `long_value`, `long_normal`, `short_normal`
 
@@ -56,6 +57,17 @@ pub enum NumForm {
     /// in (`Plain`, `Exponent` or `Scale`, as a `NumForm` index). Real. Only the design can read
     /// it: `Design::literal_value`, `Design::literal_eq`, `Design::long_digits`.
     Long,
+}
+
+/// A number as written, read by the one bound (A18): a short literal, or a `Long` one's parts
+/// (`Builder::long_literal` takes them as they are).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Decimal<'s> {
+    /// Fits the mantissa.
+    Short(Literal),
+    /// More significant digits than the mantissa holds: the significand as written, its power
+    /// and the form that power was written in.
+    Long(&'s str, i16, NumForm),
 }
 
 /// The powers of ten a scale letter states (A3): a `Scale` literal's `exp10` is one of these.
@@ -219,6 +231,63 @@ pub fn significant_digits(significand: &str) -> usize {
         .filter(u8::is_ascii_digit)
         .skip_while(|&c| c == b'0')
         .count()
+}
+
+/// The literal a reader's number token states: `significand` as written (`[-]digits[.digits]`,
+/// a point with no digit on one side allowed), `exp10` the power written in an exponent plus
+/// the one a scale letter implies, `form` how it was written. A significand with more
+/// significant digits than the mantissa holds is `Long` (its digits kept as written); a short
+/// one with more than 18 digits after the point moves them into the power, exactly, as an
+/// `Exponent`; a real zero is `Literal::ZERO`. `None` when no literal states it: a significand not in
+/// that shape, a power outside `i16`, a form the power does not fit (`Plain` with a power), a
+/// value that is not finite. The arithmetic every reader shares (the dialects' audit, row 7):
+/// a dialect splits its token and folds its own letters into `exp10`; `mil` with an exponent,
+/// which no `NumForm` states, is the dialect's.
+pub fn decimal(significand: &str, exp10: i32, form: NumForm) -> Option<Decimal<'_>> {
+    let exp10 = i16::try_from(exp10).ok()?;
+    let body = significand.strip_prefix('-').unwrap_or(significand);
+    let (int, dec) = body.split_once('.').unwrap_or((body, ""));
+    let digit = |s: &str| s.bytes().all(|c| c.is_ascii_digit());
+    if int.len() + dec.len() == 0 || !digit(int) || !digit(dec) {
+        return None;
+    }
+    if exceeds_mantissa(significant_digits(significand)) {
+        let long = long_ok(significand, exp10, form);
+        return long.then_some(Decimal::Long(significand, exp10, form));
+    }
+    // at most 18 significant digits: the leading zeros add nothing, so this cannot overflow
+    let digits = int.bytes().chain(dec.bytes()).try_fold(0u64, |n, c| {
+        n.checked_mul(10)?.checked_add(u64::from(c - b'0'))
+    })?;
+    assert!(digits < MANTISSA_BOUND, "at most 18 significant digits");
+    // the one zero of each type: an integer `0i`, else `Literal::ZERO` (`-0.00` too)
+    if digits == 0 && form != NumForm::Int {
+        return Some(Decimal::Short(Literal::ZERO));
+    }
+    let mantissa = i64::try_from(digits).ok()?;
+    let mut l = Literal {
+        mantissa: if body.len() < significand.len() {
+            -mantissa
+        } else {
+            mantissa
+        },
+        frac: 0,
+        exp10,
+        form,
+    };
+    match u8::try_from(dec.len())
+        .ok()
+        .filter(|&f| f <= MAX_DIGITS as u8)
+    {
+        Some(frac) => l.frac = frac,
+        // `Mil`'s factor has no `Exponent` form to move into
+        None if form == NumForm::Mil => return None,
+        None => {
+            l.exp10 = i16::try_from(i32::from(exp10) - dec.len() as i32).ok()?;
+            l.form = NumForm::Exponent;
+        }
+    }
+    l.is_valid().then_some(Decimal::Short(l))
 }
 
 /// Whether `digits` significant digits exceed what a short literal's mantissa holds (18): the one
