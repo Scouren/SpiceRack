@@ -1,0 +1,9 @@
+# codes: P1100 P1100 P1100
+file "controlled_m.sp" deck
+  title "controlled_m"
+  comment " oracle: runs s2d at v(b)=0.5: E1 vol={v(b)*2} m=3 is 3 V (the value times m, read as a product, R31), G1 cur={v(b)} m=3 is 1.5 V into 1 ohm (the multiplicity), G/F poly with m: XSPICE Bad real value"
+  element behav E1 (n 0) expr=(3 * (v(b) * 2))
+  element behav G1 (0 n) mult=3 expr=(v(b)) output=current
+  opaque ngspice invalid "G2 0 n poly(1) b 0 0 1 m=3"
+  opaque ngspice invalid "F1 0 n poly(1) vs 0 1 m=3"
+  opaque ngspice invalid "G3 0 n b 0 1 2 m=3"

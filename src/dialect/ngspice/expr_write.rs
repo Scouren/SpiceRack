@@ -215,10 +215,7 @@ pub(super) fn value(design: &ir::Design, e: ir::ExprId, out: &mut String) {
 /// Whether `eval` spells every node of `e`: its functions and operators (numparam has no probe,
 /// time-like leaf or `temper`, and the B-source parser no `%`, `int`, `pow`, `sqr` or draw).
 /// Every literal spells (R28).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the element area's admits calls it (S3.1a)")
-)]
+#[allow(dead_code, reason = "the element area's admits calls it (S3.1a)")]
 pub(super) fn spells_in(design: &ir::Design, e: ir::ExprId, eval: Eval) -> bool {
     let numparam = eval == Eval::Numparam;
     let mut stack = vec![e];

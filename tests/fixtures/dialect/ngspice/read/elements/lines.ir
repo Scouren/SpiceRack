@@ -1,0 +1,11 @@
+# codes:
+file "lines.sp" deck
+  title "lines"
+  comment " oracle: ngspice-45 inp2t.c, tra.c, trasetup.c (z0 required; nl 0.25, f 1e9 when not given), inp2o.c, inp2u.c, urc.c (l, n), inp2y.c (len), inp2p.c (len, the conductor count)"
+  element lossless_line T1 (a 0 b 0) z0=50 td=1n
+  element lossless_line T2 (a 0 b 0) z0=75 freq=1g nl=0.5
+  element lossless_line T3 (a 0 b 0) z0=50 freq=1e9 nl=0.25
+  element lossy_line O1 (a 0 b 0) model=lmod?
+  element rc_line U1 (a b 0) model=umod? length=1m lumps=5
+  element single_lossy_line Y1 (a 0 b 0) model=ymod? length=2
+  element coupled_lines P1 (a1 a2 0 b1 b2 0) model=pmod? length=1

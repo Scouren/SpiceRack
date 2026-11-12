@@ -27,7 +27,7 @@ pub(super) struct Out<'a> {
     /// The text so far.
     pub(super) out: &'a mut String,
     /// Diagnostics.
-    #[expect(dead_code, reason = "the areas' writers note through it (S3.1-S3.4)")]
+    #[allow(dead_code, reason = "the areas' writers note through it (S3.1-S3.4)")]
     pub(super) diags: &'a mut ir::Diags,
     frames: Vec<Frame<'a>>,
 }

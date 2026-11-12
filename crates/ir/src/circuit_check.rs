@@ -19,17 +19,19 @@
 //! `pub(crate) fn builtin_fits`, `pub(crate) fn bound_family`
 
 use crate::check::Violation;
+use crate::circuit_features::reads_circuit;
 use crate::circuit_text::get_row;
 use crate::controlled::{DelayLaw, OutKind, Quantity, TableLaw};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
+use crate::element::MultLaw;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::expr::Expr;
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
-use crate::passive::IcMode;
+use crate::passive::{IcMode, TcBase, TcLaw};
 use crate::source::DcRule;
-use crate::wave::{PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
+use crate::wave::{GivenZero, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
 /// What is wrong with an element beyond its terminal count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,6 +54,10 @@ pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
         || e.kind.master_kind().is_none() && e.kind != ElemKind::Unresolved && named
         || e.kind == ElemKind::Unresolved && e.model.def != DefId::NONE
     {
+        v.domain = false;
+    }
+    // ngspice's multiplier law only on an instance that has a multiplier (A15 C1)
+    if e.mult_law == MultLaw::NgspiceAppend && (e.kind != ElemKind::Instance || !some(e.mult)) {
         v.domain = false;
     }
     if let Some(family) = bound_family(design, e.model)
@@ -218,6 +224,7 @@ pub(crate) fn has_polarity(f: ModelFamily) -> bool {
         | F::JfetHspice2
         | F::Mesfet
         | F::Gaas
+        | F::Mesa
         | F::Hfet1
         | F::Hfet2
         | F::Igbt => true,
@@ -283,7 +290,12 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
             let p: crate::passive::Passive = design.detail(i);
             let par = side::<crate::passive::Parasitics>(design, p.parasitics, v);
             let resistor = e.kind == ElemKind::Resistor;
-            (some(p.value) || e.model.name != NameId::NONE)
+            // A15 C2: the 27 °C base and the reciprocal law only where ngspice's behavioural
+            // rewrite gives them a meaning (a circuit-valued value with a coefficient)
+            let dynamic = reads_circuit(design, p.value) && (some(p.tc1) || some(p.tc2));
+            (p.tc_base == TcBase::Tnom || dynamic)
+                && (p.tc_law == TcLaw::Direct || dynamic && e.kind == ElemKind::Capacitor)
+                && (some(p.value) || e.model.name != NameId::NONE)
                 && (some(p.ic) == (p.ic_mode != IcMode::None))
                 && !(resistor && some(p.ic))
                 && (resistor || !some(p.ac))
@@ -351,6 +363,7 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
                 _ => None,
             };
             some(b.expr)
+                && (b.tc_base == TcBase::Tnom || some(b.tc1) || some(b.tc2))
                 && match want {
                     Some(o) => b.output == o,
                     None => !matches!(b.output, OutKind::Charge | OutKind::Flux),
@@ -432,21 +445,21 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
     let all = |e: &[ExprId]| e.iter().all(|&x| some(x));
     match w.kind {
         WaveKind::Pulse => side::<Pulse>(design, w.index, v).is_none_or(|p| {
-            all(&[p.v1, p.v2, p.delay, p.rise, p.fall, p.width, p.period])
+            // A17: under ngspice's zero rule the defaulted fields may be absent
+            all(&[p.v1, p.v2, p.delay])
+                && (p.given_zero == GivenZero::SpiceDefault
+                    || all(&[p.rise, p.fall, p.width, p.period]))
                 && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
         }),
         WaveKind::Sin => side::<Sin>(design, w.index, v).is_none_or(|s| {
-            all(&[
-                s.offset,
-                s.amplitude,
-                s.freq,
-                s.delay,
-                s.damping,
-                s.phase_deg,
-            ]) && paired(s.amplitude2, s.freq2)
+            all(&[s.offset, s.amplitude, s.delay, s.damping, s.phase_deg])
+                && (s.given_zero == GivenZero::SpiceDefault || some(s.freq))
+                && paired(s.amplitude2, s.freq2)
         }),
-        WaveKind::Exp => side::<Exp>(design, w.index, v)
-            .is_none_or(|x| all(&[x.v1, x.v2, x.td1, x.tau1, x.td2, x.tau2])),
+        WaveKind::Exp => side::<Exp>(design, w.index, v).is_none_or(|x| {
+            all(&[x.v1, x.v2])
+                && (x.given_zero == GivenZero::SpiceDefault || all(&[x.td1, x.tau1, x.td2, x.tau2]))
+        }),
         WaveKind::Pwl => side::<Pwl>(design, w.index, v).is_none_or(|p| {
             let never = p.repeat == PwlRepeat::Never;
             p.points.len().is_multiple_of(2)
@@ -459,13 +472,12 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
             all(&[
                 s.offset,
                 s.amplitude,
-                s.carrier_freq,
                 s.mod_index,
                 s.signal_freq,
                 s.delay,
                 s.phase_c_deg,
                 s.phase_m_deg,
-            ])
+            ]) && (s.given_zero == GivenZero::SpiceDefault || some(s.carrier_freq))
         }),
         WaveKind::Am => side::<Am>(design, w.index, v).is_none_or(|a| {
             all(&[

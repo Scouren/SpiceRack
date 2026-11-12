@@ -271,9 +271,9 @@ value Int or Real (`eval::eval_typed -> Value { number, int }`; `eval` keeps ret
 number; `Bindings::param_value` passes a typed parameter, defaulting to `param` as Real):
 `Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
 `Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
-chosen branch's; `ToInt` Int; `Sgn` Int iff its operand is (run f2 printed `sgn(-3)/2` as 0, so
-the run overrides the amendment's table, R5); everything else Real. An Int beyond ±2⁵³ is a
-domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`. An Int
+chosen branch's; `ToInt` Int; `SgnZeroPos` (−1 for `x < 0`, +1 otherwise, −0.0 included:
+VACASK's `sgn`, runs e1, f4) its operand's; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
 **A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
@@ -284,6 +284,9 @@ item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still
 `Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
 leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+`Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
+top scope lists no `Title`. The generator titles every deck when the set lacks it, and makes
+only libraries when the set has neither it nor `Item(Title)`.
 
 **A12 K3 (2026-11-12): `OpaqueClass::Hint` (R19).** Tunes its own simulator's solver (a
 convergence aid, a step-control knob) and names no accuracy target. Appended after `Script`, so

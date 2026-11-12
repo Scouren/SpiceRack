@@ -24,7 +24,7 @@ use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
     Quantity, TableLaw, TableSource,
 };
-use crate::element::{DetailKind, ElemKind, NO_ROW};
+use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
@@ -113,7 +113,18 @@ pub(crate) fn generate_element(
     };
     let terminals = r.terminals(kind, two_terminal);
     let model = r.master(kind);
-    let mult = if r.maybe(crate::circuit_features::mult_class(kind)) {
+    // an instance's multiplier comes with its law (A15 C1)
+    let mult_law =
+        if kind == ElemKind::Instance && r.has(X::MultInstanceNgspiceAppend) && r.g.chance(2) {
+            MultLaw::NgspiceAppend
+        } else {
+            MultLaw::Parallel
+        };
+    let mult_feature = match mult_law {
+        MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
+        MultLaw::Parallel => crate::circuit_features::mult_class(kind),
+    };
+    let mult = if mult_law == MultLaw::NgspiceAppend || r.maybe(mult_feature) {
         r.ex()
     } else {
         ExprId::NONE
@@ -124,6 +135,7 @@ pub(crate) fn generate_element(
         model,
         params: List::EMPTY,
         mult,
+        mult_law,
     };
     let detail = r.detail(kind, two_terminal, out, ctl);
     r.b.element(scope, kind, head, detail, Span::NONE)
@@ -154,11 +166,25 @@ pub(crate) fn generate_model(
             .map(|l| l.family)
             .collect()
     };
+    // and only a family the set has (A15 K5)
+    let families: Vec<ModelFamily> = families
+        .into_iter()
+        .filter(|&f| r.f.contains(Feature::Family(f)))
+        .collect();
     if families.is_empty() {
         return ItemRef::NONE;
     }
     let family = families[r.g.below(families.len() as u32) as usize];
-    let name = r.g.fresh_name(r.b);
+    // a bin is `<group>.<n>` of a fresh group (A15 C4): the name is interned first, the group
+    // where `dump` writes `bin_of`
+    let group = r.maybe(X::ModelBin).then(|| r.g.fresh());
+    let name = match &group {
+        Some(base) => {
+            let text = format!("{base}.1");
+            r.b.name(&text)
+        }
+        None => r.g.fresh_name(r.b),
+    };
     let polarity = if has_polarity(family) {
         if r.g.chance(2) {
             Polarity::N
@@ -188,10 +214,9 @@ pub(crate) fn generate_model(
         let borrowed: Vec<(&str, ExprId)> = pairs.iter().map(|(k, v)| (k.as_str(), *v)).collect();
         r.b.params(&borrowed)
     };
-    let bin_of = if r.maybe(X::ModelBin) {
-        r.g.fresh_name(r.b)
-    } else {
-        NameId::NONE
+    let bin_of = match &group {
+        Some(base) => r.b.name(base),
+        None => NameId::NONE,
     };
     let ako = if r.maybe(X::ModelAko) {
         r.reference(DefKind::Model)

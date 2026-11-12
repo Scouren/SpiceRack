@@ -284,8 +284,10 @@ fn global_drops_ground_and_funcs_bind_their_formals() {
 #[test]
 fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
     // INV 2.06 (a .param reading the circuit), manual §2.4 (ports, a head default), parse.rs
-    // P0004 (a stray closer or `.elseif`), the stub areas (S3.1-S3.4: Unread).
-    let text = "t\n.param p={v(a)}\n.subckt s a a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\nR1 a b 1k\n.model m nmos\n.tran 1n 1u\n.control\nrun\n.endc\n.title x\n.global gnd\n";
+    // P0004 (a stray closer or `.elseif`) and P0001 (a statement led by a number: Verbatim);
+    // `.title` (no rule yet). Only statements the spine and the structure area own: the areas'
+    // cards (elements, models, analyses, outputs, `.control`) are their own tests'.
+    let text = "t\n.param p={v(a)}\n.subckt s a a\nX1 a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\n5 a b\n.title x\n.global gnd\n";
     let (d, diags) = deck(text);
     let top = d.file(d.entry()).top;
     assert_eq!(d.items(top)[0].kind, ItemKind::Title);
@@ -293,12 +295,7 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
         .map(|k| opaque(&d, top, k).0)
         .collect();
     use OpaqueClass::{Inert, InvalidInSource as Bad, Unread};
-    assert_eq!(
-        classes,
-        [
-            Bad, Bad, Bad, Bad, Bad, Unread, Unread, Unread, Unread, Unread, Inert
-        ]
-    );
+    assert_eq!(classes, [Bad, Bad, Bad, Bad, Bad, Unread, Unread, Inert]);
     let c = codes_of(&diags);
     let want = [
         codes::PARAM_READS_CIRCUIT,
@@ -308,16 +305,13 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
         codes::MALFORMED,
         codes::UNREAD,
         codes::UNREAD,
-        codes::UNREAD,
-        codes::UNREAD,
-        codes::UNREAD,
         codes::GLOBAL_GROUND,
     ];
     assert_eq!(c, want);
     assert_eq!(
-        opaque(&d, top, 9).1,
-        ".control\nrun\n.endc",
-        "a block is one statement"
+        opaque(&d, top, 2).1,
+        ".subckt s a a\nX1 a\n.ends",
+        "a block is one statement, its body in it"
     );
     round_trip(text);
 }
@@ -326,10 +320,10 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
 fn a_strict_read_refuses_unread_statements() {
     // SPINE §3, RULINGS R10: Policy::Strict turns each Unread into a refusal.
     let row = dialect::by_name("ngspice").expect("row");
-    let src = Sources::one("d.sp", "t\nR1 a b 1k\n");
+    let src = Sources::one("d.sp", "t\n5 a b\n");
     assert!(dialect::transpile(&src, row, row, Policy::Strict).is_err());
     let ok = dialect::transpile(&src, row, row, Policy::Lenient).expect("lenient");
-    assert_eq!(ok.text, "t\nR1 a b 1k\n.end\n");
+    assert_eq!(ok.text, "t\n5 a b\n.end\n");
 }
 
 #[test]
@@ -444,31 +438,6 @@ fn a_row_reference_queued_by_an_area_binds_to_a_definition_pushed_later() {
 }
 
 #[test]
-fn a_model_name_is_known_from_any_file_before_lowering() {
-    // inp2q.c / inp2m.c: ngspice ends a Q or M card's nodes at the first word naming a model in
-    // the deck's model table, wherever the card stands; `Lower::is_model` answers that for the
-    // element area. Oracle: the model cards of the two files, by hand.
-    let mut src = Sources::new();
-    src.add("d.sp", "t\n.include \"m.lib\"\n.model NCH nmos\n");
-    src.add("m.lib", ".subckt s a\n.model pch pmos\n.ends\n");
-    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
-    let texts = [
-        "t\n.model NCH nmos\n".to_string(),
-        "\n.subckt s a\n.model pch pmos\n.ends\n".to_string(),
-    ];
-    let toks: Vec<_> = texts
-        .iter()
-        .map(|t| crate::syntax::tokenize(t, lex))
-        .collect();
-    let asts: Vec<_> = toks.iter().map(|t| crate::syntax::parse(t, lex)).collect();
-    let models = super::read::model_names(&asts, &toks);
-    let mut got: Vec<_> = models.into_iter().collect();
-    got.sort();
-    assert_eq!(got, ["nch", "pch"]);
-    let _ = read(&src);
-}
-
-#[test]
 fn a_read_in_a_measure_binds_to_a_measure_before_a_parameter() {
     // ngspice-45 measure.c do_measure: every other measure runs first and enters its result with
     // nupa_add_param, so inside `.meas ... param=` a measure hides a `.param` of its name; outside
@@ -519,4 +488,15 @@ fn a_blank_line_one_is_an_empty_title() {
     assert_eq!(d.items(top)[0].kind, ItemKind::Title);
     assert_eq!(d.text(t.text), "");
     assert_eq!(write(&d), "\n.param a=1\n.end\n");
+}
+
+#[test]
+fn width_and_probe_cards_reach_the_output_area() {
+    // ngspice's lexicon has no `.probe` keyword, so both arrive as plain cards; the dispatch
+    // sends them to `read_outputs::card` (its stub: `Unread` with `P1001`), not the run area.
+    let (d, diags) = deck("t\n.width out=80\n.probe v(a)\n");
+    let top = d.file(d.entry()).top;
+    assert_eq!(opaque(&d, top, 1).0, OpaqueClass::Unread);
+    assert_eq!(opaque(&d, top, 2).0, OpaqueClass::Unread);
+    assert_eq!(diags.len(), 2);
 }

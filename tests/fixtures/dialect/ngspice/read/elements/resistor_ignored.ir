@@ -1,0 +1,5 @@
+# codes: P1100
+file "resistor_ignored.sp" deck
+  title "resistor_ignored"
+  comment " oracle: ngspice-45 inp2r.c (nothing after the nodes); run f1: not a valid resistor instance line, ignored"
+  opaque ngspice invalid "R1 a 0"
