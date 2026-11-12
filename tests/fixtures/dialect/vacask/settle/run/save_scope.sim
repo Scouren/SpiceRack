@@ -1,0 +1,23 @@
+save scope
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a b) res r=1k
+l1 (b c) ind l=1m
+c1 (c 0) cap c=1u
+control
+  options rawfile="ascii"
+  analysis opd op
+  save v(b)
+  analysis opv op
+  analysis acv ac from=1k to=2k mode="lin" points=1
+  analysis trv tran stop=1u
+  clear saves
+  save full
+  analysis opf op
+endc

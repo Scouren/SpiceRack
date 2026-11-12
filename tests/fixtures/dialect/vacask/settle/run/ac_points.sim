@@ -1,0 +1,20 @@
+lin points count intervals
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a b) res r=1k
+c1 (b 0) cap c=1u
+control
+  options rawfile="ascii" reltol=1e-4 tran_fs=0.2
+  analysis a1 ac from=1k to=2k mode="lin" points=2
+  analysis a2 ac from=10 to=1k mode="dec" points=2
+  analysis n1 noise out="b" in="v1" values=[1k]
+  analysis x1 acxf out="b" values=[1k]
+  analysis d1 dcxf out="b"
+  analysis i1 dcinc
+endc

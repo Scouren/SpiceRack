@@ -1,0 +1,15 @@
+# Oracle: R43 (var stays Private, P2307: a circuit variable has no IR home; a sweep of one too);
+# VD cmd-sweep (no parameter: the principal one, which only the module knows, P2312;
+# continuation=0, P2312); a sweep binds its analysis, so a Private analysis makes its sweeps
+# Private with it (P2302 on the analysis).
+# codes: P2302 P2307 P2312 P2312 S0002 S0002 S0002 S0002 S0002 S0002 S0002 S0002
+file "sweep_private.sim" deck
+  title "sweeps the IR cannot state yet"
+  opaque vacask private "sweep s1 variable=\"x\" values=[1, 2]"
+  opaque vacask private "analysis t1 tran stop=1m"
+  opaque vacask private "sweep s2 instance=\"r1\" from=1k to=2k step=500"
+  opaque vacask private "analysis t2 tran stop=1m"
+  opaque vacask private "sweep s3 instance=\"r1\" parameter=\"r\" values=[1k] continuation=0"
+  opaque vacask private "analysis t3 tran stop=1m"
+  opaque vacask private "sweep s4 instance=\"r1\" parameter=\"r\" values=[1k]"
+  opaque vacask private "analysis t4 tran stop=1m write=0"

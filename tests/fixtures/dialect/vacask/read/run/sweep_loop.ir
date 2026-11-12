@@ -1,0 +1,18 @@
+# Oracle: VD cmd-sweep (one sweep binds the next analysis or sweep; the last sweep is the inner
+# loop; targets instance=/parameter=, model=, option=; lin points count intervals); run s1 (the
+# swept value is restored after the sweep: the docs say otherwise, the run wins); IR plan.rs
+# (`option="temp"` is the temperature, never an option named temp).
+# codes:
+file "sweep_loop.sim" deck
+  title "sweeps around analyses other than op"
+  loop sweep name=s1 (device_param r1 r) (lin start=1k stop=2k step=500i)
+    analysis tran name=t1 stop=1m cap=span_over50
+  loop sweep name=s2 (temp) (list values=[0i, 50i])
+    loop sweep name=s3 (model_param res tc) (lin start=0i stop=1m points=3i)
+      analysis ac name=a1 (list values=[1k])
+  loop sweep name=s4 (option rel_tol) (list values=[1e-3, 1e-4])
+    analysis tran name=t2 stop=1m cap=span_over50
+  loop sweep name=s5 (option private tran_rmax vacask) (list values=[1i, 2i])
+    analysis tran name=t3 stop=1m cap=span_over50
+  loop sweep name=s6 (device_param r1 r path=(x1)) (list values=[1k])
+    analysis tran name=t4 stop=1m cap=span_over50

@@ -1,0 +1,19 @@
+# Oracle: R43 / A22 (each form the IR cannot state is Private under its own code): a solution
+# slot, `write`, `writeop`, a slot name as nodeset, `localgnd` (P2302: a parameter with no
+# field, VD cmd-analysis-*); pss given by its period tper (P2304, VD cmd-analysis-pss);
+# pac/pnoise with their own steady state (P2305, VD cmd-analysis-pac, -pnoise: psssolve=1);
+# hb with the default truncation or a scalar nharm (P2306); hbac, hbnoise (P2303).
+# codes: P2302 P2302 P2302 P2302 P2302 P2303 P2303 P2304 P2305 P2305 P2306 S0002 S0002 S0002 S0002 S0002 S0002 S0002 S0002 S0002 S0002 S0002
+file "private_analyses.sim" deck
+  title "analyses the IR cannot state yet"
+  opaque vacask private "analysis p1 op store=\"x\""
+  opaque vacask private "analysis p2 op write=0"
+  opaque vacask private "analysis p3 ac from=1 to=1k mode=\"dec\" points=5 writeop=1"
+  opaque vacask private "analysis p4 op nodeset=\"x\""
+  opaque vacask private "analysis p5 pss tper=1u tstab=10u"
+  opaque vacask private "analysis p6 pac from=1 to=1k mode=\"dec\" points=5 tper=1u"
+  opaque vacask private "analysis p7 pnoise out=\"o\" in=\"v1\" from=1 to=1k mode=\"dec\" points=5 tper=1u"
+  opaque vacask private "analysis p8 hb freq=[1k] nharm=4"
+  opaque vacask private "analysis p9 hbac freq=[1k] values=[1]"
+  opaque vacask private "analysis p10 hbnoise freq=[1k] values=[1]"
+  opaque vacask private "analysis p11 acstb probe=\"vp\" localgnd=\"g\" values=[1]"

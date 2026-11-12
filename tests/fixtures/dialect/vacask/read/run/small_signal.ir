@@ -1,0 +1,15 @@
+# Oracle: VD cmd-analysis-dcinc, -dcxf (out a node or a node pair), -acxf, -noise (out, in),
+# -acstb (probe), -acsp (ports: alternating source and series resistor names); DIALECT-VACASK
+# §3.4 (DcInc, DcXf, Xf, Noise, Stb, Sp); VACASK's noise gain is a transfer function (unit
+# reference).
+# codes:
+file "small_signal.sim" deck
+  title "small-signal analyses"
+  analysis dc_inc name=d1
+  analysis dc_xf name=x1 (v (o))
+  analysis dc_xf name=x2 (vdiff (o) (p))
+  analysis xf name=x3 (v (o)) (dec start=1i stop=1k points=5i)
+  analysis noise name=n1 (v (o)) source=v1 (dec start=1i stop=1k points=5i)
+  analysis noise name=n2 (vdiff (o) (p)) source=v1 (list values=[1k])
+  analysis stb name=s1 probe=vp (dec start=1i stop=1k points=5i)
+  analysis sp name=s2 (dec start=1i stop=1k points=5i) ports=(v1 r1 v2 r2)

@@ -1,0 +1,10 @@
+# Oracle: DIALECT-VACASK §4 (an unnamed analysis is named `<kind><n>`, n its place among the
+# deck's analyses; W2301); VD cmd-sweep (a sweep needs a name: `sweep<n>`, W2302); a Dc is its
+# axes as sweep lines, outermost first, then an op.
+file "generated.ir" deck
+  title "generated names"
+  analysis op
+  analysis tran stop=1m cap=span_over50
+  loop sweep (temp) (list values=[0i])
+    analysis ac (list values=[1k])
+  analysis dc (device_param v2 dc) (list values=[0i, 1i]) (device_param v1 dc) (lin start=1i stop=3i step=0.5)
