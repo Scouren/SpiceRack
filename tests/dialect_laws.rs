@@ -48,7 +48,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 11 Untyped: a head default bound lexically to an outer parameter (`g28=(acos(atanh(g5)))`, g5 the top's) reads back unbound (`g5?`, R53: ngspice reads a default where the instance stands); R53's deferred case, a feature ngspice lacks, for the lead",
+        "a formal default's lexically bound outer read: goes with A37 (R62; seed 11 Untyped, `g28=(acos(atanh(g5)))` reads back `g5?`)",
     ),
     (
         "l7",
