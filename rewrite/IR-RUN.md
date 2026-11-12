@@ -142,3 +142,5 @@ The files of the run owner in IR-KERNEL §10, complete (types, fields, enums, bu
 `feature.rs`, and `rewrite/COVERAGE-run.md`: one line per row of `INV-constructs.md` §G, §H, §I,
 §J, §K and of `INV-semantics.md` categories 4, 8, 9, 10, 12, 13, naming the field, variant,
 feature or `Opaque` class that holds it (or `gap: <why>`).
+
+- Node-set mix (A28 follow-up): a `next_only` node set and a standing one of the same kind, node and reference, both in force at one analysis, are refused by `check` at the later item (`state_order::node_set_mix`). No simulator states both (ngspice's are standing, VACASK's next-only); the precedence is decided at the first that does (Spectre's slice is where it is expected).

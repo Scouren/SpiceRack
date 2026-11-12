@@ -26,6 +26,7 @@ use crate::plan::{
 };
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 use crate::run_words::{
     get, put_expr, put_exprs, put_flag, put_word, take_expr, take_exprs, take_word, word,
 };
@@ -43,6 +44,10 @@ impl DetailFacts for SweepLoop {
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.sweep(&mut self.sweep);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.target(&mut self.target);
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
@@ -93,6 +98,10 @@ impl DetailFacts for TableLoop {
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.exprs(self.values);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.targets(self.columns);
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {
@@ -170,6 +179,10 @@ impl DetailFacts for MonteCarlo {
         r.expr(&mut self.runs);
         r.expr(&mut self.seed);
         r.exprs(self.samples);
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {

@@ -26,6 +26,7 @@ use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -47,6 +48,10 @@ impl DetailFacts for Pac {
         r.sweep(&mut self.sweep);
         r.expr(&mut self.sidebands);
         r.expr(&mut self.relharm);
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -110,6 +115,11 @@ impl DetailFacts for Pnoise {
         r.sweep(&mut self.sweep);
         r.expr(&mut self.sidebands);
         r.expr(&mut self.relharm);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
+        r.one(&mut self.source);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -185,6 +195,10 @@ impl DetailFacts for Pxf {
         r.expr(&mut self.sidebands);
         r.expr(&mut self.relharm);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -253,6 +267,10 @@ impl DetailFacts for Pstb {
         r.expr(&mut self.sidebands);
         r.expr(&mut self.relharm);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.one(&mut self.probe);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
@@ -316,6 +334,10 @@ impl DetailFacts for Stb {
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.sweep(&mut self.sweep);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.one(&mut self.probe);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);

@@ -41,6 +41,7 @@ use crate::probe::{
 };
 use crate::run_exprs::roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -125,6 +126,11 @@ impl RowFacts for Save {
         roots(design, f).probes(row.probes);
     }
 
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Save = design.row(at.index);
+        names(design, f).probes(row.probes);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -141,7 +147,11 @@ impl RowFacts for Save {
             n > 1 && self.analyses != AnalysisKinds::ALL,
             RunExtra::SaveAnalysisSet,
         );
-        flag(set, true, save_mode(self.holds));
+        flag(
+            set,
+            true,
+            crate::option::mode_feature(&crate::option::SAVE_MODES, self.holds),
+        );
         list_features(design, self.probes, set);
     }
 
@@ -227,7 +237,7 @@ impl RowFacts for Save {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let Some(holds) =
-            crate::option::gen_holds(g, b, scope, features, RunExtra::SaveMidRun, save_mode)
+            crate::state_gen::gen_holds(g, b, scope, features, &crate::option::SAVE_MODES)
         else {
             return ItemRef::NONE;
         };
@@ -258,6 +268,11 @@ impl RowFacts for Print {
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let row: Print = design.row(at.index);
         roots(design, f).probes(row.probes);
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Print = design.row(at.index);
+        names(design, f).probes(row.probes);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -392,12 +407,4 @@ fn gen_list(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> ProbeLis
     let n = 1 + g.below(2) as usize;
     let probes: Vec<Probe> = (0..n).map(|_| gen_probe(g, b, features, false)).collect();
     b.probes(&probes)
-}
-
-/// The feature of a save's mode (A27).
-const fn save_mode(holds: Applies) -> RunExtra {
-    match holds {
-        Applies::FromHere => RunExtra::SaveFromHere,
-        Applies::WholeRun => RunExtra::SaveWholeRun,
-    }
 }

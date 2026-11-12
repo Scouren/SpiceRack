@@ -37,9 +37,7 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-#[cfg(any(test, feature = "gen"))]
-use crate::id::NameId;
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
@@ -50,6 +48,7 @@ use crate::plan::{
 use crate::plan::{gen_ref, gen_target, target_kinds};
 use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
+use crate::run_names::{names, names_of};
 use crate::run_words::{
     get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
     take_word, trim_lead, word, write_ref,
@@ -79,6 +78,11 @@ impl RowFacts for Loop {
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let row: Loop = design.row(at.index);
         by_loop!(row.kind, exprs_of(design, row.detail, f));
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Loop = design.row(at.index);
+        by_loop!(row.kind, names_of(design, row.detail, f));
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -150,9 +154,11 @@ impl RowFacts for Loop {
         if over_op {
             add(RunExtra::LoopOverOp);
         }
-        if !self.name.is_none() {
-            add(RunExtra::LoopNamed);
-        }
+        add(if self.name.is_none() {
+            RunExtra::LoopUnnamed
+        } else {
+            RunExtra::LoopNamed
+        });
         if self.kind == LoopKind::Sweep && !one_run(design, self.body) {
             add(RunExtra::SweepBodyNotOne);
         }
@@ -218,6 +224,9 @@ impl RowFacts for Loop {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let has = |x: RunExtra| features.contains(Feature::Run(x));
+        if !has(RunExtra::LoopNamed) && !has(RunExtra::LoopUnnamed) {
+            return ItemRef::NONE; // a loop is named or not: one of the two is needed
+        }
         let design = b.design();
         let outer = loop_depth(design, scope);
         if outer >= LOOP_DEPTH_MAX {
@@ -259,11 +268,15 @@ impl RowFacts for Loop {
         }
         let kind = kinds[g.below(kinds.len() as u32) as usize];
         // The name first: the text interns it before the detail's names.
-        let name = if has(RunExtra::LoopNamed) && g.chance(4) {
-            g.fresh_name(b)
-        } else {
-            NameId::NONE
-        };
+        let name = crate::run_words::gen_name(
+            g,
+            b,
+            features,
+            RunExtra::LoopNamed,
+            RunExtra::LoopUnnamed,
+            4,
+        )
+        .expect("a naming feature is in the set");
         let detail = by_loop!(kind, gen_of(g, scope, b, features))
             .expect("a possible loop kind's detail generates");
         let row = |body| Loop {
@@ -283,16 +296,18 @@ impl RowFacts for Loop {
             && (d.analyses.is_empty() || has(RunExtra::SeveralAnalyses))
             && crate::r#gen::placeable(d, body, ItemKind::Analysis, features)
             // as `Analysis::generate`: without `LoopScoped` an analysis is inside every loop
-            && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len());
+            && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len())
+            && (has(RunExtra::AnalysisNamed) || has(RunExtra::AnalysisUnnamed));
         if kind == LoopKind::Sweep
             && has(RunExtra::LoopOverOp)
             && op_ok
             && g.items_left > 1
             && g.chance(2)
         {
+            let name = crate::analysis_facts::analysis_name(g, b, features);
             let op = Analysis {
                 kind: AnalysisKind::Op,
-                name: NameId::NONE,
+                name,
                 detail: u32::MAX,
             };
             b.push(body, op, Span::NONE);
@@ -312,6 +327,17 @@ impl RowFacts for Alter {
         let mut row: Alter = design.row(at.index);
         f(&mut row.value, ExprUse::Constant);
         design.editor().set(at.index, row);
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let mut row: Alter = design.row(at.index);
+        names(design, f).target(&mut row.target);
+        design.editor().set(at.index, row);
+    }
+
+    fn string_roots(&self, _design: &Design, out: &mut Vec<ExprId>) {
+        // a string-valued device parameter (VACASK `type="dc"`; A25)
+        out.push(self.value);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {

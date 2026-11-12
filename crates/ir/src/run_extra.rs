@@ -188,13 +188,14 @@ pub enum RunExtra {
     /// A Monte Carlo loop that varies mismatch (`variations` other than `Process`).
     McMismatch,
     /// A `FromHere` option after a run item (A14: exactly this; a `WholeRun` one there is
-    /// `WholeRunMidRun`).
+    /// the kind's `*WholeRunMidRun`).
     OptionMidRun,
     /// An initial condition held in every operating point (Xyce).
     IcEveryOp,
-    /// An initial condition or node set for the next analysis only (VACASK).
+    /// An initial condition or node set for the next analysis only (VACASK), for every
+    /// `NodeSetKind`.
     IcNextOnly,
-    /// An initial condition across two nodes (VACASK).
+    /// An initial condition or node set across two nodes (VACASK), for every `NodeSetKind`.
     IcDifferential,
     /// A node set on every node (ngspice `.nodeset all=`).
     NodesetAll,
@@ -281,10 +282,16 @@ pub enum RunExtra {
     EnvMidRun,
     /// A `FromHere` `NodeSet` after a run item (A14).
     NodeSetMidRun,
-    /// A `WholeRun` state item (option, `Env`, `NodeSet`) after a run item in listed order: a
-    /// target whose state is positional cannot spell it in place (A14; a pass moves it before
-    /// the first run item when both are in one file).
-    WholeRunMidRun,
+    /// A `WholeRun` option row after a run item in listed order: a target whose state is
+    /// positional cannot spell it in place (A14; a pass moves it before the first run item when
+    /// both are in one file). One member per item kind (A28 grain).
+    OptionWholeRunMidRun,
+    /// A `WholeRun` `Env` after a run item in listed order.
+    EnvWholeRunMidRun,
+    /// A `WholeRun` `NodeSet` after a run item in listed order.
+    NodeSetWholeRunMidRun,
+    /// A `WholeRun` `Save` after a run item in listed order (a `.save` card after an analysis).
+    SaveWholeRunMidRun,
     /// A probe of every element's branch current (`ProbeKind::AllBranchI`).
     ProbeAllBranchI,
     /// A statistic measure that reports where the extremum is (`Stat::MinAt`, `Stat::MaxAt`).
@@ -303,10 +310,21 @@ pub enum RunExtra {
     /// A Fourier analysis whose harmonic count comes from the deck's `nfreqs` option
     /// (`Four::harmonics` absent).
     FourHarmonicsOption,
-    /// A state item (option, `Env`, `NodeSet`) that holds `FromHere`, wherever it stands.
-    StateFromHere,
-    /// A state item that holds `WholeRun`, wherever it stands.
-    StateWholeRun,
+    /// An option row that holds `FromHere`, wherever it stands (a script `option`). One member
+    /// per item kind and mode (A28 grain: ngspice spells a from-here option and temperature,
+    /// not a from-here node condition).
+    OptionFromHere,
+    /// An option row that holds `WholeRun` (an `.options` card).
+    OptionWholeRun,
+    /// An `Env` that holds `FromHere` (a script `set temp`, `option tnom=`).
+    EnvFromHere,
+    /// An `Env` that holds `WholeRun` (a `.temp` card).
+    EnvWholeRun,
+    /// A `NodeSet` that holds `FromHere` (a VACASK control statement's; ngspice has no script
+    /// command for it).
+    NodeSetFromHere,
+    /// A `NodeSet` that holds `WholeRun` (an `.ic` or `.nodeset` card).
+    NodeSetWholeRun,
     /// A DC axis with a name (`DcAxis::name`; VACASK's `sweep <name>` names the swept vector
     /// in the results; A22).
     DcAxisNamed,
@@ -322,7 +340,8 @@ pub enum RunExtra {
     /// measure, elaborate.
     RunInterleaved,
     /// An initial condition or node set that holds beyond the next analysis (`next_only`
-    /// false; VACASK's are an analysis's own list; A22). `IcNextOnly`'s twin.
+    /// false; VACASK's are an analysis's own list; A22), for every `NodeSetKind`. `IcNextOnly`'s
+    /// twin.
     IcBeyondNext,
     /// A save for two or more analysis kinds but not every one (VACASK's `save` limits the
     /// operating point, its sweeps and the transient, not AC; A22). One kind is
@@ -347,13 +366,21 @@ pub enum RunExtra {
     /// A save that holds for the whole run (`Save::holds` `WholeRun`: a `.save` card).
     SaveWholeRun,
     /// A `FromHere` save after a run item in listed order (a `WholeRun` one there is
-    /// `WholeRunMidRun`).
+    /// the kind's `*WholeRunMidRun`).
     SaveMidRun,
+    /// An analysis with no statement name (`Analysis::name` `NONE`; VACASK requires one, its
+    /// raw files are named by it). `AnalysisNamed`'s twin.
+    AnalysisUnnamed,
+    /// A DC axis with no name (VACASK's `sweep` requires one). `DcAxisNamed`'s twin.
+    DcAxisUnnamed,
+    /// A loop with no statement name (SPICE `.step`; VACASK's `sweep` requires one).
+    /// `LoopNamed`'s twin.
+    LoopUnnamed,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 157] = [
+    pub const ALL: [RunExtra; 167] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -485,7 +512,10 @@ impl RunExtra {
         RunExtra::LoopOverOp,
         RunExtra::EnvMidRun,
         RunExtra::NodeSetMidRun,
-        RunExtra::WholeRunMidRun,
+        RunExtra::OptionWholeRunMidRun,
+        RunExtra::EnvWholeRunMidRun,
+        RunExtra::NodeSetWholeRunMidRun,
+        RunExtra::SaveWholeRunMidRun,
         RunExtra::ProbeAllBranchI,
         RunExtra::MeasStatAt,
         RunExtra::MeasUntil,
@@ -494,8 +524,12 @@ impl RunExtra {
         RunExtra::PssScIter,
         RunExtra::PssSteadyCoeff,
         RunExtra::FourHarmonicsOption,
-        RunExtra::StateFromHere,
-        RunExtra::StateWholeRun,
+        RunExtra::OptionFromHere,
+        RunExtra::OptionWholeRun,
+        RunExtra::EnvFromHere,
+        RunExtra::EnvWholeRun,
+        RunExtra::NodeSetFromHere,
+        RunExtra::NodeSetWholeRun,
         RunExtra::DcAxisNamed,
         RunExtra::LoopNamed,
         RunExtra::SweepBodyNotOne,
@@ -511,6 +545,9 @@ impl RunExtra {
         RunExtra::SaveFromHere,
         RunExtra::SaveWholeRun,
         RunExtra::SaveMidRun,
+        RunExtra::AnalysisUnnamed,
+        RunExtra::DcAxisUnnamed,
+        RunExtra::LoopUnnamed,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

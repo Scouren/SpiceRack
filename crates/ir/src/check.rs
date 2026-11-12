@@ -19,7 +19,7 @@ use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
+use crate::feature::{ExprWalk, FeatureSet, item_features, unplaced_level};
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::item::{DefKind, ItemKind};
 use crate::literal;
@@ -155,6 +155,8 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
+    // the run owner's: a Fourier count's option in force, the node-set mix (A16, A28)
+    crate::state_order::design_check(design, out.diags);
     // the class table reads definitions through their rows, so it runs on a design whose
     // handles hold (A15 K3)
     if out.diags.len() == before {
@@ -187,8 +189,16 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
             diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
         }
     }
+    // the run owner's design-level features name their item (`analysis::feature_items`)
+    let mut placed = Vec::new();
+    crate::analysis::feature_items(design, &mut placed);
+    for (f, item) in placed {
+        if !legal.contains(f) {
+            diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
+        }
+    }
     let mut whole = FeatureSet::EMPTY;
-    design_level(design, &mut whole);
+    unplaced_level(design, &mut whole);
     for f in whole.minus(*legal).iter() {
         diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
