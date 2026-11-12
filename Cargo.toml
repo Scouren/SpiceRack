@@ -9,6 +9,9 @@ readme = "README.md"
 keywords = ["spice", "simulation", "circuit", "netlist", "eda"]
 categories = ["science", "simulation"]
 
+[workspace]
+members = ["crates/ir"]
+
 [lib]
 name = "spicerack"
 crate-type = ["cdylib", "rlib"]
@@ -18,10 +21,14 @@ pyo3 = { version = "0.27", features = ["extension-module", "num-complex"], optio
 num-complex = "0.4"
 thiserror = "2"
 tempfile = { version = "3", optional = true }
+# The semantic IR (`crates/ir`), re-exported as `spicerack::ir`.
+spicerack-ir = { path = "crates/ir" }
 
 [dev-dependencies]
 pretty_assertions = "1"
 tempfile = "3"
+# The dialect-law tests generate designs (`ir::gen`).
+spicerack-ir = { path = "crates/ir", features = ["gen"] }
 
 [features]
 default = ["python"]

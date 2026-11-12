@@ -16,6 +16,3 @@ path = "src/lib.rs"
 gen = []
 
 [dependencies]
-
-# Its own workspace until slice S2 wires it into the root crate.
-[workspace]

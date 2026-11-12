@@ -227,6 +227,10 @@ pub fn render_kit(
     name: &str,
     target: impl Into<Lang>,
 ) -> Result<Written, Diags> {
+    let target = target.into();
+    if let Some((from, to)) = crate::dialect::facade::route(kit.lang().name(), target.name()) {
+        return crate::dialect::facade::render_kit(kit, file, name, from, to);
+    }
     let f = kit.file(file);
     assert!(
         matches!(f.role, Role::Deck | Role::Library),
@@ -258,6 +262,10 @@ pub fn render_text(
     target: impl Into<Lang>,
 ) -> Result<Written, Diags> {
     let d = d.into();
+    let target = target.into();
+    if let Some((from, to)) = crate::dialect::facade::route(d.name(), target.name()) {
+        return crate::dialect::facade::render_text(text, name, from, to);
+    }
     let lex = d.lexicon().expect("a dialect with a reader");
     let t = tokenize(text, lex);
     let ast = parse(&t, lex);

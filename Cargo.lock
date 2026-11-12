@@ -376,9 +376,14 @@ dependencies = [
  "num-complex",
  "pretty_assertions",
  "pyo3",
+ "spicerack-ir",
  "tempfile",
  "thiserror",
 ]
+
+[[package]]
+name = "spicerack-ir"
+version = "0.2.0"
 
 [[package]]
 name = "syn"

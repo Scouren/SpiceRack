@@ -29,6 +29,14 @@
 //! path. A file refused or not found, or a copy that would land on a file
 //! the deck reads, exits 1 with nothing written.
 //!
+//! `--pipeline old|new` forces a pipeline for every pair (default: the
+//! route table, `dialect::facade::ROUTES`); `new` runs only where the new
+//! pipeline has the pair, else the old one, said once on stderr. `ir` (the
+//! IR's own text, suffix `.ir`) is accepted by `--dialect` and `--to` and
+//! always runs the new pipeline. `--dump-ir` writes the IR text after the
+//! read instead of a deck (`<stem>.ir`, its path on stdout);
+//! `--dump-ir=legal` writes it after legalization for the `--to` target.
+//!
 //! Exit code: 0; 1 when a deck failed (unreadable, not a fixpoint, with
 //! `--to` refused); 2 on a usage error.
 //!
@@ -36,13 +44,17 @@
 //! ... `.endl tt`, Spectre and VACASK `section`) are written as sections in
 //! every dialect that has them; LTspice has none and is refused.
 //!
-//! Cites: none (a CLI over `spicerack::import` and `syntax::render`).
+//! Cites: none (a CLI over `spicerack::import`, `syntax::render` and
+//! `spicerack::dialect`).
 //!
 //! Contents: none (a binary; `main` is its entry).
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
+use spicerack::dialect::facade;
+use spicerack::dialect::{self, Policy, Sources, irtext};
+use spicerack::ir;
 use spicerack::syntax::Dialect;
 use spicerack::syntax::render::{relink, render_kit, render_text};
 use spicerack::syntax::resolve::{FileId, Form, Role};
@@ -71,6 +83,14 @@ const EVERY: usize = 6;
 /// under the deck's directory: each by its whole path.
 const OUTSIDE: &str = "_root";
 
+/// What `--dump-ir` writes: the IR after the read, or after legalization
+/// for the `--to` target.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Dump {
+    Read,
+    Legal,
+}
+
 // ---- private ----
 
 /// A file's stem: the name its deck is written under.
@@ -82,7 +102,7 @@ fn stem(p: &Path) -> &str {
 fn usage(why: &str) -> ! {
     eprintln!("spice2rack: {why}");
     eprintln!(
-        "usage: spice2rack [-o DIR] [--dialect ngspice|hspice|ltspice|xyce|spectre|vacask] [--to DIALECT [--kit]] [--check] DECK..."
+        "usage: spice2rack [-o DIR] [--dialect ngspice|hspice|ltspice|xyce|spectre|vacask|ir] [--to DIALECT [--kit]] [--check] [--pipeline old|new] [--dump-ir[=legal]] DECK..."
     );
     std::process::exit(2)
 }
@@ -220,6 +240,76 @@ fn convert_kit(deck: &Path, d: Dialect, to: Target, out: &Path) -> std::io::Resu
     Ok(())
 }
 
+/// Converts one deck through the new pipeline alone (`ir` on a side, or
+/// `--dump-ir`): `from`'s reader, then `to`'s writer or the IR text, under
+/// `out` as `<stem>.<suffix>`, its path printed.
+///
+/// # Errors
+/// A side the new pipeline lacks, a refusal, the file system's.
+fn convert_new(
+    deck: &Path,
+    from: &str,
+    to: Option<(&str, &str)>,
+    dump: Option<Dump>,
+    out: &Path,
+) -> std::io::Result<()> {
+    let fail = |why: String| Err(std::io::Error::other(why));
+    let text = spicerack::import::decode(&std::fs::read(deck)?);
+    let stem = stem(deck);
+    let Some(reader) = dialect::by_name(from).filter(|r| r.read.is_some()) else {
+        return fail(format!("{from}: the new pipeline has no reader for it"));
+    };
+    let writer = match (dump, to) {
+        (Some(Dump::Read), _) | (_, None) => None,
+        (_, Some((name, _))) => match dialect::by_name(name).filter(|r| r.write.is_some()) {
+            Some(row) => Some(row),
+            None => return fail(format!("{name}: the new pipeline has no writer for it")),
+        },
+    };
+    let (written, ext) = match (dump, writer) {
+        (None, Some(w)) => {
+            let ext = to.map_or(irtext::SUFFIX, |t| t.1);
+            match facade::render_text(&text, stem, reader, w) {
+                Ok(w) => {
+                    eprint!("{}", w.notes.messages);
+                    (w.text, ext)
+                }
+                Err(e) => return fail(format!("{} refused:\n{}", w.name, e.messages)),
+            }
+        }
+        (None, None) | (Some(Dump::Legal), None) => {
+            return fail("--to: a target to write (or legalize) for".into());
+        }
+        (Some(dump), w) => {
+            let src = Sources::one(stem, &text);
+            let mut design = ir::Design::new();
+            let mut diags = ir::Diags::new();
+            dialect::read(&src, reader, Policy::Lenient, &mut design, &mut diags);
+            if let (Dump::Legal, Some(w)) = (dump, w) {
+                let target = w.write.expect("a writer row").features();
+                spicerack::passes::legalize(&mut design, target, &mut diags);
+            }
+            let name = w.map_or(irtext::SUFFIX, |w| w.name);
+            let shown = facade::diags(diags.rows(), &src, stem, name);
+            eprint!("{}", shown.messages);
+            if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
+                return fail("refused".into());
+            }
+            let mut ir_text = String::new();
+            for file in design.files() {
+                ir::dump(&design, file, &mut ir_text);
+            }
+            (ir_text, irtext::SUFFIX)
+        }
+    };
+    let at = out.join(format!("{stem}.{ext}"));
+    // IR text ends its last line itself; a deck gets one, as `convert` writes it.
+    let end = if written.ends_with('\n') { "" } else { "\n" };
+    std::fs::write(&at, written + end)?;
+    println!("{}", at.display());
+    Ok(())
+}
+
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mut flag = |f: &str| match args.iter().position(|a| a == f) {
@@ -230,6 +320,12 @@ fn main() {
         None => false,
     };
     let (check, kit) = (flag("--check"), flag("--kit"));
+    let dump = match (flag("--dump-ir"), flag("--dump-ir=legal")) {
+        (false, false) => None,
+        (true, false) => Some(Dump::Read),
+        (false, true) => Some(Dump::Legal),
+        (true, true) => usage("--dump-ir: once"),
+    };
     let mut value = |f: &str| {
         args.iter()
             .position(|a| a == f)
@@ -241,7 +337,24 @@ fn main() {
             })
     };
     let out = PathBuf::from(value("-o").unwrap_or_else(|| ".".into()));
-    let dialect = match value("--dialect").map_or(Ok(Dialect::Ngspice), |v| v.parse()) {
+    match value("--pipeline").as_deref() {
+        None => {}
+        Some(v @ ("old" | "new")) => {
+            // SAFETY: no other thread exists yet; the facade reads the
+            // variable once, on the first render.
+            unsafe { std::env::set_var(facade::ENV, v) };
+        }
+        Some(_) => usage("--pipeline: old or new"),
+    }
+    let from_raw = value("--dialect");
+    let to_raw = value("--to");
+    let new_only =
+        dump.is_some() || from_raw.as_deref() == Some("ir") || to_raw.as_deref() == Some("ir");
+    let dialect = match from_raw
+        .as_deref()
+        .filter(|&v| v != "ir")
+        .map_or(Ok(Dialect::Ngspice), str::parse)
+    {
         Ok(
             d @ (Dialect::Ngspice
             | Dialect::Hspice
@@ -250,14 +363,14 @@ fn main() {
             | Dialect::Spectre
             | Dialect::Vacask),
         ) => d,
-        _ => usage("--dialect: reads ngspice, hspice, ltspice, xyce, spectre or vacask"),
+        _ => usage("--dialect: reads ngspice, hspice, ltspice, xyce, spectre, vacask or ir"),
     };
-    let to: Option<Target> = value("--to").map(|v| {
+    let to: Option<Target> = to_raw.as_deref().filter(|&v| v != "ir").map(|v| {
         let d = v.parse::<Dialect>().ok();
         let found = d.and_then(|d| TARGETS.iter().find(|t| t.0 == d));
         *found.unwrap_or_else(|| {
             usage(
-                "--to: writes ngspice, hspice, ltspice, spectre, vacask, espice, xyce, cdl or verilog",
+                "--to: writes ngspice, hspice, ltspice, spectre, vacask, espice, xyce, cdl, verilog or ir",
             )
         })
     });
@@ -266,6 +379,9 @@ fn main() {
     }
     if kit && (to.is_none() || check) {
         usage("--kit: with --to, and without --check");
+    }
+    if new_only && (kit || check) {
+        usage("ir and --dump-ir: without --kit and --check");
     }
     if args.is_empty() {
         usage("no deck");
@@ -280,6 +396,14 @@ fn main() {
     let mut failed = 0;
     for deck in &args {
         let done = match to {
+            _ if new_only => {
+                let from = from_raw.as_deref().unwrap_or(Dialect::Ngspice.name());
+                let to = match to_raw.as_deref() {
+                    Some("ir") => Some(("ir", irtext::SUFFIX)),
+                    _ => to.map(|(d, ext)| (d.name(), ext)),
+                };
+                convert_new(Path::new(deck), from, to, dump, &out)
+            }
             Some(to) if kit => convert_kit(Path::new(deck), dialect, to, &out),
             _ => convert(Path::new(deck), dialect, to, &out, check),
         };
