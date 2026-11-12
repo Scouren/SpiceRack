@@ -49,9 +49,13 @@ const SEARCH_MAX: u64 = 1024;
 /// The seeds the reach list draws from: more than a law's, since it asks for every kind once.
 const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 
-/// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
-/// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str)] = &[];
+/// The kinds a row claims and no admitted generated design reaches (R55): (row, feature as
+/// `Debug` prints it, the covering property, why). The covering property is a seeded test in
+/// the owning area's test file that builds admissible designs of the kind through the builder
+/// and checks write, read back and `eq_meaning`, with floors on designs run and designs
+/// holding the kind; its function name must be found as `fn <name>` in a file under `tests/`.
+/// Strict both ways (`reach_every_kind_the_row_claims`).
+const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).
@@ -303,12 +307,78 @@ fn reach_every_kind_the_row_claims() {
     }
     let known: Vec<(String, String)> = KNOWN_REACH
         .iter()
-        .map(|(r, f)| (r.to_string(), f.to_string()))
+        .map(|(r, f, _, _)| (r.to_string(), f.to_string()))
         .collect();
     assert_eq!(
         unreached, known,
         "kinds claimed and never reached, against KNOWN_REACH"
     );
+    let uncovered = uncovered(KNOWN_REACH, &test_sources());
+    assert!(
+        uncovered.is_empty(),
+        "KNOWN_REACH rows with no covering property:\n{}",
+        uncovered.join("\n")
+    );
+}
+
+/// The covering-property check's self-test: an empty name and a name no test file defines are
+/// refused; a name that is defined passes.
+#[test]
+fn a_known_unreached_kind_names_a_covering_property_that_exists() {
+    let sources = test_sources();
+    let rows: &[(&str, &str, &str, &str)] = &[
+        ("x", "Item(Loop)", "", "no name"),
+        (
+            "x",
+            "Item(Save)",
+            "no_such_covering_property_anywhere",
+            "missing",
+        ),
+        (
+            "x",
+            "Item(Env)",
+            "reach_every_kind_the_row_claims",
+            "defined",
+        ),
+    ];
+    let found = uncovered(rows, &sources);
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert!(
+        found[0].contains("Item(Loop)") && found[1].contains("Item(Save)"),
+        "{found:?}"
+    );
+}
+
+/// The rows of `rows` whose covering property is empty or not defined (`fn <name>` in no
+/// source of `sources`: a text search, enough to name a test by its function).
+fn uncovered(rows: &[(&str, &str, &str, &str)], sources: &[String]) -> Vec<String> {
+    let defined = |name: &str| sources.iter().any(|t| t.contains(&format!("fn {name}(")));
+    rows.iter()
+        .filter(|(_, _, name, _)| name.is_empty() || !defined(name))
+        .map(|(row, kind, name, _)| format!("{row} {kind}: covering property `{name}` not found"))
+        .collect()
+}
+
+/// The text of every `.rs` file under `tests/`.
+fn test_sources() -> Vec<String> {
+    let mut out = Vec::new();
+    let mut todo = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests")];
+    // Bounded by the tree: each directory is read once.
+    while let Some(dir) = todo.pop() {
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                todo.push(p);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                out.extend(std::fs::read_to_string(&p).ok());
+            }
+        }
+    }
+    assert!(!out.is_empty(), "test_sources: the tests/ tree");
+    out
 }
 
 /// The self-test of shrink to admitted (A25): a row whose `admits` refuses every item but

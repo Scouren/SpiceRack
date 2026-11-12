@@ -167,6 +167,11 @@ Each line: question → choice → why.
     generator's stream (round 5 changed it). A rule's rows share one file; a fixture folder is a
     row's name (SPINE §4).
 
+38. R55 → `KNOWN_REACH` rows are (row, kind, covering property, why); the reach law also fails a
+    row whose property is empty or not defined as `fn <name>(` in any file under `tests/` (a text
+    search: it names a test, it does not run it). Self-test with an empty, a missing and a defined
+    name.
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.
