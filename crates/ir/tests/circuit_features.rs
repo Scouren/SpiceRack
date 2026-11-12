@@ -1190,11 +1190,27 @@ mod tests {
                 spicerack_ir::semi::Semi { area, ..semi() },
             )
         }),
-        (X::SemiInitial, |b, t, on| {
+        // the A24 ruling: one feature per member; each member is the other's neighbour
+        (X::SemiInitialOff, |b, t, on| {
+            let initial = if on {
+                InitialState::Off
+            } else {
+                InitialState::On
+            };
+            semi_el(
+                b,
+                t,
+                ElemKind::Mosfet,
+                &["d", "g", "s"],
+                ExprId::NONE,
+                spicerack_ir::semi::Semi { initial, ..semi() },
+            )
+        }),
+        (X::SemiInitialOn, |b, t, on| {
             let initial = if on {
                 InitialState::On
             } else {
-                InitialState::Unset
+                InitialState::Off
             };
             semi_el(
                 b,

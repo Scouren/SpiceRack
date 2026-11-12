@@ -163,6 +163,11 @@ pub enum CircuitExtra {
     SemiArea,
     /// A semiconductor first guess (`Semi::initial` not `Unset`).
     SemiInitial,
+    /// A semiconductor first guessed off (`InitialState::Off`; A24 ruling).
+    SemiInitialOff,
+    /// A semiconductor first guessed on (`InitialState::On`: Spectre `region=on`; ngspice lacks
+    /// it, its semiconductors take `off` only; A24 ruling).
+    SemiInitialOn,
     /// A diode with a thermal terminal (3 terminals, ng, D65).
     DiodeThermal,
     /// A switch first guess (`Switch::initial` not `Unset`, D57).
@@ -252,7 +257,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 105] = [
+    pub const ALL: [CircuitExtra; 107] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -323,6 +328,8 @@ impl CircuitExtra {
         CircuitExtra::DelaySampled,
         CircuitExtra::SemiArea,
         CircuitExtra::SemiInitial,
+        CircuitExtra::SemiInitialOff,
+        CircuitExtra::SemiInitialOn,
         CircuitExtra::DiodeThermal,
         CircuitExtra::SwitchInitial,
         CircuitExtra::SwitchControlExpr,
