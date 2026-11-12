@@ -1,0 +1,11 @@
+# codes: P1100
+file "diode_bjt.sp" deck
+  title "diode_bjt"
+  comment " oracle: ngspice-45 inpcom.c get_number_terminals (which item is the model; run: D2 a k dmod 2 is could not find a valid modelname), inp2q.c (unlabeled number is area), dio.c, bjt.c (off ic area temp dtemp m); INV-semantics 6.26, 8.21"
+  element diode D1 (a k) model=dmod?
+  opaque ngspice invalid "D2 a k dmod 2"
+  element diode D3 (a k t) model=dmod?
+  element diode D4 (a k) model=dmod? params=(pj=1u) mult=2 area=3 ic=[0.6] temp_abs=50 dtemp=2 ic_mode=uic_only initial=off
+  element bjt Q1 (c b e) model=qmod?
+  element bjt Q2 (c b e s) model=qmod? area=1.5 ic=[0.7, 0.3] ic_mode=uic_only initial=off
+  element bjt Q3 (c b e s t) model=qmod?

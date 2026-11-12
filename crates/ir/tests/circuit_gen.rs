@@ -21,8 +21,8 @@ mod tests {
 
     use spicerack_ir::r#gen::{Size, generate};
     use spicerack_ir::{
-        CircuitExtra, Design, Diags, ElemKind, Feature, FeatureSet, ItemKind, WaveKind, check,
-        dump, features_used, parse,
+        CircuitExtra, Design, Diags, ElemKind, Feature, FeatureSet, ItemKind, ModelFamily,
+        WaveKind, check, dump, features_used, parse,
     };
 
     const SIZE: Size = Size {
@@ -146,6 +146,45 @@ mod tests {
         }
         assert!(seen.contains(Feature::Item(ItemKind::Model)));
         assert!(seen.contains(Feature::Item(ItemKind::DeviceLibrary)));
+        // A15 C4: some generated instance binds to a bin group's definition
+        let grouped = (0..4000u64).any(|seed| {
+            let d = generate(seed, &set, SIZE);
+            let groups: Vec<spicerack_ir::DefId> = d
+                .definitions()
+                .iter()
+                .enumerate()
+                .filter(|(_, def)| def.kind == spicerack_ir::DefKind::Model)
+                .filter(|(_, def)| d.row::<spicerack_ir::Model>(def.item.index).name != def.name)
+                .map(|(k, _)| spicerack_ir::DefId(k as u32))
+                .collect();
+            d.reachable().iter().any(|&(item, _)| {
+                item.kind == ItemKind::Element
+                    && groups.contains(&d.row::<spicerack_ir::Element>(item.index).model.def)
+            })
+        });
+        assert!(grouped, "no seed bound an instance to a bin group");
         assert_eq!(missing, Vec::<String>::new());
+    }
+
+    /// A15 K5: with only `Family(Resistor)` of all families in the set, every generated model
+    /// is a resistor model, and some seed makes one.
+    #[test]
+    fn models_only_of_requested_families() {
+        let set = circuit_set()
+            .iter()
+            .filter(|&f| !matches!(f, Feature::Family(m) if m != ModelFamily::Resistor))
+            .fold(FeatureSet::EMPTY, FeatureSet::with);
+        let mut made = false;
+        for seed in SEEDS {
+            let d = generate(seed, &set, SIZE);
+            let extra = features_used(&d).minus(set);
+            assert!(
+                extra.is_empty(),
+                "seed {seed}: unrequested {:?}",
+                extra.iter().collect::<Vec<_>>()
+            );
+            made |= features_used(&d).contains(Feature::Family(ModelFamily::Resistor));
+        }
+        assert!(made, "no seed made a resistor model");
     }
 }

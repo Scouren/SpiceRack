@@ -133,6 +133,7 @@ mod tests {
                 period,
                 cycles,
                 law: spicerack_ir::wave::PulseLaw::Spice,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source {
                 ac_mag,
@@ -277,6 +278,7 @@ mod tests {
                 model,
                 params: List::EMPTY,
                 mult,
+                mult_law: spicerack_ir::MultLaw::Parallel,
             };
             b.instance(top, ElemKind::Instance, h, Span::NONE);
         });
@@ -328,6 +330,7 @@ mod tests {
                 period,
                 cycles: ExprId::NONE,
                 law: spicerack_ir::wave::PulseLaw::Vacask,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source {
                 wave,
@@ -357,6 +360,7 @@ mod tests {
                 td2,
                 tau2,
                 td2_from,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source { wave, ..source(dc) };
             b.source(top, ElemKind::ISource, h, row, Span::NONE);
@@ -383,6 +387,7 @@ mod tests {
                 phase_m_deg,
                 law: spicerack_ir::wave::SffmLaw::Ngspice,
                 pre: spicerack_ir::wave::PreDelay::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source { wave, ..source(dc) };
             b.source(top, ElemKind::VSource, h, row, Span::NONE);
@@ -422,6 +427,89 @@ mod tests {
                 family: ModelFamily::Bsim4,
             };
             b.device_library(top, lib, Span::NONE);
+        });
+    }
+
+    #[test]
+    fn ngspice_multiplier_and_behavioural_temperature_laws() {
+        let text = "file \"t.sp\" deck\n  subckt div (a b)\n  element instance x1 (in out) model=div \
+                    mult=2 mult_law=ngspice_append\n  element capacitor c1 (a 0) value=(v(a)) tc1=1m \
+                    tc_base=fixed27 tc_law=reciprocal\n";
+        same(text, |b, top| {
+            b.subckt(top, "div", &["a", "b"], &[], Span::NONE);
+            let name = b.name("x1");
+            let terminals = b.names(&["in", "out"]);
+            let div = b.name("div");
+            let mult = n(b, 2);
+            let h = ElemHead {
+                name,
+                terminals,
+                model: Ref::unresolved(div),
+                params: List::EMPTY,
+                mult,
+                mult_law: spicerack_ir::MultLaw::NgspiceAppend,
+            };
+            b.instance(top, ElemKind::Instance, h, Span::NONE);
+            let h = head(b, "c1", &["a", "0"]);
+            let value = b.v("a", None);
+            let tc1 = k(b, 1, -3);
+            let row = Passive {
+                value,
+                tc1,
+                tc_base: spicerack_ir::passive::TcBase::Fixed27,
+                tc_law: spicerack_ir::passive::TcLaw::Reciprocal,
+                ..Passive::PLAIN
+            };
+            b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
+        });
+    }
+
+    #[test]
+    fn bins_of_a_group_and_an_instance_of_the_group() {
+        let text = "file \"t.sp\" deck\n  model nch.1 bsim4 polarity=n bin_of=nch\n  \
+                    model nch.2 bsim4 polarity=n bin_of=nch\n  model mz mesa polarity=p\n  \
+                    element mosfet m1 (d g s b) model=nch\n";
+        same(text, |b, top| {
+            for bin in ["nch.1", "nch.2"] {
+                let name = b.name(bin);
+                let bin_of = b.name("nch");
+                let row = spicerack_ir::Model {
+                    bin_of,
+                    ..model(name, ModelFamily::Bsim4, Polarity::N)
+                };
+                b.model(top, row, Span::NONE);
+            }
+            let name = b.name("mz");
+            b.model(top, model(name, ModelFamily::Mesa, Polarity::P), Span::NONE);
+            let h = b.head("m1", &["d", "g", "s", "b"], Some("nch"), &[], ExprId::NONE);
+            b.semi(top, ElemKind::Mosfet, h, semi(), Span::NONE);
+        });
+    }
+
+    /// A17 (R35): under ngspice's zero rule a field holds what the card holds, and an omitted
+    /// one is absent.
+    #[test]
+    fn a_pulse_under_the_spice_zero_rule() {
+        let text = "file \"t.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 \
+                    rise=0 given_zero=spice_default)\n";
+        same(text, |b, top| {
+            let h = head(b, "v1", &["a", "0"]);
+            let dc = n(b, 0);
+            let [v1, v2, delay, rise] = [0, 1, 0, 0].map(|x| n(b, x));
+            let wave = b.wave(spicerack_ir::wave::Pulse {
+                v1,
+                v2,
+                delay,
+                rise,
+                fall: ExprId::NONE,
+                width: ExprId::NONE,
+                period: ExprId::NONE,
+                cycles: ExprId::NONE,
+                law: spicerack_ir::wave::PulseLaw::Spice,
+                given_zero: spicerack_ir::wave::GivenZero::SpiceDefault,
+            });
+            let row = spicerack_ir::source::Source { wave, ..source(dc) };
+            b.source(top, ElemKind::VSource, h, row, Span::NONE);
         });
     }
 }

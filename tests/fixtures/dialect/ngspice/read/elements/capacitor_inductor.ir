@@ -1,0 +1,10 @@
+# codes:
+file "capacitor_inductor.sp" deck
+  title "capacitor_inductor"
+  comment " oracle: ngspice-45 inp2c.c, inp2l.c (value, model either side: run f2), cap.c, ind.c (keys); INV-semantics 8.21 (device ic only under uic)"
+  element capacitor C1 (a 0) value=1p
+  element capacitor C2 (a 0) mult=3 value=2p ic=0.5 tc1=1m tc2=1u temp_abs=40 dtemp=1 scale=2 ic_mode=uic_only
+  element capacitor C3 (a 0) model=cmod? params=(w=1u l=2u) value=3p
+  element inductor L1 (a 0) value=1u
+  element inductor L2 (a 0) params=(nt=10) mult=2 value=2u ic=1m ic_mode=uic_only
+  element inductor L3 (a 0) model=lmod? value=3u
