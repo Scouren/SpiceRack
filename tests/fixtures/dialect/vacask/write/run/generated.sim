@@ -1,0 +1,10 @@
+generated names
+control
+  analysis op1 op
+  analysis tran2 tran stop=1m
+  sweep sweep1 option="temp" values=[0]
+    analysis ac3 ac values=[1k]
+  sweep sweep2 instance="v1" parameter="dc" from=1 to=3 step=0.5
+  sweep sweep3 instance="v2" parameter="dc" values=[0, 1]
+    analysis dc4 op
+endc

@@ -1,0 +1,9 @@
+# Oracle: VD cmd-analysis-trannoise (noisefmax enables it; noisefmin 0 or absent is
+# noisefmax/1e3; noiseseed); DIALECT-VACASK §3.4 trannoise row (the reader states the default
+# as written: fmax/1e3). `noisemode` has no field: the statement is Private (P2302).
+# codes: P2302 S0002
+file "trannoise.sim" deck
+  title "transient noise"
+  analysis tran name=tn1 stop=1m noise_fmax=5k noise_fmin=(5k /: 1e3) noise_seed=3i cap=span_over50
+  analysis tran name=tn2 stop=1m noise_fmax=5k noise_fmin=10i cap=span_over50
+  opaque vacask private "analysis tn3 tran stop=1m noisefmax=5k noisemode=\"sde\""

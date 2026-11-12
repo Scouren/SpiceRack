@@ -1,0 +1,15 @@
+# Oracle: VD cmd-save (directives accumulate; default, v(), i(), p(inst, var), hierarchical
+# names quoted); run e5 (`default` holds every node voltage and every branch current, an
+# inductor's included: all_v + all_branch_i; `save v(b)` governs op, its sweeps and tran, not
+# ac; `full` is every unknown, internal nodes included: Private, P2308); `dv` is the ac's own
+# directive, which no probe kind states (P2308); `clear saves` drops every save before it (run sv2: a Reset of the saves, A27);
+# a save holds from where it stands (runs sv1, sv2).
+# A22: the set of kinds a line governs is stated exactly (op, its sweeps, tran; with `default`
+# and no p() also ac and dcinc, whose own directive `default` is).
+# codes: P2308 P2308 S0002 S0002
+file "save.sim" deck
+  title "save directives"
+  save analysis=(op dc tran) from_here (all_v) (all_branch_i) (v (a)) (i (v1)) (param (r1) (i)) (v (x1 n))
+  opaque vacask private "save full"
+  opaque vacask private "save dv(a)"
+  reset saves

@@ -1,0 +1,23 @@
+# Oracle: VD cmd-options-tol, -temp, -tran, -op, -homotopy (the keys and their quantities);
+# DIALECT-VACASK §3.4 options row; R24/A14 (VACASK's options hold from where they stand). An
+# Env sets what it names (A14); `op_skipinitial=1` and a `tran_method` are flags.
+# codes:
+file "options.sim" deck
+  title "typed options"
+  option rel_tol value=1e-4
+  option abs_tol value=1p
+  option vn_tol value=1u
+  option chg_tol value=1f
+  option gmin value=1e-15
+  option gshunt value=0i
+  option scale value=1i
+  env temp=50i tnom=25i
+  option max_ord value=2i
+  option itl1 value=200i
+  option itl4 value=20i
+  option gmin_steps value=10i
+  option src_steps value=10i
+  option no_op_iter
+  option method_trap
+  option method_euler
+  env temp=27i

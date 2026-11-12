@@ -1,0 +1,23 @@
+# Oracle: VD cmd-analysis (`analysis name type params`), -tran, -ac, -noise, -dcxf, -acxf,
+# -acstb, -acsp, -dcinc, -op; an analysis's own ic/nodeset lists are the NodeSet rows that
+# apply to it only (run e1); a lin count is VACASK's interval count, one less than the IR's
+# values (VD cmd-analysis-ac).
+file "analyses.ir" deck
+  title "written analyses"
+  nodeset nodeset every_op next_only node=(a) value=1i
+  nodeset nodeset every_op next_only node=(b) reference=(c) value=0.5
+  analysis op name=op1
+  nodeset ic transient next_only node=(x1 n) value=1i
+  analysis tran name=t1 stop=10m record_start=6m initial_step=1u max_step=10u uic
+  analysis tran name=t2 stop=1m noise_fmax=5k noise_fmin=(5k /: 1e3) noise_seed=3i cap=span_over50
+  analysis ac name=a1 (lin start=1k stop=2k points=11i)
+  analysis ac name=a2 (lin start=1k stop=2k step=100i)
+  analysis ac name=a3 (dec start=1i stop=1g points=10i)
+  analysis ac name=a4 (list values=[1k, 2k])
+  analysis ac name=a5 (lin start=1i stop=2i points=(n + 1i))
+  analysis dc_inc name=d1
+  analysis dc_xf name=x1 (vdiff (o) (p))
+  analysis xf name=x2 (v (o)) (oct start=1i stop=1k points=3i)
+  analysis noise name=n1 (v (o)) source=v1 (dec start=1i stop=1k points=5i)
+  analysis stb name=s1 probe=vp (dec start=1i stop=1k points=5i)
+  analysis sp name=s2 (dec start=1i stop=1k points=5i) ports=(v1 r1 v2 r2)

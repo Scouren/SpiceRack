@@ -1,0 +1,12 @@
+# Oracle: VD cmd-analysis-tran (stop; step the initial step; start the start of recording;
+# maxstep; icmode="uic"; ic list); run tr1 (no maxstep: the step is capped at (stop-start)/50,
+# cap span_over50); run e7 (`maxstep=0` writes the same raw file as none: the rule, R47; a
+# literal `start=0` records from 0: no record start); run e1
+# (ic applies to that transient only; held in its operating point: transient).
+# codes:
+file "tran.sim" deck
+  title "transients"
+  analysis tran name=t1 stop=1m initial_step=1u cap=span_over50
+  nodeset ic transient next_only node=(b) value=1i
+  analysis tran name=t2 stop=10m record_start=6m initial_step=1u max_step=10u uic
+  analysis tran name=t3 stop=1m cap=span_over50

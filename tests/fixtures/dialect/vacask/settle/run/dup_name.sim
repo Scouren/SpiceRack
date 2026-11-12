@@ -1,0 +1,10 @@
+two analyses of one name
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  analysis op1 op
+  analysis op1 op
+endc

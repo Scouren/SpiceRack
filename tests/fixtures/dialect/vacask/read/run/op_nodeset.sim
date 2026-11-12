@@ -1,0 +1,5 @@
+op with a nodeset list
+control
+  analysis op1 op nodeset={"a", 1, "b", "c", 0.5, "x1:n", 2}
+  analysis op2 op
+endc

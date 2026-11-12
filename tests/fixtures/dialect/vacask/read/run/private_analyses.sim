@@ -1,0 +1,14 @@
+analyses the IR cannot state yet
+control
+  analysis p1 op store="x"
+  analysis p2 op write=0
+  analysis p3 ac from=1 to=1k mode="dec" points=5 writeop=1
+  analysis p4 op nodeset="x"
+  analysis p5 pss tper=1u tstab=10u
+  analysis p6 pac from=1 to=1k mode="dec" points=5 tper=1u
+  analysis p7 pnoise out="o" in="v1" from=1 to=1k mode="dec" points=5 tper=1u
+  analysis p8 hb freq=[1k] nharm=4
+  analysis p9 hbac freq=[1k] values=[1]
+  analysis p10 hbnoise freq=[1k] values=[1]
+  analysis p11 acstb probe="vp" localgnd="g" values=[1]
+endc

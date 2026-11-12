@@ -264,7 +264,11 @@ fn type_alter(cst: &Cst<'_>, n: Node) -> Option<(Vec<String>, Option<String>)> {
         .map(|&f| read::field_name(cst, f))
         .collect();
     let assigns = &rest[names.len()..];
-    let is_type = |f: &u32| read::field_name(cst, ast.lhs(Node(*f))) == "type";
+    // Only an `Assign` has a key; a stray field after them (`alter instance("r1", r=2k "r2")`,
+    // found by the mutation law) is none.
+    let is_type = |f: &u32| {
+        ast.tag(Node(*f)) == Tag::Assign && read::field_name(cst, ast.lhs(Node(*f))) == "type"
+    };
     if !assigns.iter().any(is_type) {
         return None;
     }
@@ -439,6 +443,13 @@ mod tests {
                 dc,
                 format!("{}{tran}{}  analysis hb1 hb\n", to("pulse"), to("dc")),
                 (Some(Fold::Other), 0),
+            ),
+            // A stray string after an assignment (the mutation law's `alter instance("r1",
+            // r=2k "r2")`): no `type` alter, and no panic.
+            (
+                dc,
+                format!("  alter instance(\"v1\") val1=2 \"v2\"\n{tran}"),
+                (None, 0),
             ),
         ];
         for (line, control, want) in cases {
