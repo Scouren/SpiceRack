@@ -1,7 +1,7 @@
 //! The expression group's diagnostic codes (`U0100..=U0199`) and their catalogue rows: the
 //! notes its passes put at an item they leave carrying a feature.
 //!
-//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const BOTH_FORMS`
+//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const CALL_LEFT`, `pub(crate) const FUNC_CALLED`, `pub(crate) const BOTH_FORMS`
 
 use crate::ir;
 
@@ -25,6 +25,10 @@ pub(crate) const PLAIN_RUN_NOMINAL: ir::Code = ir::Code::new(b'U', 109);
 pub(crate) const DRAW_SAMPLES: ir::Code = ir::Code::new(b'U', 110);
 /// A literal's digits past a double's precision were rounded.
 pub(crate) const DIGITS_ROUNDED: ir::Code = ir::Code::new(b'U', 111);
+/// A call of a user function that cannot be inlined.
+pub(crate) const CALL_LEFT: ir::Code = ir::Code::new(b'U', 113);
+/// A user function still called after inlining.
+pub(crate) const FUNC_CALLED: ir::Code = ir::Code::new(b'U', 114);
 /// A function body its callers read in both forms.
 pub(crate) const BOTH_FORMS: ir::Code = ir::Code::new(b'U', 112);
 
@@ -117,6 +121,24 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a literal's digits past a double's precision were written as the shortest decimal of its double",
             cite: "rewrite/RULINGS.md R37; rewrite/AMEND-A12.md A18",
             explain: "The source wrote more significant digits than the target keeps; the literal is written as the shortest decimal that reads back as the correctly rounded double of the digits. A simulator whose own conversion of the long digits is not correctly rounded (ngspice's INPevaluate) may have computed a double a few ulp away from it.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        CALL_LEFT,
+        ir::Info {
+            title: "a call of a user function that cannot be inlined",
+            cite: "rewrite/RULINGS.md R51; INV-semantics.md 2.26",
+            explain: "The target has no user functions, so each call is replaced by the function's body with its arguments substituted. This call stays: the function is recursive (directly or through another), the call is unresolved, its argument count does not match, an argument holds a statistical draw that the body reads more than once (each read would draw anew), or an argument that reads the temperature or the circuit is never read by the body (the call counts as reading it; the copy would not). The item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        FUNC_CALLED,
+        ir::Info {
+            title: "a user function still called after inlining",
+            cite: "rewrite/RULINGS.md R51",
+            explain: "The target has no user functions; a function is removed once nothing calls it, and this one is still called by a call inline_funcs could not replace. The item is refused.",
             kind: ir::Kind::Note,
         },
     ),

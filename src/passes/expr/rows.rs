@@ -1,5 +1,6 @@
 //! The expression group's pass rows, in the order `legalize` tries them: the typed arithmetic
-//! first (a later rule may read the tags it settles), then the powers, the roundings (even
+//! first after the functions are inlined (every other rule then sees the inlined trees, and a
+//! later rule may read the tags the typed ones settle), then the powers, the roundings (even
 //! before away: the first emits the second), the ternaries and the other functions, the bit
 //! folds, the leaves, the draws and the long literals. Each rule is its plain row then its
 //! `_dyn` row (A26); each `requires` is what its output may add, per form.
@@ -17,6 +18,8 @@ use crate::passes::Pass;
 /// The group's passes, in the order `legalize` tries them. One row per line: a table.
 #[rustfmt::skip]
 pub(crate) const PASSES: &[Pass] = &[
+    row("inline_funcs", X::Expr(T::UserCall), &[], &[CALL_LEFT], inline_funcs::inline_funcs),
+    row("drop_unused_funcs", X::Item(ir::ItemKind::Func), &[], &[FUNC_CALLED], inline_funcs::drop_unused_funcs),
     row("div_to_div_typed", X::Binary(O::Div), &[X::Binary(O::DivTyped), X::Binary(O::Mul), X::Expr(T::Binary)], &[BOTH_FORMS], div_to_div_typed::div_to_div_typed),
     row("div_to_div_typed_dyn", X::BinaryDyn(O::Div), &[X::BinaryDyn(O::DivTyped), X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[BOTH_FORMS], div_to_div_typed::div_to_div_typed_dyn),
     row("div_typed_to_div", X::Binary(O::DivTyped), &[X::Binary(O::Div), X::BinaryDyn(O::Div), X::Func(F::Trunc), X::FuncDyn(F::Trunc), X::Expr(T::Binary), X::Expr(T::Call)], &[MIXED_DIVISION, BOTH_FORMS], div_typed_to_div::div_typed_to_div),
