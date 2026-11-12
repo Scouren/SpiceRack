@@ -76,6 +76,23 @@ fn a_mutant_that_breaks_the_reader_is_caught_and_shrunk() {
 }
 
 #[test]
+fn reasons_that_differ_only_by_a_name_or_number_are_one_group() {
+    assert_eq!(
+        masked("panic: analysis name t3 used twice"),
+        masked("panic: analysis name a5 used twice")
+    );
+    assert_ne!(
+        masked("ir::check: X0016"),
+        masked("ir::check: X0015"),
+        "codes are kept"
+    );
+    assert_ne!(
+        masked("panic: a name used twice"),
+        masked("panic: a name not found")
+    );
+}
+
+#[test]
 fn a_shrink_that_hits_its_bound_says_it_is_not_minimal() {
     // Every candidate stays bad but only a line-by-line walk could tell: on a text of more lines
     // than the bound, the shrink stops and says so.
@@ -97,7 +114,7 @@ fn a_shrink_that_hits_its_bound_says_it_is_not_minimal() {
 }
 
 /// Every mutant of every fixture deck of `row`, read and checked; each distinct failure (by
-/// its reason) once, with the first seed and deck that showed it, its mutant shrunk.
+/// its reason, names and numbers masked: [`masked`]) once, with the first seed and deck that showed it, its mutant shrunk.
 fn mutants_of(row: &DialectRow) -> Result<(), String> {
     let decks = decks(row.name);
     if decks.is_empty() {
@@ -109,12 +126,14 @@ fn mutants_of(row: &DialectRow) -> Result<(), String> {
             let mutant = mutate(text, seed);
             let bad = |t: &str| bad_read(row, t);
             let Some(why) = bad(&mutant) else { continue };
-            if found.iter().any(|(w, _)| *w == why) {
+            // One bug, one shrink: reasons are grouped with the names and numbers in them masked.
+            let group = masked(&why);
+            if found.iter().any(|(w, _)| *w == group) {
                 continue;
             }
             let small = shrink(&mutant, &bad);
             found.push((
-                why.clone(),
+                group,
                 format!("{path} seed {seed}: {why}\nshrunk mutant:\n{small}"),
             ));
         }
@@ -127,6 +146,24 @@ fn mutants_of(row: &DialectRow) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join("\n")),
     }
+}
+
+/// `why` with every word holding a digit masked, a diagnostic code (`X0016`) kept
+/// (`analysis name t3 used twice` and `… a5 …` are one reason; `X0016` and `X0015` two): the
+/// key failures are grouped by.
+fn masked(why: &str) -> String {
+    let code = |w: &str| {
+        let b = w.as_bytes();
+        b.len() == 5 && b[0].is_ascii_uppercase() && b[1..].iter().all(u8::is_ascii_digit)
+    };
+    let word = |w: &str| match w.chars().any(|c| c.is_ascii_digit()) && !code(w) {
+        true => "#".to_string(),
+        false => w.to_string(),
+    };
+    why.split_whitespace()
+        .map(word)
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Why `text` is a bad read for `row` (a panic, or an `X` row), or `None`.

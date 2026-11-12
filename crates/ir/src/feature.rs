@@ -30,7 +30,7 @@
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
-use crate::class::{ExprClass, def_classes, node_class};
+use crate::class::def_classes;
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
@@ -485,12 +485,7 @@ pub(crate) fn item_features(
     for (root, use_) in roots_with_use(design, &handles) {
         let nodes = walk.tree(design, root);
         // the one form decision (A26): the field's use and the tree's class (R14, A19)
-        let table = def_classes(design);
-        let class = nodes
-            .iter()
-            .map(|&e| node_class(design, e, table))
-            .max()
-            .unwrap_or(ExprClass::Constant);
+        let class = crate::class::tree_class(design, root, def_classes(design));
         // A28 (R51): a function body counts in its callers' forms, every other root in its own
         let forms = if item.kind == ItemKind::Func {
             let bits = body_forms(design).get(&root).copied().unwrap_or(0);

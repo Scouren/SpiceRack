@@ -20,7 +20,7 @@
 
 use crate::check::Violation;
 pub(crate) use crate::circuit_tables::{
-    bound_family, builtin_fits, builtin_kind, has_polarity, typed_key, versioned,
+    bound_family, builtin_fits, builtin_kind, has_polarity, needs_version, typed_key, versioned,
 };
 use crate::circuit_text::get_row;
 use crate::class::{ExprClass, def_classes, tree_class};
@@ -123,7 +123,9 @@ pub(crate) fn check_element(e: &Element, design: &Design, at: ItemRef, out: &mut
 
 /// Appends `m`'s `FieldDomain` violation, if any.
 pub(crate) fn check_model(m: &Model, design: &Design, at: ItemRef, out: &mut Diags) {
-    if !model_ok(design, m) {
+    // a versioned family states its version (round 7): `check`'s alone, not the builder's
+    let versionless = needs_version(m.family) && m.version == ExprId::NONE;
+    if !model_ok(design, m) || versionless {
         out.push_at(violation_code(Violation::FieldDomain), design, at, at.index);
     }
 }
@@ -393,6 +395,10 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 && never != some(p.repeat_at)
                 && (!never || p.join == PwlJoin::Jump && !some(p.repeat_count))
                 && some(p.join_width) == (p.join == PwlJoin::RampWidth)
+                // A30 finding 4: the pairs no simulator states
+                && !(p.repeat == PwlRepeat::Period && p.join == PwlJoin::Ramp)
+                && !(p.repeat == PwlRepeat::From
+                    && matches!(p.join, PwlJoin::RampWidth | PwlJoin::Extrapolate))
         }),
         WaveKind::Sffm => side::<Sffm>(design, w.index, v).is_none_or(|s| {
             let def = [
