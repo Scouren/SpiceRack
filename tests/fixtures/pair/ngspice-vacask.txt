@@ -8,7 +8,6 @@
 # 64e3c8ef: A38's strict refusal (S0104) landed. After step2-passes ad03d731
 # (tran_print_step_to_simulator, R67) the eight transients pass all six steps.
 dc_sweep_pulse 2 refused:W2007 ruling=R64 # R64a: a .dc over a source with a PULSE is refused, not swept (VACASK ignores a waveform source's dc)
-tran_uic 2 refused:U0001:Circuit(IcUicOnly) pass=device_ic_to_tran_ic # a capacitor's ic= under uic
 unresolved_param 1 refused:S0104 ruling=A38 # the strict read refuses a parameter read no definition binds (R63); ngspice rejects the deck too
 latch 4 mismatch finding=F8 # R75: dc v(a) at vin=2 of outer step 2 (rin 10.1k): 2.50 V ngspice vs 3.00 V VACASK; the resistor axis converts since step2-vacask 622f80cb (DcAxisElementValue)
 latch_vdd 4 mismatch finding=F8 # R75: dc v(a) at vin=2 of outer step 2 (vdd 5.1): 2.55 V ngspice vs 3.02 V VACASK (ngspice restarts the inner sweep, VACASK carries the last solve)

@@ -587,27 +587,7 @@ fn uic_start(sim: sim::Sim, src: &str, ran: Ran) -> Ran {
         return ran;
     };
     if skip {
-        for p in &mut plots {
-            let at0 = p
-                .real_data
-                .first()
-                .is_some_and(|t| t.first() == Some(&0.0) && t.len() > 1);
-            let timed = p
-                .variables
-                .first()
-                .is_some_and(|v| v.name.eq_ignore_ascii_case("time"));
-            if at0 && timed {
-                p.real_data.iter_mut().for_each(|c| {
-                    c.remove(0);
-                });
-                p.complex_data
-                    .iter_mut()
-                    .filter(|c| !c.is_empty())
-                    .for_each(|c| {
-                        c.remove(0);
-                    });
-            }
-        }
+        cmp::without_start(&mut plots);
     }
     Ran::Plots(plots)
 }

@@ -85,6 +85,9 @@ struct Spine {
     renames: HashMap<String, String>,
     devices: BTreeSet<String>,
     axes: BTreeSet<String>,
+    /// A transient has `uic` in the legalized design: its t = 0 point is not compared
+    /// (`cmp::without_start`).
+    uic: bool,
 }
 
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
@@ -181,13 +184,19 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         (a, b)
     });
     let (a, b) = match ran {
-        Ok((Ran::Plots(a), Ran::Plots(b))) => (
-            plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
-            plots::only(
-                plots::renamed(plots::hierarchical(b), &spine.renames),
-                pair.vectors.as_ref(),
-            ),
-        ),
+        Ok((Ran::Plots(mut a), Ran::Plots(mut b))) => {
+            if spine.uic {
+                cmp::without_start(&mut a);
+                cmp::without_start(&mut b);
+            }
+            (
+                plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
+                plots::only(
+                    plots::renamed(plots::hierarchical(b), &spine.renames),
+                    pair.vectors.as_ref(),
+                ),
+            )
+        }
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
     };
@@ -212,7 +221,11 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
                         SECS,
                     );
                     match (a2, b2) {
-                        (Ran::Plots(x), Ran::Plots(y)) => Some(
+                        (Ran::Plots(mut x), Ran::Plots(mut y)) => Some({
+                            if spine.uic {
+                                cmp::without_start(&mut x);
+                                cmp::without_start(&mut y);
+                            }
                             cmp::compare(
                                 &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
                                 &plots::only(
@@ -221,8 +234,8 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
                                 ),
                                 tol,
                             )
-                            .is_ok(),
-                        ),
+                            .is_ok()
+                        }),
                         _ => None,
                     }
                 });
@@ -393,12 +406,14 @@ fn spine(
             devices.insert(name);
         }
     }
+    let uic = ir::features_used(&design).contains(ir::Feature::Run(ir::RunExtra::TranUic));
     Ok(Spine {
         legal: design,
         files,
         renames,
         devices,
         axes,
+        uic,
     })
 }
 
