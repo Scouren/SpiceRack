@@ -3801,7 +3801,6 @@ xyce/Certification_Tests/ISSUE_492/test_c3.cir ltspice written differently: a `.
 xyce/Certification_Tests/ISSUE_492/test_c4.cir ltspice written differently: a `.dc` over a parameter is `.step param` beside `.op` (P3-115)
 xyce/Certification_Tests/ISSUE_492/test_c5.cir ltspice written differently: a `.dc` over a parameter is `.step param` beside `.op` (P3-115)
 xyce/Certification_Tests/ISSUE_492/test_c6.cir ltspice written differently: a `.dc` over a parameter is `.step param` beside `.op` (P3-115)
-xyce/Output/SPARAMS/RCladderSPdc.cir ltspice refused differently: a `.dc` over a device or its parameter is no LTspice `.dc`: W0015 at the card too (P3-115)
 xyce/PARAM_REFACTOR/paramDc1.cir ltspice written differently: a `.dc` over a parameter is `.step param` beside `.op` (P3-115)
 xyce/POWERNODE/resInner.cir ltspice now refused: a `.dc` over a resistor, capacitor or inductor is no LTspice `.dc`: W0015 (P3-115)
 xyce/SENS/ampSens.cir ltspice refused differently: a `.dc` over a parameter beside another analysis or a `.step` is no LTspice `.dc`: W0015 at the card too (P3-115)

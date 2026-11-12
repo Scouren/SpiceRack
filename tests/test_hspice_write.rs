@@ -209,8 +209,8 @@ fn xyce_printed(text: &str) -> Vec<(String, f64)> {
 /// nothing without a `.print` ("Netlist warning: No print specified");
 /// `V(*)` is every node voltage (RG 7.10 §2.1.31.11) on the print of the
 /// kind the deck runs, the one print Xyce takes ("Analysis type TRAN and
-/// print type DC are inconsistent." stops it), so a deck of two kinds
-/// gets none and says so (W0023). VACASK saves every node when no `save`
+/// print type DC are inconsistent." stops it); a deck of two kinds is
+/// refused (W0321), as Xyce runs one card alone. VACASK saves every node when no `save`
 /// is given (`lib/coredcinc.cpp`, `addAllUnknowns`): no line, no note.
 /// The decks run: 1 V over 1k, 1k and 2k is 0.75 V and 0.5 V, in Xyce's
 /// print file too. A list is left out and noted, as before.
@@ -239,11 +239,11 @@ fn p3_043_save_all_is_written_for_hspice_xyce_and_vacask() {
     let printed = xyce_printed(&xy);
     let out = printed.iter().find(|(n, _)| n == "V(3)");
     assert!(out.is_some_and(|(_, v)| tol.within(*v, 0.5)), "{printed:?}");
-    // Two kinds: Xyce runs one and stops on the other's print.
+    // Two kinds: Xyce runs one card alone, so the deck is refused (W0321,
+    // ZERO-LEDGER P1-066-xyce-one-analysis).
     let both = format!("{net}.save all\n.tran 1u 2u\n.ac dec 1 1k 10k\n.end\n");
-    let w = oracle::written(&both, ng, Dialect::Xyce);
-    assert!(!w.text.contains(".print"), "{}", w.text);
-    assert!(oracle::notes(&w).contains(&Code::W0023), "{}", w.text);
+    let codes = oracle::refusal(&both, ng, Dialect::Xyce);
+    assert!(codes.contains(&Code::W0321), "{codes:?}");
     let va = oracle::written(&op, ng, Dialect::Vacask);
     assert!(!oracle::notes(&va).contains(&Code::W0023), "{}", va.text);
     let on = [ng, Dialect::Hspice, Dialect::Xyce, Dialect::Vacask];
