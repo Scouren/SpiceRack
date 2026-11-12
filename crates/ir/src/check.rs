@@ -13,6 +13,7 @@
 
 use std::collections::HashSet;
 
+use crate::class::ExprClass;
 use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
@@ -60,7 +61,10 @@ pub enum Violation {
     EmptyName,
     /// A `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt` appears in an expression a row lists as a
     /// [`Handle::Expr`] (a field that must be constant in time: a parameter, a model value, an
-    /// analysis argument). Under [`Handle::ExprDyn`] they are legal. `arg`: the expression.
+    /// analysis argument), or the expression is of class `Circuit` through a parameter or
+    /// function it reads (A15 K3; reported only on a design with no other violation, since the
+    /// class table reads definitions through their rows). Under [`Handle::ExprDyn`] they are
+    /// legal. `arg`: the expression (the probe's row, or the field's root when through a read).
     ProbeContext,
     /// Two definitions of one kind and name in one scope. `arg`: the second definition.
     DuplicateDef,
@@ -112,6 +116,7 @@ impl Violation {
 /// lists in `RowFacts::handles`; each row's own invariants are its `RowFacts::check` (one
 /// exhaustive dispatch over `ItemKind`).
 pub fn check(design: &Design, diags: &mut Diags) {
+    let before = diags.len();
     let mut out = Out { design, diags };
     files_and_scopes(&mut out);
     definitions(&mut out);
@@ -119,6 +124,11 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
+    // the class table reads definitions through their rows, so it runs on a design whose
+    // handles hold (A15 K3)
+    if out.diags.len() == before {
+        probe_classes(&mut out);
+    }
 }
 
 /// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
@@ -143,6 +153,39 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
 }
 
 // ---- private ----
+
+/// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
+/// head default) whose expression is of class `Circuit` by a parameter or function it reads.
+/// A direct probe in it was reported by `expression`; this pass sees only valid designs.
+fn probe_classes(out: &mut Out<'_>) {
+    let d = out.design;
+    let table = crate::class::def_classes(d);
+    let mut handles = Vec::new();
+    for (item, _) in d.reachable() {
+        handles.clear();
+        for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
+        let mut roots = Vec::new();
+        for h in &handles {
+            match *h {
+                Handle::Expr(e) => roots.push(e),
+                Handle::Params(l) => roots.extend(d.params(l).iter().map(|p| p.1)),
+                Handle::Exprs(l) => roots.extend_from_slice(d.exprs(l)),
+                Handle::ExprDyn(_)
+                | Handle::Name(_)
+                | Handle::Ref(_)
+                | Handle::Names(_)
+                | Handle::Scope(_)
+                | Handle::Text(_)
+                | Handle::Branches(_) => {}
+            }
+        }
+        for e in roots {
+            if crate::class::tree_class(d, e, table) == ExprClass::Circuit {
+                out.report(Violation::ProbeContext, d.span_of(item), e.0);
+            }
+        }
+    }
+}
 
 impl Out<'_> {
     fn report(&mut self, v: Violation, span: Span, arg: u32) {

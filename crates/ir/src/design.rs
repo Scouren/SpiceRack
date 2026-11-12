@@ -426,14 +426,16 @@ impl Design {
     }
 
     /// Structural equality: every table, pool, list and id equal, literals field by field
-    /// (`1k` ≠ `1e3`), spans ignored. The `≅` of law L5 before its case rule.
+    /// (`1k` ≠ `1e3`, forms included), spans ignored. Exact by design (A15 K4). The `≅` of law
+    /// L5 before its case rule.
     pub fn eq_ignoring_spans(&self, other: &Design) -> bool {
         self.same(other, |a, b| a == b)
     }
 
-    /// As [`Design::eq_ignoring_spans`], but two literals are equal when their exact decimal
-    /// values are (`Literal::eq_value`: `1k` = `1e3`). For the differential harness
-    /// (REWRITE-PLAN §7.3), which compares meanings across dialects.
+    /// As [`Design::eq_ignoring_spans`], but two real literals are equal when their exact
+    /// decimal values are, whatever their forms (`Literal::eq_value`: `1k` = `1e3` = `1000`), and
+    /// an `Int` literal equals only an `Int` of the same value (A15 K4, R28). For the
+    /// differential harness (REWRITE-PLAN §7.3), which compares meanings across dialects.
     pub fn eq_meaning(&self, other: &Design) -> bool {
         self.same(other, Literal::eq_value)
     }

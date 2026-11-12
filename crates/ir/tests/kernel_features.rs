@@ -11,7 +11,7 @@
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
     AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
-    ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass, OptionKey,
+    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, OpaqueClass, OptionKey,
     Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
@@ -53,6 +53,7 @@ fn index_and_from_index_are_inverses() {
         RunExtra::ALL.len(),
         OptionKey::ALL.len(),
         spicerack_ir::ModelFamily::ALL.len(),
+        (spicerack_ir::ScopeKind::ALL.len() - 1) * ItemKind::ALL.len(),
     ];
     assert_eq!(Feature::COUNT as usize, groups.iter().sum::<usize>());
     let mut seen = vec![false; Feature::COUNT as usize];
@@ -66,9 +67,12 @@ fn index_and_from_index_are_inverses() {
         Feature::Item(ItemKind::Measure).index(),
         ItemKind::Measure as u16
     );
-    // the groups in declaration order: the last feature is the last model family (A15 K5)
+    // the groups in declaration order: the last feature is the last placement (A15 K1)
     let last = Feature::from_index(Feature::COUNT - 1);
-    assert!(matches!(last, Feature::Family(_)), "{last:?}");
+    assert_eq!(
+        last,
+        Feature::Placed(spicerack_ir::ScopeKind::Loop, ItemKind::Elaborate)
+    );
     assert_ne!(
         Feature::Func(Func::Sin).index(),
         Feature::FuncDyn(Func::Sin).index()
@@ -82,7 +86,7 @@ fn the_bitset_is_a_set() {
         .with(Feature::Func(Func::Exp));
     let b = FeatureSet::EMPTY
         .with(Feature::Func(Func::Exp))
-        .with(Feature::Extra(Extra::LocalFunc));
+        .with(Feature::Extra(Extra::IntLiteral));
     assert!(a.contains(Feature::Item(ItemKind::Param)));
     assert!(!a.contains(Feature::Item(ItemKind::Title)));
     assert!(FeatureSet::EMPTY.is_empty() && !a.is_empty());
@@ -95,7 +99,7 @@ fn the_bitset_is_a_set() {
         vec![
             Feature::Item(ItemKind::Param),
             Feature::Func(Func::Exp),
-            Feature::Extra(Extra::LocalFunc)
+            Feature::Extra(Extra::IntLiteral)
         ]
     );
     let all = (0..Feature::COUNT).fold(FeatureSet::EMPTY, |s, i| s.with(Feature::from_index(i)));
@@ -156,63 +160,6 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
     let cases: [(Extra, Build, Build); Extra::COUNT] = [
-        (
-            Extra::NestedSubckt,
-            |b, top| {
-                let (_, body) = b.subckt(top, "outer", &[], &[], Span::NONE);
-                b.subckt(body, "inner", &[], &[], Span::NONE);
-            },
-            |b, top| {
-                b.subckt(top, "outer", &[], &[], Span::NONE);
-                b.subckt(top, "inner", &[], &[], Span::NONE);
-            },
-        ),
-        (
-            Extra::LocalModel,
-            |_, _| {}, // a Model is the circuit owner's row: its pair is in the owner's tests
-            |_, _| {},
-        ),
-        (
-            Extra::LocalFunc,
-            |b, top| {
-                let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
-                let one = b.num(1.0);
-                b.func(body, "f", &[], one, Span::NONE);
-            },
-            |b, top| {
-                b.subckt(top, "s", &[], &[], Span::NONE);
-                let one = b.num(1.0);
-                b.func(top, "f", &[], one, Span::NONE);
-            },
-        ),
-        (
-            Extra::ParamInBranch,
-            |b, top| {
-                let c = b.num(1.0);
-                let (_, branches) = b.if_(top, &[c], Span::NONE);
-                let body = b.design().branches(branches)[0].body;
-                b.param(body, "k", c, Span::NONE);
-            },
-            |b, top| {
-                let c = b.num(1.0);
-                b.if_(top, &[c], Span::NONE);
-                b.param(top, "k", c, Span::NONE);
-            },
-        ),
-        (
-            Extra::LoadInBranch,
-            |b, top| {
-                let c = b.num(1.0);
-                let (_, branches) = b.if_(top, &[c], Span::NONE);
-                let body = b.design().branches(branches)[0].body;
-                b.load(body, LoadKind::Osdi, "m.osdi", Span::NONE);
-            },
-            |b, top| {
-                let c = b.num(1.0);
-                b.if_(top, &[c], Span::NONE);
-                b.load(top, LoadKind::Osdi, "m.osdi", Span::NONE);
-            },
-        ),
         (
             Extra::IncludeSection,
             |b, top| {
@@ -299,7 +246,7 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             },
         ),
         (
-            Extra::FormalReadsParam,
+            Extra::FormalNotConstant,
             |b, top| {
                 let one = b.num(1.0);
                 b.param(top, "w0", one, Span::NONE);
@@ -321,11 +268,33 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.comment(top, "titled", Span::NONE);
             },
         ),
+        (
+            Extra::FormalWithoutDefault,
+            |b, top| {
+                b.subckt(top, "s", &[], &[("w", ExprId::NONE)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+            },
+        ),
+        (
+            Extra::IfConditionDynamic,
+            |b, top| {
+                let t = b.temp();
+                let lim = b.num(100.0);
+                let hot = b.binary(BinOp::Gt, t, lim);
+                b.if_(top, &[hot], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                let zero = b.literal(spicerack_ir::Literal::ZERO);
+                let yes = b.binary(BinOp::Gt, one, zero);
+                b.if_(top, &[yes], Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
-        if extra == Extra::LocalModel {
-            continue;
-        }
         let f = Feature::Extra(extra);
         assert!(used(sets).contains(f), "{extra:?} is set");
         assert!(
@@ -427,4 +396,60 @@ fn a_library_without_a_title_is_no_deck_without_one() {
         b.comment(top, "a library", Span::NONE);
     }
     assert!(!features_used(&d).contains(Feature::Extra(Extra::DeckWithoutTitle)));
+}
+
+#[test]
+fn placement_is_enclosure_at_any_depth() {
+    // A15 K1 (R27, ruled "enclosed"): Placed(S, K) for each scope kind S on the item's chain,
+    // File excluded; spec examples worked by hand
+    use spicerack_ir::ScopeKind as S;
+    let placed = |s: S, k: ItemKind| Feature::Placed(s, k);
+    let used = used(|b, top| {
+        let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
+        let one = b.num(1.0);
+        let (_, branches) = b.if_(outer, &[one], Span::NONE);
+        let branch = b.design().branches(branches)[0].body;
+        let (_, inner) = b.subckt(branch, "inner", &[], &[], Span::NONE);
+        let two = b.num(2.0);
+        b.param(inner, "p", two, Span::NONE);
+    });
+    let got: Vec<Feature> = used
+        .iter()
+        .filter(|f| matches!(f, Feature::Placed(..)))
+        .collect();
+    let mut want = vec![
+        placed(S::Subckt, ItemKind::If),
+        placed(S::Subckt, ItemKind::Subckt),
+        placed(S::Branch, ItemKind::Subckt),
+        placed(S::Subckt, ItemKind::Param),
+        placed(S::Branch, ItemKind::Param),
+    ];
+    want.sort_by_key(|f| f.index());
+    assert_eq!(got, want, "the outer subckt in the top sets nothing");
+    // the helper
+    let set = FeatureSet::placed(S::Loop, &[ItemKind::Loop, ItemKind::Analysis]);
+    assert_eq!(
+        set.iter().collect::<Vec<_>>(),
+        vec![
+            placed(S::Loop, ItemKind::Analysis),
+            placed(S::Loop, ItemKind::Loop)
+        ]
+    );
+}
+
+#[test]
+fn a_temperature_default_is_not_a_constant() {
+    // A15 widening of A12 K2: a head default of class Temp (VACASK run: `$temp` cannot be
+    // overridden either) sets FormalNotConstant, as a parameter read does; a literal does not
+    let f = Feature::Extra(Extra::FormalNotConstant);
+    let temp = used(|b, top| {
+        let t = b.temp();
+        b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
+    });
+    assert!(temp.contains(f), "w = $temp");
+    let tnom = used(|b, top| {
+        let t = b.tnom();
+        b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
+    });
+    assert!(!tnom.contains(f), "w = $tnom is a constant of the run");
 }

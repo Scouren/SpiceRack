@@ -4,21 +4,14 @@
 //!
 //! Cites: `rewrite/AMEND-A12.md` A14; `rewrite/RULINGS.md` R24, R26; `rewrite/IR-RUN.md` §1.
 //!
-//! Contents: `pub(crate) fn nested`, `pub(crate) fn state_order_features`
+//! Contents: `pub(crate) fn state_order_features`
 
 use crate::design::{Design, ItemRow};
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{FileId, ScopeId};
-use crate::item::{ItemKind, Role, ScopeKind};
+use crate::item::{ItemKind, Role};
 use crate::option::{Applies, Env, NodeSet, OptionRow};
 use crate::run_extra::RunExtra;
-use crate::run_words::in_scope_kind;
-
-/// Whether an item listed in `scope` sits inside a subcircuit or section body (R26).
-pub(crate) fn nested(design: &Design, scope: ScopeId) -> bool {
-    in_scope_kind(design, scope, ScopeKind::Subckt)
-        || in_scope_kind(design, scope, ScopeKind::Section)
-}
 
 /// Adds the features of state items that come after a run item (an analysis, loop or alter)
 /// in listed order (A14): per deck file, its items depth first with each body right after its

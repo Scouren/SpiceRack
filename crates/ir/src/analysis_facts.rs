@@ -32,6 +32,7 @@ use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::target_refs;
+#[cfg(any(test, feature = "gen"))]
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::loop_depth;
@@ -70,6 +71,15 @@ pub(crate) trait DetailFacts: RunDetail {
         features: &FeatureSet,
     ) -> Option<Self>;
 }
+
+/// The periodic small-signal kinds: each needs an `Hb` or `Pss` before it (R5).
+#[cfg(any(test, feature = "gen"))]
+const PERIODIC: [AnalysisKind; 4] = [
+    AnalysisKind::Pac,
+    AnalysisKind::Pnoise,
+    AnalysisKind::Pxf,
+    AnalysisKind::Pstb,
+];
 
 /// Dispatches a generic call over an analysis kind's detail type (`$none` for the kinds
 /// without one). Exhaustive: a new kind fails to compile here.
@@ -166,11 +176,8 @@ impl RowFacts for Analysis {
         }
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
-        if crate::state_order::nested(design, scope) {
-            *set = set.with(Feature::Run(RunExtra::RunItemNested));
-        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -233,11 +240,6 @@ impl RowFacts for Analysis {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let design = b.design();
-        if crate::state_order::nested(design, scope)
-            && !features.contains(Feature::Run(RunExtra::RunItemNested))
-        {
-            return ItemRef::NONE;
-        }
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
         // Generation appends, so the table's rows are the design's analyses (no dead rows).
         if !design.analyses.is_empty() && !several {
@@ -257,27 +259,7 @@ impl RowFacts for Analysis {
         if kinds.is_empty() {
             return ItemRef::NONE;
         }
-        // Right after an `Hb`/`Pss`, favour the small-signal kinds that need one, so each of
-        // them is reached (they are possible only there).
-        let periodic: Vec<AnalysisKind> = kinds
-            .iter()
-            .copied()
-            .filter(|k| {
-                matches!(
-                    k,
-                    AnalysisKind::Pac
-                        | AnalysisKind::Pnoise
-                        | AnalysisKind::Pxf
-                        | AnalysisKind::Pstb
-                )
-            })
-            .collect();
-        let pool = if !periodic.is_empty() && g.chance(2) {
-            &periodic
-        } else {
-            &kinds
-        };
-        let kind = pool[g.below(pool.len() as u32) as usize];
+        let kind = kinds[g.below(kinds.len() as u32) as usize];
         // The name first: the text, and so the parse, interns it before the detail's names.
         let name = if g.chance(4) {
             g.fresh_name(b)
@@ -286,11 +268,41 @@ impl RowFacts for Analysis {
         };
         let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
             .expect("a possible kind's detail generates");
-        b.push(
+        let item = b.push(
             scope,
             Analysis { kind, name, detail },
             crate::span::Span::NONE,
-        )
+        );
+        // A periodic small-signal kind is possible only right after its base: a base this call
+        // made gets one at once (half the time), so none of them depends on the kernel picking an
+        // analysis next. Counted in the budget like any item.
+        if matches!(kind, AnalysisKind::Hb | AnalysisKind::Pss)
+            && several
+            && g.items_left > 1
+            && g.chance(2)
+        {
+            let follow: Vec<AnalysisKind> = PERIODIC
+                .into_iter()
+                .filter(|&k| features.contains(Feature::Analysis(k)))
+                .collect();
+            if !follow.is_empty() {
+                let kind = follow[g.below(follow.len() as u32) as usize];
+                let name = if g.chance(4) {
+                    g.fresh_name(b)
+                } else {
+                    NameId::NONE
+                };
+                let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+                    .expect("a periodic kind generates right after its base");
+                b.push(
+                    scope,
+                    Analysis { kind, name, detail },
+                    crate::span::Span::NONE,
+                );
+                g.items_left -= 1;
+            }
+        }
+        item
     }
 }
 

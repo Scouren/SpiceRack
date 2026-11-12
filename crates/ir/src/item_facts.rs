@@ -41,8 +41,14 @@ impl RowFacts for Title {
         // no feature beyond the kind
     }
 
-    fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
-        // no invariant beyond the handles
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+        // A15 K3: one line of text; only in a deck's top (a pass may have moved it)
+        let s = design.scope(scope);
+        let deck = s.kind == crate::item::ScopeKind::File
+            && design.file(s.file).role == crate::item::Role::Deck;
+        if !deck || design.text(self.text).contains(['\n', '\r']) {
+            field_domain(design, at, out);
+        }
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -82,8 +88,11 @@ impl RowFacts for Comment {
         // no feature beyond the kind
     }
 
-    fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
-        // no invariant beyond the handles
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
+        // A15 K3: one line of text
+        if design.text(self.text).contains(['\n', '\r']) {
+            field_domain(design, at, out);
+        }
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -305,14 +314,20 @@ impl RowFacts for Subckt {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        // A12 K2: a head default that reads a parameter
-        let defaults = design
-            .params(self.params)
-            .iter()
-            .map(|p| p.1)
-            .filter(|e| !e.is_none());
-        if defaults.into_iter().any(|e| reads_param(design, e)) {
-            *set = set.with(Feature::Extra(Extra::FormalReadsParam));
+        // A12 K2, widened by A15: a head default that is not a constant
+        let table = crate::class::def_classes(design);
+        let not_constant = design.params(self.params).iter().any(|p| {
+            !p.1.is_none()
+                && (reads_param(design, p.1)
+                    || crate::class::tree_class(design, p.1, table)
+                        >= crate::class::ExprClass::Temp)
+        });
+        if not_constant {
+            *set = set.with(Feature::Extra(Extra::FormalNotConstant));
+        }
+        // A15 K2: a formal an instance must pass
+        if design.params(self.params).iter().any(|p| p.1.is_none()) {
+            *set = set.with(Feature::Extra(Extra::FormalWithoutDefault));
         }
     }
 
@@ -412,8 +427,15 @@ impl RowFacts for If {
         // no reference field
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        // A15 K2: a condition no constant fold decides
+        let table = crate::class::def_classes(design);
+        let dynamic = design.branches(self.branches).iter().any(|br| {
+            crate::class::tree_class(design, br.cond, table) >= crate::class::ExprClass::Temp
+        });
+        if dynamic {
+            *set = set.with(Feature::Extra(Extra::IfConditionDynamic));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
