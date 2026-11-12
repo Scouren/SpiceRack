@@ -37,7 +37,7 @@ ACtests/bsim4/opamp.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461
 ACtests/mos/gain-stage6.cir mismatch # ac V(2): 0.09999946945255755-0.00023033554385911846i vs 0.1+0i at 3981071.705534983 (tol 2.020e-4)
 AMPMOD/amp_mod.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(30): 13.005517297239802 leaves the tube at t=0.0002243761517194102 (tol 2.000e-1)
 B4SOI_450/invert_b4soi_4.5.cir mismatch # tran VDDDEV#branch: -0.004150921538424679 leaves the tube at t=1.5083773420246618e-06 (tol 4.876e-05; target there -0.003277989441613449)
-B4SOI_450/inverter_tr.cir mismatch # tran VGATE#branch: -0.002481225949942353 leaves the tube at t=1.411811989374297e-10 (tol 3.375e-05; target there -0.0023086303492655625)
+B4SOI_450/inverter_tr.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VGATE#branch: -0.002481225949942353 leaves the tube at t=0.0000000001411811989374297 (tol 3.375e-5)
 B4SOI_450/ring_osc.cir mismatch # tran BUF: 0.07055074021050438 leaves the tube at t=8.605901878273634e-10 (tol 1.509e-02; target there 0.44418778524839575)
 B4SOI_450/test3.cir mismatch # dc VD#branch: -6.978103646901452e-11 vs 8.0449899842635e+26 at 0.02 (tol 9.326e-07; 180/183 points out)
 B4SOI_450/test7.cir mismatch # dc VD#branch: 6.690598311415213e-11 vs -5.542094503651548e+26 at -0.02 (tol 9.308e-07; 180/183 points out)
@@ -99,7 +99,7 @@ CONNECTIVITY/connect.cir simulator-differs:self-inconsistency reason=XYCE-GLOBAL
 Certification_Tests/BUG_1018_SON/bug1018son.cir mismatch # op ANODEOFMOSDIODE: 1.0592177780850767+0i vs 0.5180792647412922+0i at 0 (tol 2.120e-3)
 Certification_Tests/BUG_1037_SON/specials_in_dot_param.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [temp] | Formula() error. | Undefined parameter [vt] | Formula() error.
 Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=1.0954826735058434e-08 (tol 2.277e-02; target there 0.8824570593608186)
-Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2.cir mismatch # tran V(1): 2.0394030325951755 leaves the tube at t=2.5239840023868877e-08 (tol 2.204e-02; target there 1.5735676654521173)
+Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 2.0394030325951755 leaves the tube at t=0.000000025239840023868877 (tol 2.204e-2)
 Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2Ref.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): 2.0394030325951755 leaves the tube at t=0.000000025239840023868877 (tol 2.204e-2)
 Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScaleRef.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 Certification_Tests/BUG_1041_SON/mos1_invert_scale.cir mismatch # tran IN: 4.930539477883728 leaves the tube at t=0.00000150040625 (tol 5.000e-2)
