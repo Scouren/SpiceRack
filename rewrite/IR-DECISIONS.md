@@ -251,3 +251,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - A design-level feature (`feature::design_level`, beside the case clash): it is a fact of a file, not of an item. `check_legal` reports it at `Span::NONE`.
 - The generator: with the feature absent, every deck gets its `Title` first, even past the item budget. A set holding neither the feature nor `Item(Title)` can hold no deck, so every generated file is then a `Library`.
 
+## `Design::entry` is file 0 (ruled)
+
+- Replaces "the first `Deck` file, else file 0": the entry is file 0 whatever its role (`NONE` with no file). A kit whose entry is a library reaching a deck writes the library. `kernel_store::files_scopes_and_entry` and `kernel_structure::entry_is_total` now pin file 0.
+
