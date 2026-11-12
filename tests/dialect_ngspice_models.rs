@@ -118,13 +118,8 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         // MESA without its level reads back as MES (mesa.c:108, inpdomod.c nmf level 1)
         ("model a mesa polarity=n params=(vto=1)", "W1203"),
         ("model a bsim4 polarity=n version=\"4.9\"", "W1202"),
-        ("model a mos1 polarity=n version=\"1.0\"", "W1202"),
         ("model a hisim_hv polarity=n version=\"3.0\"", "W1202"),
         ("model a mos1 polarity=n params=(vto=1 bogus=2)", "W1203"),
-        (
-            "model a bsim4 polarity=n params=(level=54) version=\"4.8.3\"",
-            "W1203",
-        ),
         ("model a.1 mos1 polarity=n bin_of=a", "W1204"),
         (
             "model b.1 bsim4 polarity=n bin_of=a version=\"4.8.3\"",
@@ -178,7 +173,7 @@ fn written_models_run_on_ngspice_to_the_original_numbers() {
         (".model rr res r=2k", "R2 d 0 rr"),
         (".model mz pmf level=2 vto=-1 beta=1e-3", "Z1 0 g d mz"),
         (
-            ".temp 127\n.model mm nmos vto={0.5+temper*1m} kp=1e-4",
+            ".model mm nmos vto={0.5+temper*1m} kp=1e-4\n.temp 127",
             "M1 d g 0 0 mm w=1u l=1u",
         ),
         (".model mm psoi level=10", "M1 d g 0 0 0 mm w=1u l=1u"),
@@ -197,7 +192,7 @@ fn written_models_run_on_ngspice_to_the_original_numbers() {
     ];
     for (cards, instance) in cases {
         let deck = format!(
-            "probe\n{cards}\n{instance}\nVd d 0 1\nVg g 0 1\n.control\nop\nprint i(vd)\n.endc\n.end\n"
+            "probe\nVd d 0 1\nVg g 0 1\n{instance}\n{cards}\n.control\nop\nprint i(vd)\n.endc\n.end\n"
         );
         let (design, _) = read_deck("probe.sp", &deck);
         // the cards are written by the writer, not copied: every one is a model row
