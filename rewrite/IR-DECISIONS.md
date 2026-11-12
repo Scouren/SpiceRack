@@ -317,3 +317,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The drift property runs 300 seeds of `FeatureSet::ALL` and asserts the kinds that hold references (Element, Model, Analysis, Loop, Alter, Statistics, Elaborate) were each seen with one, so it cannot pass vacuously.
 - `probe_classes` (A15 K3) walks with one stamped `ExprWalk` rather than `tree_class`'s per-call set; `tree_class` stays for the row facts that call it once per row.
 
+## A19 applied (an `ExprDyn` field's form)
+
+- `feature::item_features` marks a root dynamic when the row lists it as `Handle::ExprDyn`, or when its class is at least `Temp`. A root listed under both kinds counts as dynamic.
+- Generator: `operator()` takes the dynamic form under `Reads::Circuit` or `Gen::dyn_form`. The run owner's `gen_event` sets `dyn_form` around the event value, an `ExprDyn` field generated with constant reads unless the set has `MeasCircuitThreshold`. The merged tree's `random_run_subsets_restrict_the_generator` found it as `FuncDyn(Sqrt)` outside a set.
+- The test's unary is `-(2 + 1)`: IR text reads `-1` as a negative literal, not a `Neg` node.
+

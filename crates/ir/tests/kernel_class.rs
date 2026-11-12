@@ -182,8 +182,9 @@ fn a_field_that_may_read_the_circuit_counts_its_operators_dynamic() {
         assert!(diags.is_empty(), "{:?}", diags.rows());
         features_used(&d)
     };
-    let source =
-        read("file \"t.sp\" deck\n  element behav b1 (a 0) expr=(pow(2, 3) + -1) output=voltage\n");
+    let source = read(
+        "file \"t.sp\" deck\n  element behav b1 (a 0) expr=(pow(2, 3) + -(2 + 1)) output=voltage\n",
+    );
     for f in [
         Feature::FuncDyn(Func::Pow),
         Feature::BinaryDyn(BinOp::Add),
@@ -194,7 +195,7 @@ fn a_field_that_may_read_the_circuit_counts_its_operators_dynamic() {
     assert!(
         !source.contains(Feature::Func(Func::Pow)) && !source.contains(Feature::Binary(BinOp::Add))
     );
-    let param = read("file \"t.sp\" deck\n  param p = pow(2, 3) + -1\n");
+    let param = read("file \"t.sp\" deck\n  param p = pow(2, 3) + -(2 + 1)\n");
     assert!(
         param.contains(Feature::Func(Func::Pow)) && param.contains(Feature::Binary(BinOp::Add))
     );

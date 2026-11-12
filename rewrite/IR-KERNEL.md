@@ -340,6 +340,15 @@ sections may now be nested where the set allows. `Placed(_, Title)` never occurs
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
 
+**A19 (2026-11-12): a field that may read the circuit counts the dynamic form (R38).** An
+expression a row lists as `Handle::ExprDyn` counts its functions and operators as `FuncDyn`,
+`BinaryDyn` and `UnaryDyn` whatever its class; elsewhere the form follows the class as before
+(dynamic when `Temp` or `Circuit`). A constant in a B source's expression is the dynamic form,
+because its simulator reads that field with the behavioural parser (`B1 a 0 V={2**3}`). The
+generator picks operators from the dynamic features for every tree under `Reads::Circuit`, and
+for a `Handle::ExprDyn` field it builds with constant reads (`Gen::dyn_form`, a measure's
+threshold).
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

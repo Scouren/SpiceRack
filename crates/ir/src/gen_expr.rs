@@ -221,10 +221,12 @@ impl Gen {
         dynamic: bool,
     ) -> Option<(Node, usize)> {
         let has = |f| features.contains(f);
+        // A19: a field that may read the circuit counts the dynamic form whatever the class
+        let form = dynamic || self.reads == Reads::Circuit || self.dyn_form;
         let mut nodes: Vec<(Node, usize)> = Vec::new();
         if has(Feature::Expr(ExprTag::Unary)) {
             for op in UnOp::ALL {
-                if has(if dynamic {
+                if has(if form {
                     Feature::UnaryDyn(op)
                 } else {
                     Feature::Unary(op)
@@ -235,7 +237,7 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::Binary)) {
             for op in BinOp::ALL {
-                if has(if dynamic {
+                if has(if form {
                     Feature::BinaryDyn(op)
                 } else {
                     Feature::Binary(op)
@@ -249,7 +251,7 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::Call)) {
             for f in Func::ALL {
-                let member = if dynamic {
+                let member = if form {
                     Feature::FuncDyn(f)
                 } else {
                     Feature::Func(f)
