@@ -9,7 +9,8 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9, §7.2 (A4: references are bound by `link` after the text);
 //! `text.rs` (`Words`).
 //!
-//! Contents (crate-private): `pub(crate) fn parse_element`, `pub(crate) fn parse_model`
+//! Contents (crate-private): `pub(crate) fn parse_element`, `pub(crate) fn parse_model`,
+//! `pub(crate) fn parse_library`
 
 use crate::build::Builder;
 use crate::circuit_fields::{Field, Fields, Side};
@@ -20,6 +21,7 @@ use crate::diag::Diags;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::id::{ExprId, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::DefKind;
+use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, Parasitics, Passive};
@@ -170,6 +172,40 @@ pub(crate) fn parse_model(
     let item = b.push(scope, m, span);
     b.define(DefKind::Model, name, scope, item);
     item
+}
+
+/// Reads a device library's fields after its keyword and pushes it into `scope`. Returns
+/// `ItemRef::NONE`, having pushed nothing, when the family word is missing.
+pub(crate) fn parse_library(
+    words: &mut Words<'_>,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> ItemRef {
+    let span = words.span();
+    let Some(family) = words
+        .next()
+        .and_then(|w| FAMILY_WORDS.iter().position(|&k| k == w))
+        .map(|i| ModelFamily::ALL[i])
+    else {
+        words.error(diags);
+        return ItemRef::NONE;
+    };
+    let mut path = NameId::NONE;
+    // bounded: each pass consumes at least one word of the line
+    while !words.at_end() {
+        match words.key() {
+            Some("path") => match words.string(diags) {
+                Some(p) => path = b.name(&p),
+                None => return ItemRef::NONE,
+            },
+            _ => {
+                words.error(diags);
+                words.next();
+            }
+        }
+    }
+    b.device_library(scope, DeviceLibrary { path, family }, span)
 }
 
 impl Fields for NoDetail {

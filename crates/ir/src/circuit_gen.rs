@@ -11,7 +11,8 @@
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator, round trip); `rewrite/IR-KERNEL.md` §9; the
 //! IR-text forms of `circuit_text.rs`.
 //!
-//! Contents (crate-private): `pub(crate) fn generate_element`, `pub(crate) fn generate_model`;
+//! Contents (crate-private): `pub(crate) fn generate_element`, `pub(crate) fn generate_model`,
+//! `pub(crate) fn generate_library`;
 //! the row bodies of `R` are in `circuit_gen_rows.rs` (a child module: it reads `R`'s private
 //! helpers).
 
@@ -27,6 +28,7 @@ use crate::element::{DetailKind, ElemKind, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::library::DeviceLibrary;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, IcMode};
 use crate::semi::{InitialState, Semi, Switch};
@@ -165,6 +167,17 @@ pub(crate) fn generate_model(
         polarity,
     };
     r.b.model(scope, row, Span::NONE)
+}
+
+/// Pushes one random device library into `scope` (always possible).
+pub(crate) fn generate_library(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>) -> ItemRef {
+    let family = ModelFamily::ALL[g.below(ModelFamily::COUNT as u32) as usize];
+    let path = if g.chance(2) {
+        NameId::NONE
+    } else {
+        b.name(&format!("{}.osdi", g.fresh()))
+    };
+    b.device_library(scope, DeviceLibrary { path, family }, Span::NONE)
 }
 
 // ---- private ----

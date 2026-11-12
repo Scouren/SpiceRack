@@ -60,6 +60,7 @@ use crate::item::{
     Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Role,
     Section, Subckt, Title,
 };
+use crate::library::DeviceLibrary;
 use crate::model::Model;
 use crate::names::{FxMap, Names, Texts};
 use crate::option::{Env, NodeSet, OptionRow};
@@ -101,6 +102,7 @@ pub struct Design {
     pub(crate) params: Table<Param>,
     pub(crate) funcs: Table<Func>,
     pub(crate) models: Table<Model>,
+    pub(crate) device_libraries: Table<DeviceLibrary>,
     pub(crate) statistics: Table<Statistics>,
     pub(crate) elements: Table<Element>,
     pub(crate) analyses: Table<Analysis>,
@@ -179,6 +181,7 @@ item_rows! {
     Param => Param, params;
     Func => Func, funcs;
     Model => Model, models;
+    DeviceLibrary => DeviceLibrary, device_libraries;
     Statistics => Statistics, statistics;
     Element => Element, elements;
     Analysis => Analysis, analyses;
@@ -220,6 +223,7 @@ impl Design {
             params: Table::new(),
             funcs: Table::new(),
             models: Table::new(),
+            device_libraries: Table::new(),
             statistics: Table::new(),
             elements: Table::new(),
             analyses: Table::new(),

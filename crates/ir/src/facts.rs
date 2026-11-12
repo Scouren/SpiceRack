@@ -227,6 +227,10 @@ macro_rules! for_kind {
                 type $R = $crate::model::Model;
                 $body
             }
+            $crate::ItemKind::DeviceLibrary => {
+                type $R = $crate::library::DeviceLibrary;
+                $body
+            }
             $crate::ItemKind::Statistics => {
                 type $R = $crate::stats::Statistics;
                 $body

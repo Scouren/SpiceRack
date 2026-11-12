@@ -83,6 +83,7 @@ mod circuit_parse;
 mod circuit_text;
 pub mod controlled;
 pub mod element;
+pub mod library;
 pub mod line;
 pub mod model;
 pub mod passive;
@@ -93,6 +94,7 @@ pub mod wave;
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, NO_ROW};
+pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 

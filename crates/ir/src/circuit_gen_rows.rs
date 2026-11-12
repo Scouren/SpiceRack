@@ -16,10 +16,10 @@ use crate::r#gen::Reads;
 use crate::id::{ExprId, List, NameId};
 use crate::line::Line;
 use crate::passive::{IcMode, Parasitics, Passive};
-use crate::source::{Distof, PortSpec, Source};
+use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::wave::{
-    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw, Sin,
-    TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
+    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
+    Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
 };
 
 impl R<'_, '_> {
@@ -166,6 +166,7 @@ impl R<'_, '_> {
             parasitics,
             port,
             distof,
+            dc_rule: DcRule::Given,
         }
     }
 
@@ -283,6 +284,7 @@ impl R<'_, '_> {
                     width,
                     period,
                     cycles,
+                    law: PulseLaw::Spice,
                 })
             }
             WaveKind::Sin => {
@@ -316,6 +318,7 @@ impl R<'_, '_> {
                     tau1,
                     td2,
                     tau2,
+                    td2_from: TdFrom::Zero,
                 })
             }
             WaveKind::Pwl => {
@@ -347,6 +350,7 @@ impl R<'_, '_> {
                     phase_c_deg,
                     phase_m_deg,
                     law,
+                    pre: PreDelay::Offset,
                 })
             }
             WaveKind::Am => {

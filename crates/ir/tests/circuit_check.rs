@@ -24,7 +24,8 @@ mod tests {
     use spicerack_ir::diag::violation_code;
     use spicerack_ir::passive::{Coupling, IcMode, Passive};
     use spicerack_ir::semi::{InitialState, Switch};
-    use spicerack_ir::wave::{Pwl, PwlJoin, PwlRepeat};
+    use spicerack_ir::source::DcRule;
+    use spicerack_ir::wave::{PulseLaw, Pwl, PwlJoin, PwlRepeat};
     use spicerack_ir::{
         Builder, Code, DefId, Design, Diags, ElemKind, Element, ExprId, List, ModelFamily, NO_ROW,
         NameId, Polarity, Ref, ScopeId, Span, Violation, WaveRef, check,
@@ -106,6 +107,13 @@ mod tests {
             );
             push(b, top, ElemKind::Instance, &["a"], Some("sub"), NO_ROW);
             push(b, top, ElemKind::Unresolved, &[], Some("kit_cell"), NO_ROW);
+            let wave = b.wave(pulse(one));
+            let w = b.detail(spicerack_ir::source::Source {
+                wave,
+                dc_rule: DcRule::WaveAtZero,
+                ..source(ExprId::NONE)
+            });
+            push(b, top, ElemKind::VSource, &["a", "0"], None, w);
             let name = b.name("nch");
             b.push(
                 top,
@@ -171,7 +179,7 @@ mod tests {
     #[test]
     fn every_field_domain_rule_is_reported_alone() {
         type Case = fn(&mut Builder<'_>, ScopeId);
-        let cases: [(&str, Case); 26] = [
+        let cases: [(&str, Case); 29] = [
             ("diode without a model", |b, top| {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
@@ -422,6 +430,37 @@ mod tests {
                     model(name, ModelFamily::Module, Polarity::None),
                     Span::NONE,
                 );
+            }),
+            ("wave-at-zero rule with a dc", |b, top| {
+                let one = n(b, 1);
+                let wave = b.wave(pulse(one));
+                let v = b.detail(spicerack_ir::source::Source {
+                    wave,
+                    dc_rule: DcRule::WaveAtZero,
+                    ..source(one)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            }),
+            ("wave-at-zero rule without a wave", |b, top| {
+                let v = b.detail(spicerack_ir::source::Source {
+                    dc_rule: DcRule::WaveAtZero,
+                    ..source(ExprId::NONE)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            }),
+            ("vacask pulse with a zero rise", |b, top| {
+                let one = n(b, 1);
+                let zero = n(b, 0);
+                let wave = b.wave(spicerack_ir::wave::Pulse {
+                    rise: zero,
+                    law: PulseLaw::Vacask,
+                    ..pulse(one)
+                });
+                let v = b.detail(spicerack_ir::source::Source {
+                    wave,
+                    ..source(one)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
             }),
         ];
         for (what, case) in cases {

@@ -51,6 +51,9 @@ pub enum ItemKind {
     // ---- definitions (circuit, run) ----
     /// A device model. Row `model::Model` (circuit).
     Model,
+    /// A simulator's own implementation of an equation family, made available. Row
+    /// `library::DeviceLibrary` (circuit; AMEND-A12 C5, delegated to the circuit owner).
+    DeviceLibrary,
     /// A statistics block (process and mismatch variations). Row `stats::Statistics` (run).
     Statistics,
     // ---- circuit ----
@@ -293,7 +296,7 @@ const _: () = assert!(size_of::<Func>() == 16);
 
 impl ItemKind {
     /// Every kind, in declaration order (the order of `Feature::Item` indices).
-    pub const ALL: [ItemKind; 23] = [
+    pub const ALL: [ItemKind; 24] = [
         ItemKind::Title,
         ItemKind::Comment,
         ItemKind::Include,
@@ -306,6 +309,7 @@ impl ItemKind {
         ItemKind::Param,
         ItemKind::Func,
         ItemKind::Model,
+        ItemKind::DeviceLibrary,
         ItemKind::Statistics,
         ItemKind::Element,
         ItemKind::Analysis,

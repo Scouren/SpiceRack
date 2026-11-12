@@ -176,11 +176,51 @@ pub enum CircuitExtra {
     ModelBin,
     /// A model derived by `ako:` (`Model::ako`, F8).
     ModelAko,
+    // A12 C1–C4 (VACASK, AMEND-A12)
+    /// A pulse under `PulseLaw::Spice` (A12 C1).
+    PulseSpice,
+    /// A pulse under `PulseLaw::Vacask` (A12 C1).
+    PulseVacask,
+    /// An exponential whose `td2` counts from t = 0 (`TdFrom::Zero`, SPICE; A12 C2).
+    ExpTd2FromZero,
+    /// An exponential whose `td2` counts from `td1` (`TdFrom::Td1`, va; A12 C2).
+    ExpTd2FromTd1,
+    /// An SFFM that is its offset before the delay (A12 C3).
+    SffmPreOffset,
+    /// An SFFM that holds its t = delay value before the delay (va; A12 C3).
+    SffmPreHold,
+    /// An SFFM that is 0 before the delay (ng; A12 C3).
+    SffmPreZero,
+    /// A source with a waveform whose DC is given (`DcRule::Given`): va ignores `dc` on a waveform type (A12 C4).
+    DcGivenWithWave,
+    /// A pulse source whose DC is the wave at t = 0 (`DcRule::WaveAtZero`; A12 C4).
+    DcAtZeroPulse,
+    /// A sine source whose DC is the wave at t = 0.
+    DcAtZeroSin,
+    /// An exponential source whose DC is the wave at t = 0.
+    DcAtZeroExp,
+    /// A PWL source whose DC is the wave at t = 0.
+    DcAtZeroPwl,
+    /// An SFFM source whose DC is the wave at t = 0 (ngspice lacks it: its rule is 0).
+    DcAtZeroSffm,
+    /// An AM source whose DC is the wave at t = 0 (ngspice lacks it).
+    DcAtZeroAm,
+    /// A transient-noise source whose DC is the wave at t = 0 (ngspice lacks it).
+    DcAtZeroTrNoise,
+    /// A transient-random source whose DC is the wave at t = 0 (ngspice lacks it).
+    DcAtZeroTrRandom,
+    /// A pattern source whose DC is the wave at t = 0.
+    DcAtZeroPattern,
+    // A12 C5 (device libraries, R17)
+    /// An element that names no master (`model.name` `NONE`): VACASK instantiates every device through a model (A12 C5, run n2).
+    ElementWithoutModel,
+    /// A model whose family has no `DeviceLibrary` of that family in the design (design-level; A12 C5).
+    ModelWithoutLibrary,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 76] = [
+    pub const ALL: [CircuitExtra; 95] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -257,6 +297,25 @@ impl CircuitExtra {
         CircuitExtra::LineLumps,
         CircuitExtra::ModelBin,
         CircuitExtra::ModelAko,
+        CircuitExtra::PulseSpice,
+        CircuitExtra::PulseVacask,
+        CircuitExtra::ExpTd2FromZero,
+        CircuitExtra::ExpTd2FromTd1,
+        CircuitExtra::SffmPreOffset,
+        CircuitExtra::SffmPreHold,
+        CircuitExtra::SffmPreZero,
+        CircuitExtra::DcGivenWithWave,
+        CircuitExtra::DcAtZeroPulse,
+        CircuitExtra::DcAtZeroSin,
+        CircuitExtra::DcAtZeroExp,
+        CircuitExtra::DcAtZeroPwl,
+        CircuitExtra::DcAtZeroSffm,
+        CircuitExtra::DcAtZeroAm,
+        CircuitExtra::DcAtZeroTrNoise,
+        CircuitExtra::DcAtZeroTrRandom,
+        CircuitExtra::DcAtZeroPattern,
+        CircuitExtra::ElementWithoutModel,
+        CircuitExtra::ModelWithoutLibrary,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

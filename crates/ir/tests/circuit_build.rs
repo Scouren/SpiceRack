@@ -302,6 +302,7 @@ mod tests {
                 tau1: v,
                 td2: v,
                 tau2: v,
+                td2_from: spicerack_ir::wave::TdFrom::Td1,
             }),
             Wave::Pwl(Pwl {
                 points,
@@ -323,6 +324,7 @@ mod tests {
                 phase_c_deg: v,
                 phase_m_deg: v,
                 law: SffmLaw::Ngspice,
+                pre: PreDelay::Zero,
             }),
             Wave::Am(Am {
                 offset: v,

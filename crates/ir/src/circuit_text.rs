@@ -33,7 +33,7 @@
 //! `rewrite/IR-DECISIONS.md` A5.
 //!
 //! Contents (crate-private): `pub(crate) fn element_handles`, `pub(crate) fn model_handles`,
-//! `pub(crate) fn dump_element`, `pub(crate) fn dump_model`, `pub(crate) const KIND_WORDS`,
+//! `pub(crate) fn dump_element`, `pub(crate) fn dump_model`, `pub(crate) fn dump_library`, `pub(crate) const KIND_WORDS`,
 //! `pub(crate) const FAMILY_WORDS`, `pub(crate) const WAVE_WORDS`, `pub(crate) fn get_row`.
 //! The reader of these forms is `circuit_parse.rs`.
 
@@ -44,6 +44,7 @@ use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::facts::Handle;
 use crate::id::{ExprId, NameId};
 use crate::item::DefKind;
+use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, Parasitics, Passive};
@@ -302,6 +303,15 @@ pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String
     if m.word != NameId::NONE {
         out.push_str(" word=");
         write_name(design, m.word, out);
+    }
+}
+
+/// Writes a device library's fields: `<family> [path="<path>"]`.
+pub(crate) fn dump_library(l: &DeviceLibrary, design: &Design, out: &mut String) {
+    out.push_str(FAMILY_WORDS[l.family as usize]);
+    if l.path != NameId::NONE {
+        out.push_str(" path=");
+        text::write_string(design.str(l.path), out);
     }
 }
 
