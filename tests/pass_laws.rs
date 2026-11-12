@@ -141,13 +141,15 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ("hoist_enclosing_refs_default", HOIST_SET),
     (
         "tran_cap_ngspice_to_given",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Analysis))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
-            .with(ir::Feature::Run(ir::RunExtra::TranCapNgspice))
-            .with(ir::Feature::Run(ir::RunExtra::TranRecordStart)),
+        tran_set(ir::RunExtra::TranCapNgspice),
+    ),
+    (
+        "tran_cap_span50_to_given",
+        tran_set(ir::RunExtra::TranCapSpan50),
+    ),
+    (
+        "tran_cap_span10_to_given",
+        tran_set(ir::RunExtra::TranCapSpan10),
     ),
 ];
 
@@ -176,6 +178,23 @@ const HOIST_SET: ir::FeatureSet = ir::FeatureSet::EMPTY
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);
 
 // ---- private ----
+
+/// A transient-only set whose step cap is `cap` (the `tran_cap_*_to_given` rows: under the full
+/// set the generator rarely draws that rule).
+const fn tran_set(cap: ir::RunExtra) -> ir::FeatureSet {
+    ir::FeatureSet::EMPTY
+        .with(ir::Feature::Item(ir::ItemKind::Title))
+        .with(ir::Feature::Item(ir::ItemKind::Analysis))
+        .with(ir::Feature::Expr(ir::ExprTag::Num))
+        .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
+        .with(ir::Feature::Run(cap))
+        .with(ir::Feature::Run(ir::RunExtra::TranRecordStart))
+        // every transient sets one print-step twin (R67/A41) and every analysis one name twin
+        // (A35): without them the generator draws no transient
+        .with(ir::Feature::Run(ir::RunExtra::TranPrintStep))
+        .with(ir::Feature::Run(ir::RunExtra::TranSimulatorStep))
+        .with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed))
+}
 
 #[test]
 fn p1_check_is_clean_after_the_pass() {

@@ -175,6 +175,7 @@ ngspice Run(VaryMean) unspoken
 ngspice Run(NodeSetMidRun) owed from=vacask
 ngspice Run(NodeSetFromHere) owed from=vacask
 ngspice Run(PssOscDiff) unspoken
+ngspice Run(PssArgumentOmitted) unspoken
 ngspice Option(MethodEuler) owed from=vacask
 ngspice Option(MaxStep) unspoken
 ngspice Option(GminDc) unspoken
@@ -501,6 +502,8 @@ vacask Run(ResetOptions) owed from=ngspice
 vacask Run(ResetTemp) owed from=ngspice
 vacask Run(ResetTnom) owed from=ngspice
 vacask Run(TranPrintStep) owed from=ngspice
+vacask Run(AnalysisParamArgument) owed from=ngspice
+vacask Run(PssArgumentOmitted) unspoken
 vacask Option(TrTol) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice
 vacask Option(PivRel) owed from=ngspice

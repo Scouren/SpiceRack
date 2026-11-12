@@ -77,6 +77,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::DcAxisUnnamed),
     // a `.tran` card always gives its print step (`tstep`, inp2dot.c), R67/A41
     Feature::Run(RunExtra::TranPrintStep),
+    // a card argument may read a `.param` (numparam, `{…}`): R68/A42
+    Feature::Run(RunExtra::AnalysisParamArgument),
     Feature::Run(RunExtra::TranRecordStart),
     Feature::Run(RunExtra::TranMaxStep),
     Feature::Run(RunExtra::TranCapNgspice),

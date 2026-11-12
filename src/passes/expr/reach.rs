@@ -116,7 +116,7 @@ fn setters(design: &ir::Design) -> Vec<(ir::ItemRef, Vec<ir::ExprId>)> {
                 ir::Handle::Params(l) => roots.extend(design.params(l).iter().map(|p| p.1)),
                 ir::Handle::Branches(l) => roots.extend(design.branches(l).iter().map(|b| b.cond)),
                 ir::Handle::Name(_)
-                | ir::Handle::Ref(_)
+                | ir::Handle::Ref(..)
                 | ir::Handle::Names(_)
                 | ir::Handle::Scope(_)
                 | ir::Handle::Text(_) => {}

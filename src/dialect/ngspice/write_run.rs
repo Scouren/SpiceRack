@@ -61,19 +61,23 @@ pub(super) const CODES: &[Row] = &[
 /// count is the deck's `nfreqs` option, which no `.four` card states.
 const FOUR_HARMONICS: ir::Code = ir::Code::new(b'W', 1300);
 /// An analysis field ngspice's card has no position for: a DC source axis on an element that is
-/// no V or I source, an element-value axis on one that is no resistor; a `.pss` missing one of
-/// its last four arguments; an output no ngspice card spells (`write_outputs::probe_admits`).
+/// no V or I source, an element-value axis on one that is no resistor; an output no ngspice
+/// card spells (`write_outputs::probe_admits`). (A `.pss` missing an argument is
+/// `PssArgumentOmitted`, an output with a part an invariant: R68, A42.)
 const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 
-/// A card value that reads the temperature: numparam evaluates a dot card's `{…}` once, before
-/// the run, with no `temper` (`inpcom.c` `inp_fix_temper_in_param` rewrites `.param` only).
+/// A state card's value (`.options`, `.temp`, `.ic`, `.nodeset`) that reads the temperature:
+/// numparam evaluates a dot card's `{…}` once, before the run, with no `temper` (`inpcom.c`
+/// `inp_fix_temper_in_param` rewrites `.param` only). An analysis argument reading it is
+/// X0023 (R68, A42).
 const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
 /// An option or temperature that holds from its place on (a script `option`) whose value is no
 /// number literal: the frontend reads a number, never a numparam expression.
 const SCRIPT_VALUE: ir::Code = ir::Code::new(b'W', 1304);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300`, `W1301`), a value that reads the temperature (`W1302`), a script
+/// (R21): a card form (`W1300`, `W1301`), a state card's value that reads the temperature
+/// (`W1302`), a script
 /// option's value that is no number (`W1304`). A node set that holds from its place on is
 /// `NodeSetFromHere`, which `FEATURES` lack (`commands.c` has no command that sets one).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
@@ -110,10 +114,9 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     let a: ir::Analysis = design.row(item.index);
     let mut form_ok = true;
     let mut outs = Vec::new();
-    // a sweep's form is a feature (`Sweep{Dc,Freq}*`, A24); its values are checked here
-    let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
-        values.extend([s.start, s.stop, s.points]);
-    };
+    // an analysis argument reading the temperature is X0023 and an output with a part
+    // FieldDomain (R68, A42); a `.pss` missing an argument is `PssArgumentOmitted`, which
+    // FEATURES lack: what is left is ngspice's own card form
     match a.kind {
         AnalysisKind::Dc => {
             let dc: Dc = design.detail(a.detail);
@@ -128,37 +131,12 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                     ir::TargetKind::ElementValue => name == Some(b'r'),
                     _ => true,
                 };
-                let s = axis.sweep;
-                values.extend([s.start, s.stop, s.step]);
             }
         }
-        AnalysisKind::Ac => freq(design.detail::<Ac>(a.detail).sweep, &mut values),
-        AnalysisKind::Noise => {
-            let n: Noise = design.detail(a.detail);
-            outs.push(n.output);
-            freq(n.sweep, &mut values);
-            values.push(n.points_per_summary);
-        }
+        AnalysisKind::Noise => outs.push(design.detail::<Noise>(a.detail).output),
         AnalysisKind::Tf => outs.push(design.detail::<Tf>(a.detail).output),
         AnalysisKind::Sens => outs.push(design.detail::<Sens>(a.detail).output),
-        AnalysisKind::SensAc => {
-            let s: SensAc = design.detail(a.detail);
-            outs.push(s.output);
-            freq(s.sweep, &mut values);
-        }
-        AnalysisKind::Disto => {
-            let d: Disto = design.detail(a.detail);
-            freq(d.sweep, &mut values);
-            values.push(d.f2_over_f1);
-        }
-        AnalysisKind::Sp => freq(design.detail::<Sp>(a.detail).sweep, &mut values),
-        AnalysisKind::Tran => {
-            let t: Tran = design.detail(a.detail);
-            values.extend([t.print_step, t.stop, t.record_start]);
-            if let StepCeiling::Given(e) = t.ceiling {
-                values.push(e);
-            }
-        }
+        AnalysisKind::SensAc => outs.push(design.detail::<SensAc>(a.detail).output),
         AnalysisKind::Four => {
             let f: Four = design.detail(a.detail);
             // a given count is ngspice's default; none is the deck's `nfreqs` (A16)
@@ -167,15 +145,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             if !nine {
                 refuse(FOUR_HARMONICS);
             }
-            values.push(f.fundamental);
             outs.extend_from_slice(design.probes(f.outputs));
-        }
-        AnalysisKind::Pss => {
-            let p: Pss = design.detail(a.detail);
-            let given = [p.harmonics, p.points, p.sc_iter, p.steady_coeff];
-            form_ok &= given.iter().all(|e| !e.is_none());
-            values.extend([p.fundamental, p.tstab]);
-            values.extend(given);
         }
         _ => {}
     }
@@ -183,7 +153,6 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     if !form_ok {
         refuse(CARD_FORM);
     }
-    check_values(design, &values, &mut refuse);
 }
 
 /// An `Analysis` as its card, or as its script command when the deck takes the script form
