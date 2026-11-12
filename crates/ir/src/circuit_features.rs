@@ -24,7 +24,7 @@ use crate::expr::Expr;
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{ExprId, NameId};
 use crate::item::ItemKind;
-use crate::letter::spice_letter;
+use crate::letter::spice_letters;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily};
@@ -58,9 +58,12 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     if source_like && e.model.name != NameId::NONE || e.kind == ElemKind::Coupling && mutual {
         add(X::BuiltinMaster);
     }
-    if let Some(letter) = spice_letter(design, e) {
+    // a name begins with one of the letters a SPICE card may give it (A13; a voltage B may be
+    // an E card, a current one a G card, a port a V card)
+    let letters = spice_letters(design, e);
+    if !letters.is_empty() {
         let first = design.str(e.name).as_bytes().first().copied().unwrap_or(0);
-        if !first.eq_ignore_ascii_case(&letter) {
+        if !letters.iter().any(|l| first.eq_ignore_ascii_case(l)) {
             add(X::NameWithoutLetter);
         }
     }

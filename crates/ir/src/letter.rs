@@ -28,9 +28,16 @@
 //! `pub fn letter_of(ElemKind, Quantity, Quantity) -> Option<u8>`
 
 use crate::circuit_text::get_row;
-use crate::controlled::{FreqTable, Laplace, Poly, Quantity, TableSource};
+use crate::controlled::{Behav, FreqTable, Laplace, OutKind, Poly, Quantity, TableSource};
 use crate::design::Design;
 use crate::element::{ElemKind, Element};
+
+/// Each upper-case letter as a one-letter slice (`LETTERS[l - b'A']`), so `spice_letters`
+/// returns `&'static` data without allocating.
+const LETTERS: [&[u8]; 26] = [
+    b"A", b"B", b"C", b"D", b"E", b"F", b"G", b"H", b"I", b"J", b"K", b"L", b"M", b"N", b"O", b"P",
+    b"Q", b"R", b"S", b"T", b"U", b"V", b"W", b"X", b"Y", b"Z",
+];
 
 /// The SPICE card letter of `element`, upper case, or `None` for a kind SPICE cards do not
 /// have. Reads the detail row of a polynomial, table, Laplace or frequency-table source (its
@@ -58,7 +65,18 @@ pub fn spice_letter(design: &Design, element: &Element) -> Option<u8> {
 /// Every letter a SPICE card may give `element` (the canonical `spice_letter` first); empty
 /// for a kind SPICE cards do not have.
 pub fn spice_letters(design: &Design, element: &Element) -> &'static [u8] {
-    todo!()
+    match element.kind {
+        ElemKind::Behav => match get_row::<Behav>(design, element.detail).map(|b| b.output) {
+            Some(OutKind::Voltage) => b"BE",
+            Some(OutKind::Current) => b"BG",
+            _ => b"B",
+        },
+        ElemKind::Port => b"PV",
+        _ => match spice_letter(design, element) {
+            Some(l) => LETTERS[usize::from(l - b'A')],
+            None => b"",
+        },
+    }
 }
 
 /// The letter of `kind` with output quantity `out` and control quantity `ctl` (both read only

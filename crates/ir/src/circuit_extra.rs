@@ -223,7 +223,7 @@ pub enum CircuitExtra {
     /// the model and unbinds the element).
     BuiltinMaster,
     // A13 (R23)
-    /// An element whose name does not begin with its SPICE letter (`letter::spice_letter`,
+    /// An element whose name begins with none of its SPICE letters (`letter::spice_letters`,
     /// ASCII case ignored): a SPICE-card dialect cannot spell it; a pass renames it and every
     /// reference to it.
     NameWithoutLetter,

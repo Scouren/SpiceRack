@@ -33,8 +33,11 @@ field and say which dialect needs it in its doc.
 
 Header as IR-KERNEL §6, with A13 (R23): `name` is the element's whole name as its dialect
 spells it (ngspice: letter included, folded), unique in its scope across kinds; the SPICE card
-letter is the neutral fact `letter::spice_letter(design, element)`, and a name that does not
-begin with it is `CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
+letter is the neutral fact `letter::spice_letter(design, element)` (the canonical letter, which a
+rename pass uses); `letter::spice_letters` lists every letter a SPICE card may give the element
+(a voltage `Behav` B or E and a current one B or G, as ngspice and HSPICE read `E … vol=` and
+`G … cur=`; a `Port` P or V), and a name that begins with none of them is
+`CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
 renames). Two elements of one name in one scope are `Violation::DuplicateElement`
 (`element::design_check`). For every `ElemKind` document the terminal roles in order, the allowed
 terminal count (fixed or a range), whether `model` is required, and its detail row.
