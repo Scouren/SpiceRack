@@ -96,8 +96,10 @@ pub enum OptionKey {
     Cshunt,
     /// Resistance in series with every inductor, Ω. ngspice `rseries`.
     Rseries,
-    /// Factor applied to every instance length and width (areas by its square),
-    /// dimensionless. ngspice, HSPICE, Spectre, VACASK `scale`; Xyce `parser scale`. LTspice
+    /// Geometry scale, dimensionless: every instance length and width (MOSFET `l`, `w`, `pd`,
+    /// `ps`; R and C `l`, `w`; the level-3 diode's geometry) is multiplied by it, every area
+    /// (`ad`, `as`, diode `area` given in m²) by its square (`INV-semantics.md` 6.06). Folding
+    /// it into the instances (LTspice has no such option) is a pass. ngspice, HSPICE, Spectre, VACASK `scale`; Xyce `parser scale`. LTspice
     /// has none.
     Scale,
     /// Default MOSFET channel length, m. ngspice, HSPICE `defl`.

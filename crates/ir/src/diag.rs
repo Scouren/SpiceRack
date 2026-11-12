@@ -103,49 +103,176 @@ impl Code {
 
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        write!(f, "{}{:04}", self.letter as char, self.number)
     }
 }
 
 impl Diags {
     /// An empty list.
     pub fn new() -> Diags {
-        todo!()
+        Diags::default()
     }
 
     /// Appends one row.
     pub fn push(&mut self, code: Code, span: Span, arg: u32) {
-        todo!()
+        self.rows.push(Diag { code, span, arg });
     }
 
     /// Every row, in append order.
     pub fn rows(&self) -> &[Diag] {
-        todo!()
+        &self.rows
     }
 
     /// Row count.
     pub fn len(&self) -> usize {
-        todo!()
+        self.rows.len()
     }
 
     /// Whether no row was appended.
     pub fn is_empty(&self) -> bool {
-        todo!()
+        self.rows.is_empty()
     }
 }
 
 /// `X0001` + the violation's position in `Violation::ALL`; `arg` per variant's doc.
 pub const fn violation_code(v: Violation) -> Code {
-    todo!()
+    Code::new(b'X', v as u16 + 1)
 }
 
 /// `S0001` + the class's position in `OpaqueClass::ALL`; `arg` 0. All are notes: a strict read
 /// turns `Unread` into its reader's own refusal.
 pub const fn opaque_code(class: OpaqueClass) -> Code {
-    todo!()
+    Code::new(b'S', class as u16 + 1)
 }
 
 /// The catalogue row of one of this crate's codes, or `None` for another owner's code.
 pub fn info(code: Code) -> Option<Info> {
-    todo!()
+    let at = (code.number as usize).checked_sub(1)?;
+    match code.letter {
+        b'X' => Violation::ALL.get(at).map(|&v| {
+            let (title, explain) = violation_text(v);
+            Info {
+                title,
+                cite: "rewrite/IR-KERNEL.md §9",
+                explain,
+                kind: Kind::Refusal,
+            }
+        }),
+        b'S' => OpaqueClass::ALL.get(at).map(|&c| {
+            let (title, explain) = opaque_text(c);
+            Info {
+                title,
+                cite: "REWRITE-PLAN.md §3.4",
+                explain,
+                kind: Kind::Note,
+            }
+        }),
+        b'U' if code == UNSUPPORTED => Some(Info {
+            title: "a feature the target cannot spell",
+            cite: "REWRITE-PLAN.md §3.5, §4.4",
+            explain: "the design uses a feature (arg: its Feature::index) outside the writer's FEATURES and no pass removed it; the writer's citation table says why the target lacks it.",
+            kind: Kind::Refusal,
+        }),
+        b'P' if code == TEXT_SYNTAX => Some(Info {
+            title: "a line of IR text that does not parse",
+            cite: "crates/ir/src/text.rs (grammar)",
+            explain: "the line is skipped and the rest of the text is still read.",
+            kind: Kind::Refusal,
+        }),
+        _ => None,
+    }
+}
+
+// ---- private ----
+
+/// Title and explanation of each invariant's code.
+fn violation_text(v: Violation) -> (&'static str, &'static str) {
+    match v {
+        Violation::HandleRange => (
+            "a handle out of its table's range",
+            "a row, list or pool holds a handle that is neither NONE where NONE is allowed nor below its table's length, or a list overruns its pool. The producer of the design wrote a row by hand or kept a stale id.",
+        ),
+        Violation::ScopeTree => (
+            "the scope tree is not a forest of file scopes",
+            "a scope reaches no file scope, the parent chain has a cycle, a file scope has a parent or another file, or an item is listed in two scopes.",
+        ),
+        Violation::ScopeOwner => (
+            "a scope's owner does not match it",
+            "a non-file scope's owner is of the wrong kind for the scope, does not name the scope as its body, or is not listed in the scope's parent.",
+        ),
+        Violation::ExprOrder => (
+            "an expression child is not below its parent",
+            "children are appended before their parent, so a child id at or above its parent's means the expression table was edited in place.",
+        ),
+        Violation::ExprArity => (
+            "an argument count outside its arity",
+            "a call or draw has an argument count its function or distribution does not take, or a ternary's then/else pair overruns the expression pool.",
+        ),
+        Violation::TerminalCount => (
+            "an element's terminal count outside its kind's range",
+            "the element kind's `terminals()` range does not hold the row's terminal list length.",
+        ),
+        Violation::DetailRow => (
+            "a detail row present when the kind has none, or missing when it has one",
+            "an element's `detail` index must name a row of its kind's detail table exactly when the kind has one.",
+        ),
+        Violation::RefTarget => (
+            "a reference bound to the wrong definition",
+            "a resolved reference names a definition of a kind its field does not accept or of another name, or a parameter read is bound to a measure outside a measure.",
+        ),
+        Violation::NonFinite => (
+            "a literal whose value is not finite",
+            "a decimal literal's value overflows a double; the NaN gate was bypassed.",
+        ),
+        Violation::EmptyName => (
+            "an empty name",
+            "a row names something with the empty string; names are non-empty.",
+        ),
+        Violation::ProbeContext => (
+            "a circuit read in a field constant in time",
+            "a V, I, Time, Freq, Ddt or Idt appears in an expression field that may not read the circuit (a Handle::Expr: a parameter, a model value, an analysis argument).",
+        ),
+        Violation::DuplicateDef => (
+            "two definitions of one kind and name in one scope",
+            "a reader keeps one winner per duplicate by its simulator's rule before it pushes.",
+        ),
+        Violation::OpaqueEmpty => (
+            "an opaque statement without a dialect or text",
+            "an Opaque row must name its dialect and keep the statement's text.",
+        ),
+        Violation::LiteralShape => (
+            "a literal that breaks its invariants",
+            "a decimal literal's mantissa, fraction digits, exponent or zero form is outside what Literal states.",
+        ),
+        Violation::FieldDomain => (
+            "a row's field outside its domain",
+            "a field holds a value its row does not allow, or two fields disagree (a name that must be set, a repeated port, an else branch before the last).",
+        ),
+    }
+}
+
+/// Title and explanation of each opaque class's code.
+fn opaque_text(c: OpaqueClass) -> (&'static str, &'static str) {
+    match c {
+        OpaqueClass::Unread => (
+            "a statement the reader has no rule for",
+            "kept as its dialect's text; a strict read refuses it.",
+        ),
+        OpaqueClass::Private => (
+            "a statement only its own simulator has",
+            "kept as its dialect's text; only that dialect's writer copies it.",
+        ),
+        OpaqueClass::Inert => (
+            "a statement that changes no number",
+            "kept as its dialect's text; a writer of another family leaves it out.",
+        ),
+        OpaqueClass::InvalidInSource => (
+            "a statement its own simulator rejects",
+            "kept as its dialect's text with this note.",
+        ),
+        OpaqueClass::Script => (
+            "data-dependent control flow",
+            "kept as its dialect's text; a script is not a static run plan.",
+        ),
+    }
 }

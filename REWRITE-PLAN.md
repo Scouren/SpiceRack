@@ -1,8 +1,13 @@
 # SpiceRack rewrite plan: one IR, one contract per dialect
 
-Status (2026-11-11): go given; phase 1 of §8.3 (the IR crate's definitions) is running on branch
-`ir-rewrite`, worktree `../SpiceRack-ir`, where this file and `rewrite/` are tracked. `main` is
-untouched and nothing is pushed. Written against `main` (f7fbf3b, 0.2.0) and the integration head
+Status (2026-11-12): go given. Phase 1 of §8.3 is done: the IR crate's definitions are frozen
+(tag `ir-defs-frozen`, branch `ir-rewrite`, worktree `../SpiceRack-ir`, where this file and
+`rewrite/` are tracked): 43 files, 9.3k lines, every type and signature, bodies `todo!()`; 23 item
+kinds, 37 element kinds, 9 waveforms, 70 model families, 24 analysis kinds, 40 functions, 496
+features; 531 inventory rows mapped to a field, variant or feature and 51 named gaps
+(`rewrite/COVERAGE-circuit.md`, `COVERAGE-run.md`). Phase 2 is running: the crate's tests and
+bodies (`rewrite/IR-IMPL.md`) and slice S2 (`rewrite/SPINE.md`). `main` is untouched and nothing
+is pushed. Written against `main` (f7fbf3b, 0.2.0) and the integration head
 `p7-integrate` (1059821, 596 commits ahead of `main`, never pushed). Method: the house `rewrite-clean` (old code kept alive as the oracle, one slice at
 a time, four gated phases per slice) and `codebase-clean-code` (data, owners, spines, seams,
 drills). Every count below was measured on 1059821 unless it says otherwise.

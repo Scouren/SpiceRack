@@ -18,6 +18,7 @@
 
 use crate::build::Builder;
 use crate::design::{Design, DetailRow, ItemRow};
+use crate::facts::RowFacts;
 use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::DefKind;
 
@@ -30,37 +31,49 @@ pub struct Editor<'d> {
 impl<'d> Editor<'d> {
     /// The design as it stands, read only.
     pub fn design(&self) -> &Design {
-        todo!()
+        self.design
     }
 
     /// An append door for new rows, expressions, scopes and definitions.
     pub fn builder(&mut self) -> Builder<'_> {
-        todo!()
+        Builder {
+            design: self.design,
+        }
     }
 
     /// The ordered item list of `scope`. An item taken out of every list is dead (its row stays,
     /// unreachable); an item must not appear in two lists.
     pub fn items_mut(&mut self, scope: ScopeId) -> &mut Vec<ItemRef> {
-        todo!()
+        assert!(
+            scope.index() < self.design.scope_items.len(),
+            "a scope id in range"
+        );
+        &mut self.design.scope_items[scope.index()]
     }
 
     /// Replaces the row at `index` of `R`'s table; the span is kept. Asserts the index is in
     /// range and the row's handles are.
     pub fn set<R: ItemRow>(&mut self, index: u32, row: R) {
-        todo!()
+        R::table_mut(self.design).set(index, row)
     }
 
     /// Replaces the row at `index` of `D`'s table (a pass rewriting a typed field). Asserts the
     /// index is in range and the row's handles are. A detail row shared by two headers is a bug
     /// of the pass that shared it: the builder gives each header its own.
     pub fn set_detail<D: DetailRow>(&mut self, index: u32, row: D) {
-        todo!()
+        let rows = D::rows_mut(self.design);
+        assert!((index as usize) < rows.len(), "a detail index in range");
+        rows[index as usize] = row;
     }
 
     /// Calls `f` on each `Ref` of `item`'s row with the kind its field expects, and stores the
     /// row back (one exhaustive dispatch over `ItemKind` to `RowFacts::map_refs`). For the
     /// linker and for passes that renumber definitions. Asserts `item` is in range.
     pub fn map_refs(&mut self, item: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        todo!()
+        for_kind!(item.kind, R => {
+            let mut row: R = self.design.row(item.index);
+            row.map_refs(f);
+            R::table_mut(self.design).set(item.index, row);
+        })
     }
 }
