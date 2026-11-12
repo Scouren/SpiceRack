@@ -270,6 +270,7 @@ impl R<'_, '_> {
             rpar,
             output,
             tc_base,
+            tc_law: TcLaw::Direct,
         }
     }
 

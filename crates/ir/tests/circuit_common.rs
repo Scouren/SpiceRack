@@ -145,6 +145,7 @@ pub fn behav(expr: ExprId, output: spicerack_ir::controlled::OutKind) -> Behav {
         rpar: ExprId::NONE,
         output,
         tc_base: TcBase::Tnom,
+        tc_law: spicerack_ir::passive::TcLaw::Direct,
     }
 }
 

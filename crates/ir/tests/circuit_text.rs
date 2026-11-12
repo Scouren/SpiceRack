@@ -512,4 +512,51 @@ mod tests {
             b.source(top, ElemKind::VSource, h, row, Span::NONE);
         });
     }
+
+    /// A17: an AM with ngspice's omitted fields, and a charge-defined capacitor whose
+    /// coefficient divides the charge.
+    #[test]
+    fn an_am_with_omitted_fields_and_a_reciprocal_charge() {
+        let text = "file \"t.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=am(offset=0 amplitude=1 \
+                    mod_offset=1 pre=zero given_zero=spice_default)\n  element charge_capacitor c1 (b 0) \
+                    expr=(v(b) * 1p) tc1=1m output=charge tc_law=reciprocal\n";
+        same(text, |b, top| {
+            let h = head(b, "v1", &["a", "0"]);
+            let dc = n(b, 0);
+            let [offset, amplitude, mod_offset] = [0, 1, 1].map(|x| n(b, x));
+            let none = ExprId::NONE;
+            let wave = b.wave(spicerack_ir::wave::Am {
+                offset,
+                amplitude,
+                mod_offset,
+                mod_index: none,
+                mod_freq: none,
+                carrier_freq: none,
+                delay: none,
+                phase_m_deg: none,
+                phase_c_deg: none,
+                mod_time: spicerack_ir::wave::AmModTime::Delay,
+                pre: spicerack_ir::wave::PreDelay::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::SpiceDefault,
+            });
+            b.source(
+                top,
+                ElemKind::VSource,
+                h,
+                spicerack_ir::source::Source { wave, ..source(dc) },
+                Span::NONE,
+            );
+            let h = head(b, "c1", &["b", "0"]);
+            let vb = b.v("b", None);
+            let p = k(b, 1, -12);
+            let q = b.binary(BinOp::Mul, vb, p);
+            let tc1 = k(b, 1, -3);
+            let row = spicerack_ir::controlled::Behav {
+                tc1,
+                tc_law: spicerack_ir::passive::TcLaw::Reciprocal,
+                ..behav(q, OutKind::Charge)
+            };
+            b.behav(top, ElemKind::ChargeCapacitor, h, row, Span::NONE);
+        });
+    }
 }

@@ -201,6 +201,7 @@ impl R<'_, '_> {
                     phase_c_deg,
                     mod_time,
                     pre,
+                    given_zero: GivenZero::AsGiven,
                 })
             }
             WaveKind::TrNoise => {
@@ -226,6 +227,7 @@ impl R<'_, '_> {
                     p1,
                     p2,
                     kind,
+                    given_zero: GivenZero::AsGiven,
                 })
             }
             WaveKind::Pattern => {
