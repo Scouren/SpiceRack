@@ -47,8 +47,9 @@ pub(super) const CODES: &[Row] = &[(
 
 /// Appends a refusal when `item` has no ngspice card that reads back as it (R21).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
-    if !spellable(design, item) {
-        diags.push_at(UNSPELLABLE, design, item, 0);
+    let why = why_not(design, item);
+    if why != 0 {
+        diags.push_at(UNSPELLABLE, design, item, why);
     }
 }
 
@@ -183,10 +184,21 @@ fn spell(design: &ir::Design, p: &ir::Probe, ctx: Ctx) -> Option<String> {
 
 /// Whether every part of `item` has a card that reads back as it.
 fn spellable(d: &ir::Design, item: ir::ItemRef) -> bool {
+    why_not(d, item) == 0
+}
+
+/// Why `item` has no card, the refusal's `arg` (W1350; 0: it has one): 1 retired (a save of
+/// some analyses: the features refuse it), 2 a save probe with no word, 3 a print of another analysis, 4 a print view
+/// other than the main one, 5 a print probe with no word, then a measure's: 6 its analysis,
+/// 7 its name, `8 + MeasureKind as u32` its body (trig/targ, when, find, stat, param, deriv).
+fn why_not(d: &ir::Design, item: ir::ItemRef) -> u32 {
+    let first = |checks: &[(bool, u32)]| checks.iter().find(|c| !c.0).map_or(0, |c| c.1);
     match item.kind {
         ir::ItemKind::Save => {
+            // a save of some analyses is the features' (`SavePerAnalysis`, `SaveAnalysisSet`:
+            // FEATURES has neither), not a refusal here (R21)
             let s: ir::Save = d.row(item.index);
-            s.analyses == ir::AnalysisKinds::ALL && save_words(d, s.probes).is_some()
+            first(&[(save_words(d, s.probes).is_some(), 2)])
         }
         ir::ItemKind::Print => {
             let p: ir::Print = d.row(item.index);
@@ -195,16 +207,20 @@ fn spellable(d: &ir::Design, item: ir::ItemRef) -> bool {
                 AnalysisKind::Tran | AnalysisKind::Ac | AnalysisKind::Dc
             );
             let ctx = Ctx::Print(p.analysis);
-            kind && p.view == ir::PrintView::Main
-                && d.probes(p.probes).iter().all(|q| reads_back(d, q, ctx))
+            first(&[
+                (kind, 3),
+                (p.view == ir::PrintView::Main, 4),
+                (d.probes(p.probes).iter().all(|q| reads_back(d, q, ctx)), 5),
+            ])
         }
-        ir::ItemKind::Measure => measure_spellable(d, d.row(item.index)),
+        ir::ItemKind::Measure => measure_why(d, d.row(item.index)),
         _ => unreachable!("write_outputs::admits: an output item"),
     }
 }
 
-/// The measure rules of `read_outputs/meas.rs`, as checks.
-fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
+/// The measure rules of `read_outputs/meas.rs`, as checks: the first that fails (`why_not`'s
+/// numbers), or 0.
+fn measure_why(d: &ir::Design, m: ir::Measure) -> u32 {
     let kind = matches!(
         m.analysis,
         AnalysisKind::Tran | AnalysisKind::Ac | AnalysisKind::Dc | AnalysisKind::Sp
@@ -274,7 +290,8 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
         MeasureKind::Param => constant(d, d.detail::<MeasureParam>(m.detail).value),
         MeasureKind::Deriv => false,
     };
-    kind && name_ok && body
+    let checks = [(kind, 6), (name_ok, 7), (body, 8 + m.kind as u32)];
+    checks.iter().find(|c| !c.0).map_or(0, |c| c.1)
 }
 
 /// Whether `p` spelled in `ctx` reads back as one probe of its kind, part and paths.

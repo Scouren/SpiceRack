@@ -49,7 +49,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
-    ("l5", "ngspice", "seed 11 Untyped: a loop over a list holding a long literal (`-73.384558234620672336478e-8`) is written as `foreach sr1 …` and read back as one Unread opaque (P1408: the script's word literal takes no long literal); a finding for ng-control. (A37's outer-read cause is gone: the generator draws FormalOuterRead only for a set that holds it)"),
+    ("l5", "ngspice", "seed 19 Untyped: a whole-run `option no_init` in a `.lib` section is written as `.control` / `option noinit` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area. (Seed 11's causes are gone: a script number word keeps its long digits, settle loop_long.sp; an element-value loop over `g149` is refused by the writer, W1407)"),
     ("l7", "ngspice", "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)"),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];

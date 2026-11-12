@@ -13,7 +13,6 @@
 /// Strict both ways (`reach_every_kind_the_row_claims`).
 #[rustfmt::skip] // a table: one row per line
 pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
-    ("ngspice", "Elem(Capacitor)", FIXPOINT, ELEMENTS),
     ("ngspice", "Elem(Port)", FIXPOINT, SOURCES),
     ("ngspice", "Elem(Table)", FIXPOINT, ELEMENTS),
     ("ngspice", "Wave(Pulse)", FIXPOINT, SOURCES),
