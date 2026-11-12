@@ -62,6 +62,7 @@ pub mod class;
 pub mod design;
 pub mod diag;
 pub mod edit;
+pub mod element_uses;
 pub mod eval;
 pub mod expr;
 pub mod feature;
@@ -153,6 +154,7 @@ pub use class::{ExprClass, expr_class};
 pub use design::{Design, DetailRow, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
+pub use element_uses::ElementUse;
 pub use eval::{Bindings, Domain, Value, eval, eval_typed};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
 pub use facts::{ExprUse, Handle, RowFacts};
@@ -188,5 +190,7 @@ pub mod r#gen;
 // `check`'s fixtures need the crate-private tables; last, after `gen`, for check_style.py
 #[cfg(test)]
 mod check_tests;
+#[cfg(test)]
+mod element_uses_tests;
 #[cfg(test)]
 mod form_tests;
