@@ -27,7 +27,7 @@
 //! `INVALID`, `INERT`, `DC_WINDOW`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
 //! `pub(super) fn script_save(lw, st, &[String], ir::Applies) -> Result<(), No>`,
-//! `pub(super) fn save_command`, `pub(super) fn meas_command` (each `(lw, st, &[String]) -> Result<(), No>`),
+//! `pub(super) fn meas_command(lw, st, &[String]) -> Result<(), No>`,
 //! `pub(super) fn fail(No) -> Fail`, `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
 //! words (`Ctx`, `Want`, `probe_word`) are `read_outputs/probe.rs`, the measures
 //! `read_outputs/meas.rs`
@@ -232,11 +232,6 @@ pub(super) fn script_save(
         return Err(No::Untyped);
     }
     save(lw, st, words, holds)
-}
-
-/// [`script_save`] holding `FromHere`, until the control area passes `holds` itself.
-pub(super) fn save_command(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
-    script_save(lw, st, words, ir::Applies::FromHere)
 }
 
 /// A script's `meas kind name …` (the control area calls it when the script holds one analysis

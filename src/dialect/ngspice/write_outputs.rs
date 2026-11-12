@@ -53,7 +53,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
 }
 
 /// A `Save`: `.save p …` for the whole run, a script's `save p …` from where it stands, in the
-/// script's order (the control area reads it back through `read_outputs::save_command`).
+/// script's order (the control area reads it back through `read_outputs::script_save`).
 pub(super) fn save(w: &mut Out<'_>, item: ir::ItemRef) {
     debug_assert!(spellable(w.design, item), "ngspice write: an admitted save");
     let s: ir::Save = w.design.row(item.index);
