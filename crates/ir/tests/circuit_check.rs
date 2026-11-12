@@ -543,4 +543,54 @@ mod tests {
             assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
         }
     }
+
+    /// An element of `kind` named `name` in `scope`, with a valid detail row.
+    fn named(b: &mut Builder<'_>, scope: ScopeId, kind: ElemKind, name: &str) {
+        let one = n(b, 1);
+        let detail = match kind {
+            ElemKind::VSource => b.detail(source(one)),
+            _ => b.detail(Passive {
+                value: one,
+                ..Passive::PLAIN
+            }),
+        };
+        let name = b.name(name);
+        let terminals = b.names(&["a", "0"]);
+        let row = Element {
+            kind,
+            name,
+            terminals,
+            model: Ref {
+                name: NameId::NONE,
+                def: DefId::NONE,
+            },
+            params: List::EMPTY,
+            mult: ExprId::NONE,
+            detail,
+        };
+        b.push(scope, row, Span::NONE);
+    }
+
+    #[test]
+    fn two_elements_of_one_name_in_one_scope_across_kinds() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        named(&mut b, top, ElemKind::Resistor, "x1");
+        named(&mut b, top, ElemKind::VSource, "x1");
+        let mut diags = Diags::new();
+        check(&d, &mut diags);
+        assert_eq!(codes(&diags), only(Violation::DuplicateElement));
+        assert_eq!(diags.rows()[0].arg, 1, "the second element's row");
+    }
+
+    #[test]
+    fn one_name_in_two_scopes_is_legal() {
+        let got = checked(|b, top| {
+            named(b, top, ElemKind::Resistor, "x1");
+            let (_, body) = b.subckt(top, "sub", &[], &[], Span::NONE);
+            named(b, body, ElemKind::VSource, "x1");
+        });
+        assert_eq!(got, Vec::<Code>::new());
+    }
 }

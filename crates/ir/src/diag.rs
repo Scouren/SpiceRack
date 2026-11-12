@@ -248,6 +248,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a row's field outside its domain",
             "a field holds a value its row does not allow, or two fields disagree (a name that must be set, a repeated port, an else branch before the last).",
         ),
+        Violation::DuplicateElement => (
+            "two elements of one name in one scope",
+            "an element's name is its whole name and is unique in its scope across kinds (A13, R23), so a by-name reference names one element.",
+        ),
     }
 }
 

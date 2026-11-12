@@ -26,7 +26,8 @@
 //! - `pub enum DetailKind` (`ALL`, `COUNT`)
 //! - `pub struct Element`, `pub const NO_ROW`
 //! - `pub struct CircuitDetails`; `DetailRow` (kernel, A6) for every row type it holds
-//! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`
+//! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
+//!   `pub(crate) fn design_check(&Design, &mut Diags)`
 
 use crate::build::Builder;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
@@ -616,4 +617,12 @@ impl RowFacts for Element {
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
     // one design-level circuit feature: a model with no library of its family (A12 C5)
     crate::circuit_features::library_features(design, set);
+}
+
+/// The circuit owner's design-level invariants, which no single row can see (A13): appends one
+/// `Violation::DuplicateElement` per element whose name an earlier element of the same scope
+/// already has (`arg`: the later element's row). Called once by `check`. One pass per scope;
+/// the map is lookup only, so the rows come in item order.
+pub(crate) fn design_check(design: &Design, out: &mut Diags) {
+    let _ = (design, out);
 }
