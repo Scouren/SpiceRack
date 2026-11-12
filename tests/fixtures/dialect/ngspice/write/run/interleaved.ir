@@ -1,0 +1,9 @@
+# oracle: R25 (items in IR order), RunInterleaved (state, elements, analyses mixed in a file top: ngspice reads cards in any order); written by hand
+file "interleaved.sp" deck
+  title "interleaved"
+  option rel_tol value=1e-4 whole_run
+  element vsource V1 (a 0) dc=1
+  analysis op
+  element resistor R1 (a 0) value=1k
+  env temp=50 whole_run
+  analysis tran stop=1u print_step=1n cap=ngspice_rule

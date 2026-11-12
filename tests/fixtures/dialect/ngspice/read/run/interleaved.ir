@@ -1,0 +1,9 @@
+# codes:
+file "interleaved.sp" deck
+  title "interleaved"
+  comment " oracle: ngspice-45 inp.c (state cards, elements and analyses read in any order: the common deck shape, 30 of 419 ngspice-45 examples, e.g. cider/bicmos/bicmpd.cir), RunInterleaved"
+  option rel_tol value=1e-4 whole_run
+  env temp=50 whole_run
+  element vsource V1 (a 0) dc=1
+  element resistor R1 (a 0) value=1k
+  analysis op
