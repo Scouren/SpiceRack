@@ -47,6 +47,8 @@ pub struct Words<'t> {
     pub(crate) end: usize,
     /// Byte offset of the statement's first byte (after its indentation).
     pub(crate) line: usize,
+    /// The file block the line sits in: every span this cursor makes names it.
+    pub(crate) file: FileId,
 }
 
 impl<'t> Words<'t> {
@@ -180,7 +182,7 @@ impl<'t> Words<'t> {
 
     /// A field value: an atom, or a parenthesized expression (references in it are linked after
     /// the whole text). `scope` is where the expression is used.
-    pub fn value(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
+    pub fn value(&mut self, _scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
         self.blank();
         let at = self.pos;
         let s = self.text.as_bytes();
@@ -212,7 +214,7 @@ impl<'t> Words<'t> {
 
     /// An expression to the end of the line or the next unmatched `)`/`,`/`]` (the `param` and
     /// `func` right-hand sides). Explicit operator stack: no recursion on nesting depth (C11).
-    pub fn expr(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
+    pub fn expr(&mut self, _scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
         self.blank();
         match parse_expr(self.text, self.pos, self.end, b) {
             Ok((e, q)) => {
@@ -228,7 +230,7 @@ impl<'t> Words<'t> {
     }
 
     /// A bracketed expression list: `[e1, e2]`, possibly `[]`.
-    pub fn exprs(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprList {
+    pub fn exprs(&mut self, _scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprList {
         if !self.expect("[", diags) {
             return ExprList::EMPTY;
         }
@@ -305,7 +307,7 @@ impl<'t> Words<'t> {
         }
         let end = self.word_end(at);
         Span {
-            file: FileId::NONE,
+            file: self.file,
             start: at as u32,
             len: (end - at) as u32,
         }
@@ -346,7 +348,7 @@ impl<'t> Words<'t> {
     /// The whole statement's bytes (the span a reader gives the item it pushes).
     pub fn line_span(&self) -> Span {
         Span {
-            file: FileId::NONE,
+            file: self.file,
             start: self.line as u32,
             len: (self.end - self.line) as u32,
         }
@@ -419,7 +421,7 @@ impl Words<'_> {
         diags.push(
             TEXT_SYNTAX,
             Span {
-                file: FileId::NONE,
+                file: self.file,
                 start: at as u32,
                 len: (end - at) as u32,
             },

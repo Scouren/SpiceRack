@@ -11,10 +11,11 @@
 //! Gen, ScopeId, &mut Builder<'_>, &FeatureSet) -> ItemRef`)
 
 use crate::build::Builder;
+use crate::class::ExprClass;
 use crate::expr::ExprTag;
 use crate::feature::{Extra, Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
-use crate::id::{ExprId, ItemRef, ScopeId};
+use crate::id::{DefId, ExprId, ItemRef, ScopeId};
 use crate::item::{DefKind, LoadKind, OpaqueClass};
 use crate::span::Span;
 
@@ -100,22 +101,34 @@ pub(crate) fn gen_subckt(
     b: &mut Builder<'_>,
     f: &FeatureSet,
 ) -> ItemRef {
+    let mut classes = Vec::new();
+    // a head default reads a parameter only when the set has FormalReadsParam (A12 K2)
+    g.param_reads = f.contains(Feature::Extra(Extra::FormalReadsParam));
     let defaults: Vec<ExprId> = (0..g.below(3))
         .map(|_| {
             let value = f.contains(Feature::Expr(ExprTag::Num)) && g.chance(2);
-            if value {
+            let e = if value {
                 g.expr(b, f, Reads::Constant)
             } else {
                 ExprId::NONE
-            }
+            };
+            classes.push(if value { g.class } else { ExprClass::Constant });
+            e
         })
         .collect();
+    g.param_reads = true;
     let name = g.fresh();
     let ports: Vec<String> = (0..g.below(4)).map(|_| g.fresh()).collect();
     let keys: Vec<String> = defaults.iter().map(|_| g.fresh()).collect();
     let ports: Vec<&str> = ports.iter().map(String::as_str).collect();
     let params: Vec<(&str, ExprId)> = keys.iter().map(String::as_str).zip(defaults).collect();
-    b.subckt(scope, &name, &ports, &params, Span::NONE).0
+    let item = b.subckt(scope, &name, &ports, &params, Span::NONE).0;
+    // the head defaults are the last definitions, in order
+    let last = b.design().definitions().len();
+    for (k, class) in classes.into_iter().enumerate() {
+        g.note(DefId((last - params.len() + k) as u32), class);
+    }
+    item
 }
 
 pub(crate) fn gen_section(
@@ -147,8 +160,11 @@ pub(crate) fn gen_param(
     f: &FeatureSet,
 ) -> ItemRef {
     let value = g.expr(b, f, Reads::Constant);
+    let class = g.class;
     let name = g.fresh();
-    b.param(scope, &name, value, Span::NONE)
+    let item = b.param(scope, &name, value, Span::NONE);
+    g.note(DefId((b.design().definitions().len() - 1) as u32), class);
+    item
 }
 
 pub(crate) fn gen_func(
@@ -160,8 +176,11 @@ pub(crate) fn gen_func(
     let args: Vec<String> = (0..g.below(3)).map(|_| g.fresh()).collect();
     g.formals = args.clone();
     let body = g.expr(b, f, Reads::Circuit);
+    let class = g.class;
     g.formals.clear();
     let name = g.fresh();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
-    b.func(scope, &name, &args, body, Span::NONE)
+    let item = b.func(scope, &name, &args, body, Span::NONE);
+    g.note(DefId((b.design().definitions().len() - 1) as u32), class);
+    item
 }

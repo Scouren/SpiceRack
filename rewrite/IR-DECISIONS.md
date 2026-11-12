@@ -185,6 +185,22 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The writers live in `text_expr.rs` and are re-exported from `text` (`text::write_value`, …), together with `Ctx`. `write_names`, `write_exprs` and `write_params` were added as the mirrors of `Words::names`, `exprs` and `params`; `write_params` asserts every value is set (a head default without a value is the `Subckt` row's own spelling).
 - A10: `link` and `item_text::dump_subckt` use the subcircuit's body as the lookup scope of its head defaults. Tests: `kernel_link::a_subckt_default_reads_its_sibling_head_parameter` (red with the rule reverted), `kernel_text::a_subckt_default_reading_a_sibling_needs_no_mark`.
 
+
+## The spine's additions and the canonical empty list
+
+- `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
+- An empty list is always `List::EMPTY` (start 0): every `Builder` list constructor (`names`, `name_ids`, `exprs`, `params`, and through them every row and expression list) returns it for an empty slice, and `check` reports any other empty range as `HandleRange`. Equality therefore no longer depends on how an empty list was made (the circuit owner's report; its `canonical()` in circuit_parse.rs can go).
+- `check_legal` agrees with `features_used` by construction: both take the design-level features from `feature::design_level` (the case clash and both owners' `design_features`). A generated property checks it: for 40 designs × 20 random subsets, the set of reported `arg`s equals `features_used(d).minus(legal)`.
+
+## A11 applied (kernel)
+
+- The class lives in a new kernel file, `class.rs` (`ExprClass`, `expr_class`; crate `def_classes`, `node_class`). The per-definition table is cached in `Design::classes` (a `std::sync::OnceLock`, so `Design` stays `Sync`). `Design::builder()`/`editor()` and every mutating `Builder`/`Editor` method clear it, and it is not part of equality. `expr_class` costs O(its tree) once the table is built, and O(design) the first time after a mutation.
+- A formal-argument read (a `Param` expression bound to its `Func`) is not a dependency: its class is the call's argument's, which the caller's own tree holds. A user call is a dependency on its `Func`.
+- `ProbeContext` stays direct, as ruled. Making it transitive (a parameter whose value reads the circuit through another parameter) is open.
+- The generator follows R14. It decides a tree's class up front: a dynamic tree starts from `Temp` (or a probe under `Reads::Circuit`); a constant tree holds neither and reads only definitions the generator noted as constant (`Gen::def_class`, set by each row's generator for the definitions it pushes). `Ddt`/`Idt` appear only in a dynamic tree under `Reads::Circuit`. The expression generator moved to `gen_expr.rs` (gen.rs passed 500 lines).
+- `bind_ref` asserts the slot's kind, not the name (a reader may bind by its own case rule; `check`'s `RefTarget` then judges the name).
+- kernel_store.rs passed 500 lines: its structure tests (`reachable`, the empty list, `bind_ref`) moved to `tests/kernel_structure.rs`.
+
 ## Implementation, run owner
 
 - One crate-private trait `DetailFacts` (in `analysis_facts.rs`) carries a detail row's handles, features, field fault, text and generator; each header kind (`Analysis`, `Loop`, `Measure`) reaches its 22, 3 and 6 detail types through one exhaustive macro dispatch (`by_detail!`, `by_loop!`, `by_measure!`).
@@ -199,3 +215,34 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
 - An empty list is always `List::EMPTY` (start 0): every `Builder` list constructor (`names`, `name_ids`, `exprs`, `params`, and through them every row and expression list) returns it for an empty slice, and `check` reports any other empty range as `HandleRange`. Equality therefore no longer depends on how an empty list was made (the circuit owner's report; its `canonical()` in circuit_parse.rs can go).
 - `check_legal` agrees with `features_used` by construction: both take the design-level features from `feature::design_level` (the case clash and both owners' `design_features`). A generated property checks it: for 40 designs × 20 random subsets, the set of reported `arg`s equals `features_used(d).minus(legal)`.
+
+## The spine's two text requests
+
+- `text::parse` gives every span (an item's, a `TEXT_SYNTAX` row's) the file of the block its line sits in (`FileId::NONE` for a `file` line itself), with byte offsets into the whole text handed to `parse`. `Words` carries the line's file in a crate field, so every reader's `line_span()`/`span()` is right without a change on the owners' side.
+- `Design::entry` is total: `FileId::NONE` for a design with no file; a caller that needs a file asserts.
+
+## A12 K1 applied (typed arithmetic)
+
+- `Sgn` is Int-valued (Int iff its operand is), against AMEND-A12's table and with DIALECT-VACASK run f2 (`sgn(-3)/2` printed 0; R5, the run wins). Reported to the lead before building.
+- The evaluator keeps every numeric rule on `f64` and adds the tag in `apply` from the operator and its operands' tags; `DivTyped` is the one operator whose number depends on the tags. `eval` is `eval_typed(...).map(|v| v.number)`.
+- `Bindings::param_value` is a defaulted method (no existing `Bindings` impl breaks); a typed parameter (an instance passing `x=3` or `x=3.0`) comes through it.
+- IR text: `3i` (the suffix `i`; no scale letter is `i`), `/:` at `*`'s precedence, `to_int`.
+- The Int zero (`0i`) is a valid literal beside `Literal::ZERO`; `eq_value` separates Int from real literals of one value (also `Design::eq_meaning`).
+- `Literal` and `NumForm` moved to `literal.rs` (expr.rs passed 500 lines), re-exported from `expr`.
+- The generator makes Int literals only when the set has `Extra::IntLiteral` (`Gen::int_literals`, set by `expr`); `DivTyped` and `ToInt` follow the `Binary`/`Func` features as every member does.
+
+## A12 K2 applied (two features of scope)
+
+- `EnclosingRef` counts every resolved reference an item holds: its row `Ref`s and the `Param`/`UserCall` nodes of its expressions; an unresolved (`HELD` or `NONE`) one is not bound anywhere and does not count. The test is on the item's own scope chain (`Design::in_enclosing_subckt`, crate-private), so a subckt's head defaults (read in the subckt's parent scope) count against the parent's subcircuit.
+- `FormalReadsParam` is a `Subckt` row fact (its `features`), not a design-level hook: it depends on the row's own defaults only.
+- The generator: `Gen::enclosing_ok` filters `pick_def`'s draws; `Gen::param_reads` is cleared around a subckt's head defaults when the set lacks `FormalReadsParam`, and `leaf()` then drops `Param`.
+
+## A12 K3 applied (`OpaqueClass::Hint`)
+
+- Appended last (`S0006`), text word `hint`; no feature per class exists today, so `Feature::COUNT` does not move. The generator draws it with every other class (`OpaqueClass::ALL`).
+
+## M5: the properties over every feature
+
+- `kernel_gen::the_full_set_runs_every_property`: under `FeatureSet::ALL`, 400 seeds are valid, stay within the set and round-trip through IR text; up to 4,000 seeds between them use every feature but `Func(Ddt)` and `Func(Idt)`, named in the test. A `ddt`/`idt` makes its tree class `Circuit`, so it only ever counts as `FuncDyn`, and no valid design holds the non-dynamic pair. The pair stays in the enum: it is an index any writer's `FEATURES` may list, and nothing sets it.
+- The generator makes `Extra::CaseSensitiveNames` (`Gen::case_ok`): when the set has it, one fresh name in 16 is the upper-case twin of the previous index (`G4` after `g4`). Before this, no generator made it.
+

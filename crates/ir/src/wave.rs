@@ -500,13 +500,24 @@ impl WaveRef {
 
     /// Whether this is [`WaveRef::NONE`].
     pub const fn is_none(self) -> bool {
-        todo!()
+        self.index == u32::MAX
     }
 }
 
 impl Design {
     /// The waveform `wave` refers to, decoded. Asserts it is not `NONE` and is in range.
     pub fn wave(&self, wave: WaveRef) -> Wave {
-        todo!()
+        assert!(!wave.is_none(), "no waveform");
+        match wave.kind {
+            WaveKind::Pulse => Wave::Pulse(self.detail(wave.index)),
+            WaveKind::Sin => Wave::Sin(self.detail(wave.index)),
+            WaveKind::Exp => Wave::Exp(self.detail(wave.index)),
+            WaveKind::Pwl => Wave::Pwl(self.detail(wave.index)),
+            WaveKind::Sffm => Wave::Sffm(self.detail(wave.index)),
+            WaveKind::Am => Wave::Am(self.detail(wave.index)),
+            WaveKind::TrNoise => Wave::TrNoise(self.detail(wave.index)),
+            WaveKind::TrRandom => Wave::TrRandom(self.detail(wave.index)),
+            WaveKind::Pattern => Wave::Pattern(self.detail(wave.index)),
+        }
     }
 }

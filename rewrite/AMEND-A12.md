@@ -132,3 +132,56 @@ fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {}
 `dialect::legalize` calls it last. Law L4 reads: `write` is total over a design `legalize`
 accepted. The law harness skips and counts generated designs `admits` refuses, and fails when a
 dialect admits none of a kind its `FEATURES` claims.
+
+# Amendment A13: an element's name is its whole name (R23)
+
+Source: the ngspice scaffold (`rewrite/S3-AREAS.md` on `dialect-ngspice`): with names stored
+without their SPICE letter, `i(vdd)` reads as `I("dd")`, and a current through `L1` cannot be
+told from one through `V1`: every by-name reference to an element (`Expr::I`, a coupling's
+inductors, a controlled source's sensing element, a sweep or alter target, a probe) would need a
+kind beside the name.
+
+- **Rule.** `Element.name` is the element's whole name as its dialect spells it (ngspice: the
+  letter included, folded: `r1`, `vdd`, `x1`). Element names are unique in their scope across
+  kinds; a by-name reference names exactly one element. `IR-KERNEL.md` §6's "without any type
+  letter" and `DIALECT-NGSPICE.md` §4's "prefixes an element name with its kind's letter" are
+  withdrawn; the worked example of `text.rs` already spells whole names.
+- **Circuit.** `spice_letter(design, element) -> Option<u8>`: the SPICE card letter of an
+  element (its kind, and its detail where the letter depends on it; `None` for a kind SPICE
+  cards do not have). Feature `CircuitExtra::NameWithoutLetter`: an element whose name does not
+  begin with its SPICE letter (ASCII case ignored): a SPICE-card dialect cannot spell it, and a
+  pass renames it and every reference to it. The generator makes letter-led names when the set
+  lacks the feature.
+- **Kernel.** `Violation::DuplicateElement` (two elements of one name in one scope; `arg`: the
+  second), reported through a design-level check hook of the circuit owner
+  (`pub(crate) fn design_check(design, out)` in `element.rs`, called once by `check`, as
+  `design_features` is).
+
+# Amendment A14: state that holds for the whole run, and what order means (R24–R26)
+
+Source: the ngspice run area (`ng-run`), from `cktdojob.c`, `cktnewan.c`, `analysis.c`, `inp.c`
+and runs: ngspice's batch mode runs the analyses of a deck by type rank (AC, DC, OP, TRAN, PZ,
+TF, DISTO, NOISE, SENS, PSS, SP), reverse card order only inside one type (so
+`INV-semantics.md` 8.04 is wrong); every state card (`.options`, `.temp`, `.ic`, `.nodeset`)
+holds for the whole deck wherever it stands; a run card inside a `.subckt` body is the deck's.
+
+- **R24, run owner.** `Option`, `Env` and `NodeSet` rows gain `applies: Applies::{FromHere,
+  WholeRun}`. `FromHere`: the item holds for the run items after it (a script, a control block).
+  `WholeRun`: it holds for every run item of its deck wherever it stands; among `WholeRun` items
+  that set the same thing (an option key, `temp`, `tnom`, one node's condition) the last in
+  listed order holds. "Listed order" reads an `Include` as the items of the file it names, in
+  place. Features, so that each target can refuse or legalize what it lacks: a `FromHere` state
+  item after a run item (today's `OptionMidRun`, and its `Env` and `NodeSet` twins); a
+  `WholeRun` state item after a run item (a target whose state is positional cannot spell it in
+  place; a pass moves it before the first run item when both are in one file). `Env`'s `temp`
+  and `tnom` are each optional: an `Env` sets what it names.
+- **R25, IR-RUN §1.** Run items are listed in the order their source lists them. Analyses with
+  no `Alter`, no loop boundary and no `FromHere` state item between them are independent: their
+  order changes no number, only the order of the results, which is a run fact of the dialect
+  that ran them (S12), not a property of the design. No reader permutes run items; no writer
+  reorders them. `DIALECT-NGSPICE.md` §3's "run items in the order ngspice runs them" is
+  withdrawn.
+- **R26, run owner.** A run item is its deck's wherever it stands: a scope does not scope an
+  analysis, an option or an `Env`. Feature `RunExtra::RunItemNested`: such an item listed
+  outside its file's top scope and the `If` chains of it. (A `NodeSet` inside a subcircuit keeps
+  its own, different meaning, `NodeSetInSubckt`: nodes local to each instance.)

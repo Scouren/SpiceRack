@@ -27,11 +27,12 @@
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
+use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::id::{ExprId, ItemRef, NameId, ScopeId};
+use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
@@ -102,6 +103,15 @@ pub enum Extra {
     /// Two names of the design that differ only in ASCII case: a case-folding target would
     /// merge them.
     CaseSensitiveNames,
+    /// A literal of form `Int` anywhere in the design (A12 K1: typed arithmetic).
+    IntLiteral,
+    /// An item holds a reference bound to a definition in the body of a subcircuit enclosing
+    /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
+    /// resolves in the own scope, then the top, never an enclosing subcircuit).
+    EnclosingRef,
+    /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
+    /// only a formal whose default folds to a constant).
+    FormalReadsParam,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -230,7 +240,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 8] = [
+    pub const ALL: [Extra; 11] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -239,6 +249,9 @@ impl Extra {
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
+        Extra::IntLiteral,
+        Extra::EnclosingRef,
+        Extra::FormalReadsParam,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -327,8 +340,9 @@ impl FeatureSet {
 /// the expression features of the expressions in its `RowFacts::handles`; then the features of the
 /// whole design: the case clash and the circuit and run owners' `design_features` hooks, each
 /// called once.
-/// An expression's functions and operators count as `*Dyn` when the expression holds a `V`,
-/// `I`, `Time` or `Freq` leaf.
+/// An expression's functions and operators count as `*Dyn` when its class is at least `Temp`
+/// (`class::expr_class`: it, or a parameter or function it reads, holds the temperature or reads
+/// the circuit; R14, A11).
 pub fn features_used(design: &Design) -> FeatureSet {
     let mut set = FeatureSet::EMPTY;
     let mut walk = ExprWalk::new(design);
@@ -400,16 +414,43 @@ pub(crate) fn item_features(
     if let Some(extra) = placed {
         *set = set.with(Feature::Extra(extra));
     }
+    // A12 K2: a resolved reference (in the row or in its expressions) into an enclosing
+    // subcircuit's body
+    let mut refs: Vec<DefId> = handles
+        .iter()
+        .filter_map(|h| match h {
+            Handle::Ref(r) => Some(r.def),
+            _ => None,
+        })
+        .collect();
+    for root in expr_roots(design, &handles) {
+        for &e in walk.tree(design, root) {
+            if let Expr::Param(r) | Expr::UserCall(r, _) = design.expr(e) {
+                refs.push(r.def);
+            }
+        }
+    }
+    let enclosing = refs.iter().any(|&d| {
+        d.index_checked(design.defs.len())
+            .is_some_and(|k| design.in_enclosing_subckt(scope, design.defs[k].scope))
+    });
+    if enclosing {
+        *set = set.with(Feature::Extra(Extra::EnclosingRef));
+    }
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);
-        let dynamic = nodes.iter().any(|&e| {
-            matches!(
-                design.expr(e),
-                Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq
-            )
-        });
+        // the Dyn features are class >= Temp (R14, A11): transitive through reads
+        let table = def_classes(design);
+        let dynamic = nodes
+            .iter()
+            .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
+            if let Expr::Num(n) = design.expr(e)
+                && design.num(n).form == NumForm::Int
+            {
+                *set = set.with(Feature::Extra(Extra::IntLiteral));
+            }
             let f = match design.expr(e) {
                 Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
                 Expr::Call(func, _) => Feature::Func(func),

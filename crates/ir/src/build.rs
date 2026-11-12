@@ -16,7 +16,10 @@
 //! expression, a resolved [`Ref`] in the row it pushes. A builder that has no such rule leaves
 //! them unresolved and calls `link` (the neutral rule, A4) when it is done.
 //!
-//! ```ignore
+//! ```
+//! use spicerack_ir::{BinOp, Design, Diags, ExprId, Role, Span, check, link};
+//!
+//! let mut design = Design::new();
 //! let mut b = design.builder();
 //! let (_, top) = b.file("rc.sp", Role::Deck);
 //! b.title(top, "rc divider", Span::NONE);
@@ -27,7 +30,13 @@
 //! let half = { let two = b.num(2.0); let r = b.param_ref("r"); b.binary(BinOp::Div, r, two) };
 //! let ok = { let t = b.temp(); let lim = b.num(125.0); b.binary(BinOp::Lt, t, lim) };
 //! let (_, branches) = b.if_(body, &[ok, ExprId::NONE], Span::NONE);
+//! b.param(body, "w", half, Span::NONE);
 //! // circuit and run methods (`build_circuit.rs`, `build_run.rs`) push elements and analyses.
+//! let mut diags = Diags::new();
+//! link(&mut design, &mut diags); // the neutral rule binds `rval` and `r`
+//! check(&design, &mut diags);
+//! assert!(diags.is_empty());
+//! # let _ = branches;
 //! ```
 //!
 //! Cites: `rewrite/IR-KERNEL.md` C2, C6–C10, C13; `REWRITE-PLAN.md` §2.4 (caller code first).
@@ -48,6 +57,7 @@
 //!   `Builder::opaque`, `Builder::subckt`, `Builder::section`, `Builder::if_`, `Builder::param`,
 //!   `Builder::func`
 //! - definitions: `Builder::define(&mut self, DefKind, NameId, ScopeId, ItemRef) -> DefId`,
+//!   `Builder::bind_ref(&mut self, ItemRef, u32, DefId)`,
 //!   `Builder::resolve(&mut self, ExprId, DefId)`
 
 use crate::design::{Design, DetailRow, ItemRow};
@@ -191,6 +201,7 @@ impl<'d> Builder<'d> {
     /// and the table's capacity; the row's own fields are validated by `check` (through its
     /// `RowFacts`), not here. Does not define anything.
     pub fn push<R: ItemRow>(&mut self, scope: ScopeId, row: R, span: Span) -> ItemRef {
+        self.design.classes.take();
         assert!(
             scope.index() < self.design.scopes.len(),
             "a scope id in range"
@@ -405,12 +416,32 @@ impl<'d> Builder<'d> {
     /// (`resolve` covers expressions). Asserts `k` is in range and `def` has the kind that slot
     /// expects.
     pub fn bind_ref(&mut self, item: ItemRef, k: u32, def: DefId) {
-        todo!() // A11: red first
+        let target = self.design.def(def).kind;
+        let mut kinds = Vec::new();
+        self.design
+            .editor()
+            .map_refs(item, &mut |_, kind| kinds.push(kind));
+        assert!(
+            (k as usize) < kinds.len(),
+            "bind_ref names one of the item's references"
+        );
+        assert!(
+            kinds[k as usize] == target,
+            "bind_ref binds a definition of the kind its slot expects"
+        );
+        let mut slot = 0;
+        self.design.editor().map_refs(item, &mut |r, _| {
+            if slot == k {
+                r.def = def;
+            }
+            slot += 1;
+        });
     }
 
     /// Adds a definition. Asserts no definition of `kind` named `name` exists in `scope` yet:
     /// the reader keeps one winner by its simulator's rule before it calls.
     pub fn define(&mut self, kind: DefKind, name: NameId, scope: ScopeId, item: ItemRef) -> DefId {
+        self.design.classes.take();
         assert!(
             scope.index() < self.design.scopes.len(),
             "a scope id in range"
@@ -439,6 +470,7 @@ impl<'d> Builder<'d> {
     /// that `def` has the name and a kind the expression accepts: `Param` (or `Measure`, for a
     /// measure reading an earlier measure, A7) for a `Param` tag, `Func` for a `UserCall`.
     pub fn resolve(&mut self, expr: ExprId, def: DefId) {
+        self.design.classes.take();
         self.assert_expr(expr);
         let target = self.design.def(def);
         let i = expr.index();

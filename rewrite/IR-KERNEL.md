@@ -244,6 +244,54 @@ writer's bare-or-`#k` test and `parse` (through `link`) use the body for that ro
 keeps its listing scope. Why: ngspice sorts head parameters by dependency, HSPICE and Spectre read
 them in the body, and a lookup from the parent would dump the common case as `r#k`.
 
+**A11 (2026-11-12): from the ngspice tracer (ngspice-45 source and runs).**
+1. Three `Func` members: `StepHalf` (0 for x < 0, 0.5 at 0, 1 for x > 0: ngspice B-source `u`,
+   `PTustep`), `PowSigned` (−pow(−x, y) for x < 0, else pow(x, y), `0` to a negative power a
+   domain error: B-source `pwr`, `PTpwr`), `Sqr` (x·x: numparam `sqr`). `Func::COUNT` is 43 and
+   `Feature::COUNT` 502.
+2. Attributions corrected, no behaviour change: `Step` is not ngspice's `u`; `SqrtAbs` and `LnAbs`
+   are not ngspice-45's B-source `sqrt`/`ln` (those error below zero), and are removed if no reader
+   produces them; `ExpLin14` is ngspice's B-source `exp` under `ngbehavior=ps` only; `IntDiv` is not
+   ngspice's `\` (which is `trunc(|a / b|)`, read as `Trunc(Abs(Div))`), no speaker yet.
+3. The dynamic class (R14): `pub enum ExprClass { Constant, Temp, Circuit }` (ordered) and
+   `pub fn expr_class(&Design, ExprId) -> ExprClass`. An expression is `Circuit` when it, or a
+   parameter or user function it reads (transitively), holds V, I, Time, Freq, Ddt or Idt; else
+   `Temp` when one of them holds `Temp`; else `Constant`. One class per `Param`/`Func` definition,
+   computed once per design state (Kahn's worklist; a definition on or behind a reference cycle is
+   `Circuit`) and cached in the design, cleared by every `Builder`/`Editor` mutation. The `*Dyn`
+   features are `class >= Temp`. `ProbeContext` stays the direct test.
+4. `Builder::bind_ref(item, k, def)` sets the k-th `Ref` of `item`, in `map_refs` order (asserts `k`
+   in range and the slot's kind), so a reader binds a row reference to a definition it pushes later.
+
+**A12 K1 (2026-11-12): typed arithmetic (R16).** `NumForm::Int` (a whole number of integer type:
+`frac == 0`, `exp10 == 0`; the Int zero is the second permitted zero); `BinOp::DivTyped` (both
+Int: the quotient truncated toward zero, Int; else `a / b`, Real; `Div` unchanged); `Func::ToInt`
+(`x` truncated, Int; `Trunc` stays Real); `Extra::IntLiteral`. The reference evaluator tags every
+value Int or Real (`eval::eval_typed -> Value { number, int }`; `eval` keeps returning the
+number; `Bindings::param_value` passes a typed parameter, defaulting to `param` as Real):
+`Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
+`Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
+chosen branch's; `ToInt` Int; `Sgn` Int iff its operand is (run f2 printed `sgn(-3)/2` as 0, so
+the run overrides the amendment's table, R5); everything else Real. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`. An Int
+and a real literal of one value are not `eq_value` (they mean different things).
+
+**A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
+resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressions) bound to a
+definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
+item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
+(so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
+`Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
+generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
+leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+
+**A12 K3 (2026-11-12): `OpaqueClass::Hint` (R19).** Tunes its own simulator's solver (a
+convergence aid, a step-control knob) and names no accuracy target. Appended after `Script`, so
+its code is `S0006` and no earlier code moves; IR text word `hint`. Its note says its own family
+copies it and another family leaves it out, the numbers moving at most within the solver's
+tolerance (not `Inert`'s note: an `Inert` statement moves no number). Dropping it is the spine's
+`legalize`, not the kernel's.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

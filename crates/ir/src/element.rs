@@ -560,7 +560,7 @@ impl DetailKind {
 
 impl RowFacts for Element {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
-        todo!()
+        crate::circuit_text::element_handles(self, design, out)
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -575,17 +575,16 @@ impl RowFacts for Element {
         design.editor().set(at.index, row);
     }
 
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
-        todo!()
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        crate::circuit_features::element_features(self, design, set)
     }
 
-    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
-        todo!()
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
+        crate::circuit_check::check_element(self, design, at, out)
     }
 
-    #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
     fn dump(&self, design: &Design, ctx: &crate::text_expr::Ctx, out: &mut String) {
-        todo!()
+        crate::circuit_text::dump_element(self, design, ctx, out)
     }
 
     fn parse(
@@ -594,7 +593,7 @@ impl RowFacts for Element {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        crate::circuit_parse::parse_element(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -604,12 +603,13 @@ impl RowFacts for Element {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::circuit_gen::generate_element(g, scope, b, features)
     }
 }
 
 /// The circuit owner's features of the whole design, which no single row carries (A9). Called
 /// once by `features_used` and by `check_legal`. Empty until the circuit owner fills it.
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
+    // Every circuit feature is a field of one row (`RowFacts::features`); none is positional.
     let _ = (design, set);
 }

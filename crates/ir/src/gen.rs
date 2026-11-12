@@ -15,17 +15,19 @@
 //! Contents: `pub struct Size`, `pub fn generate(u64, &FeatureSet, Size) -> Design`,
 //! `pub struct Gen`, `Gen::below(&mut self, u32) -> u32`, `Gen::chance(&mut self, u32) -> bool`,
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
-//! `Gen::expr(&mut self, &mut Builder<'_>, &FeatureSet, Reads) -> ExprId`,
+//! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
 //! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::fresh(&mut self) -> String`,
-//! `Gen::word(&mut self) -> &'static str`
+//! `Gen::word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
+//! `Gen::note(&mut self, DefId, ExprClass)`
 
 use crate::build::Builder;
+use crate::class::ExprClass;
 use crate::design::Design;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, NumForm, UnOp};
+use crate::expr::{ExprTag, Literal, NumForm};
 use crate::facts::RowFacts;
 use crate::feature::{Extra, Feature, FeatureSet};
-use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
+use crate::id::{DefId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, Role, ScopeKind};
 
 /// How big a generated design is.
@@ -62,6 +64,25 @@ pub struct Gen {
     /// The definitions of each kind seen so far, in definition order (`pick_def`'s index,
     /// caught up from the design's table on each call: definitions are only appended).
     pub(crate) by_kind: Vec<Vec<DefId>>,
+    /// The dynamic class of each definition generated so far, by `DefId` (`Constant` when not
+    /// noted): a constant-class tree reads only constant-class definitions (R14).
+    pub(crate) def_class: Vec<ExprClass>,
+    /// The class of the tree being generated (after `expr` returns: of the tree it built), and
+    /// what that tree may read.
+    pub(crate) class: ExprClass,
+    pub(crate) dynamic: bool,
+    pub(crate) reads: Reads,
+    /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
+    /// `expr` from its feature set).
+    pub(crate) int_literals: bool,
+    /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
+    /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
+    /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
+    pub(crate) enclosing_ok: bool,
+    pub(crate) param_reads: bool,
+    /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
+    /// `Extra::CaseSensitiveNames`).
+    pub(crate) case_ok: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -93,24 +114,6 @@ const WORDS: [&str; 8] = [
     "x.y",
 ];
 
-/// An operator node waiting for its operands.
-enum Node {
-    Unary(UnOp),
-    Binary(BinOp),
-    Ternary,
-    Call(Func),
-    User(String, DefId),
-    Draw(Dist, DrawWhen, DrawPer),
-    List,
-}
-
-/// One open operator of the expression being generated.
-struct Frame {
-    node: Node,
-    kids: Vec<ExprId>,
-    need: usize,
-}
-
 /// A random design under `features`, at most `size`. A feature outside the set never appears;
 /// a feature in it may not (the set is an upper bound).
 pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
@@ -123,6 +126,14 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         scope: ScopeId::NONE,
         formals: Vec::new(),
         by_kind: vec![Vec::new(); DefKind::COUNT],
+        def_class: Vec::new(),
+        class: ExprClass::Constant,
+        dynamic: false,
+        reads: Reads::Constant,
+        int_literals: false,
+        enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
+        param_reads: true,
+        case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -155,6 +166,15 @@ impl Gen {
     /// trailing zeros in `frac`, so every writer's number spelling and the literal round trip are
     /// exercised.
     pub fn literal(&mut self) -> Literal {
+        if self.int_literals && self.chance(4) {
+            let n = self.below(2001) as i64 - 1000;
+            return Literal {
+                mantissa: n,
+                frac: 0,
+                exp10: 0,
+                form: NumForm::Int,
+            };
+        }
         let sign = if self.chance(4) { -1 } else { 1 };
         let mantissa = sign * (1 + self.below(999_999)) as i64;
         let frac = self.below(4) as u8;
@@ -198,57 +218,6 @@ impl Gen {
         b.name(&name)
     }
 
-    /// A random expression of depth at most `size.expr_depth`, using only `features` and only
-    /// leaves `reads` allows. Parameter reads name definitions visible where it is used, or are
-    /// left unresolved.
-    pub fn expr(&mut self, b: &mut Builder<'_>, features: &FeatureSet, reads: Reads) -> ExprId {
-        assert!(
-            features.contains(Feature::Expr(ExprTag::Num)),
-            "an expression needs literals to end in"
-        );
-        let probes: Vec<ExprTag> = [ExprTag::V, ExprTag::I, ExprTag::Time, ExprTag::Freq]
-            .into_iter()
-            .filter(|t| features.contains(Feature::Expr(*t)))
-            .collect();
-        let dynamic = reads == Reads::Circuit && !probes.is_empty() && self.chance(2);
-        let mut need_probe = dynamic;
-        let mut stack: Vec<Frame> = Vec::new();
-        // depth-first, building each row after its children, left to right: a caller's order
-        loop {
-            let depth = stack.len();
-            let node = if depth + 1 >= self.size.expr_depth as usize || self.chance(3) {
-                None
-            } else {
-                self.operator(b, features, dynamic)
-            };
-            let mut value = match node {
-                Some((node, need)) if need > 0 => {
-                    stack.push(Frame {
-                        node,
-                        kids: Vec::new(),
-                        need,
-                    });
-                    continue;
-                }
-                // a tree that still owes its probe takes a leaf where an empty node would end it
-                Some((node, _)) if !need_probe => build(b, node, Vec::new()),
-                Some(_) | None => self.leaf(b, features, &probes, dynamic, &mut need_probe),
-            };
-            // hand the value up, building every frame it completes
-            loop {
-                let Some(top) = stack.last_mut() else {
-                    return value;
-                };
-                top.kids.push(value);
-                if top.kids.len() < top.need {
-                    break;
-                }
-                let frame = stack.pop().expect("the frame just filled");
-                value = build(b, frame.node, frame.kids);
-            }
-        }
-    }
-
     /// An existing definition of `kind` visible from `scope`, chosen at random (up to eight
     /// draws among that kind's definitions), or `NONE` when the draws find none visible.
     pub fn pick_def(&mut self, design: &Design, scope: ScopeId, kind: DefKind) -> DefId {
@@ -271,7 +240,9 @@ impl Gen {
         for _ in 0..if n == 0 { 0 } else { 8 } {
             let k = self.below(n) as usize;
             let def = self.by_kind[kind as usize][k];
-            if chain.contains(&design.def(def).scope) {
+            let at = design.def(def).scope;
+            let enclosing = !self.enclosing_ok && design.in_enclosing_subckt(scope, at);
+            if chain.contains(&at) && !enclosing {
                 return def;
             }
         }
@@ -282,7 +253,28 @@ impl Gen {
     /// interns it in a builder caller's order).
     pub(crate) fn fresh(&mut self) -> String {
         self.fresh += 1;
+        // the case twin of the previous call's index: each index has at most one, so the name
+        // is still unique as written
+        if self.case_ok && self.fresh > 1 && self.chance(16) {
+            return format!("G{}", self.fresh - 2);
+        }
         format!("g{}", self.fresh - 1)
+    }
+
+    /// The class noted for a generated definition (`Constant` when none was).
+    pub(crate) fn class_of(&self, def: DefId) -> ExprClass {
+        self.def_class
+            .get(def.index())
+            .copied()
+            .unwrap_or(ExprClass::Constant)
+    }
+
+    /// Notes the class of a definition just pushed.
+    pub(crate) fn note(&mut self, def: DefId, class: ExprClass) {
+        if self.def_class.len() <= def.index() {
+            self.def_class.resize(def.index() + 1, ExprClass::Constant);
+        }
+        self.def_class[def.index()] = class;
     }
 
     /// A word for a string value or a text (`WORDS`).
@@ -398,196 +390,4 @@ fn candidates(
             | ItemKind::Elaborate => true,
         })
         .collect()
-}
-
-impl Gen {
-    /// A leaf the set allows: constants, parameter reads and the constant leaves; in a
-    /// circuit-reading tree also probes, its first leaf always one.
-    fn leaf(
-        &mut self,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-        probes: &[ExprTag],
-        dynamic: bool,
-        need_probe: &mut bool,
-    ) -> ExprId {
-        const CONSTANT: [ExprTag; 7] = [
-            ExprTag::Num,
-            ExprTag::Str,
-            ExprTag::Param,
-            ExprTag::Temp,
-            ExprTag::TStep,
-            ExprTag::TStop,
-            ExprTag::Tnom,
-        ];
-        let tag = if std::mem::take(need_probe) {
-            probes[self.below(probes.len() as u32) as usize]
-        } else {
-            let leaves: Vec<ExprTag> = CONSTANT
-                .into_iter()
-                .filter(|t| features.contains(Feature::Expr(*t)))
-                .chain(probes.iter().copied().filter(|_| dynamic))
-                .collect();
-            leaves[self.below(leaves.len() as u32) as usize]
-        };
-        match tag {
-            ExprTag::Num => {
-                let l = self.literal();
-                b.literal(l)
-            }
-            ExprTag::Str => {
-                let w = self.word();
-                b.string(w)
-            }
-            ExprTag::Param => self.param_read(b),
-            ExprTag::Temp => b.temp(),
-            ExprTag::TStep => b.tstep(),
-            ExprTag::TStop => b.tstop(),
-            ExprTag::Tnom => b.tnom(),
-            ExprTag::V => {
-                let (net, reference) = (self.fresh(), self.fresh());
-                b.v(&net, self.chance(2).then_some(reference.as_str()))
-            }
-            ExprTag::I => {
-                let e = self.fresh();
-                b.i(&e)
-            }
-            ExprTag::Time => b.time(),
-            ExprTag::Freq => b.freq(),
-            ExprTag::Call
-            | ExprTag::UserCall
-            | ExprTag::Unary
-            | ExprTag::Binary
-            | ExprTag::Ternary
-            | ExprTag::Draw
-            | ExprTag::List => unreachable!("not a leaf"),
-        }
-    }
-
-    /// A parameter read: a visible definition, a formal of the function being generated, or a
-    /// fresh name no definition has.
-    fn param_read(&mut self, b: &mut Builder<'_>) -> ExprId {
-        let def = self.pick_def(b.design(), self.scope, DefKind::Param);
-        match self.below(3) {
-            0 if !def.is_none() => {
-                let name = b.design().str(b.design().def(def).name).to_string();
-                let e = b.param_ref(&name);
-                b.resolve(e, def);
-                e
-            }
-            1 if !self.formals.is_empty() => {
-                let k = self.below(self.formals.len() as u32) as usize;
-                let name = self.formals[k].clone();
-                b.param_ref(&name)
-            }
-            _ => {
-                let name = self.fresh();
-                b.param_ref(&name)
-            }
-        }
-    }
-
-    /// An operator the set allows and the operand count it takes (`None`: none allowed).
-    fn operator(
-        &mut self,
-        b: &Builder<'_>,
-        features: &FeatureSet,
-        dynamic: bool,
-    ) -> Option<(Node, usize)> {
-        let has = |f| features.contains(f);
-        let mut nodes: Vec<(Node, usize)> = Vec::new();
-        if has(Feature::Expr(ExprTag::Unary)) {
-            for op in UnOp::ALL {
-                if has(if dynamic {
-                    Feature::UnaryDyn(op)
-                } else {
-                    Feature::Unary(op)
-                }) {
-                    nodes.push((Node::Unary(op), 1));
-                }
-            }
-        }
-        if has(Feature::Expr(ExprTag::Binary)) {
-            for op in BinOp::ALL {
-                if has(if dynamic {
-                    Feature::BinaryDyn(op)
-                } else {
-                    Feature::Binary(op)
-                }) {
-                    nodes.push((Node::Binary(op), 2));
-                }
-            }
-        }
-        if has(Feature::Expr(ExprTag::Ternary)) {
-            nodes.push((Node::Ternary, 3));
-        }
-        if has(Feature::Expr(ExprTag::Call)) {
-            for f in Func::ALL {
-                let member = if dynamic {
-                    Feature::FuncDyn(f)
-                } else {
-                    Feature::Func(f)
-                };
-                if has(member) && (dynamic || !f.reads_circuit()) {
-                    nodes.push((Node::Call(f), f.arity().0 as usize));
-                }
-            }
-        }
-        if has(Feature::Expr(ExprTag::UserCall)) {
-            let def = self.pick_def(b.design(), self.scope, DefKind::Func);
-            let name = if def.is_none() {
-                self.fresh()
-            } else {
-                b.design().str(b.design().def(def).name).to_string()
-            };
-            nodes.push((Node::User(name, def), self.below(3) as usize));
-        }
-        if has(Feature::Expr(ExprTag::Draw)) {
-            let dists: Vec<Dist> = Dist::ALL
-                .into_iter()
-                .filter(|d| has(Feature::Dist(*d)))
-                .collect();
-            let whens: Vec<DrawWhen> = DrawWhen::ALL
-                .into_iter()
-                .filter(|w| has(Feature::DrawWhen(*w)))
-                .collect();
-            let pers: Vec<DrawPer> = DrawPer::ALL
-                .into_iter()
-                .filter(|p| has(Feature::DrawPer(*p)))
-                .collect();
-            if !dists.is_empty() && !whens.is_empty() && !pers.is_empty() {
-                let d = dists[self.below(dists.len() as u32) as usize];
-                let w = whens[self.below(whens.len() as u32) as usize];
-                let p = pers[self.below(pers.len() as u32) as usize];
-                nodes.push((Node::Draw(d, w, p), d.arity().0 as usize));
-            }
-        }
-        if has(Feature::Expr(ExprTag::List)) {
-            nodes.push((Node::List, self.below(4) as usize));
-        }
-        if nodes.is_empty() {
-            return None;
-        }
-        let k = self.below(nodes.len() as u32) as usize;
-        Some(nodes.swap_remove(k))
-    }
-}
-
-/// Builds an operator row from its operands (in order).
-fn build(b: &mut Builder<'_>, node: Node, kids: Vec<ExprId>) -> ExprId {
-    match node {
-        Node::Unary(op) => b.unary(op, kids[0]),
-        Node::Binary(op) => b.binary(op, kids[0], kids[1]),
-        Node::Ternary => b.ternary(kids[0], kids[1], kids[2]),
-        Node::Call(f) => b.call(f, &kids),
-        Node::User(name, def) => {
-            let e = b.user_call(&name, &kids);
-            if !def.is_none() {
-                b.resolve(e, def);
-            }
-            e
-        }
-        Node::Draw(d, w, p) => b.draw(d, w, p, &kids),
-        Node::List => b.list(&kids),
-    }
 }

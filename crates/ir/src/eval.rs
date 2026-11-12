@@ -14,10 +14,12 @@
 //! Contents: `pub trait Bindings` (`Bindings::param`, `Bindings::voltage`, `Bindings::current`,
 //! `Bindings::time`, `Bindings::temp`, `Bindings::freq`, `Bindings::tstep`, `Bindings::tstop`,
 //! `Bindings::tnom`, `Bindings::draw`), `pub enum Domain`, `pub const CALLS_MAX`,
-//! `pub fn eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`
+//! `pub fn eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`,
+//! `pub fn eval_typed(&Design, ExprId, &dyn Bindings) -> Result<Value, Domain>`, `pub struct Value`
+//! (`Value::real(f64)`, `Value::int(f64)`), `Bindings::param_value`
 
 use crate::design::Design;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, Func, NumForm, UnOp};
 use crate::id::{DefId, ExprId, NameId, Ref};
 use crate::item::{DefKind, Func as FuncRow};
 
@@ -47,6 +49,22 @@ pub trait Bindings {
     /// A draw's value given its evaluated arguments: the nominal or a sample, by the caller's run
     /// context and the draw's `when` and `per`. `args.len()` is within `dist.arity()`.
     fn draw(&self, dist: Dist, when: DrawWhen, per: DrawPer, args: &[f64]) -> Option<f64>;
+
+    /// A parameter read's value with its type (A12 K1): an instance may pass an Int or a Real.
+    /// Default: `param` as a Real.
+    fn param_value(&self, param: Ref) -> Option<Value> {
+        self.param(param).map(Value::real)
+    }
+}
+
+/// A value and its type (A12 K1): an Int is a whole number within ±2⁵³ computed with integer
+/// rules (`DivTyped` truncates); everything else is Real.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Value {
+    /// The number.
+    pub number: f64,
+    /// Whether it is of Int type.
+    pub int: bool,
 }
 
 /// Why an expression has no value. Each carries the row where evaluation stopped.
@@ -65,23 +83,11 @@ pub enum Domain {
     NotANumber(ExprId),
 }
 
-/// The dynamic class of an expression (R14, A11): `Circuit` when it, or a parameter or user
-/// function it reads (transitively), holds `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt`; else `Temp`
-/// when one of them holds `Temp`; else `Constant`. Ordered: the `*Dyn` features are
-/// `class >= Temp`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-pub enum ExprClass {
-    /// Reads nothing that varies in a run.
-    Constant,
-    /// Reads the temperature (directly or through a definition), nothing of the circuit.
-    Temp,
-    /// Reads the circuit or the time (directly or through a definition).
-    Circuit,
-}
-
 /// Deepest user-function call nesting `eval` follows.
 pub const CALLS_MAX: usize = 1024;
+
+/// The largest magnitude an Int value may have (2⁵³; R12: no integer overflow is carried).
+const INT_MAX: f64 = 9_007_199_254_740_992.0;
 
 /// The frame index of the outermost expression (no formal arguments bound).
 const NO_FRAME: u32 = u32::MAX;
@@ -108,26 +114,33 @@ enum Task {
 struct Frame {
     def: DefId,
     names: Vec<NameId>,
-    values: Vec<f64>,
+    values: Vec<Value>,
 }
 
 /// The evaluator's state: the value stack, the call frames and the task stack.
 struct Machine<'a> {
     design: &'a Design,
     env: &'a dyn Bindings,
-    values: Vec<f64>,
+    values: Vec<Value>,
     frames: Vec<Frame>,
     tasks: Vec<Task>,
 }
 
 /// The value of `e` under `env`. Pure: the same design, id and bindings give the same result.
-/// `Ddt` and `Idt` need a time history no `Bindings` gives: they are [`Domain::Unbound`].
-pub fn expr_class(design: &Design, e: ExprId) -> ExprClass {
-    todo!() // A11: red first
+impl Value {
+    /// A Real value.
+    pub const fn real(number: f64) -> Value {
+        Value { number, int: false }
+    }
+
+    /// An Int value.
+    pub const fn int(number: f64) -> Value {
+        Value { number, int: true }
+    }
 }
 
-/// The value of `e` under `env`.
-pub fn eval(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<f64, Domain> {
+/// `Ddt` and `Idt` need a time history no `Bindings` gives: they are [`Domain::Unbound`].
+pub fn eval_typed(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<Value, Domain> {
     assert!(
         !e.is_none() && e.index() < design.expr_count(),
         "an expression id in range"
@@ -146,6 +159,11 @@ pub fn eval(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<f64, Domai
     Ok(m.values[0])
 }
 
+/// The value of `e` under `env`, as a number (`eval_typed` without the type).
+pub fn eval(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<f64, Domain> {
+    eval_typed(design, e, env).map(|v| v.number)
+}
+
 // ---- private ----
 
 impl Machine<'_> {
@@ -157,7 +175,7 @@ impl Machine<'_> {
                 let Expr::Ternary(_, then, other) = self.design.expr(e) else {
                     unreachable!()
                 };
-                let cond = self.pop();
+                let cond = self.pop().number;
                 self.tasks
                     .push(Task::Eval(if cond != 0.0 { then } else { other }, frame));
                 Ok(())
@@ -166,21 +184,22 @@ impl Machine<'_> {
                 let Expr::Binary(op, _, right) = self.design.expr(e) else {
                     unreachable!()
                 };
-                let left = self.pop() != 0.0;
+                let left = self.pop().number != 0.0;
                 let decided = match op {
                     BinOp::And => (!left).then_some(0.0),
                     BinOp::Or => left.then_some(1.0),
                     _ => unreachable!("Logic is pushed for And and Or only"),
                 };
                 match decided {
-                    Some(v) => self.values.push(v),
+                    Some(v) => self.values.push(Value::int(v)),
                     None => self.tasks.extend([Task::Truth, Task::Eval(right, frame)]),
                 }
                 Ok(())
             }
             Task::Truth => {
-                let v = self.pop();
-                self.values.push(if v != 0.0 { 1.0 } else { 0.0 });
+                let v = self.pop().number;
+                self.values
+                    .push(Value::int(if v != 0.0 { 1.0 } else { 0.0 }));
                 Ok(())
             }
             Task::Return => {
@@ -195,10 +214,16 @@ impl Machine<'_> {
         let d = self.design;
         let operands = |l| d.exprs(l).iter().rev().map(move |&a| Task::Eval(a, frame));
         match d.expr(e) {
-            Expr::Num(n) => self.values.push(d.num(n).value()),
+            Expr::Num(n) => {
+                let l = d.num(n);
+                self.values.push(Value {
+                    number: l.value(),
+                    int: l.form == NumForm::Int,
+                });
+            }
             Expr::Str(_) | Expr::List(_) => return Err(Domain::NotANumber(e)),
             Expr::Param(r) => {
-                let v = self.formal(r, frame).or_else(|| self.env.param(r));
+                let v = self.formal(r, frame).or_else(|| self.env.param_value(r));
                 self.values.push(v.ok_or(Domain::Unbound(e))?);
             }
             Expr::Call(Func::Ddt | Func::Idt, _) => return Err(Domain::Unbound(e)),
@@ -235,25 +260,58 @@ impl Machine<'_> {
     /// Applies `e`'s operator to the operand values on the stack.
     fn apply(&mut self, e: ExprId, frame: u32) -> Result<(), Domain> {
         let d = self.design;
+        // the number by the untyped rule, then its type by the tag table (A12 K1)
         let v = match d.expr(e) {
             Expr::Unary(op, _) => {
                 let a = self.pop();
-                unary(op, a).ok_or(Domain::OutOfDomain(e))?
+                let n = unary(op, a.number).ok_or(Domain::OutOfDomain(e))?;
+                Value {
+                    number: n,
+                    int: op != UnOp::Neg || a.int,
+                }
+            }
+            Expr::Binary(BinOp::DivTyped, _, _) => {
+                let b = self.pop();
+                let a = self.pop();
+                if b.number == 0.0 {
+                    return Err(Domain::DivideByZero(e));
+                }
+                if a.int && b.int {
+                    Value::int((a.number / b.number).trunc())
+                } else {
+                    Value::real(a.number / b.number)
+                }
             }
             Expr::Binary(op, _, _) => {
                 let b = self.pop();
                 let a = self.pop();
-                binary(e, op, a, b)?
+                let n = binary(e, op, a.number, b.number)?;
+                Value {
+                    number: n,
+                    int: binary_int(op, a.int && b.int),
+                }
             }
             Expr::Call(f, args) => {
                 let xs = self.pop_n(args.len());
-                call(e, f, &xs)?
+                let numbers: Vec<f64> = xs.iter().map(|v| v.number).collect();
+                let n = call(e, f, &numbers)?;
+                let all_int = xs.iter().all(|v| v.int);
+                let int = match f {
+                    Func::Min | Func::Max => all_int,
+                    Func::ToInt => true,
+                    Func::Sgn => all_int, // run f2: `sgn(-3)/2` printed 0
+                    _ => false,
+                };
+                Value { number: n, int }
             }
             Expr::Draw(dist, when, per, args) => {
                 let xs = self.pop_n(args.len());
-                self.env
-                    .draw(dist, when, per, &xs)
-                    .ok_or(Domain::Unbound(e))?
+                let numbers: Vec<f64> = xs.iter().map(|v| v.number).collect();
+                Value::real(
+                    self.env
+                        .draw(dist, when, per, &numbers)
+                        .ok_or(Domain::Unbound(e))?,
+                )
             }
             Expr::UserCall(r, args) => {
                 let xs = self.pop_n(args.len());
@@ -273,7 +331,8 @@ impl Machine<'_> {
             | Expr::Tnom
             | Expr::List(_) => unreachable!("only operators are applied"),
         };
-        if !v.is_finite() {
+        // R12: no integer overflow is carried
+        if !v.number.is_finite() || (v.int && v.number.abs() > INT_MAX) {
             return Err(Domain::OutOfDomain(e));
         }
         self.values.push(v);
@@ -281,7 +340,7 @@ impl Machine<'_> {
     }
 
     /// Starts a user call: binds its formal arguments and evaluates its body in a new frame.
-    fn enter(&mut self, e: ExprId, r: Ref, values: Vec<f64>, _caller: u32) -> Result<(), Domain> {
+    fn enter(&mut self, e: ExprId, r: Ref, values: Vec<Value>, _caller: u32) -> Result<(), Domain> {
         let d = self.design;
         if !r.is_resolved() || d.def(r.def).kind != DefKind::Func {
             return Err(Domain::Unbound(e));
@@ -306,7 +365,7 @@ impl Machine<'_> {
     }
 
     /// The value of a formal argument read in the current call frame, if `r` is one.
-    fn formal(&self, r: Ref, frame: u32) -> Option<f64> {
+    fn formal(&self, r: Ref, frame: u32) -> Option<Value> {
         let f = self.frames.get(frame as usize)?;
         if f.def != r.def {
             return None;
@@ -318,20 +377,32 @@ impl Machine<'_> {
     }
 
     fn leaf(&mut self, e: ExprId, v: Option<f64>) -> Result<(), Domain> {
-        self.values.push(v.ok_or(Domain::Unbound(e))?);
+        self.values.push(Value::real(v.ok_or(Domain::Unbound(e))?));
         Ok(())
     }
 
-    fn pop(&mut self) -> f64 {
+    fn pop(&mut self) -> Value {
         self.values.pop().expect("an operand on the value stack")
     }
 
-    fn pop_n(&mut self, n: usize) -> Vec<f64> {
+    fn pop_n(&mut self, n: usize) -> Vec<Value> {
         assert!(
             self.values.len() >= n,
             "every operand is on the value stack"
         );
         self.values.split_off(self.values.len() - n)
+    }
+}
+
+/// Whether a binary operator's result is Int, given whether both operands are (A12 K1's table).
+fn binary_int(op: BinOp, both_int: bool) -> bool {
+    match op {
+        BinOp::Add | BinOp::Sub | BinOp::Mul => both_int,
+        BinOp::Div | BinOp::IntDiv => false,
+        BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => true,
+        BinOp::And | BinOp::Or => true,
+        BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr => true,
+        BinOp::DivTyped => both_int,
     }
 }
 
@@ -375,6 +446,7 @@ fn binary(e: ExprId, op: BinOp, a: f64, b: f64) -> Result<f64, Domain> {
         BinOp::BitXor => bits(|a, b| a ^ b),
         BinOp::Shl => shift(true),
         BinOp::Shr => shift(false),
+        BinOp::DivTyped => unreachable!("typed division is applied with its operands' tags"),
     }
 }
 
@@ -411,7 +483,19 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Trunc => x.trunc(),
         Func::RoundHalfAway => x.round(),
         Func::RoundHalfEven => x.round_ties_even(),
-        Func::StepHalf | Func::PowSigned | Func::Sqr => todo!(), // A11: red first
+        Func::StepHalf => {
+            if x < 0.0 {
+                0.0
+            } else if x == 0.0 {
+                0.5
+            } else {
+                1.0
+            }
+        }
+        Func::PowSigned if x == 0.0 && y() < 0.0 => return Err(out),
+        Func::PowSigned if x < 0.0 => -(-x).powf(y()),
+        Func::PowSigned => x.powf(y()),
+        Func::Sqr => x * x,
         Func::Sgn => {
             if x > 0.0 {
                 1.0
@@ -458,6 +542,7 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         }
         Func::Ddt | Func::Idt => unreachable!("refused before their arguments are evaluated"),
         Func::Pwl => return pwl(xs).ok_or(out),
+        Func::ToInt => x.trunc(),
     };
     Ok(v)
 }

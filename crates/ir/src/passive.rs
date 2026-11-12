@@ -19,7 +19,7 @@
 //!   `Design::coupling(&self, &Element) -> Coupling`
 
 use crate::design::Design;
-use crate::element::{Element, NO_ROW};
+use crate::element::{DetailKind, Element, NO_ROW};
 use crate::id::{ExprId, NameList};
 
 /// When a device initial condition (`ic=` on a C, L, diode, BJT, MOSFET) applies. Two
@@ -157,11 +157,21 @@ impl Passive {
 impl Design {
     /// The passive row of a resistor, capacitor or inductor. Asserts the kind.
     pub fn passive(&self, element: &Element) -> Passive {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Passive,
+            "{:?} has no Passive row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 
     /// The coupling row of a coupling. Asserts the kind.
     pub fn coupling(&self, element: &Element) -> Coupling {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Coupling,
+            "{:?} has no Coupling row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 }

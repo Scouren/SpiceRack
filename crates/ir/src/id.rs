@@ -118,6 +118,7 @@ macro_rules! handle {
 
             /// The row index when the handle names a row of a table of `len` rows; `None` for
             /// `NONE` or a handle at or past `len` (crate-internal: `check` reads untrusted rows).
+            #[allow(dead_code)] // every handle has it; not every handle's table is read by `check`
             pub(crate) const fn index_checked(self, len: usize) -> Option<usize> {
                 if self.is_none() || self.0 as usize >= len { None } else { Some(self.0 as usize) }
             }

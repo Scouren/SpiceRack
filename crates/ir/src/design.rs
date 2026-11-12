@@ -11,15 +11,23 @@
 //! Typed access to a row of any kind is generic over [`ItemRow`] (`design.row::<Subckt>(i)`,
 //! `builder.push(scope, row, span)`, `editor.set(i, row)`): one accessor per kind, written once.
 //!
-//! ```ignore
+//! ```
+//! use spicerack_ir::{Design, Diags, ItemKind, item::Subckt, parse};
+//!
+//! let mut design = Design::new();
+//! let text = "file \"a.sp\" deck\n  subckt div (a b)\n    param k = 1\n";
+//! parse(text, &mut design.builder(), &mut Diags::new());
+//! let mut ports = 0;
 //! for file in design.files() {
 //!     for &item in design.items(design.file(file).top) {
-//!         match item.kind {
-//!             ItemKind::Subckt => { let s: Subckt = design.row(item.index); /* … */ }
-//!             // one arm per kind, no `_` arm
+//!         // a writer matches every kind with no `_` arm; this example reads one
+//!         if item.kind == ItemKind::Subckt {
+//!             let s: Subckt = design.row(item.index);
+//!             ports += design.names(s.ports).len();
 //!         }
 //!     }
 //! }
+//! assert_eq!(ports, 2);
 //! ```
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §4, C3, C4, C5, C13; `REWRITE-PLAN.md` §3.2.
@@ -46,6 +54,7 @@
 
 use crate::analysis::{Analysis, RunDetails};
 use crate::build::Builder;
+use crate::class::ExprClass;
 use crate::edit::Editor;
 use crate::element::{CircuitDetails, Element};
 use crate::expr::{
@@ -116,6 +125,9 @@ pub struct Design {
     // detail tables, owned by the circuit and run owners
     pub(crate) circuit: CircuitDetails,
     pub(crate) run: RunDetails,
+    /// The dynamic class of each definition (`class::def_classes`), computed on demand and
+    /// cleared by every `Builder` and `Editor` mutation. Not part of equality.
+    pub(crate) classes: std::sync::OnceLock<Vec<ExprClass>>,
 }
 
 /// A row type that is an item: it names its kind and its table. Implemented here for every
@@ -236,23 +248,28 @@ impl Design {
             elaborates: Table::new(),
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
+            classes: std::sync::OnceLock::new(),
         }
     }
 
     /// The append-only door for readers and builders.
     pub fn builder(&mut self) -> Builder<'_> {
+        self.classes.take();
         Builder { design: self }
     }
 
     /// The door for passes: replace rows and item lists, append through a builder.
     pub fn editor(&mut self) -> Editor<'_> {
+        self.classes.take();
         Editor { design: self }
     }
 
-    /// The file a run starts from: the first `Deck` file, else file 0. Asserts the design has a
-    /// file.
+    /// The file a run starts from: the first `Deck` file, else file 0; `FileId::NONE` for a
+    /// design with no file (a caller that needs a file asserts).
     pub fn entry(&self) -> FileId {
-        assert!(!self.files.is_empty(), "a design with a file has an entry");
+        if self.files.is_empty() {
+            return FileId::NONE;
+        }
         let deck = self.files.iter().position(|f| f.role == Role::Deck);
         FileId(deck.unwrap_or(0) as u16)
     }
