@@ -1,0 +1,9 @@
+# Oracle: settle unclosed_p1 (VACASK 36be560: "Parser syntax error, unexpected =, expecting
+# identifier or integer or )", exit 1): a statement whose bracket never closes is invalid in
+# source, P2012. VACASK joins lines while a bracket is open (settle unclosed_p2, _b2, _c2 run),
+# so the statement runs on to the end of the file, as VACASK reads it.
+# codes: P2012 S0004
+file "unclosed_paren.sim" deck
+  title "paren: unclosed"
+  model vsource source_v
+  opaque vacask invalid "v1 (in 0 vsource dc=1.0\ncontrol\n  analysis op1 op\nendc"

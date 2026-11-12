@@ -1,0 +1,19 @@
+param_funcs: parameter functions whose rule differs between the two (VACASK's sgn of 0 is 1, pow of a negative base, a rounding of a half, abs, sqrt, exp, ln) as source values, one node each
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters s0=sgn(0.0)+2.0 pw=pow(-2.0, 2.0) rn=round(2.5) ab=abs(-3.0) sq=sqrt(16.0) ex=exp(0.0) lg=ln(exp(2.0))
+v1 (a 0) vsource dc=s0
+v2 (b 0) vsource dc=pw
+v3 (c 0) vsource dc=rn
+v4 (d 0) vsource dc=ab
+v5 (e 0) vsource dc=sq
+v6 (f 0) vsource dc=ex
+v7 (g 0) vsource dc=lg
+r1 (a b) resistor r=1k
+r2 (c d) resistor r=1k
+r3 (e f) resistor r=1k
+r4 (g 0) resistor r=1k
+control
+  analysis op1 op
+endc

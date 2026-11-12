@@ -1,0 +1,12 @@
+case_names: VACASK keeps case, ngspice folds it: nodes OUT and out are two nodes (2 V and 1.5 V), and resistors R1 and r1 two elements; the ngspice text must keep them apart
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource dc=3.0
+R1 (in OUT) resistor r=1k
+R2 (OUT 0) resistor r=2k
+r1 (in out) resistor r=1k
+r2 (out 0) resistor r=1k
+control
+  analysis op1 op
+endc

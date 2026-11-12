@@ -5,7 +5,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §7; `REWRITE-PLAN.md` §4.5.
 //!
-//! Contents: `CODES`, `info` (crate-private), and the spine's codes `UNREAD`, `PRIVATE`
+//! Contents: `CODES`, `info` (crate-private), and the spine's codes `UNREAD`, `PRIVATE`, `UNCLOSED`
 
 use crate::ir;
 
@@ -19,6 +19,9 @@ pub(super) const UNREAD: ir::Code = ir::Code::new(b'P', 2004);
 /// A construct only VACASK has and no pass reads: kept as a `Private` opaque.
 pub(super) const PRIVATE: ir::Code = ir::Code::new(b'P', 2003);
 
+/// A statement whose `(`, `[` or `{` never closes, or a string a line break ends.
+pub(super) const UNCLOSED: ir::Code = ir::Code::new(b'P', 2012);
+
 /// The spine's rows.
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     (
@@ -28,6 +31,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             cite: "rewrite/DIALECT-VACASK.md §3, §5 (G5, G13–G16)",
             explain: "The statement means something only VACASK runs (vector values, a solution slot, a custom behavioural body, …); VACASK's own writer copies it, any other dialect refuses it.",
             kind: ir::Kind::Note,
+        },
+    ),
+    (
+        UNCLOSED,
+        ir::Info {
+            title: "a bracket that never closes, or a string a line break ends",
+            cite: "settle unclosed_p1, _b1, _c1, _e1, _q1 (VACASK 36be560: \"Parser syntax error\", \"unexpected newline in string literal\"); unclosed_p2, _b2, _c2 (a bracket joins lines)",
+            explain: "VACASK reads on across line breaks while a bracket is open and stops with a syntax error when it never closes; a string cannot cross a line break. The statement, to where VACASK's joining takes it, is invalid in source.",
+            kind: ir::Kind::Refusal,
         },
     ),
     (

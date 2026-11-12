@@ -1,0 +1,16 @@
+# Oracle: R64, A39 (the writer spells the source-DC target as a sweep of the source's `dc`
+# parameter, `instance="<path:name>" parameter="dc"`); VD cmd-sweep; run sweep_source
+# (settle/run: that sweep moves the source's value as ngspice's `.dc` does).
+file "sweep_source.ir" deck
+  title "written source sweeps"
+  model vsource source_v
+  model isource source_i
+  subckt s (p n)
+    element vsource v2 (p n) model=vsource dc=1i
+  element vsource v1 (a 0) model=vsource dc=1i
+  element isource i1 (a 0) model=isource dc=1m
+  element instance x1 (b 0) model=s
+  analysis dc name=dc1 (source_dc i1) (list values=[0i, 1m]) name=ig (source_dc v1) (lin start=0i stop=5i step=0.1) name=vg
+  analysis dc name=dc2 (source_dc v2 path=(x1)) (list values=[1i, 2i]) name=vs
+  loop sweep name=vl (source_dc v1) (list values=[1i, 2i])
+    analysis tran name=t1 stop=1m cap=span_over50

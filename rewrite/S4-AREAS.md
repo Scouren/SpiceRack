@@ -152,7 +152,7 @@ test in the same commit as the rule that cites it):
 
 | Test | Fails because | Goes when |
 |---|---|---|
-| `dialect_laws` l5 (`vacask`) | seed 2 Untyped: an analysis with no name (`analysis xf …`) is written with a generated name (`acxf1`, W2301) and reads back named; VACASK requires a name | an unnamed analysis becomes a feature VACASK lacks with a naming pass, or vc-run's writer refuses it |
+| `dialect_laws` l5 (`vacask`) | seed 1 Untyped: a ccvs, vcvs or isource whose model names no definition reads back Unresolved, and an unresolved element's mult reads back as a `$mfactor` parameter (the row in `tests/dialect_laws.rs`; the invented-name cause, W2301, is gone with R59's naming rows) | vc-sources and vc-devices' fix |
 | `dialect_laws` l7 (`vacask`) | no ngspice↔VACASK passes until S4.4 | S4.4's passes |
 | `dialect_laws` reach (`vacask`) | Item(Save) (W2303), Elem(Capacitor/Inductor/Mosfet) (W2104, W2105, W2108), Elem(Coupling) (never generated), Elem(Diode) and Elem(ModuleModel) (`interim`: fixture fixpoint), Wave(Am) (W2201): each names its covering property in KNOWN_REACH | each row with its cause; the two `interim` rows by S4.5 |
 

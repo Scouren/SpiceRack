@@ -1,0 +1,9 @@
+# Oracle: settle unclosed_q1 (VACASK 36be560: "Syntax error, unexpected newline in string
+# literal.", exit 1): a string a line break ends is invalid in source, P2012.
+# codes: P2012 S0004
+file "unclosed_string.sim" deck
+  title "quote: unclosed"
+  model vsource source_v
+  element vsource v1 (in 0) model=vsource dc=1.0
+  opaque vacask invalid "options rawfile=\"ascii"
+  analysis op name=op1

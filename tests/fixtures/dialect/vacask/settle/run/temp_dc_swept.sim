@@ -1,0 +1,15 @@
+dc bound from temp, swept temp
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a b) res r=1k
+c1 (b 0) cap c=1u
+control
+  options rawfile="ascii"
+  sweep st option="temp" values=[0, 50]
+  sweep vd instance="v1" parameter="dc" from=0 to=$temp/10 step=1
+    analysis d2 op
+endc

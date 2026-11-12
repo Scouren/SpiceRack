@@ -67,11 +67,13 @@ use spicerack::syntax::Dialect;
 use spicerack::syntax::diag::Code;
 use spicerack::syntax::resolve::Form;
 
+#[path = "../common/cmp.rs"]
 mod cmp;
 mod kit;
 mod lists;
 mod ltspice;
 mod proofs;
+#[path = "../common/sim.rs"]
 mod sim;
 #[path = "../test_import_suite/tube.rs"]
 mod tube;

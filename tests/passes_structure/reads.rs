@@ -3,11 +3,15 @@
 //! `proves =` lines.
 //!
 //! Contents: `pub fn feature`, `pub fn refs`, `pub fn param_reads`, `pub fn instances_pass`,
-//! `pub fn elements`, `pub fn added_library`, `pub fn model_row`, `pub fn proven_by_pair_decks`
+//! `pub fn elements`, `pub fn added_library`, `pub fn model_row`, `pub fn proven_by_pair_decks`,
+//! `pub type Run`, `pub fn instance_actual(&str, Run, &str, &str) -> Result<f64, ir::Domain>`
 
 use std::path::Path;
 
 use spicerack::ir;
+
+/// A pass's run function.
+pub type Run = fn(&mut ir::Design, &mut ir::Diags);
 
 pub fn feature(x: ir::CircuitExtra) -> ir::Feature {
     ir::Feature::Circuit(x)
@@ -140,4 +144,33 @@ pub fn proven_by_pair_decks() -> Vec<String> {
         }
     }
     out
+}
+
+/// The fixture `tests/fixtures/passes/structure/<case>.ir` read and passed by `run`: the
+/// actual instance `inst` passes for `formal`, evaluated with every read bound by its
+/// definition.
+///
+/// # Panics
+/// When the case does not read clean, or `inst` passes no `formal`.
+pub fn instance_actual(case: &str, run: Run, inst: &str, formal: &str) -> Result<f64, ir::Domain> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("tests/fixtures/passes/structure/{case}.ir"));
+    let text = std::fs::read_to_string(path).expect(case);
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(&text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{case}: {:?}", diags.rows());
+    run(&mut design, &mut diags);
+    let e = elements(&design)
+        .map(|i| design.row::<ir::Element>(i.index))
+        .find(|e| design.str(e.name) == inst)
+        .expect("the instance");
+    let actual = design
+        .params(e.params)
+        .iter()
+        .find(|p| design.str(p.0) == formal);
+    let actual = actual
+        .unwrap_or_else(|| panic!("{case}: {inst} passes no {formal}"))
+        .1;
+    ir::eval(&design, actual, &crate::bindings::ByDefinition(&design))
 }

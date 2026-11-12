@@ -1,0 +1,14 @@
+subckt_param: a subcircuit instance with a parameter: a divider whose lower leg is the instance's rlo
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+subckt div(top mid)
+  parameters rlo=1k
+  r1 (top mid) resistor r=1k
+  r2 (mid 0) resistor r=rlo
+ends
+v1 (in 0) vsource dc=3.0
+x1 (in out) div rlo=2k
+control
+  analysis op1 op
+endc

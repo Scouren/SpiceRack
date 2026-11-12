@@ -1,0 +1,4 @@
+file "a.sp" deck
+  loop sweep (temp) (list values=[1])
+    opaque ngspice private "echo $v"
+    analysis op

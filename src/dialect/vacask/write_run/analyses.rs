@@ -4,13 +4,15 @@
 //! `read_run::analysis` (VD cmd-analysis-*, cmd-sweep; a lin count is VACASK's interval count,
 //! one less than the IR's values).
 //!
-//! Contents: `analysis`, `range`, `target`, `sweep_name`, `sweeps_before` (crate-private)
+//! Every analysis and axis has its name: `FEATURES` holds the named forms only, and the run
+//! group's naming rows give one (R59, A35).
+//!
+//! Contents: `analysis`, `range`, `target` (crate-private)
 
 use super::{name_of, quote};
 use crate::dialect::vacask::expr_write::write_expr;
 use crate::dialect::vacask::name::{self, Place};
 use crate::dialect::vacask::number;
-use crate::dialect::vacask::read_run::{ANALYSIS_NAME_MADE, SWEEP_NAME_MADE};
 use crate::dialect::vacask::write::Writer;
 use crate::ir;
 
@@ -18,28 +20,17 @@ use crate::ir;
 pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
     let row: ir::Analysis = d.row(at.index);
-    let name = match row.name.is_none() {
-        false => d.str(row.name).to_string(),
-        true => {
-            w.diags.push_at(ANALYSIS_NAME_MADE, d, at, 0);
-            generated(d, at, row.kind)
-        }
-    };
+    assert!(!row.name.is_none(), "FEATURES lacks AnalysisUnnamed");
+    let name = d.str(row.name).to_string();
     super::fold_alters(w, at);
     if row.kind == ir::AnalysisKind::Dc {
         let dc: ir::dc_ac::Dc = d.detail(row.detail);
         let axes: Vec<ir::dc_ac::DcAxis> = axes(d, dc.axes).to_vec();
-        let base = sweeps_before(d, at);
-        for (k, axis) in axes.iter().rev().enumerate() {
+        for axis in axes.iter().rev() {
+            assert!(!axis.name.is_none(), "FEATURES lacks DcAxisUnnamed");
             w.line();
             w.out.push_str("sweep ");
-            match axis.name.is_none() {
-                false => name::spell(d.str(axis.name), Place::Other, w.out),
-                true => {
-                    w.diags.push_at(SWEEP_NAME_MADE, d, at, 0);
-                    w.out.push_str(&sweep_name(base + k + 1));
-                }
-            }
+            name::spell(d.str(axis.name), Place::Other, w.out);
             target(d, axis.target, w.out);
             range(d, axis.sweep, w.out);
             w.out.push('\n');
@@ -137,7 +128,8 @@ pub(super) fn range(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
     }
 }
 
-/// ` instance="x1:r1" parameter="r"`, ` model="m" parameter="p"`, ` option="name"`.
+/// ` instance="x1:r1" parameter="r"`, ` instance="x1:v1" parameter="dc"` (a source's DC value,
+/// R64), ` model="m" parameter="p"`, ` option="name"`.
 pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
     let element = |out: &mut String| {
         let mut path = name_of(d, t.path);
@@ -153,6 +145,11 @@ pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
             element(out);
             out.push_str(" parameter=");
             quote(d.str(t.b), out);
+        }
+        ir::TargetKind::SourceDc => {
+            out.push_str(" instance=");
+            element(out);
+            out.push_str(" parameter=\"dc\"");
         }
         ir::TargetKind::ModelParam => {
             out.push_str(" model=");
@@ -172,67 +169,11 @@ pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
     }
 }
 
-/// The name of the `n`-th sweep line of a deck: `sweep<n>`.
-pub(super) fn sweep_name(n: usize) -> String {
-    format!("sweep{n}")
-}
-
-/// How many sweep lines the deck writes before item `at` (a sweep loop is one, a `Dc` one per
-/// axis), in listed order.
-pub(super) fn sweeps_before(d: &ir::Design, at: ir::ItemRef) -> usize {
-    let mut n = 0;
-    for (item, _) in d.reachable() {
-        if item == at {
-            break;
-        }
-        match item.kind {
-            ir::ItemKind::Loop => {
-                let row: ir::Loop = d.row(item.index);
-                n += usize::from(row.kind == ir::LoopKind::Sweep);
-            }
-            ir::ItemKind::Analysis => {
-                let row: ir::Analysis = d.row(item.index);
-                if row.kind == ir::AnalysisKind::Dc {
-                    let dc: ir::dc_ac::Dc = d.detail(row.detail);
-                    n += dc.axes.len as usize;
-                }
-            }
-            _ => {}
-        }
-    }
-    n
-}
-
 // ---- private ----
 
 /// The axes of a `Dc`, innermost first.
 fn axes(d: &ir::Design, list: ir::dc_ac::DcAxisList) -> &[ir::dc_ac::DcAxis] {
     d.dc_axes(list)
-}
-
-/// `<kind><n>`: n is `at`'s place among the deck's analyses in listed order.
-fn generated(d: &ir::Design, at: ir::ItemRef, kind: ir::AnalysisKind) -> String {
-    let n = d
-        .reachable()
-        .iter()
-        .take_while(|(item, _)| *item != at)
-        .filter(|(item, _)| item.kind == ir::ItemKind::Analysis)
-        .count()
-        + 1;
-    let word = match kind {
-        ir::AnalysisKind::Op => "op",
-        ir::AnalysisKind::Dc => "dc",
-        ir::AnalysisKind::DcInc => "dcinc",
-        ir::AnalysisKind::DcXf => "dcxf",
-        ir::AnalysisKind::Ac => "ac",
-        ir::AnalysisKind::Xf => "acxf",
-        ir::AnalysisKind::Stb => "acstb",
-        ir::AnalysisKind::Sp => "acsp",
-        ir::AnalysisKind::Noise => "noise",
-        ir::AnalysisKind::Tran => "tran",
-        _ => "analysis",
-    };
-    format!("{word}{n}")
 }
 
 /// ` key=value` when `e` is given.

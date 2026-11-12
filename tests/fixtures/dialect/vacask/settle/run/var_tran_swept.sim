@@ -1,0 +1,15 @@
+tran stop from a swept variable
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a b) res r=1k
+c1 (b 0) cap c=1u
+control
+  options rawfile="ascii"
+  var k=1
+  sweep sk variable="k" values=[1, 2]
+    analysis v1 tran stop=1m*k maxstep=10u
+endc
