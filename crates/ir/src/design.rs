@@ -40,6 +40,7 @@
 //!   `Design::files(&self) -> impl Iterator<Item = FileId>`, `Design::file(&self, FileId) -> File`,
 //!   `Design::scope(&self, ScopeId) -> Scope`, `Design::items(&self, ScopeId) -> &[ItemRef]`,
 //!   `Design::row<R: ItemRow>(&self, u32) -> R`, `Design::span_of(&self, ItemRef) -> Span`,
+//!   `Design::item_handles(&self, ItemRef, &mut Vec<Handle>)`,
 //!   `Design::item_refs(&self, ItemRef, &mut Vec<(Ref, DefKind)>)`,
 //!   `Design::str(&self, NameId) -> &str`, `Design::find_name(&self, &str) -> NameId`,
 //!   `Design::names(&self, NameList) -> &[NameId]`, `Design::exprs(&self, ExprList) -> &[ExprId]`,
@@ -61,7 +62,7 @@ use crate::element::{CircuitDetails, Element};
 use crate::expr::{
     BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Exprs, Func as Builtin, Literal, UnOp,
 };
-use crate::facts::RowFacts;
+use crate::facts::{Handle, RowFacts};
 use crate::id::{
     BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, NumId, ParamList,
     Ref, ScopeId, TextId,
@@ -424,6 +425,14 @@ impl Design {
     pub fn def(&self, def: DefId) -> Def {
         assert!(def.index() < self.defs.len(), "a definition id in range");
         self.defs[def.index()]
+    }
+
+    /// Appends every handle `item`'s row and detail rows hold, in field order (one exhaustive
+    /// dispatch to `RowFacts::handles`). Asserts `item` is in range.
+    pub fn item_handles(&self, item: ItemRef, out: &mut Vec<Handle>) {
+        let rows = for_kind!(item.kind, R => R::table(self).len());
+        assert!((item.index as usize) < rows, "an item in range");
+        for_kind!(item.kind, R => self.row::<R>(item.index).handles(self, out))
     }
 
     /// Appends every `Ref` `item` owns (header, detail rows, pools) with the kind its field

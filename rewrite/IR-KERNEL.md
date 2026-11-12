@@ -350,6 +350,27 @@ generator picks operators from the dynamic features for every tree under `Reads:
 for a `Handle::ExprDyn` field it builds with constant reads (`Gen::dyn_form`, a measure's
 threshold).
 
+**A23 (2026-11-12): the passes' door for expressions.** A fourth row fact beside `handles`,
+`map_refs` and `refs`:
+
+```rust
+pub enum ExprUse { Constant, Circuit }
+fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)); // default: no root
+```
+
+It calls `f` on exactly the roots `handles` lists, in its order (`NONE` included): a single
+`Expr` (`Constant`) or `ExprDyn` (`Circuit`) field, each `Exprs` element and each `Params` value
+(`Constant`), and stores back what `f` changed. `Editor::map_exprs` dispatches it;
+`Design::item_handles` dispatches `handles` for readers. `rewrite_exprs(design, rule) -> u32`
+(`rewrite.rs`) rewrites every root of every listed item bottom-up: `rule(b, node)` sees a node
+whose children are rewritten and returns `Some(new)`; a node whose child changed is appended
+again (`Builder::rebuild`), an unchanged tree keeps its ids, a shared subtree is rewritten once
+(a memo by old id), the walk is an explicit stack, and only rows that existed before the pass are
+visited. Properties (`tests/kernel_rewrite.rs`): `map_exprs` against `handles` for every
+generated item (the owners' kinds named as a marker until their round-4 rows land), an identity
+rule changes no id, a wrapping rule changes every visited root and no `eval` value, and `check`
+finds nothing after either.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

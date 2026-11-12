@@ -327,3 +327,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - Appended last to `Func` (text `to_real`); its value is `x`, and its tag Real is an explicit arm beside `ToInt`'s. Spec examples from VACASK run b1 in kernel_typed: `to_real(3i) /: 2i` is 1.5, `to_int(to_real(3i)) /: 2i` is 1, and `ToReal` of a Real is the identity.
 
+## A23 applied (the passes' door for expressions)
+
+- Shape: a fourth facts function, `RowFacts::map_exprs`, with a drift property against `handles`. One mutable visitor per row from which all four derive would have replaced every row's `handles`, `map_refs` and `refs` in all three owners' files mid-round. The default body (no root) stays: most rows hold no expression, and the drift property fails a row that lists a root and keeps it.
+- Line counts: the trait method and `ExprUse`, 25 lines (facts.rs); the kernel rows, 39 (Subckt, If, Param, Func); `Editor::map_exprs`, 9; `Design::item_handles`, 8; `Builder::rebuild`, 40; `rewrite.rs`, 124 with its doctest (the amendment's pass, with `Design::exprs` where it wrote `args`); `tests/kernel_rewrite.rs`, 258.
+- `rewrite_exprs` reads the roots through `handles` and stores them back through `map_exprs`: the drift property makes the two the same list, so every root is reached and stored.
+- `item_facts.rs` passed 500 lines: `Param` and `Func` moved to `item_facts_defs.rs`; `field_domain` and `distinct` became crate-visible for it.
+
