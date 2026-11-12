@@ -281,7 +281,7 @@ mod tests {
     fn refused(line: &str) -> bool {
         let mut design = ir::Design::new();
         let mut diags = ir::Diags::new();
-        let text = format!("file \"t.sp\" deck\n  param k = 1\n  {line}\n");
+        let text = format!("file \"t.sp\" deck\n  title \"t\"\n  param k = 1\n  {line}\n");
         ir::parse(&text, &mut design.builder(), &mut diags);
         assert!(diags.is_empty(), "{line}: {diags:?}");
         let item = *design
@@ -301,14 +301,18 @@ mod tests {
         // no time, probe, temperature, TSTEP or TSTOP (runs `{time*1}`, `{temper}`: fatal).
         let wave = |w: &str| format!("element vsource v1 (a 0) wave={w} dc_rule=wave_at_zero");
         let refusals = [
-            wave("sin(offset=0 amplitude=1 delay=1u pre=hold_delay_value)"),
-            wave("am(offset=0 amplitude=2 mod_offset=1 pre=zero)"),
-            wave("sffm(offset=0 amplitude=1 law=ngspice pre=hold_delay_value)"),
-            wave("pulse(v1=0 v2=1 delay=0 rise=$tstep)"),
+            wave(
+                "sin(offset=0 amplitude=1 delay=1u pre=hold_delay_value given_zero=spice_default)",
+            ),
+            wave("am(offset=0 amplitude=2 mod_offset=1 pre=zero given_zero=spice_default)"),
+            wave(
+                "sffm(offset=0 amplitude=1 law=ngspice pre=hold_delay_value given_zero=spice_default)",
+            ),
+            wave("pulse(v1=0 v2=1 delay=0 rise=$tstep given_zero=spice_default)"),
             "element isource i1 (a 0) wave=pwl(points=[0, 0, 1u, 1] delay=1u) dc_rule=wave_at_zero"
                 .to_string(),
             "element isource i1 (a 0) wave=sffm(offset=0 amplitude=1 delay=1u law=ngspice \
-             pre=hold_delay_value) dc_rule=wave_at_zero"
+             pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero"
                 .to_string(),
             "element vsource v1 (a 0) dc=($time * 2)".to_string(),
             "element vsource v1 (a 0) dc=$temp".to_string(),
@@ -317,12 +321,12 @@ mod tests {
             assert!(refused(line), "{line}");
         }
         let spelled = [
-            wave("sin(offset=0 amplitude=1 freq=0 delay=1u pre=hold_delay_value)"),
-            wave("am(offset=0 amplitude=1 mod_offset=1 pre=zero)"),
-            wave("sffm(offset=0 amplitude=1 law=ngspice pre=zero)"),
+            wave("sin(offset=0 amplitude=1 freq=0 delay=1u pre=hold_delay_value given_zero=spice_default)"),
+            wave("am(offset=0 amplitude=1 mod_offset=1 pre=zero given_zero=spice_default)"),
+            wave("sffm(offset=0 amplitude=1 law=ngspice pre=zero given_zero=spice_default)"),
             wave("pwl(points=[0, 0, 1u, (k * 2)] delay=1u repeat_at=0 repeat=from)"),
             "element isource i1 (a 0) mult=2 wave=sffm(offset=0 amplitude=1 carrier_freq=1k \
-             mod_index=1 signal_freq=1k phase_m_deg=3 law=ngspice pre=hold_delay_value) \
+             mod_index=1 signal_freq=1k phase_m_deg=3 law=ngspice pre=hold_delay_value given_zero=spice_default) \
              dc_rule=wave_at_zero"
                 .to_string(),
             "element vsource v1 (a 0) dc=(k * 2) ac_mag=1 ac_phase_deg=0".to_string(),

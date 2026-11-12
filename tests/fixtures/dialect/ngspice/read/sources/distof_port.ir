@@ -1,4 +1,4 @@
-# codes: P1157 P1001
+# codes: P1157 P1406
 file "distof_port.sp" deck
   title "distof_port"
   comment " oracle: vsrcpar.c VSRC_D_F1/F2 (one value: phase 0), vsrc.c (portnum, z0 under RFSPICE), vsrctemp.c (z0 50 when absent); run `dc 1 portnum 1 z0 100` into 1 ohm = 9.90099e-3"
@@ -7,4 +7,5 @@ file "distof_port.sp" deck
   element resistor R2 (b 0) value=1
   element port V3 (c 0) dc=0 ac_mag=1 ac_phase_deg=0 port=(index=2 z0=50)
   element resistor R3 (c 0) value=50
-  opaque ngspice unread ".control\nop\nprint v(b) v(c)\n.endc"
+  analysis op
+  opaque ngspice inert ".control\nprint v(b) v(c)\n.endc"
