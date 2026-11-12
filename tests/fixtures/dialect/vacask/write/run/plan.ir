@@ -4,6 +4,12 @@
 # (default = every node voltage and branch current).
 file "plan.ir" deck
   title "written plan"
+  device_library resistor
+  model res resistor
+  subckt s (p)
+    element resistor r1 (p 0) model=res value=1k
+  element instance x1 (n) model=s
+  element resistor r1 (n 0) model=res value=1k
   subckt a (p)
   opaque vacask inert "print instance(\"r1\")"
   alter (device_param r1 r) value=2k

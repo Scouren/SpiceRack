@@ -214,6 +214,12 @@ fn directives(l: &Lower<'_, '_, '_>, n: Node) -> Option<Vec<(String, Vec<String>
         .find(|&i| tags[i] == Tok::EndOfStatement)
         .unwrap_or(tags.len());
     let text = |i: usize| tokens.text(i as u32);
+    // `save ( … )`: the directives in one pair of parentheses, over lines (settle run/save_paren:
+    // the same raw file as the line without them; corpus test/test_resistor.sim).
+    let (first, end) = match end > first + 1 && text(first) == "(" && text(end - 1) == ")" {
+        true => (first + 1, end - 1),
+        false => (first, end),
+    };
     let mut out = Vec::new();
     let mut i = first;
     // Bounded: each pass moves past at least one token.

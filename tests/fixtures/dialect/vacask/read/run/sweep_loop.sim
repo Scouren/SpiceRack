@@ -1,4 +1,12 @@
 sweeps around analyses other than op
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s (p)
+  r1 (p 0) res r=1k
+ends
+x1 (n) s
+r1 (n 0) res r=1k
+r2 (n 0) res r=1k
 control
   sweep s1 instance="r1" parameter="r" from=1k to=2k step=500
     analysis t1 tran stop=1m

@@ -20,7 +20,7 @@ mod plan;
 pub(super) use super::expr_write::string as quote;
 use super::read_run::{
     MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM, RESET_CLASS,
-    SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, identifier,
+    SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, TARGET_UNFOUND, identifier,
 };
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
@@ -120,7 +120,8 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
 /// of a source VACASK would not find by its name from the top (W2309); a
 /// node set no analysis line that takes its list follows (W2308: VACASK states `ic=` and
 /// `nodeset=` on an analysis only); an `mc` loop inside another (W2310: VD cmd-analysis-mc, no
-/// nesting); a transfer or noise analysis whose output is no node or node pair (W2311).
+/// nesting); a transfer or noise analysis whose output is no node or node pair (W2311); a
+/// device or top-level parameter target VACASK would not find (W2312).
 pub(super) fn admit(
     design: &ir::Design,
     at: ir::ItemRef,
@@ -145,15 +146,21 @@ pub(super) fn admit(
         diags.push_at(NAME_SPELLING, design, at, 0);
     }
     for t in swept_targets(design, at) {
-        if t.kind != ir::TargetKind::SourceDc {
-            continue;
-        }
-        match source_of(design, t) {
-            None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
-            Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
-                diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
+        match t.kind {
+            ir::TargetKind::SourceDc => match source_of(design, t) {
+                None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
+                Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
+                    diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
+                }
+                Some(_) => {}
+            },
+            ir::TargetKind::DeviceParam if element_of(design, t).is_none() => {
+                diags.push_at(TARGET_UNFOUND, design, at, 0);
             }
-            Some(_) => {}
+            ir::TargetKind::Param if !top_param(design, t) => {
+                diags.push_at(TARGET_UNFOUND, design, at, 0);
+            }
+            _ => {}
         }
     }
     let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
@@ -290,7 +297,7 @@ fn on_an_analysis(design: &ir::Design, scope: ir::ScopeId, at: ir::ItemRef) -> b
     }
 }
 
-/// The targets a DC analysis's axes or a sweep loop sweep; none for any other item.
+/// The targets a DC analysis's axes, a sweep loop or an alter set; none for any other item.
 fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
     match at.kind {
         ir::ItemKind::Analysis => {
@@ -301,6 +308,7 @@ fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
             let dc: ir::dc_ac::Dc = design.detail(row.detail);
             design.dc_axes(dc.axes).iter().map(|a| a.target).collect()
         }
+        ir::ItemKind::Alter => vec![design.row::<ir::Alter>(at.index).target],
         ir::ItemKind::Loop => {
             let row: ir::Loop = design.row(at.index);
             match row.kind {
@@ -314,31 +322,57 @@ fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
     }
 }
 
-/// The independent source a source-DC target names, found from the entry file's top through
-/// each instance's bound subcircuit, as VACASK's `instance="x1:v1"` finds it (the reader's
-/// `masters::Declared::source`); `None` when a name on the way is no element of that kind.
-fn source_of(design: &ir::Design, t: ir::Target) -> Option<ir::source::Source> {
+/// The element a target names, found from the top level (every file's top) through each
+/// instance's bound
+/// subcircuit, as VACASK's `instance="x1:v1"` finds it (the reader's
+/// `masters::Declared::has_instance`); `None` when a name on the way is no element.
+fn element_of(design: &ir::Design, t: ir::Target) -> Option<ir::Element> {
     let named = |scope: ir::ScopeId, name: ir::NameId| {
         design.items(scope).iter().copied().find(|i| {
             i.kind == ir::ItemKind::Element && design.row::<ir::Element>(i.index).name == name
         })
     };
-    let mut scope = design.file(design.entry()).top;
+    // VACASK's include is textual: the top of every file is the one top level.
+    let mut scopes: Vec<ir::ScopeId> = design.files().map(|f| design.file(f).top).collect();
+    // An elaborated subcircuit's instances stand at the top level too (VD cir-elaboration).
+    for (at, _) in design.reachable() {
+        if at.kind == ir::ItemKind::Elaborate {
+            let row: ir::Elaborate = design.row(at.index);
+            for r in design.refs(row.circuits) {
+                if !r.def.is_none() && design.def(r.def).kind == ir::DefKind::Subckt {
+                    let sub: ir::item::Subckt = design.row(design.def(r.def).item.index);
+                    scopes.push(sub.body);
+                }
+            }
+        }
+    }
     // Bounded by the path's length.
     for &inst in design.names(t.path) {
-        let model = design
-            .row::<ir::Element>(named(scope, inst)?.index)
-            .model
-            .def;
+        let at = scopes.iter().find_map(|&sc| named(sc, inst))?;
+        let model = design.row::<ir::Element>(at.index).model.def;
         if model.is_none() || design.def(model).kind != ir::DefKind::Subckt {
             return None;
         }
-        scope = design
-            .row::<ir::item::Subckt>(design.def(model).item.index)
-            .body;
+        scopes = vec![
+            design
+                .row::<ir::item::Subckt>(design.def(model).item.index)
+                .body,
+        ];
     }
-    let row: ir::Element = design.row(named(scope, t.a.name)?.index);
+    let at = scopes.iter().find_map(|&sc| named(sc, t.a.name))?;
+    Some(design.row(at.index))
+}
+
+/// The independent source a source-DC target names (`element_of`), or `None`.
+fn source_of(design: &ir::Design, t: ir::Target) -> Option<ir::source::Source> {
+    let row = element_of(design, t)?;
     matches!(row.kind, ir::ElemKind::VSource | ir::ElemKind::ISource).then(|| design.source(&row))
+}
+
+/// Whether parameter target `t` is bound to a parameter of a file's top level, which
+/// VACASK's `__topinst__` names (R70; settle run/top_nosuch: "Parameter 'zz' not found.").
+fn top_param(design: &ir::Design, t: ir::Target) -> bool {
+    !t.a.def.is_none() && design.scope(design.def(t.a.def).scope).kind == ir::ScopeKind::File
 }
 
 /// Whether `at` is a run item.
