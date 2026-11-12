@@ -228,9 +228,11 @@ fn time_domain_and_periodic_analyses() {
     let text = "file \"t.sp\" deck
   analysis tran name=t1 stop=1u print_step=1n segments=[2n, 2u] cap=ngspice_rule uic
   analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (v db (in))
+  option n_freqs value=10
+  analysis four fundamental=2k periods=1 (v (out))
   analysis timed_op times=[1u, 2u]
   analysis hb tones=[1g, 1.1g] harmonics=[5, 5] intermod=7 truncate=diamond
-  analysis pss autonomous fundamental=1meg tstab=1u harmonics=10 osc_p=out osc_n=0
+  analysis pss autonomous fundamental=1meg tstab=1u harmonics=10 osc_p=out osc_n=0 sc_iter=50 steady_coeff=1m
   analysis pac (lin start=1 stop=1k points=11) sidebands=3 relharm=1 relative
   analysis pnoise (v (out)) source=v1 (dec start=1 stop=1k points=2) sidebands=2
   analysis pxf (v (out)) (dec start=1 stop=1k points=2)
@@ -271,6 +273,19 @@ fn time_domain_and_periodic_analyses() {
             outputs,
         };
         b.analysis(top, None, row, Span::NONE);
+        let v = n(b, "10");
+        b.option(top, spicerack_ir::OptionKey::NFreqs, v, Span::NONE);
+        let (f, p) = (n(b, "2k"), n(b, "1"));
+        let o = [b.probe_v(&["out"])];
+        let outputs = b.probes(&o);
+        let row = Four {
+            fundamental: f,
+            harmonics: NO,
+            periods: p,
+            grid: NO,
+            outputs,
+        };
+        b.analysis(top, None, row, Span::NONE);
         let t = [n(b, "1u"), n(b, "2u")];
         let times = b.exprs(&t);
         b.analysis(top, None, TimedOp { times }, Span::NONE);
@@ -292,6 +307,7 @@ fn time_domain_and_periodic_analyses() {
         );
         let (f, t, h) = (n(b, "1meg"), n(b, "1u"), n(b, "10"));
         let (osc_p, osc_n) = (b.name("out"), b.name("0"));
+        let (sc_iter, steady_coeff) = (n(b, "50"), n(b, "1m"));
         let row = Pss {
             mode: PssMode::Autonomous,
             uic: false,
@@ -301,6 +317,8 @@ fn time_domain_and_periodic_analyses() {
             points: NO,
             osc_p,
             osc_n,
+            sc_iter,
+            steady_coeff,
         };
         b.analysis(top, None, row, Span::NONE);
         let s = sweep(b, SweepSpec::lin_points, ["1", "1k", "11"]);

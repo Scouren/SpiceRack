@@ -68,8 +68,12 @@ Decisions:
   (Spectre `ac dev= param=`) is a `Loop` over that target around the analysis.
 - `Noise { out_p, out_n, source: NameId, sweep, points_per_summary }`; `Tf { output: Probe,
   source }`; `Pz { in_p, in_n, out_p, out_n, transfer: Vol \| Cur, find: Poles \| Zeros \| Both }`.
-- `Four { fundamental, outputs: probes, harmonics }` (the harmonic count is a field here, not an
-  option).
+- `Four { fundamental, outputs: probes, harmonics }`: the harmonic count is a field; absent, the
+  deck's `OptionKey::NFreqs` gives it (ngspice, A16; checked: the design sets one). A reader
+  states its simulator's default in the field when the deck sets no option.
+- `Pss` carries ngspice's `sc_iter` and `steady_coeff` as their own optional fields (A16), not
+  as any other simulator's knob. A named analysis is `RunExtra::AnalysisNamed` (ngspice cannot
+  spell a name).
 - `Hb { tones: ExprList, harmonics: ExprList }`: several tones from the start (the one-tone
   restriction is a writer's feature).
 - Each simulator's "what the same analysis means" differences in `INV-semantics.md` category 8

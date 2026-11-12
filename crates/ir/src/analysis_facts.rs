@@ -71,6 +71,15 @@ pub(crate) trait DetailFacts: RunDetail {
     ) -> Option<Self>;
 }
 
+/// The periodic small-signal kinds: each needs an `Hb` or `Pss` before it (R5).
+#[cfg(any(test, feature = "gen"))]
+const PERIODIC: [AnalysisKind; 4] = [
+    AnalysisKind::Pac,
+    AnalysisKind::Pnoise,
+    AnalysisKind::Pxf,
+    AnalysisKind::Pstb,
+];
+
 /// Dispatches a generic call over an analysis kind's detail type (`$none` for the kinds
 /// without one). Exhaustive: a new kind fails to compile here.
 macro_rules! by_detail {
@@ -171,6 +180,9 @@ impl RowFacts for Analysis {
         if crate::state_order::nested(design, scope) {
             *set = set.with(Feature::Run(RunExtra::RunItemNested));
         }
+        if !self.name.is_none() {
+            *set = set.with(Feature::Run(RunExtra::AnalysisNamed));
+        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -257,40 +269,60 @@ impl RowFacts for Analysis {
         if kinds.is_empty() {
             return ItemRef::NONE;
         }
-        // Right after an `Hb`/`Pss`, favour the small-signal kinds that need one, so each of
-        // them is reached (they are possible only there).
-        let periodic: Vec<AnalysisKind> = kinds
-            .iter()
-            .copied()
-            .filter(|k| {
-                matches!(
-                    k,
-                    AnalysisKind::Pac
-                        | AnalysisKind::Pnoise
-                        | AnalysisKind::Pxf
-                        | AnalysisKind::Pstb
-                )
-            })
-            .collect();
-        let pool = if !periodic.is_empty() && g.chance(2) {
-            &periodic
-        } else {
-            &kinds
-        };
-        let kind = pool[g.below(pool.len() as u32) as usize];
+        let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // A Fourier analysis that takes its count from the deck's option gets the option from
+        // here, first (it is listed before the analysis, and holds no name the header's name
+        // would follow), half the time.
+        if kind == AnalysisKind::Four
+            && features.contains(Feature::Run(RunExtra::FourHarmonicsOption))
+            && g.chance(2)
+        {
+            crate::option::gen_nfreqs(g, scope, b, features);
+        }
         // The name first: the text, and so the parse, interns it before the detail's names.
-        let name = if g.chance(4) {
+        let name = if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
             g.fresh_name(b)
         } else {
             NameId::NONE
         };
         let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
             .expect("a possible kind's detail generates");
-        b.push(
+        let item = b.push(
             scope,
             Analysis { kind, name, detail },
             crate::span::Span::NONE,
-        )
+        );
+        // A periodic small-signal kind is possible only right after its base: a base this call
+        // made gets one at once (half the time), so none of them depends on the kernel picking an
+        // analysis next. Counted in the budget like any item.
+        if matches!(kind, AnalysisKind::Hb | AnalysisKind::Pss)
+            && several
+            && g.items_left > 1
+            && g.chance(2)
+        {
+            let follow: Vec<AnalysisKind> = PERIODIC
+                .into_iter()
+                .filter(|&k| features.contains(Feature::Analysis(k)))
+                .collect();
+            if !follow.is_empty() {
+                let kind = follow[g.below(follow.len() as u32) as usize];
+                let name =
+                    if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
+                        g.fresh_name(b)
+                    } else {
+                        NameId::NONE
+                    };
+                let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+                    .expect("a periodic kind generates right after its base");
+                b.push(
+                    scope,
+                    Analysis { kind, name, detail },
+                    crate::span::Span::NONE,
+                );
+                g.items_left -= 1;
+            }
+        }
+        item
     }
 }
 

@@ -66,8 +66,8 @@ use crate::id::{
     Ref, ScopeId, TextId,
 };
 use crate::item::{
-    Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Role,
-    Section, Subckt, Title,
+    Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Section,
+    Subckt, Title,
 };
 use crate::library::DeviceLibrary;
 use crate::model::Model;
@@ -268,14 +268,16 @@ impl Design {
         Editor { design: self }
     }
 
-    /// The file a run starts from: the first `Deck` file, else file 0; `FileId::NONE` for a
-    /// design with no file (a caller that needs a file asserts).
+    /// The file a run starts from: file 0, whatever its role; `FileId::NONE` for a design with
+    /// no file (a caller that needs a file asserts). One rule, no heuristic: a reader creates
+    /// the entry first (the `Read` contract), IR text's first `file` block is file 0, and a
+    /// builder decides its own order.
     pub fn entry(&self) -> FileId {
         if self.files.is_empty() {
-            return FileId::NONE;
+            FileId::NONE
+        } else {
+            FileId(0)
         }
-        let deck = self.files.iter().position(|f| f.role == Role::Deck);
-        FileId(deck.unwrap_or(0) as u16)
     }
 
     /// Every file, in id order.

@@ -279,11 +279,20 @@ pub enum RunExtra {
     /// A measure crossing picked by ngspice's default, skipping the first interval
     /// (`Event::skip_initial`).
     MeasSkipInitial,
+    /// An analysis with a statement name (ngspice cannot spell one; a pass drops it, A16).
+    AnalysisNamed,
+    /// A PSS with ngspice's shooting iteration limit (`Pss::sc_iter`).
+    PssScIter,
+    /// A PSS with ngspice's steady-state coefficient (`Pss::steady_coeff`).
+    PssSteadyCoeff,
+    /// A Fourier analysis whose harmonic count comes from the deck's `nfreqs` option
+    /// (`Four::harmonics` absent).
+    FourHarmonicsOption,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 128] = [
+    pub const ALL: [RunExtra; 132] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -412,6 +421,10 @@ impl RunExtra {
         RunExtra::MeasStatAt,
         RunExtra::MeasUntil,
         RunExtra::MeasSkipInitial,
+        RunExtra::AnalysisNamed,
+        RunExtra::PssScIter,
+        RunExtra::PssSteadyCoeff,
+        RunExtra::FourHarmonicsOption,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
