@@ -324,11 +324,12 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
     }
 }
 
-/// An `Option` as `.options key[=value]` (`method=trap|gear` for the method flags).
+/// An `Option` as `.options key[=value]` (`method=trap|gear` for the method flags), or the
+/// script command `option key[=value]` when it holds from its place on.
 pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let o: ir::OptionRow = d.row(item.index);
-    let mut t = String::from(".options ");
+    let mut t = String::new();
     match o.key {
         ir::OptionKey::MethodTrap => t.push_str("method=trap"),
         ir::OptionKey::MethodGear => t.push_str("method=gear"),
@@ -344,32 +345,35 @@ pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
             }
         }
     }
-    w.line(&t.replace("= ", "="));
+    state(w, o.holds, ".options", &t);
 }
 
-/// An `Env`: `.temp t` when it sets the temperature only and is the design's one `Env` that
-/// sets it, else `.options temp=t tnom=n` (what it sets): `.temp` beats every `.options temp=`
-/// (`inp.c:1159-1186`), while among `.options` keys the last wins, the IR's rule (R24), and
-/// both spellings read back to the same `Env`.
+/// An `Env`: `.temp t` when it sets the temperature only and is the design's one whole-run
+/// `Env` that sets it, else `.options temp=t tnom=n` (what it sets): `.temp` beats every
+/// `.options temp=` (`inp.c:1159-1186`), while among `.options` keys the last wins, the IR's
+/// rule (R24), and both spellings read back to the same `Env`. A `FromHere` one is the script
+/// command `option temp=t tnom=n`.
 pub(super) fn env(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let e: ir::Env = d.row(item.index);
-    let mut t = String::new();
-    if e.tnom.is_none() && temps_set(d) == 1 {
-        t.push_str(".temp");
+    let whole = e.holds == ir::Applies::WholeRun;
+    if whole && e.tnom.is_none() && temps_set(d) == 1 {
+        let mut t = String::from(".temp");
         value(d, e.temp, &mut t);
-    } else {
-        t.push_str(".options");
-        for (key, v) in [("temp", e.temp), ("tnom", e.tnom)] {
-            if !v.is_none() {
+        return w.line(&t);
+    }
+    let mut t = String::new();
+    for (key, v) in [("temp", e.temp), ("tnom", e.tnom)] {
+        if !v.is_none() {
+            if !t.is_empty() {
                 t.push(' ');
-                t.push_str(key);
-                t.push('=');
-                value(d, v, &mut t);
             }
+            t.push_str(key);
+            t.push('=');
+            value(d, v, &mut t);
         }
     }
-    w.line(&t.replace("= ", "="));
+    state(w, e.holds, ".options", &t);
 }
 
 /// A `NodeSet` as `.ic v(path)=value`, `.nodeset v(path)=value` or `.nodeset all=value`.
@@ -411,9 +415,23 @@ fn check_values(design: &ir::Design, values: &[ir::ExprId], refuse: &mut impl Fn
     }
 }
 
-/// How many `Env` items of `design` set the temperature.
+/// `body` (`k=v …`) as a state card (`WholeRun`: `.options body`) or, holding from its place on,
+/// as the script command `option body` (ngspice's `set` of each key: `cp_vset`; ng-control's
+/// run state_option_temp).
+fn state(w: &mut Out<'_>, holds: ir::Applies, card: &str, body: &str) {
+    let body = body.replace("= ", "=");
+    match holds {
+        ir::Applies::WholeRun => w.line(&format!("{card} {body}")),
+        ir::Applies::FromHere => w.script(&format!("option {body}")),
+    }
+}
+
+/// How many whole-run `Env` items of `design` set the temperature.
 fn temps_set(design: &ir::Design) -> usize {
-    let sets = |i: ir::ItemRef| !design.row::<ir::Env>(i.index).temp.is_none();
+    let sets = |i: ir::ItemRef| {
+        let e: ir::Env = design.row(i.index);
+        !e.temp.is_none() && e.holds == ir::Applies::WholeRun
+    };
     design
         .reachable()
         .into_iter()
