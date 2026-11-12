@@ -22,14 +22,15 @@
 //! IR text:
 //!
 //! ```text
-//! option <key> [value=v]                       option private <name> <dialect> [value=v]
-//! env temp=v tnom=v
+//! option <key> [value=v] [whole_run]           option private <name> <dialect> [value=v] [whole_run]
+//! env [temp=v] [tnom=v] [whole_run]              (at least one of temp, tnom)
 //! nodeset ic|nodeset|device transient|every_op [next_only] [node=(…)] [reference=(…)] value=v
+//!         [whole_run]
 //! ```
 //!
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
-//! `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
-//! `OptionRow`, `Env` and `NodeSet`
+//! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
+//! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`)
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
@@ -45,8 +46,6 @@ use crate::item::{DefKind, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
-use crate::run_words::after_run_item;
-#[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
     flag, in_scope_kind, put_expr, put_flag, put_name, put_names, put_word, take_enum, take_expr,
@@ -54,6 +53,7 @@ use crate::run_words::{
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
+use crate::state_order::nested;
 use crate::text::Words;
 use crate::text_expr::Ctx;
 
@@ -72,18 +72,23 @@ pub struct OptionRow {
     pub dialect: NameId,
     /// The value in the key's unit; `NONE` for a flag. A string value is an `Expr::Str`.
     pub value: ExprId,
+    /// Which run items it holds for (A14, R24).
+    pub holds: Applies,
 }
 
-/// The circuit temperature and the nominal temperature, °C. Both always present (IR-RUN §3).
-/// One per deck, before its first run item; a change between runs is an `Alter` of
-/// `Target::TEMP`.
+/// The circuit temperature and the nominal temperature, °C. An `Env` sets what it names (A14):
+/// either may be `NONE`, not both (checked). A reader fills its simulator's defaults into the
+/// deck's first `Env` (HSPICE 25/25, the others 27/27), so every run sees both; a change
+/// between runs is an `Alter` of `Target::TEMP` or a `FromHere` `Env`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Env {
-    /// The circuit temperature; never `NONE`. May be an expression of parameters (ngspice
-    /// `.temp {t}`).
+    /// The circuit temperature, or `NONE` when this item does not set it. May be an expression
+    /// of parameters (ngspice `.temp {t}`).
     pub temp: ExprId,
-    /// The temperature model parameters were measured at; never `NONE`.
+    /// The temperature model parameters were measured at, or `NONE` when not set here.
     pub tnom: ExprId,
+    /// Which run items it holds for (A14, R24).
+    pub holds: Applies,
 }
 
 /// An initial condition or a node set on one node, or on the voltage between two.
@@ -108,6 +113,24 @@ pub struct NodeSet {
     /// inductor's current); never `NONE`. May be an expression of parameters (Xyce
     /// `.ic v(1)={V1}`).
     pub value: ExprId,
+    /// Which run items it holds for (A14, R24); distinct from `applies`, which says which
+    /// operating points of a run hold an `Ic`.
+    pub holds: Applies,
+}
+
+/// Which run items a state item (`OptionRow`, `Env`, `NodeSet`) holds for (A14, R24).
+/// `FromHere` is the default (builder, IR text): it is the meaning state items had before A14.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Applies {
+    /// The run items after it in listed order (a script's `option`, a VACASK `control`
+    /// statement).
+    FromHere,
+    /// Every run item of its deck, wherever it stands (ngspice's `.options`, `.temp`, `.ic`,
+    /// `.nodeset`). Among `WholeRun` items that set the same thing (an option key, `temp`,
+    /// `tnom`, one node's condition) the last in listed order holds; listed order reads an
+    /// `Include` as the items of the file it names, in place.
+    WholeRun,
 }
 
 /// What a [`NodeSet`] does.
@@ -136,8 +159,15 @@ pub enum IcScope {
 }
 
 const _: () = assert!(size_of::<OptionRow>() == 16);
-const _: () = assert!(size_of::<Env>() == 8);
+const _: () = assert!(size_of::<Env>() == 12);
 const _: () = assert!(size_of::<NodeSet>() == 24);
+
+impl Applies {
+    /// Every mode, in declaration order.
+    pub const ALL: [Applies; 2] = [Applies::FromHere, Applies::WholeRun];
+    /// Mode count.
+    pub const COUNT: usize = Self::ALL.len();
+}
 
 impl NodeSetKind {
     /// Every kind, in declaration order.
@@ -166,9 +196,10 @@ impl RowFacts for OptionRow {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Option(self.key));
-        // `OptionMidRun` is a fact of the whole design: `analysis::design_features`.
+        flag(set, nested(design, scope), RunExtra::RunItemNested);
+        // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -190,6 +221,7 @@ impl RowFacts for OptionRow {
         put_name(out, design, "", self.private);
         put_name(out, design, "", self.dialect);
         put_expr(out, design, ctx, "value", self.value);
+        put_flag(out, self.holds == Applies::WholeRun, "whole_run");
     }
 
     fn parse(
@@ -207,6 +239,7 @@ impl RowFacts for OptionRow {
             dialect = words.name(b, diags);
         }
         let value = take_expr(words, "value", scope, b, diags);
+        let holds = take_holds(words);
         b.push(
             scope,
             OptionRow {
@@ -214,6 +247,7 @@ impl RowFacts for OptionRow {
                 private,
                 dialect,
                 value,
+                holds,
             },
             words.span(),
         )
@@ -229,11 +263,9 @@ impl RowFacts for OptionRow {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let design = b.design();
-        let pos = design.items(scope).len();
-        if !has(features, RunExtra::OptionMidRun) && after_run_item(design, scope, pos) {
+        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::OptionMidRun) else {
             return ItemRef::NONE;
-        }
+        };
         let keys: Vec<OptionKey> = OptionKey::ALL
             .into_iter()
             .filter(|&k| features.contains(Feature::Option(k)))
@@ -254,6 +286,7 @@ impl RowFacts for OptionRow {
                 private,
                 dialect,
                 value,
+                holds,
             }
         } else {
             let value = if key.is_flag() {
@@ -266,6 +299,7 @@ impl RowFacts for OptionRow {
                 private: NameId::NONE,
                 dialect: NameId::NONE,
                 value,
+                holds,
             }
         };
         b.push(scope, row, Span::NONE)
@@ -281,10 +315,12 @@ impl RowFacts for Env {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {}
+    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        flag(set, nested(design, scope), RunExtra::RunItemNested);
+    }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
-        if self.temp.is_none() || self.tnom.is_none() {
+        if self.temp.is_none() && self.tnom.is_none() {
             report(design, at, Violation::FieldDomain, out);
         }
     }
@@ -293,6 +329,7 @@ impl RowFacts for Env {
         let at = out.len();
         put_expr(out, design, ctx, "temp", self.temp);
         put_expr(out, design, ctx, "tnom", self.tnom);
+        put_flag(out, self.holds == Applies::WholeRun, "whole_run");
         trim_lead(out, at);
     }
 
@@ -304,7 +341,8 @@ impl RowFacts for Env {
     ) -> ItemRef {
         let temp = take_expr(words, "temp", scope, b, diags);
         let tnom = take_expr(words, "tnom", scope, b, diags);
-        b.push(scope, Env { temp, tnom }, words.span())
+        let holds = take_holds(words);
+        b.push(scope, Env { temp, tnom, holds }, words.span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -317,9 +355,22 @@ impl RowFacts for Env {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let temp = g.expr(b, features, Reads::Constant);
-        let tnom = g.expr(b, features, Reads::Constant);
-        b.push(scope, Env { temp, tnom }, Span::NONE)
+        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::EnvMidRun) else {
+            return ItemRef::NONE;
+        };
+        // At least one of the two, each in the text's order.
+        let which = g.below(3);
+        let temp = if which != 2 {
+            g.expr(b, features, Reads::Constant)
+        } else {
+            ExprId::NONE
+        };
+        let tnom = if which != 1 {
+            g.expr(b, features, Reads::Constant)
+        } else {
+            ExprId::NONE
+        };
+        b.push(scope, Env { temp, tnom, holds }, Span::NONE)
     }
 }
 
@@ -377,6 +428,7 @@ impl RowFacts for NodeSet {
         put_names(out, design, "node", self.node);
         put_names(out, design, "reference", self.reference);
         put_expr(out, design, ctx, "value", self.value);
+        put_flag(out, self.holds == Applies::WholeRun, "whole_run");
     }
 
     fn parse(
@@ -395,6 +447,7 @@ impl RowFacts for NodeSet {
         let node = take_names(words, "node", b, diags);
         let reference = take_names(words, "reference", b, diags);
         let value = take_expr(words, "value", scope, b, diags);
+        let holds = take_holds(words);
         let row = NodeSet {
             kind,
             applies,
@@ -402,6 +455,7 @@ impl RowFacts for NodeSet {
             node,
             reference,
             value,
+            holds,
         };
         b.push(scope, row, words.span())
     }
@@ -421,6 +475,9 @@ impl RowFacts for NodeSet {
         {
             return ItemRef::NONE;
         }
+        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun) else {
+            return ItemRef::NONE;
+        };
         let mut kinds = vec![NodeSetKind::Ic, NodeSetKind::Nodeset];
         if has(features, RunExtra::IcDevice) {
             kinds.push(NodeSetKind::Device);
@@ -459,7 +516,48 @@ impl RowFacts for NodeSet {
             node,
             reference,
             value,
+            holds,
         };
         b.push(scope, row, Span::NONE)
     }
+}
+
+// ---- private ----
+
+/// `whole_run` when it is the next word.
+fn take_holds(words: &mut Words<'_>) -> Applies {
+    if take_word(words, "whole_run") {
+        Applies::WholeRun
+    } else {
+        Applies::FromHere
+    }
+}
+
+/// The mode of a state item generated into `scope`, or `None` when the set allows neither: once
+/// any run item exists (conservatively: anywhere, since items are generated in listed order),
+/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun`; a nested item needs
+/// `RunItemNested` (options and envs only: the caller's kind).
+#[cfg(any(test, feature = "gen"))]
+fn gen_holds(
+    g: &mut Gen,
+    b: &Builder<'_>,
+    scope: ScopeId,
+    features: &FeatureSet,
+    mid: RunExtra,
+) -> Option<Applies> {
+    let d = b.design();
+    if mid != RunExtra::NodeSetMidRun && nested(d, scope) && !has(features, RunExtra::RunItemNested)
+    {
+        return None;
+    }
+    let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
+    let modes: Vec<Applies> = [
+        (Applies::FromHere, mid),
+        (Applies::WholeRun, RunExtra::WholeRunMidRun),
+    ]
+    .into_iter()
+    .filter(|&(_, x)| !after || has(features, x))
+    .map(|(m, _)| m)
+    .collect();
+    (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])
 }
