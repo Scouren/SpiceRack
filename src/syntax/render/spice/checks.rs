@@ -126,7 +126,8 @@ impl W<'_, '_> {
     /// Text that did not parse is the source's own: its dialect gets it
     /// back as written, another target refuses it (W0032) unless the
     /// statement holding it was left out (a drop note at its first token,
-    /// or the reader's `P0010`/`P0011` for a line its simulator rejects).
+    /// or the reader's `P0010`/`P0011` for a line its simulator rejects),
+    /// or is a kept statement the target refuses whole (`W::checks`).
     /// Asked once the deck is written, when its drops are noted.
     pub(super) fn unparsed(&mut self) {
         if !self.pair.foreign_text {
@@ -153,6 +154,17 @@ impl W<'_, '_> {
             }
             _ => None,
         }));
+        // A statement kept as another family's text that the target
+        // refuses (`W::checks`: its construct's cell) is answered whole:
+        // unread text inside it is no second refusal.
+        let foreign = |t: &u32| self.rd.text_behaviours(*t).text_family != self.b.text_family;
+        let refused = |t: &u32| {
+            let c = self.rd.kept_construct(*t);
+            matches!(self.cells[c as usize], Action::Refuse(_))
+        };
+        let kept = blocks.iter().flat_map(|b| self.raws(b));
+        let answered = kept.filter(|t| foreign(t) && refused(t));
+        dropped.extend(answered.map(|t| (t, self.rd.line_last(t))));
         // A line its own simulator rejects was left out by the reader
         // (`Rd::rejected`, its note at the line's first token): text
         // inside it is no unread text.

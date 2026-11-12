@@ -423,3 +423,38 @@ fn p4_067_ltspice_a_devices_are_private() {
     let plain = format!("{rc}.tran 1u 20u\n.end\n");
     assert!(write(&plain, lt, Dialect::Ngspice).contains(".tran"));
 }
+
+// S4-tr-w0032-kept: unread text inside a statement the target already
+// refuses whole is no second refusal. Xyce's general external device
+// carries `DPARAMS={NAME=R VALUE=1K}` (corpus `GenCoupAPI/genextDC.cir`:
+// a brace list, no expression, P0002) and its PDE device a `region={…}`
+// table on continuation lines (`Certification_Tests/BUG_1178`). Each is
+// Xyce's own statement (W0039) on the SPICE targets as on Spectre, whose
+// writer never added W0032. Oracle: the named writer's refusal of the same
+// deck (two writers of one reader's plan; the record's `spectre.refused`:
+// W0039 alone). The neighbour: unread text in a card the target would
+// write (a B source's expression) is still refused W0032. Checks: 2 + 8 + 1.
+#[test]
+fn s4_tr_unread_text_in_a_refused_kept_statement_is_no_w0032() {
+    let xy = Dialect::Xyce;
+    let rc = "* t\nV1 1 0 1\nR2 1 0 1k\n";
+    for kept in [
+        "YGenExt R1 1 0 DPARAMS={NAME=R VALUE=1K}",
+        "YPDE d1 1 0 PDEDIODE\n+ region={name = reg1, reg2\n+ type = ntype, ptype}",
+    ] {
+        let deck = format!("{rc}{kept}\n.end\n");
+        let want = refusals(&deck, xy, Dialect::Spectre);
+        assert_eq!(want, [Code::W0039], "{kept}");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Ltspice,
+        ] {
+            assert_eq!(refusals(&deck, xy, to), want, "{to:?}: {kept}");
+        }
+    }
+    // The neighbour: text that did not parse in a card the target writes.
+    let b = format!("{rc}B1 9 0 V={{V(1) V(1)}}\nR9 9 0 1k\n.end\n");
+    assert!(refusal(&b, xy, Dialect::Ngspice).contains(&Code::W0032));
+}
