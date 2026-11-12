@@ -18,7 +18,7 @@
 //! `tests/fixtures/dialect/ngspice/read/sources/`, and VACASK 36be560 with the runs of
 //! `vc-sources` `tests/fixtures/dialect/vacask/settle/src_*.sim` and `dcw.sim`
 //! (`tests/wave_eval.rs` holds every value and its run). Laws no run pins yet are marked
-//! *unmeasured*: their slice's runs decide them.
+//! *unmeasured: specified from the document only*: their slice's runs decide them.
 //!
 //! Cites: `rewrite/AMEND-A12.md` A30, A17, A22, C1–C4; `rewrite/RULINGS.md` R35, R36, R42;
 //! `rewrite/IR-CIRCUIT.md` §3; `wave.rs`, `source.rs`; `eval.rs` (`Bindings`, `Domain`).
@@ -137,7 +137,7 @@ pub fn source_value(
 /// **Sine** (`Sin`). Defaults: `freq` both 1/TSTOP; `delay`, `damping`, `phase_deg` omitted 0.
 /// τ = t − delay. For τ ≤ 0 the value is `pre`'s: `Offset` offset, `HoldDelayValue`
 /// offset + amplitude·sin(phase) (`vsrcload.c:180-181`), `Zero` 0. For τ > 0, a `cycles` value n
-/// makes τ = n/freq for τ > n/freq (the value holds; lt, *unmeasured*), and the value is
+/// makes τ = n/freq for τ > n/freq (the value holds; lt, *unmeasured: specified from the document only*), and the value is
 /// offset + amplitude·sin(freq·τ·2π + phase)·e^(−τ·damping) + amplitude2·sin(2π·freq2·τ), the
 /// last term only with a second tone.
 ///
@@ -156,16 +156,17 @@ pub fn source_value(
 /// - `PwlRepeat::From` (ng, hs, xy, lt): r = `repeat_at`, P = t_N − r, P ≤ 0 `Undefined`. For
 ///   τ ≤ t_N the value is p(τ). After, the pass m = ⌈(τ − t_N)/P⌉ (1 the first repeat); with a
 ///   `repeat_count` n and m > n the value is v_N; else u = r + ((τ − r) − P·⌊(τ − r)/P⌋)
-///   (`vsrcload.c:335-340`) and the value is by `join`: `Jump` p(u); `Ramp` (lt, *unmeasured*)
+///   (`vsrcload.c:335-340`) and the value is by `join`: `Jump` p(u); `Ramp` (lt, *unmeasured: specified from the document only*)
 ///   the line from (r, v_N) to (t₀, v₀) for u < t₀, else p(u). `RampWidth` and `Extrapolate`
-///   are `Undefined` here (they belong to a period).
+///   are `Undefined` here (no simulator states them; `check` refuses the pair).
 /// - `PwlRepeat::Period` (va, sp): P = `repeat_at`, P ≤ 0 `Undefined`; τ below 0 is 0 (VACASK
 ///   run src-pwl: the op and the value before the delay are the value at τ = 0); k = ⌊τ/P⌋, and
 ///   with a `repeat_count` n and k > n the value is v_N; else u = τ mod P (`fmod`) and the value
-///   is by `join`: `Jump` p(u); `Extrapolate` (A22) the line through (t_N, v_N) and
-///   (P + t₀, v₀) at u for u ≥ t_N or u < t₀, else p(u); `RampWidth` (sp, *unmeasured*), w =
+///   is by `join` (the evaluator takes `fmod`; x − P·⌊x/P⌋ agrees with every run to 1e-12, so the
+///   runs do not tell the two apart): `Jump` p(u); `Extrapolate` (A22) the line through (t_N, v_N) and
+///   (P + t₀, v₀) at u for u ≥ t_N or u < t₀, else p(u); `RampWidth` (sp, *unmeasured: specified from the document only*), w =
 ///   `join_width`: the line from (P − w, p(P − w)) to (P, p(0)) for u ≥ P − w, else p(u). `Ramp`
-///   is `Undefined` here.
+///   is `Undefined` here (no simulator states it; `check` refuses the pair).
 ///
 /// **FM** (`Sffm`). Defaults: `signal_freq` omitted 5/TSTOP; `mod_index` omitted 90;
 /// `carrier_freq` both 500/TSTOP; `delay`, `phase_c_deg`, `phase_m_deg` omitted 0. Under
@@ -180,7 +181,7 @@ pub fn source_value(
 /// τ + phase_c/(360·carrier) (`CarrierPhase`), it is offset + amplitude·(mod_offset +
 /// mod_index·sin(2π·mod_freq·τm + phase_m))·sin(2π·carrier·τ + phase_c).
 ///
-/// **Bit pattern** (`Pattern`, hs/xy PAT, *unmeasured*). Each bit is a level: `1` high, `0`
+/// **Bit pattern** (`Pattern`, hs/xy PAT, *unmeasured: specified from the document only*). Each bit is a level: `1` high, `0`
 /// low, `m` (high + low)/2. The sequence is the bits, then `repeats` passes (`NONE` forever) of
 /// the bits from `repeat_start` (1-based); bit k holds [k·sample, (k + 1)·sample) of
 /// τ = t − delay, starting with a line from the previous bit's level over `rise` (going up)
