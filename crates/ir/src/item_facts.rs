@@ -229,7 +229,7 @@ impl RowFacts for Load {
     fn dump(&self, design: &Design, out: &mut String) {
         // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
         // `item_text::dump_load` with the item's context instead
-        item_text::dump_load(self, design, ItemRef::NONE, &Ctx::detached(), out);
+        item_text::dump_load(self, design, &[], out);
     }
 
     fn parse(

@@ -155,6 +155,13 @@ fn files_and_scopes(out: &mut Out<'_>) {
         }
     }
     let mut listed: HashSet<ItemRef> = HashSet::new();
+    // the scope that first lists each item, for the owner test (one pass, not a search per scope)
+    let mut listing: std::collections::HashMap<ItemRef, ScopeId> = std::collections::HashMap::new();
+    for (k, items) in d.scope_items.iter().enumerate() {
+        for &item in items {
+            listing.entry(item).or_insert(ScopeId(k as u32));
+        }
+    }
     for (k, s) in d.scopes.iter().enumerate() {
         let id = k as u32;
         let parent_ok = s.parent.is_none() || s.parent.index() < n_scopes;
@@ -175,7 +182,7 @@ fn files_and_scopes(out: &mut Out<'_>) {
                 out.report(Violation::ScopeTree, d.span_of(item), id);
             }
         }
-        if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id)) {
+        if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id), &listing) {
             out.report(Violation::ScopeOwner, Span::NONE, id);
         }
     }
@@ -203,7 +210,11 @@ fn reaches_a_file(d: &Design, scope: ScopeId) -> bool {
 
 /// Whether a non-file scope's owner has the scope's kind, names it as a body, and is listed in
 /// the scope's parent.
-fn owner_matches(d: &Design, scope: ScopeId) -> bool {
+fn owner_matches(
+    d: &Design,
+    scope: ScopeId,
+    listing: &std::collections::HashMap<ItemRef, ScopeId>,
+) -> bool {
     let s = d.scopes[scope.index()];
     let kind_ok = match s.kind {
         ScopeKind::Subckt => s.owner.kind == ItemKind::Subckt,
@@ -212,7 +223,7 @@ fn owner_matches(d: &Design, scope: ScopeId) -> bool {
         ScopeKind::Loop => s.owner.kind == ItemKind::Loop,
         ScopeKind::File => false,
     };
-    if !kind_ok || !d.scope_items[s.parent.index()].contains(&s.owner) {
+    if !kind_ok || listing.get(&s.owner) != Some(&s.parent) {
         return false;
     }
     let mut handles = Vec::new();
@@ -255,7 +266,7 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
                     Some(l) => {
                         if !l.shape_ok() {
                             out.report(Violation::LiteralShape, Span::NONE, i as u32);
-                        } else if !l.value().is_finite() {
+                        } else if !l.finite() {
                             out.report(Violation::NonFinite, Span::NONE, i as u32);
                         }
                         true

@@ -113,13 +113,15 @@
 //! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`); crate:
 //! `pub(crate) fn keyword(ItemKind) -> &'static str`
 
+use std::collections::HashMap;
+
 use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
 use crate::expr::ExprTag;
 use crate::facts::RowFacts;
-use crate::id::{BranchList, DefId, ExprId, FileId, ItemRef, ScopeId};
-use crate::item::{If, ItemKind, Role};
+use crate::id::{BranchList, DefId, ExprId, FileId, ItemRef, NameId, ScopeId};
+use crate::item::{DefKind, If, ItemKind, Role};
 use crate::item_text;
 use crate::link::link;
 use crate::text_expr::{Ctx, write_expr, write_string};
@@ -190,6 +192,14 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
         Role::Missing => " missing\n",
     });
     let bodies = design.bodies();
+    let mut modules: HashMap<ItemRef, Vec<NameId>> = HashMap::new();
+    for def in design
+        .definitions()
+        .iter()
+        .filter(|def| def.kind == DefKind::Module)
+    {
+        modules.entry(def.item).or_default().push(def.name);
+    }
     let mut stack = vec![Frame::Items {
         scope: f.top,
         depth: 1,
@@ -234,16 +244,13 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
                 out.push_str(keyword(item.kind));
                 let fields = out.len();
                 out.push(' ');
-                write_fields(
-                    design,
+                let ctx = Ctx {
+                    scope,
                     item,
-                    &Ctx {
-                        scope,
-                        item,
-                        formals: DefId::NONE,
-                    },
-                    out,
-                );
+                    formals: DefId::NONE,
+                };
+                let own = modules.get(&item).map_or(&[][..], |m| m.as_slice());
+                write_fields(design, item, &ctx, own, out);
                 if out.len() == fields + 1 {
                     out.truncate(fields);
                 }
@@ -502,7 +509,7 @@ fn if_conditions(
 
 /// Writes the fields of `item`'s row (after its keyword): kernel rows with their context
 /// (`item_text`), the owners' rows through their `RowFacts::dump`.
-fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, out: &mut String) {
+fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &mut String) {
     fn owner<R: RowFacts>(d: &Design, item: ItemRef, out: &mut String) {
         d.row::<R>(item.index).dump(d, out);
     }
@@ -512,7 +519,7 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, out: &mut String) {
         ItemKind::Comment => item_text::dump_comment(&d.row(i), d, item, ctx, out),
         ItemKind::Include => item_text::dump_include(&d.row(i), d, item, ctx, out),
         ItemKind::Global => item_text::dump_global(&d.row(i), d, item, ctx, out),
-        ItemKind::Load => item_text::dump_load(&d.row(i), d, item, ctx, out),
+        ItemKind::Load => item_text::dump_load(&d.row(i), d, modules, out),
         ItemKind::Opaque => item_text::dump_opaque(&d.row(i), d, item, ctx, out),
         ItemKind::Subckt => item_text::dump_subckt(&d.row(i), d, item, ctx, out),
         ItemKind::Section => item_text::dump_section(&d.row(i), d, item, ctx, out),

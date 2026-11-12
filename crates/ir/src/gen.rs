@@ -59,6 +59,9 @@ pub struct Gen {
     /// The formal arguments of the function whose body is being generated (`Func`'s generator
     /// sets them around its `expr` call), which `expr` may read.
     pub(crate) formals: Vec<String>,
+    /// The definitions of each kind seen so far, in definition order (`pick_def`'s index,
+    /// caught up from the design's table on each call: definitions are only appended).
+    pub(crate) by_kind: Vec<Vec<DefId>>,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -119,6 +122,7 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         fresh: 0,
         scope: ScopeId::NONE,
         formals: Vec::new(),
+        by_kind: vec![Vec::new(); DefKind::COUNT],
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -245,9 +249,13 @@ impl Gen {
         }
     }
 
-    /// An existing definition of `kind` visible from `scope`, chosen uniformly, or `NONE` when
-    /// there is none.
+    /// An existing definition of `kind` visible from `scope`, chosen at random (up to eight
+    /// draws among that kind's definitions), or `NONE` when the draws find none visible.
     pub fn pick_def(&mut self, design: &Design, scope: ScopeId, kind: DefKind) -> DefId {
+        let seen: usize = self.by_kind.iter().map(Vec::len).sum();
+        for (k, def) in design.definitions().iter().enumerate().skip(seen) {
+            self.by_kind[def.kind as usize].push(DefId(k as u32));
+        }
         let mut chain = Vec::new();
         let mut at = scope;
         // bounded by the scope count: each step moves to a parent
@@ -258,17 +266,16 @@ impl Gen {
             chain.push(at);
             at = design.scope(at).parent;
         }
-        let visible: Vec<DefId> = design
-            .definitions()
-            .iter()
-            .enumerate()
-            .filter(|(_, d)| d.kind == kind && chain.contains(&d.scope))
-            .map(|(k, _)| DefId(k as u32))
-            .collect();
-        if visible.is_empty() {
-            return DefId::NONE;
+        // a few random draws among this kind's definitions, kept if visible: O(depth) per read
+        let n = self.by_kind[kind as usize].len() as u32;
+        for _ in 0..if n == 0 { 0 } else { 8 } {
+            let k = self.below(n) as usize;
+            let def = self.by_kind[kind as usize][k];
+            if chain.contains(&design.def(def).scope) {
+                return def;
+            }
         }
-        visible[self.below(visible.len() as u32) as usize]
+        DefId::NONE
     }
 
     /// A fresh name as text, not interned (a row's generator passes it to the push, which
@@ -302,7 +309,8 @@ fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
         b.title(top, text, crate::span::Span::NONE);
         g.items_left -= 1;
     }
-    let first = 1 + g.below(g.size.items.clamp(1, 12));
+    // the top takes what the budget leaves; each body a few items
+    let first = g.items_left;
     let mut stack: Vec<(ScopeId, usize, u32)> = vec![(top, 0, first)];
     while let Some((scope, depth, left)) = stack.pop() {
         if left == 0 || g.items_left == 0 {
