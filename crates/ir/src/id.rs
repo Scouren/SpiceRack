@@ -12,7 +12,7 @@
 //! Contents:
 //! - `pub struct NameId`, `NameId::GROUND`, `pub struct FileId`, `pub struct ScopeId`,
 //!   `pub struct ExprId`, `pub struct DefId`, `pub struct TextId`, `pub struct NumId`; on each:
-//!   `NONE`,
+//!   `NONE`, crate `index_checked(self, usize) -> Option<usize>`,
 //!   `index(self) -> usize`, `is_none(self) -> bool`
 //! - `DefId::HELD` (crate-private: a reference the IR text wrote `name?`, until `text::parse`
 //!   has run `link`)
@@ -114,6 +114,12 @@ macro_rules! handle {
             pub const fn index(self) -> usize {
                 assert!(self.0 != <$int>::MAX, "a handle used as an index is not NONE");
                 self.0 as usize
+            }
+
+            /// The row index when the handle names a row of a table of `len` rows; `None` for
+            /// `NONE` or a handle at or past `len` (crate-internal: `check` reads untrusted rows).
+            pub(crate) const fn index_checked(self, len: usize) -> Option<usize> {
+                if self.is_none() || self.0 as usize >= len { None } else { Some(self.0 as usize) }
             }
 
             /// Whether this is the `NONE` sentinel.
