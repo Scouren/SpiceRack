@@ -1,0 +1,15 @@
+maxstep zero
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  options rawfile="ascii"
+  analysis tq tran stop=10m step=1u
+  analysis tw tran stop=10m step=1u maxstep=0
+endc

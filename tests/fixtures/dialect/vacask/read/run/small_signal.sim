@@ -1,0 +1,11 @@
+small-signal analyses
+control
+  analysis d1 dcinc
+  analysis x1 dcxf out="o"
+  analysis x2 dcxf out=["o", "p"]
+  analysis x3 acxf out="o" from=1 to=1k mode="dec" points=5
+  analysis n1 noise out="o" in="v1" from=1 to=1k mode="dec" points=5
+  analysis n2 noise out=["o", "p"] in="v1" values=[1k]
+  analysis s1 acstb probe="vp" from=1 to=1k mode="dec" points=5
+  analysis s2 acsp ports=["v1", "r1", "v2", "r2"] from=1 to=1k mode="dec" points=5
+endc

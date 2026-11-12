@@ -1,0 +1,14 @@
+sweeps around analyses other than op
+control
+  sweep s1 instance="r1" parameter="r" from=1k to=2k step=500
+    analysis t1 tran stop=1m
+  sweep s2 option="temp" values=[0, 50]
+  sweep s3 model="res" parameter="tc" from=0 to=1m mode="lin" points=2
+    analysis a1 ac values=[1k]
+  sweep s4 option="reltol" values=[1e-3, 1e-4]
+    analysis t2 tran stop=1m
+  sweep s5 option="tran_rmax" values=[1, 2]
+    analysis t3 tran stop=1m
+  sweep s6 instance="x1:r1" parameter="r" values=[1k]
+    analysis t4 tran stop=1m
+endc

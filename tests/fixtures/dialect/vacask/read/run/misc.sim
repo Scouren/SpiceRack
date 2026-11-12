@@ -1,0 +1,14 @@
+print, abort, postprocess, clear, var
+control
+  // a comment before the first statement
+  var x=2
+  print instance("r1")
+  abort always
+  analysis op1 op
+  /* between
+     analyses */
+  analysis op2 op
+  postprocess(PYTHON, "x.py")
+  clear options
+  clear
+endc

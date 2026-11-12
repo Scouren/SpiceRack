@@ -1,0 +1,13 @@
+# Oracle: run e3 (an analysis parameter VACASK lacks: "Parameter 'foo' not found."); VD
+# cmd-analysis-op (a nodeset list holds node, value pairs); VD cmd-analysis-overview (the
+# kinds); VD cmd-analysis-mc (endmc closes an mc; an mc without endmc). Each is InvalidInSource
+# (P2320); an unclosed mc keeps its body inside the refused loop's text.
+# codes: P2320 P2320 P2320 P2320 P2320 S0004 S0004 S0004 S0004 S0004
+file "refused.sim" deck
+  title "statements VACASK rejects"
+  opaque vacask invalid "analysis op1 op foo=1"
+  opaque vacask invalid "analysis t1 tran stop=1m nodeset={\"a\"}"
+  opaque vacask invalid "analysis z1 frob"
+  opaque vacask invalid "endmc"
+  opaque vacask invalid "mc m1 samples=2"
+  analysis op name=op2

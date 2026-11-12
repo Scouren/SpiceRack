@@ -1,0 +1,5 @@
+one options line, four classes
+control
+  options reltol=1e-4 tran_fs=0.1 rawfile="ascii" tolscale=2 abstol=1p tran_rmax=10 op_debug=1 tran_method="gear"
+  options op_skipinitial=0
+endc

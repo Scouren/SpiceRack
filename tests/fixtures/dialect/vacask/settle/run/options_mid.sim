@@ -1,0 +1,17 @@
+options from here
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k tc=1m
+control
+  options rawfile="ascii"
+  analysis op1 op
+  options temp=127
+  analysis op2 op
+  analysis op3 op
+endc

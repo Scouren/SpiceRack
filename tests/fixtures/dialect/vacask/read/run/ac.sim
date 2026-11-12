@@ -1,0 +1,9 @@
+ac sweeps
+control
+  analysis a1 ac from=1k to=2k step=100
+  analysis a2 ac from=1k to=2k mode="lin" points=10
+  analysis a3 ac from=1 to=1g mode="dec" points=10
+  analysis a4 ac from=1 to=1k mode="oct" points=3
+  analysis a5 ac values=[1k, 2k, 5k]
+  analysis a6 ac from=1 to=1k mode="dec" points=n
+endc

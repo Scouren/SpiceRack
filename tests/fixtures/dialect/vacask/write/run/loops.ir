@@ -1,0 +1,17 @@
+# Oracle: VD cmd-sweep (`sweep name target range` lines bind the next analysis; the last sweep
+# is the inner loop; instance=/parameter=, model=, option=), cmd-analysis-mc (`mc name
+# samples= seed= lh=` … `endmc`, lh=1 the default).
+file "loops.ir" deck
+  title "written loops"
+  loop sweep name=s1 (device_param r1 r path=(x1)) (lin start=1k stop=2k step=500i)
+    analysis tran name=t1 stop=1m cap=span_over50
+  loop sweep name=s2 (temp) (list values=[0i, 50i])
+    loop sweep name=s3 (model_param res tc) (lin start=0i stop=1m points=3i)
+      analysis ac name=a1 (list values=[1k])
+  loop sweep name=s4 (option private tran_rmax vacask) (dec start=1i stop=100i points=2i)
+    analysis tran name=t2 stop=1m cap=span_over50
+  loop monte_carlo name=m1 runs=3i seed=1i latin_hypercube
+    analysis op name=op1
+  loop monte_carlo name=m2 runs=2i
+    loop sweep name=s5 (option rel_tol) (list values=[1e-3])
+      analysis op name=op2

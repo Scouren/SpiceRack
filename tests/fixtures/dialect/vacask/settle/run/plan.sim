@@ -1,0 +1,20 @@
+alters persist
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model ind sp_inductor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+control
+  options rawfile="ascii"
+  print instance("r1")
+  analysis op1 op
+  alter instance("r2") r=3k
+  analysis op2 op
+  // the alter still holds
+  analysis op3 op
+endc

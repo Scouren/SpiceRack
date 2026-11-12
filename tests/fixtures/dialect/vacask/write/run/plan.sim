@@ -1,0 +1,15 @@
+written plan
+subckt a (p)
+ends
+control
+  print instance("r1")
+  alter instance("r1") r=2k
+  alter instance("x1:r1") r=3k
+  alter model("res") tc=1m
+  elaborate circuit("a")
+  save default v(a) i(v1) p(r1, i) v('x1:n')
+  analysis op1 op
+  // between
+  analysis op2 op
+  abort always
+endc

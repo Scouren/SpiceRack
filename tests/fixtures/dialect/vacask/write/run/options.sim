@@ -1,0 +1,12 @@
+written options
+control
+  options reltol=1e-4
+  options abstol=1p
+  options temp=50 tnom=25
+  options tnom=30
+  options tran_method="trap"
+  options op_skipinitial=1
+  options op_itl=200
+  options tran_fs=0.1
+  analysis op1 op
+endc

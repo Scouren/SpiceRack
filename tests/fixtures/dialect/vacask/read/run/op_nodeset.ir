@@ -1,0 +1,11 @@
+# Oracle: VD cmd-analysis-op ("nodeset={"node1", 1.2, "node2", "node3", 0.8}": a node and a
+# value, or two nodes and their difference; hierarchical names `x1:n`); run e1 (an analysis's
+# own list applies to it only: next_only). A nodeset serves every solve (every_op).
+# codes:
+file "op_nodeset.sim" deck
+  title "op with a nodeset list"
+  nodeset nodeset every_op next_only node=(a) value=1i
+  nodeset nodeset every_op next_only node=(b) reference=(c) value=0.5
+  nodeset nodeset every_op next_only node=(x1 n) value=2i
+  analysis op name=op1
+  analysis op name=op2

@@ -1,0 +1,6 @@
+sweeps before an op
+control
+  sweep vg instance="v1" parameter="dc" from=1 to=3 step=0.5
+  sweep vd instance="v2" parameter="dc" values=[0, 1]
+    analysis dc1 op
+endc
