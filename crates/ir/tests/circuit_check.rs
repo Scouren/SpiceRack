@@ -1017,4 +1017,55 @@ mod tests {
         });
         assert_eq!(legal, Vec::<Code>::new());
     }
+
+    /// A20 (R39): a lossless line may name the simulator's own ideal line, and only that; the
+    /// model has no parameters and no polarity.
+    #[test]
+    fn a_lossless_line_through_its_ideal_line_model() {
+        fn tline(b: &mut Builder<'_>, top: ScopeId, master: Ref) {
+            let one = n(b, 1);
+            let detail = b.detail(spicerack_ir::line::Line {
+                z0: one,
+                td: one,
+                ..line()
+            });
+            let name = unique(b, top);
+            let terminals = b.names(&["a", "0", "b", "0"]);
+            let row = Element {
+                kind: ElemKind::LosslessLine,
+                name,
+                terminals,
+                model: master,
+                params: List::EMPTY,
+                mult: ExprId::NONE,
+                detail,
+                mult_law: MultLaw::Parallel,
+            };
+            b.push(top, row, Span::NONE);
+        }
+        let ok = checked(|b, top| {
+            let m = bound(b, top, "tl", ModelFamily::TlineIdeal);
+            tline(b, top, m);
+        });
+        assert_eq!(ok, Vec::<Code>::new());
+        let wrong = checked(|b, top| {
+            let m = bound(b, top, "nch", ModelFamily::Bsim4);
+            tline(b, top, m);
+        });
+        assert_eq!(wrong, only(Violation::FieldDomain));
+        let params = checked(|b, top| {
+            let name = b.name("tl");
+            let one = n(b, 1);
+            let params = b.params(&[("z0", one)]);
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    ..model(name, ModelFamily::TlineIdeal, Polarity::None)
+                },
+                Span::NONE,
+            );
+        });
+        assert_eq!(params, only(Violation::FieldDomain));
+    }
 }

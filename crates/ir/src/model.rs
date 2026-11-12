@@ -206,6 +206,11 @@ pub enum ModelFamily {
     Cccs,
     /// The built-in mutual inductance, no parameters (va `mutual`). Only a `Coupling` names it.
     Mutual,
+    /// The simulator's own ideal transmission line, no parameters (va `tline_ideal`, a loaded
+    /// OSDI module; AMEND-A12 A20, R39). Only a `LosslessLine` names it. Unlike the other
+    /// builtins a target may need a `DeviceLibrary` for it (VACASK does), so a model of it
+    /// without one sets `ModelWithoutLibrary`.
+    TlineIdeal,
     // ---- modules ----
     /// XSPICE code model; `Model::word` is the code model's name (`s_xfer`, `d_cosim`; D37,
     /// F20).
@@ -268,7 +273,7 @@ const _: () = assert!(size_of::<Model>() == 44);
 
 impl ModelFamily {
     /// Every member, in declaration order.
-    pub const ALL: [ModelFamily; 78] = [
+    pub const ALL: [ModelFamily; 79] = [
         ModelFamily::Resistor,
         ModelFamily::ResistorMultiplier,
         ModelFamily::Capacitor,
@@ -344,6 +349,7 @@ impl ModelFamily {
         ModelFamily::Ccvs,
         ModelFamily::Cccs,
         ModelFamily::Mutual,
+        ModelFamily::TlineIdeal,
         ModelFamily::CodeModel,
         ModelFamily::Module,
         ModelFamily::Other,

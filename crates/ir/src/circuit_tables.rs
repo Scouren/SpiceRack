@@ -94,6 +94,7 @@ pub(crate) fn has_polarity(f: ModelFamily) -> bool {
         | F::Ccvs
         | F::Cccs
         | F::Mutual
+        | F::TlineIdeal
         | F::CodeModel
         | F::Module
         | F::Other => false,

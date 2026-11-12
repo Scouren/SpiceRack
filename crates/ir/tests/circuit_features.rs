@@ -1572,4 +1572,41 @@ mod tests {
         assert!(charge(TcLaw::Direct).contains(Feature::Circuit(X::TcLawDirect)));
         assert!(!charge(TcLaw::Direct).contains(Feature::Circuit(X::TcLawReciprocal)));
     }
+
+    /// A20: a lossless line naming a model is `BuiltinMaster` (ngspice's T card names none);
+    /// the ideal line needs a library, unlike the other builtins.
+    #[test]
+    fn the_ideal_line_names_a_model_and_needs_a_library() {
+        let line_with = |master: Option<&str>| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            if master.is_some() {
+                let name = b.name("tl");
+                b.model(
+                    top,
+                    model(name, ModelFamily::TlineIdeal, Polarity::None),
+                    Span::NONE,
+                );
+            }
+            let one = n(&mut b, 1);
+            let h = b.head("t1", &["a", "0", "b", "0"], master, &[], ExprId::NONE);
+            b.line(
+                top,
+                ElemKind::LosslessLine,
+                h,
+                spicerack_ir::line::Line {
+                    z0: one,
+                    td: one,
+                    ..line()
+                },
+                Span::NONE,
+            );
+            features_used(&d)
+        };
+        let with = line_with(Some("tl"));
+        assert!(with.contains(Feature::Circuit(X::BuiltinMaster)));
+        assert!(with.contains(Feature::Circuit(X::ModelWithoutLibrary)));
+        assert!(!line_with(None).contains(Feature::Circuit(X::BuiltinMaster)));
+    }
 }
