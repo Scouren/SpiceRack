@@ -366,3 +366,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `features_used` now reads each root's use from the row's handles (`feature::roots_with_use`, `map_exprs`'s order) instead of testing membership in the `ExprDyn` list. A root id listed under both kinds of handle counts in each field's own form, where before one `ExprDyn` listing made every listing dynamic.
 - `rewrite_exprs` and `rewrite_exprs_in` are one walk (`rewrite_where`). Each root's form is decided before the builder opens, while the class table is cached, and `map_exprs` stores back by position in the same order.
 
+## A25 item 1 applied (`Diag.item`)
+
+- `check`'s report takes the item instead of a span; non-item rows (expression rows, definitions' own faults at `Span::NONE`, the design-level features) pass `ItemRef::NONE`. The owners' row checks (`item_facts::field_domain`, the opaque check, `element::design_check`, `circuit_check`, `analysis_facts::report`) push at the item too; `Diags::push(code, span, arg)` stays for a reader's syntax rows and sets no item.
+

@@ -292,11 +292,7 @@ impl RowFacts for Opaque {
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let no_dialect = self.dialect.is_none() || design.str(self.dialect).is_empty();
         if no_dialect || design.text(self.text).is_empty() {
-            out.push(
-                violation_code(Violation::OpaqueEmpty),
-                design.span_of(at),
-                at.index,
-            );
+            out.push_at(violation_code(Violation::OpaqueEmpty), design, at, at.index);
         }
     }
 
@@ -531,11 +527,7 @@ impl RowFacts for If {
 
 /// Appends `FieldDomain` at `at` (`arg`: the row's index in its table).
 pub(crate) fn field_domain(design: &Design, at: ItemRef, out: &mut Diags) {
-    out.push(
-        violation_code(Violation::FieldDomain),
-        design.span_of(at),
-        at.index,
-    );
+    out.push_at(violation_code(Violation::FieldDomain), design, at, at.index);
 }
 
 /// Whether no name appears twice. O(n²): lists are short (ports, arguments, nets).

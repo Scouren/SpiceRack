@@ -132,7 +132,17 @@ impl Diags {
 
     /// Appends a row about `item`, its span taken from the item (`Span::NONE` for `NONE`).
     pub fn push_at(&mut self, code: Code, design: &Design, item: ItemRef, arg: u32) {
-        todo!()
+        let span = if item.index == ItemRef::NONE.index {
+            Span::NONE
+        } else {
+            design.span_of(item)
+        };
+        self.rows.push(Diag {
+            code,
+            span,
+            item,
+            arg,
+        });
     }
 
     /// Every row, in append order.
