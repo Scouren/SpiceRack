@@ -36,6 +36,11 @@ const TARGETS: &str = "file \"t.sp\" deck
   loop sweep (param zz) (list values=[1])
     analysis op
   analysis dc (source_dc vmissing) (lin start=0 stop=1 step=1)
+  alter (element_value r9) value=2
+  loop sweep (device_param r9 r) (list values=[1])
+    analysis op
+  analysis noise (v (n1)) source=vnoise (lin start=1 stop=2 step=1)
+  analysis noise (v (n1)) source=r4 (lin start=1 stop=2 step=1)
 ";
 
 // ---- private ----
@@ -286,12 +291,16 @@ fn the_unbound_targets_are_the_ones_that_provably_name_nothing() {
         (16, "nosuch"),      // an elaborate of no subcircuit
         (17, "zz"),          // a loop over no parameter
         (18, "vmissing"),    // a DC axis over no source
+        (19, "r9"),          // an alter of an element's value, no such element
+        (20, "r9"),          // a loop over a device nothing defines
+        (21, "vnoise"),      // a noise analysis whose source names no element
     ]
     .into_iter()
     .map(|(k, n)| (k, n.to_string()))
     .collect();
     // not listed: p (bound), r1, r2 through x1, r3 through x1 y1 (bound), r5 through xu (an
-    // unresolved master: the absent kit may hold it), s (bound)
+    // unresolved master: the absent kit may hold it; the spine's interim walk listed it), s
+    // (bound), the second noise analysis's source r4 (bound)
     assert_eq!(unbound_at(&d), want);
 }
 

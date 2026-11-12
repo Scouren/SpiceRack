@@ -16,9 +16,6 @@
 //! `pub fn unbound_reads(&Design) -> Vec<UnboundRead>`, `pub struct UnboundTarget`,
 //! `pub fn unbound_targets(&Design) -> Vec<UnboundTarget>`
 
-use crate::analysis::{Analysis, AnalysisKind};
-use crate::circuit_text::get_row;
-use crate::dc_ac::Dc;
 use crate::design::Design;
 use crate::diag::Diags;
 #[cfg(doc)]
@@ -29,7 +26,6 @@ use crate::facts::RowFacts;
 use crate::feature::{ExprWalk, expr_roots};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, Include, ItemKind, Role, ScopeKind, Subckt};
-use crate::plan::{Alter, Elaborate, Loop, LoopKind, SweepLoop, TableLoop, Target};
 
 /// A parameter read no definition is bound to (A38, R63), at the item whose expressions hold it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,13 +41,13 @@ pub struct UnboundRead {
     pub held: bool,
 }
 
-/// A run item's target that provably names nothing (A43, R70), at the item that holds it.
+/// A name a run item reads that provably names nothing (A43, R70), at the item that holds it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UnboundTarget {
-    /// The alter, loop, analysis (a DC axis) or elaborate that holds the target.
+    /// The alter, loop, analysis or elaborate that reads the name.
     pub item: ItemRef,
-    /// The name that names nothing: the reference's, or the first segment of an element
-    /// target's path (the element's own name last) that is no element where it is looked up.
+    /// The name that names nothing: the reference's, or the first segment of an element path
+    /// (the element's own name last) that is no element where it is looked up.
     pub name: NameId,
 }
 
@@ -206,63 +202,62 @@ pub fn unbound_reads(design: &Design) -> Vec<UnboundRead> {
     out
 }
 
-/// The targets of run items that provably name nothing (A43, R70), in `reachable` order: an
-/// alter's, a sweep or table loop's, a DC axis's target, an elaborate's circuits. A definition
-/// reference (a parameter, a subcircuit's or a model's parameter, an elaborated circuit) is
-/// listed when it is unresolved. An element target (a source's DC value, an element's value, a
-/// device parameter) is looked up from the deck's top along its instance path, and listed only
-/// when the lookup provably fails: each instance on the path binds to a subcircuit the design
-/// holds, and the name that fails is no element of the scope it is looked up in. A path through
-/// an instance whose master is unresolved, or a scope that holds an `Opaque` item or includes a
-/// file the design lacks (or holds as `Missing`), is not listed: the absent kit may hold the
-/// element. Listed, for one: VACASK's `alter instance("__topinst__") a=2` read as a device
-/// parameter of an element `__topinst__` the deck does not have (the pair test's F7).
-/// Unresolved is legal IR (A4): the refusal is the spine's, under its strict policy.
-/// O(items × scope depth + targets × path length).
+/// The names run items read that provably name nothing (A43, R70), item by item in
+/// `reachable` order: every unresolved definition reference of an alter, a loop, an analysis
+/// or an elaborate (an alter's, a loop's or a DC axis's parameter, subcircuit or model target,
+/// an elaborated circuit), and every element such an item reads by name (an element target's
+/// path, a noise analysis's `source=`, an `i(…)` in its expressions) whose lookup provably
+/// fails. An element is looked up from the deck's top (from a subcircuit's body for an item in
+/// one) along its instance path, and is listed only when every instance on the path binds to a
+/// subcircuit the design holds and the name that fails is no element of the scope it is looked
+/// up in, or follows an element that is no instance. Not listed: a path through an instance
+/// whose master is unresolved, or a lookup scope that holds an `Opaque` item or includes a file
+/// the design lacks (or holds as `Missing`): the absent kit may hold the element. (The spine's
+/// interim walk, `ir-next` 3294c4a9, listed a path through an unresolved master; this one does
+/// not, by the lead's ruling.) Listed, for one: VACASK's `alter instance("__topinst__") a=2`
+/// read as a device parameter of an element `__topinst__` the deck does not have (the pair
+/// test's F7). Unresolved is legal IR (A4): the refusal is the spine's, under its strict
+/// policy. O(design) for one copy (the rows' element-name walk takes `&mut`), then O(items ×
+/// scope depth + names × path length).
 pub fn unbound_targets(design: &Design) -> Vec<UnboundTarget> {
     let lookup = element_scopes(design);
+    let mut copy = design.clone();
+    let (mut refs, mut handles, mut nodes) = (Vec::new(), Vec::new(), Vec::new());
     let mut out = Vec::new();
-    for (item, _) in design.reachable() {
-        let mut targets: Vec<Target> = Vec::new();
-        match item.kind {
-            ItemKind::Alter => targets.push(design.row::<Alter>(item.index).target),
-            ItemKind::Loop => {
-                let row: Loop = design.row(item.index);
-                match row.kind {
-                    LoopKind::Sweep => {
-                        targets.extend(get_row::<SweepLoop>(design, row.detail).map(|d| d.target))
-                    }
-                    LoopKind::Table => {
-                        if let Some(t) = get_row::<TableLoop>(design, row.detail) {
-                            targets.extend_from_slice(design.targets(t.columns));
-                        }
-                    }
-                    LoopKind::MonteCarlo => {}
-                }
-            }
-            ItemKind::Analysis => {
-                let row: Analysis = design.row(item.index);
-                if row.kind == AnalysisKind::Dc
-                    && let Some(dc) = get_row::<Dc>(design, row.detail)
-                {
-                    targets.extend(design.dc_axes(dc.axes).iter().map(|a| a.target));
-                }
-            }
-            ItemKind::Elaborate => {
-                let row: Elaborate = design.row(item.index);
-                let unbound = design.refs(row.circuits).iter();
-                let unbound = unbound.filter(|r| !r.name.is_none() && !r.is_resolved());
-                out.extend(unbound.map(|r| UnboundTarget { item, name: r.name }));
-            }
-            _ => {}
+    for (item, scope) in design.reachable() {
+        let run = matches!(
+            item.kind,
+            ItemKind::Alter | ItemKind::Loop | ItemKind::Analysis | ItemKind::Elaborate
+        );
+        if !run {
+            continue;
         }
-        for t in targets {
-            let name = match t.kind.def_kind() {
-                Some(_) => (!t.a.name.is_none() && !t.a.is_resolved()).then_some(t.a.name),
-                None if t.kind.has_path() => element_unbound(design, &lookup, &t),
-                None => None,
-            };
-            out.extend(name.map(|name| UnboundTarget { item, name }));
+        refs.clear();
+        design.item_refs(item, &mut refs);
+        let unbound = refs
+            .iter()
+            .filter(|(r, _)| !r.name.is_none() && !r.is_resolved());
+        out.extend(unbound.map(|(r, _)| UnboundTarget { item, name: r.name }));
+        // the names the row reads by name (paths joined), then each `i(…)` of its expressions
+        let mut paths: Vec<Vec<NameId>> = Vec::new();
+        for_kind!(item.kind, R => R::map_element_names(&mut copy, item, &mut |p| paths.push(p.to_vec())));
+        handles.clear();
+        design.item_handles(item, &mut handles);
+        for root in expr_roots(design, &handles) {
+            nodes.clear();
+            crate::class::tree_nodes(design, root, &mut nodes);
+            nodes.sort_unstable();
+            for &e in &nodes {
+                if let Expr::I(name) = design.expr(e) {
+                    paths.push(vec![name]);
+                }
+            }
+        }
+        let from = lookup_scope(design, scope);
+        for path in paths {
+            if let Some(name) = element_unbound(design, &lookup, from, &path) {
+                out.push(UnboundTarget { item, name });
+            }
         }
     }
     out
@@ -275,19 +270,7 @@ fn element_scopes(design: &Design) -> Lookup {
     let mut out: Lookup = Lookup::new();
     out.entry(ScopeId::NONE).or_default();
     for (item, scope) in design.reachable() {
-        let mut at = scope;
-        // bounded by the scope count: each step moves to a parent
-        for _ in 0..=design.scopes.len() {
-            let s = design.scope(at);
-            if s.kind == ScopeKind::Subckt || s.parent.is_none() {
-                break;
-            }
-            at = s.parent;
-        }
-        let subckt = design.scope(at).kind == ScopeKind::Subckt;
-        let entry = out
-            .entry(if subckt { at } else { ScopeId::NONE })
-            .or_default();
+        let entry = out.entry(lookup_scope(design, scope)).or_default();
         match item.kind {
             ItemKind::Element => entry.0.push((design.row::<Element>(item.index).name, item)),
             ItemKind::Opaque => entry.1 = true,
@@ -302,12 +285,38 @@ fn element_scopes(design: &Design) -> Lookup {
     out
 }
 
-/// The name an element target provably fails at (module doc of `unbound_targets`), or `None`
-/// when it names an element or the lookup cannot tell.
-fn element_unbound(design: &Design, lookup: &Lookup, t: &Target) -> Option<NameId> {
-    let path = design.names(t.path);
-    let mut at = ScopeId::NONE;
-    for (k, &name) in path.iter().chain(std::iter::once(&t.a.name)).enumerate() {
+/// The lookup scope of an item listed in `scope`: the body of the subcircuit it sits in, or
+/// the deck's top (`ScopeId::NONE`).
+fn lookup_scope(design: &Design, scope: ScopeId) -> ScopeId {
+    let mut at = scope;
+    // bounded by the scope count: each step moves to a parent
+    for _ in 0..=design.scopes.len() {
+        let s = design.scope(at);
+        if s.kind == ScopeKind::Subckt {
+            return at;
+        }
+        if s.parent.is_none() {
+            break;
+        }
+        at = s.parent;
+    }
+    ScopeId::NONE
+}
+
+/// The name `path` (instances, then the element) provably fails at from the lookup scope
+/// `from` (`unbound_targets`' doc), or `None` when it names an element or the lookup cannot
+/// tell.
+fn element_unbound(
+    design: &Design,
+    lookup: &Lookup,
+    from: ScopeId,
+    path: &[NameId],
+) -> Option<NameId> {
+    let mut at = from;
+    for (k, &name) in path.iter().enumerate() {
+        if name.is_none() {
+            return None;
+        }
         // a body with no item has no entry: empty, and closed
         let (list, open) = lookup
             .get(&at)
@@ -315,10 +324,9 @@ fn element_unbound(design: &Design, lookup: &Lookup, t: &Target) -> Option<NameI
         let Some(&(_, item)) = list.iter().find(|(n, _)| *n == name) else {
             return (!open).then_some(name);
         };
-        if k == path.len() {
+        if k + 1 == path.len() {
             return None; // the element itself is there
         }
-        // a path segment: an instance of a subcircuit the design holds, or the lookup stops
         let e: Element = design.row(item.index);
         let master = e
             .model
@@ -331,7 +339,7 @@ fn element_unbound(design: &Design, lookup: &Lookup, t: &Target) -> Option<NameI
             }
             (ElemKind::Instance, _) => return None, // an unresolved master: the kit may hold it
             // no element lives below an element that is no instance
-            _ => return Some(path.get(k + 1).copied().unwrap_or(t.a.name)),
+            _ => return Some(path[k + 1]),
         };
     }
     None
