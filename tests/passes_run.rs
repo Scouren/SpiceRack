@@ -15,6 +15,7 @@ mod memcap;
 mod bindings;
 #[path = "passes_run/dc_loops.rs"]
 mod dc_loops;
+#[allow(dead_code)] // `sources_only` is the laws'
 #[path = "passes_run/gen_sets.rs"]
 mod gen_sets;
 #[path = "passes_run/loops.rs"]

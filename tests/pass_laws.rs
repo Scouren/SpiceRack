@@ -61,14 +61,14 @@ const KNOWN: &[(&str, &str, &str)] = &[];
 const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     (
         "pulse_spice_to_vacask",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Pulse],
             ir::Feature::Circuit(ir::CircuitExtra::PulseVacask),
         ),
     ),
     (
         "given_zero_to_as_given",
-        sources_only(
+        gen_sets::sources_only(
             &[
                 ir::WaveKind::Pulse,
                 ir::WaveKind::Sin,
@@ -82,21 +82,21 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ),
     (
         "pulse_vacask_to_spice",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Pulse],
             ir::Feature::Circuit(ir::CircuitExtra::PulseSpice),
         ),
     ),
     (
         "am_pre_hold_to_zero",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Am],
             ir::Feature::Circuit(ir::CircuitExtra::AmPreZero),
         ),
     ),
     (
         "as_given_to_given_zero",
-        sources_only(
+        gen_sets::sources_only(
             &[
                 ir::WaveKind::Pulse,
                 ir::WaveKind::Sin,
@@ -110,28 +110,28 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ),
     (
         "exp_td2_relative",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Exp],
             ir::Feature::Circuit(ir::CircuitExtra::ExpTd2FromTd1),
         ),
     ),
     (
         "exp_td2_absolute",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Exp],
             ir::Feature::Circuit(ir::CircuitExtra::ExpTd2FromZero),
         ),
     ),
     (
         "sffm_ngspice_to_spice3",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Sffm],
             ir::Feature::Circuit(ir::CircuitExtra::SffmSpice3),
         ),
     ),
     (
         "sffm_spice3_to_ngspice",
-        sources_only(
+        gen_sets::sources_only(
             &[ir::WaveKind::Sffm],
             ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
@@ -578,33 +578,4 @@ fn fixture(pass: &Pass, case: &Path) -> Result<(), String> {
         true => Ok(()),
         false => Err(format!("written\n{got}expected\n{expected}")),
     }
-}
-
-/// Every feature but the element kinds other than the two independent sources, the waves not
-/// in `waves`, and `without` (the competing feature): designs that hold sources of those waves
-/// (pass-expr's measured construction: 66 of 96 seeds hold a SPICE pulse).
-const fn sources_only(waves: &[ir::WaveKind], without: ir::Feature) -> ir::FeatureSet {
-    let mut set = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(without));
-    let mut i = 0;
-    while i < ir::ElemKind::ALL.len() {
-        let k = ir::ElemKind::ALL[i];
-        if !matches!(k, ir::ElemKind::VSource | ir::ElemKind::ISource) {
-            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)));
-        }
-        i += 1;
-    }
-    let mut j = 0;
-    while j < ir::WaveKind::ALL.len() {
-        let w = ir::WaveKind::ALL[j];
-        let (mut k, mut keep) = (0, false);
-        while k < waves.len() {
-            keep |= waves[k] as u8 == w as u8;
-            k += 1;
-        }
-        if !keep {
-            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Wave(w)));
-        }
-        j += 1;
-    }
-    set
 }
