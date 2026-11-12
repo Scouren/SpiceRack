@@ -234,6 +234,10 @@ fn literal(
     let significant = digits.trim_start_matches('0');
     let mut frac = frac as i32;
     let mut power: i32 = 0;
+    // ponytail: more significant digits than the mantissa holds are rounded half to even on the
+    // digits (decimal, no float; P1005). Ceiling: on ngspice card values (INPevaluate) the
+    // rounded text can land a few ulp from the double the long text gives (run: see
+    // DIALECT-NGSPICE.md §3 numbers). Upgrade: A18 keeps the digit text beside the literal.
     let (mut mantissa, rounded) = if significant.len() > DIGITS_MAX {
         power += (significant.len() - DIGITS_MAX) as i32;
         (round_digits(significant, DIGITS_MAX), true)
