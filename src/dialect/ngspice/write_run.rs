@@ -132,7 +132,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         AnalysisKind::Tran => {
             let t: Tran = design.detail(a.detail);
             let zero_max = !t.max_step.is_none()
-                && matches!(design.expr(t.max_step), ir::Expr::Num(n) if design.num(n).mantissa == 0);
+                && matches!(design.expr(t.max_step), ir::Expr::Num(n) if design.literal_eq(design.num(n), ir::Literal::ZERO));
             form_ok &= t.cap == StepCap::NgspiceRule
                 && (t.max_step.is_none() || !t.record_start.is_none())
                 && !zero_max;
@@ -142,7 +142,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             let f: Four = design.detail(a.detail);
             // a given count is ngspice's default; none is the deck's `nfreqs` (A16)
             let nine = f.harmonics.is_none()
-                || matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.num(n).value() == 9.0);
+                || matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.literal_value(design.num(n)) == 9.0);
             if !nine {
                 refuse(FOUR_HARMONICS);
             }
@@ -427,7 +427,7 @@ const fn refusal(
 fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
     out.push(' ');
     if let ir::Expr::Num(n) = d.expr(e) {
-        number::spell(d.num(n), Grammar::Inp, out);
+        number::spell(d, d.num(n), Grammar::Inp, out);
         return;
     }
     out.push('{');

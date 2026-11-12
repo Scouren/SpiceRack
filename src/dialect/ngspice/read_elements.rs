@@ -31,7 +31,7 @@ mod modules;
 mod passive;
 mod semi;
 
-use super::codes::{self, Row};
+use super::codes::Row;
 use super::expr_read::{self, Fail, Tree};
 use super::number::{self, Scan};
 use super::read::{Lower, Stmt};
@@ -338,12 +338,7 @@ pub(super) fn b_tree(text: &str) -> Result<Tree, Fail> {
 /// Appends a value read by [`val`].
 pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
     match v {
-        Val::Lit(s) => {
-            if s.rounded {
-                lw.note(st, codes::ROUNDED);
-            }
-            lw.b.literal(s.literal)
-        }
+        Val::Lit(s) => lw.number(s.literal, &s.fit),
         Val::Tree(t) => lw.expr(st, t, st.scope),
     }
 }
@@ -478,7 +473,7 @@ pub(super) const fn literal(mantissa: i64, frac: u8, exp10: i16, form: ir::NumFo
             form,
         },
         len: 0,
-        rounded: false,
+        fit: number::Fit::Exact,
     }
 }
 

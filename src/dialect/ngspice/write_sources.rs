@@ -270,7 +270,7 @@ fn is_one(d: &ir::Design, e: ir::ExprId) -> bool {
         exp10: 0,
         form: ir::NumForm::Plain,
     };
-    matches!(d.expr(e), ir::Expr::Num(n) if d.num(n).eq_value(one))
+    matches!(d.expr(e), ir::Expr::Num(n) if d.literal_eq(d.num(n), one))
 }
 
 #[cfg(test)]

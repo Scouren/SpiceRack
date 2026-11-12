@@ -163,6 +163,17 @@ fn b_ok(d: &ir::Design, e: ExprId) -> bool {
 /// Whether a tc number survives `eval_tc`'s `%15.8e` (at most 9 significant digits).
 fn tc_spells(d: &ir::Design, e: ExprId) -> bool {
     match d.expr(e) {
+        // a long literal's digits less its leading and trailing zeros (A18)
+        Expr::Num(n) if d.long_digits(d.num(n)).is_some() => {
+            let (significand, _) = d.long_digits(d.num(n)).expect("a long literal");
+            let digits = significand.trim_start_matches(['-', '0', '.']);
+            digits
+                .trim_end_matches(['0', '.'])
+                .bytes()
+                .filter(u8::is_ascii_digit)
+                .count()
+                <= 9
+        }
         Expr::Num(n) => {
             let mut m = d.num(n).mantissa.unsigned_abs();
             // Bounded: at most 19 decimal digits.

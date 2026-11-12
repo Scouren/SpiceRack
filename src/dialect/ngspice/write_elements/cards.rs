@@ -152,7 +152,7 @@ pub(super) fn passive_fields(p: &ir::passive::Passive) -> [ExprId; 8] {
 /// Appends a card value: a number in `INPevaluate`'s spelling, anything else in `{…}`.
 fn cv(d: &ir::Design, e: ExprId, out: &mut String) {
     if let Expr::Num(n) = d.expr(e) {
-        return number::spell(d.num(n), Grammar::Inp, out);
+        return number::spell(d, d.num(n), Grammar::Inp, out);
     }
     out.push('{');
     expr_write::expr(d, e, out);

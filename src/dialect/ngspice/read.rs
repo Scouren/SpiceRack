@@ -22,7 +22,7 @@
 //! `pub(super) fn bind_reads`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
-//! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, wins,
+//! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
 //! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use super::codes;
@@ -30,6 +30,7 @@ use super::cst::{body, extent, joined, line, next, rest, unquote};
 use super::declare::{Class, Declared, declare};
 use super::expr_read::Tree;
 use super::name::{self, Folder};
+use super::number;
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
 };
@@ -343,6 +344,12 @@ impl<'a, 'd> Lower<'a, 'd> {
             self.note(st, code);
         }
         tree.emit(self.b, self.names, scope, self.pending)
+    }
+
+    /// Appends a card number (`number::Scan`'s literal and fit) and returns its root: a long one
+    /// as its digits (A18).
+    pub(super) fn number(&mut self, lit: ir::Literal, fit: &number::Fit) -> ir::ExprId {
+        fit.build(self.b, lit)
     }
 
     /// Whether the definition `(def, name)` of field `k` of `st` is the one ngspice keeps in

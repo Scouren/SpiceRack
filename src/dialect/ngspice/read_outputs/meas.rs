@@ -14,7 +14,6 @@
 
 use super::probe::{Ctx, Want, build, probe_word};
 use super::{No, unwrap, words};
-use crate::dialect::ngspice::codes;
 use crate::dialect::ngspice::declare::Class;
 use crate::dialect::ngspice::expr_read::{self, Tree};
 use crate::dialect::ngspice::name;
@@ -27,8 +26,8 @@ use crate::syntax::ast::{Node, Tag};
 
 /// A value read but not yet appended.
 enum Val {
-    /// A number (and whether it was rounded).
-    Lit(ir::Literal, bool),
+    /// A number and how its digits fit (`number::Fit`).
+    Lit(ir::Literal, number::Fit),
     /// A numparam expression.
     Tree(Tree),
     /// A threshold that reads the circuit: `v(x)` or `i(x)`.
@@ -222,7 +221,7 @@ fn clause(
     }
     let value = match &p.val {
         Some(v) => value(lw, st, v)?,
-        None => Val::Lit(ir::Literal::ZERO, false),
+        None => Val::Lit(ir::Literal::ZERO, number::Fit::Exact),
     };
     if p.edge.is_none() {
         return Err(No::Invalid); // "at, rise, fall or cross must be given"
@@ -451,7 +450,7 @@ fn value(lw: &mut Lower<'_, '_>, st: Stmt, text: &str) -> Result<Val, No> {
         .starts_with(|c: char| c.is_ascii_digit() || c == '.');
     if numeric {
         let s = number::card(text).ok_or(No::Invalid)?;
-        return Ok(Val::Lit(s.literal, s.rounded));
+        return Ok(Val::Lit(s.literal, s.fit));
     }
     Ok(Val::Tree(numparam(lw, st, unwrap(text), true)?))
 }
@@ -523,12 +522,7 @@ fn event(lw: &mut Lower<'_, '_>, st: Stmt, e: Ev) -> Event {
 /// A value appended.
 fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: Val) -> ir::ExprId {
     match v {
-        Val::Lit(lit, rounded) => {
-            if rounded {
-                lw.note(st, codes::ROUNDED);
-            }
-            lw.b.literal(lit)
-        }
+        Val::Lit(lit, fit) => lw.number(lit, &fit),
         Val::Tree(t) => lw.expr(st, &t, st.scope),
         Val::Probe(w) if w.kind == ProbeKind::I => {
             let e = lw.names.fold(&w.a[0]);

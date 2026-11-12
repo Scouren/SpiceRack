@@ -16,7 +16,7 @@
 //!
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
-//! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`, `ROUNDED`,
+//! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
 //! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
 //! `MISSING_FILE`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
@@ -40,8 +40,6 @@ pub(super) const EXPR_INVALID: Code = Code::new(b'P', 1002);
 pub(super) const EXPR_NO_MEMBER: Code = Code::new(b'P', 1003);
 /// A numparam then-branch ternary nested past `a?b?c:d:e`: `InvalidInSource`.
 pub(super) const TERNARY_NEST: Code = Code::new(b'P', 1004);
-/// A number with more than 18 significant digits, rounded to 18 (A3).
-pub(super) const ROUNDED: Code = Code::new(b'P', 1005);
 /// A `.param` value or `.if` condition that reads the circuit: `InvalidInSource`.
 pub(super) const PARAM_READS_CIRCUIT: Code = Code::new(b'P', 1006);
 /// A structure card missing its name, path or parentheses, or a closer with no block:
@@ -98,12 +96,6 @@ pub(super) const CODES: &[Row] = &[
         "a numparam ternary nested in a then-branch past one level",
         "rewrite/INV-semantics.md 2.13",
         "numparam reads a?b?c:d:e as a?c:e and a deeper nest no single way; kept as text (InvalidInSource).",
-    ),
-    row(
-        ROUNDED,
-        "a number rounded to 18 significant digits",
-        "rewrite/IR-KERNEL.md §7.3",
-        "the IR literal holds at most 18 significant digits.",
     ),
     row(
         PARAM_READS_CIRCUIT,

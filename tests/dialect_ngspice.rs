@@ -36,6 +36,7 @@ const READ: &[&str] = &[
     "limit_three",
     "negation_refused",
     "numbers",
+    "numbers_long",
     "param_last_wins",
     "param_reads_circuit",
     "param_temp_class",
