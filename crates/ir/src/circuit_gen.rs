@@ -18,7 +18,7 @@
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::{builtin_kind, has_polarity, versioned};
+use crate::circuit_check::{builtin_kind, has_polarity, master_ports, versioned};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_tables::{VERSIONS, needs_version};
 use crate::controlled::{
@@ -28,7 +28,7 @@ use crate::controlled::{
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Params, Reads};
-use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::letter::letter_of;
 use crate::model::{Model, ModelFamily, Polarity};
@@ -113,8 +113,17 @@ pub(crate) fn generate_element(
         }
         _ => r.g.fresh_name(r.b),
     };
-    let terminals = r.terminals(kind, two_terminal);
-    let model = r.master(kind);
+    // R61/A36: an instance's terminals follow its subcircuit's ports, so its master is picked
+    // first (no name is interned for it: a bound master's name already is)
+    let bound = (kind == ElemKind::Instance)
+        .then(|| r.bound_subckt())
+        .flatten();
+    let ports = bound.and_then(|m| master_ports(r.b.design(), m));
+    let terminals = r.terminals(kind, two_terminal, ports);
+    let model = match bound {
+        Some(m) => m,
+        None => r.master(kind),
+    };
     // an instance's multiplier comes with its law (A15 C1)
     let mult_law =
         if kind == ElemKind::Instance && r.has(X::MultInstanceNgspiceAppend) && r.g.chance(2) {
@@ -206,7 +215,15 @@ pub(crate) fn generate_model(
     } else {
         r.g.below(3)
     };
-    let values: Vec<ExprId> = (0..count).map(|_| r.ex()).collect();
+    // a parameter list's value may be a string or a list (A25 item 4)
+    let values: Vec<ExprId> = (0..count)
+        .map(|_| {
+            (r.g.root_str, r.g.root_list) = (true, true);
+            let value = r.ex();
+            (r.g.root_str, r.g.root_list) = (false, false);
+            value
+        })
+        .collect();
     for value in values {
         let key = r.g.fresh_name(r.b);
         pairs.push((r.b.design().str(key).to_owned(), value));
@@ -327,15 +344,6 @@ impl R<'_, '_> {
         }
     }
 
-    fn fresh_names(&mut self, count: u32) -> NameList {
-        let ids: Vec<NameId> = (0..count).map(|_| self.g.fresh_name(self.b)).collect();
-        if ids.is_empty() {
-            List::EMPTY
-        } else {
-            self.b.name_ids(&ids)
-        }
-    }
-
     /// One of `choices` (members whose feature is given as `Some(x)` only when `x` is in the
     /// set). Asserts at least one is allowed.
     fn pick<T: Copy>(&mut self, choices: &[(T, Option<X>)]) -> T {
@@ -358,7 +366,7 @@ impl R<'_, '_> {
             }
             DetailKind::Coupling => {
                 let count = if self.maybe(X::CouplingMany) { 3 } else { 2 };
-                let inductors = self.fresh_names(count);
+                let inductors = self.element_names(count);
                 let k = self.dy();
                 self.b.detail(Coupling { inductors, k })
             }
@@ -369,7 +377,7 @@ impl R<'_, '_> {
             DetailKind::Controlled => {
                 let gain = self.ex();
                 let sense = if matches!(kind, ElemKind::Cccs | ElemKind::Ccvs) {
-                    self.g.fresh_name(self.b)
+                    self.element_name()
                 } else {
                     NameId::NONE
                 };
@@ -379,7 +387,11 @@ impl R<'_, '_> {
                 let dimension = 1 + self.g.below(2) as u8;
                 let control = ctl;
                 let per = if control == Quantity::Voltage { 2 } else { 1 };
-                let controls = self.fresh_names(per * u32::from(dimension));
+                let controls = if control == Quantity::Current {
+                    self.element_names(u32::from(dimension))
+                } else {
+                    self.fresh_names(per * u32::from(dimension))
+                };
                 let n = 1 + self.g.below(3);
                 let coeffs = self.exprs(n);
                 let output = out;
@@ -495,7 +507,7 @@ impl R<'_, '_> {
             }
             DetailKind::Switch => {
                 let sense = if kind == ElemKind::ISwitch {
-                    self.g.fresh_name(self.b)
+                    self.element_name()
                 } else {
                     NameId::NONE
                 };

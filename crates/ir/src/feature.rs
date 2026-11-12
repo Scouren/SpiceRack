@@ -22,7 +22,8 @@
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
-//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
+//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`,
+//!   `pub(crate) fn unplaced_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
 //!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
@@ -138,6 +139,17 @@ pub enum Extra {
     /// `$tnom`, class `Constant`): VACASK reads `parameters x=1` there as a formal, ngspice's
     /// `.param` there is none (A25, R48). A structure pass makes it a formal.
     SubcktConstantParam,
+    /// A `Param`'s value, or a `Subckt` head default, whose root is a string (A25 item 4: a
+    /// value by type; a string in an element's or model's parameter list is `Expr(Str)` alone).
+    StringValue,
+    /// A `Param`'s value, or a `Subckt` head default, whose root is a list (A25 item 4).
+    ListValue,
+    /// A `Subckt` head default holding a read bound to a definition outside the subcircuit's
+    /// body: read by the lexical rule (R62, A37). A read of a sibling formal is none.
+    FormalOuterRead,
+    /// A `Subckt` head default holding an unbound read whose name is no sibling formal's: looked
+    /// up from each instance's scope (R62, A37, A29).
+    FormalUnboundRead,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -289,7 +301,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::SubcktConstantParam as usize + 1] = [
+    pub const ALL: [Extra; Extra::FormalUnboundRead as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -301,6 +313,10 @@ impl Extra {
         Extra::IfConditionDynamic,
         Extra::LongLiteral,
         Extra::SubcktConstantParam,
+        Extra::StringValue,
+        Extra::ListValue,
+        Extra::FormalOuterRead,
+        Extra::FormalUnboundRead,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -388,7 +404,6 @@ impl FeatureSet {
 
     /// The members, in index order.
     pub fn iter(&self) -> impl Iterator<Item = Feature> + use<> {
-        // A real body: `todo!()` does not satisfy an `impl Iterator` return.
         let set = *self;
         (0..Feature::COUNT)
             .filter(move |&i| set.words[i as usize / 64] >> (i % 64) & 1 == 1)
@@ -418,9 +433,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
     set
 }
 
-/// The features of the whole design, no item's: each owner's
-/// `design_features` hook (A9). `check_legal` reports these at `Span::NONE`.
+/// The features of the whole design, no item's: each owner's `design_features` hook (A9).
+/// `check_legal` reports the run owner's at their items (`analysis::feature_items`) and the rest
+/// (`unplaced_level`) at `Span::NONE`.
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
+    unplaced_level(design, set);
+    crate::analysis::design_features(design, set);
+}
+
+/// The design-level features that name no item: a deck without a title, the circuit owner's
+/// hook.
+pub(crate) fn unplaced_level(design: &Design, set: &mut FeatureSet) {
     let untitled = |f| {
         let file = design.file(f);
         file.role == Role::Deck
@@ -433,7 +456,6 @@ pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
         *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
     }
     crate::element::design_features(design, set);
-    crate::analysis::design_features(design, set);
 }
 
 /// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),

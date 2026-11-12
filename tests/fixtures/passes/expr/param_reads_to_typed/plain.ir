@@ -1,0 +1,5 @@
+file "d.sp" deck
+  param gain = 2.5
+  param k = 3i
+  element behav b1 (n 0) expr=(gain * v(n) + k)
+  element resistor r1 (n 0) value=(gain * 1k)

@@ -19,6 +19,7 @@
 //! `pub(crate) fn tree_class_with(&Design, ExprId, &dyn Fn(DefId) -> ExprClass) -> ExprClass`,
 //! `pub(crate) fn class_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
 //! `pub(crate) fn tree_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
+//! `pub(crate) fn formals_read(&Design, DefId) -> Option<Vec<bool>>`,
 //! `pub(crate) fn cycle_defs(&Design) -> Vec<usize>`,
 
 use crate::design::Design;
@@ -108,6 +109,35 @@ pub(crate) fn cycle_defs(design: &Design) -> Vec<usize> {
         .collect()
 }
 
+/// Whether the body of user function `def` reads each of its formals, by position; `None` when
+/// `def` is no function this design defines (then every argument counts).
+pub(crate) fn formals_read(design: &Design, def: DefId) -> Option<Vec<bool>> {
+    let d = design.defs[def.index_checked(design.defs.len())?];
+    if d.kind != DefKind::Func
+        || d.item.kind != ItemKind::Func
+        || d.item.index as usize >= design.funcs.len()
+    {
+        return None;
+    }
+    let f: crate::item::Func = design.row(d.item.index);
+    let mut nodes = Vec::new();
+    tree_nodes(design, f.body, &mut nodes);
+    let reads: Vec<NameId> = nodes
+        .iter()
+        .filter_map(|&e| match design.expr(e) {
+            Expr::Param(r) if r.def == def => Some(r.name),
+            _ => None,
+        })
+        .collect();
+    Some(
+        design
+            .names(f.args)
+            .iter()
+            .map(|n| reads.contains(n))
+            .collect(),
+    )
+}
+
 // ---- private ----
 
 /// [`class_nodes`] (`read_only`: a user call's unread arguments skipped) or [`tree_nodes`]. Its
@@ -140,35 +170,6 @@ fn walk_small(design: &Design, root: ExprId, out: &mut Vec<ExprId>, read_only: b
         // children have lower ids, so the walk ends on any table contents
         stack.extend(kids.iter().copied().filter(|k| *k < e));
     }
-}
-
-/// Whether the body of user function `def` reads each of its formals, by position; `None` when
-/// `def` is no function this design defines (then every argument counts).
-fn formals_read(design: &Design, def: DefId) -> Option<Vec<bool>> {
-    let d = design.defs[def.index_checked(design.defs.len())?];
-    if d.kind != DefKind::Func
-        || d.item.kind != ItemKind::Func
-        || d.item.index as usize >= design.funcs.len()
-    {
-        return None;
-    }
-    let f: crate::item::Func = design.row(d.item.index);
-    let mut nodes = Vec::new();
-    tree_nodes(design, f.body, &mut nodes);
-    let reads: Vec<NameId> = nodes
-        .iter()
-        .filter_map(|&e| match design.expr(e) {
-            Expr::Param(r) if r.def == def => Some(r.name),
-            _ => None,
-        })
-        .collect();
-    Some(
-        design
-            .names(f.args)
-            .iter()
-            .map(|n| reads.contains(n))
-            .collect(),
-    )
 }
 
 /// Each definition's direct class, the definitions it reads (one entry per read), and its

@@ -34,6 +34,7 @@ use crate::id::{NameId, ScopeId};
 use crate::periodic::{Hb, HbTruncate, Pss, PssMode};
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -56,6 +57,10 @@ impl DetailFacts for Hb {
         r.exprs(self.tones);
         r.exprs(self.harmonics);
         r.expr(&mut self.intermod);
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.tones.len > 1, RunExtra::HbMultiTone);
@@ -162,6 +167,10 @@ impl DetailFacts for Pss {
         ] {
             r.expr(e);
         }
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.mode == PssMode::Driven, RunExtra::PssDriven);

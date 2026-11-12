@@ -2,7 +2,7 @@
 file "bins.sp" deck
   title "bins"
   comment " oracle: inpgmod.c INPgetModBin (BSIM3, BSIM4, HiSIM2, HiSIM-HV bin; misc/string.c model_name_match: base.<digits>), run: an instance of nch picks the bin by lmin lmax wmin wmax; run: rr.1 is no bin of rr (unknown parameter (rr)); A15 C4: the group nch is defined too, bound to nch.1"
-  model nch.1 bsim4 polarity=n params=(lmin=0 lmax=2u wmin=0 wmax=2u) bin_of=nch version="4.5"
-  model nch.2 bsim4 polarity=n params=(lmin=2u lmax=10u wmin=0 wmax=2u) bin_of=nch version="4.5"
+  model nch.1 bsim4 polarity=n params=(lmin=0 lmax=2u wmin=0 wmax=2u) bin_of=nch version="4.5.0"
+  model nch.2 bsim4 polarity=n params=(lmin=2u lmax=10u wmin=0 wmax=2u) bin_of=nch version="4.5.0"
   model rr.1 resistor params=(r=5)
   model n9.1 mos9 polarity=n

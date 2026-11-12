@@ -19,7 +19,7 @@ use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
+use crate::feature::{ExprWalk, FeatureSet, item_features, unplaced_level};
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::item::{DefKind, ItemKind};
 use crate::literal;
@@ -97,6 +97,21 @@ pub enum Violation {
     /// (the lead's ruling on A28's finding b: no simulator we know accepts one). `arg`: the call's
     /// expression.
     CallArity,
+    /// A function body whose root is a string or a list (A25 item 4: a body is a number).
+    /// `arg`: the root.
+    StringOrListBody,
+    /// A typed field (a `Handle::Expr` or `Handle::ExprDyn` root, or any root of a
+    /// `Handle::Exprs` vector, of a row other than a `Param`'s value) whose root is a list, or a
+    /// string where the row's `RowFacts::string_roots` does not name it (A25 item 4). A vector
+    /// given whole by one list-valued expression is a form the IR does not state: its reader keeps
+    /// the statement `Private` (with a census count) until a deck of a pair needs it. `arg`: the
+    /// root.
+    StringOrListField,
+    /// A subcircuit instance whose terminal count differs from the port count of the
+    /// definition it is bound to (the lead's R61/A36, `vc-devices`' finding: ngspice and HSPICE
+    /// refuse the deck, VACASK gives missing trailing terminals internal nodes). The circuit
+    /// owner's row check. `arg`: the terminal count.
+    InstancePortCount,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -107,7 +122,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::CallArity as usize + 1] = [
+    pub const ALL: [Violation; Violation::InstancePortCount as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -127,6 +142,9 @@ impl Violation {
         Violation::DefinitionCycle,
         Violation::StaleDefinition,
         Violation::CallArity,
+        Violation::StringOrListBody,
+        Violation::StringOrListField,
+        Violation::InstancePortCount,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -146,6 +164,8 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
+    // the run owner's: a Fourier count's option in force, the node-set mix (A16, A28)
+    crate::state_order::design_check(design, out.diags);
     // the class table reads definitions through their rows, so it runs on a design whose
     // handles hold (A15 K3)
     if out.diags.len() == before {
@@ -178,8 +198,16 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
             diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
         }
     }
+    // the run owner's design-level features name their item (`analysis::feature_items`)
+    let mut placed = Vec::new();
+    crate::analysis::feature_items(design, &mut placed);
+    for (f, item) in placed {
+        if !legal.contains(f) {
+            diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
+        }
+    }
     let mut whole = FeatureSet::EMPTY;
-    design_level(design, &mut whole);
+    unplaced_level(design, &mut whole);
     for f in whole.minus(*legal).iter() {
         diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
@@ -372,15 +400,18 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
     let d = out.design;
     let mut walk = ExprWalk::new(d);
     let mut handles = Vec::new();
+    let mut strings = Vec::new();
     for (item, scope) in d.reachable() {
         if (item.index as usize) >= table_len(d, item.kind) {
             continue; // reported with the scope's list
         }
         handles.clear();
+        strings.clear();
         let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
+            row.string_roots(d, &mut strings);
             row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
@@ -398,6 +429,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         }
         for h in handles.clone() {
             handle(out, item, h, bad, &mut walk);
+            typed_roots(out, item, h, &strings);
         }
     }
 }
@@ -453,6 +485,36 @@ fn handle(out: &mut Out<'_>, item: ItemRef, h: Handle, bad: &[bool], walk: &mut 
             if !in_pool(l.start, l.len, d.branch_pool.len()) {
                 out.report(Violation::HandleRange, item, l.start);
             }
+        }
+    }
+}
+
+/// A25 item 4: a function body, and a typed field's root (a `Param`'s value aside), is neither
+/// a list nor a string, but a string where the row's `RowFacts::string_roots` names it. Out of
+/// range handles are skipped (`handle` reports them).
+fn typed_roots(out: &mut Out<'_>, item: ItemRef, h: Handle, strings: &[ExprId]) {
+    let d = out.design;
+    let roots: &[ExprId] = match &h {
+        Handle::Expr(e) | Handle::ExprDyn(e) => std::slice::from_ref(e),
+        Handle::Exprs(l) if l.start as usize + l.len as usize <= d.expr_pool.len() => d.exprs(*l),
+        _ => return,
+    };
+    if item.kind == ItemKind::Param {
+        return; // a value of any type (`Extra::StringValue`, `ListValue`)
+    }
+    for &e in roots {
+        if e.is_none() || e.index() >= d.expr_count() {
+            continue;
+        }
+        let (string, list) = match d.expr(e) {
+            Expr::Str(_) => (true, false),
+            Expr::List(_) => (false, true),
+            _ => continue,
+        };
+        if item.kind == ItemKind::Func {
+            out.report(Violation::StringOrListBody, item, e.0);
+        } else if list || (string && !strings.contains(&e)) {
+            out.report(Violation::StringOrListField, item, e.0);
         }
     }
 }

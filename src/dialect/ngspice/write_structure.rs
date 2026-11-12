@@ -40,6 +40,10 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     // a head default may read a parameter (A12 K2)
     Feature::Extra(Extra::EnclosingRef),
     Feature::Extra(Extra::FormalNotConstant),
+    // a head default's read of no sibling formal is looked up from each instance's scope (A29,
+    // runs which–which3): unbound; a read bound outside the body (`FormalOuterRead`) ngspice
+    // cannot state (R62, A37)
+    Feature::Extra(Extra::FormalUnboundRead),
     // a `.param` in a `.subckt` body is that body's local, constant or not (A25, R48)
     Feature::Extra(Extra::SubcktConstantParam),
 ])
@@ -227,33 +231,30 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
     w.line(&text);
 }
 
-/// Appends a refusal for any item but a model whose expressions hold a string or a list
-/// (`W1006`): `FEATURES` holds `Expr(Str)` for a model's version string only, and no feature
-/// states where a string stands; and for any such item whose expression holds a node the
-/// evaluator its class picks cannot spell (`W1007`: a draw in a value that reads `temper` or
-/// the circuit, which the B-source parser writes and which has no `unif`). Placements, formals without a default, dynamic `.if`
-/// conditions and line breaks are features or invariants (A15), not refusals.
+/// Appends a refusal for any item but a model whose expression holds a node the evaluator its
+/// class picks cannot spell (`W1007`: a draw in a value that reads `temper` or the circuit,
+/// which the B-source parser writes and which has no `unif`). Placements, formals without a
+/// default, dynamic `.if` conditions, line breaks and string or list values (`StringValue`,
+/// `ListValue`, X0020, X0021: A25 item 4) are features or invariants (A15), not refusals.
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     // ponytail: the roots through the pass door on a copy (the kernel has no read-only twin of
-    // `Editor::map_exprs`); goes when A25 item 4 makes a string's use a feature
+    // `Editor::map_exprs`); a read-only walk when the kernel has one
     let mut copy = design.clone();
     let mut ed = copy.editor();
     for (item, _) in design.reachable() {
         if item.kind == ItemKind::Model {
             continue;
         }
-        let (mut text, mut unspelled) = (false, false);
+        let mut unspelled = false;
         ed.map_exprs(item, &mut |e, _| {
-            if e.is_none() {
+            // a string or list root is `StringValue`/`ListValue` (or X0021): a feature states it
+            if e.is_none() || matches!(design.expr(*e), ir::Expr::Str(_) | ir::Expr::List(_)) {
                 return;
             }
-            text |= expr_write::holds_text(design, *e);
             let eval = expr_write::eval_of(design, *e);
             unspelled |= !expr_write::spells_in(design, *e, eval);
         });
-        if text {
-            diags.push_at(codes::TEXT_VALUE, design, item, 0);
-        } else if unspelled {
+        if unspelled {
             diags.push_at(codes::UNSPELLED_VALUE, design, item, 0);
         }
     }

@@ -72,6 +72,9 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Option(OptionKey::NFreqs),
     Feature::Option(OptionKey::FourGridSize),
     Feature::Run(RunExtra::SeveralAnalyses),
+    // an analysis card and a `.dc` axis carry no name (A35)
+    Feature::Run(RunExtra::AnalysisUnnamed),
+    Feature::Run(RunExtra::DcAxisUnnamed),
     Feature::Run(RunExtra::TranRecordStart),
     Feature::Run(RunExtra::TranMaxStep),
     Feature::Run(RunExtra::TranCapNgspice),
@@ -137,8 +140,14 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::NodeSetHierarchical),
     Feature::Run(RunExtra::IcBeyondNext),
     Feature::Item(ItemKind::Env),
-    Feature::Run(RunExtra::WholeRunMidRun),
-    Feature::Run(RunExtra::StateWholeRun),
+    // every state card holds for the whole run wherever it stands (R24)
+    Feature::Run(RunExtra::OptionWholeRun),
+    Feature::Run(RunExtra::EnvWholeRun),
+    Feature::Run(RunExtra::NodeSetWholeRun),
+    Feature::Run(RunExtra::OptionWholeRunMidRun),
+    Feature::Run(RunExtra::EnvWholeRunMidRun),
+    Feature::Run(RunExtra::NodeSetWholeRunMidRun),
+    Feature::Run(RunExtra::SaveWholeRunMidRun),
     // ngspice reads dot cards and element cards in any order (`inp.c` passes over the deck)
     Feature::Run(RunExtra::RunInterleaved),
     // a run card in a `.subckt` body is the deck's (R26, run sub.cir); a `.ic` there holds each

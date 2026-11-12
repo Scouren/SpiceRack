@@ -28,8 +28,13 @@ use spicerack::passes;
 /// The run passes whose simulator proof (a pair deck naming it in `proves =`) is to come:
 /// compared by name with the decks, both ways.
 const PENDING_PAIRS: &[&str] = &[
-    "whole_run_state_first",
-    "whole_run_to_from_here",
+    "whole_run_option_first",
+    "whole_run_env_first",
+    "whole_run_node_set_first",
+    "whole_run_save_first",
+    "whole_run_option_to_from_here",
+    "whole_run_env_to_from_here",
+    "whole_run_node_set_to_from_here",
     "whole_run_save_to_from_here",
     "run_items_together",
     "tran_cap_ngspice_to_given",
@@ -58,12 +63,26 @@ const SIZE: Size = Size {
 
 #[test]
 fn whole_run_state_first_keeps_the_state_at_every_analysis() {
-    keeps_state("whole_run_state_first", ir::RunExtra::WholeRunMidRun);
+    keeps_state("whole_run_option_first", ir::RunExtra::OptionWholeRunMidRun);
+    keeps_state("whole_run_env_first", ir::RunExtra::EnvWholeRunMidRun);
+    keeps_state(
+        "whole_run_node_set_first",
+        ir::RunExtra::NodeSetWholeRunMidRun,
+    );
+    keeps_state("whole_run_save_first", ir::RunExtra::SaveWholeRunMidRun);
 }
 
 #[test]
 fn whole_run_to_from_here_keeps_the_state_at_every_analysis() {
-    keeps_state("whole_run_to_from_here", ir::RunExtra::StateWholeRun);
+    keeps_state(
+        "whole_run_option_to_from_here",
+        ir::RunExtra::OptionWholeRun,
+    );
+    keeps_state("whole_run_env_to_from_here", ir::RunExtra::EnvWholeRun);
+    keeps_state(
+        "whole_run_node_set_to_from_here",
+        ir::RunExtra::NodeSetWholeRun,
+    );
 }
 
 #[test]
@@ -279,8 +298,13 @@ fn legalize_makes_whole_run_state_positional() {
     assert!(diags.is_empty(), "{:?}", diags.rows());
     let before = state::states(&design);
     let lacks = [
-        ir::RunExtra::WholeRunMidRun,
-        ir::RunExtra::StateWholeRun,
+        ir::RunExtra::OptionWholeRunMidRun,
+        ir::RunExtra::EnvWholeRunMidRun,
+        ir::RunExtra::NodeSetWholeRunMidRun,
+        ir::RunExtra::SaveWholeRunMidRun,
+        ir::RunExtra::OptionWholeRun,
+        ir::RunExtra::EnvWholeRun,
+        ir::RunExtra::NodeSetWholeRun,
         ir::RunExtra::SaveWholeRun,
         ir::RunExtra::RunInterleaved,
     ]

@@ -4,8 +4,8 @@
 //! - P1: `ir::check` is clean after it;
 //! - P2: every item still carrying `removes` (by `ir::check_legal`, per `Diag::item`) has a
 //!   coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
-//!   generated item has none), and every other item has lost it; a feature `check_legal`
-//!   reports at no item (design-level) is noted by any note of the pass;
+//!   generated item has none), and every other item has lost it (`check_legal` reports the run
+//!   owner's design-level features at their items too);
 //! - P3: its output uses nothing outside its input's features plus `requires`;
 //! - P4: running it twice equals running it once (IR text equal);
 //! - P5: on a design without the feature nothing changes (IR text equal).
@@ -45,13 +45,44 @@ const SIZE: Size = Size {
 
 /// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
 /// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "p3",
-    "given_zero_to_as_given",
-    "on its GEN_SETS set, seed 45: the output adds FuncDyn(Log10), BinaryDyn(BitXor), \
-     BinaryDyn(Shr): an expression it moves into a wave field changes class (static to \
-     dynamic) and its requires do not name the Dyn twins; with pass-expr",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "p1",
+        "toreal_to_mul",
+        "seed 53: `until=(to_real(\"two words\"))` becomes `until=\"two words\"`, a string root in a \
+         typed field (X0021, A25 item 4): the tag table counts a string Real, so to_real(x) is \
+         written x; with the expr owner",
+    ),
+    (
+        "p3",
+        "formal_defaults_to_instances",
+        "seed 42: the output adds Func(PowAbs), Func(Min), Func(StepHalf): the dropped default was \
+         the only dynamic caller of a user function (`@g15(…)`), whose body then counts in the \
+         static form (R51, A28: a body's form follows its callers), which its requires do not \
+         name; with the structure owner",
+    ),
+    (
+        "p3",
+        "formal_defaults_to_instances_default",
+        "as formal_defaults_to_instances (seed 42, the same body made static)",
+    ),
+    (
+        "p3",
+        "exp_td2_absolute",
+        "on its GEN_SETS set, seed 5: the output adds BinaryDyn(Ne), BinaryDyn(Lt), \
+         BinaryDyn(BitOr): td2 becomes td1 + td2, a root whose form is the more dynamic of the \
+         two, so the operators of the static one count in their Dyn twins, which its requires \
+         do not name; with the waves owner",
+    ),
+    (
+        "p3",
+        "tran_cap_ngspice_to_given",
+        "seed 70: the output adds BinaryDyn(Le), BinaryDyn(DivTyped): max_step becomes \
+         min(print_step, stop / 50), a root whose form is the more dynamic of the two (print_step \
+         reads $temp), so the operators of the static stop count in their Dyn twins, which its \
+         requires do not name; with the run owner",
+    ),
+];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
@@ -77,6 +108,34 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
                 ir::WaveKind::TrRandom,
             ],
             ir::Feature::Circuit(ir::CircuitExtra::GivenZeroAsGiven),
+        ),
+    ),
+    (
+        "exp_td2_relative",
+        sources_only(
+            &[ir::WaveKind::Exp],
+            ir::Feature::Circuit(ir::CircuitExtra::ExpTd2FromTd1),
+        ),
+    ),
+    (
+        "exp_td2_absolute",
+        sources_only(
+            &[ir::WaveKind::Exp],
+            ir::Feature::Circuit(ir::CircuitExtra::ExpTd2FromZero),
+        ),
+    ),
+    (
+        "sffm_ngspice_to_spice3",
+        sources_only(
+            &[ir::WaveKind::Sffm],
+            ir::Feature::Circuit(ir::CircuitExtra::SffmSpice3),
+        ),
+    ),
+    (
+        "sffm_spice3_to_ngspice",
+        sources_only(
+            &[ir::WaveKind::Sffm],
+            ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
     ),
     (
@@ -340,15 +399,10 @@ fn p2_on(pass: &Pass) -> Result<(), String> {
         let mut diags = ir::Diags::new();
         (pass.run)(&mut design, &mut diags);
         for item in carrying(&design, pass.removes) {
-            // interim, until `check_legal` reports the run owner's design-level features at
-            // their items (ir-run `feature_items`, the kernel's switch): a feature reported at
-            // no item is noted by any note of the pass. Remove with that hash: P2 by item then
-            // covers them.
-            let design_level = item.index == u32::MAX;
             let noted = diags
                 .rows()
                 .iter()
-                .any(|d| (design_level || d.item == item) && pass.notes.contains(&d.code));
+                .any(|d| d.item == item && pass.notes.contains(&d.code));
             if !noted {
                 return Err(format!(
                     "seed {seed}: the item {item:?} keeps it with no note"

@@ -2,7 +2,7 @@
 //! rule per file in this folder.
 //!
 //! Owns the passes over analyses, options, state items, loops and outputs
-//! (`tran_explicit_cap`, `tf_to_dcxf`, `whole_run_state_first`, `hoist_run_items`,
+//! (`tran_explicit_cap`, `tf_to_dcxf`, `whole_run_state_first`'s rows, `hoist_run_items`,
 //! `loop_keep_last_to_alter`, `rshunt_to_gshunt`, … in `rewrite/DIALECT-VACASK.md` §6). It runs
 //! last and may read what every other group produced.
 //!
@@ -32,32 +32,59 @@ pub mod whole_run_state_first;
 
 use super::Pass;
 use crate::ir;
+use crate::ir::RunExtra;
 use tran_ceiling_given as tc;
 use whole_run_state_first as wr;
 
 /// The group's passes, in the order `legalize` tries them.
 pub(super) const PASSES: &[Pass] = &[
-    Pass {
-        name: "whole_run_state_first",
-        removes: ir::Feature::Run(ir::RunExtra::WholeRunMidRun),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::RunInterleaved)),
-        notes: &[wr::STATE_ELSEWHERE],
-        run: wr::whole_run_state_first,
-    },
-    Pass {
-        name: "whole_run_to_from_here",
-        removes: ir::Feature::Run(ir::RunExtra::StateWholeRun),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::StateFromHere)),
-        notes: &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
-        run: wr::whole_run_to_from_here,
-    },
-    Pass {
-        name: "whole_run_save_to_from_here",
-        removes: ir::Feature::Run(ir::RunExtra::SaveWholeRun),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::SaveFromHere)),
-        notes: &[wr::MID_RUN, wr::RESET_RESTORES],
-        run: wr::whole_run_save_to_from_here,
-    },
+    // one row per item kind over one body each (`whole_run_state_first.rs`)
+    first(
+        "whole_run_option_first",
+        RunExtra::OptionWholeRunMidRun,
+        wr::whole_run_option_first,
+    ),
+    first(
+        "whole_run_env_first",
+        RunExtra::EnvWholeRunMidRun,
+        wr::whole_run_env_first,
+    ),
+    first(
+        "whole_run_node_set_first",
+        RunExtra::NodeSetWholeRunMidRun,
+        wr::whole_run_node_set_first,
+    ),
+    first(
+        "whole_run_save_first",
+        RunExtra::SaveWholeRunMidRun,
+        wr::whole_run_save_first,
+    ),
+    to_from_here(
+        "whole_run_option_to_from_here",
+        (RunExtra::OptionWholeRun, RunExtra::OptionFromHere),
+        &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
+        wr::whole_run_option_to_from_here,
+    ),
+    to_from_here(
+        "whole_run_env_to_from_here",
+        (RunExtra::EnvWholeRun, RunExtra::EnvFromHere),
+        &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
+        wr::whole_run_env_to_from_here,
+    ),
+    // a node set is no class a reset restores
+    to_from_here(
+        "whole_run_node_set_to_from_here",
+        (RunExtra::NodeSetWholeRun, RunExtra::NodeSetFromHere),
+        &[wr::MID_RUN, wr::FROM_HERE_SAME],
+        wr::whole_run_node_set_to_from_here,
+    ),
+    // two saves never set one thing: they add up
+    to_from_here(
+        "whole_run_save_to_from_here",
+        (RunExtra::SaveWholeRun, RunExtra::SaveFromHere),
+        &[wr::MID_RUN, wr::RESET_RESTORES],
+        wr::whole_run_save_to_from_here,
+    ),
     Pass {
         name: "tran_cap_ngspice_to_given",
         removes: ir::Feature::Run(ir::RunExtra::TranCapNgspice),
@@ -91,7 +118,7 @@ pub(super) const PASSES: &[Pass] = &[
         removes: ir::Feature::Run(ir::RunExtra::IcBeyondNext),
         requires: ir::FeatureSet::EMPTY
             .with(ir::Feature::Run(ir::RunExtra::IcNextOnly))
-            .with(ir::Feature::Run(ir::RunExtra::StateFromHere))
+            .with(ir::Feature::Run(ir::RunExtra::NodeSetFromHere))
             .with(ir::Feature::Run(ir::RunExtra::NodeSetMidRun)),
         notes: &[ic_next_only::IC_KEPT],
         run: ic_next_only::ic_beyond_next_to_next_only,
@@ -106,21 +133,21 @@ pub(super) const PASSES: &[Pass] = &[
     Pass {
         name: "analysis_name_dropped",
         removes: ir::Feature::Run(ir::RunExtra::AnalysisNamed),
-        requires: ir::FeatureSet::EMPTY,
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed)),
         notes: &[],
         run: names_dropped::analysis_name_dropped,
     },
     Pass {
         name: "dc_axis_name_dropped",
         removes: ir::Feature::Run(ir::RunExtra::DcAxisNamed),
-        requires: ir::FeatureSet::EMPTY,
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::DcAxisUnnamed)),
         notes: &[],
         run: names_dropped::dc_axis_name_dropped,
     },
     Pass {
         name: "loop_name_dropped",
         removes: ir::Feature::Run(ir::RunExtra::LoopNamed),
-        requires: ir::FeatureSet::EMPTY,
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::LoopUnnamed)),
         notes: &[names_dropped::LOOP_NAME_READ],
         run: names_dropped::loop_name_dropped,
     },
@@ -144,7 +171,7 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[loop_end::LOOP_END_KEPT],
         run: loop_end::loop_keep_last_to_restore,
     },
-    // after `whole_run_state_first`: a move may interleave
+    // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
         removes: ir::Feature::Run(ir::RunExtra::RunInterleaved),
@@ -249,6 +276,39 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
 ];
 
 // ---- private ----
+
+/// A `whole_run_*_first` row: it removes the kind's `*WholeRunMidRun` and requires
+/// `RunInterleaved` (a moved item may land after a circuit item).
+const fn first(
+    name: &'static str,
+    removes: RunExtra,
+    run: fn(&mut ir::Design, &mut ir::Diags),
+) -> Pass {
+    Pass {
+        name,
+        removes: ir::Feature::Run(removes),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(RunExtra::RunInterleaved)),
+        notes: &[wr::STATE_ELSEWHERE],
+        run,
+    }
+}
+
+/// A `whole_run_*_to_from_here` row: it removes the kind's `*WholeRun` and requires its
+/// `*FromHere` (`modes`: that pair).
+const fn to_from_here(
+    name: &'static str,
+    modes: (RunExtra, RunExtra),
+    notes: &'static [ir::Code],
+    run: fn(&mut ir::Design, &mut ir::Diags),
+) -> Pass {
+    Pass {
+        name,
+        removes: ir::Feature::Run(modes.0),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(modes.1)),
+        notes,
+        run,
+    }
+}
 
 /// What a ceiling row's expression may add: the given ceiling, its operators and their tags.
 const fn ceiling(ops: &[ir::BinOp], min: bool) -> ir::FeatureSet {

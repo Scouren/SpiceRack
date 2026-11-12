@@ -616,6 +616,10 @@ impl RowFacts for Element {
         crate::circuit_fields::element_map_exprs(design, at.index, f)
     }
 
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        crate::circuit_fields::element_map_names(design, at.index, f)
+    }
+
     fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
         // `map_refs`'s order
         if let Some(kind) = self.kind.master_kind()

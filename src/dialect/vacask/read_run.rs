@@ -87,7 +87,11 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::AnalysisNamed))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisNamed))
 .with(ir::Feature::Run(ir::RunExtra::LoopNamed))
-.with(ir::Feature::Run(ir::RunExtra::StateFromHere))
+// every state item holds from where it stands: `options` (an option row, the temperatures as
+// an `Env`) and an analysis line's `ic=`/`nodeset=` lists (next-only node sets)
+.with(ir::Feature::Run(ir::RunExtra::OptionFromHere))
+.with(ir::Feature::Run(ir::RunExtra::EnvFromHere))
+.with(ir::Feature::Run(ir::RunExtra::NodeSetFromHere))
 .with(ir::Feature::Run(ir::RunExtra::TranSimulatorStep))
 .with(ir::Feature::Run(ir::RunExtra::TranRecordStart))
 .with(ir::Feature::Run(ir::RunExtra::TranMaxStep))

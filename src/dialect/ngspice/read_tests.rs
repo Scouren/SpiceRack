@@ -361,11 +361,12 @@ fn any_bytes_read_returns_and_checks_clean() {
 }
 
 #[test]
-fn what_ngspice_cannot_spell_is_refused_by_a_feature_and_a_string_value_by_admits() {
+fn what_ngspice_cannot_spell_is_refused_by_a_feature() {
     // A15: a head parameter with no default is `FormalWithoutDefault`, an `.if` reading the
     // temperature `IfConditionDynamic`, both outside FEATURES (U0001 at legalize); R28: literals
-    // in a form ngspice has no letter for are respelled, never refused; R21: what no feature
-    // states stays `admits`'s: a string value where numparam reads an expression (W1006).
+    // in a form ngspice has no letter for are respelled, never refused; A25 item 4: a string
+    // `.param` value is `StringValue`, outside FEATURES (numparam has no string values), so no
+    // writer note (W1006 went with it).
     let mut d = ir::Design::new();
     {
         let mut b = d.builder();
@@ -394,11 +395,12 @@ fn what_ngspice_cannot_spell_is_refused_by_a_feature_and_a_string_value_by_admit
     };
     assert!(feature(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)));
     assert!(feature(ir::Feature::Extra(ir::Extra::IfConditionDynamic)));
+    assert!(feature(ir::Feature::Extra(ir::Extra::StringValue)));
     let w: Vec<ir::Code> = codes_of(&diags)
         .into_iter()
         .filter(|c| c.letter == b'W')
         .collect();
-    assert_eq!(w, [codes::TEXT_VALUE]);
+    assert!(w.is_empty(), "{w:?}");
 }
 
 #[test]

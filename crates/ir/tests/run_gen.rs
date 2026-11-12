@@ -229,3 +229,83 @@ fn every_run_feature_is_reached_on_a_second_seed_list() {
         "run features no seed generated: {missing:?}"
     );
 }
+
+#[test]
+fn a_named_only_set_draws_no_unnamed_row_and_names_split_exactly() {
+    // R59/A35: each row sets exactly one of its pair; a set holding only the named member draws
+    // named rows only (VACASK's laws)
+    let drop = [
+        RunExtra::AnalysisUnnamed,
+        RunExtra::DcAxisUnnamed,
+        RunExtra::LoopUnnamed,
+    ];
+    let named_only = drop.iter().fold(run_set(), |s, &x| {
+        s.minus(FeatureSet::EMPTY.with(Feature::Run(x)))
+    });
+    let mut analyses = 0;
+    for seed in 0..200u64 {
+        let d = generate(seed, &named_only, SIZE);
+        let used = features_used(&d);
+        for x in drop {
+            assert!(!used.contains(Feature::Run(x)), "seed {seed}: {x:?}");
+        }
+        let text = text_of(&d);
+        analyses += text.matches("analysis ").count();
+        // every analysis line names itself
+        for line in text
+            .lines()
+            .filter(|l| l.trim_start().starts_with("analysis "))
+        {
+            assert!(line.contains(" name="), "seed {seed}: {line}");
+        }
+    }
+    assert!(analyses > 0, "the named-only set still draws analyses");
+}
+
+#[test]
+fn every_generated_named_row_sets_exactly_one_of_its_pair() {
+    // R59/A35 as a property over generated designs: `check_legal` against the empty set reports
+    // each item's features at it
+    use spicerack_ir::{ItemRef, check_legal};
+    let pair = |named, unnamed| [Feature::Run(named), Feature::Run(unnamed)];
+    let analysis = pair(RunExtra::AnalysisNamed, RunExtra::AnalysisUnnamed);
+    let lp = pair(RunExtra::LoopNamed, RunExtra::LoopUnnamed);
+    let axis = pair(RunExtra::DcAxisNamed, RunExtra::DcAxisUnnamed);
+    let mut seen = 0;
+    for seed in 0..200u64 {
+        let d = generate(seed, &run_set(), SIZE);
+        let mut diags = Diags::new();
+        check_legal(&d, &FeatureSet::EMPTY, &mut diags);
+        let at = |item: ItemRef, of: &[Feature; 2]| {
+            of.iter()
+                .filter(|f| {
+                    diags
+                        .rows()
+                        .iter()
+                        .any(|r| r.item == item && r.arg == f.index() as u32)
+                })
+                .count()
+        };
+        for (item, _) in d.reachable() {
+            match item.kind {
+                ItemKind::Analysis => {
+                    assert_eq!(at(item, &analysis), 1, "seed {seed}, {item:?}");
+                    let row: spicerack_ir::Analysis = d.row(item.index);
+                    if row.kind == AnalysisKind::Dc {
+                        // one per axis: at least one, both only with several axes
+                        let n = at(item, &axis);
+                        let dc: spicerack_ir::dc_ac::Dc = d.detail(row.detail);
+                        assert!(n >= 1 && (n == 1 || dc.axes.len > 1), "seed {seed}");
+                    }
+                    seen += 1;
+                }
+                ItemKind::Loop => {
+                    assert_eq!(at(item, &lp), 1, "seed {seed}, {item:?}");
+                    seen += 1;
+                }
+                _ => {} // else: only analyses, DC axes and loops carry a name pair
+            }
+        }
+    }
+    assert!(seen > 100, "the property ran on {seen} rows");
+}

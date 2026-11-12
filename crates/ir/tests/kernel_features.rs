@@ -1,18 +1,18 @@
 //! Features and diagnostics: `Feature::index`/`from_index` as inverses over every feature, the
-//! bitset's algebra, `features_used` of hand-built designs against hand-listed sets, each kernel
-//! `Extra` beside a legal neighbour that does not set it, `check_legal`'s refusals, and the
-//! kernel's code table.
+//! bitset's algebra, `features_used` of hand-built designs against hand-listed sets,
+//! `check_legal`'s refusals, and the kernel's code table (each kernel `Extra` and its neighbour:
+//! `kernel_extra.rs`).
 //!
 //! Oracles: the inverse (`from_index(index(f)) == f` for every index); spec examples (the expected
-//! feature sets are written out in each test); a legal neighbour per `Extra`.
+//! feature sets are written out in each test).
 //!
 //! Contents: none (tests only).
 
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
     AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
-    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, OpaqueClass, OptionKey,
-    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
+    ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, OpaqueClass, OptionKey, Role,
+    RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -151,189 +151,6 @@ fn features_of_a_hand_built_deck() {
     assert_eq!(
         got.iter().collect::<Vec<_>>(),
         want.iter().collect::<Vec<_>>()
-    );
-}
-
-#[test]
-fn each_kernel_extra_has_a_row_and_a_neighbour() {
-    type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
-    // (extra, a design that sets it, its legal neighbour that does not)
-    let cases: [(Extra, Build, Build); Extra::COUNT] = [
-        (
-            Extra::IncludeSection,
-            |b, top| {
-                b.include(top, "m.lib", Some("tt"), Span::NONE);
-            },
-            |b, top| {
-                b.include(top, "m.lib", None, Span::NONE);
-            },
-        ),
-        (
-            Extra::SectionLibrary,
-            |b, top| {
-                b.section(top, "tt", Some("lib"), Span::NONE);
-            },
-            |b, top| {
-                b.section(top, "tt", None, Span::NONE);
-            },
-        ),
-        (
-            Extra::CaseSensitiveNames,
-            |b, top| {
-                b.global(top, &["vdd", "VDD"], Span::NONE);
-            },
-            |b, top| {
-                b.global(top, &["vdd", "vss"], Span::NONE);
-            },
-        ),
-        (
-            Extra::IntLiteral,
-            |b, top| {
-                let three = spicerack_ir::Literal {
-                    mantissa: 3,
-                    frac: 0,
-                    exp10: 0,
-                    form: spicerack_ir::NumForm::Int,
-                };
-                let v = b.literal(three);
-                b.param(top, "k", v, Span::NONE);
-            },
-            |b, top| {
-                let v = b.num(3.0);
-                b.param(top, "k", v, Span::NONE);
-            },
-        ),
-        (
-            Extra::EnclosingRef,
-            |b, top| {
-                // outer body defines p; the inner subckt's param reads it: an enclosing body
-                let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
-                let one = b.num(1.0);
-                b.param(outer, "p", one, Span::NONE);
-                let (_, inner) = b.subckt(outer, "inner", &[], &[], Span::NONE);
-                let read = b.param_ref("p");
-                let p = b.design().lookup(
-                    outer,
-                    spicerack_ir::DefKind::Param,
-                    b.design().find_name("p"),
-                );
-                b.resolve(read, p);
-                b.param(inner, "q", read, Span::NONE);
-            },
-            |b, top| {
-                // the neighbour reads its own subcircuit's p and the top's t
-                let one = b.num(1.0);
-                b.param(top, "t", one, Span::NONE);
-                let (_, outer) = b.subckt(top, "outer", &[], &[], Span::NONE);
-                let (_, inner) = b.subckt(outer, "inner", &[], &[], Span::NONE);
-                let two = b.num(2.0);
-                b.param(inner, "p", two, Span::NONE);
-                let own = b.param_ref("p");
-                let p = b.design().lookup(
-                    inner,
-                    spicerack_ir::DefKind::Param,
-                    b.design().find_name("p"),
-                );
-                b.resolve(own, p);
-                let at_top = b.param_ref("t");
-                let t =
-                    b.design()
-                        .lookup(top, spicerack_ir::DefKind::Param, b.design().find_name("t"));
-                b.resolve(at_top, t);
-                let sum = b.binary(BinOp::Add, own, at_top);
-                b.param(inner, "q", sum, Span::NONE);
-            },
-        ),
-        (
-            Extra::FormalNotConstant,
-            |b, top| {
-                let one = b.num(1.0);
-                b.param(top, "w0", one, Span::NONE);
-                let read = b.param_ref("w0");
-                b.subckt(top, "s", &[], &[("w", read)], Span::NONE);
-            },
-            |b, top| {
-                let one = b.num(1.0);
-                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
-            },
-        ),
-        (
-            Extra::DeckWithoutTitle,
-            |b, top| {
-                b.comment(top, "no title", Span::NONE);
-            },
-            |b, top| {
-                b.title(top, "", Span::NONE);
-                b.comment(top, "titled", Span::NONE);
-            },
-        ),
-        (
-            Extra::FormalWithoutDefault,
-            |b, top| {
-                b.subckt(top, "s", &[], &[("w", ExprId::NONE)], Span::NONE);
-            },
-            |b, top| {
-                let one = b.num(1.0);
-                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
-            },
-        ),
-        (
-            Extra::IfConditionDynamic,
-            |b, top| {
-                let t = b.temp();
-                let lim = b.num(100.0);
-                let hot = b.binary(BinOp::Gt, t, lim);
-                b.if_(top, &[hot], Span::NONE);
-            },
-            |b, top| {
-                let one = b.num(1.0);
-                let zero = b.literal(spicerack_ir::Literal::ZERO);
-                let yes = b.binary(BinOp::Gt, one, zero);
-                b.if_(top, &[yes], Span::NONE);
-            },
-        ),
-        (
-            Extra::LongLiteral,
-            |b, top| {
-                let v =
-                    b.long_literal("0.12345678901234567890123", 0, spicerack_ir::NumForm::Plain);
-                b.param(top, "p", v, Span::NONE);
-            },
-            |b, top| {
-                let v = b.num(0.123_456_789_012_345_67);
-                b.param(top, "p", v, Span::NONE);
-            },
-        ),
-        (
-            Extra::SubcktConstantParam,
-            |b, top| {
-                let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
-                let one = b.num(1.0);
-                b.param(body, "k", one, Span::NONE);
-            },
-            |b, top| {
-                // a dependent local (it reads the formal) and a constant at the top
-                let one = b.num(1.0);
-                let (_, body) = b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
-                let w = b.param_ref("w");
-                b.param(body, "k", w, Span::NONE);
-                let two = b.num(2.0);
-                b.param(top, "c", two, Span::NONE);
-            },
-        ),
-    ];
-    for (extra, sets, neighbour) in cases {
-        let f = Feature::Extra(extra);
-        assert!(used(sets).contains(f), "{extra:?} is set");
-        assert!(
-            !used(neighbour).contains(f),
-            "{extra:?}'s neighbour does not set it"
-        );
-    }
-    assert_eq!(
-        cases.map(|c| c.0),
-        Extra::ALL,
-        "every kernel Extra has its pair"
     );
 }
 

@@ -35,6 +35,9 @@ struct Frame {
     node: Node,
     kids: Vec<ExprId>,
     need: usize,
+    /// Per operand: whether the tree's class skips it (a bound call's argument whose formal
+    /// the body never reads, `class::class_nodes`).
+    unread: Vec<bool>,
 }
 
 impl Gen {
@@ -67,30 +70,57 @@ impl Gen {
         self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
         self.long_literals = features.contains(Feature::Extra(crate::feature::Extra::LongLiteral));
         let mut need_probe = dynamic;
+        // A25 item 4: a string or a list stands at the root only where the field asks for one
+        let mut at_root = *features;
+        if !self.root_str {
+            at_root = at_root.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::Str)));
+        }
+        if !self.root_list {
+            at_root = at_root.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::List)));
+        }
         let mut stack: Vec<Frame> = Vec::new();
         // depth-first, building each row after its children, left to right: a caller's order
         loop {
             let depth = stack.len();
+            let here = if depth == 0 { &at_root } else { features };
+            // a slot the class skips cannot hold the tree's probe: a dynamic tree whose only
+            // dynamic leaf sits in an unread argument is constant, and its operators' form wrong
+            let unread = stack
+                .iter()
+                .any(|f| f.unread.get(f.kids.len()).copied().unwrap_or(false));
+            let mut no_probe = false;
+            let owes = if unread {
+                &mut no_probe
+            } else {
+                &mut need_probe
+            };
             let node = if depth + 1 >= self.size.expr_depth as usize || self.chance(3) {
                 None
             } else {
-                self.operator(b, features, dynamic)
+                self.operator(b, here, dynamic)
             };
             let mut value = match node {
                 Some((node, need)) if need > 0 => {
+                    let unread = match &node {
+                        Node::User(_, def) => crate::class::formals_read(b.design(), *def)
+                            .map(|read| read.iter().map(|r| !r).collect())
+                            .unwrap_or_default(),
+                        _ => Vec::new(),
+                    };
                     stack.push(Frame {
                         node,
                         kids: Vec::new(),
                         need,
+                        unread,
                     });
                     continue;
                 }
                 // a tree that still owes its probe takes a leaf where an empty node would end it
-                Some((node, _)) if !need_probe => {
+                Some((node, _)) if !*owes => {
                     self.class = self.class.max(self.own_class(&node));
                     build(b, node, Vec::new())
                 }
-                Some(_) | None => self.leaf(b, features, &probes, dynamic, &mut need_probe),
+                Some(_) | None => self.leaf(b, here, &probes, dynamic, owes),
             };
             // hand the value up, building every frame it completes
             loop {
@@ -145,6 +175,12 @@ impl Gen {
             ExprTag::TStop,
             ExprTag::Tnom,
         ];
+        // A33: under `typed_params` a parameter read is the operand of a dynamic `ToReal` or
+        // `ToInt` the set allows (or is not drawn)
+        let typed = [Func::ToReal, Func::ToInt].into_iter().find(|f| {
+            features.contains(Feature::Expr(ExprTag::Call))
+                && features.contains(Feature::FuncDyn(*f))
+        });
         let tag = if std::mem::take(need_probe) {
             probes[self.below(probes.len() as u32) as usize]
         } else {
@@ -152,6 +188,7 @@ impl Gen {
                 .into_iter()
                 .filter(|t| features.contains(Feature::Expr(*t)))
                 .filter(|t| !matches!(t, ExprTag::Param | ExprTag::Tnom) || self.param_reads)
+                .filter(|t| *t != ExprTag::Param || !self.typed_params || typed.is_some())
                 .chain(probes.iter().copied().filter(|_| dynamic))
                 .collect();
             leaves[self.below(leaves.len() as u32) as usize]
@@ -187,7 +224,13 @@ impl Gen {
                 let w = self.word();
                 b.string(w)
             }
-            ExprTag::Param => self.param_read(b),
+            ExprTag::Param => {
+                let read = self.param_read(b);
+                match typed {
+                    Some(f) if self.typed_params => b.call(f, &[read]),
+                    _ => read,
+                }
+            }
             ExprTag::Temp => b.temp(),
             ExprTag::TStep => b.tstep(),
             ExprTag::TStop => b.tstop(),
@@ -197,7 +240,20 @@ impl Gen {
                 b.v(&net, self.chance(2).then_some(reference.as_str()))
             }
             ExprTag::I => {
-                let e = self.fresh();
+                // A32: half the time an item of this scope, when it is an element (one draw,
+                // O(1): a scan per leaf would make the build quadratic in a flat scope)
+                let items = b.design().items(self.scope);
+                let pick = (!items.is_empty() && self.chance(2))
+                    .then(|| items[self.below(items.len() as u32) as usize])
+                    .filter(|i| i.kind == crate::item::ItemKind::Element);
+                let e = match pick {
+                    Some(i) => {
+                        let d = b.design();
+                        d.str(d.row::<crate::element::Element>(i.index).name)
+                            .to_string()
+                    }
+                    None => self.fresh(),
+                };
                 b.i(&e)
             }
             ExprTag::Time => b.time(),
@@ -228,7 +284,7 @@ impl Gen {
     /// fresh name no definition has.
     fn param_read(&mut self, b: &mut Builder<'_>) -> ExprId {
         let def = self.pick_def(b.design(), self.scope, DefKind::Param);
-        let readable = !def.is_none() && self.may_read(def);
+        let readable = !def.is_none() && self.may_read(def) && self.bound_reads;
         match self.below(3) {
             0 if readable => {
                 self.class = self.class.max(self.class_of(def));
@@ -242,9 +298,13 @@ impl Gen {
                 let name = self.formals[k].clone();
                 b.param_ref(&name)
             }
-            _ => {
+            _ if self.unbound_reads => {
                 let name = self.fresh();
                 b.param_ref(&name)
+            }
+            _ => {
+                let l = self.literal();
+                b.literal(l)
             }
         }
     }
@@ -415,5 +475,97 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_typed_parameter_read_is_wrapped_or_not_drawn() {
+        // A33 (oracle: the tree's own rows): under `typed_params` every `Param` row is the
+        // operand of a `ToReal` or `ToInt` call the set allows dynamically (`ToInt` missing:
+        // only `ToReal`), with a floor of reads drawn; with neither allowed, no `Param` row
+        use crate::expr::{Expr, Func};
+        use crate::feature::Feature;
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        let only_real =
+            FeatureSet::ALL.minus(FeatureSet::EMPTY.with(Feature::FuncDyn(Func::ToInt)));
+        let neither = only_real.minus(FeatureSet::EMPTY.with(Feature::FuncDyn(Func::ToReal)));
+        let mut wrapped_reads = 0;
+        for (set, wrapper) in [(only_real, Some(Func::ToReal)), (neither, None)] {
+            for seed in 0..200u64 {
+                let mut d = Design::new();
+                let mut b = d.builder();
+                let (_, top) = b.file("t.sp", Role::Deck);
+                let mut g = Gen::new(seed, &set, size);
+                g.scope = top;
+                g.typed_params = true;
+                for _ in 0..10 {
+                    let e = g.expr(&mut b, &set, Reads::Circuit);
+                    let des = b.design();
+                    let mut nodes = Vec::new();
+                    crate::class::tree_nodes(des, e, &mut nodes);
+                    let mut operands = Vec::new();
+                    for &n in &nodes {
+                        if let Expr::Call(f, _) = des.expr(n)
+                            && Some(f) == wrapper
+                        {
+                            des.children(n, &mut operands);
+                        }
+                    }
+                    for &n in &nodes {
+                        if let Expr::Param(_) = des.expr(n) {
+                            assert!(operands.contains(&n), "seed {seed}: an untyped read");
+                            wrapped_reads += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            wrapped_reads >= 50,
+            "only {wrapped_reads} typed reads drawn"
+        );
+    }
+
+    #[test]
+    fn a_root_is_a_string_or_a_list_only_where_asked() {
+        // A25 item 4 (oracle: the root's row): `Gen::expr` over the full set returns no string
+        // or list root unless `root_str` or `root_list` asks for one, and each flag is reached
+        use crate::expr::Expr;
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        let mut reached = [false; 2];
+        for asked in [false, true] {
+            for seed in 0..200u64 {
+                let mut d = Design::new();
+                let mut b = d.builder();
+                let (_, top) = b.file("t.sp", Role::Deck);
+                let mut g = Gen::new(seed, &FeatureSet::ALL, size);
+                g.scope = top;
+                (g.root_str, g.root_list) = (asked, asked);
+                for _ in 0..10 {
+                    let e = g.expr(&mut b, &FeatureSet::ALL, Reads::Constant);
+                    let k = match b.design().expr(e) {
+                        Expr::Str(_) => 0,
+                        Expr::List(_) => 1,
+                        _ => continue,
+                    };
+                    assert!(asked, "seed {seed}: a root no flag asked for");
+                    reached[k] = true;
+                }
+            }
+        }
+        assert_eq!(
+            reached,
+            [true, true],
+            "string and list roots are drawn when asked"
+        );
     }
 }

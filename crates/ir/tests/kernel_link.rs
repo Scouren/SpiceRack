@@ -7,7 +7,8 @@
 //! Contents: none (tests only).
 
 use spicerack_ir::{
-    BinOp, DefId, DefKind, Design, Diags, Expr, ExprId, Ref, Role, ScopeId, Span, link,
+    BinOp, DefId, DefKind, Design, Diags, Expr, ExprId, Ref, Role, ScopeId, Span, UnboundRead,
+    link, parse, unbound_reads,
 };
 
 // ---- private ----
@@ -187,4 +188,36 @@ fn a_default_never_reads_its_own_formal() {
     assert!(used.contains(spicerack_ir::Feature::Extra(
         spicerack_ir::Extra::FormalNotConstant
     )));
+}
+
+#[test]
+fn the_unbound_reads_are_listed_at_their_items_held_ones_apart() {
+    // A38 (R63; oracle: the reads written by hand): an unbound read in an element's value and
+    // one in a model parameter are listed at their items, in listed order; a formal default's
+    // held read is listed apart; a bound read is not listed
+    let src = concat!(
+        "file \"t.sp\" deck\n",
+        "  param k = 1\n",
+        "  element resistor r1 (a b) value=(zz + k)\n",
+        "  model dmod diode params=(is=yy)\n",
+        "  subckt s (p q) w=ww?\n",
+    );
+    let mut d = Design::new();
+    let mut diags = Diags::new();
+    parse(src, &mut d.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let top = d.file(d.entry()).top;
+    let items = d.items(top);
+    let rows: Vec<(spicerack_ir::ItemRef, &str, bool)> = unbound_reads(&d)
+        .into_iter()
+        .map(|r: UnboundRead| (r.item, d.str(r.name), r.held))
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            (items[1], "zz", false),
+            (items[2], "yy", false),
+            (items[3], "ww", true)
+        ]
+    );
 }

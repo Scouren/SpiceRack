@@ -1,0 +1,5 @@
+file "a.sp" deck
+  analysis op
+  save (v (a))
+  option rel_tol value=1m whole_run
+  analysis op

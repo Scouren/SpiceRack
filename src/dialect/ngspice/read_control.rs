@@ -52,6 +52,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Placed(ScopeKind::Loop, ItemKind::Reset),
     Feature::Run(RunExtra::LoopKeepLast),
     Feature::Run(RunExtra::LoopNamed),
+    // a `foreach` whose variable is the writer's made-up `sr<depth>` (A35)
+    Feature::Run(RunExtra::LoopUnnamed),
     Feature::Run(RunExtra::LoopOverOp),
     Feature::Run(RunExtra::LoopScoped),
     Feature::Run(RunExtra::LoopParam),
@@ -65,7 +67,10 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::AlterElementValue),
     Feature::Run(RunExtra::AlterDeviceParam),
     Feature::Run(RunExtra::AlterModelParam),
-    Feature::Run(RunExtra::StateFromHere),
+    // a script `option`/`set` holds from its place; no script command sets a node's condition
+    // (`commands.c`), so `NodeSetFromHere` is no member
+    Feature::Run(RunExtra::OptionFromHere),
+    Feature::Run(RunExtra::EnvFromHere),
     Feature::Run(RunExtra::OptionMidRun),
     Feature::Run(RunExtra::EnvMidRun),
     Feature::Run(RunExtra::SweepBodyNotOne),

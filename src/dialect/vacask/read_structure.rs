@@ -49,7 +49,10 @@ pub(super) const FEATURES: ir::FeatureSet = families(PLACEMENTS)
     .with(ir::Feature::Item(ir::ItemKind::If))
     .with(ir::Feature::Item(ir::ItemKind::Param))
     .with(ir::Feature::Extra(ir::Extra::IncludeSection))
-    .with(ir::Feature::Extra(ir::Extra::CaseSensitiveNames));
+    .with(ir::Feature::Extra(ir::Extra::CaseSensitiveNames))
+    // a `parameters` value (or a subcircuit's constant one, its formal's default) may be a
+    // string (`check_expr` takes `Tag::Str`); a list there is `Private` (G13, `private_expr`)
+    .with(ir::Feature::Extra(ir::Extra::StringValue));
 
 /// Where VACASK takes each statement (A15 `Placed`: enclosed at any depth by a scope of that kind).
 /// A subcircuit: parameters, instances, models, nested subcircuits, `@if`, `include` (VD

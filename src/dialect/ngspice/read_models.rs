@@ -279,6 +279,17 @@ fn read(lw: &mut Lower<'_, '_>, st: Stmt) -> Result<(), Refusal> {
         }
         Head::Code(_) | Head::Module(_) => None,
     };
+    // the version ngspice runs, in the IR's vocabulary (a silent card's default is in it)
+    let version = match (version, device) {
+        (Some(v), Some(dev)) => {
+            let std = families::standard(family, dev, &v);
+            Some(
+                std.expect("every version ngspice runs is a standard one")
+                    .to_string(),
+            )
+        }
+        (v, _) => v,
+    };
     if family == F::Txl {
         txl(lw, &card)?;
     }

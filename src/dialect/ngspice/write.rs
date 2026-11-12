@@ -117,7 +117,7 @@ pub(super) fn write(
 /// `Write::admits` (R21): a refusal for each reachable item ngspice cannot spell for a reason no
 /// feature states, by the item's area (one exhaustive dispatch, as `write`'s).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    // a string or list anywhere but a model (W1006): one walk over every item
+    // a value its evaluator cannot spell (W1007): one walk over every item
     write_structure::admits(design, diags);
     // each item's place in its scope: `reachable` lists a scope's items in order (O(items))
     let mut at: std::collections::HashMap<ir::ScopeId, usize> = std::collections::HashMap::new();

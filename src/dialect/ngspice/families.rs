@@ -32,7 +32,9 @@
 //! `pub(super) fn device(ir::ModelFamily, Option<&str>) -> Option<&'static str>`,
 //! `pub(super) fn accepts(&str, &str) -> bool`, `pub(super) fn binnable(ir::ModelFamily) -> bool`,
 //! `pub(super) fn code_model(&str) -> bool`, `pub(super) fn device_name(&str) -> bool`,
-//! `pub(super) fn module_word(&str) -> bool`
+//! `pub(super) fn module_word(&str) -> bool`,
+//! `pub(super) fn standard(ir::ModelFamily, &str, &str) -> Option<&'static str>`,
+//! `pub(super) fn spelling(ir::ModelFamily, &str) -> &str`
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -313,7 +315,81 @@ pub(super) fn binnable(family: F) -> bool {
     matches!(family, F::Bsim3 | F::Bsim4 | F::Hisim2 | F::HisimHv)
 }
 
-/// Whether `word` (lowercase) is an XSPICE code model of the pinned build.
+/// The model standard's version (ir-circuit's vocabulary, `circuit_tables::VERSIONS`) that
+/// ngspice runs for a card of `family` on `device` whose version is written `text`, or `None`
+/// when it runs none of them. Each device's own acceptance rule: BSIM3v32 reads `3.2.4`/`3.24`,
+/// `3.2.3`/`3.23`, `3.2.2`/`3.22`, else 3.2 (b3v32set.c:86-92); BSIM4v5 any of 4.0-4.5 by its
+/// prefix (b4v5check.c:64-69); BSIM4 `4.8.1`/`4.81`, `4.8.2`/`4.82`, `4.8.3`/`4.83`, else 4.8.0
+/// (b4set.c:345-347, b4check.c:68-70); BSIM3v0, BSIM3v1, BSIM3 (3.3.0), BSIM4v6 (4.6.5), BSIM4v7
+/// (4.7.0) one each; HiSIM-HV and HiSIM2 reset any version to theirs (hsmhvset.c:76-81,
+/// hsmhv2set.c:136-150, hsm2set.c:132-138); HICUM2, B4SOI, B3SOI and VBIC keep the text and never
+/// read it again (no use outside their `*mpar.c`/`*mask.c`), so any version runs their one.
+/// Pinned by runs: `the_version_spellings_run_the_same_device` in
+/// `tests/dialect_ngspice_models.rs` (both spellings of each family, one operating point).
+pub(super) fn standard(family: F, device: &str, text: &str) -> Option<&'static str> {
+    let pick = |rows: &[(&str, &str, &'static str)], other: Option<&'static str>| {
+        rows.iter()
+            .find(|(exact, prefix, _)| text == *exact || text.starts_with(prefix))
+            .map(|r| r.2)
+            .or(other)
+    };
+    match device {
+        "bsim3v0" => Some("3.0"),
+        "bsim3v1" => Some("3.1"),
+        "bsim3v32" => pick(
+            &[
+                ("3.2.4", "3.24", "3.2.4"),
+                ("3.2.3", "3.23", "3.2.3"),
+                ("3.2.2", "3.22", "3.2.2"),
+            ],
+            Some("3.2"),
+        ),
+        "bsim3" => Some("3.3.0"),
+        "bsim4v5" => ["4.0.0", "4.1.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0"]
+            .into_iter()
+            .find(|v| text.starts_with(&v[..3])),
+        "bsim4v6" => Some("4.6.5"),
+        "bsim4v7" => Some("4.7.0"),
+        "bsim4" => pick(
+            &[
+                ("4.8.1", "4.81", "4.8.1"),
+                ("4.8.2", "4.82", "4.8.2"),
+                ("4.8.3", "4.83", "4.8.3"),
+            ],
+            Some("4.8.0"),
+        ),
+        "hisimhv1" => Some("1.24"),
+        "hisimhv2" => Some("2.20"),
+        // the standard's version the device implements (devhelp: "HiSIM 2.8.0", "B4SOI version
+        // 4.4.0", B3SOI FD/DD 2.1, PD 2.2.3), not the parameter's own default (280, 4.4, 2.0)
+        "hisim2" => Some("2.8.0"),
+        // silently ignored: runs: HICUM2 2.3, B4SOI 4.3, B3SOI-PD 2.2, VBIC vers=1.3 give the
+        // currents of 2.4.0, 4.4, 2.0, 1.2
+        _ => match family {
+            F::Hicum2 => Some("2.4.0"),
+            F::B4Soi => Some("4.4.0"),
+            F::B3SoiFd | F::B3SoiDd => Some("2.1"),
+            F::B3SoiPd => Some("2.2.3"),
+            F::Vbic => Some("1.2"),
+            _ => None,
+        },
+    }
+}
+
+/// The text ngspice's `version` parameter is written with for the standard version `std`: the
+/// standard string itself where it picks the device (BSIM3, BSIM4, HiSIM-HV: it reads back as
+/// itself), else the parameter's own default (HiSIM2 `280`, B4SOI `4.4`, B3SOI `2.0`: the one
+/// version those devices run, `standard` maps it back).
+pub(super) fn spelling(family: F, std: &str) -> &str {
+    if dispatches(family) {
+        return std;
+    }
+    version(family).map_or(std, |(_, default)| default)
+}
+
+/// Whether `word` (lowercase) is an XSPICE code model of the pinned build. Limit: a user
+/// library loaded with ngspice's `codemodel` command is invisible here, so its models read as
+/// modules (no corpus deck uses the command: `rewrite/DIALECT-NGSPICE.md` §3).
 pub(super) fn code_model(word: &str) -> bool {
     CODE_MODELS.split_whitespace().any(|w| w == word)
 }

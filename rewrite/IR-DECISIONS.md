@@ -441,6 +441,11 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `move_item` re-parents the item's body scopes and asserts both scopes are in one file (a scope's `file` is not rewritten).
 - `rename_def` leaves bound references' names to the pass (else `RefTarget`).
 
+
+## Run features per item kind: state modes (ng-run's W1303)
+
+- `StateFromHere`/`StateWholeRun` are now split into `{Option,Env,NodeSet}{FromHere,WholeRun}`, and `WholeRunMidRun` into `{Option,Env,NodeSet,Save}WholeRunMidRun`. A dialect then lists exactly the kinds it spells from a given place: ngspice spells a from-here option and temperature, but not a from-here node condition. Each kind's four mode features are one `option::Modes` constant (`OPTION_MODES`, `ENV_MODES`, `NODE_SET_MODES`, `SAVE_MODES`), read by the row features, the listed-order walk and `state_gen::gen_holds`.
+
 ## A32 applied (the element-name door)
 
 - `map_element_uses` takes the item's listing scope (`(scope, item, f)`, changed from the first proposal before any body): finding it per item would scan every list.
@@ -452,4 +457,16 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `class::class_nodes` is the one walk that decides which rows a tree's class reads; `tree_class`, `tree_class_with` (the generator's table), the definition graph, the feature count, the forms and `check`'s last pass go through it. `formals_read` decides, per call, which arguments' formals the body reads (a walk of the body per call node; no cache: bodies are small and the classes are cached above it). `node_class` is gone (no caller left).
 - The generator no longer tracks a class node by node: it computes the finished tree's class with `tree_class_with` over its own definition table, which is exact by construction and O(tree).
 - The inlining property no longer excludes inlinings that drop a dynamic argument.
+
+## Round 7b: check's scaling, the A33 hook, strings and lists
+
+- The scaling gate failed at cdc69867. Check went from 0.115 s to 1.201 s at 4x items, a ratio of 10.49 against the bound of 8. The cause was `class::formals_read`: it built an `ExprWalk`, a table sized by the design, once per user call node. `element_uses`' `current_reads` built one per item. Both now walk with `class::tree_nodes`, whose seen set grows with the tree only. The rule: a walk that a row or a node may call builds no table sized by the design.
+- `Gen::typed_params` is a flag on the existing leaf, not a new draw. The read keeps its class, and the wrapper adds none.
+- Strings and lists by type are root tests, by the ruling's words ("a string as the value"). A ternary of two strings is not a `StringValue`. The typed-field invariant also covers `Handle::Exprs` roots. Both owners stated their vector fields are lists of scalar roots, so a list root there is as wrong as in an `Expr` field.
+- Exceptions are a row method (`RowFacts::string_roots`), not a kernel table of field names. The kernel does not know an owner's fields, and a row's exception holds wherever it is checked. `Param`'s value is the kernel's own exemption, by kind.
+
+## R62/A37: a default's two rules, and a probe in an unread argument
+
+- "Outside its subcircuit" is a definition whose scope is not the subcircuit's body: a formal, or a local of the body, is inside. A sibling by name is an unbound read whose name is one of the head's formals.
+- The two new members shifted `random_subsets_restrict_the_generator`'s coin flips and exposed a generator bug that predates them. A dynamic tree's one probe could land in a bound call's argument whose formal the body never reads. Since the ruling on a call's class, that argument adds nothing, so the tree was Constant while its operators had been drawn in the dynamic form (subset 2, seed 12: `@g43($temp != …) << ""` used `Binary(Shl)` outside its set). The fix: a frame records which operands the class skips (`class::formals_read`), and a leaf drawn under one never pays the tree's probe.
 

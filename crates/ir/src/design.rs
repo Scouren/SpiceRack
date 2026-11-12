@@ -300,7 +300,6 @@ impl Design {
 
     /// Every file, in id order.
     pub fn files(&self) -> impl Iterator<Item = FileId> + use<> {
-        // A real body: `todo!()` does not satisfy an `impl Iterator` return.
         (0..self.files.len() as u16).map(FileId)
     }
 

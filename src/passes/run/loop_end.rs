@@ -21,7 +21,6 @@
 //! `pub fn loop_keep_last_to_restore(&mut ir::Design, &mut ir::Diags)`,
 //! `pub const LOOP_END_KEPT: ir::Code`
 
-use super::whole_run_state_first::walks;
 use crate::ir;
 use ir::plan::{Loop, LoopEnd, LoopKind, SweepLoop, TableLoop, Target, TargetKind};
 
@@ -45,7 +44,7 @@ pub fn loop_keep_last_to_restore(design: &mut ir::Design, diags: &mut ir::Diags)
 
 fn convert(design: &mut ir::Design, diags: &mut ir::Diags, from: LoopEnd) {
     let mut work: Vec<(ir::ItemRef, ir::ScopeId, Vec<Set>)> = Vec::new();
-    for (top, order) in walks(design) {
+    for (top, order) in ir::run_walks(design) {
         for (k, &(item, scope)) in order.iter().enumerate() {
             if item.kind != ir::ItemKind::Loop || design.row::<Loop>(item.index).after != from {
                 continue;

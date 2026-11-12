@@ -1,0 +1,15 @@
+which3: a default naming a parameter only the instance's enclosing subckt has
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt inner(a)
+  parameters r=u
+  r1 (a 0) res r=r
+ends
+subckt wrap(a)
+  parameters u=8k
+  x1 (a) inner
+ends
+x0 (n) wrap
+control
+  print instance("x0:x1:r1")
+endc

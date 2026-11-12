@@ -400,6 +400,11 @@ impl RowFacts for Model {
         crate::circuit_fields::model_map_exprs(design, at.index, f)
     }
 
+    fn string_roots(&self, _design: &Design, out: &mut Vec<ExprId>) {
+        // a family version is a number or a string ("4.8.3"; INV-semantics 7.04, A25 item 4)
+        out.push(self.version);
+    }
+
     fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
         // `map_refs`'s order
         if self.ako.name != NameId::NONE {

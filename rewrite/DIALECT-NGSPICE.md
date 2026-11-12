@@ -77,6 +77,7 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 | `m` on an X line | the multiplicity unless the subcircuit declares `m`; it overrides an inner `m` (6.01) | `mult` on the instance, the effective `mult` on inner elements |
 | R/C/L whose value reads the circuit | ngspice runs it as a B source: keeps `tc1`, `tc2`, `m`, drops `dtemp` and thermal noise (6.14) | the kind and flags that state exactly that |
 | model levels | ngspice's own table; above 99 it silently runs level 1 (7.01, 7.02) | `ModelFamily` by (type word, level); a level ngspice would not run as written is `InvalidInSource` |
+| a model's type word beyond the SPICE words | `INPtypelook` (`inptyplk.c`, `inpdomod.c` default branch) looks it up among the built-in devices, then the build's code models, then OSDI modules a `pre_osdi` loaded; an unknown word is "Unknown model type - ignored" (run `.model dd foo`). Limit: a user code-model library loaded with the `codemodel` command is invisible to the reader, so its models read as `Module`; corpus count (spice-bench 21,331 files, the ngspice-45 tarball's examples and tests, the PDKs): 0 decks, the one `codemodel` line is `tests/xspice/digital/spinit.in`, an init template loading the build's own `digital.cm` | `CodeModel` when the word is one of the pinned build's code models (`devhelp`), else `Module`; a built-in device name `Unread`; the writer refuses a word that would read back as another kind (W1206) |
 | SOI3 `M` card (`nsoi`/`psoi` level 60) | six terminals d, fg, s, bg, bulk, thermal (`soi3.c:30`); the node count is `get_number_terminals`'s (items before the first `k=v`/`off` from the fifth), so all six are read. With four or five nodes the pinned build aborts in `spbuild.c:267` (`spGetElement` assertion, exit 134; run) instead of an error | the card as written: the node count needs the model's family, known only at bind time (fixture `elements/mosfet_soi3`) |
 | analyses in one deck | run by type rank (AC, DC, OP, TRAN, PZ, TF, DISTO, NOISE, SENS, PSS, SP), reverse card order only inside one type: the order of the results (corrected: `cktdojob.c:208-216` loops `analInfo` in `analysis.c:36-58` order over `task->jobs`, which `cktnewan.c:34` prepends; runs: `.tran .ac .dc .op` gives AC, DC, OP, Tran; two `.ac`, the later first; INV 8.04's "reverse card order" is wrong) | run items in card order (R25); the result order is a run fact (S12) |
 | state cards | `.options`, `.temp`, `.ic`, `.nodeset` hold for the whole deck wherever they stand; a repeated key or node, the last wins; `.temp` beats `.options temp=` in either order (runs late.cir, icdup.cir, optdup2.cir, temp1/2/5.cir; `inp.c:1159-1186`) | `applies: WholeRun` (R24); the losing `.options temp=` is `Inert` |
@@ -135,7 +136,7 @@ invalid on every simulator (an IR invariant candidate), **F** valid elsewhere bu
 
 | Code | Refused | Class | Candidate, or why it stays | Owner |
 |---|---|---|---|---|
-| W1006 | a string or list in any expression but a model's | F | the kernel's string/list contexts (A25 item 4: ngspice takes a string as `.param` value, formal default, instance actual) | ir-kernel (in its queue) |
+| W1006 | a string or list in any expression but a model's | F | gone (round 9): `Extra::StringValue`, `ListValue` (a `.param` value, a formal default) are features `FEATURES` lacks, a `.if` condition or `.func` body is X0021, X0020 (A25 item 4) | ir-kernel |
 | W1007 | an expression its evaluator cannot spell: a draw in a value that reads the temperature or the circuit | N | R52's approximation; stays until a deck needs the three-form split (`DistDyn`) | spine dialect |
 | W1100 | an element ngspice has no card for though its features are in `FEATURES` | N | the card forms (manual §3) | ng-elements |
 | W1150 | a source ngspice's positional card cannot spell | N | the V/I card's fixed order | ng-sources |
@@ -146,7 +147,7 @@ invalid on every simulator (an IR invariant candidate), **F** valid elsewhere bu
 | W1300 | a `.four` count other than ngspice's default (only `nfreqs` sets it) | F | a feature (count by option), with ir-run's per-kind state split | ir-run |
 | W1301 | an analysis field with no position on ngspice's card | F | a feature per field form | ir-run |
 | W1302 | a dot-card value that reads the temperature | N | numparam evaluates a dot card once, before the run | ng-run |
-| W1303 | a node set that holds from its place on | F | a feature (`NodeSetFromHere`, ir-run 7f9aed10's split); ngspice has no script command for it | ir-run |
+| W1303 | a node set that holds from its place on | F | gone (round 9): `NodeSetFromHere` (ir-run 7f9aed10's split), which `FEATURES` lacks; ngspice has no script command for it | ir-run |
 | W1350 | an output ngspice has no card or command for | N | the output grammar | ng-outputs |
 | W1401 | a parameter alter whose `reset` would drop another alter or a from-here state | N | ngspice's `alterparam` applies only through `reset` | ng-control |
 | W1402 | a loop that is no sweep over a list of numbers | N | `foreach` reads words | ng-control |

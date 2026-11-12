@@ -207,7 +207,8 @@ fn pending(sub: &str) -> Vec<&'static str> {
 fn a_node_set_that_holds_from_its_place_on_is_refused() {
     // Oracle: ngspice-45 commands.c (the script commands: no `ic` or `nodeset`; a node's
     // condition is the `.ic`/`.nodeset` card, which holds for the whole run, R24). The law L5's
-    // seed 0 wrote one as a card, which read back whole-run.
+    // seed 0 wrote one as a card, which read back whole-run. Since the per-kind split it is
+    // `NodeSetFromHere`, which ngspice's FEATURES lack: refused by the feature (U0001), not W1303.
     for item in [
         "nodeset nodeset every_op value=1",
         "nodeset ic transient node=(b) value=0.5",
@@ -218,8 +219,32 @@ fn a_node_set_that_holds_from_its_place_on_is_refused() {
         );
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
+        let from_here = u32::from(ir::Feature::Run(ir::RunExtra::NodeSetFromHere).index());
+        let rows: Vec<(String, u32)> = diags
+            .rows()
+            .iter()
+            .map(|r| (r.code.to_string(), r.arg))
+            .collect();
+        assert_eq!(rows, [("U0001".to_string(), from_here)], "{item}");
+    }
+}
+
+#[test]
+fn a_script_option_whose_value_is_no_number_is_refused() {
+    // Oracle: ng-control's run settle/option_brace.sp (ng-control 5a5949dd): a script `option
+    // temp={q}` is "bad type given" and runs 27, `option temp={10+40}` runs 10; a script option's
+    // value is the frontend's number, never a numparam expression. L5 seed 10 wrote one.
+    for item in [
+        "env tnom=(1 + 2)",
+        "env temp=t",
+        "option rel_tol value=(1e-3 * 2)",
+    ] {
+        let text = format!("file \"f.sp\" deck\n  title \"f\"\n  param t = 50\n  {item}\n");
+        let mut design = parse_ir("from_here_value", &text);
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
         let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
-        assert_eq!(codes, ["W1303"], "{item}");
+        assert_eq!(codes, ["W1304"], "{item}");
     }
 }
 

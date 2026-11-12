@@ -17,8 +17,10 @@ use crate::design::Design;
 use crate::element::{DetailKind, ElemKind};
 use crate::model::{Model, ModelFamily};
 
-/// The generator's version vocabulary: per family, the model standard's versions a simulator is
-/// known to accept, so a generated design names a device that exists. Data, not a `check` rule
+/// The generator's version vocabulary: per family, the model standard's versions (what another
+/// simulator must match, not a simulator's version parameter: HiSIM2 2.8.0 where ngspice's
+/// parameter is 280, B3SOI-FD/DD 2.1 and -PD 2.2.3 and B4SOI 4.4.0 by ngspice's device
+/// descriptions where its parameter's default is 2.0 or 4.4) a simulator is known to accept, so a generated design names a device that exists. Data, not a `check` rule
 /// (a version outside it is legal IR; a dialect's `admits` decides what it runs). A versioned
 /// family without a row draws a fresh string. Provenance: ngspice-45 (tarball sha256
 /// f1aad8ab…, `src/spicelib/`), as `ng-models` read it: parser/inpdomod.c (dispatch by level
@@ -26,9 +28,12 @@ use crate::model::{Model, ModelFamily};
 /// bsim4v6/b4v6check.c:815, bsim4v7/b4v7check.c:834, bsim4/b4check.c:68-70,
 /// hisimhv1/hsmhvset.c:76-81, hisimhv2/hsmhv2set.c:136-150, hisim2/hsm2set.c:132-138,
 /// hicum2/hicum2setup.c:45, bsimsoi/b4soiset.c:124, b3soi{fd,dd,pd}set.c:69,
-/// vbic/vbicsetup.c:360.
+/// vbic/vbicsetup.c:360. VACASK 36be560, as `vc-devices` read it (module file names and the VD
+/// dev-spice and dev-vacask tables; no run of each module's default yet): PSP 103.4
+/// (psp103v4.osdi), BSIM-BULK 106 (bsimbulk106.osdi), VBIC 1.3 (vbic13*), BSIM4 4.8.0–4.8.3 and
+/// BSIM3 3.3.0 (already listed).
 #[cfg(any(test, feature = "gen"))]
-pub(crate) const VERSIONS: [(ModelFamily, &[&str]); 10] = [
+pub(crate) const VERSIONS: [(ModelFamily, &[&str]); 12] = [
     (
         ModelFamily::Bsim3,
         &["3.0", "3.1", "3.2", "3.2.2", "3.2.3", "3.2.4", "3.3.0"],
@@ -41,13 +46,15 @@ pub(crate) const VERSIONS: [(ModelFamily, &[&str]); 10] = [
         ],
     ),
     (ModelFamily::HisimHv, &["1.24", "2.20"]),
-    (ModelFamily::Hisim2, &["280"]),
+    (ModelFamily::Hisim2, &["2.8.0"]),
     (ModelFamily::Hicum2, &["2.4.0"]),
-    (ModelFamily::B4Soi, &["4.4"]),
-    (ModelFamily::B3SoiFd, &["2.0"]),
-    (ModelFamily::B3SoiDd, &["2.0"]),
-    (ModelFamily::B3SoiPd, &["2.0"]),
-    (ModelFamily::Vbic, &["1.2"]),
+    (ModelFamily::B4Soi, &["4.4.0"]),
+    (ModelFamily::B3SoiFd, &["2.1"]),
+    (ModelFamily::B3SoiDd, &["2.1"]),
+    (ModelFamily::B3SoiPd, &["2.2.3"]),
+    (ModelFamily::Vbic, &["1.2", "1.3"]),
+    (ModelFamily::Psp103, &["103.4"]),
+    (ModelFamily::BsimBulk, &["106"]),
 ];
 
 /// Whether a family's models are n- or p-type (transistors); `Other` may be either way.

@@ -1,0 +1,4 @@
+file "d.sp" deck
+  subckt s (a) w=3i
+    element behav b1 (a 0) expr=(w * v(a))
+  element instance x1 (n) model=s params=(w=2.5)

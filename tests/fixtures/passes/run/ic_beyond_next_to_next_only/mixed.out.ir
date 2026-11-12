@@ -1,5 +1,5 @@
 file "a.sp" deck
   nodeset ic every_op node=(a) value=1 whole_run
   analysis op
-  nodeset ic every_op next_only node=(a) value=2
+  nodeset ic every_op node=(a) value=2
   analysis op
