@@ -103,7 +103,7 @@ Decisions:
   `Noise(…)`, `All`, `AllV`, `AllI`, `Expr(ExprId)`; `part: None | Re | Im | Mag | PhaseDeg | Db`.
   Paths are name lists (no separator character in the IR). The sign convention of a current probe
   is pinned in its doc (positive into the first terminal).
-- `Save { probes }`, `Print { analysis: AnalysisKind or none, probes }`.
+- `Save { analyses: AnalysisKinds, probes }` (every kind, one, or a set: A22), `Print { analysis: AnalysisKind, view, probes }`.
 - Known gap (R29): what a deck saves when it names nothing. Today the IR is silent and the
   target's default applies; whether a reader writes out its simulator's default set is decided
   with the run side (S12).

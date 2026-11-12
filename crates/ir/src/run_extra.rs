@@ -285,11 +285,32 @@ pub enum RunExtra {
     StateFromHere,
     /// A state item that holds `WholeRun`, wherever it stands.
     StateWholeRun,
+    /// A DC axis with a name (`DcAxis::name`; VACASK's `sweep <name>` names the swept vector
+    /// in the results; A22).
+    DcAxisNamed,
+    /// A loop with a statement name (`Loop::name`: VACASK `sweep <name>`, Spectre `sw1 sweep`;
+    /// SPICE `.step` has none; A22).
+    LoopNamed,
+    /// A sweep loop whose body, comments aside, is not exactly one analysis or one sweep loop
+    /// (VACASK binds one analysis to each sweep; A22).
+    SweepBodyNotOne,
+    /// An item of a file's top scope that is no run item, comment or opaque, listed between two
+    /// run items there (VACASK has one `control` block per file; A22). A run item here is any
+    /// run owner's statement kind: analysis, loop, alter, option, env, node set, save, print,
+    /// measure, elaborate.
+    RunInterleaved,
+    /// An initial condition or node set that holds beyond the next analysis (`next_only`
+    /// false; VACASK's are an analysis's own list; A22). `IcNextOnly`'s twin.
+    IcBeyondNext,
+    /// A save for two or more analysis kinds but not every one (VACASK's `save` limits the
+    /// operating point, its sweeps and the transient, not AC; A22). One kind is
+    /// `SavePerAnalysis`; every kind neither.
+    SaveAnalysisSet,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 131] = [
+    pub const ALL: [RunExtra; 137] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -421,6 +442,12 @@ impl RunExtra {
         RunExtra::FourHarmonicsOption,
         RunExtra::StateFromHere,
         RunExtra::StateWholeRun,
+        RunExtra::DcAxisNamed,
+        RunExtra::LoopNamed,
+        RunExtra::SweepBodyNotOne,
+        RunExtra::RunInterleaved,
+        RunExtra::IcBeyondNext,
+        RunExtra::SaveAnalysisSet,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

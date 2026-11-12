@@ -104,7 +104,7 @@ fn sweep(
 fn dc_and_small_signal_analyses() {
     let text = "file \"t.sp\" deck
   analysis op name=op1
-  analysis dc (source_dc v1) (lin start=0 stop=5 step=1) (temp) (list values=[0, 27]) restart
+  analysis dc (source_dc v1) (lin start=0 stop=5 step=1) (temp) (list values=[0, 27]) name=s2 restart
   analysis ac (dec on_stop start=1 stop=1g points=10)
   analysis noise (vdiff (out) (ref)) source=v1 (oct start=1k stop=1meg points=3) points_per_summary=5 source_ac
   analysis tf (i (v2)) source=v1
@@ -123,14 +123,17 @@ fn dc_and_small_signal_analyses() {
         let s1 = sweep(b, SweepSpec::lin_step, ["0", "5", "1"]);
         let vals = [n(b, "0"), n(b, "27")];
         let s2 = SweepSpec::list(b.exprs(&vals));
+        let name = b.name("s2");
         let axes = b.dc_axes(&[
             DcAxis {
                 target: v1,
                 sweep: s1,
+                name: NameId::NONE,
             },
             DcAxis {
                 target: Target::TEMP,
                 sweep: s2,
+                name,
             },
         ]);
         b.analysis(

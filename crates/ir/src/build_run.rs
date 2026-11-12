@@ -18,6 +18,7 @@
 //! use spicerack_ir::measure::MeasureTrigTarg;
 //! use spicerack_ir::plan::SweepLoop;
 //! use spicerack_ir::tran::{StepCap, Tran};
+//! use spicerack_ir::{AnalysisKinds, NameId};
 //! use spicerack_ir::{
 //!     AnalysisKind, Design, Edge, Event, ExprId, ItemKind, List, LoopEnd, Role, Span, SweepSpec,
 //!     TargetKind,
@@ -38,7 +39,7 @@
 //!
 //! let v1 = b.target(TargetKind::SourceDc, &[], "V1", None);
 //! let sweep = SweepSpec::lin_step(b.num(0.0), b.num(5.0), b.num(0.1));
-//! let axes = b.dc_axes(&[DcAxis { target: v1, sweep }]);
+//! let axes = b.dc_axes(&[DcAxis { target: v1, sweep, name: NameId::NONE }]);
 //! b.analysis(body, None, Dc { axes, restart: false }, span);
 //!
 //! let tran = Tran {
@@ -50,7 +51,7 @@
 //! b.analysis(body, None, tran, span);
 //!
 //! let (out, i1) = (b.probe_v(&["out"]), b.probe_i(&["v1"]));
-//! b.save(top, None, &[out, i1], span);
+//! b.save(top, AnalysisKinds::ALL, &[out, i1], span);
 //!
 //! let (half, one) = (b.num(0.5), b.num(1.0));
 //! let vin = b.probe_v(&["in"]);
@@ -78,7 +79,7 @@
 //!   `Builder::node_set`, `Builder::save`, `Builder::print`, `Builder::measure`,
 //!   `Builder::statistics`, `Builder::elaborate`
 
-use crate::analysis::{Analysis, AnalysisKind, RunDetail};
+use crate::analysis::{Analysis, AnalysisKind, AnalysisKinds, RunDetail};
 use crate::build::Builder;
 use crate::dc_ac::{DcAxis, DcAxisList};
 use crate::design::ItemRow;
@@ -418,27 +419,19 @@ impl Builder<'_> {
         self.push(scope, row, span)
     }
 
-    /// A member of the save set, for one analysis kind or (`None`) every analysis. Asserts at
-    /// least one probe.
+    /// A member of the save set, kept by the analyses in `analyses` (`AnalysisKinds::ALL`: every
+    /// analysis). Asserts at least one probe and at least one analysis kind.
     pub fn save(
         &mut self,
         scope: ScopeId,
-        analysis: Option<AnalysisKind>,
+        analyses: AnalysisKinds,
         probes: &[Probe],
         span: Span,
     ) -> ItemRef {
         assert!(!probes.is_empty(), "a save of no probe");
+        assert!(!analyses.is_empty(), "a save for no analysis");
         let probes = self.probes(probes);
-        let (analysis, every_analysis) = analysis.map_or((AnalysisKind::Op, true), |k| (k, false));
-        self.push(
-            scope,
-            Save {
-                analysis,
-                every_analysis,
-                probes,
-            },
-            span,
-        )
+        self.push(scope, Save { analyses, probes }, span)
     }
 
     /// A printed table of `analysis`'s results. Asserts at least one probe.

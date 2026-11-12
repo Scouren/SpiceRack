@@ -40,6 +40,7 @@ use crate::probe::gen_probe;
 use crate::probe::{
     ProbeList, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -155,6 +156,22 @@ impl DetailFacts for Tran {
             out.push(Handle::Expr(e));
         }
         out.push(Handle::Exprs(self.segments));
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        for e in [
+            &mut self.stop,
+            &mut self.record_start,
+            &mut self.print_step,
+            &mut self.max_step,
+            &mut self.initial_step,
+            &mut self.noise_fmax,
+            &mut self.noise_fmin,
+            &mut self.noise_seed,
+        ] {
+            r.expr(e);
+        }
+        r.exprs(self.segments);
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
@@ -300,6 +317,18 @@ impl DetailFacts for Four {
         for p in get(&design.run.probes, self.outputs).unwrap_or(&[]) {
             probe_handles(p, out);
         }
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        for e in [
+            &mut self.fundamental,
+            &mut self.harmonics,
+            &mut self.periods,
+            &mut self.grid,
+        ] {
+            r.expr(e);
+        }
+        r.probes(self.outputs);
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {

@@ -109,7 +109,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - R16. Where a `.ic` holds differs (ngspice: the transient's OP only; Xyce: every OP, 8.21) and VACASK's `ic=` belongs to one analysis → `NodeSet { applies: IcScope, next_only: bool, reference: NameList }`; an empty `node` on a `Nodeset` is every node (ngspice `.nodeset all=`).
 - R17. HSPICE `.noise` takes the deck's AC frequencies; Xyce refers input noise to the source's AC magnitude → `Noise::ac_sweep: bool`, `Noise::input_ref: NoiseRef::{Unit, SourceAc}`.
 - R18. A Spectre statistics `correlate param=[a b c]` → its pairs (`Correlation { a, b, cc }`), which write back as pairs (the law holds on the IR). `Vary::mean` (`NONE` = the parameter's value) is added for table forms that state a centre (Xyce `means=`).
-- R19. "Analysis kind or none" fields (IR-RUN §6) → `Save { analysis, every_analysis: bool }`; `Print` always names its kind (`.print` requires one).
+- R19. "Analysis kind or none" fields (IR-RUN §6) → `Save { analysis, every_analysis: bool }` (A22: `Save { analyses: AnalysisKinds }`); `Print` always names its kind (`.print` requires one).
 - R20. Item count of `Extra` → the run owner adds 119 members; with the kernel's 8 the `u8` repr leaves the circuit owner 129. If the two owners' regions together pass 256, `Extra` needs `#[repr(u16)]` (kernel).
 - R21. A device's initial state stated outside the device (VACASK's transient `ic` entry, Xyce `.INITCOND`; circuit cross-request D6) → `NodeSetKind::Device`, `node` the element path; an instance's own `IC=` stays the circuit owner's field. The HB drive of a source (5.20) and Spectre `xfmag` stay on the source side (gaps G-HBDRIVE, G-XFMAG, for the circuit owner's ruling); `Hb` and `Xf` refer to no source field.
 
@@ -317,6 +317,17 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The drift property runs 300 seeds of `FeatureSet::ALL` and asserts the kinds that hold references (Element, Model, Analysis, Loop, Alter, Statistics, Elaborate) were each seen with one, so it cannot pass vacuously.
 - `probe_classes` (A15 K3) walks with one stamped `ExprWalk` rather than `tree_class`'s per-call set; `tree_class` stays for the row facts that call it once per row.
 
+
+## Amendment A22, run owner (R43)
+
+- `DcAxis::name` is appended (`DcAxis` 52 → 56 bytes) and written `name=` after the axis's sweep. `Loop::name` already existed. Each name has a feature, `DcAxisNamed` and `LoopNamed` (any loop kind), set per row, and names are generated only with them. Before this, loops were named with no feature.
+- `Save { analysis, every_analysis }` becomes `Save { analyses: AnalysisKinds }`, a `u32` bitset with one bit per `AnalysisKind` (24 ≤ 32, asserted). Every analysis is `AnalysisKinds::ALL`; empty is a `FieldDomain` fault, and `Builder::save` asserts against it. The text is `analysis=<kind>` for one kind and `analysis=(<kind> …)` for several, in declaration order; it is omitted for every kind. One kind is `SavePerAnalysis`, a set with two or more kinds short of all is `SaveAnalysisSet`, and every kind sets neither.
+- `SweepBodyNotOne`: a `LoopKind::Sweep` whose body, comments aside, is not exactly one analysis or one sweep loop. An empty body counts, and so does an opaque. The generator opens a sweep loop only with this feature, because the kernel fills the body (0–3 items) and the row cannot bound it.
+- `RunInterleaved` (owned here, not by the kernel: it is an order fact about run kinds, and `Placed` states only enclosure): a file top lists an item that is no run item, comment or opaque between two run items. A run item here is any kind of the run section of `ItemKind`. `state_order::interleaved_features` makes one pass over the file tops. Without the feature, every run row's generator first asks `state_order::run_append_ok`, which reads back at most 32 items and refuses when that does not decide, so generation stays O(1) per row (10⁶ items: build 3.8 s, linear with 10⁵).
+- `IcBeyondNext` is `IcNextOnly`'s twin (`next_only` false), so each member of the field has its feature. A node set is generated only when one of the two is in the set.
+- Docs: `OptionKey::TrTol` is not VACASK's `tran_lteratio` (a hint, R19). `MethodGear` is variable order up to `MaxOrd`, not VACASK's fixed-order `gear2`/`bdf2`, and no member states a fixed order yet.
+- Reach over the harness's 4,000 seeds of `FeatureSet::ALL`: `DcAxisNamed` 132, `LoopNamed` 1305, `SweepBodyNotOne` 1503, `RunInterleaved` 3997, `IcBeyondNext` 2614, `SaveAnalysisSet` 1673.
+
 ## A19 applied (an `ExprDyn` field's form)
 
 - `feature::item_features` marks a root dynamic when the row lists it as `Handle::ExprDyn`, or when its class is at least `Temp`. A root listed under both kinds counts as dynamic.
@@ -334,3 +345,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `rewrite_exprs` reads the roots through `handles` and stores them back through `map_exprs`: the drift property makes the two the same list, so every root is reached and stored.
 - `item_facts.rs` passed 500 lines: `Param` and `Func` moved to `item_facts_defs.rs`; `field_domain` and `distinct` became crate-visible for it.
 
+
+## Amendment A23, run owner (`map_exprs`)
+
+- `run_exprs::Roots` holds the kernel's expression-list pool, the run pools and the pass's visitor. Its methods mirror the `*_handles` helpers one for one (`expr`, `exprs`, `sweep`, `probe`, `probes`, `event`, `dc_axes`, `varies`, `correlations`), so each row's `map_exprs` is one call per field, in `handles`' order. Pools are written in place. A probe's expression and an event's value are `Circuit`; every other root is `Constant`.
+- `DetailFacts::map_exprs(&mut self, &mut Roots)` is required, so every detail kind writes its own roots. `exprs_of::<D>` reads the detail row, visits it, and stores it back. Analysis, Loop and Measure dispatch through it; Alter, OptionRow, Env, NodeSet, Save, Print and Statistics write their own fields. Elaborate keeps the default because it holds no expression.
+- Oracle: the kernel's drift property (`kernel_rewrite`). It went red on a swapped event order (`count`/`delay`) before it was trusted green.

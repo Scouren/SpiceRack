@@ -103,21 +103,11 @@ fn map_exprs_visits_the_roots_handles_lists() {
         }
     }
     drift.sort_by_key(|k| *k as u8);
-    // known gap, a named marker: the owners' rows write their part in round 4 (A23); a kind
-    // that stops drifting fails this until its line goes
-    let not_yet = [
-        ItemKind::Statistics,
-        ItemKind::Analysis,
-        ItemKind::Loop,
-        ItemKind::Alter,
-        ItemKind::Option,
-        ItemKind::Env,
-        ItemKind::NodeSet,
-        ItemKind::Save,
-        ItemKind::Print,
-        ItemKind::Measure,
-    ];
-    assert_eq!(drift, not_yet, "kinds whose map_exprs drifts from handles");
+    assert_eq!(
+        drift,
+        Vec::<ItemKind>::new(),
+        "kinds whose map_exprs drifts from handles"
+    );
 }
 
 #[test]

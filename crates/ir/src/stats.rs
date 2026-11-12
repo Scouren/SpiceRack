@@ -28,7 +28,7 @@ use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
@@ -36,6 +36,7 @@ use crate::id::{ExprId, ItemRef, List, Ref, ScopeId};
 use crate::item::DefKind;
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::gen_ref;
+use crate::run_exprs::roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -158,6 +159,25 @@ impl RowFacts for Statistics {
         for e in [self.truncate, self.process_truncate, self.mismatch_truncate] {
             out.push(Handle::Expr(e));
         }
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Statistics = design.row(at.index);
+        {
+            let mut r = roots(design, f);
+            r.varies(row.process);
+            r.varies(row.mismatch);
+            r.correlations(row.process_correlations);
+            r.correlations(row.mismatch_correlations);
+            for e in [
+                &mut row.truncate,
+                &mut row.process_truncate,
+                &mut row.mismatch_truncate,
+            ] {
+                r.expr(e);
+            }
+        }
+        design.editor().set(at.index, row);
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {

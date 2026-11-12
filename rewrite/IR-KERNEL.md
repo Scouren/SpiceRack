@@ -367,7 +367,7 @@ whose children are rewritten and returns `Some(new)`; a node whose child changed
 again (`Builder::rebuild`), an unchanged tree keeps its ids, a shared subtree is rewritten once
 (a memo by old id), the walk is an explicit stack, and only rows that existed before the pass are
 visited. Properties (`tests/kernel_rewrite.rs`): `map_exprs` against `handles` for every
-generated item (the owners' kinds named as a marker until their round-4 rows land), an identity
+generated item (every kind of all three owners, since round 4), an identity
 rule changes no id, a wrapping rule changes every visited root and no `eval` value, and `check`
 finds nothing after either.
 

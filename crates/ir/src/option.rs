@@ -38,7 +38,7 @@ use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
@@ -194,6 +194,12 @@ impl RowFacts for OptionRow {
         ]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: OptionRow = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -266,6 +272,9 @@ impl RowFacts for OptionRow {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -317,6 +326,13 @@ impl RowFacts for Env {
         out.extend([Handle::Expr(self.temp), Handle::Expr(self.tnom)]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Env = design.row(at.index);
+        f(&mut row.temp, ExprUse::Constant);
+        f(&mut row.tnom, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -363,6 +379,9 @@ impl RowFacts for Env {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -394,6 +413,12 @@ impl RowFacts for NodeSet {
         ]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: NodeSet = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -411,6 +436,7 @@ impl RowFacts for NodeSet {
             RunExtra::IcEveryOp,
         );
         flag(set, self.next_only, RunExtra::IcNextOnly);
+        flag(set, !self.next_only, RunExtra::IcBeyondNext);
         flag(set, self.reference.len > 0, RunExtra::IcDifferential);
         flag(
             set,
@@ -481,8 +507,18 @@ impl RowFacts for NodeSet {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
+        let (next, beyond) = (
+            has(features, RunExtra::IcNextOnly),
+            has(features, RunExtra::IcBeyondNext),
+        );
+        if !next && !beyond {
+            return ItemRef::NONE;
         }
         let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun) else {
             return ItemRef::NONE;
@@ -499,7 +535,7 @@ impl RowFacts for NodeSet {
         } else {
             IcScope::Transient
         };
-        let next_only = has(features, RunExtra::IcNextOnly) && g.chance(3);
+        let next_only = next && (!beyond || g.chance(3));
         let all =
             kind == NodeSetKind::Nodeset && has(features, RunExtra::NodesetAll) && g.chance(3);
         let node = if all {
