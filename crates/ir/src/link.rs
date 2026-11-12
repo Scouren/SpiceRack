@@ -15,7 +15,8 @@
 //! Contents: `pub fn link(&mut Design, &mut Diags)`, `pub struct UnboundRead`,
 //! `pub fn unbound_reads(&Design) -> Vec<UnboundRead>`, `pub struct UnboundTarget`,
 //! `pub fn unbound_targets(&Design) -> Vec<UnboundTarget>`; crate:
-//! `pub(crate) fn target_aliases(&Design) -> Vec<(ItemRef, NameId)>`
+//! `pub(crate) fn target_aliases(&Design) -> Vec<(ItemRef, NameId)>`,
+//! `pub(crate) fn scope_element(&mut Gen, &Design, ScopeId, &dyn Fn(ElemKind) -> bool) -> Option<NameId>` (gen)
 
 use crate::analysis::{Analysis, AnalysisKind};
 use crate::dc_ac::Dc;
@@ -59,7 +60,8 @@ pub struct UnboundTarget {
 /// outside a subcircuit) is `ScopeId::NONE`, a subcircuit's body is its scope. Per lookup scope:
 /// its elements by name, and whether it is open (an `Opaque` item, or an include of a file the
 /// design lacks or holds as `Missing`: an element may hide there).
-type Lookup = std::collections::HashMap<ScopeId, (Vec<(NameId, ItemRef)>, bool)>;
+type Lookup =
+    std::collections::HashMap<ScopeId, (std::collections::HashMap<NameId, ItemRef>, bool)>;
 
 /// What an element path finds from a lookup scope.
 enum Found {
@@ -315,6 +317,36 @@ pub(crate) fn target_aliases(design: &Design) -> Vec<(ItemRef, NameId)> {
     out
 }
 
+/// A random element listed in `scope` itself whose kind `fits`, or none after a few tries:
+/// one a run item listed there finds by name with an empty path under both walks,
+/// `unbound_targets`' lookup (which also reaches what the deck's top nests outside a
+/// subcircuit) and `element_uses`' (the listing scope only). The generator's, so a target
+/// names a real element some of the time (the lead's reach finding on `TargetAlias`). O(1):
+/// draws an index rather than collecting the scope.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn scope_element(
+    g: &mut crate::r#gen::Gen,
+    design: &Design,
+    scope: ScopeId,
+    fits: &dyn Fn(ElemKind) -> bool,
+) -> Option<NameId> {
+    let items = design.items(scope);
+    if items.is_empty() {
+        return None;
+    }
+    // ponytail: 32 draws; a scope with few fitting elements is hit less often
+    for _ in 0..32 {
+        let item = items[g.below(items.len() as u32) as usize];
+        if item.kind == ItemKind::Element {
+            let e: Element = design.row(item.index);
+            if fits(e.kind) {
+                return Some(e.name);
+            }
+        }
+    }
+    None
+}
+
 // ---- private ----
 
 /// Every lookup scope's elements and openness. O(items × scope depth).
@@ -324,7 +356,13 @@ fn element_scopes(design: &Design) -> Lookup {
     for (item, scope) in design.reachable() {
         let entry = out.entry(lookup_scope(design, scope)).or_default();
         match item.kind {
-            ItemKind::Element => entry.0.push((design.row::<Element>(item.index).name, item)),
+            ItemKind::Element => {
+                // the first element of a name is the one a lookup finds
+                entry
+                    .0
+                    .entry(design.row::<Element>(item.index).name)
+                    .or_insert(item);
+            }
             ItemKind::Opaque => entry.1 = true,
             ItemKind::Include => {
                 let path = design.str(design.row::<Include>(item.index).path);
@@ -378,10 +416,10 @@ fn find_element(design: &Design, lookup: &Lookup, from: ScopeId, path: &[NameId]
             return Found::Unknown;
         }
         // a body with no item has no entry: empty, and closed
-        let (list, open) = lookup
+        let (found, open) = lookup
             .get(&at)
-            .map_or((&[][..], false), |(l, o)| (&l[..], *o));
-        let Some(&(_, item)) = list.iter().find(|(n, _)| *n == name) else {
+            .map_or((None, false), |(l, o)| (l.get(&name).copied(), *o));
+        let Some(item) = found else {
             return if open {
                 Found::Unknown
             } else {
