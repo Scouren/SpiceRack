@@ -22,7 +22,7 @@
 //!   `pub(crate) fn close`
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
-//!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`,
+//!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`, `pub(crate) fn is_zero`,
 //!   `pub(crate) fn loop_depth`
 
 use std::fmt::{Debug, Write as _};
@@ -364,6 +364,11 @@ pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
         form: NumForm::Plain,
     };
     matches!(design.expr(e), Expr::Num(k) if design.num(k).eq_value(one))
+}
+
+/// Whether `e` is the literal 0, of any form (`0`, `0.0`, `0e3`, the integer 0); `NONE` is not.
+pub(crate) fn is_zero(design: &Design, e: ExprId) -> bool {
+    !e.is_none() && matches!(design.expr(e), Expr::Num(k) if design.num(k).mantissa == 0)
 }
 
 /// How many `Loop` scopes enclose `scope`, itself included. Bounded by the scope count.

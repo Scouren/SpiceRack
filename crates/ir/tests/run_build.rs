@@ -11,7 +11,7 @@ use spicerack_ir::dc_ac::{Dc, DcAxis};
 use spicerack_ir::measure::{MeasureParam, MeasureTrigTarg};
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, Variations};
 use spicerack_ir::stats::Correlation;
-use spicerack_ir::tran::{StepCap, Tran};
+use spicerack_ir::tran::{StepCap, StepCeiling, Tran};
 use spicerack_ir::{
     AcPart, Alter, Analysis, AnalysisKind, AnalysisKinds, Applies, Builder, DefKind, Design, Edge,
     Env, Event, ExprId, IcScope, ItemKind, ItemRef, List, Loop, LoopEnd, LoopKind, Measure,
@@ -34,13 +34,12 @@ fn tran(b: &mut Builder<'_>) -> Tran {
         stop: b.num(1e-6),
         record_start: ExprId::NONE,
         print_step: b.num(1e-9),
-        max_step: ExprId::NONE,
         initial_step: ExprId::NONE,
         noise_fmax: ExprId::NONE,
         noise_fmin: ExprId::NONE,
         noise_seed: ExprId::NONE,
         segments: List::EMPTY,
-        cap: StepCap::NgspiceRule,
+        ceiling: StepCeiling::Rule(StepCap::NgspiceRule),
         uic: true,
         startup: false,
     }

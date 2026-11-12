@@ -34,7 +34,7 @@ use crate::run_words::{
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::sweep::gen_sweep;
-use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
+use crate::sweep::{SweepUse, dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
 use crate::text_expr::Ctx;
 
@@ -150,7 +150,7 @@ impl DetailFacts for Sp {
         r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(set, self.ports.len > 0, RunExtra::SpPorts);
         flag(set, self.noise, RunExtra::SpNoise);
     }
@@ -183,7 +183,7 @@ impl DetailFacts for Sp {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let ports = if has(features, RunExtra::SpPorts) && g.chance(2) {
             let p = g.fresh_name(b);
             b.name_ids(&[p])
@@ -281,7 +281,7 @@ impl DetailFacts for Disto {
         r.expr(&mut self.f2_over_f1);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep))
@@ -309,7 +309,7 @@ impl DetailFacts for Disto {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let f = if g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {
