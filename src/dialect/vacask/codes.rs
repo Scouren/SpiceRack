@@ -10,8 +10,8 @@
 use crate::ir;
 
 use super::{
-    expr_read, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
-    write_structure,
+    expr_read, expr_write, fold, read_elements, read_models, read_outputs, read_run, read_sources,
+    read_structure, write_structure,
 };
 
 /// A statement the reader has no rule for yet (an area not written): kept as an `Unread` opaque.
@@ -43,9 +43,11 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
 
 /// The row of `code` in any area's table, or `None`.
 pub(super) fn info(code: ir::Code) -> Option<ir::Info> {
-    let tables: [&[(ir::Code, ir::Info)]; 9] = [
+    let tables: [&[(ir::Code, ir::Info)]; 11] = [
         CODES,
         expr_read::CODES,
+        expr_write::CODES,
+        fold::CODES,
         read_structure::CODES,
         write_structure::CODES,
         read_elements::CODES,
@@ -68,9 +70,11 @@ mod tests {
     /// Oracle: the range rule of §7 (each code `P`, `R` or `W`, 2000–2999) and uniqueness.
     #[test]
     fn every_row_is_in_vacasks_range_and_unique() {
-        let tables: [&[(ir::Code, ir::Info)]; 9] = [
+        let tables: [&[(ir::Code, ir::Info)]; 11] = [
             CODES,
             expr_read::CODES,
+            expr_write::CODES,
+            fold::CODES,
             read_structure::CODES,
             write_structure::CODES,
             read_elements::CODES,

@@ -1,8 +1,8 @@
 //! The writer's spine: one file of a legal design → VACASK text. The title first (line 1 of an
 //! entry deck: VACASK reads line 1 as the title whatever it holds, so a deck with none gets an
 //! empty line), then the file's items in order, each body below its item and indented two
-//! spaces per level (explicit stack, C11), the run items of the top scope in one `control …
-//! endc` block at the end (S4.3). One exhaustive `match` over `ir::ItemKind`, no `_` arm: each
+//! spaces per level (explicit stack, C11), the range of the top scope's items that
+//! `write_run::control_span` names in one `control … endc` block in place (R43). One exhaustive `match` over `ir::ItemKind`, no `_` arm: each
 //! arm is an area function. An `Opaque` is copied when its dialect is `vacask` (the spine's
 //! `legalize` refused every other).
 //!
@@ -24,6 +24,9 @@ pub(super) struct Writer<'d, 'o> {
     pub(super) depth: usize,
     /// The directory of the file being written (`""` for none), which its paths are relative to.
     pub(super) dir: String,
+    /// The writer's notes (a name the writer gave, DIALECT-VACASK §4).
+    #[allow(dead_code, reason = "write_run (S4.3) pushes W2301/W2302")]
+    pub(super) diags: &'o mut ir::Diags,
 }
 
 /// One step of the walk: an item, a branch head of an `If`, or a block's closing line.
@@ -75,7 +78,6 @@ pub(super) fn write(
     out: &mut String,
     diags: &mut ir::Diags,
 ) {
-    let _ = diags;
     let top = design.file(file).top;
     let path = design.str(design.file(file).path);
     let dir = std::path::Path::new(path)
@@ -86,6 +88,7 @@ pub(super) fn write(
         out,
         depth: 0,
         dir,
+        diags,
     };
     if design.file(file).role == ir::Role::Deck {
         let title = design

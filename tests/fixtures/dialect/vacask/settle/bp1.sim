@@ -1,0 +1,20 @@
+behavioural probes: v(n), v(a, b), i(inst), idt, ddt
+load "spice/resistor.osdi"
+model vsource vsource
+model res sp_resistor
+v1 (a 0) vsource dc=2
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+b1 (c 0) v=v(a)*2
+b2 (d 0) v=v(a, b)+1
+b3 (e 0) v=i(v1)*1k
+b4 (f 0) v=idt(v(a))
+b5 (g 0) v=ddt(v(a))
+r3 (c 0) res r=1k
+r4 (d 0) res r=1k
+r5 (e 0) res r=1k
+r6 (f 0) res r=1k
+r7 (g 0) res r=1k
+control
+  analysis op1 op
+endc

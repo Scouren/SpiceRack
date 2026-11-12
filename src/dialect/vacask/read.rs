@@ -19,6 +19,7 @@ use std::collections::HashSet;
 
 use super::bind;
 use super::codes;
+use super::fold;
 use super::{read_elements, read_models, read_run, read_sources, read_structure};
 use crate::dialect::{Reference, Sources};
 use crate::ir;
@@ -64,6 +65,15 @@ pub(super) struct Lower<'a, 'b, 's> {
     pub(super) reads: &'a mut Vec<(ir::ExprId, ir::ScopeId, ir::Span)>,
     /// Each element whose master to bind, bound by `bind::masters` at the end.
     pub(super) masters: &'a mut Vec<bind::Master>,
+    /// Every master every file declares (`read_elements::declare`): an instance's kind.
+    #[allow(
+        dead_code,
+        reason = "read_elements (S4.1) and read_sources (S4.2) read it"
+    )]
+    pub(super) declared: &'a read_elements::Declared,
+    /// Each source a `type` alter reaches and the alters that are framing (R42: `fold::folds`).
+    #[allow(dead_code, reason = "read_sources (S4.2) and read_run (S4.3) read it")]
+    pub(super) folds: &'a fold::Folds,
     /// `parameters` entries a subcircuit's head took (their `Assign` nodes).
     pub(super) taken: HashSet<u32>,
     /// The next token whose leading gap has not been searched for comments.
@@ -260,6 +270,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
     let (grounds, named_files, source_models) = declare(&csts);
     let mut reads = Vec::new();
     let mut masters = Vec::new();
+    let declared = read_elements::declare(&csts);
+    let folds = fold::folds(&csts);
     for (cst, top) in &csts {
         let mut l = Lower {
             b: &mut *out,
@@ -272,6 +284,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             source_models: &source_models,
             reads: &mut reads,
             masters: &mut masters,
+            declared: &declared,
+            folds: &folds,
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,

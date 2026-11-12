@@ -36,11 +36,6 @@ const SIZE: Size = Size {
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l3",
-        "vacask",
-        "seeds 0..8 admit none: generated DeviceLibrary rows name families VACASK has no file for (W2002; Feature::Family is not set for DeviceLibrary) and loads whose path extension does not state the kind (W2004)",
-    ),
-    (
         "l5",
         "vacask",
         "seed 31: a formal default reading $tnom is dependent in VACASK (run c3) and reads back as a local; FormalNotConstant counts Temp but not Tnom",

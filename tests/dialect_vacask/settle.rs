@@ -343,3 +343,48 @@ fn sp2_the_acsp_port_is_ngspices_port() {
         assert!((re - 0.5).abs() < 1e-6, "{name} = {re}");
     }
 }
+
+#[test]
+fn bp_behavioural_probes_and_integrals() {
+    // bp1: v(a) = 2, v(b) = 1 (a 1k–1k divider), i(v1) is the branch flow into the first
+    // terminal (−1 mA); idt starts from 0 and ddt is 0 at the operating point.
+    let r = run("vacask", "bp1.sim");
+    let op = raw(&r, "op1.raw");
+    for (node, want) in [("c", 4.0), ("d", 2.0), ("e", -1.0), ("f", 0.0), ("g", 0.0)] {
+        assert!(close(at(&op, node, 0.0), want, 1e-12), "{node}: {}", r.out);
+    }
+    // bp2: ddt reads the circuit only in a behavioural source.
+    assert!(says(&run("vacask", "bp2.sim"), "Function 'ddt' not found."));
+    // bp3: idt(x, ic) starts from ic (the IR's Idt starts from 0: no IR form).
+    let r = run("vacask", "bp3.sim");
+    assert!(
+        close(at(&raw(&r, "op1.raw"), "f", 0.0), 3.0, 1e-12),
+        "{}",
+        r.out
+    );
+}
+
+#[test]
+fn dcw_a_dc_source_with_type_alters_is_spices_dc_value_and_waveform() {
+    // R42's proof: ngspice-45 on `V1 a 0 DC -6 PULSE(…)` and VACASK on the writers' spelling
+    // (a `type="dc"` line with the pulse's parameters, `alter … type=` around the transient).
+    let ng = run("ngspice", "dcw.cir");
+    let measure = |m: &str| -> f64 {
+        let line = ng
+            .out
+            .lines()
+            .find(|l| l.starts_with(m))
+            .expect("a measure");
+        line.split('=').nth(1).unwrap().trim().parse().unwrap()
+    };
+    let ops: Vec<&str> = ng.out.lines().filter(|l| l.starts_with("v(a) =")).collect();
+    assert_eq!(ops, ["v(a) = -6.00000e+00"; 2], "{}", ng.out);
+    let r = run("vacask", "dcw.sim");
+    for op in ["op1.raw", "op2.raw"] {
+        assert!(close(at(&raw(&r, op), "a", 0.0), -6.0, 1e-12), "{}", r.out);
+    }
+    let tran = raw(&r, "tr1.raw");
+    for (m, t) in [("w1", 0.5e-6), ("w2", 1.5e-6), ("w3", 3e-6), ("w4", 4.5e-6)] {
+        assert!(close(at(&tran, "a", t), measure(m), 1e-6), "{m}: {}", r.out);
+    }
+}
