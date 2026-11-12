@@ -174,3 +174,44 @@ fn p5_007_a_two_tone_or_oscillator_hb_is_not_read_as_one_tone() {
         }
     }
 }
+
+/// ZERO-LEDGER P5-007 (the prints). Xyce's `.PRINT HB_FD` and `.PRINT
+/// HB_TD` (RG 7.10 §2.1.31: "HB frequency domain", "HB time domain") are
+/// HSPICE RF's `.PRINT HB` and `.PRINT HBTRAN` (User Guide: RF Analysis
+/// E-2010.12 p.116; p.122: "The output syntax is .PRINT [HBTRAN | HBTR]
+/// V(n1)"). Its `HB_IC` and `HB_STARTUP` print the transient ahead of the
+/// balance (RG Table 2-21), which HSPICE RF has no print of: left out,
+/// noted W0023. Oracle: the manual's forms, and the closed form of
+/// `p5_004` met by the HSPICE text on ESPice. ESPice reads the Xyce kinds
+/// (0.3.0, run): its deck keeps them.
+#[test]
+fn p5_007_xyce_hb_print_kinds_are_hspice_rfs_own() {
+    let xy = Dialect::Xyce;
+    let kinds = ["hb_fd", "hb_td", "hb_ic", "hb_startup"];
+    let prints: String = kinds.iter().map(|k| format!(".print {k} v(2)\n")).collect();
+    let deck = format!("{RC}.hb 1e5\n.options hbint numfreq=5\n{prints}.end\n");
+    let cite = "HSPICE UG: RF Analysis E-2010.12 pp.116, 122: .PRINT HB, .PRINT [HBTRAN | HBTR]";
+    let lines = [".print hb v(2)", ".print hbtran v(2)"];
+    let text = spec_example(cite, &deck, xy, Dialect::Hspice, &lines);
+    assert!(
+        !text.contains(".print hb_"),
+        "a Xyce kind on HSPICE:\n{text}"
+    );
+    let noted = oracle::notes(&oracle::written(&deck, xy, Dialect::Hspice));
+    let dropped = noted.iter().filter(|c| **c == Code::W0023).count();
+    assert_eq!(dropped, 2, "`hb_ic` and `hb_startup`: {noted:?}");
+    let espice = oracle::write(&deck, xy, Dialect::Espice);
+    for k in kinds {
+        assert!(
+            espice.contains(&format!(".print {k} v(2)")),
+            "{k}:\n{espice}"
+        );
+    }
+    let x = 0.4 * std::f64::consts::PI;
+    let want = (-x / (1.0 + x * x), -1.0 / (1.0 + x * x));
+    let got = phasor(&oracle::run(Dialect::Hspice, &text), "2", 1e5);
+    assert!(
+        LINEAR.within(got.0, want.0) && LINEAR.within(got.1, want.1),
+        "V(2) at 100 kHz {got:?}, the closed form {want:?}"
+    );
+}

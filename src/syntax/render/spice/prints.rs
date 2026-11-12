@@ -6,7 +6,12 @@
 //! `.PRINT`) leave the analysis "not run" (each run by hand). On ngspice
 //! such a print or output is left out (W0023), a print format
 //! (`PRECISION=`) too (W0024), and Xyce's accessors are spelled as
-//! ngspice's (`ngspice_output`); the other targets get the card as read.
+//! ngspice's (`ngspice_output`); the other targets get the card as read,
+//! but that HSPICE RF prints a harmonic balance as `HB` (its phasors) or
+//! `HBTRAN` (the time domain; User Guide: RF Analysis E-2010.12 pp.116,
+//! 122): Xyce's `HB_FD` and `HB_TD` (RG 7.10 §2.1.31) are those, and its
+//! `HB_IC` and `HB_STARTUP` (the transient ahead of the balance, Table
+//! 2-21) are left out (W0023).
 //! Xyce's card for a save list that asks `all` is written here too:
 //! `.print <kind> V(*)` (RG 7.10 §2.1.31.11: "V(*) will print all of the
 //! node voltages in the circuit for all analysis modes"), Xyce's print
@@ -79,6 +84,18 @@ impl W<'_, '_> {
                 kept
             } else {
                 outs.clone()
+            };
+            // HSPICE RF's prints of a balance are `HB` and `HBTRAN` (the
+            // module's doc).
+            let hs = self.b.analysis_form == AnalysisForm::Hspice;
+            let kind = match kind.to_ascii_lowercase().as_str() {
+                "hb_fd" if hs => "hb",
+                "hb_td" if hs => "hbtran",
+                "hb_ic" | "hb_startup" if hs => {
+                    self.note(Code::W0023, *tok);
+                    continue;
+                }
+                _ => kind.as_str(),
             };
             let sep = if kind.is_empty() { "" } else { " " };
             let line = format!(".print{sep}{kind} {}", outs.join(" "));
