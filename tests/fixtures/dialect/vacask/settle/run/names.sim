@@ -1,0 +1,22 @@
+names VACASK accepts
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  options rawfile="ascii"
+  analysis op op
+  analysis tran tran stop=1u
+  analysis save op
+  analysis op1 op
+  analysis OP1 op
+  analysis _x1 op
+  analysis $x op
+  sweep x instance="v1" parameter="dc" values=[1, 2]
+    analysis x tran stop=1u
+  sweep s instance="v1" parameter="dc" values=[1, 2]
+    analysis axis1 op
+  sweep s instance="v1" parameter="dc" values=[1]
+    analysis loop1 tran stop=1u
+endc

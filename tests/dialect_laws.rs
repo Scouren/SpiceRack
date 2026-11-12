@@ -45,7 +45,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "vacask",
-        "seed 2 Untyped: an analysis with no name (`analysis xf …`) is written with a generated name (`acxf1`, W2301) and reads back named; VACASK requires a name, so an unnamed analysis needs a feature VACASK lacks or a naming pass (vc-run's)",
+        "seed 2 Untyped: an unnamed analysis is written under an invented name (`acxf1`): goes with A35's features (AnalysisUnnamed, DcAxisUnnamed, LoopUnnamed; R59)",
     ),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];
