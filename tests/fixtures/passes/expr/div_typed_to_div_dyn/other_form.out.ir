@@ -1,0 +1,3 @@
+file "d.sp" deck
+  param q = 7i /: 2i
+  element behav b1 (n 0) expr=(trunc(q / 2i) + v(n))

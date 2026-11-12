@@ -22,10 +22,13 @@ pub(crate) const PASSES: &[Pass] = &[
     row("drop_unused_funcs", X::Item(ir::ItemKind::Func), &[], &[FUNC_CALLED], inline_funcs::drop_unused_funcs),
     row("div_to_div_typed", X::Binary(O::Div), &[X::Binary(O::DivTyped), X::Binary(O::Mul), X::Expr(T::Binary)], &[BOTH_FORMS], div_to_div_typed::div_to_div_typed),
     row("div_to_div_typed_dyn", X::BinaryDyn(O::Div), &[X::BinaryDyn(O::DivTyped), X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[BOTH_FORMS], div_to_div_typed::div_to_div_typed_dyn),
-    row("div_typed_to_div", X::Binary(O::DivTyped), &[X::Binary(O::Div), X::BinaryDyn(O::Div), X::Func(F::Trunc), X::FuncDyn(F::Trunc), X::Expr(T::Binary), X::Expr(T::Call)], &[MIXED_DIVISION, BOTH_FORMS], div_typed_to_div::div_typed_to_div),
-    row("div_typed_to_div_dyn", X::BinaryDyn(O::DivTyped), &[X::Binary(O::Div), X::BinaryDyn(O::Div), X::Func(F::Trunc), X::FuncDyn(F::Trunc), X::Expr(T::Binary), X::Expr(T::Call)], &[MIXED_DIVISION, BOTH_FORMS], div_typed_to_div::div_typed_to_div_dyn),
+    row("div_typed_to_div", X::Binary(O::DivTyped), &[X::Binary(O::Div), X::Func(F::Trunc), X::Expr(T::Binary), X::Expr(T::Call)], &[MIXED_DIVISION, OTHER_FORM_READS, BOTH_FORMS], div_typed_to_div::div_typed_to_div),
+    row("div_typed_to_div_dyn", X::BinaryDyn(O::DivTyped), &[X::BinaryDyn(O::Div), X::FuncDyn(F::Trunc), X::Expr(T::Binary), X::Expr(T::Call)], &[MIXED_DIVISION, OTHER_FORM_READS, BOTH_FORMS], div_typed_to_div::div_typed_to_div_dyn),
     row("toint_to_trunc", X::Func(F::ToInt), &[X::Func(F::Trunc), X::Expr(T::Call)], &[TAG_READ, BOTH_FORMS], toint_to_trunc::toint_to_trunc),
     row("toint_to_trunc_dyn", X::FuncDyn(F::ToInt), &[X::FuncDyn(F::Trunc), X::Expr(T::Call)], &[TAG_READ, BOTH_FORMS], toint_to_trunc::toint_to_trunc_dyn),
+    // after the two rules that write `trunc`
+    row("trunc_to_ternary", X::Func(F::Trunc), &[X::Expr(T::Ternary), X::Binary(O::Lt), X::Func(F::Ceil), X::Func(F::Floor), X::Expr(T::Binary), X::Expr(T::Call), X::Expr(T::Num)], &[DRAW_TWICE, BOTH_FORMS, OPERAND_TOO_LARGE], trunc_to_ternary::trunc_to_ternary),
+    row("trunc_to_ternary_dyn", X::FuncDyn(F::Trunc), &[X::Expr(T::Ternary), X::BinaryDyn(O::Lt), X::FuncDyn(F::Ceil), X::FuncDyn(F::Floor), X::Expr(T::Binary), X::Expr(T::Call), X::Expr(T::Num)], &[DRAW_TWICE, BOTH_FORMS, OPERAND_TOO_LARGE], trunc_to_ternary::trunc_to_ternary_dyn),
     row("toreal_to_mul", X::Func(F::ToReal), &[X::Binary(O::Mul), X::Expr(T::Binary)], &[TEXT_OPERAND, BOTH_FORMS], toreal_to_mul::toreal_to_mul),
     row("toreal_to_mul_dyn", X::FuncDyn(F::ToReal), &[X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[TEXT_OPERAND, BOTH_FORMS], toreal_to_mul::toreal_to_mul_dyn),
     row("sgnzeropos_to_ternary", X::Func(F::SgnZeroPos), &[X::Expr(T::Ternary), X::Binary(O::Lt), X::Expr(T::Binary)], &[TAG_READ, BOTH_FORMS], sgnzeropos_to_ternary::sgnzeropos_to_ternary),
@@ -79,7 +82,7 @@ pub(crate) const PASSES: &[Pass] = &[
     row("long_literal_to_shortest", X::Extra(E::LongLiteral), &[X::Expr(T::Num)], &[], long_literal_to_shortest::long_literal_to_shortest),
     // last: the typed rules decide by an integer literal's tag first
     row("int_literal_to_plain", X::Extra(E::IntLiteral), &[], &[INT_TAG_READ], int_literal_to_plain::int_literal_to_plain),
-    row("param_reads_to_typed", X::Circuit(ir::CircuitExtra::BehavUntypedParam), &[X::FuncDyn(F::ToReal), X::FuncDyn(F::ToInt), X::Expr(T::Call), X::Expr(T::Call)], &[UNTYPED_READ], param_reads_to_typed::param_reads_to_typed),
+    row("param_reads_to_typed", X::Circuit(ir::CircuitExtra::BehavUntypedParam), &[X::FuncDyn(F::ToReal), X::FuncDyn(F::ToInt), X::Expr(T::Call)], &[UNTYPED_READ], param_reads_to_typed::param_reads_to_typed),
 ];
 
 // ---- private ----
