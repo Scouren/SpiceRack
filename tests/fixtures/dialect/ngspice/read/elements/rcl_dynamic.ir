@@ -1,0 +1,10 @@
+# codes:
+file "rcl_dynamic.sp" deck
+  title "rcl_dynamic"
+  comment " oracle: ngspice-45 inpcom.c inp_compat (an R/C/L reading v( i( temper hertz time runs as a B source: value, m, noisy kept), b_transformation_wanted; INV-semantics 6.14"
+  element resistor R1 (a b) value=(v(a) * 1k) noisy=false
+  element resistor R2 (a b) mult=2 value=(1k + v(a))
+  element inductor L1 (a b) value=(1u * (1 + i(vx))) noisy=false
+  element capacitor C1 (a b) value=(1p * (1 + v(a))) noisy=false
+  element charge_capacitor C2 (a b) expr=(1p * v(a)) output=charge
+  element resistor R3 (a b) value=($temp * 10) noisy=false

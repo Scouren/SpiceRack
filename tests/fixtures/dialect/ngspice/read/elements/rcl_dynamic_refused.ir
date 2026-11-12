@@ -1,0 +1,8 @@
+# codes: P1103 P1105 P1100 P1102
+file "rcl_dynamic_refused.sp" deck
+  title "rcl_dynamic_refused"
+  comment " oracle: ngspice-45 inpcom.c inp_compat (first { on the line is the value; no brace: mal formed, exit), asrcload.c:41 (tc from 300.15 K); INV-semantics 14.13"
+  opaque ngspice unread "R1 a b {v(a)*1k} tc1=1m"
+  opaque ngspice private "R2 a b tc1={1m} r={v(a)}"
+  opaque ngspice invalid "R3 a b v(a)"
+  element capacitor C1 (a b) value=(v(a) * 1p) noisy=false
