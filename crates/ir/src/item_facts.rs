@@ -37,6 +37,10 @@ impl RowFacts for Title {
         // no reference field
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
@@ -84,6 +88,10 @@ impl RowFacts for Comment {
         // no reference field
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
@@ -125,6 +133,10 @@ impl RowFacts for Include {
     }
 
     fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
 
@@ -173,6 +185,10 @@ impl RowFacts for Global {
         // no reference field
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
@@ -217,6 +233,10 @@ impl RowFacts for Load {
         // no reference field
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
@@ -257,6 +277,10 @@ impl RowFacts for Opaque {
     }
 
     fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
 
@@ -310,6 +334,10 @@ impl RowFacts for Subckt {
     }
 
     fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
 
@@ -376,6 +404,10 @@ impl RowFacts for Section {
         // no reference field
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         if !self.library.is_none() {
             *set = set.with(Feature::Extra(Extra::SectionLibrary));
@@ -424,6 +456,10 @@ impl RowFacts for If {
     }
 
     fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
 
@@ -479,6 +515,10 @@ impl RowFacts for Param {
         // no reference field
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // no feature beyond the kind
     }
@@ -524,6 +564,10 @@ impl RowFacts for Func {
     }
 
     fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // no reference field
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
 

@@ -609,6 +609,15 @@ impl RowFacts for Element {
         design.editor().set(at.index, row);
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        if let Some(kind) = self.kind.master_kind()
+            && self.model.name != NameId::NONE
+        {
+            out.push((self.model, kind));
+        }
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         crate::circuit_features::element_features(self, design, set)
     }

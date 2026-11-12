@@ -9,7 +9,7 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
-//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
+//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
 //! `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum Handle`,
 //! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
@@ -42,6 +42,11 @@ pub trait RowFacts: ItemRow {
     /// and a pass that renumbers definitions rewrites through it. Must not change anything but
     /// the references `f` changes.
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+
+    /// Appends every `Ref` the item `at` owns, with the kind its field expects, in `map_refs`'s
+    /// order, changing nothing: the read-only twin for readers (`check`) that hold `&Design`
+    /// (M5). `kernel_gen`'s drift property holds the two lists equal for every generated item.
+    fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>);
 
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
     /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features; `at` is the item, `scope` the

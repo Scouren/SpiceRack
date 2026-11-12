@@ -29,7 +29,7 @@
 //!   `Design::targets(&self, TargetList) -> &[Target]`, `Design::refs(&self, RefList) -> &[Ref]`
 //! - the run rows' target facts: `pub(crate) TargetKind::reads_b`,
 //!   `pub(crate) TargetKind::has_path`, `pub(crate) enum TargetUse`,
-//!   `pub(crate) fn target_handles`, `pub(crate) fn target_refs`, `pub(crate) fn target_valid`,
+//!   `pub(crate) fn target_handles`, `pub(crate) fn target_refs`, `pub(crate) fn target_refs_into`, `pub(crate) fn target_valid`,
 //!   `pub(crate) fn target_features`, `pub(crate) fn dump_target`, `pub(crate) fn parse_target`,
 //!   `pub(crate) fn gen_target`, `pub(crate) fn target_kinds`, `pub(crate) fn gen_ref`
 //! - (`RowFacts` for `Loop` and `Alter`, and the loop details' facts: `plan_facts.rs`)
@@ -367,6 +367,13 @@ impl Design {
 pub(crate) fn target_refs(t: &mut Target, f: &mut dyn FnMut(&mut Ref, DefKind)) {
     if let Some(kind) = t.kind.def_kind() {
         f(&mut t.a, kind);
+    }
+}
+
+/// Appends a target's reference, as `target_refs` visits it (the read-only twin).
+pub(crate) fn target_refs_into(t: &Target, out: &mut Vec<(Ref, DefKind)>) {
+    if let Some(kind) = t.kind.def_kind() {
+        out.push((t.a, kind));
     }
 }
 

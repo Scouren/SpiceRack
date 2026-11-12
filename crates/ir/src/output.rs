@@ -116,6 +116,10 @@ impl RowFacts for Save {
         let _ = (design, at, f); // no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         flag(set, !self.every_analysis, RunExtra::SavePerAnalysis);
         list_features(design, self.probes, set);
@@ -199,6 +203,10 @@ impl RowFacts for Print {
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

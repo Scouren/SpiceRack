@@ -31,7 +31,7 @@ use crate::id::NameId;
 use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
-use crate::plan::target_refs;
+use crate::plan::{target_refs, target_refs_into};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
@@ -173,6 +173,21 @@ impl RowFacts for Analysis {
         let end = (start + dc.axes.len as usize).min(design.run.dc_axes.len());
         for axis in &mut design.run.dc_axes[start.min(end)..end] {
             target_refs(&mut axis.target, f);
+        }
+    }
+
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order: a DC sweep's axes' targets
+        if self.kind != AnalysisKind::Dc {
+            return;
+        }
+        let Some(dc) = detail_get::<Dc>(design, self.detail) else {
+            return;
+        };
+        let start = dc.axes.start as usize;
+        let end = (start + dc.axes.len as usize).min(design.run.dc_axes.len());
+        for axis in &design.run.dc_axes[start.min(end)..end] {
+            target_refs_into(&axis.target, out);
         }
     }
 
