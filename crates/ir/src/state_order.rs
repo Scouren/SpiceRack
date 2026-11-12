@@ -28,7 +28,9 @@ use crate::id::{FileId, ItemRef, NameId, ScopeId};
 #[cfg(any(test, feature = "gen"))]
 use crate::item::ScopeKind;
 use crate::item::{ItemKind, Role};
-use crate::option::{Applies, Env, NodeSet, OptionRow};
+use crate::option::{
+    Applies, ENV_MODES, Env, NODE_SET_MODES, NodeSet, OPTION_MODES, OptionRow, SAVE_MODES,
+};
 use crate::option_key::OptionKey;
 use crate::output::Save;
 use crate::reset::{Reset, Restorable};
@@ -198,8 +200,8 @@ pub fn in_force(
 
 /// Appends, at the state item, the features of state items that come after a run item (an
 /// analysis, loop or alter) in a walk's listed order (A14): a `FromHere` item there is
-/// `OptionMidRun`, `EnvMidRun`, `NodeSetMidRun` or `SaveMidRun`; a `WholeRun` one is
-/// `WholeRunMidRun`. O(items + scopes) per walk.
+/// `OptionMidRun`, `EnvMidRun`, `NodeSetMidRun` or `SaveMidRun`; a `WholeRun` one is the
+/// kind's `*WholeRunMidRun`. O(items + scopes) per walk.
 pub(crate) fn state_order_features(design: &Design, out: &mut Vec<(Feature, ItemRef)>) {
     for (_, order) in run_walks(design) {
         let mut seen_run = false;
@@ -207,20 +209,14 @@ pub(crate) fn state_order_features(design: &Design, out: &mut Vec<(Feature, Item
             let holds = match item.kind {
                 ItemKind::Option => Some((
                     OptionRow::table(design).get(item.index).holds,
-                    RunExtra::OptionMidRun,
+                    &OPTION_MODES,
                 )),
-                ItemKind::Env => Some((
-                    Env::table(design).get(item.index).holds,
-                    RunExtra::EnvMidRun,
-                )),
+                ItemKind::Env => Some((Env::table(design).get(item.index).holds, &ENV_MODES)),
                 ItemKind::NodeSet => Some((
                     NodeSet::table(design).get(item.index).holds,
-                    RunExtra::NodeSetMidRun,
+                    &NODE_SET_MODES,
                 )),
-                ItemKind::Save => Some((
-                    Save::table(design).get(item.index).holds,
-                    RunExtra::SaveMidRun,
-                )),
+                ItemKind::Save => Some((Save::table(design).get(item.index).holds, &SAVE_MODES)),
                 ItemKind::Title
                 | ItemKind::Comment
                 | ItemKind::Include
@@ -244,12 +240,12 @@ pub(crate) fn state_order_features(design: &Design, out: &mut Vec<(Feature, Item
                 | ItemKind::Elaborate
                 | ItemKind::Reset => None,
             };
-            if let Some((holds, from_here)) = holds
+            if let Some((holds, modes)) = holds
                 && seen_run
             {
                 let x = match holds {
-                    Applies::FromHere => from_here,
-                    Applies::WholeRun => RunExtra::OptionWholeRunMidRun,
+                    Applies::FromHere => modes.mid,
+                    Applies::WholeRun => modes.whole_mid,
                 };
                 out.push((Feature::Run(x), item));
             }

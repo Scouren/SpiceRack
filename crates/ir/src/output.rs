@@ -147,7 +147,11 @@ impl RowFacts for Save {
             n > 1 && self.analyses != AnalysisKinds::ALL,
             RunExtra::SaveAnalysisSet,
         );
-        flag(set, true, save_mode(self.holds));
+        flag(
+            set,
+            true,
+            crate::option::mode_feature(&crate::option::SAVE_MODES, self.holds),
+        );
         list_features(design, self.probes, set);
     }
 
@@ -233,7 +237,7 @@ impl RowFacts for Save {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let Some(holds) =
-            crate::state_gen::gen_holds(g, b, scope, features, RunExtra::SaveMidRun, save_mode)
+            crate::state_gen::gen_holds(g, b, scope, features, &crate::option::SAVE_MODES)
         else {
             return ItemRef::NONE;
         };
@@ -403,12 +407,4 @@ fn gen_list(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> ProbeLis
     let n = 1 + g.below(2) as usize;
     let probes: Vec<Probe> = (0..n).map(|_| gen_probe(g, b, features, false)).collect();
     b.probes(&probes)
-}
-
-/// The feature of a save's mode (A27).
-const fn save_mode(holds: Applies) -> RunExtra {
-    match holds {
-        Applies::FromHere => RunExtra::SaveFromHere,
-        Applies::WholeRun => RunExtra::SaveWholeRun,
-    }
 }

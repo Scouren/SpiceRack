@@ -31,7 +31,8 @@
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
 //! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
 //! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`); crate:
-//! `pub(crate) const fn mode_feature` (the generators: `state_gen.rs`)
+//! `pub(crate) struct Modes`, `pub(crate) const OPTION_MODES`, `ENV_MODES`, `NODE_SET_MODES`,
+//! `SAVE_MODES`, `pub(crate) const fn mode_feature` (the generators: `state_gen.rs`)
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
@@ -170,6 +171,48 @@ pub enum IcScope {
     EveryOp,
 }
 
+/// One state item kind's mode features (A28 grain): each mode wherever it stands, and each
+/// after a run item in listed order.
+pub(crate) struct Modes {
+    /// The kind's item that holds `FromHere`.
+    pub(crate) from_here: RunExtra,
+    /// The kind's item that holds `WholeRun`.
+    pub(crate) whole_run: RunExtra,
+    /// A `FromHere` one after a run item.
+    pub(crate) mid: RunExtra,
+    /// A `WholeRun` one after a run item.
+    pub(crate) whole_mid: RunExtra,
+}
+
+/// An option row's mode features.
+pub(crate) const OPTION_MODES: Modes = Modes {
+    from_here: RunExtra::OptionFromHere,
+    whole_run: RunExtra::OptionWholeRun,
+    mid: RunExtra::OptionMidRun,
+    whole_mid: RunExtra::OptionWholeRunMidRun,
+};
+/// An `Env`'s mode features.
+pub(crate) const ENV_MODES: Modes = Modes {
+    from_here: RunExtra::EnvFromHere,
+    whole_run: RunExtra::EnvWholeRun,
+    mid: RunExtra::EnvMidRun,
+    whole_mid: RunExtra::EnvWholeRunMidRun,
+};
+/// A `NodeSet`'s mode features.
+pub(crate) const NODE_SET_MODES: Modes = Modes {
+    from_here: RunExtra::NodeSetFromHere,
+    whole_run: RunExtra::NodeSetWholeRun,
+    mid: RunExtra::NodeSetMidRun,
+    whole_mid: RunExtra::NodeSetWholeRunMidRun,
+};
+/// A `Save`'s mode features.
+pub(crate) const SAVE_MODES: Modes = Modes {
+    from_here: RunExtra::SaveFromHere,
+    whole_run: RunExtra::SaveWholeRun,
+    mid: RunExtra::SaveMidRun,
+    whole_mid: RunExtra::SaveWholeRunMidRun,
+};
+
 const _: () = assert!(size_of::<OptionRow>() == 16);
 const _: () = assert!(size_of::<Env>() == 12);
 const _: () = assert!(size_of::<NodeSet>() == 24);
@@ -219,9 +262,9 @@ impl RowFacts for OptionRow {
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        holds_feature(self.holds, set);
+        holds_feature(&OPTION_MODES, self.holds, set);
         *set = set.with(Feature::Option(self.key));
-        // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
+        // `OptionMidRun` and `OptionWholeRunMidRun` are facts of the listed order: `state_order_features`.
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -288,14 +331,7 @@ impl RowFacts for OptionRow {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let Some(holds) = crate::state_gen::gen_holds(
-            g,
-            b,
-            scope,
-            features,
-            RunExtra::OptionMidRun,
-            mode_feature,
-        ) else {
+        let Some(holds) = crate::state_gen::gen_holds(g, b, scope, features, &OPTION_MODES) else {
             return ItemRef::NONE;
         };
         let keys: Vec<OptionKey> = OptionKey::ALL
@@ -359,7 +395,7 @@ impl RowFacts for Env {
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        holds_feature(self.holds, set);
+        holds_feature(&ENV_MODES, self.holds, set);
         // placement is the kernel's `Placed` (A15 K1)
     }
 
@@ -402,9 +438,7 @@ impl RowFacts for Env {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let Some(holds) =
-            crate::state_gen::gen_holds(g, b, scope, features, RunExtra::EnvMidRun, mode_feature)
-        else {
+        let Some(holds) = crate::state_gen::gen_holds(g, b, scope, features, &ENV_MODES) else {
             return ItemRef::NONE;
         };
         // At least one of the two, each in the text's order.
@@ -459,7 +493,7 @@ impl RowFacts for NodeSet {
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        holds_feature(self.holds, set);
+        holds_feature(&NODE_SET_MODES, self.holds, set);
         let held = self.kind != NodeSetKind::Nodeset;
         flag(
             set,
@@ -551,14 +585,8 @@ impl RowFacts for NodeSet {
         if !next && !beyond {
             return ItemRef::NONE;
         }
-        let Some(holds) = crate::state_gen::gen_holds(
-            g,
-            b,
-            scope,
-            features,
-            RunExtra::NodeSetMidRun,
-            mode_feature,
-        ) else {
+        let Some(holds) = crate::state_gen::gen_holds(g, b, scope, features, &NODE_SET_MODES)
+        else {
             return ItemRef::NONE;
         };
         let mut kinds = vec![NodeSetKind::Ic, NodeSetKind::Nodeset];
@@ -609,11 +637,11 @@ impl RowFacts for NodeSet {
     }
 }
 
-/// The feature of each `Applies` member.
-pub(crate) const fn mode_feature(holds: Applies) -> RunExtra {
+/// The feature of each `Applies` member of one state item kind (A28 grain: per kind).
+pub(crate) const fn mode_feature(modes: &Modes, holds: Applies) -> RunExtra {
     match holds {
-        Applies::FromHere => RunExtra::OptionFromHere,
-        Applies::WholeRun => RunExtra::OptionWholeRun,
+        Applies::FromHere => modes.from_here,
+        Applies::WholeRun => modes.whole_run,
     }
 }
 
@@ -628,7 +656,7 @@ fn take_holds(words: &mut Words<'_>) -> Applies {
     }
 }
 
-/// Adds the feature of a state item's mode (`StateFromHere`, `StateWholeRun`).
-fn holds_feature(holds: Applies, set: &mut FeatureSet) {
-    flag(set, true, mode_feature(holds));
+/// Adds the feature of a state item's mode (`OptionFromHere`, `EnvWholeRun`, …).
+fn holds_feature(modes: &Modes, holds: Applies, set: &mut FeatureSet) {
+    flag(set, true, mode_feature(modes, holds));
 }

@@ -9,9 +9,8 @@ use crate::build::Builder;
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{NameId, ScopeId};
-use crate::option::{Applies, OptionRow, mode_feature};
+use crate::option::{Applies, Modes, OPTION_MODES, OptionRow, mode_feature};
 use crate::option_key::OptionKey;
-use crate::run_extra::RunExtra;
 use crate::run_words::has;
 use crate::span::Span;
 
@@ -28,7 +27,7 @@ pub(crate) fn gen_nfreqs(
         && crate::r#gen::placeable(b.design(), scope, crate::item::ItemKind::Option, features)
         && g.items_left > 1;
     let Some(holds) = allowed
-        .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun, mode_feature))
+        .then(|| gen_holds(g, b, scope, features, &OPTION_MODES))
         .flatten()
     else {
         return false;
@@ -48,24 +47,23 @@ pub(crate) fn gen_nfreqs(
 
 /// The mode of a state item generated into `scope`, or `None` when the set allows neither: once
 /// any run item exists (conservatively: anywhere, since items are generated in listed order),
-/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun` (placement is `fill`'s, A15 K1);
-/// each mode also needs its own feature, `mode(m)` (a state item's or a save's).
+/// `FromHere` needs the kind's `mid` and `WholeRun` its `whole_mid` (placement is `fill`'s, A15
+/// K1); each mode also needs the kind's own feature (`mode_feature`).
 pub(crate) fn gen_holds(
     g: &mut Gen,
     b: &Builder<'_>,
     _scope: ScopeId,
     features: &FeatureSet,
-    mid: RunExtra,
-    mode: fn(Applies) -> RunExtra,
+    modes: &Modes,
 ) -> Option<Applies> {
     let d = b.design();
     let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
     let modes: Vec<Applies> = [
-        (Applies::FromHere, mid),
-        (Applies::WholeRun, RunExtra::OptionWholeRunMidRun),
+        (Applies::FromHere, modes.mid),
+        (Applies::WholeRun, modes.whole_mid),
     ]
     .into_iter()
-    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode(m)))
+    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode_feature(modes, m)))
     .map(|(m, _)| m)
     .collect();
     (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])

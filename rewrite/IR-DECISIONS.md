@@ -441,3 +441,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `move_item` re-parents the item's body scopes and asserts both scopes are in one file (a scope's `file` is not rewritten).
 - `rename_def` leaves bound references' names to the pass (else `RefTarget`).
 
+
+## Run features per item kind: state modes (ng-run's W1303)
+
+- `StateFromHere`/`StateWholeRun` are now split into `{Option,Env,NodeSet}{FromHere,WholeRun}`, and `WholeRunMidRun` into `{Option,Env,NodeSet,Save}WholeRunMidRun`. A dialect then lists exactly the kinds it spells from a given place: ngspice spells a from-here option and temperature, but not a from-here node condition. Each kind's four mode features are one `option::Modes` constant (`OPTION_MODES`, `ENV_MODES`, `NODE_SET_MODES`, `SAVE_MODES`), read by the row features, the listed-order walk and `state_gen::gen_holds`.
