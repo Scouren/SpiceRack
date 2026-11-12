@@ -80,3 +80,52 @@ fn p5_006_an_ltspice_capacitors_units_are_one_scaled_capacitor() {
     let lt = write(deck, Dialect::Ltspice, Dialect::Ltspice);
     assert!(lt.lines().any(|l| l == "C1 o1 0 1u x2"), "{lt}");
 }
+
+/// Ledger P4-067 (spec S4-rf-private-cards). LTspice help, ".MACHINE —
+/// Arbitrary State Machine": five cards (`.mach[ine]`, `.state`, `.rule`,
+/// `.output`, `.endmach[ine]`); LTspice 26.1.1 ran the three decks below
+/// (the machine inverts V(1): V(2) = 1 at 0.75 ms, 0 at 0.25 ms, both
+/// spellings). `.softstart` scales the soft-start time of LTspice's own
+/// regulator models (the example decks' comments); LTspice 26.1.1 reads
+/// it and stops on an unknown card. ngspice-45 stops on each
+/// ("unimplemented dot command") and Xyce 7.10 reads past each
+/// (research/impl/evidence/S4-rf-private-cards/RESULTS.txt). So every
+/// other target refuses each as LTspice's own (W0039), never as text no
+/// rule read (W0001), and LTspice gets its lines back as written.
+#[test]
+fn p4_067_ltspice_own_cards_are_refused_as_its_own() {
+    use spicerack::syntax::diag::Code;
+    let lt = Dialect::Ltspice;
+    let rc = "t\nV1 1 0 PULSE(0 1 0 1u 1u .5m 1m)\nR1 2 0 1k\n";
+    let end = ".tran 3m\n.end\n";
+    let machine = ".machine\n.state S0 0\n.rule S0 S0 V(1) > .5\n.output (2) V(1) < .5\n\
+        .endmachine\n";
+    let cards = [
+        ".softstart .5\n",
+        machine,
+        ".mach\n.output (2) V(1) < .5\n.endmach\n",
+    ];
+    for card in cards {
+        let deck = format!("{rc}{card}{end}");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Xyce,
+            Dialect::Spectre,
+            Dialect::Vacask,
+        ] {
+            let codes = oracle::refusal(&deck, lt, to);
+            let own = codes.contains(&Code::W0039) && !codes.contains(&Code::W0001);
+            assert!(own, "{to:?}: {codes:?}\n{deck}");
+        }
+        // LTspice gets each card back as written.
+        let back = write(&deck, lt, lt);
+        for line in card.lines() {
+            assert!(back.lines().any(|l| l == line), "{line}\n{back}");
+        }
+    }
+    // The legal neighbour: the circuit without the cards is written.
+    let plain = format!("{rc}{end}");
+    assert!(write(&plain, lt, Dialect::Ngspice).contains(".tran"));
+}

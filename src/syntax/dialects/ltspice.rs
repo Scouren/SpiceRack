@@ -160,6 +160,20 @@ pub(super) fn ltspice() -> DialectDef {
         // sample-and-hold, phase detector, varistor); ngspice reads `A` as
         // an XSPICE code model, Xyce and HSPICE have no `A` element.
         .kept_word("a", Construct::PrivateText)
+        // Its own cards (ZERO-LEDGER P4-067), W0039 on any other target:
+        // `.softstart` scales the soft-start time of LTspice's own
+        // regulator models (the example decks' comments; LTspice 26.1.1
+        // reads it, ngspice-45 stops on it), and the arbitrary state
+        // machine's five cards (help, `.MACHINE`: `.mach[ine]`, `.state`,
+        // `.rule`, `.output`, `.endmach[ine]`).
+        .kept_word(".softstart", Construct::PrivateText)
+        .kept_word(".machine", Construct::PrivateText)
+        .kept_word(".mach", Construct::PrivateText)
+        .kept_word(".state", Construct::PrivateText)
+        .kept_word(".rule", Construct::PrivateText)
+        .kept_word(".output", Construct::PrivateText)
+        .kept_word(".endmachine", Construct::PrivateText)
+        .kept_word(".endmach", Construct::PrivateText)
         // Its state files (ZERO-LEDGER P6-006; help, `.SAVESTATE`,
         // `.LOADSTATE`: "a proprietary format"; `.SAVEBIAS`: a file for
         // `.loadbias`, P5-026's).

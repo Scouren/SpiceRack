@@ -270,3 +270,43 @@ fn p6_014_xyce_preprocess_removeunused_addresistors() {
     let both = unused.replace(".end\n", ".preprocess replaceground true\n.end\n");
     oracle::spec_refusal(cite, &both, xy, ng, &[Code::W0039]);
 }
+
+// Ledger P4-065 (spec S4-rf-private-cards). `.ROL` is Xyce's optimization
+// analysis, with its `.ROL_DC` sweep and `.ROL_OBJ` objectives: Xyce 7.10
+// on the corpus deck `ROL/dc-rol.cir` says "No objectives have been
+// defined for optimization, please include .ROL_OBJ lines to define", and
+// on `ROL/amplifier.cir` "Unrecognized value 'I1' on .ROL line"; the RG
+// has no such card and ngspice-45 stops on it ("unimplemented dot command
+// '.rol'"; research/impl/evidence/S4-rf-private-cards/RESULTS.txt). No
+// other simulator has it, so every other target refuses the cards as
+// Xyce's own (W0039), never as text no rule read (W0001), and Xyce gets
+// them back as written.
+#[test]
+fn p4_065_xyce_rol_cards_are_refused_as_its_own() {
+    let xy = Dialect::Xyce;
+    let plain = "* t\nR1 1 0 10\nV1 1 0 0\n.dc V1 0 10 1\n.print dc v(1)\n.end\n";
+    let cards = [
+        ".rol",
+        ".rol_dc data=meas",
+        ".rol_obj DC l2err error {iv2} {-I(V1)}",
+    ];
+    let deck = plain.replace(".end\n", &format!("{}\n.end\n", cards.join("\n")));
+    for to in [
+        Dialect::Ngspice,
+        Dialect::Espice,
+        Dialect::Hspice,
+        Dialect::Ltspice,
+        Dialect::Spectre,
+        Dialect::Vacask,
+    ] {
+        let codes = oracle::refusal(&deck, xy, to);
+        let own = codes.contains(&Code::W0039) && !codes.contains(&Code::W0001);
+        assert!(own, "{to:?}: {codes:?}\n{deck}");
+    }
+    let back = oracle::write(&deck, xy, xy);
+    for line in cards {
+        assert!(back.lines().any(|l| l == line), "{line}\n{back}");
+    }
+    // The legal neighbour: the circuit without the cards is written.
+    assert!(oracle::write(plain, xy, Dialect::Ngspice).contains(".dc"));
+}
