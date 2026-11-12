@@ -1,0 +1,3 @@
+file "a.sp" deck
+  analysis tran stop=1u print_step=1n cap=none
+  analysis tran stop=3u record_start=1u print_step=1n cap=none

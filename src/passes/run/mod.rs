@@ -19,14 +19,17 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod run_items_together`, `pub mod whole_run_state_first`,
+//! Contents: `pub mod run_items_together`, `pub mod tran_ceiling_given`,
+//! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod run_items_together;
+pub mod tran_ceiling_given;
 pub mod whole_run_state_first;
 
 use super::Pass;
 use crate::ir;
+use tran_ceiling_given as tc;
 use whole_run_state_first as wr;
 
 /// The group's passes, in the order `legalize` tries them.
@@ -51,6 +54,34 @@ pub(super) const PASSES: &[Pass] = &[
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::SaveFromHere)),
         notes: &[wr::MID_RUN, wr::RESET_RESTORES],
         run: wr::whole_run_save_to_from_here,
+    },
+    Pass {
+        name: "tran_cap_ngspice_to_given",
+        removes: ir::Feature::Run(ir::RunExtra::TranCapNgspice),
+        requires: ceiling(&[ir::BinOp::Sub, ir::BinOp::Div], true),
+        notes: &[tc::NO_PRINT_STEP],
+        run: tc::tran_cap_ngspice_to_given,
+    },
+    Pass {
+        name: "tran_cap_span50_to_given",
+        removes: ir::Feature::Run(ir::RunExtra::TranCapSpan50),
+        requires: ceiling(&[ir::BinOp::Sub, ir::BinOp::Div], false),
+        notes: &[],
+        run: tc::tran_cap_span50_to_given,
+    },
+    Pass {
+        name: "tran_cap_span10_to_given",
+        removes: ir::Feature::Run(ir::RunExtra::TranCapSpan10),
+        requires: ceiling(&[ir::BinOp::Sub, ir::BinOp::Div], false),
+        notes: &[],
+        run: tc::tran_cap_span10_to_given,
+    },
+    Pass {
+        name: "tran_cap_none_to_given",
+        removes: ir::Feature::Run(ir::RunExtra::TranCapNone),
+        requires: ceiling(&[ir::BinOp::Sub], false),
+        notes: &[],
+        run: tc::tran_cap_none_to_given,
     },
     // after `whole_run_state_first`: a move may interleave
     Pass {
@@ -101,6 +132,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        tc::NO_PRINT_STEP,
+        ir::Info {
+            title: "a transient under ngspice's step ceiling with no print step",
+            cite: "rewrite/AMEND-A12.md A24; R47",
+            explain: "ngspice's default ceiling is the smaller of the print step and a fiftieth of the span; this transient leaves the print step to the simulator, so the ceiling has no value to state and the analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         run_items_together::HOLDS_RUN_ITEMS,
         ir::Info {
             title: "a circuit item between run items that holds run items",
@@ -110,3 +150,19 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
 ];
+
+// ---- private ----
+
+/// What a ceiling row's expression may add: the given ceiling and its operators.
+const fn ceiling(ops: &[ir::BinOp], min: bool) -> ir::FeatureSet {
+    let mut set = ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranMaxStep));
+    let mut k = 0;
+    while k < ops.len() {
+        set = set.with(ir::Feature::Binary(ops[k]));
+        k += 1;
+    }
+    if min {
+        set = set.with(ir::Feature::Func(ir::Func::Min));
+    }
+    set
+}

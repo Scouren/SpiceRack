@@ -8,6 +8,8 @@
 //!
 //! Contents: tests only.
 
+#[path = "passes_structure/bindings.rs"]
+mod bindings;
 #[path = "passes_run/state.rs"]
 mod state;
 #[path = "passes_run/walk.rs"]
@@ -26,6 +28,10 @@ const PENDING_PAIRS: &[&str] = &[
     "whole_run_to_from_here",
     "whole_run_save_to_from_here",
     "run_items_together",
+    "tran_cap_ngspice_to_given",
+    "tran_cap_span50_to_given",
+    "tran_cap_span10_to_given",
+    "tran_cap_none_to_given",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -57,6 +63,85 @@ fn whole_run_save_to_from_here_keeps_the_saves_at_every_analysis() {
 #[test]
 fn run_items_together_keeps_the_state_at_every_analysis() {
     keeps_state("run_items_together", ir::RunExtra::RunInterleaved);
+}
+
+/// The ceiling rows against `StepCap`'s docs: for a grid of transients (stops, record starts
+/// and print steps of several magnitudes, record start absent or set), the given ceiling
+/// evaluates (reference evaluator) to the doc's arithmetic on the fields' values, bit for bit.
+#[test]
+fn tran_ceilings_are_the_rules_arithmetic() {
+    use spicerack::ir::tran::{StepCap, StepCeiling, Tran};
+    let rows = [
+        (
+            "tran_cap_ngspice_to_given",
+            StepCap::NgspiceRule,
+            "ngspice_rule",
+        ),
+        (
+            "tran_cap_span50_to_given",
+            StepCap::SpanOver50,
+            "span_over50",
+        ),
+        (
+            "tran_cap_span10_to_given",
+            StepCap::SpanOver10,
+            "span_over10",
+        ),
+        ("tran_cap_none_to_given", StepCap::None, "none"),
+    ];
+    let stops = ["1u", "3.3e-6", "1", "7.31e-9", "1e3", "0.1"];
+    let starts = ["", "1n", "1.1e-7", "0.05"];
+    let steps = ["1n", "1e-12", "2.5e-6", "0.01"];
+    for (name, cap, word) in rows {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        let mut points = 0;
+        for stop in stops {
+            for start in starts {
+                for step in steps {
+                    let rs = if start.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" record_start={start}")
+                    };
+                    let text = format!(
+                        "file \"a.sp\" deck\n  analysis tran stop={stop}{rs} print_step={step} cap={word}\n"
+                    );
+                    let mut design = ir::Design::new();
+                    let mut diags = ir::Diags::new();
+                    ir::parse(&text, &mut design.builder(), &mut diags);
+                    if !diags.is_empty() {
+                        continue; // a record start past the stop: outside the analysis's domain
+                    }
+                    (pass.run)(&mut design, &mut diags);
+                    let a = design.row::<ir::Analysis>(
+                        design.items(design.file(design.entry()).top)[0].index,
+                    );
+                    let t = design.detail::<Tran>(a.detail);
+                    let StepCeiling::Given(g) = t.ceiling else {
+                        panic!("{name}: {text} keeps its rule");
+                    };
+                    let env = bindings::ByDefinition(&design);
+                    let value =
+                        |e: ir::ExprId| ir::eval(&design, e, &env).expect("a literal field");
+                    let span = if t.record_start.is_none() {
+                        value(t.stop)
+                    } else {
+                        value(t.stop) - value(t.record_start)
+                    };
+                    let want = match cap {
+                        StepCap::None => span,
+                        StepCap::SpanOver10 => span / 10.0,
+                        StepCap::SpanOver50 => span / 50.0,
+                        StepCap::NgspiceRule => value(t.print_step).min(span / 50.0),
+                    };
+                    assert_eq!(value(g).to_bits(), want.to_bits(), "{name}: {text}");
+                    points += 1;
+                }
+            }
+        }
+        assert!(points > 0, "{name}: no point");
+        eprintln!("{name}: {points} points");
+    }
 }
 
 /// The chain for a target with neither whole-run state nor interleaved run items: legalize
