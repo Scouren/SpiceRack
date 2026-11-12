@@ -463,5 +463,13 @@ fn a_temperature_default_is_not_a_constant() {
         let t = b.tnom();
         b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
     });
-    assert!(!tnom.contains(f), "w = $tnom is a constant of the run");
+    assert!(
+        tnom.contains(f),
+        "w = $tnom (A25, VACASK run c3: dependent, reads back as a local)"
+    );
+    let literal = used(|b, top| {
+        let one = b.num(1.0);
+        b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+    });
+    assert!(!literal.contains(f), "a literal default is a constant");
 }
