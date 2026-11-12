@@ -110,9 +110,10 @@ pub enum StepCap {
 pub struct Four {
     /// The fundamental frequency, Hz; never `NONE`.
     pub fundamental: ExprId,
-    /// The number of harmonics, the fundamental included (LTspice `Nh`), or `NONE` when the
-    /// deck's `OptionKey::NFreqs` gives it (ngspice takes it from `nfreqs`, `fourier.c:69`, A16;
-    /// checked: such an option exists). A reader states its simulator's default count here
+    /// The number of harmonics, the fundamental included and the DC term not (LTspice `Nh`), or
+    /// `NONE` when the deck's `OptionKey::NFreqs` gives it (ngspice, `fourier.c:69`, A16;
+    /// checked: such an option exists). `nfreqs` counts the DC term too: `nfreqs = n` is
+    /// `harmonics = n − 1`. A reader states its simulator's default count here
     /// when the deck sets no option.
     pub harmonics: ExprId,
     /// How many periods at the end are analysed (LTspice `Np`, default 1); never `NONE`.

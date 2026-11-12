@@ -151,8 +151,9 @@ pub enum OptionKey {
     KeepOpInfo,
     /// Flag: suppress the initialisation report. ngspice `noinit`.
     NoInit,
-    /// The harmonic count of every Fourier analysis that names none, count. ngspice `nfreqs`
-    /// (A16).
+    /// The row count of every Fourier analysis that names no count: the DC term included, so
+    /// `nfreqs = n` is DC, the fundamental and the harmonics up to the (n − 1)-th (ngspice
+    /// `nfreqs`, `fourier.c:69`; A16). Under it a count-less `Four` has `Four::harmonics` = n − 1.
     NFreqs,
     /// The size of the Fourier analysis's interpolation grid, count. ngspice `fourgridsize`
     /// (A16).
