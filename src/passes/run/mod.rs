@@ -19,13 +19,14 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod dc_axes_to_loops`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod dc_axes_to_loops`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
 
 mod codes;
 pub mod dc_axes_to_loops;
+pub mod drop_print;
 pub mod ic_next_only;
 pub mod inert_options;
 pub mod loop_end;
@@ -281,6 +282,15 @@ pub(super) const PASSES: &[Pass] = &[
     inert(inert_options::INERT[10]),
     inert(inert_options::INERT[11]),
     inert(inert_options::INERT[12]),
+    inert(inert_options::INERT[13]),
+    inert(inert_options::INERT[14]),
+    Pass {
+        name: "drop_print",
+        removes: ir::Feature::Item(ir::ItemKind::Print),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[drop_print::PRINT_KEPT],
+        run: drop_print::drop_print,
+    },
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",

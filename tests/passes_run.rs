@@ -115,6 +115,16 @@ fn inert_options_leave_the_raw_file_alone() {
 }
 
 #[test]
+fn klu_within_its_rounding() {
+    options::klu_within_its_rounding();
+}
+
+#[test]
+fn prints_leave_the_raw_file_alone() {
+    options::prints_leave_the_raw_file_alone();
+}
+
+#[test]
 fn a_loop_of_ops_is_no_continued_sweep() {
     dc_loops::a_loop_of_ops_is_no_continued_sweep();
 }

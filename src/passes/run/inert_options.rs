@@ -1,30 +1,34 @@
 //! Rule `inert_options`: an option that changes no result dropped, one note each
 //! (`OPTION_DROPPED`, its argument the key's index). One row per key, each removing its
 //! `Option(<key>)` and requiring nothing: `noacct`, `acct`, `list`, `nomod`, `nopage`,
-//! `node`, `opts`, `warn`, `maxwarns`, `norefvalue`, `noinit`, `nfreqs`, `fourgridsize`
-//! (rows `drop_option_<key>`).
+//! `node`, `opts`, `warn`, `maxwarns`, `norefvalue`, `noinit`, `nfreqs`, `fourgridsize`, and
+//! the two solver selections `klu`, `sparse` (rows `drop_option_<key>`; R83).
 //!
 //! Exact by runs, never by a manual (`tests/passes_run/decks/options_probe.sp`: a pulse into an
 //! RC, a diode through an inductor to a load, a level-1 MOSFET with no W, L, AD or AS; op, dc,
-//! ac, tran, and a `.four`): ngspice-45 `-b -r` writes the same raw file with each of these
-//! options as without it (the `Date:` line aside); `nfreqs` and `fourgridsize` change only the
-//! log's Fourier table. `tests/passes_run/options.rs` reruns the table. The same runs leave out:
+//! ac, tran, and a `.four`): ngspice-45 `-b -r` writes the same raw file with each of the
+//! first thirteen as without it (the `Date:` line aside); `nfreqs` and `fourgridsize` change
+//! only the log's Fourier table. The solver selections within a stated bound (R60): `sparse` is
+//! the default solver and identical; `klu` moves values by at most 1e-7 relative (above ABSTOL,
+//! 1e-12), another solver's rounding. `tests/passes_run/options.rs` reruns all fifteen.
 //!
-//! | option | what changed in the raw file |
-//! |---|---|
-//! | `keepopinfo` | an extra plot, the AC's operating point |
-//! | `interp` | the transient's points (243 → 201, resampled) |
-//! | `autostop` | the transient stops at its first point (243 → 1) |
-//! | `trtol=10`, `method=gear` | the transient's step count (243 → 246) |
-//! | `rshunt=1e12` | values (i(vdd) by 0.67 relative in dc and tran) |
-//! | `cshunt=1e-15` | values (ac i(vdd) 6e-2) and the transient's step count |
-//! | `rseries=1e-3` | an extra node (`l1_intern__`) and values |
-//! | `defl`, `defw`, `defad`, `defas` | values (MOSFET geometry) |
-//! | `klu` | values at 1e-7 relative (another solver's rounding) |
+//! An option in a loop's body or a branch, or one a loop or alter targets, is left with
+//! `OPTION_KEPT`: dropping it changes the body's shape (a loop of one op, `LoopOverOp`).
 //!
-//! and `seed=7`, `pivtol`, `pivrel`, `itl2`, `sparse`, identical here, which the deck does not
-//! exercise (no random draw, no near-singular pivot, no DC point past the default iterations,
-//! the default solver): not proven inert, so no row.
+//! Not dropped, and why (R83; the same runs; each owed until a census deck is freed by it):
+//!
+//! | option | what the run showed | why no row |
+//! |---|---|---|
+//! | `rshunt=1e12` | values (i(vdd) by 0.67 relative in dc and tran) | meaning: explicit elements |
+//! | `cshunt=1e-15` | values (ac i(vdd) 6e-2), the transient's step count | meaning |
+//! | `rseries=1e-3` | an extra node (`l1_intern__`) and values | meaning |
+//! | `defl`, `defw` | values (MOSFET current, 0.98 relative) | meaning: instance fields |
+//! | `defad`, `defas` | values (ac 3e-3, tran 5e-2) | meaning: instance fields |
+//! | `interp` | the transient's points (243 → 201, resampled) | the print step as an output interval (R67) |
+//! | `keepopinfo` | an extra plot, the AC's operating point | output shape |
+//! | `autostop` | the transient stops at its first point (243 → 1) | output shape |
+//! | `trtol=10`, `method=gear` | the transient's step count (243 → 246) | error control, ruled with the lossless-LC reading |
+//! | `seed=7`, `pivtol`, `pivrel`, `itl2` | identical | the deck does not exercise them (no draw, no near-singular pivot, no DC point near the iteration limit) |
 //!
 //! Cites: `crates/ir/src/option_key.rs` (`OptionClass::Output`); R67.
 //!
@@ -87,6 +91,10 @@ pub const INERT: &[Row] = &[
     }),
     ("drop_option_fourgridsize", K::FourGridSize, |d, g| {
         drop_option(d, g, K::FourGridSize)
+    }),
+    ("drop_option_klu", K::Klu, |d, g| drop_option(d, g, K::Klu)),
+    ("drop_option_sparse", K::Sparse, |d, g| {
+        drop_option(d, g, K::Sparse)
     }),
 ];
 

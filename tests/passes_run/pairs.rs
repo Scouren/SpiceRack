@@ -30,6 +30,10 @@ pub const PENDING_PAIRS: &[&str] = &[
     "drop_option_noinit",
     "drop_option_nfreqs",
     "drop_option_fourgridsize",
+    "drop_option_klu",
+    "drop_option_sparse",
+    // proven on ngspice by `passes_run/options.rs` (prints): no VACASK deck holds a print
+    "drop_print",
     "whole_run_option_first",
     "whole_run_env_first",
     "whole_run_node_set_first",
