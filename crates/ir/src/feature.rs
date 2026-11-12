@@ -27,6 +27,7 @@
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
+use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
@@ -327,8 +328,9 @@ impl FeatureSet {
 /// the expression features of the expressions in its `RowFacts::handles`; then the features of the
 /// whole design: the case clash and the circuit and run owners' `design_features` hooks, each
 /// called once.
-/// An expression's functions and operators count as `*Dyn` when the expression holds a `V`,
-/// `I`, `Time` or `Freq` leaf.
+/// An expression's functions and operators count as `*Dyn` when its class is at least `Temp`
+/// (`class::expr_class`: it, or a parameter or function it reads, holds the temperature or reads
+/// the circuit; R14, A11).
 pub fn features_used(design: &Design) -> FeatureSet {
     let mut set = FeatureSet::EMPTY;
     let mut walk = ExprWalk::new(design);
@@ -401,12 +403,11 @@ pub(crate) fn item_features(
     }
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);
-        let dynamic = nodes.iter().any(|&e| {
-            matches!(
-                design.expr(e),
-                Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq
-            )
-        });
+        // the Dyn features are class >= Temp (R14, A11): transitive through reads
+        let table = def_classes(design);
+        let dynamic = nodes
+            .iter()
+            .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
             let f = match design.expr(e) {

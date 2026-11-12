@@ -46,6 +46,7 @@
 
 use crate::analysis::{Analysis, RunDetails};
 use crate::build::Builder;
+use crate::class::ExprClass;
 use crate::edit::Editor;
 use crate::element::{CircuitDetails, Element};
 use crate::expr::{
@@ -115,6 +116,9 @@ pub struct Design {
     // detail tables, owned by the circuit and run owners
     pub(crate) circuit: CircuitDetails,
     pub(crate) run: RunDetails,
+    /// The dynamic class of each definition (`class::def_classes`), computed on demand and
+    /// cleared by every `Builder` and `Editor` mutation. Not part of equality.
+    pub(crate) classes: std::sync::OnceLock<Vec<ExprClass>>,
 }
 
 /// A row type that is an item: it names its kind and its table. Implemented here for every
@@ -233,16 +237,19 @@ impl Design {
             measures: Table::new(),
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
+            classes: std::sync::OnceLock::new(),
         }
     }
 
     /// The append-only door for readers and builders.
     pub fn builder(&mut self) -> Builder<'_> {
+        self.classes.take();
         Builder { design: self }
     }
 
     /// The door for passes: replace rows and item lists, append through a builder.
     pub fn editor(&mut self) -> Editor<'_> {
+        self.classes.take();
         Editor { design: self }
     }
 

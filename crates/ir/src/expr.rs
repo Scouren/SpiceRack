@@ -153,7 +153,9 @@ pub enum BinOp {
     Mul,
     /// `a / b`; `b == 0` is a domain error.
     Div,
-    /// `trunc(a / b)`, toward zero (ngspice `\`); `b == 0` is a domain error.
+    /// `trunc(a / b)`, toward zero; `b == 0` is a domain error. Not ngspice's `\` (which is
+    /// `trunc(|a / b|)`, read as `Trunc(Abs(Div))`, A11); no speaker yet: removed if no reader
+    /// produces it.
     IntDiv,
     /// `a == b` (exact).
     Eq,
@@ -205,15 +207,19 @@ pub enum Func {
     Abs,
     /// `√x`; `x < 0` is a domain error.
     Sqrt,
-    /// `√|x|` (ngspice B-source `sqrt`).
+    /// `√|x|`. Not ngspice-45's B-source `sqrt`, which errors below zero (A11); speaker to be
+    /// confirmed by the HSPICE and LTspice slices: removed if no reader produces it.
     SqrtAbs,
     /// `eˣ`, exact; a non-finite result is a domain error.
     Exp,
-    /// `eˣ` for `x <= 14`, `e¹⁴·(1 + x − 14)` beyond (ngspice B-source `exp`).
+    /// `eˣ` for `x <= 14`, `e¹⁴·(1 + x − 14)` beyond (ngspice's B-source `exp` under
+    /// `ngbehavior=ps` only, A11).
     ExpLin14,
     /// Natural logarithm; `x <= 0` is a domain error.
     Ln,
-    /// `ln|x|` (ngspice B-source `ln`, `log`); `x == 0` is a domain error.
+    /// `ln|x|`; `x == 0` is a domain error. Not ngspice-45's B-source `ln`/`log`, which error
+    /// below zero (A11); speaker to be confirmed by the HSPICE and LTspice slices: removed if no
+    /// reader produces it.
     LnAbs,
     /// Base-10 logarithm; `x <= 0` is a domain error.
     Log10,
@@ -221,7 +227,7 @@ pub enum Func {
     /// with a fractional `y`, and `0` to a negative power, are domain errors (HSPICE, LTspice,
     /// Spectre, VACASK `**`/`pow`).
     Pow,
-    /// `|x|ʸ` (ngspice `**`, `^`, B-source `pow`); `x == 0, y < 0` is a domain error.
+    /// `|x|ʸ` (ngspice B-source `**`, `^`, `pow`); `x == 0, y < 0` is a domain error.
     PowAbs,
     /// The real part of the complex power: `Pow` where `Pow` is defined, `|x|ʸ·cos(πy)` for
     /// `x < 0` and a fractional `y` (Xyce `**`, `pow`, `pwr`).
@@ -283,7 +289,8 @@ pub enum Func {
     Fmod,
     /// `clamp(x, lo, hi)` = `min(max(x, lo), hi)`; `lo > hi` is a domain error.
     Clamp,
-    /// The unit step: 1 for `x > 0`, else 0 (ngspice `u`).
+    /// The unit step: 1 for `x > 0`, else 0. Not ngspice's `u` (that is `StepHalf`, A11);
+    /// speaker to be confirmed by the LTspice and Xyce slices.
     Step,
     /// The unit ramp: `x` for `x > 0`, else 0 (ngspice `uramp`).
     Ramp,

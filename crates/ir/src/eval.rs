@@ -65,21 +65,6 @@ pub enum Domain {
     NotANumber(ExprId),
 }
 
-/// The dynamic class of an expression (R14, A11): `Circuit` when it, or a parameter or user
-/// function it reads (transitively), holds `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt`; else `Temp`
-/// when one of them holds `Temp`; else `Constant`. Ordered: the `*Dyn` features are
-/// `class >= Temp`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-pub enum ExprClass {
-    /// Reads nothing that varies in a run.
-    Constant,
-    /// Reads the temperature (directly or through a definition), nothing of the circuit.
-    Temp,
-    /// Reads the circuit or the time (directly or through a definition).
-    Circuit,
-}
-
 /// Deepest user-function call nesting `eval` follows.
 pub const CALLS_MAX: usize = 1024;
 
@@ -122,11 +107,6 @@ struct Machine<'a> {
 
 /// The value of `e` under `env`. Pure: the same design, id and bindings give the same result.
 /// `Ddt` and `Idt` need a time history no `Bindings` gives: they are [`Domain::Unbound`].
-pub fn expr_class(design: &Design, e: ExprId) -> ExprClass {
-    todo!() // A11: red first
-}
-
-/// The value of `e` under `env`.
 pub fn eval(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<f64, Domain> {
     assert!(
         !e.is_none() && e.index() < design.expr_count(),
@@ -411,7 +391,19 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Trunc => x.trunc(),
         Func::RoundHalfAway => x.round(),
         Func::RoundHalfEven => x.round_ties_even(),
-        Func::StepHalf | Func::PowSigned | Func::Sqr => todo!(), // A11: red first
+        Func::StepHalf => {
+            if x < 0.0 {
+                0.0
+            } else if x == 0.0 {
+                0.5
+            } else {
+                1.0
+            }
+        }
+        Func::PowSigned if x == 0.0 && y() < 0.0 => return Err(out),
+        Func::PowSigned if x < 0.0 => -(-x).powf(y()),
+        Func::PowSigned => x.powf(y()),
+        Func::Sqr => x * x,
         Func::Sgn => {
             if x > 0.0 {
                 1.0

@@ -244,6 +244,25 @@ writer's bare-or-`#k` test and `parse` (through `link`) use the body for that ro
 keeps its listing scope. Why: ngspice sorts head parameters by dependency, HSPICE and Spectre read
 them in the body, and a lookup from the parent would dump the common case as `r#k`.
 
+**A11 (2026-11-12): from the ngspice tracer (ngspice-45 source and runs).**
+1. Three `Func` members: `StepHalf` (0 for x < 0, 0.5 at 0, 1 for x > 0: ngspice B-source `u`,
+   `PTustep`), `PowSigned` (−pow(−x, y) for x < 0, else pow(x, y), `0` to a negative power a
+   domain error: B-source `pwr`, `PTpwr`), `Sqr` (x·x: numparam `sqr`). `Func::COUNT` is 43 and
+   `Feature::COUNT` 502.
+2. Attributions corrected, no behaviour change: `Step` is not ngspice's `u`; `SqrtAbs` and `LnAbs`
+   are not ngspice-45's B-source `sqrt`/`ln` (those error below zero), and are removed if no reader
+   produces them; `ExpLin14` is ngspice's B-source `exp` under `ngbehavior=ps` only; `IntDiv` is not
+   ngspice's `\` (which is `trunc(|a / b|)`, read as `Trunc(Abs(Div))`), no speaker yet.
+3. The dynamic class (R14): `pub enum ExprClass { Constant, Temp, Circuit }` (ordered) and
+   `pub fn expr_class(&Design, ExprId) -> ExprClass`. An expression is `Circuit` when it, or a
+   parameter or user function it reads (transitively), holds V, I, Time, Freq, Ddt or Idt; else
+   `Temp` when one of them holds `Temp`; else `Constant`. One class per `Param`/`Func` definition,
+   computed once per design state (Kahn's worklist; a definition on or behind a reference cycle is
+   `Circuit`) and cached in the design, cleared by every `Builder`/`Editor` mutation. The `*Dyn`
+   features are `class >= Temp`. `ProbeContext` stays the direct test.
+4. `Builder::bind_ref(item, k, def)` sets the k-th `Ref` of `item`, in `map_refs` order (asserts `k`
+   in range and the slot's kind), so a reader binds a row reference to a definition it pushes later.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

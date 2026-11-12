@@ -48,12 +48,15 @@ pub mod facts;
 pub mod build;
 pub mod build_expr;
 pub mod check;
+pub mod class;
 pub mod design;
 pub mod diag;
 pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
+#[cfg(any(test, feature = "gen"))]
+mod gen_expr;
 #[cfg(any(test, feature = "gen"))]
 mod gen_rows;
 pub mod id;
@@ -108,10 +111,11 @@ pub mod tran;
 pub use analysis::{Analysis, AnalysisKind, RunDetail, RunDetails};
 pub use build::Builder;
 pub use check::{Violation, check, check_legal};
+pub use class::{ExprClass, expr_class};
 pub use design::{Design, DetailRow, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
-pub use eval::{Bindings, Domain, ExprClass, eval, expr_class};
+pub use eval::{Bindings, Domain, eval};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
 pub use facts::{Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};

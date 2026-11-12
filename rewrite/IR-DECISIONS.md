@@ -190,3 +190,12 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
 - An empty list is always `List::EMPTY` (start 0): every `Builder` list constructor (`names`, `name_ids`, `exprs`, `params`, and through them every row and expression list) returns it for an empty slice, and `check` reports any other empty range as `HandleRange`. Equality therefore no longer depends on how an empty list was made (the circuit owner's report; its `canonical()` in circuit_parse.rs can go).
 - `check_legal` agrees with `features_used` by construction: both take the design-level features from `feature::design_level` (the case clash and both owners' `design_features`). A generated property checks it: for 40 designs × 20 random subsets, the set of reported `arg`s equals `features_used(d).minus(legal)`.
+
+## A11 applied (kernel)
+
+- The class lives in a new kernel file, `class.rs` (`ExprClass`, `expr_class`; crate `def_classes`, `node_class`). The per-definition table is cached in `Design::classes` (a `std::sync::OnceLock`, so `Design` stays `Sync`). `Design::builder()`/`editor()` and every mutating `Builder`/`Editor` method clear it, and it is not part of equality. `expr_class` costs O(its tree) once the table is built, and O(design) the first time after a mutation.
+- A formal-argument read (a `Param` expression bound to its `Func`) is not a dependency: its class is the call's argument's, which the caller's own tree holds. A user call is a dependency on its `Func`.
+- `ProbeContext` stays direct, as ruled. Making it transitive (a parameter whose value reads the circuit through another parameter) is open.
+- The generator follows R14. It decides a tree's class up front: a dynamic tree starts from `Temp` (or a probe under `Reads::Circuit`); a constant tree holds neither and reads only definitions the generator noted as constant (`Gen::def_class`, set by each row's generator for the definitions it pushes). `Ddt`/`Idt` appear only in a dynamic tree under `Reads::Circuit`. The expression generator moved to `gen_expr.rs` (gen.rs passed 500 lines).
+- `bind_ref` asserts the slot's kind, not the name (a reader may bind by its own case rule; `check`'s `RefTarget` then judges the name).
+- kernel_store.rs passed 500 lines: its structure tests (`reachable`, the empty list, `bind_ref`) moved to `tests/kernel_structure.rs`.
