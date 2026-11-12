@@ -33,7 +33,7 @@ use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, PortSpec, Source};
 use crate::wave::{
     Am, AmModTime, Exp, GivenZero, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm,
-    SffmLaw, Sin, TdFrom, WaveKind, WaveRef,
+    SffmLaw, Sin, TdFrom, TrRandom, WaveKind, WaveRef,
 };
 
 /// Adds the element's kind, its waveform's kind and its circuit extras.
@@ -116,6 +116,13 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
         DetailKind::Behav => {
             if let Some(b) = get_row::<Behav>(design, e.detail) {
                 behav(b, &mut add);
+                // A17: a charge-defined capacitor's coefficient states its law
+                if e.kind == ElemKind::ChargeCapacitor && (some(b.tc1) || some(b.tc2)) {
+                    add(match b.tc_law {
+                        TcLaw::Direct => X::TcLawDirect,
+                        TcLaw::Reciprocal => X::TcLawReciprocal,
+                    });
+                }
             }
         }
         DetailKind::Laplace => {
@@ -432,11 +439,9 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
         WaveKind::Sin => get_row::<Sin>(design, w.index).map(|p| p.given_zero),
         WaveKind::Exp => get_row::<Exp>(design, w.index).map(|p| p.given_zero),
         WaveKind::Sffm => get_row::<Sffm>(design, w.index).map(|p| p.given_zero),
-        WaveKind::Pwl
-        | WaveKind::Am
-        | WaveKind::TrNoise
-        | WaveKind::TrRandom
-        | WaveKind::Pattern => None,
+        WaveKind::Am => get_row::<Am>(design, w.index).map(|p| p.given_zero),
+        WaveKind::TrRandom => get_row::<TrRandom>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Pwl | WaveKind::TrNoise | WaveKind::Pattern => None,
     };
     match rule {
         Some(GivenZero::AsGiven) => add(X::GivenZeroAsGiven),

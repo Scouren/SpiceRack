@@ -120,6 +120,7 @@ mod tests {
             phase_c_deg: v,
             mod_time,
             pre,
+            given_zero: spicerack_ir::wave::GivenZero::AsGiven,
         }
     }
 
@@ -363,6 +364,7 @@ mod tests {
                 p1: v,
                 p2: v,
                 kind: TrRandomKind::Gauss,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             WaveKind::Pattern => {
                 let bits = b.name("10");
@@ -1517,5 +1519,57 @@ mod tests {
             true,
         );
         assert!(!port.contains(Feature::Circuit(X::NameWithoutLetter)));
+    }
+
+    /// A17: the zero rule of an AM and a TRRANDOM, and a charge-defined capacitor's law, are
+    /// features as on the other rows.
+    #[test]
+    fn am_trrandom_and_charge_laws_are_features() {
+        let am = used(
+            |b, t, _| {
+                let r = am(b, AmModTime::Delay, PreDelay::Zero);
+                let w = b.wave(Am {
+                    given_zero: GivenZero::SpiceDefault,
+                    ..r
+                });
+                with_wave(b, t, w);
+            },
+            true,
+        );
+        assert!(am.contains(Feature::Circuit(X::GivenZeroSpiceDefault)));
+        let tr = used(
+            |b, t, _| {
+                let v = n(b, 1);
+                let w = b.wave(TrRandom {
+                    ts: v,
+                    td: v,
+                    p1: v,
+                    p2: v,
+                    kind: TrRandomKind::Gauss,
+                    given_zero: GivenZero::AsGiven,
+                });
+                with_wave(b, t, w);
+            },
+            true,
+        );
+        assert!(tr.contains(Feature::Circuit(X::GivenZeroAsGiven)));
+        let charge = |law: TcLaw| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            let e = n(&mut b, 1);
+            let tc1 = n(&mut b, 1);
+            let h = b.head("c1", &["a", "0"], None, &[], ExprId::NONE);
+            let row = spicerack_ir::controlled::Behav {
+                tc1,
+                tc_law: law,
+                ..behav(e, OutKind::Charge)
+            };
+            b.behav(top, ElemKind::ChargeCapacitor, h, row, Span::NONE);
+            features_used(&d)
+        };
+        assert!(charge(TcLaw::Reciprocal).contains(Feature::Circuit(X::TcLawReciprocal)));
+        assert!(charge(TcLaw::Direct).contains(Feature::Circuit(X::TcLawDirect)));
+        assert!(!charge(TcLaw::Direct).contains(Feature::Circuit(X::TcLawReciprocal)));
     }
 }
