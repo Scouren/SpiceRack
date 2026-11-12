@@ -16,12 +16,15 @@
 use crate::design::Design;
 use crate::diag::Diags;
 #[cfg(doc)]
-use crate::diag::LINK_UNBOUND;
+use crate::edit::Editor;
 
-/// Binds every unresolved reference by `Design::lookup` from the scope of the item (or
-/// expression's item) that holds it, with the kind the field expects. Appends one
-/// [`LINK_UNBOUND`] note per reference it leaves unresolved (`arg`: the name). Deterministic:
-/// items in scope order, fields in `map_refs` order. O(references × scope depth).
+/// Binds every still-unresolved reference by `Design::lookup` from the scope of the item (or the
+/// expression's item) that holds it, innermost scope first, exact names, with the kind the field
+/// expects. A reference it cannot bind stays unresolved and gets no diagnostic: unresolved is
+/// legal. A bound reference and a held one (IR text `name?`, held by a crate-private sentinel) are never changed.
+/// Works through an [`Editor`] (`Editor::map_refs`, `Builder::resolve`). Deterministic: items in
+/// scope order, fields in `map_refs` order. O(references × scope depth). `diags` is not appended
+/// to today; it is the spine's uniform signature.
 pub fn link(design: &mut Design, diags: &mut Diags) {
     todo!()
 }

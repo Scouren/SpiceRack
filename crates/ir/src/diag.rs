@@ -5,8 +5,7 @@
 //! This crate's own catalogue: `X` (an invariant violation: a bug in a reader, pass or builder,
 //! never the user's deck; one per `Violation`), `U` (a feature the target lacks; `arg` is the
 //! `Feature::index`), `S` (a statement read but not representable; one per `OpaqueClass`), and
-//! `P9001..=P9099` for the IR text reader (`text::parse`), `R9001..=R9099` for the linker
-//! (`link`). Every
+//! `P9001..=P9099` for the IR text reader (`text::parse`). Every
 //! other owner keeps its letters and numeric ranges in its own table; a root-crate test checks
 //! the assembled catalogue for collisions. Codes are never renumbered or reused (D24 freezes them
 //! at 1.0).
@@ -19,7 +18,7 @@
 //! - `Diags::new() -> Diags`, `Diags::push(&mut self, Code, Span, u32)`,
 //!   `Diags::rows(&self) -> &[Diag]`, `Diags::len(&self) -> usize`,
 //!   `Diags::is_empty(&self) -> bool`
-//! - `pub const UNSUPPORTED: Code`, `pub const LINK_UNBOUND: Code`, `pub const TEXT_SYNTAX: Code`,
+//! - `pub const UNSUPPORTED: Code`, `pub const TEXT_SYNTAX: Code`,
 //!   `pub const fn violation_code(Violation) -> Code`,
 //!   `pub const fn opaque_code(OpaqueClass) -> Code`, `pub fn info(Code) -> Option<Info>`
 
@@ -82,10 +81,6 @@ pub struct Diags {
 
 /// The code of an unsupported feature on the target: `U0001`, `arg` the feature's index.
 pub const UNSUPPORTED: Code = Code::new(b'U', 1);
-
-/// A reference `link` left unresolved: `R9001`, a note (the kit may be absent); `arg` the
-/// `NameId`. The kernel linker's range is `R9001..=R9099`.
-pub const LINK_UNBOUND: Code = Code::new(b'R', 9001);
 
 /// A line of IR text that `text::parse` cannot read: `P9001` (the IR text reader's range is
 /// `P9001..=P9099`); `arg` 0.
