@@ -44,7 +44,7 @@ use super::read_models::UNKNOWN;
 use super::read_structure::ENCLOSING;
 use super::write_models;
 use crate::ir;
-use crate::syntax::ast::{NONE, Node, Tag};
+use crate::syntax::ast::{Node, Tag};
 use masters::{Found, Master};
 
 /// What this area's rows use.
@@ -197,22 +197,19 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
 /// The body of `instance`, given every file's declared masters.
 #[allow(dead_code, reason = "instance calls it once Lower::declared lands")]
 pub(super) fn instance_in(l: &mut Lower<'_, '_, '_>, n: Node, declared: &Declared) {
-    let h = l.cst.ast.header(n);
-    let (name, master) = (h.name, h.master);
-    let nodes: Vec<String> = h.nodes.iter().map(|&x| node(l, x)).collect();
-    let name = read::field_name(l.cst, name);
+    let h = super::bind::head(l, n);
+    let (name, nodes) = (h.name, h.terminals);
     let mut entries = Vec::new();
-    for &f in l.cst.ast.fields(n) {
+    for &f in &h.args {
         if l.cst.ast.tag(Node(f)) != Tag::Assign {
             return read::opaque(l, n, ir::OpaqueClass::Private, Some(super::codes::PRIVATE));
         }
         let key = read::field_name(l.cst, l.cst.ast.lhs(Node(f)));
         entries.push((key, l.cst.ast.rhs(Node(f))));
     }
-    if master == NONE {
+    let Some(master) = h.master else {
         return behavioural::source(l, n, &name, &nodes, &entries);
-    }
-    let master = read::field_name(l.cst, master);
+    };
     match masters::find(l, declared, &master) {
         Found::Enclosing => read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(ENCLOSING)),
         Found::Nowhere => unresolved(l, n, &name, &nodes, &master, &entries),
@@ -224,15 +221,6 @@ pub(super) fn instance_in(l: &mut Lower<'_, '_, '_>, n: Node, declared: &Declare
 }
 
 // ---- private ----
-
-/// A node name: a ground name is `0` (VD cir-nodes).
-fn node(l: &Lower<'_, '_, '_>, field: u32) -> String {
-    let x = read::field_name(l.cst, field);
-    match l.grounds.contains(&x) {
-        true => super::name::GROUND.to_string(),
-        false => x,
-    }
-}
 
 /// Checks every value of `entries` in `ctx` (A2: before the first push).
 fn check(l: &Lower<'_, '_, '_>, entries: &[(String, u32)], ctx: Context) -> Result<(), Refusal> {
