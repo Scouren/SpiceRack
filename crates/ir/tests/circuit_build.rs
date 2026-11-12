@@ -762,4 +762,67 @@ mod tests {
             Some(b'B')
         );
     }
+
+    /// `n` resistors, each valued by a parameter of its own pushed just before it: every element
+    /// push follows a definition, as a reader of a PDK library does.
+    fn resistor_deck(n: usize) -> Design {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        for i in 0..n {
+            let one = super::circuit_common::n(&mut b, 1);
+            let name = format!("p{i}");
+            b.param(top, &name, one, Span::NONE);
+            let value = b.param_ref(&name);
+            let h = b.head(&format!("r{i}"), &["a", "0"], None, &[], ExprId::NONE);
+            b.passive(
+                top,
+                ElemKind::Resistor,
+                h,
+                Passive {
+                    value,
+                    ..Passive::PLAIN
+                },
+                Span::NONE,
+            );
+        }
+        d
+    }
+
+    /// The fastest of three runs of `f`, in seconds (the minimum filters other builds' load).
+    fn fastest(mut f: impl FnMut()) -> f64 {
+        (0..3)
+            .map(|_| {
+                let t = std::time::Instant::now();
+                f();
+                t.elapsed().as_secs_f64()
+            })
+            .fold(f64::INFINITY, f64::min)
+    }
+
+    /// Building and checking the circuit rows is linear in the items (the round-4 regression: the
+    /// builder's element assert recomputed the definition classes after every push). Oracle: the
+    /// same deck at N and 4N items. A linear step takes 4 times as long at 4N, a quadratic one
+    /// 16; the bound 10 leaves 2.5 times linear's ratio for noise and cache effects, and fails a
+    /// quadratic step.
+    #[test]
+    fn building_and_checking_scale_linearly() {
+        const N: usize = 2_000;
+        const BOUND: f64 = 10.0;
+        let build_n = fastest(|| drop(resistor_deck(N)));
+        let build_4n = fastest(|| drop(resistor_deck(4 * N)));
+        assert!(
+            build_4n < BOUND * build_n,
+            "build: {build_n:.4} s at {N}, {build_4n:.4} s at {}",
+            4 * N
+        );
+        let (small, large) = (resistor_deck(N), resistor_deck(4 * N));
+        let check_n = fastest(|| spicerack_ir::check(&small, &mut spicerack_ir::Diags::new()));
+        let check_4n = fastest(|| spicerack_ir::check(&large, &mut spicerack_ir::Diags::new()));
+        assert!(
+            check_4n < BOUND * check_n,
+            "check: {check_n:.4} s at {N}, {check_4n:.4} s at {}",
+            4 * N
+        );
+    }
 }
