@@ -225,3 +225,82 @@ fn a_draw_counts_in_its_roots_form() {
     let dynamic = read(&format!("file \"t.sp\" deck\n  param p = {draw} + $temp\n"));
     assert!(dynamic.contains(Feature::DistDyn(rel)) && !dynamic.contains(Feature::Dist(rel)));
 }
+
+#[test]
+fn an_argument_no_formal_reads_adds_no_class() {
+    // the lead's ruling on finding (a): a call's class is its body's, each formal read taking
+    // its argument's class; `f(temper)` with a body that ignores its formal is constant
+    use spicerack_ir::{ExprClass, Form, expr_class, root_form};
+    let read = |text: &str| {
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        spicerack_ir::parse(text, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        d
+    };
+    let value = |d: &Design, name: &str| {
+        let top = d.file(d.entry()).top;
+        let def = d.lookup(top, spicerack_ir::DefKind::Param, d.find_name(name));
+        d.row::<spicerack_ir::item::Param>(d.def(def).item.index)
+            .value
+    };
+    let d = read(concat!(
+        "file \"t.sp\" deck\n",
+        "  func f(x) = 1\n",
+        "  func g(x) = x + 1\n",
+        "  param a = @f($temp)\n",
+        "  param b = @g($temp)\n",
+        "  param c = a + 1\n",
+    ));
+    assert_eq!(
+        expr_class(&d, value(&d, "a")),
+        ExprClass::Constant,
+        "f ignores x"
+    );
+    assert_eq!(expr_class(&d, value(&d, "b")), ExprClass::Temp, "g reads x");
+    assert_eq!(
+        expr_class(&d, value(&d, "c")),
+        ExprClass::Constant,
+        "and a reads as constant"
+    );
+    let used = features_used(&d);
+    assert!(!used.contains(Feature::Extra(spicerack_ir::Extra::IfConditionDynamic)));
+    assert_eq!(
+        root_form(&d, value(&d, "a"), spicerack_ir::ExprUse::Constant),
+        Form::Static
+    );
+}
+
+#[test]
+fn an_unbound_read_is_constant_by_assumption_until_bound() {
+    // A33 (the lead's answer c): an unbound parameter read counts as Constant by assumption (a
+    // reader that leaves it unbound asserts a parameter will bind it, R4); binding it to a
+    // definition of class Temp makes the root Temp (the binding door clears the derived tables)
+    use spicerack_ir::{ExprClass, expr_class};
+    let mut d = Design::new();
+    let (read, hot) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let t = b.temp();
+        b.param(top, "hot", t, Span::NONE);
+        let read = b.param_ref("hot"); // left unbound by its reader
+        b.param(top, "p", read, Span::NONE);
+        let hot = b.design().lookup(
+            top,
+            spicerack_ir::DefKind::Param,
+            b.design().find_name("hot"),
+        );
+        (read, hot)
+    };
+    assert_eq!(
+        expr_class(&d, read),
+        ExprClass::Constant,
+        "unbound: Constant by assumption"
+    );
+    d.builder().resolve(read, hot);
+    assert_eq!(
+        expr_class(&d, read),
+        ExprClass::Temp,
+        "bound to a Temp definition"
+    );
+}

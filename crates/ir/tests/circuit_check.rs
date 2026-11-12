@@ -77,7 +77,17 @@ mod tests {
         } else {
             Polarity::None
         };
-        b.model(top, model(n, family, polarity), Span::NONE);
+        // a versioned family states its version
+        let version = if family == ModelFamily::Bsim4 {
+            b.string("4.8.3")
+        } else {
+            ExprId::NONE
+        };
+        let row = spicerack_ir::Model {
+            version,
+            ..model(n, family, polarity)
+        };
+        b.model(top, row, Span::NONE);
         let def = DefId(b.design().definitions().len() as u32 - 1);
         Ref { name: n, def }
     }
@@ -178,9 +188,13 @@ mod tests {
             });
             push(b, top, ElemKind::VSource, &["a", "0"], None, o);
             let name = b.name("nch");
+            let version = b.string("4.8.3");
             b.push(
                 top,
-                model(name, ModelFamily::Bsim4, Polarity::N),
+                spicerack_ir::Model {
+                    version,
+                    ..model(name, ModelFamily::Bsim4, Polarity::N)
+                },
                 Span::NONE,
             );
         });
@@ -1067,5 +1081,85 @@ mod tests {
             );
         });
         assert_eq!(params, only(Violation::FieldDomain));
+    }
+
+    /// A model of a versioned family states its version (ng-models' L5 finding: "no version"
+    /// means each simulator's own default); its neighbour, a family of one version with none
+    /// stated, stays legal.
+    #[test]
+    fn a_versioned_family_states_its_version() {
+        let versionless = checked(|b, top| {
+            let name = b.name("nch");
+            b.push(
+                top,
+                model(name, ModelFamily::Bsim4, Polarity::N),
+                Span::NONE,
+            );
+        });
+        assert_eq!(versionless, only(Violation::FieldDomain));
+        let given = checked(|b, top| {
+            let name = b.name("nch");
+            let version = b.string("4.8.3");
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    version,
+                    ..model(name, ModelFamily::Bsim4, Polarity::N)
+                },
+                Span::NONE,
+            );
+        });
+        assert_eq!(given, Vec::<Code>::new());
+        let single = checked(|b, top| {
+            let name = b.name("m1");
+            b.push(top, model(name, ModelFamily::Mos1, Polarity::N), Span::NONE);
+        });
+        assert_eq!(single, Vec::<Code>::new());
+    }
+
+    /// A30's finding 4: the PWL repeat and join pairs no simulator states (`Ramp` under
+    /// `Period`, `RampWidth` or `Extrapolate` under `From`) are refused; the six others are legal.
+    #[test]
+    fn the_pwl_repeat_and_join_pairs() {
+        for (repeat, join, legal) in [
+            (PwlRepeat::From, PwlJoin::Jump, true),
+            (PwlRepeat::From, PwlJoin::Ramp, true),
+            (PwlRepeat::From, PwlJoin::RampWidth, false),
+            (PwlRepeat::From, PwlJoin::Extrapolate, false),
+            (PwlRepeat::Period, PwlJoin::Jump, true),
+            (PwlRepeat::Period, PwlJoin::Ramp, false),
+            (PwlRepeat::Period, PwlJoin::RampWidth, true),
+            (PwlRepeat::Period, PwlJoin::Extrapolate, true),
+        ] {
+            let got = checked(|b, top| {
+                let one = n(b, 1);
+                let points = b.exprs(&[one, one]);
+                let wave = b.wave(Pwl {
+                    points,
+                    delay: ExprId::NONE,
+                    repeat_at: one,
+                    repeat_count: ExprId::NONE,
+                    join_width: if join == PwlJoin::RampWidth {
+                        one
+                    } else {
+                        ExprId::NONE
+                    },
+                    file: NameId::NONE,
+                    repeat,
+                    join,
+                });
+                let v = b.detail(spicerack_ir::source::Source {
+                    wave,
+                    ..source(one)
+                });
+                push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            });
+            let want = if legal {
+                Vec::new()
+            } else {
+                only(Violation::FieldDomain)
+            };
+            assert_eq!(got, want, "{repeat:?} {join:?}");
+        }
     }
 }

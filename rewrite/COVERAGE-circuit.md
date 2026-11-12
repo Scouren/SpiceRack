@@ -336,6 +336,10 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - A24 ruling → `SemiInitial` split into `SemiInitialOff` and `SemiInitialOn` (ngspice semis take `off` only; Spectre's diode `region=on`); `SwitchInitial` stays one
 - Unmeasured, no feature now (A24 ruling, R18): `TrRandomKind` per member, `FreqUnit` per member, `AmModTime::Delay`: check at Xyce, HSPICE, Spectre, LTspice
 - R44's shape (vc-devices) → `ElementWithoutModel` only for a kind with a master (`master_kind` `Some`); the masterless kinds need no feature in the generator
+- A31 → `CircuitExtra::AmModOffset` (an AM whose `mod_offset` is not the real literal 1, an Int 1 included); without it the generator draws the real literal 1
+- Round 7 → `ModelFamily::word`, `ModelFamily::library_free` public (A32); a versioned standard's model states its version (`check`), the generator's vocabulary `VERSIONS` (ngspice-45, ng-models); `CircuitExtra::BehavUntypedParam` (A33, R56; the generator reads no parameter in a behavioural expression without it); PWL `Ramp`/`Period` and `RampWidth`/`Extrapolate` under `From` refused (A30 finding 4)
+- Unmeasured: specified from the document only (A30): the LTspice ramp join (`PwlJoin::Ramp`), the LTspice sine `cycles`, the Spectre `PwlJoin::RampWidth`, the bit pattern; the PWL `Period` wrap takes `fmod`, which the runs cannot tell from x − P·⌊x/P⌋ at 1e-12
+- A30 → `wave_eval.rs`: `source_value`, `wave_value`, `At`, `WaveDomain`; every law of §3 specified on `wave_value`; 48 ngspice and 205 VACASK run values reproduced to 1e-12; properties (periodic repeat, PWL ends, op = value at 0, finite or domain)
 - A25 → a `DeviceLibrary` uses `Feature::Family(family)`; the generator draws a library only of a family the set holds
 - A24 (R44, R45) → `library_free` exempts `Module`, `CodeModel`, `Other`; `DeviceLibrary.path` is spelling (no check or feature reads it); `CircuitExtra::PwlPeriodJump`
 - A22 (R42) → `Pwl` holds its first value before the first point and its last after the last; no reader writes a point; `PwlJoin::Extrapolate` is VACASK's periodic law (docs; `check` and the generator never assumed a point at 0)
