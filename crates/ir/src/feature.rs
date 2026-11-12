@@ -15,7 +15,7 @@
 //! - `pub enum Feature`, `Feature::COUNT`, `Feature::index(self) -> u16`,
 //!   `Feature::from_index(u16) -> Feature`
 //! - `pub enum Extra`, `Extra::ALL`, `Extra::COUNT`
-//! - `pub struct FeatureSet`, `FeatureSet::EMPTY`, `FeatureSet::with(self, Feature) -> FeatureSet`,
+//! - `pub struct FeatureSet`, `FeatureSet::EMPTY`, `FeatureSet::ALL`, `FeatureSet::with(self, Feature) -> FeatureSet`,
 //!   `FeatureSet::union(self, FeatureSet) -> FeatureSet`,
 //!   `FeatureSet::minus(self, FeatureSet) -> FeatureSet`,
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
@@ -247,6 +247,10 @@ impl Extra {
 impl FeatureSet {
     /// The empty set.
     pub const EMPTY: FeatureSet = FeatureSet { words: [0; WORDS] };
+
+    /// Every feature: all `Feature::COUNT` bits (the IR-text writer's set: IR text spells
+    /// everything).
+    pub const ALL: FeatureSet = FeatureSet::EMPTY; // red placeholder: the test comes first
 
     /// This set and `f`.
     pub const fn with(self, f: Feature) -> FeatureSet {

@@ -292,3 +292,11 @@ fn the_kernel_code_table() {
         None
     );
 }
+
+#[test]
+fn the_full_set_holds_every_feature() {
+    let names: Vec<Feature> = FeatureSet::ALL.iter().collect();
+    let want: Vec<Feature> = (0..Feature::COUNT).map(Feature::from_index).collect();
+    assert_eq!(names, want);
+    assert!(FeatureSet::ALL.minus(FeatureSet::ALL).is_empty());
+}
