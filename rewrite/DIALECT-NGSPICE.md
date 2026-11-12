@@ -76,8 +76,10 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 | `m` on an X line | the multiplicity unless the subcircuit declares `m`; it overrides an inner `m` (6.01) | `mult` on the instance, the effective `mult` on inner elements |
 | R/C/L whose value reads the circuit | ngspice runs it as a B source: keeps `tc1`, `tc2`, `m`, drops `dtemp` and thermal noise (6.14) | the kind and flags that state exactly that |
 | model levels | ngspice's own table; above 99 it silently runs level 1 (7.01, 7.02) | `ModelFamily` by (type word, level); a level ngspice would not run as written is `InvalidInSource` |
-| analyses in one deck | run in reverse card order in batch mode (8.04) | run items in the order ngspice runs them |
-| `.temp` list | ngspice runs 27 °C and says so (4.02) | `Env` 27 with a note |
+| analyses in one deck | run by type rank (AC, DC, OP, TRAN, PZ, TF, DISTO, NOISE, SENS, PSS, SP), reverse card order only inside one type: the order of the results (corrected: `cktdojob.c:208-216` loops `analInfo` in `analysis.c:36-58` order over `task->jobs`, which `cktnewan.c:34` prepends; runs: `.tran .ac .dc .op` gives AC, DC, OP, Tran; two `.ac`, the later first; INV 8.04's "reverse card order" is wrong) | run items in card order (R25); the result order is a run fact (S12) |
+| state cards | `.options`, `.temp`, `.ic`, `.nodeset` hold for the whole deck wherever they stand; a repeated key or node, the last wins; `.temp` beats `.options temp=` in either order (runs late.cir, icdup.cir, optdup2.cir, temp1/2/5.cir; `inp.c:1159-1186`) | `applies: WholeRun` (R24); the losing `.options temp=` is `Inert` |
+| a run card in a `.subckt` body | the deck's (run sub.cir); a `.ic` there holds each instance's own node (run icsub.cir) | in its scope, `RunExtra::RunItemNested` (R26); `NodeSetInSubckt` |
+| `.temp` list | ngspice runs 27 °C and says so (4.02); so does a value `strtod` does not read whole (`.temp 0.1k`: run temp4.cir, `inp.c:1173-1182`) | `Env` 27 with a note |
 | `.control` | `alterparam` needs `reset`; a dot-card analysis runs after the script and at each `run` (13.01) | run items in run order; display commands `Inert` |
 
 A construct with no row in the IR is an `Opaque`, classed honestly: `Unread` is work to do,
