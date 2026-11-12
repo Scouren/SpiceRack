@@ -141,7 +141,8 @@ fn vacask_corpus_to_ngspice() {
         var: "VACASK_CORPUS",
         keep: |p| {
             let other = ["ngspice", "xyce", "gnucap"];
-            !p.split('/').any(|seg| other.iter().any(|o| seg.starts_with(o)))
+            !p.split('/')
+                .any(|seg| other.iter().any(|o| seg.starts_with(o)))
         },
         source_list: "vacask",
     };
