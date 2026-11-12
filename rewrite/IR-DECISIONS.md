@@ -323,3 +323,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Generator: `operator()` takes the dynamic form under `Reads::Circuit` or `Gen::dyn_form`. The run owner's `gen_event` sets `dyn_form` around the event value, an `ExprDyn` field generated with constant reads unless the set has `MeasCircuitThreshold`. The merged tree's `random_run_subsets_restrict_the_generator` found it as `FuncDyn(Sqrt)` outside a set.
 - The test's unary is `-(2 + 1)`: IR text reads `-1` as a negative literal, not a `Neg` node.
 
+## A21 applied (`Func::ToReal`)
+
+- Appended last to `Func` (text `to_real`); its value is `x`, and its tag Real is an explicit arm beside `ToInt`'s. Spec examples from VACASK run b1 in kernel_typed: `to_real(3i) /: 2i` is 1.5, `to_int(to_real(3i)) /: 2i` is 1, and `ToReal` of a Real is the identity.
+

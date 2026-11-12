@@ -300,6 +300,7 @@ impl Machine<'_> {
                     Func::Min | Func::Max => all_int,
                     Func::ToInt => true,
                     Func::SgnZeroPos => all_int, // VACASK runs f2, f4: its operand's
+                    Func::ToReal => false,       // A21: the mirror of ToInt
                     _ => false,
                 };
                 Value { number: n, int }
@@ -543,7 +544,7 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Ddt | Func::Idt => unreachable!("refused before their arguments are evaluated"),
         Func::Pwl => return pwl(xs).ok_or(out),
         Func::ToInt => x.trunc(),
-        Func::ToReal => todo!(),
+        Func::ToReal => x,
         Func::SgnZeroPos => {
             if x < 0.0 {
                 -1.0
