@@ -199,3 +199,12 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The generator follows R14. It decides a tree's class up front: a dynamic tree starts from `Temp` (or a probe under `Reads::Circuit`); a constant tree holds neither and reads only definitions the generator noted as constant (`Gen::def_class`, set by each row's generator for the definitions it pushes). `Ddt`/`Idt` appear only in a dynamic tree under `Reads::Circuit`. The expression generator moved to `gen_expr.rs` (gen.rs passed 500 lines).
 - `bind_ref` asserts the slot's kind, not the name (a reader may bind by its own case rule; `check`'s `RefTarget` then judges the name).
 - kernel_store.rs passed 500 lines: its structure tests (`reachable`, the empty list, `bind_ref`) moved to `tests/kernel_structure.rs`.
+
+## Implementation, run owner
+
+- One crate-private trait `DetailFacts` (in `analysis_facts.rs`) carries a detail row's handles, features, field fault, text and generator; each header kind (`Analysis`, `Loop`, `Measure`) reaches its 22, 3 and 6 detail types through one exhaustive macro dispatch (`by_detail!`, `by_loop!`, `by_measure!`).
+- Compound values (probe, target, sweep, event, variation) are parenthesized groups of their own fields in IR text; enum members are the snake case of their names; a `bool` is a bare word; a first-member enum is written only where its doc says so. The kernel's keyword for `NodeSet` is `nodeset`.
+- The builder's pool appends (`probes`, `targets`, `dc_axes`, `varies`, `correlations`) do not check field domains, as `push` does not (`check`'s `FieldDomain`); the typed value constructors (`probe_v`, `target`, …) assert theirs. The empty list is `List::EMPTY` (a built and a parsed design compare equal).
+- `map_refs` (A9) visits, in this fixed order: an analysis's DC axes' targets; a sweep loop's target or a table loop's columns; an alter's target; a statistics block's process then mismatch variations, then each correlation's two ends. An element target's `a` is a name, never visited.
+- `design_features` sets `SeveralAnalyses`, `OptionMidRun` and `LoopScoped` (reported at `Span::NONE`); `NodeSetInSubckt` and `LoopNested` are set per row from its scope.
+- Generators choose a kind whose detail they can build before interning anything (a failed attempt would leave a stray name), build in the parse's order (names and lists exactly where the text puts them), require `Expr(Num)` (`Gen::expr` asserts it), leave loop bodies to the kernel, and keep a non-string alter value free of strings.
