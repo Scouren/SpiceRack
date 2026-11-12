@@ -111,9 +111,6 @@ impl RowFacts for Loop {
             LoopEnd::Restore => RunExtra::LoopRestore,
             LoopEnd::KeepLast => RunExtra::LoopKeepLast,
         });
-        if loop_depth(design, self.body) > 1 {
-            add(RunExtra::LoopNested);
-        }
         // `LoopScoped` is a fact of the whole design: `analysis::design_features`.
         let body = design.items(self.body);
         let over_op = self.kind == LoopKind::Sweep
@@ -184,7 +181,7 @@ impl RowFacts for Loop {
         let has = |x: RunExtra| features.contains(Feature::Run(x));
         let design = b.design();
         let outer = loop_depth(design, scope);
-        if (outer > 0 && !has(RunExtra::LoopNested)) || outer >= LOOP_DEPTH_MAX {
+        if outer >= LOOP_DEPTH_MAX {
             return ItemRef::NONE;
         }
         if !has(RunExtra::LoopScoped) && !design.analyses.is_empty() {
@@ -239,7 +236,7 @@ impl RowFacts for Loop {
         let op_ok = features.contains(Feature::Item(ItemKind::Analysis))
             && features.contains(Feature::Analysis(AnalysisKind::Op))
             && (d.analyses.is_empty() || has(RunExtra::SeveralAnalyses))
-            && (!crate::state_order::nested(d, body) || has(RunExtra::RunItemNested))
+            && crate::r#gen::placeable(d, body, ItemKind::Analysis, features)
             // as `Analysis::generate`: without `LoopScoped` an analysis is inside every loop
             && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len());
         if kind == LoopKind::Sweep

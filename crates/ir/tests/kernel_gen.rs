@@ -15,7 +15,7 @@
 use spicerack_ir::r#gen::{Size, generate};
 use spicerack_ir::{
     BinOp, Design, Diags, Dist, DrawPer, DrawWhen, ExprTag, Extra, Feature, FeatureSet, Func,
-    ItemKind, UnOp, check, dump, features_used, parse,
+    ItemKind, ScopeKind, UnOp, check, dump, features_used, parse,
 };
 
 const SIZE: Size = Size {
@@ -202,7 +202,14 @@ fn the_full_set_runs_every_property() {
     }
     // a `ddt`/`idt` makes its tree read the circuit (class `Circuit`), so it only ever counts as
     // `FuncDyn`: no valid design holds these two
-    let unreachable = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)];
+    // and a title stands only in a deck's top, so no placement of one exists (A15 K1)
+    let titles = ScopeKind::ALL[1..]
+        .iter()
+        .map(|&s| Feature::Placed(s, ItemKind::Title));
+    let unreachable: Vec<Feature> = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)]
+        .into_iter()
+        .chain(titles)
+        .collect();
     // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
     let not_yet: [Feature; 0] = [];
     let goal = unreachable

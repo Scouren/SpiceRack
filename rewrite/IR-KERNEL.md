@@ -281,9 +281,9 @@ resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressio
 definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
 item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
 (so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
-`Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
+`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read anywhere in its tree or of class `Temp`. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
-leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+leaf or a `$temp` in a head default only when it has `FormalNotConstant` (VACASK runs n1, m1, c1, t2).
 `Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
 top scope lists no `Title`. The generator titles every deck when the set lacks it, and makes
 only libraries when the set has neither it nor `Item(Title)`.
@@ -313,6 +313,31 @@ The generator writes one-line titles and comments, and a tree under `Reads::Cons
 literals by exact value whatever their forms (`1k` = `1e3` = `1000` = `1000.0`); an `Int` literal
 equals only an `Int` of the same value. `Design::eq_ignoring_spans` stays exact: forms are
 compared. Both were already so; `kernel_literal` pins it.
+
+**A15 K1 (2026-11-12): placement is a feature class (R27, ruled "enclosed").**
+`Feature::Placed(ScopeKind, ItemKind)`: an item of that kind with a scope of that kind on its
+scope chain, at any depth; `File` is never the scope kind (every target has a file's top), so the
+group is 4 × `ItemKind::COUNT`. A subcircuit in an `If` branch in a subcircuit sets
+`Placed(Branch, Subckt)` and `Placed(Subckt, Subckt)`. The kernel sets it for every item in
+`item_features`; no owner sets a placement member. `FeatureSet::placed(scope, &[kinds])` builds a
+writer's set. It replaces, with this mapping:
+
+| Was | Now |
+|---|---|
+| `Extra::NestedSubckt` | `Placed(Subckt, Subckt)` |
+| `Extra::LocalModel` | `Placed(Subckt, Model)` |
+| `Extra::LocalFunc` | `Placed(Subckt, Func)` |
+| `Extra::ParamInBranch` | `Placed(Branch, Param)` |
+| `Extra::LoadInBranch` | `Placed(Branch, Load)` |
+| `RunExtra::NodeSetInSubckt` | `Placed(Subckt, NodeSet)` |
+| `RunExtra::LoopNested` | `Placed(Loop, Loop)` |
+| `RunExtra::RunItemNested` | `Placed(Subckt, K)` and `Placed(Section, K)` for the run kind `K` |
+
+The generator's `fill` admits a kind in a scope only when every placement it would make is in
+the set (`gen::placeable`, also for a row's own generator that pushes into a body it opened);
+sections may now be nested where the set allows. `Placed(_, Title)` never occurs: a title stands
+only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
+text refuses it, so only a pass moving the item reaches the check).
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
@@ -370,8 +395,8 @@ Unary(UnOp), UnaryDyn(UnOp), Dist(Dist), DrawWhen(DrawWhen), DrawPer(DrawPer), E
 Circuit(CircuitExtra), Run(RunExtra), Option(OptionKey) }` with a `const fn index(self) -> u16`
 (496 features at the freeze). The features that are fields, not kinds, are three closed enums,
 one per owner and each in its owner's file, so adding one never touches a kernel file: `Extra`
-(kernel, `feature.rs`: `NestedSubckt`, `LocalModel`, `LocalFunc`, `ParamInBranch`,
-`CaseSensitiveNames`, …), `CircuitExtra` (`circuit_extra.rs`: pulse cycle counts, PWL repeat
+(kernel, `feature.rs`: `IncludeSection`, `CaseSensitiveNames`, …; placement is
+`Feature::Placed` since A15 K1), `CircuitExtra` (`circuit_extra.rs`: pulse cycle counts, PWL repeat
 forms, each law variant, IC modes, parasitics, multiplicity per kind class, …), `RunExtra`
 (`run_extra.rs`: a simulator-chosen step, start-up, list and table sweeps, sweep ends, loop
 targets, measure and probe kinds, …). `FeatureSet` is a fixed bitset with `const` constructors
