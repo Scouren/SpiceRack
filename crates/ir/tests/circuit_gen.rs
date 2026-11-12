@@ -148,8 +148,14 @@ mod tests {
     /// (oracle: the bound `Subckt` row), over the full set.
     #[test]
     fn a_generated_instance_matches_its_masters_ports() {
+        // the floor is on the instances seen, not the seeds (the stream shifts with the
+        // generators): the walk stops once it has checked `WANT`
+        const WANT: usize = 20;
         let mut bound = 0;
-        for seed in 0..400u64 {
+        for seed in 0..4000u64 {
+            if bound >= WANT {
+                break;
+            }
             let d = generate(seed, &circuit_set(), SIZE);
             for (item, _) in d.reachable() {
                 if item.kind != ItemKind::Element {
@@ -165,7 +171,7 @@ mod tests {
                 assert_eq!(e.terminals.len(), ports.len(), "seed {seed}");
             }
         }
-        assert!(bound > 20, "the property saw {bound} bound instances");
+        assert!(bound >= WANT, "the property saw {bound} bound instances");
     }
 
     /// A33 (the lead's ruling): a set without `BehavUntypedParam` but with the dynamic

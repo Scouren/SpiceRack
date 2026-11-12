@@ -5,7 +5,7 @@
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator); `rewrite/AMEND-A12.md` C5; `circuit_gen.rs`.
 //!
 //! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible`, `R::element_names`,
-//! `R::element_name` (`pub(super)`)
+//! `R::element_name`, `R::bound_subckt`, `R::fresh_names` (`pub(super)`)
 
 use super::{BUILTINS, NONE_REF, R};
 use crate::circuit_check::{bound_family, builtin_fits, builtin_kind};
@@ -16,9 +16,16 @@ use crate::item::{DefKind, ItemKind};
 use crate::model::{Model, ModelFamily};
 
 impl R<'_, '_> {
-    pub(super) fn terminals(&mut self, kind: ElemKind, two: bool) -> NameList {
+    pub(super) fn terminals(
+        &mut self,
+        kind: ElemKind,
+        two: bool,
+        ports: Option<usize>,
+    ) -> NameList {
         let (lo, hi) = kind.terminals();
         let count = match kind {
+            // R61/A36: an instance of a subcircuit has its ports' count
+            _ if ports.is_some() => ports.unwrap_or(0) as u32,
             ElemKind::Laplace | ElemKind::FreqTable | ElemKind::VSwitch => {
                 if two {
                     2
@@ -206,6 +213,26 @@ impl R<'_, '_> {
         match self.existing_element() {
             Some(n) => n,
             None => self.g.fresh_name(self.b),
+        }
+    }
+
+    /// A visible subcircuit an instance is bound to, or none (no name is interned).
+    pub(super) fn bound_subckt(&mut self) -> Option<Ref> {
+        let def = self
+            .g
+            .pick_def(self.b.design(), self.scope, DefKind::Subckt);
+        (!def.is_none()).then(|| Ref {
+            name: self.b.design().def(def).name,
+            def,
+        })
+    }
+
+    pub(super) fn fresh_names(&mut self, count: u32) -> NameList {
+        let ids: Vec<NameId> = (0..count).map(|_| self.g.fresh_name(self.b)).collect();
+        if ids.is_empty() {
+            List::EMPTY
+        } else {
+            self.b.name_ids(&ids)
         }
     }
 }

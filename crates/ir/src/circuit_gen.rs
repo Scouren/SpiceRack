@@ -18,7 +18,7 @@
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::{builtin_kind, has_polarity, versioned};
+use crate::circuit_check::{builtin_kind, has_polarity, master_ports, versioned};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_tables::{VERSIONS, needs_version};
 use crate::controlled::{
@@ -28,7 +28,7 @@ use crate::controlled::{
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Params, Reads};
-use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::letter::letter_of;
 use crate::model::{Model, ModelFamily, Polarity};
@@ -113,8 +113,17 @@ pub(crate) fn generate_element(
         }
         _ => r.g.fresh_name(r.b),
     };
-    let terminals = r.terminals(kind, two_terminal);
-    let model = r.master(kind);
+    // R61/A36: an instance's terminals follow its subcircuit's ports, so its master is picked
+    // first (no name is interned for it: a bound master's name already is)
+    let bound = (kind == ElemKind::Instance)
+        .then(|| r.bound_subckt())
+        .flatten();
+    let ports = bound.and_then(|m| master_ports(r.b.design(), m));
+    let terminals = r.terminals(kind, two_terminal, ports);
+    let model = match bound {
+        Some(m) => m,
+        None => r.master(kind),
+    };
     // an instance's multiplier comes with its law (A15 C1)
     let mult_law =
         if kind == ElemKind::Instance && r.has(X::MultInstanceNgspiceAppend) && r.g.chance(2) {
@@ -332,15 +341,6 @@ impl R<'_, '_> {
             List::EMPTY
         } else {
             self.b.exprs(&ids)
-        }
-    }
-
-    fn fresh_names(&mut self, count: u32) -> NameList {
-        let ids: Vec<NameId> = (0..count).map(|_| self.g.fresh_name(self.b)).collect();
-        if ids.is_empty() {
-            List::EMPTY
-        } else {
-            self.b.name_ids(&ids)
         }
     }
 
