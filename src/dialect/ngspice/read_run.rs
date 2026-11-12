@@ -84,6 +84,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::TranCapNgspice),
     Feature::Run(RunExtra::TranUic),
     Feature::Run(RunExtra::DcNested),
+    // each outer step starts afresh (R75)
+    Feature::Run(RunExtra::DcOuterAfresh),
     Feature::Run(RunExtra::DcAxisTemp),
     Feature::Run(RunExtra::DcAxisElementValue),
     Feature::Run(RunExtra::SweepDcLinStep),

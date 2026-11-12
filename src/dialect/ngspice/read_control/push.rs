@@ -83,7 +83,13 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
             Ready::Alter(target, value) => {
                 let t = target_of(lw, target);
                 let v = emit(lw, st, scope, value);
-                let item = lw.b.alter(scope, t, v, span);
+                // `alterparam` takes effect at the next `reset` (R70/A43, settle
+                // alter_param_reset.sp); `alter`/`altermod` at once
+                let effect = match target {
+                    Target::Param(_) => ir::plan::AlterEffect::AtReset,
+                    _ => ir::plan::AlterEffect::AtOnce,
+                };
+                let item = lw.b.alter(scope, t, v, effect, span);
                 refer(lw, item, scope, target);
             }
             Ready::Option(key, value) => {

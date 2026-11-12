@@ -30,7 +30,7 @@ pub(super) enum Why {
     PassiveRewrite = 3,
     /// A static R, C or L with an instance parameter its device does not take.
     PassiveKeys = 4,
-    /// A C or L with `tce`, `ac` or `noisy=false` (an R's only).
+    /// A C or L with `ac` or `noisy=false` (an R's only; `tce` there is FieldDomain, R74).
     PassiveROnly = 5,
     /// A static R, C or L whose other field, parameter or mult reads the circuit or time.
     PassiveReadsRun = 6,
@@ -282,7 +282,8 @@ fn passive_ok(d: &ir::Design, e: &ir::Element) -> Result<(), Why> {
         .params(e.params)
         .iter()
         .all(|&(k, _)| allowed.contains(&d.str(k).to_ascii_lowercase().as_str()));
-    let r_only = r || (p.tce.is_none() && p.ac.is_none() && p.noisy);
+    // `tce` on a C or L is FieldDomain (R74): `check` refuses it before here
+    let r_only = r || (p.ac.is_none() && p.noisy);
     let value = !p.value.is_none() || !e.model.name.is_none();
     let why = [
         (keys, Why::PassiveKeys),

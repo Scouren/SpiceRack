@@ -38,20 +38,21 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
                     words::emit(lw, st, b),
                     words::emit(lw, st, c),
                 );
+                // ngspice's nested `.dc` starts each outer step afresh and carries inside the
+                // inner sweep (R75, latch_desc.sp); rows are innermost first
+                let afresh = !rows.is_empty();
                 rows.push(DcAxis {
                     target,
                     sweep: ir::SweepSpec::lin_step(a, b, c),
                     name: ir::NameId::NONE,
+                    afresh,
                 });
             }
             let axes = lw.b.dc_axes(&rows);
             lw.b.analysis(
                 scope,
                 None,
-                Dc {
-                    axes,
-                    restart: false,
-                },
+                Dc { axes },
                 span,
             );
         }

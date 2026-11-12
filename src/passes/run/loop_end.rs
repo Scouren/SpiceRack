@@ -5,10 +5,10 @@
 //!   an alter of each target to the design's own value (the parameter's expression) follows.
 //!   Exact when nothing before the loop has changed the target: no alter of it earlier in the
 //!   walk, no enclosing loop over it (the value in force before the loop is then the design's).
-//!   Requires `Run(LoopKeepLast)`, `Item(Alter)`, `Run(AlterParam)`.
+//!   Requires `Run(LoopKeepLast)`, `Item(Alter)`, `Run(AlterParam)`, `Run(AlterParamAtOnce)`.
 //! - `loop_keep_last_to_restore` removes `Run(LoopKeepLast)`: the loop restores and an alter
 //!   of each target to its last value follows: a list sweep's last value, a table's last row.
-//!   Requires `Run(LoopRestore)`, `Item(Alter)`, `Run(AlterParam)`.
+//!   Requires `Run(LoopRestore)`, `Item(Alter)`, `Run(AlterParam)`, `Run(AlterParamAtOnce)`.
 //!
 //! Both copy an operand into the alter, so a value holding a draw leaves the loop with
 //! `LOOP_END_KEPT`, as does any other target kind, a Monte Carlo loop, a range sweep (its last
@@ -68,9 +68,11 @@ fn convert(design: &mut ir::Design, diags: &mut ir::Diags, from: LoopEnd) {
             .map(|(t, v)| {
                 editor.builder().push(
                     scope,
+                    // the value from here on, where it stands: the loop's own end rule
                     ir::plan::Alter {
                         target: t,
                         value: v,
+                        effect: ir::plan::AlterEffect::AtOnce,
                     },
                     ir::Span::NONE,
                 )
