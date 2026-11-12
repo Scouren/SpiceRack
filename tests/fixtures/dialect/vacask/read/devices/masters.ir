@@ -1,0 +1,27 @@
+# Oracle: VD cir-masters (Scope: the current subcircuit, then the toplevel; masters may be
+# defined in a subcircuit); run fwd (an instance before its model reads fine); run m1 (an
+# enclosing subcircuit's model: "Master 'res' not found." → InvalidInSource R2003); a library
+# file's top is the toplevel too (VACASK's include is textual); runs c1, n2 (a subcircuit
+# instance gives only declared parameters, `$mfactor` among them when declared: R2004); run fwd
+# (a subcircuit terminal left out: Private P2104); a master no read file defines: Unresolved,
+# R2002.
+# codes: P2104 R2002 R2003 R2004 S0002 S0004 S0004
+file "masters.sim" deck
+  title "master scoping"
+  device_library resistor
+  element resistor r0 (a 0) model=late value=1k
+  model late resistor
+  element resistor r9 (a 0) model=libres value=2k
+  subckt outer (p)
+    model own resistor
+    element resistor r1 (p 0) model=own value=1k
+    subckt inner (q)
+      opaque vacask invalid "r2 (q 0) own r=1k"
+  subckt sub (a b) g=1i $mfactor=1i
+    element resistor r1 (a b) model=late value=g
+  element instance x1 (n1 n2) model=sub params=(g=2i $mfactor=3i)
+  opaque vacask invalid "x2 (n1 n2) sub h=2"
+  opaque vacask private "x3 (n1) sub"
+  element unresolved x4 (n1 n2) model=nothing params=(w=1i)
+file "masters--lib" library
+  model libres resistor

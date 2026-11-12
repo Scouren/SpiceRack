@@ -1,0 +1,14 @@
+# Oracle: VD dev-builtin (seven builtin devices, each made available by a `model` line with no
+# `load`); DIALECT-VACASK run n2 ("Master 'vsource' not found." without one); run bp (a
+# builtin's model line takes no parameter: "Parameter 'dc' not found.") → InvalidInSource P2103.
+# codes: P2103 S0004
+file "builtin_models.sim" deck
+  title "builtin models"
+  model vs source_v
+  model is source_i
+  model e vcvs
+  model g vccs
+  model h ccvs
+  model f cccs
+  model k mutual
+  opaque vacask invalid "model vs2 vsource dc=1"

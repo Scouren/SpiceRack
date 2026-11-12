@@ -1,0 +1,7 @@
+behavioural sources
+parameters p=3
+b1 (a 0) v=3/2
+b2 (b 0) i=1m
+b3 (c 0) potential=v(a)*2
+b4 (d 0) v=p/2
+b5 (e 0) expr=1 declarations=""

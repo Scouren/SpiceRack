@@ -1,0 +1,16 @@
+R C L reference (ngspice-45) for devices_own.sim
+i1 0 n1 dc 1m ac 1
+r1 n1 0 1.5k
+i6 0 n6 dc 1m ac 1
+r6 n6 0 1k m=2
+i7 0 c1 ac 1
+rc1 c1 0 1e12
+c1 c1 0 1n m=2
+i9 0 l1 ac 1
+l1 l1 0 1m m=2
+.options tnom=27 temp=50 reltol=1e-9
+.control
+ac lin 1 1k 1k
+print mag(v(n1)) mag(v(n6)) mag(v(c1)) mag(v(l1))
+.endc
+.end

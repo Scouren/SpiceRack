@@ -1,0 +1,11 @@
+elements
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/diode.osdi"
+model r sp_resistor
+model c sp_capacitor
+model dmod sp_diode
+r1 (a 0) r r=1k temp=77 dtemp=10 tc1=0.01 tc2=0.001 tce=1 scale=2 noisy=0 $mfactor=2
+r2 (a b) r r=1k w=2u
+c1 (b 0) c c=1n
+d1 (b 0) dmod area=2

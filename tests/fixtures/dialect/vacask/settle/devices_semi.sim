@@ -1,0 +1,23 @@
+sp_diode sp_mos1 against ngspice-45 D and M level 1 (R41 a); run semi
+load "spice/resistor.osdi"
+load "spice/diode.osdi"
+load "spice/mos1.osdi"
+model vs vsource
+model r sp_resistor
+model dmod sp_diode is=1e-14 n=1.05 rs=10 cjo=1p
+model mn sp_mos1 vto=0.7 kp=100u lambda=0.02 gamma=0.4
+model mp sp_mos1 type=-1 vto=-0.7 kp=50u
+vdd (vdd 0) vs dc=5
+vd (vd 0) vs dc=3 mag=1
+rd1 (vd d1) r r=10k
+d1 (d1 0) dmod area=2
+rm (vdd dm1) r r=10k
+vg (g1 0) vs dc=2 mag=1
+m1 (dm1 g1 0 0) mn w=10u l=2u
+rp (dp1 0) r r=10k
+vgp (gp 0) vs dc=2.5 mag=1
+m2 (dp1 gp vdd vdd) mp w=20u l=2u $mfactor=2
+control
+  options temp=50 tnom=27 reltol=1e-9 rawfile="ascii"
+  analysis ac1 ac from=1k to=1k mode="lin" points=1
+endc
