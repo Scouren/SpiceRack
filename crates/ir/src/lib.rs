@@ -63,11 +63,19 @@ pub mod wave;
 // run owner
 pub mod analysis;
 pub mod build_run;
+pub mod dc_ac;
+pub mod measure;
 pub mod option;
+pub mod option_key;
 pub mod output;
+pub mod periodic;
 pub mod plan;
+pub mod probe;
 pub mod stats;
+pub mod sweep;
+pub mod tran;
 
+pub use analysis::{Analysis, AnalysisKind, Detail, RunDetails};
 pub use build::Builder;
 pub use check::{Violation, check, check_legal};
 pub use design::{Design, ItemRow};
@@ -83,7 +91,15 @@ pub use id::{
 };
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
 pub use link::link;
+pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
+pub use option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
+pub use option_key::{OptionClass, OptionKey};
+pub use output::{Measure, Print, PrintView, Save};
+pub use plan::{Alter, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
+pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
 pub use span::Span;
+pub use stats::{Statistics, Vary, VaryDist};
+pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};
 pub use table::Table;
 pub use text::{dump, parse};
 
