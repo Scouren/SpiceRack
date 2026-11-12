@@ -19,11 +19,12 @@ use crate::controlled::{
     Behav, Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm,
     OutKind, Poly, Quantity, TableLaw, TableSource,
 };
+use crate::element::MultLaw;
 use crate::element::NO_ROW;
 use crate::id::{ExprId, ExprList, List, NameId, NameList};
 use crate::line::Line;
 use crate::model::Polarity;
-use crate::passive::{Coupling, IcMode, Parasitics, Passive};
+use crate::passive::{Coupling, IcMode, Parasitics, Passive, TcBase, TcLaw};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::wave::{
@@ -147,6 +148,9 @@ choices! {
     PulseLaw: ["spice", "vacask"];
     TdFrom: ["zero", "td1"];
     DcRule: ["given", "wave_at_zero"];
+    TcBase: ["tnom", "fixed27"];
+    TcLaw: ["direct", "reciprocal"];
+    MultLaw: ["parallel", "ngspice_append"];
 }
 
 fields! {
@@ -154,6 +158,7 @@ fields! {
         value: Dyn = N, ic: Expr = N, tc1: Expr = N, tc2: Expr = N, tce: Expr = N,
         temp_abs: Expr = N, dtemp: Expr = N, ac: Expr = N, scale: Expr = N,
         parasitics: Side[Parasitics] = NO_ROW, ic_mode: Choice = IcMode::None, noisy: Flag = true,
+        tc_base: Choice = TcBase::Tnom, tc_law: Choice = TcLaw::Direct,
     }
     Parasitics { rser: Expr = N, lser: Expr = N, rpar: Expr = N, cpar: Expr = N, rlshunt: Expr = N }
     Coupling { inductors: Names = NL, k: Dyn = N }
@@ -176,7 +181,7 @@ fields! {
     }
     Behav {
         expr: Dyn = N, tc1: Expr = N, tc2: Expr = N, temp_abs: Expr = N, dtemp: Expr = N,
-        rpar: Expr = N, output: Choice = OutKind::Voltage,
+        rpar: Expr = N, output: Choice = OutKind::Voltage, tc_base: Choice = TcBase::Tnom,
     }
     Laplace {
         num: Exprs = EL, den: Exprs = EL, input: Dyn = N, output: Choice = Quantity::Voltage,

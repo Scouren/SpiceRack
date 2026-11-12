@@ -668,6 +668,7 @@ mod tests {
             },
             params: List::EMPTY,
             mult: ExprId::NONE,
+            mult_law: spicerack_ir::MultLaw::Parallel,
         };
         let item = b.instance(top, ElemKind::Instance, head, Span::NONE);
         assert!(b.design().row::<Element>(item.index).model.is_resolved());

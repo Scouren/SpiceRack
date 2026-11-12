@@ -18,6 +18,7 @@ use crate::controlled::{
     Behav, DelayLaw, FreqLaw, FreqTable, Laplace, LaplaceForm, OutKind, TableLaw, TableSource,
 };
 use crate::design::Design;
+use crate::element::MultLaw;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::expr::Expr;
 use crate::feature::{Feature, FeatureSet};
@@ -27,7 +28,7 @@ use crate::letter::spice_letter;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily};
-use crate::passive::{Coupling, IcMode, Passive};
+use crate::passive::{Coupling, IcMode, Passive, TcBase, TcLaw};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, PortSpec, Source};
 use crate::wave::{
@@ -64,12 +65,15 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
         }
     }
     if some(e.mult) {
-        add(mult_class(e.kind));
+        add(match e.mult_law {
+            MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
+            MultLaw::Parallel => mult_class(e.kind),
+        });
     }
     match e.kind.detail() {
         DetailKind::Passive => {
             if let Some(p) = get_row::<Passive>(design, e.detail) {
-                passive(design, p, &mut add);
+                passive(design, e.kind, p, &mut add);
             }
         }
         DetailKind::Coupling => {
@@ -293,7 +297,7 @@ pub(crate) fn mult_class(kind: ElemKind) -> X {
         | E::FreqTable
         | E::Delay => X::MultControlled,
         E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
-        E::Instance => X::MultInstance,
+        E::Instance => X::MultInstanceParallel, // the law's own member: `element_features`
         E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
         E::ChargeCapacitor
         | E::FluxInductor
@@ -312,6 +316,13 @@ pub(crate) fn mult_class(kind: ElemKind) -> X {
 
 // ---- private ----
 
+fn tc_base(base: TcBase) -> X {
+    match base {
+        TcBase::Tnom => X::TcBaseTnom,
+        TcBase::Fixed27 => X::TcBaseFixed27,
+    }
+}
+
 fn ic_mode(mode: IcMode, add: &mut impl FnMut(X)) {
     match mode {
         IcMode::None => {}
@@ -320,9 +331,19 @@ fn ic_mode(mode: IcMode, add: &mut impl FnMut(X)) {
     }
 }
 
-fn passive(design: &Design, p: Passive, add: &mut impl FnMut(X)) {
+fn passive(design: &Design, kind: ElemKind, p: Passive, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
     ic_mode(p.ic_mode, add);
+    // A15 C2: a circuit-valued element's coefficient states its base (and a capacitor's, its law)
+    if reads_circuit(design, p.value) && (some(p.tc1) || some(p.tc2)) {
+        add(tc_base(p.tc_base));
+        if kind == ElemKind::Capacitor {
+            add(match p.tc_law {
+                TcLaw::Direct => X::TcLawDirect,
+                TcLaw::Reciprocal => X::TcLawReciprocal,
+            });
+        }
+    }
     let flags = [
         (reads_circuit(design, p.value), X::PassiveDynamicValue),
         (!p.noisy, X::PassiveNoiseless),
@@ -368,6 +389,7 @@ fn behav(b: Behav, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
     if some(b.tc1) || some(b.tc2) {
         add(X::BehavTc);
+        add(tc_base(b.tc_base));
     }
     if some(b.rpar) {
         add(X::BehavRpar);

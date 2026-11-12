@@ -12,7 +12,7 @@
 
 use spicerack_ir::controlled::Behav;
 use spicerack_ir::line::Line;
-use spicerack_ir::passive::IcMode;
+use spicerack_ir::passive::{IcMode, TcBase};
 use spicerack_ir::semi::{InitialState, Semi};
 use spicerack_ir::source::{DcRule, PortSpec, Source};
 use spicerack_ir::wave::{PreDelay, Pulse, PulseLaw, Sin};
@@ -142,6 +142,7 @@ pub fn behav(expr: ExprId, output: spicerack_ir::controlled::OutKind) -> Behav {
         dtemp: ExprId::NONE,
         rpar: ExprId::NONE,
         output,
+        tc_base: TcBase::Tnom,
     }
 }
 
