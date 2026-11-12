@@ -285,14 +285,34 @@ fn walk(cst: &Cst<'_>, n: Node, out: &mut Folds, seen: &mut HashSet<String>) {
     let ast = &cst.ast;
     let mut tracks: HashMap<String, Track> = HashMap::new();
     let body = ast.body(n).to_vec();
-    // Nested blocks (`mc`, loops) are searched for alters only: one there is no fold.
-    let mut nested: Vec<u32> = body
-        .iter()
-        .flat_map(|&s| ast.body(Node(s)).iter().copied())
-        .collect();
-    // Bounded: each node of the (acyclic) statement tree is taken once.
+    // Nested blocks are searched for alters only: one there is no fold. Only a block's body is
+    // walked (as `read::read`'s declare walk does): a leaf statement's body slot is no list on
+    // a recovered parse (an unclosed `/*` in a control block, dialect_mutants read/run/misc.sim
+    // seed 1, made this walk read a garbage list and grow without end).
+    let block = |s: u32| {
+        s != crate::syntax::ast::NONE
+            && matches!(
+                ast.tag(Node(s)),
+                Tag::Subckt | Tag::Section | Tag::If | Tag::Else | Tag::Control
+            )
+    };
+    let mut nested: Vec<u32> = body.iter().copied().filter(|&s| block(s)).collect();
+    let mut found: Vec<u32> = Vec::new();
+    // Bounded: each block is taken once (a set of the blocks taken guards a cycle).
+    let mut taken: HashSet<u32> = HashSet::new();
     while let Some(s) = nested.pop() {
-        nested.extend(ast.body(Node(s)).iter().copied());
+        if !taken.insert(s) {
+            continue;
+        }
+        for &c in ast.body(Node(s)) {
+            match block(c) {
+                true => nested.push(c),
+                false if c != crate::syntax::ast::NONE => found.push(c),
+                false => {}
+            }
+        }
+    }
+    for s in found {
         if let Some((names, _)) = type_alter(cst, Node(s)) {
             for name in names {
                 track(&mut tracks, &name).ok = false;
