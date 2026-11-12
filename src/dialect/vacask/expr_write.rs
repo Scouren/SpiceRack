@@ -18,7 +18,8 @@ use super::number;
 use crate::ir;
 
 /// A real conversion VACASK cannot spell: `to_real` anywhere but over a parameter read in a
-/// circuit-reading field, or a bare parameter read in one (which reads back as `to_real`).
+/// behavioural source's expression, or a bare parameter read in one (it reads back as
+/// `to_real`). A passive's value is not one (R52), whatever its handle's kind.
 pub(super) const NO_REAL: ir::Code = ir::Code::new(b'W', 2006);
 
 /// An integer literal past 32 bits, which VACASK would wrap (run iw1).
@@ -154,9 +155,13 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     for (at, _) in design.reachable() {
         handles.clear();
         design.item_handles(at, &mut handles);
+        // Only a behavioural source's expression is VACASK's behavioural evaluator (R52); a
+        // passive's value is its parameter evaluator's, whatever the handle's kind.
+        let behavioural = at.kind == ir::ItemKind::Element
+            && design.row::<ir::Element>(at.index).kind == ir::ElemKind::Behav;
         let refused = handles.iter().find_map(|&h| match h {
             ir::Handle::Expr(e) => refusal(design, e, false),
-            ir::Handle::ExprDyn(e) => refusal(design, e, true),
+            ir::Handle::ExprDyn(e) => refusal(design, e, behavioural),
             ir::Handle::Exprs(list) => design
                 .exprs(list)
                 .iter()
@@ -176,7 +181,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
 // ---- private ----
 
 /// What VACASK cannot spell in root `e`: an integer literal past 32 bits ([`WIDE_INT`]); a real
-/// conversion it lacks ([`NO_REAL`]): in a circuit-reading field (`circuit`) a parameter read
+/// conversion it lacks ([`NO_REAL`]): in a behavioural source's expression (`circuit`) a parameter read
 /// that is not the operand of a `to_real`, or a `to_real` of anything else; in any other field a
 /// `to_real`.
 fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code> {

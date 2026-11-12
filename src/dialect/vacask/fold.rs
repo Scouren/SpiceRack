@@ -159,6 +159,8 @@ pub(super) fn wave_word(kind: ir::WaveKind) -> Option<&'static str> {
         ir::WaveKind::Exp => "exp",
         ir::WaveKind::Pwl => "pwl",
         ir::WaveKind::Am => "am",
+        // vc-sources' run: VACASK's fm is exact for the one Sffm law and pre FEATURES holds.
+        ir::WaveKind::Sffm => "fm",
         _ => return None,
     })
 }

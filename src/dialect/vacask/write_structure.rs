@@ -6,7 +6,7 @@
 //!
 //! Cites: VD input-include, cir-subckt, cir-nodes, cir-conditional, cir-loading.
 //!
-//! Contents: `NO_LIBRARY`, `CONSTANT_LOCAL`, `LOAD_KIND`, `CODES`, `title`, `comment`, `include`, `section`, `section_end`,
+//! Contents: `NO_LIBRARY`, `LOAD_KIND`, `CODES`, `title`, `comment`, `include`, `section`, `section_end`,
 //! `load`, `device_library`, `admits`,
 //! `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` (crate-private)
 
@@ -20,26 +20,12 @@ use crate::ir;
 /// row states `Feature::Family` (it states none: `library.rs`); asked of the circuit owner.
 pub(super) const NO_LIBRARY: ir::Code = ir::Code::new(b'W', 2002);
 
-/// A subcircuit's local parameter whose value is constant: VACASK reads every constant
-/// `parameters` entry of a subcircuit as a formal an instance may override (run c1), so a constant
-/// local has no spelling. ponytail: a kernel feature for it is asked; this refusal goes then.
-pub(super) const CONSTANT_LOCAL: ir::Code = ir::Code::new(b'W', 2005);
-
 /// A load whose kind its path's extension does not state (VACASK compiles a `.va`, loads the
 /// rest as OSDI: VD cir-loading).
 pub(super) const LOAD_KIND: ir::Code = ir::Code::new(b'W', 2004);
 
 /// This area's rows.
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
-    (
-        CONSTANT_LOCAL,
-        ir::Info {
-            title: "a constant local parameter in a subcircuit",
-            cite: "VD cir-subckt (Parameters); DIALECT-VACASK Appendix A run c1",
-            explain: "VACASK makes every subcircuit parameter whose value folds to a constant a formal an instance may override; a local one that must not be overridden has no VACASK spelling.",
-            kind: ir::Kind::Refusal,
-        },
-    ),
     (
         NO_LIBRARY,
         ir::Info {
@@ -151,10 +137,10 @@ pub(super) fn device_library(w: &mut Writer<'_, '_>, row: ir::DeviceLibrary) {
 }
 
 /// Appends a refusal for what no feature states and VACASK cannot spell: a load whose kind its
-/// extension does not state; a device library VACASK cannot name; a constant local parameter
-/// of a subcircuit.
+/// extension does not state; a device library VACASK cannot name (a constant local parameter
+/// of a subcircuit is `Extra::SubcktConstantParam`, which `FEATURES` lacks: A25).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, scope) in design.reachable() {
+    for (at, _) in design.reachable() {
         let refused = match at.kind {
             ir::ItemKind::Load => {
                 let row: ir::item::Load = design.row(at.index);
@@ -175,10 +161,6 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
                     }
                 };
                 (!spelled).then_some(NO_LIBRARY)
-            }
-            ir::ItemKind::Param if in_subckt(design, scope) => {
-                let row: ir::item::Param = design.row(at.index);
-                constant(design, row.value).then_some(CONSTANT_LOCAL)
             }
             _ => None,
         };
@@ -278,43 +260,6 @@ pub(super) fn opaque(w: &mut Writer<'_, '_>, row: ir::item::Opaque) {
 }
 
 // ---- private ----
-
-/// Whether `scope` is a subcircuit body or inside one.
-fn in_subckt(design: &ir::Design, scope: ir::ScopeId) -> bool {
-    let mut at = scope;
-    // Bounded: each step moves to a parent, and the scope tree is acyclic.
-    for _ in 0..1 << 16 {
-        if at.is_none() {
-            return false;
-        }
-        let s = design.scope(at);
-        if s.kind == ir::ScopeKind::Subckt {
-            return true;
-        }
-        at = s.parent;
-    }
-    false
-}
-
-/// Whether expression `e` folds to a constant by VACASK's rule (the reader's `is_constant`): it
-/// reads no parameter and no special identifier.
-fn constant(design: &ir::Design, e: ir::ExprId) -> bool {
-    let mut todo = vec![e];
-    // Bounded: each row of the (acyclic) expression tree is taken once per parent.
-    while let Some(x) = todo.pop() {
-        match design.expr(x) {
-            ir::Expr::Param(_) | ir::Expr::Temp | ir::Expr::Tnom | ir::Expr::Time => return false,
-            ir::Expr::Unary(_, a) => todo.push(a),
-            ir::Expr::Binary(_, a, b) => todo.extend([a, b]),
-            ir::Expr::Ternary(a, b, c) => todo.extend([a, b, c]),
-            ir::Expr::Call(_, args) | ir::Expr::Draw(_, _, _, args) | ir::Expr::List(args) => {
-                todo.extend_from_slice(design.exprs(args));
-            }
-            _ => {}
-        }
-    }
-    true
-}
 
 /// `"text"`, `"` and `\\` escaped.
 fn string(text: &str, out: &mut String) {
