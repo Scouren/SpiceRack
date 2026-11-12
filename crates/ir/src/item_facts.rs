@@ -41,9 +41,12 @@ impl RowFacts for Title {
         // no feature beyond the kind
     }
 
-    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
-        // A15 K3: one line of text
-        if design.text(self.text).contains(['\n', '\r']) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
+        // A15 K3: one line of text; only in a deck's top (a pass may have moved it)
+        let s = design.scope(scope);
+        let deck = s.kind == crate::item::ScopeKind::File
+            && design.file(s.file).role == crate::item::Role::Deck;
+        if !deck || design.text(self.text).contains(['\n', '\r']) {
             field_domain(design, at, out);
         }
     }

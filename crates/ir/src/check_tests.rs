@@ -300,3 +300,31 @@ fn probe_context_follows_the_class() {
     );
     assert_eq!(build(false), vec![], "k = h(1), h = exp(x)");
 }
+
+#[test]
+fn a_title_outside_a_decks_top_is_a_field_domain() {
+    // `ItemKind::Title`: only in a `Deck` file's top scope. The builder asserts it and IR text
+    // refuses it; a pass that moves the item is what `check` catches
+    let moved = |to_body: bool| {
+        let mut d = Design::new();
+        let (top, body) = {
+            let mut b = d.builder();
+            let (_, top) = b.file("t.sp", Role::Deck);
+            b.title(top, "t", Span::NONE);
+            let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
+            (top, body)
+        };
+        if to_body {
+            let mut e = d.editor();
+            let title = e.items_mut(top).remove(0);
+            e.items_mut(body).push(title);
+        }
+        violations(&d)
+    };
+    assert_eq!(moved(false), vec![], "in the deck's top");
+    assert_eq!(
+        moved(true),
+        vec![Violation::FieldDomain],
+        "moved into a subckt body"
+    );
+}
