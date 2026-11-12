@@ -325,6 +325,10 @@ asserts an old code (R9).
 | P2001 | refusal | not a VACASK number (`1k5`, `1e3k`, `1d3`) | S 1.05–1.07 |
 | P2002 | refusal | `inf`/`nan` literal (NaN gate) | VD input-numbers; C9 |
 | P2003 | note | a statement read as `Private` (one per construct class of §3) | §3 |
+| P2004 | note | a statement of an area not written yet, kept `Unread` (S4.0's stubs) | §2 |
+| P2005 | refusal | `parameters` inside an `@if` branch | VD cir-conditional |
+| P2006 | refusal | `v()`, `i()` or `$abstime` outside a behavioural source | VD dev-builtin-behavioral |
+| P2008 | refusal | `load`, `embed`, `global` or `ground` inside a subcircuit or branch | VD cir-subckt, cir-loading |
 | R2001 | refusal | a parameter defined twice in one scope | RUN n3 |
 | R2002 | note | an instance whose master no read file defines (`Unresolved`) | VS V29 |
 | R2003 | refusal | a name only an enclosing subckt defines | RUN n1, m1 |
