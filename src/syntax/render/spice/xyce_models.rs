@@ -21,7 +21,9 @@
 //! `bjtsetup.c` (the defaults), `devices/hicum2/hicum2.c` (level 8, its
 //! aliases), `devices/mos6/mos6set.c:93-97` (level 6: `lambda0`, by default
 //! `lambda`); Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` (`LAMBDA` read only
-//! beside `LAMBDA0`).
+//! beside `LAMBDA0`). The levels with no Xyce device (`NO_XYCE_DEVICE`):
+//! Xyce 7.10 and ngspice-45 run on a one-device deck per type and level
+//! (ZERO-LEDGER P1-066, research/impl/evidence/P1-066-xyce-model-levels/).
 //!
 //! Contents:
 //! - `pub(super) enum Shape`, `pub(super) fn xyce_shape_of(kind: &str, params: &[(String, String)]) -> Shape`
@@ -68,6 +70,25 @@ struct Device {
     /// Names both devices read under other laws: refused off 0.
     differ: &'static [&'static str],
 }
+
+/// The ngspice `.model` types (lowercase) and LEVELs ngspice-45 has a
+/// device for and Xyce 7.10 none: Xyce stops on an instance of one ("Model
+/// is required for device M1 and no valid model card found"). At MOSFET
+/// level 9 it runs another model with no message (ngspice's MOS9, Xyce's
+/// BSIM3: one default card at Vds = Vgs = 1 V, 1.036e-5 A against
+/// 1.010e-12 A). In order: BSIM1, BSIM2, MOS9, BSIM3SOI FD and DD, HiSIM2,
+/// HiSIM_HV; VBIC (Xyce's are levels 11 and 12, another parameter set);
+/// MESA (Xyce's `Z` has level 1 alone); HFET1 and HFET2 (no such type).
+const NO_XYCE_DEVICE: [(&str, &[u32]); 8] = [
+    ("nmos", &[4, 5, 9, 55, 56, 68, 73]),
+    ("pmos", &[4, 5, 9, 55, 56, 68, 73]),
+    ("npn", &[4, 9]),
+    ("pnp", &[4, 9]),
+    ("nmf", &[2, 3, 4]),
+    ("pmf", &[2, 3, 4]),
+    ("nhfet", &[5, 6]),
+    ("phfet", &[5, 6]),
+];
 
 /// The safe-operating-area limits ngspice reads only for a warning.
 const SOA: &[(&str, Off)] = &[
@@ -247,7 +268,8 @@ pub(super) fn xyce_shape_of(kind: &str, params: &[(String, String)]) -> Shape {
 ///
 /// # Errors
 /// W0050: a parameter ngspice reads, Xyce's device lacks, and set to
-/// another value than its off one, or a model kind no Xyce device is;
+/// another value than its off one, or a model kind or level no Xyce
+/// device is ([`NO_XYCE_DEVICE`]);
 /// W0051: a C or L model giving the element's value.
 pub(super) fn xyce_model(
     ngspice: bool,
@@ -275,6 +297,7 @@ pub(super) fn xyce_model(
         // ngspice's VDMOS (`devices/vdmos`): Xyce has no `vdmos` model
         // type, and its level-18 VDMOS is another model (RG `M` level 18).
         ("vdmos", _) => return Err(Code::W0050),
+        (k, l) if no_xyce_device(k, l) => return Err(Code::W0050),
         _ => return Ok(None),
     };
     let xyce = names(XYCE, device.key);
@@ -335,6 +358,22 @@ pub(super) fn xyce_model(
 }
 
 // ---- private ----
+
+/// Whether ngspice's `.model` type `kind` (lowercase) at `level` (the
+/// card's text; none is level 1) is a row of [`NO_XYCE_DEVICE`]. A level
+/// that is no whole number (an expression, `4.5`) is no row: the card is
+/// copied and Xyce reports it.
+fn no_xyce_device(kind: &str, level: Option<&str>) -> bool {
+    debug_assert!(!kind.bytes().any(|b| b.is_ascii_uppercase()));
+    let level = match level.map(fold) {
+        None => 1.0,
+        Some(Some(l)) => l,
+        Some(None) => return false,
+    };
+    NO_XYCE_DEVICE
+        .iter()
+        .any(|(k, levels)| *k == kind && levels.iter().any(|&l| f64::from(l) == level))
+}
 
 /// An ngspice C or L model whose card gives the element's value (`c=1p`):
 /// ngspice's model `cap`/`ind` and an instance parameter on the card are

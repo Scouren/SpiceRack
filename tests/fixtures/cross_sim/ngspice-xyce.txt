@@ -154,13 +154,6 @@ ngspice/examples/soi/inv_tr.sp target-fails # no raw file .cross_sim_out.raw: Ne
 ngspice/examples/soi/ring51_40.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
 ngspice/examples/various/roessler-attractor.sp mismatch # tran v(x): -7.559967302059855 leaves the tube at t=51.23295999997131 (tol 1.143e-1)
 ngspice/examples/various/tmp-noise.sp mismatch # plots ["ac", "noise", "noise", "op"] became ["ac", "op"]: two one-point .noise spectra, now paired by plot name (P1-015), have no Xyce counterpart (Xyce runs one .NOISE; not triaged)
-ngspice/examples/vbic/DFF_Y_ECL.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
-ngspice/examples/vbic/npn_gum.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/qnva.mod
-ngspice/examples/vbic/npn_out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/qnva.mod
-ngspice/examples/vbic/npn_out_qs.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/Infineon
-ngspice/examples/vbic/vbic99_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/examples/vbic/vbic99_tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/examples/vbic/vbic_ac_par.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/vbic/Infineon
 ngspice/iscas85/c1355/c1355.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 ngspice/iscas85/c1355/c1355_ann.sp slow # quarantined
 ngspice/iscas85/c1908/c1908.sp slow # quarantined
@@ -177,36 +170,13 @@ ngspice/paranoia/pton/op-test-adi.sp mismatch # plots ["dc", "tran"] became ["tr
 ngspice/paranoia/various/nmos_pmos_BSIM330.sp slow # quarantined
 ngspice/paranoia/various/nmos_pmos_plotting.sp slow # quarantined
 ngspice/paranoia/various/ro_17_4.sp mismatch # tran v(3): 1.0032345606593271 leaves the tube at t=0.000000001128 (tol 2.020e-2)
-ngspice/paranoia/vbic/DFF_Y_ECL.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
-ngspice/paranoia/vbic/npn_gum.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/vbic/qnva.mo
-ngspice/paranoia/vbic/npn_out.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/vbic/qnva.mo
-ngspice/paranoia/vbic/vbic99_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/paranoia/vbic/vbic99_tran.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/paranoia/vbic/vbic_ac_par.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/paranoia/examples/vbic/Infineo
-ngspice/tests/bsim1/test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
-ngspice/tests/bsim2/test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
-ngspice/tests/bsim3soidd/inv2.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/bsim3soidd/t3.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/bsim3soidd/t4.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/bsim3soidd/t5.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
 ngspice/tests/bsim3soipd/ring51.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type TRAN are inconsistent. | Simulation aborted due to error.  There are 0 MSG_FATAL 
 ngspice/tests/bsim3soipd/t4.sp mismatch # dc i(vb): 0+0i vs -0.000000000006278979391451045+0i at 0 (tol 2.000e-12)
 ngspice/tests/general/fourbitadder.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(x1.x1.x1.x5.8): -0.0006232238726266992 leaves the tube at t=0.0000000036177435765459917 (tol 2.519e-5)
 ngspice/tests/general/rc.sp mismatch # tran v(1): 0.011117920800000002 leaves the tube at t=0.0011117920800000002 (tol 1.000e-2)
 ngspice/tests/general/rca3040.sp mismatch # plots ["ac", "dc", "tran"] became ["tran"]
-ngspice/tests/hfet/id_vgs.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/hfet/inverter.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/tests/jfet/jfet_vds-vgs.sp mismatch # plots ["dc", "op"] became ["dc"]
 ngspice/tests/mes/subth.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: VIDS#BRANCH | Simulation aborted due to error.  There are 0 MSG_F
-ngspice/tests/mesa/mesa.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/mesa/mesa11.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/mesa/mesa13.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type VIG#BRANCH are inconsistent. | Simulation aborted due to error.  There are 0 MSG_
-ngspice/tests/mesa/mesa14.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/mesa/mesa15.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/mesa/mesa21.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type DC and print type VIDS#BRANCH are inconsistent. | Simulation aborted due to error.  There are 0 MSG
-ngspice/tests/mesa/mesgout.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/mesa/mesinv.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/mesa/mesosc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/tests/mos6/mos6inv.sp mismatch # tran i(vin): -0.00006723369385653813 leaves the tube at t=0.00000000046 (tol 6.811e-7)
 ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): -0.0000008905818325687239 leaves the tube at t=0.000000038139999999999996 (tol 9.868e-8)
 ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {100*foo0()} | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MS
@@ -215,6 +185,3 @@ ngspice/tests/regression/misc/test-noise-2.sp mismatch # plots ["noise", "total"
 ngspice/tests/regression/misc/test-noise-3.sp mismatch # plots ["noise", "noise", "total", "total"] became ["noise"]
 ngspice/tests/resistance/res_array.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: Analysis type TRAN and print type AC are inconsistent. | Simulation aborted due to error.  There are 0 MSG_FATAL 
 ngspice/tests/resistance/res_partition.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/vbic/FO.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There 
-ngspice/tests/vbic/noise_scale_test.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
-ngspice/tests/vbic/temp.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MSG_ERROR | err
