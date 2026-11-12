@@ -16,11 +16,12 @@ use std::collections::HashSet;
 use crate::class::ExprClass;
 use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
-use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
+use crate::literal;
 use crate::span::Span;
 
 /// One invariant of a well-formed design. Each has its `X` code (`diag::violation_code`); the
@@ -327,6 +328,12 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
         let (range_ok, arity_ok) = match tag {
             ExprTag::Num => (
                 match x.nums.get(a as usize) {
+                    Some(l) if l.form == NumForm::Long => {
+                        if let Some(v) = literal::long_violation(&x.long, *l) {
+                            out.report(v, Span::NONE, i as u32);
+                        }
+                        true
+                    }
                     Some(l) => {
                         if !l.shape_ok() {
                             out.report(Violation::LiteralShape, Span::NONE, i as u32);

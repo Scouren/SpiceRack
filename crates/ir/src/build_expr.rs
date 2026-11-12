@@ -6,14 +6,16 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7, C7, C9, Addenda A1–A3.
 //!
-//! Contents: `Builder::literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`,
+//! Contents: `Builder::literal`, `Builder::long_literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`,
 //! `Builder::call`, `Builder::user_call`, `Builder::unary`, `Builder::binary`,
 //! `Builder::ternary`, `Builder::v`, `Builder::i`, `Builder::time`, `Builder::temp`,
 //! `Builder::freq`, `Builder::tstep`, `Builder::tstop`, `Builder::tnom`, `Builder::draw`,
 //! `Builder::list` (each `-> ExprId`); crate: `Builder::rebuild`, `Builder::expr_row`, `Builder::assert_expr`
 
 use crate::build::Builder;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, UnOp, UserCall};
+use crate::expr::{
+    BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, NumForm, UnOp, UserCall,
+};
 use crate::id::{DefId, EXPRS_MAX, ExprId, NameId, Ref};
 
 impl Builder<'_> {
@@ -26,6 +28,30 @@ impl Builder<'_> {
         assert!(nums.len() < EXPRS_MAX, "at most EXPRS_MAX literals");
         nums.push(literal);
         let id = (nums.len() - 1) as u32;
+        self.expr_row(ExprTag::Num, 0, id, 0)
+    }
+
+    /// A literal whose significand has more significant digits than the mantissa holds (A18):
+    /// `significand` as written (`[-]digits[.digits]`), `exp10` the power written or implied by
+    /// a scale letter, `written` the form it was written in (`Plain` with `exp10 == 0`,
+    /// `Exponent`, or `Scale` with a letter's power). Asserts the significand is that long
+    /// (`literal::exceeds_mantissa`; a shorter one is built with `literal`) and well formed.
+    pub fn long_literal(&mut self, significand: &str, exp10: i16, written: NumForm) -> ExprId {
+        assert!(
+            crate::literal::long_ok(significand, exp10, written),
+            "a long literal meets its invariants (and does not fit the mantissa)"
+        );
+        let x = &mut self.design.exprs;
+        assert!(x.nums.len() < EXPRS_MAX, "at most EXPRS_MAX literals");
+        x.long.push(significand.into());
+        let literal = Literal {
+            mantissa: (x.long.len() - 1) as i64,
+            frac: written as u8,
+            exp10,
+            form: NumForm::Long,
+        };
+        x.nums.push(literal);
+        let id = (x.nums.len() - 1) as u32;
         self.expr_row(ExprTag::Num, 0, id, 0)
     }
 

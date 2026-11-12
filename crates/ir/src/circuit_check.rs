@@ -437,7 +437,7 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
 /// sign is not known before evaluation, so only a literal is judged here).
 fn nonpositive_literal(design: &Design, e: ExprId) -> bool {
     match design.expr(e) {
-        Expr::Num(k) => design.num(k).value() <= 0.0,
+        Expr::Num(k) => design.literal_value(design.num(k)) <= 0.0,
         _ => false,
     }
 }
