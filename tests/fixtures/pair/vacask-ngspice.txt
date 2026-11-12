@@ -1,5 +1,6 @@
 # The vacask-ngspice cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`,
-# compared by (deck, step) both ways. A line goes the day its step passes.
+# compared by (deck, step) both ways, class included (a refusal's class names its features). A
+# line goes the day its step passes. Re-recorded on ir-spine 0f63c87a: no row changed cause.
 # Proofs: `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.2 (or REWRITE-PLAN §4.4) plans for the
 # feature refused (not registered on the trunk); `finding=<id>` a pair finding sent to the lead:
 #   F3  ngspice lacks Extra(IntLiteral) and no pass removes it, none planned (§6.2 has no row): a
@@ -8,21 +9,21 @@
 #   F4  ngspice lacks Circuit(GivenZeroAsGiven) and `given_zero_to_as_given` (ngspice -> VACASK)
 #       has no reverse row, none planned: every VACASK pulse or sine source the reader reads
 #       carries it and refuses the deck. Owner: the waves group.
-#   F5  a division in an instance parameter (`r=rbase*num/den`, all reals) stays BinaryDyn(DivTyped)
+#   F5  (R66) a division in an instance parameter (`r=rbase*num/den`, all reals) stays BinaryDyn(DivTyped)
 #       and is refused with W1007: `div_typed_to_div_dyn` does not remove it for ngspice. Owner:
 #       the expr group (the pass's requires against ngspice's FEATURES) or the ngspice writer.
-#   F6  the ngspice writer spells a top-level resistor with a model and an expression value as
+#   F6  (with `ngspice`) the ngspice writer spells a top-level resistor with a model and an expression value as
 #       `r1 in 0 {expr} resistor`, which ngspice-45 rejects ("unknown parameter (resistor)"); it
 #       runs `r1 in 0 3k resistor` and `r1 in 0 resistor r={1k*3}` (probes by hand, same shell).
 #       The reader reads the text back equal (step 3 passes): only the simulator sees it.
 #       Owner: the ngspice writer.
-ac_rc 2 refused:U0001 finding=F3 # Extra(IntLiteral) at `points=10`
-int_literal 2 refused:U0001 finding=F3 # Extra(IntLiteral) at `dc=5`
-dc_sweep 2 refused:U0001 pass=dc_axes_to_loops # Run(DcAxisDeviceParam): `sweep instance="v1" parameter="dc"` reads as a device parameter
-diode 2 refused:U0001 pass=dc_axes_to_loops # as dc_sweep
-mosfet 2 refused:U0001 pass=dc_axes_to_loops # as dc_sweep
-tran_rc_pulse 2 refused:U0001 pass=pulse_vacask_to_spice # Circuit(PulseVacask); also Circuit(GivenZeroAsGiven) (F4), Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
-tran_sine 2 refused:U0001 finding=F4 # Circuit(GivenZeroAsGiven); also Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
-param_div 2 refused:U0001,W1007 finding=F5 # BinaryDyn(DivTyped) at `r=rbase*num/den`
+ac_rc 2 refused:U0001:Extra(IntLiteral) finding=F3 # Extra(IntLiteral) at `points=10`
+int_literal 2 refused:U0001:Extra(IntLiteral) finding=F3 # Extra(IntLiteral) at `dc=5`
+dc_sweep 2 refused:U0001:Run(DcAxisDeviceParam) pass=dc_axes_to_loops # Run(DcAxisDeviceParam): `sweep instance="v1" parameter="dc"` reads as a device parameter
+diode 2 refused:U0001:Run(DcAxisDeviceParam) pass=dc_axes_to_loops # as dc_sweep
+mosfet 2 refused:U0001:Run(DcAxisDeviceParam) pass=dc_axes_to_loops # as dc_sweep
+tran_rc_pulse 2 refused:U0001:Circuit(GivenZeroAsGiven)+Circuit(PulseVacask)+Run(TranInitialStep)+Run(TranSimulatorStep) pass=pulse_vacask_to_spice # Circuit(PulseVacask); also Circuit(GivenZeroAsGiven) (F4), Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
+tran_sine 2 refused:U0001:Circuit(GivenZeroAsGiven)+Run(TranInitialStep)+Run(TranSimulatorStep) finding=F4 # Circuit(GivenZeroAsGiven); also Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
+param_div 2 refused:U0001,W1007:BinaryDyn(DivTyped) finding=F5 # BinaryDyn(DivTyped) at `r=rbase*num/den`
 expr_resistor 4 target-fails finding=F6 # ngspice: "unknown parameter (resistor)" on `r1 in 0 {...} resistor`
-case_names 2 refused:U0001 pass=rename_collisions # Extra(CaseSensitiveNames): r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
+case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # Extra(CaseSensitiveNames): r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)

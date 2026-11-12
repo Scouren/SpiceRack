@@ -1,38 +1,38 @@
 # The ngspice-vacask cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`,
-# compared by (deck, step) both ways. A line goes the day its step passes.
+# compared by (deck, step) both ways, class included (a refusal's class names its features). A
+# line goes the day its step passes.
 # Proofs: `ruling=<id>` a ruling or amendment that settles the cause and says when it goes;
 # `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.1 plans for the feature refused (not
-# registered on the trunk);
-# `finding=<id>` a pair finding sent to the lead (the deck is its smallest form):
-#   F1  the VACASK writer panics on a `.dc` over a source's DC value (TargetKind::SourceDc):
-#       `unreachable!` at src/dialect/vacask/write_run/analyses.rs:171; the IR states that sweep
-#       as every writer's (crates/ir/src/plan.rs `target_extra`: no feature). Owner: VACASK writer.
-#   F2  the VACASK writer drops a transient's `print_step`: the legalized design holds
-#       `print_step=0.1n`, the text read back none. Owner: VACASK writer (or FEATURES, if VACASK
-#       has no print step, with a pass). Behind A35's invented name on the same line.
-ac_rc 3 differs ruling=A35 # analysis ac (no name) read back as `name=ac1` (the writer invents it, W2301)
-diode_op 3 differs ruling=A35 # analysis op read back as `name=op1`
-mosfet_op 3 differs ruling=A35 # analysis op read back as `name=op1`
-op_divider 3 differs ruling=A35 # analysis op read back as `name=op1`
-subckt_param 3 differs ruling=A35 # analysis op read back as `name=op1`
-tran_rc_pulse 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.1n`
-tran_sine 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=10n`
-dc_sweep 3 panic finding=F1 # the writer panics: FEATURES lacks a target of kind SourceDc
-diode 3 panic finding=F1 # as dc_sweep
-mosfet 3 panic finding=F1 # as dc_sweep
-unresolved_param 3 differs ruling=A35 # analysis op read back as `name=op1`
-unresolved_param 4 source-fails ruling=A38 # ngspice: "Undefined parameter [nosuch]"; under A38 the strict read refuses it at step 1, and these two lines become one
-controlled 3 differs ruling=A35 # analysis op read back as `name=op1`
-param_div 3 differs ruling=A35 # analysis op read back as `name=op1`
-param_funcs 3 differs ruling=A35 # analysis op read back as `name=op1`
-temp_diode 3 differs ruling=A35 # analysis op read back as `name=op1`
-tran_pwl 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.5n`
-tran_rl_isrc 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.2n`
-tran_exp 2 refused:U0001 pass=exp_td2_relative # Circuit(ExpTd2FromZero)
-tran_uic 2 refused:U0001 pass=device_ic_to_nodeset # Circuit(IcUicOnly): a capacitor's ic= under uic
-ac_phase 3 differs ruling=A35 # analysis ac read back as `name=ac1`
-case_names 3 differs ruling=A35 # analysis op read back as `name=op1`
-temp_card 3 differs ruling=A35 # analysis op read back as `name=op1`
-coupled_l 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=5n`
-pulse_zero_edges 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.1n`
-sine_full 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.1n`
+# registered on the trunk); `finding=<id>` a pair finding sent to the lead.
+# Re-recorded on ir-spine 0f63c87a: VACASK's FEATURES no longer holds AnalysisUnnamed (A35), so
+# every deck is refused at step 2 until the naming rules (the run group's A35 rows) land. Behind
+# that refusal no deck is written, so these are unobservable today and come back with the
+# naming rules: F1 (R64: the VACASK writer's panic on a `.dc` over a source: dc_sweep, diode,
+# mosfet), F2 (the VACASK writer drops a transient's print_step: every tran deck), and A38 on
+# unresolved_param (the strict read should refuse it at step 1; the IR door landed in 70df1a14,
+# the spine's refusal has not).
+ac_phase 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+ac_rc 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+case_names 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+controlled 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+coupled_l 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+dc_sweep 2 refused:U0001:Run(AnalysisUnnamed)+Run(DcAxisUnnamed) ruling=A35 # Run(DcAxisUnnamed) too: the .dc axis has no name (A35); F1 behind it
+diode 2 refused:U0001:Run(AnalysisUnnamed)+Run(DcAxisUnnamed) ruling=A35 # as dc_sweep
+diode_op 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+mosfet 2 refused:U0001:Run(AnalysisUnnamed)+Run(DcAxisUnnamed) ruling=A35 # as dc_sweep
+mosfet_op 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+op_divider 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+param_div 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+param_funcs 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+pulse_zero_edges 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+sine_full 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+subckt_param 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+temp_card 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+temp_diode 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+tran_exp 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # ExpTd2FromZero no longer refused: exp_td2_relative registered (17c42343)
+tran_pwl 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+tran_rc_pulse 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+tran_rl_isrc 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+tran_sine 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+unresolved_param 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # A38 owed at step 1 (see the header)
+tran_uic 2 refused:U0001:Circuit(IcUicOnly)+Run(AnalysisUnnamed) pass=device_ic_to_nodeset # Circuit(IcUicOnly): a capacitor's ic= under uic; and A35

@@ -424,8 +424,9 @@ fn guard<T>(step: u8, f: impl FnOnce() -> T) -> Result<T, (u8, Fail)> {
     })
 }
 
-/// The refusing rows of `diags` from `from` on, as a class `refused:<codes>` and a message
-/// naming each with its title and source line; `None` when none refuses.
+/// The refusing rows of `diags` from `from` on, as a class `refused:<codes>` (and, for `U0001`,
+/// `:<features>`: the cause is the feature, so a row whose feature changes fails its line) and
+/// a message naming each with its title and source line; `None` when none refuses.
 fn refusal(diags: &ir::Diags, from: usize, text: &str) -> Option<Fail> {
     let rows: Vec<&ir::Diag> = diags.rows()[from..]
         .iter()
@@ -435,10 +436,19 @@ fn refusal(diags: &ir::Diags, from: usize, text: &str) -> Option<Fail> {
         return None;
     }
     let codes: BTreeSet<String> = rows.iter().map(|d| d.code.to_string()).collect();
-    let class = format!(
+    let features: BTreeSet<String> = rows
+        .iter()
+        .filter(|d| d.code == ir::diag::UNSUPPORTED)
+        .map(|d| format!("{:?}", ir::Feature::from_index(d.arg as u16)).replace(' ', ""))
+        .collect();
+    let mut class = format!(
         "refused:{}",
         codes.into_iter().collect::<Vec<_>>().join(",")
     );
+    if !features.is_empty() {
+        class += ":";
+        class += &features.into_iter().collect::<Vec<_>>().join("+");
+    }
     Some(fail(&class, describe(&rows, text)))
 }
 
