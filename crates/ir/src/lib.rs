@@ -34,7 +34,7 @@
 //! - kernel: `Design`, `ItemRow`, `DetailRow`, `Builder`, `Editor`, the handles of `id` (`NameId`, `FileId`,
 //!   `ScopeId`, `ExprId`, `DefId`, `TextId`, `NumId`, `ItemRef`, `Ref`, `List` and its aliases),
 //!   `Span`, `Table`, the kernel enums of `item` and `expr`, `Literal`, `NumForm`, `RowFacts`,
-//!   `Handle`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `check`,
+//!   `Handle`, `ExprUse`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `rewrite_exprs`, `check`,
 //!   `check_legal`, `Violation`, the diagnostic rows of `diag`, `eval`, `Bindings`, `Domain`,
 //!   `dump`, `parse`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
@@ -70,10 +70,12 @@ mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
+mod item_facts_defs;
 pub mod item_text;
 pub mod link;
 pub mod literal;
 pub mod names;
+pub mod rewrite;
 pub mod scope;
 pub mod span;
 pub mod table;
@@ -147,7 +149,7 @@ pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
 pub use eval::{Bindings, Domain, Value, eval, eval_typed};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
-pub use facts::{Handle, RowFacts};
+pub use facts::{ExprUse, Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};
 pub use id::{
     BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, NumId, ParamList,
@@ -163,6 +165,7 @@ pub use plan::{
     Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
 };
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
+pub use rewrite::rewrite_exprs;
 pub use run_extra::RunExtra;
 pub use span::Span;
 pub use stats::{Statistics, Vary, VaryDist};
