@@ -26,6 +26,8 @@ mod gen_sets;
 mod loops;
 #[path = "passes_run/names.rs"]
 mod names;
+#[path = "passes_run/options.rs"]
+mod options;
 #[path = "passes_run/pairs.rs"]
 mod pairs;
 #[path = "passes_run/params.rs"]
@@ -105,6 +107,11 @@ fn dc_axes_to_loops_convert_generated_designs() {
 #[test]
 fn continuation_is_a_fact_of_each_sweep_level() {
     continuation::continuation_is_a_fact_of_each_sweep_level();
+}
+
+#[test]
+fn inert_options_leave_the_raw_file_alone() {
+    options::inert_options_leave_the_raw_file_alone();
 }
 
 #[test]

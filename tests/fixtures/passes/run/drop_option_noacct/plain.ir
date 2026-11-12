@@ -1,0 +1,4 @@
+file "a.sp" deck
+  option no_acct whole_run
+  option rel_tol value=1m whole_run
+  analysis op
