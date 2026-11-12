@@ -11,8 +11,11 @@
 //! What changes for the reader of the results: the source writes one DC plot over every axis
 //! (its swept vectors named by the axes); the target writes one plot per pass of the loops,
 //! outermost slowest, each an operating point (or a DC over the inner axes), and no vector of
-//! a peeled axis: its value at each pass is the loop's list, in order. The note `AS_LOOPS` at
-//! the outermost loop says so; its argument is the analysis's name.
+//! a peeled axis: its value at each pass is the loop's list, in order. Around an inner DC each
+//! pass still gives one DC plot, so the passes join outer-loop-major. The note `AS_LOOPS` at
+//! every loop a peeled axis became says so (the results' reader takes exactly that loop's
+//! plots, in run order, and its values from the loop's own sweep row); its argument is the
+//! analysis's name as read.
 //!
 //! Exact only when:
 //! - the analysis restarts every point from the initial guess (`Dc::restart`): a loop's
@@ -41,7 +44,7 @@ use ir::plan::{LoopEnd, SweepLoop, TargetKind};
 
 /// The note at a DC analysis the rule leaves as it is.
 pub const DC_AXIS_KEPT: ir::Code = ir::Code::new(b'U', 415);
-/// The note at the outermost loop a DC analysis became: `arg` is the analysis's name.
+/// The note at each loop a DC analysis's peeled axis became: `arg` is the analysis's name.
 pub const AS_LOOPS: ir::Code = ir::Code::new(b'U', 416);
 
 /// One conversion: the analysis, its scope, the peeled axes (outermost first) with their
@@ -136,12 +139,13 @@ fn build(design: &mut ir::Design, diags: &mut ir::Diags, (item, scope, peeled, i
         .map(|(x, _)| (x.name != ir::NameId::NONE).then(|| design.str(x.name).to_string()))
         .collect();
     let mut a = design.row::<ir::Analysis>(item.index);
-    let outer = place(design, (item, scope), &peeled, &names, &inner, &mut a);
-    diags.push_at(AS_LOOPS, design, outer, a.name.0);
+    for l in place(design, (item, scope), &peeled, &names, &inner, &mut a) {
+        diags.push_at(AS_LOOPS, design, l, a.name.0);
+    }
 }
 
 /// The loops pushed where `at.0` stood, `a` rewritten (an operating point, or a DC over
-/// `inner`) and moved into the innermost body; the outermost loop.
+/// `inner`) and moved into the innermost body; the loops, outermost first.
 fn place(
     design: &mut ir::Design,
     (item, scope): (ir::ItemRef, ir::ScopeId),
@@ -149,7 +153,7 @@ fn place(
     names: &[Option<String>],
     inner: &[DcAxis],
     a: &mut ir::Analysis,
-) -> ir::ItemRef {
+) -> Vec<ir::ItemRef> {
     let mut editor = design.editor();
     let at = editor
         .design()
@@ -158,7 +162,7 @@ fn place(
         .position(|&i| i == item)
         .expect("listed");
     let mut parent = scope;
-    let mut outer = None;
+    let mut loops = Vec::with_capacity(peeled.len());
     for ((axis, vals), name) in peeled.iter().zip(names) {
         let mut b = editor.builder();
         let ids: Vec<ir::ExprId> = vals.iter().map(|&l| b.literal(l)).collect();
@@ -174,13 +178,13 @@ fn place(
             LoopEnd::KeepLast,
             ir::Span::NONE,
         );
-        if outer.is_none() {
+        if loops.is_empty() {
             let items = editor.items_mut(scope);
             assert!(items.last() == Some(&l), "a new loop is pushed last");
             items.pop();
             items.insert(at, l);
-            outer = Some(l);
         }
+        loops.push(l);
         parent = body;
     }
     if inner.is_empty() {
@@ -193,5 +197,6 @@ fn place(
     }
     editor.set(item.index, *a);
     editor.move_item(scope, item, parent, 0);
-    outer.expect("one loop")
+    assert!(loops.len() == peeled.len(), "a loop an axis");
+    loops
 }
