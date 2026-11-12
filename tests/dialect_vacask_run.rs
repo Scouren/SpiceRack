@@ -410,6 +410,12 @@ fn two_blocks_one_control_block_per_file() {
 }
 
 #[test]
+fn dup_name_a_second_analysis_of_one_name_is_refused() {
+    let r = settle("dup_name.sim");
+    assert!(r.out.contains("Analysis 'op1' redefinition."), "{}", r.out);
+}
+
+#[test]
 fn unknown_option_is_refused() {
     let r = settle("unknown_option.sim");
     assert!(r.out.contains("Parameter 'foo' not found."), "{}", r.out);
