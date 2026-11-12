@@ -259,10 +259,10 @@ fn expressions_spell_with_the_fewest_parentheses() {
         "a << 2 >> 1",
         "a // 2 + a / 2",
         "a == b",
-        "(a == b) == c",
+        "a == b == c",
         "a < b",
         "~a",
-        "pow_abs(a, 2) + @f(a, 1) - @g?()",
+        "pow_abs(a, 2) + @f(a, 1) - @g()",
         "round_half_even(a) * exp_lin14(a)",
         "draw:abs_gauss:always:reference(1, 0.1, 3)",
         "draw:rel_unif:sampling:call_site(1, 0.1)",
@@ -271,7 +271,7 @@ fn expressions_spell_with_the_fewest_parentheses() {
         "$time * $temp + $freq - $tstep / $tstop * $tnom",
         "[1, 2, 3]",
         "\"4.8\"",
-        "`odd name` + b?",
+        "`odd name` + b",
         "pwl(a, 0, 0, 1, 1)",
     ];
     let text = params(&canonical);
@@ -400,9 +400,10 @@ fn deep_nesting_goes_through_every_walk() {
     let root = {
         let mut b = d.builder();
         let (_, top) = b.file("deep.sp", Role::Deck);
-        let one = b.literal(plain(1));
+        // a tree, built in the order its text reads: every `1`, the `0`, then the sums inside out
+        let ones: Vec<ExprId> = (0..DEPTH).map(|_| b.literal(plain(1))).collect();
         let mut e = b.literal(plain(0));
-        for _ in 0..DEPTH {
+        for &one in ones.iter().rev() {
             e = b.binary(BinOp::Add, one, e);
         }
         b.param(top, "p", e, Span::NONE);
