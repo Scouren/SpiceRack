@@ -27,7 +27,7 @@ use crate::controlled::{
 };
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
-use crate::r#gen::{Gen, Reads};
+use crate::r#gen::{Gen, Params, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::letter::letter_of;
@@ -200,7 +200,8 @@ pub(crate) fn generate_model(
     };
     let mut pairs: Vec<(String, ExprId)> = Vec::new();
     // values first, then keys: the order `Words::params` creates them in
-    let count = if builtin_kind(family).is_some() {
+    // A28 item 5: `TypedOnly` draws no untyped parameter (elements never draw one)
+    let count = if builtin_kind(family).is_some() || r.g.params == Params::TypedOnly {
         0
     } else {
         r.g.below(3)
