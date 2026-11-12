@@ -12,7 +12,6 @@
 //! `admits`, `source` (crate-private)
 
 use super::expr_write::write_expr;
-use super::name::{self, Place};
 use super::number;
 use super::read_sources::default_of;
 use super::write::Writer;
@@ -30,17 +29,7 @@ pub(super) const PARAMS: ir::Code = ir::Code::new(b'W', 2203);
 pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
     let e: ir::Element = d.row(at.index);
-    w.line();
-    name::spell(d.str(e.name), Place::Other, w.out);
-    w.out.push_str(" (");
-    for (k, &t) in d.names(e.terminals).iter().enumerate() {
-        if k > 0 {
-            w.out.push(' ');
-        }
-        name::spell(d.str(t), Place::Node, w.out);
-    }
-    w.out.push_str(") ");
-    name::spell(d.str(e.model.name), Place::Other, w.out);
+    w.head(&e);
     match e.kind {
         ir::ElemKind::VSource | ir::ElemKind::ISource => independent(w, d.source(&e)),
         ir::ElemKind::Vcvs | ir::ElemKind::Vccs | ir::ElemKind::Cccs | ir::ElemKind::Ccvs => {
