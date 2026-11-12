@@ -110,3 +110,64 @@ fn every_listed_use_is_spelled_in_its_item() {
     }
     assert!(checked >= 100, "only {checked} uses checked");
 }
+
+#[cfg(feature = "gen")]
+#[test]
+fn renaming_every_element_leaves_no_old_name_in_the_text() {
+    // A32 completeness, the lead's property 2 (oracle: the IR text as a whole, which knows
+    // nothing of the rows): rename every element of every generated design and every use the
+    // door lists that resolves to one; a reference some row forgot keeps its old name and is
+    // found as a whole token, whichever row holds it
+    use spicerack_ir::r#gen::{Size, generate};
+    use spicerack_ir::{Element, FeatureSet, ItemKind, NameId, ScopeId};
+    use std::collections::{HashMap, HashSet};
+    let size = Size {
+        items: 30,
+        scope_depth: 3,
+        expr_depth: 4,
+        files: 1,
+    };
+    let (mut renamed, mut uses) = (0, 0);
+    for seed in 0..1000u64 {
+        let d = generate(seed, &FeatureSet::ALL, size);
+        let mut e = d.clone();
+        let items = d.reachable();
+        let elements: Vec<(spicerack_ir::ItemRef, ScopeId, NameId)> = items
+            .iter()
+            .filter(|(i, _)| i.kind == ItemKind::Element)
+            .map(|&(i, s)| (i, s, d.row::<Element>(i.index).name))
+            .collect();
+        let mut fresh: HashMap<NameId, NameId> = HashMap::new();
+        for &(_, _, n) in &elements {
+            let marker = e.builder().name(&format!("zz{}", d.str(n)));
+            fresh.insert(n, marker);
+        }
+        let named: HashSet<(ScopeId, NameId)> = elements.iter().map(|&(_, s, n)| (s, n)).collect();
+        for &(item, scope) in &items {
+            e.editor().map_element_uses(scope, item, &mut |u| {
+                let hit = named.contains(&(u.scope, u.name));
+                uses += usize::from(hit);
+                hit.then(|| fresh[&u.name])
+            });
+        }
+        for &(item, _, n) in &elements {
+            let row = Element {
+                name: fresh[&n],
+                ..e.row::<Element>(item.index)
+            };
+            e.editor().set(item.index, row);
+        }
+        renamed += elements.len();
+        let after = text(&e);
+        let old: HashSet<&str> = elements.iter().map(|&(_, _, n)| d.str(n)).collect();
+        let left: Vec<&str> = after
+            .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+            .filter(|t| old.contains(t))
+            .collect();
+        assert!(left.is_empty(), "seed {seed}: {left:?} left\n{after}");
+    }
+    assert!(
+        renamed >= 1000 && uses >= 8,
+        "{renamed} elements, {uses} uses renamed"
+    );
+}
