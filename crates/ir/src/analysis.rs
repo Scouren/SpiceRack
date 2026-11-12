@@ -28,7 +28,7 @@ use crate::design::ItemRow;
 use crate::design::{Design, DetailRow};
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{NameId, Ref};
-use crate::item::{ItemKind, ScopeKind};
+use crate::item::ItemKind;
 use crate::measure::{
     MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen,
 };
@@ -263,8 +263,9 @@ impl AnalysisKind {
 }
 
 /// The run owner's features of the whole design, which no single row carries (A9): several
-/// analyses in one run (`SeveralAnalyses`), an option set after a run item or inside a loop
-/// (`OptionMidRun`), a loop whose body does not hold every analysis (`LoopScoped`). Called once
+/// analyses in one run (`SeveralAnalyses`), a loop whose body does not hold every analysis
+/// (`LoopScoped`), and the state items after a run item in listed order (`OptionMidRun`,
+/// `EnvMidRun`, `NodeSetMidRun`, `WholeRunMidRun`: `state_order::state_order_features`). Called once
 /// by `features_used` and `check_legal` (which reports them at `Span::NONE`). One pass over the
 /// scopes and items: O(scopes + items).
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
@@ -295,23 +296,15 @@ pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
     if total > 1 {
         *set = set.with(Feature::Run(RunExtra::SeveralAnalyses));
     }
-    for (s, items) in design.scope_items.iter().enumerate() {
-        let in_loop = design.scopes[s].kind == ScopeKind::Loop;
-        let mut after_run = in_loop;
+    crate::state_order::state_order_features(design, set);
+    for items in &design.scope_items {
         for item in items {
-            if item.kind == ItemKind::Option && after_run {
-                *set = set.with(Feature::Run(RunExtra::OptionMidRun));
-            }
             if item.kind == ItemKind::Loop {
                 let body = Loop::table(design).get(item.index).body;
                 if below[body.index()] < total {
                     *set = set.with(Feature::Run(RunExtra::LoopScoped));
                 }
             }
-            after_run |= matches!(
-                item.kind,
-                ItemKind::Analysis | ItemKind::Alter | ItemKind::Loop
-            );
         }
     }
 }
