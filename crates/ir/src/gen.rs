@@ -17,7 +17,7 @@
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
-//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::fresh(&mut self) -> String`,
+//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
 //! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
 
@@ -77,7 +77,7 @@ pub struct Gen {
     pub(crate) int_literals: bool,
     /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
     /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
-    /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
+    /// (cleared around a head default when the set lacks `Extra::FormalNotConstant`).
     pub(crate) enclosing_ok: bool,
     pub(crate) param_reads: bool,
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
@@ -307,6 +307,16 @@ impl Gen {
     }
 }
 
+/// Whether an item of `kind` may be listed in `scope` under `features`: `Placed(S, kind)` is in
+/// the set for every scope kind S on `scope`'s chain but a file's top (A15 K1). For a row's own
+/// generator that pushes into a body it opened.
+pub(crate) fn placeable(d: &Design, scope: ScopeId, kind: ItemKind, features: &FeatureSet) -> bool {
+    let chain = crate::feature::chain_kinds(d, scope);
+    ScopeKind::ALL.into_iter().all(|s| {
+        s == ScopeKind::File || !chain[s as usize] || features.contains(Feature::Placed(s, kind))
+    })
+}
+
 // ---- private ----
 
 /// Fills `top` and every body its items open, depth first (each body right after its item: the
@@ -356,7 +366,7 @@ fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
     }
 }
 
-/// The kinds a row in `scope` may have: in the set, allowed where it sits (placement `Extra`s,
+/// The kinds a row in `scope` may have: in the set, allowed where it sits (`placeable`,
 /// sections only in a file's top, scopes only below the depth cap), and with what its fields
 /// need (literals for any expression). Never `Title` (`fill` places it first in a deck).
 fn candidates(
@@ -366,34 +376,23 @@ fn candidates(
     cap: usize,
     features: &FeatureSet,
 ) -> Vec<ItemKind> {
-    let (mut in_subckt, mut in_branch, mut at) = (false, false, scope);
-    for _ in 0..=d.scopes.len() {
-        if at.is_none() {
-            break;
-        }
-        let s = d.scope(at);
-        in_subckt |= s.kind == ScopeKind::Subckt;
-        in_branch |= s.kind == ScopeKind::Branch;
-        at = s.parent;
-    }
     let has = |f| features.contains(f);
-    let file_top = d.scope(scope).kind == ScopeKind::File;
     let exprs = has(Feature::Expr(ExprTag::Num));
     let opens = depth < cap;
     ItemKind::ALL
         .into_iter()
-        .filter(|&k| has(Feature::Item(k)))
+        .filter(|&k| has(Feature::Item(k)) && placeable(d, scope, k, features))
         .filter(|&k| match k {
             ItemKind::Title => false,
-            ItemKind::Subckt => opens && (!in_subckt || has(Feature::Extra(Extra::NestedSubckt))),
-            ItemKind::Section => opens && file_top,
+            ItemKind::Subckt => opens,
+            ItemKind::Section => opens,
             ItemKind::If => opens && exprs,
             ItemKind::Loop => opens,
-            ItemKind::Func => exprs && (!in_subckt || has(Feature::Extra(Extra::LocalFunc))),
-            ItemKind::Param => exprs && (!in_branch || has(Feature::Extra(Extra::ParamInBranch))),
-            ItemKind::Load => !in_branch || has(Feature::Extra(Extra::LoadInBranch)),
-            ItemKind::Model => !in_subckt || has(Feature::Extra(Extra::LocalModel)),
+            ItemKind::Func => exprs,
+            ItemKind::Param => exprs,
             ItemKind::Comment
+            | ItemKind::Load
+            | ItemKind::Model
             | ItemKind::Include
             | ItemKind::Global
             | ItemKind::Opaque
