@@ -321,6 +321,32 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.param(top, "c", two, Span::NONE);
             },
         ),
+        (
+            // A25 item 4: a string as a parameter's value; the neighbour is a list there
+            Extra::StringValue,
+            |b, top| {
+                let s = b.string("fast");
+                b.param(top, "corner", s, Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                let l = b.list(&[one]);
+                b.param(top, "v", l, Span::NONE);
+            },
+        ),
+        (
+            // a list as a formal's default; the neighbour is a string there
+            Extra::ListValue,
+            |b, top| {
+                let (one, two) = (b.num(1.0), b.num(2.0));
+                let l = b.list(&[one, two]);
+                b.subckt(top, "s", &[], &[("w", l)], Span::NONE);
+            },
+            |b, top| {
+                let s = b.string("fast");
+                b.subckt(top, "s", &[], &[("w", s)], Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         let f = Feature::Extra(extra);

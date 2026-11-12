@@ -482,4 +482,43 @@ mod tests {
             "only {wrapped_reads} typed reads drawn"
         );
     }
+
+    #[test]
+    fn a_root_is_a_string_or_a_list_only_where_asked() {
+        // A25 item 4 (oracle: the root's row): `Gen::expr` over the full set returns no string
+        // or list root unless `root_str` or `root_list` asks for one, and each flag is reached
+        use crate::expr::Expr;
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        let mut reached = [false; 2];
+        for asked in [false, true] {
+            for seed in 0..200u64 {
+                let mut d = Design::new();
+                let mut b = d.builder();
+                let (_, top) = b.file("t.sp", Role::Deck);
+                let mut g = Gen::new(seed, &FeatureSet::ALL, size);
+                g.scope = top;
+                (g.root_str, g.root_list) = (asked, asked);
+                for _ in 0..10 {
+                    let e = g.expr(&mut b, &FeatureSet::ALL, Reads::Constant);
+                    let k = match b.design().expr(e) {
+                        Expr::Str(_) => 0,
+                        Expr::List(_) => 1,
+                        _ => continue,
+                    };
+                    assert!(asked, "seed {seed}: a root no flag asked for");
+                    reached[k] = true;
+                }
+            }
+        }
+        assert_eq!(
+            reached,
+            [true, true],
+            "string and list roots are drawn when asked"
+        );
+    }
 }
