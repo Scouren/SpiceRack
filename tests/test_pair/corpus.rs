@@ -216,7 +216,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
         "{}: census of {} decks in {file}\n{}",
         c.name,
         paths.len(),
-        table(&seen, paths.len())
+        table(&seen, &paths.iter().map(|p| rel(p)).collect::<Vec<_>>())
     );
     crate::judge(&format!("{}-corpus", c.name), &seen)
 }
@@ -285,9 +285,11 @@ fn quarantined(list: &str) -> Vec<String> {
         .collect()
 }
 
-/// The census table: decks by their first failing step and its class (`6:pass` for none), and
-/// the step-2 refusals by feature.
-fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
+/// The census table: decks by their first failing step and its class (`6:pass` for none), the
+/// step-2 refusals by feature, and each kit family (`cmcqa/<kit>/`) once: its decks, how many
+/// pass, and its top three step-2 features (thousands of near-identical decks are one fact).
+fn table(seen: &BTreeMap<(String, u8), Fail>, names: &[String]) -> String {
+    let decks = names.len();
     let mut first: BTreeMap<String, &Fail> = BTreeMap::new();
     for ((deck, _), f) in seen {
         first.entry(deck.clone()).or_insert(f);
@@ -338,6 +340,44 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
     ops.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     for (o, n) in ops {
         out += &format!("  {n:5} {o}\n");
+    }
+    // Kit families: one line each.
+    let kit = |d: &str| {
+        let w: Vec<&str> = d.split('/').collect();
+        (w.len() > 2 && w[0] == "cmcqa").then(|| format!("{}/{}", w[0], w[1]))
+    };
+    let mut kits: BTreeMap<String, (usize, usize, BTreeMap<String, usize>)> = BTreeMap::new();
+    for d in names {
+        if let Some(k) = kit(d) {
+            let e = kits.entry(k).or_default();
+            e.0 += 1;
+            e.1 += usize::from(!first.contains_key(d));
+        }
+    }
+    for ((deck, step), f) in seen {
+        if let (Some(k), 2) = (kit(deck), *step) {
+            let e = kits.get_mut(&k).expect("a kit of a listed deck");
+            for feature in f
+                .class
+                .split(':')
+                .nth(2)
+                .into_iter()
+                .flat_map(|x| x.split('+'))
+            {
+                *e.2.entry(feature.to_string()).or_default() += 1;
+            }
+        }
+    }
+    out += "kit families (decks, pass all six, top three step-2 features by decks):\n";
+    for (k, (n, pass, feats)) in &kits {
+        let mut top: Vec<(&String, &usize)> = feats.iter().collect();
+        top.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        let top: Vec<String> = top
+            .iter()
+            .take(3)
+            .map(|(f, c)| format!("{f} {c}"))
+            .collect();
+        out += &format!("  {k}: {n} decks, {pass} pass; {}\n", top.join(", "));
     }
     out
 }
