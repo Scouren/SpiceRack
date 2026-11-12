@@ -34,6 +34,9 @@ const PENDING_PAIRS: &[&str] = &[
     "tran_cap_none_to_given",
     "ic_beyond_next_to_next_only",
     "ic_next_only_to_beyond",
+    "analysis_name_dropped",
+    "dc_axis_name_dropped",
+    "loop_name_dropped",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -70,6 +73,13 @@ fn ic_beyond_next_to_next_only_keeps_the_state_at_every_analysis() {
 #[test]
 fn ic_next_only_to_beyond_keeps_the_state_at_every_analysis() {
     keeps_state("ic_next_only_to_beyond", ir::RunExtra::IcNextOnly);
+}
+
+#[test]
+fn names_dropped_keep_the_state_at_every_analysis() {
+    keeps_state("analysis_name_dropped", ir::RunExtra::AnalysisNamed);
+    keeps_state("dc_axis_name_dropped", ir::RunExtra::DcAxisNamed);
+    keeps_state("loop_name_dropped", ir::RunExtra::LoopNamed);
 }
 
 #[test]

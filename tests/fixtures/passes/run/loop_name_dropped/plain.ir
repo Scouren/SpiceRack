@@ -1,0 +1,3 @@
+file "a.sp" deck
+  loop sweep name=s1 (temp) (list values=[1])
+    analysis op

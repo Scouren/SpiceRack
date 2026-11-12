@@ -19,11 +19,12 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod ic_next_only`, `pub mod names_dropped`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod ic_next_only;
+pub mod names_dropped;
 pub mod run_items_together;
 pub mod tran_ceiling_given;
 pub mod whole_run_state_first;
@@ -101,6 +102,27 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[ic_next_only::IC_KEPT],
         run: ic_next_only::ic_next_only_to_beyond,
     },
+    Pass {
+        name: "analysis_name_dropped",
+        removes: ir::Feature::Run(ir::RunExtra::AnalysisNamed),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[],
+        run: names_dropped::analysis_name_dropped,
+    },
+    Pass {
+        name: "dc_axis_name_dropped",
+        removes: ir::Feature::Run(ir::RunExtra::DcAxisNamed),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[],
+        run: names_dropped::dc_axis_name_dropped,
+    },
+    Pass {
+        name: "loop_name_dropped",
+        removes: ir::Feature::Run(ir::RunExtra::LoopNamed),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[names_dropped::LOOP_NAME_READ],
+        run: names_dropped::loop_name_dropped,
+    },
     // after `whole_run_state_first`: a move may interleave
     Pass {
         name: "run_items_together",
@@ -164,6 +186,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an initial condition or node set whose reach the target cannot state",
             cite: "rewrite/AMEND-A12.md A22",
             explain: "The target states a condition either for the next analysis only or for every analysis after it, not this one's way. The rule copies or re-labels a deck's conditions together, and here it cannot: a condition or an analysis stands in a body or loop, a value holds a random draw, one node is set both for the whole run and from a point on, or a next-only condition precedes an analysis that is not the last. The condition is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        names_dropped::NAME_DROPPED,
+        ir::Info {
+            title: "a statement name the target cannot spell, dropped",
+            cite: "rewrite/AMEND-A12.md A16, A22, A32",
+            explain: "The target has no name on this analysis, DC axis or loop, so the name was dropped; it labels results only. The note's argument is the old name: results are given back under it.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        names_dropped::LOOP_NAME_READ,
+        ir::Info {
+            title: "a named loop whose body may read its name",
+            cite: "rewrite/AMEND-A12.md A27",
+            explain: "The target has no loop name. This loop's body holds a statement kept as its dialect's text, which may read the name as the loop variable, so the name cannot be dropped and the loop is refused.",
             kind: ir::Kind::Note,
         },
     ),

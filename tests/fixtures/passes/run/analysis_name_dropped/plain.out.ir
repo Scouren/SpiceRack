@@ -1,0 +1,4 @@
+file "a.sp" deck
+  analysis op
+  analysis tran stop=1u print_step=1n cap=none
+  analysis op
