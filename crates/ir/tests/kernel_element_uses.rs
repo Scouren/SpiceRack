@@ -128,7 +128,11 @@ fn renaming_every_element_leaves_no_old_name_in_the_text() {
         files: 1,
     };
     let (mut renamed, mut uses) = (0, 0);
-    for seed in 0..1000u64 {
+    // the floor is on uses, not seeds: the generator's stream shifts with every change
+    for seed in 0..20_000u64 {
+        if seed >= 1000 && uses >= 20 {
+            break;
+        }
         let d = generate(seed, &FeatureSet::ALL, size);
         let mut e = d.clone();
         let items = d.reachable();
@@ -167,7 +171,7 @@ fn renaming_every_element_leaves_no_old_name_in_the_text() {
         assert!(left.is_empty(), "seed {seed}: {left:?} left\n{after}");
     }
     assert!(
-        renamed >= 1000 && uses >= 8,
+        renamed >= 1000 && uses >= 20,
         "{renamed} elements, {uses} uses renamed"
     );
 }
