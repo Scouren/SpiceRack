@@ -137,3 +137,49 @@ fn a_subckt_default_reads_its_sibling_head_parameter() {
     );
     assert_ne!(def, param_def(&d, top, "r"), "the outer `r` is shadowed");
 }
+
+#[test]
+fn a_default_never_reads_its_own_formal() {
+    // A29 (R53): `subckt s () t=(t + 1) u=(t * 2)` beside an outer `t`: `u`'s `t` is the sibling
+    // formal (as A10), but `t`'s own `t` is never the formal itself: it is what is visible from
+    // where the subcircuit is defined (the outer `t`), or unbound when nothing is
+    let mut d = Design::new();
+    let (top, own, sibling, sub) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("top.sp", Role::Deck);
+        let five = b.num(5.0);
+        b.param(top, "t", five, Span::NONE);
+        let own = b.param_ref("t");
+        let one = b.num(1.0);
+        let t = b.binary(BinOp::Add, own, one);
+        let sibling = b.param_ref("t");
+        let two = b.num(2.0);
+        let u = b.binary(BinOp::Mul, sibling, two);
+        let (sub, _) = b.subckt(top, "s", &[], &[("t", t), ("u", u)], Span::NONE);
+        (top, own, sibling, sub)
+    };
+    link(&mut d, &mut Diags::new());
+    assert_eq!(bound(&d, own), param_def(&d, top, "t"), "the outer t");
+    assert_eq!(
+        d.def(bound(&d, sibling)).item,
+        sub,
+        "u reads the sibling formal"
+    );
+    // with no outer `t`, the default's read stays unbound
+    let mut lone = Design::new();
+    let own = {
+        let mut b = lone.builder();
+        let (_, top) = b.file("top.sp", Role::Deck);
+        let own = b.param_ref("t");
+        b.subckt(top, "s", &[], &[("t", own)], Span::NONE);
+        own
+    };
+    link(&mut lone, &mut Diags::new());
+    assert!(
+        bound(&lone, own).is_none(),
+        "unbound, read where the instance stands"
+    );
+    let mut diags = Diags::new();
+    spicerack_ir::check(&lone, &mut diags);
+    assert!(diags.is_empty(), "no cycle: {:?}", diags.rows());
+}
