@@ -1,0 +1,11 @@
+an instance with more terminals than its subcircuit has ports
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s (a b)
+  r1 (a b) res r=1k
+ends
+x1 (n1 n2 n3) s
+r0 (n1 0) res r=1k
+control
+  analysis op1 op
+endc

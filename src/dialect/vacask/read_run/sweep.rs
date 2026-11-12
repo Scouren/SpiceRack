@@ -319,7 +319,7 @@ fn option_aim(name: &str) -> Option<Aim> {
     (own && !name.ends_with("_debug")).then(|| Aim::PrivateOption(name.to_string()))
 }
 
-/// `node` plus one: an integer literal's successor, else `node + 1`.
+/// `node` plus one: an integer literal's successor, `x` for `x - 1`, else `node + 1`.
 fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
     let ast = &l.cst.ast;
     if ast.tag(Node(node)) == Tag::Num
@@ -334,6 +334,14 @@ fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
         return l.b.literal(next);
     }
     let e = value(l, node);
+    // `x - 1` is the writer's spelling of the count `x` (`write_run::analyses::minus_one`).
+    if let ir::Expr::Binary(ir::BinOp::Sub, x, one) = l.b.design().expr(e)
+        && let ir::Expr::Num(n) = l.b.design().expr(one)
+        && l.b.design().num(n).form == ir::NumForm::Int
+        && l.b.design().num(n) == int_one()
+    {
+        return x;
+    }
     let one = l.b.literal(int_one());
     l.b.binary(ir::BinOp::Add, e, one)
 }

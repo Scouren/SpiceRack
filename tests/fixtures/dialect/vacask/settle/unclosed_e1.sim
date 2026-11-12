@@ -1,0 +1,7 @@
+paren: unclosed in an expression
+model vsource vsource
+parameters a=(1+2
+v1 (in 0) vsource dc=a
+control
+  analysis op1 op
+endc

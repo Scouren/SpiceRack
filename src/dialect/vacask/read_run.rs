@@ -18,7 +18,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -26,6 +26,7 @@ mod options;
 mod plan;
 mod sweep;
 
+use super::codes::UNCLOSED;
 use super::read::{self, Lower};
 use super::read_outputs;
 use crate::ir;
@@ -167,6 +168,14 @@ pub(super) const SWEEP_WAVE: ir::Code = ir::Code::new(b'P', 2314);
 /// feature candidate (class F: ngspice has the form; a pass giving such a source its wave's
 /// value at zero as a given DC, spelled as R42's fold, would convert it when a pair deck needs it).
 pub(super) const SOURCE_SWEEP_WAVE: ir::Code = ir::Code::new(b'W', 2307);
+/// A sweep of a source's DC value whose element is no independent source found from the top.
+pub(super) const SOURCE_SWEEP_NAME: ir::Code = ir::Code::new(b'W', 2309);
+/// A transfer or noise analysis whose output is no node or node pair.
+pub(super) const OUTPUT_FORM: ir::Code = ir::Code::new(b'W', 2311);
+/// An `mc` loop inside another.
+pub(super) const MC_NESTED: ir::Code = ir::Code::new(b'W', 2310);
+/// A node set no analysis line that takes its list follows.
+pub(super) const NODE_SET_PLACE: ir::Code = ir::Code::new(b'W', 2308);
 /// A control statement VACASK rejects.
 pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 2320);
 
@@ -286,6 +295,34 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Refusal,
     ),
     row(
+        SOURCE_SWEEP_NAME,
+        "a sweep of the DC value of a source VACASK would not find",
+        "R64; VD cmd-sweep (instance= is a hierarchical instance name)",
+        "VACASK finds a swept instance by its path from the top; a source-DC target whose path or name names no independent source there reads back as a device parameter of an unknown instance.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        OUTPUT_FORM,
+        "a transfer or noise analysis whose output is no node voltage",
+        "VD cmd-analysis-dcxf, -acxf, -noise (`out`: one node or a node pair)",
+        "VACASK's dcxf, acxf and noise name their output as a node or a node pair; a current or another probe has no VACASK spelling there (it would read back as a node of that name).",
+        ir::Kind::Refusal,
+    ),
+    row(
+        MC_NESTED,
+        "an mc loop inside another",
+        "VD cmd-analysis-mc (an mc block cannot be nested); the reader refuses one (P2320)",
+        "VACASK runs one Monte Carlo loop at a time; a loop of samples inside another has no VACASK spelling.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        NODE_SET_PLACE,
+        "a node set no analysis that takes it follows",
+        "VD cmd-analysis-op, -tran, -dcinc, -dcxf (`ic=` on tran, `nodeset=` on op, dcinc, dcxf and tran)",
+        "VACASK states an initial condition or a nodeset only as a list on the analysis line it applies to; a node set before any other item, or before an analysis without that list, has no VACASK spelling.",
+        ir::Kind::Refusal,
+    ),
+    row(
         REJECTED,
         "a control statement VACASK rejects",
         "VD cmd-overview, cmd-sweep, cmd-analysis-*, cmd-options; runs e3, e6, x1, x3",
@@ -345,6 +382,13 @@ pub(super) fn control(l: &mut Lower<'_, '_, '_>, n: Node) {
         let start = l.start(s);
         l.comments_until(start, true);
         l.stmt = l.span(s);
+        if read::unclosed(l.cst, s) {
+            for sw in sweeps.drain(..) {
+                read::opaque(l, sw, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
+            }
+            read::opaque(l, s, ir::OpaqueClass::InvalidInSource, Some(UNCLOSED));
+            continue;
+        }
         let word = head(l, s);
         let private = mc.is_some_and(|(_, p)| p);
         if word == "sweep" && !private {
