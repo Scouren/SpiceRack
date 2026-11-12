@@ -4,7 +4,7 @@ circuitsim90/MOS2/cram.sp target-fails # no raw file tran1.raw: convergence not 
 circuitsim90/MOS2/gm6.sp simulator-differs:third-simulator reason=S-NGSPICE-OUTLIER-3RD proof=s-ngspice-outlier-3rd.md # op v(13): 0.40898654762563585+0i vs 0+0i at 0 (tol 8.200e-4)
 circuitsim90/MOS2/hussamp.sp target-fails # no raw file op1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 147 step(s) tried.
 circuitsim90/MOS2/mux8.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 87 step(s) tried.
-circuitsim90/MOS2/ring.sp mismatch # tran v(2): 1.5267320280194356 leaves the tube at t=0.00000008005055142853478 (tol 3.055e-2)
+circuitsim90/MOS2/ring.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(2): 1.5267320280194356 leaves the tube at t=0.00000008005055142853478 (tol 3.055e-2)
 circuitsim90/MOS2/schmitfast.sp target-fails # no raw file dc1.raw: worst residual=0.00e+00 @ (unknown), worst delta=0.00e+00 >TOL @ (unknown) | NR solver failed to converge. | Leaving core NR loop in iterat
 circuitsim90/MOS2/schmitslow.sp target-fails # no raw file dc1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 119 step(s) tried.
 circuitsim90/MOS2/slowlatch.sp target-fails # no raw file tran1.raw: Timestep too small. Transient analysis aborted. | Analysis 'tran1' aborted.
@@ -19,38 +19,28 @@ circuitsim90/MOS3/gm1.sp target-fails # no raw file tran1.raw: worst residual=0.
 circuitsim90/MOS3/gm19.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 100 step(s) tried.
 circuitsim90/MOS3/gm3.sp target-fails # no raw file op1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 96 step(s) tried.
 circuitsim90/MOS3/jge.sp target-fails # no raw file tran1.raw: convergence not allowed | NR solver failed to converge. | Leaving core NR loop in iteration 50. | Homotopy failed, 53 step(s) tried.
-circuitsim90/MOS3/mike2.sp mismatch # tran i(vpulse): -0.0020017239627740935 leaves the tube at t=0.0000000010047600892638032 (tol 2.311e-5)
+circuitsim90/MOS3/mike2.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran i(vpulse): -0.0020017239627740935 leaves the tube at t=0.0000000010047600892638032 (tol 2.311e-5)
 circuitsim90/MOS3/rich3.sp target-fails # no raw file tran1.raw: worst residual=0.00e+00 >TOL @ (unknown), worst delta=0.00e+00 >TOL @ (unknown) | NR solver failed to converge. | Leaving core NR loop in
 ngspice/examples/measure/rc-meas-ac-control.sp target-fails # no raw file ac1.raw: Refactorization failed, size=5, rank=4. | Factorization failed, size=5, rank=4, zero pivot @ node 'mid1'. | Leaving core NR loop in iterati
-ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/examples/noise/resdiv.sp mismatch # plots ["noise", "noise", "noise", "total", "total", "total"] became ["noise", "noise", "noise"]
+ngspice/examples/noise/bipolar-noise.sp mismatch # noise: sweep grid changed (84 -> 85 points)
 ngspice/examples/snapshot/adder_mos.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (maxstep, TSTOP/100000) agree; its .tran is in the included file and the harness refines no VACASK deck; as written v(10) is 2.52 x out
 ngspice/examples/snapshot/adder_mos_circ.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (maxstep, TSTOP/100000) agree (worst 0.806 of the tolerance); at TSTOP/20000 i(vin3b) is 7.91 x out; the harness refines no VACASK deck
 ngspice/examples/soa/nic_soa.sp mismatch # tran v(bias): 0.6388506757411574 leaves the tube at t=0 (tol 6.502e-3)
-ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])
-ngspice/examples/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/examples/various/diode_ac_par.sp mismatch # dc: no vector in common (["@d1[gd]", "@d1[cd]", "@d1[qd]"] vs ["1", "d1:a_int", "d1:implicit_equation_0", "v1:flow(br)"])
 ngspice/examples/various/roessler-attractor.sp mismatch # tran v(z): 15.171474718990456 leaves the tube at t=172.01896000045733 (tol 2.284e-01; target there 14.46884464898786)
 ngspice/examples/various/todo-temper-3.sp target-fails # no raw file dc1.raw: Variable or constant 'temper' not defined. | model dplain sp_diode (is=temper >= 25 ? 1e-10 : (temper+1)*1e-11) | ^ | 9:27 (0x66) in .cross
-ngspice/paranoia/various/bjtnoise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/paranoia/vdmos/IXTP6N100D2-n-weak-inv.sp mismatch # dc: sweep grid changed (5400 -> 505 points)
-ngspice/tests/general/fourbitadder.sp mismatch # tran v(x1.x1.x1.x6.8): 0.00004785659230303885 leaves the tube at t=0.000000000038400000000000004 (tol 2.781e-6)
+ngspice/tests/general/fourbitadder.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(x1.x1.x1.x6.8): 0.00004785659230303885 leaves the tube at t=0.000000000038400000000000004 (tol 2.781e-6)
 ngspice/tests/general/mosamp.sp mismatch # tran v(5): 7.48424320532575 leaves the tube at t=0.000005006817099418725 (tol 1.363e-1)
 ngspice/tests/general/rc.sp target-fails # no raw file tran1.raw: Rise time of pulse transient must be grater than 0. | vin (1 0) vsource dc=0 mag=1e0 type="pulse" val0=0 val1=1e0 delay=0 ri ... | ^ | 14
-ngspice/tests/general/rca3040.sp mismatch # tran v(31): -0.05902549482449474 leaves the tube at t=0.00000011444936933892054 (tol 5.924e-4)
-ngspice/tests/hfet/id_vgs.sp target-fails # no raw file dc1.raw: Device 'nhfet' not found. | model hfet nhfet (rdi=0 rsi=0 m=2.57 lambda=0.17 vs=1.5e5 mu=0.385 vt0 ... | ^ | 7:1 (0x24) in .cross_sim_deck.
-ngspice/tests/hfet/inverter.sp target-fails # no raw file tran1.raw: Device 'nhfet' not found. | model adrv nhfet (rd=60 rs=60 m=2.57 lambda=0.17 vs=1.5e5 mu=0.385 vt0 ... | ^ | 7:1 (0x24) in .cross_sim_dec
-ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): 0.0000009674103010281582 leaves the tube at t=0.0000000606399999999999 (tol 9.868e-8)
+ngspice/tests/general/rca3040.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(31): -0.05902549482449474 leaves the tube at t=0.00000011444936933892054 (tol 5.924e-4)
+ngspice/tests/mos6/simpleinv.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran i(vin): 0.0000009674103010281582 leaves the tube at t=0.0000000606399999999999 (tol 9.868e-8)
 ngspice/tests/regression/lib-processing/ex1a.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'RES'.
 ngspice/tests/regression/lib-processing/ex1b.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'RES'.
 ngspice/tests/regression/lib-processing/ex2a.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'MOS'.
 ngspice/tests/regression/lib-processing/ex3a.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'MOS'.
-ngspice/tests/regression/misc/bugs-2.sp mismatch # dc: no vector in common (["v(@v1[dc])"] vs ["1", "v1:flow(br)"])
 ngspice/tests/regression/misc/empty-1.sp target-fails # no raw file op1.raw: Circuit has no unknowns.
 ngspice/tests/regression/misc/if-elseif.sp target-fails # no raw file op1.raw: Parser syntax error, unexpected =
 ngspice/tests/regression/misc/log-functions-1.sp target-fails # no raw file op1.raw: Inf found in vector, row node 'bb1:flow(br)' (ln of a node at the first iterate's 0 V)
-ngspice/tests/regression/misc/test-noise-2.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/tests/regression/misc/test-noise-3.sp mismatch # plots ["noise", "noise", "total", "total"] became ["noise", "noise"]
 ngspice/tests/regression/model/binning-1.sp target-fails # no raw file op1.raw: Master 'nmos_tst' not found. | mx2 (2 2 0 0) nmos_tst l=5u w=5u | ^ | 16:1 (0x1c7) in .cross_sim_deck.sp
 ngspice/tests/regression/temper/temper-1.sp target-fails # no raw file op1.raw: Variable or constant 'temper' not defined. | model dplain sp_diode (is=temper+1000) | ^ | 7:27 (0x40) in .cross_sim_deck.sp
 ngspice/tests/regression/temper/temper-2.sp target-fails # no raw file dc1.raw: Variable or constant 'temper' not defined. | model dtest sp_diode (is=1e-12 * temper) | ^ | 10:34 (0x93) in .cross_sim_deck.sp

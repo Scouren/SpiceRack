@@ -75,6 +75,8 @@ mod proofs;
 mod sim;
 #[path = "../test_import_suite/tube.rs"]
 mod tube;
+mod vacask;
+mod vacask_tests;
 
 use lists::{admits, listed};
 use sim::{Ran, Sim};

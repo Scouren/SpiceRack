@@ -25,7 +25,7 @@ use crate::syntax::behaviour::{ModelSemantics, OptionTo, OptionsForm, Writer};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::epochs::{Plan, plan};
-use crate::syntax::render::read::{Bench, BenchCard, Opt, Val, step_points};
+use crate::syntax::render::read::{Ana, Bench, BenchCard, Opt, Val, step_points};
 use crate::syntax::render::swept::{Swept, step_makes, step_swept};
 
 /// The testbench, folded from its statements in read order.
@@ -261,7 +261,8 @@ impl W<'_, '_> {
     /// Notes what the testbench holds that neither target writes: each
     /// `.print`, Xyce's own options, ngspice's mode, a VACASK save of a
     /// module's output variable, a list `.step`, the save list where the
-    /// target saves every node.
+    /// target saves every node; on VACASK also an ngspice noise run's
+    /// integrals and a saved or printed `@dev[param]` (W0052).
     pub(super) fn unwritten_outputs(&mut self, tb: &Tb) {
         for (outs, tok) in &tb.prints {
             self.ask(Construct::Print, *tok);
@@ -280,6 +281,30 @@ impl W<'_, '_> {
         }
         for &tok in &tb.unsaved {
             self.note(Code::W0023, tok);
+        }
+        // ngspice's `.noise` also writes its integrals as a one-point plot
+        // and names a device's vectors `@dev[param]`; VACASK's `noise`
+        // writes the spectrum alone and its raw file no device vector
+        // (W0052, as `xyce_drops` notes for Xyce; runs:
+        // research/impl/evidence/P1-066-vacask-noted-drops/runs.txt).
+        if self.b.writer == Writer::Vacask {
+            assert_eq!(
+                tb.plan.runs.len(),
+                tb.plan.run_tok.len(),
+                "a token per analysis"
+            );
+            let ngspice = self.rd.b.model_semantics == ModelSemantics::Ngspice;
+            for (a, tok) in tb.plan.runs.iter().zip(&tb.plan.run_tok) {
+                if ngspice && matches!(a, Ana::Noise { .. }) {
+                    self.note(Code::W0052, *tok);
+                }
+            }
+            let at = |outs: &[String]| outs.iter().any(|o| o.contains('@'));
+            let saved = tb.save_tok.filter(|_| at(&tb.saves));
+            let printed = tb.prints.iter().filter(|p| at(&p.0)).map(|p| p.1);
+            for tok in saved.into_iter().chain(printed) {
+                self.note(Code::W0052, tok);
+            }
         }
         for &tok in &tb.ngbehavior {
             self.ask(Construct::NgBehavior, tok);

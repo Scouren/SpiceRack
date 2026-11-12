@@ -110,10 +110,11 @@ pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: 
 /// `text` with every transient's TMAX at most (TSTOP - TSTART)/n: the
 /// refinement oracle (ZERO-LEDGER P1-012, mismatches.md §4.2): a pair that
 /// agrees once both simulators take small steps differed numerically.
-/// `None` for a VACASK deck (its `tran` takes `maxstep=`, not refined here).
+/// A VACASK deck's `tran` takes `maxstep=` (`vacask::refined`): `None`
+/// when it has no transient with a literal `stop=`.
 pub fn refined(sim: Sim, text: &str, n: f64) -> Option<String> {
     if sim == Sim::Vacask {
-        return None;
+        return super::vacask::refined(text, n);
     }
     // LTspice's `.tran <Tstop>` in the four-number order first.
     let line = |l: &str| match sim {
@@ -266,9 +267,12 @@ fn run_in(
         };
         let all = spicerack::rawfile::parse_raw_all(&bytes).map_err(|e| e.to_string())?;
         // ngspice's `write` after a failed analysis writes its constants plot.
+        // VACASK's noise plot in ngspice's names and units; any other plot
+        // passes through (`vacask::spectrum`).
         plots.extend(
             all.into_iter()
-                .filter(|p| !p.plot_name.eq_ignore_ascii_case("constants")),
+                .filter(|p| !p.plot_name.eq_ignore_ascii_case("constants"))
+                .map(super::vacask::spectrum),
         );
     }
     if matches!(sim, Sim::Ngspice | Sim::NgspiceHsa) && dc_loop(&text) {

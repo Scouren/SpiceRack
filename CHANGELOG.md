@@ -60,6 +60,8 @@ One line per change, written by hand, citing its pull request. Every number is m
 - xyce: an ngspice `.print … all` is written `v(*) i(*)` and a branch vector `v1#branch` as `i(v1)`; Xyce stopped on both words (ZERO-LEDGER P1-066).
 - xyce: an ngspice MESFET card's threshold `vt0` is written `vto`, and ngspice's -2 V default when the card gives none; Xyce ignored `vt0` and computed with 0 V (ZERO-LEDGER P1-066).
 - python, render: `SingleFrequencyFMVoltageSource`/`…CurrentSource` builds ngspice's `SFFM(VO VA FM MDI FC)` with the signal frequency third and the carrier fifth (it built them the other way round: ngspice-45 ran a 10 kHz carrier modulated at 200 Hz, index 4, as 0.279 V at 213.3 µs where the closed form is 0.948 V), and its default DC value is 0, ngspice's value up to time zero. An ngspice SFFM is written for Spectre and VACASK with `freq` the carrier (VACASK ran −0.160 V for ngspice's 0.939 V at 213.7 µs); one that SPICE3's form runs otherwise (an offset, an index outside 0 to FC/FM, an FC of 0, an expression) is refused (`W0108`) for Xyce, HSPICE, LTspice, Spectre and VACASK, which wrote it; an ngspice SFFM card with no DC value reads as 0 V at an operating point, not its offset (ZERO-LEDGER P3-021, P8-315).
+- dialects (VACASK): an ngspice HFET model card (`nhfet`, `phfet`) is refused (W0104) instead of copied as a master VACASK does not have ("Device 'nhfet' not found.") (ZERO-LEDGER P1-066).
+- render/named (VACASK): an ngspice `.noise`'s integrated-noise plot and a saved or printed `@dev[param]` vector, which VACASK writes no vector for, are noted (W0052), as on Xyce (ZERO-LEDGER P1-066).
 
 ## 0.2.0 (2026-11-03)
 

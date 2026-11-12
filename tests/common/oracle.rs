@@ -66,6 +66,8 @@
 
 #[path = "../test_cross_sim/sim.rs"]
 mod sim;
+#[path = "../test_cross_sim/vacask.rs"]
+mod vacask;
 
 use std::path::Path;
 

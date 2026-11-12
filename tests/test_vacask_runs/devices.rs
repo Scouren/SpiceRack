@@ -367,3 +367,29 @@ fn p3_069_diode_knee_current_ngspice_ik() {
         .unwrap_or_default();
     assert!(codes.contains(&Code::W0114), "{codes:?}");
 }
+
+/// ZERO-LEDGER P1-066. ngspice's HFET (`.model … NHFET level=5`, a `Z`
+/// card) has no VACASK module: the deck written with `model hfet nhfet`
+/// stops VACASK ("Device 'nhfet' not found.", spice-bench
+/// `ngspice/tests/hfet/id_vgs.sp`, run:
+/// research/impl/evidence/P1-066-vacask-hfet/vacask.txt). Oracle: VACASK's
+/// own module list (`devices/spice/` at 36be560: no HFET) and that run;
+/// the MESFET level 1 card beside it is `sp_mes1` and stays written.
+#[test]
+fn p1_066_an_hfet_card_is_refused() {
+    let card = |kind: &str, level: u32| {
+        format!(
+            "t\nz1 1 2 0 zm l=1u w=10u\nvgs 2 0 0.3\nvds 1 0 1\n\
+             .model zm {kind} level={level} vt0=0.13\n.op\n.end\n"
+        )
+    };
+    for (kind, level) in [("nhfet", 5), ("phfet", 5), ("nhfet", 6)] {
+        let codes = emit(&card(kind, level)).unwrap_err();
+        assert_eq!(codes, [Code::W0104], "{kind} level {level}");
+    }
+    let mes = "t\nz1 1 2 0 zm\nvgs 2 0 -0.5\nvds 1 0 1\n.model zm nmf level=1\n.op\n.end\n";
+    assert!(
+        emit(mes).unwrap().contains("sp_mes1"),
+        "a MESFET is written"
+    );
+}
