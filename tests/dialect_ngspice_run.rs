@@ -39,6 +39,7 @@ const READ: &[&str] = &[
     "ic",
     "ic_dotted_net",
     "ic_subckt",
+    "interleaved",
     "nodeset",
     "noise",
     "noise_current_refused",
@@ -63,7 +64,13 @@ const READ: &[&str] = &[
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["analyses", "analyses_outputs", "state", "temps"];
+const WRITE: &[&str] = &[
+    "analyses",
+    "analyses_outputs",
+    "interleaved",
+    "state",
+    "temps",
+];
 
 /// The fixtures that fail today, by name, with why. Strict both ways: a listed fixture that
 /// passes fails the test until its line goes.
@@ -76,6 +83,10 @@ const DECKS: &[(&str, &str)] = &[
     (
         "rc_tran",
         "rc tran\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k\nC1 b 0 1n\n.TRAN 0.1U 20U 1U 0.2U\n.Tran 1u 30u UIC\n.IC V(b)=0.5\n.OPTIONS RELTOL=1e-4 method=gear\n.end\n",
+    ),
+    (
+        "rc_interleaved",
+        "rc interleaved\n.OPTIONS RELTOL=1e-4\n.TEMP 50\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\n.tran 0.1u 20u\nR1 a b 1k tc1=0.01\n.ic v(b)=0.2\nC1 b 0 1n\n.op\n.end\n",
     ),
     (
         "rc_pss",
