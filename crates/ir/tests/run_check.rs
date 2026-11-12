@@ -16,10 +16,10 @@ use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::tran::{StepCap, Tran};
 use spicerack_ir::{
-    Alter, Analysis, AnalysisKind, Builder, Design, Diags, Edge, Env, Event, ExprId, IcScope, List,
-    Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet, NodeSetKind, OptionKey,
-    OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId, ScopeKind, Span, Statistics, SweepSpec,
-    Target, TargetKind, Vary, VaryDist, Violation, check,
+    Alter, Analysis, AnalysisKind, Builder, Design, Diags, Edge, Elaborate, Env, Event, ExprId,
+    IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet, NodeSetKind,
+    OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId, ScopeKind, Span, Statistics,
+    SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
 };
 
 type Fixture = (&'static str, Violation, fn(&mut Builder<'_>, ScopeId));
@@ -179,6 +179,9 @@ const BROKEN: &[Fixture] = &[
         let p = Ref::unresolved(b.name("p"));
         let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, mean: NO, spread: NO }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
+    }),
+    ("elaborate of no circuit", Violation::FieldDomain, |b, s| {
+        b.push(s, Elaborate { circuits: List::EMPTY }, Span::NONE);
     }),
     ("a parameter correlated with itself", Violation::FieldDomain, |b, s| {
         let p = Ref::unresolved(b.name("p"));
@@ -366,6 +369,7 @@ fn a_valid_run_reports_nothing() {
             spread: one,
         }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
+        b.elaborate(s, &["top2"], Span::NONE);
     });
     assert!(got.is_empty(), "{got:?}");
 }

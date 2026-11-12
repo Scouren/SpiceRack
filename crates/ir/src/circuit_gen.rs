@@ -11,13 +11,14 @@
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator, round trip); `rewrite/IR-KERNEL.md` §9; the
 //! IR-text forms of `circuit_text.rs`.
 //!
-//! Contents (crate-private): `pub(crate) fn generate_element`, `pub(crate) fn generate_model`;
+//! Contents (crate-private): `pub(crate) fn generate_element`, `pub(crate) fn generate_model`,
+//! `pub(crate) fn generate_library`;
 //! the row bodies of `R` are in `circuit_gen_rows.rs` (a child module: it reads `R`'s private
 //! helpers).
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::has_polarity;
+use crate::circuit_check::{builtin_kind, has_polarity};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
@@ -26,20 +27,38 @@ use crate::controlled::{
 use crate::element::{DetailKind, ElemKind, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
-use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::item::DefKind;
+use crate::letter::letter_of;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, IcMode};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::span::Span;
 
+#[path = "circuit_gen_head.rs"]
+mod head;
 #[path = "circuit_gen_rows.rs"]
 mod rows;
+#[path = "circuit_gen_waves.rs"]
+mod waves;
+
+pub(crate) use rows::generate_library;
 
 const N: ExprId = ExprId::NONE;
 const NONE_REF: Ref = Ref {
     name: NameId::NONE,
-    def: crate::id::DefId::NONE,
+    def: DefId::NONE,
 };
+
+/// The builtin families and the kinds they serve (AMEND-A12 C5).
+const BUILTINS: [(ModelFamily, ElemKind); 6] = [
+    (ModelFamily::SourceV, ElemKind::VSource),
+    (ModelFamily::SourceI, ElemKind::ISource),
+    (ModelFamily::Vcvs, ElemKind::Vcvs),
+    (ModelFamily::Vccs, ElemKind::Vccs),
+    (ModelFamily::Ccvs, ElemKind::Ccvs),
+    (ModelFamily::Cccs, ElemKind::Cccs),
+];
 
 /// The generator's state for one row.
 struct R<'r, 'b> {
@@ -74,10 +93,27 @@ pub(crate) fn generate_element(
         ElemKind::VSwitch => r.maybe(X::SwitchControlExpr),
         _ => false,
     };
-    let name = r.g.fresh_name(r.b);
+    // the output and control quantities fix the SPICE letter, so they come before the name
+    let out = if r.g.chance(2) {
+        Quantity::Voltage
+    } else {
+        Quantity::Current
+    };
+    let ctl = if r.g.chance(2) {
+        Quantity::Voltage
+    } else {
+        Quantity::Current
+    };
+    let name = match letter_of(kind, out, ctl) {
+        Some(l) if !r.has(X::NameWithoutLetter) || r.g.chance(2) => {
+            let text = format!("{}{}", char::from(l.to_ascii_lowercase()), r.g.fresh());
+            r.b.name(&text)
+        }
+        _ => r.g.fresh_name(r.b),
+    };
     let terminals = r.terminals(kind, two_terminal);
     let model = r.master(kind);
-    let mult = if r.maybe(mult_extra(kind)) {
+    let mult = if r.maybe(crate::circuit_features::mult_class(kind)) {
         r.ex()
     } else {
         ExprId::NONE
@@ -89,7 +125,7 @@ pub(crate) fn generate_element(
         params: List::EMPTY,
         mult,
     };
-    let detail = r.detail(kind, two_terminal);
+    let detail = r.detail(kind, two_terminal, out, ctl);
     r.b.element(scope, kind, head, detail, Span::NONE)
 }
 
@@ -106,8 +142,23 @@ pub(crate) fn generate_model(
         f: features,
         scope,
     };
+    // without `ModelWithoutLibrary`, only a family some library of the design implements;
+    // decided before anything is interned, so a refusal leaves no orphan name
+    let families: Vec<ModelFamily> = if r.has(X::ModelWithoutLibrary) {
+        ModelFamily::ALL.to_vec()
+    } else {
+        r.b.design()
+            .device_libraries
+            .rows
+            .iter()
+            .map(|l| l.family)
+            .collect()
+    };
+    if families.is_empty() {
+        return ItemRef::NONE;
+    }
+    let family = families[r.g.below(families.len() as u32) as usize];
     let name = r.g.fresh_name(r.b);
-    let family = ModelFamily::ALL[r.g.below(ModelFamily::COUNT as u32) as usize];
     let polarity = if has_polarity(family) {
         if r.g.chance(2) {
             Polarity::N
@@ -121,7 +172,12 @@ pub(crate) fn generate_model(
     };
     let mut pairs: Vec<(String, ExprId)> = Vec::new();
     // values first, then keys: the order `Words::params` creates them in
-    let values: Vec<ExprId> = (0..r.g.below(3)).map(|_| r.ex()).collect();
+    let count = if builtin_kind(family).is_some() {
+        0
+    } else {
+        r.g.below(3)
+    };
+    let values: Vec<ExprId> = (0..count).map(|_| r.ex()).collect();
     for value in values {
         let key = r.g.fresh_name(r.b);
         pairs.push((r.b.design().str(key).to_owned(), value));
@@ -138,12 +194,12 @@ pub(crate) fn generate_model(
         NameId::NONE
     };
     let ako = if r.maybe(X::ModelAko) {
-        r.reference(crate::item::DefKind::Model)
+        r.reference(DefKind::Model)
     } else {
         NONE_REF
     };
     let module = if family == ModelFamily::Module {
-        r.reference(crate::item::DefKind::Module)
+        r.reference(DefKind::Module)
     } else {
         NONE_REF
     };
@@ -169,43 +225,6 @@ pub(crate) fn generate_model(
 
 // ---- private ----
 
-/// The multiplicity member of a kind's class (as `circuit_features`).
-fn mult_extra(kind: ElemKind) -> X {
-    use ElemKind as E;
-    match kind {
-        E::Resistor => X::MultResistor,
-        E::Capacitor => X::MultCapacitor,
-        E::Inductor => X::MultInductor,
-        E::VSource => X::MultVSource,
-        E::ISource => X::MultISource,
-        E::Vcvs
-        | E::Vccs
-        | E::Cccs
-        | E::Ccvs
-        | E::Poly
-        | E::Table
-        | E::Behav
-        | E::Laplace
-        | E::FreqTable
-        | E::Delay => X::MultControlled,
-        E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
-        E::Instance => X::MultInstance,
-        E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
-        E::ChargeCapacitor
-        | E::FluxInductor
-        | E::Coupling
-        | E::Port
-        | E::VSwitch
-        | E::ISwitch
-        | E::LosslessLine
-        | E::LossyLine
-        | E::RcLine
-        | E::SingleLossyLine
-        | E::CoupledLines
-        | E::Unresolved => X::MultOther,
-    }
-}
-
 impl R<'_, '_> {
     fn has(&self, x: X) -> bool {
         self.f.contains(Feature::Circuit(x))
@@ -228,6 +247,17 @@ impl R<'_, '_> {
                 ElemKind::FreqTable => self.has(X::FreqComplexLinear) || self.has(X::FreqDbLogFreq),
                 _ => true,
             }
+            && (self.has(X::ElementWithoutModel)
+                || kind == ElemKind::Unresolved
+                || match kind.master_kind() {
+                    Some(_) if kind == ElemKind::Coupling => {
+                        self.has(X::CouplingCore)
+                            || self.has(X::BuiltinMaster) && self.has_visible(ModelFamily::Mutual)
+                    }
+                    Some(_) if BUILTINS.iter().any(|b| b.1 == kind) => self.has(X::BuiltinMaster),
+                    Some(_) => true,
+                    None => false,
+                })
     }
 
     fn ex(&mut self) -> ExprId {
@@ -273,64 +303,8 @@ impl R<'_, '_> {
         allowed[self.g.below(allowed.len() as u32) as usize]
     }
 
-    fn terminals(&mut self, kind: ElemKind, two: bool) -> NameList {
-        let (lo, hi) = kind.terminals();
-        let count = match kind {
-            ElemKind::Laplace | ElemKind::FreqTable | ElemKind::VSwitch => {
-                if two {
-                    2
-                } else {
-                    4
-                }
-            }
-            ElemKind::Diode => 2 + u32::from(self.maybe(X::DiodeThermal)),
-            ElemKind::CoupledLines => 4 + 2 * self.g.below(3),
-            _ => lo as u32 + self.g.below((hi - lo).min(3) as u32 + 1),
-        };
-        let ids: Vec<NameId> = (0..count)
-            .map(|_| {
-                if self.g.chance(4) {
-                    NameId::GROUND
-                } else {
-                    self.g.fresh_name(self.b)
-                }
-            })
-            .collect();
-        if ids.is_empty() {
-            List::EMPTY
-        } else {
-            self.b.name_ids(&ids)
-        }
-    }
-
-    /// An existing definition of `kind` visible here, or a fresh unresolved name.
-    fn reference(&mut self, kind: crate::item::DefKind) -> Ref {
-        let def = self.g.pick_def(self.b.design(), self.scope, kind);
-        if def == crate::id::DefId::NONE {
-            Ref::unresolved(self.g.fresh_name(self.b))
-        } else {
-            Ref {
-                name: self.b.design().def(def).name,
-                def,
-            }
-        }
-    }
-
-    fn master(&mut self, kind: ElemKind) -> Ref {
-        let optional = match kind {
-            ElemKind::Coupling => self.maybe(X::CouplingCore),
-            ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor => self.g.chance(4),
-            _ => false,
-        };
-        match kind.master_kind() {
-            _ if kind == ElemKind::Unresolved => Ref::unresolved(self.g.fresh_name(self.b)),
-            Some(dk) if kind.needs_model() || optional => self.reference(dk),
-            _ => NONE_REF,
-        }
-    }
-
     /// Pushes `kind`'s detail row (its side and wave rows first, at their field positions).
-    fn detail(&mut self, kind: ElemKind, two: bool) -> u32 {
+    fn detail(&mut self, kind: ElemKind, two: bool, out: Quantity, ctl: Quantity) -> u32 {
         match kind.detail() {
             DetailKind::None => NO_ROW,
             DetailKind::Passive => {
@@ -358,20 +332,12 @@ impl R<'_, '_> {
             }
             DetailKind::Poly => {
                 let dimension = 1 + self.g.below(2) as u8;
-                let control = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let control = ctl;
                 let per = if control == Quantity::Voltage { 2 } else { 1 };
                 let controls = self.fresh_names(per * u32::from(dimension));
                 let n = 1 + self.g.below(3);
                 let coeffs = self.exprs(n);
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(Poly {
                     controls,
                     coeffs,
@@ -394,11 +360,7 @@ impl R<'_, '_> {
                 } else {
                     N
                 };
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(TableSource {
                     input,
                     points,
@@ -420,11 +382,7 @@ impl R<'_, '_> {
                 let num = self.exprs(a);
                 let den = self.exprs(c);
                 let input = if two { self.dy() } else { N };
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(Laplace {
                     num,
                     den,
@@ -442,11 +400,7 @@ impl R<'_, '_> {
                 let n = 3 + 3 * self.g.below(2);
                 let points = self.exprs(n);
                 let unit = FreqUnit::ALL[self.g.below(3) as usize];
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(FreqTable {
                     input,
                     points,

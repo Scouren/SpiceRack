@@ -121,7 +121,8 @@ pub(super) fn spell(lit: ir::Literal, grammar: Grammar, out: &mut String) {
     }
     digits_into(i128::from(lit.mantissa), u32::from(lit.frac), out);
     match lit.form {
-        ir::NumForm::Plain => {}
+        // an `Int` literal (A12, outside FEATURES: `Extra::IntLiteral`) is its digits, as Plain
+        ir::NumForm::Plain | ir::NumForm::Int => {}
         ir::NumForm::Exponent => {
             out.push('e');
             out.push_str(&lit.exp10.to_string());

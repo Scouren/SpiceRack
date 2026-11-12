@@ -12,7 +12,7 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - B8 → `ElemKind::Instance`, `Element.model` (`DefKind::Subckt`), `Element.params`
 - B9 → `ElemKind::Instance` / `Module` / a device kind by what the reader binds the master to; `Unresolved` otherwise
 - B10 → `Element.mult`; `Extra::MultInstance` (ESPice lacks it); a subckt that declares `m` keeps it in `params`
-- B16 → `Element.name` without the letter; the kind is `ElemKind`, never the letter
+- B16 → `Element.name` is the whole name (A13, R23), unique in its scope; the kind is `ElemKind`, never the letter; `letter::spice_letter` and `CircuitExtra::NameWithoutLetter` (a pass renames for a SPICE-card target)
 - B17 → names: `Coupling.inductors`, `Controlled.sense`, `Switch.sense`, `Poly.controls` (current control); `Expr::I` (kernel)
 - B24 → `ElemKind::ModuleModel` (ng `N`, va) and `ElemKind::Module` (sp, hs); `ModelFamily::Module` + `Model.module`; `$mfactor` → `Element.mult`
 
@@ -325,6 +325,15 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - 3.09 → no `given` bit: absence is `NONE` where every simulator means the same, otherwise the reader writes its simulator's value (IR-KERNEL §2 "explicit over implicit"); see 5.05
 - 9.02 → run owner (probes); the element side supplies role order (`ElemKind`) and the sign rule
 - 9.06 → run owner (operating-point quantities); depends on `ModelFamily`
+
+## AMEND-A12 (VACASK)
+
+- A12 C1 → `Pulse.law: PulseLaw::{Spice, Vacask}`; `CircuitExtra::{PulseSpice, PulseVacask}`; `check`: a literal `rise <= 0` under `Vacask` is `FieldDomain`
+- A12 C2 → `Exp.td2_from: TdFrom::{Zero, Td1}`; `CircuitExtra::{ExpTd2FromZero, ExpTd2FromTd1}` (E5, 5.08: the reader no longer adds)
+- A12 C3 → `Sffm.pre: PreDelay`; `CircuitExtra::{SffmPreOffset, SffmPreHold, SffmPreZero}`
+- A12 C4 → `Source.dc_rule: DcRule::{Given, WaveAtZero}` (`dc` `NONE` exactly under `WaveAtZero`, which needs a wave); `CircuitExtra::DcGivenWithWave` and `DcAtZero{Pulse, Sin, Exp, Pwl, Sffm, Am, TrNoise, TrRandom, Pattern}` (5.13, E1, E38)
+- A13 (R23) → whole names; `letter::spice_letter(design, element)`; `CircuitExtra::NameWithoutLetter`; `Violation::DuplicateElement` through `element::design_check` (with the kernel owner)
+- A12 C5 → `ItemKind::DeviceLibrary`, `library::DeviceLibrary { family, path }`; `CircuitExtra::ElementWithoutModel` (item), `CircuitExtra::ModelWithoutLibrary` (design-level); parameterless builtin models: `ModelFamily::{SourceV, SourceI, Vcvs, Vccs, Ccvs, Cccs, Mutual}`, an optional `Model` master on the source and linear controlled kinds, `CircuitExtra::BuiltinMaster` (the direction ngspice lacks) (IR-CIRCUIT §4a)
 
 ## Gaps and proposals
 

@@ -135,6 +135,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::VaryLogNormal, "  statistics process (p log_normal spread=1)", ST),
     (RunExtra::VaryPercent, "  statistics process (p gauss percent spread=1)", ST),
     (RunExtra::VaryMean, "  statistics process (p gauss mean=2 spread=1)", ST),
+    (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";

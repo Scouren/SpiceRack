@@ -21,11 +21,13 @@
 //! field    = name | ref | "(" [ name { " " name } ] ")" | key "=" value
 //! value    = atom | "(" expr ")" | "(" [ name { " " name } ] ")"
 //! atom     = number | string | ref | leaf
-//! number   = ["-"] digits ["." digits] [ "e" ["-"] digits | scale | "mil" ]
+//! number   = ["-"] digits ["." digits] [ "e" ["-"] digits | scale | "mil" ] | ["-"] digits "i"
 //!            the literal as stored (Addendum A3): the mantissa's digits with `frac` of them
 //!            after the point (trailing zeros kept: 0.050000), then the form: `e<exp10>`
-//!            (Exponent), a scale letter (Scale), `mil`, or nothing (Plain). Lossless: the
-//!            text rebuilds the literal field by field; `1k` and `1e3` stay distinct.
+//!            (Exponent), a scale letter (Scale), `mil`, or nothing (Plain); a whole number with
+//!            the suffix `i` is an Int literal (A12 K1: `3i` is of integer type, `3` is real).
+//!            Lossless: the text rebuilds the literal field by field; `1k` and `1e3` stay
+//!            distinct.
 //! scale    = a(−18) f(−15) p(−12) n(−9) u(−6) m(−3) c(−2) k(3) meg(6) g(9) t(12) peta(15)
 //!            (lower case, one spelling each)
 //! string   = '"' { char | '\"' | '\\' | '\n' } '"'
@@ -46,7 +48,7 @@
 //! include "path" [section=name]
 //! global name { name }
 //! load veriloga|osdi "path" [modules=(name …)]      the loaded modules' definitions
-//! opaque name unread|private|inert|invalid|script "text"
+//! opaque name unread|private|inert|invalid|script|hint "text"
 //! subckt name (port …) { key=value }                 body below
 //! section name [library=name]                        body below
 //! if (expr)            body below; then at the same depth:  elif (expr)  …  else
@@ -66,7 +68,8 @@
 //! rel     = shift { (" < " | " <= " | " > " | " >= ") shift }
 //! shift   = add { (" << " | " >> ") add }
 //! add     = mul { (" + " | " - ") mul }
-//! mul     = unary { (" * " | " / " | " // ") unary }    (`//` is IntDiv)
+//! mul     = unary { (" * " | " / " | " // " | " /: ") unary }
+//!           (`//` is IntDiv, `/:` is DivTyped, A12 K1)
 //! unary   = ("-" | "!" | "~") unary | primary
 //!           (a "-" glued to a digit where a unary may stand is a negative literal's sign; the
 //!           `Neg` of a literal is written "-(…)": `-1.5` and `-(1.5)` are two trees)
@@ -155,6 +158,7 @@ pub(crate) fn keyword(kind: ItemKind) -> &'static str {
         ItemKind::Param => "param",
         ItemKind::Func => "func",
         ItemKind::Model => "model",
+        ItemKind::DeviceLibrary => "device_library",
         ItemKind::Statistics => "statistics",
         ItemKind::Element => "element",
         ItemKind::Analysis => "analysis",
@@ -166,6 +170,7 @@ pub(crate) fn keyword(kind: ItemKind) -> &'static str {
         ItemKind::Save => "save",
         ItemKind::Print => "print",
         ItemKind::Measure => "measure",
+        ItemKind::Elaborate => "elaborate",
     }
 }
 
@@ -541,6 +546,7 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
         ItemKind::Param => item_text::dump_param(&d.row(i), d, item, ctx, out),
         ItemKind::Func => item_text::dump_func(&d.row(i), d, item, ctx, out),
         ItemKind::Model => owner::<crate::model::Model>(d, ctx, out),
+        ItemKind::DeviceLibrary => owner::<crate::library::DeviceLibrary>(d, ctx, out),
         ItemKind::Statistics => owner::<crate::stats::Statistics>(d, ctx, out),
         ItemKind::Element => owner::<crate::element::Element>(d, ctx, out),
         ItemKind::Analysis => owner::<crate::analysis::Analysis>(d, ctx, out),
@@ -552,6 +558,7 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
         ItemKind::Save => owner::<crate::output::Save>(d, ctx, out),
         ItemKind::Print => owner::<crate::output::Print>(d, ctx, out),
         ItemKind::Measure => owner::<crate::output::Measure>(d, ctx, out),
+        ItemKind::Elaborate => owner::<crate::plan::Elaborate>(d, ctx, out),
     }
 }
 

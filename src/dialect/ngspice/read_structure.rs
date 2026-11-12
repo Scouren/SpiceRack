@@ -23,6 +23,7 @@ use super::cst::{self, joined};
 use super::declare::Class;
 use super::expr_read::{self, Tree};
 use super::read::{Def, Lower, Stmt};
+use super::read_outputs;
 use super::read_run;
 use super::tables::Eval;
 use crate::ir;
@@ -36,11 +37,12 @@ struct Head {
     params: Vec<(String, String)>,
 }
 
-/// Line 1 of a deck: its text as the title; a blank line 1, or a library's, is framing.
+/// Line 1 of a deck: its text as the title, blank too (every ngspice deck has a title line,
+/// INV 14.12); a library's line 1 is the reader's own blank line, framing.
 pub(super) fn title(lw: &mut Lower<'_, '_>, st: Stmt) {
     let text = lw.toks.text(lw.ast.main_token(st.node));
     let text = text.trim_end_matches('\r');
-    if lw.role != ir::Role::Deck || text.trim().is_empty() {
+    if lw.role != ir::Role::Deck {
         lw.framing();
         return;
     }
@@ -286,13 +288,16 @@ pub(super) fn global(lw: &mut Lower<'_, '_>, st: Stmt) {
 }
 
 /// Any other dot card: a stray closer (`.ends`, `.endl`, `.endif`, `.endc` with no block) is
-/// `InvalidInSource`; `.title` is `Unread` here; the rest belong to the run area (S3.3).
+/// `InvalidInSource`; `.title` is `Unread` here; `.width` belongs to the output area, the rest
+/// to the run area (S3.3).
 pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     match lw.keyword(st.node).as_str() {
         ".ends" | ".eom" | ".endl" | ".endif" | ".endc" | ".enddata" | ".end_variation" => {
             malformed(lw, st)
         }
         ".title" => lw.unread(st),
+        // `.width` sets the print width of `.print` output: the output area's
+        ".width" => read_outputs::card(lw, st),
         _ => read_run::card(lw, st),
     }
 }

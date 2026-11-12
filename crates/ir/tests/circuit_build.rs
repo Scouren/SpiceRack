@@ -45,13 +45,13 @@ mod tests {
             (E::ChargeCapacitor, (2, 2), D::Behav, false, None),
             (E::FluxInductor, (2, 2), D::Behav, false, None),
             (E::Coupling, (0, 0), D::Coupling, false, m),
-            (E::VSource, (2, 2), D::Source, false, None),
-            (E::ISource, (2, 2), D::Source, false, None),
+            (E::VSource, (2, 2), D::Source, false, m),
+            (E::ISource, (2, 2), D::Source, false, m),
             (E::Port, (2, 2), D::Source, false, None),
-            (E::Vcvs, (4, 4), D::Controlled, false, None),
-            (E::Vccs, (4, 4), D::Controlled, false, None),
-            (E::Cccs, (2, 2), D::Controlled, false, None),
-            (E::Ccvs, (2, 2), D::Controlled, false, None),
+            (E::Vcvs, (4, 4), D::Controlled, false, m),
+            (E::Vccs, (4, 4), D::Controlled, false, m),
+            (E::Cccs, (2, 2), D::Controlled, false, m),
+            (E::Ccvs, (2, 2), D::Controlled, false, m),
             (E::Poly, (2, 2), D::Poly, false, None),
             (E::Table, (2, 2), D::Table, false, None),
             (E::Behav, (2, 2), D::Behav, false, None),
@@ -78,6 +78,106 @@ mod tests {
             (E::Unresolved, (0, 255), D::None, true, None),
         ]
     };
+
+    /// The SPICE letter of every kind, from `letter.rs`'s header (A13), at voltage output and
+    /// control.
+    const LETTERS: [(ElemKind, Option<u8>); 37] = {
+        use ElemKind as E;
+        [
+            (E::Resistor, Some(b'R')),
+            (E::Capacitor, Some(b'C')),
+            (E::Inductor, Some(b'L')),
+            (E::ChargeCapacitor, Some(b'C')),
+            (E::FluxInductor, Some(b'L')),
+            (E::Coupling, Some(b'K')),
+            (E::VSource, Some(b'V')),
+            (E::ISource, Some(b'I')),
+            (E::Port, Some(b'P')),
+            (E::Vcvs, Some(b'E')),
+            (E::Vccs, Some(b'G')),
+            (E::Cccs, Some(b'F')),
+            (E::Ccvs, Some(b'H')),
+            (E::Poly, Some(b'E')),
+            (E::Table, Some(b'E')),
+            (E::Behav, Some(b'B')),
+            (E::Laplace, Some(b'E')),
+            (E::FreqTable, Some(b'E')),
+            (E::Delay, Some(b'E')),
+            (E::Diode, Some(b'D')),
+            (E::Bjt, Some(b'Q')),
+            (E::Mosfet, Some(b'M')),
+            (E::Jfet, Some(b'J')),
+            (E::Mesfet, Some(b'Z')),
+            (E::Igbt, Some(b'Z')),
+            (E::VSwitch, Some(b'S')),
+            (E::ISwitch, Some(b'W')),
+            (E::LosslessLine, Some(b'T')),
+            (E::LossyLine, Some(b'O')),
+            (E::RcLine, Some(b'U')),
+            (E::SingleLossyLine, Some(b'Y')),
+            (E::CoupledLines, Some(b'P')),
+            (E::CodeModel, Some(b'A')),
+            (E::ModuleModel, Some(b'N')),
+            (E::Module, Some(b'X')),
+            (E::Instance, Some(b'X')),
+            (E::Unresolved, None),
+        ]
+    };
+
+    #[test]
+    fn every_kind_has_its_spice_letter() {
+        use spicerack_ir::controlled::Quantity::{Current as I, Voltage as V};
+        use spicerack_ir::letter::letter_of;
+        let listed: Vec<ElemKind> = LETTERS.iter().map(|l| l.0).collect();
+        assert_eq!(listed, ElemKind::ALL.to_vec());
+        for (kind, letter) in LETTERS {
+            assert_eq!(letter_of(kind, V, V), letter, "{kind:?}");
+        }
+        // the polynomial's letter follows its output and control; tables, Laplace and
+        // frequency tables are voltage-controlled, so only their output counts
+        assert_eq!(letter_of(ElemKind::Poly, I, V), Some(b'G'));
+        assert_eq!(letter_of(ElemKind::Poly, I, I), Some(b'F'));
+        assert_eq!(letter_of(ElemKind::Poly, V, I), Some(b'H'));
+        for kind in [ElemKind::Table, ElemKind::Laplace, ElemKind::FreqTable] {
+            assert_eq!(letter_of(kind, I, V), Some(b'G'), "{kind:?}");
+            assert_eq!(letter_of(kind, I, I), Some(b'G'), "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn spice_letter_reads_the_detail() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        let one = n(&mut b, 1);
+        let controls = b.names(&["v1"]);
+        let coeffs = b.exprs(&[one]);
+        let poly = Poly {
+            controls,
+            coeffs,
+            dimension: 1,
+            output: Quantity::Current,
+            control: Quantity::Current,
+        };
+        let h = b.head("f1", &["o", "0"], None, &[], ExprId::NONE);
+        let f1 = b.poly(top, h, poly, Span::NONE);
+        let points = b.exprs(&[one, one]);
+        let table = TableSource {
+            input: one,
+            points,
+            delta: ExprId::NONE,
+            law: TableLaw::Exact,
+            output: Quantity::Current,
+        };
+        let h = b.head("g1", &["o", "0"], None, &[], ExprId::NONE);
+        let g1 = b.table_source(top, h, table, Span::NONE);
+        let design = b.design();
+        let letter = |i: spicerack_ir::ItemRef| {
+            spicerack_ir::spice_letter(design, &design.row::<Element>(i.index))
+        };
+        assert_eq!(letter(f1), Some(b'F'));
+        assert_eq!(letter(g1), Some(b'G'));
+    }
 
     #[test]
     fn kind_facts_match_the_docs() {
@@ -302,6 +402,7 @@ mod tests {
                 tau1: v,
                 td2: v,
                 tau2: v,
+                td2_from: spicerack_ir::wave::TdFrom::Td1,
             }),
             Wave::Pwl(Pwl {
                 points,
@@ -323,6 +424,7 @@ mod tests {
                 phase_c_deg: v,
                 phase_m_deg: v,
                 law: SffmLaw::Ngspice,
+                pre: PreDelay::Zero,
             }),
             Wave::Am(Am {
                 offset: v,
@@ -479,8 +581,14 @@ mod tests {
     fn element_refuses_a_master_on_a_kind_without_one() {
         pushed(|b, top| {
             let one = n(b, 1);
-            let h = b.head("v1", &["a", "0"], Some("vmod"), &[], ExprId::NONE);
-            b.source(top, ElemKind::VSource, h, source(one), Span::NONE);
+            let h = b.head("b1", &["a", "0"], Some("bmod"), &[], ExprId::NONE);
+            b.behav(
+                top,
+                ElemKind::Behav,
+                h,
+                behav(one, OutKind::Voltage),
+                Span::NONE,
+            );
         });
     }
 

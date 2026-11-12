@@ -33,6 +33,7 @@ const READ: &[&str] = &[
     "if_branch_param_refused",
     "if_chain",
     "include_lib",
+    "limit_three",
     "negation_refused",
     "numbers",
     "param_last_wins",

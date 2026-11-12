@@ -104,7 +104,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             | ir::ItemKind::Param
             | ir::ItemKind::Func => write_structure::admits(design, item, scope, diags),
             ir::ItemKind::Element => write_elements::admits(design, item, diags),
-            ir::ItemKind::Model => write_models::admits(design, item, diags),
+            ir::ItemKind::Model => write_models::admits(design, item, scope, diags),
             ir::ItemKind::Statistics
             | ir::ItemKind::Analysis
             | ir::ItemKind::Option
@@ -116,6 +116,8 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             ir::ItemKind::Load | ir::ItemKind::Loop | ir::ItemKind::Alter => {
                 write_control::admits(design, item, diags);
             }
+            // ngspice spells neither (FEATURES lacks both): nothing to refuse beyond the feature
+            ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate => {}
         }
     }
 }
@@ -162,5 +164,18 @@ fn dispatch(w: &mut Out<'_>, item: ir::ItemRef) {
         ir::ItemKind::Save => write_outputs::save(w, item),
         ir::ItemKind::Print => write_outputs::print(w, item),
         ir::ItemKind::Measure => write_outputs::measure(w, item),
+        ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate => unspelled(item),
     }
+}
+
+/// A kind ngspice spells nothing for (a VACASK device library, an `elaborate`; A12): the spine
+/// never hands one here, since `FEATURES` lacks its item feature; asserts so.
+fn unspelled(item: ir::ItemRef) {
+    let feature = ir::Feature::Item(item.kind);
+    assert!(
+        !super::FEATURES.contains(feature),
+        "ngspice write: FEATURES has {:?} but nothing spells it",
+        item.kind
+    );
+    unreachable!("ngspice write: no {:?} is legal for ngspice", item.kind)
 }
