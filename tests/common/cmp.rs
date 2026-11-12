@@ -35,7 +35,9 @@
 //! the circuit on neither side (`without_start`, called by the cross-sim `uic_start` and by the
 //! pair test when the legalized design's transient has `uic`: a fact of the run, never a deck
 //! key). Every point from the first step on is compared, so a wrong initial condition still
-//! shows.
+//! shows. It is the cross-sim harness's existing rule given one home, a guard for a simulator
+//! that stores its unsolved start: neither pair cell needs it today, since ngspice-45 stores no
+//! row at t = 0 and the comparison covers only the time both runs hold (it was not shown red).
 //!
 //! The pair test's refinement class (`simulator-differs:refinement`, rulings R84) is not a pass
 //! and not a conversion finding: a transient that leaves the tube is run again with both decks'

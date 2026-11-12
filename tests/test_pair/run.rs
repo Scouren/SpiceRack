@@ -563,7 +563,9 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
         .collect()
 }
 
-/// How much of step 4's tolerance a passing pair uses (`PAIR_MARGINS=1`, triage): the smallest
+/// How much of step 4's value tolerance a passing pair uses (`PAIR_MARGINS=1`, triage). It
+/// measures the value band only: on a smooth transient the 1 % time tube covers the difference,
+/// so "passes at 0" there means not measured by this probe, never 0 %. Reports the smallest
 /// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
 /// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
 /// below it (the worst vector, its value and the tolerance there).
@@ -585,7 +587,9 @@ fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
             Err(_) => lo = mid,
         }
     }
-    let below = at(lo).err().unwrap_or_else(|| "passes at 0: exact".into());
+    let below = at(lo).err().unwrap_or_else(|| {
+        "passes at 0: not measured by this probe (exact, or inside the time tube)".into()
+    });
     format!(
         "uses {:.0} % of the tolerance; below it: {below}",
         hi * 100.0
