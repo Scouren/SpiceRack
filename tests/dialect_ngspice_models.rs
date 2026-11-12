@@ -327,7 +327,7 @@ fn the_version_spellings_run_the_same_device() {
             "2.20",
             "M1 d g 0 0 mm w=10u l=10u",
         ),
-        ("nmos level=68", "version=281", "version=280", "280", m4),
+        ("nmos level=68", "version=281", "version=280", "2.8.0", m4),
         // never read again (no use beyond *mpar.c/*mask.c): silently their one version
         (
             "npn level=8",
@@ -337,8 +337,8 @@ fn the_version_spellings_run_the_same_device() {
             "Q1 d g 0 q",
         ),
         ("npn level=4", "vers=1.3", "vers=1.2", "1.2", "Q1 d g 0 q"),
-        ("nmos level=10", "version=4.3", "version=4.4", "4.4", soi),
-        ("nmos level=57", "version=2.2", "version=2.0", "2.0", soi),
+        ("nmos level=10", "version=4.3", "version=4.4", "4.4.0", soi),
+        ("nmos level=57", "version=2.2", "version=2.0", "2.2.3", soi),
     ];
     for (head, a, b, standard, instance) in cases {
         let name = if instance.starts_with('Q') { "q" } else { "mm" };

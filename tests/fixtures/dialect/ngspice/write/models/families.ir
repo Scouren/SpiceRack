@@ -18,12 +18,12 @@ file "families.sp" deck
   model o mos9 polarity=n
   model p bsim3 polarity=n version="3.3.0"
   model q bsim4 polarity=p version="4.8.3"
-  model r b4_soi polarity=n version="4.4"
-  model s b3_soi_fd polarity=n version="2.0"
-  model t b3_soi_dd polarity=n version="2.0"
-  model u b3_soi_pd polarity=n version="2.0"
+  model r b4_soi polarity=n version="4.4.0"
+  model s b3_soi_fd polarity=n version="2.1"
+  model t b3_soi_dd polarity=n version="2.1"
+  model u b3_soi_pd polarity=n version="2.2.3"
   model v soi3 polarity=n
-  model w hisim2 polarity=n version="280"
+  model w hisim2 polarity=n version="2.8.0"
   model x hisim_hv polarity=n version="2.20"
   model y vdmos polarity=p
   model z jfet_shichman polarity=n

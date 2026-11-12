@@ -33,7 +33,8 @@
 //! `pub(super) fn accepts(&str, &str) -> bool`, `pub(super) fn binnable(ir::ModelFamily) -> bool`,
 //! `pub(super) fn code_model(&str) -> bool`, `pub(super) fn device_name(&str) -> bool`,
 //! `pub(super) fn module_word(&str) -> bool`,
-//! `pub(super) fn standard(ir::ModelFamily, &str, &str) -> Option<&'static str>`
+//! `pub(super) fn standard(ir::ModelFamily, &str, &str) -> Option<&'static str>`,
+//! `pub(super) fn spelling(ir::ModelFamily, &str) -> &str`
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -359,17 +360,31 @@ pub(super) fn standard(family: F, device: &str, text: &str) -> Option<&'static s
         ),
         "hisimhv1" => Some("1.24"),
         "hisimhv2" => Some("2.20"),
-        "hisim2" => Some("280"),
+        // the standard's version the device implements (devhelp: "HiSIM 2.8.0", "B4SOI version
+        // 4.4.0", B3SOI FD/DD 2.1, PD 2.2.3), not the parameter's own default (280, 4.4, 2.0)
+        "hisim2" => Some("2.8.0"),
         // silently ignored: runs: HICUM2 2.3, B4SOI 4.3, B3SOI-PD 2.2, VBIC vers=1.3 give the
         // currents of 2.4.0, 4.4, 2.0, 1.2
         _ => match family {
             F::Hicum2 => Some("2.4.0"),
-            F::B4Soi => Some("4.4"),
-            F::B3SoiFd | F::B3SoiDd | F::B3SoiPd => Some("2.0"),
+            F::B4Soi => Some("4.4.0"),
+            F::B3SoiFd | F::B3SoiDd => Some("2.1"),
+            F::B3SoiPd => Some("2.2.3"),
             F::Vbic => Some("1.2"),
             _ => None,
         },
     }
+}
+
+/// The text ngspice's `version` parameter is written with for the standard version `std`: the
+/// standard string itself where it picks the device (BSIM3, BSIM4, HiSIM-HV: it reads back as
+/// itself), else the parameter's own default (HiSIM2 `280`, B4SOI `4.4`, B3SOI `2.0`: the one
+/// version those devices run, `standard` maps it back).
+pub(super) fn spelling(family: F, std: &str) -> &str {
+    if dispatches(family) {
+        return std;
+    }
+    version(family).map_or(std, |(_, default)| default)
 }
 
 /// Whether `word` (lowercase) is an XSPICE code model of the pinned build. Limit: a user
