@@ -176,6 +176,16 @@ impl W<'_, '_> {
                 control: self.b.named_rules == NamedRules::Spectre,
                 ground: true,
             },
+            // A deck by its text (a source, an analysis) that another file
+            // includes is no line 1 on VACASK either: its title is a
+            // statement there (`adder_mos.sp`), and a `control` block with
+            // no testbench statement to hold is a second one beside its
+            // includer's.
+            _ if self.b.named_rules == NamedRules::Vacask && self.rd.included() => Frame {
+                title: false,
+                control: !self.deck.bench.is_empty(),
+                ..role::frame(role)
+            },
             _ => role::frame(role),
         }
     }

@@ -41,6 +41,7 @@
 //!   `Kit::scope(&self, file: FileId, n: Node) -> Option<Scope>`,
 //!   `Kit::split(&self, file: FileId, n: Node) -> Option<Split>`,
 //!   `Kit::target(&self, file: FileId, n: Node) -> Option<Target>`,
+//!   `Kit::included(&self, file: FileId) -> bool`,
 //!   `Kit::node_count(&self, file: FileId) -> usize`
 //! - `Def::base(&self) -> &str`
 //! - `pub fn role(t: &Tokens, ast: &Ast) -> Role`
@@ -543,6 +544,21 @@ impl Kit {
     /// `file` reads; `None` when it reads no file of the kit.
     pub fn target(&self, file: FileId, n: Node) -> Option<Target> {
         find(&self.facts[file.0 as usize].targets, n)
+    }
+
+    /// Whether a file of the kit reads `file` (an include, a `.lib` call, a
+    /// Verilog-A load): a simulator is given it through that file, never
+    /// alone.
+    ///
+    /// Cost: one pass over every file's targets.
+    ///
+    /// # Panics
+    /// When `file` is no file of the kit.
+    pub fn included(&self, file: FileId) -> bool {
+        assert!((file.0 as usize) < self.files.len(), "a file of the kit");
+        assert_eq!(self.facts.len(), self.files.len(), "one fact row a file");
+        let reads = |f: &Facts| f.targets.iter().any(|&(_, t)| t.file == file);
+        self.facts.iter().any(reads)
     }
 
     /// The node count of the tree `file`'s answers were made on (0 for an

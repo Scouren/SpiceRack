@@ -24,7 +24,7 @@ circuitsim90/MOS3/rich3.sp target-fails # no raw file tran1.raw: worst residual=
 ngspice/examples/measure/rc-meas-ac-control.sp target-fails # no raw file ac1.raw: Refactorization failed, size=5, rank=4. | Factorization failed, size=5, rank=4, zero pivot @ node 'mid1'. | Leaving core NR loop in iterati
 ngspice/examples/noise/bipolar-noise.sp mismatch # plots ["noise", "total"] became ["noise"]
 ngspice/examples/noise/resdiv.sp mismatch # plots ["noise", "noise", "noise", "total", "total", "total"] became ["noise", "noise", "noise"]
-ngspice/examples/snapshot/adder_mos.sp target-fails # no plot: Parser syntax error, unexpected newline, expecting (
+ngspice/examples/snapshot/adder_mos.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (maxstep, TSTOP/100000) agree; its .tran is in the included file and the harness refines no VACASK deck; as written v(10) is 2.52 x out
 ngspice/examples/snapshot/adder_mos_circ.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (maxstep, TSTOP/100000) agree (worst 0.806 of the tolerance); at TSTOP/20000 i(vin3b) is 7.91 x out; the harness refines no VACASK deck
 ngspice/examples/soa/nic_soa.sp mismatch # tran v(bias): 0.6388506757411574 leaves the tube at t=0 (tol 6.502e-3)
 ngspice/examples/various/bjt_ac_par.sp mismatch # dc: no vector in common (["@q1[gm]", "v(@q1[pi])", "@q1[go]", "@q1[qbe]", "@q1[qbc]", "@q1[cmu]"] vs ["1", "b", "c", "q1:b_int", "q1:c_int", "q1:e_int"])

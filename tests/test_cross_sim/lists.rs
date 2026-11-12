@@ -231,7 +231,7 @@ mod tests {
         // Oracle: the list files' own lines, and the proof file's rows
         // (ngspice-45, Xyce 7.10.0 and VACASK at TSTOP/100000, every
         // vector through the comparer), matched by deck and target.
-        // Checks: 3 + 3.
+        // Checks: 4 + 4.
         let by_hand = "simulator-differs:refinement:by-hand";
         let dir = env!("CARGO_MANIFEST_DIR");
         let file = format!("{dir}/tests/fixtures/cross_sim/proof/refined-by-hand-spice-bench.md");
@@ -240,6 +240,7 @@ mod tests {
             ("ngspice-xyce", "adder_mos.sp", "Xyce"),
             ("ngspice-xyce", "adder_mos_circ.sp", "Xyce"),
             ("ngspice-vacask", "adder_mos_circ.sp", "VACASK"),
+            ("ngspice-vacask", "adder_mos.sp", "VACASK"),
         ] {
             let deck = format!("ngspice/examples/snapshot/{deck}");
             let class = listed(cell).get(&deck).cloned();

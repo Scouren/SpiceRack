@@ -176,6 +176,47 @@ fn an_included_library_has_no_title_line() {
     close(col(&run(&deck), "b")[0], 0.5, 1e-9);
 }
 
+/// ZERO-LEDGER P1-066 (`ngspice/examples/snapshot/adder_mos.sp`). An
+/// included file that holds a source or the analysis is a deck by its text
+/// (`resolve::role`): written for VACASK with a title line it was
+/// "unexpected newline, expecting (", and its `control` block a second one
+/// beside the includer's. Oracle: VACASK on the kit `spice2rack --kit`
+/// writes, and the divider's closed form, 1 V over 1k into 3k: 0.75 V.
+/// Checks: 2.
+#[test]
+fn p1_066_an_included_deck_has_no_title_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let src = dir.path().join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    // (the deck, the file it includes)
+    let kits = [
+        // The stimulus in the include, the analysis in the deck.
+        (
+            "t\n.include stim.inc\nR1 a b 1k\nR2 b 0 3k\n.op\n.end\n",
+            "* stimulus\nV1 a 0 1\n",
+        ),
+        // The whole circuit and its analysis in the include (adder_mos.sp).
+        (
+            "t\n.include stim.inc\n.end\n",
+            "* circuit\nV1 a 0 1\nR1 a b 1k\nR2 b 0 3k\n.op\n.end\n",
+        ),
+    ];
+    for (k, (top, inc)) in kits.into_iter().enumerate() {
+        std::fs::write(src.join("top.sp"), top).unwrap();
+        std::fs::write(src.join("stim.inc"), inc).unwrap();
+        let out = dir.path().join(format!("out{k}"));
+        let o = std::process::Command::new(env!("CARGO_BIN_EXE_spice2rack"))
+            .args(["--dialect", "ngspice", "--to", "vacask", "--kit", "-o"])
+            .arg(&out)
+            .arg(src.join("top.sp"))
+            .output()
+            .expect("spice2rack runs");
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        let deck = std::fs::read_to_string(out.join("top.vacask.sim")).unwrap();
+        close(col(&run_text(&deck), "b")[0], 0.75, 1e-9);
+    }
+}
+
 #[test]
 fn control_lines_keep_their_place_among_the_analyses() {
     // A VACASK control block runs in order (`docs/cmd-overview.md`):

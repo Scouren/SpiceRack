@@ -239,7 +239,7 @@ fn run_in(
         )));
     }
     let raws = match sim {
-        Sim::Vacask => vacask_raws(dir, &text),
+        Sim::Vacask => vacask_raws(dir, &text, files),
         // LTspice writes `<deck>.raw` beside the deck.
         Sim::Ltspice => vec![file.with_extension("raw")],
         _ => vec![raw],
@@ -630,14 +630,37 @@ fn number(word: &str) -> Option<f64> {
 }
 
 /// The raw files a VACASK deck writes, one per `analysis <name>` in deck
-/// order (`<name>.raw`).
-fn vacask_raws(dir: &Path, text: &str) -> Vec<std::path::PathBuf> {
+/// order (`<name>.raw`), then those of the files written beside it (an
+/// included file may hold the analysis: `adder_mos.sp`).
+fn vacask_raws(dir: &Path, text: &str, files: &[(String, String)]) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
-    for l in text.lines() {
+    let texts = std::iter::once(text).chain(files.iter().map(|f| f.1.as_str()));
+    for l in texts.flat_map(str::lines) {
         let mut w = l.split_whitespace();
         if let (Some("analysis"), Some(name)) = (w.next(), w.next()) {
             out.push(dir.join(format!("{name}.raw")));
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn p1_066_an_included_files_analysis_names_a_raw_file() {
+        // VACASK names a raw file after each analysis, wherever its line
+        // is read from. Oracle: VACASK on a deck including the file that
+        // holds `analysis tran1 tran` wrote `tran1.raw`
+        // (research/impl/evidence/P1-066-vacask-include-title/vacask-runs.txt),
+        // and the names below written out by hand. Checks: 2.
+        let d = Path::new("/d");
+        let inc = "control\n  analysis tran1 tran stop=1\nendc\n".to_string();
+        let files = [("circ.inc".to_string(), inc)];
+        let raws = vacask_raws(d, "ground 0\ninclude \"circ.inc\"\n", &files);
+        assert_eq!(raws, [d.join("tran1.raw")]);
+        let own = vacask_raws(d, "t\ncontrol\n  analysis op1 op\nendc\n", &[]);
+        assert_eq!(own, [d.join("op1.raw")]);
+    }
 }

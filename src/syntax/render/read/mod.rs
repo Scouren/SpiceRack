@@ -33,7 +33,7 @@
 //!   `enum Elem`, `enum Raw`, `struct Cond`, `struct Section`, `enum Func`
 //! - `Block::elements(&self) -> Vec<Elem>`
 //! - `fn read(ast: &Ast, t: &Tokens, d: Lang, name: &str, kit: Option<(&Kit, FileId)>) -> (Rd, Deck)`
-//! - `Rd::text_behaviours`, `Rd::text_lang`, `Rd::role`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
+//! - `Rd::text_behaviours`, `Rd::text_lang`, `Rd::role`, `Rd::included`, `Rd::kit_split`, `Rd::master_name`, `Rd::named`, `Rd::tag`, `Rd::main`, `Rd::fields`, `Rd::body`,
 //!   `Rd::ttag` (`Rd::card`, `Rd::raw`, `Rd::unparsed`, `Rd::keep`, `Rd::section`: `dispatch.rs`)
 //! - `fn unwrapped(t: &str) -> String`
 
@@ -460,6 +460,12 @@ impl<'a> Rd<'a> {
             Some((kit, f)) => kit.file(f).role,
             None => crate::syntax::resolve::role(self.t, self.ast),
         }
+    }
+
+    /// Whether another file of the kit reads this one; false for a file
+    /// read alone.
+    pub(in crate::syntax::render) fn included(&self) -> bool {
+        self.kit.is_some_and(|(kit, f)| kit.included(f))
     }
 
     /// The kit's corrected split of element `n`.

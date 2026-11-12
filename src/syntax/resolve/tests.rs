@@ -422,6 +422,21 @@ fn roles_and_verilog_a() {
 }
 
 #[test]
+fn p1_066_a_file_another_reads_is_included() {
+    // The entry is given to a simulator alone; the file its `.include`
+    // names is not, though its top-level source makes it a deck by its
+    // text. Oracle: the two files' cards, read by hand. Checks: 3.
+    let files = [
+        ("/d.sp", "t\n.include stim.inc\nr1 a 0 1k\n.op\n.end\n"),
+        ("/stim.inc", "* stimulus\nv1 a 0 1\n"),
+    ];
+    let k = kit(&files, "/d.sp", Form::Deck, Dialect::Ngspice);
+    assert_eq!(k.file(FileId(1)).role, Role::Deck);
+    assert!(!k.included(FileId(0)));
+    assert!(k.included(FileId(1)));
+}
+
+#[test]
 fn nesting_ten_thousand_deep_resolves_without_recursion() {
     // Rule 7 of the compiler-construction skill: every walk over input
     // depth is a heap worklist. 10⁴ nested `.if`s inside 10⁴ nested
