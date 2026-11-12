@@ -2,7 +2,9 @@
 //! the old cross-sim cells run (spice-bench for `ngspice-vacask`, the VACASK corpus for
 //! `vacask-ngspice`), read leniently with every file it names, through the six steps on
 //! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash) on every tenth written deck. A deck the
-//! corpus's cross-sim source list quarantines as `slow` is converted and not simulated.
+//! corpus's cross-sim source list quarantines as `slow` is neither converted nor simulated (step 1
+//! `quarantined`). Each deck's line is also appended to `pair-<cell>-census.partial.txt` as it
+//! finishes, so a census cut short keeps what ran.
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
@@ -109,10 +111,17 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     let running: Mutex<Vec<Option<(usize, std::time::Instant)>>> =
         Mutex::new(vec![None; jobs.max(1)]);
     let workers_left = AtomicUsize::new(jobs.max(1));
+    let partial_path = format!(
+        "{}/pair-{}-census.partial.txt",
+        env!("CARGO_TARGET_TMPDIR"),
+        c.name
+    );
+    let partial =
+        std::fs::File::create(&partial_path).unwrap_or_else(|e| panic!("{partial_path}: {e}"));
     std::thread::scope(|s| {
         for w in 0..jobs.max(1) {
             let (running, workers_left, next, done) = (&running, &workers_left, &next, &done);
-            let (load, none, paths) = (&load, &none, &paths);
+            let (load, none, paths, slow, partial) = (&load, &none, &paths, &slow, &partial);
             s.spawn(move || {
                 // Bounded: each index is taken once.
                 loop {
@@ -120,10 +129,26 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
                     let Some(p) = paths.get(k) else { break };
                     running.lock().expect("no worker panicked")[w] =
                         Some((k, std::time::Instant::now()));
-                    let mut v = run::steps(c, from, to, &load(p), none);
+                    let mut v = match slow.contains(&rel(p)) {
+                        // Quarantined: its conversion alone can run for hours (the
+                        // powergrid decks), so it is named, not run.
+                        true => Done {
+                            fails: [(
+                                1,
+                                run::fail("quarantined", "slow in the source list".into()),
+                            )]
+                            .into(),
+                            last: 1,
+                            written: None,
+                        },
+                        false => run::steps(c, from, to, &load(p), none),
+                    };
                     running.lock().expect("no worker panicked")[w] = None;
                     let h = v.written.take().map(|w| hash(&w));
                     let mut all = done.lock().expect("no worker panicked");
+                    // The line as the deck finishes: a census cut short keeps what ran.
+                    let line = format!("{} {}\n", rel(p), crate::line(&v, h.is_some()));
+                    let _ = std::io::Write::write_all(&mut &*partial, line.as_bytes());
                     all.push((k, v, h));
                     if all.len().is_multiple_of(200) {
                         eprintln!("{}: {} of {} decks", c.name, all.len(), paths.len());
