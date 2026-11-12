@@ -24,7 +24,7 @@
 //!   `ElemKind::detail(self) -> DetailKind`, `ElemKind::has_detail(self) -> bool`,
 //!   `ElemKind::needs_model(self) -> bool`, `ElemKind::master_kind(self) -> Option<DefKind>`
 //! - `pub enum DetailKind` (`ALL`, `COUNT`)
-//! - `pub struct Element`, `pub const NO_ROW`
+//! - `pub struct Element`, `pub enum MultLaw` (`ALL`, `COUNT`), `pub const NO_ROW`
 //! - `pub struct CircuitDetails`; `DetailRow` (kernel, A6) for every row type it holds
 //! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
 //!   `pub(crate) fn design_check(&Design, &mut Diags)`
@@ -247,6 +247,24 @@ pub struct Element {
     pub mult: ExprId,
     /// Row in the kind's detail table, or [`NO_ROW`] when the kind has none.
     pub detail: u32,
+    /// How `mult` multiplies (AMEND-A12 A15 C1, R31); anything but `Parallel` only on an
+    /// `Instance` with a `mult`.
+    pub mult_law: MultLaw,
+}
+
+/// How an element's multiplicity acts (AMEND-A12 A15 C1, R31).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum MultLaw {
+    /// `mult` whole copies in parallel; through the hierarchy multiplicities compose by
+    /// multiplication (xy, hs, the Python API; INV-semantics 6.01).
+    Parallel,
+    /// ngspice's `m` on an X line (`inpcom.c:4124-4198`): the instance's `mult` is given to
+    /// every element of the subcircuit's body that takes a multiplier, replacing that
+    /// element's own, and passed on the same way to nested instances; an element of a kind
+    /// ngspice does not multiply is left as it is (IR-CIRCUIT §2 lists the kinds). Only on an
+    /// `Instance`.
+    NgspiceAppend,
 }
 
 /// The circuit owner's detail tables (the design's `circuit` field; no spans: a detail row's
@@ -282,6 +300,7 @@ pub struct CircuitDetails {
 
 const _: () = assert!(size_of::<ElemKind>() == 1);
 const _: () = assert!(size_of::<DetailKind>() == 1);
+const _: () = assert!(size_of::<MultLaw>() == 1);
 const _: () = assert!(size_of::<Element>() == 40);
 
 macro_rules! detail_rows {
@@ -542,6 +561,13 @@ impl ElemKind {
             | ElemKind::Unresolved => None,
         }
     }
+}
+
+impl MultLaw {
+    /// Every member, in declaration order.
+    pub const ALL: [MultLaw; 2] = [MultLaw::Parallel, MultLaw::NgspiceAppend];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
 }
 
 impl DetailKind {
