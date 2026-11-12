@@ -178,8 +178,7 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
 }
 
 /// Appends a refusal for a structure item ngspice cannot spell for a reason no feature states
-/// (R21): a head parameter with no default (`W1001`), a blank or multi-line title or a
-/// multi-line comment (`W1002`), a literal it would read back in another form (`W1003`), a
+/// (R21): a head parameter with no default (`W1001`), a multi-line title or comment (`W1002`), a
 /// section in a section or a definition or include in an `.if` branch (`W1004`), an `.if`
 /// condition that reads the run or a value that reads the circuit (`W1005`), a string or list
 /// value (`W1006`).
@@ -193,7 +192,7 @@ pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diag
         ItemKind::Title => {
             let t: ir::item::Title = d.row(item.index);
             let text = d.text(t.text);
-            if text.trim().is_empty() || broken(text) {
+            if broken(text) {
                 refuse(codes::LINE_BREAK);
             }
         }
@@ -244,8 +243,6 @@ pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diag
         }
         if expr_write::holds_text(d, e) {
             refuse(codes::TEXT_VALUE);
-        } else if !expr_write::spells_in(d, e, expr_write::eval_of(d, e)) {
-            refuse(codes::LITERAL_FORM);
         }
     }
 }

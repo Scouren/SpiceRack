@@ -359,10 +359,10 @@ impl<'a, 'd> Lower<'a, 'd> {
         self.toks.text(self.ast.main_token(n)).to_ascii_lowercase()
     }
 
-    /// Appends `tree` for an item in `scope`, notes a rounded number, and returns its root.
+    /// Appends `tree` for an item in `scope`, gives its reading's notes, and returns its root.
     pub(super) fn expr(&mut self, st: Stmt, tree: &Tree, scope: ir::ScopeId) -> ir::ExprId {
-        if tree.rounded() {
-            self.note(st, codes::ROUNDED);
+        for &code in tree.notes() {
+            self.note(st, code);
         }
         tree.emit(self.b, self.names, scope, self.pending)
     }

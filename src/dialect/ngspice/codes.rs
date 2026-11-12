@@ -17,8 +17,8 @@
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`, `ROUNDED`,
-//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
-//! `MISSING_FILE`, `NO_DEFAULT`, `LINE_BREAK`, `LITERAL_FORM`, `PLACEMENT`, `READS_RUN`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
+//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
+//! `MISSING_FILE`, `NO_DEFAULT`, `LINE_BREAK`, `PLACEMENT`, `READS_RUN`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, write_control,
@@ -57,6 +57,9 @@ pub(super) const GLOBAL_GROUND: Code = Code::new(b'P', 1010);
 /// A numparam `-` after a binary operator before anything but a number (`{2*-q}`: ngspice's
 /// "wrongly determined negation", or a later number negated instead): `InvalidInSource`.
 pub(super) const NEGATION: Code = Code::new(b'P', 1011);
+/// A numparam call of a two-argument function with three arguments (`limit(a, b, c)`): ngspice
+/// evaluates it on the first and the last (`xpressn.c` `formula`), and so does the IR.
+pub(super) const FIRST_LAST: Code = Code::new(b'P', 1012);
 /// A `.param` the same scope defines again later: ngspice keeps the last (INV 3.01); this one
 /// is `Inert`.
 pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);
@@ -68,13 +71,8 @@ pub(super) const MISSING_FILE: Code = Code::new(b'R', 1003);
 
 /// A subcircuit parameter with no default: ngspice's `params:` gives every one a value.
 pub(super) const NO_DEFAULT: Code = Code::new(b'W', 1001);
-/// A title that is blank or holds a line break, or a comment that holds one: line 1 and a `*`
-/// line hold one line each.
+/// A title or a comment that holds a line break: line 1 and a `*` line hold one line each.
 pub(super) const LINE_BREAK: Code = Code::new(b'W', 1002);
-/// A literal ngspice spells in another form (a scale it has no letter for: 10⁻², 10¹⁵; `mil`
-/// in a numparam expression, where it reads as milli): its digits would read back as another
-/// literal.
-pub(super) const LITERAL_FORM: Code = Code::new(b'W', 1003);
 /// A definition or include ngspice does not read where it stands: a `.lib` section inside a
 /// section, a `.subckt`, `.lib` section, `.func` or `.include` in an `.if` branch.
 pub(super) const PLACEMENT: Code = Code::new(b'W', 1004);
@@ -158,13 +156,7 @@ pub(super) const CODES: &[Row] = &[
         LINE_BREAK,
         "a title or comment that ngspice cannot hold on one line",
         "ngspice manual §1.5, §2.3",
-        "line 1 is the whole title and a * line one line of comment; a blank title, or a line break in either, would read back otherwise; refused.",
-    ),
-    refusal(
-        LITERAL_FORM,
-        "a literal ngspice would read back in another form",
-        "ngspice-45 inpeval.c, xpressn.c parseunit",
-        "ngspice has no letter for that power (or numparam reads mil as milli); refused rather than written as a different literal.",
+        "line 1 is the whole title and a * line one line of comment; a line break in either would read back otherwise; refused.",
     ),
     refusal(
         PLACEMENT,
@@ -183,6 +175,12 @@ pub(super) const CODES: &[Row] = &[
         "a condition or parameter that reads the run",
         "rewrite/RULINGS.md R14; ngspice manual §2.15",
         "numparam evaluates an .if once and a .param has no circuit to read; refused.",
+    ),
+    row(
+        FIRST_LAST,
+        "a three-argument call of a two-argument numparam function",
+        "ngspice-45 xpressn.c formula",
+        "numparam passes such a function its first and last argument and evaluates the middle one only for its side effects; read the same way.",
     ),
     row(
         DUPLICATE_PARAM,

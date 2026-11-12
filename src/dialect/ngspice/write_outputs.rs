@@ -12,7 +12,8 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
-//! `pub(super) fn save`, `print`, `measure`
+//! `pub(super) fn save`, `print`, `measure`,
+//! `pub(super) fn probe(design: &ir::Design, probe: &ir::Probe, out: &mut String)`
 
 use super::codes::Row;
 use super::write::Out;
@@ -56,4 +57,13 @@ pub(super) fn measure(_w: &mut Out<'_>, _item: ir::ItemRef) {
         "ngspice write: measure is a stub but FEATURES has Measure"
     );
     unreachable!("ngspice write: FEATURES lacks Item(Measure) until S3.3 lands")
+}
+
+/// Appends one probe as ngspice spells it inside another card (`v(a)`, `v(a,b)`, `i(vin)`): the
+/// run area calls it for the outputs of `.four`, `.tf`, `.noise`. Stub: unreachable (no probe
+/// feature is in `FEATURES` yet).
+#[expect(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe(design: &ir::Design, probe: &ir::Probe, out: &mut String) {
+    let _ = (design, probe, out);
+    unreachable!("ngspice write: no probe is spelled until S3.3b lands")
 }

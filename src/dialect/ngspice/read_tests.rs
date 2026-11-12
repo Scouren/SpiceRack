@@ -368,8 +368,7 @@ fn any_bytes_read_returns_and_checks_clean() {
 
 #[test]
 fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
-    // R21 (`Write::admits`): a literal ngspice reads back otherwise (no centi letter; numparam
-    // reads `mil` as milli: xpressn.c parseunit), a head parameter with no default (manual
+    // R21 (`Write::admits`): never a literal (R28: respelled exactly), a head parameter with no default (manual
     // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once),
     // a string value (numparam has none).
     let mut d = ir::Design::new();
@@ -407,8 +406,6 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
         .collect();
     got.sort();
     let mut want = vec![
-        codes::LITERAL_FORM,
-        codes::LITERAL_FORM,
         codes::NO_DEFAULT,
         codes::LINE_BREAK,
         codes::READS_RUN,
@@ -511,4 +508,15 @@ fn a_subckts_formals_are_known_from_any_enclosing_block() {
     let outer = crate::syntax::ast::Node(ast.fields(root)[1]);
     let want = ["m".to_string(), "w".to_string()];
     assert_eq!(d.formals(outer, "inner"), Some(&want[..]));
+}
+
+#[test]
+fn a_blank_line_one_is_an_empty_title() {
+    // INV 14.12: line 1 of a deck is its title whatever it holds, so every ngspice deck has one.
+    let (d, _) = deck("\n.param a=1\n");
+    let top = d.file(d.entry()).top;
+    let t: ir::item::Title = d.row(d.items(top)[0].index);
+    assert_eq!(d.items(top)[0].kind, ItemKind::Title);
+    assert_eq!(d.text(t.text), "");
+    assert_eq!(write(&d), "\n.param a=1\n.end\n");
 }

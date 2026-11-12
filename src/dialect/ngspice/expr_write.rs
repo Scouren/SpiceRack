@@ -212,10 +212,13 @@ pub(super) fn value(design: &ir::Design, e: ir::ExprId, out: &mut String) {
     }
 }
 
-/// Whether `eval` spells every node of `e` so that it reads back as itself: its functions and
-/// operators (numparam has no probe, time-like leaf or `temper`, and the B-source parser no `%`,
-/// `int`, `pow`, `sqr` or draw), and its literals (a scale ngspice has a letter for; no `mil`
-/// under numparam, which reads it as milli).
+/// Whether `eval` spells every node of `e`: its functions and operators (numparam has no probe,
+/// time-like leaf or `temper`, and the B-source parser no `%`, `int`, `pow`, `sqr` or draw).
+/// Every literal spells (R28).
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the element area's admits calls it (S3.1a)")
+)]
 pub(super) fn spells_in(design: &ir::Design, e: ir::ExprId, eval: Eval) -> bool {
     let numparam = eval == Eval::Numparam;
     let mut stack = vec![e];
@@ -228,12 +231,12 @@ pub(super) fn spells_in(design: &ir::Design, e: ir::ExprId, eval: Eval) -> bool 
         }
         let row = design.expr(x);
         let ok = match row {
-            ir::Expr::Num(n) => {
-                let lit = design.num(n);
-                let scale_ok = lit.form != ir::NumForm::Scale || ![-2, 15].contains(&lit.exp10);
-                scale_ok && !(numparam && lit.form == ir::NumForm::Mil)
-            }
-            ir::Expr::Param(_) | ir::Expr::UserCall(..) | ir::Expr::Ternary(..) => true,
+            // every literal has an exact spelling (R28: `number::spell` respells a form ngspice
+            // has no letter for, and `mil` under numparam, in exponent form)
+            ir::Expr::Num(_)
+            | ir::Expr::Param(_)
+            | ir::Expr::UserCall(..)
+            | ir::Expr::Ternary(..) => true,
             ir::Expr::Call(ir::Func::PowAbs, _) => true,
             ir::Expr::Call(ir::Func::Fmod, _) => numparam,
             ir::Expr::Call(f, _) => tables::func_spelling(eval, f).is_some(),
