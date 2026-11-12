@@ -53,7 +53,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 9 Untyped: a code_model model (word=g50) is written `.model g48 g50 …` and reads back as a module model: the type word alone does not say which (models: ng-models)",
+        "seed 10 Untyped: a FromHere Env tnom={expression} is written as a script `option tnom={…}` and reads back a Private opaque (the frontend's option takes no numparam braces): control and run (ng-control, ng-run)",
     ),
     (
         "l7",

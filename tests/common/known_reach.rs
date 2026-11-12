@@ -41,6 +41,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Family(Hisim2)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(HisimHv)", FIXPOINT, VERSIONED),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
+    ("ngspice", "Family(CodeModel)", FIXPOINT, CODE_MODELS),
 ];
 
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
@@ -52,3 +53,4 @@ const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, s
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, noise, sens, disto, pss)";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VERSIONED: &str = "interim: dialect_ngspice_models' fixtures (bjt, mos_levels, bins, polarity_default, bsim_version, b3soi_fd, b3soi_dd, hisim2); no valid version drawn before ir-circuit b6888c35";
+const CODE_MODELS: &str = "interim: dialect_ngspice_models' fixture code_module; the generator's code-model words never name one of the build's code models (W1206)";
