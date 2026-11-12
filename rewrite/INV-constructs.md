@@ -293,7 +293,7 @@ Row ids (A1, B7, …) are stable handles for this file only. 537 rows in areas A
 | D109 | `M=` on an independent source | xy | Xyce ignores `M` on V/I sources (no such parameter). | XY S1 |
 | D110 | Xyce source oddities | xy | `Vsrc 1 0 1 0` (DC 1), `DC pulse((…))` (double parentheses), a waveform with no closing `)`, unit letters after numbers ignored. | XY S3, S7 |
 | D111 | Xyce port with a source | xy | `P1 1 0 port=2 sin 0 1 1e5`, `P1 1 0 port=1 z0=50 AC 1`; a `P` line with no `port=`. | XY S9 |
-| D112 | Xyce R/C/L instance extras | xy | `TC=a,b` (TC1, TC2), `TEMP=`, `DTEMP=`, `TCE=`, capacitor `AGE=`/`D=`; R level 2 (thermal). | XY E4, E5, §2b |
+| D112 | Xyce R/C/L instance extras | xy | `TC=a,b` (TC1, TC2), `TEMP=`, `DTEMP=`, `TCE=` on a resistor only (Xyce 7.10 rejects it on a capacitor and an inductor: "Unrecognized parameter TCE for device C1"; run recorded with ir-rewrite 825dee93, R74), capacitor `AGE=`/`D=`; R level 2 (thermal). | XY E4, E5, §2b |
 | D113 | Positional area on D and J | xy | `D2 15 17 SWITCH 1.5`, `J13 22 14 23 JNOM 2.0`. | XY E6 |
 | D114 | Core-model coupling details | xy | `K1 L1 L2 1 nlcore`: Jiles-Atherton `CORE` model; the L values become turns. | XY E7 |
 | D115 | Coupling keyword / time-dependent k | xy | `K2 L1 L2 K = 0.5`, `k={expr of time}`. | XY E8 |
