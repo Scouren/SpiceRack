@@ -440,14 +440,16 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
                     .b
                     .draw(dist, ir::DrawWhen::Sampling, ir::DrawPer::CallSite, &args);
             }
-            // `sgn(x)` is `x >= 0 ? 1 : -1`; `sign(x, y)` is `abs(x) * (y >= 0 ? 1 : -1)`: zero
-            // counts as positive (run e1, f1; R13 sugar: each operand once, read back the same).
+            // `sgn(x)` is `SgnZeroPos(x)` (typed as `x`: run f4), `x >= 0 ? 1 : -1` until it
+            // lands; `sign(x, y)` is `abs(x) * (y >= 0 ? 1 : -1)` (always real): zero counts as
+            // positive (runs e1, f1, f4; R13 sugar: each operand once, read back the same).
             let last = *args.last().expect("checked arity");
-            let sign = nonnegative_sign(l, last);
-            match name.as_str() {
-                "sgn" => sign,
+            match (name.as_str(), super::a12::SGN_ZERO_POS) {
+                ("sgn", Some(f)) => l.b.call(f, &[last]),
+                ("sgn", None) => nonnegative_sign(l, last),
                 _ => {
                     let mag = l.b.call(ir::Func::Abs, &[args[0]]);
+                    let sign = nonnegative_sign(l, last);
                     l.b.binary(ir::BinOp::Mul, mag, sign)
                 }
             }

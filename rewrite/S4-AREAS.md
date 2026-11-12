@@ -73,3 +73,32 @@ the ground names, the files loads and includes name, the parameter reads to bind
   absent title and an empty one alike (an empty line). L5 needs `Gen` to give an entry deck a
   non-empty `Title` as its first item, or none in a library.
 - `Write::admits` (R21) needs name pools per family for `Gen` (parameter names a module has).
+
+## Evidence: how to check a VACASK fact
+
+A rule cites a VD clause or a run; when the two disagree the run wins (R5). Everything below is in
+`nix develop .#testing`.
+
+| What | Where |
+|---|---|
+| the binary (36be560) | `vacask` on PATH; `/nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask` |
+| its docs (`VD <file>`) | `…-vacask-unstable-2026/share/doc/vacask/docs/<file>.md` (`dev-builtin-src.md`, `cmd-sweep.md`, `cir-instance.md`, `expr-functions.md`, …) |
+| its demo and test decks | `…-vacask-unstable-2026/share/doc/vacask/{demo,test}/`; the corpus the tests walk is `$VACASK_CORPUS` (184 netlists, gnucap decks out of set) |
+| its device modules | `…-vacask-unstable-2026/lib/vacask/mod/` (`spice/*.osdi`, `spice/{sn,full}/`, the CMC modules): what `tables.rs::is_library_file` lists |
+| the settle runs | `tests/fixtures/dialect/vacask/settle/*.sim`, asserted by `tests/dialect_vacask/settle.rs`; DIALECT-VACASK Appendix A records each |
+| ngspice-45, for pair facts | `ngspice -b deck.cir` in the same shell (the `ngspice` outside it is 44.2: do not use it) |
+
+How the settle runs read a number (copy the pattern for a new fact, then add the deck and its
+test in the same commit as the rule that cites it):
+
+- **A parameter's value, typed**: `control` … `print ("label", expr, …)` … `endc` prints
+  `label value …` on one line (VD cmd-print). Dividing by an integer shows the type: `x/2` is
+  1 for an integer 3 and 1.5 for a real (runs i1, f2–f4).
+- **What an instance received**: `print instance("r1", "x1:r1")` dumps each instance's
+  parameters (`resistance = 11 (real)`): a resistor of `r=expr+10` reads `expr` back.
+- **A waveform or a sweep**: `options rawfile="ascii"` and an analysis; read the raw file with
+  `spicerack::rawfile::parse_raw` (the settle tests' `raw`/`at` helpers).
+- **A refusal**: VACASK prints the message and a location line (`9:10 (0xad) in …`); assert the
+  message text (`settle::says`).
+- Every builtin needs a `model` line (`model vsource vsource`); every SPICE device a `load
+  "spice/<m>.osdi"` and a `model` (run n2).

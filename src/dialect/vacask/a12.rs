@@ -6,7 +6,8 @@
 //!
 //! Cites: `rewrite/AMEND-A12.md` K1, K3, C5.
 //!
-//! Contents: `INT_FORM`, `DIV_TYPED`, `TO_INT`, `HINT`, `LIBRARY_LOAD` (crate-private consts)
+//! Contents: `INT_FORM`, `DIV_TYPED`, `TO_INT`, `SGN_ZERO_POS`, `HINT`, `LIBRARY_LOAD`
+//! (crate-private consts)
 
 use crate::ir;
 
@@ -21,6 +22,11 @@ pub(super) const DIV_TYPED: ir::BinOp = ir::BinOp::Div;
 /// A12 K1: `Func::ToInt`, VACASK's `int()` (truncation with an integer result). Until it lands
 /// `int()` is `Trunc`.
 pub(super) const TO_INT: ir::Func = ir::Func::Trunc;
+
+/// A12 K1 addendum: `Func::SgnZeroPos`, VACASK's `sgn` (−1 below zero, else +1, typed as its
+/// operand: run f4). Until it lands `expr_read` reads `sgn(x)` as the sugar `x >= 0 ? 1 : -1`,
+/// exact in value while the IR has no types.
+pub(super) const SGN_ZERO_POS: Option<ir::Func> = None;
 
 /// A12 K3: `OpaqueClass::Hint`, a solver knob. Until it lands a hint is `Private`.
 #[cfg_attr(
@@ -62,6 +68,15 @@ mod tests {
     #[should_panic(expected = "A12 K1")]
     fn int_has_an_integer_result() {
         assert!(TO_INT != ir::Func::Trunc, "A12 K1: Func::ToInt not landed");
+    }
+
+    #[test]
+    #[should_panic(expected = "A12 K1")]
+    fn sgn_is_a_member_typed_as_its_operand() {
+        assert!(
+            SGN_ZERO_POS.is_some(),
+            "A12 K1: Func::SgnZeroPos not landed"
+        );
     }
 
     #[test]
