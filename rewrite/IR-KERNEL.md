@@ -396,6 +396,11 @@ a root of the other form keeps its id, and a subtree shared by roots of both for
 for the one and kept for the other. Property: with a wrapping rule of `-(-e)`, the other form's
 `Neg` feature is never added, its roots keep their ids, and every root keeps its value.
 
+**A25 (2026-11-12): a row names its item (R48).** `Diag.item: ItemRef` (`ItemRef::NONE` when a
+row is about no item) and `Diags::push_at(code, design, item, arg)`, which takes the span from
+the item. `check`, `check_legal` and every row's own check push at the item, so a design built
+with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
