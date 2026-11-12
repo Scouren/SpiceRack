@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param a = 3i
+  param r = to_real(a)
+  param s = to_real(2.5)

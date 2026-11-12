@@ -1,0 +1,2 @@
+file "d.sp" deck
+  element behav b1 (n 0) expr=(v(n) * ~5)

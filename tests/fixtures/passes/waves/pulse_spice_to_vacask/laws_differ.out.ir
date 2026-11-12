@@ -1,0 +1,4 @@
+file "d.sp" deck
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=0 width=5u period=10u)
+  element vsource v2 (b 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=1n width=1n period=3n)
+  element vsource v3 (c 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=1n width=1n period=0)

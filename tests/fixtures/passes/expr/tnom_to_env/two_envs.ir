@@ -1,0 +1,4 @@
+file "d.sp" deck
+  env tnom=25 whole_run
+  env tnom=30 whole_run
+  param a = $tnom + 1

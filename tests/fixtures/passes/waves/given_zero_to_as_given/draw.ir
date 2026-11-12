@@ -1,0 +1,3 @@
+file "d.sp" deck
+  param w = draw:abs_gauss:always:reference(2u, 0.1u, 3)
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 rise=1n fall=1n width=w period=10u given_zero=spice_default)

@@ -1,0 +1,4 @@
+file "d.sp" deck
+  env tnom=25 whole_run
+  param a = 25 + 1
+  element behav b1 (n 0) expr=(v(n) * 25)

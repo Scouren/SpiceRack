@@ -1,0 +1,5 @@
+file "d.sp" deck
+  param a = 3i
+  param r = sgn_zero_pos(a)
+  param s = 2.5 < 0 ? -1 : 1
+  param t = r /: 2i

@@ -1,0 +1,5 @@
+file "d.sp" deck
+  param k = 7i /: 2i
+  subckt s (p) w=3i
+    param z = w /: 2i
+  element instance x1 (n) model=s params=(w=2.5)

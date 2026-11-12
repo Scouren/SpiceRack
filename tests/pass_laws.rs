@@ -45,13 +45,41 @@ const SIZE: Size = Size {
 
 /// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
 /// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[];
+const KNOWN: &[(&str, &str, &str)] = &[(
+    "p3",
+    "given_zero_to_as_given",
+    "on its GEN_SETS set, seed 45: the output adds FuncDyn(Log10), BinaryDyn(BitXor), \
+     BinaryDyn(Shr): an expression it moves into a wave field changes class (static to \
+     dynamic) and its requires do not name the Dyn twins; with pass-expr",
+)];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
 /// comes from the pass's row (its `removes`, the kinds that hold it, `Expr(Num)`, without the
 /// competing features), as the IR owner who knows the generator states it; (pass name, set).
-const GEN_SETS: &[(&str, ir::FeatureSet)] = &[];
+const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
+    (
+        "pulse_spice_to_vacask",
+        sources_only(
+            &[ir::WaveKind::Pulse],
+            ir::Feature::Circuit(ir::CircuitExtra::PulseVacask),
+        ),
+    ),
+    (
+        "given_zero_to_as_given",
+        sources_only(
+            &[
+                ir::WaveKind::Pulse,
+                ir::WaveKind::Sin,
+                ir::WaveKind::Exp,
+                ir::WaveKind::Sffm,
+                ir::WaveKind::Am,
+                ir::WaveKind::TrRandom,
+            ],
+            ir::Feature::Circuit(ir::CircuitExtra::GivenZeroAsGiven),
+        ),
+    ),
+];
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);
@@ -381,4 +409,33 @@ fn fixture(pass: &Pass, case: &Path) -> Result<(), String> {
         true => Ok(()),
         false => Err(format!("written\n{got}expected\n{expected}")),
     }
+}
+
+/// Every feature but the element kinds other than the two independent sources, the waves not
+/// in `waves`, and `without` (the competing feature): designs that hold sources of those waves
+/// (pass-expr's measured construction: 66 of 96 seeds hold a SPICE pulse).
+const fn sources_only(waves: &[ir::WaveKind], without: ir::Feature) -> ir::FeatureSet {
+    let mut set = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(without));
+    let mut i = 0;
+    while i < ir::ElemKind::ALL.len() {
+        let k = ir::ElemKind::ALL[i];
+        if !matches!(k, ir::ElemKind::VSource | ir::ElemKind::ISource) {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)));
+        }
+        i += 1;
+    }
+    let mut j = 0;
+    while j < ir::WaveKind::ALL.len() {
+        let w = ir::WaveKind::ALL[j];
+        let (mut k, mut keep) = (0, false);
+        while k < waves.len() {
+            keep |= waves[k] as u8 == w as u8;
+            k += 1;
+        }
+        if !keep {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Wave(w)));
+        }
+        j += 1;
+    }
+    set
 }

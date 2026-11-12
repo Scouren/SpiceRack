@@ -1,0 +1,3 @@
+file "d.sp" deck
+  param a = draw:abs_gauss:sampling:call_site(1, 0.1, 3) + 2
+  element behav b1 (n 0) expr=(v(n) * draw:rel_unif:sampling:reference(2i, 0.1))

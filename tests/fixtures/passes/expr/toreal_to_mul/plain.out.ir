@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param a = 3i
+  param r = 1 * a
+  param s = 2.5

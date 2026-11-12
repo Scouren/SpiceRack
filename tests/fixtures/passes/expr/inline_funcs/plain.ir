@@ -1,0 +1,5 @@
+file "d.sp" deck
+  func g(y) = y + 1
+  func f(x, z) = @g(x) * x + z
+  param a = @f(2, 3)
+  element behav b1 (n 0) expr=(@f(v(n), 0))

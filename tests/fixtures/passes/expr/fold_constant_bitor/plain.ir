@@ -1,0 +1,2 @@
+file "d.sp" deck
+  param a = (5 | 2) + (1 | (2 | 4))
