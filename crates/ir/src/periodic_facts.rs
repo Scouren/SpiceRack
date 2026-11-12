@@ -7,7 +7,7 @@
 //! ```text
 //! hb     tones=[v, …] harmonics=[v, …] [intermod=v] truncate=box|diamond|hybrid
 //! pss    driven|autonomous [uic] fundamental=v tstab=v [harmonics=v] [points=v] [osc_p=n]
-//!        [osc_n=n]
+//!        [osc_n=n] [sc_iter=v] [steady_coeff=v]
 //! pac    <sweep> [sidebands=v] [relharm=v] [relative]
 //! pnoise <probe> source=n <sweep> [sidebands=v] [relharm=v] [relative]
 //! pxf    <probe> <sweep> [sidebands=v] [relharm=v] [relative]
@@ -193,6 +193,8 @@ impl DetailFacts for Pss {
             points,
             osc_p,
             osc_n,
+            sc_iter: ExprId::NONE,
+            steady_coeff: ExprId::NONE,
         })
     }
     #[cfg(any(test, feature = "gen"))]
@@ -241,6 +243,8 @@ impl DetailFacts for Pss {
             points,
             osc_p,
             osc_n,
+            sc_iter: ExprId::NONE,
+            steady_coeff: ExprId::NONE,
         })
     }
 }
