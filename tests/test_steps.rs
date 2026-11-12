@@ -333,3 +333,67 @@ fn p3_134_a_stepped_source_steps_its_own_value_on_ltspice_and_spectre() {
     let text = oracle::write(&temp, Dialect::Xyce, Dialect::Ltspice);
     assert!(text.lines().any(|l| l == ".step temp 0 100 50"), "{text}");
 }
+
+/// ZERO-LEDGER P5-102. Oracle: LTspice 26.1.1 running the source deck (a
+/// `.step param X` makes X by itself: the deck holds no `.param X`),
+/// again here unless CI's `LTSPICE_CI_PENDING_MIRROR` marker says it is
+/// absent, each point the divider's closed form v(out) = X / (1k + X);
+/// met by Xyce 7.10 on the written deck, which stopped on "unrecognized
+/// symbol: X" before. Spectre has no binary here: its text is held to
+/// Reference 19.1 p.506 ("Parameter Declaration": a top-level parameter
+/// is declared with its value, anywhere in the top-level description)
+/// and p.406 (`sweep param=`: a top-level netlist parameter). A
+/// parameter the deck declares is declared once. By hand:
+/// research/impl/evidence/P5-102/run.txt. Tolerance: a linear solve of
+/// three elements; LTspice's raw file holds single floats (6e-8).
+#[test]
+fn p5_102_a_parameter_an_ltspice_step_makes_is_declared() {
+    const DECK: &str = "* made by its step\nV1 in 0 1\nR1 in out 1k\nR2 out 0 {X}\n";
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let meets = |on: Dialect, text: &str, want: &[f64]| {
+        let got = outs(on, text);
+        let near = got.len() == want.len() && got.iter().zip(want).all(|(g, w)| tol.within(*g, *w));
+        assert!(near, "{on:?}: v(out) = {got:?}, want {want:?}\n{text}");
+    };
+    let ltspice = std::env::var_os("LTSPICE_CI_PENDING_MIRROR").is_none();
+    let cite = "Spectre Reference 19.1 p.506: Parameter Declaration; p.406: sweep param=";
+    // The card, v(out) in run order, Xyce's two cards, Spectre's sweep.
+    let cases: [(&str, &[f64], [&str; 2], &str); 2] = [
+        (
+            ".step param X 1k 3k 1k",
+            &[0.5, 2.0 / 3.0, 0.75],
+            [".param X=1000", ".step X 1000 3000 1000"],
+            "sweep1_x sweep param=X start=1k stop=3k step=1k {",
+        ),
+        (
+            ".step param X list 1k 3k",
+            &[0.5, 0.75],
+            [".param X=1k", ".step X list 1k 3k"],
+            "sweep1_x sweep param=X values=[1k 3k] {",
+        ),
+    ];
+    for (card, want, [param, step], head) in cases {
+        let deck = format!("{DECK}{card}\n.op\n.end\n");
+        if ltspice {
+            meets(Dialect::Ltspice, &deck, want);
+        }
+        let xyce = oracle::write(&deck, Dialect::Ltspice, Dialect::Xyce);
+        let at = |line: &str| xyce.lines().position(|l| l == line);
+        assert!(at(param).is_some() && at(param) < at(step), "{xyce}");
+        meets(Dialect::Xyce, &xyce, want);
+        let lines = ["parameters X=1k", head];
+        oracle::spec_example(cite, &deck, Dialect::Ltspice, Dialect::Spectre, &lines);
+        // LTspice's own step makes it: the deck goes back as it came.
+        let own = oracle::write(&deck, Dialect::Ltspice, Dialect::Ltspice);
+        assert!(!own.contains(".param"), "{own}");
+    }
+    // A parameter the deck declares: no second declaration.
+    let declared = format!("{DECK}.param X=2k\n.step param X 1k 3k 1k\n.op\n.end\n");
+    let xyce = oracle::write(&declared, Dialect::Ltspice, Dialect::Xyce);
+    assert_eq!(xyce.matches(".param X=").count(), 1, "{xyce}");
+    let spectre = oracle::write(&declared, Dialect::Ltspice, Dialect::Spectre);
+    assert_eq!(spectre.matches("parameters X=").count(), 1, "{spectre}");
+}

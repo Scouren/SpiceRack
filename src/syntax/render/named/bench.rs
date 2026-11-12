@@ -26,7 +26,7 @@ use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::epochs::{Plan, plan};
 use crate::syntax::render::read::{Bench, BenchCard, Opt, Val, step_points};
-use crate::syntax::render::swept::{Swept, step_swept};
+use crate::syntax::render::swept::{Swept, step_makes, step_swept};
 
 /// The testbench, folded from its statements in read order.
 #[derive(Default)]
@@ -210,6 +210,9 @@ impl W<'_, '_> {
         // list `.step` is `sweep … values=[…]` (`[REF]` pp.406-409) of
         // what a ranged one sweeps (`W::sweep_what`).
         let mut heads: Vec<(u32, String)> = Vec::new();
+        // A parameter the source's `.step` made by itself, declared ahead
+        // of the sweeps (`W::step_decl`).
+        let mut made: Vec<String> = Vec::new();
         for (i, (p, v, tok)) in tb.step_lists.iter().enumerate() {
             let k = tb.steps.len() + i + 1;
             let Some(what) = self.sweep_what(p, *tok) else {
@@ -217,10 +220,12 @@ impl W<'_, '_> {
             };
             let head = format!("sweep{k}_{} sweep {what} {} {{", suffix(p), self.values(v));
             heads.push((*tok, head));
+            made.extend(v.first().and_then(|first| self.step_decl(p, *first)));
         }
         for (idx, step) in tb.steps.iter().enumerate() {
             if let Some(head) = self.sweep_head(idx, step) {
                 heads.push((step.3, head));
+                made.extend(self.step_decl(&step.1, step.2[0]));
             }
         }
         // Read order: a token's index grows along the deck.
@@ -231,7 +236,7 @@ impl W<'_, '_> {
             wrapped.push("}".into());
             block = wrapped;
         }
-        for l in &block {
+        for l in made.iter().chain(&block) {
             self.line(l);
         }
     }
@@ -511,6 +516,17 @@ impl W<'_, '_> {
                 None
             }
         }
+    }
+
+    /// `parameters <name>=<first>` where the source's `.step` makes the
+    /// parameter it steps ([`step_makes`]: LTspice's `.step param X` with
+    /// no `.param X`): a `sweep param=` names a top-level netlist
+    /// parameter (`[REF]` p.406), which is declared with its value,
+    /// "anywhere in the top-level circuit description" (`[REF]` p.506,
+    /// "Parameter Declaration"). `first` is the step's first value.
+    fn step_decl(&self, name: &str, first: f64) -> Option<String> {
+        step_makes(self.rd, self.deck, &self.names, name)
+            .then(|| format!("parameters {name}={}", self.num(first)))
     }
 }
 

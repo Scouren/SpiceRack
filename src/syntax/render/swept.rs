@@ -17,6 +17,7 @@
 //! - `pub(super) enum Swept`
 //! - `fn swept(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Swept`
 //! - `fn step_swept(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Swept`
+//! - `fn step_makes(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> bool`
 //! - `fn dc_value(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Option<char>`
 
 use super::names::Names;
@@ -125,4 +126,21 @@ pub(super) fn dc_value(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Optio
         }
         Swept::Temp | Swept::Param | Swept::Source { .. } | Swept::Other | Swept::Unseen => None,
     }
+}
+
+/// Whether a `.step` over `name` makes the parameter it steps: LTspice's
+/// `.step param <name>` where no `.param` of the top declares `name`
+/// (26.1.1, run: the cards read `{name}` at each step's value). A target
+/// whose own step sweeps declared parameters only then declares `name`,
+/// at the step's first value.
+///
+/// # Panics
+/// On an empty `name`.
+pub(super) fn step_makes(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> bool {
+    assert!(!name.is_empty(), "step_makes: an empty name");
+    let declared = match swept(rd, deck, names, name) {
+        Swept::Temp | Swept::Param => true,
+        Swept::Source { .. } | Swept::Value(_) | Swept::Other | Swept::Unseen => false,
+    };
+    rd.b.card_rules == CardRules::Ltspice && !declared
 }

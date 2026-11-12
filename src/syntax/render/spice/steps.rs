@@ -24,7 +24,7 @@ use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Alt, Construct};
 use crate::syntax::render::out::Space;
 use crate::syntax::render::read::step_points;
-use crate::syntax::render::swept::{Swept, step_swept};
+use crate::syntax::render::swept::{Swept, step_makes, step_swept};
 
 impl W<'_, '_> {
     /// The deck's `.step` cards in read order, ranges and lists as they
@@ -32,9 +32,11 @@ impl W<'_, '_> {
     pub(super) fn step_cards(&mut self, tb: &Tb) {
         let mut cards = self.steps(tb);
         cards.extend(self.step_lists(tb));
+        // A card a `.step`, and the declaration of what it made
+        // (`W::step_decl`) ahead of it: the sort below is stable.
         assert!(
-            cards.len() <= tb.steps.len() + tb.step_lists.len(),
-            "step_cards: a card a `.step` at most"
+            cards.len() <= 2 * (tb.steps.len() + tb.step_lists.len()),
+            "step_cards: a card and a declaration a `.step` at most"
         );
         // Read order: a token's index grows along the deck.
         cards.sort_by_key(|c| c.0);
@@ -78,6 +80,7 @@ impl W<'_, '_> {
                 (None, Some(s)) => format!(".step {s} {item} {a} {b} {c}"),
                 (None, None) => format!(".step {item} {a} {b} {c}"),
             };
+            out.extend(self.step_decl(param, &a.to_string()).map(|d| (*tok, d)));
             out.push((*tok, line));
         }
         out
@@ -103,6 +106,8 @@ impl W<'_, '_> {
                 continue;
             }
             if let Some(item) = self.step_item(param, *tok) {
+                let decl = vals.first().and_then(|v| self.step_decl(param, v));
+                out.extend(decl.map(|d| (*tok, d)));
                 out.push((*tok, self.list_card(&item, values)));
             }
         }
@@ -139,5 +144,17 @@ impl W<'_, '_> {
                 None
             }
         }
+    }
+
+    /// `.param <name>=<first>` ahead of a `.step` that makes the parameter
+    /// it steps ([`step_makes`]: LTspice's `.step param X` with no `.param
+    /// X`), on a target whose own `.step` does not: Xyce steps a declared
+    /// parameter (7.10, run: "contains unrecognized symbol: X" without the
+    /// card, LTspice's numbers with it). LTspice makes its own. `first` is
+    /// the step's first value as its card spells it.
+    fn step_decl(&self, name: &str, first: &str) -> Option<String> {
+        let makes = self.b.analysis_form != AnalysisForm::Ltspice
+            && step_makes(self.rd, self.deck, &self.names, name);
+        makes.then(|| format!(".param {name}={first}"))
     }
 }
