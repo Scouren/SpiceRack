@@ -25,6 +25,8 @@ use spicerack::ir;
 
 /// The read fixtures, by name.
 const READ: &[&str] = &[
+    "b3soi_dd",
+    "b3soi_fd",
     "bins",
     "bjt",
     "branch",
@@ -34,6 +36,7 @@ const READ: &[&str] = &[
     "diode",
     "diode_level_invalid",
     "duplicate",
+    "hisim2",
     "jfet_mes_hfet",
     "level_invalid",
     "local_model",
