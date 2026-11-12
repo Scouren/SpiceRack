@@ -1,8 +1,9 @@
 # IR throughput (slice S1)
 
-Status: **preliminary, kernel kinds only** (2026-11-12). The circuit and run owners' rows are not
-merged yet, so the generated designs hold the kernel's 11 item kinds and every expression form.
-M5 re-measures with every feature once both owners land.
+Status: **M5, every feature** (2026-11-12, `ir-rewrite` after the refs twin). The tables below
+measure `FeatureSet::ALL` (all three owners' 25 item kinds, every expression form and every
+placement) and, for comparison, the kernel set. The first measurement (kernel kinds only, before
+the owners merged) is kept below it.
 
 ## How it is measured
 
@@ -25,7 +26,45 @@ expr_depth: 4, files: 1 }`, seed 1) and times, in one process, in a release buil
 Machine: Intel Core i9-14900HX (32 threads, one used), 31 GB RAM, NixOS; rustc 1.95.0 inside
 `nix develop`; the crate's default release profile.
 
-## Numbers (best of the runs below; each run is one process)
+## Numbers, every feature (M5; best of three runs at 10⁶; each run is one process)
+
+`target/release/examples/throughput N all` and `N kernel`, same machine and profile as below.
+
+| set | items | text | build | dump | parse (with link) | link alone | check | peak RSS |
+|---|---|---|---|---|---|---|---|---|
+| all | 250,000 | 17.4 MB, 0.26 M lines, 0.94 M expression rows | 0.77 s (325 k items/s) | 0.124 s (140 MB/s) | 0.34 s (**50.4 MB/s**) | 0.07 s | 0.168 s (1.49 M items/s) | 189 MB |
+| all | 1,000,000 | 70.7 MB, 1.04 M lines, 3.76 M expression rows | 4.0 s (250 k items/s) | 0.54 s (132 MB/s) | 1.45 s (**48.9 MB/s**) | 0.29 s | 0.91 s (1.10 M items/s) | 751 MB |
+| all | 2,000,000 | 142.2 MB, 2.08 M lines, 7.52 M expression rows | 9.9 s (203 k items/s) | 1.10 s (129 MB/s) | 3.01 s (**47.2 MB/s**) | 0.61 s | 2.52 s (0.79 M items/s) | 1.50 GB |
+| kernel | 1,000,000 | 41.8 MB, 1.09 M lines, 1.59 M expression rows | 1.69 s (593 k items/s) | 0.30 s (140 MB/s) | 0.85 s (**49.4 MB/s**) | 0.22 s | 0.57 s (1.75 M items/s) | |
+| kernel | 2,000,000 | 84.5 MB, 2.18 M lines, 3.17 M expression rows | 3.83 s (522 k items/s) | | | | 1.36 s (1.47 M items/s) | |
+
+Parse over every feature runs at 47–51 MB/s against today's 58 MB/s; the breakdown below (a fifth
+is the final `link`; the reading loop alone is about 62 MB/s on this text) holds for it too.
+
+**`check` before and after the `refs` twin** (M5). Before, `check` read each row's references
+through `map_refs` on one clone of the whole design; now `RowFacts::refs` reads them in place
+(`kernel_gen::refs_and_map_refs_list_the_same_references_in_the_same_order` holds the twin to
+`map_refs`, and goes red when one row's order is swapped).
+
+| set, items | before (clone + `map_refs`) | after (`refs`) | peak RSS before → after |
+|---|---|---|---|
+| all, 250,000 | 0.304 s | 0.168 s (−45%) | 228 → 189 MB |
+| all, 1,000,000 | 1.00 s | 0.91 s (−9%) | 908 → 751 MB (−17%) |
+| kernel, 1,000,000 | 0.64 s | 0.57 s (−11%) | |
+
+The after column also has A15's `ProbeContext`-through-reads pass, which before was not in
+`check`, so the twin's own gain is larger than the difference shown. `check`'s instruction count
+is linear (callgrind, kernel set: 290.7 M instructions at 60 k items, 1,158.4 M at 240 k, ×3.98
+for ×4); its time per item rises from 0.67 µs at 250 k to 1.26 µs at 2 M because the design
+outgrows the caches (the class table, the definition index and the expression rows are walked
+in item order, not in table order). That is the next lever, not an algorithm.
+
+**Build** over every feature is 250 k items/s at 10⁶ against 593 k for the kernel set: the
+owners' generators make detail rows, pools and their names per item. It was quadratic in the
+run owner's generators (170 s at 10⁶) until their fix; it is flat to within the cache effect
+now (325 k → 250 k → 203 k items/s from 0.25 M to 2 M).
+
+## Numbers, kernel kinds only, before the owners merged (best of the runs below; each run is one process)
 
 | items | text | build | dump | parse (with link) | link alone | check |
 |---|---|---|---|---|---|---|

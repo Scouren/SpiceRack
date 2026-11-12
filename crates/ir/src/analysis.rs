@@ -16,6 +16,10 @@
 //! Contents:
 //! - `pub enum AnalysisKind` (`ALL`, `COUNT`, `AnalysisKind::has_detail(self) -> bool`),
 //!   `pub struct Analysis`, `pub struct RunDetails`
+//! - `pub struct AnalysisKinds` (`EMPTY`, `ALL`, `AnalysisKinds::of(&[AnalysisKind]) -> Self`,
+//!   `AnalysisKinds::contains(self, AnalysisKind) -> bool`, `AnalysisKinds::len(self) -> u32`,
+//!   `AnalysisKinds::is_empty(self) -> bool`,
+//!   `AnalysisKinds::iter(self) -> impl Iterator<Item = AnalysisKind>`)
 //! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
 //! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`); crate:
@@ -95,6 +99,12 @@ pub enum AnalysisKind {
     TimedOp,
 }
 
+/// A set of analysis kinds (a `Save`'s scope, A22): one bit per `AnalysisKind`, in declaration
+/// order; no bit past the last kind is ever set (the constructors keep it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct AnalysisKinds(u32);
+
 /// An analysis: its kind, its statement name and its detail row.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Analysis {
@@ -171,6 +181,8 @@ pub trait RunDetail: DetailRow {
 
 const _: () = assert!(size_of::<AnalysisKind>() == 1);
 const _: () = assert!(size_of::<Analysis>() == 12);
+const _: () = assert!(AnalysisKind::COUNT <= 32); // one bit each in `AnalysisKinds`
+const _: () = assert!(size_of::<AnalysisKinds>() == 4);
 
 macro_rules! details {
     ($($row:ty => $kind:ident :: $variant:ident, $field:ident;)*) => {
@@ -262,10 +274,51 @@ impl AnalysisKind {
     }
 }
 
+impl AnalysisKinds {
+    /// No kind.
+    pub const EMPTY: AnalysisKinds = AnalysisKinds(0);
+    /// Every kind (a SPICE `.save`: every analysis keeps the quantities).
+    pub const ALL: AnalysisKinds = AnalysisKinds((1u32 << AnalysisKind::COUNT) - 1);
+
+    /// The set of `kinds` (repeats are one member).
+    pub const fn of(kinds: &[AnalysisKind]) -> Self {
+        let mut bits = 0u32;
+        let mut k = 0;
+        while k < kinds.len() {
+            bits |= 1 << kinds[k] as u32;
+            k += 1;
+        }
+        AnalysisKinds(bits)
+    }
+
+    /// Whether `kind` is a member.
+    pub const fn contains(self, kind: AnalysisKind) -> bool {
+        self.0 & (1 << kind as u32) != 0
+    }
+
+    /// The member count.
+    pub const fn len(self) -> u32 {
+        self.0.count_ones()
+    }
+
+    /// Whether the set has no member.
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    /// The members, in declaration order.
+    pub fn iter(self) -> impl Iterator<Item = AnalysisKind> {
+        AnalysisKind::ALL
+            .into_iter()
+            .filter(move |&k| self.contains(k))
+    }
+}
+
 /// The run owner's features of the whole design, which no single row carries (A9): several
 /// analyses in one run (`SeveralAnalyses`), a loop whose body does not hold every analysis
 /// (`LoopScoped`), and the state items after a run item in listed order (`OptionMidRun`,
-/// `EnvMidRun`, `NodeSetMidRun`, `WholeRunMidRun`: `state_order::state_order_features`). Called once
+/// `EnvMidRun`, `NodeSetMidRun`, `WholeRunMidRun`: `state_order::state_order_features`), and a
+/// file top's other items between run items (`RunInterleaved`: `interleaved_features`). Called once
 /// by `features_used` and `check_legal` (which reports them at `Span::NONE`). One pass over the
 /// scopes and items: O(scopes + items).
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
@@ -297,6 +350,7 @@ pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
         *set = set.with(Feature::Run(RunExtra::SeveralAnalyses));
     }
     crate::state_order::state_order_features(design, set);
+    crate::state_order::interleaved_features(design, set);
     for items in &design.scope_items {
         for item in items {
             if item.kind == ItemKind::Loop {

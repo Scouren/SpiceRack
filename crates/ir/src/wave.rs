@@ -67,19 +67,19 @@ pub enum PreDelay {
     Zero,
 }
 
-/// What a zero in a wave field means (AMEND-A12 A17, R35), on the waves that have such fields
-/// (`Pulse`, `Sin`, `Exp`, `Sffm`; IR-CIRCUIT §3 lists the fields and their defaults).
+/// What a zero or an omitted field means (AMEND-A12 A17, R35), on the waves with defaulted
+/// fields (`Pulse`, `Sin`, `Exp`, `Sffm`, `Am`, `TrRandom`; IR-CIRCUIT §3 lists the fields,
+/// their defaults, and which of them also replace a given zero).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum GivenZero {
     /// A field means what it holds: a zero `rise` is an ideal edge. Every field is present.
     AsGiven,
-    /// ngspice's rule (`vsrcload.c`): a listed field that evaluates to zero after parameter
-    /// substitution, or that the card omits (`NONE`), means its default (PULSE rise and fall
-    /// TSTEP, width and period TSTOP; SIN frequency 1/TSTOP; EXP `td1`, `tau1`, `tau2` TSTEP,
-    /// `td2` = `td1` + TSTEP; SFFM carrier 500/TSTOP). A field holds what the card holds; no
-    /// reader copies a default in, and a pass that converts to `AsGiven` writes the
-    /// `TStep`/`TStop` leaves.
+    /// ngspice's rule (`vsrcload.c`, `vsrcpar.c`): a listed field the card omits (`NONE`)
+    /// means its default, and the "both" fields (PULSE rise, fall, width, period; SIN freq;
+    /// EXP `td1`, `tau1`, `td2`, `tau2`; SFFM carrier) also when they evaluate to zero after
+    /// parameter substitution. A field holds what the card holds; no reader copies a default
+    /// in, and a pass that converts to `AsGiven` writes the `TStep`/`TStop` leaves.
     SpiceDefault,
 }
 
@@ -144,8 +144,16 @@ pub enum PwlJoin {
     /// A ramp over `join_width` seconds when the first and last values differ (sp
     /// `pwlperiod` with `twidth`, default period/1000 written by the reader).
     RampWidth,
-    /// The wrap segment is the extrapolation of the first segment (va `period=` with a first
-    /// time above 0, measured against its own documentation).
+    /// VACASK's periodic PWL (`period=` > 0, A22, R42): on [xN, period) and on [0, x1) of the
+    /// wrapped time τ, the value is the line through (xN, yN) and (period + x1, y1), evaluated
+    /// at τ itself; between the points it is the plain PWL. So the value jumps at each period
+    /// start and at x1. VACASK 36be560 (`src_pwl.sim`, branch `vc-sources`): points
+    /// (1u, 1) (2u, 3), period 4u give 4.333 at 0, 3.833 at 0.75u, 1 at 1u, 2.667 at 2.5u,
+    /// 1.733 at 3.9u, 4.267 at 4.1u; points (0, 0) (1u, 1), period 2u (x1 = 0) give 0.5 at
+    /// 1.5u and 3.5u. A `delay` shifts τ: before it, and at the operating point, the value
+    /// is the line at τ = 0. VACASK itself refuses x1 = 0 with xN = period and y1 ≠ yN (it
+    /// drops the last point when y1 = yN), and xN > period: the writer's refusals, not
+    /// invariants of this row.
     Extrapolate,
 }
 
@@ -190,7 +198,7 @@ pub struct Pulse {
     pub v1: ExprId,
     /// Pulsed value. Never `NONE`.
     pub v2: ExprId,
-    /// Delay to the first rising edge (s). Never `NONE` (the reader writes 0).
+    /// Delay to the first rising edge (s); `NONE` only under `SpiceDefault` (omitted: 0).
     pub delay: ExprId,
     /// Rise time (s); a zero under `AsGiven` is an ideal edge, under `SpiceDefault` TSTEP
     /// (5.05), and `NONE` only under `SpiceDefault` (omitted). va refuses 0, its reader never
@@ -223,11 +231,13 @@ pub struct Sin {
     pub amplitude: ExprId,
     /// Frequency (Hz); under `SpiceDefault` a zero or `NONE` is 1/TSTOP (A17).
     pub freq: ExprId,
-    /// Delay (s); may be negative (ng = xy, 5.06). Never `NONE`.
+    /// Delay (s); may be negative (ng = xy, 5.06); `NONE` only under `SpiceDefault` (omitted: 0).
     pub delay: ExprId,
-    /// Damping factor θ (1/s); sp `damp`, va `theta` (5.07). Never `NONE`.
+    /// Damping factor θ (1/s); sp `damp`, va `theta` (5.07); `NONE` only under `SpiceDefault`
+    /// (omitted: 0).
     pub damping: ExprId,
-    /// Phase at t = delay (degrees); sp `sinephase`, va `tdphase` (5.06). Never `NONE`.
+    /// Phase at t = delay (degrees); sp `sinephase`, va `tdphase` (5.06); `NONE` only under
+    /// `SpiceDefault` (omitted: 0).
     pub phase_deg: ExprId,
     /// Periods after which the value holds (lt Ncycles, 5.06). `NONE`: unlimited.
     pub cycles: ExprId,
@@ -266,10 +276,12 @@ pub struct Exp {
     pub given_zero: GivenZero,
 }
 
-/// `PWL(t1 v1 t2 v2 …)`: absolute (time, value) points, linear between them, the last value
-/// held. Relative times (lt `+t`), scale, offset and stretch (lt, sp, va) are accumulated by
-/// the reader into the absolute points as expressions (5.09, 5.33); a deck with no t = 0 point
-/// gets the one its simulator implies (hs ramps from DC, ng and lt hold the first value; 5.10).
+/// `PWL(t1 v1 t2 v2 …)`: absolute (time, value) points, linear between them. Before the first
+/// point the first value holds, after the last the last value, unless `repeat` says otherwise
+/// (A22, R42). No reader writes a point the deck lacks: a simulator with another rule before
+/// the first point gets a mode member when its slice shows the rule (none today). Relative
+/// times (lt `+t`), scale, offset and stretch (lt, sp, va) are accumulated by the reader into
+/// the absolute points as expressions (5.09, 5.33).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Pwl {
     /// Flat (time, value) pairs, times non-decreasing; `List::EMPTY` only when `file` is set.
@@ -303,15 +315,16 @@ pub struct Sffm {
     pub amplitude: ExprId,
     /// Carrier frequency (Hz); under `SpiceDefault` a zero or `NONE` is 500/TSTOP (A17).
     pub carrier_freq: ExprId,
-    /// Modulation index. Never `NONE`.
+    /// Modulation index; `NONE` only under `SpiceDefault` (omitted: 90, clamped to fc/fm).
     pub mod_index: ExprId,
-    /// Modulating (signal) frequency (Hz). Never `NONE`; ngspice's default is 5/`TStop`.
+    /// Modulating (signal) frequency (Hz); `NONE` only under `SpiceDefault` (omitted: 5/TSTOP;
+    /// a given 0 stays 0).
     pub signal_freq: ExprId,
-    /// Delay (s) (ng TD, E21). Never `NONE` (0 when the card has none).
+    /// Delay (s) (ng TD, E21); `NONE` only under `SpiceDefault` (omitted: 0).
     pub delay: ExprId,
-    /// Carrier phase (degrees) (ng PHC). Never `NONE`.
+    /// Carrier phase (degrees) (ng PHC); `NONE` only under `SpiceDefault` (omitted: 0).
     pub phase_c_deg: ExprId,
-    /// Modulation phase (degrees) (ng PHM). Never `NONE`.
+    /// Modulation phase (degrees) (ng PHM); `NONE` only under `SpiceDefault` (omitted: 0).
     pub phase_m_deg: ExprId,
     /// Which formula.
     pub law: SffmLaw,
@@ -326,8 +339,9 @@ pub struct Sffm {
 /// t ≥ delay, offset + amplitude·(mod_offset + mod_index·sin(2π·mod_freq·τ + phase_m))·
 /// sin(2π·carrier_freq·(t − delay) + phase_c), τ as `mod_time`. ng: amplitude 1,
 /// mod_offset VMO, mod_index VMA; hs: amplitude SA, mod_offset OC, mod_index 1; sp:
-/// mod_offset 1. Every field is required (never `NONE`): ngspice's defaults 5/TSTOP and
-/// 500/TSTOP are written as `TStop` expressions.
+/// mod_offset 1. Every field is required under `GivenZero::AsGiven`; under `SpiceDefault` the
+/// fields ngspice defaults when omitted (`mod_index`, `mod_freq`, `carrier_freq`, `delay`,
+/// `phase_m_deg`, `phase_c_deg`) may be `NONE` (IR-CIRCUIT §3; AM replaces no given zero).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Am {
     /// Offset (ng VO; es has none: 0).
@@ -352,6 +366,8 @@ pub struct Am {
     pub mod_time: AmModTime,
     /// What the source is before `delay`.
     pub pre: PreDelay,
+    /// Whether omitted fields take ngspice's defaults (A17).
+    pub given_zero: GivenZero,
 }
 
 /// ngspice `TRNOISE(na nt nalpha namp rtsam rtscapt rtsemit)`: noise superposed on a given DC value in
@@ -377,8 +393,9 @@ pub struct TrNoise {
 
 /// ngspice `TRRANDOM(type ts [td [p1 [p2]]])`: a random value drawn every `ts`, superposed on a
 /// given DC value, transient only; before its first draw and at the operating point it is the
-/// offset of its distribution (A17). Every field required (the reader writes ngspice's defaults:
-/// td 0, p1 1, p2 0).
+/// offset of its distribution, `p2` (A17; `1-f-code.c:239`). Every field required under
+/// `GivenZero::AsGiven`; under `SpiceDefault` an omitted `td`, `p1`, `p2` is `NONE` and means
+/// ngspice's default (0, 1, 0).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrRandom {
     /// Sample interval (s).
@@ -391,6 +408,8 @@ pub struct TrRandom {
     pub p2: ExprId,
     /// The distribution.
     pub kind: TrRandomKind,
+    /// Whether omitted fields take ngspice's defaults (A17).
+    pub given_zero: GivenZero,
 }
 
 /// A bit-pattern source (hs `PAT`, xy `PAT`; 5.22): each bit holds `high` or `low` (`m` the

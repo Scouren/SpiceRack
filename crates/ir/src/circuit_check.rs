@@ -15,11 +15,13 @@
 //!
 //! Contents (crate-private): `pub(crate) struct Verdict`, `pub(crate) fn verdict`,
 //! `pub(crate) fn check_element`, `pub(crate) fn check_model`, `pub(crate) fn model_ok`,
-//! `pub(crate) fn detail_len`, `pub(crate) fn has_polarity`, `pub(crate) fn builtin_kind`,
-//! `pub(crate) fn builtin_fits`, `pub(crate) fn bound_family`
+//! `pub(crate) fn detail_len`; it re-exports the tables of `circuit_tables.rs`
 
 use crate::check::Violation;
 use crate::circuit_features::reads_circuit;
+pub(crate) use crate::circuit_tables::{
+    bound_family, builtin_fits, builtin_kind, has_polarity, typed_key, versioned,
+};
 use crate::circuit_text::get_row;
 use crate::controlled::{DelayLaw, OutKind, Quantity, TableLaw};
 use crate::design::{Design, DetailRow};
@@ -66,6 +68,13 @@ pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
         v.domain = false;
     }
     let kind = e.kind.detail();
+    if design
+        .params(e.params)
+        .iter()
+        .any(|&(key, _)| typed_key(kind, design.str(key)))
+    {
+        v.domain = false;
+    }
     if kind == DetailKind::None {
         v.rows &= e.detail == NO_ROW;
         return v;
@@ -97,7 +106,7 @@ pub(crate) fn check_element(e: &Element, design: &Design, at: ItemRef, out: &mut
 
 /// Appends `m`'s `FieldDomain` violation, if any.
 pub(crate) fn check_model(m: &Model, design: &Design, at: ItemRef, out: &mut Diags) {
-    if !model_ok(m) {
+    if !model_ok(design, m) {
         out.push(
             violation_code(Violation::FieldDomain),
             design.span_of(at),
@@ -108,59 +117,32 @@ pub(crate) fn check_model(m: &Model, design: &Design, at: ItemRef, out: &mut Dia
 
 /// Whether a model row's fields are in their domains: `word` exactly for `CodeModel` and
 /// `Other`, `module` exactly for `Module`, a polarity exactly for the families that have one.
-pub(crate) fn model_ok(m: &Model) -> bool {
+pub(crate) fn model_ok(design: &Design, m: &Model) -> bool {
+    // A19: no key the row types (`level` only on families whose level is a device parameter),
+    // a version only on a versioned family (a value that reads the circuit is the kernel's
+    // `ProbeContext`: model values are `Handle::Expr` fields)
+    let free = matches!(
+        m.family,
+        ModelFamily::Other | ModelFamily::Module | ModelFamily::CodeModel
+    );
+    let keys_ok = design.params(m.params).iter().all(|&(key, _)| {
+        let key = design.str(key);
+        let typed = key.eq_ignore_ascii_case("type")
+            || key.eq_ignore_ascii_case("version")
+            || key.eq_ignore_ascii_case("level") && m.family != ModelFamily::Mesa;
+        free || !typed
+    });
+    let version_ok = m.version == ExprId::NONE || versioned(m.family);
     let wants_word = matches!(m.family, ModelFamily::CodeModel | ModelFamily::Other);
     let wants_module = m.family == ModelFamily::Module;
     let polar = m.family == ModelFamily::Other || has_polarity(m.family);
-    (builtin_kind(m.family).is_none() || m.params.is_empty())
+    keys_ok
+        && version_ok
+        && (builtin_kind(m.family).is_none() || m.params.is_empty())
         && (m.word != NameId::NONE) == wants_word
         && (m.module.name != NameId::NONE) == wants_module
         && (m.polarity != Polarity::None || !has_polarity(m.family))
         && (m.polarity == Polarity::None || polar)
-}
-
-/// The element kind a builtin family's model serves (AMEND-A12 C5), or `None` for every other
-/// family.
-pub(crate) fn builtin_kind(f: ModelFamily) -> Option<ElemKind> {
-    match f {
-        ModelFamily::SourceV => Some(ElemKind::VSource),
-        ModelFamily::SourceI => Some(ElemKind::ISource),
-        ModelFamily::Vcvs => Some(ElemKind::Vcvs),
-        ModelFamily::Vccs => Some(ElemKind::Vccs),
-        ModelFamily::Ccvs => Some(ElemKind::Ccvs),
-        ModelFamily::Cccs => Some(ElemKind::Cccs),
-        ModelFamily::Mutual => Some(ElemKind::Coupling),
-        _ => None, // every other family serves the kinds its own docs name
-    }
-}
-
-/// Whether an element of `kind` may name a model of `family`: a builtin family serves only its
-/// kind, and a source or linear controlled source names only its builtin (a coupling may also
-/// name a core).
-pub(crate) fn builtin_fits(kind: ElemKind, family: ModelFamily) -> bool {
-    let only_builtin = matches!(
-        kind,
-        ElemKind::VSource
-            | ElemKind::ISource
-            | ElemKind::Vcvs
-            | ElemKind::Vccs
-            | ElemKind::Cccs
-            | ElemKind::Ccvs
-    );
-    match builtin_kind(family) {
-        Some(k) => k == kind,
-        None => !only_builtin,
-    }
-}
-
-/// The family of the model `r` is bound to, if it is bound to a model row (total: a bad
-/// definition index is the kernel's `HandleRange`).
-pub(crate) fn bound_family(design: &Design, r: crate::id::Ref) -> Option<ModelFamily> {
-    let def = design.definitions().get(r.def.0 as usize)?;
-    (def.item.kind == crate::item::ItemKind::Model)
-        .then(|| get_item::<Model>(design, def.item.index))
-        .flatten()
-        .map(|m| m.family)
 }
 
 /// The row count of `kind`'s table (0 for `DetailKind::None`).
@@ -181,91 +163,6 @@ pub(crate) fn detail_len(design: &Design, kind: DetailKind) -> usize {
         DetailKind::Semi => c.semis.len(),
         DetailKind::Switch => c.switches.len(),
         DetailKind::Line => c.lines.len(),
-    }
-}
-
-/// Whether a family's models are n- or p-type (transistors); `Other` may be either way.
-pub(crate) fn has_polarity(f: ModelFamily) -> bool {
-    use ModelFamily as F;
-    match f {
-        F::GummelPoon
-        | F::Vbic
-        | F::Hicum0
-        | F::Hicum2
-        | F::Mextram
-        | F::HbtUcsd
-        | F::Mos0
-        | F::Mos1
-        | F::Mos2
-        | F::Mos3
-        | F::Mos6
-        | F::Mos9
-        | F::Bsim1
-        | F::Bsim2
-        | F::Bsim3
-        | F::Bsim4
-        | F::BsimSoi
-        | F::B3SoiFd
-        | F::B3SoiDd
-        | F::B3SoiPd
-        | F::B4Soi
-        | F::Soi3
-        | F::Ekv
-        | F::Hisim1
-        | F::Hisim2
-        | F::HisimHv
-        | F::Psp103
-        | F::BsimBulk
-        | F::Vdmos
-        | F::VdmosRpi
-        | F::JfetShichman
-        | F::JfetParkerSkellern
-        | F::JfetShockley
-        | F::JfetHspice2
-        | F::Mesfet
-        | F::Gaas
-        | F::Mesa
-        | F::Hfet1
-        | F::Hfet2
-        | F::Igbt => true,
-        F::Resistor
-        | F::ResistorMultiplier
-        | F::Capacitor
-        | F::CapacitorMultiplier
-        | F::Inductor
-        | F::InductorMultiplier
-        | F::Diode
-        | F::DiodeLevel3
-        | F::DiodePspice
-        | F::DiodePspiceTemp
-        | F::DiodeLtspice
-        | F::DiodeIdeal
-        | F::DiodeSpectre
-        | F::Juncap200
-        | F::DiodeCmc
-        | F::SwitchHyst
-        | F::SwitchHystSmooth
-        | F::SwitchLogCubic
-        | F::CurrentSwitchHyst
-        | F::CurrentSwitchHystSmooth
-        | F::CurrentSwitchLogCubic
-        | F::Relay
-        | F::Ltra
-        | F::Txl
-        | F::Cpl
-        | F::Urc
-        | F::HspiceW
-        | F::CoreJilesAtherton
-        | F::SourceV
-        | F::SourceI
-        | F::Vcvs
-        | F::Vccs
-        | F::Ccvs
-        | F::Cccs
-        | F::Mutual
-        | F::CodeModel
-        | F::Module
-        | F::Other => false,
     }
 }
 
@@ -293,7 +190,9 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
             // A15 C2: the 27 °C base and the reciprocal law only where ngspice's behavioural
             // rewrite gives them a meaning (a circuit-valued value with a coefficient)
             let dynamic = reads_circuit(design, p.value) && (some(p.tc1) || some(p.tc2));
-            (p.tc_base == TcBase::Tnom || dynamic)
+            // A19: only a resistor or a circuit-valued element has thermal noise to switch off
+            (p.noisy || resistor || reads_circuit(design, p.value))
+                && (p.tc_base == TcBase::Tnom || dynamic)
                 && (p.tc_law == TcLaw::Direct || dynamic && e.kind == ElemKind::Capacitor)
                 && (some(p.value) || e.model.name != NameId::NONE)
                 && (some(p.ic) == (p.ic_mode != IcMode::None))
@@ -362,8 +261,10 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
                 ElemKind::FluxInductor => Some(OutKind::Flux),
                 _ => None,
             };
+            let tc = some(b.tc1) || some(b.tc2);
             some(b.expr)
-                && (b.tc_base == TcBase::Tnom || some(b.tc1) || some(b.tc2))
+                && (b.tc_base == TcBase::Tnom || tc)
+                && (b.tc_law == TcLaw::Direct || tc && e.kind == ElemKind::ChargeCapacitor)
                 && match want {
                     Some(o) => b.output == o,
                     None => !matches!(b.output, OutKind::Charge | OutKind::Flux),
@@ -443,23 +344,28 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
         return true;
     }
     let all = |e: &[ExprId]| e.iter().all(|&x| some(x));
+    // A17: `req` always present; `def` present under `AsGiven`, may be omitted under
+    // `SpiceDefault` (IR-CIRCUIT §3's table)
+    let fits = |rule: GivenZero, req: &[ExprId], def: &[ExprId]| {
+        all(req) && (rule == GivenZero::SpiceDefault || all(def))
+    };
     match w.kind {
         WaveKind::Pulse => side::<Pulse>(design, w.index, v).is_none_or(|p| {
-            // A17: under ngspice's zero rule the defaulted fields may be absent
-            all(&[p.v1, p.v2, p.delay])
-                && (p.given_zero == GivenZero::SpiceDefault
-                    || all(&[p.rise, p.fall, p.width, p.period]))
-                && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
+            fits(
+                p.given_zero,
+                &[p.v1, p.v2],
+                &[p.delay, p.rise, p.fall, p.width, p.period],
+            ) && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
         }),
         WaveKind::Sin => side::<Sin>(design, w.index, v).is_none_or(|s| {
-            all(&[s.offset, s.amplitude, s.delay, s.damping, s.phase_deg])
-                && (s.given_zero == GivenZero::SpiceDefault || some(s.freq))
-                && paired(s.amplitude2, s.freq2)
+            fits(
+                s.given_zero,
+                &[s.offset, s.amplitude],
+                &[s.freq, s.delay, s.damping, s.phase_deg],
+            ) && paired(s.amplitude2, s.freq2)
         }),
-        WaveKind::Exp => side::<Exp>(design, w.index, v).is_none_or(|x| {
-            all(&[x.v1, x.v2])
-                && (x.given_zero == GivenZero::SpiceDefault || all(&[x.td1, x.tau1, x.td2, x.tau2]))
-        }),
+        WaveKind::Exp => side::<Exp>(design, w.index, v)
+            .is_none_or(|x| fits(x.given_zero, &[x.v1, x.v2], &[x.td1, x.tau1, x.td2, x.tau2])),
         WaveKind::Pwl => side::<Pwl>(design, w.index, v).is_none_or(|p| {
             let never = p.repeat == PwlRepeat::Never;
             p.points.len().is_multiple_of(2)
@@ -469,33 +375,30 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 && some(p.join_width) == (p.join == PwlJoin::RampWidth)
         }),
         WaveKind::Sffm => side::<Sffm>(design, w.index, v).is_none_or(|s| {
-            all(&[
-                s.offset,
-                s.amplitude,
+            let def = [
+                s.carrier_freq,
                 s.mod_index,
                 s.signal_freq,
                 s.delay,
                 s.phase_c_deg,
                 s.phase_m_deg,
-            ]) && (s.given_zero == GivenZero::SpiceDefault || some(s.carrier_freq))
+            ];
+            fits(s.given_zero, &[s.offset, s.amplitude], &def)
         }),
         WaveKind::Am => side::<Am>(design, w.index, v).is_none_or(|a| {
-            all(&[
-                a.offset,
-                a.amplitude,
-                a.mod_offset,
+            let def = [
                 a.mod_index,
                 a.mod_freq,
                 a.carrier_freq,
                 a.delay,
                 a.phase_m_deg,
                 a.phase_c_deg,
-            ])
+            ];
+            fits(a.given_zero, &[a.offset, a.amplitude, a.mod_offset], &def)
         }),
         WaveKind::TrNoise => side::<TrNoise>(design, w.index, v).is_none_or(|t| all(&[t.na, t.nt])),
-        WaveKind::TrRandom => {
-            side::<TrRandom>(design, w.index, v).is_none_or(|t| all(&[t.ts, t.td, t.p1, t.p2]))
-        }
+        WaveKind::TrRandom => side::<TrRandom>(design, w.index, v)
+            .is_none_or(|t| fits(t.given_zero, &[t.ts], &[t.td, t.p1, t.p2])),
         WaveKind::Pattern => side::<Pattern>(design, w.index, v).is_none_or(|p| {
             all(&[
                 p.high,
@@ -517,9 +420,4 @@ fn nonpositive_literal(design: &Design, e: ExprId) -> bool {
         Expr::Num(k) => design.num(k).value() <= 0.0,
         _ => false,
     }
-}
-
-/// Row `index` of `R`'s item table, or `None` when out of range.
-fn get_item<R: crate::design::ItemRow>(design: &Design, index: u32) -> Option<R> {
-    R::table(design).rows.get(index as usize).copied()
 }

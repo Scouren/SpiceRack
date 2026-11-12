@@ -194,6 +194,9 @@ pub struct Behav {
     pub output: OutKind,
     /// Where `tc1`/`tc2`'s ΔT counts from (A15 C2: ngspice's B source measures from 27 °C).
     pub tc_base: crate::passive::TcBase,
+    /// How the temperature factor applies to a charge-defined capacitor (ngspice `C … q=`
+    /// divides the charge by the polynomial, A17); `Direct` on every other row.
+    pub tc_law: crate::passive::TcLaw,
 }
 
 /// A Laplace source (D23, D91): output = H(s) applied to the input, H as `form` reads `num`

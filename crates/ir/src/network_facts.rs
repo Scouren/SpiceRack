@@ -24,6 +24,7 @@ use crate::id::{NameId, ScopeId};
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -42,6 +43,10 @@ impl DetailFacts for Pz {
         for n in [self.in_p, self.in_n, self.out_p, self.out_n, self.source] {
             out.push(Handle::Name(n));
         }
+    }
+
+    fn map_exprs(&mut self, _r: &mut Roots<'_>) {
+        // no expression field
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.input == PzInput::Source, RunExtra::PzSourceInput);
@@ -140,6 +145,10 @@ impl DetailFacts for Sp {
         sweep_handles(&self.sweep, out);
         out.push(Handle::Names(self.ports));
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);
         flag(set, self.ports.len > 0, RunExtra::SpPorts);
@@ -197,6 +206,12 @@ impl DetailFacts for Net {
             Handle::Expr(self.rin),
             Handle::Expr(self.rout),
         ]);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.expr(&mut self.rin);
+        r.expr(&mut self.rout);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -260,6 +275,11 @@ impl DetailFacts for Disto {
         sweep_handles(&self.sweep, out);
         out.push(Handle::Expr(self.f2_over_f1));
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.f2_over_f1);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);
     }
@@ -305,6 +325,10 @@ impl DetailFacts for Disto {
 impl DetailFacts for TimedOp {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Exprs(self.times));
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.exprs(self.times);
     }
     fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
     fn fault(&self, _design: &Design) -> Option<Violation> {

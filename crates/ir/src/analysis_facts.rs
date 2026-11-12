@@ -9,7 +9,8 @@
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (A2, `RowFacts`); `rewrite/IR-IMPL.md` §1; `rewrite/
 //! IR-DECISIONS.md` R4, R5 (a periodic small-signal analysis follows an `Hb` or `Pss`).
 //!
-//! Contents: `pub(crate) trait DetailFacts` (`DetailFacts::handles`, `DetailFacts::features`,
+//! Contents: `pub(crate) trait DetailFacts` (`DetailFacts::handles`, `DetailFacts::map_exprs`,
+//! `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
 //! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
 //! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
@@ -22,17 +23,17 @@ use crate::check::Violation;
 use crate::dc_ac::{Ac, Dc, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf};
 use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, violation_code};
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 #[cfg(any(test, feature = "gen"))]
 use crate::id::NameId;
-use crate::id::{ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
-use crate::plan::target_refs;
-#[cfg(any(test, feature = "gen"))]
+use crate::plan::{target_refs, target_refs_into};
+use crate::run_exprs::{Roots, exprs_of};
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::loop_depth;
@@ -47,6 +48,9 @@ use crate::tran::{Four, Tran};
 pub(crate) trait DetailFacts: RunDetail {
     /// Appends every handle the row holds, its pools' elements included, in field order.
     fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+    /// Visits the row's expression roots, its pools' included, as `handles` lists them (A23);
+    /// the caller stores the row back.
+    fn map_exprs(&mut self, r: &mut Roots<'_>);
     /// Adds the row's `RunExtra` and option features.
     fn features(&self, design: &Design, set: &mut FeatureSet);
     /// The first broken invariant of the row's own fields: `FieldDomain`, or `HandleRange` for a
@@ -176,8 +180,31 @@ impl RowFacts for Analysis {
         }
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let row: Analysis = design.row(at.index);
+        by_detail!(row.kind, (), exprs_of(design, row.detail, f));
+    }
+
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order: a DC sweep's axes' targets
+        if self.kind != AnalysisKind::Dc {
+            return;
+        }
+        let Some(dc) = detail_get::<Dc>(design, self.detail) else {
+            return;
+        };
+        let start = dc.axes.start as usize;
+        let end = (start + dc.axes.len as usize).min(design.run.dc_axes.len());
+        for axis in &design.run.dc_axes[start.min(end)..end] {
+            target_refs_into(&axis.target, out);
+        }
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
+        if !self.name.is_none() {
+            *set = set.with(Feature::Run(RunExtra::AnalysisNamed));
+        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -236,6 +263,9 @@ impl RowFacts for Analysis {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -260,8 +290,17 @@ impl RowFacts for Analysis {
             return ItemRef::NONE;
         }
         let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // A Fourier analysis that takes its count from the deck's option gets the option from
+        // here, first (it is listed before the analysis, and holds no name the header's name
+        // would follow), half the time.
+        if kind == AnalysisKind::Four
+            && features.contains(Feature::Run(RunExtra::FourHarmonicsOption))
+            && g.chance(2)
+        {
+            crate::option::gen_nfreqs(g, scope, b, features);
+        }
         // The name first: the text, and so the parse, interns it before the detail's names.
-        let name = if g.chance(4) {
+        let name = if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
             g.fresh_name(b)
         } else {
             NameId::NONE
@@ -287,11 +326,12 @@ impl RowFacts for Analysis {
                 .collect();
             if !follow.is_empty() {
                 let kind = follow[g.below(follow.len() as u32) as usize];
-                let name = if g.chance(4) {
-                    g.fresh_name(b)
-                } else {
-                    NameId::NONE
-                };
+                let name =
+                    if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
+                        g.fresh_name(b)
+                    } else {
+                        NameId::NONE
+                    };
                 let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
                     .expect("a periodic kind generates right after its base");
                 b.push(
