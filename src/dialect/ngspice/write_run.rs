@@ -364,8 +364,8 @@ pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
     state(w, o.holds, ".options", &t);
 }
 
-/// An `Env`: `.temp t` when it sets the temperature only and is the design's one whole-run
-/// `Env` that sets it, else `.options temp=t tnom=n` (what it sets): `.temp` beats every
+/// An `Env`: `.temp t` when it sets the temperature only, is the design's one whole-run `Env`
+/// that sets it, and `t` is one `.temp` reads whole (`strtod_reads`), else `.options temp=t tnom=n` (what it sets): `.temp` beats every
 /// `.options temp=` (`inp.c:1159-1186`), while among `.options` keys the last wins, the IR's
 /// rule (R24), and both spellings read back to the same `Env`. A `FromHere` one is the script
 /// command `option temp=t tnom=n`.
@@ -373,7 +373,7 @@ pub(super) fn env(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let e: ir::Env = d.row(item.index);
     let whole = e.holds == ir::Applies::WholeRun;
-    if whole && e.tnom.is_none() && temps_set(d) == 1 {
+    if whole && e.tnom.is_none() && temps_set(d) == 1 && strtod_reads(d, e.temp) {
         let mut t = String::from(".temp");
         value(d, e.temp, &mut t);
         return w.line(&t);
@@ -439,6 +439,16 @@ fn state(w: &mut Out<'_>, holds: ir::Applies, card: &str, body: &str) {
     match holds {
         ir::Applies::WholeRun => w.line(&format!("{card} {body}")),
         ir::Applies::FromHere => w.script(&format!("option {body}")),
+    }
+}
+
+/// Whether `.temp`'s `strtod` reads `e` as written whole (`inp.c:1173-1182`): a literal with no
+/// scale letter, or a `{…}` numparam replaces with a number; else ngspice runs 27 and the value
+/// goes as `.options temp=`, which `INPevaluate` reads (L5 seed 4).
+fn strtod_reads(d: &ir::Design, e: ir::ExprId) -> bool {
+    match d.expr(e) {
+        ir::Expr::Num(n) => matches!(d.num(n).form, ir::NumForm::Plain | ir::NumForm::Exponent),
+        _ => true,
     }
 }
 

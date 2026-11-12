@@ -69,6 +69,7 @@ const WRITE: &[&str] = &[
     "analyses_outputs",
     "interleaved",
     "state",
+    "temp_scale",
     "temps",
 ];
 

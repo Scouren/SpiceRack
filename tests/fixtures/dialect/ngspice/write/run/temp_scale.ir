@@ -1,0 +1,4 @@
+# oracle: ngspice-45 inp.c:1173-1182 (.temp reads its value with strtod: a scale letter runs 27), cktsopt.c:269 (.options temp= reads it with INPevaluate); L5 seed 4: a .temp value with a scale is written as .options temp=; written by hand
+file "temp_scale.sp" deck
+  title "temp_scale"
+  env temp=0.1k whole_run
