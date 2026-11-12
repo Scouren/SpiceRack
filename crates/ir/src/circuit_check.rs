@@ -19,15 +19,17 @@
 //! `pub(crate) fn builtin_fits`, `pub(crate) fn bound_family`
 
 use crate::check::Violation;
+use crate::circuit_features::reads_circuit;
 use crate::circuit_text::get_row;
 use crate::controlled::{DelayLaw, OutKind, Quantity, TableLaw};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
+use crate::element::MultLaw;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::expr::Expr;
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
-use crate::passive::IcMode;
+use crate::passive::{IcMode, TcBase, TcLaw};
 use crate::source::DcRule;
 use crate::wave::{PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
@@ -52,6 +54,10 @@ pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
         || e.kind.master_kind().is_none() && e.kind != ElemKind::Unresolved && named
         || e.kind == ElemKind::Unresolved && e.model.def != DefId::NONE
     {
+        v.domain = false;
+    }
+    // ngspice's multiplier law only on an instance that has a multiplier (A15 C1)
+    if e.mult_law == MultLaw::NgspiceAppend && (e.kind != ElemKind::Instance || !some(e.mult)) {
         v.domain = false;
     }
     if let Some(family) = bound_family(design, e.model)
@@ -283,7 +289,12 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
             let p: crate::passive::Passive = design.detail(i);
             let par = side::<crate::passive::Parasitics>(design, p.parasitics, v);
             let resistor = e.kind == ElemKind::Resistor;
-            (some(p.value) || e.model.name != NameId::NONE)
+            // A15 C2: the 27 °C base and the reciprocal law only where ngspice's behavioural
+            // rewrite gives them a meaning (a circuit-valued value with a coefficient)
+            let dynamic = reads_circuit(design, p.value) && (some(p.tc1) || some(p.tc2));
+            (p.tc_base == TcBase::Tnom || dynamic)
+                && (p.tc_law == TcLaw::Direct || dynamic && e.kind == ElemKind::Capacitor)
+                && (some(p.value) || e.model.name != NameId::NONE)
                 && (some(p.ic) == (p.ic_mode != IcMode::None))
                 && !(resistor && some(p.ic))
                 && (resistor || !some(p.ac))
@@ -351,6 +362,7 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
                 _ => None,
             };
             some(b.expr)
+                && (b.tc_base == TcBase::Tnom || some(b.tc1) || some(b.tc2))
                 && match want {
                     Some(o) => b.output == o,
                     None => !matches!(b.output, OutKind::Charge | OutKind::Flux),

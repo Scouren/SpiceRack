@@ -12,6 +12,7 @@ use super::{N, R};
 use crate::build::Builder;
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_features::dc_at_zero;
+use crate::circuit_features::reads_circuit;
 use crate::controlled::{Behav, OutKind};
 use crate::element::{ElemKind, NO_ROW};
 use crate::r#gen::Gen;
@@ -55,7 +56,32 @@ impl R<'_, '_> {
         } else {
             self.ex()
         };
-        let tc = self.maybe(X::PassiveTc);
+        // a circuit-valued element's coefficient needs a base (and a capacitor's a law) the set
+        // allows (A15 C2)
+        let dynamic = reads_circuit(self.b.design(), value);
+        let cap = kind == ElemKind::Capacitor;
+        let bases = [
+            (TcBase::Tnom, X::TcBaseTnom),
+            (TcBase::Fixed27, X::TcBaseFixed27),
+        ];
+        let laws = [
+            (TcLaw::Direct, X::TcLawDirect),
+            (TcLaw::Reciprocal, X::TcLawReciprocal),
+        ];
+        let base_ok = bases.iter().any(|b| self.has(b.1));
+        let law_ok = laws.iter().any(|l| self.has(l.1));
+        let tc = self.maybe(X::PassiveTc) && (!dynamic || base_ok && (!cap || law_ok));
+        let (tc_base, tc_law) = if tc && dynamic {
+            let base = self.pick(&bases.map(|(m, x)| (m, Some(x))));
+            let law = if cap {
+                self.pick(&laws.map(|(m, x)| (m, Some(x))))
+            } else {
+                TcLaw::Direct
+            };
+            (base, law)
+        } else {
+            (TcBase::Tnom, TcLaw::Direct)
+        };
         let tc1 = if tc { self.ex() } else { N };
         let tc2 = if tc && self.g.chance(2) { self.ex() } else { N };
         let tce = self.opt(X::PassiveTce);
@@ -106,8 +132,8 @@ impl R<'_, '_> {
             parasitics,
             ic_mode,
             noisy,
-            tc_base: TcBase::Tnom,
-            tc_law: TcLaw::Direct,
+            tc_base,
+            tc_law,
         }
     }
 
@@ -207,7 +233,15 @@ impl R<'_, '_> {
 
     pub(super) fn behav(&mut self, kind: ElemKind) -> Behav {
         let expr = self.dy();
-        let tc = self.maybe(X::BehavTc);
+        let tc = self.maybe(X::BehavTc) && (self.has(X::TcBaseTnom) || self.has(X::TcBaseFixed27));
+        let tc_base = if tc {
+            self.pick(&[
+                (TcBase::Tnom, Some(X::TcBaseTnom)),
+                (TcBase::Fixed27, Some(X::TcBaseFixed27)),
+            ])
+        } else {
+            TcBase::Tnom
+        };
         let tc1 = if tc { self.ex() } else { N };
         let tc2 = if tc && self.g.chance(2) { self.ex() } else { N };
         let temp_abs = self.opt(X::InstanceTemp);
@@ -235,7 +269,7 @@ impl R<'_, '_> {
             dtemp,
             rpar,
             output,
-            tc_base: TcBase::Tnom,
+            tc_base,
         }
     }
 

@@ -41,14 +41,14 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 
 | Family | Kinds | Detail row (owner file) | Decisions |
 |---|---|---|---|
-| passives | resistor, capacitor, inductor | `Passive` (`passive.rs`) | `value` (Ω, F, H; `NONE` when only the model gives it), `ic` + `ic_mode`, `tc1`, `tc2`, `temp_abs`, `dtemp` (two fields: Xyce and VACASK have both, HSPICE only the offset), `noisy`, `parasitics` (row or `NONE`: `rser lser rpar cpar rlshunt`, LTspice's; the builders take them too) |
+| passives | resistor, capacitor, inductor | `Passive` (`passive.rs`) | `value` (Ω, F, H; `NONE` when only the model gives it), `ic` + `ic_mode`, `tc1`, `tc2`, `temp_abs`, `dtemp` (two fields: Xyce and VACASK have both, HSPICE only the offset), `noisy`, `parasitics` (row or `NONE`: `rser lser rpar cpar rlshunt`, LTspice's; the builders take them too); for a value that reads the circuit, `tc_base: TcBase::{Tnom, Fixed27}` (ngspice measures its `tc1`/`tc2` from 27 °C whatever `tnom` is, `asrcload.c:41`) and, on a capacitor, `tc_law: TcLaw::{Direct, Reciprocal}` (ngspice divides by the polynomial, `inpcom.c:6747`); `Fixed27` and `Reciprocal` elsewhere are `FieldDomain` (A15 C2) |
 | charge capacitor | charge-defined capacitor | `Behav` with `OutKind::Charge` | one construct, five spellings (`INV-constructs` D5) |
 | coupling | coupling | `Coupling { inductors: NameList, k: ExprId }` | no terminals; every listed pair is coupled by `k`; `k` may be an expression |
 | sources | voltage source, current source, RF port | `Source` (`source.rs`) | three independent slots: `dc` (what `.op`/`.dc` read) with `dc_rule: DcRule::{Given, WaveAtZero}` (A12 C4: `dc` is `NONE` exactly under `WaveAtZero`, the wave's t = 0 value; ngspice has `WaveAtZero` for SIN, PULSE, EXP, PWL, VACASK for every wave, and VACASK lacks `Given` with a wave: features `DcGivenWithWave`, `DcAtZero<Wave>`), `ac_mag` + `ac_phase_deg` (`NONE` = no AC stimulus), `wave` (`NONE` = the transient holds `dc`); `distof1`, `distof2`; `tc1`, `tc2` (Spectre scales the whole waveform); `parasitics`; port fields `port_index`, `z0`, with the value convention pinned as the EMF behind `z0` (Spectre's user value is half of it: its reader doubles) |
 | linear controlled | VCVS, VCCS, CCCS, CCVS | `Controlled { gain, sense: NameId }` | terminals (out+, out−, ctl+, ctl−) or (out+, out−) + the sensing element's name |
 | polynomial | one kind, `output: V \| I`, `control: Voltage \| Current` | `Poly { dimension, controls: NameList, coeffs: ExprList }` | stays `Poly`; expanding it is a pass |
 | table | one kind | `Table { input: ExprId, points: ExprList, law: TableLaw, output }` | linear between points, ends held; ngspice's native TABLE rounds corners: its own law |
-| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr }` | positive current flows from the first terminal through the source to the second |
+| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr, tc_base }` (`tc_base: TcBase`, A15 C2: `Fixed27` only with a coefficient) | positive current flows from the first terminal through the source to the second |
 | Laplace | one kind | `Laplace { num: ExprList, den: ExprList, output }` | terminals (out+, out−, in+, in−); coefficients in ascending powers of `s`, absolute gain already applied |
 | semiconductors | diode, BJT, MOSFET, JFET, MESFET | `Semi { area, flags, ic, temp_abs, dtemp }` or none | terminal ranges: BJT 3–5, MOSFET 3–7, diode 2–3 (thermal); everything else is a named instance parameter |
 | switches | voltage switch, current switch | `Switch { initial: SwitchState, sense: NameId }` | the initial state seeds the operating point only |
@@ -56,7 +56,24 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 | modules | code model, Verilog-A module, subcircuit instance, unresolved master | none | `model` names the master; `Ref.def == NONE` for the unresolved kind is legal and is what a Spectre reader produces without the kit |
 
 `mult` is the header's field for every kind: a reader lowers `m=` (and VACASK `$mfactor`) to it,
-never to a parameter named `m`.
+never to a parameter named `m`. How it multiplies is the header's `mult_law` (AMEND-A12 A15 C1,
+R31): `MultLaw::Parallel` (every kind: `mult` whole copies in parallel; through the hierarchy
+multiplicities compose by multiplication) or, on an `Instance` with a `mult` only,
+`MultLaw::NgspiceAppend` (ngspice's `m` on an X line, `inpcom.c:4124-4198`): the instance's
+`mult` is given to every element of the subcircuit's body whose kind ngspice multiplies,
+replacing that element's own `mult`, and is passed on the same way to nested `Instance`s. By
+kind, ngspice leaves these as they are (their own `mult` stays): `VSource` and `Port` (V cards),
+`Vcvs` and `Delay` and a voltage-output `Poly`, `Table`, `Laplace` or `FreqTable` (E cards),
+`Ccvs` and a voltage-output current-controlled `Poly` (H cards), `Behav` with
+`OutKind::Voltage` (a V-valued B card), `CodeModel` (A), `Coupling` (K), `ModuleModel` (N), the
+line kinds (`LosslessLine`, `LossyLine`, `RcLine`, `SingleLossyLine`, `CoupledLines`) and the
+switches (`VSwitch`, `ISwitch`). Every other kind takes it: R, C, L and their charge- and
+flux-defined forms, `ISource`, `Vccs`, `Cccs` and their `Poly`/`Table`/`Laplace`/`FreqTable`
+current-output forms, a `Behav` of any other output, the semiconductors. This list is A15's
+reading of the exclusion list; the exact list by card letter (with the B source split by
+output) comes from the ngspice elements slice, and a difference is a change of this paragraph
+only, with its run. Features: `MultInstanceParallel`, `MultInstanceNgspiceAppend` (they
+replace `MultInstance`).
 
 ## 3. Waveforms (`wave.rs`)
 

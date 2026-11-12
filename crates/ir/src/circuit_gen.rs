@@ -113,7 +113,18 @@ pub(crate) fn generate_element(
     };
     let terminals = r.terminals(kind, two_terminal);
     let model = r.master(kind);
-    let mult = if r.maybe(crate::circuit_features::mult_class(kind)) {
+    // an instance's multiplier comes with its law (A15 C1)
+    let mult_law =
+        if kind == ElemKind::Instance && r.has(X::MultInstanceNgspiceAppend) && r.g.chance(2) {
+            MultLaw::NgspiceAppend
+        } else {
+            MultLaw::Parallel
+        };
+    let mult_feature = match mult_law {
+        MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
+        MultLaw::Parallel => crate::circuit_features::mult_class(kind),
+    };
+    let mult = if mult_law == MultLaw::NgspiceAppend || r.maybe(mult_feature) {
         r.ex()
     } else {
         ExprId::NONE
@@ -124,7 +135,7 @@ pub(crate) fn generate_element(
         model,
         params: List::EMPTY,
         mult,
-        mult_law: MultLaw::Parallel,
+        mult_law,
     };
     let detail = r.detail(kind, two_terminal, out, ctl);
     r.b.element(scope, kind, head, detail, Span::NONE)
