@@ -4,10 +4,16 @@
 //! it) until none is nested. It removes `Placed(Subckt, Subckt)` and, with it,
 //! `Extra::EnclosingRef` (VACASK resolves a name in the own subcircuit, then the top, never an
 //! enclosing subcircuit; A12 K2). A read of an enclosing subcircuit's parameter becomes a new
-//! formal of the same name (default `0`: every instance passes it), and each instance passes
-//! that name, bound to the enclosing definition; a name taken where the subcircuit lands is
-//! renamed (`<name>_<n>`), its instances following. Requires `Extra(FormalNotConstant)`? No:
-//! the new formals' defaults are constants; it requires nothing.
+//! formal of the same name, and each instance passes that name, bound to the enclosing
+//! definition; a name taken where the subcircuit lands is renamed (`<name>_<n>`), its
+//! instances following.
+//!
+//! The added formal's default (R13: no invented value): the rows `hoist_nested_subckts` and
+//! `hoist_enclosing_refs` leave it without one and require `Extra(FormalWithoutDefault)`, the
+//! exact statement that every instance passes it; their `_default` twins, for a target without
+//! that feature, give it the literal `0` and put a `HOIST_DEFAULT` note at the subcircuit
+//! saying the default is the hoist's and no instance reads it. `legalize` takes the first
+//! usable row, so a target that can say "no default" gets the clean form.
 //!
 //! Left with a note: a subcircuit whose body reads an enclosing model, function or subcircuit
 //! (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
@@ -19,7 +25,9 @@
 //! Cites: `rewrite/AMEND-A12.md` K2, A15 K1, A32; R27; `rewrite/DIALECT-VACASK.md` §6.
 //!
 //! Contents: `pub fn hoist_nested_subckts(design: &mut ir::Design, diags: &mut ir::Diags)`,
-//! `pub const READS_ENCLOSING: ir::Code`, `pub const NOT_IN_BODY: ir::Code`
+//! `pub fn hoist_nested_subckts_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
+//! `pub const READS_ENCLOSING: ir::Code`, `pub const NOT_IN_BODY: ir::Code`,
+//! `pub const HOIST_DEFAULT: ir::Code`
 
 use crate::ir;
 
@@ -29,7 +37,15 @@ pub const READS_ENCLOSING: ir::Code = ir::Code::new(b'U', 303);
 /// The note at a subcircuit defined in a branch, loop or section inside a subcircuit.
 pub const NOT_IN_BODY: ir::Code = ir::Code::new(b'U', 304);
 
-/// Hoists every nested subcircuit one level per step until none is nested.
+/// The note at a hoisted subcircuit whose added formals got the literal default `0`.
+pub const HOIST_DEFAULT: ir::Code = ir::Code::new(b'U', 307);
+
+/// Hoists every nested subcircuit one level per step until none is nested; added formals have
+/// no default.
 // ponytail: red until the move door lands (`Editor::move_item`); the fixtures and
 // `tests/passes_structure.rs` state what it must do.
 pub fn hoist_nested_subckts(_design: &mut ir::Design, _diags: &mut ir::Diags) {}
+
+/// As [`hoist_nested_subckts`], the added formals defaulting to `0`, with a `HOIST_DEFAULT` note.
+// ponytail: red until the move door lands, as above.
+pub fn hoist_nested_subckts_default(_design: &mut ir::Design, _diags: &mut ir::Diags) {}

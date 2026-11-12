@@ -1,6 +1,4 @@
 file "a.sp" deck
-  device_library inductor
-  device_library tline_ideal
   model inductor inductor
   model mutual mutual
   model cccs cccs

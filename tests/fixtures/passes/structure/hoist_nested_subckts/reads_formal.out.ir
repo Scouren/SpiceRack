@@ -2,6 +2,6 @@ file "a.sp" deck
   subckt outer (a b) w=2
     param u = w + 1
     element instance x1 (a b) model=inner params=(w=w u=u)
-  subckt inner (x y) w=0 u=0
+  subckt inner (x y) w u
     element resistor r1 (x y) value=(w * u)
   element instance x2 (n 0) model=outer params=(w=5)

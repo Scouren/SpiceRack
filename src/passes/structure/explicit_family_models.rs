@@ -6,9 +6,9 @@
 //! alone; a model elsewhere in a section, a subcircuit or a branch would be a placement,
 //! `Feature::Placed`, the design may not have had), first after a leading title, named by the
 //! family's IR-text word (`resistor`, `source_v`, …) or that word and `_<n>` when the design
-//! already holds the name. A family that needs a library and has none gets one
-//! (`libraries.rs`), so the pass leaves no `ModelWithoutLibrary` a target without it would
-//! refuse.
+//! already holds the name. A family that needs a library is left without one
+//! (`ModelWithoutLibrary`, which `device_libraries` removes: A32, `legalize` runs this pass
+//! when that one makes the feature legal).
 //!
 //! Why the file's top serves every scope of the file: the IR's lookup is lexical (a scope, then
 //! its parents, up to the file's top), and a target that looks in the element's own subcircuit
@@ -16,7 +16,7 @@
 //! scope between can shadow it: its name is one the design holds nowhere, in any case, so no
 //! definition of that name stands between the element and the top (A32).
 //!
-//! Requires `Item(Model)`, `Item(DeviceLibrary)`, the families it names, and
+//! Requires `Item(Model)`, `Circuit(ModelWithoutLibrary)`, the families it names, and
 //! `Circuit(BuiltinMaster)` (a source or coupling now naming its builtin). A kind that names no
 //! master (`ElemKind::master_kind` is `None`: behavioural, table, Laplace, port, …) keeps the
 //! feature with a `NO_FAMILY` note; an element in a section the design places no model in, with
@@ -28,14 +28,13 @@
 //! `pub const REQUIRES: ir::FeatureSet`, `pub const NO_FAMILY: ir::Code`,
 //! `pub const NO_PLACE: ir::Code`
 
-use super::libraries::add_libraries;
 use crate::ir;
 
-/// What the output may add: models, libraries, the families of [`FAMILIES`], builtin masters.
+/// What the output may add: models, models without a library, the families of [`FAMILIES`], builtin masters.
 pub const REQUIRES: ir::FeatureSet = {
     let mut set = ir::FeatureSet::EMPTY
         .with(ir::Feature::Item(ir::ItemKind::Model))
-        .with(ir::Feature::Item(ir::ItemKind::DeviceLibrary))
+        .with(ir::Feature::Circuit(ir::CircuitExtra::ModelWithoutLibrary))
         .with(ir::Feature::Circuit(ir::CircuitExtra::BuiltinMaster));
     let mut k = 0;
     while k < FAMILIES.len() {
@@ -84,7 +83,7 @@ const FAMILIES: [(ir::ElemKind, ir::ModelFamily, &str); 11] = [
 ];
 
 /// Binds every reachable model-less element of a [`FAMILIES`] kind to its scope's model of its
-/// family, adding the model (and its library) where none was added yet; notes the rest.
+/// family, adding the model where none was added yet; notes the rest.
 pub fn explicit_family_models(design: &mut ir::Design, diags: &mut ir::Diags) {
     // the elements to bind: (element, its home scope, its row in FAMILIES)
     let mut bare: Vec<(ir::ItemRef, ir::ScopeId, usize)> = Vec::new();
@@ -114,7 +113,6 @@ pub fn explicit_family_models(design: &mut ir::Design, diags: &mut ir::Diags) {
     let names: Vec<String> = FAMILIES.iter().map(|f| fresh(design, f.2)).collect();
     // one model per (home, family), in first-need order, then each element bound to its own
     let mut models: Vec<(ir::ScopeId, usize, ir::DefId)> = Vec::new();
-    let mut families = Vec::new();
     for &(item, scope, k) in &bare {
         let found = models
             .iter()
@@ -126,7 +124,6 @@ pub fn explicit_family_models(design: &mut ir::Design, diags: &mut ir::Diags) {
                 let before = models.iter().filter(|m| m.0 == scope).count();
                 let def = add_model(design, scope, before, FAMILIES[k].1, &names[k]);
                 models.push((scope, k, def));
-                families.push(FAMILIES[k].1);
                 def
             }
         };
@@ -137,7 +134,6 @@ pub fn explicit_family_models(design: &mut ir::Design, diags: &mut ir::Diags) {
         };
         design.editor().set(item.index, e);
     }
-    add_libraries(design, &families);
 }
 
 // ---- private ----

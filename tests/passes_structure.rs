@@ -11,11 +11,22 @@
 //!
 //! Contents: tests only.
 
+#[path = "passes_structure/bindings.rs"]
+mod bindings;
+#[path = "passes_structure/reads.rs"]
+mod reads;
+
 use std::path::Path;
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::passes;
+
+use bindings::ByDefinition;
+use reads::{
+    added_library, elements, feature, instances_pass, model_row, param_reads, proven_by_pair_decks,
+    refs,
+};
 
 /// The structure passes whose simulator proof (a pair deck naming it in `proves =`,
 /// `rewrite/SPINE.md` §8a) is still to come: compared by name with the decks, both ways.
@@ -27,7 +38,10 @@ const PENDING_PAIRS: &[&str] = &[
     "drop_device_libraries",
     "hoist_nested_subckts",
     "hoist_enclosing_refs",
+    "hoist_nested_subckts_default",
+    "hoist_enclosing_refs_default",
     "formal_defaults_to_instances",
+    "formal_defaults_to_instances_default",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -55,8 +69,6 @@ fn explicit_family_models_keeps_every_reference_and_binds_only_the_bare() {
         let bare: Vec<ir::ItemRef> = elements(&design)
             .filter(|&i| design.row::<ir::Element>(i.index).model.name == ir::NameId::NONE)
             .collect();
-        let had_library_gap =
-            ir::features_used(&design).contains(feature(ir::CircuitExtra::ModelWithoutLibrary));
         let mut diags = ir::Diags::new();
         passes::structure::explicit_family_models::explicit_family_models(&mut design, &mut diags);
         let mut found = ir::Diags::new();
@@ -86,12 +98,6 @@ fn explicit_family_models_keeps_every_reference_and_binds_only_the_bare() {
                 "seed {seed}: the binding is the lexical one"
             );
         }
-        let gap =
-            ir::features_used(&design).contains(feature(ir::CircuitExtra::ModelWithoutLibrary));
-        assert!(
-            !gap || had_library_gap,
-            "seed {seed}: it left a model without a library"
-        );
     }
     assert!(ran > 0, "no generated design had a model-less element");
     eprintln!("explicit_family_models: {ran} generated designs");
@@ -233,7 +239,7 @@ fn drop_builtin_models_undoes_explicit_family_models_on_sources() {
     assert!(diags.is_empty(), "{:?}", diags.rows());
     let mut out = String::new();
     ir::dump(&design, design.entry(), &mut out);
-    let expected = "file \"a.sp\" deck\n  device_library inductor\n  model inductor inductor\n  element vsource v1 (a 0) dc=1\n  element inductor l1 (a 0) model=inductor value=1u\n  element inductor l2 (b 0) model=inductor value=1u\n  element coupling k1 () inductors=(l1 l2) k=0.5\n  element vcvs e1 (o 0 a 0) gain=2\n";
+    let expected = "file \"a.sp\" deck\n  model inductor inductor\n  element vsource v1 (a 0) dc=1\n  element inductor l1 (a 0) model=inductor value=1u\n  element inductor l2 (b 0) model=inductor value=1u\n  element coupling k1 () inductors=(l1 l2) k=0.5\n  element vcvs e1 (o 0 a 0) gain=2\n";
     assert_eq!(out, expected);
 }
 
@@ -319,6 +325,44 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
     eprintln!("hoist_nested_subckts: {ran} generated designs");
 }
 
+/// R53's runs (ng-scaffold, ngspice-45, `tests/fixtures/passes/structure/
+/// formal_defaults_to_instances/which*.ir`): after the pass, the actual the instance `xs`
+/// passes, evaluated by the reference evaluator with every read bound by its definition, is
+/// the resistance ngspice measured (v(n1) at 1 mA): which 3k, which2 3k, which3 6k (`l`).
+#[test]
+fn formal_defaults_to_instances_gives_the_values_ngspice_measured() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/passes/structure/formal_defaults_to_instances");
+    for (case, formal, ohms) in [
+        ("which1", "t", 3e3),
+        ("which2", "t", 3e3),
+        ("which3", "l", 6e3),
+    ] {
+        let text = std::fs::read_to_string(root.join(format!("{case}.ir"))).expect(case);
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(&text, &mut design.builder(), &mut diags);
+        passes::structure::formal_defaults_to_instances::formal_defaults_to_instances(
+            &mut design,
+            &mut diags,
+        );
+        let xs = elements(&design)
+            .map(|i| design.row::<ir::Element>(i.index))
+            .find(|e| design.str(e.name) == "xs")
+            .expect("the instance xs");
+        let actual = design
+            .params(xs.params)
+            .iter()
+            .find(|p| design.str(p.0) == formal)
+            .map(|p| p.1);
+        let Some(actual) = actual else {
+            panic!("{case}: xs passes no {formal}");
+        };
+        let got = ir::eval(&design, actual, &ByDefinition(&design));
+        assert_eq!(got, Ok(ohms), "{case}: {formal}");
+    }
+}
+
 #[test]
 fn legalize_gives_every_model_less_element_a_model_and_a_library() {
     let text = "file \"a.sp\" deck\n  element resistor r1 (a 0) value=1k\n  element vsource v1 (a 0) dc=1\n  element lossless_line t1 (a 0 b 0) z0=50 td=1n\n";
@@ -361,134 +405,4 @@ fn every_structure_pass_has_its_pair_deck_or_a_pending_marker_and_not_both() {
         wrong.is_empty(),
         "pair deck against PENDING_PAIRS: {wrong:?}"
     );
-}
-
-fn feature(x: ir::CircuitExtra) -> ir::Feature {
-    ir::Feature::Circuit(x)
-}
-
-/// Every reachable item with the references it holds.
-fn refs(design: &ir::Design) -> Vec<(ir::ItemRef, Vec<(ir::Ref, ir::DefKind)>)> {
-    let reachable = design.reachable().into_iter();
-    reachable
-        .map(|(item, _)| {
-            let mut out = Vec::new();
-            design.item_refs(item, &mut out);
-            (item, out)
-        })
-        .collect()
-}
-
-/// Every bound parameter read of every reachable item's expressions, in item and tree order:
-/// (item, definition).
-fn param_reads(design: &ir::Design) -> Vec<(ir::ItemRef, ir::DefId)> {
-    let mut out = Vec::new();
-    let mut handles = Vec::new();
-    for (item, _) in design.reachable() {
-        handles.clear();
-        design.item_handles(item, &mut handles);
-        let mut stack: Vec<ir::ExprId> = Vec::new();
-        for h in &handles {
-            match *h {
-                ir::Handle::Expr(e) | ir::Handle::ExprDyn(e) => stack.push(e),
-                ir::Handle::Exprs(l) => stack.extend_from_slice(design.exprs(l)),
-                ir::Handle::Params(l) => stack.extend(design.params(l).iter().map(|p| p.1)),
-                _ => {}
-            }
-        }
-        stack.retain(|e| !e.is_none());
-        stack.reverse();
-        // bounded: a tree's rows lie below its root, each visited once per path
-        while let Some(e) = stack.pop() {
-            match design.expr(e) {
-                ir::Expr::Param(r) if r.is_resolved() => out.push((item, r.def)),
-                ir::Expr::Call(_, l)
-                | ir::Expr::UserCall(_, l)
-                | ir::Expr::Draw(_, _, _, l)
-                | ir::Expr::List(l) => stack.extend(design.exprs(l).iter().rev()),
-                ir::Expr::Unary(_, a) => stack.push(a),
-                ir::Expr::Binary(_, a, b) => stack.extend([b, a]),
-                ir::Expr::Ternary(c, a, b) => stack.extend([b, a, c]),
-                _ => {}
-            }
-        }
-    }
-    out
-}
-
-/// Whether every reachable instance of the subcircuit `subckt` passes `name` as a read of `old`.
-fn instances_pass(
-    design: &ir::Design,
-    subckt: ir::ItemRef,
-    name: ir::NameId,
-    old: ir::DefId,
-) -> bool {
-    elements(design).all(|i| {
-        let e = design.row::<ir::Element>(i.index);
-        let of = e.kind == ir::ElemKind::Instance
-            && e.model.is_resolved()
-            && design.def(e.model.def).item == subckt;
-        !of || design.params(e.params).iter().any(|&(n, v)| {
-            n == name && matches!(design.expr(v), ir::Expr::Param(r) if r.def == old)
-        })
-    })
-}
-
-fn elements(design: &ir::Design) -> impl Iterator<Item = ir::ItemRef> + '_ {
-    let reachable = design.reachable().into_iter();
-    reachable
-        .map(|(i, _)| i)
-        .filter(|i| i.kind == ir::ItemKind::Element)
-}
-
-/// Whether `item` is a library the pass added (no item of `before`).
-fn added_library(before: &[(ir::ItemRef, Vec<(ir::Ref, ir::DefKind)>)], item: ir::ItemRef) -> bool {
-    item.kind == ir::ItemKind::DeviceLibrary && !before.iter().any(|(i, _)| *i == item)
-}
-
-fn model_row(
-    name: ir::NameId,
-    family: ir::ModelFamily,
-    polarity: ir::Polarity,
-    module: ir::Ref,
-    word: Option<ir::NameId>,
-) -> ir::Model {
-    ir::Model {
-        name,
-        params: ir::ParamList::EMPTY,
-        bin_of: ir::NameId::NONE,
-        ako: ir::Ref::unresolved(ir::NameId::NONE),
-        module,
-        version: ir::ExprId::NONE,
-        word: word.unwrap_or(ir::NameId::NONE),
-        family,
-        polarity,
-    }
-}
-
-/// The passes some pair deck says it proves (`proves = <pass>` in a `.pair` file).
-fn proven_by_pair_decks() -> Vec<String> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pair");
-    let mut out = Vec::new();
-    let cells = std::fs::read_dir(root).into_iter().flatten().flatten();
-    for cell in cells.filter(|c| c.path().is_dir()) {
-        for deck in std::fs::read_dir(cell.path())
-            .into_iter()
-            .flatten()
-            .flatten()
-        {
-            if deck.path().extension().is_some_and(|e| e == "pair") {
-                let text = std::fs::read_to_string(deck.path()).unwrap_or_default();
-                for line in text.lines() {
-                    let line = line.split('#').next().unwrap_or("");
-                    if let Some((k, v)) = line.split_once('=')
-                        && k.trim() == "proves"
-                    {
-                        out.push(v.trim().to_string());
-                    }
-                }
-            }
-        }
-    }
-    out
 }

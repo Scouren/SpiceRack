@@ -1,7 +1,5 @@
 file "a.sp" deck
   title "plain"
-  device_library resistor
-  device_library capacitor
   model resistor resistor
   model capacitor capacitor
   model source_v source_v

@@ -1,6 +1,4 @@
 file "a.sp" deck
-  device_library resistor
-  device_library capacitor
   model resistor resistor
   model capacitor capacitor
   element resistor r1 (a 0) model=resistor value=1

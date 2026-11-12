@@ -1,0 +1,9 @@
+file "a.sp" deck
+  comment "R53 run which (ng-scaffold, ngspice-45): v(n1) = 3 at 1 mA, the instance's t = 3k"
+  param t = 1k
+  subckt s (a b) t=0
+    element resistor r1 (a b) value=t
+  subckt w (a b)
+    param t = 3k
+    element instance xs (a b) model=s params=(t=t)
+  element instance xw (n1 0) model=w

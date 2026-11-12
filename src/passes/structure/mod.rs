@@ -29,7 +29,6 @@ pub mod drop_device_libraries;
 pub mod explicit_family_models;
 pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
-mod libraries;
 
 use super::Pass;
 use crate::ir;
@@ -47,7 +46,7 @@ pub(super) const PASSES: &[Pass] = &[
     Pass {
         name: "hoist_nested_subckts",
         removes: ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt),
-        requires: ir::FeatureSet::EMPTY,
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
         notes: &[
             hoist_nested_subckts::READS_ENCLOSING,
             hoist_nested_subckts::NOT_IN_BODY,
@@ -55,24 +54,57 @@ pub(super) const PASSES: &[Pass] = &[
         run: hoist_nested_subckts::hoist_nested_subckts,
     },
     Pass {
+        name: "hoist_nested_subckts_default",
+        removes: ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[
+            hoist_nested_subckts::READS_ENCLOSING,
+            hoist_nested_subckts::NOT_IN_BODY,
+            hoist_nested_subckts::HOIST_DEFAULT,
+        ],
+        run: hoist_nested_subckts::hoist_nested_subckts_default,
+    },
+    Pass {
         name: "hoist_enclosing_refs",
+        removes: ir::Feature::Extra(ir::Extra::EnclosingRef),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
+        notes: &[
+            hoist_nested_subckts::READS_ENCLOSING,
+            hoist_nested_subckts::NOT_IN_BODY,
+        ],
+        run: hoist_nested_subckts::hoist_nested_subckts,
+    },
+    Pass {
+        name: "hoist_enclosing_refs_default",
         removes: ir::Feature::Extra(ir::Extra::EnclosingRef),
         requires: ir::FeatureSet::EMPTY,
         notes: &[
             hoist_nested_subckts::READS_ENCLOSING,
             hoist_nested_subckts::NOT_IN_BODY,
+            hoist_nested_subckts::HOIST_DEFAULT,
         ],
-        run: hoist_nested_subckts::hoist_nested_subckts,
+        run: hoist_nested_subckts::hoist_nested_subckts_default,
     },
     Pass {
         name: "formal_defaults_to_instances",
         removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
-        requires: ir::FeatureSet::EMPTY,
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,
         ],
         run: formal_defaults_to_instances::formal_defaults_to_instances,
+    },
+    Pass {
+        name: "formal_defaults_to_instances_default",
+        removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[
+            formal_defaults_to_instances::DRAW_IN_DEFAULT,
+            formal_defaults_to_instances::UNKNOWN_INSTANCES,
+            formal_defaults_to_instances::PASS_DEFAULT,
+        ],
+        run: formal_defaults_to_instances::formal_defaults_to_instances_default,
     },
     // before `device_libraries`: the models it adds may need libraries (it adds them itself)
     Pass {
@@ -149,6 +181,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        hoist_nested_subckts::HOIST_DEFAULT,
+        ir::Info {
+            title: "a hoisted subcircuit's added formal given the default 0",
+            cite: "R13; rewrite/AMEND-A12.md K2",
+            explain: "Hoisting the subcircuit made a parameter of its enclosing subcircuit a formal, which every instance passes. The target has no formal without a default, so the formal got the default 0: the hoist's value, which no instance reads.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         formal_defaults_to_instances::DRAW_IN_DEFAULT,
         ir::Info {
             title: "a subcircuit formal whose non-constant default holds a draw",
@@ -163,6 +204,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a subcircuit with instances the design cannot bind",
             cite: "R53; rewrite/AMEND-A12.md A29",
             explain: "Its non-constant default would be passed at every instance and itself replaced; an element names a subcircuit of this name without a binding (its file is not read), and that instance would read the replaced default, so the subcircuit is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        formal_defaults_to_instances::PASS_DEFAULT,
+        ir::Info {
+            title: "a formal whose non-constant default the pass replaced with 0",
+            cite: "R13, R53; rewrite/AMEND-A12.md A29",
+            explain: "Every instance now passes this formal's default as its actual. The target has no formal without a default, so the formal's own default became 0: the pass's value, which no instance reads.",
             kind: ir::Kind::Note,
         },
     ),
