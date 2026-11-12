@@ -390,6 +390,23 @@ mod tests {
     }
 
     #[test]
+    fn voltage_source_through_its_builtin_model() {
+        let text =
+            "file \"t.sp\" deck\n  model v source_v\n  element vsource v1 (a 0) model=v dc=1\n";
+        same(text, |b, top| {
+            let name = b.name("v");
+            b.model(
+                top,
+                model(name, ModelFamily::SourceV, Polarity::None),
+                Span::NONE,
+            );
+            let h = b.head("v1", &["a", "0"], Some("v"), &[], ExprId::NONE);
+            let dc = n(b, 1);
+            b.source(top, ElemKind::VSource, h, source(dc), Span::NONE);
+        });
+    }
+
+    #[test]
     fn device_libraries_with_and_without_a_path() {
         let text = "file \"t.sp\" deck\n  device_library resistor\n  \
                     device_library bsim4 path=\"spice/sn/bsim4.osdi\"\n";

@@ -68,6 +68,46 @@ mod tests {
         b.push(top, row, Span::NONE);
     }
 
+    /// Pushes a model of `family` named `name` and returns a reference bound to it.
+    fn bound(b: &mut Builder<'_>, top: ScopeId, name: &str, family: ModelFamily) -> Ref {
+        let n = b.name(name);
+        let polarity = if family == ModelFamily::Bsim4 {
+            Polarity::N
+        } else {
+            Polarity::None
+        };
+        b.model(top, model(n, family, polarity), Span::NONE);
+        let def = DefId(b.design().definitions().len() as u32 - 1);
+        Ref { name: n, def }
+    }
+
+    /// An element of `kind` whose master is `master`, with a valid detail row.
+    fn with_master(b: &mut Builder<'_>, top: ScopeId, kind: ElemKind, master: Ref) {
+        let one = n(b, 1);
+        let (terms, detail): (&[&str], u32) = match kind {
+            ElemKind::VSource => (&["a", "0"], b.detail(source(one))),
+            _ => (
+                &["a", "b"],
+                b.detail(Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                }),
+            ),
+        };
+        let name = b.name("e2");
+        let terminals = b.names(terms);
+        let row = Element {
+            kind,
+            name,
+            terminals,
+            model: master,
+            params: List::EMPTY,
+            mult: ExprId::NONE,
+            detail,
+        };
+        b.push(top, row, Span::NONE);
+    }
+
     fn only(v: Violation) -> Vec<Code> {
         vec![violation_code(v)]
     }
@@ -179,7 +219,7 @@ mod tests {
     #[test]
     fn every_field_domain_rule_is_reported_alone() {
         type Case = fn(&mut Builder<'_>, ScopeId);
-        let cases: [(&str, Case); 29] = [
+        let cases: [(&str, Case); 33] = [
             ("diode without a model", |b, top| {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
@@ -461,6 +501,35 @@ mod tests {
                     ..source(one)
                 });
                 push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+            }),
+            ("voltage source bound to a transistor model", |b, top| {
+                let m = bound(b, top, "nch", ModelFamily::Bsim4);
+                with_master(b, top, ElemKind::VSource, m);
+            }),
+            ("resistor bound to a builtin source model", |b, top| {
+                let m = bound(b, top, "v", ModelFamily::SourceV);
+                with_master(b, top, ElemKind::Resistor, m);
+            }),
+            ("builtin model with parameters", |b, top| {
+                let name = b.name("v");
+                let one = n(b, 1);
+                let params = b.params(&[("dc", one)]);
+                b.push(
+                    top,
+                    spicerack_ir::Model {
+                        params,
+                        ..model(name, ModelFamily::SourceV, Polarity::None)
+                    },
+                    Span::NONE,
+                );
+            }),
+            ("builtin model with a polarity", |b, top| {
+                let name = b.name("v");
+                b.push(
+                    top,
+                    model(name, ModelFamily::SourceV, Polarity::N),
+                    Span::NONE,
+                );
             }),
         ];
         for (what, case) in cases {

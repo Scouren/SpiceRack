@@ -1313,6 +1313,22 @@ mod tests {
     }
 
     #[test]
+    fn a_builtin_model_needs_no_library() {
+        let set = used(
+            |b, t, _| {
+                let name = b.name("v");
+                b.model(
+                    t,
+                    model(name, ModelFamily::SourceV, Polarity::None),
+                    Span::NONE,
+                );
+            },
+            true,
+        );
+        assert!(!set.contains(Feature::Circuit(X::ModelWithoutLibrary)));
+    }
+
+    #[test]
     fn kinds_are_features() {
         let set = used(
             |b, t, _| {

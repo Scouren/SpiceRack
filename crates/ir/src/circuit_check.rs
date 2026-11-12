@@ -198,6 +198,13 @@ pub(crate) fn has_polarity(f: ModelFamily) -> bool {
         | F::Urc
         | F::HspiceW
         | F::CoreJilesAtherton
+        | F::SourceV
+        | F::SourceI
+        | F::Vcvs
+        | F::Vccs
+        | F::Ccvs
+        | F::Cccs
+        | F::Mutual
         | F::CodeModel
         | F::Module
         | F::Other => false,
