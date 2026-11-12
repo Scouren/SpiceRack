@@ -17,7 +17,7 @@
 mod analyses;
 mod plan;
 
-use super::read_run::{OPTION_ROW_PRIVATE, RESET_CLASS};
+use super::read_run::{NAME_SPELLING, OPTION_ROW_PRIVATE, RESET_CLASS, identifier};
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
 use crate::ir;
@@ -64,9 +64,11 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// The first and last index into `design.items(top)` of the control block's items, for the
 /// spine's `control` … `endc` (VD cmd-overview: one block per file; run x1): from the first run
 /// item to the last, widened over the control-command opaques next to them (a `print` before
-/// the first analysis); with no run item, the first and last control-command opaque of class
-/// Private, Inert or Hint. A command word alone is no proof: outside a block `print …` is an
-/// instance named `print` (another area's opaque, of class Unread or InvalidInSource).
+/// the first analysis), across comments; with no run item, the first and last control-command
+/// opaque of class Private, Inert or Hint (the classes only this area gives a command line). A
+/// command word alone is no proof: outside a block `print …` or `save v(…)` is another area's
+/// opaque (Unread, or InvalidInSource: run fx). So a block that holds only refused statements
+/// reads back as refused statements at the top: VACASK rejects both.
 pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
     let items = design.items(top);
     let command = |k: usize| command_opaque(design, items[k]);
@@ -97,7 +99,7 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
                 c,
                 ir::OpaqueClass::Private | ir::OpaqueClass::Inert | ir::OpaqueClass::Hint
             )
-        }) || command(*k) == Some(ir::OpaqueClass::InvalidInSource) && reserved(design, items[*k])
+        })
     };
     let first = (0..items.len()).find(own)?;
     let last = (0..items.len()).rfind(own)?;
@@ -113,6 +115,9 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
         {
             diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+        }
+        if !names_spelled(design, at) {
+            diags.push_at(NAME_SPELLING, design, at, 0);
         }
         let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
         if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
@@ -231,18 +236,57 @@ fn command_opaque(design: &ir::Design, at: ir::ItemRef) -> Option<ir::OpaqueClas
     (design.str(row.dialect) == "vacask" && COMMANDS.contains(&head)).then_some(row.class)
 }
 
-/// Whether opaque `at` starts with a word VACASK reads as a control statement only (`analysis`,
-/// `sweep`, `save` are reserved in a control block, VD input-reserved; `options`, `mc`,
-/// `endmc`, `alter`, `elaborate` are no instance names an area reads as invalid).
-fn reserved(design: &ir::Design, at: ir::ItemRef) -> bool {
-    let row: ir::item::Opaque = design.row(at.index);
-    let head = design
-        .text(row.text)
-        .split_whitespace()
-        .next()
-        .unwrap_or("");
-    matches!(
-        head,
-        "analysis" | "sweep" | "save" | "options" | "mc" | "endmc" | "alter" | "elaborate"
-    )
+/// Whether `at`'s own names spell (settle names, names_quoted, names_chain): an analysis's, a
+/// loop's and each DC axis's name, when set, is an identifier; the sweep lines of one chain (a
+/// `Dc`'s axes, a loop and the loops and `Dc` that are its whole body) have distinct names.
+fn names_spelled(design: &ir::Design, at: ir::ItemRef) -> bool {
+    let ok = |n: ir::NameId| n.is_none() || identifier(design.str(n));
+    match at.kind {
+        ir::ItemKind::Analysis => {
+            let row: ir::Analysis = design.row(at.index);
+            if row.kind != ir::AnalysisKind::Dc {
+                return ok(row.name);
+            }
+            let dc: ir::dc_ac::Dc = design.detail(row.detail);
+            let names: Vec<ir::NameId> = design.dc_axes(dc.axes).iter().map(|a| a.name).collect();
+            let distinct = names
+                .iter()
+                .enumerate()
+                .all(|(k, n)| n.is_none() || !names[..k].contains(n));
+            ok(row.name) && names.iter().all(|&n| ok(n)) && distinct
+        }
+        ir::ItemKind::Loop => {
+            // The chain of sweep lines this loop heads: the loops whose body is one loop, then
+            // a `Dc`'s axes; every name in it distinct (bounded by the loop depth, LOOP_DEPTH_MAX).
+            let mut names = Vec::new();
+            let mut item = at;
+            for _ in 0..=ir::plan::LOOP_DEPTH_MAX {
+                match item.kind {
+                    ir::ItemKind::Loop => {
+                        let row: ir::Loop = design.row(item.index);
+                        names.push(row.name);
+                        match design.items(row.body) {
+                            [only] => item = *only,
+                            _ => break,
+                        }
+                    }
+                    ir::ItemKind::Analysis => {
+                        let row: ir::Analysis = design.row(item.index);
+                        if row.kind == ir::AnalysisKind::Dc {
+                            let dc: ir::dc_ac::Dc = design.detail(row.detail);
+                            names.extend(design.dc_axes(dc.axes).iter().map(|a| a.name));
+                        }
+                        break;
+                    }
+                    _ => break,
+                }
+            }
+            let distinct = names
+                .iter()
+                .enumerate()
+                .all(|(k, n)| n.is_none() || !names[..k].contains(n));
+            ok(design.row::<ir::Loop>(at.index).name) && distinct
+        }
+        _ => true,
+    }
 }

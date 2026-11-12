@@ -135,3 +135,55 @@ fn save_clear_drops_every_save_before_it() {
     assert_eq!(vectors(&raw(&r, "op2.raw")), ["a", "b", "v1:flow(br)"]);
     assert_eq!(vectors(&raw(&r, "op3.raw")), ["b"]);
 }
+
+#[test]
+fn names_analysis_and_sweep_names_vacask_accepts() {
+    // Kind words, reserved words, case (op1 and OP1 are two), `_` and `$`, an analysis and a
+    // sweep of one name, one sweep name in two chains: every one runs (A35's naming pass).
+    let r = settle("names.sim");
+    let names: Vec<&str> = r.raws.iter().map(|(n, _)| n.as_str()).collect();
+    for n in [
+        "op.raw",
+        "tran.raw",
+        "save.raw",
+        "op1.raw",
+        "OP1.raw",
+        "_x1.raw",
+        "$x.raw",
+        "x.raw",
+        "axis1.raw",
+        "loop1.raw",
+    ] {
+        assert!(names.contains(&n), "{n} not written: {}", r.out);
+    }
+}
+
+#[test]
+fn names_quoted_an_analysis_name_is_an_identifier() {
+    let r = settle("names_quoted.sim");
+    assert!(
+        r.out.contains("Syntax error, unexpected string."),
+        "{}",
+        r.out
+    );
+}
+
+#[test]
+fn names_chain_the_sweeps_of_one_analysis_have_distinct_names() {
+    let r = settle("names_chain.sim");
+    assert!(
+        r.out.contains("Sweep does not have a unique name."),
+        "{}",
+        r.out
+    );
+}
+
+#[test]
+fn names_mc_quoted_an_mc_name_is_an_identifier() {
+    let r = settle("names_mc_quoted.sim");
+    assert!(
+        r.out.contains("Syntax error, unexpected string."),
+        "{}",
+        r.out
+    );
+}

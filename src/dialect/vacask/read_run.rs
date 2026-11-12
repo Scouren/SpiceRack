@@ -18,7 +18,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`), `control`,
+//! `ALTER_TYPE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -174,6 +174,10 @@ pub(super) const OPTION_ROW_PRIVATE: ir::Code = ir::Code::new(b'W', 2304);
 /// `write_run::admits`).
 pub(super) const RESET_CLASS: ir::Code = ir::Code::new(b'W', 2305);
 
+/// An analysis, sweep or mc name VACASK cannot spell: no identifier, or a sweep name repeated
+/// in one analysis's chain (refused by `write_run::admits`; settle names_quoted, names_chain).
+pub(super) const NAME_SPELLING: ir::Code = ir::Code::new(b'W', 2306);
+
 /// This area's rows (the writer's two notes too: `write_run` has no table of its own).
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     row(
@@ -293,6 +297,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "a reset VACASK has no statement for",
         "VD cmd-save, cmd-options-set; run sv2",
         "VACASK's `clear saves` restores the saves alone; `clear options` also resets what the IR holds as opaque options and the temperatures, so it is kept as text, and no other reset has a spelling.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        NAME_SPELLING,
+        "an analysis or sweep name VACASK cannot spell",
+        "settle names_quoted, names_chain (VACASK 36be560)",
+        "VACASK reads an analysis, sweep or mc name as a bare identifier only (a quoted name is \"Syntax error, unexpected string.\"), and the sweeps of one analysis must have distinct names (\"Sweep does not have a unique name.\").",
         ir::Kind::Refusal,
     ),
     row(
@@ -425,6 +436,25 @@ pub(super) fn push_opaque(
 /// Statement `n`'s head word (`analysis`, `options`, `save`, or a card's first token).
 pub(super) fn head(l: &Lower<'_, '_, '_>, n: Node) -> String {
     l.cst.tokens.text(l.cst.ast.main_token(n)).to_string()
+}
+
+/// Whether the name token of field `f` is a bare identifier: VACASK reads an analysis, sweep
+/// or mc name as an identifier only (settle names_quoted: `analysis 'a b' op` is "Syntax error,
+/// unexpected string."; a leading digit is no identifier either).
+pub(super) fn bare_name(l: &Lower<'_, '_, '_>, f: u32) -> bool {
+    let text = l.cst.tokens.text(l.cst.ast.main_token(Node(f)));
+    identifier(text)
+}
+
+/// Whether `name` is an identifier VACASK reads bare: a letter, `_` or `$`, then letters,
+/// digits, `_`, `$` (settle names).
+pub(super) fn identifier(name: &str) -> bool {
+    name.bytes()
+        .next()
+        .is_some_and(|b| b.is_ascii_alphabetic() || b == b'_' || b == b'$')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
 }
 
 // ---- private ----

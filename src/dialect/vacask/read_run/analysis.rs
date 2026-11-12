@@ -18,7 +18,7 @@
 use super::sweep::{
     BAD, Spec, Sweep, Why, check, get, pairs, private, range, spec, sweep, target, value, vector,
 };
-use super::{ANALYSIS_FIELD, ANALYSIS_HB_SMALL, HB_FORM, OWN_PSS, PSS_PERIOD, string};
+use super::{ANALYSIS_FIELD, ANALYSIS_HB_SMALL, HB_FORM, OWN_PSS, PSS_PERIOD, bare_name, string};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
 use crate::dialect::vacask::read_outputs::{self, NodeEntry};
@@ -82,7 +82,20 @@ const NO_FIELD: &[&str] = &[
 
 /// The analysis `n` and the sweep lines `sweeps` that bind it.
 pub(super) fn analysis(l: &mut Lower<'_, '_, '_>, sweeps: &[Node], n: Node) {
-    let swept: Vec<Result<Sweep, Why>> = sweeps.iter().map(|&s| sweep(l, s)).collect();
+    let mut swept: Vec<Result<Sweep, Why>> = sweeps.iter().map(|&s| sweep(l, s)).collect();
+    // Settle names_chain: one name twice among the sweeps of one analysis is "Sweep does not
+    // have a unique name.".
+    for k in 1..swept.len() {
+        let again = match &swept[k] {
+            Ok(s) => swept[..k]
+                .iter()
+                .any(|o| o.as_ref().is_ok_and(|o| o.name == s.name)),
+            Err(_) => false,
+        };
+        if again {
+            swept[k] = Err(BAD);
+        }
+    }
     let plan = plan(l, n);
     let failed = swept.iter().any(Result::is_err) || plan.is_err();
     if failed {
@@ -153,7 +166,7 @@ pub(super) fn analysis(l: &mut Lower<'_, '_, '_>, sweeps: &[Node], n: Node) {
 fn plan(l: &mut Lower<'_, '_, '_>, n: Node) -> Result<Plan, Why> {
     let ast = &l.cst.ast;
     let h = ast.header(n);
-    if h.name == NONE || h.master == NONE {
+    if h.name == NONE || h.master == NONE || !bare_name(l, h.name) {
         return Err(BAD);
     }
     let name = read::field_name(l.cst, h.name);

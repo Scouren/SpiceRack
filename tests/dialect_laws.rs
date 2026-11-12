@@ -46,7 +46,11 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
-    ("l5", "vacask", "an unnamed analysis comes back named (S4-AREAS, Known failures)"),
+    (
+        "l5",
+        "vacask",
+        "seed 2 Untyped: an unnamed analysis is written under an invented name (`acxf1`): goes with A35's features (AnalysisUnnamed, DcAxisUnnamed, LoopUnnamed; R59)",
+    ),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];
 

@@ -10,7 +10,7 @@
 //! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
 
-use super::{REJECTED, SWEEP_FORM, VARIABLE, assign, string};
+use super::{REJECTED, SWEEP_FORM, VARIABLE, assign, bare_name, string};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
@@ -159,6 +159,9 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
         return Err(BAD);
     };
     if l.cst.ast.tag(Node(name)) != Tag::Word {
+        return Err(BAD);
+    }
+    if !bare_name(l, name) {
         return Err(BAD);
     }
     let name = read::field_name(l.cst, name);

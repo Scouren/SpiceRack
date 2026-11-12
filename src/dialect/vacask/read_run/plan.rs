@@ -14,7 +14,9 @@
 //!
 //! Contents: `mc`, `statement` (crate-private)
 
-use super::{ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, string};
+use super::{
+    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, bare_name, string,
+};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::fold;
 use crate::dialect::vacask::read::{self, Lower};
@@ -36,6 +38,9 @@ pub(super) fn mc(l: &mut Lower<'_, '_, '_>, n: Node) -> Option<bool> {
         return bad(l);
     };
     if l.cst.ast.tag(Node(name)) != Tag::Word {
+        return bad(l);
+    }
+    if !bare_name(l, name) {
         return bad(l);
     }
     let name = read::field_name(l.cst, name);
