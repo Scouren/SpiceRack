@@ -257,7 +257,27 @@ impl RowFacts for Analysis {
         if kinds.is_empty() {
             return ItemRef::NONE;
         }
-        let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // Right after an `Hb`/`Pss`, favour the small-signal kinds that need one, so each of
+        // them is reached (they are possible only there).
+        let periodic: Vec<AnalysisKind> = kinds
+            .iter()
+            .copied()
+            .filter(|k| {
+                matches!(
+                    k,
+                    AnalysisKind::Pac
+                        | AnalysisKind::Pnoise
+                        | AnalysisKind::Pxf
+                        | AnalysisKind::Pstb
+                )
+            })
+            .collect();
+        let pool = if !periodic.is_empty() && g.chance(2) {
+            &periodic
+        } else {
+            &kinds
+        };
+        let kind = pool[g.below(pool.len() as u32) as usize];
         // The name first: the text, and so the parse, interns it before the detail's names.
         let name = if g.chance(4) {
             g.fresh_name(b)
@@ -325,16 +345,21 @@ pub(crate) fn gen_of<D: DetailFacts>(
     Some(b.detail(row))
 }
 
-/// Whether the last item of `scope` is an `Hb` or `Pss` analysis: the generator's O(1) form of
-/// `base_before` (a periodic small-signal row it generates follows its base directly).
+/// Whether the last analysis listed in `scope` is an `Hb` or `Pss`: the generator's form of
+/// `base_before` (a periodic small-signal row it generates follows its base in the same scope).
+/// Scans back only to the scope's last analysis: amortized O(1) per generated item.
 #[cfg(any(test, feature = "gen"))]
 pub(crate) fn base_just_before(design: &Design, scope: ScopeId) -> bool {
-    design.items(scope).last().is_some_and(|it| {
-        it.kind == ItemKind::Analysis
-            && matches!(
-                Analysis::table(design).get(it.index).kind,
-                AnalysisKind::Hb | AnalysisKind::Pss
-            )
+    let last = design
+        .items(scope)
+        .iter()
+        .rev()
+        .find(|it| it.kind == ItemKind::Analysis);
+    last.is_some_and(|it| {
+        matches!(
+            Analysis::table(design).get(it.index).kind,
+            AnalysisKind::Hb | AnalysisKind::Pss
+        )
     })
 }
 
