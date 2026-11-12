@@ -211,6 +211,7 @@ fn cell(c: &Cell) {
                 path,
                 policy: Policy::Strict,
                 simulate: true,
+                missing: Vec::new(),
             }
         })
         .collect();

@@ -74,20 +74,25 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     let reader = from.read.expect("rows checked it");
     // A deck is loaded in the worker that runs it and dropped after: a corpus does not fit in
     // memory at once. Step 6 keeps a hash of the written bytes, not the bytes.
+    // Paths relative to the corpus root, so an include above the deck's folder
+    // (`include "../mosmm.inc"`) stays inside what `Sources::load` confines a kit to.
     let load = |p: &Path| {
-        let dir = p.parent().expect("a deck in a folder").to_path_buf();
-        let name = p
-            .file_name()
-            .expect("a file")
-            .to_string_lossy()
-            .into_owned();
-        let mut read = |f: &str| std::fs::read_to_string(dir.join(f)).ok();
+        let mut missing = Vec::new();
+        let mut read = |f: &str| {
+            let text = std::fs::read_to_string(root.join(f)).ok();
+            if text.is_none() {
+                missing.push(f.to_string());
+            }
+            text
+        };
+        let src = Sources::load(&[&rel(p)], ir::Role::Deck, reader, &mut read);
         Deck {
             name: rel(p),
             path: p.to_path_buf(),
-            src: Sources::load(&[&name], ir::Role::Deck, reader, &mut read),
+            src,
             policy: Policy::Lenient,
             simulate: !slow.contains(&rel(p)),
+            missing,
         }
     };
     let jobs = std::env::var("PAIR_JOBS")

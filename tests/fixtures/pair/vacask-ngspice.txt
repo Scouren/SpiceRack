@@ -8,6 +8,13 @@
 #   F5  (R66) a division in an instance parameter (`r=rbase*num/den`, all reals) stays BinaryDyn(DivTyped)
 #       and is refused with W1007: `div_typed_to_div_dyn` does not remove it for ngspice. Owner:
 #       the expr group (the pass's requires against ngspice's FEATURES) or the ngspice writer.
+#   F7  WRONG NUMBER: `alter instance("__topinst__") a=2.0` (a top-level parameter, VACASK
+#       re-elaborates) is read as a device-parameter alter of an element `__topinst__` and
+#       written `alter @__topinst__[a]=2`; ngspice-45: "no such device or model name
+#       __topinst__", every op at a=1 (corpus test/test_cblock.sim). Owner: the VACASK reader
+#       (an AlterParam target), or the IR (a device alter naming no element), then the ngspice
+#       writer (alterparam and reset).
+alter_toplevel 4 mismatch finding=F7 # op v1:flow(br): -0.005 (VACASK, r1 = 2k) vs -0.01 (ngspice, the alter failed)
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
 param_div 2 refused:U0001,W1007:Binary(DivTyped) finding=F5 # static since R66/A40 (a constant tree); div_typed_to_div does not remove it and W1007 still refuses it
