@@ -1,0 +1,3 @@
+# A DC axis over an arithmetic list made linear by step.
+owner = runrules
+proves = sweep_dc_list_to_step

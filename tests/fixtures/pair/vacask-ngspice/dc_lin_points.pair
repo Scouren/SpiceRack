@@ -1,0 +1,3 @@
+# A DC axis linear by count made linear by step.
+owner = runrules
+proves = sweep_dc_lin_points_to_step

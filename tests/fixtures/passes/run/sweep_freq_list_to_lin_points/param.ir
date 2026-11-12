@@ -1,0 +1,3 @@
+file "a.sp" deck
+  param f = 1k
+  analysis ac (list values=[f])

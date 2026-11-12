@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
@@ -29,6 +29,7 @@ pub mod names_dropped;
 pub mod names_given;
 pub mod run_items_together;
 pub mod save_set_to_all;
+pub mod sweep_forms;
 pub mod tran_ceiling_given;
 pub mod whole_run_state_first;
 
@@ -201,6 +202,24 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[save_set_to_all::SAVE_SET_KEPT],
         run: save_set_to_all::save_set_to_all,
     },
+    sweep(
+        "sweep_dc_lin_points_to_step",
+        (RunExtra::SweepDcLinPoints, RunExtra::SweepDcLinStep),
+        &[sweep_forms::SWEEP_KEPT],
+        sweep_forms::sweep_dc_lin_points_to_step,
+    ),
+    sweep(
+        "sweep_dc_list_to_step",
+        (RunExtra::SweepDcList, RunExtra::SweepDcLinStep),
+        &[sweep_forms::SWEEP_KEPT],
+        sweep_forms::sweep_dc_list_to_step,
+    ),
+    sweep(
+        "sweep_freq_list_to_lin_points",
+        (RunExtra::SweepFreqList, RunExtra::SweepFreqLinPoints),
+        &[sweep_forms::FREQ_LIST_KEPT],
+        sweep_forms::sweep_freq_list_to_lin_points,
+    ),
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
@@ -322,6 +341,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        sweep_forms::SWEEP_KEPT,
+        ir::Info {
+            title: "a DC axis no linear step states exactly",
+            cite: "rewrite/IR-RUN.md §1; ngspice-45 dctrcurv.c",
+            explain: "The target's DC axis is linear by step. This axis's values are no such grid: a value is not a literal, the list is not arithmetic or repeats a value, the step does not terminate within a literal's 18 digits, or ngspice's end test (2.2e-13, absolute) would run another number of points. The analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        sweep_forms::FREQ_LIST_KEPT,
+        ir::Info {
+            title: "a frequency list other than one value of an AC analysis",
+            cite: "rewrite/IR-RUN.md §1; ngspice-45 acan.c",
+            explain: "The target sweeps frequency by decade, octave or a linear count. One listed frequency of an AC analysis is a linear sweep of one point; two or more are not exact (ngspice's linear sweep of two points runs one, and its end test scales with reltol), and another analysis's list is not rewritten. The analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         run_items_together::HOLDS_RUN_ITEMS,
         ir::Info {
             title: "a circuit item between run items that holds run items",
@@ -362,6 +399,22 @@ const fn to_from_here(
         name,
         removes: ir::Feature::Run(modes.0),
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(modes.1)),
+        notes,
+        run,
+    }
+}
+
+/// A `sweep_forms` row: it removes the form `forms.0` and requires the form `forms.1`.
+const fn sweep(
+    name: &'static str,
+    forms: (RunExtra, RunExtra),
+    notes: &'static [ir::Code],
+    run: fn(&mut ir::Design, &mut ir::Diags),
+) -> Pass {
+    Pass {
+        name,
+        removes: ir::Feature::Run(forms.0),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(forms.1)),
         notes,
         run,
     }
