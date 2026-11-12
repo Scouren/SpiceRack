@@ -14,8 +14,8 @@ use crate::expr::{Literal, NumForm};
 use crate::feature::Feature;
 use crate::id::{ExprId, NameId};
 use crate::wave::{
-    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
-    Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
+    Am, AmModTime, Exp, GivenZero, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat,
+    Sffm, SffmLaw, Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
 };
 
 impl R<'_, '_> {
@@ -88,6 +88,7 @@ impl R<'_, '_> {
                     period,
                     cycles,
                     law,
+                    given_zero: GivenZero::AsGiven,
                 })
             }
             WaveKind::Sin => {
@@ -109,6 +110,7 @@ impl R<'_, '_> {
                     amplitude2,
                     freq2,
                     pre,
+                    given_zero: GivenZero::AsGiven,
                 })
             }
             WaveKind::Exp => {
@@ -126,6 +128,7 @@ impl R<'_, '_> {
                     td2,
                     tau2,
                     td2_from,
+                    given_zero: GivenZero::AsGiven,
                 })
             }
             WaveKind::Pwl => {
@@ -159,6 +162,7 @@ impl R<'_, '_> {
                     phase_m_deg,
                     law,
                     pre,
+                    given_zero: GivenZero::AsGiven,
                 })
             }
             WaveKind::Am => {

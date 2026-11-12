@@ -23,8 +23,8 @@ mod tests {
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::{DcRule, Distof, Source};
     use spicerack_ir::wave::{
-        Am, AmModTime, Exp, Pattern, PreDelay, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
-        TdFrom, TrNoise, TrRandom, TrRandomKind,
+        Am, AmModTime, Exp, GivenZero, Pattern, PreDelay, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm,
+        SffmLaw, TdFrom, TrNoise, TrRandom, TrRandomKind,
     };
     use spicerack_ir::{
         Builder, CircuitExtra as X, Design, DeviceLibrary, ElemKind, ExprId, Feature, FeatureSet,
@@ -102,6 +102,7 @@ mod tests {
             phase_m_deg: v,
             law,
             pre: PreDelay::Zero,
+            given_zero: spicerack_ir::wave::GivenZero::AsGiven,
         }
     }
 
@@ -282,6 +283,16 @@ mod tests {
         b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
     }
 
+    /// A source with a pulse whose zero fields follow `rule`.
+    fn zero_rule(b: &mut Builder<'_>, top: ScopeId, rule: GivenZero) {
+        let one = n(b, 1);
+        let w = b.wave(spicerack_ir::wave::Pulse {
+            given_zero: rule,
+            ..pulse(one)
+        });
+        with_wave(b, top, w);
+    }
+
     fn pulse_law(b: &mut Builder<'_>, top: ScopeId, law: PulseLaw) {
         let one = n(b, 1);
         let w = b.wave(spicerack_ir::wave::Pulse { law, ..pulse(one) });
@@ -298,6 +309,7 @@ mod tests {
             td2: v,
             tau2: v,
             td2_from,
+            given_zero: spicerack_ir::wave::GivenZero::AsGiven,
         });
         with_wave(b, top, w);
     }
@@ -322,6 +334,7 @@ mod tests {
                 td2: v,
                 tau2: v,
                 td2_from: TdFrom::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             WaveKind::Pwl => {
                 let r = pwl(b);
@@ -1369,6 +1382,28 @@ mod tests {
         }),
         (X::TcLawReciprocal, |b, t, on| {
             dynamic_cap(b, t, if on { TcLaw::Reciprocal } else { TcLaw::Direct })
+        }),
+        (X::GivenZeroAsGiven, |b, t, on| {
+            zero_rule(
+                b,
+                t,
+                if on {
+                    GivenZero::AsGiven
+                } else {
+                    GivenZero::SpiceDefault
+                },
+            )
+        }),
+        (X::GivenZeroSpiceDefault, |b, t, on| {
+            zero_rule(
+                b,
+                t,
+                if on {
+                    GivenZero::SpiceDefault
+                } else {
+                    GivenZero::AsGiven
+                },
+            )
         }),
     ];
 

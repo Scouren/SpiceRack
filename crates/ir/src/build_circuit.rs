@@ -12,7 +12,7 @@
 //! ```
 //! use spicerack_ir::passive::Passive;
 //! use spicerack_ir::source::{DcRule, Source};
-//! use spicerack_ir::wave::{Pulse, PulseLaw};
+//! use spicerack_ir::wave::{GivenZero, Pulse, PulseLaw};
 //! use spicerack_ir::{
 //!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, MultLaw, NameId,
 //!     NumForm, Polarity, Ref, Role, Span, NO_ROW,
@@ -33,7 +33,7 @@
 //! let (edge, width, period) = (b.num(1e-9), b.num(5e-6), b.num(10e-6));
 //! let wave = b.wave(Pulse {
 //!     v1: zero, v2: one, delay: zero, rise: edge, fall: edge, width, period,
-//!     cycles: ExprId::NONE, law: PulseLaw::Spice,
+//!     cycles: ExprId::NONE, law: PulseLaw::Spice, given_zero: GivenZero::AsGiven,
 //! });
 //! let head = b.head("v1", &["in", "0"], None, &[], ExprId::NONE);
 //! let source = Source {

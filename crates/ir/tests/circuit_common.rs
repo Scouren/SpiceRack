@@ -88,6 +88,7 @@ pub fn pulse(v: ExprId) -> Pulse {
         period: v,
         cycles: ExprId::NONE,
         law: PulseLaw::Spice,
+        given_zero: spicerack_ir::wave::GivenZero::AsGiven,
     }
 }
 
@@ -104,6 +105,7 @@ pub fn sin(v: ExprId) -> Sin {
         amplitude2: ExprId::NONE,
         freq2: ExprId::NONE,
         pre: PreDelay::Offset,
+        given_zero: spicerack_ir::wave::GivenZero::AsGiven,
     }
 }
 
