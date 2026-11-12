@@ -54,6 +54,8 @@ pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
+#[cfg(any(test, feature = "gen"))]
+mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
