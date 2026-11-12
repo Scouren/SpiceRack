@@ -1,8 +1,9 @@
 //! Pass `deck_title`: a design in, the same design out with an empty `Title` as the first item
 //! of every `Deck` file whose top scope holds none. It removes `Extra::DeckWithoutTitle`
 //! (ngspice and VACASK read a deck's first line as its title whatever it holds, so "no title"
-//! and "an empty title" are one text there) and requires nothing. Nothing else moves: every
-//! other item keeps its place, and the only feature the design can gain is `Item(Title)`.
+//! and "an empty title" are one text there) and requires `Item(Title)`, the title it adds.
+//! Nothing else moves: every other item keeps its place, and the only feature the design can
+//! gain is `Item(Title)`.
 //!
 //! Cites: the lead's ruling on decks without a title (VACASK scaffold); `rewrite/SPINE.md` §4.
 //!
@@ -78,10 +79,34 @@ mod tests {
             after.minus(before).minus(title).is_empty(),
             "it gains only Item(Title)"
         );
-        // The cue: when the kernel adds `Extra::DeckWithoutTitle`, `features_used` reports it
-        // and this goes red. Then assert `before.minus(after)` is exactly that feature, and
-        // register the pass in `PASSES` (`removes` it, `requires` nothing).
-        assert!(before.minus(after).is_empty());
+        let removed = ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::DeckWithoutTitle));
+        assert_eq!(
+            before.minus(after),
+            removed,
+            "it loses exactly DeckWithoutTitle"
+        );
+    }
+
+    #[test]
+    fn legalize_runs_it_for_a_target_without_the_feature() {
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(
+            "file \"a.sp\" deck\n  param p = 1\n",
+            &mut design.builder(),
+            &mut diags,
+        );
+        let target = ir::FeatureSet::ALL
+            .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::DeckWithoutTitle)));
+        crate::passes::legalize(&mut design, &target, &mut diags);
+        assert!(
+            diags.is_empty(),
+            "nothing left to refuse: {:?}",
+            diags.rows()
+        );
+        let mut out = String::new();
+        ir::dump(&design, design.entry(), &mut out);
+        assert_eq!(out, "file \"a.sp\" deck\n  title \"\"\n  param p = 1\n");
     }
 
     #[test]
