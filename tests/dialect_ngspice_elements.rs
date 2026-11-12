@@ -95,16 +95,19 @@ R1 p q 1k m=5
 R8 x 0 1k
 R9 a k {1k+v(a)}
 R10 k 0 1k
+R20 a w R = '1k + 0.033*1k*V(a)'
+R21 w 0 1k
+C5 a 0 C = '1p + 0.033*1p*V(a)'
 .control
 op
-print v(a) v(b) v(e) v(g) v(f) v(h2) v(p) v(h) v(bi) v(t) v(d) v(x) v(k) v(q) v(vb)
+print v(a) v(b) v(e) v(g) v(f) v(h2) v(p) v(h) v(bi) v(t) v(d) v(x) v(k) v(q) v(vb) v(w)
 .endc
 .end
 ";
 
 /// The nets `SIM` prints, in order.
 const SIM_NETS: &[&str] = &[
-    "a", "b", "e", "g", "f", "h2", "p", "h", "bi", "t", "d", "x", "k", "q", "vb",
+    "a", "b", "e", "g", "f", "h2", "p", "h", "bi", "t", "d", "x", "k", "q", "vb", "w",
 ];
 
 /// A six-terminal SOI3 MOSFET (`soi3.c:30`), apart: its model does not converge beside `SIM`'s
