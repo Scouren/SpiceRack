@@ -1443,4 +1443,44 @@ mod tests {
         let without = used(|b, t, on| at_zero(b, t, WaveKind::Pulse, on), false);
         assert!(!without.contains(Feature::Family(ModelFamily::Bsim4)));
     }
+
+    /// ng-elements' finding (A13): a voltage `Behav` may be an E card and a current one a G
+    /// card (ngspice reads `E … vol=`, `G … cur=` as B sources), and a port a V card; such a
+    /// name is no `NameWithoutLetter`, the other controlled letter is.
+    #[test]
+    fn a_behavioural_source_takes_b_or_its_controlled_letter() {
+        let named = |name: &str, out: OutKind| {
+            let mut d = Design::new();
+            let t = deck(&mut d);
+            let mut b = d.builder();
+            let e = n(&mut b, 1);
+            let h = b.head(name, &["o", "0"], None, &[], ExprId::NONE);
+            b.behav(t, ElemKind::Behav, h, behav(e, out), Span::NONE);
+            features_used(&d).contains(Feature::Circuit(X::NameWithoutLetter))
+        };
+        assert!(!named("B1", OutKind::Voltage));
+        assert!(!named("E4", OutKind::Voltage));
+        assert!(!named("G3", OutKind::Current));
+        assert!(named("G3", OutKind::Voltage));
+        assert!(named("E4", OutKind::Current));
+        let port = used(
+            |b, t, _| {
+                let one = n(b, 1);
+                let p = b.detail(port(one, one));
+                let h = b.head("V1", &["a", "0"], None, &[], ExprId::NONE);
+                b.source(
+                    t,
+                    ElemKind::Port,
+                    h,
+                    Source {
+                        port: p,
+                        ..source(one)
+                    },
+                    Span::NONE,
+                );
+            },
+            true,
+        );
+        assert!(!port.contains(Feature::Circuit(X::NameWithoutLetter)));
+    }
 }

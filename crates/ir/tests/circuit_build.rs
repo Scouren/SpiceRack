@@ -715,4 +715,47 @@ mod tests {
         spicerack_ir::check(&d, &mut diags);
         assert!(diags.is_empty(), "{:?}", diags.rows());
     }
+
+    #[test]
+    fn spice_letters_of_a_behavioural_source_and_a_port() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        let one = n(&mut b, 1);
+        let h = b.head("e4", &["o", "0"], None, &[], ExprId::NONE);
+        let v = b.behav(
+            top,
+            ElemKind::Behav,
+            h,
+            behav(one, OutKind::Voltage),
+            Span::NONE,
+        );
+        let h = b.head("g3", &["o", "0"], None, &[], ExprId::NONE);
+        let i = b.behav(
+            top,
+            ElemKind::Behav,
+            h,
+            behav(one, OutKind::Current),
+            Span::NONE,
+        );
+        let h = b.head("b2", &["o", "0"], None, &[], ExprId::NONE);
+        let r = b.behav(
+            top,
+            ElemKind::Behav,
+            h,
+            behav(one, OutKind::Resistance),
+            Span::NONE,
+        );
+        let design = b.design();
+        let letters = |x: spicerack_ir::ItemRef| {
+            spicerack_ir::spice_letters(design, &design.row::<Element>(x.index))
+        };
+        assert_eq!(letters(v), b"BE");
+        assert_eq!(letters(i), b"BG");
+        assert_eq!(letters(r), b"B");
+        assert_eq!(
+            spicerack_ir::spice_letter(design, &design.row::<Element>(v.index)),
+            Some(b'B')
+        );
+    }
 }

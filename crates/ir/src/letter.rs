@@ -17,7 +17,14 @@
 //! Cites: `rewrite/AMEND-A12.md` A13; `rewrite/RULINGS.md` R23; `rewrite/INV-constructs.md` B16,
 //! D1–D47.
 //!
+//! A kind may take more than one letter on some dialect's cards: a voltage-output `Behav` is B
+//! or E (ngspice and HSPICE read `E … vol=`/`value=` as a B source), a current-output one B or
+//! G (`G … cur=`/`value=`), and a `Port` P or V (ngspice's port is a V card). `spice_letters`
+//! lists every letter a SPICE card may give the element, `spice_letter` the canonical one (the
+//! first), which a rename pass uses.
+//!
 //! Contents: `pub fn spice_letter(&Design, &Element) -> Option<u8>`,
+//! `pub fn spice_letters(&Design, &Element) -> &'static [u8]`,
 //! `pub fn letter_of(ElemKind, Quantity, Quantity) -> Option<u8>`
 
 use crate::circuit_text::get_row;
@@ -46,6 +53,12 @@ pub fn spice_letter(design: &Design, element: &Element) -> Option<u8> {
         _ => (v, v), // every other kind's letter is its kind's alone
     };
     letter_of(element.kind, out, ctl)
+}
+
+/// Every letter a SPICE card may give `element` (the canonical `spice_letter` first); empty
+/// for a kind SPICE cards do not have.
+pub fn spice_letters(design: &Design, element: &Element) -> &'static [u8] {
+    todo!()
 }
 
 /// The letter of `kind` with output quantity `out` and control quantity `ctl` (both read only
