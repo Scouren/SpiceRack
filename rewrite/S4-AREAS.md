@@ -101,3 +101,16 @@ test in the same commit as the rule that cites it):
   message text (`settle::says`).
 - Every builtin needs a `model` line (`model vsource vsource`); every SPICE device a `load
   "spice/<m>.osdi"` and a `model` (run n2).
+
+## Known failures (strict both ways: a line goes the day its cause is fixed)
+
+| Test | Fails because | Goes when |
+|---|---|---|
+| `dialect_laws` `l3_one_read_and_four_threads_give_the_same_bytes`, `l5_read_of_write_is_the_design`, `l8_a_file_is_written_the_same_whatever_the_other_files` | the generator draws `Opaque` rows of other dialects only (`gen_rows.rs`): `write`'s debug assertion "no foreign Opaque for vacask" | the spine owner's harness fix (a row that is not lossless generates no `Opaque`) |
+| `dialect_laws` `l4_write_is_total_over_a_design_legalize_accepted` | the same: every generated design is refused, so no admitted design holds a claimed kind | the same |
+| `dialect_laws` `l7_legalized_designs_use_only_the_writers_features` | `vacask lacks Item(Func)`: no pass (S4.4) and no citations table yet | S4.4's passes and `citations.toml` |
+| `dialect_vacask` `laws::l5_read_of_write_is_the_design_without_foreign_opaques` (marked) | too few generated designs VACASK spells: placement (`global`, `include` in a branch), default-less or `$temp` formals (W2003) | A15 `Placed`, `Family`; `Extra::FormalWithoutDefault` and the widened `FormalReadsParam` |
+| `test_spine` `a_kit_whose_entry_is_a_library_writes_the_library` (an unexpected pass) | a stale marker on the spine's branch | the spine owner drops it |
+
+A scale letter VACASK lacks (`c`, `peta`) is already respelled exactly as `e<exp10>` with the same
+digits (R28): it reads back equal by value (`eq_meaning`), not field by field.
