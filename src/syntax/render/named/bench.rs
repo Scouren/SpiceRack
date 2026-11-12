@@ -462,10 +462,11 @@ impl W<'_, '_> {
     /// counts its points
     /// in all (`python/keywords.rs` `Sweep::Log`) and Spectre's `log=` its
     /// steps (`[REF]` p.407: "Number of steps, log sweep"), one fewer. A
-    /// grid that ends short of its stop value is `values=[…]`, its points
+    /// grid that ends short of its stop value, and one that runs down
+    /// (`start` above `stop`), is `values=[…]`, its points
     /// (`read::step_points`: Xyce's, which VACASK and the ngspice loops
     /// run): `[REF]` pp.406-408 do not say where `step=` and `dec=` end
-    /// such a grid.
+    /// the first, nor that a sweep towards a lower `stop` runs.
     fn sweep_head(
         &mut self,
         idx: usize,
@@ -483,7 +484,8 @@ impl W<'_, '_> {
             _ => ("step", *step),
         };
         let what = self.sweep_what(param, *tok)?;
-        if let Some((points, true)) = step_points(*sweep, [*start, *stop, *step]) {
+        let grid = step_points(*sweep, [*start, *stop, *step]);
+        if let Some((points, _)) = grid.filter(|(_, short)| *short || start > stop) {
             let values = self.values(&points);
             let k = idx + 1;
             return Some(format!("sweep{k}_{suffix} sweep {what} {values} {{"));

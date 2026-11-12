@@ -397,3 +397,35 @@ fn p5_102_a_parameter_an_ltspice_step_makes_is_declared() {
     let spectre = oracle::write(&declared, Dialect::Ltspice, Dialect::Spectre);
     assert_eq!(spectre.matches("parameters X=").count(), 1, "{spectre}");
 }
+
+/// ZERO-LEDGER P5-107. Oracle: Xyce 7.10 running the source deck (a
+/// range towards a lower stop value steps down through it: rr = 3k, 2k,
+/// 1k), each point the divider's closed form v(out) = rr / (1k + rr).
+/// Spectre has no binary here, and Reference 19.1 pp.406-408 (`start`,
+/// `stop`, `step`: "Step size, linear sweep") never say a `sweep`
+/// towards a lower `stop` runs (ruling 2026-11-11, D43): its text is the
+/// points, `values=[…]` ("Array of sweep values"), in the order Xyce
+/// steps through them. An upward range that reaches its stop value
+/// stays a range. By hand: research/impl/evidence/P5-107/run.txt.
+/// Tolerance: a linear solve of three elements.
+#[test]
+fn p5_107_a_step_that_runs_down_is_its_points_on_spectre() {
+    let tol = oracle::Tol {
+        rel: 1e-6,
+        floor: 0.0,
+    };
+    let down = format!("{DIVIDER}.step rr 3k 1k -1k\n.op\n.end\n");
+    let got = outs(Dialect::Xyce, &down);
+    let want = [0.75, 2.0 / 3.0, 0.5];
+    let near = got.len() == want.len() && got.iter().zip(want).all(|(g, w)| tol.within(*g, w));
+    assert!(near, "Xyce: v(out) = {got:?}, want {want:?}");
+    let cite = "Spectre Reference 19.1 pp.406-408: sweep, values=[...]";
+    let head = "sweep1_rr sweep param=rr values=[3k 2k 1k] {";
+    oracle::spec_example(cite, &down, Dialect::Xyce, Dialect::Spectre, &[head]);
+    // The Python API's card (`tb.step("rr", 3e3, 1e3, -1e3)`) is the same.
+    let given = Lang::NGSPICE_GIVEN;
+    oracle::spec_example(cite, &down, given, Dialect::Spectre, &[head]);
+    let up = format!("{DIVIDER}.step rr 1k 3k 1k\n.op\n.end\n");
+    let head = "sweep1_rr sweep param=rr start=1k stop=3k step=1k {";
+    oracle::spec_example(cite, &up, Dialect::Xyce, Dialect::Spectre, &[head]);
+}
