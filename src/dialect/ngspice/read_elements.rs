@@ -95,7 +95,7 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Circuit(X::CouplingMany),
     Feature::Circuit(X::TableNgspiceRounded),
     Feature::Circuit(X::SemiArea),
-    Feature::Circuit(X::SemiInitial),
+    Feature::Circuit(X::SemiInitialOff),
     Feature::Circuit(X::DiodeThermal),
     Feature::Circuit(X::SwitchInitial),
     Feature::Circuit(X::LineFreqNl),

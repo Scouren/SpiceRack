@@ -42,7 +42,8 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
         b'j' => (K::Jfet, 3, 3),
         _ => (K::Mesfet, 3, 3),
     };
-    let Some(at) = model_at(letter, items).filter(|&k| (min..=max).contains(&k)) else {
+    let in_card = |k: &usize| *k < items.len() && (min..=max).contains(k);
+    let Some(at) = model_at(letter, items).filter(in_card) else {
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     };
     let model_ok = items[at].kind == Kind::Word && number_word(&items[at].text).is_none();

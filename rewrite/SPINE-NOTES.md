@@ -160,6 +160,12 @@ Each line: question → choice → why.
 36. P2 by item → `Diag::item`; self-test: a pass noting the first comment and leaving all fails P2
     (by span it passed: generated spans are all `NONE`).
 
+37. L5 and L6 compare by meaning (R28): `Design::eq_meaning` (real literals equal by value, whatever
+    their form); the IR text stays only as the failure's evidence. L6 is L5 over a corpus, so it
+    follows. The shrink self-test searches its seed (bounded, 1,024) instead of relying on the
+    generator's stream (round 5 changed it). A rule's rows share one file; a fixture folder is a
+    row's name (SPINE §4).
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.

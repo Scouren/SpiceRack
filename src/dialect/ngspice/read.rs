@@ -22,7 +22,7 @@
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
-//! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
+//! class, subckt_formals, refer, pending, rescope, unqueue_reads, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use std::collections::HashSet;
 
@@ -423,6 +423,25 @@ impl<'a, 'd> Lower<'a, 'd> {
         for p in &mut self.pending[mark..] {
             p.1 = scope;
         }
+    }
+
+    /// Takes the parameter reads queued in `from..to` whose name is not in `keep` out of the bind
+    /// step: they stay unbound names (R53: a head default's read of anything but a sibling
+    /// formal is looked up from each instance's scope; runs which.cir, which2.cir, which3.cir).
+    pub(super) fn unqueue_reads(&mut self, from: usize, to: usize, keep: &[String]) {
+        assert!(
+            from <= to && to <= self.pending.len(),
+            "unqueue_reads: marks from before"
+        );
+        let design = self.b.design();
+        let kept = |e: ir::ExprId| match design.expr(e) {
+            ir::Expr::Param(r) => keep.iter().any(|k| k == design.str(r.name)),
+            _ => true,
+        };
+        let tail = self.pending.split_off(to);
+        let range = self.pending.split_off(from);
+        self.pending.extend(range.into_iter().filter(|p| kept(p.0)));
+        self.pending.extend(tail);
     }
 
     /// The path an include names, as the design's file table names it: resolved against this

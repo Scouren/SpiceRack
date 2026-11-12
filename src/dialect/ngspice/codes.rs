@@ -18,7 +18,7 @@
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
 //! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
-//! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `TEXT_VALUE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
+//! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `TEXT_VALUE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, write_control,
@@ -69,6 +69,9 @@ pub(super) const MISSING_FILE: Code = Code::new(b'R', 1003);
 /// An element card whose name an earlier card of the same scope has: ngspice bails out
 /// ("device already exists"): `InvalidInSource`.
 pub(super) const DUPLICATE_ELEMENT: Code = Code::new(b'R', 1004);
+/// A `.subckt` whose head defaults read each other in a cycle: ngspice stops ("a level depth
+/// greater 1000 for dependent parameters"): `InvalidInSource`.
+pub(super) const DEFAULT_CYCLE: Code = Code::new(b'R', 1005);
 
 /// A string or list value where ngspice reads an expression (a `.param`, head default, `.if`
 /// or `.func`): numparam has no string or vector values.
@@ -163,6 +166,12 @@ pub(super) const CODES: &[Row] = &[
         "a definition repeated in one scope",
         "rewrite/DIALECT-NGSPICE.md §3",
         "which one ngspice keeps is not established for this kind; the repeat is kept as text (Unread).",
+    ),
+    row(
+        DEFAULT_CYCLE,
+        "subcircuit head defaults that read each other in a cycle",
+        "ngspice-45 run (mutual.cir: \"A level depth greater 1000 for dependent parameters\")",
+        "ngspice stops on the deck; kept as InvalidInSource text.",
     ),
     row(
         DUPLICATE_ELEMENT,
