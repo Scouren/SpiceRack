@@ -34,10 +34,7 @@ const SETTLE: &str = "tests/fixtures/dialect/vacask/settle";
 const KNOWN: &[(&str, &str)] = &[];
 
 /// Reader fixtures the write tests cannot take yet, by cause (compared by the reader test).
-const KNOWN_WRITE: &[(&str, &str)] = &[(
-    "fold.sim",
-    "S4.3: the control block is Unread, so fold::admits sees no analysis and refuses the Given source (W2007)",
-)];
+const KNOWN_WRITE: &[(&str, &str)] = &[];
 
 // ---- private ----
 

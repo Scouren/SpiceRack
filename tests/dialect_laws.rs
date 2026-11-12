@@ -73,6 +73,12 @@ const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ),
     (
         "vacask",
+        "Elem(Coupling)",
+        "property_am_and_mutual_round_trip",
+        "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused",
+    ),
+    (
+        "vacask",
         "Wave(Am)",
         "property_am_and_mutual_round_trip",
         "VACASK's AM fixes the modulation offset at 1 (W2201 until A31's AmModOffset lands); the generator draws mod_offset freely, so no admitted design holds an Am",
