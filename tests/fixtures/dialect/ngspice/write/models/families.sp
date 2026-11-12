@@ -20,7 +20,7 @@ families
 .model s nmos level=55 version=2.0
 .model t nmos level=56 version=2.0
 .model u nmos level=57 version=2.0
-.model v nmos level=60
+.model v nsoi level=60
 .model w nmos level=68 version=280
 .model x nmos level=73 version=2.20
 .model y vdmos pchan

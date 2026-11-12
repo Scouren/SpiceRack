@@ -1,39 +1,290 @@
-//! Model cards (sub-slice S3.2, a stub until it lands): a `Model` item → its `.model` card.
+//! Model cards: a `Model` row → `.model name word [level=n] [pchan] [version=v] k=v …`, the
+//! type word and level by `families::card` (the inverse of the reader's dispatch), a code
+//! model's or module's name as the word, the version under its family's keyword, the parameters
+//! in IR order: a number as `INPevaluate` reads it, a string quoted, anything else
+//! `expr_write::value` (bare name or `{…}`). A bin's name is already `base.<digits>`.
 //!
-//! **Contract for S3.2.** `pub(super) fn model(w: &mut Out<'_>, item: ir::ItemRef)`: the (type word, level) of the family through `families::card`; parameters in IR order; bins as `name.k`.
-//! Each function writes one item of a design legal for `FEATURES` (the spine checked it), sees
-//! only the IR, and never learns a source. It spells exactly the rows its area adds to
-//! `FEATURES` and asserts it is not handed another. Codes: `W1200–W1299` (`codes.rs`).
+//! `admits` (R21) refuses what ngspice cannot run as the row says: a family it has no device
+//! for, a version that picks no device or a version on a family ngspice runs one way, a
+//! parameter the device's tables lack (ngspice would ignore it: a wrong number with no crash),
+//! a bin of a family ngspice does not bin or not named `base.<digits>`, a value it reads back
+//! otherwise or that reads the run.
 //!
-//! Stub: its features are absent from `FEATURES`, so the spine never hands it an item; it
-//! asserts so.
-//!
-//! Cites: `rewrite/DIALECT-NGSPICE.md` §2, §4; `rewrite/S3-AREAS.md`.
+//! Cites: ngspice-45 `inpdomod.c`, `inpgmod.c` (`create_model`, `INPgetModBin`), `inpcom.c`
+//! `inp_vdmos_model`; `rewrite/DIALECT-NGSPICE.md` §4; `rewrite/RULINGS.md` R21.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn model(w: &mut Out<'_>, item: ir::ItemRef)`
 
 use super::codes::Row;
+use super::expr_write;
+use super::families;
+use super::number::{self, Grammar};
+use super::read_models;
 use super::write::Out;
-use crate::ir;
+use crate::ir::{self, Code, Info, Kind, ModelFamily as F};
 
-/// What this area adds to `FEATURES` (the IR nodes its writer spells). Empty in the stub.
-pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY;
+/// What this area spells: exactly the reader's image (law L5).
+pub(super) const FEATURES: ir::FeatureSet = read_models::FEATURES;
 
-/// This area's codes, `W1200–W1299`. Empty in the stub.
-pub(super) const CODES: &[Row] = &[];
+/// This area's codes, `W1200–W1299`.
+pub(super) const CODES: &[Row] = &[
+    refusal(
+        FAMILY,
+        "a model family ngspice has no device for",
+        "ngspice-45 inpdomod.c INPdomodel",
+        "no type word and level of ngspice runs this family's equations.",
+    ),
+    refusal(
+        VERSION,
+        "a model version ngspice has no device for",
+        "ngspice-45 inpdomod.c INPfindVer",
+        "BSIM3, BSIM4 and HiSIM-HV pick their device by the version's prefix; a family with one device and no version parameter runs one version.",
+    ),
+    refusal(
+        PARAM,
+        "a model parameter ngspice's device lacks",
+        "ngspice-45 inpgmod.c create_model",
+        "ngspice ignores a name no parameter table of the device has (unrecognized parameter): the number would be silently wrong.",
+    ),
+    refusal(
+        BIN,
+        "a bin ngspice does not bin",
+        "ngspice-45 inpgmod.c INPgetModBin",
+        "ngspice bins BSIM3, BSIM4, HiSIM2 and HiSIM-HV models named base.<digits> only.",
+    ),
+    refusal(
+        VALUE,
+        "a model value ngspice reads otherwise",
+        "ngspice-45 inpcom.c inp_fix_param_values",
+        "a literal ngspice spells in another form, a string or version it cannot quote, or a value that reads the temperature or the circuit.",
+    ),
+    refusal(
+        PLACEMENT,
+        "a model in an .if branch",
+        "rewrite/S3-AREAS.md",
+        "the reader keeps such a card as text; the IR's definition in a branch scope has no ngspice reading yet.",
+    ),
+];
 
-/// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21, `Write::admits`). Stub: nothing (no item of this area is legal yet).
-pub(super) fn admits(_design: &ir::Design, _item: ir::ItemRef, _diags: &mut ir::Diags) {}
+/// A family ngspice has no device for.
+const FAMILY: Code = Code::new(b'W', 1201);
+/// A version ngspice has no device for, or a version on a family ngspice runs one way.
+const VERSION: Code = Code::new(b'W', 1202);
+/// A parameter the device's tables lack (or `level`, a field).
+const PARAM: Code = Code::new(b'W', 1203);
+/// A bin ngspice does not bin.
+const BIN: Code = Code::new(b'W', 1204);
+/// A value ngspice reads back as another value, or one that reads the run.
+const VALUE: Code = Code::new(b'W', 1205);
+/// A model in an `.if` branch.
+const PLACEMENT: Code = Code::new(b'W', 1206);
 
-/// A `Model` (stub: unreachable).
-pub(super) fn model(_w: &mut Out<'_>, _item: ir::ItemRef) {
-    let feature = ir::Feature::Item(ir::ItemKind::Model);
-    assert!(
-        !super::FEATURES.contains(feature),
-        "ngspice write: model is a stub but FEATURES has Model"
-    );
-    unreachable!("ngspice write: FEATURES lacks Item(Model) until S3.2 lands")
+/// Appends a refusal for a `Model` ngspice cannot run as the row says (R21).
+pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
+    let m: ir::Model = design.row(item.index);
+    let span = design.span_of(item);
+    let mut refuse = |code| diags.push(code, span, 0);
+    if in_branch(design, item) {
+        refuse(PLACEMENT);
+    }
+    let named = matches!(m.family, F::CodeModel | F::Module);
+    if !named && families::card(m.family, m.polarity).is_none() {
+        refuse(FAMILY);
+        return;
+    }
+    let version = (!m.version.is_none()).then(|| version_text(design, m.version));
+    let device = if named {
+        None
+    } else {
+        let has = families::version(m.family).is_some();
+        let picked = version
+            .clone()
+            .flatten()
+            .filter(|_| families::dispatches(m.family));
+        let ok = match &version {
+            None => true,
+            Some(v) => has && v.as_deref().is_some_and(bare),
+        };
+        match families::device(m.family, picked.as_deref()) {
+            Some(d) if ok => Some(d),
+            _ => {
+                refuse(VERSION);
+                None
+            }
+        }
+    };
+    let params = design.params(m.params);
+    for &(name, value) in params {
+        let name = design.str(name);
+        if let Some(dev) = device
+            && (name == "level" || !families::accepts(dev, name))
+        {
+            refuse(PARAM);
+        }
+        if !value_spells(design, value) {
+            refuse(VALUE);
+        }
+    }
+    if m.bin_of != ir::NameId::NONE {
+        let name = design.str(m.name);
+        let base = design.str(m.bin_of);
+        let digits = name
+            .strip_prefix(base)
+            .and_then(|r| r.strip_prefix('.'))
+            .is_some_and(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_digit()));
+        if !digits || !families::binnable(m.family) {
+            refuse(BIN);
+        }
+    }
+}
+
+/// `.model name word [level=n] [pchan] [version=v] k=v …`.
+pub(super) fn model(w: &mut Out<'_>, item: ir::ItemRef) {
+    let d = w.design;
+    let m: ir::Model = d.row(item.index);
+    let mut s = format!(".model {} ", d.str(m.name));
+    match m.family {
+        F::CodeModel => s.push_str(d.str(m.word)),
+        F::Module => s.push_str(d.str(m.module.name)),
+        f => {
+            let (word, level) = families::card(f, m.polarity).expect("admits refused the rest");
+            s.push_str(word);
+            if let Some(level) = level {
+                s.push_str(&format!(" level={level}"));
+            }
+            if f == F::Vdmos && m.polarity == ir::Polarity::P {
+                s.push_str(" pchan");
+            }
+        }
+    }
+    if !m.version.is_none() {
+        let (key, _) = families::version(m.family).expect("admits refused a version");
+        let text = version_text(d, m.version).expect("admits refused another value");
+        s.push_str(&format!(" {key}={text}"));
+    }
+    for &(name, value) in d.params(m.params) {
+        s.push(' ');
+        s.push_str(d.str(name));
+        s.push('=');
+        spell(d, value, &mut s);
+    }
+    w.line(&s);
+}
+
+// ---- private ----
+
+/// A refusal row.
+const fn refusal(
+    code: Code,
+    title: &'static str,
+    cite: &'static str,
+    explain: &'static str,
+) -> Row {
+    (
+        code,
+        Info {
+            title,
+            cite,
+            explain,
+            kind: Kind::Refusal,
+        },
+    )
+}
+
+/// A version's text: a string as is, a number as `INPevaluate` reads it; `None` for any other
+/// expression.
+fn version_text(d: &ir::Design, e: ir::ExprId) -> Option<String> {
+    match d.expr(e) {
+        ir::Expr::Str(s) => Some(d.str(s).to_string()),
+        ir::Expr::Num(n) => {
+            let mut out = String::new();
+            number::spell(d.num(n), Grammar::Inp, &mut out);
+            Some(out)
+        }
+        _ => None,
+    }
+}
+
+/// Whether a version text is one token ngspice reads whole (`INPfindVer` takes `%s`).
+fn bare(text: &str) -> bool {
+    !text.is_empty()
+        && text
+            .bytes()
+            .all(|c| c.is_ascii_graphic() && !b"(),=\"'{}".contains(&c))
+}
+
+/// Appends a parameter value: a number as `INPevaluate` reads it, a string quoted, else
+/// `expr_write::value`.
+fn spell(d: &ir::Design, e: ir::ExprId, out: &mut String) {
+    match d.expr(e) {
+        ir::Expr::Num(n) => number::spell(d.num(n), Grammar::Inp, out),
+        ir::Expr::Str(s) => {
+            out.push('"');
+            out.push_str(d.str(s));
+            out.push('"');
+        }
+        _ => expr_write::value(d, e, out),
+    }
+}
+
+/// Whether [`spell`] writes `e` so that the reader reads it back as itself.
+fn value_spells(d: &ir::Design, e: ir::ExprId) -> bool {
+    match d.expr(e) {
+        ir::Expr::Num(n) => {
+            let lit = d.num(n);
+            // a scale ngspice has no letter for would read back as an exponent literal
+            lit.form != ir::NumForm::Scale || ![-2, 15].contains(&lit.exp10)
+        }
+        ir::Expr::Str(s) => !d.str(s).contains(['"', '\n', '\r']),
+        _ => {
+            ir::expr_class(d, e) < ir::ExprClass::Temp
+                && expr_write::literals_spell(d, e)
+                && !holds(d, e, |x| matches!(x, ir::Expr::Str(_) | ir::Expr::List(_)))
+        }
+    }
+}
+
+/// Whether a node of `e`'s tree satisfies `pred`.
+fn holds(d: &ir::Design, e: ir::ExprId, pred: impl Fn(ir::Expr) -> bool) -> bool {
+    let mut stack = vec![e];
+    let mut seen = vec![false; d.expr_count()];
+    // Bounded: each row is visited once.
+    while let Some(x) = stack.pop() {
+        if std::mem::replace(&mut seen[x.index()], true) {
+            continue;
+        }
+        let row = d.expr(x);
+        if pred(row) {
+            return true;
+        }
+        stack.extend(children(d, row));
+    }
+    false
+}
+
+/// The children of an expression row.
+fn children(d: &ir::Design, row: ir::Expr) -> Vec<ir::ExprId> {
+    match row {
+        ir::Expr::Call(_, args)
+        | ir::Expr::UserCall(_, args)
+        | ir::Expr::Draw(_, _, _, args)
+        | ir::Expr::List(args) => d.exprs(args).to_vec(),
+        ir::Expr::Unary(_, a) => vec![a],
+        ir::Expr::Binary(_, a, b) => vec![a, b],
+        ir::Expr::Ternary(c, t, o) => vec![c, t, o],
+        _ => Vec::new(),
+    }
+}
+
+/// Whether `item` is listed in an `.if` branch's scope.
+// ponytail: one scan of the design per model; pass the listing scope (as write_structure's
+// admits gets it) when ng-scaffold's write.rs hands it over.
+fn in_branch(design: &ir::Design, item: ir::ItemRef) -> bool {
+    design
+        .reachable()
+        .into_iter()
+        .find(|(i, _)| *i == item)
+        .is_some_and(|(_, scope)| design.scope(scope).kind == ir::ScopeKind::Branch)
 }

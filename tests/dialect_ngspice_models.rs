@@ -285,6 +285,8 @@ fn ngspice_print(deck: &str) -> String {
     let out = std::process::Command::new("ngspice")
         .arg("-b")
         .arg(&path)
+        // BSIM3 and B4SOI write their check logs into the working directory
+        .current_dir(dir.path())
         .output()
         .expect("ngspice runs (nix develop .#testing provides it; unsupported fails)");
     let stdout = String::from_utf8_lossy(&out.stdout);

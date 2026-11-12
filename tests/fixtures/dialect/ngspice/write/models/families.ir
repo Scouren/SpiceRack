@@ -1,4 +1,4 @@
-# oracle: inpdomod.c (the type word and level ngspice dispatches each family on; MOS 49 and 54 the PDK spellings of 8 and 14), inpcom.c inp_vdmos_model (pchan), vbic.c:183 (vers); written by hand
+# oracle: inpdomod.c (the type word and level ngspice dispatches each family on; MOS 49 and 54 the PDK spellings of 8 and 14), inpcom.c inp_vdmos_model (pchan), soi3.c:177 (SOI3 is nsoi/psoi), vbic.c:183 (vers); written by hand
 file "families.sp" deck
   title "families"
   model a resistor
