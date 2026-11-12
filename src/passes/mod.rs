@@ -264,7 +264,7 @@ mod tests {
             .collect();
         let mut editor = d.editor();
         for (k, (item, scope)) in found.iter().enumerate() {
-            editor.items_mut(*scope).retain(|i| i != item);
+            editor.remove_item(*scope, *item);
             make(&mut editor.builder(), *scope, k);
         }
     }
