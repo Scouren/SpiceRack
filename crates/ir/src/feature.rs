@@ -103,6 +103,8 @@ pub enum Extra {
     /// Two names of the design that differ only in ASCII case: a case-folding target would
     /// merge them.
     CaseSensitiveNames,
+    /// A literal of form `Int` anywhere in the design (A12 K1: typed arithmetic).
+    IntLiteral,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -231,7 +233,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 8] = [
+    pub const ALL: [Extra; 9] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -240,6 +242,7 @@ impl Extra {
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
+        Extra::IntLiteral,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

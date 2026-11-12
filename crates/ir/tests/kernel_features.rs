@@ -33,7 +33,7 @@ fn set(fs: &[Feature]) -> FeatureSet {
 
 #[test]
 fn index_and_from_index_are_inverses() {
-    assert_eq!(Feature::COUNT, 502); // A11: three more `Func` members, each twice (plain, Dyn)
+    assert_eq!(Feature::COUNT, 507); // A11: +6; A12 K1: DivTyped and ToInt twice, IntLiteral
     let mut seen = vec![false; Feature::COUNT as usize];
     for i in 0..Feature::COUNT {
         let f = Feature::from_index(i);
@@ -131,7 +131,7 @@ fn features_of_a_hand_built_deck() {
 fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
-    let cases: [(Extra, Build, Build); 8] = [
+    let cases: [(Extra, Build, Build); 9] = [
         (
             Extra::NestedSubckt,
             |b, top| {
@@ -214,6 +214,23 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             },
             |b, top| {
                 b.global(top, &["vdd", "vss"], Span::NONE);
+            },
+        ),
+        (
+            Extra::IntLiteral,
+            |b, top| {
+                let three = spicerack_ir::Literal {
+                    mantissa: 3,
+                    frac: 0,
+                    exp10: 0,
+                    form: spicerack_ir::NumForm::Int,
+                };
+                let v = b.literal(three);
+                b.param(top, "k", v, Span::NONE);
+            },
+            |b, top| {
+                let v = b.num(3.0);
+                b.param(top, "k", v, Span::NONE);
             },
         ),
     ];

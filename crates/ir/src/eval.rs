@@ -14,7 +14,9 @@
 //! Contents: `pub trait Bindings` (`Bindings::param`, `Bindings::voltage`, `Bindings::current`,
 //! `Bindings::time`, `Bindings::temp`, `Bindings::freq`, `Bindings::tstep`, `Bindings::tstop`,
 //! `Bindings::tnom`, `Bindings::draw`), `pub enum Domain`, `pub const CALLS_MAX`,
-//! `pub fn eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`
+//! `pub fn eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`,
+//! `pub fn eval_typed(&Design, ExprId, &dyn Bindings) -> Result<Value, Domain>`, `pub struct Value`
+//! (`Value::real(f64)`, `Value::int(f64)`), `Bindings::param_value`
 
 use crate::design::Design;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, Func, UnOp};
@@ -47,6 +49,22 @@ pub trait Bindings {
     /// A draw's value given its evaluated arguments: the nominal or a sample, by the caller's run
     /// context and the draw's `when` and `per`. `args.len()` is within `dist.arity()`.
     fn draw(&self, dist: Dist, when: DrawWhen, per: DrawPer, args: &[f64]) -> Option<f64>;
+
+    /// A parameter read's value with its type (A12 K1): an instance may pass an Int or a Real.
+    /// Default: `param` as a Real.
+    fn param_value(&self, param: Ref) -> Option<Value> {
+        self.param(param).map(Value::real)
+    }
+}
+
+/// A value and its type (A12 K1): an Int is a whole number within ±2⁵³ computed with integer
+/// rules (`DivTyped` truncates); everything else is Real.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Value {
+    /// The number.
+    pub number: f64,
+    /// Whether it is of Int type.
+    pub int: bool,
 }
 
 /// Why an expression has no value. Each carries the row where evaluation stopped.
@@ -106,7 +124,24 @@ struct Machine<'a> {
 }
 
 /// The value of `e` under `env`. Pure: the same design, id and bindings give the same result.
+impl Value {
+    /// A Real value.
+    pub const fn real(number: f64) -> Value {
+        Value { number, int: false }
+    }
+
+    /// An Int value.
+    pub const fn int(number: f64) -> Value {
+        Value { number, int: true }
+    }
+}
+
 /// `Ddt` and `Idt` need a time history no `Bindings` gives: they are [`Domain::Unbound`].
+pub fn eval_typed(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<Value, Domain> {
+    todo!() // A12 K1: red first
+}
+
+/// The value of `e` under `env`, as a number (`eval_typed` without the type).
 pub fn eval(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<f64, Domain> {
     assert!(
         !e.is_none() && e.index() < design.expr_count(),
@@ -355,6 +390,7 @@ fn binary(e: ExprId, op: BinOp, a: f64, b: f64) -> Result<f64, Domain> {
         BinOp::BitXor => bits(|a, b| a ^ b),
         BinOp::Shl => shift(true),
         BinOp::Shr => shift(false),
+        BinOp::DivTyped => todo!(), // A12 K1: red first
     }
 }
 
@@ -450,6 +486,7 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         }
         Func::Ddt | Func::Idt => unreachable!("refused before their arguments are evaluated"),
         Func::Pwl => return pwl(xs).ok_or(out),
+        Func::ToInt => todo!(), // A12 K1: red first
     };
     Ok(v)
 }
