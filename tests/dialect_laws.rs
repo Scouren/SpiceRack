@@ -8,8 +8,7 @@
 //! for the set by construction) and their canonical IR text (`ir::dump`, which has no spans:
 //! `≅`); fixed seeds, each printed in the failing assertion.
 //!
-//! Until the circuit and run owners' rows land, designs are generated over the kernel's item
-//! kinds only (`KERNEL_KINDS`); then `kernel()` goes and each law runs on the writer's whole set.
+//! Each law runs on the writer's whole feature set.
 //!
 //! Contents: tests only.
 
@@ -19,22 +18,6 @@ use spicerack::ir::r#gen::{Size, generate};
 
 /// The seeds every generated law runs (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..64;
-
-/// The item kinds whose rows the kernel owns (bodies landed, M1–M4); the circuit and run
-/// owners' kinds join when their rows land, then this set is the writer's whole set.
-const KERNEL_KINDS: [ir::ItemKind; 11] = [
-    ir::ItemKind::Title,
-    ir::ItemKind::Comment,
-    ir::ItemKind::Include,
-    ir::ItemKind::Global,
-    ir::ItemKind::Load,
-    ir::ItemKind::Opaque,
-    ir::ItemKind::Subckt,
-    ir::ItemKind::Section,
-    ir::ItemKind::If,
-    ir::ItemKind::Param,
-    ir::ItemKind::Func,
-];
 
 /// A moderate design: the merge tier's size (REWRITE-PLAN §7.5).
 const SIZE: Size = Size {
@@ -64,10 +47,33 @@ fn l1_l2_any_bytes_read_returns_and_checks_clean() {
 }
 
 #[test]
+fn l1_an_empty_text_is_one_file_with_no_item() {
+    for (row, _) in readers() {
+        for text in ["", "\n"] {
+            let (design, diags) = read_text(row, text);
+            let files: Vec<ir::FileId> = design.files().collect();
+            assert_eq!(files.len(), 1, "{}: {text:?} is one file", row.name);
+            assert!(
+                design.reachable().is_empty(),
+                "{}: {text:?} holds no item",
+                row.name
+            );
+            assert!(
+                diags.is_empty(),
+                "{}: {text:?}: {:?}",
+                row.name,
+                diags.rows()
+            );
+            assert_eq!(design.str(design.file(files[0]).path), "law");
+        }
+    }
+}
+
+#[test]
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
     for (row, writer) in writers() {
         for seed in SEEDS.take(8) {
-            let text = all_files(&generate(seed, &kernel(writer.features()), SIZE), row);
+            let text = all_files(&generate(seed, writer.features(), SIZE), row);
             let once = all_files(&read_text(row, &text).0, row);
             let threads: Vec<String> = std::thread::scope(|s| {
                 let jobs: Vec<_> = (0..4)
@@ -89,7 +95,7 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
 #[test]
 fn l4_write_is_total_over_a_design_legalize_accepted() {
     for (row, writer) in writers() {
-        let claimed = kernel(writer.features());
+        let claimed = *writer.features();
         let (mut skipped, mut seen) = (Vec::new(), ir::FeatureSet::EMPTY);
         for seed in SEEDS {
             let mut design = generate(seed, &claimed, SIZE);
@@ -134,7 +140,7 @@ fn l5_read_of_write_is_the_design() {
             continue;
         }
         for seed in SEEDS {
-            let design = generate(seed, &kernel(writer.features()), SIZE);
+            let design = generate(seed, writer.features(), SIZE);
             let text = all_files(&design, row);
             let back = read_text(row, &text).0;
             assert_eq!(
@@ -186,7 +192,7 @@ fn l7_legalized_designs_use_only_the_writers_features() {
             );
         }
         for seed in SEEDS {
-            let mut design = generate(seed, &kernel(all), SIZE);
+            let mut design = generate(seed, all, SIZE);
             let mut diags = ir::Diags::new();
             spicerack::passes::legalize(&mut design, writer.features(), &mut diags);
             let refused: Vec<u32> = diags
@@ -214,7 +220,7 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
     for (row, writer) in writers() {
         for seed in SEEDS {
-            let design = generate(seed, &kernel(writer.features()), SIZE);
+            let design = generate(seed, writer.features(), SIZE);
             let entry = design.entry();
             let path = design.str(design.file(entry).path).to_string();
             let mut alone = ir::Diags::new();
@@ -228,17 +234,6 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             assert_eq!(again, first, "{} seed {seed}", row.name);
         }
     }
-}
-
-/// `set` without the item kinds the kernel does not own yet (what `generate` may build today).
-fn kernel(set: &ir::FeatureSet) -> ir::FeatureSet {
-    let others = ir::ItemKind::ALL
-        .iter()
-        .filter(|k| !KERNEL_KINDS.contains(k));
-    let others = others.fold(ir::FeatureSet::EMPTY, |acc, &k| {
-        acc.with(ir::Feature::Item(k))
-    });
-    set.minus(others)
 }
 
 /// The rows with a reader.
@@ -324,9 +319,9 @@ fn noise(seed: u64, len: usize) -> String {
 #[cfg(feature = "corpus")]
 fn corpus(name: &str) -> Vec<String> {
     match name {
-        // The kernel's kinds; the worked example of `text.rs` (elements, an analysis) joins
-        // when the circuit and run owners' rows land.
+        // The kernel's kinds, and the worked example of `crates/ir/src/text.rs`.
         "ir" => vec![
+            "file \"rc.sp\" deck\n  title \"rc divider\"\n  param rval = 1k\n  subckt div (in out gnd) r=rval\n    element resistor r1 (in out) value=r\n    element resistor r2 (out gnd) value=(r / 2)\n  element instance x1 (a b 0) model=div\n  element vsource v1 (a 0) dc=1.8\n  analysis op\n".to_string(),
             "file \"kit.sp\" deck\n  title \"kernel kinds\"\n  global vdd vss\n  param w = 2u\n  subckt cell (a b) r=w\n    param k = r * 2\n  if (w > 1u)\n    param m = 1\n  else\n    param m = 3\nfile \"models.lib\" library\n  section tt\n    param vth = 0.4\n".to_string(),
         ],
         _ => Vec::new(),

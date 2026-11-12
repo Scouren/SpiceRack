@@ -4,14 +4,10 @@
 //! format and code map, the route override, and `Sources::load`'s walk.
 //!
 //! Oracles: canonical IR text read and written back is the same text (a fixpoint): the
-//! kernel's kinds today (`KERNEL`), the grammar's worked example (`crates/ir/src/text.rs`) when
-//! the circuit and run rows land; hand-computed line and column of a byte offset; the old
+//! kernel's kinds (`KERNEL`) and the grammar's worked example (`crates/ir/src/text.rs`); hand-computed line and column of a byte offset; the old
 //! catalogue's own titles; the route rules of `rewrite/SPINE.md` §5 written out as a table; a
 //! hand-built include graph with its expected breadth-first order.
-//!
-//! Tests that still reach an IR stub (the circuit and run owners' rows) carry the marker
-//! `#[should_panic(expected = "not yet implemented")]`: they fail (an unexpected pass) the day
-//! the rows land, until the marker goes.
+
 //!
 //! Contents: tests only.
 
@@ -199,8 +195,6 @@ fn kernel_kinds_are_a_fixpoint_of_the_ir_dialect() {
 }
 
 #[test]
-// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
-#[should_panic(expected = "not yet implemented")]
 fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
     let src = Sources::one("rc.ir", WORKED);
     let out = dialect::transpile(&src, ir_row(), ir_row(), Policy::Strict)
@@ -230,8 +224,6 @@ fn a_feature_no_pass_removes_is_refused_at_its_item() {
 }
 
 #[test]
-// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
-#[should_panic(expected = "not yet implemented")]
 fn a_feature_no_pass_removes_is_refused_with_its_index() {
     let src = Sources::one("rc.ir", WORKED);
     let refused = dialect::transpile(&src, ir_row(), &NO_SUBCKT, Policy::Lenient)
@@ -354,6 +346,19 @@ fn a_writer_that_admits_everything_writes_as_before() {
             .split("file \"models.lib\"")
             .next()
             .expect("the deck")
+    );
+}
+
+#[test]
+// marker: waits for `ir::parse` to set `span.file` (the lead's ruling on surprise 1); remove then
+#[should_panic(expected = "names its line")]
+fn a_routed_ir_text_diagnostic_names_its_line() {
+    let text = "file \"d.sp\" deck\n  title \"t\"\n  bogus line\n";
+    let refused = facade::render_text(text, "d", ir_row(), ir_row()).expect_err("P9001 refuses");
+    let line = refused.messages.lines().next().unwrap_or("");
+    assert!(
+        line.starts_with("d:3:"),
+        "a routed diagnostic names its line: {line}"
     );
 }
 

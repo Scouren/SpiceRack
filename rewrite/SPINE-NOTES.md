@@ -24,12 +24,10 @@ Each line: question → choice → why.
 8. `Policy::Strict` → `dialect::read` pushes `STRICT_UNREAD` (`S0101`, the spine's own table, ruling 1)
    at each `Opaque` row of class `Unread` (scanning the `Opaque` table). `S0001` (the reader's note)
    stays a note.
-9. Text family (R11) → `dialect::legalize` (once per design and target, in place) walks every reachable
-   item: another family's `Opaque` of class `Inert` is removed from its scope with an `INERT_DROPPED`
-   note (`S0102`), any other class is refused (`U0001`, `arg` = `Feature::Item(Opaque)`) at the item;
-   `ANY_FAMILY = "*"` (the IR text writer) skips the step. The walk is a private stand-in for
-   `Design::reachable()` (Subckt, Section, If, Loop bodies; files in id order), swapped when the
-   kernel makes it public (ruling 5).
+9. Text family (R11) → `dialect::legalize` (once per design and target, in place) walks
+   `Design::reachable()`: another family's `Opaque` of class `Inert` is removed from its listing
+   scope with an `INERT_DROPPED` note (`S0102`), any other class is refused (`U0001`, `arg` =
+   `Feature::Item(Opaque)`) at the item; `ANY_FAMILY = "*"` (the IR text writer) skips the step.
 10. `write` (R11) → calls the writer only; legality is the caller's contract (debug assertions:
     features inside the writer's set, no foreign `Opaque`). `transpile` = read → refused? → legalize →
     refused? → write of the entry. The facade's `render_kit` keeps today's one-file-per-call shape:
@@ -60,14 +58,14 @@ Each line: question → choice → why.
     `--check` it is a usage error (exit 2). `--dump-ir` writes every file of the design as IR text to
     `<stem>.ir` and prints its path; `--dump-ir=legal` needs `--to` with a new-pipeline writer.
     A side the new pipeline lacks (e.g. `--dialect ngspice --dump-ir`) fails the deck (exit 1).
-20. `IrText::features` → every feature, built once at run time (`OnceLock`) from
-    `Feature::from_index`, until `FeatureSet::ALL` lands as a `const` (ruling 4), then swapped.
+20. `IrText::features` → `&ir::FeatureSet::ALL`.
 21. The IR reader reads each `Sources` text with `ir::parse`; the text's own `file` lines name the
     design's files (the `Sources` path is not used) → IR text is self-describing.
 22. L1's "statement count in = out" → not asserted for `ir` (no statement counter the IR exposes);
-    L1 asserts the read returns and L2 that `check` adds no `X` row. L6's corpus for `ir` is the
-    worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous with one row.
-
+    L1 asserts the read returns, L2 that `check` adds no `X` row, and the empty-text case that ""
+    and "\n" read as one file with no item and no row. L6's corpus for `ir` is a kernel-kinds text
+    and the worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous
+    with one row.
 23. `Write::admits` (AMEND-A12 S1) → default empty; `dialect::legalize` calls it last; `write`'s debug
     assertions run it into a scratch list that must stay empty. L4 skips a generated design
     `legalize` refuses (any refusal) and fails when no admitted design holds an item kind the
@@ -76,6 +74,12 @@ Each line: question → choice → why.
 24. `OpaqueClass::Hint` (R19) is not in the kernel yet: `legalize`'s match over classes is exhaustive,
     so the member's arrival stops the build; then a spine note row (distinct from `INERT_DROPPED`:
     "the numbers may move within the solver's tolerance") and the drop.
+25. The `Read` contract (lead's ruling on surprise 4) → a reader creates a file for every text of
+    `src`, the entry first, even when empty. `IrText` meets it by opening an empty file at the
+    `Sources` path when a text opens no `file` block (empty, comments only, or refused lines): an
+    empty `.ir` is then one empty deck, not a panic in `Design::entry` (the lead's exception, "a text
+    with no `file` line is a `P9001`", does not hold: an empty or comment-only text gives no row).
+    `transpile` asserts an entry after a read with no refusal.
 
 ## Requests (ruled by the lead)
 
@@ -106,8 +110,19 @@ index; `ir::diag::info` answers the kernel's codes). Differences found:
 5. A repeated port (`subckt s (a a)`) is a `P9001` with nothing pushed, as `item_text.rs` says; an
    unresolved name (`param p = q + 1`) is no row (legal, C8).
 
+## The IR at cf98e0d4
+
+6. `Design::entry()` is the first `Deck` file, else file 0, not "the first file". A kit read with a
+   library as its entry (`facade::render_kit` on an included file) whose walk reaches a deck file
+   would write that deck instead. Today's walk follows the entry's own references only, so a deck
+   is reached only when a library includes one. Either `transpile` writes file 0 (the `Read`
+   contract puts the entry first), or `entry()` states the case; the spine keeps `entry()` until
+   ruled.
+
 ## Open
 
-- The gate item "`spice2rack --dialect ir --to ir` is a fixpoint on the worked example" waits for the
-  circuit and run rows (`the_worked_example_is_a_fixpoint_of_the_ir_dialect` carries the marker); the
-  kernel-kinds twin `kernel_kinds_are_a_fixpoint_of_the_ir_dialect` passes.
+- Done at cf98e0d4: `spice2rack --dialect ir --to ir` (and `--dump-ir`) is a byte fixpoint on the
+  worked example of `text.rs`; `the_worked_example_is_a_fixpoint_of_the_ir_dialect` passes.
+- Waiting for the kernel: `span.file` set by `parse` (then a routed IR-text diagnostic prints its file
+  and line; test `a_routed_ir_text_diagnostic_names_its_line` carries the marker), a total
+  `Design::entry()`, `OpaqueClass::Hint` (decision 24).

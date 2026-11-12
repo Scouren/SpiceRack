@@ -65,8 +65,9 @@ pub trait Read: Sync {
 
     /// Every statement of every file of `src` becomes IR items, or an `Opaque` item with a
     /// coded diagnostic. Total: never panics on input, never drops a statement, never learns a
-    /// target. A reader of a SPICE-family dialect creates the design's files in `src`'s order
-    /// (the facade anchors diagnostics by it).
+    /// target. A reader creates a file for every text of `src`, in `src`'s order, the entry
+    /// first, even when the text is empty (the facade anchors diagnostics by that order, and
+    /// `transpile` writes the entry).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags);
 }
 
@@ -302,7 +303,13 @@ pub fn transpile(
     if refused(&diags) {
         return Err(diags);
     }
-    let text = write(&design, design.entry(), to, &mut diags);
+    let entry = design.entry();
+    assert!(
+        entry != ir::FileId::NONE,
+        "transpile: the {} reader made no file",
+        from.name
+    );
+    let text = write(&design, entry, to, &mut diags);
     Ok(Written { text, notes: diags })
 }
 
@@ -335,49 +342,11 @@ fn foreign(design: &ir::Design, to: &DialectRow) -> Vec<(ir::ItemRef, ir::ScopeI
     if to.text_family == ANY_FAMILY {
         return Vec::new();
     }
-    let mut out = reachable(design);
+    let mut out = design.reachable();
     out.retain(|(item, _)| {
         item.kind == ir::ItemKind::Opaque
             && design.str(design.row::<ir::item::Opaque>(item.index).dialect) != to.text_family
     });
-    out
-}
-
-/// Every reachable item with its listing scope, files in id order, each scope's items in
-/// order, nested bodies after their scope's items.
-// ponytail: a stand-in for the kernel's `Design::reachable()` (ruling 5); swap when it is public.
-fn reachable(design: &ir::Design) -> Vec<(ir::ItemRef, ir::ScopeId)> {
-    let mut out = Vec::new();
-    let mut todo = Vec::new();
-    let mut scopes = 0;
-    for file in design.files() {
-        todo.push(design.file(file).top);
-        // Bounded: each scope is pushed once, by its owner (checked by `ir::check`).
-        while let Some(scope) = todo.pop() {
-            scopes += 1;
-            assert!(
-                scopes <= ir::id::SCOPES_MAX,
-                "reachable: a scope listed twice"
-            );
-            for &item in design.items(scope) {
-                out.push((item, scope));
-                match item.kind {
-                    ir::ItemKind::Subckt => {
-                        todo.push(design.row::<ir::item::Subckt>(item.index).body)
-                    }
-                    ir::ItemKind::Section => {
-                        todo.push(design.row::<ir::item::Section>(item.index).body)
-                    }
-                    ir::ItemKind::Loop => todo.push(design.row::<ir::Loop>(item.index).body),
-                    ir::ItemKind::If => {
-                        let row: ir::item::If = design.row(item.index);
-                        todo.extend(design.branches(row.branches).iter().map(|b| b.body));
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
     out
 }
 

@@ -183,3 +183,30 @@ fn a_set_without_items_generates_files_only() {
     assert!(features_used(&d).is_empty());
     assert!(d.files().count() >= 1);
 }
+
+#[test]
+fn check_legal_agrees_with_features_used() {
+    // check_legal is empty exactly when features_used(d).minus(legal) is, and reports exactly
+    // that difference (compared as sets of feature indices)
+    let full = kernel_set();
+    let mut state = 0xC4EC_u64;
+    for seed in 0..40u64 {
+        let d = generate(seed, &full, SIZE);
+        let used = features_used(&d);
+        for k in 0..20 {
+            let mut legal = FeatureSet::EMPTY;
+            for f in full.iter() {
+                if next(&mut state).is_multiple_of(3) {
+                    legal = legal.with(f);
+                }
+            }
+            let mut diags = Diags::new();
+            spicerack_ir::check_legal(&d, &legal, &mut diags);
+            let mut got: Vec<u32> = diags.rows().iter().map(|r| r.arg).collect();
+            got.sort_unstable();
+            got.dedup();
+            let want: Vec<u32> = used.minus(legal).iter().map(|f| f.index() as u32).collect();
+            assert_eq!(got, want, "seed {seed}, subset {k}");
+        }
+    }
+}

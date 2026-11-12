@@ -7,7 +7,7 @@
 //! Per-kind constant facts an owner's `check` needs (`ElemKind::terminals() -> (u8, u8)`,
 //! `ElemKind::has_detail()`, `ElemKind::needs_model()`) are `const fn`s in the owner's file.
 //!
-//! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2 and A4).
+//! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
 //! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
 //! `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
@@ -27,6 +27,7 @@ use crate::id::{
 };
 use crate::item::DefKind;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// What the kernel's generic code needs from an item row. Implemented by the row's owner, in
 /// the row's file; the kernel reaches every kind through one exhaustive dispatch.
@@ -35,23 +36,30 @@ pub trait RowFacts: ItemRow {
     /// their ranges and reads the expression features from them).
     fn handles(&self, design: &Design, out: &mut Vec<Handle>);
 
-    /// Calls `f` on each `Ref` the row holds, in field order, with the definition kind the field
-    /// expects (A4). The linker binds through it; a pass that renumbers definitions rewrites
-    /// through it.
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind));
+    /// Calls `f` on every `Ref` the item `at` owns (its header row, its detail rows, its pools),
+    /// in a fixed order, with the definition kind each field expects, and stores them back (A4,
+    /// A9). An associated function, so a row reaches references outside its header. The linker
+    /// binds through it, `check` reads through it, `Builder::bind_ref` addresses its k-th slot,
+    /// and a pass that renumbers definitions rewrites through it. Must not change anything but
+    /// the references `f` changes.
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
 
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
-    /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features. The kernel adds the expression features from `handles`.
-    fn features(&self, design: &Design, set: &mut FeatureSet);
+    /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features; `at` is the item, `scope` the
+    /// scope that lists it (A9). The kernel adds the expression and placement features; features
+    /// of the whole design are the owners' `design_features` hooks.
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
 
     /// Appends the violations of the row's own invariants (counts, a detail row present exactly
-    /// when the kind has one, field domains); `at` is the item, for the span. Handle ranges are
-    /// the kernel's check.
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags);
+    /// when the kind has one, field domains); `at` is the item (for the span), `scope` the scope
+    /// that lists it. Handle ranges are the kernel's check.
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
 
-    /// Writes the row as IR text: its statement, without indentation, without the line break
-    /// and without its body (the kernel writes bodies).
-    fn dump(&self, design: &Design, out: &mut String);
+    /// Writes the row's fields as IR text: what follows its keyword, without indentation, line
+    /// break or body (the kernel writes those). `ctx` is where it stands (`ctx.item` the item,
+    /// `ctx.scope` the scope a reference's bare spelling is looked up from); pass it to the
+    /// `text_expr` writers so references come out bare, `name?` or `name#k` by the A4 rule.
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String);
 
     /// Reads one IR-text statement of this kind (`words` stands after the keyword) and pushes it
     /// into `scope`. On a malformed statement it reports through `words` and still pushes the
@@ -102,23 +110,45 @@ pub enum Handle {
 
 /// The definition phase's `RowFacts` for a row: every method `todo!()`. The implementation
 /// phase replaces each `todo_facts!(Row);` line with the row's own `impl RowFacts`.
+#[allow(unused_macros)] // its last users are the owners' placeholder rows; removed at M5
 macro_rules! todo_facts {
     ($row:ty) => {
         impl $crate::facts::RowFacts for $row {
             fn handles(&self, design: &$crate::Design, out: &mut Vec<$crate::facts::Handle>) {
                 todo!()
             }
-            fn map_refs(&mut self, f: &mut dyn FnMut(&mut $crate::Ref, $crate::DefKind)) {
+            fn map_refs(
+                design: &mut $crate::Design,
+                at: $crate::ItemRef,
+                f: &mut dyn FnMut(&mut $crate::Ref, $crate::DefKind),
+            ) {
                 todo!()
             }
-            fn features(&self, design: &$crate::Design, set: &mut $crate::FeatureSet) {
+            fn features(
+                &self,
+                design: &$crate::Design,
+                at: $crate::ItemRef,
+                scope: $crate::ScopeId,
+                set: &mut $crate::FeatureSet,
+            ) {
                 todo!()
             }
-            fn check(&self, design: &$crate::Design, at: $crate::ItemRef, out: &mut $crate::Diags) {
+            fn check(
+                &self,
+                design: &$crate::Design,
+                at: $crate::ItemRef,
+                scope: $crate::ScopeId,
+                out: &mut $crate::Diags,
+            ) {
                 todo!()
             }
             #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
-            fn dump(&self, design: &$crate::Design, out: &mut String) {
+            fn dump(
+                &self,
+                design: &$crate::Design,
+                ctx: &$crate::text_expr::Ctx,
+                out: &mut String,
+            ) {
                 todo!()
             }
             fn parse(

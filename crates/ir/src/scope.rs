@@ -11,8 +11,8 @@
 //!
 //! Contents: `pub struct File`, `pub struct Scope`, `pub struct Def`,
 //! `Design::lookup(&self, ScopeId, DefKind, NameId) -> DefId`,
-//! `Design::find_file(&self, &str) -> FileId`; crate:
-//! `Design::reachable(&self) -> Vec<(ItemRef, ScopeId)>`,
+//! `Design::find_file(&self, &str) -> FileId`,
+//! `Design::reachable(&self) -> Vec<(ItemRef, ScopeId)>`; crate:
 //! `Design::bodies(&self) -> HashMap<ItemRef, Vec<ScopeId>>`
 
 use std::collections::HashMap;
@@ -96,9 +96,11 @@ impl Design {
 
     /// Every item reachable from a file's top scope, with the scope that lists it: files in id
     /// order, each scope's items in order, an item's body scopes right after the item (depth
-    /// first: the order of `text::dump`). Total over any table contents: each scope is entered
-    /// once, out-of-range scopes are skipped. Explicit stack (C11).
-    pub(crate) fn reachable(&self) -> Vec<(ItemRef, ScopeId)> {
+    /// first: the order of `text::dump`). The order is part of the contract: callers attribute
+    /// an item to its file by its listing scope (`design.scope(scope).file`, R10), never by its
+    /// span. Total over any table contents: each scope is entered once, out-of-range scopes are
+    /// skipped. Explicit stack (C11). O(items + scopes).
+    pub fn reachable(&self) -> Vec<(ItemRef, ScopeId)> {
         let bodies = self.bodies();
         let mut entered = vec![false; self.scopes.len()];
         let mut out = Vec::new();

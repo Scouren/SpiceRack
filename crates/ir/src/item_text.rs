@@ -10,9 +10,10 @@
 //!
 //! Cites: `crates/ir/src/text.rs` (grammar); `rewrite/IR-KERNEL.md` §5, §9.
 //!
-//! Contents: crate: `dump_title`, `dump_comment`, `dump_include`, `dump_global`, `dump_load`,
+//! Contents: crate: `modules_of(&Design, ItemRef) -> Vec<NameId>`, `dump_title`, `dump_comment`, `dump_include`, `dump_global`, `dump_load`,
 //! `dump_opaque`, `dump_subckt`, `dump_section`, `dump_if`, `dump_param`, `dump_func` (each
-//! `(row, &Design, ItemRef, &Ctx, &mut String)`); `parse_title`, `parse_comment`,
+//! `(row, &Design, ItemRef, &Ctx, &mut String)`, but `dump_load(row, &Design, &[NameId], &mut
+//! String)`); `parse_title`, `parse_comment`,
 //! `parse_include`, `parse_global`, `parse_load`, `parse_opaque`, `parse_subckt`,
 //! `parse_section`, `parse_if`, `parse_param`, `parse_func` (each `(&mut Words<'_>, ScopeId,
 //! &mut Builder<'_>, &mut Diags) -> ItemRef`)
@@ -50,23 +51,18 @@ pub(crate) fn dump_global(row: &Global, d: &Design, _: ItemRef, _: &Ctx, out: &m
     names(d, d.names(row.nets), " ", out);
 }
 
-/// `veriloga|osdi "path" [modules=(…)]`: the modules are the `Module` definitions whose item
-/// is this load, in definition order (none when `at` is `NONE`).
-pub(crate) fn dump_load(row: &Load, d: &Design, at: ItemRef, _: &Ctx, out: &mut String) {
+/// `veriloga|osdi "path" [modules=(…)]`: `modules` are the `Module` definitions whose item is
+/// this load, in definition order (`text::dump` gathers them once per dump; `modules_of` finds
+/// them for one load).
+pub(crate) fn dump_load(row: &Load, d: &Design, modules: &[NameId], out: &mut String) {
     out.push_str(match row.kind {
         LoadKind::VerilogA => "veriloga ",
         LoadKind::Osdi => "osdi ",
     });
     write_string(d.str(row.path), out);
-    let modules: Vec<NameId> = d
-        .definitions()
-        .iter()
-        .filter(|def| def.kind == DefKind::Module && def.item == at)
-        .map(|def| def.name)
-        .collect();
     if !modules.is_empty() {
         out.push_str(" modules=(");
-        names(d, &modules, " ", out);
+        names(d, modules, " ", out);
         out.push(')');
     }
 }
@@ -84,12 +80,17 @@ pub(crate) fn dump_subckt(row: &Subckt, d: &Design, _: ItemRef, ctx: &Ctx, out: 
     out.push_str(" (");
     names(d, d.names(row.ports), " ", out);
     out.push(')');
+    // A10: the head defaults are read from the body, where the sibling parameters are defined
+    let body = Ctx {
+        scope: row.body,
+        ..*ctx
+    };
     for &(name, value) in d.params(row.params) {
         out.push(' ');
         write_name(d.str(name), out);
         if !value.is_none() {
             out.push('=');
-            write_value(d, value, ctx, out);
+            write_value(d, value, &body, out);
         }
     }
 }
@@ -122,11 +123,11 @@ pub(crate) fn dump_func(row: &Func, d: &Design, at: ItemRef, ctx: &Ctx, out: &mu
     out.push('(');
     names(d, d.names(row.args), ", ", out);
     out.push_str(") = ");
-    let def = d
-        .definitions()
-        .iter()
-        .position(|def| def.kind == DefKind::Func && def.item == at);
-    let formals = def.map_or(crate::id::DefId::NONE, |k| crate::id::DefId(k as u32));
+    // the function defines itself in the scope that lists it: one index lookup
+    let formals = match d.def_index.get(&(ctx.scope, DefKind::Func, row.name)) {
+        Some(&def) if d.def(def).item == at => def,
+        Some(_) | None => crate::id::DefId::NONE,
+    };
     write_expr(d, row.body, &Ctx { formals, ..*ctx }, out);
 }
 
@@ -402,6 +403,14 @@ pub(crate) fn parse_func(
     }
     let args: Vec<&str> = args.iter().map(|a| a.as_ref()).collect();
     b.func(scope, &name, &args, body, w.line_span())
+}
+
+/// The `Module` names a load defines, in definition order. O(definitions): for one load.
+pub(crate) fn modules_of(d: &Design, at: ItemRef) -> Vec<NameId> {
+    let defs = d.definitions().iter();
+    defs.filter(|def| def.kind == DefKind::Module && def.item == at)
+        .map(|def| def.name)
+        .collect()
 }
 
 // ---- private ----

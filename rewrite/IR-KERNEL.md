@@ -210,15 +210,58 @@ three meanings, so the node states them: `Expr::Draw(Dist, DrawWhen, DrawPer, Ex
 parameter idiom, Spectre's `statistics` block) is a pass.
 
 **A9 (2026-11-12): a row's facts take its position.** The bodies showed three things the trait
-above could not say, so its final shape is: `handles(&self, design, out)`; `features(&self,
-design, at: ItemRef, scope: ScopeId, set)`; `check(&self, design, at, scope, out)`; `dump(&self,
-design, at, scope, out)` (with the scope a row writes `name#k` exactly when lookup would bind
-another definition); `map_refs(design: &mut Design, at: ItemRef, f)` as an associated function
-that visits every `Ref` the item owns, in its header, its detail rows and its pools (a sweep's
-target, a `Vary`'s parameter), and stores them back. Features of the whole design (several
-analyses in one deck, an option after a run item) are not a row's: `features_used` calls one
-`design_features(&Design, &mut FeatureSet)` hook per owner. `text.rs` gives owners the writers
-that mirror the `Words` readers (`write_name`, `write_value`, `write_expr`, `write_ref`, …).
+above could not say, so its final shape is (as implemented in `facts.rs`):
+
+```rust
+fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
+fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
+fn dump(&self, design: &Design, ctx: &text::Ctx, out: &mut String);
+fn parse(words: &mut Words<'_>, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ItemRef;
+fn generate(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>, features: &FeatureSet) -> ItemRef;
+```
+
+`map_refs` is an associated function: it visits every `Ref` the item owns, in its header, its
+detail rows and its pools (a sweep's target, a `Vary`'s parameter), in a fixed order, and stores
+them back. `Editor::map_refs` dispatches to it, `link` binds through it in two passes (record,
+look up, write the k-th answer to the k-th slot), and `check` reads it from one copy of the design.
+`dump` takes a `text::Ctx { scope, item, formals }`: the scope a bare reference is looked up from,
+the item (a measure's reads fall back to measures), and the function whose body is being written
+(its formal arguments). The kernel's dump loop builds it; a row passes it to the writers. Features
+of the whole design (several analyses in one deck, an option after a run item) are not a row's:
+`features_used` calls one `pub(crate) fn design_features(&Design, &mut FeatureSet)` hook per owner
+(`element.rs`, `analysis.rs`), and `check_legal` reports what they add at `Span::NONE`. `text`
+gives owners the writers that mirror the `Words` readers: `write_name`, `write_names`,
+`write_string`, `write_literal`, `write_value`, `write_expr`, `write_exprs`, `write_params`,
+`write_ref(design, r, kind, ctx, out)` (bare when lookup from `ctx.scope` gives what the reference
+holds, `name?` for an unresolved reference the lookup would bind, `name#k` otherwise).
+
+**A10 (2026-11-12): a subcircuit's head defaults are looked up from its body.** The neutral lookup
+scope of a `Subckt` row's expressions is its body scope, not the scope that lists it, so
+`r=rval w=(2*r)` binds `r` to the sibling head parameter and then looks outward. `link`, the
+writer's bare-or-`#k` test and `parse` (through `link`) use the body for that row; every other row
+keeps its listing scope. Why: ngspice sorts head parameters by dependency, HSPICE and Spectre read
+them in the body, and a lookup from the parent would dump the common case as `r#k`.
+
+**A11 (2026-11-12): from the ngspice tracer (ngspice-45 source and runs).**
+1. Three `Func` members: `StepHalf` (0 for x < 0, 0.5 at 0, 1 for x > 0: ngspice B-source `u`,
+   `PTustep`), `PowSigned` (−pow(−x, y) for x < 0, else pow(x, y), `0` to a negative power a
+   domain error: B-source `pwr`, `PTpwr`), `Sqr` (x·x: numparam `sqr`). `Func::COUNT` is 43 and
+   `Feature::COUNT` 502.
+2. Attributions corrected, no behaviour change: `Step` is not ngspice's `u`; `SqrtAbs` and `LnAbs`
+   are not ngspice-45's B-source `sqrt`/`ln` (those error below zero), and are removed if no reader
+   produces them; `ExpLin14` is ngspice's B-source `exp` under `ngbehavior=ps` only; `IntDiv` is not
+   ngspice's `\` (which is `trunc(|a / b|)`, read as `Trunc(Abs(Div))`), no speaker yet.
+3. The dynamic class (R14): `pub enum ExprClass { Constant, Temp, Circuit }` (ordered) and
+   `pub fn expr_class(&Design, ExprId) -> ExprClass`. An expression is `Circuit` when it, or a
+   parameter or user function it reads (transitively), holds V, I, Time, Freq, Ddt or Idt; else
+   `Temp` when one of them holds `Temp`; else `Constant`. One class per `Param`/`Func` definition,
+   computed once per design state (Kahn's worklist; a definition on or behind a reference cycle is
+   `Circuit`) and cached in the design, cleared by every `Builder`/`Editor` mutation. The `*Dyn`
+   features are `class >= Temp`. `ProbeContext` stays the direct test.
+4. `Builder::bind_ref(item, k, def)` sets the k-th `Ref` of `item`, in `map_refs` order (asserts `k`
+   in range and the slot's kind), so a reader binds a row reference to a definition it pushes later.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

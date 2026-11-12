@@ -48,7 +48,8 @@
 //!   but `Expr`: `ALL`, `COUNT`
 //! - `pub struct Literal`, `Literal::ZERO`, `Literal::value(self) -> f64`,
 //!   `Literal::from_f64(f64) -> Literal`, `Literal::eq_value(self, Literal) -> bool`,
-//!   `Literal::is_valid(self) -> bool`, crate: `Literal::shape_ok(self) -> bool`
+//!   `Literal::is_valid(self) -> bool`, crate: `Literal::shape_ok(self) -> bool`,
+//!   `Literal::finite(self) -> bool`
 //! - `Func::arity(self) -> (u8, u8)`, `Func::reads_circuit(self) -> bool`,
 //!   `Dist::arity(self) -> (u8, u8)`, `Expr::tag(self) -> ExprTag`
 //! - `pub(crate) struct Exprs`, `pub(crate) struct UserCall`
@@ -152,7 +153,9 @@ pub enum BinOp {
     Mul,
     /// `a / b`; `b == 0` is a domain error.
     Div,
-    /// `trunc(a / b)`, toward zero (ngspice `\`); `b == 0` is a domain error.
+    /// `trunc(a / b)`, toward zero; `b == 0` is a domain error. Not ngspice's `\` (which is
+    /// `trunc(|a / b|)`, read as `Trunc(Abs(Div))`, A11); no speaker yet: removed if no reader
+    /// produces it.
     IntDiv,
     /// `a == b` (exact).
     Eq,
@@ -204,15 +207,19 @@ pub enum Func {
     Abs,
     /// `√x`; `x < 0` is a domain error.
     Sqrt,
-    /// `√|x|` (ngspice B-source `sqrt`).
+    /// `√|x|`. Not ngspice-45's B-source `sqrt`, which errors below zero (A11); speaker to be
+    /// confirmed by the HSPICE and LTspice slices: removed if no reader produces it.
     SqrtAbs,
     /// `eˣ`, exact; a non-finite result is a domain error.
     Exp,
-    /// `eˣ` for `x <= 14`, `e¹⁴·(1 + x − 14)` beyond (ngspice B-source `exp`).
+    /// `eˣ` for `x <= 14`, `e¹⁴·(1 + x − 14)` beyond (ngspice's B-source `exp` under
+    /// `ngbehavior=ps` only, A11).
     ExpLin14,
     /// Natural logarithm; `x <= 0` is a domain error.
     Ln,
-    /// `ln|x|` (ngspice B-source `ln`, `log`); `x == 0` is a domain error.
+    /// `ln|x|`; `x == 0` is a domain error. Not ngspice-45's B-source `ln`/`log`, which error
+    /// below zero (A11); speaker to be confirmed by the HSPICE and LTspice slices: removed if no
+    /// reader produces it.
     LnAbs,
     /// Base-10 logarithm; `x <= 0` is a domain error.
     Log10,
@@ -220,7 +227,7 @@ pub enum Func {
     /// with a fractional `y`, and `0` to a negative power, are domain errors (HSPICE, LTspice,
     /// Spectre, VACASK `**`/`pow`).
     Pow,
-    /// `|x|ʸ` (ngspice `**`, `^`, B-source `pow`); `x == 0, y < 0` is a domain error.
+    /// `|x|ʸ` (ngspice B-source `**`, `^`, `pow`); `x == 0, y < 0` is a domain error.
     PowAbs,
     /// The real part of the complex power: `Pow` where `Pow` is defined, `|x|ʸ·cos(πy)` for
     /// `x < 0` and a fractional `y` (Xyce `**`, `pow`, `pwr`).
@@ -241,6 +248,14 @@ pub enum Func {
     RoundHalfEven,
     /// −1, 0 or 1 by the sign of `x`.
     Sgn,
+    /// The half-maximum step: 0 for `x < 0`, 0.5 at `x == 0`, 1 for `x > 0` (ngspice B-source
+    /// `u`, `ptfuncs.c` `PTustep`).
+    StepHalf,
+    /// The signed power: `−pow(−x, y)` for `x < 0`, else `pow(x, y)`; `x == 0, y < 0` is a
+    /// domain error (ngspice B-source `pwr`, `PTpwr`).
+    PowSigned,
+    /// `x·x`, one multiplication (ngspice numparam `sqr`, `xpressn.c`).
+    Sqr,
     /// Sine.
     Sin,
     /// Cosine.
@@ -274,7 +289,8 @@ pub enum Func {
     Fmod,
     /// `clamp(x, lo, hi)` = `min(max(x, lo), hi)`; `lo > hi` is a domain error.
     Clamp,
-    /// The unit step: 1 for `x > 0`, else 0 (ngspice `u`).
+    /// The unit step: 1 for `x > 0`, else 0. Not ngspice's `u` (that is `StepHalf`, A11);
+    /// speaker to be confirmed by the LTspice and Xyce slices.
     Step,
     /// The unit ramp: `x` for `x > 0`, else 0 (ngspice `uramp`).
     Ramp,
@@ -488,7 +504,7 @@ impl UnOp {
 
 impl Func {
     /// Every function, in declaration order.
-    pub const ALL: [Func; 40] = [
+    pub const ALL: [Func; 43] = [
         Func::Abs,
         Func::Sqrt,
         Func::SqrtAbs,
@@ -508,6 +524,9 @@ impl Func {
         Func::RoundHalfAway,
         Func::RoundHalfEven,
         Func::Sgn,
+        Func::StepHalf,
+        Func::PowSigned,
+        Func::Sqr,
         Func::Sin,
         Func::Cos,
         Func::Tan,
@@ -564,12 +583,15 @@ impl Func {
             | Func::Acosh
             | Func::Atanh
             | Func::Step
+            | Func::StepHalf
+            | Func::Sqr
             | Func::Ramp
             | Func::Ddt
             | Func::Idt => (1, 1),
             Func::Pow
             | Func::PowAbs
             | Func::PowRe
+            | Func::PowSigned
             | Func::Min
             | Func::Max
             | Func::Atan2
@@ -713,7 +735,22 @@ impl Literal {
 
     /// Whether the literal meets every invariant on [`Literal`].
     pub fn is_valid(self) -> bool {
-        self.shape_ok() && self.value().is_finite()
+        self.shape_ok() && self.finite()
+    }
+
+    /// Whether the value is finite, from the digit count and the power where that decides it
+    /// (the largest double is about 1.8e308), and by `value()` only at the boundary.
+    pub(crate) fn finite(self) -> bool {
+        let (m, k) = self.exact();
+        if m == 0 {
+            return true;
+        }
+        let digits = m.unsigned_abs().ilog10() as i32 + 1;
+        match digits + k {
+            ..=308 => true,
+            310.. => false,
+            309 => self.value().is_finite(),
+        }
     }
 
     /// Whether the literal meets every invariant but finiteness (`check` reports the two

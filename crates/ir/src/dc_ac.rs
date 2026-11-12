@@ -270,6 +270,6 @@ impl PzFind {
 impl Design {
     /// The axes of a list. Asserts the range is inside the axis pool.
     pub fn dc_axes(&self, list: DcAxisList) -> &[DcAxis] {
-        todo!()
+        crate::run_words::get(&self.run.dc_axes, list).expect("an axis list inside the axis pool")
     }
 }
