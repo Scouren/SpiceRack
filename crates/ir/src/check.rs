@@ -17,7 +17,7 @@ use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::feature::{ExprWalk, Extra, Feature, FeatureSet, case_clash, item_features};
+use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::span::Span;
@@ -114,8 +114,11 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
 }
 
-/// Appends one `UNSUPPORTED` row per item that uses a feature outside `legal` (span: the item;
-/// `arg`: `Feature::index`). Assumes `check` passed. O(rows).
+/// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
+/// `legal` (span: the item; `arg`: `Feature::index`), and one at `Span::NONE` per feature of the
+/// whole design outside it (the case clash, the owners' `design_features`). It appends nothing
+/// exactly when `features_used(design).minus(legal)` is empty: these rows are `legalize`'s
+/// leftovers (R10). Assumes `check` passed. O(rows).
 pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
     let mut walk = ExprWalk::new(design);
     for (item, scope) in design.reachable() {
@@ -125,9 +128,10 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
             diags.push(UNSUPPORTED, design.span_of(item), f.index() as u32);
         }
     }
-    let clash = Feature::Extra(Extra::CaseSensitiveNames);
-    if !legal.contains(clash) && case_clash(design) {
-        diags.push(UNSUPPORTED, Span::NONE, clash.index() as u32);
+    let mut whole = FeatureSet::EMPTY;
+    design_level(design, &mut whole);
+    for f in whole.minus(*legal).iter() {
+        diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
 }
 
@@ -343,17 +347,20 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
     let d = out.design;
     let mut walk = ExprWalk::new(d);
     let mut handles = Vec::new();
-    for (item, _) in d.reachable() {
+    // `map_refs` reaches a row's references through `&mut Design`, and `check` only reads: it
+    // reads them from one copy of the design (O(design), once per check; A9)
+    let mut scratch = d.clone();
+    for (item, scope) in d.reachable() {
         if (item.index as usize) >= table_len(d, item.kind) {
             continue; // reported with the scope's list
         }
         handles.clear();
         let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
-            let mut row: R = d.row(item.index);
+            let row: R = d.row(item.index);
             row.handles(d, &mut handles);
-            row.map_refs(&mut |r, kind| refs.push((*r, kind)));
-            row.check(d, item, out.diags);
+            R::map_refs(&mut scratch, item, &mut |r, kind| refs.push((*r, kind)));
+            row.check(d, item, scope, out.diags);
         });
         let span = d.span_of(item);
         for (r, kind) in refs {

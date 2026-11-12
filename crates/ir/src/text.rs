@@ -110,7 +110,9 @@
 //! `name#k` only when the lookup would bind another definition than the row's.
 //!
 //! Contents: `pub fn dump(&Design, FileId, &mut String)`,
-//! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`); crate:
+//! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`), the
+//! writers `Ctx`, `write_expr`, `write_value`, `write_exprs`, `write_names`, `write_params`,
+//! `write_ref`, `write_name`, `write_string`, `write_literal` (re-exported from `text_expr`); crate:
 //! `pub(crate) fn keyword(ItemKind) -> &'static str`
 
 use std::collections::HashMap;
@@ -124,7 +126,10 @@ use crate::id::{BranchList, DefId, ExprId, FileId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, If, ItemKind, Role};
 use crate::item_text;
 use crate::link::link;
-use crate::text_expr::{Ctx, write_expr, write_string};
+pub use crate::text_expr::{
+    Ctx, write_expr, write_exprs, write_literal, write_name, write_names, write_params, write_ref,
+    write_string, write_value,
+};
 pub use crate::text_words::Words;
 
 /// An `if` whose `elif`/`else` lines are still to come at its depth: its branches and the
@@ -510,8 +515,8 @@ fn if_conditions(
 /// Writes the fields of `item`'s row (after its keyword): kernel rows with their context
 /// (`item_text`), the owners' rows through their `RowFacts::dump`.
 fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &mut String) {
-    fn owner<R: RowFacts>(d: &Design, item: ItemRef, out: &mut String) {
-        d.row::<R>(item.index).dump(d, out);
+    fn owner<R: RowFacts>(d: &Design, ctx: &Ctx, out: &mut String) {
+        d.row::<R>(ctx.item.index).dump(d, ctx, out);
     }
     let i = item.index;
     match item.kind {
@@ -526,18 +531,18 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
         ItemKind::If => item_text::dump_if(&d.row(i), d, item, ctx, out),
         ItemKind::Param => item_text::dump_param(&d.row(i), d, item, ctx, out),
         ItemKind::Func => item_text::dump_func(&d.row(i), d, item, ctx, out),
-        ItemKind::Model => owner::<crate::model::Model>(d, item, out),
-        ItemKind::Statistics => owner::<crate::stats::Statistics>(d, item, out),
-        ItemKind::Element => owner::<crate::element::Element>(d, item, out),
-        ItemKind::Analysis => owner::<crate::analysis::Analysis>(d, item, out),
-        ItemKind::Loop => owner::<crate::plan::Loop>(d, item, out),
-        ItemKind::Alter => owner::<crate::plan::Alter>(d, item, out),
-        ItemKind::Option => owner::<crate::option::OptionRow>(d, item, out),
-        ItemKind::Env => owner::<crate::option::Env>(d, item, out),
-        ItemKind::NodeSet => owner::<crate::option::NodeSet>(d, item, out),
-        ItemKind::Save => owner::<crate::output::Save>(d, item, out),
-        ItemKind::Print => owner::<crate::output::Print>(d, item, out),
-        ItemKind::Measure => owner::<crate::output::Measure>(d, item, out),
+        ItemKind::Model => owner::<crate::model::Model>(d, ctx, out),
+        ItemKind::Statistics => owner::<crate::stats::Statistics>(d, ctx, out),
+        ItemKind::Element => owner::<crate::element::Element>(d, ctx, out),
+        ItemKind::Analysis => owner::<crate::analysis::Analysis>(d, ctx, out),
+        ItemKind::Loop => owner::<crate::plan::Loop>(d, ctx, out),
+        ItemKind::Alter => owner::<crate::plan::Alter>(d, ctx, out),
+        ItemKind::Option => owner::<crate::option::OptionRow>(d, ctx, out),
+        ItemKind::Env => owner::<crate::option::Env>(d, ctx, out),
+        ItemKind::NodeSet => owner::<crate::option::NodeSet>(d, ctx, out),
+        ItemKind::Save => owner::<crate::output::Save>(d, ctx, out),
+        ItemKind::Print => owner::<crate::output::Print>(d, ctx, out),
+        ItemKind::Measure => owner::<crate::output::Measure>(d, ctx, out),
     }
 }
 

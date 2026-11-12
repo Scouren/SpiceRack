@@ -20,8 +20,8 @@ use crate::edit::Editor;
 use crate::expr::Expr;
 use crate::facts::RowFacts;
 use crate::feature::{ExprWalk, expr_roots};
-use crate::id::DefId;
-use crate::item::{DefKind, ItemKind};
+use crate::id::{DefId, NameId};
+use crate::item::{DefKind, ItemKind, Subckt};
 
 /// Binds every still-unresolved reference by `Design::lookup` from the scope of the item (or the
 /// expression's item) that holds it, innermost scope first, exact names, with the kind the field
@@ -37,22 +37,40 @@ pub fn link(design: &mut Design, diags: &mut Diags) {
     for (item, scope) in design.reachable() {
         // rows: bind on a copy against the design as it is, then store the copy back
         handles.clear();
-        let d: &Design = design;
-        let mut changed = false;
         for_kind!(item.kind, R => {
-            let mut row: R = d.row(item.index);
-            row.handles(d, &mut handles);
-            row.map_refs(&mut |r, kind| {
-                if r.def.is_none() {
-                    r.def = d.lookup(scope, kind, r.name);
-                    changed |= !r.def.is_none();
-                }
-            });
-            if changed {
-                design.editor().set(item.index, row);
-            }
+            let row: R = design.row(item.index);
+            row.handles(design, &mut handles);
         });
-        // expressions: collect the bindings, then apply them through the builder
+        // rows: record every reference in `map_refs` order, look the unresolved ones up through
+        // `&Design`, then write the k-th answer into the k-th reference
+        let mut slots: Vec<(NameId, DefKind, DefId)> = Vec::new();
+        design
+            .editor()
+            .map_refs(item, &mut |r, kind| slots.push((r.name, kind, r.def)));
+        let found: Vec<DefId> = slots
+            .iter()
+            .map(|&(name, kind, def)| {
+                if def.is_none() {
+                    design.lookup(scope, kind, name)
+                } else {
+                    def
+                }
+            })
+            .collect();
+        if found.iter().zip(&slots).any(|(f, s)| *f != s.2) {
+            let mut k = 0;
+            design.editor().map_refs(item, &mut |r, _| {
+                r.def = found[k];
+                k += 1;
+            });
+        }
+        // expressions: a subcircuit's head defaults are looked up from its body (A10: a default
+        // reads its sibling head parameters first); every other row's from its listing scope
+        let scope = if item.kind == ItemKind::Subckt {
+            design.row::<Subckt>(item.index).body
+        } else {
+            scope
+        };
         let mut binds = Vec::new();
         for root in expr_roots(design, &handles) {
             for &e in walk.tree(design, root) {

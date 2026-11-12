@@ -210,15 +210,39 @@ three meanings, so the node states them: `Expr::Draw(Dist, DrawWhen, DrawPer, Ex
 parameter idiom, Spectre's `statistics` block) is a pass.
 
 **A9 (2026-11-12): a row's facts take its position.** The bodies showed three things the trait
-above could not say, so its final shape is: `handles(&self, design, out)`; `features(&self,
-design, at: ItemRef, scope: ScopeId, set)`; `check(&self, design, at, scope, out)`; `dump(&self,
-design, at, scope, out)` (with the scope a row writes `name#k` exactly when lookup would bind
-another definition); `map_refs(design: &mut Design, at: ItemRef, f)` as an associated function
-that visits every `Ref` the item owns, in its header, its detail rows and its pools (a sweep's
-target, a `Vary`'s parameter), and stores them back. Features of the whole design (several
-analyses in one deck, an option after a run item) are not a row's: `features_used` calls one
-`design_features(&Design, &mut FeatureSet)` hook per owner. `text.rs` gives owners the writers
-that mirror the `Words` readers (`write_name`, `write_value`, `write_expr`, `write_ref`, …).
+above could not say, so its final shape is (as implemented in `facts.rs`):
+
+```rust
+fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
+fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
+fn dump(&self, design: &Design, ctx: &text::Ctx, out: &mut String);
+fn parse(words: &mut Words<'_>, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ItemRef;
+fn generate(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>, features: &FeatureSet) -> ItemRef;
+```
+
+`map_refs` is an associated function: it visits every `Ref` the item owns, in its header, its
+detail rows and its pools (a sweep's target, a `Vary`'s parameter), in a fixed order, and stores
+them back. `Editor::map_refs` dispatches to it, `link` binds through it in two passes (record,
+look up, write the k-th answer to the k-th slot), and `check` reads it from one copy of the design.
+`dump` takes a `text::Ctx { scope, item, formals }`: the scope a bare reference is looked up from,
+the item (a measure's reads fall back to measures), and the function whose body is being written
+(its formal arguments). The kernel's dump loop builds it; a row passes it to the writers. Features
+of the whole design (several analyses in one deck, an option after a run item) are not a row's:
+`features_used` calls one `pub(crate) fn design_features(&Design, &mut FeatureSet)` hook per owner
+(`element.rs`, `analysis.rs`), and `check_legal` reports what they add at `Span::NONE`. `text`
+gives owners the writers that mirror the `Words` readers: `write_name`, `write_names`,
+`write_string`, `write_literal`, `write_value`, `write_expr`, `write_exprs`, `write_params`,
+`write_ref(design, r, kind, ctx, out)` (bare when lookup from `ctx.scope` gives what the reference
+holds, `name?` for an unresolved reference the lookup would bind, `name#k` otherwise).
+
+**A10 (2026-11-12): a subcircuit's head defaults are looked up from its body.** The neutral lookup
+scope of a `Subckt` row's expressions is its body scope, not the scope that lists it, so
+`r=rval w=(2*r)` binds `r` to the sibling head parameter and then looks outward. `link`, the
+writer's bare-or-`#k` test and `parse` (through `link`) use the body for that row; every other row
+keeps its listing scope. Why: ngspice sorts head parameters by dependency, HSPICE and Spectre read
+them in the body, and a lookup from the parent would dump the common case as `r#k`.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

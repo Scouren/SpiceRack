@@ -80,12 +80,17 @@ pub(crate) fn dump_subckt(row: &Subckt, d: &Design, _: ItemRef, ctx: &Ctx, out: 
     out.push_str(" (");
     names(d, d.names(row.ports), " ", out);
     out.push(')');
+    // A10: the head defaults are read from the body, where the sibling parameters are defined
+    let body = Ctx {
+        scope: row.body,
+        ..*ctx
+    };
     for &(name, value) in d.params(row.params) {
         out.push(' ');
         write_name(d.str(name), out);
         if !value.is_none() {
             out.push('=');
-            write_value(d, value, ctx, out);
+            write_value(d, value, &body, out);
         }
     }
 }

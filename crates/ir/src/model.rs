@@ -334,26 +334,28 @@ impl RowFacts for Model {
         todo!()
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // A real body: A4's contract for this row. A `NONE` name is no reference.
-        if self.ako.name != NameId::NONE {
-            f(&mut self.ako, DefKind::Model);
+        let mut row: Model = design.row(at.index);
+        if row.ako.name != NameId::NONE {
+            f(&mut row.ako, DefKind::Model);
         }
-        if self.module.name != NameId::NONE {
-            f(&mut self.module, DefKind::Module);
+        if row.module.name != NameId::NONE {
+            f(&mut row.module, DefKind::Module);
         }
+        design.editor().set(at.index, row);
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         todo!()
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         todo!()
     }
 
     #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &crate::text_expr::Ctx, out: &mut String) {
         todo!()
     }
 

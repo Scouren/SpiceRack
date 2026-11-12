@@ -21,7 +21,7 @@
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
-//! - crate: `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
+//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`
 
@@ -309,7 +309,9 @@ impl FeatureSet {
 
 /// Every feature the design uses, in one scan over its reachable items: per item, its
 /// `Feature::Item`, its row's `RowFacts::features` (one exhaustive dispatch over `ItemKind`), and
-/// the expression features of the expressions in its `RowFacts::handles`.
+/// the expression features of the expressions in its `RowFacts::handles`; then the features of the
+/// whole design: the case clash and the circuit and run owners' `design_features` hooks, each
+/// called once.
 /// An expression's functions and operators count as `*Dyn` when the expression holds a `V`,
 /// `I`, `Time` or `Freq` leaf.
 pub fn features_used(design: &Design) -> FeatureSet {
@@ -318,10 +320,18 @@ pub fn features_used(design: &Design) -> FeatureSet {
     for (item, scope) in design.reachable() {
         item_features(design, item, scope, &mut walk, &mut set);
     }
-    if case_clash(design) {
-        set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
-    }
+    design_level(design, &mut set);
     set
+}
+
+/// The features of the whole design, no item's: the case clash and each owner's
+/// `design_features` hook (A9). `check_legal` reports these at `Span::NONE`.
+pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
+    if case_clash(design) {
+        *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
+    crate::element::design_features(design, set);
+    crate::analysis::design_features(design, set);
 }
 
 /// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),
@@ -337,7 +347,7 @@ pub(crate) fn item_features(
     let mut handles = Vec::new();
     for_kind!(item.kind, R => {
         let row: R = design.row(item.index);
-        row.features(design, set);
+        row.features(design, item, scope, set);
         row.handles(design, &mut handles);
     });
     let (in_subckt, in_branch) = enclosing(design, scope);
