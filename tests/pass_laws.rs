@@ -2,8 +2,8 @@
 //! `passes::GROUPS`, over generated designs that use the pass's `removes` feature and over ones
 //! that do not:
 //! - P1: `ir::check` is clean after it;
-//! - P2: every item still carrying `removes` (by `ir::check_legal`, per `Diag::item`) has a
-//!   coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
+//! - P2: every item still carrying `removes` (by `ir::check_legal`, per `Diag::item`) has
+//!   exactly one coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
 //!   generated item has none), and every other item has lost it (`check_legal` reports the run
 //!   owner's design-level features at their items too);
 //! - P3: its output uses nothing outside its input's features plus `requires`;
@@ -223,6 +223,20 @@ fn p2_every_item_left_carrying_the_feature_has_the_passes_note() {
     laws("p2", p2_on);
 }
 
+/// P2's second self-test (R69 d): a pass that notes every comment it leaves twice fails P2.
+#[test]
+fn p2_catches_a_pass_that_notes_an_item_twice() {
+    let twice = Pass {
+        name: "twice",
+        removes: ir::Feature::Item(ir::ItemKind::Comment),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[LEAKY],
+        run: note_every_comment_twice,
+    };
+    let found = p2_on(&twice).expect_err("P2 sees the repeated note");
+    assert!(found.contains("keeps it with 2 notes"), "{found}");
+}
+
 /// P2's self-test (A25): a pass that notes the first comment and leaves every comment fails
 /// P2 by item. By span it passed: every generated item's span is `NONE`, so one note anywhere
 /// matched every item.
@@ -395,21 +409,31 @@ fn carrying(design: &ir::Design, feature: ir::Feature) -> Vec<ir::ItemRef> {
     rows.map(|d| d.item).collect()
 }
 
-/// P2 on one pass: every item still carrying `removes` after it has one of its notes at that
-/// item (`Diag::item`).
+/// P2 on one pass: every item still carrying `removes` after it has exactly one of its notes at
+/// that item (`Diag::item`).
 fn p2_on(pass: &Pass) -> Result<(), String> {
     each_with(pass, |seed, mut design| {
         let mut diags = ir::Diags::new();
         (pass.run)(&mut design, &mut diags);
         for item in carrying(&design, pass.removes) {
-            let noted = diags
+            // exactly one (R69 d): a note repeated at one item is the user reading it twice
+            let notes = diags
                 .rows()
                 .iter()
-                .any(|d| d.item == item && pass.notes.contains(&d.code));
-            if !noted {
-                return Err(format!(
-                    "seed {seed}: the item {item:?} keeps it with no note"
-                ));
+                .filter(|d| d.item == item && pass.notes.contains(&d.code))
+                .count();
+            match notes {
+                1 => {}
+                0 => {
+                    return Err(format!(
+                        "seed {seed}: the item {item:?} keeps it with no note"
+                    ));
+                }
+                n => {
+                    return Err(format!(
+                        "seed {seed}: the item {item:?} keeps it with {n} notes"
+                    ));
+                }
             }
         }
         Ok(())
@@ -424,6 +448,16 @@ fn note_first_comment(design: &mut ir::Design, diags: &mut ir::Diags) {
         .find(|(i, _)| i.kind == ir::ItemKind::Comment);
     if let Some((item, _)) = first {
         diags.push_at(LEAKY, design, item, 0);
+    }
+}
+
+/// The repeating self-test pass: two notes at every comment, and no change.
+fn note_every_comment_twice(design: &mut ir::Design, diags: &mut ir::Diags) {
+    for (item, _) in design.reachable() {
+        if item.kind == ir::ItemKind::Comment {
+            diags.push_at(LEAKY, design, item, 0);
+            diags.push_at(LEAKY, design, item, 0);
+        }
     }
 }
 
