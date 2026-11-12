@@ -349,3 +349,49 @@ fn build(b: &mut Builder<'_>, node: Node, kids: Vec<ExprId>) -> ExprId {
         Node::List => b.list(&kids),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::class::{ExprClass, expr_class};
+    use crate::design::Design;
+    use crate::feature::FeatureSet;
+    use crate::r#gen::{Gen, Reads, Size};
+    use crate::id::DefId;
+    use crate::item::{DefKind, Role};
+    use crate::span::Span;
+
+    #[test]
+    fn the_tracked_class_is_the_trees() {
+        // `Gen::class` is the generated tree's class (oracle: `expr_class`), with nullary user
+        // functions of class Circuit to pick: a node chosen and then abandoned for a leaf adds
+        // nothing
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        for seed in 0..300u64 {
+            let mut d = Design::new();
+            let mut b = d.builder();
+            let (_, top) = b.file("t.sp", Role::Deck);
+            let mut g = Gen::new(seed, &FeatureSet::ALL, size);
+            g.scope = top;
+            for k in 0..3 {
+                let v = b.v("out", None);
+                b.func(top, &format!("h{k}"), &[], v, Span::NONE);
+                let def =
+                    b.design()
+                        .lookup(top, DefKind::Func, b.design().find_name(&format!("h{k}")));
+                g.note(def, ExprClass::Circuit);
+            }
+            let _ = DefId::NONE;
+            for _ in 0..20 {
+                for reads in [Reads::Circuit, Reads::Constant] {
+                    let e = g.expr(&mut b, &FeatureSet::ALL, reads);
+                    assert_eq!(g.class, expr_class(b.design(), e), "seed {seed}, {reads:?}");
+                }
+            }
+        }
+    }
+}

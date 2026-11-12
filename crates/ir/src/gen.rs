@@ -126,26 +126,7 @@ const WORDS: [&str; 8] = [
 /// a feature in it may not (the set is an upper bound).
 pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
     let mut design = Design::new();
-    let mut g = Gen {
-        state: seed,
-        size,
-        items_left: size.items,
-        fresh: 0,
-        scope: ScopeId::NONE,
-        formals: Vec::new(),
-        by_kind: vec![Vec::new(); DefKind::COUNT],
-        def_class: Vec::new(),
-        class: ExprClass::Constant,
-        dynamic: false,
-        reads: Reads::Constant,
-        int_literals: false,
-        long_literals: false,
-        enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
-        param_reads: true,
-        case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
-        constant_only: false,
-        dyn_form: false,
-    };
+    let mut g = Gen::new(seed, features, size);
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
     for k in 0..files {
@@ -294,6 +275,31 @@ impl Gen {
             self.def_class.resize(def.index() + 1, ExprClass::Constant);
         }
         self.def_class[def.index()] = class;
+    }
+
+    /// A generator at `seed` for `features` and `size`, with no scope chosen yet (`generate`'s
+    /// start; crate tests drive `expr` from it).
+    pub(crate) fn new(seed: u64, features: &FeatureSet, size: Size) -> Gen {
+        Gen {
+            state: seed,
+            size,
+            items_left: size.items,
+            fresh: 0,
+            scope: ScopeId::NONE,
+            formals: Vec::new(),
+            by_kind: vec![Vec::new(); DefKind::COUNT],
+            def_class: Vec::new(),
+            class: ExprClass::Constant,
+            dynamic: false,
+            reads: Reads::Constant,
+            int_literals: false,
+            long_literals: false,
+            enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
+            param_reads: true,
+            case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
+            constant_only: false,
+            dyn_form: false,
+        }
     }
 
     /// A word for a string value or a text (`WORDS`).
