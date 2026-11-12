@@ -149,3 +149,83 @@ fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
         assert_eq!(canonical(&twice), before, "{}", deck.display());
     }
 }
+
+/// Every fixture deck under the reader fixtures, subdirectories included, sorted.
+fn all_decks() -> Vec<PathBuf> {
+    let mut todo = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join(DIR)];
+    let mut out = Vec::new();
+    // Bounded: each directory is taken once (the fixture tree is acyclic).
+    while let Some(dir) = todo.pop() {
+        for e in std::fs::read_dir(&dir).expect("a fixture directory") {
+            let p = e.expect("an entry").path();
+            match (p.is_dir(), p.extension().is_some_and(|e| e == "sim")) {
+                (true, _) => todo.push(p),
+                (false, true) => out.push(p),
+                _ => {}
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Oracle: settle unclosed_* (VACASK rejects a statement whose `(`, `[` or `{` never closes, or
+/// whose string a line break ends: "Parser syntax error …", "unexpected newline in string
+/// literal"). Mutants of every reader fixture: one line's last closing bracket deleted, or a
+/// line's closing quote; each must be refused by the reader (the mutation law's edits never
+/// make one: the pair agent's paren deck read Private).
+#[test]
+fn a_deleted_closing_bracket_or_quote_is_refused() {
+    let mut failed = Vec::new();
+    let (mut brackets, mut quotes) = (0, 0);
+    for deck in all_decks() {
+        let text = std::fs::read_to_string(&deck).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        let mut embed = false;
+        for (k, line) in lines.iter().enumerate().skip(1) {
+            let t = line.trim_start();
+            // An embed's body (`<<<MARK` … `>>>MARK`) is another language's text.
+            if line.contains("<<<") || t.starts_with(">>>") {
+                embed = line.contains("<<<");
+                continue;
+            }
+            if embed || t.starts_with("//") || line.contains("/*") || line.contains("*/") {
+                continue;
+            }
+            let quote_count = line.matches('"').count();
+            let cut = if quote_count == 0 {
+                line.rfind([')', ']', '}']).map(|at| (at, &mut brackets))
+            } else if quote_count == 2 && !line.contains('\\') {
+                line.rfind('"').map(|at| (at, &mut quotes))
+            } else {
+                None
+            };
+            let Some((at, count)) = cut else {
+                continue;
+            };
+            *count += 1;
+            let mut mutant: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+            mutant[k].remove(at);
+            let mutant = mutant.join("\n") + "\n";
+            let (_, diags) = read(&Sources::one("mutant.sim", &mutant), "vacask");
+            if !diags.rows().iter().any(|d| dialect::refuses(d.code)) {
+                failed.push(format!(
+                    "{}:{}: {}",
+                    deck.display(),
+                    k + 1,
+                    mutant.lines().nth(k).unwrap()
+                ));
+            }
+        }
+    }
+    assert!(
+        brackets >= 40 && quotes >= 20,
+        "{brackets} bracket and {quotes} quote mutants"
+    );
+    assert!(
+        failed.is_empty(),
+        "{} not refused:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}

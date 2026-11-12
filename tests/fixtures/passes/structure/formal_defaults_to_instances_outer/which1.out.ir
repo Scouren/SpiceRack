@@ -1,0 +1,9 @@
+file "a.sp" deck
+  comment "VACASK run which1 (settle which1.sim, DIALECT-VACASK A): r1 = 2000, u read where the definition stands, not the wrapper's 8k"
+  param u = 2k
+  subckt inner (a b) r
+    element resistor r1 (a b) value=r
+  subckt wrap (a b)
+    param u = 8k
+    element instance x1 (a b) model=inner params=(r=u#0)
+  element instance x0 (n 0) model=wrap

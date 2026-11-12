@@ -1,0 +1,10 @@
+# Oracle: R59, A35 (legalize names each unnamed analysis by its kind's IR word and a count from
+# 1 per word, each DC axis `axis<n>` in listed order, each loop `loop<n>`); VD cmd-sweep (a Dc is
+# its axes as sweep lines, outermost first, then an op).
+file "names_given.ir" deck
+  title "names given"
+  analysis op
+  analysis tran stop=1m cap=span_over50
+  loop sweep (temp) (list values=[0i])
+    analysis ac (list values=[1k])
+  analysis dc (device_param v2 dc) (list values=[0i, 1i]) (device_param v1 dc) (lin start=1i stop=3i step=0.5)

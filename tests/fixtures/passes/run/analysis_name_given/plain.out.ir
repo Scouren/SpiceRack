@@ -1,0 +1,5 @@
+file "a.sp" deck
+  analysis op name=op1
+  analysis op name=op2
+  analysis tran name=tran1 stop=1u print_step=1n cap=none
+  analysis op name=op3

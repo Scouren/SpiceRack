@@ -1,0 +1,7 @@
+# oracle: settle/passive_model_order_ok.sp runs this text (the value after the model, R, C and L, literal and braced); written by hand
+file "model_value.sp" deck
+  title "model_value"
+  element resistor R1 (n 0) model=rmod? value=(1k * 3)
+  element capacitor C1 (n 0) model=cmod? value=3n
+  element inductor L1 (n 0) model=lmod? value=(1m * 3)
+  element resistor R2 (n 0) model=rmod? value=3k

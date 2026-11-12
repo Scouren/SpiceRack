@@ -15,6 +15,8 @@ mod memcap;
 mod bindings;
 #[path = "passes_run/loops.rs"]
 mod loops;
+#[path = "passes_run/names.rs"]
+mod names;
 #[path = "passes_run/params.rs"]
 mod params;
 #[path = "passes_run/state.rs"]
@@ -49,6 +51,9 @@ const PENDING_PAIRS: &[&str] = &[
     "analysis_name_dropped",
     "dc_axis_name_dropped",
     "loop_name_dropped",
+    "analysis_name_given",
+    "dc_axis_name_given",
+    "loop_name_given",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
 ];
@@ -108,6 +113,89 @@ fn names_dropped_keep_the_state_at_every_analysis() {
     keeps_state("analysis_name_dropped", ir::RunExtra::AnalysisNamed);
     keeps_state("dc_axis_name_dropped", ir::RunExtra::DcAxisNamed);
     keeps_state("loop_name_dropped", ir::RunExtra::LoopNamed);
+}
+
+#[test]
+fn names_given_keep_the_state_at_every_analysis() {
+    keeps_state("analysis_name_given", ir::RunExtra::AnalysisUnnamed);
+    keeps_state("dc_axis_name_given", ir::RunExtra::DcAxisUnnamed);
+    keeps_state("loop_name_given", ir::RunExtra::LoopUnnamed);
+}
+
+/// After each naming row (R59, A35), over generated designs holding its feature: every
+/// statement of its kind has a name, but a loop it noted (an opaque body), no two share one
+/// without case (DC axes and loops as one set), and each note's argument is the name now at its item. Each design runs twice:
+/// as generated, and with its first named statement renamed to the upper case of the first
+/// name the rule gave (a name the rule must then skip). Oracle: the rows' names read back,
+/// against the rule's statement.
+#[test]
+fn names_given_name_every_statement_of_a_kind_once() {
+    for (name, feature) in [
+        ("analysis_name_given", ir::RunExtra::AnalysisUnnamed),
+        ("dc_axis_name_given", ir::RunExtra::DcAxisUnnamed),
+        ("loop_name_given", ir::RunExtra::LoopUnnamed),
+    ] {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        let (mut ran, mut planted) = (0, 0);
+        for seed in SEEDS {
+            let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+            if !ir::features_used(&design).contains(ir::Feature::Run(feature)) {
+                continue;
+            }
+            ran += 1;
+            let Some(first) = names::named_once(pass, feature, &mut design, seed) else {
+                continue;
+            };
+            let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+            if names::rename_first_named(&mut design, feature, &first.to_ascii_uppercase()) {
+                planted += 1;
+                names::named_once(pass, feature, &mut design, seed);
+            }
+        }
+        assert!(ran > 0, "{name}: no generated design had the feature");
+        assert!(
+            planted > 0,
+            "{name}: no design had a named statement to rename"
+        );
+    }
+}
+
+/// The naming rows and `names_dropped` are inverse pairs (R59): a target with both forms runs
+/// neither; one with the named forms only gets every name. Oracle: the rule's statement, by hand.
+#[test]
+fn legalize_names_for_the_named_forms_and_runs_neither_pair_with_both() {
+    let text = "file \"a.sp\" deck\n  title \"t\"\n  analysis op name=op1\n  analysis op\n  \
+                loop sweep (temp) (list values=[1])\n    analysis dc (source_dc v1) (lin start=0 \
+                stop=1 step=1)\n";
+    let unnamed = [
+        ir::RunExtra::AnalysisUnnamed,
+        ir::RunExtra::DcAxisUnnamed,
+        ir::RunExtra::LoopUnnamed,
+    ];
+    let named_only = unnamed.iter().fold(ir::FeatureSet::ALL, |s, &x| {
+        s.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(x)))
+    });
+    for (target, want) in [
+        (ir::FeatureSet::ALL, text.to_string()),
+        (
+            named_only,
+            "file \"a.sp\" deck\n  title \"t\"\n  analysis op name=op1\n  analysis op name=op2\n  \
+             loop sweep name=loop1 (temp) (list values=[1])\n    analysis dc name=dc1 (source_dc v1) \
+             (lin start=0 stop=1 step=1) name=axis1\n"
+                .to_string(),
+        ),
+    ] {
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(text, &mut design.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        passes::legalize(&mut design, &target, &mut diags);
+        let refused: Vec<_> = diags.rows().iter().filter(|d| d.code == ir::diag::UNSUPPORTED).collect();
+        assert!(refused.is_empty(), "{refused:?}");
+        let mut out = String::new();
+        ir::dump(&design, design.entry(), &mut out);
+        assert_eq!(out, want);
+    }
 }
 
 /// The loop-end rows keep the value every swept or altered parameter holds at every analysis

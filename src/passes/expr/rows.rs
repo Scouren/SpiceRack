@@ -2,7 +2,7 @@
 //! first after the functions are inlined (every other rule then sees the inlined trees, and a
 //! later rule may read the tags the typed ones settle), then the powers, the roundings (even
 //! before away: the first emits the second), the ternaries and the other functions, the bit
-//! folds, the leaves, the draws and the long literals. Each rule is its plain row then its
+//! folds, the leaves, the draws, the long literals and the integer literals. Each rule is its plain row then its
 //! `_dyn` row (A26); each `requires` is what its output may add, per form.
 //!
 //! Contents: `pub(crate) const PASSES: &[Pass]`
@@ -26,8 +26,8 @@ pub(crate) const PASSES: &[Pass] = &[
     row("div_typed_to_div_dyn", X::BinaryDyn(O::DivTyped), &[X::Binary(O::Div), X::BinaryDyn(O::Div), X::Func(F::Trunc), X::FuncDyn(F::Trunc), X::Expr(T::Binary), X::Expr(T::Call)], &[MIXED_DIVISION, BOTH_FORMS], div_typed_to_div::div_typed_to_div_dyn),
     row("toint_to_trunc", X::Func(F::ToInt), &[X::Func(F::Trunc), X::Expr(T::Call)], &[TAG_READ, BOTH_FORMS], toint_to_trunc::toint_to_trunc),
     row("toint_to_trunc_dyn", X::FuncDyn(F::ToInt), &[X::FuncDyn(F::Trunc), X::Expr(T::Call)], &[TAG_READ, BOTH_FORMS], toint_to_trunc::toint_to_trunc_dyn),
-    row("toreal_to_mul", X::Func(F::ToReal), &[X::Binary(O::Mul), X::Expr(T::Binary)], &[BOTH_FORMS], toreal_to_mul::toreal_to_mul),
-    row("toreal_to_mul_dyn", X::FuncDyn(F::ToReal), &[X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[BOTH_FORMS], toreal_to_mul::toreal_to_mul_dyn),
+    row("toreal_to_mul", X::Func(F::ToReal), &[X::Binary(O::Mul), X::Expr(T::Binary)], &[TEXT_OPERAND, BOTH_FORMS], toreal_to_mul::toreal_to_mul),
+    row("toreal_to_mul_dyn", X::FuncDyn(F::ToReal), &[X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[TEXT_OPERAND, BOTH_FORMS], toreal_to_mul::toreal_to_mul_dyn),
     row("sgnzeropos_to_ternary", X::Func(F::SgnZeroPos), &[X::Expr(T::Ternary), X::Binary(O::Lt), X::Expr(T::Binary)], &[TAG_READ, BOTH_FORMS], sgnzeropos_to_ternary::sgnzeropos_to_ternary),
     row("sgnzeropos_to_ternary_dyn", X::FuncDyn(F::SgnZeroPos), &[X::Expr(T::Ternary), X::BinaryDyn(O::Lt), X::Expr(T::Binary)], &[TAG_READ, BOTH_FORMS], sgnzeropos_to_ternary::sgnzeropos_to_ternary_dyn),
     row("pow_to_powabs", X::Func(F::Pow), &[X::Func(F::PowAbs), X::Func(F::PowSigned), X::Expr(T::Call)], &[POW_BASE, BOTH_FORMS], pow_to_powabs::pow_to_powabs),
@@ -77,6 +77,8 @@ pub(crate) const PASSES: &[Pass] = &[
     row("draws_per_reference_to_call_site", X::DrawPer(P::Reference), &[X::DrawPer(P::CallSite)], &[DRAW_SAMPLES], draws_per_reference_to_call_site::draws_per_reference_to_call_site),
     row("sampling_draws_to_nominal", X::DrawWhen(W::Sampling), &[X::Binary(O::Mul), X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[DRAW_SAMPLES], sampling_draws_to_nominal::sampling_draws_to_nominal),
     row("long_literal_to_shortest", X::Extra(E::LongLiteral), &[X::Expr(T::Num)], &[], long_literal_to_shortest::long_literal_to_shortest),
+    // last: the typed rules decide by an integer literal's tag first
+    row("int_literal_to_plain", X::Extra(E::IntLiteral), &[], &[INT_TAG_READ], int_literal_to_plain::int_literal_to_plain),
     row("param_reads_to_typed", X::Circuit(ir::CircuitExtra::BehavUntypedParam), &[X::FuncDyn(F::ToReal), X::FuncDyn(F::ToInt), X::Expr(T::Call), X::Expr(T::Call)], &[UNTYPED_READ], param_reads_to_typed::param_reads_to_typed),
 ];
 

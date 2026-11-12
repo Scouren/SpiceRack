@@ -51,7 +51,6 @@ ngspice DrawPer(Instance) unspoken
 ngspice DrawPer(Run) unspoken
 ngspice Extra(SectionLibrary) unspoken
 ngspice Extra(CaseSensitiveNames) owed from=vacask
-ngspice Extra(IntLiteral) owed from=vacask
 ngspice Extra(FormalWithoutDefault) unspoken
 ngspice Extra(IfConditionDynamic) unspoken
 ngspice Extra(StringValue) owed from=vacask
@@ -102,11 +101,9 @@ ngspice Circuit(SemiInitialOn) unspoken
 ngspice Circuit(SwitchControlExpr) unspoken
 ngspice Circuit(LineLengthVel) unspoken
 ngspice Circuit(ModelAko) unspoken
-ngspice Circuit(PulseVacask) owed from=vacask
 ngspice Circuit(SffmPreOffset) unspoken
 ngspice Circuit(DcAtZeroPattern) unspoken
 ngspice Circuit(TcBaseTnom) unspoken
-ngspice Circuit(GivenZeroAsGiven) owed from=vacask
 ngspice Run(TranSimulatorStep) owed from=vacask
 ngspice Run(TranInitialStep) owed from=vacask
 ngspice Run(TranStartup) unspoken
@@ -457,7 +454,6 @@ vacask Run(LoopTable) unspoken
 vacask Run(LoopKeepLast) owed from=ngspice
 vacask Run(LoopParam) owed from=ngspice
 vacask Run(LoopSubcktParam) unspoken
-vacask Run(LoopSourceDc) owed from=ngspice
 vacask Run(LoopElementValue) owed from=ngspice
 vacask Run(AlterParam) owed from=ngspice
 vacask Run(AlterSubcktParam) unspoken
@@ -514,9 +510,6 @@ vacask Run(ResetValues) owed from=ngspice
 vacask Run(ResetOptions) owed from=ngspice
 vacask Run(ResetTemp) owed from=ngspice
 vacask Run(ResetTnom) owed from=ngspice
-vacask Run(AnalysisUnnamed) owed from=ngspice
-vacask Run(DcAxisUnnamed) owed from=ngspice
-vacask Run(LoopUnnamed) owed from=ngspice
 vacask Run(TranPrintStep) owed from=ngspice
 vacask Option(TrTol) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice

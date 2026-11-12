@@ -1,0 +1,28 @@
+source dc sweeps
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+model isource isource
+subckt s (p n)
+  v2 (p n) vsource dc=1
+ends
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+i1 (0 c) isource dc=1m
+r3 (c 0) res r=2k
+x1 (d 0) s
+r4 (d 0) res r=1k
+v3 (e 0) vsource type="pulse" val0=0 val1=1 rise=1u width=1u
+r5 (e 0) res r=1k
+control
+  options rawfile="ascii"
+  sweep vg instance="v1" parameter="dc" from=0 to=5 step=1
+    analysis dv op
+  sweep ig instance="i1" parameter="dc" values=[0, 1m, 3m]
+    analysis di op
+  sweep vs instance="x1:v2" parameter="dc" values=[2, 4]
+    analysis dx op
+  sweep vp instance="v3" parameter="dc" values=[2, 4]
+    analysis dp op
+endc

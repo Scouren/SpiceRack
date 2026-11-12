@@ -6,7 +6,8 @@
 //!   exactly one coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
 //!   generated item has none), and every other item has lost it (`check_legal` reports the run
 //!   owner's design-level features at their items too);
-//! - P3: its output uses nothing outside its input's features plus `requires`;
+//! - P3: its output uses nothing outside its input's features plus `requires`, a function,
+//!   operator or draw compared without its form (static or dynamic: R65, A39);
 //! - P4: running it twice equals running it once (IR text equal);
 //! - P5: on a design without the feature nothing changes (IR text equal).
 //!
@@ -28,6 +29,8 @@
 
 #[path = "common/memcap.rs"]
 mod memcap;
+#[path = "common/p2_twice.rs"]
+mod p2_twice;
 
 use std::path::Path;
 
@@ -48,44 +51,7 @@ const SIZE: Size = Size {
 
 /// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
 /// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "p1",
-        "toreal_to_mul",
-        "seed 53: `until=(to_real(\"two words\"))` becomes `until=\"two words\"`, a string root in a \
-         typed field (X0021, A25 item 4): the tag table counts a string Real, so to_real(x) is \
-         written x; with the expr owner",
-    ),
-    (
-        "p3",
-        "formal_defaults_to_instances",
-        "seed 42: the output adds Func(PowAbs), Func(Min), Func(StepHalf): the dropped default was \
-         the only dynamic caller of a user function (`@g15(…)`), whose body then counts in the \
-         static form (R51, A28: a body's form follows its callers), which its requires do not \
-         name; with the structure owner",
-    ),
-    (
-        "p3",
-        "formal_defaults_to_instances_default",
-        "as formal_defaults_to_instances (seed 42, the same body made static)",
-    ),
-    (
-        "p3",
-        "exp_td2_absolute",
-        "on its GEN_SETS set, seed 5: the output adds BinaryDyn(Ne), BinaryDyn(Lt), \
-         BinaryDyn(BitOr): td2 becomes td1 + td2, a root whose form is the more dynamic of the \
-         two, so the operators of the static one count in their Dyn twins, which its requires \
-         do not name; with the waves owner",
-    ),
-    (
-        "p3",
-        "tran_cap_ngspice_to_given",
-        "seed 70: the output adds BinaryDyn(Le), BinaryDyn(DivTyped): max_step becomes \
-         min(print_step, stop / 50), a root whose form is the more dynamic of the two (print_step \
-         reads $temp), so the operators of the static stop count in their Dyn twins, which its \
-         requires do not name; with the run owner",
-    ),
-];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
@@ -111,6 +77,27 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
                 ir::WaveKind::TrRandom,
             ],
             ir::Feature::Circuit(ir::CircuitExtra::GivenZeroAsGiven),
+        ),
+    ),
+    (
+        "pulse_vacask_to_spice",
+        sources_only(
+            &[ir::WaveKind::Pulse],
+            ir::Feature::Circuit(ir::CircuitExtra::PulseSpice),
+        ),
+    ),
+    (
+        "as_given_to_given_zero",
+        sources_only(
+            &[
+                ir::WaveKind::Pulse,
+                ir::WaveKind::Sin,
+                ir::WaveKind::Exp,
+                ir::WaveKind::Sffm,
+                ir::WaveKind::Am,
+                ir::WaveKind::TrRandom,
+            ],
+            ir::Feature::Circuit(ir::CircuitExtra::GivenZeroSpiceDefault),
         ),
     ),
     (
@@ -141,50 +128,8 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
     ),
-    (
-        "hoist_enclosing_refs",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Subckt))
-            .with(ir::Feature::Item(ir::ItemKind::Param))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Subckt,
-            ))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Param,
-            ))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Expr(ir::ExprTag::Param))
-            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
-            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
-            .with(ir::Feature::Binary(ir::BinOp::Add))
-            .with(ir::Feature::Binary(ir::BinOp::Mul)),
-    ),
-    (
-        "hoist_enclosing_refs_default",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Subckt))
-            .with(ir::Feature::Item(ir::ItemKind::Param))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Subckt,
-            ))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Param,
-            ))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Expr(ir::ExprTag::Param))
-            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
-            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
-            .with(ir::Feature::Binary(ir::BinOp::Add))
-            .with(ir::Feature::Binary(ir::BinOp::Mul)),
-    ),
+    ("hoist_enclosing_refs", HOIST_SET),
+    ("hoist_enclosing_refs_default", HOIST_SET),
     (
         "tran_cap_ngspice_to_given",
         ir::FeatureSet::EMPTY
@@ -196,6 +141,27 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             .with(ir::Feature::Run(ir::RunExtra::TranRecordStart)),
     ),
 ];
+
+/// `hoist_enclosing_refs`' set (both rows): a subcircuit in a subcircuit reading its parent.
+const HOIST_SET: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Title))
+    .with(ir::Feature::Item(ir::ItemKind::Subckt))
+    .with(ir::Feature::Item(ir::ItemKind::Param))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Subckt,
+        ir::ItemKind::Subckt,
+    ))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Subckt,
+        ir::ItemKind::Param,
+    ))
+    .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Expr(ir::ExprTag::Param))
+    .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
+    .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
+    .with(ir::Feature::Binary(ir::BinOp::Add))
+    .with(ir::Feature::Binary(ir::BinOp::Mul));
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);
@@ -221,20 +187,6 @@ fn p1_check_is_clean_after_the_pass() {
 #[test]
 fn p2_every_item_left_carrying_the_feature_has_the_passes_note() {
     laws("p2", p2_on);
-}
-
-/// P2's second self-test (R69 d): a pass that notes every comment it leaves twice fails P2.
-#[test]
-fn p2_catches_a_pass_that_notes_an_item_twice() {
-    let twice = Pass {
-        name: "twice",
-        removes: ir::Feature::Item(ir::ItemKind::Comment),
-        requires: ir::FeatureSet::EMPTY,
-        notes: &[LEAKY],
-        run: note_every_comment_twice,
-    };
-    let found = p2_on(&twice).expect_err("P2 sees the repeated note");
-    assert!(found.contains("keeps it with 2 notes"), "{found}");
 }
 
 /// P2's self-test (A25): a pass that notes the first comment and leaves every comment fails
@@ -265,18 +217,22 @@ fn p2_by_item_catches_a_pass_that_notes_one_item_and_leaves_two() {
 #[test]
 fn p3_the_output_uses_only_the_inputs_features_and_requires() {
     laws("p3", |pass| {
-        each_with(pass, |seed, mut design| {
-            let allowed = ir::features_used(&design).union(pass.requires);
-            let mut diags = ir::Diags::new();
-            (pass.run)(&mut design, &mut diags);
-            let extra: Vec<ir::Feature> =
-                ir::features_used(&design).minus(allowed).iter().collect();
-            match extra.is_empty() {
-                true => Ok(()),
-                false => Err(format!("seed {seed}: it adds {extra:?}")),
-            }
+        each_with(pass, |seed, design| {
+            p3_on(pass, design).map_err(|m| format!("seed {seed}: {m}"))
         })
     });
+}
+
+/// P3's self-test (R65, A39): on `v(n) + 1` beside a static `2 * 3`, a pass that writes
+/// `v(n) + 1 * 1` only moves `Mul` from its static into its dynamic member, which P3 passes; one
+/// that writes `v(n) + (1 - 1)` adds `Sub`, which neither form used, and P3 catches it.
+#[test]
+fn p3_passes_a_changed_form_and_catches_a_new_operator() {
+    let form_only = stub("form_only", mul_one);
+    p3_on(&form_only, p3_design()).expect("a moved form is no new feature");
+    let adds = stub("adds_sub", sub_one);
+    let found = p3_on(&adds, p3_design()).expect_err("Sub is new in either form");
+    assert!(found.contains("BinaryDyn(Sub)"), "{found}");
 }
 
 #[test]
@@ -451,14 +407,76 @@ fn note_first_comment(design: &mut ir::Design, diags: &mut ir::Diags) {
     }
 }
 
-/// The repeating self-test pass: two notes at every comment, and no change.
-fn note_every_comment_twice(design: &mut ir::Design, diags: &mut ir::Diags) {
-    for (item, _) in design.reachable() {
-        if item.kind == ir::ItemKind::Comment {
-            diags.push_at(LEAKY, design, item, 0);
-            diags.push_at(LEAKY, design, item, 0);
-        }
+/// P3 on one design: what `pass` leaves uses nothing outside what the design used plus
+/// `requires`, an expression feature compared without its form (R65, A39).
+fn p3_on(pass: &Pass, mut design: ir::Design) -> Result<(), String> {
+    let allowed = ir::features_used(&design).union(pass.requires);
+    let allowed: Vec<ir::Feature> = allowed.iter().map(static_member).collect();
+    let mut diags = ir::Diags::new();
+    (pass.run)(&mut design, &mut diags);
+    let used = ir::features_used(&design);
+    let extra: Vec<ir::Feature> = used
+        .iter()
+        .filter(|&f| !allowed.contains(&static_member(f)))
+        .collect();
+    match extra.is_empty() {
+        true => Ok(()),
+        false => Err(format!("it adds {extra:?}")),
     }
+}
+
+/// A function, operator or draw's static member; every other feature itself. A root's form is
+/// a fact about the root (R51), so a pass that merges two roots or drops a caller moves what it
+/// did not write between the two members (R65).
+fn static_member(feature: ir::Feature) -> ir::Feature {
+    match feature {
+        ir::Feature::FuncDyn(f) => ir::Feature::Func(f),
+        ir::Feature::BinaryDyn(op) => ir::Feature::Binary(op),
+        ir::Feature::UnaryDyn(op) => ir::Feature::Unary(op),
+        ir::Feature::DistDyn(d) => ir::Feature::Dist(d),
+        other => other,
+    }
+}
+
+/// A self-test pass of one rule, no `requires` and no notes.
+fn stub(name: &'static str, run: fn(&mut ir::Design, &mut ir::Diags)) -> Pass {
+    Pass {
+        name,
+        removes: ir::Feature::Item(ir::ItemKind::Comment),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[],
+        run,
+    }
+}
+
+/// P3's self-test design: a static `Mul` and a dynamic `Add` over a literal.
+fn p3_design() -> ir::Design {
+    let text = "file \"d.sp\" deck\n  param a = 2 * 3\n  element behav b1 (n 0) expr=(v(n) + 1)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    design
+}
+
+/// Every literal of a dynamic root `x` becomes `x * x`.
+fn mul_one(design: &mut ir::Design, _: &mut ir::Diags) {
+    literal_to(design, ir::BinOp::Mul);
+}
+
+/// Every literal of a dynamic root `x` becomes `x - x`.
+fn sub_one(design: &mut ir::Design, _: &mut ir::Diags) {
+    literal_to(design, ir::BinOp::Sub);
+}
+
+fn literal_to(design: &mut ir::Design, op: ir::BinOp) {
+    let changed = ir::rewrite_exprs_in(design, ir::Form::Dynamic, &mut |b, e| {
+        let ir::Expr::Num(_) = b.design().expr(e) else {
+            return None;
+        };
+        Some(b.binary(op, e, e))
+    });
+    assert_eq!(changed, 1, "one dynamic root holds a literal");
 }
 
 /// `≅`: the canonical IR text of every file.

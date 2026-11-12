@@ -1,0 +1,6 @@
+brace: unclosed
+model vsource vsource
+v1 (in 0) vsource dc=1.0
+control
+  analysis op1 op nodeset={"in", 1
+endc

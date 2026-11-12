@@ -52,11 +52,6 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
     ("l5", "ngspice", "seed 11 Untyped: a loop over a list holding a long literal (`-73.384558234620672336478e-8`) is written as `foreach sr1 …` and read back as one Unread opaque (P1408: the script's word literal takes no long literal); a finding for ng-control. (A37's outer-read cause is gone: the generator draws FormalOuterRead only for a set that holds it)"),
-    ("l7", "ngspice", "seed 0: passes::legalize panics, toreal_to_mul makes IR that fails ir::check (X0021: the p1 row of pass_laws, with the passes agent); the missing features are l7_missing_features_are_the_known_list's"),
-    ("l5", "vacask", "seed 1 Untyped: a ccvs, vcvs or isource whose model names no definition (`g37 (g38 g39) g40 ctlinst=…`) reads back Unresolved (VACASK takes the kind from the master; the sources area's admits has no W2104 check), and an unresolved element's mult reads back as a `$mfactor` parameter; a finding for vc-sources and vc-devices. (A35's invented-name cause is gone: VACASK's set draws named rows only)"),
-    ("l4", "vacask", "seed 15 Untyped: the writer panics on a DC axis over a source's DC value (`analysis dc … (source_dc g1 path=(g2))`, write_run/analyses.rs `target`): TargetKind::SourceDc on a DC axis has no feature (every target has it, ir plan.rs `target_extra`) and the writer has no spelling; a finding for vc-run"),
-    ("l8", "vacask", "as l4 (seed 15 Untyped: the writer panics on a DC axis over a source's DC value)"),
-    ("l7", "vacask", "seed 0: passes::legalize panics, toreal_to_mul makes IR that fails ir::check (X0021: the p1 row of pass_laws, with the passes agent); the missing features are l7_missing_features_are_the_known_list's"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the

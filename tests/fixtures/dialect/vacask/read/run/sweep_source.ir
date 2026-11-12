@@ -1,0 +1,20 @@
+# Oracle: R64, A39 (one meaning, one row: a sweep of the `dc` parameter of an independent
+# `vsource` or `isource` instance is the source-DC target, every other instance or parameter the
+# device-parameter target); run sweep_source (settle/run: the sweep moves the source's value as
+# ngspice's `.dc` does); VD cmd-sweep (the last sweep is the inner axis).
+# codes:
+file "sweep_source.sim" deck
+  title "sweeps of a source's dc value"
+  model vsource source_v
+  model isource source_i
+  subckt s (p n)
+    element vsource v2 (p n) model=vsource dc=1i
+  element vsource v1 (a 0) model=vsource dc=1i
+  element isource i1 (a 0) model=isource dc=1m
+  element instance x1 (b 0) model=s
+  analysis dc name=dc1 (source_dc i1) (list values=[0i, 1m]) name=ig (source_dc v1) (lin start=0i stop=5i step=0.1) name=vg
+  analysis dc name=dc2 (source_dc v2 path=(x1)) (list values=[1i, 2i]) name=vs
+  analysis dc name=dc3 (device_param v1 mag) (list values=[1i, 2i]) name=vm
+  analysis dc name=dc4 (device_param u1 dc) (list values=[1i, 2i]) name=vu
+  loop sweep name=vl (source_dc v1) (list values=[1i, 2i])
+    analysis tran name=t1 stop=1m cap=span_over50

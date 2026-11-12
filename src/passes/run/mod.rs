@@ -19,13 +19,14 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod ic_next_only;
 pub mod loop_end;
 pub mod names_dropped;
+pub mod names_given;
 pub mod run_items_together;
 pub mod tran_ceiling_given;
 pub mod whole_run_state_first;
@@ -152,6 +153,27 @@ pub(super) const PASSES: &[Pass] = &[
         run: names_dropped::loop_name_dropped,
     },
     Pass {
+        name: "analysis_name_given",
+        removes: ir::Feature::Run(ir::RunExtra::AnalysisUnnamed),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::AnalysisNamed)),
+        notes: &[],
+        run: names_given::analysis_name_given,
+    },
+    Pass {
+        name: "dc_axis_name_given",
+        removes: ir::Feature::Run(ir::RunExtra::DcAxisUnnamed),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::DcAxisNamed)),
+        notes: &[],
+        run: names_given::dc_axis_name_given,
+    },
+    Pass {
+        name: "loop_name_given",
+        removes: ir::Feature::Run(ir::RunExtra::LoopUnnamed),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::LoopNamed)),
+        notes: &[names_given::LOOP_NAME_UNREAD],
+        run: names_given::loop_name_given,
+    },
+    Pass {
         name: "loop_restore_to_keep_last",
         removes: ir::Feature::Run(ir::RunExtra::LoopRestore),
         requires: ir::FeatureSet::EMPTY
@@ -252,6 +274,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a named loop whose body may read its name",
             cite: "rewrite/AMEND-A12.md A27",
             explain: "The target has no loop name. This loop's body holds a statement kept as its dialect's text, which may read the name as the loop variable, so the name cannot be dropped and the loop is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        names_given::NAME_GIVEN,
+        ir::Info {
+            title: "a statement the target must name, given a name",
+            cite: "rewrite/AMEND-A12.md A35; R59",
+            explain: "The target names every analysis, DC axis and loop, and this one had no name, so it was given one: its kind's word and a count, unused by any other statement of its kind. It labels results only. The note's argument is the new name: results are given back under the source's addressing.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        names_given::LOOP_NAME_UNREAD,
+        ir::Info {
+            title: "an unnamed loop whose body may read a name",
+            cite: "rewrite/AMEND-A12.md A35",
+            explain: "The target names every loop. This loop's body holds a statement kept as its dialect's text, which may read a variable a new loop name would shadow, so no name is given and the loop is refused.",
             kind: ir::Kind::Note,
         },
     ),

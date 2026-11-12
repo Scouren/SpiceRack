@@ -27,8 +27,8 @@
 
 use super::super::read::{Lower, Stmt};
 use super::{
-    Card, DROPPED, FIRST_BRACE, Item, Kind, MALFORMED, TC_BASE, UNREAD_FORM, Val, b_tree, emit,
-    head, literal, number_word, push_done, val,
+    Card, DROPPED, FIRST_BRACE, Item, Kind, MALFORMED, MODEL_ORDER, TC_BASE, UNREAD_FORM, Val,
+    b_tree, emit, head, literal, number_word, push_done, val,
 };
 use crate::ir::{self, ElemKind as K, NumForm};
 
@@ -96,6 +96,11 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
         .filter(|i| i.kind == Kind::Word && !is_value(i))
     {
         card.model = Some(m.text.clone());
+        // settle passive_model_order.sp: before the model ngspice-45 takes an R's number only
+        // ("unknown parameter (<model>)" for a C's or L's, or a braced or quoted value)
+        if at == 1 && (letter != b'r' || rest[0].kind == Kind::Brace) {
+            return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MODEL_ORDER);
+        }
         at += 1;
         if f.value.is_none() && rest.get(at).is_some_and(is_value) {
             f.value = Some(match val(lw, st, &rest[at].as_value()) {
@@ -128,6 +133,10 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
             };
             card.dups |= f.tc2.replace(Val::Lit(s)).is_some();
             k += 1;
+        }
+        // settle passive_model_order.sp: an L with a model takes no `l=` ("unknown parameter (l)")
+        if slot == Slot::Value && letter == b'l' && card.model.is_some() {
+            return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MODEL_ORDER);
         }
         let taken = match slot {
             Slot::Value => f.value.replace(v).is_some(),

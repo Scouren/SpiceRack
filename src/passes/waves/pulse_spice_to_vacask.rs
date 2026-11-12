@@ -12,13 +12,16 @@
 //! period of zero (VACASK: one pulse) or of exactly `rise + width + fall` (RUN q13), a field
 //! that is no literal, or ngspice's zero rule (its own pass makes it `AsGiven` first).
 //!
-//! Removes `Circuit(PulseSpice)`, requires `Circuit(PulseVacask)`. One row: a wave law has no
-//! form.
+//! Removes `Circuit(PulseSpice)`, requires `Circuit(PulseVacask)`. Its inverse row,
+//! `pulse_vacask_to_spice`, relabels a VACASK pulse SPICE's under the same condition (the two
+//! laws agree on it either way) and notes every other with the same code; it removes
+//! `Circuit(PulseVacask)` and requires `Circuit(PulseSpice)`. A wave law has no form.
 //!
 //! Cites: `rewrite/AMEND-A12.md` C1, A30; `rewrite/DIALECT-VACASK.md` §6.1 (RUN p1, p2, q13);
 //! `crates/ir/src/wave.rs` (`PulseLaw`).
 //!
-//! Contents: `pub fn pulse_spice_to_vacask(&mut ir::Design, &mut ir::Diags)`
+//! Contents: `pub fn pulse_spice_to_vacask(&mut ir::Design, &mut ir::Diags)`,
+//! `pub fn pulse_vacask_to_spice(&mut ir::Design, &mut ir::Diags)`
 
 use super::PULSE_LAWS_DIFFER;
 use super::nodes::{literal, note_left, sources};
@@ -27,6 +30,23 @@ use crate::ir::wave::{GivenZero, Pulse, PulseLaw};
 
 /// Relabels every SPICE pulse VACASK's law reproduces; notes every other.
 pub fn pulse_spice_to_vacask(design: &mut ir::Design, diags: &mut ir::Diags) {
+    relabel(design, (PulseLaw::Spice, PulseLaw::Vacask));
+    let feature = ir::Feature::Circuit(ir::CircuitExtra::PulseSpice);
+    note_left(design, diags, feature, PULSE_LAWS_DIFFER);
+}
+
+/// Relabels every VACASK pulse SPICE's law reproduces; notes every other.
+pub fn pulse_vacask_to_spice(design: &mut ir::Design, diags: &mut ir::Diags) {
+    relabel(design, (PulseLaw::Vacask, PulseLaw::Spice));
+    let feature = ir::Feature::Circuit(ir::CircuitExtra::PulseVacask);
+    note_left(design, diags, feature, PULSE_LAWS_DIFFER);
+}
+
+// ---- private ----
+
+/// Every reachable pulse of law `laws.0` on which the two laws agree, relabelled `laws.1`.
+fn relabel(design: &mut ir::Design, laws: (PulseLaw, PulseLaw)) {
+    assert!(laws.0 != laws.1, "a relabel changes the law");
     let rows: Vec<u32> = sources(design)
         .into_iter()
         .filter(|(_, s)| !s.wave.is_none() && s.wave.kind == ir::WaveKind::Pulse)
@@ -34,19 +54,15 @@ pub fn pulse_spice_to_vacask(design: &mut ir::Design, diags: &mut ir::Diags) {
         .collect();
     for index in rows {
         let pulse: Pulse = design.detail(index);
-        if pulse.law == PulseLaw::Spice && agree(design, &pulse) {
-            let vacask = Pulse {
-                law: PulseLaw::Vacask,
+        if pulse.law == laws.0 && agree(design, &pulse) {
+            let new = Pulse {
+                law: laws.1,
                 ..pulse
             };
-            design.editor().set_detail(index, vacask);
+            design.editor().set_detail(index, new);
         }
     }
-    let feature = ir::Feature::Circuit(ir::CircuitExtra::PulseSpice);
-    note_left(design, diags, feature, PULSE_LAWS_DIFFER);
 }
-
-// ---- private ----
 
 /// Whether the two laws agree on `pulse` at every instant (the module header's condition).
 fn agree(design: &ir::Design, pulse: &Pulse) -> bool {

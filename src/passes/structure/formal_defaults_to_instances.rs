@@ -14,14 +14,23 @@
 //! that instance's actual for it (or the sibling's default, expanded the same way), and a
 //! function call stays bound to the definition's function.
 //!
+//! Two more rows, one per rule a default's read states (R62, A37), the same body over the
+//! subcircuits that carry their feature: `formal_defaults_to_instances_outer` removes
+//! `Extra(FormalOuterRead)` (a read bound outside the body stays bound in the copy, VACASK run
+//! which1), `formal_defaults_to_instances_unbound` removes `Extra(FormalUnboundRead)` (the read
+//! is bound in each instance's scope, ngspice runs which–which3). Each requires what the
+//! written actual may use: `FormalWithoutDefault` and a reference into an enclosing body.
+//!
 //! Left with a note: a default holding a draw (`DRAW_IN_DEFAULT`: one draw per copy would not
 //! be the draw the default made), and a subcircuit an element names that no definition binds
 //! (`UNKNOWN_INSTANCES`: an instance the pass cannot see would read the new default).
 //!
-//! Cites: R53; `rewrite/AMEND-A12.md` A29, K2, A25; `rewrite/DIALECT-VACASK.md` §6.
+//! Cites: R53, R62; `rewrite/AMEND-A12.md` A29, A37, K2, A25; `rewrite/DIALECT-VACASK.md` §6.
 //!
 //! Contents: `pub fn formal_defaults_to_instances(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub fn formal_defaults_to_instances_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
+//! `pub fn formal_defaults_to_instances_outer(design: &mut ir::Design, diags: &mut ir::Diags)`,
+//! `pub fn formal_defaults_to_instances_unbound(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub const DRAW_IN_DEFAULT: ir::Code`, `pub const UNKNOWN_INSTANCES: ir::Code`,
 //! `pub const PASS_DEFAULT: ir::Code`
 
@@ -41,19 +50,33 @@ type Formal = (ir::NameId, ir::ExprId, ir::DefId);
 
 /// Passes every non-constant default at each instance that omits it; the default goes.
 pub fn formal_defaults_to_instances(design: &mut ir::Design, diags: &mut ir::Diags) {
-    defaults(design, diags, false);
+    defaults(design, diags, ir::Extra::FormalNotConstant, false);
 }
 
 /// As [`formal_defaults_to_instances`], the replaced defaults the literal `0`, with a
 /// `PASS_DEFAULT` note.
 pub fn formal_defaults_to_instances_default(design: &mut ir::Design, diags: &mut ir::Diags) {
-    defaults(design, diags, true);
+    defaults(design, diags, ir::Extra::FormalNotConstant, true);
+}
+
+/// As [`formal_defaults_to_instances`], over the subcircuits whose default holds a read bound
+/// outside the body (`FormalOuterRead`): the copy keeps it bound to that definition.
+pub fn formal_defaults_to_instances_outer(design: &mut ir::Design, diags: &mut ir::Diags) {
+    defaults(design, diags, ir::Extra::FormalOuterRead, false);
+}
+
+/// As [`formal_defaults_to_instances`], over the subcircuits whose default holds an unbound
+/// read (`FormalUnboundRead`): the copy binds it in each instance's scope.
+pub fn formal_defaults_to_instances_unbound(design: &mut ir::Design, diags: &mut ir::Diags) {
+    defaults(design, diags, ir::Extra::FormalUnboundRead, false);
 }
 
 // ---- private ----
 
-fn defaults(design: &mut ir::Design, diags: &mut ir::Diags, with_default: bool) {
-    let feature = ir::Feature::Extra(ir::Extra::FormalNotConstant);
+/// The pass over the subcircuits that carry `rule` (each row's feature): every non-constant
+/// default of each written at its instances.
+fn defaults(design: &mut ir::Design, diags: &mut ir::Diags, rule: ir::Extra, with_default: bool) {
+    let feature = ir::Feature::Extra(rule);
     let legal = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(feature));
     let mut rows = ir::Diags::new();
     ir::check_legal(design, &legal, &mut rows);

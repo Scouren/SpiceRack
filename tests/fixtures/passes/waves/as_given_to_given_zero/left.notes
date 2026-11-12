@@ -1,0 +1,2 @@
+U0205  # v1: an ideal rise, ngspice would read TSTEP
+U0205  # v2: freq=f may be zero
