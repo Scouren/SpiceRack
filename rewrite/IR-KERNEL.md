@@ -281,9 +281,9 @@ resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressio
 definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
 item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
 (so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
-`Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
+`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read anywhere in its tree or of class `Temp`. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
-leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+leaf or a `$temp` in a head default only when it has `FormalNotConstant` (VACASK runs n1, m1, c1, t2).
 `Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
 top scope lists no `Title`. The generator titles every deck when the set lacks it, and makes
 only libraries when the set has neither it nor `Item(Title)`.

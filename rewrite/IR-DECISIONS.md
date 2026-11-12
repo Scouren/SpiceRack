@@ -296,3 +296,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `Title::check` reports a title outside a deck's top (`FieldDomain`), as `ItemKind::Title`'s doc always said; before, only the builder's assert and the IR-text refusal held it.
 - The generator no longer keeps sections in a file's top: `Placed(S, Section)` decides, and with it IR text's nested sections are exercised.
 
+## A15: `FormalReadsParam` widened and renamed `FormalNotConstant`
+
+- Ruled: every head default that is not a constant (a parameter read, or class `Temp`) sets it. The old name would mislead for `w=$temp`, so it is `Extra::FormalNotConstant`; its index is unchanged. `$tnom` and the other A1 leaves are constants of the run and do not set it. The generator keeps a default constant (`param_reads` off, `constant_only` on) unless the set has it.
+

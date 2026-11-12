@@ -314,13 +314,15 @@ impl RowFacts for Subckt {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        // A12 K2: a head default that reads a parameter
-        let defaults = design
-            .params(self.params)
-            .iter()
-            .map(|p| p.1)
-            .filter(|e| !e.is_none());
-        if defaults.into_iter().any(|e| reads_param(design, e)) {
+        // A12 K2, widened by A15: a head default that is not a constant
+        let table = crate::class::def_classes(design);
+        let not_constant = design.params(self.params).iter().any(|p| {
+            !p.1.is_none()
+                && (reads_param(design, p.1)
+                    || crate::class::tree_class(design, p.1, table)
+                        >= crate::class::ExprClass::Temp)
+        });
+        if not_constant {
             *set = set.with(Feature::Extra(Extra::FormalNotConstant));
         }
         // A15 K2: a formal an instance must pass

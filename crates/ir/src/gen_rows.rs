@@ -102,8 +102,11 @@ pub(crate) fn gen_subckt(
     f: &FeatureSet,
 ) -> ItemRef {
     let mut classes = Vec::new();
-    // a head default reads a parameter only when the set has FormalNotConstant (A12 K2)
-    g.param_reads = f.contains(Feature::Extra(Extra::FormalNotConstant));
+    // a head default is a constant (no parameter read, class Constant) unless the set has
+    // FormalNotConstant (A12 K2, A15)
+    let free = f.contains(Feature::Extra(Extra::FormalNotConstant));
+    g.param_reads = free;
+    g.constant_only = !free;
     // no formal can be made when it may neither go without a default nor have one
     let formals = if f.contains(Feature::Expr(ExprTag::Num))
         || f.contains(Feature::Extra(Extra::FormalWithoutDefault))
@@ -127,6 +130,7 @@ pub(crate) fn gen_subckt(
         })
         .collect();
     g.param_reads = true;
+    g.constant_only = false;
     let name = g.fresh();
     let ports: Vec<String> = (0..g.below(4)).map(|_| g.fresh()).collect();
     let keys: Vec<String> = defaults.iter().map(|_| g.fresh()).collect();
