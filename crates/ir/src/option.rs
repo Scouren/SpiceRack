@@ -266,6 +266,9 @@ impl RowFacts for OptionRow {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -363,6 +366,9 @@ impl RowFacts for Env {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -411,6 +417,7 @@ impl RowFacts for NodeSet {
             RunExtra::IcEveryOp,
         );
         flag(set, self.next_only, RunExtra::IcNextOnly);
+        flag(set, !self.next_only, RunExtra::IcBeyondNext);
         flag(set, self.reference.len > 0, RunExtra::IcDifferential);
         flag(
             set,
@@ -481,8 +488,18 @@ impl RowFacts for NodeSet {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
+        let (next, beyond) = (
+            has(features, RunExtra::IcNextOnly),
+            has(features, RunExtra::IcBeyondNext),
+        );
+        if !next && !beyond {
+            return ItemRef::NONE;
         }
         let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun) else {
             return ItemRef::NONE;
@@ -499,7 +516,7 @@ impl RowFacts for NodeSet {
         } else {
             IcScope::Transient
         };
-        let next_only = has(features, RunExtra::IcNextOnly) && g.chance(3);
+        let next_only = next && (!beyond || g.chance(3));
         let all =
             kind == NodeSetKind::Nodeset && has(features, RunExtra::NodesetAll) && g.chance(3);
         let node = if all {

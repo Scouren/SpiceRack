@@ -40,8 +40,9 @@ pub enum OptionKey {
     VnTol,
     /// Absolute charge tolerance, C. ngspice, LTspice, VACASK `chgtol`; Spectre `chargeabstol`.
     ChgTol,
-    /// Truncation-error overestimation factor, dimensionless (ngspice default 7, LTspice 2,
-    /// VACASK 3.5). ngspice, LTspice `trtol`; VACASK `tran_lteratio`.
+    /// Truncation-error overestimation factor, dimensionless (ngspice default 7, LTspice 2).
+    /// ngspice, LTspice `trtol`. Not VACASK's `tran_lteratio`: by VACASK's run that knob is a
+    /// solver hint (an `Opaque` of class `Hint`, R19), not this factor (A22).
     TrTol,
     /// Absolute pivot threshold of the sparse factorisation. ngspice `pivtol`; Spectre
     /// `pivabs`.
@@ -54,8 +55,9 @@ pub enum OptionKey {
     /// Flag: trapezoidal integration. ngspice, LTspice, HSPICE `method=trap`; Xyce
     /// `timeint method=7`; VACASK `tran_method="trap"` or `"am2"`.
     MethodTrap,
-    /// Flag: Gear (BDF) integration up to `MaxOrd`. ngspice, LTspice, HSPICE `method=gear`;
-    /// Xyce `timeint method=8`; VACASK `tran_method="gear2"` or `"bdf2"`.
+    /// Flag: Gear (BDF) integration of variable order up to `MaxOrd`. ngspice, LTspice, HSPICE
+    /// `method=gear`; Xyce `timeint method=8`. Not VACASK's `tran_method="gear2"` or `"bdf2"`,
+    /// which run at the fixed order 2 (A22; no IR member states a fixed order today).
     MethodGear,
     /// Flag: backward Euler integration. VACASK `tran_method="euler"` (ngspice states it as
     /// `MethodGear` with `MaxOrd` 1).

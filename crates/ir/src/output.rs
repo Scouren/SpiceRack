@@ -12,8 +12,8 @@
 //! Cites: `rewrite/IR-RUN.md` §4; `rewrite/INV-constructs.md` H1–H5, H10, H22, H28;
 //! `rewrite/INV-semantics.md` 9.03, 9.04, 9.07, 9.08.
 //!
-//! IR text: `save [analysis=<kind>] <probe> …` (no `analysis=` when it is for every
-//! analysis); `print <kind> [hb_time] <probe> …`; measures: `measure_facts.rs`.
+//! IR text: `save [analysis=<kind>|analysis=(<kind> …)] <probe> …` (no `analysis=` when it is
+//! for every analysis; one kind bare, several in declaration order in parentheses); `print <kind> [hb_time] <probe> …`; measures: `measure_facts.rs`.
 //!
 //! Contents: `pub struct Save`, `pub struct Print`, `pub enum PrintView`, `pub struct Measure`;
 //! `PrintView::ALL`, `PrintView::COUNT`; `RowFacts` for `Save` and `Print` (`Measure`'s:
@@ -41,7 +41,7 @@ use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
-    flag, get, put_flag, put_word, take_enum, take_key, take_word, trim_lead, word,
+    close, flag, get, open, put_flag, put_word, take_enum, take_key, take_word, trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -121,7 +121,13 @@ impl RowFacts for Save {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        flag(set, self.analyses.len() == 1, RunExtra::SavePerAnalysis);
+        let n = self.analyses.len();
+        flag(set, n == 1, RunExtra::SavePerAnalysis);
+        flag(
+            set,
+            n > 1 && self.analyses != AnalysisKinds::ALL,
+            RunExtra::SaveAnalysisSet,
+        );
         list_features(design, self.probes, set);
     }
 
@@ -129,14 +135,20 @@ impl RowFacts for Save {
         if let Some(v) = list_fault(design, self.probes) {
             report(design, at, v, out);
         }
+        if self.analyses.is_empty() {
+            report(design, at, Violation::FieldDomain, out);
+        }
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         let at = out.len();
-        if let Some(kind) = self.analyses.iter().next()
-            && self.analyses != AnalysisKinds::ALL
-        {
-            put_word(out, &format!("analysis={}", word(kind)));
+        if self.analyses != AnalysisKinds::ALL {
+            let kinds: Vec<String> = self.analyses.iter().map(word).collect();
+            let kinds = match kinds.as_slice() {
+                [one] => one.clone(),
+                _ => format!("({})", kinds.join(" ")),
+            };
+            put_word(out, &format!("analysis={kinds}"));
         }
         dump_list(design, ctx, self.probes, out);
         trim_lead(out, at);
@@ -150,10 +162,25 @@ impl RowFacts for Save {
     ) -> ItemRef {
         let mut analyses = AnalysisKinds::ALL;
         if take_key(words, "analysis") {
-            let Some(kind) = take_enum(words, &AnalysisKind::ALL, diags) else {
+            let several = words.peek() == Some("(");
+            if several && !open(words, diags) {
                 return ItemRef::NONE;
-            };
-            analyses = AnalysisKinds::of(&[kind]);
+            }
+            let mut kinds = Vec::new();
+            // one kind per pass; the bound allows each kind twice (repeats are one member)
+            for _ in 0..2 * AnalysisKind::COUNT {
+                let Some(kind) = take_enum(words, &AnalysisKind::ALL, diags) else {
+                    return ItemRef::NONE;
+                };
+                kinds.push(kind);
+                if !several || words.peek() == Some(")") {
+                    break;
+                }
+            }
+            if several && !close(words, diags) {
+                return ItemRef::NONE;
+            }
+            analyses = AnalysisKinds::of(&kinds);
         }
         let Some(probes) = parse_list(words, scope, b, diags) else {
             return ItemRef::NONE;
@@ -168,15 +195,21 @@ impl RowFacts for Save {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let probes = gen_list(g, b, features);
-        let per = has(features, RunExtra::SavePerAnalysis) && g.chance(3);
-        let analyses = if per {
-            AnalysisKinds::of(&[AnalysisKind::ALL[g.below(AnalysisKind::COUNT as u32) as usize]])
-        } else {
-            AnalysisKinds::ALL
+        let n = AnalysisKind::COUNT as u32;
+        let (a, c) = (g.below(n), g.below(n - 1));
+        let first = AnalysisKind::ALL[a as usize];
+        let second = AnalysisKind::ALL[((a + 1 + c) % n) as usize]; // any other kind
+        let analyses = match g.below(3) {
+            0 if has(features, RunExtra::SavePerAnalysis) => AnalysisKinds::of(&[first]),
+            1 if has(features, RunExtra::SaveAnalysisSet) => AnalysisKinds::of(&[first, second]),
+            _ => AnalysisKinds::ALL,
         };
         b.push(scope, Save { analyses, probes }, Span::NONE)
     }
@@ -247,6 +280,9 @@ impl RowFacts for Print {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }

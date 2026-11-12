@@ -4,7 +4,7 @@
 //! IR text (after `analysis <kind> [name=n]`; fields in declaration order):
 //!
 //! ```text
-//! dc       <target> <sweep> { <target> <sweep> } [restart]
+//! dc       <target> <sweep> [name=n] { <target> <sweep> [name=n] } [restart]
 //! ac       <sweep>
 //! noise    <probe> source=n <sweep> [points_per_summary=v] [ac_sweep] [source_ac]
 //! tf       <probe> source=n          dc_xf <probe>          xf <probe> <sweep>
@@ -68,6 +68,7 @@ impl DetailFacts for Dc {
         for axis in get(&design.run.dc_axes, self.axes).unwrap_or(&[]) {
             target_handles(&axis.target, out);
             sweep_handles(&axis.sweep, out);
+            out.push(Handle::Name(axis.name));
         }
     }
 
@@ -76,6 +77,7 @@ impl DetailFacts for Dc {
         flag(set, axes.len() > 1, RunExtra::DcNested);
         flag(set, self.restart, RunExtra::DcRestart);
         for axis in axes {
+            flag(set, !axis.name.is_none(), RunExtra::DcAxisNamed);
             target_features(&axis.target, TargetUse::Dc, set);
             sweep_features(&axis.sweep, set);
         }
@@ -96,6 +98,7 @@ impl DetailFacts for Dc {
         for axis in design.dc_axes(self.axes) {
             dump_target(design, ctx, &axis.target, out);
             dump_sweep(design, ctx, &axis.sweep, out);
+            put_name(out, design, "name", axis.name);
         }
         put_flag(out, self.restart, "restart");
     }
@@ -110,10 +113,11 @@ impl DetailFacts for Dc {
         while words.peek() == Some("(") {
             let target = parse_target(words, b, diags)?;
             let sweep = parse_sweep(words, scope, b, diags)?;
+            let name = take_name(words, "name", b, diags);
             axes.push(DcAxis {
                 target,
                 sweep,
-                name: NameId::NONE,
+                name,
             });
         }
         let restart = take_word(words, "restart");
@@ -138,10 +142,17 @@ impl DetailFacts for Dc {
         let mut axes = Vec::with_capacity(n);
         for _ in 0..n {
             let target = gen_target(g, b, features, TargetUse::Dc)?;
+            let sweep = gen_sweep(g, b, features);
+            // after the sweep: the text interns the name after the sweep's values
+            let name = if has(features, RunExtra::DcAxisNamed) && g.chance(3) {
+                g.fresh_name(b)
+            } else {
+                NameId::NONE
+            };
             axes.push(DcAxis {
                 target,
-                sweep: gen_sweep(g, b, features),
-                name: NameId::NONE,
+                sweep,
+                name,
             });
         }
         let restart = has(features, RunExtra::DcRestart) && g.chance(2);
