@@ -94,7 +94,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 13] = [
+    let cases: [(Violation, Break); 15] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -191,6 +191,24 @@ fn each_kernel_invariant_has_its_fixture() {
                 global.expect("the base has a global").index,
                 Global { nets },
             );
+        }),
+        (Violation::DefinitionCycle, |b| {
+            // k = k
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let k = b.d.lookup(top, DefKind::Param, b.d.find_name("k"));
+            let read = b.d.builder().param_ref("k");
+            b.d.builder().resolve(read, k);
+            let row = Param {
+                name: b.d.find_name("k"),
+                value: read,
+            };
+            set_param(&mut b.d, b.param, row);
+        }),
+        (Violation::StaleDefinition, |b| {
+            // the parameter dropped through the raw list: its definition stays in the index
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let param = b.param;
+            b.d.editor().items_mut(top).retain(|&i| i != param);
         }),
     ];
     for (want, break_it) in cases {
@@ -384,10 +402,50 @@ fn a_dead_body_is_no_violation() {
         top
     };
     assert_eq!(violations(&d), vec![], "the live design");
-    d.editor().items_mut(top).clear();
+    // through the door (round 7b): the raw list would leave the subckt's definition stale
+    let outer = d.items(top)[0];
+    d.editor().remove_item(top, outer);
     assert_eq!(
         violations(&d),
         vec![],
         "the outer subckt dropped: its body and the inner one are dead"
     );
+}
+
+#[test]
+fn a_definition_cycle_is_its_own_violation() {
+    // A28: `subckt s` whose formal `t` defaults to a read of `t` (bound to the formal itself, a
+    // cycle of one), and a body parameter that reads `t`: one DefinitionCycle at the formal, no
+    // ProbeContext at the reader
+    // (link never makes it, A29; a reader that binds by its own rule can, as the ngspice
+    // reader once did)
+    let mut d = Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let read = b.param_ref("t");
+        let (_, body) = b.subckt(top, "s", &[], &[("t", read)], Span::NONE);
+        let formal = b
+            .design()
+            .lookup(body, DefKind::Param, b.design().find_name("t"));
+        b.resolve(read, formal);
+        let inner = b.param_ref("t");
+        b.resolve(inner, formal);
+        b.param(body, "k", inner, Span::NONE);
+    }
+    assert_eq!(violations(&d), vec![Violation::DefinitionCycle]);
+    // its neighbour: the default reads a top parameter of another name
+    let mut ok = Design::new();
+    {
+        let mut b = ok.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let one = b.num(1.0);
+        b.param(top, "u", one, Span::NONE);
+        let read = b.param_ref("u");
+        let (_, body) = b.subckt(top, "s", &[], &[("t", read)], Span::NONE);
+        let inner = b.param_ref("t");
+        b.param(body, "k", inner, Span::NONE);
+    }
+    link(&mut ok, &mut Diags::new());
+    assert_eq!(violations(&ok), vec![]);
 }

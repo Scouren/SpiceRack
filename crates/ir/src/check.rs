@@ -58,7 +58,8 @@ pub enum Violation {
     /// A literal's value is not finite (`1e400`). `arg`: the expression.
     NonFinite,
     /// A literal breaks an invariant of `Literal` (mantissa range, `frac`, an `exp10` its form
-    /// does not allow, a non-canonical zero). `arg`: the expression.
+    /// does not allow, a non-canonical zero), or an `idt` whose initial value is a literal 0 (the
+    /// absent one written again, A28; at the item). `arg`: the expression.
     LiteralShape,
     /// A name used by a row is empty. `arg`: the name.
     EmptyName,
@@ -82,6 +83,16 @@ pub enum Violation {
     /// names one element). Reported by the circuit owner's `element::design_check`. `arg`: the
     /// second element's row in the `Element` table.
     DuplicateElement,
+    /// Parameter or function definitions that read one another in a cycle (A28; A29: a default
+    /// bound to its own formal): invalid on every simulator. Reported once per definition on
+    /// the cycle, at its item; what merely reads the cycle is not reported again. `arg`: the
+    /// definition.
+    DefinitionCycle,
+    /// The definition index holds an entry, in a live scope, whose definition's item no live
+    /// scope lists (a pass removed or moved an item through `Editor::items_mut`, bypassing
+    /// `Editor::remove_item` and `Editor::move_item`), or a reference is bound to a definition
+    /// the index does not hold. `arg`: the definition.
+    StaleDefinition,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -92,7 +103,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; 16] = [
+    pub const ALL: [Violation; Violation::StaleDefinition as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -109,6 +120,8 @@ impl Violation {
         Violation::OpaqueEmpty,
         Violation::FieldDomain,
         Violation::DuplicateElement,
+        Violation::DefinitionCycle,
+        Violation::StaleDefinition,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -122,6 +135,7 @@ pub fn check(design: &Design, diags: &mut Diags) {
     let before = diags.len();
     let mut out = Out { design, diags };
     crate::check_scopes::files_and_scopes(&mut out);
+    crate::check_scopes::stale_definitions(&mut out);
     definitions(&mut out);
     let bad = expression_rows(&mut out);
     items(&mut out, &bad);
@@ -130,20 +144,31 @@ pub fn check(design: &Design, diags: &mut Diags) {
     // the class table reads definitions through their rows, so it runs on a design whose
     // handles hold (A15 K3)
     if out.diags.len() == before {
+        // A28: a cycle among definitions, once per definition on it, at its item
+        for k in crate::class::cycle_defs(design) {
+            out.report(Violation::DefinitionCycle, design.defs[k].item, k as u32);
+        }
         probe_classes(&mut out);
     }
 }
 
 /// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
 /// `legal` (span: the item; `arg`: `Feature::index`), and one at `Span::NONE` per feature of the
-/// whole design outside it (the case clash, the owners' `design_features`). It appends nothing
+/// whole design outside it (the owners' `design_features`); a case clash at the item that brings
+/// the second spelling. It appends nothing
 /// exactly when `features_used(design).minus(legal)` is empty: these rows are `legalize`'s
 /// leftovers (R10). Assumes `check` passed. O(rows).
 pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
     let mut walk = ExprWalk::new(design);
+    let clashes = crate::case::case_clashes(design);
     for (item, scope) in design.reachable() {
         let mut used = FeatureSet::EMPTY;
         item_features(design, item, scope, &mut walk, &mut used);
+        if clashes.contains(&item) {
+            used = used.with(crate::feature::Feature::Extra(
+                crate::feature::Extra::CaseSensitiveNames,
+            ));
+        }
         for f in used.minus(*legal).iter() {
             diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
         }
@@ -168,6 +193,13 @@ pub(crate) fn table_len(d: &Design, kind: ItemKind) -> usize {
 }
 
 // ---- private ----
+
+/// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
+/// removed through `Editor::remove_item` is not held).
+fn in_index(d: &Design, def: DefId) -> bool {
+    let row = d.defs[def.index()];
+    d.def_index.get(&(row.scope, row.kind, row.name)) == Some(&def)
+}
 
 /// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
 /// head default) whose expression is of class `Circuit` by a parameter or function it reads.
@@ -350,6 +382,8 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
                 out.report(Violation::HandleRange, item, r.def.0);
             } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
                 out.report(Violation::RefTarget, item, r.def.0);
+            } else if !in_index(d, r.def) {
+                out.report(Violation::StaleDefinition, item, r.def.0);
             }
         }
         for h in handles.clone() {
@@ -452,8 +486,21 @@ fn expression(
             Expr::Call(f, _) if f.reads_circuit() && !dynamic => {
                 out.report(Violation::ProbeContext, item, node.0)
             }
+            // A28: `idt(x, 0)` is `idt(x)` written twice
+            Expr::Call(Func::Idt, args)
+                if d.exprs(args).get(1).is_some_and(
+                    |&ic| matches!(d.expr(ic), Expr::Num(n) if d.literal_value(d.num(n)) == 0.0),
+                ) =>
+            {
+                out.report(Violation::LiteralShape, item, node.0)
+            }
             Expr::Param(r) if r.is_resolved() && !param_target_ok(d, item, r) => {
                 out.report(Violation::RefTarget, item, r.def.0)
+            }
+            Expr::Param(r) | Expr::UserCall(r, _)
+                if r.is_resolved() && def_ok(d, r.def) && !in_index(d, r.def) =>
+            {
+                out.report(Violation::StaleDefinition, item, r.def.0)
             }
             Expr::UserCall(r, _) if r.is_resolved() && !same(d, r, DefKind::Func) => {
                 out.report(Violation::RefTarget, item, r.def.0)

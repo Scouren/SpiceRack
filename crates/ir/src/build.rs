@@ -43,7 +43,8 @@
 //!
 //! Contents:
 //! - `pub struct Builder<'d>`, `Builder::design(&self) -> &Design`,
-//!   `Builder::element_named(&mut self, ScopeId, NameId) -> Option<ItemRef>`
+//!   `Builder::element_named(&mut self, ScopeId, NameId) -> Option<ItemRef>`; crate:
+//!   `pub(crate) fn element_index(&Design) -> FxMap<(ScopeId, NameId), ItemRef>`
 //! - files and pools: `Builder::file(&mut self, &str, Role) -> (FileId, ScopeId)`,
 //!   `Builder::name(&mut self, &str) -> NameId`, `Builder::text(&mut self, &str) -> TextId`,
 //!   `Builder::names(&mut self, &[&str]) -> NameList`,
@@ -531,11 +532,9 @@ impl<'d> Builder<'d> {
     }
 }
 
-// ---- private ----
-
 /// The first element of each whole name in each scope, in list order: `element_named`'s index,
 /// built from the design in O(items).
-fn element_index(d: &Design) -> crate::names::FxMap<(ScopeId, NameId), ItemRef> {
+pub(crate) fn element_index(d: &Design) -> crate::names::FxMap<(ScopeId, NameId), ItemRef> {
     let mut names = crate::names::FxMap::default();
     for (s, items) in d.scope_items.iter().enumerate() {
         for &item in items.iter().filter(|i| i.kind == ItemKind::Element) {
@@ -545,6 +544,8 @@ fn element_index(d: &Design) -> crate::names::FxMap<(ScopeId, NameId), ItemRef> 
     }
     names
 }
+
+// ---- private ----
 
 impl Builder<'_> {
     /// A new empty scope. Asserts `SCOPES_MAX`.
