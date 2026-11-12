@@ -4,8 +4,9 @@
 # file's top is the toplevel too (VACASK's include is textual); runs c1, n2 (a subcircuit
 # instance gives only declared parameters, `$mfactor` among them when declared: R2004); run fwd
 # (a subcircuit terminal left out: Private P2104); a master no read file defines: Unresolved,
-# R2002.
-# codes: P2104 R2002 R2003 R2004 S0002 S0004 S0004
+# R2002; settle fwd_long (more terminals than the subcircuit's ports: "Too many terminals
+# specified at instantiation." → InvalidInSource P2109, R61).
+# codes: P2104 P2109 R2002 R2003 R2004 S0002 S0004 S0004 S0004
 file "masters.sim" deck
   title "master scoping"
   device_library resistor
@@ -22,6 +23,7 @@ file "masters.sim" deck
   element instance x1 (n1 n2) model=sub params=(g=2i $mfactor=3i)
   opaque vacask invalid "x2 (n1 n2) sub h=2"
   opaque vacask private "x3 (n1) sub"
+  opaque vacask invalid "x5 (n1 n2 n3) sub"
   element unresolved x4 (n1 n2) model=nothing params=(w=1i)
 file "masters--lib" library
   model libres resistor

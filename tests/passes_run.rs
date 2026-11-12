@@ -8,6 +8,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_run/loops.rs"]

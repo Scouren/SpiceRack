@@ -1,0 +1,8 @@
+# Oracle: settle unclosed_c1 (VACASK 36be560: "Parser syntax error, unexpected identifier,
+# expecting } or \",\"" at the `endc` the open brace joined, exit 1): invalid in source, P2012.
+# codes: P2012 S0004
+file "unclosed_brace.sim" deck
+  title "brace: unclosed"
+  model vsource source_v
+  element vsource v1 (in 0) model=vsource dc=1.0
+  opaque vacask invalid "analysis op1 op nodeset={\"in\", 1\nendc"

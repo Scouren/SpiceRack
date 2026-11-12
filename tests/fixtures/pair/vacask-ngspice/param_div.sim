@@ -1,0 +1,11 @@
+param_div: parameter expressions with a division (VACASK: real operands, 1.0/4.0 = 0.25; div_typed_to_div gives ngspice's /), as a resistor value
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters num=1.0 den=4.0 rbase=4k
+v1 (in 0) vsource dc=1.0
+r1 (in out) resistor r=rbase*num/den
+r2 (out 0) resistor r=1k
+control
+  analysis op1 op
+endc

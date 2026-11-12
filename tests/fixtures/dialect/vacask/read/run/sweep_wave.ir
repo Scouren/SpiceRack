@@ -1,0 +1,10 @@
+# Oracle: settle run/sweep_source (its negative row) (VACASK 36be560 leaves a pulse source at its wave's value while
+# its `dc` is swept: e = 0, 0, where ngspice-45's `.dc` gives 2, 4): a meaning only VACASK has,
+# Private P2314 (R64's limit); a sweep binds its analysis, so both are kept as text.
+# codes: P2314 S0002 S0002
+file "sweep_wave.sim" deck
+  title "a dc sweep of a waveform source"
+  model vsource source_v
+  element vsource v3 (e 0) model=vsource wave=pulse(v1=0i v2=1i delay=0 rise=1u fall=0 width=1u period=0 law=vacask) dc_rule=wave_at_zero
+  opaque vacask private "sweep vp instance=\"v3\" parameter=\"dc\" values=[2, 4]"
+  opaque vacask private "analysis dp op"

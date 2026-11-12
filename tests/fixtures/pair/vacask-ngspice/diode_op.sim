@@ -1,0 +1,12 @@
+diode_op: the operating point of a diode (sp_diode, SPICE level 1, area 2) behind a resistor: the model family converts without a sweep
+load "spice/resistor.osdi"
+load "spice/diode.osdi"
+model vsource vsource
+model resistor sp_resistor
+model dmod sp_diode is=1e-14 n=1.05 rs=10.0
+v1 (in 0) vsource dc=2.0
+r1 (in a) resistor r=1k
+d1 (a 0) dmod area=2.0
+control
+  analysis op1 op
+endc

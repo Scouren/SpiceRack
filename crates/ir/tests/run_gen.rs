@@ -309,3 +309,43 @@ fn every_generated_named_row_sets_exactly_one_of_its_pair() {
     }
     assert!(seen > 100, "the property ran on {seen} rows");
 }
+
+#[test]
+fn every_generated_transient_sets_exactly_one_print_step_member() {
+    // R67/A41: `TranPrintStep` and `TranSimulatorStep` split the transients exactly; a set with
+    // only one of them draws only that one (VACASK's laws hold no print step)
+    use spicerack_ir::{ItemRef, check_legal};
+    let [print, chosen] = [RunExtra::TranPrintStep, RunExtra::TranSimulatorStep];
+    let without = |x: RunExtra| run_set().minus(FeatureSet::EMPTY.with(Feature::Run(x)));
+    let mut seen = [0usize; 3];
+    for (k, set) in [run_set(), without(print), without(chosen)]
+        .iter()
+        .enumerate()
+    {
+        for seed in 0..200u64 {
+            let d = generate(seed, set, SIZE);
+            let mut diags = Diags::new();
+            check_legal(&d, &FeatureSet::EMPTY, &mut diags);
+            let at = |item: ItemRef, f: RunExtra| {
+                let f = Feature::Run(f).index() as u32;
+                diags.rows().iter().any(|r| r.item == item && r.arg == f)
+            };
+            for (item, _) in d.reachable() {
+                let row = (item.kind == ItemKind::Analysis)
+                    .then(|| d.row::<spicerack_ir::Analysis>(item.index));
+                if row.is_none_or(|a| a.kind != AnalysisKind::Tran) {
+                    continue;
+                }
+                let (p, c) = (at(item, print), at(item, chosen));
+                assert!(p != c, "seed {seed}, set {k}, {item:?}: exactly one");
+                assert!(
+                    k != 1 || c,
+                    "seed {seed}: only TranSimulatorStep in the set"
+                );
+                assert!(k != 2 || p, "seed {seed}: only TranPrintStep in the set");
+                seen[k] += 1;
+            }
+        }
+    }
+    assert!(seen.iter().all(|&n| n > 20), "transients per set: {seen:?}");
+}

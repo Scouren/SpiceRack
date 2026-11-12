@@ -9,15 +9,19 @@
 //! hand-built include graph with its expected breadth-first order.
 
 //!
-//! Contents: tests only.
+//! Contents: tests only (`strict`: the strict read; `sources`: `Sources::load`).
 
-use std::collections::HashMap;
+#[path = "test_spine/sources.rs"]
+mod sources;
+#[path = "test_spine/strict.rs"]
+mod strict;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use spicerack::dialect::facade::{self, IR_NOTE, IR_REFUSAL, Pipeline, ROUTES};
 use spicerack::dialect::{
-    self, BUILTIN, DialectRow, HINT_DROPPED, INERT_DROPPED, Policy, Reference, STRICT_UNREAD,
-    Sources, Write, irtext::IrText,
+    self, BUILTIN, DialectRow, HINT_DROPPED, INERT_DROPPED, Policy, STRICT_UNREAD, Sources, Write,
+    irtext::IrText,
 };
 use spicerack::ir;
 use spicerack::syntax::diag::{Code, info};
@@ -230,22 +234,6 @@ fn a_feature_no_pass_removes_is_refused_with_its_index() {
     let subckt = u32::from(ir::Feature::Item(ir::ItemKind::Subckt).index());
     let rows: Vec<(ir::Code, u32)> = refused.rows().iter().map(|d| (d.code, d.arg)).collect();
     assert_eq!(rows, [(ir::diag::UNSUPPORTED, subckt)]);
-}
-
-#[test]
-fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
-    let text = "file \"o.sp\" deck\n  opaque ngspice unread \".foo bar\"\n";
-    let src = Sources::one("o.ir", text);
-    let strict = dialect::transpile(&src, ir_row(), ir_row(), Policy::Strict);
-    let codes: Vec<ir::Code> = strict
-        .expect_err("strict")
-        .rows()
-        .iter()
-        .map(|d| d.code)
-        .collect();
-    assert!(codes.contains(&STRICT_UNREAD), "{codes:?}");
-    let lenient = dialect::transpile(&src, ir_row(), ir_row(), Policy::Lenient);
-    assert_eq!(lenient.expect("lenient keeps it").text, text);
 }
 
 #[test]
@@ -497,66 +485,4 @@ fn every_listed_route_has_both_sides_in_builtin() {
 #[test]
 fn the_spine_refuses_its_own_strict_code() {
     assert!(dialect::refuses(STRICT_UNREAD));
-}
-
-#[test]
-fn sources_load_walks_references_breadth_first_once_each() {
-    // deck -> a, b; a -> b, sub/c; sub/c -> ../a (seen), d (missing); b names a Verilog-A file.
-    let files: HashMap<&str, &str> = HashMap::from([
-        (
-            "top/deck.ir",
-            "file \"deck\" deck\n  include \"a.ir\"\n  include \"./b.ir\"\n",
-        ),
-        ("top/a.ir", "  include \"b.ir\"\n  include \"sub/c.ir\"\n"),
-        ("top/b.ir", "  load veriloga \"r.va\"\n"),
-        (
-            "top/sub/c.ir",
-            "  include \"../a.ir\"\n  include \"d.ir\"\n",
-        ),
-    ]);
-    let mut asked = Vec::new();
-    let mut loader = |p: &str| {
-        asked.push(p.to_string());
-        files.get(p).map(|t| t.to_string())
-    };
-    let src = Sources::load(&["top/deck.ir"], ir::Role::Deck, &IrText, &mut loader);
-    let paths: Vec<&str> = src.files().iter().map(|(p, _)| p.as_str()).collect();
-    assert_eq!(
-        paths,
-        ["top/deck.ir", "top/a.ir", "top/b.ir", "top/sub/c.ir"]
-    );
-    assert_eq!(src.entries().len(), 1);
-    assert_eq!(src.form(), ir::Role::Deck);
-    assert_eq!(asked.last().map(String::as_str), Some("top/sub/d.ir"));
-    assert!(
-        !asked.iter().any(|p| p.ends_with("r.va")),
-        "Verilog-A is not followed"
-    );
-}
-
-#[test]
-fn sources_load_stops_at_the_depth_cap() {
-    // f0 -> f1 -> ... : DEPTH_MAX + 1 files are read (depths 0..=DEPTH_MAX).
-    let n = usize::from(dialect::DEPTH_MAX) + 20;
-    let texts: Vec<String> = (0..n)
-        .map(|i| format!("  include \"f{}.ir\"\n", i + 1))
-        .collect();
-    let mut loader = |p: &str| {
-        let i: usize = p.strip_prefix('f')?.strip_suffix(".ir")?.parse().ok()?;
-        texts.get(i).cloned()
-    };
-    let src = Sources::load(&["f0.ir"], ir::Role::Library, &IrText, &mut loader);
-    assert_eq!(src.files().len(), usize::from(dialect::DEPTH_MAX) + 1);
-    assert_eq!(src.form(), ir::Role::Library);
-}
-
-#[test]
-fn a_reference_resolves_beside_its_file() {
-    let r = Reference::File("../m/x.lib".into());
-    assert_eq!(r.resolve("kit/deck/a.sp"), "kit/m/x.lib");
-    assert_eq!(
-        Reference::File("/abs/y.lib".into()).resolve("kit/a.sp"),
-        "/abs/y.lib"
-    );
-    assert_eq!(Reference::VerilogA("r.va".into()).resolve("a.sp"), "r.va");
 }

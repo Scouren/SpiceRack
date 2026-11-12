@@ -196,10 +196,15 @@ fn mult(d: &ir::Design, e: &ir::Element, out: &mut String) {
     kv(d, "m", e.mult, out);
 }
 
-/// An R, C or L: value, model, typed fields, parameters, `m`.
+/// An R, C or L: model, value, typed fields, parameters, `m` (the value after the model: the
+/// one order ngspice-45 takes for R, C and L in every value form, settle
+/// `passive_model_order.sp`); one run as a B source: value, model.
 fn passive(d: &ir::Design, e: &ir::Element, s: &mut String) {
     let p = d.passive(e);
     let rewritten = names_run(d, p.value);
+    if !rewritten {
+        master(d, e, s);
+    }
     if !p.value.is_none() {
         s.push(' ');
         if rewritten {
@@ -208,7 +213,9 @@ fn passive(d: &ir::Design, e: &ir::Element, s: &mut String) {
             cv(d, p.value, s);
         }
     }
-    master(d, e, s);
+    if rewritten {
+        master(d, e, s);
+    }
     let keys = ["ic", "tc1", "tc2", "tce", "temp", "dtemp", "ac", "scale"];
     for (k, v) in keys.iter().zip(passive_fields(&p)) {
         kv(d, k, v, s);

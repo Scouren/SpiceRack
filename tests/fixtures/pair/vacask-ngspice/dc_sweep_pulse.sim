@@ -1,0 +1,11 @@
+dc_sweep_pulse: a sweep of parameter "dc" on a pulse-type source (VACASK ignores the dc of a waveform source: R64a, the reader keeps it Private, so it is refused, never swept)
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource type="pulse" dc=0.0 val0=0.0 val1=1.0 delay=1n rise=1n fall=1n width=5n period=20n
+r1 (in out) resistor r=1k
+r2 (out 0) resistor r=3k
+control
+  sweep s1 instance="v1" parameter="dc" from=0.0 to=5.0 step=0.25
+  analysis dc1 op
+endc

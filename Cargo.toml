@@ -25,6 +25,8 @@ tempfile = { version = "3", optional = true }
 spicerack-ir = { path = "crates/ir" }
 
 [dev-dependencies]
+# The law binaries' memory cap (`tests/common/memcap.rs`: setrlimit); already in the lock.
+libc = "0.2"
 pretty_assertions = "1"
 tempfile = "3"
 # The dialect-law tests generate designs (`ir::gen`).

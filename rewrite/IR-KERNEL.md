@@ -348,7 +348,42 @@ sections may now be nested where the set allows. `Placed(_, Title)` never occurs
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
 
-**A19 (2026-11-12): a field that may read the circuit counts the dynamic form (R38).** An
+**A number token's literal (2026-11-12, the dialects' audit row 7).** `literal::decimal(
+significand, exp10, form) -> Option<Decimal>` (`Decimal::Short(Literal)` or `Decimal::Long(
+digits, exp10, form)`) and `Builder::decimal`, which pushes it: the significand as written,
+the power of its exponent plus its scale letter, the form. A significand past 18 significant
+digits is `Long` (A18); a short one with more than 18 fraction digits moves them into the
+power exactly, as an `Exponent` (none for `Mil`); a real zero is `Literal::ZERO`, an integer
+zero `0i`; `None` for a shape, power or value no literal states. IR text reads its numbers
+through it (`text_lex::number_parts` splits the word). Oracles: hand-worked cases, and Rust's
+decimal parser on 10^4 random significands (`tests/kernel_literal.rs`).
+
+**The builder's undo (2026-11-12, the dialects' audit row 5).** `Builder::mark() -> Mark` and
+`Builder::truncate(Mark)` (`mark.rs`): a mark holds every table's length (the kernel's, the 26
+item tables, the circuit and run details, listed by exhaustive destructuring so a new table is
+a compile error), and the truncate drops what was appended since: rows, pool entries, names
+(each out of its hash chain, newest first), texts, definitions and their index entries,
+scopes, and the items at the end of each surviving scope list. Appends only: a row changed in
+place since the mark stays changed. A reader marks before a statement, pushes while it
+validates, and truncates a refused one. Property (`tests/kernel_mark.rs`): a generated text
+pushed after a mark and truncated leaves the design equal to one read without the detour,
+its next ids the same.
+
+**A40 (2026-11-12): a root's form follows its class, except in a behavioural source (R66;
+amends A19 and A26).** `ExprUse` has a third member, `Behavioural`: the expression of an element
+whose detail is a `Behav` row (a behavioural source, a charge-defined capacitor, a flux-defined
+inductor), its row's one `Handle::ExprDyn`; the circuit rows' `map_exprs` reports it, and the
+kernel reads the same from the handles (`circuit_fields::is_behavioural`). A root counts
+dynamic when its class is `Temp` or above or its use is `Behavioural`, static otherwise: a
+passive's constant value, a table's input, a measure threshold count static, though their
+fields may read the circuit. `Handle::ExprDyn` keeps its meaning for `check`. The generator
+draws the dynamic form for a dynamic-class tree and around a `Behav` row's expression
+(`Gen::dyn_form`), the static form everywhere else. Spec example
+(`form_tests::a_root_counts_in_its_class_except_in_a_behavioural_source`): `value=(rbase * num
+/: den)` on a resistor counts `Binary(Mul)` and `Binary(DivTyped)`; with `* $temp`, or as a
+behavioural source's `expr`, the `*Dyn` members.
+
+**A19 (2026-11-12, amended by A40): a field that may read the circuit counts the dynamic form (R38).** An
 expression a row lists as `Handle::ExprDyn` counts its functions and operators as `FuncDyn`,
 `BinaryDyn` and `UnaryDyn` whatever its class; elsewhere the form follows the class as before
 (dynamic when `Temp` or `Circuit`). A constant in a B source's expression is the dynamic form,
@@ -361,7 +396,7 @@ threshold).
 `map_refs` and `refs`:
 
 ```rust
-pub enum ExprUse { Constant, Circuit }
+pub enum ExprUse { Constant, Circuit, Behavioural } // Behavioural: A40
 fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)); // default: no root
 ```
 
@@ -395,8 +430,9 @@ false for it; every generic caller goes through the design (`literal_value`, `li
 form. `Extra::LongLiteral` marks one; the generator makes them only when the set has it.
 
 **A26 (2026-11-12): the expression door takes a form.** `pub enum Form { Static, Dynamic }` and
-`root_form(design, root, use) -> Form`: `Dynamic` when the root's field may read the circuit
-(`ExprUse::Circuit`) or its tree is of class `Temp` or above; the one decision, which
+`root_form(design, root, use) -> Form`: `Dynamic` when the root is a behavioural source's
+expression (`ExprUse::Behavioural`, A40; before A40, any `ExprUse::Circuit` field) or its tree
+is of class `Temp` or above; the one decision, which
 `features_used` makes through the same private rule. `rewrite_exprs_in(design, form, rule)` is
 `rewrite_exprs` restricted to the roots of one form (decided before the pass appends anything):
 a root of the other form keeps its id, and a subtree shared by roots of both forms is rewritten
@@ -584,6 +620,14 @@ FeatureSet` is one scan.
   format is canonical (one spelling per design), lossless (`parse(dump(d))` rebuilds equal tables),
   line oriented, indented by scope, writable by hand. Put the grammar and one worked example in
   the file header.
+  (2026-11-12, R61/A36's finding on the trunk's mutation law: IR text is a dialect like the
+  others.) `parse` refuses a text that states an invalid design: a line read only in part
+  leaves no item, and after the link every item a `check` row names is one `TEXT_SYNTAX` row
+  and leaves its scope, the references to its definitions unbound, until `check` names none
+  (one `check` per read of a valid text). `parse_unchecked(&str, &mut Builder, &mut Diags)`
+  builds what the text states, valid or not: the door for `check`'s own fixtures. Law:
+  `tests/kernel_text_refuse.rs`, mutated dumps of generated designs read to designs `check`
+  accepts.
 - `gen.rs` (behind `cfg(any(test, feature = "gen"))`): `generate(seed, &FeatureSet, Size) ->
   Design`, always valid under `check` and legal for the set.
 - `diag.rs`: `Code { letter: u8, number: u16 }`, `Kind::{Note, Refusal}`, `Info { title, cite,

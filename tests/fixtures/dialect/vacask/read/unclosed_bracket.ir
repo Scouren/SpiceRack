@@ -1,0 +1,7 @@
+# Oracle: settle unclosed_b1 (VACASK 36be560: "Parser syntax error, unexpected identifier,
+# expecting ] or \",\"", exit 1): an unclosed vector bracket is invalid in source, P2012.
+# codes: P2012 S0004
+file "unclosed_bracket.sim" deck
+  title "bracket: unclosed"
+  model vsource source_v
+  opaque vacask invalid "parameters v=[1, 2\nv1 (in 0) vsource dc=1.0\ncontrol\n  analysis op1 op\nendc"

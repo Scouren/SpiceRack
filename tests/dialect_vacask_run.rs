@@ -20,6 +20,9 @@
 //! Contents: tests only (`settle`, the settle decks' facts; `save_plans`, the seeded save
 //! property).
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -413,4 +416,71 @@ fn every_settle_deck_runs_the_same_after_read_and_write() {
         }
     }
     assert_known(&failed, KNOWN_TRIP);
+}
+
+// ---- the writer's refusals ----
+
+#[test]
+fn a_sweep_of_a_waveform_sources_dc_is_refused_and_a_dc_sources_is_not() {
+    // Oracle: settle run/sweep_source's negative row (VACASK leaves a pulse source at its wave
+    // while its `dc` is swept: e = 0 0 where ngspice-45 gives 2 4), so the writer refuses the
+    // source-DC target of a source whose DC is its wave at zero (W2307), on a DC axis and on a
+    // loop; a dc source and R42's fold (given DC beside a wave) are swept as written.
+    let head = r#"file "w.ir" deck
+  title "swept sources"
+  model vsource source_v
+"#;
+    let pulse = "wave=pulse(v1=0i v2=1i delay=0 rise=1u fall=0 width=1u period=0 law=vacask)";
+    let cases: [(String, &[&str]); 2] = [
+        (
+            format!(
+                "  element vsource v1 (a 0) model=vsource dc=1i
+  element vsource v3 (e 0) model=vsource {pulse} dc_rule=wave_at_zero
+  analysis dc name=d1 (source_dc v1) (list values=[1i, 2i]) name=s1
+  analysis dc name=d2 (source_dc v3) (list values=[1i, 2i]) name=s2
+  loop sweep name=s4 (source_dc v3) (list values=[1i, 2i])
+    analysis tran name=t1 stop=1m cap=span_over50
+"
+            ),
+            &["W2307 d2", "W2307 s4"],
+        ),
+        // R42's fold: the line is type dc during the DC analyses, so the sweep moves it.
+        (
+            format!(
+                "  element vsource v4 (f 0) model=vsource dc=2i {pulse}
+  analysis dc name=d3 (source_dc v4) (list values=[1i, 2i]) name=s3
+  analysis tran name=t2 stop=1m cap=span_over50
+"
+            ),
+            &[],
+        ),
+    ];
+    let row = dialect::by_name("vacask").expect("the vacask row");
+    for (body, want) in cases {
+        let (mut design, _) = read("w.ir", &format!("{head}{body}"), "ir");
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row, &mut diags);
+        let mut refused: Vec<String> = diags
+            .rows()
+            .iter()
+            .filter(|d| dialect::refuses(d.code))
+            .map(|d| {
+                let at = d.item;
+                assert_ne!(at, ir::ItemRef::NONE, "a refusal at its item");
+                let name = match at.kind {
+                    ir::ItemKind::Analysis => design.row::<ir::Analysis>(at.index).name,
+                    ir::ItemKind::Loop => design.row::<ir::Loop>(at.index).name,
+                    _ => ir::NameId::NONE,
+                };
+                let name = if name.is_none() {
+                    "?"
+                } else {
+                    design.str(name)
+                };
+                format!("{}{:04} {name}", d.code.letter as char, d.code.number)
+            })
+            .collect();
+        refused.sort();
+        assert_eq!(refused, want, "{body}");
+    }
 }

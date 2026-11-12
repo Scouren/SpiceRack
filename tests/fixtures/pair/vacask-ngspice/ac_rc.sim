@@ -1,0 +1,12 @@
+ac_rc: the AC sweep of an RC low-pass (pole at 1/(2 pi 1k 1n) = 159 kHz), 10 points a decade
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=0.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1n
+control
+  analysis ac1 ac from=1k to=100meg mode="dec" points=10
+endc

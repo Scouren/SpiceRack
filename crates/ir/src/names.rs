@@ -18,6 +18,7 @@
 //! - `pub(crate) struct Fx` (a `Hasher`), `pub(crate) type FxMap<K, V>`
 //! - `pub(crate) struct Texts`: `Texts::new() -> Texts`, `Texts::push(&mut self, &str) -> TextId`,
 //!   `Texts::str(&self, TextId) -> &str`, `Texts::len(&self) -> usize`
+//! - `pub(crate) fn hash(&str) -> u64` (the interner's bucket key; the builder's undo reads it)
 
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
@@ -198,15 +199,15 @@ impl Texts {
     }
 }
 
-// ---- private ----
-
 /// The lookup key of a name's bytes (`Fx`: deterministic across runs).
-fn hash(name: &str) -> u64 {
+pub(crate) fn hash(name: &str) -> u64 {
     let mut h = Fx::default();
     h.write(name.as_bytes());
     h.write_u8(0xFF); // a terminator, so "a" and "a\0" differ
     h.finish()
 }
+
+// ---- private ----
 
 impl Fx {
     fn add(&mut self, word: u64) {

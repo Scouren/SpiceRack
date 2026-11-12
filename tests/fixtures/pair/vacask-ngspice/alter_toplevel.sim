@@ -1,0 +1,12 @@
+alter_toplevel: an alter of a top-level parameter between two operating points (VACASK: alter instance("__topinst__") a=2.0 re-elaborates, r1 = 2k at op2); the smallest form of the corpus's test/test_cblock.sim
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters a=1.0
+v1 (in 0) vsource dc=10.0
+r1 (in 0) resistor r=1k*a
+control
+  analysis op1 op
+  alter instance("__topinst__") a=2.0
+  analysis op2 op
+endc

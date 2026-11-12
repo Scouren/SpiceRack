@@ -1,6 +1,7 @@
 # Oracle: VD cmd-analysis-ac (stepped, lin by intervals: points+1 values, dec and oct per
 # decade/octave, values list); IR sweep.rs (`points` is the number of values: VACASK's reader
-# adds one to a lin count, as an integer literal or `+ 1`).
+# adds one to a lin count, as an integer literal or `+ 1`, and takes `x - 1`, the writer's
+# spelling of the count `x`, back as `x`: law L5 seed found it).
 # codes:
 file "ac.sim" deck
   title "ac sweeps"
@@ -10,3 +11,5 @@ file "ac.sim" deck
   analysis ac name=a4 (oct start=1i stop=1k points=3i)
   analysis ac name=a5 (list values=[1k, 2k, 5k])
   analysis ac name=a6 (dec start=1i stop=1k points=n?)
+  analysis ac name=a7 (lin start=1i stop=1k points=n?)
+  analysis ac name=a8 (lin start=1i stop=1k points=(n? + 1i))

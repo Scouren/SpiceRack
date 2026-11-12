@@ -187,3 +187,118 @@ fn names_mc_quoted_an_mc_name_is_an_identifier() {
         r.out
     );
 }
+
+#[test]
+fn sweep_source_a_sweep_of_a_sources_dc_is_ngspices_dc_while_its_type_is_dc() {
+    // R64. The same circuit on ngspice-45 (`.dc v1 0 5 1`, `.dc i1 0 3m 1m`, a `.dc` of `v2`
+    // in `x1`, `.dc v3 2 4 2` on `v3 e 0 pulse(0 1 0 1u 1u 1u)`) printed v(b) = 0 0.5 1 1.5 2
+    // 2.5, v(c) = 0 2 4 6, v(d) = 2 4, v(e) = 2 4. VACASK matches on the three dc sources
+    // (positive rows) and leaves the pulse source at its wave's value, e = 0 0 (the negative
+    // row: VACASK reads `dc` only while the type is dc; P2314, W2307).
+    let r = settle("sweep_source.sim");
+    let rows: [(&str, &str, &[f64]); 4] = [
+        ("dv.raw", "b", &[0.0, 0.5, 1.0, 1.5, 2.0, 2.5]),
+        ("di.raw", "c", &[0.0, 2.0, 6.0]),
+        ("dx.raw", "d", &[2.0, 4.0]),
+        ("dp.raw", "e", &[0.0, 0.0]),
+    ];
+    for (file, node, want) in rows {
+        let plot = raw(&r, file);
+        for (k, &x) in want.iter().enumerate() {
+            assert!(
+                close(value(&plot, node, k), x, 1e-12),
+                "{file} {node}[{k}]: {}",
+                r.out
+            );
+        }
+    }
+    assert_eq!(value(&raw(&r, "dp.raw"), "vp", 1), 4.0, "{}", r.out);
+}
+
+#[test]
+fn temp_an_analysis_parameter_cannot_read_the_temperature() {
+    // Item 5a: `$temp` in a tran's `stop`, an ac bound or a dc sweep bound is rejected when the
+    // analysis runs, alone, under `options temp=50`, and inside a sweep over the temperature
+    // (VACASK 36be560); a `var` of `$temp` is rejected where it stands.
+    for deck in [
+        "temp_tran.sim",
+        "temp_tran_swept.sim",
+        "temp_tran_options.sim",
+        "temp_ac.sim",
+        "temp_ac_swept.sim",
+        "temp_dc.sim",
+        "temp_dc_swept.sim",
+        "var_temp.sim",
+    ] {
+        let r = settle(deck);
+        assert!(
+            r.out.contains("Variable or constant '$temp' not defined."),
+            "{deck}: {}",
+            r.out
+        );
+    }
+}
+
+#[test]
+fn var_an_analysis_parameter_reads_a_circuit_variable_per_sweep_point() {
+    // Item 5a's contrast: `stop=1m*k` with `var k` swept over 1, 2 ends the transients at 1 ms
+    // and 2 ms (re-evaluated per point); a top-level `parameters k` is not visible there,
+    // swept (instance="__topinst__") or not: "Variable or constant 'k' not defined.".
+    let r = settle("var_tran_swept.sim");
+    let plot = raw(&r, "v1.raw");
+    let t = plot
+        .variables
+        .iter()
+        .position(|v| v.name == "time")
+        .unwrap();
+    let times = &plot.real_data[t];
+    let ends: Vec<f64> = (0..times.len())
+        .filter(|&k| k + 1 == times.len() || times[k + 1] < times[k])
+        .map(|k| times[k])
+        .collect();
+    assert_eq!(ends.len(), 2, "{}", r.out);
+    assert!(
+        close(ends[0], 1e-3, 1e-12) && close(ends[1], 2e-3, 1e-12),
+        "{ends:?}"
+    );
+    for deck in ["param_tran.sim", "param_tran_swept.sim"] {
+        let r = settle(deck);
+        assert!(
+            r.out.contains("Variable or constant 'k' not defined."),
+            "{deck}: {}",
+            r.out
+        );
+    }
+}
+
+#[test]
+fn part_vacask_writes_no_part_of_a_small_signal_output() {
+    // Item 5b: a part as a noise output is a node name VACASK looks up ("Node 'vdb(b)' not
+    // found.", the analysis aborted); `save vdb(b)`, `save vr(b)` and, on a noise, `save vm(b)`
+    // are accepted and change nothing: the ac raw file holds the default complex vectors, the
+    // noise one its real PSDs.
+    let r = settle("part_noise_out.sim");
+    assert!(r.out.contains("Node 'vdb(b)' not found."), "{}", r.out);
+    for (deck, file) in [
+        ("part_ac_save_db.sim", "ac1.raw"),
+        ("part_ac_save_real.sim", "ac2.raw"),
+    ] {
+        let r = settle(deck);
+        assert_eq!(
+            vectors(&raw(&r, file)),
+            ["frequency", "a", "b", "v1:flow(br)"],
+            "{deck}"
+        );
+    }
+    for (deck, file) in [
+        ("part_noise_save.sim", "n2.raw"),
+        ("part_noise_save_mag.sim", "n3.raw"),
+    ] {
+        let r = settle(deck);
+        assert_eq!(
+            vectors(&raw(&r, file)),
+            ["frequency", "onoise", "gain", "n(r1)"],
+            "{deck}"
+        );
+    }
+}

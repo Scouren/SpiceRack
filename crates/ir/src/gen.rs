@@ -89,8 +89,8 @@ pub struct Gen {
     /// Whether the expression being built must be of class `Constant` (cleared around an `If`
     /// condition when the set lacks `Extra::IfConditionDynamic`).
     pub(crate) constant_only: bool,
-    /// Whether the expression being built lies in a `Handle::ExprDyn` field generated with
-    /// `Reads::Constant` (a measure's threshold): its operators take the dynamic form (A19).
+    /// Whether the expression being built is a behavioural source's own expression
+    /// (`ExprUse::Behavioural`): its operators take the dynamic form whatever its class (R66).
     pub(crate) dyn_form: bool,
     /// Whether the expression being built is a function body (A28): its forms are its callers',
     /// unknown while it is built, so each operator must be allowed in both forms.

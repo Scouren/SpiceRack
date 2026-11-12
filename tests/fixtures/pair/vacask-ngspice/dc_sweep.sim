@@ -1,0 +1,11 @@
+dc_sweep: a DC sweep of the source of a divider, 0 to 5 V by 0.25 V (a sweep before an op)
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource dc=0.0
+r1 (in out) resistor r=1k
+r2 (out 0) resistor r=3k
+control
+  sweep s1 instance="v1" parameter="dc" from=0.0 to=5.0 step=0.25
+  analysis dc1 op
+endc

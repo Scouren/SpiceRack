@@ -1,0 +1,10 @@
+int_literal: a VACASK integer literal (dc=5, an `int` in VACASK) as a source value: ngspice has no integer literal, so legalize must convert it or refuse it
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+src (in 0) vsource dc=5
+r1 (in out) resistor r=1k
+lower (out 0) resistor r=2k
+control
+  analysis op1 op
+endc

@@ -1,0 +1,14 @@
+mosfet: an NMOS (sp_mos1, SPICE level 1) with a resistor load, its drain swept by the gate
+load "spice/resistor.osdi"
+load "spice/mos1.osdi"
+model vsource vsource
+model resistor sp_resistor
+model nmod sp_mos1 vto=0.7 kp=100u lambda=0.02
+vdd (vdd 0) vsource dc=3.0
+vg (g 0) vsource dc=0.0
+rd (vdd d) resistor r=10k
+m1 (d g 0 0) nmod w=10u l=2u
+control
+  sweep s1 instance="vg" parameter="dc" from=0.0 to=3.0 step=0.1
+  analysis dc1 op
+endc

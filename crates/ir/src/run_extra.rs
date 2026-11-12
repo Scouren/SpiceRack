@@ -376,11 +376,14 @@ pub enum RunExtra {
     /// A loop with no statement name (SPICE `.step`; VACASK's `sweep` requires one).
     /// `LoopNamed`'s twin.
     LoopUnnamed,
+    /// A transient whose print step is given (`print_step` set; VACASK has no output interval,
+    /// R67/A41). `TranSimulatorStep`'s twin: each transient sets exactly one.
+    TranPrintStep,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 167] = [
+    pub const ALL: [RunExtra; 168] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -548,6 +551,7 @@ impl RunExtra {
         RunExtra::AnalysisUnnamed,
         RunExtra::DcAxisUnnamed,
         RunExtra::LoopUnnamed,
+        RunExtra::TranPrintStep,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
