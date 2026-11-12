@@ -3,9 +3,9 @@
 file "sffm.sp" deck
   title "sffm"
   comment " oracle: vsrcload.c SFFM (VO VA FM MDI FC TD PHM PHC; 0 for t - TD <= 0); isrcload.c SFFM (no delay; 6th value PHM, 7th PHC); R36 (dc is the wave at t = 0); runs: V op 0 for td 0, 0.5 for td -1m; I `sffm(0.5 1 1k 2 10k 30)` op -1.34147 into 1 ohm"
-  element vsource v1 (a 0) wave=sffm(offset=0.5 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k law=ngspice pre=zero) dc_rule=wave_at_zero
-  element vsource v2 (b 0) wave=sffm(offset=0.5 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k delay=-1m law=ngspice pre=zero) dc_rule=wave_at_zero
-  element isource i3 (c 0) wave=sffm(offset=0.5 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k phase_m_deg=30 law=ngspice pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource V1 (a 0) wave=sffm(offset=0.5 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k law=ngspice pre=zero) dc_rule=wave_at_zero
+  element vsource V2 (b 0) wave=sffm(offset=0.5 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k delay=-1m law=ngspice pre=zero) dc_rule=wave_at_zero
+  element isource I3 (c 0) wave=sffm(offset=0.5 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k phase_m_deg=30 law=ngspice pre=hold_delay_value) dc_rule=wave_at_zero
   opaque ngspice unread "R3 c 0 1"
-  element vsource v4 (d 0) wave=sffm(offset=0 amplitude=1 law=ngspice pre=zero) dc_rule=wave_at_zero
+  element vsource V4 (d 0) wave=sffm(offset=0 amplitude=1 law=ngspice pre=zero) dc_rule=wave_at_zero
   opaque ngspice unread ".control\nop\nprint v(a) v(b) v(c) v(d)\ntran 1u 100u\nprint v(a)[30] v(b)[30] v(c)[30]\n.endc"

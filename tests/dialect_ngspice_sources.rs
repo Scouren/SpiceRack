@@ -145,7 +145,10 @@ fn written_sources_print_what_ngspice_prints_for_the_original() {
 fn ngspice_prints_the_pinned_values() {
     for (name, line) in PINNED {
         let lines = printed(&text("read", name, "sp"));
-        assert!(lines.iter().any(|l| l == line), "{name}: {line} in {lines:?}");
+        assert!(
+            lines.iter().any(|l| l == line),
+            "{name}: {line} in {lines:?}"
+        );
     }
 }
 

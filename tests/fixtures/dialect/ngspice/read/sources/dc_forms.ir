@@ -3,12 +3,12 @@ file "dc_forms.sp" deck
   title "dc_forms"
   comment " oracle: inp2v.c (a leading value is set after INPdevParse: run `1 dc 3` op 1), inpgtok.c (`=` separates), isrc.c (`c` is dc), vsrctemp.c (\"has no value, DC 0 assumed\"; run op 0), runs `V1 a 0 vdd` = 2"
   param vdd = 2
-  element vsource v1 (a 0) dc=1
-  element vsource v2 (b 0) dc=2
-  element vsource v3 (c 0) dc=3
-  element vsource v4 (d 0) dc=1
-  element vsource v5 (e 0) dc=0
-  element vsource v6 (f 0) dc=0
-  element vsource v7 (g 0) dc=vdd
-  element vsource v8 (h 0) dc=(vdd * 2)
+  element vsource V1 (a 0) dc=1
+  element vsource V2 (b 0) dc=2
+  element vsource V3 (c 0) dc=3
+  element vsource V4 (d 0) dc=1
+  element vsource V5 (e 0) dc=0
+  element vsource V6 (f 0) dc=0
+  element vsource V7 (g 0) dc=vdd
+  element vsource V8 (h 0) dc=(vdd * 2)
   opaque ngspice unread ".control\nop\nprint v(a) v(b) v(c) v(d) v(e) v(f) v(g) v(h)\n.endc"
