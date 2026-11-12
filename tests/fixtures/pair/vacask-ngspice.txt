@@ -14,5 +14,4 @@
 alter_toplevel 4 target-fails finding=F7 # ngspice reports "Error: no such device or model name __topinst__" (its own error report fails the run); the numbers differ too: -0.005 vs -0.01
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
-tran_rc_pulse 2 refused:U0001:Run(TranInitialStep)+Run(TranSimulatorStep) pass=tran_explicit_cap # VACASK's tran step forms
-tran_sine 2 refused:U0001:Run(TranInitialStep)+Run(TranSimulatorStep) pass=tran_explicit_cap # as tran_rc_pulse
+dc_nested 2 refused:U0001:Run(SweepDcLinPoints)+Run(SweepDcList) pass=sweep_dc_lin_points_to_step # runrules' keep_nested.sim: a nested sweep (values= around points=); its rows are on step3-runrules 5c8834b8, not merged

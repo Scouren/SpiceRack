@@ -1,0 +1,2 @@
+file "a.sp" deck
+  analysis tran stop=10u initial_step=1n max_step=(10u / 50)
