@@ -86,8 +86,10 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   `read`, one `legalize`, one `write` per file.
 - `transpile` = `read`, `legalize`, `write` of the entry file, and the verdict: any
   `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
-  turns an `Opaque` of class `Unread` into a refusal; `Lenient` keeps it (a writer of the same
-  text family copies it).
+  turns an `Opaque` of class `Unread` into a refusal (`S0101`) and refuses, at its item, each
+  parameter read no definition binds (`S0104`, the name as the argument; `ir::unbound_reads`,
+  a formal default's held read aside: R63, A38); `Lenient` keeps both (a writer of the same
+  text family copies the opaque; the read stays unresolved).
 - Every branch on which work happens is in these four functions.
 
 ## 4. Legalization (`src/passes/`)
@@ -233,7 +235,8 @@ laws run on.
   the top of the test.
 - `tests/test_spine.rs`: `transpile` over the `ir` dialect on hand-written IR text (a deck with
   a subcircuit, an element, an analysis); a refusal when `PASSES` cannot remove a feature a stub
-  writer lacks; `Policy::Strict` refusing an `Unread`; the facade's message format; the route
+  writer lacks; `Policy::Strict` refusing an `Unread` and an unresolved parameter read (a held
+  one passes); the facade's message format; the route
   override.
 
 ## 8a. The pair test (`tests/test_pair.rs`, from the trunk merge)
