@@ -37,7 +37,7 @@ const READ: &[&str] = &[
     "print_ac_parts",
     "print_invalid",
     "print_tran",
-    "save_all_unread",
+    "save_all",
     "save_probes",
 ];
 
@@ -178,6 +178,10 @@ C1 b 0 100p
 .meas tran ib find i(v1) at=1u
 .meas tran p1 param='tr*2'
 .meas tran p2 param='av+half'
+.meas tran w5 when v(a)=0.5 from=1u
+.meas tran f4 find v(b) when v(a)=0.5 rise=2 to=2u
+.meas tran mxa max_at v(b) from=1u
+.meas tran t4 trig v(a) val=0.2 rise=1 from=1u targ v(b) val=0.5 fall=1
 .end
 ";
     let (design, _) = read_deck("rt.sp", deck);
@@ -186,7 +190,7 @@ C1 b 0 100p
     let want = ngspice_measures(deck);
     assert_eq!(
         want.len(),
-        15,
+        19,
         "every measure of the original ran:\n{want:?}"
     );
     assert_eq!(ngspice_measures(&written), want, "{written}");
@@ -205,6 +209,7 @@ C1 out 0 1u
 .meas ac ph find vp(out) at=100
 .meas ac bw when vdb(out)=-3 fall=1
 .meas ac m find vm(out) when vr(out)=0.5
+.meas ac b2 when vdb(out)=-3 from=100
 .end
 ";
     let (design, _) = read_deck("ac.sp", deck);
@@ -213,7 +218,7 @@ C1 out 0 1u
     let want = ngspice_measures(deck);
     assert_eq!(
         want.len(),
-        5,
+        6,
         "every measure of the original ran:\n{want:?}"
     );
     assert_eq!(ngspice_measures(&written), want, "{written}");
@@ -252,6 +257,11 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
         F::Run(X::MeasLast),
         F::Run(X::MeasDelay),
         F::Run(X::MeasCircuitThreshold),
+        F::Run(X::ProbeAllV),
+        F::Run(X::ProbeAllBranchI),
+        F::Run(X::MeasStatAt),
+        F::Run(X::MeasUntil),
+        F::Run(X::MeasSkipInitial),
     ]
     .iter()
     .fold(ir::FeatureSet::EMPTY, |s, f| s.with(*f));
@@ -262,7 +272,7 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
         files: 1,
     };
     let mut seen = std::collections::BTreeSet::new();
-    for seed in 0..20_000 {
+    for seed in 0..80_000 {
         let mut design = ir::r#gen::generate(seed, &set, size);
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row, &mut diags);
@@ -293,6 +303,9 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
             "find ",
             "stat ",
             "param value",
+            "skip_initial",
+            "until=",
+            "_at ",
         ] {
             if want.contains(form) {
                 seen.insert(form);
@@ -300,12 +313,15 @@ fn generated_outputs_the_writer_admits_read_back_as_themselves() {
         }
     }
     let all = [
+        "_at ",
         "find ",
         "param value",
         "print ",
         "save ",
+        "skip_initial",
         "stat ",
         "trig_targ ",
+        "until=",
         "when ",
     ];
     assert_eq!(seen.into_iter().collect::<Vec<_>>(), all);

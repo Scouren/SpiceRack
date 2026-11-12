@@ -6,7 +6,7 @@ file "meas_invalid.sp" deck
   opaque ngspice invalid ".meas tran d2 find v(a,b) at=1u"
   opaque ngspice invalid ".meas tran d3 integral v(a)"
   opaque ngspice invalid ".meas op d4 find v(a) at=1"
-  measure w tran when (cross cross (v (a)) value=0.5 count=1)
+  measure w tran when (cross cross skip_initial (v (a)) value=0.5)
   opaque ngspice invalid ".meas tran d5 when v(a)=0.5 td=w"
   opaque ngspice invalid ".meas tran d6 err v(a)"
   opaque ngspice invalid ".meas tran d7 when v(a)=v(b)*2"

@@ -1,6 +1,7 @@
 //! Output cards → their IR items: `.save` → `Save`, `.print` → `Print`, `.meas`/`.measure` →
-//! `Measure` (`read_outputs/meas.rs`), `.plot` → an `Inert` opaque (an ASCII picture on stdout,
-//! no number). A form the IR cannot state yet is `Unread` (`P1350`), one ngspice rejects or
+//! `Measure` (`read_outputs/meas.rs`), `.plot` and `.width` → an `Inert` opaque (an ASCII picture
+//! or a column width on stdout, no number); `.probe` → `Unread` (ngspice-45's `inp_probe` adds
+//! sources and a `.save all`, `inpc_probe.c`). A form the IR cannot state yet is `Unread` (`P1350`), one ngspice rejects or
 //! fails on is `InvalidInSource` (`P1351`); a card inside a block (`.subckt`, `.if`) is `Unread`.
 //!
 //! The words of a card are ngspice's: whitespace inside parentheses and around `=` is dropped
@@ -51,6 +52,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::ProbeI),
     Feature::Run(RunExtra::ProbeParam),
     Feature::Run(RunExtra::ProbeHierarchical),
+    Feature::Run(RunExtra::ProbeAllV),
+    Feature::Run(RunExtra::ProbeAllBranchI),
     Feature::Run(RunExtra::PartRe),
     Feature::Run(RunExtra::PartMag),
     Feature::Run(RunExtra::PartPhaseRad),
@@ -63,13 +66,16 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::MeasLast),
     Feature::Run(RunExtra::MeasDelay),
     Feature::Run(RunExtra::MeasCircuitThreshold),
+    Feature::Run(RunExtra::MeasStatAt),
+    Feature::Run(RunExtra::MeasUntil),
+    Feature::Run(RunExtra::MeasSkipInitial),
 ]);
 
 /// An output form the IR has no row for yet: `Unread`.
 pub(super) const UNTYPED: Code = Code::new(b'P', 1350);
 /// An output card ngspice rejects or fails on: `InvalidInSource`.
 pub(super) const INVALID: Code = Code::new(b'P', 1351);
-/// `.plot`: an ASCII picture, no number: `Inert`.
+/// `.plot`, `.width`: an ASCII picture or a column width, no number: `Inert`.
 pub(super) const INERT: Code = Code::new(b'P', 1352);
 
 /// This area's codes.
@@ -78,7 +84,7 @@ pub(super) const CODES: &[Row] = &[
         UNTYPED,
         "an output form the IR cannot state yet",
         "rewrite/IR-RUN.md §4",
-        "save all or alli, max_at or min_at, from= or to= on a crossing, td= off a tran crossing, par(), a column expression, a card in a block; kept as ngspice text (Unread).",
+        ".probe, save alli, to=0 on a crossing, from= or to= on a dc crossing, td= off tran or with from=, td= on a window, par(), a column expression, .print op, a card in a block; kept as ngspice text (Unread).",
     ),
     note(
         INVALID,
@@ -88,9 +94,9 @@ pub(super) const CODES: &[Row] = &[
     ),
     note(
         INERT,
-        "a .plot card",
-        "ngspice-45 dotcards.c ft_cktcoms (com_asciiplot)",
-        "an ASCII plot on standard output moves no number; kept as Inert text.",
+        "a .plot or .width card",
+        "ngspice-45 dotcards.c ft_cktcoms (com_asciiplot, the width variable)",
+        "an ASCII plot or a column width on standard output moves no number; kept as Inert text.",
     ),
 ];
 
@@ -106,7 +112,7 @@ pub(super) enum No {
 /// An output card into `st.scope`, or one opaque with its code.
 pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     let kw = lw.keyword(st.node);
-    if kw == ".plot" {
+    if kw == ".plot" || kw == ".width" {
         return lw.opaque(st, ir::OpaqueClass::Inert, INERT);
     }
     let result = if lw.ast.tag(st.container) != Tag::Root {
@@ -116,6 +122,9 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
         match kw.as_str() {
             ".save" => save(lw, st, &words),
             ".print" => print(lw, st, &words),
+            // inp_probe (inpc_probe.c) adds `.save all` to a deck with no save and 0 V and E
+            // sources at the devices it names: not a save, not typed
+            ".probe" => Err(No::Untyped),
             _ => meas::card(lw, st, &words),
         }
     };

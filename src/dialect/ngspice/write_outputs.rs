@@ -57,7 +57,10 @@ pub(super) fn save(w: &mut Out<'_>, item: ir::ItemRef) {
     debug_assert!(spellable(w.design, item), "ngspice write: an admitted save");
     let s: ir::Save = w.design.row(item.index);
     let mut t = ".save".to_string();
-    probes(w.design, s.probes, Ctx::Save, &mut t);
+    for word in save_words(w.design, s.probes).expect("ngspice write: an admitted save") {
+        t.push(' ');
+        t.push_str(&word);
+    }
     w.line(&t);
 }
 
@@ -128,6 +131,26 @@ pub(super) fn measure(w: &mut Out<'_>, item: ir::ItemRef) {
     w.line(&t);
 }
 
+/// Appends one output named inside another card (`.four`, `.tf`, `.noise`) as ngspice spells
+/// it there: `v(a)`, `v(a,b)`, `i(e)`. Asserts [`probe_admits`] (the run area refuses first).
+#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe(design: &ir::Design, probe: &ir::Probe, out: &mut String) {
+    assert!(
+        probe_admits(design, probe),
+        "ngspice write: an admitted analysis output"
+    );
+    out.push_str(&spelled(design, probe, Ctx::Output));
+}
+
+/// Whether an analysis output has an ngspice spelling that reads back as it (the run area's
+/// `admits` calls it for `.four`, `.tf`, `.noise` outputs).
+#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe_admits(design: &ir::Design, probe: &ir::Probe) -> bool {
+    reads_back(design, probe, Ctx::Output)
+}
+
+// ---- private ----
+
 /// A probe as ngspice spells it in `ctx`, or `None` for a kind or part it has no word for. A
 /// measure's real part is `v(…)`: its `vr(…)` saves nothing in a batch run (`gettok_iv` takes
 /// `vr` for the vector; run: "can't parse 'vr'", the analysis does not run).
@@ -158,35 +181,12 @@ fn spell(design: &ir::Design, p: &ir::Probe, ctx: Ctx) -> Option<String> {
     })
 }
 
-/// Appends one output named inside another card (`.four`, `.tf`, `.noise`) as ngspice spells
-/// it there: `v(a)`, `v(a,b)`, `i(e)`. Asserts [`probe_admits`] (the run area refuses first).
-#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
-pub(super) fn probe(design: &ir::Design, probe: &ir::Probe, out: &mut String) {
-    assert!(
-        probe_admits(design, probe),
-        "ngspice write: an admitted analysis output"
-    );
-    out.push_str(&spelled(design, probe, Ctx::Output));
-}
-
-/// Whether an analysis output has an ngspice spelling that reads back as it (the run area's
-/// `admits` calls it for `.four`, `.tf`, `.noise` outputs).
-#[allow(dead_code, reason = "the run area calls it (S3.3a)")]
-pub(super) fn probe_admits(design: &ir::Design, probe: &ir::Probe) -> bool {
-    reads_back(design, probe, Ctx::Output)
-}
-
-// ---- private ----
-
 /// Whether every part of `item` has a card that reads back as it.
 fn spellable(d: &ir::Design, item: ir::ItemRef) -> bool {
     match item.kind {
         ir::ItemKind::Save => {
             let s: ir::Save = d.row(item.index);
-            s.every_analysis
-                && d.probes(s.probes)
-                    .iter()
-                    .all(|p| reads_back(d, p, Ctx::Save))
+            s.every_analysis && save_words(d, s.probes).is_some()
         }
         ir::ItemKind::Print => {
             let p: ir::Print = d.row(item.index);
@@ -213,17 +213,30 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
     let name_ok =
         !name.is_empty() && !name.contains(|c: char| c.is_whitespace() || "=('{\"".contains(c));
     let ctx = Ctx::Meas(m.analysis);
-    let tran = m.analysis == AnalysisKind::Tran;
+    let dc = m.analysis == AnalysisKind::Dc;
     let complex = matches!(m.analysis, AnalysisKind::Ac | AnalysisKind::Sp);
     let signal = |p: &ir::Probe| p.kind != ProbeKind::Vdiff && reads_back(d, p, ctx);
     let value = |e: ir::ExprId| constant(d, e);
-    // a `when` threshold may be one `v(x)` or `i(x)`; a trigger's `val=` is a number
+    // a `when` threshold may be one `v(x)` or `i(x)`, a trigger's `val=` is a number; only a
+    // `when` takes ngspice's default pick (no edge word: any edge); dc has no typed window
     let cross = |e: &Event, when: bool| {
         e.kind == EventKind::Cross
             && signal(&e.signal)
             && (value(e.value) || (when && !complex && threshold(d, e.value).is_some()))
             && (e.count.is_none() || value(e.count))
-            && (e.delay.is_none() || (tran && value(e.delay)))
+            && (!e.skip_initial || (when && e.edge == Edge::Cross))
+            && (e.delay.is_none() || (!dc && value(e.delay)))
+            && (e.until.is_none() || (!dc && value(e.until) && !zero(d, e.until)))
+    };
+    // ac and sp spell a delay `from=`, which ngspice copies to the other clause when it has none
+    // and it is not 0 (get_measure2); a trigger's `from=` must be a number
+    let copied = |e: &Event| !e.delay.is_none() && !zero(d, e.delay);
+    let literal = |e: &Event| e.delay.is_none() || matches!(d.expr(e.delay), ir::Expr::Num(_));
+    let pair = |a: &Event, b: &Event| {
+        !complex
+            || (literal(a)
+                && literal(b)
+                && (copied(a) == copied(b) || !a.delay.is_none() && !b.delay.is_none()))
     };
     let at = |e: &Event| e.kind == EventKind::At && value(e.value);
     let bound =
@@ -231,7 +244,9 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
     let body = match m.kind {
         MeasureKind::TrigTarg => {
             let r: MeasureTrigTarg = d.detail(m.detail);
-            (cross(&r.trig, false) || at(&r.trig)) && (cross(&r.targ, false) || at(&r.targ))
+            (cross(&r.trig, false) || at(&r.trig))
+                && (cross(&r.targ, false) || at(&r.targ))
+                && pair(&r.trig, &r.targ)
         }
         MeasureKind::When => cross(&d.detail::<MeasureWhen>(m.detail).at, true),
         MeasureKind::Find => {
@@ -315,7 +330,7 @@ fn clause(d: &ir::Design, e: &Event, ctx: Ctx, t: &mut String) {
     t.push_str(&spelled(d, &e.signal, ctx));
     t.push_str(" val=");
     expr_write::value(d, e.value, t);
-    tail(d, e, t);
+    tail(d, e, ctx, t);
 }
 
 /// A `when` clause: `sig=v [td=d] edge=n|last`.
@@ -326,14 +341,25 @@ fn crossing(d: &ir::Design, e: &Event, ctx: Ctx, t: &mut String) {
         Some(probe) => t.push_str(&probe),
         None => expr_write::value(d, e.value, t),
     }
-    tail(d, e, t);
+    tail(d, e, ctx, t);
 }
 
-/// ` [td=d] edge=n|last`.
-fn tail(d: &ir::Design, e: &Event, t: &mut String) {
-    if !e.delay.is_none() {
-        t.push_str(" td=");
-        expr_write::value(d, e.delay, t);
+/// ` [td=d|from=d] [to=u] [edge=n|last]`: tran spells the delay `td=`, ac and sp `from=`
+/// (ngspice reads TD in tran only); ngspice's default pick has no edge word.
+fn tail(d: &ir::Design, e: &Event, ctx: Ctx, t: &mut String) {
+    let td = if ctx == Ctx::Meas(AnalysisKind::Tran) {
+        " td="
+    } else {
+        " from="
+    };
+    for (key, x) in [(td, e.delay), (" to=", e.until)] {
+        if !x.is_none() {
+            t.push_str(key);
+            expr_write::value(d, x, t);
+        }
+    }
+    if e.skip_initial {
+        return;
     }
     t.push(' ');
     t.push_str(match e.edge {
@@ -346,6 +372,31 @@ fn tail(d: &ir::Design, e: &Event, t: &mut String) {
     } else {
         expr_write::value(d, e.count, t);
     }
+}
+
+/// The words of a save list: `all` for `AllV` then `AllBranchI` (ngspice's `all`), each other
+/// probe its own word that reads back as it; `None` when one has none.
+fn save_words(d: &ir::Design, list: ir::ProbeList) -> Option<Vec<String>> {
+    let probes = d.probes(list);
+    let mut out = Vec::new();
+    let mut k = 0;
+    // Bounded: each step takes one or two probes.
+    while let Some(p) = probes.get(k) {
+        let next = probes.get(k + 1).map(|q| q.kind);
+        let plain =
+            p.part == AcPart::None && probes.get(k + 1).is_some_and(|q| q.part == AcPart::None);
+        if p.kind == ProbeKind::AllV && next == Some(ProbeKind::AllBranchI) && plain {
+            out.push("all".to_string());
+            k += 2;
+            continue;
+        }
+        if !reads_back(d, p, Ctx::Save) {
+            return None;
+        }
+        out.push(spelled(d, p, Ctx::Save));
+        k += 1;
+    }
+    Some(out)
 }
 
 /// An element path as ngspice flattens it: `name`, or `letter.x1.….name`.
@@ -378,5 +429,7 @@ fn stat(s: Stat) -> &'static str {
         Stat::Pp => "pp",
         Stat::Rms => "rms",
         Stat::Integ => "integ",
+        Stat::MinAt => "min_at",
+        Stat::MaxAt => "max_at",
     }
 }

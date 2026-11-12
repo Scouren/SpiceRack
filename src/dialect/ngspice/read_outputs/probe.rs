@@ -26,7 +26,7 @@ pub(in crate::dialect::ngspice) enum Ctx {
 /// A probe read but not yet appended: its kind, part and path segments as written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(in crate::dialect::ngspice) struct Want {
-    /// The probe kind: `V`, `Vdiff`, `I` or `Param`.
+    /// The probe kind: `V`, `Vdiff`, `I`, `Param`, or the categories `AllV`, `AllBranchI`.
     pub(in crate::dialect::ngspice) kind: ProbeKind,
     /// The part read.
     pub(in crate::dialect::ngspice) part: AcPart,
@@ -38,6 +38,12 @@ pub(in crate::dialect::ngspice) struct Want {
 
 /// The probes a word names in `ctx` (`.save v(a,b)` names two).
 pub(in crate::dialect::ngspice) fn probe_word(word: &str, ctx: Ctx) -> Result<Vec<Want>, No> {
+    // `all` and its synonym `allv` (outitf.c: `cieq(name, "all") || cieq(name, "allv")`): every
+    // node voltage and every branch current (run: a b c x1.n e1#branch l1#branch v1#branch)
+    if ctx == Ctx::Save && (word.eq_ignore_ascii_case("all") || word.eq_ignore_ascii_case("allv")) {
+        let all = |kind| want(kind, AcPart::None, Vec::new(), Vec::new());
+        return Ok(vec![all(ProbeKind::AllV), all(ProbeKind::AllBranchI)]);
+    }
     if let Some(rest) = word.strip_prefix('@') {
         let (dev, q) = rest
             .strip_suffix(']')
@@ -113,6 +119,9 @@ pub(in crate::dialect::ngspice) fn element(name: &str) -> Vec<String> {
 
 /// The probes of `want` appended through the builder (names folded; a node `gnd` is `0`).
 pub(in crate::dialect::ngspice) fn build(lw: &mut Lower<'_, '_>, w: &Want) -> ir::Probe {
+    if matches!(w.kind, ProbeKind::AllV | ProbeKind::AllBranchI) {
+        return ir::Probe::category(w.kind);
+    }
     let node = matches!(w.kind, ProbeKind::V | ProbeKind::Vdiff);
     let fold = |lw: &mut Lower<'_, '_>, path: &[String], node: bool| -> Vec<String> {
         let last = path.len() - 1;

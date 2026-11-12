@@ -7,4 +7,7 @@ file "measure.sp" deck
   measure f tran find (v (out)) (cross cross (v (in)) value=(v(b)) count=2)
   measure g ac find (v db (out)) (cross rise (v re (in)) value=0.5 count=1)
   measure s dc stat avg (i (v1)) (at value=0.1) (bound)
+  measure k tran when (cross cross skip_initial (v (a)) value=0.5 delay=1u until=2u)
+  measure b ac when (cross fall (v db (out)) value=-3 count=1 delay=100)
+  measure x tran stat max_at (v (b)) (bound) (at value=2u)
   measure p tran param value=(tr * 2 + half)

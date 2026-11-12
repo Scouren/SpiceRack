@@ -33,17 +33,22 @@ enum Val {
     Probe(Want),
 }
 
+/// A crossing read but not yet appended.
+struct Crossing {
+    signal: Want,
+    value: Val,
+    edge: Edge,
+    last: bool,
+    count: Option<Val>,
+    skip_initial: bool,
+    delay: Option<Val>,
+    until: Option<Val>,
+}
+
 /// An event read but not yet appended.
 enum Ev {
     /// A crossing.
-    Cross {
-        signal: Want,
-        value: Val,
-        edge: Edge,
-        last: bool,
-        count: Option<Val>,
-        delay: Option<Val>,
-    },
+    Cross(Box<Crossing>),
     /// A position on the sweep axis.
     At(Val),
     /// The analysis's start or end.
@@ -66,6 +71,8 @@ struct Params {
     val: Option<String>,
     td: Option<String>,
     at: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
 }
 
 /// One `.meas` card.
@@ -97,7 +104,8 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result
             "when" => Body::When(when(lw, st, rest, ctx)?),
             "find" => find(lw, st, rest, ctx)?,
             "avg" | "min" | "max" | "pp" | "rms" | "integ" => stat(lw, st, &low, rest, ctx)?,
-            "min_at" | "max_at" | "delay" | "targ" => return Err(No::Untyped),
+            "min_at" | "max_at" => stat(lw, st, &low, rest, ctx)?,
+            "delay" | "targ" => return Err(No::Untyped),
             _ => return Err(No::Invalid), // deriv, err*: "not supported"; else "no such function"
         }
     };
@@ -165,23 +173,47 @@ fn trig_targ(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String], ctx: Ctx) -> Re
         .iter()
         .position(|w| w.eq_ignore_ascii_case("targ"))
         .ok_or(No::Invalid)?;
-    let trig = clause(lw, st, &words[..k], ctx)?;
-    let targ = clause(lw, st, &words[k + 1..], ctx)?;
+    let (mut a, mut b) = (head(&words[..k], ctx)?, head(&words[k + 1..], ctx)?);
+    // a FROM of one clause is the other's when that one has none, unless it is 0 (get_measure2:
+    // "If there was a FROM propagate trig<->targ", `m_from != 0.0`); an expression is not read
+    let given = |f: &Option<String>| -> Result<Option<String>, No> {
+        match f.as_deref().map(number::card) {
+            None => Ok(None),
+            Some(None) => Err(No::Untyped),
+            Some(Some(n)) => Ok((n.literal.mantissa != 0).then(|| f.clone()).flatten()),
+        }
+    };
+    let (fa, fb) = (given(&a.1.from)?, given(&b.1.from)?);
+    a.1.from = a.1.from.take().or(fb);
+    b.1.from = b.1.from.take().or(fa);
+    let trig = clause(lw, st, a, ctx)?;
+    let targ = clause(lw, st, b, ctx)?;
     Ok(Body::TrigTarg(trig, targ))
 }
 
-/// A trigger or target clause: `at=v`, or `sig [val=] [td=] rise|fall|cross=n|last`.
-fn clause(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String], ctx: Ctx) -> Result<Ev, No> {
+/// A trigger or target clause's signal (none for `at=`) and its `key=value` words.
+fn head(words: &[String], ctx: Ctx) -> Result<(Option<Want>, Params), No> {
     let (first, rest) = words.split_first().ok_or(No::Invalid)?;
     if first.len() >= 2 && first[..2].eq_ignore_ascii_case("at") {
-        let p = params(words, true)?;
-        if p.edge.is_some() || p.val.is_some() || p.td.is_some() {
+        return Ok((None, params(words, true)?));
+    }
+    Ok((Some(one(first, ctx)?), params(rest, true)?))
+}
+
+/// A trigger or target clause: `at=v`, or `sig [val=] [td=|from=] [to=] rise|fall|cross=n|last`.
+fn clause(
+    lw: &mut Lower<'_, '_>,
+    st: Stmt,
+    (signal, p): (Option<Want>, Params),
+    ctx: Ctx,
+) -> Result<Ev, No> {
+    let Some(signal) = signal else {
+        let extra = p.edge.is_some() || p.val.is_some() || p.td.is_some();
+        if extra || p.from.is_some() || p.to.is_some() {
             return Err(No::Untyped);
         }
         return Ok(Ev::At(value(lw, st, &p.at.ok_or(No::Invalid)?)?));
-    }
-    let signal = one(first, ctx)?;
-    let p = params(rest, true)?;
+    };
     if p.at.is_some() {
         return Err(No::Untyped); // a signal and at=: ngspice measures at
     }
@@ -189,8 +221,10 @@ fn clause(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String], ctx: Ctx) -> Resul
         Some(v) => value(lw, st, v)?,
         None => Val::Lit(ir::Literal::ZERO, false),
     };
-    let edge = p.edge.ok_or(No::Invalid)?; // "at, rise, fall or cross must be given"
-    crossing(lw, st, signal, value, Some(edge), p.td, ctx)
+    if p.edge.is_none() {
+        return Err(No::Invalid); // "at, rise, fall or cross must be given"
+    }
+    crossing(lw, st, signal, value, p, ctx)
 }
 
 /// `sig=rhs [td=] [rise|fall|cross=n|last]`.
@@ -213,7 +247,7 @@ fn when(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String], ctx: Ctx) -> Result<
         value(lw, st, rhs)?
     };
     let p = params(rest, false)?;
-    crossing(lw, st, signal, value, p.edge, p.td, ctx)
+    crossing(lw, st, signal, value, p, ctx)
 }
 
 /// `find sig at=v` or `find sig when …`.
@@ -242,6 +276,8 @@ fn stat(lw: &mut Lower<'_, '_>, st: Stmt, f: &str, words: &[String], ctx: Ctx) -
         "max" => Stat::Max,
         "pp" => Stat::Pp,
         "rms" => Stat::Rms,
+        "min_at" => Stat::MinAt,
+        "max_at" => Stat::MaxAt,
         _ => Stat::Integ,
     };
     let signal = one(sig, ctx)?;
@@ -262,32 +298,50 @@ fn stat(lw: &mut Lower<'_, '_>, st: Stmt, f: &str, words: &[String], ctx: Ctx) -
     Ok(Body::Stat(stat, signal, from, to))
 }
 
-/// A crossing event; with no edge given, the first crossing (`cross=1`).
+/// A crossing event. No edge given: ngspice's first crossing after the first interval
+/// (`skip_initial`, R30; never `cross=1`). `td=` (tran only) or `from=` (tran, ac, sp: both skip
+/// points below them in `com_measure_when`) is the delay, `to=` the end of the search; a dc
+/// window (`from`/`to` swapped and defaulted to ±1e99) is not typed.
 fn crossing(
     lw: &mut Lower<'_, '_>,
     st: Stmt,
     signal: Want,
     value: Val,
-    edge: Option<(Edge, Option<String>)>,
-    td: Option<String>,
+    p: Params,
     ctx: Ctx,
 ) -> Result<Ev, No> {
-    let (edge, count) = edge.unwrap_or((Edge::Cross, Some("1".to_string())));
+    let tran = ctx == Ctx::Meas(AnalysisKind::Tran);
+    let dc = ctx == Ctx::Meas(AnalysisKind::Dc);
+    if (p.td.is_some() && (!tran || p.from.is_some()))
+        || (dc && (p.from.is_some() || p.to.is_some()))
+    {
+        return Err(No::Untyped); // TD off tran is ignored; TD with FROM is their maximum
+    }
+    if p.to
+        .as_deref()
+        .and_then(number::card)
+        .is_some_and(|n| n.literal.mantissa == 0)
+    {
+        return Err(No::Untyped); // `to=0` is "no limit" (`m_to != 0.0e0`)
+    }
+    let skip_initial = p.edge.is_none();
+    let (edge, count) = p.edge.unwrap_or((Edge::Cross, None));
     let count = count.map(|c| self::value(lw, st, &c)).transpose()?;
-    let delay = match td {
-        // only a tran measure reads TD (com_measure_when's tran_check)
-        Some(_) if ctx != Ctx::Meas(AnalysisKind::Tran) => return Err(No::Untyped),
-        Some(t) => Some(self::value(lw, st, &t)?),
-        None => None,
-    };
-    Ok(Ev::Cross {
+    let delay =
+        p.td.or(p.from)
+            .map(|t| self::value(lw, st, &t))
+            .transpose()?;
+    let until = p.to.map(|t| self::value(lw, st, &t)).transpose()?;
+    Ok(Ev::Cross(Box::new(Crossing {
         signal,
         value,
         edge,
-        last: count.is_none(),
+        last: count.is_none() && !skip_initial,
         count,
+        skip_initial,
         delay,
-    })
+        until,
+    })))
 }
 
 /// A clause's `key=value` words (`measure_parse_stdParams`); `trig` allows `val=` and `at=`.
@@ -307,7 +361,9 @@ fn params(words: &[String], trig: bool) -> Result<Params, No> {
             "td" => p.td = Some(v.to_string()),
             "val" if trig => p.val = Some(v.to_string()),
             "at" if trig => p.at = Some(v.to_string()),
-            "val" | "at" | "from" | "to" => return Err(No::Untyped),
+            "from" => p.from = Some(v.to_string()),
+            "to" => p.to = Some(v.to_string()),
+            "val" | "at" => return Err(No::Untyped),
             _ => return Err(No::Invalid), // "no such parameter"
         }
     }
@@ -373,21 +429,27 @@ fn event(lw: &mut Lower<'_, '_>, st: Stmt, e: Ev) -> Event {
     match e {
         Ev::Bound => Event::BOUND,
         Ev::At(v) => Event::at(emit(lw, st, v)),
-        Ev::Cross {
-            signal,
-            value,
-            edge,
-            last,
-            count,
-            delay,
-        } => {
+        Ev::Cross(c) => {
+            let Crossing {
+                signal,
+                value,
+                edge,
+                last,
+                count,
+                skip_initial,
+                delay,
+                until,
+            } = *c;
             let signal = build(lw, &signal);
             let value = emit(lw, st, value);
             let count = count.map_or(ir::ExprId::NONE, |c| emit(lw, st, c));
             let delay = delay.map_or(ir::ExprId::NONE, |d| emit(lw, st, d));
+            let until = until.map_or(ir::ExprId::NONE, |d| emit(lw, st, d));
             Event {
                 last,
+                skip_initial,
                 delay,
+                until,
                 ..Event::cross(signal, edge, value, count)
             }
         }

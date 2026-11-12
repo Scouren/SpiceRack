@@ -1,9 +1,11 @@
 # codes:
 file "meas_when.sp" deck
   title "meas_when"
-  comment " oracle: ngspice-45 com_measure2.c measure_parse_when, com_measure_when (no rise/fall/cross: the first crossing); inpcom.c braces a numparam right-hand side but not v(...); runs: w1 = w4 = 8.33429e-08"
+  comment " oracle: ngspice-45 com_measure2.c measure_parse_when, com_measure_when (no rise/fall/cross: the first crossing after the first interval, 576-579, R30; from= skips points below it as td= does in tran, 478-486; to= stops the search); inpcom.c braces a numparam right-hand side but not v(...); runs: w1 = w4 = 8.33429e-08, from=1u = td=1u = 1.08334e-06"
   param half = 0.5
-  measure w1 tran when (cross cross (v (a)) value=0.5 count=1)
+  measure w1 tran when (cross cross skip_initial (v (a)) value=0.5)
   measure w2 tran when (cross rise (v (a)) value=(v(b)) count=2 delay=1u)
   measure w3 tran when (cross fall last (v (a)) value=half)
   measure w4 tran when (cross cross (v (a)) value=0.5 count=1)
+  measure w5 tran when (cross cross skip_initial (v (a)) value=0.5 delay=1u)
+  measure w6 tran when (cross rise (v (a)) value=0.5 count=1 until=2u)
