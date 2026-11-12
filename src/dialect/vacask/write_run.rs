@@ -71,12 +71,15 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// the first analysis), across comments; with no run item, the first and last control-command
 /// opaque of class Private, Inert or Hint (the classes only this area gives a command line). A
 /// command word alone is no proof: outside a block `print …` or `save v(…)` is another area's
-/// opaque (Unread, or InvalidInSource: run fx). So a block that holds only refused statements
-/// reads back as refused statements at the top: VACASK rejects both.
+/// opaque (InvalidInSource P2013: run fx). So a block that holds only refused statements reads
+/// back as refused statements at the top: VACASK rejects both.
 pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
     let items = design.items(top);
     let command = |k: usize| command_opaque(design, items[k]);
-    let ours = |k: usize| command(k).is_some_and(|c| c != ir::OpaqueClass::Unread);
+    // ponytail: every class widens, a top-level invalid command line beside the block
+    // included (it reads back inside the block: VACASK rejects that deck either way); an
+    // invalid statement inside a block (a refused `save (…)`) must not cut the block short.
+    let ours = |k: usize| command(k).is_some();
     let comment = |k: usize| items[k].kind == ir::ItemKind::Comment;
     if let Some(mut first) = items.iter().position(|&at| run_item(at)) {
         let mut last = items.iter().rposition(|&at| run_item(at))?;

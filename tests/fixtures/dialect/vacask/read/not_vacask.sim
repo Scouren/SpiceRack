@@ -1,0 +1,5 @@
+not vacask text
+model vsource vsource
+* a star line
+.model dn d is=1e-14
+v1 (a 0) vsource dc=1

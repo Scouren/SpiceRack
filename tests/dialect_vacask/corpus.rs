@@ -57,6 +57,7 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
     }
     files.sort();
     let mut failed = Vec::new();
+    let mut unread_files: Vec<String> = Vec::new();
     for path in &files {
         let rel = path.strip_prefix(root).unwrap().display().to_string();
         let text = std::fs::read_to_string(path).unwrap();
@@ -72,6 +73,12 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
             continue;
         }
         let before = canonical(&once);
+        // The zero gate (item 6b): every corpus statement is read, Private, Inert, a hint, or
+        // invalid in source; none is left `Unread`.
+        let unread = before.matches("opaque vacask unread").count();
+        if unread > 0 {
+            unread_files.push(format!("{rel}: {unread}"));
+        }
         let mut written = String::new();
         let mut wd = ir::Diags::new();
         dialect::legalize(&mut once, row, &mut wd);
@@ -91,6 +98,12 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
             ));
         }
     }
+    assert!(
+        unread_files.is_empty(),
+        "{} files hold Unread statements:\n{}",
+        unread_files.len(),
+        unread_files.join("\n")
+    );
     assert!(
         failed.is_empty(),
         "{} of {} files:\n{}",
