@@ -348,6 +348,16 @@ sections may now be nested where the set allows. `Placed(_, Title)` never occurs
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
 
+**A number token's literal (2026-11-12, the dialects' audit row 7).** `literal::decimal(
+significand, exp10, form) -> Option<Decimal>` (`Decimal::Short(Literal)` or `Decimal::Long(
+digits, exp10, form)`) and `Builder::decimal`, which pushes it: the significand as written,
+the power of its exponent plus its scale letter, the form. A significand past 18 significant
+digits is `Long` (A18); a short one with more than 18 fraction digits moves them into the
+power exactly, as an `Exponent` (none for `Mil`); a real zero is `Literal::ZERO`, an integer
+zero `0i`; `None` for a shape, power or value no literal states. IR text reads its numbers
+through it (`text_lex::number_parts` splits the word). Oracles: hand-worked cases, and Rust's
+decimal parser on 10^4 random significands (`tests/kernel_literal.rs`).
+
 **The builder's undo (2026-11-12, the dialects' audit row 5).** `Builder::mark() -> Mark` and
 `Builder::truncate(Mark)` (`mark.rs`): a mark holds every table's length (the kernel's, the 26
 item tables, the circuit and run details, listed by exhaustive destructuring so a new table is

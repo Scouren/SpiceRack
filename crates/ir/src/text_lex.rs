@@ -5,8 +5,8 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (A4), §7.3 (A3), §9.
 //!
-//! Contents: crate: `pub(crate) enum Mark`, `pub(crate) enum Lexed`,
-//! `pub(crate) fn lex_literal(&str) -> Option<Literal>`, `pub(crate) fn lex_number(&str) -> Option<Lexed<'_>>`,
+//! Contents: crate: `pub(crate) enum Mark`,
+//! `pub(crate) fn lex_literal(&str) -> Option<Literal>`, `pub(crate) fn number_parts(&str) -> Option<(&str, i32, NumForm)>`,
 //! `pub(crate) fn lex_name(&str, usize, usize) -> Option<(Cow<'_, str>, usize)>`,
 //! `pub(crate) fn unquote(&str, usize, usize) -> Option<(Cow<'_, str>, usize)>`,
 //! `pub(crate) fn lex_mark(&str, usize, usize) -> (Mark, usize)`,
@@ -20,7 +20,7 @@ use std::borrow::Cow;
 use crate::build::Builder;
 use crate::expr::{ExprTag, Literal, NumForm};
 use crate::id::{DefId, ExprId};
-use crate::literal;
+use crate::literal::{self, Decimal};
 
 /// How a reference was marked in the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,15 +31,6 @@ pub(crate) enum Mark {
     Held,
     /// `name#k`: bound to definition `k`.
     Def(u32),
-}
-
-/// A number word, read by the one bound (A18): a short literal, or a `Long` one's parts.
-pub(crate) enum Lexed<'w> {
-    /// Fits the mantissa.
-    Short(Literal),
-    /// More significant digits than the mantissa holds: the significand as written, its power
-    /// and the form that power was written in.
-    Long(&'w str, i16, NumForm),
 }
 
 /// The scale letters, longest first (as `text_expr`'s writer spells them).
@@ -61,29 +52,23 @@ const SCALES: [(&str, i16); 12] = [
 /// A literal as one word: `[-]digits[.digits]` then `e<int>`, a scale letter, `mil`, `i`, or
 /// nothing. A short literal only; `None` for anything else, a `Long` literal included.
 pub(crate) fn lex_literal(word: &str) -> Option<Literal> {
-    match lex_number(word)? {
-        Lexed::Short(l) => Some(l),
-        Lexed::Long(..) => None,
+    let (significand, exp10, form) = number_parts(word)?;
+    match literal::decimal(significand, exp10, form)? {
+        Decimal::Short(l) => Some(l),
+        Decimal::Long(..) => None,
     }
 }
 
-/// A number word as `Lexed`: `Long` when its significand has more significant digits than the
-/// mantissa holds (`literal::exceeds_mantissa`), else a short literal. `None` for anything
-/// else, or a literal outside its invariants.
-pub(crate) fn lex_number(word: &str) -> Option<Lexed<'_>> {
-    let (negative, rest) = match word.strip_prefix('-') {
-        Some(r) => (true, r),
-        None => (false, word),
-    };
-    let int_len = rest.bytes().take_while(u8::is_ascii_digit).count();
-    let (int, rest) = rest.split_at(int_len);
-    let (dec, rest) = match rest.strip_prefix('.') {
-        Some(r) => r.split_at(r.bytes().take_while(u8::is_ascii_digit).count()),
-        None => ("", rest),
-    };
-    if int.is_empty() && dec.is_empty() {
-        return None;
-    }
+/// A number word split as `literal::decimal` takes it: the significand as written
+/// (`[-]digits[.digits]`), the power of its exponent or scale letter, its form (`e<int>`, a
+/// scale letter, `mil`, `i`, or nothing). `None` for a word with no such suffix.
+pub(crate) fn number_parts(word: &str) -> Option<(&str, i32, NumForm)> {
+    let body = word.strip_prefix('-').unwrap_or(word);
+    let number = body
+        .bytes()
+        .take_while(|c| c.is_ascii_digit() || *c == b'.')
+        .count();
+    let rest = &body[number..];
     let (exp10, form) = if rest.is_empty() {
         (0, NumForm::Plain)
     } else if rest == "mil" {
@@ -95,28 +80,7 @@ pub(crate) fn lex_number(word: &str) -> Option<Lexed<'_>> {
     } else {
         (SCALES.iter().find(|s| s.0 == rest)?.1, NumForm::Scale)
     };
-    let significand = &word[..word.len() - rest.len()];
-    if literal::exceeds_mantissa(literal::significant_digits(significand)) {
-        return literal::long_ok(significand, exp10, form).then_some(Lexed::Long(
-            significand,
-            exp10,
-            form,
-        ));
-    }
-    if dec.len() > 18 {
-        return None;
-    }
-    let digits = int.bytes().chain(dec.bytes()).try_fold(0u64, |n, c| {
-        n.checked_mul(10)?.checked_add((c - b'0') as u64)
-    })?;
-    let mantissa = i64::try_from(digits).ok()?;
-    let l = Literal {
-        mantissa: if negative { -mantissa } else { mantissa },
-        frac: dec.len() as u8,
-        exp10,
-        form,
-    };
-    l.is_valid().then_some(Lexed::Short(l))
+    Some((&word[..word.len() - rest.len()], i32::from(exp10), form))
 }
 
 /// A name in a name position at `text[at..end]`: bare `[A-Za-z0-9_.$]+` or backtick-quoted.
