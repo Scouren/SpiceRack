@@ -445,3 +445,29 @@ fn a_subckt_default_reading_a_sibling_needs_no_mark() {
     assert!(!out.contains('#'), "{out}");
     assert_eq!(out, text);
 }
+
+#[test]
+fn spans_name_the_file_block_of_their_line() {
+    // offsets stay into the whole text; `file` is the block the line sits in
+    let text =
+        "file \"a.sp\" deck\n  param x = 1\nfile \"b.sp\" library\n  param y = 2\n  param = 3\n";
+    let (d, diags) = read(text);
+    assert_eq!(diags.len(), 1, "{:?}", diags.rows());
+    let bad = diags.rows()[0].span;
+    assert_eq!(
+        bad.file,
+        spicerack_ir::FileId(1),
+        "the bad line is in the second block"
+    );
+    assert!(bad.start as usize >= text.find("  param = 3").unwrap());
+    let top_b = d.file(spicerack_ir::FileId(1)).top;
+    let y = d.items(top_b)[0];
+    let span = d.span_of(y);
+    assert_eq!(span.file, spicerack_ir::FileId(1));
+    assert_eq!(
+        &text[span.start as usize..(span.start + span.len) as usize],
+        "param y = 2"
+    );
+    let top_a = d.file(spicerack_ir::FileId(0)).top;
+    assert_eq!(d.span_of(d.items(top_a)[0]).file, spicerack_ir::FileId(0));
+}
