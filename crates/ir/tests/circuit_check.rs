@@ -815,4 +815,203 @@ mod tests {
         });
         assert_eq!(no_tc, only(Violation::FieldDomain));
     }
+
+    /// A19 (R38): invariants every simulator holds, each broken alone; the neighbours are legal.
+    #[test]
+    fn a19_invariants_broken_alone() {
+        type Case = fn(&mut Builder<'_>, ScopeId);
+        fn semi_with(b: &mut Builder<'_>, top: ScopeId, key: &str) {
+            let one = n(b, 1);
+            let s = b.detail(semi());
+            let name = unique(b, top);
+            let terminals = b.names(&["a", "0"]);
+            let params = b.params(&[(key, one)]);
+            let model = Ref {
+                name: b.name("dm"),
+                def: DefId::NONE,
+            };
+            let row = Element {
+                kind: ElemKind::Diode,
+                name,
+                terminals,
+                model,
+                params,
+                mult: ExprId::NONE,
+                detail: s,
+                mult_law: MultLaw::Parallel,
+            };
+            b.push(top, row, Span::NONE);
+        }
+        fn model_with(b: &mut Builder<'_>, top: ScopeId, family: ModelFamily, key: &str) {
+            let name = unique(b, top);
+            let one = n(b, 1);
+            let params = b.params(&[(key, one)]);
+            let polarity = if family == ModelFamily::Bsim4 {
+                Polarity::N
+            } else {
+                Polarity::None
+            };
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    ..model(name, family, polarity)
+                },
+                Span::NONE,
+            );
+        }
+        let cases: [(&str, Case); 10] = [
+            ("a resistor with no value and no model", |b, top| {
+                let r = b.detail(Passive::PLAIN);
+                push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            }),
+            ("an AC resistance on a capacitor", |b, top| {
+                let one = n(b, 1);
+                let c = b.detail(Passive {
+                    value: one,
+                    ac: one,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            }),
+            ("a noiseless constant inductor", |b, top| {
+                let one = n(b, 1);
+                let l = b.detail(Passive {
+                    value: one,
+                    noisy: false,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Inductor, &["a", "0"], None, l);
+            }),
+            ("a diode parameter named as its area field", |b, top| {
+                semi_with(b, top, "area")
+            }),
+            ("a diode parameter m (its multiplicity)", |b, top| {
+                semi_with(b, top, "m")
+            }),
+            ("a diode parameter temp (its temperature)", |b, top| {
+                semi_with(b, top, "temp")
+            }),
+            ("a level parameter on a family that fixes it", |b, top| {
+                model_with(b, top, ModelFamily::Bsim4, "level")
+            }),
+            ("a lossless line with neither form", |b, top| {
+                let one = n(b, 1);
+                let l = b.detail(spicerack_ir::line::Line { z0: one, ..line() });
+                push(
+                    b,
+                    top,
+                    ElemKind::LosslessLine,
+                    &["a", "0", "b", "0"],
+                    None,
+                    l,
+                );
+            }),
+            ("a model value that reads the circuit", |b, top| {
+                let name = unique(b, top);
+                let va = b.v("a", None);
+                let params = b.params(&[("is", va)]);
+                b.push(
+                    top,
+                    spicerack_ir::Model {
+                        params,
+                        ..model(name, ModelFamily::Diode, Polarity::None)
+                    },
+                    Span::NONE,
+                );
+            }),
+            ("a version on a family with one version", |b, top| {
+                let name = unique(b, top);
+                let version = b.string("2");
+                b.push(
+                    top,
+                    spicerack_ir::Model {
+                        version,
+                        ..model(name, ModelFamily::Mos1, Polarity::N)
+                    },
+                    Span::NONE,
+                );
+            }),
+        ];
+        for (what, case) in cases {
+            assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
+        }
+        let legal = checked(|b, top| {
+            let one = n(b, 1);
+            // a value given by the model alone, a noiseless resistor, a noiseless circuit-valued
+            // capacitor, a parameter m on a subcircuit instance (a declared m, A15), a level on
+            // MESA and on an unknown family, a version on BSIM4, a lossless line by frequency
+            let r = b.detail(Passive::PLAIN);
+            push(b, top, ElemKind::Resistor, &["a", "b"], Some("rm"), r);
+            let r = b.detail(Passive {
+                value: one,
+                noisy: false,
+                ..Passive::PLAIN
+            });
+            push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            let va = b.v("a", None);
+            let c = b.detail(Passive {
+                value: va,
+                noisy: false,
+                ..Passive::PLAIN
+            });
+            push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            let name = unique(b, top);
+            let terminals = b.names(&["a"]);
+            let params = b.params(&[("m", one)]);
+            let model_ref = Ref {
+                name: b.name("sub"),
+                def: DefId::NONE,
+            };
+            let x = Element {
+                kind: ElemKind::Instance,
+                name,
+                terminals,
+                model: model_ref,
+                params,
+                mult: ExprId::NONE,
+                detail: NO_ROW,
+                mult_law: MultLaw::Parallel,
+            };
+            b.push(top, x, Span::NONE);
+            model_with(b, top, ModelFamily::Mesa, "level");
+            let name = unique(b, top);
+            let word = b.name("hvmos");
+            let params = b.params(&[("level", one)]);
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    word,
+                    ..model(name, ModelFamily::Other, Polarity::None)
+                },
+                Span::NONE,
+            );
+            let name = unique(b, top);
+            let version = b.string("4.8");
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    version,
+                    ..model(name, ModelFamily::Bsim4, Polarity::N)
+                },
+                Span::NONE,
+            );
+            let l = b.detail(spicerack_ir::line::Line {
+                z0: one,
+                freq: one,
+                nl: one,
+                ..line()
+            });
+            push(
+                b,
+                top,
+                ElemKind::LosslessLine,
+                &["a", "0", "b", "0"],
+                None,
+                l,
+            );
+        });
+        assert_eq!(legal, Vec::<Code>::new());
+    }
 }
