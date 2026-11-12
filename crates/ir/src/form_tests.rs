@@ -172,7 +172,7 @@ fn inlining_every_call_adds_no_feature() {
         expr_depth: 4,
         files: 2,
     };
-    let (mut calls, mut dropped) = (0, 0);
+    let mut calls = 0;
     for seed in 0..200u64 {
         let d = generate(seed, &FeatureSet::ALL, size);
         let before = features_used(&d);
@@ -180,12 +180,9 @@ fn inlining_every_call_adds_no_feature() {
             calls += 1;
         }
         let mut after = d.clone();
-        let (dynamic_dropped, any_dropped) = inline_all(&mut after);
-        if dynamic_dropped {
-            // a dynamic argument dropped: the caller's root changed form (reported, A28)
-            dropped += 1;
-            continue;
-        }
+        // a dropped argument (its formal unread) changes no class (the lead's ruling on
+        // finding a), so every inlining is compared
+        let (_, any_dropped) = inline_all(&mut after);
         let used = features_used(&after);
         let added: Vec<Feature> = used.minus(before).iter().collect();
         if !added.is_empty() {
@@ -217,9 +214,6 @@ fn inlining_every_call_adds_no_feature() {
         );
     }
     assert!(calls > 20, "the generator made calls ({calls} seeds)");
-    assert!(
-        dropped * 4 < calls,
-        "most inlinings drop no dynamic argument ({dropped} of {calls})"
-    );
+
     let _ = ScopeKind::File;
 }
