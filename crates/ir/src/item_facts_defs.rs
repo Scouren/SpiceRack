@@ -17,7 +17,7 @@ use crate::feature::{Extra, Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::DefId;
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, ScopeId};
 use crate::item::{DefKind, Func, Param, ScopeKind};
 #[cfg(any(test, feature = "gen"))]
 use crate::item_facts::value_roots;
@@ -37,10 +37,6 @@ impl RowFacts for Param {
         let mut row: Param = design.row(at.index);
         f(&mut row.value, ExprUse::Constant);
         design.editor().set(at.index, row);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
@@ -126,10 +122,6 @@ impl RowFacts for Func {
         let mut row: Func = design.row(at.index);
         f(&mut row.body, ExprUse::Circuit);
         design.editor().set(at.index, row);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {

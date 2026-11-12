@@ -27,7 +27,7 @@ use crate::facts::{Handle, RowFacts};
 use crate::feature::{Extra, Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{
     Comment, DefKind, Global, Include, Load, LoadKind, Opaque, OpaqueClass, Role, ScopeKind, Title,
 };
@@ -40,10 +40,6 @@ use crate::text_expr::{Ctx, write_name, write_string};
 impl RowFacts for Title {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Text(self.text));
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
@@ -97,10 +93,6 @@ impl RowFacts for Comment {
         out.push(Handle::Text(self.text));
     }
 
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         // A15 K3: one line of text
         if design.text(self.text).contains(['\n', '\r']) {
@@ -141,10 +133,6 @@ impl RowFacts for Comment {
 impl RowFacts for Include {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.path), Handle::Name(self.section)]);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
@@ -209,10 +197,6 @@ impl RowFacts for Global {
         out.push(Handle::Names(self.nets));
     }
 
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let nets = design.names(self.nets);
         if nets.is_empty() || nets.contains(&NameId::GROUND) || !distinct(nets) {
@@ -263,10 +247,6 @@ impl RowFacts for Global {
 impl RowFacts for Load {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Name(self.path));
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -347,10 +327,6 @@ impl RowFacts for Load {
 impl RowFacts for Opaque {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.dialect), Handle::Text(self.text)]);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {

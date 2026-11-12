@@ -43,8 +43,7 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-use crate::id::{ExprId, ItemRef, NameId, NameList, Ref, ScopeId};
-use crate::item::DefKind;
+use crate::id::{ExprId, ItemRef, NameId, NameList, ScopeId};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 use crate::run_names::names;
@@ -260,10 +259,6 @@ impl RowFacts for OptionRow {
         }
     }
 
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         holds_feature(&OPTION_MODES, self.holds, set);
         *set = set.with(Feature::Option(self.key));
@@ -389,10 +384,6 @@ impl RowFacts for Env {
         design.editor().set(at.index, row);
     }
 
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         holds_feature(&ENV_MODES, self.holds, set);
         // placement is the kernel's `Placed` (A15 K1)
@@ -481,10 +472,6 @@ impl RowFacts for NodeSet {
                 r.net_path(row.reference);
             }
         }
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

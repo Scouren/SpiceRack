@@ -270,7 +270,7 @@ fn probe_classes(out: &mut Out<'_>) {
                 Handle::Exprs(l) => roots.extend_from_slice(d.exprs(l)),
                 Handle::ExprDyn(_)
                 | Handle::Name(_)
-                | Handle::Ref(_)
+                | Handle::Ref(..)
                 | Handle::Names(_)
                 | Handle::Scope(_)
                 | Handle::Text(_)
@@ -413,14 +413,20 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         }
         handles.clear();
         strings.clear();
-        let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
             row.string_roots(d, &mut strings);
-            row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
+        // the references `map_refs` visits, read off the handles (M5: no copy of the design)
+        let refs: Vec<(crate::Ref, DefKind)> = handles
+            .iter()
+            .filter_map(|h| match *h {
+                Handle::Ref(r, kind) => Some((r, kind)),
+                _ => None,
+            })
+            .collect();
         for (r, kind) in refs {
             if !r.is_resolved() {
                 continue;
@@ -476,7 +482,7 @@ fn handle(out: &mut Out<'_>, item: ItemRef, h: Handle, bad: &[bool], walk: &mut 
         }
         Handle::Expr(e) => expression(out, item, e, false, bad, walk),
         Handle::ExprDyn(e) => expression(out, item, e, true, bad, walk),
-        Handle::Ref(_) => {} // references are reached through `map_refs`
+        Handle::Ref(..) => {} // references are reached through `map_refs`
         Handle::Scope(s) => {
             if !s.is_none() && s.index() >= d.scopes.len() {
                 out.report(Violation::HandleRange, item, s.0);

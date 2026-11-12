@@ -9,7 +9,7 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
-//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
+//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
 //! `RowFacts::map_exprs`, `RowFacts::map_element_names`, `RowFacts::string_roots`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum ExprUse`, `pub enum Handle`,
 //! `macro for_kind`, `macro with_item_kinds` (crate-internal: the one list of item kinds and the one exhaustive dispatch from an `ItemKind` to its row
@@ -48,11 +48,6 @@ pub trait RowFacts: ItemRow {
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f);
     }
-
-    /// Appends every `Ref` the item `at` owns, with the kind its field expects, in `map_refs`'s
-    /// order, changing nothing: the read-only twin for readers (`check`) that hold `&Design`
-    /// (M5). `kernel_gen`'s drift property holds the two lists equal for every generated item.
-    fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>);
 
     /// Calls `f` on every expression root the item `at` owns, exactly the roots `handles` lists
     /// and in its order (`NONE` roots included): a single `Expr`/`ExprDyn` field, each element of
@@ -146,8 +141,11 @@ pub enum Handle {
     ExprDyn(ExprId),
     /// A name.
     Name(NameId),
-    /// A reference to a definition.
-    Ref(Ref),
+    /// A reference to a definition, with the kind of definition its field expects: exactly the
+    /// references `RowFacts::map_refs` visits, in its order (`Design::item_refs` lists them;
+    /// `kernel_gen`'s drift property holds the two equal). A reference field `map_refs` skips
+    /// (an element's or a model's absent master, named `NONE`) is listed as its `Name`.
+    Ref(Ref, DefKind),
     /// A name list.
     Names(NameList),
     /// An expression list.

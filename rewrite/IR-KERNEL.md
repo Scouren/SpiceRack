@@ -215,7 +215,8 @@ above could not say, so its final shape is (as implemented in `facts.rs`):
 ```rust
 fn handles(&self, design: &Design, out: &mut Vec<Handle>);
 fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
-fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>); // M5: read twin
+// M5's read twin is the handles: `Handle::Ref(Ref, DefKind)` lists exactly the references
+// `map_refs` visits, in its order (`Design::item_refs` reads them off; audit 2026-11-12 row 5)
 fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
 fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
 fn dump(&self, design: &Design, ctx: &text::Ctx, out: &mut String);

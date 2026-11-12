@@ -33,7 +33,7 @@ use crate::r#gen::Gen;
 use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
-use crate::plan::{target_refs, target_refs_into};
+use crate::plan::target_refs;
 use crate::run_exprs::{Roots, exprs_of};
 use crate::run_extra::RunExtra;
 use crate::run_names::{Names, names_of};
@@ -176,21 +176,6 @@ impl RowFacts for Analysis {
     fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
         let row: Analysis = design.row(at.index);
         by_detail!(row.kind, (), names_of(design, row.detail, f));
-    }
-
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        // `map_refs`'s order: a DC sweep's axes' targets
-        if self.kind != AnalysisKind::Dc {
-            return;
-        }
-        let Some(dc) = crate::circuit_text::get_row::<Dc>(design, self.detail) else {
-            return;
-        };
-        let start = dc.axes.start as usize;
-        let end = (start + dc.axes.len as usize).min(design.run.dc_axes.len());
-        for axis in &design.run.dc_axes[start.min(end)..end] {
-            target_refs_into(&axis.target, out);
-        }
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

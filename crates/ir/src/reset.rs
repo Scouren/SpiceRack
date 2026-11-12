@@ -22,8 +22,7 @@ use crate::facts::RowFacts;
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ItemRef, Ref, ScopeId};
-use crate::item::DefKind;
+use crate::id::{ItemRef, ScopeId};
 use crate::run_extra::RunExtra;
 use crate::run_words::{member, put_word, word};
 #[cfg(any(test, feature = "gen"))]
@@ -125,10 +124,6 @@ impl ResetSet {
 }
 
 impl RowFacts for Reset {
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         for c in self.restores.iter() {
             *set = set.with(Feature::Run(class_feature(c)));

@@ -145,7 +145,7 @@ impl RowFacts for Statistics {
         for list in [self.process, self.mismatch] {
             for v in get(&design.run.varies, list).unwrap_or(&[]) {
                 out.extend([
-                    Handle::Ref(v.param),
+                    Handle::Ref(v.param, DefKind::Param),
                     Handle::Expr(v.mean),
                     Handle::Expr(v.spread),
                 ]);
@@ -153,7 +153,11 @@ impl RowFacts for Statistics {
         }
         for list in [self.process_correlations, self.mismatch_correlations] {
             for c in get(&design.run.correlations, list).unwrap_or(&[]) {
-                out.extend([Handle::Ref(c.a), Handle::Ref(c.b), Handle::Expr(c.cc)]);
+                out.extend([
+                    Handle::Ref(c.a, DefKind::Param),
+                    Handle::Ref(c.b, DefKind::Param),
+                    Handle::Expr(c.cc),
+                ]);
             }
         }
         for e in [self.truncate, self.process_truncate, self.mismatch_truncate] {
@@ -196,25 +200,6 @@ impl RowFacts for Statistics {
             for c in &mut design.run.correlations[start.min(end)..end] {
                 f(&mut c.a, DefKind::Param);
                 f(&mut c.b, DefKind::Param);
-            }
-        }
-    }
-
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        // `map_refs`'s order: every vary's parameter, then every correlation's two ends
-        for list in [self.process, self.mismatch] {
-            let start = list.start as usize;
-            let end = (start + list.len as usize).min(design.run.varies.len());
-            for v in &design.run.varies[start.min(end)..end] {
-                out.push((v.param, DefKind::Param));
-            }
-        }
-        for list in [self.process_correlations, self.mismatch_correlations] {
-            let start = list.start as usize;
-            let end = (start + list.len as usize).min(design.run.correlations.len());
-            for c in &design.run.correlations[start.min(end)..end] {
-                out.push((c.a, DefKind::Param));
-                out.push((c.b, DefKind::Param));
             }
         }
     }

@@ -83,7 +83,7 @@ fn from_handles(d: &Design, item: ItemRef) -> Vec<(ExprId, ExprUse)> {
             Handle::Exprs(l) => out.extend(d.exprs(l).iter().map(|&e| (e, ExprUse::Constant))),
             Handle::Params(l) => out.extend(d.params(l).iter().map(|p| (p.1, ExprUse::Constant))),
             Handle::Name(_)
-            | Handle::Ref(_)
+            | Handle::Ref(..)
             | Handle::Names(_)
             | Handle::Scope(_)
             | Handle::Text(_)

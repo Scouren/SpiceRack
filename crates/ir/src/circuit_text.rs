@@ -42,7 +42,7 @@ use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, Tabl
 use crate::design::{Design, DetailRow};
 use crate::element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 use crate::facts::Handle;
-use crate::id::{ExprId, NameId};
+use crate::id::{ExprId, NameId, Ref};
 use crate::item::DefKind;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
@@ -195,7 +195,11 @@ pub(crate) fn element_handles(e: &Element, design: &Design, out: &mut Vec<Handle
     out.extend([
         Handle::Name(e.name),
         Handle::Names(e.terminals),
-        Handle::Ref(e.model),
+        // R5: only a kind's master is a reference (`map_refs` skips any other)
+        match e.kind.master_kind() {
+            Some(kind) if e.model.name != NameId::NONE => Handle::Ref(e.model, kind),
+            _ => Handle::Name(e.model.name),
+        },
         Handle::Params(e.params),
         Handle::Expr(e.mult),
     ]);
@@ -223,8 +227,8 @@ pub(crate) fn model_handles(m: &Model, out: &mut Vec<Handle>) {
         Handle::Name(m.name),
         Handle::Params(m.params),
         Handle::Name(m.bin_of),
-        Handle::Ref(m.ako),
-        Handle::Ref(m.module),
+        ref_or_name(m.ako, DefKind::Model),
+        ref_or_name(m.module, DefKind::Module),
         Handle::Expr(m.version),
         Handle::Name(m.word),
     ]);
@@ -328,6 +332,16 @@ pub(crate) fn dump_library(l: &DeviceLibrary, design: &Design, out: &mut String)
 }
 
 // ---- private ----
+
+/// A reference field as a handle: `Ref` when it names something (`map_refs` visits it), else
+/// its `NONE` name.
+fn ref_or_name(r: Ref, kind: DefKind) -> Handle {
+    if r.name == NameId::NONE {
+        Handle::Name(r.name)
+    } else {
+        Handle::Ref(r, kind)
+    }
+}
 
 /// The fields of a kind with no detail row: none.
 /// Appends the handles of row `index` of `D`'s table, if it exists.

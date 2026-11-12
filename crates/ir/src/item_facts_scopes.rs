@@ -21,7 +21,7 @@ use crate::feature::{Extra, Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::DefId;
-use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, If, Section, Subckt};
 #[cfg(any(test, feature = "gen"))]
 use crate::item_facts::value_roots;
@@ -50,10 +50,6 @@ impl RowFacts for Subckt {
         for p in &mut design.param_pool[start.min(end)..end] {
             f(&mut p.1, ExprUse::Constant);
         }
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
@@ -241,10 +237,6 @@ impl RowFacts for Section {
         ]);
     }
 
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         if !self.library.is_none() {
             *set = set.with(Feature::Extra(Extra::SectionLibrary));
@@ -326,10 +318,6 @@ impl RowFacts for If {
                 f(&mut branch.cond, ExprUse::Constant);
             }
         }
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

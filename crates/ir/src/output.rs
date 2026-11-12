@@ -30,8 +30,7 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
-use crate::item::DefKind;
+use crate::id::{ExprId, ItemRef, NameId, ScopeId};
 use crate::measure::MeasureKind;
 use crate::option::Applies;
 #[cfg(any(test, feature = "gen"))]
@@ -129,10 +128,6 @@ impl RowFacts for Save {
     fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
         let row: Save = design.row(at.index);
         names(design, f).probes(row.probes);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
@@ -269,10 +264,6 @@ impl RowFacts for Print {
     fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
         let row: Print = design.row(at.index);
         names(design, f).probes(row.probes);
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
