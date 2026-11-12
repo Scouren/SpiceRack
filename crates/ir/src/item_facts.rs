@@ -41,8 +41,11 @@ impl RowFacts for Title {
         // no feature beyond the kind
     }
 
-    fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
-        // no invariant beyond the handles
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
+        // A15 K3: one line of text
+        if design.text(self.text).contains(['\n', '\r']) {
+            field_domain(design, at, out);
+        }
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -82,8 +85,11 @@ impl RowFacts for Comment {
         // no feature beyond the kind
     }
 
-    fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
-        // no invariant beyond the handles
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
+        // A15 K3: one line of text
+        if design.text(self.text).contains(['\n', '\r']) {
+            field_domain(design, at, out);
+        }
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {

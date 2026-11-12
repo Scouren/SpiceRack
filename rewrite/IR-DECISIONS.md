@@ -260,3 +260,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Both are row facts (`Subckt::features`, `If::features`). `IfConditionDynamic` reads each condition's class through `class::tree_class`, a walk sized by the tree, not the design: `expr_class` (now built on it) allocated an expression-table stamp per call, quadratic when a row calls it per expression.
 - The generator: `Gen::constant_only` keeps a tree non-dynamic around `If` conditions; a formal always gets a default unless the set has `FormalWithoutDefault`, and a set with neither literals nor that feature makes subcircuits without formals.
 
+## A15 K3 applied
+
+- The transitive `ProbeContext` is `check`'s last pass (`probe_classes`), run only when nothing else was reported: `class::compute` reads parameter rows and expression pools without range checks, and `check` must not panic on any input. A broken design reports its structural faults first and this one on the next check. `arg` is the field's root expression.
+- The generator's reads go through `Gen::may_read`: a constant tree reads only constant definitions, a dynamic one under `Reads::Constant` none above `Temp`. Titles and comments draw from `Gen::line_word`.
+

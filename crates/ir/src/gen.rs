@@ -18,7 +18,7 @@
 //! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
 //! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::fresh(&mut self) -> String`,
-//! `Gen::word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
+//! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
 
 use crate::build::Builder;
@@ -294,6 +294,12 @@ impl Gen {
         WORDS[self.below(WORDS.len() as u32) as usize]
     }
 
+    /// A word with no line break, for a title or a comment (A15 K3).
+    pub(crate) fn line_word(&mut self) -> &'static str {
+        let lines: Vec<&'static str> = WORDS.into_iter().filter(|w| !w.contains('\n')).collect();
+        lines[self.below(lines.len() as u32) as usize]
+    }
+
     /// Items still allowed; a row generator that opens a scope fills its body only while this is
     /// positive.
     pub fn budget(&self) -> u32 {
@@ -311,7 +317,7 @@ fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
     let titled = features.contains(Feature::Item(ItemKind::Title))
         && (!untitled_ok || (g.items_left > 0 && g.chance(2)));
     if deck && titled {
-        let text = g.word();
+        let text = g.line_word();
         b.title(top, text, crate::span::Span::NONE);
         g.items_left = g.items_left.saturating_sub(1); // a required title may pass the budget
     }

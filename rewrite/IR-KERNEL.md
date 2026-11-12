@@ -301,6 +301,14 @@ condition of class `Temp` or `Circuit` (transitive, as the `*Dyn` features are).
 gives every formal a default and makes every condition `Constant` unless the set has the
 feature.
 
+**A15 K3 (2026-11-12): two invariants.** A `Title`'s or `Comment`'s text holds no line break
+(`\n` or `\r`): `FieldDomain`. `ProbeContext` follows the class: a constant-in-time field
+(`Handle::Expr`, a list of them, a head default) whose expression is of class `Circuit` through a
+parameter or function it reads is a violation, as a direct probe is. That pass runs last and only
+on a design with no other violation (the class table reads definitions through their rows).
+The generator writes one-line titles and comments, and a tree under `Reads::Constant` reads no
+`Circuit`-class definition.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

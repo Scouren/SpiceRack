@@ -25,7 +25,7 @@ pub(crate) fn gen_title(
     b: &mut Builder<'_>,
     _: &FeatureSet,
 ) -> ItemRef {
-    let text = g.word();
+    let text = g.line_word();
     b.title(scope, text, Span::NONE)
 }
 
@@ -35,7 +35,7 @@ pub(crate) fn gen_comment(
     b: &mut Builder<'_>,
     _: &FeatureSet,
 ) -> ItemRef {
-    let text = g.word();
+    let text = g.line_word();
     b.comment(scope, text, Span::NONE)
 }
 
