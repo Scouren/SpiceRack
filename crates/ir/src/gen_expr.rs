@@ -416,4 +416,57 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn a_typed_parameter_read_is_wrapped_or_not_drawn() {
+        // A33 (oracle: the tree's own rows): under `typed_params` every `Param` row is the
+        // operand of a `ToReal` or `ToInt` call the set allows dynamically (`ToInt` missing:
+        // only `ToReal`), with a floor of reads drawn; with neither allowed, no `Param` row
+        use crate::expr::{Expr, Func};
+        use crate::feature::Feature;
+        let size = Size {
+            items: 40,
+            scope_depth: 3,
+            expr_depth: 4,
+            files: 1,
+        };
+        let only_real =
+            FeatureSet::ALL.minus(FeatureSet::EMPTY.with(Feature::FuncDyn(Func::ToInt)));
+        let neither = only_real.minus(FeatureSet::EMPTY.with(Feature::FuncDyn(Func::ToReal)));
+        let mut wrapped_reads = 0;
+        for (set, wrapper) in [(only_real, Some(Func::ToReal)), (neither, None)] {
+            for seed in 0..200u64 {
+                let mut d = Design::new();
+                let mut b = d.builder();
+                let (_, top) = b.file("t.sp", Role::Deck);
+                let mut g = Gen::new(seed, &set, size);
+                g.scope = top;
+                g.typed_params = true;
+                for _ in 0..10 {
+                    let e = g.expr(&mut b, &set, Reads::Circuit);
+                    let des = b.design();
+                    let mut nodes = Vec::new();
+                    crate::class::tree_nodes(des, e, &mut nodes);
+                    let mut operands = Vec::new();
+                    for &n in &nodes {
+                        if let Expr::Call(f, _) = des.expr(n)
+                            && Some(f) == wrapper
+                        {
+                            des.children(n, &mut operands);
+                        }
+                    }
+                    for &n in &nodes {
+                        if let Expr::Param(_) = des.expr(n) {
+                            assert!(operands.contains(&n), "seed {seed}: an untyped read");
+                            wrapped_reads += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            wrapped_reads >= 50,
+            "only {wrapped_reads} typed reads drawn"
+        );
+    }
 }
