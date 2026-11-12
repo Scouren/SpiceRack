@@ -353,7 +353,7 @@ impl RowFacts for Subckt {
         let table = crate::class::def_classes(design);
         let not_constant = design.params(self.params).iter().any(|p| {
             !p.1.is_none()
-                && (reads_param(design, p.1)
+                && (reads_dependent(design, p.1)
                     || crate::class::tree_class(design, p.1, table)
                         >= crate::class::ExprClass::Temp)
         });
@@ -540,16 +540,17 @@ pub(crate) fn distinct(names: &[NameId]) -> bool {
 
 // ---- private ----
 
-/// Whether the tree under `root` holds a `Param` read. Explicit stack (C11); descends only to
-/// lower ids, so it ends on any table contents.
-fn reads_param(design: &Design, root: ExprId) -> bool {
+/// Whether the tree under `root` reads a parameter or `$tnom` (A12 K2, A25: what makes a head
+/// default dependent). Explicit stack (C11); descends only to lower ids, so it ends on any table
+/// contents.
+fn reads_dependent(design: &Design, root: ExprId) -> bool {
     let mut stack = vec![root];
     let mut kids = Vec::new();
     while let Some(e) = stack.pop() {
         if e.index() >= design.expr_count() {
             continue;
         }
-        if let crate::expr::Expr::Param(_) = design.expr(e) {
+        if let crate::expr::Expr::Param(_) | crate::expr::Expr::Tnom = design.expr(e) {
             return true;
         }
         kids.clear();

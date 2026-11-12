@@ -132,7 +132,7 @@ impl Gen {
             let leaves: Vec<ExprTag> = CONSTANT
                 .into_iter()
                 .filter(|t| features.contains(Feature::Expr(*t)))
-                .filter(|t| *t != ExprTag::Param || self.param_reads)
+                .filter(|t| !matches!(t, ExprTag::Param | ExprTag::Tnom) || self.param_reads)
                 .chain(probes.iter().copied().filter(|_| dynamic))
                 .collect();
             leaves[self.below(leaves.len() as u32) as usize]

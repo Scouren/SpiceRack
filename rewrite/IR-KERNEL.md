@@ -283,7 +283,7 @@ resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressio
 definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
 item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
 (so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
-`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read anywhere in its tree or of class `Temp`. The
+`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read or `$tnom` (A25, VACASK run c3) anywhere in its tree or of class `Temp`. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
 leaf or a `$temp` in a head default only when it has `FormalNotConstant` (VACASK runs n1, m1, c1, t2).
 `Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose

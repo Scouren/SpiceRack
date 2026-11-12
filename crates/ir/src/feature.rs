@@ -123,8 +123,8 @@ pub enum Extra {
     /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
     /// resolves in the own scope, then the top, never an enclosing subcircuit).
     EnclosingRef,
-    /// A `Subckt` head default that is not a constant: it holds a `Param` read, or its class is
-    /// `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
+    /// A `Subckt` head default that is not a constant: it holds a `Param` read or `$tnom` (A25,
+    /// VACASK run c3), or its class is `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
     /// default folds to a constant; it was `FormalReadsParam`).
     FormalNotConstant,
     /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
