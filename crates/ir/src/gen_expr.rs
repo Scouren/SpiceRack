@@ -310,7 +310,13 @@ impl Gen {
         if has(Feature::Expr(ExprTag::Draw)) {
             let dists: Vec<Dist> = Dist::ALL
                 .into_iter()
-                .filter(|d| has(Feature::Dist(*d)))
+                .filter(|d| {
+                    has(if form {
+                        Feature::DistDyn(*d)
+                    } else {
+                        Feature::Dist(*d)
+                    })
+                })
                 .collect();
             let whens: Vec<DrawWhen> = DrawWhen::ALL
                 .into_iter()

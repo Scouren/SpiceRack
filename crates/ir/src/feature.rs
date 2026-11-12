@@ -520,7 +520,12 @@ pub(crate) fn item_features(
                     *set = set
                         .with(Feature::DrawWhen(when))
                         .with(Feature::DrawPer(per));
-                    Feature::Dist(dist)
+                    // A28: the distribution counts in its root's form, as a function does
+                    if dynamic {
+                        Feature::DistDyn(dist)
+                    } else {
+                        Feature::Dist(dist)
+                    }
                 }
                 Expr::Num(_)
                 | Expr::Str(_)

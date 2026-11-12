@@ -398,3 +398,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `Builder::element_named(scope, name) -> Option<ItemRef>`: the first element of that whole name listed in `scope`, from an index on `Design` (`element_names`, lookup only) built on first use in O(items). It is extended by `Builder::push` itself whenever the row is an `Element`, so IR text (which pushes through the low tier) and `Builder::element` both keep it. It is cleared where `editor()` hands out its door and in `Editor::items_mut` and `Editor::set`, the mutations that can move or rename an element, as the class cache is. It takes `&mut self` because the builder's design is `&mut`; it reads only.
 
+## A28 applied: dead scopes, draws
+
+- `check` walks the live scopes: a file's top, and the body of an item listed in a live scope (`check_scopes::live_scopes`, an explicit worklist). Range checks still run on every scope, since a pass reads them; the tree's shape, owners and listings are checked on live scopes only. `files_and_scopes` moved to `check_scopes.rs` (check.rs passed 500 lines).
+- `Feature::DistDyn(Dist)`, the 21st group, appended last. A draw's distribution counts `DistDyn` in a dynamic root, `Dist` in a static one; `DrawWhen` and `DrawPer` stay one feature each (no simulator was found to differ by form there). The generator picks a distribution from the form's features.
+
