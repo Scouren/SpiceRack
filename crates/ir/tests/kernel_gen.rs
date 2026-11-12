@@ -129,11 +129,11 @@ fn generated_designs_are_valid_and_within_their_set() {
 #[test]
 fn random_subsets_restrict_the_generator() {
     let full = kernel_set();
-    let mut state = 0x5EB5_E7u64;
+    let mut state = 0x005E_B5E7_u64;
     for k in 0..20u64 {
         let mut set = FeatureSet::EMPTY;
         for f in full.iter() {
-            if next(&mut state) % 2 == 0 {
+            if next(&mut state).is_multiple_of(2) {
                 set = set.with(f);
             }
         }

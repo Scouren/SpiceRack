@@ -67,7 +67,7 @@ impl RowFacts for Title {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_title(g, scope, b, features)
     }
 }
 
@@ -110,7 +110,7 @@ impl RowFacts for Comment {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_comment(g, scope, b, features)
     }
 }
 
@@ -157,7 +157,7 @@ impl RowFacts for Include {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_include(g, scope, b, features)
     }
 }
 
@@ -203,7 +203,7 @@ impl RowFacts for Global {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_global(g, scope, b, features)
     }
 }
 
@@ -248,7 +248,7 @@ impl RowFacts for Load {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_load(g, scope, b, features)
     }
 }
 
@@ -298,7 +298,7 @@ impl RowFacts for Opaque {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_opaque(g, scope, b, features)
     }
 }
 
@@ -350,7 +350,7 @@ impl RowFacts for Subckt {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_subckt(g, scope, b, features)
     }
 }
 
@@ -401,7 +401,7 @@ impl RowFacts for Section {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_section(g, scope, b, features)
     }
 }
 
@@ -454,7 +454,7 @@ impl RowFacts for If {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_if(g, scope, b, features)
     }
 }
 
@@ -499,7 +499,7 @@ impl RowFacts for Param {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_param(g, scope, b, features)
     }
 }
 
@@ -549,7 +549,7 @@ impl RowFacts for Func {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        todo!()
+        crate::gen_rows::gen_func(g, scope, b, features)
     }
 }
 
