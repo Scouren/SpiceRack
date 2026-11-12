@@ -1,0 +1,4 @@
+file "a.sp" deck
+  title "t"
+  element vsource v1 (in 0) dc=1
+  save analysis=(op dc tran) from_here (v (in))

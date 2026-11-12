@@ -83,7 +83,7 @@ struct Spine {
     devices: BTreeSet<String>,
 }
 
-/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run`).
+/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
 
 /// `name_with_letter`'s note at a renamed element, `arg` the old name (the pass's `RENAMED`,
@@ -146,8 +146,8 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     let rest = &placed[..];
     let text = &deck.src.files()[0].1;
     let ran = guard(4, || {
-        let a = sim::run(c.from_sim, &deck.path, text, &[], SECS);
-        let b = sim::run(
+        let a = sim::run_checked(c.from_sim, &deck.path, text, &[], SECS);
+        let b = sim::run_checked(
             c.to_sim,
             &deck.path.with_extension(c.to_ext),
             &entry.1,

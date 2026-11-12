@@ -11,7 +11,7 @@
 //! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
 
-use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, string};
+use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, check_value, string};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
@@ -86,7 +86,7 @@ pub(super) fn get(pairs: &[(String, u32)], key: &str) -> u32 {
 /// Checks each expression node of `nodes` that is given.
 pub(super) fn check(l: &Lower<'_, '_, '_>, nodes: &[u32]) -> Result<(), Why> {
     for &node in nodes.iter().filter(|&&x| x != NONE) {
-        expr_read::check_expr(l, node, Context::Param).map_err(|r| Why {
+        check_value(l, node).map_err(|r| Why {
             class: r.class,
             code: Some(r.code),
         })?;

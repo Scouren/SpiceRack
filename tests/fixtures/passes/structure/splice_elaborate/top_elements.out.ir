@@ -1,0 +1,7 @@
+file "a.sp" deck
+  title "t"
+  element vsource v1 (1 0) dc=10
+  element resistor r1 (1 2) value=1k
+  element resistor r2 (2 0) value=9k
+  element resistor rp2 (2 0) value=9k
+  analysis op

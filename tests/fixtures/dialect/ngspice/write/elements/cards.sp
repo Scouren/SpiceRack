@@ -16,5 +16,6 @@ W1 a b vctl wmod off
 T2 a 0 b 0 z0=75 f=1g nl=0.5
 U1 a b 0 umod l=1m n=5
 X1 a b sub m=2
+N1 a b nmod w=1 m=2
 A1 in out amod
 .end

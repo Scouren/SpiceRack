@@ -1,0 +1,16 @@
+# Oracle: settle star_in_section (a statement VACASK has no syntax for inside an included
+# section: "Syntax error, unexpected string.", invalid in source P2013), star_outside_section and
+# junk_outside_section (outside every section of a library included by `section=` VACASK skips
+# it, junk included: Inert, P2014).
+# codes: P2013 P2014 P2014 S0003 S0003 S0004
+file "outside_section.sim" deck
+  title "a library with text vacask has no syntax for"
+  include "outside_section--lib.lib" section=b
+file "outside_section--lib.lib" library
+  section a
+    opaque vacask invalid "* star inside a section"
+    param p = 1i
+  opaque vacask inert "* star outside"
+  opaque vacask inert ".model x d"
+  section b
+    param p = 2i

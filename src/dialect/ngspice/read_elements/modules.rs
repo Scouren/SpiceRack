@@ -6,7 +6,9 @@
 //!   `inp_fix_subckt_multiplier` hands `m={m}` to the inner cards) unless the subcircuit
 //!   declares `m` (`inp_fix_inst_calls_for_numparam`, `found_mult_param`; INV 6.01), then it is a
 //!   parameter;
-//! - `N n1 … nk model k=v …` (OSDI, `inp2n.c`): every parameter, `m` too, is the module's own;
+//! - `N n1 … nk model k=v …` (OSDI, `inp2n.c`): every parameter is the module's own but `m`,
+//!   the multiplicity (OpenVAF's `$mfactor`; settle `osdi_mult.sp`: `m=2` doubles the current,
+//!   and a module that declares a parameter `m` rejects `m=`, `osdi_mult_own.sp`);
 //! - `A n1 … nk model` (XSPICE): typed only when every connection is a plain node; a port
 //!   modifier (`%v`, `%id`, `[ ]`, `~`) has no IR field (`Private`).
 //!
@@ -64,7 +66,7 @@ pub(super) fn n(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
     }
     card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
     card.model = Some(items[words - 1].text.clone());
-    if !keyed(lw, st, &mut card, &items[words..], false) {
+    if !keyed(lw, st, &mut card, &items[words..], true) {
         return;
     }
     let h = head(lw, st, &card);

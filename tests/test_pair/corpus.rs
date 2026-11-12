@@ -46,6 +46,9 @@ pub struct Corpus {
 // when a nightly has the hour.
 const STRIDE_SIX: usize = 10;
 
+/// A deck still running after this many seconds is named on stderr while it runs.
+const SLOW: u64 = 120;
+
 /// Every deck of `corpus` through `c`'s six steps: the census written, its table printed, and
 /// the differences from the cell's corpus list returned (empty: the list holds).
 pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
@@ -102,14 +105,23 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     let next = AtomicUsize::new(0);
     let done: Mutex<Vec<(usize, Done, Option<u64>)>> = Mutex::new(Vec::new());
     let none = PairFile::default();
+    // Each worker's deck and its start, so a deck that runs long is named while it runs.
+    let running: Mutex<Vec<Option<(usize, std::time::Instant)>>> =
+        Mutex::new(vec![None; jobs.max(1)]);
+    let workers_left = AtomicUsize::new(jobs.max(1));
     std::thread::scope(|s| {
-        for _ in 0..jobs.max(1) {
-            s.spawn(|| {
+        for w in 0..jobs.max(1) {
+            let (running, workers_left, next, done) = (&running, &workers_left, &next, &done);
+            let (load, none, paths) = (&load, &none, &paths);
+            s.spawn(move || {
                 // Bounded: each index is taken once.
                 loop {
                     let k = next.fetch_add(1, Ordering::Relaxed);
                     let Some(p) = paths.get(k) else { break };
-                    let mut v = run::steps(c, from, to, &load(p), &none);
+                    running.lock().expect("no worker panicked")[w] =
+                        Some((k, std::time::Instant::now()));
+                    let mut v = run::steps(c, from, to, &load(p), none);
+                    running.lock().expect("no worker panicked")[w] = None;
                     let h = v.written.take().map(|w| hash(&w));
                     let mut all = done.lock().expect("no worker panicked");
                     all.push((k, v, h));
@@ -117,8 +129,22 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
                         eprintln!("{}: {} of {} decks", c.name, all.len(), paths.len());
                     }
                 }
+                workers_left.fetch_sub(1, Ordering::Relaxed);
             });
         }
+        // The watch: every 30 s, each deck past SLOW seconds is named (once a minute at most).
+        s.spawn(|| {
+            let mut told = std::collections::BTreeSet::new();
+            while workers_left.load(Ordering::Relaxed) > 0 {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                for (k, t) in running.lock().expect("no worker panicked").iter().flatten() {
+                    let secs = t.elapsed().as_secs();
+                    if secs > SLOW && told.insert((*k, secs / 60)) {
+                        eprintln!("{}: still on {} after {secs} s", c.name, rel(&paths[*k]));
+                    }
+                }
+            }
+        });
     });
     let mut done = done.into_inner().expect("no worker panicked");
     done.sort_by_key(|(k, _, _)| *k);
