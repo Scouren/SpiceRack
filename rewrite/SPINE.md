@@ -139,7 +139,7 @@ any other edge, a pass of one group importing another group included.
 **Laws** (`tests/pass_laws.rs`, generic over `GROUPS`, failing passes compared by name with a
 strict `KNOWN` list; a law that runs on no generated design for a pass fails for it), over
 generated designs that use the pass's `removes` and over ones that do not: P1 `ir::check` is
-clean after it; P2 every item still carrying `removes` (by `ir::check_legal`) has a note of the
+clean after it; P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has a note of the
 pass at it, every other has lost it; P3 the output uses nothing outside the input's features
 plus `requires`; P4 running it twice equals running it once (IR text equal); P5 on a design
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
@@ -189,9 +189,14 @@ laws run on.
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
   row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
-  total over a design `legalize` accepted; a generated design `legalize` refuses (`admits`) is
-  skipped and counted, and the law fails when no admitted design holds an item kind the
-  writer's features claim. In this slice the only
+  total over a design `legalize` accepted. A generated design the row refuses is shrunk to what
+  it admits (A25, R48): the items its refusals name (`Diag::item`) are dropped from their
+  listing scopes, then the items `ir::check` no longer accepts, to a fixpoint bounded by the item
+  count, and the laws run on the rest; a refusal at no item skips the seed, counted by code in
+  the failure text. A law that runs on no design fails. The reach list: every `Item`, `Elem`,
+  `Wave`, `Analysis` and `Family` kind of the writer's features is used by some admitted design
+  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list. So a writer's `admits`
+  pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
   edge: a file under `src/dialect/<d>/` importing another dialect (except a declared parent),
