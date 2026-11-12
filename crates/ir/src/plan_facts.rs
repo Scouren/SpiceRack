@@ -43,7 +43,7 @@ use crate::id::{ExprId, ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
-    TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
+    TargetKind, TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
     target_refs_into, target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
@@ -332,7 +332,9 @@ impl RowFacts for Alter {
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
-        if !target_valid(&self.target) || self.value.is_none() {
+        // A28: the temperature and options change through `Env` and `OptionRow`
+        let state = matches!(self.target.kind, TargetKind::Temp | TargetKind::Option);
+        if !target_valid(&self.target) || self.value.is_none() || state {
             report(design, at, Violation::FieldDomain, out);
         }
     }

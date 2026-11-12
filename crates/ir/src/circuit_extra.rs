@@ -220,7 +220,9 @@ pub enum CircuitExtra {
     /// A pattern source whose DC is the wave at t = 0.
     DcAtZeroPattern,
     // A12 C5 (device libraries, R17)
-    /// An element that names no master (`model.name` `NONE`): VACASK instantiates every device through a model (A12 C5, run n2).
+    /// An element of a kind that can name a master (`ElemKind::master_kind` is `Some`) that names
+    /// none (`model.name` `NONE`): VACASK instantiates every device through a model (A12 C5, run
+    /// n2). A masterless kind (`Behav`, `ChargeCapacitor`, `FluxInductor`, …) never sets it.
     ElementWithoutModel,
     /// A model whose family has no `DeviceLibrary` of that family in the design (design-level; A12 C5).
     ModelWithoutLibrary,

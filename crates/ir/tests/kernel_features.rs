@@ -54,6 +54,7 @@ fn index_and_from_index_are_inverses() {
         OptionKey::ALL.len(),
         spicerack_ir::ModelFamily::ALL.len(),
         (spicerack_ir::ScopeKind::ALL.len() - 1) * ItemKind::ALL.len(),
+        Dist::ALL.len(),
     ];
     assert_eq!(Feature::COUNT as usize, groups.iter().sum::<usize>());
     let mut seen = vec![false; Feature::COUNT as usize];
@@ -69,10 +70,7 @@ fn index_and_from_index_are_inverses() {
     );
     // the groups in declaration order: the last feature is the last placement (A15 K1)
     let last = Feature::from_index(Feature::COUNT - 1);
-    assert_eq!(
-        last,
-        Feature::Placed(spicerack_ir::ScopeKind::Loop, ItemKind::Elaborate)
-    );
+    assert_eq!(last, Feature::DistDyn(*Dist::ALL.last().unwrap()));
     assert_ne!(
         Feature::Func(Func::Sin).index(),
         Feature::FuncDyn(Func::Sin).index()
@@ -143,8 +141,9 @@ fn features_of_a_hand_built_deck() {
         Feature::Expr(ExprTag::Draw),
         Feature::Func(Func::Exp),
         Feature::Binary(BinOp::Mul),
-        Feature::FuncDyn(Func::Abs),
-        Feature::UnaryDyn(UnOp::Neg),
+        // A28 (R51): f's body reads the circuit but nothing calls it, so it counts static
+        Feature::Func(Func::Abs),
+        Feature::Unary(UnOp::Neg),
         Feature::Dist(Dist::AbsGauss),
         Feature::DrawWhen(DrawWhen::Always),
         Feature::DrawPer(DrawPer::Reference),
