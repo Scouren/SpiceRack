@@ -82,6 +82,9 @@ pub enum ItemKind {
     /// The named subcircuits' bodies become the top circuit from here on (A12 R1). Row
     /// `plan::Elaborate` (run).
     Elaborate,
+    /// From here the listed classes of script changes hold the design's own value again (A27,
+    /// A28). Row `reset::Reset` (run).
+    Reset,
 }
 
 /// What a scope is; it fixes which item kind owns it (checked).
@@ -303,7 +306,7 @@ const _: () = assert!(size_of::<Func>() == 16);
 
 impl ItemKind {
     /// Every kind, in declaration order (the order of `Feature::Item` indices).
-    pub const ALL: [ItemKind; ItemKind::Elaborate as usize + 1] = [
+    pub const ALL: [ItemKind; ItemKind::Reset as usize + 1] = [
         ItemKind::Title,
         ItemKind::Comment,
         ItemKind::Include,
@@ -329,6 +332,7 @@ impl ItemKind {
         ItemKind::Print,
         ItemKind::Measure,
         ItemKind::Elaborate,
+        ItemKind::Reset,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();

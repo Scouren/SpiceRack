@@ -425,7 +425,8 @@ fn candidates(
             | ItemKind::Save
             | ItemKind::Print
             | ItemKind::Measure
-            | ItemKind::Elaborate => true,
+            | ItemKind::Elaborate
+            | ItemKind::Reset => true,
         })
         .collect()
 }

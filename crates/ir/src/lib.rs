@@ -39,7 +39,7 @@
 //!   `dump`, `parse`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
-//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
+//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `Reset`, `ResetSet`, `Restorable`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
 //!   `EventKind`, `MeasureKind`, `Stat`, `Env`, `IcScope`, `NodeSet`, `NodeSetKind`,
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
@@ -134,6 +134,7 @@ mod periodic_ss_facts;
 pub mod plan;
 mod plan_facts;
 pub mod probe;
+pub mod reset;
 mod run_exprs;
 pub mod run_extra;
 mod run_words;
@@ -167,6 +168,7 @@ pub use plan::{
     Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
 };
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
+pub use reset::{Reset, ResetSet, Restorable};
 pub use rewrite::{rewrite_exprs, rewrite_exprs_in};
 pub use run_extra::RunExtra;
 pub use span::Span;

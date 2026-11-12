@@ -171,6 +171,7 @@ pub(crate) fn keyword(kind: ItemKind) -> &'static str {
         ItemKind::Print => "print",
         ItemKind::Measure => "measure",
         ItemKind::Elaborate => "elaborate",
+        ItemKind::Reset => "reset",
     }
 }
 
@@ -559,6 +560,7 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
         ItemKind::Print => owner::<crate::output::Print>(d, ctx, out),
         ItemKind::Measure => owner::<crate::output::Measure>(d, ctx, out),
         ItemKind::Elaborate => owner::<crate::plan::Elaborate>(d, ctx, out),
+        ItemKind::Reset => owner::<crate::reset::Reset>(d, ctx, out),
     }
 }
 

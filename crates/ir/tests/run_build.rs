@@ -19,6 +19,7 @@ use spicerack_ir::{
     Ref, Role, Save, ScopeId, ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary,
     VaryDist,
 };
+use spicerack_ir::{Reset, ResetSet, Restorable};
 
 // ---- private ----
 
@@ -210,7 +211,8 @@ fn state_items_hold_their_fields() {
     let (mut d, top) = deck();
     let mut b = d.builder();
     let (v, t85, t27) = (b.num(1e-3), b.num(85.0), b.num(27.0));
-    let al = b.alter(top, Target::TEMP, t85, Span::NONE);
+    let r1 = b.target(TargetKind::ElementValue, &[], "r1", None);
+    let al = b.alter(top, r1, t85, Span::NONE);
     let op = b.option(top, OptionKey::RelTol, v, Span::NONE);
     let fl = b.option(top, OptionKey::Klu, ExprId::NONE, Span::NONE);
     let pr = b.option_private(top, "xyce", "timeint.reltol", v, Span::NONE);
@@ -227,7 +229,7 @@ fn state_items_hold_their_fields() {
     assert_eq!(
         d.row::<Alter>(al.index),
         Alter {
-            target: Target::TEMP,
+            target: r1,
             value: t85
         }
     );
@@ -321,10 +323,11 @@ fn outputs_hold_their_probes() {
         b.probe_v(&["out"]),
         b.probe_i(&["v1"]).with_part(AcPart::Mag),
     ];
-    let all = b.save(top, AnalysisKinds::ALL, &p, Span::NONE);
+    let all = b.save(top, AnalysisKinds::ALL, Applies::WholeRun, &p, Span::NONE);
     let tr = b.save(
         top,
         AnalysisKinds::of(&[AnalysisKind::Tran]),
+        Applies::FromHere,
         &p[..1],
         Span::NONE,
     );
@@ -332,8 +335,10 @@ fn outputs_hold_their_probes() {
     let s: Save = d.row(all.index);
     assert_eq!(s.analyses, AnalysisKinds::ALL);
     assert_eq!(d.probes(s.probes), &p);
+    assert_eq!(s.holds, Applies::WholeRun);
     let s: Save = d.row(tr.index);
     assert_eq!(s.analyses.iter().collect::<Vec<_>>(), [AnalysisKind::Tran]);
+    assert_eq!(s.holds, Applies::FromHere);
     let q: Print = d.row(pr.index);
     assert_eq!((q.analysis, q.view), (AnalysisKind::Hb, PrintView::HbTime));
     assert_eq!(d.probes(q.probes), &p);
@@ -343,7 +348,8 @@ fn outputs_hold_their_probes() {
 #[should_panic(expected = "no probe")]
 fn a_save_of_nothing_asserts() {
     let (mut d, top) = deck();
-    d.builder().save(top, AnalysisKinds::ALL, &[], Span::NONE);
+    d.builder()
+        .save(top, AnalysisKinds::ALL, Applies::WholeRun, &[], Span::NONE);
 }
 
 #[test]
@@ -352,7 +358,13 @@ fn a_save_for_no_analysis_asserts() {
     let (mut d, top) = deck();
     let mut b = d.builder();
     let p = b.probe_v(&["out"]);
-    b.save(top, AnalysisKinds::EMPTY, &[p], Span::NONE);
+    b.save(
+        top,
+        AnalysisKinds::EMPTY,
+        Applies::WholeRun,
+        &[p],
+        Span::NONE,
+    );
 }
 
 #[test]
@@ -470,4 +482,35 @@ fn statistics_and_dc_hold_their_lists() {
     let got = d.detail::<Dc>(h.detail);
     assert!(got.restart);
     assert_eq!(d.dc_axes(got.axes)[0].target, src);
+}
+
+#[test]
+fn a_reset_holds_its_classes_in_declaration_order() {
+    let (mut d, top) = deck();
+    let mut b = d.builder();
+    let set = ResetSet::of(&[Restorable::Saves, Restorable::Values, Restorable::Saves]);
+    let r = b.reset(top, set, Span::NONE);
+    let row: Reset = d.row(r.index);
+    assert_eq!(
+        row.restores.iter().collect::<Vec<_>>(),
+        [Restorable::Values, Restorable::Saves]
+    );
+    assert!(ResetSet::ALL.iter().eq(Restorable::ALL));
+    assert!(ResetSet::EMPTY.is_empty() && ResetSet::ALL.contains(Restorable::Values));
+}
+
+#[test]
+#[should_panic(expected = "no class")]
+fn a_reset_of_no_class_asserts() {
+    let (mut d, top) = deck();
+    d.builder().reset(top, ResetSet::EMPTY, Span::NONE);
+}
+
+#[test]
+#[should_panic(expected = "Env or option row")]
+fn an_alter_of_the_temperature_asserts() {
+    let (mut d, top) = deck();
+    let mut b = d.builder();
+    let v = b.num(85.0);
+    b.alter(top, Target::TEMP, v, Span::NONE);
 }

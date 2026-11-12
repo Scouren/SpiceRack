@@ -71,7 +71,7 @@ fn index_and_from_index_are_inverses() {
     let last = Feature::from_index(Feature::COUNT - 1);
     assert_eq!(
         last,
-        Feature::Placed(spicerack_ir::ScopeKind::Loop, ItemKind::Elaborate)
+        Feature::Placed(spicerack_ir::ScopeKind::Loop, ItemKind::Reset)
     );
     assert_ne!(
         Feature::Func(Func::Sin).index(),
