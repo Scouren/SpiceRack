@@ -688,8 +688,11 @@ mod tests {
         let push_bin = |b: &mut spicerack_ir::Builder<'_>, name: &str| {
             let name = b.name(name);
             let bin_of = b.name("nch");
+            // a versioned family states its version
+            let version = b.string("4.8.3");
             let row = spicerack_ir::Model {
                 bin_of,
+                version,
                 ..model(name, ModelFamily::Bsim4, Polarity::N)
             };
             b.model(top, row, Span::NONE)

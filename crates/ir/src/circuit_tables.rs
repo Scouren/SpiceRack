@@ -6,7 +6,8 @@
 //! Cites: `rewrite/AMEND-A12.md` C5, A19; `rewrite/IR-CIRCUIT.md` §3a, §4a; `model.rs` family
 //! docs.
 //!
-//! Contents (crate-private): `pub(crate) fn has_polarity`, `pub(crate) fn versioned`,
+//! Contents (crate-private): `pub(crate) fn has_polarity`, `pub(crate) fn needs_version`,
+//! `pub(crate) const VERSIONS`, `pub(crate) fn versioned`,
 //! `pub(crate) fn typed_key`, `pub(crate) fn library_free`, `pub(crate) fn builtin_kind`,
 //! `pub(crate) fn builtin_fits`,
 //! `pub(crate) fn bound_family`
@@ -15,6 +16,39 @@ use crate::circuit_fields::Fields;
 use crate::design::Design;
 use crate::element::{DetailKind, ElemKind};
 use crate::model::{Model, ModelFamily};
+
+/// The generator's version vocabulary: per family, the model standard's versions a simulator is
+/// known to accept, so a generated design names a device that exists. Data, not a `check` rule
+/// (a version outside it is legal IR; a dialect's `admits` decides what it runs). A versioned
+/// family without a row draws a fresh string. Provenance: ngspice-45 (tarball sha256
+/// f1aad8ab…, `src/spicelib/`), as `ng-models` read it: parser/inpdomod.c (dispatch by level
+/// and version prefix), bsim3v32/b3v32set.c:86-92, bsim3/b3check.c:49, bsim4v5/b4v5check.c:64-69,
+/// bsim4v6/b4v6check.c:815, bsim4v7/b4v7check.c:834, bsim4/b4check.c:68-70,
+/// hisimhv1/hsmhvset.c:76-81, hisimhv2/hsmhv2set.c:136-150, hisim2/hsm2set.c:132-138,
+/// hicum2/hicum2setup.c:45, bsimsoi/b4soiset.c:124, b3soi{fd,dd,pd}set.c:69,
+/// vbic/vbicsetup.c:360.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) const VERSIONS: [(ModelFamily, &[&str]); 10] = [
+    (
+        ModelFamily::Bsim3,
+        &["3.0", "3.1", "3.2", "3.2.2", "3.2.3", "3.2.4", "3.3.0"],
+    ),
+    (
+        ModelFamily::Bsim4,
+        &[
+            "4.0.0", "4.1.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.6.5", "4.7.0", "4.8.0",
+            "4.8.1", "4.8.2", "4.8.3",
+        ],
+    ),
+    (ModelFamily::HisimHv, &["1.24", "2.20"]),
+    (ModelFamily::Hisim2, &["280"]),
+    (ModelFamily::Hicum2, &["2.4.0"]),
+    (ModelFamily::B4Soi, &["4.4"]),
+    (ModelFamily::B3SoiFd, &["2.0"]),
+    (ModelFamily::B3SoiDd, &["2.0"]),
+    (ModelFamily::B3SoiPd, &["2.0"]),
+    (ModelFamily::Vbic, &["1.2"]),
+];
 
 /// Whether a family's models are n- or p-type (transistors); `Other` may be either way.
 pub(crate) fn has_polarity(f: ModelFamily) -> bool {
@@ -100,6 +134,13 @@ pub(crate) fn has_polarity(f: ModelFamily) -> bool {
         | F::Module
         | F::Other => false,
     }
+}
+
+/// Whether a model of `f` must state its version (round 7, ng-models' L5 finding): a versioned
+/// family of a model standard, where "no version" would be each simulator's own default. A
+/// `Module` or `Other` model may state one but need not.
+pub(crate) fn needs_version(f: ModelFamily) -> bool {
+    versioned(f) && !matches!(f, ModelFamily::Module | ModelFamily::Other)
 }
 
 /// Whether a family has more than one version, so `Model::version` names one (BSIM, SOI, HiSIM,

@@ -65,6 +65,10 @@ pub enum CircuitExtra {
     SourceParasitics,
     /// A behavioural source's parallel resistance (`Behav::rpar`, lt, D101).
     BehavRpar,
+    /// A behavioural source whose expression reads a parameter outside `ToReal` and `ToInt`
+    /// (A33, R56): VACASK types every identifier of a behavioural expression, ngspice's B
+    /// source never does.
+    BehavUntypedParam,
     // couplings
     /// A coupling of three or more inductors on one row (xy, lt; ngspice expands, D56).
     CouplingMany,
@@ -108,6 +112,9 @@ pub enum CircuitExtra {
     AmPreZero,
     /// An AM whose modulation time is shifted by the carrier phase (`AmModTime::CarrierPhase`, sp).
     AmModCarrierPhase,
+    /// An AM whose `mod_offset` is not the real literal 1 (an Int `1i` sets it too; A31): VACASK's AM is
+    /// `sinedc + ampl·sin(carrier)·(1 + modindex·sin(mod))`, ngspice's takes any offset.
+    AmModOffset,
     /// A PWL delay (`Pwl::delay`, E7).
     PwlDelay,
     /// A PWL replaying from a time (`PwlRepeat::From`, 5.11).
@@ -257,7 +264,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 106] = [
+    pub const ALL: [CircuitExtra; 108] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -282,6 +289,7 @@ impl CircuitExtra {
         CircuitExtra::ElementParasitics,
         CircuitExtra::SourceParasitics,
         CircuitExtra::BehavRpar,
+        CircuitExtra::BehavUntypedParam,
         CircuitExtra::CouplingMany,
         CircuitExtra::CouplingCore,
         CircuitExtra::SourceTc,
@@ -302,6 +310,7 @@ impl CircuitExtra {
         CircuitExtra::AmPreHold,
         CircuitExtra::AmPreZero,
         CircuitExtra::AmModCarrierPhase,
+        CircuitExtra::AmModOffset,
         CircuitExtra::PwlDelay,
         CircuitExtra::PwlRepeatFrom,
         CircuitExtra::PwlRepeatPeriod,

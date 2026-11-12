@@ -641,6 +641,25 @@ mod tests {
         (X::BehavRpar, |b, t, on| {
             behav_el(b, t, OutKind::Voltage, false, on, false)
         }),
+        (X::BehavUntypedParam, |b, t, on| {
+            // A33: the bare read; its neighbour the read under `to_real`
+            let one = n(b, 1);
+            b.param(t, "p", one, Span::NONE);
+            let p = b.param_ref("p");
+            let read = if on {
+                p
+            } else {
+                b.call(spicerack_ir::Func::ToReal, &[p])
+            };
+            let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+            b.behav(
+                t,
+                ElemKind::Behav,
+                h,
+                behav(read, OutKind::Voltage),
+                Span::NONE,
+            );
+        }),
         (X::CouplingMany, |b, t, on| {
             let one = n(b, 1);
             let inductors = if on {
@@ -881,6 +900,15 @@ mod tests {
                 },
                 PreDelay::Zero,
             );
+            let w = b.wave(r);
+            with_wave(b, t, w)
+        }),
+        (X::AmModOffset, |b, t, on| {
+            // A31: an offset of 2; its neighbour the literal 1 (VACASK's only offset)
+            let mut r = am(b, AmModTime::Delay, PreDelay::Zero);
+            if on {
+                r.mod_offset = n(b, 2);
+            }
             let w = b.wave(r);
             with_wave(b, t, w)
         }),
@@ -1718,5 +1746,83 @@ mod tests {
         };
         assert!(!with(false), "a behavioural source");
         assert!(with(true), "a resistor");
+    }
+
+    /// A33 (R56): a behavioural source whose expression reads a parameter outside `ToReal` and
+    /// `ToInt` states `BehavUntypedParam`; neighbours: the read under `to_real`, and a resistor
+    /// valued by the bare read (the feature is the behavioural source's own).
+    #[test]
+    fn an_untyped_parameter_read_in_a_behavioural_source() {
+        let used = |case: fn(&mut Builder<'_>, ScopeId)| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            case(&mut d.builder(), top);
+            features_used(&d).contains(Feature::Circuit(X::BehavUntypedParam))
+        };
+        fn behav_reading(b: &mut Builder<'_>, top: ScopeId, typed: bool) {
+            let one = n(b, 1);
+            b.param(top, "p", one, Span::NONE);
+            let p = b.param_ref("p");
+            let read = if typed {
+                b.call(spicerack_ir::Func::ToReal, &[p])
+            } else {
+                p
+            };
+            let v = b.v("a", None);
+            let e = b.binary(spicerack_ir::BinOp::Mul, read, v);
+            let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+            b.behav(
+                top,
+                ElemKind::Behav,
+                h,
+                behav(e, OutKind::Voltage),
+                Span::NONE,
+            );
+        }
+        assert!(used(|b, t| behav_reading(b, t, false)));
+        assert!(!used(|b, t| behav_reading(b, t, true)));
+        assert!(!used(|b, top| {
+            let one = n(b, 1);
+            b.param(top, "p", one, Span::NONE);
+            let p = b.param_ref("p");
+            let h = b.head("r1", &["a", "0"], None, &[], ExprId::NONE);
+            b.passive(
+                top,
+                ElemKind::Resistor,
+                h,
+                Passive {
+                    value: p,
+                    ..Passive::PLAIN
+                },
+                Span::NONE,
+            );
+        }));
+    }
+
+    /// A31 as ruled after vc-sources' gap: `AmModOffset` fires for every modulating offset but
+    /// the real literal 1 (VACASK's reader fills that one and its writer spells none): `1`
+    /// (Plain) no, `1i` (Int) yes, `1.5` yes.
+    #[test]
+    fn the_am_offset_is_free_only_as_the_real_literal_one() {
+        use spicerack_ir::{Literal, NumForm};
+        let with = |offset: Literal| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            let mut r = am(&mut b, AmModTime::Delay, PreDelay::Zero);
+            r.mod_offset = b.literal(offset);
+            let w = b.wave(r);
+            with_wave(&mut b, top, w);
+            features_used(&d).contains(Feature::Circuit(X::AmModOffset))
+        };
+        let lit = |mantissa: i64, frac: u8, form: NumForm| Literal {
+            mantissa,
+            frac,
+            exp10: 0,
+            form,
+        };
+        assert!(!with(lit(1, 0, NumForm::Plain)), "1");
+        assert!(with(lit(1, 0, NumForm::Int)), "1i");
+        assert!(with(lit(15, 1, NumForm::Plain)), "1.5");
     }
 }
