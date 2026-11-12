@@ -1,0 +1,7 @@
+# codes:
+file "sens.sp" deck
+  title "sens"
+  comment " oracle: ngspice-45 inp2dot.c dot_sens (output, then nothing, dc, or ac DEC|OCT|LIN np fstart fstop)"
+  analysis sens (v (b))
+  analysis sens (i (v1))
+  analysis sens_ac (vdiff (a) (b)) (dec start=1 stop=1k points=10)

@@ -1,0 +1,6 @@
+# codes:
+file "noise.sp" deck
+  title "noise"
+  comment " oracle: ngspice-45 inp2dot.c dot_noise (v(out[,ref]) src DEC|OCT|LIN np fstart fstop [ptspersum]); manual 15.3.4 (input noise to a unit source)"
+  analysis noise (v (out)) source=v1 (dec start=1 stop=1meg points=10)
+  analysis noise (vdiff (a) (b)) source=vin (lin start=1 stop=10 points=5) points_per_summary=2

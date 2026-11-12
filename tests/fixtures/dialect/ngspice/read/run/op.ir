@@ -1,0 +1,5 @@
+# codes:
+file "op.sp" deck
+  title "op"
+  comment " oracle: ngspice-45 inp2dot.c dot_op (no argument)"
+  analysis op

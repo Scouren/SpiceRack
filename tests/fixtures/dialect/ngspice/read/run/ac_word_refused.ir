@@ -1,0 +1,5 @@
+# codes: P1300
+file "ac_word_refused.sp" deck
+  title "ac_word_refused"
+  comment " oracle: ngspice-45 inp2dot.c:200 (Missing DEC, OCT, or LIN); run: .ac decade 2 1 10 is circuit not parsed"
+  opaque ngspice invalid_in_source ".ac decade 2 1 10"

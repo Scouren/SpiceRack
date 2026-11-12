@@ -1,0 +1,3 @@
+pss
+* oracle: ngspice-45 inp2dot.c dot_pss (sc_iter and steady_coeff have no Pss field)
+.pss 1k 1m b 64 10 50 1e-3

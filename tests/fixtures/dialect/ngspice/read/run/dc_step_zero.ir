@@ -1,0 +1,5 @@
+# codes: P1300
+file "dc_step_zero.sp" deck
+  title "dc_step_zero"
+  comment " oracle: ngspice-45 inp2dot.c:313 (a zero step is Bad syntax), inp2dot.c:884-888"
+  opaque ngspice invalid_in_source ".dc v1 0 5 0"

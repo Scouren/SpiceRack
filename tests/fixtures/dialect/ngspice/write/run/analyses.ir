@@ -1,0 +1,15 @@
+# oracle: ngspice-45 inp2dot.c (each card's positional form), traninit.c:29 (the ngspice cap is the default ceiling); written by hand
+file "analyses.sp" deck
+  title "analyses"
+  param tstop = 2u
+  analysis op
+  analysis dc (source_dc v1) (lin start=-1 stop=1 step=0.5) (temp) (lin start=0 stop=50 step=25)
+  analysis ac (lin start=0 stop=1k points=11)
+  analysis tran stop=(tstop * 2) record_start=0 print_step=1n max_step=10n cap=ngspice_rule uic
+  analysis noise (vdiff (a) (b)) source=vin (oct start=1 stop=10 points=5) points_per_summary=2
+  analysis tf (i (vx)) source=vin
+  analysis sens_ac (v (x1 b)) (dec start=1 stop=1k points=10)
+  analysis pz nodes current zeros in_p=in in_n=0 out_p=out out_n=0
+  analysis disto (dec start=1k stop=10k points=5) f2_over_f1=0.9
+  analysis sp (lin start=1 stop=10 points=2) noise
+  analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (i (v1))

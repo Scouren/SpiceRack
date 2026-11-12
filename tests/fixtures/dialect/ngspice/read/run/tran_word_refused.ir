@@ -1,0 +1,5 @@
+# codes: P1300
+file "tran_word_refused.sp" deck
+  title "tran_word_refused"
+  comment " oracle: ngspice-45 inp2dot.c:441-447 (unknown parameter on .tran); run: circuit not parsed"
+  opaque ngspice invalid_in_source ".tran 1u 10u bogus"
