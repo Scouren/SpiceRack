@@ -1,0 +1,4 @@
+file "a.sp" deck
+  option rel_tol value=1m whole_run
+  nodeset nodeset every_op node=(a) value=0.5 whole_run
+  analysis op

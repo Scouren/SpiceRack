@@ -8,7 +8,8 @@
 //! Left with a `HOLDS_RUN_ITEMS` note: a circuit item between run items that holds run items in
 //! its body or includes a file that does (moving it would move them in listed order).
 //!
-//! Cites: `rewrite/AMEND-A12.md` A22; `crates/ir/src/state_order.rs` (`interleaved_features`).
+//! Cites: `rewrite/AMEND-A12.md` A22; `crates/ir/src/state_order.rs` (`interleaved_features`,
+//! `listed`: the classes the feature counts by).
 //!
 //! Contents: `pub fn run_items_together(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub const HOLDS_RUN_ITEMS: ir::Code`
@@ -16,20 +17,10 @@
 use std::collections::HashSet;
 
 use crate::ir;
+use crate::ir::{Listed, listed};
 
 /// The note at a circuit item between run items that holds or includes run items.
 pub const HOLDS_RUN_ITEMS: ir::Code = ir::Code::new(b'U', 404);
-
-/// How an item counts between run items (`state_order.rs`'s classes).
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Listed {
-    /// A run owner's statement kind.
-    Run,
-    /// A comment or an opaque: stands anywhere.
-    Neutral,
-    /// Anything else: a circuit item.
-    Other,
-}
 
 /// Moves each file top's circuit items out from between its run items.
 pub fn run_items_together(design: &mut ir::Design, diags: &mut ir::Diags) {
@@ -67,40 +58,6 @@ pub fn run_items_together(design: &mut ir::Design, diags: &mut ir::Diags) {
 }
 
 // ---- private ----
-
-/// Each kind's class.
-// ponytail: a copy of the IR's crate-private `state_order::listed`; the fixtures and the laws
-// pin it (a wrong class leaves `RunInterleaved` or adds it); it goes when the IR exports it.
-const fn listed(kind: ir::ItemKind) -> Listed {
-    use ir::ItemKind as K;
-    match kind {
-        K::Analysis
-        | K::Loop
-        | K::Alter
-        | K::Option
-        | K::Env
-        | K::NodeSet
-        | K::Save
-        | K::Print
-        | K::Measure
-        | K::Elaborate
-        | K::Reset => Listed::Run,
-        K::Comment | K::Opaque => Listed::Neutral,
-        K::Title
-        | K::Include
-        | K::Global
-        | K::Load
-        | K::Subckt
-        | K::Section
-        | K::If
-        | K::Param
-        | K::Func
-        | K::Model
-        | K::DeviceLibrary
-        | K::Statistics
-        | K::Element => Listed::Other,
-    }
-}
 
 /// The items that hold a run item in a body (any depth) or include a file whose items do.
 fn holders(design: &ir::Design) -> HashSet<ir::ItemRef> {

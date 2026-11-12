@@ -1,0 +1,5 @@
+file "a.sp" deck
+  nodeset nodeset every_op node=(a) value=0.5 whole_run
+  analysis op
+  env temp=50 whole_run
+  analysis op

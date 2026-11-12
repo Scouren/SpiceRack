@@ -20,6 +20,7 @@
 //! Contents: tests only (`settle`, the settle decks' facts; `save_plans`, the seeded save
 //! property).
 
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -43,6 +44,15 @@ const SETTLE: &str = "tests/fixtures/dialect/vacask/settle/run";
 /// Reader fixtures that fail for a cause outside this area, each with its cause; strict both
 /// ways.
 const KNOWN: &[(&str, &str)] = &[];
+
+/// Writer fixtures that fail for a cause outside this area, each with its cause; strict both
+/// ways.
+const KNOWN_WRITE: &[(&str, &str)] = &[(
+    "generated",
+    "its unnamed analyses, DC axes and loop are AnalysisUnnamed, DcAxisUnnamed, LoopUnnamed \
+     (A35, R59), which VACASK lacks and no pass yet removes: legalize refuses them until the \
+     run group's naming rows land and W2301/W2302 go",
+)];
 
 /// Settle decks the round trip cannot run yet, each with its cause; strict both ways.
 const KNOWN_TRIP: &[(&str, &str)] = &[];
@@ -363,12 +373,15 @@ fn every_writer_fixture_writes_its_text() {
     for path in files(WRITE, "ir") {
         let want = std::fs::read_to_string(path.with_extension("sim")).expect("a .sim beside");
         let (mut design, _) = read("want.ir", &std::fs::read_to_string(&path).unwrap(), "ir");
-        let got = write_entry(&mut design);
-        if got != want {
-            failed.push((stem(&path), format!("--- got\n{got}--- want\n{want}")));
+        match catch_unwind(AssertUnwindSafe(|| write_entry(&mut design))) {
+            Ok(got) if got == want => {}
+            Ok(got) => failed.push((stem(&path), format!("--- got\n{got}--- want\n{want}"))),
+            Err(_) => failed.push((stem(&path), "legalize or write refused".to_string())),
         }
     }
-    assert!(failed.is_empty(), "{failed:#?}");
+    let names: Vec<&str> = failed.iter().map(|f| f.0.as_str()).collect();
+    let known: Vec<&str> = KNOWN_WRITE.iter().map(|k| k.0).collect();
+    assert_eq!(names, known, "{failed:#?}");
 }
 
 // ---- the simulator round trip ----

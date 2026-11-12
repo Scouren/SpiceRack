@@ -1,0 +1,6 @@
+file "a.sp" deck
+  option rel_tol value=1m whole_run
+  env temp=50
+  analysis op
+  env tnom=30 whole_run
+  analysis op

@@ -1,7 +1,8 @@
 //! Rule `names_dropped`: statement names a target cannot spell dropped, each with a
 //! `NAME_DROPPED` note at its item whose argument is the old name's id (the rename map as data,
 //! A32: the run side gives the results back under the source's names). Three rows, each
-//! removing its feature and requiring nothing:
+//! removing its feature and requiring its unnamed twin (`AnalysisUnnamed`, `DcAxisUnnamed`,
+//! `LoopUnnamed`: A35, R59):
 //! - `analysis_name_dropped` (`AnalysisNamed`, A16): `Analysis::name` cleared;
 //! - `dc_axis_name_dropped` (`DcAxisNamed`, A22): every axis's `DcAxis::name` of a DC analysis
 //!   cleared (one note per named axis, at the analysis);

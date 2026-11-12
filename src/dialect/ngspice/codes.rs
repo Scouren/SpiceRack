@@ -18,7 +18,7 @@
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
 //! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
-//! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `TEXT_VALUE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
+//! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, write_control,
@@ -76,9 +76,6 @@ pub(super) const DUPLICATE_ELEMENT: Code = Code::new(b'R', 1004);
 /// greater 1000 for dependent parameters"): `InvalidInSource`.
 pub(super) const DEFAULT_CYCLE: Code = Code::new(b'R', 1005);
 
-/// A string or list value where ngspice reads an expression (a `.param`, head default, `.if`
-/// or `.func`): numparam has no string or vector values.
-pub(super) const TEXT_VALUE: Code = Code::new(b'W', 1006);
 /// An expression holding a node the evaluator its class picks cannot spell: a draw in a value
 /// that reads the temperature or the circuit (the B-source parser has no `unif`).
 pub(super) const UNSPELLED_VALUE: Code = Code::new(b'W', 1007);
@@ -138,12 +135,6 @@ pub(super) const CODES: &[Row] = &[
         "a .global of ground only",
         "ngspice-45 inpcom.c inp_fix_gnd_name",
         "ground is global already; kept as Inert text.",
-    ),
-    refusal(
-        TEXT_VALUE,
-        "a string or list where ngspice reads an expression",
-        "ngspice-45 xpressn.c formula",
-        "a .param, head default, .if condition or .func body is a number expression; refused.",
     ),
     refusal(
         UNSPELLED_VALUE,

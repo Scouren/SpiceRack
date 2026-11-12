@@ -207,7 +207,8 @@ fn pending(sub: &str) -> Vec<&'static str> {
 fn a_node_set_that_holds_from_its_place_on_is_refused() {
     // Oracle: ngspice-45 commands.c (the script commands: no `ic` or `nodeset`; a node's
     // condition is the `.ic`/`.nodeset` card, which holds for the whole run, R24). The law L5's
-    // seed 0 wrote one as a card, which read back whole-run.
+    // seed 0 wrote one as a card, which read back whole-run. Since the per-kind split it is
+    // `NodeSetFromHere`, which ngspice's FEATURES lack: refused by the feature (U0001), not W1303.
     for item in [
         "nodeset nodeset every_op value=1",
         "nodeset ic transient node=(b) value=0.5",
@@ -218,8 +219,13 @@ fn a_node_set_that_holds_from_its_place_on_is_refused() {
         );
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
-        let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
-        assert_eq!(codes, ["W1303"], "{item}");
+        let from_here = u32::from(ir::Feature::Run(ir::RunExtra::NodeSetFromHere).index());
+        let rows: Vec<(String, u32)> = diags
+            .rows()
+            .iter()
+            .map(|r| (r.code.to_string(), r.arg))
+            .collect();
+        assert_eq!(rows, [("U0001".to_string(), from_here)], "{item}");
     }
 }
 

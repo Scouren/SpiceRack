@@ -4,12 +4,12 @@
 //!   it, a next-only `FromHere` copy of every beyond-next condition in force there (a
 //!   `WholeRun` one: the last of its node; a `FromHere` one: the last before the analysis),
 //!   unless a next-only condition of that node already stands for it; the beyond-next items go.
-//!   Requires `Run(IcNextOnly)`, `Run(StateFromHere)`, `Run(NodeSetMidRun)` (the copies).
+//!   Requires `Run(IcNextOnly)`, `Run(NodeSetFromHere)`, `Run(NodeSetMidRun)` (the copies).
 //! - `ic_next_only_to_beyond` removes `Run(IcNextOnly)`: a `FromHere` next-only condition whose
 //!   next analysis is the walk's last becomes beyond-next (it then holds for that analysis
 //!   alone, as before). Requires `Run(IcBeyondNext)`.
 //!
-//! Listed order and the walks are `whole_run_state_first`'s (`walks`). Left with a note
+//! Listed order and the walks are the IR's (`ir::run_walks`). Left with a note
 //! (`IC_KEPT`), all of a walk's conditions together so no node mixes the two forms: a
 //! condition or an analysis of the walk not listed in its top scope (a body or loop: a copy
 //! there would be a placement the design may lack), a value holding a draw (a copy per
@@ -21,7 +21,6 @@
 //! Contents: `pub fn ic_beyond_next_to_next_only(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn ic_next_only_to_beyond(&mut ir::Design, &mut ir::Diags)`, `pub const IC_KEPT: ir::Code`
 
-use super::whole_run_state_first::walks;
 use crate::ir;
 
 /// The note at a condition the rule leaves in its form.
@@ -29,7 +28,7 @@ pub const IC_KEPT: ir::Code = ir::Code::new(b'U', 406);
 
 /// Replaces each walk's beyond-next conditions by next-only copies before each analysis.
 pub fn ic_beyond_next_to_next_only(design: &mut ir::Design, diags: &mut ir::Diags) {
-    for (top, order) in walks(design) {
+    for (top, order) in ir::run_walks(design) {
         let sets: Vec<(ir::ItemRef, ir::ScopeId)> = order
             .iter()
             .copied()
@@ -113,7 +112,7 @@ pub fn ic_beyond_next_to_next_only(design: &mut ir::Design, diags: &mut ir::Diag
 /// Makes a next-only condition before a walk's last analysis beyond-next.
 pub fn ic_next_only_to_beyond(design: &mut ir::Design, diags: &mut ir::Diags) {
     let mut change = Vec::new();
-    for (top, order) in walks(design) {
+    for (top, order) in ir::run_walks(design) {
         let next: Vec<ir::ItemRef> = order
             .iter()
             .map(|p| p.0)

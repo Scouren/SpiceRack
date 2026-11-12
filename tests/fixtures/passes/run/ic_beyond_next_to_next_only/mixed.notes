@@ -1,1 +1,2 @@
-U0406  # a: whole-run and next-only on one node
+U0406  # a: whole-run and from-here on one node (the whole-run one)
+U0406  # a: the from-here one

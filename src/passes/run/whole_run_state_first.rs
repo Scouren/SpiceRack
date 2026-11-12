@@ -1,7 +1,10 @@
 //! Rule `whole_run_state_first`: state items that hold for the whole run (`Applies::WholeRun`:
-//! options, `Env`, node sets, saves) made positional. Three rows:
-//! - `whole_run_state_first` removes `Run(WholeRunMidRun)`: every `WholeRun` item after a run
-//!   item (an analysis, loop or alter) in listed order moves to just before the first run item,
+//! options, `Env`, node sets, saves) made positional. Two bodies, one row per item kind each
+//! (a row removes one feature, and the mode features are per kind: ir-run 7f9aed10):
+//! - `whole_run_option_first`, `whole_run_env_first`, `whole_run_node_set_first`,
+//!   `whole_run_save_first` remove `Run(OptionWholeRunMidRun)`, `EnvWholeRunMidRun`,
+//!   `NodeSetWholeRunMidRun`, `SaveWholeRunMidRun`: every `WholeRun` item of the row's kind
+//!   after a run item (an analysis, loop or alter) in listed order moves to just before the first run item,
 //!   still `WholeRun`, in its listed order. Exact: a `WholeRun` item holds wherever it stands,
 //!   and among items that set one thing the last in listed order holds, which the move keeps
 //!   (every moved item stays after every item that stood before the first run item). Requires
@@ -11,29 +14,29 @@
 //!   across files or out of a body would change what includes it), a next-only node set (it
 //!   holds for the analysis after it: a move would change which), and an item a kept one of
 //!   the same thing stands before (the move would make the kept one the last).
-//! - `whole_run_to_from_here` removes `Run(StateWholeRun)` and `whole_run_save_to_from_here`
-//!   removes `Run(SaveWholeRun)`: a `WholeRun` option, `Env` or node set (or save) standing before
-//!   every run item becomes `FromHere` (requires `Run(StateFromHere)`, `Run(SaveFromHere)`).
+//! - `whole_run_option_to_from_here`, `whole_run_env_to_from_here`,
+//!   `whole_run_node_set_to_from_here`, `whole_run_save_to_from_here` remove `Run(OptionWholeRun)`,
+//!   `EnvWholeRun`, `NodeSetWholeRun`, `SaveWholeRun`: a `WholeRun` item of the row's kind standing
+//!   before every run item becomes `FromHere` (requires the kind's `*FromHere`).
 //!   Exact there: it holds for every run item after it, that is for all of them. Left with a
 //!   note: one after a run item (`MID_RUN`), one whose class a `Reset` of the walk restores
 //!   (`RESET_RESTORES`: a reset drops `FromHere` state, never `WholeRun`), one a `FromHere` item
 //!   of the walk sets the same thing as (`FROM_HERE_SAME`: which of the two holds is not
 //!   stated by the IR, so the item keeps its mode).
 //!
-//! Listed order is the IR's (`Applies` docs, `state_order.rs`): per deck file its items depth
-//! first, each body right after its item, an `Include` read as the items of the file it names
-//! in place; a file no deck includes is walked alone.
+//! Listed order is the IR's (`ir::run_walks`): per deck file its items depth first, each body
+//! right after its item, an `Include` read as the items of the file it names in place; a file
+//! no deck includes is walked alone.
 //!
 //! Cites: `rewrite/AMEND-A12.md` A14, A22, A27, A28; R24, R26; `rewrite/IR-RUN.md` §1.
 //!
-//! Contents: `pub fn whole_run_state_first(&mut ir::Design, &mut ir::Diags)`,
-//! `pub fn whole_run_to_from_here(&mut ir::Design, &mut ir::Diags)`,
-//! `pub fn whole_run_save_to_from_here(&mut ir::Design, &mut ir::Diags)`,
+//! Contents: `pub fn whole_run_option_first`, `pub fn whole_run_env_first`,
+//! `pub fn whole_run_node_set_first`, `pub fn whole_run_save_first`,
+//! `pub fn whole_run_option_to_from_here`, `pub fn whole_run_env_to_from_here`,
+//! `pub fn whole_run_node_set_to_from_here`, `pub fn whole_run_save_to_from_here` (each
+//! `(&mut ir::Design, &mut ir::Diags)`),
 //! `pub const STATE_ELSEWHERE: ir::Code`, `pub const MID_RUN: ir::Code`,
-//! `pub const RESET_RESTORES: ir::Code`, `pub const FROM_HERE_SAME: ir::Code`; to the group:
-//! `pub(super) fn walks(&ir::Design) -> Vec<(ir::ScopeId, Vec<(ir::ItemRef, ir::ScopeId)>)>`
-
-use std::collections::{HashMap, HashSet};
+//! `pub const RESET_RESTORES: ir::Code`, `pub const FROM_HERE_SAME: ir::Code`
 
 use crate::ir;
 
@@ -46,9 +49,51 @@ pub const RESET_RESTORES: ir::Code = ir::Code::new(b'U', 402);
 /// The note at a `WholeRun` item a `FromHere` item of its walk sets the same thing as.
 pub const FROM_HERE_SAME: ir::Code = ir::Code::new(b'U', 403);
 
-/// Moves each walk's mid-run `WholeRun` items to just before its first run item.
-pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
-    for (top, order) in walks(design) {
+/// Moves each walk's mid-run `WholeRun` options to just before its first run item.
+pub fn whole_run_option_first(design: &mut ir::Design, diags: &mut ir::Diags) {
+    move_first(design, diags, ir::ItemKind::Option);
+}
+
+/// Moves each walk's mid-run `WholeRun` `Env`s to just before its first run item.
+pub fn whole_run_env_first(design: &mut ir::Design, diags: &mut ir::Diags) {
+    move_first(design, diags, ir::ItemKind::Env);
+}
+
+/// Moves each walk's mid-run `WholeRun` node sets to just before its first run item.
+pub fn whole_run_node_set_first(design: &mut ir::Design, diags: &mut ir::Diags) {
+    move_first(design, diags, ir::ItemKind::NodeSet);
+}
+
+/// Moves each walk's mid-run `WholeRun` saves to just before its first run item.
+pub fn whole_run_save_first(design: &mut ir::Design, diags: &mut ir::Diags) {
+    move_first(design, diags, ir::ItemKind::Save);
+}
+
+/// Makes each walk's leading `WholeRun` options `FromHere`.
+pub fn whole_run_option_to_from_here(design: &mut ir::Design, diags: &mut ir::Diags) {
+    to_from_here(design, diags, ir::ItemKind::Option);
+}
+
+/// Makes each walk's leading `WholeRun` `Env`s `FromHere`.
+pub fn whole_run_env_to_from_here(design: &mut ir::Design, diags: &mut ir::Diags) {
+    to_from_here(design, diags, ir::ItemKind::Env);
+}
+
+/// Makes each walk's leading `WholeRun` node sets `FromHere`.
+pub fn whole_run_node_set_to_from_here(design: &mut ir::Design, diags: &mut ir::Diags) {
+    to_from_here(design, diags, ir::ItemKind::NodeSet);
+}
+
+/// Makes each walk's leading `WholeRun` saves `FromHere`.
+pub fn whole_run_save_to_from_here(design: &mut ir::Design, diags: &mut ir::Diags) {
+    to_from_here(design, diags, ir::ItemKind::Save);
+}
+
+// ---- private ----
+
+/// The `whole_run_*_first` body over the `WholeRun` items of `kind`.
+fn move_first(design: &mut ir::Design, diags: &mut ir::Diags, kind: ir::ItemKind) {
+    for (top, order) in ir::run_walks(design) {
         let Some(first) = order.iter().position(|&(i, _)| is_run(i.kind)) else {
             continue;
         };
@@ -56,7 +101,7 @@ pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
         let mut moved = Vec::new();
         let mut kept: Vec<ir::ItemRef> = Vec::new();
         for &(item, scope) in &order[first + 1..] {
-            if holds(design, item) != Some(ir::Applies::WholeRun) {
+            if item.kind != kind || holds(design, item) != Some(ir::Applies::WholeRun) {
                 continue;
             }
             // a next-only condition holds for the analysis after it: a move would change which
@@ -89,84 +134,6 @@ pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
     }
 }
 
-/// Makes each walk's leading `WholeRun` options, `Env`s and node sets `FromHere`.
-pub fn whole_run_to_from_here(design: &mut ir::Design, diags: &mut ir::Diags) {
-    to_from_here(
-        design,
-        diags,
-        &[
-            ir::ItemKind::Option,
-            ir::ItemKind::Env,
-            ir::ItemKind::NodeSet,
-        ],
-    );
-}
-
-/// Makes each walk's leading `WholeRun` saves `FromHere`.
-pub fn whole_run_save_to_from_here(design: &mut ir::Design, diags: &mut ir::Diags) {
-    to_from_here(design, diags, &[ir::ItemKind::Save]);
-}
-
-/// Every walk: (its top scope, its items in listed order with their listing scopes). Decks
-/// first, then each file no walk reached. Explicit stack; each scope entered once per walk.
-pub(super) fn walks(design: &ir::Design) -> Vec<(ir::ScopeId, Vec<(ir::ItemRef, ir::ScopeId)>)> {
-    let files: Vec<ir::FileId> = design.files().collect();
-    let deck = |f: &ir::FileId| design.file(*f).role == ir::Role::Deck;
-    let starts: Vec<ir::FileId> = files
-        .iter()
-        .copied()
-        .filter(deck)
-        .chain(files.iter().copied().filter(|f| !deck(f)))
-        .collect();
-    // each item's body scopes, in the order `reachable` lists them (branch order for an `If`)
-    let mut bodies: HashMap<ir::ItemRef, Vec<ir::ScopeId>> = HashMap::new();
-    let mut listed: HashSet<ir::ScopeId> = HashSet::new();
-    for (_, s) in design.reachable() {
-        let owner = design.scope(s).owner;
-        if owner != ir::ItemRef::NONE && listed.insert(s) {
-            bodies.entry(owner).or_default().push(s);
-        }
-    }
-    let mut reached = vec![false; files.len()];
-    let mut out = Vec::new();
-    for start in starts {
-        if reached[start.index()] && !deck(&start) {
-            continue;
-        }
-        reached[start.index()] = true;
-        let top = design.file(start).top;
-        let mut order = Vec::new();
-        let mut entered = HashSet::from([top]);
-        let mut stack = vec![(top, 0usize)];
-        // bounded: each scope is entered once, each of its items read once
-        while let Some((scope, k)) = stack.pop() {
-            let Some(&item) = design.items(scope).get(k) else {
-                continue;
-            };
-            stack.push((scope, k + 1));
-            order.push((item, scope));
-            let mut next: Vec<ir::ScopeId> = bodies.get(&item).cloned().unwrap_or_default();
-            if item.kind == ir::ItemKind::Include {
-                let path = design.row::<ir::item::Include>(item.index).path;
-                let target = design.find_file(design.str(path));
-                if !target.is_none() {
-                    reached[target.index()] = true;
-                    next.push(design.file(target).top);
-                }
-            }
-            for &s in next.iter().rev() {
-                if entered.insert(s) {
-                    stack.push((s, 0));
-                }
-            }
-        }
-        out.push((top, order));
-    }
-    out
-}
-
-// ---- private ----
-
 /// Whether the item is a run item for listed order (A14): an analysis, loop or alter.
 fn is_run(kind: ir::ItemKind) -> bool {
     matches!(
@@ -186,10 +153,10 @@ fn holds(design: &ir::Design, item: ir::ItemRef) -> Option<ir::Applies> {
     }
 }
 
-/// The `WholeRun` items of `kinds` before each walk's first run item made `FromHere`, or noted.
-fn to_from_here(design: &mut ir::Design, diags: &mut ir::Diags, kinds: &[ir::ItemKind]) {
+/// The `WholeRun` items of `kind` before each walk's first run item made `FromHere`, or noted.
+fn to_from_here(design: &mut ir::Design, diags: &mut ir::Diags, kind: ir::ItemKind) {
     let mut change = Vec::new();
-    for (_, order) in walks(design) {
+    for (_, order) in ir::run_walks(design) {
         let first = order
             .iter()
             .position(|&(i, _)| is_run(i.kind))
@@ -201,7 +168,7 @@ fn to_from_here(design: &mut ir::Design, diags: &mut ir::Diags, kinds: &[ir::Ite
             .collect();
         let mut verdicts: Vec<(ir::ItemRef, Option<ir::Code>)> = Vec::new();
         for (k, &(item, _)) in order.iter().enumerate() {
-            if !kinds.contains(&item.kind) || holds(design, item) != Some(ir::Applies::WholeRun) {
+            if item.kind != kind || holds(design, item) != Some(ir::Applies::WholeRun) {
                 continue;
             }
             let restored = classes(design, item)

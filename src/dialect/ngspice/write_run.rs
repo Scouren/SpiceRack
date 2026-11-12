@@ -44,12 +44,6 @@ pub(super) const CODES: &[Row] = &[
         "numparam evaluates a dot card's braces once before the run, with no temper; refused.",
     ),
     refusal(
-        NODESET_FROM_HERE,
-        "an initial condition or node set that holds from its place on",
-        "ngspice-45 frontend/commands.c (no ic or nodeset command); rewrite/RULINGS.md R24",
-        "ngspice sets a node's condition only with its .ic and .nodeset cards, which hold for the whole run; refused.",
-    ),
-    refusal(
         SCRIPT_VALUE,
         "a script option whose value is no number",
         "ng-control's run settle/option_brace.sp (option temp={q}: bad type; {10+40}: 10)",
@@ -74,20 +68,17 @@ const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 /// A card value that reads the temperature: numparam evaluates a dot card's `{…}` once, before
 /// the run, with no `temper` (`inpcom.c` `inp_fix_temper_in_param` rewrites `.param` only).
 const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
-/// An initial condition or node set that holds from its place on: ngspice's script has no
-/// command that sets one (`commands.c`), and its `.ic`/`.nodeset` cards hold for the whole run.
-const NODESET_FROM_HERE: ir::Code = ir::Code::new(b'W', 1303);
 /// An option or temperature that holds from its place on (a script `option`) whose value is no
 /// number literal: the frontend reads a number, never a numparam expression.
 const SCRIPT_VALUE: ir::Code = ir::Code::new(b'W', 1304);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300`, `W1301`), a value that reads the temperature (`W1302`), a node set
-/// that holds from its place on (`W1303`), a script option's value that is no number (`W1304`).
+/// (R21): a card form (`W1300`, `W1301`), a value that reads the temperature (`W1302`), a script
+/// option's value that is no number (`W1304`). A node set that holds from its place on is
+/// `NodeSetFromHere`, which `FEATURES` lack (`commands.c` has no command that sets one).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     let mut values = Vec::new();
-    // a `FromHere` state item is `RunExtra::StateFromHere`, which FEATURES lack
     // a script `option`'s value is the frontend's number, never a numparam `{…}` (ng-control's
     // run settle/option_brace.sp: `option temp={q}` is a bad type, `{10+40}` runs 10)
     let mut script_values = |holds: ir::Applies, vals: &[ir::ExprId]| {
@@ -110,10 +101,6 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         ir::ItemKind::NodeSet => {
             let n: ir::NodeSet = design.row(item.index);
             values.push(n.value);
-            // no script command sets a node's condition (commands.c): only the whole-run card
-            if n.holds == ir::Applies::FromHere {
-                refuse(NODESET_FROM_HERE);
-            }
         }
         _ => {}
     }

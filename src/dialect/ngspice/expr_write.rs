@@ -18,8 +18,7 @@
 //! `pub(super) fn expr(&ir::Design, ir::ExprId, &mut String)`,
 //! `pub(super) fn value(&ir::Design, ir::ExprId, &mut String)`,
 //! `pub(super) fn expr_in(&ir::Design, ir::ExprId, Eval, &mut String)`,
-//! `pub(super) fn spells_in(&ir::Design, ir::ExprId, Eval) -> bool`,
-//! `pub(super) fn holds_text(&ir::Design, ir::ExprId) -> bool`
+//! `pub(super) fn spells_in(&ir::Design, ir::ExprId, Eval) -> bool`
 
 use super::number;
 use super::tables::{self, Eval};
@@ -259,27 +258,6 @@ pub(super) fn spells_in(design: &ir::Design, e: ir::ExprId, eval: Eval) -> bool 
         stack.extend_from_slice(&kids);
     }
     true
-}
-
-/// Whether `e` holds a string or a list anywhere (no ngspice expression has either).
-pub(super) fn holds_text(design: &ir::Design, e: ir::ExprId) -> bool {
-    let mut stack = vec![e];
-    let mut kids = Vec::new();
-    let mut seen = vec![false; design.expr_count()];
-    // Bounded: each row is visited once.
-    while let Some(x) = stack.pop() {
-        if std::mem::replace(&mut seen[x.index()], true) {
-            continue;
-        }
-        let row = design.expr(x);
-        if matches!(row, ir::Expr::Str(_) | ir::Expr::List(_)) {
-            return true;
-        }
-        kids.clear();
-        children(design, row, &mut kids);
-        stack.extend_from_slice(&kids);
-    }
-    false
 }
 
 // ---- private ----
