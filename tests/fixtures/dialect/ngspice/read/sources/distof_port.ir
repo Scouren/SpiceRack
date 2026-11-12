@@ -1,0 +1,10 @@
+# codes: P1001 P1157 P1001 P1001
+file "distof_port.sp" deck
+  title "distof_port"
+  comment " oracle: vsrcpar.c VSRC_D_F1/F2 (one value: phase 0), vsrc.c (portnum, z0 under RFSPICE), vsrctemp.c (z0 50 when absent); run `dc 1 portnum 1 z0 100` into 1 ohm = 9.90099e-3"
+  element vsource v1 (a 0) dc=0 distof=(f1_mag=0.1 f1_phase_deg=0 f2_mag=0.2 f2_phase_deg=30)
+  element port v2 (b 0) dc=1 port=(index=1 z0=100)
+  opaque ngspice unread "R2 b 0 1"
+  element port v3 (c 0) dc=0 ac_mag=1 ac_phase_deg=0 port=(index=2 z0=50)
+  opaque ngspice unread "R3 c 0 50"
+  opaque ngspice unread ".control\nop\nprint v(b) v(c)\n.endc"
