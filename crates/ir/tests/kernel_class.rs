@@ -168,3 +168,38 @@ fn a_class_read_after_a_mutation_sees_the_mutation() {
     }
     assert_eq!(expr_class(&d, p_read), ExprClass::Temp, "p = $temp now");
 }
+
+#[test]
+fn a_field_that_may_read_the_circuit_counts_its_operators_dynamic() {
+    // A19 (R38): an expression under `Handle::ExprDyn` (a behavioural source's expression)
+    // counts `FuncDyn`/`BinaryDyn`/`UnaryDyn` whatever its class; under `Handle::Expr` (a
+    // parameter) a constant counts the static forms. Oracle: the rule's spec example
+    // `B1 a 0 V={2**3}`.
+    let read = |text: &str| {
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        spicerack_ir::parse(text, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        features_used(&d)
+    };
+    let source =
+        read("file \"t.sp\" deck\n  element behav b1 (a 0) expr=(pow(2, 3) + -1) output=voltage\n");
+    for f in [
+        Feature::FuncDyn(Func::Pow),
+        Feature::BinaryDyn(BinOp::Add),
+        Feature::UnaryDyn(spicerack_ir::UnOp::Neg),
+    ] {
+        assert!(source.contains(f), "{f:?} in the source's expression");
+    }
+    assert!(
+        !source.contains(Feature::Func(Func::Pow)) && !source.contains(Feature::Binary(BinOp::Add))
+    );
+    let param = read("file \"t.sp\" deck\n  param p = pow(2, 3) + -1\n");
+    assert!(
+        param.contains(Feature::Func(Func::Pow)) && param.contains(Feature::Binary(BinOp::Add))
+    );
+    assert!(
+        !param.contains(Feature::FuncDyn(Func::Pow)),
+        "a constant parameter is static"
+    );
+}
