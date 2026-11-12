@@ -286,6 +286,83 @@ fn code_models_of_the_build_round_trip_by_meaning() {
     assert!(run >= 64 && holding >= 64, "{run} run, {holding} holding");
 }
 
+#[test]
+fn the_version_spellings_run_the_same_device() {
+    // Settle decks for families::standard: each family's card in two spellings of one version
+    // (or, where ngspice never reads the version again, two versions) prints the same
+    // operating point on ngspice-45, and the reader stores the standard version both times.
+    // (card head, spelling a, spelling b, the standard version, instance)
+    let m4 = "M1 d g 0 0 mm w=1u l=0.5u";
+    let soi = "M1 d g 0 0 0 mm w=1u l=1u";
+    let cases: &[(&str, &str, &str, &str, &str)] = &[
+        // b3v32set.c:86-92: 3.24 is 3.2.4, 3.20 is 3.2
+        (
+            "nmos level=49 tox=4n vth0=0.4",
+            "version=3.24",
+            "version=3.2.4",
+            "3.2.4",
+            m4,
+        ),
+        (
+            "nmos level=49 tox=4n vth0=0.4",
+            "version=3.20",
+            "version=3.2",
+            "3.2",
+            m4,
+        ),
+        // b4v5check.c:64: 4.5 is 4.5.0; b4set.c:345: 4.81 is 4.8.1
+        ("nmos level=54", "version=4.5", "version=4.5.0", "4.5.0", m4),
+        (
+            "nmos level=54",
+            "version=4.81",
+            "version=4.8.1",
+            "4.8.1",
+            m4,
+        ),
+        // hsmhv2set.c:136-150: 2.1 is reset to 2.20 (a warning); hsm2set.c:136: 281 to 280
+        (
+            "nmos level=73",
+            "version=2.1",
+            "version=2.20",
+            "2.20",
+            "M1 d g 0 0 mm w=10u l=10u",
+        ),
+        ("nmos level=68", "version=281", "version=280", "280", m4),
+        // never read again (no use beyond *mpar.c/*mask.c): silently their one version
+        (
+            "npn level=8",
+            "version=2.3",
+            "version=2.4.0",
+            "2.4.0",
+            "Q1 d g 0 q",
+        ),
+        ("npn level=4", "vers=1.3", "vers=1.2", "1.2", "Q1 d g 0 q"),
+        ("nmos level=10", "version=4.3", "version=4.4", "4.4", soi),
+        ("nmos level=57", "version=2.2", "version=2.0", "2.0", soi),
+    ];
+    for (head, a, b, standard, instance) in cases {
+        let name = if instance.starts_with('Q') { "q" } else { "mm" };
+        let deck = |v: &str| {
+            format!(
+                "probe\n.model {name} {head} {v}\n{instance}\nVd d 0 1\nVg g 0 1\n.control\nop\nprint i(vd)\n.endc\n.end\n"
+            )
+        };
+        assert_eq!(
+            ngspice_print(&deck(a)),
+            ngspice_print(&deck(b)),
+            "{head} {a} / {b}"
+        );
+        for v in [a, b] {
+            let (design, _) = read_deck("v.sp", &deck(v));
+            let text = dump(&design);
+            assert!(
+                text.contains(&format!("version=\"{standard}\"")),
+                "{head} {v}:\n{text}"
+            );
+        }
+    }
+}
+
 /// The ngspice row.
 fn row() -> &'static DialectRow {
     dialect::by_name("ngspice").expect("the ngspice row")
