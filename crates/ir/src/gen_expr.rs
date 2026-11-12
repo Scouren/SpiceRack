@@ -219,7 +219,20 @@ impl Gen {
                 b.v(&net, self.chance(2).then_some(reference.as_str()))
             }
             ExprTag::I => {
-                let e = self.fresh();
+                // A32: half the time an item of this scope, when it is an element (one draw,
+                // O(1): a scan per leaf would make the build quadratic in a flat scope)
+                let items = b.design().items(self.scope);
+                let pick = (!items.is_empty() && self.chance(2))
+                    .then(|| items[self.below(items.len() as u32) as usize])
+                    .filter(|i| i.kind == crate::item::ItemKind::Element);
+                let e = match pick {
+                    Some(i) => {
+                        let d = b.design();
+                        d.str(d.row::<crate::element::Element>(i.index).name)
+                            .to_string()
+                    }
+                    None => self.fresh(),
+                };
                 b.i(&e)
             }
             ExprTag::Time => b.time(),

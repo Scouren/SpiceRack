@@ -229,3 +229,35 @@ fn every_run_feature_is_reached_on_a_second_seed_list() {
         "run features no seed generated: {missing:?}"
     );
 }
+
+#[test]
+fn a_named_only_set_draws_no_unnamed_row_and_names_split_exactly() {
+    // R59/A35: each row sets exactly one of its pair; a set holding only the named member draws
+    // named rows only (VACASK's laws)
+    let drop = [
+        RunExtra::AnalysisUnnamed,
+        RunExtra::DcAxisUnnamed,
+        RunExtra::LoopUnnamed,
+    ];
+    let named_only = drop.iter().fold(run_set(), |s, &x| {
+        s.minus(FeatureSet::EMPTY.with(Feature::Run(x)))
+    });
+    let mut analyses = 0;
+    for seed in 0..200u64 {
+        let d = generate(seed, &named_only, SIZE);
+        let used = features_used(&d);
+        for x in drop {
+            assert!(!used.contains(Feature::Run(x)), "seed {seed}: {x:?}");
+        }
+        let text = text_of(&d);
+        analyses += text.matches("analysis ").count();
+        // every analysis line names itself
+        for line in text
+            .lines()
+            .filter(|l| l.trim_start().starts_with("analysis "))
+        {
+            assert!(line.contains(" name="), "seed {seed}: {line}");
+        }
+    }
+    assert!(analyses > 0, "the named-only set still draws analyses");
+}
