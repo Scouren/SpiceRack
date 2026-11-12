@@ -1,6 +1,6 @@
 # codes:
 file "hisim2.sp" deck
   title "hisim2"
-  comment " oracle: inpdomod.c level 68 (HiSIM2), hsm2set.c:133 (a silent version is 280), hsm2.c model table (tox vfbc xld)"
-  model h1 hisim2 polarity=n params=(tox=3n vfbc=-1) version="280"
-  model h2 hisim2 polarity=p params=(xld=1e-8) version="280"
+  comment " oracle: inpdomod.c level 68 (HiSIM2), hsm2set.c:133-138 (any version runs 280, HiSIM 2.8.0: the IR vocabulary's string, ir-circuit 48abdc5f), hsm2.c model table (tox vfbc xld)"
+  model h1 hisim2 polarity=n params=(tox=3n vfbc=-1) version="2.8.0"
+  model h2 hisim2 polarity=p params=(xld=1e-8) version="2.8.0"

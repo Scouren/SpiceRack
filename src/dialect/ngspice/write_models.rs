@@ -126,9 +126,9 @@ pub(super) fn admits(
             Some(d)
                 if ok
                     && version.as_ref().is_none_or(|v| {
-                        v.as_deref()
-                            .and_then(|t| families::standard(m.family, d, t))
-                            == v.as_deref()
+                        v.as_deref().and_then(|t| {
+                            families::standard(m.family, d, families::spelling(m.family, t))
+                        }) == v.as_deref()
                     }) =>
             {
                 Some(d)
@@ -192,7 +192,7 @@ pub(super) fn model(w: &mut Out<'_>, item: ir::ItemRef) {
     if !m.version.is_none() {
         let (key, _) = families::version(m.family).expect("admits refused a version");
         let text = version_text(d, m.version).expect("admits refused another value");
-        s.push_str(&format!(" {key}={text}"));
+        s.push_str(&format!(" {key}={}", families::spelling(m.family, &text)));
     }
     for &(name, value) in d.params(m.params) {
         s.push(' ');
