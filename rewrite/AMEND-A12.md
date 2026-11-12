@@ -185,3 +185,58 @@ holds for the whole deck wherever it stands; a run card inside a `.subckt` body 
   analysis, an option or an `Env`. Feature `RunExtra::RunItemNested`: such an item listed
   outside its file's top scope and the `If` chains of it. (A `NodeSet` inside a subcircuit keeps
   its own, different meaning, `NodeSetInSubckt`: nodes local to each instance.)
+
+# Amendment A15: what the ngspice scaffold and its first areas found (R27–R31)
+
+Sources: the S3.0 final report (laws L3, L4, L5 and L8 ran on nothing for the `ngspice` row:
+its `admits` refused every generated design for forms no feature states); `ng-elements`
+(`inpcom.c:4124-4198`, `asrcload.c:41-52`, runs); `ng-outputs` (`com_measure2.c`, runs).
+
+## Kernel
+
+- **K1. Placement is a feature class (R27).** `Feature::Placed(ScopeKind, ItemKind)`: an item of
+  that kind listed directly in a scope of that kind. It replaces the placement members of
+  `Extra` (`NestedSubckt`, `LocalModel`, `LocalFunc`, `ParamInBranch`, `LoadInBranch`) and, with
+  the run owner, `NodeSetInSubckt`, `LoopNested` and A14's `RunItemNested`; the generator's
+  placement table reads the set. A placement every target has (an item in a file's top scope)
+  need not be a feature. A helper builds sets by scope kind (`placed(scope, &[kinds])`).
+- **K2.** `Extra::FormalWithoutDefault`: a `Subckt` head parameter with no default.
+  `Extra::IfConditionDynamic`: an `If` condition of class `Temp` or `Circuit`.
+- **K3. Two invariants.** A `Title`'s and a `Comment`'s text holds no line break
+  (`FieldDomain`). `ProbeContext` follows the class: a `Handle::Expr` field whose expression is
+  of class `Circuit` (through a parameter or function too) is a violation; the generator
+  respects both.
+- **K4. Literal forms and equality (R28).** `eq_meaning` compares two real literals by value
+  (`eq_value`), whatever their forms; an `Int` literal equals only an `Int` of the same value.
+  `eq_ignoring_spans` stays exact. Stated in the docs of both; changed if it is not so.
+
+## Circuit
+
+- **C1. The multiplier law of a subcircuit instance (R31).** `MultLaw::{Parallel,
+  NgspiceAppend}` on an `Instance`: `Parallel` is `mult` whole copies in parallel (it composes
+  by multiplication through the hierarchy); `NgspiceAppend` is ngspice's: the instance's `m` is
+  given to every element of the subcircuit's body that takes a multiplier, replacing that
+  element's own, and passed on the same way to nested instances; an element of a kind ngspice
+  does not multiply (independent V sources, E, H, code models, couplings, OSDI instances, the
+  line kinds, switches, a voltage-valued behavioural source: the letters of
+  `inpcom.c`'s exclusion list) is left as it is. One feature per law (they replace
+  `MultInstance`).
+- **C2. The base of a behavioural temperature coefficient.** `TcBase::{Tnom, Fixed27}` on
+  `Behav` and on a `Passive` whose value reads the circuit (ngspice measures a B source's
+  `tc1`/`tc2` from 27 °C whatever `tnom` is: `asrcload.c:41`), and `TcLaw::{Direct,
+  Reciprocal}` for a circuit-valued capacitor (ngspice divides by the polynomial:
+  `inpcom.c:6747`). Features per member.
+
+## Run
+
+- **R1.** `ProbeKind::AllBranchI`: the branch current of every element that has a branch
+  unknown (ngspice's `all`: every node voltage at every depth and these; `AllSourceI` is only
+  the voltage sources).
+- **R2. Measures (R30).** `Stat::MinAt`, `Stat::MaxAt` (where the extremum is). `Event.until`
+  (an upper limit of the search; none when absent). A pick rule beside the count for "the
+  simulator's default first event" where it is not the first by count (ngspice's default skips
+  a crossing in the first interval, an explicit `CROSS=1` counts it): the run owner names the
+  member.
+- **R3. Open, not typed now (R29).** What a deck saves when it names nothing: today the IR is
+  silent and the target's default applies. Decided with the run side (S12); `output.rs`'s
+  sentence that the reader expands the default is withdrawn until then.
