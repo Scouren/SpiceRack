@@ -136,6 +136,10 @@ pub fn check(design: &Design, diags: &mut Diags) {
     // the class table reads definitions through their rows, so it runs on a design whose
     // handles hold (A15 K3)
     if out.diags.len() == before {
+        // A28: a cycle among definitions, once per definition on it, at its item
+        for k in crate::class::cycle_defs(design) {
+            out.report(Violation::DefinitionCycle, design.defs[k].item, k as u32);
+        }
         probe_classes(&mut out);
     }
 }

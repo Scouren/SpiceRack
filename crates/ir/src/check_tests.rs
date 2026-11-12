@@ -94,7 +94,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 13] = [
+    let cases: [(Violation, Break); 14] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -191,6 +191,18 @@ fn each_kernel_invariant_has_its_fixture() {
                 global.expect("the base has a global").index,
                 Global { nets },
             );
+        }),
+        (Violation::DefinitionCycle, |b| {
+            // k = k
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let k = b.d.lookup(top, DefKind::Param, b.d.find_name("k"));
+            let read = b.d.builder().param_ref("k");
+            b.d.builder().resolve(read, k);
+            let row = Param {
+                name: b.d.find_name("k"),
+                value: read,
+            };
+            set_param(&mut b.d, b.param, row);
         }),
     ];
     for (want, break_it) in cases {

@@ -417,6 +417,14 @@ dead, not wrong. The generator builds a function body from operators its set all
 forms. Property (`form_tests`): inlining every call adds no feature, whenever no inlined call
 drops an argument of class `Temp` or above (one that does changes its caller's form).
 
+**A28 (2026-11-12): a definition cycle is its own violation.** `Violation::DefinitionCycle`
+(X0017): parameter or function definitions that read one another in a cycle; the smallest is a
+formal's default bound to the formal itself (A29). `check` reports each definition on a cycle
+once, at its item (a definition neither a deps-first nor a readers-first worklist settles,
+`class::cycle_defs`). A definition on or behind a cycle takes the most class its own value and
+what it reads give, so the cycle no longer makes every reader `Circuit` and a `ProbeContext`
+report.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

@@ -68,10 +68,12 @@ fn the_dynamic_class_is_transitive() {
         ExprClass::Circuit,
         "through the function it calls"
     );
+    // A28: a cycle is `check`'s DefinitionCycle; its members take what their own values give
+    // (here nothing), so a cycle no longer turns every reader into Circuit
     assert_eq!(
         expr_class(&d, x),
-        ExprClass::Circuit,
-        "a reference cycle counts as Circuit"
+        ExprClass::Constant,
+        "a reference cycle of constants"
     );
     assert!(ExprClass::Constant < ExprClass::Temp && ExprClass::Temp < ExprClass::Circuit);
     // the Dyn features are class >= Temp: a and b's `exp` is Dyn, c's is not

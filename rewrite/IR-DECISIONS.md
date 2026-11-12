@@ -424,3 +424,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `Loop.name`'s doc: the loop's own name in its dialect (Spectre's or VACASK's statement name, ngspice's `foreach` variable).
 - Oracle: the feature table with a neighbour for each new member, three new `check` rows, the IR text round trip, and builder asserts. The tests were not committed red before the bodies. Instead, with the bodies stubbed out (no reset features, no `from_here` text, a save's mode ignored by the listed-order walk), the feature table, the text test and the walk test each failed on exactly the stubbed members.
 - Reach over 4,000 full-set seeds: every new member is in 1,868 seeds or more. The scaling gate (`throughput -- scaling`) passes: build ratio 4.20 at 4× items, bound 8.
+
+## A28: the definition cycle
+
+- Withdrawn: A11's "what the worklist cannot order is `Circuit`". A definition on or behind a cycle rises to the fixpoint of its direct class and its reads' classes (each class rises at most twice). The cycle itself is `DefinitionCycle`, reported before `ProbeContext` in `check`'s last pass, on an otherwise valid design, since the graph reads definitions through their rows.
+- The cycle test is two worklists over the read graph: a definition that neither settles is on a cycle, or between two (reported too; no generated or corpus design has one). `class.rs`'s graph, `kahn` and `order` are shared by the class table and the cycle test.
+
