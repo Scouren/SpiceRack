@@ -1427,4 +1427,20 @@ mod tests {
         assert!(!set.contains(Feature::Wave(WaveKind::Pulse)));
         assert!(!set.contains(Feature::Elem(ElemKind::Resistor)));
     }
+
+    /// A15 K5 (R32): a model sets the feature of its family, and only that one.
+    #[test]
+    fn a_model_sets_its_family() {
+        let with = used(
+            |b, t, _| {
+                let name = b.name("nch");
+                b.model(t, model(name, ModelFamily::Bsim4, Polarity::N), Span::NONE);
+            },
+            true,
+        );
+        assert!(with.contains(Feature::Family(ModelFamily::Bsim4)));
+        assert!(!with.contains(Feature::Family(ModelFamily::Mos1)));
+        let without = used(|b, t, on| at_zero(b, t, WaveKind::Pulse, on), false);
+        assert!(!without.contains(Feature::Family(ModelFamily::Bsim4)));
+    }
 }

@@ -21,8 +21,8 @@ mod tests {
 
     use spicerack_ir::r#gen::{Size, generate};
     use spicerack_ir::{
-        CircuitExtra, Design, Diags, ElemKind, Feature, FeatureSet, ItemKind, WaveKind, check,
-        dump, features_used, parse,
+        CircuitExtra, Design, Diags, ElemKind, Feature, FeatureSet, ItemKind, ModelFamily,
+        WaveKind, check, dump, features_used, parse,
     };
 
     const SIZE: Size = Size {
@@ -164,5 +164,27 @@ mod tests {
         });
         assert!(grouped, "no seed bound an instance to a bin group");
         assert_eq!(missing, Vec::<String>::new());
+    }
+
+    /// A15 K5: with only `Family(Resistor)` of all families in the set, every generated model
+    /// is a resistor model, and some seed makes one.
+    #[test]
+    fn models_only_of_requested_families() {
+        let set = circuit_set()
+            .iter()
+            .filter(|&f| !matches!(f, Feature::Family(m) if m != ModelFamily::Resistor))
+            .fold(FeatureSet::EMPTY, FeatureSet::with);
+        let mut made = false;
+        for seed in SEEDS {
+            let d = generate(seed, &set, SIZE);
+            let extra = features_used(&d).minus(set);
+            assert!(
+                extra.is_empty(),
+                "seed {seed}: unrequested {:?}",
+                extra.iter().collect::<Vec<_>>()
+            );
+            made |= features_used(&d).contains(Feature::Family(ModelFamily::Resistor));
+        }
+        assert!(made, "no seed made a resistor model");
     }
 }
