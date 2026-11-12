@@ -199,6 +199,18 @@ pub(crate) fn table_len(d: &Design, kind: ItemKind) -> usize {
 
 // ---- private ----
 
+/// How many formals the user function `def` has, when `def` is a function this design defines.
+fn formal_count(d: &Design, def: DefId) -> Option<usize> {
+    let row = d.defs[def.index_checked(d.defs.len())?];
+    (row.kind == DefKind::Func
+        && row.item.kind == ItemKind::Func
+        && (row.item.index as usize) < table_len(d, ItemKind::Func))
+    .then(|| {
+        d.names(d.row::<crate::item::Func>(row.item.index).args)
+            .len()
+    })
+}
+
 /// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
 /// removed through `Editor::remove_item` is not held).
 fn in_index(d: &Design, def: DefId) -> bool {
@@ -502,6 +514,11 @@ fn expression(
             }
             Expr::UserCall(r, _) if r.is_resolved() && !same(d, r, DefKind::Func) => {
                 out.report(Violation::RefTarget, item, r.def.0)
+            }
+            Expr::UserCall(r, args)
+                if r.is_resolved() && formal_count(d, r.def).is_some_and(|n| n != args.len()) =>
+            {
+                out.report(Violation::CallArity, item, node.0)
             }
             Expr::Num(_)
             | Expr::Str(_)

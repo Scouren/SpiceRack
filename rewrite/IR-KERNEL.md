@@ -473,6 +473,10 @@ rows but those arguments) for the class table, `expr_class`, the feature count, 
 `check`; the generator computes its tree's class with it at the end. Inlining then changes no
 root's class.
 
+**Round 7b (2026-11-12): a call's arity.** `Violation::CallArity` (X0019): a user call bound to
+a function whose formals number differently from its arguments, at the item. The generator calls
+a bound function with one argument per formal.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
