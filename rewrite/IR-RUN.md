@@ -61,6 +61,8 @@ of class `Private`; say which ones you left there and why in the coverage file.
 Decisions:
 
 - `Tran { stop, record_start, print_step, initial_step, ceiling: StepCeiling (Given(e) | Rule(StepCap)), uic: bool, startup: bool }` (A24: no literal-zero ceiling or `record_start`)
+  (R67/A41: `print_step` given is `RunExtra::TranPrintStep`, absent `TranSimulatorStep`; each
+  transient sets exactly one, and the generator draws the print step by which twin the set holds)
   (`INV-semantics.md` 8.01–8.03): every field named, none inferred from another, `NONE` is not 0.
   Each simulator reads the positional `.tran` fields differently (Xyce's first is an initial-step
   guess, ngspice's a print step that also caps the step, HSPICE's extra fields are segments): the
