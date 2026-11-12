@@ -417,7 +417,7 @@ fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Result<(), String>)
     let mut failing = Vec::new();
     let mut messages = Vec::new();
     for (row, writer) in writers() {
-        if let Err(m) = law(row, writer) {
+        if let Err(m) = caught(|| law(row, writer)) {
             failing.push(row.name);
             messages.push(format!("{}: {m}", row.name));
         }
@@ -430,12 +430,25 @@ fn reader_laws(name: &str, law: impl Fn(&DialectRow, &dyn Read) -> Result<(), St
     let mut failing = Vec::new();
     let mut messages = Vec::new();
     for (row, reader) in readers() {
-        if let Err(m) = law(row, reader) {
+        if let Err(m) = caught(|| law(row, reader)) {
             failing.push(row.name);
             messages.push(format!("{}: {m}", row.name));
         }
     }
     check_known(name, &failing, &messages);
+}
+
+/// `law()`, a panic in it (a reader's or a writer's) turned into the row's failure, so one row
+/// that panics fails as a row instead of aborting the law for every row.
+fn caught(law: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    match catch_unwind(AssertUnwindSafe(law)) {
+        Ok(result) => result,
+        Err(p) => {
+            let msg = p.downcast_ref::<String>().cloned();
+            let msg = msg.or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()));
+            Err(format!("panicked: {}", msg.unwrap_or_default()))
+        }
+    }
 }
 
 /// The rows that failed law `name` against its [`KNOWN`] rows, in `BUILTIN` order.
