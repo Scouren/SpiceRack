@@ -136,3 +136,76 @@ fn int_literal_to_plain_keeps_every_value_and_leaves_what_a_tag_reads() {
     eprintln!("int_literal_to_plain: {points} boundary points");
     assert_eq!(notes("int_literal_to_plain", "read"), [code(118); 6]);
 }
+
+/// The census's `r=1.0/7` (VACASK corpus `demo/natures/ddt.sim:22`): legalized for ngspice,
+/// the typed division goes first and then the integer literal, in one legalize. The rule read
+/// the dead row of the division it replaced (rows are appended, the old ones stay) as a reader.
+#[test]
+fn a_division_gone_leaves_its_integer_literal_free_in_the_same_legalize() {
+    let text = "file \"p.sp\" deck\n  title \"t\"\n  element resistor r1 (a 0) value=(1.0 /: 7i)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    passes::legalize(
+        &mut design,
+        &spicerack::dialect::ngspice::FEATURES,
+        &mut diags,
+    );
+    let left = ir::features_used(&design).minus(spicerack::dialect::ngspice::FEATURES);
+    assert!(
+        left.is_empty(),
+        "left: {:?} {:?}",
+        left.iter().collect::<Vec<_>>(),
+        diags.rows()
+    );
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    assert!(out.contains("value=(1.0 / 7)"), "{out}");
+}
+
+/// The census's integer quotient (VACASK corpus `test/test_hb3.sim:8`, `rth=(3000-25)/60`, 49
+/// on VACASK): legalized for ngspice it is `trunc((3000 - 25) / 60)` with plain literals, 49 by
+/// the reference evaluator, and ngspice writes `trunc` as numparam's `int` (ngspice-45:
+/// `int((3000-25)/60)` gives 49 and `int(-2.5)` -2, `trunc(…)` is "Formula() error"); run:
+/// the written deck's resistor of `rth` ohms passes 1/49 A at 1 V.
+#[test]
+fn an_integer_quotient_reaches_ngspice_as_its_truncation() {
+    let text = "file \"p.sp\" deck\n  title \"t\"\n  param rth = (3000i - 25i) /: 60i\n  element vsource v1 (a 0) dc=1\n  element resistor r1 (a 0) value=rth\n  analysis op\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let ngspice = spicerack::dialect::ngspice::FEATURES;
+    passes::legalize(&mut design, &ngspice, &mut diags);
+    let left: Vec<ir::Feature> = ir::features_used(&design).minus(ngspice).iter().collect();
+    assert!(left.is_empty(), "left: {left:?}");
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    assert!(out.contains("param rth = trunc((3000 - 25) / 60)"), "{out}");
+    let row = spicerack::dialect::by_name("ngspice").expect("the ngspice row");
+    let deck = spicerack::dialect::write(&design, design.entry(), row, &mut diags);
+    let deck = deck.replace(".end", ".control\nop\nprint i(v1)\n.endc\n.end");
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let path = dir.path().join("deck.cir");
+    std::fs::write(&path, &deck).expect("the deck");
+    let run = std::process::Command::new("ngspice")
+        .arg("-b")
+        .arg(&path)
+        .output()
+        .expect("ngspice runs (nix develop .#testing provides it; unsupported fails)");
+    let printed = String::from_utf8_lossy(&run.stdout).into_owned();
+    let line = printed
+        .lines()
+        .find(|l| l.contains("i(v1) = "))
+        .unwrap_or_else(|| panic!("{deck}\n{printed}"));
+    let amps: f64 = line
+        .split('=')
+        .nth(1)
+        .expect("a value")
+        .trim()
+        .parse()
+        .expect("a number");
+    // `print` shows six significant digits: the tolerance is its rounding
+    assert!((amps * 49.0 + 1.0).abs() < 1e-5, "{amps}: {deck}");
+}
