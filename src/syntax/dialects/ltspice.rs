@@ -154,6 +154,12 @@ pub(super) fn ltspice() -> DialectDef {
         .kept_word(".fra", Construct::PrivateText)
         .kept_word("@", Construct::PrivateText)
         .kept_word("&", Construct::PrivateText)
+        // P4-067: every `A` line. Help, "A. Special Functions": "Analog
+        // Devices proprietary special function/mixed mode simulation
+        // devices" (gates, flip-flops, Schmitt triggers, the modulator,
+        // sample-and-hold, phase detector, varistor); ngspice reads `A` as
+        // an XSPICE code model, Xyce and HSPICE have no `A` element.
+        .kept_word("a", Construct::PrivateText)
         // Its state files (ZERO-LEDGER P6-006; help, `.SAVESTATE`,
         // `.LOADSTATE`: "a proprietary format"; `.SAVEBIAS`: a file for
         // `.loadbias`, P5-026's).

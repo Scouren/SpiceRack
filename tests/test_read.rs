@@ -384,3 +384,42 @@ fn p4_066_xyce_k_core_model_is_private() {
         };
     assert!(!codes.contains(&Code::W0039), "{codes:?}");
 }
+
+// ZERO-LEDGER P4-067: LTspice's `A` devices (help, "A. Special Functions":
+// `Annn n001 … n008 <model> [instance parameters]`, "Analog Devices
+// proprietary special function/mixed mode simulation devices"). Oracle:
+// the help page, and runs (research/impl/evidence/P4-067): LTspice 26.1.1
+// runs the AND gate's deck, ngspice-45 stops ("MIF-ERROR - unable to find
+// definition of model and": it reads `A` as an XSPICE code model), Xyce
+// 7.10 stops ("Invalid device type for device A1"). So each target refuses
+// the line as LTspice's own (W0039), never as text it could not read
+// (W0001); LTspice gets it back as written. Checks: 24 refusals, 4 lines,
+// 1 neighbour.
+#[test]
+fn p4_067_ltspice_a_devices_are_private() {
+    let lt = Dialect::Ltspice;
+    let cite = "LTspice help, A. Special Functions: Analog Devices proprietary devices";
+    let rc = "* t\nV1 a 0 PULSE(0 1 0 1n 1n 5u 10u)\nV2 b 0 1\nR1 out 0 1k\n";
+    for line in [
+        "A1 a b 0 0 0 0 out 0 AND",
+        "A2 a 0 0 0 0 out 0 0 BUF",
+        "A3 a 0 b 0 0 0 out 0 DFLOP trise=10n tfall=10n Vhigh=5",
+        "A4 a 0 0 0 0 0 out 0 SCHMITT Vt=3 Vh=3m Trise=100n Vhigh=3",
+    ] {
+        let deck = format!("{rc}{line}\n.tran 1u 20u\n.end\n");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Xyce,
+            Dialect::Spectre,
+            Dialect::Vacask,
+        ] {
+            assert_eq!(refusals(&deck, lt, to), [Code::W0039], "{to:?}: {line}");
+        }
+        oracle::spec_example(cite, &deck, lt, lt, &[line]);
+    }
+    // The legal neighbour: the same circuit without the device is written.
+    let plain = format!("{rc}.tran 1u 20u\n.end\n");
+    assert!(write(&plain, lt, Dialect::Ngspice).contains(".tran"));
+}

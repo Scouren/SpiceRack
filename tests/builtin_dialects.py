@@ -773,6 +773,8 @@ def ltspice(d):
         .kept_word(".fra", Construct.PrivateText)
         .kept_word("@", Construct.PrivateText)
         .kept_word("&", Construct.PrivateText)
+        # P4-067: every `A` line (LTspice help, A. Special Functions).
+        .kept_word("a", Construct.PrivateText)
         # Its state files (LTspice help, `.SAVESTATE`, `.LOADSTATE`, `.SAVEBIAS`: P6-006).
         .kept_word(".savestate", Construct.PrivateText)
         .kept_word(".loadstate", Construct.PrivateText)

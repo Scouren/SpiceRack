@@ -3043,3 +3043,25 @@ xyce/SENS/nlMutIndSens1_FD.cir cdl written differently: a kept core coupling is 
 xyce/SENS/nlMutIndSens2.cir cdl written differently: a kept core coupling is commented `* error: W0039` (P4-066)
 xyce/SENS/nlMutIndSens2_FD.cir cdl written differently: a kept core coupling is commented `* error: W0039` (P4-066)
 xyce/WAMPDE/Todd_test.cir cdl written differently: a kept core coupling is commented `* error: W0039` (P4-066)
+
+# S4: P4-067: an LTspice `A` device (help, A. Special Functions: "Analog Devices proprietary special function/mixed mode
+# simulation devices") is refused W0039, never W0001; CDL's comment for it names W0039. Oracle: the help page and
+# LTspice 26.1.1 / ngspice-45 / Xyce 7.10 runs (research/impl/evidence/P4-067/; tests/test_read.rs::p4_067_ltspice_a_devices_are_private).
+ltspice/ltspice_demos/LT1721_AN98F19.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_demos/LTC6992-2.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/160.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/2956-1.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/2956-2.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/3210-1.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/3210-2.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/3210-3.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/3210.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/3900.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/6561.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/8708-1.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/8708.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/Electrometer.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/PLL.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/PLL2.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/SampleAndHold.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
+ltspice/ltspice_examples/varistor.net cdl written differently: a kept LTspice A device is commented `* error: W0039` (P4-067)
