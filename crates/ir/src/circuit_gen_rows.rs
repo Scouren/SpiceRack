@@ -12,7 +12,7 @@ use super::{N, R};
 use crate::build::Builder;
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_features::dc_at_zero;
-use crate::circuit_features::reads_circuit;
+use crate::class::ExprClass;
 use crate::controlled::{Behav, OutKind};
 use crate::element::{ElemKind, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
@@ -60,10 +60,9 @@ impl R<'_, '_> {
             Reads::Constant
         };
         let value = self.g.expr(self.b, self.f, reads);
-        // ponytail: `reads_circuit` recomputes the design's class table after every push, O(design)
-        // per passive in the generator only (test code); `Gen::class` would be O(1) once it is exact
-        // (it over-states a tree whose zero-arity operator gave way to a probe leaf)
-        let dynamic = reads_circuit(self.b.design(), value);
+        // the class the generator tracked while drawing it, exact (ir-kernel 6e35638d; later draws
+        // overwrite it): `expr_class` here would recompute the design's table after every push
+        let dynamic = self.g.class == ExprClass::Circuit;
         let ic_mode = if kind == ElemKind::Resistor {
             IcMode::None
         } else {
