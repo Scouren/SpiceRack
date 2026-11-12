@@ -203,6 +203,26 @@ fn pending(sub: &str) -> Vec<&'static str> {
 }
 
 #[test]
+fn a_node_set_that_holds_from_its_place_on_is_refused() {
+    // Oracle: ngspice-45 commands.c (the script commands: no `ic` or `nodeset`; a node's
+    // condition is the `.ic`/`.nodeset` card, which holds for the whole run, R24). The law L5's
+    // seed 0 wrote one as a card, which read back whole-run.
+    for item in [
+        "nodeset nodeset every_op value=1",
+        "nodeset ic transient node=(b) value=0.5",
+    ] {
+        let mut design = parse_ir(
+            "from_here",
+            &format!("file \"f.sp\" deck\n  title \"f\"\n  {item}\n"),
+        );
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
+        let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
+        assert_eq!(codes, ["W1303"], "{item}");
+    }
+}
+
+#[test]
 fn a_temp_or_nfreqs_in_another_file_is_not_seen_today() {
     // Oracle: none yet; pins the `ponytail:` limit of `read_run` (`.temp` and `nfreqs` are found
     // in the statement's own file only). ngspice would read `temp=50` as beaten by the library's
