@@ -63,10 +63,11 @@ Decisions:
 - `Tran { stop, record_start, print_step, initial_step, ceiling: StepCeiling (Given(e) | Rule(StepCap)), uic: bool, startup: bool }` (A24: no literal-zero ceiling or `record_start`)
   (R67/A41: `print_step` given is `RunExtra::TranPrintStep`, absent `TranSimulatorStep`; each
   transient sets exactly one, and the generator draws the print step by which twin the set holds)
-  (R68/A42: an analysis's own argument, a DC axis's range and a sweep loop's range are of class
+  (R68/A42: an analysis's own argument, a DC axis's range and every loop row's expression field
+  (a sweep's range, a table's values, a Monte Carlo loop's runs, seed and samples) are of class
   at most a parameter's, `Violation::RunArgumentClass`; one that reads a parameter, directly or
   through a function's body, is `RunExtra::AnalysisParamArgument`; an analysis's output carries
-  no part, `output_valid`'s `FieldDomain`; a `Pss` with its harmonics, points, `sc_iter` or
+  no part, `output_valid`'s `FieldDomain` (a Fourier analysis's outputs too: transient vectors); a `Pss` with its harmonics, points, `sc_iter` or
   `steady_coeff` absent is `RunExtra::PssArgumentOmitted`. The generator draws these arguments
   constant, a parameter read and a bound call only with the feature, outputs without a part,
   and all four `Pss` arguments without the feature.)

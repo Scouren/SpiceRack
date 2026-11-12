@@ -162,11 +162,10 @@ impl RowFacts for Loop {
         if self.kind == LoopKind::Sweep && !one_run(design, self.body) {
             add(RunExtra::SweepBodyNotOne);
         }
-        // R68/A42: a sweep loop's range is evaluated as an analysis's own argument
+        // R68/A42: every loop row's expression field is evaluated before any analysis runs, as
+        // an analysis's own argument (ruled for table and Monte Carlo rows too)
         let mut handles = Vec::new();
-        if self.kind == LoopKind::Sweep {
-            self.handles(design, &mut handles);
-        }
+        self.handles(design, &mut handles);
         if crate::analysis_facts::run_arguments_read_param(design, &handles) {
             add(RunExtra::AnalysisParamArgument);
         }
@@ -180,11 +179,9 @@ impl RowFacts for Loop {
         if loop_depth(design, self.body) > LOOP_DEPTH_MAX {
             report(design, at, Violation::FieldDomain, out);
         }
-        if self.kind == LoopKind::Sweep {
-            let mut handles = Vec::new();
-            self.handles(design, &mut handles);
-            crate::analysis_facts::check_run_arguments(design, at, &handles, out);
-        }
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        crate::analysis_facts::check_run_arguments(design, at, &handles, out);
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -290,13 +287,10 @@ impl RowFacts for Loop {
             4,
         )
         .expect("a naming feature is in the set");
-        // R68/A42: a sweep's range is drawn as an analysis's own argument
-        let detail = match kind {
-            LoopKind::Sweep => crate::analysis_facts::run_arguments(g, features, |g| {
-                by_loop!(kind, gen_of(g, scope, b, features))
-            }),
-            LoopKind::Table | LoopKind::MonteCarlo => by_loop!(kind, gen_of(g, scope, b, features)),
-        }
+        // R68/A42: a loop row's fields are drawn as an analysis's own arguments
+        let detail = crate::analysis_facts::run_arguments(g, features, |g| {
+            by_loop!(kind, gen_of(g, scope, b, features))
+        })
         .expect("a possible loop kind's detail generates");
         let row = |body| Loop {
             kind,

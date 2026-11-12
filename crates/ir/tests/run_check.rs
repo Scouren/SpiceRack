@@ -146,6 +146,18 @@ const BROKEN: &[Fixture] = &[
         let values = b.exprs(&v);
         raw_loop(b, s, LoopKind::Table, TableLoop { columns, values });
     }),
+    // R68/A42 (1), ruled for every loop row: the plan is evaluated before any analysis runs
+    ("a table loop's value reads the temperature", Violation::RunArgumentClass, |b, s| {
+        let columns = b.targets(&[Target::TEMP]);
+        let v = [b.temp()];
+        let values = b.exprs(&v);
+        raw_loop(b, s, LoopKind::Table, TableLoop { columns, values });
+    }),
+    ("a monte carlo loop's runs read the temperature", Violation::RunArgumentClass, |b, s| {
+        let runs = b.temp();
+        let mc = MonteCarlo { runs, seed: NO, samples: List::EMPTY, variations: Variations::Process, sampler: Sampler::Random, nominal: false };
+        raw_loop(b, s, LoopKind::MonteCarlo, mc);
+    }),
     ("monte carlo without runs", Violation::FieldDomain, |b, s| {
         let mc = MonteCarlo { runs: NO, seed: NO, samples: List::EMPTY, variations: Variations::Process, sampler: Sampler::Random, nominal: false };
         raw_loop(b, s, LoopKind::MonteCarlo, mc);
@@ -234,6 +246,13 @@ const BROKEN: &[Fixture] = &[
         let p = Ref::unresolved(b.name("p"));
         let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, mean: NO, spread: NO }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
+    }),
+    // R68/A42 (3), ruled for Fourier: its outputs are transient vectors, a part means nothing
+    ("a fourier output with a part", Violation::FieldDomain, |b, s| {
+        let (f, h, p) = (b.num(1e3), b.num(9.0), b.num(1.0));
+        let o = [b.probe_v(&["out"]).with_part(AcPart::Db)];
+        let outputs = b.probes(&o);
+        raw(b, s, AnalysisKind::Four, Four { fundamental: f, harmonics: h, periods: p, grid: NO, outputs });
     }),
     ("fourier with no count and no nfreqs option", Violation::FieldDomain, |b, s| {
         let (f, p) = (b.num(1e3), b.num(1.0));
