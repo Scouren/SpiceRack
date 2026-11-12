@@ -1,0 +1,4 @@
+models from an include
+include "include--models.lib"
+v1 (a 0) vs dc=1
+e1 (b 0 a 0) amp gain=2

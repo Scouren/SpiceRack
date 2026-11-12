@@ -1,0 +1,12 @@
+sine: dc ignored, tdphase, phase AC only, hold before delay, damping
+model vsource vsource
+v1 (a 0) vsource type="sine" dc=5 sinedc=1 ampl=2 freq=1k
+v2 (b 0) vsource type="sine" sinedc=1 ampl=2 freq=1k delay=0.25m tdphase=90
+v3 (c 0) vsource type="sine" phase=90
+v4 (d 0) vsource type="sine" sinedc=1 ampl=2 freq=1k theta=1k delay=0.25m
+v5 (e 0) vsource type="sine" sinedc=1 ampl=2 freq=1k delay=-0.25m
+control
+  options rawfile="ascii"
+  analysis op1 op
+  analysis tr1 tran stop=1m step=1n maxstep=0.5u
+endc

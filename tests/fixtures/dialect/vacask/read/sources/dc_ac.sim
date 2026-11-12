@@ -1,0 +1,11 @@
+dc and ac
+model vsource vsource
+model isource isource
+v1 (a 0) vsource dc=1
+v2 (b 0) vsource
+v3 (c 0) vsource type="dc" dc=2.5
+v4 (d 0) vsource dc=1 mag=1
+v5 (e 0) vsource mag=2 phase=45
+v6 (f 0) vsource phase=30
+i1 (a 0) isource dc=1m $mfactor=2
+v7 (gnd 0) vsource dc=-1

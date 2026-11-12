@@ -1,0 +1,22 @@
+tline_ideal: td, f and nl, their defaults and precedence
+load "tline_ideal.osdi"
+load "resistor.osdi"
+model vsource vsource
+model r resistor
+model tl tline_ideal
+v1 (s 0) vsource type="pulse" val0=0 val1=1 rise=1p
+rs (s a) r r=50
+t1 (a 0 b 0) tl z0=50 td=2n
+t2 (a 0 c 0) tl z0=50 f=100M
+t3 (a 0 d 0) tl z0=50 f=100M nl=0.5
+t4 (a 0 e 0) tl z0=50
+t5 (a 0 g 0) tl z0=50 td=2n f=100M
+rb (b 0) r r=50
+rc (c 0) r r=50
+rd (d 0) r r=50
+re (e 0) r r=50
+rg (g 0) r r=50
+control
+  options rawfile="ascii"
+  analysis tr1 tran stop=20n step=10p maxstep=10p
+endc

@@ -1,0 +1,12 @@
+pulse: defaults, one pulse, no fall, negative delay
+model vsource vsource
+v1 (a 0) vsource type="pulse"
+v2 (b 0) vsource type="pulse" val0=0 val1=1 rise=1u fall=1u width=1u period=0
+v3 (c 0) vsource type="pulse" val0=0 val1=1 rise=1u fall=-1 width=1u period=4u
+v4 (d 0) vsource type="pulse" val0=0 val1=1 delay=-1u rise=2u fall=1u width=1u
+v5 (e 0) vsource type="pulse" dc=7 val0=2 val1=3
+control
+  options rawfile="ascii"
+  analysis op1 op
+  analysis tr1 tran stop=10u step=1n maxstep=5n
+endc

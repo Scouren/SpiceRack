@@ -1,0 +1,9 @@
+am and fm, every parameter off its default
+model vsource vsource
+v1 (a 0) vsource type="am" sinedc=0.5 ampl=2 freq=10k tdphase=30 delay=20u modfreq=1k modphase=45 modindex=0.7
+v2 (b 0) vsource type="fm" sinedc=0.5 ampl=2 freq=10k tdphase=30 delay=20u modfreq=1k modphase=45 modindex=0.7
+control
+  options rawfile="ascii"
+  analysis op1 op
+  analysis tr1 tran stop=1m step=1n maxstep=0.5u
+endc

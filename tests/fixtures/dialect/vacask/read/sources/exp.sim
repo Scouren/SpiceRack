@@ -1,0 +1,4 @@
+exp
+model vsource vsource
+v1 (a 0) vsource type="exp" td2=1u tau1=1u tau2=2u
+v2 (b 0) vsource type="exp" val0=0 val1=1 delay=1u td2=2u tau1=1u tau2=0.5u

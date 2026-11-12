@@ -1,0 +1,8 @@
+refused: td2
+model vsource vsource
+model f cccs
+v0 (a 0) vsource dc=1
+v1 (a 0) vsource type="exp" tau1=1u tau2=1u
+control
+  analysis op1 op
+endc

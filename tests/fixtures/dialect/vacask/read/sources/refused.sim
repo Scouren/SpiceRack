@@ -1,0 +1,21 @@
+refused sources
+model vsource vsource
+model f cccs
+model m mutual
+v1 (a 0) vsource type="pulse" rise=0
+v2 (a 0) vsource type="pulse" rise=-1n
+v3 (a 0) vsource type="exp" tau1=1u tau2=1u
+v4 (a 0) vsource type="sine" freq=0
+v5 (a 0) vsource dc=1 foo=2
+v6 (a 0 b) vsource dc=1
+v7 (a 0) vsource type="sawtooth"
+v8 (a 0) vsource type="pwl" wave=[0, 0, 1u]
+f1 (a 0) f gain=2
+m1 () m k=0.5 ind1="l1"
+m2 () m k=0.5 ind1="l1" ind2="l2" $mfactor=2
+m3 (a 0) m k=0.5 ind1="l1" ind2="l2"
+v9 (a 0) vsource type="exp" td2=1u tau1=1u
+v10 (a 0) vsource type="exp" td2=1u tau1=0 tau2=1u
+v12 (a 0) vsource dc=1
+v12 (a 0) vsource dc=2
+v11 a 0 vsource dc=1

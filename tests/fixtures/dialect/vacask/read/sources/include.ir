@@ -1,0 +1,13 @@
+# Oracle: VD input-include (textual: what an included file defines is the includer's) and
+# vc-devices' declared table (VACASK's own-subckt-then-top rule, forward and included masters):
+# the instances' masters come from the library, read as models of their builtin families
+# (bound across files: `#k` names the k-th definition, IR text A4).
+# codes:
+file "include.sim" deck
+  title "models from an include"
+  include "include--models.lib"
+  element vsource v1 (a 0) model=vs#0 dc=1i
+  element vcvs e1 (b 0 a 0) model=amp#1 gain=2i
+file "include--models.lib" library
+  model vs source_v
+  model amp vcvs

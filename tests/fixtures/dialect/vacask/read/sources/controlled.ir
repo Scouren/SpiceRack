@@ -1,0 +1,18 @@
+# Oracle: VD dev-builtin-vcvs, -vccs, -cccs, -ccvs (gain 1 by default; vcvs/vccs `p n cp cn`;
+# cccs/ccvs `p n` and `ctlinst` the sensing instance, `ctlnode` "flow(br)" by default, the
+# branch current) and run src-ctl (`print instance` of `f1 … ctlinst="v1" $mfactor=3`: gain 1,
+# ctlnode "flow(br)").
+# codes:
+file "controlled.sim" deck
+  title "controlled sources"
+  model vsource source_v
+  model e vcvs
+  model g vccs
+  model f cccs
+  model h ccvs
+  element vsource vp (a b) model=vsource dc=0i
+  element vcvs e1 (o1 0 a 0) model=e gain=10i
+  element vcvs e2 (o2 0 a 0) model=e gain=1
+  element vccs g1 (o3 0 a b) model=g mult=2i gain=1m
+  element cccs f1 (0 o4) model=f gain=3i sense=vp
+  element ccvs h1 (o5 0) model=h gain=1k sense=vp

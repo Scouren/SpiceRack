@@ -1,6 +1,7 @@
 //! `Model` rows → `model name module params`, the inverse of `read_models`: the module word
 //! from the family (`families::default_word`; a user module's own name), `type=1` or `type=-1`
-//! for a model with a polarity (stated even for VACASK's default 1: run t1), `version=` from the model's
+//! for a model with a polarity (stated even for VACASK's default 1: run t1; a deck that omits
+//! `type` then prints it as given after a round trip, spelling only), `version=` from the model's
 //! version, each family parameter under the module's name for it (`model_<p>`).
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cir-masters; R21 (`admits`).
@@ -32,7 +33,9 @@ pub(super) fn model(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     name::spell(d.str(row.name), Place::Other, w.out);
     w.out.push(' ');
     name::spell(&module, Place::Other, w.out);
-    // Always stated: `print model` tells a given `type` from the default (run t1).
+    // Always stated: `print model` tells a given `type` from the default (run t1). The reverse
+    // case is spelling only: a deck that omits `type` prints it as given after a round trip (no
+    // settle deck prints one); the numbers are the same.
     match row.polarity {
         ir::Polarity::N => w.out.push_str(" type=1"),
         ir::Polarity::P => w.out.push_str(" type=-1"),
