@@ -27,6 +27,7 @@ use spicerack::ir;
 /// The read fixtures, by name.
 const READ: &[&str] = &[
     "alter_forms",
+    "alter_param_case",
     "alter_unread",
     "altermod",
     "alterparam_no_reset",
@@ -58,6 +59,7 @@ const READ: &[&str] = &[
     "script_state_cards",
     "script_vector",
     "two_blocks",
+    "unclosed",
 ];
 
 /// The write fixtures, by name.

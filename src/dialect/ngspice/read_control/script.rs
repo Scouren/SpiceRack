@@ -99,7 +99,7 @@ fn commands(text: &str) -> Vec<Cmd> {
     }
     let mut out: Vec<Cmd> = Vec::new();
     for raw in text.lines() {
-        let l = raw.trim();
+        let l = strip_comment(raw.trim());
         let lower = l.to_ascii_lowercase();
         // a `*#` line in a block is its command (`inp.c:752-756` keeps it; `:777` strips `*#`)
         if let Some(cmd) = l.strip_prefix("*#") {
@@ -112,6 +112,7 @@ fn commands(text: &str) -> Vec<Cmd> {
         }
         if l.is_empty()
             || l.starts_with('*')
+            || l.starts_with('#')
             || lower.starts_with(".control")
             || lower.starts_with(".endc")
         {
@@ -133,6 +134,35 @@ fn commands(text: &str) -> Vec<Cmd> {
         });
     }
     out
+}
+
+/// `line` without its comment, as `inp_stripcomments_line` cuts a script line
+/// (`inpcom.c:3500-3580`, `cs` set): from a `;` after the first character, a `$` followed by a
+/// blank, or `//`, outside quotes; the blanks before it go too.
+fn strip_comment(line: &str) -> &str {
+    let b = line.as_bytes();
+    let mut k = 0;
+    // Bounded: each step moves `k` forward.
+    while k < b.len() {
+        let c = b[k];
+        let next = b.get(k + 1).copied();
+        if c == b'"' || c == b'\'' {
+            k += 1;
+            while k < b.len() && (b[k] != c || b[k - 1] == b'\\') {
+                k += 1;
+            }
+            k += 1;
+            continue;
+        }
+        if next == Some(b';') {
+            return line[..k + 1].trim_end();
+        }
+        if (c == b'$' && next == Some(b' ')) || (c == b'/' && next == Some(b'/')) {
+            return line[..k].trim_end();
+        }
+        k += 1;
+    }
+    line
 }
 
 /// The tree of `cmds`: loops and flow blocks closed by `end`; `Err` on an `end` with no opener
@@ -188,6 +218,19 @@ mod tests {
                 hash: false
             })
         );
+    }
+
+    #[test]
+    fn a_script_lines_comment_is_cut_as_ngspice_cuts_it() {
+        // inpcom.c:3519-3560 with `cs`: `$ `, `;`, `//`; `$v` and quoted text stay
+        assert_eq!(
+            strip_comment("meas tran t when v(2)=y $ not recognized!"),
+            "meas tran t when v(2)=y"
+        );
+        assert_eq!(strip_comment("op ; a note"), "op");
+        assert_eq!(strip_comment("alter r1 $v"), "alter r1 $v");
+        assert_eq!(strip_comment("echo \"a $ b; c\" // x"), "echo \"a $ b; c\"");
+        assert_eq!(strip_comment("tran 1u 5u"), "tran 1u 5u");
     }
 
     #[test]

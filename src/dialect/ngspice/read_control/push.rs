@@ -267,12 +267,12 @@ fn target_of(lw: &mut Lower<'_, '_>, t: &Target) -> ir::Target {
             lw.b.target(K::SourceDc, &[], &e, None)
         }
         Target::Device(e, p) => {
-            let e = lw.names.fold(e);
-            lw.b.target(K::DeviceParam, &[], &e, Some(p))
+            let (e, p) = (lw.names.fold(e), lw.names.fold(p));
+            lw.b.target(K::DeviceParam, &[], &e, Some(&p))
         }
         Target::Model(m, p) => {
-            let m = lw.names.fold(m);
-            lw.b.target(K::ModelParam, &[], &m, Some(p))
+            let (m, p) = (lw.names.fold(m), lw.names.fold(p));
+            lw.b.target(K::ModelParam, &[], &m, Some(&p))
         }
         Target::Param(p) => {
             let p = lw.names.fold(p);

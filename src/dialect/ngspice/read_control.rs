@@ -180,11 +180,11 @@ pub(super) const CODES: &[Row] = &[
 /// A control block: the deck's script read once, this statement's part pushed.
 pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt) {
     if in_branch(lw, st.scope) {
-        return lw.opaque(st, ir::OpaqueClass::Private, IN_BRANCH);
+        return whole(lw, st, ir::OpaqueClass::Private, IN_BRANCH);
     }
     let me = lw.script_index(st);
     let ops = match planned(lw, me) {
-        Err(code) => return lw.opaque(st, ir::OpaqueClass::Script, code),
+        Err(code) => return whole(lw, st, ir::OpaqueClass::Script, code),
         Ok(ops) => ops,
     };
     if ops.is_empty() {
@@ -230,6 +230,24 @@ pub(super) fn script_line(
 }
 
 // ---- private ----
+
+/// The whole block as one opaque. A block the file ends before closing (ngspice reads it to
+/// the end of the file, as the CST does) gets its `.endc`: the same script, and a deck line
+/// written after it stays outside it.
+fn whole(lw: &mut Lower<'_, '_>, st: Stmt, class: ir::OpaqueClass, code: ir::Code) {
+    let mut text = lw.raw(st.node);
+    let last = text
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    if !last.to_ascii_lowercase().starts_with(".endc") {
+        text.push_str("\n.endc");
+    }
+    let span = lw.span(st.node);
+    lw.opaque_text(st.scope, &text, span, class, code);
+}
 
 /// `Info` of a note.
 const fn note(
