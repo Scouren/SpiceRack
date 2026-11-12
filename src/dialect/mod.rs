@@ -40,8 +40,9 @@
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
 //!   `pub const STRICT_UNBOUND: ir::Code`, `pub const STRICT_UNBOUND_TARGET: ir::Code`,
+//!   `pub const PATH_AS_READ: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
-//! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
+//! - `pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path}`; `pub mod facade`, `pub mod irtext`,
 //!   `pub mod ngspice`, `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
@@ -56,7 +57,7 @@ pub mod ngspice;
 mod sources;
 pub mod vacask;
 
-pub use sources::{DEPTH_MAX, Reference, Sources};
+pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path};
 
 use crate::ir;
 use crate::ir::ItemRow as _;
@@ -185,6 +186,11 @@ pub const STRICT_UNBOUND: ir::Code = ir::Code::new(b'S', 104);
 /// model or subcircuit reference nothing binds): `S0105`, `arg` the name's `NameId` (R70, A43).
 pub const STRICT_UNBOUND_TARGET: ir::Code = ir::Code::new(b'S', 105);
 
+/// The note a writer adds where it spells an include, library or load path as it was read,
+/// because the file's key cannot be stated relative to the including file (an absolute key, or
+/// one above the root: [`written_path`], R78): `S0106`, `arg` 0, at the item.
+pub const PATH_AS_READ: ir::Code = ir::Code::new(b'S', 106);
+
 /// The note [`legalize`] adds where it drops an `Inert` statement of another dialect: `S0102`,
 /// `arg` 0.
 pub const INERT_DROPPED: ir::Code = ir::Code::new(b'S', 102);
@@ -238,6 +244,15 @@ const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
             cite: "rewrite/RULINGS.md R70; rewrite/AMEND-A12.md A43 (the pair's F7)",
             explain: "An alter, a loop, a DC axis or an elaborate names an element, model, parameter or subcircuit no statement of the complete program defines. A simulator either rejects it or (ngspice: \"no such device\") runs on at the old value, a wrong number with no error. The argument is the name.",
             kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        PATH_AS_READ,
+        ir::Info {
+            title: "a path written as it was read",
+            cite: "rewrite/RULINGS.md R78",
+            explain: "A written include, library or load path is spelled relative to the file that holds it, so the converted files keep the source tree's layout. This file's key is absolute or above the root the sources were loaded under, so it cannot be stated that way and is written as it was read; it resolves only where the original did.",
+            kind: ir::Kind::Note,
         },
     ),
 ];

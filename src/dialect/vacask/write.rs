@@ -8,7 +8,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; REWRITE-PLAN §4.3 (one exhaustive match).
 //!
-//! Contents: `Writer` (`Writer::line`, `Writer::head`), `write` (crate-private)
+//! Contents: `Writer` (`Writer::path`, `Writer::line`, `Writer::head`), `write` (crate-private)
 
 use super::name::{self, Place};
 use super::{write_elements, write_models, write_run, write_sources, write_structure};
@@ -22,8 +22,10 @@ pub(super) struct Writer<'d, 'o> {
     pub(super) out: &'o mut String,
     /// The current depth: two spaces of indent each.
     pub(super) depth: usize,
-    /// The directory of the file being written (`""` for none), which its paths are relative to.
-    pub(super) dir: String,
+    /// The file being written: its paths are spelled relative to it (R78).
+    pub(super) file: ir::FileId,
+    /// Diagnostics (a path spelled as read).
+    pub(super) diags: &'o mut ir::Diags,
     /// Each family's module word, built once per call (`families::Words`).
     pub(super) words: super::families::Words,
     /// The scope each reachable item is listed in, built once per call.
@@ -41,6 +43,19 @@ enum Task {
 }
 
 impl Writer<'_, '_> {
+    /// The text spelling path `path` of `at` in this file (R78: relative to its directory,
+    /// `dialect::written_path`); a path it cannot state so is spelled as read, with a note.
+    pub(super) fn path(&mut self, at: ir::ItemRef, path: &str) -> String {
+        match crate::dialect::written_path(self.design, self.file, path) {
+            Ok(text) => text,
+            Err(read) => {
+                self.diags
+                    .push_at(crate::dialect::PATH_AS_READ, self.design, at, 0);
+                read
+            }
+        }
+    }
+
     /// Starts a line at the current depth.
     pub(super) fn line(&mut self) {
         for _ in 0..self.depth {
@@ -75,17 +90,19 @@ impl Writer<'_, '_> {
 }
 
 /// Appends file `file` of `design` (legal for `FEATURES`) to `out`.
-pub(super) fn write(design: &ir::Design, file: ir::FileId, out: &mut String) {
+pub(super) fn write(
+    design: &ir::Design,
+    file: ir::FileId,
+    out: &mut String,
+    diags: &mut ir::Diags,
+) {
     let top = design.file(file).top;
-    let path = design.str(design.file(file).path);
-    let dir = std::path::Path::new(path)
-        .parent()
-        .map_or(String::new(), |d| d.to_string_lossy().into_owned());
     let mut w = Writer {
         design,
         out,
         depth: 0,
-        dir,
+        file,
+        diags,
         words: super::families::Words::of(design),
         scopes: design.reachable().into_iter().collect(),
         epoch: None,
@@ -191,7 +208,7 @@ fn item(w: &mut Writer<'_, '_>, todo: &mut Vec<Task>, at: ir::ItemRef) {
     match at.kind {
         ir::ItemKind::Title => {}
         ir::ItemKind::Comment => write_structure::comment(w, d.row(at.index)),
-        ir::ItemKind::Include => write_structure::include(w, d.row(at.index)),
+        ir::ItemKind::Include => write_structure::include(w, at, d.row(at.index)),
         ir::ItemKind::Global => write_structure::global(w, d.row(at.index)),
         ir::ItemKind::Load => write_structure::load(w, at),
         ir::ItemKind::DeviceLibrary => write_structure::device_library(w, d.row(at.index)),

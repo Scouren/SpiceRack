@@ -190,7 +190,8 @@ pub(super) fn load(w: &mut Out<'_>, item: ir::ItemRef) {
         l.kind == ir::LoadKind::Osdi,
         "ngspice write: only OSDI loads are in FEATURES"
     );
-    let cmd = format!("pre_osdi {}", w.design.str(l.path));
+    let path = w.path(item, w.design.str(l.path));
+    let cmd = format!("pre_osdi {path}");
     w.script(&cmd);
 }
 

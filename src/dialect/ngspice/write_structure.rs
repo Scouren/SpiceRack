@@ -100,7 +100,7 @@ pub(super) fn comment(w: &mut Out<'_>, item: ir::ItemRef) {
 /// `.include "path"`, or `.lib "path" section` for one section.
 pub(super) fn include(w: &mut Out<'_>, item: ir::ItemRef) {
     let inc: ir::item::Include = w.design.row(item.index);
-    let path = w.design.str(inc.path).to_string();
+    let path = w.path(item, w.design.str(inc.path));
     if inc.section.is_none() {
         w.line(&format!(".include \"{path}\""));
     } else {

@@ -16,6 +16,8 @@
 //!   `Sources::form(&self) -> ir::Role`,
 //!   `Sources::load(entries: &[&str], form: ir::Role, reader: &dyn Read, loader: &mut dyn FnMut(&str) -> Option<String>) -> Sources`
 //! - `Reference::path(&self) -> &str`, `Reference::resolve(&self, from: &str) -> String`
+//! - `pub fn relative_path(from: &str, to: &str) -> Option<String>`,
+//!   `pub fn written_path(design: &ir::Design, from: ir::FileId, path: &str) -> Result<String, String>`
 
 use std::collections::{HashSet, VecDeque};
 use std::path::{Component, Path, PathBuf};
@@ -171,6 +173,43 @@ impl Reference {
         let dir = Path::new(from).parent().unwrap_or(Path::new(""));
         normalize(&dir.join(self.path()).to_string_lossy())
     }
+}
+
+/// The text a writer spells for a reference from the file keyed `from` to the file keyed `to`
+/// (R78): `to` relative to `from`'s directory, with `..` segments where `to` is not below it, so
+/// the written files keep the source tree's layout. `None` when that cannot be stated: either
+/// key absolute, or above the root (a key the loader kept a leading `..` in); the writer then
+/// spells the path as it was read, with a note.
+pub fn relative_path(from: &str, to: &str) -> Option<String> {
+    let above = |k: &str| k.starts_with('/') || k == ".." || k.starts_with("../");
+    if above(from) || above(to) {
+        return None;
+    }
+    let dir: Vec<&str> = from.split('/').collect::<Vec<_>>().split_last()?.1.to_vec();
+    let target: Vec<&str> = to.split('/').collect();
+    let common = dir.iter().zip(&target).take_while(|(a, b)| a == b).count();
+    let mut out: Vec<&str> = vec![".."; dir.len() - common];
+    out.extend_from_slice(&target[common..]);
+    Some(out.join("/"))
+}
+
+/// The text a writer spells, in file `from` of `design`, for an include, library or load path
+/// `path` as the IR holds it (R78): when `path` is a file of the design (a reader stores the key
+/// of a file it resolved), that key relative to `from`'s directory ([`relative_path`]); a path
+/// that names no file of the design is spelled as it was read. `Err(path)` when the file's key
+/// cannot be stated relative to `from`: the writer spells `path` as read and notes it
+/// ([`super::PATH_AS_READ`]).
+///
+/// # Errors
+/// `Err` with the path as read, for a key above the root or an absolute one.
+pub fn written_path(design: &ir::Design, from: ir::FileId, path: &str) -> Result<String, String> {
+    let to = design.find_file(path);
+    if to.is_none() {
+        return Ok(path.to_string());
+    }
+    let from_key = design.str(design.file(from).path);
+    let to_key = design.str(design.file(to).path);
+    relative_path(from_key, to_key).ok_or_else(|| path.to_string())
 }
 
 // ---- private ----
