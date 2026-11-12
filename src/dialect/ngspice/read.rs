@@ -18,17 +18,18 @@
 //! later).
 //!
 //! Contents: `pub(super) struct Lower<'a, 'd>`, `pub(super) struct Stmt`,
-//! `pub(super) enum Def`,
+//! `pub(super) enum Def`, `pub(super) struct RowRef`, `pub(super) fn bind_rows`,
+//! `pub(super) fn bind_reads`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, wins,
-//! class, pending, rescope, include_path}`; the CST reads are `cst.rs`
+//! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use super::codes;
 use super::cst::{body, extent, joined, line, next, rest, unquote};
 use super::declare::{Class, Declared, declare};
 use super::expr_read::Tree;
-use super::name::Folder;
+use super::name::{self, Folder};
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
 };
@@ -60,6 +61,8 @@ pub(super) struct Lower<'a, 'd> {
     /// Its role.
     pub(super) role: ir::Role,
     pending: &'a mut Vec<(ir::ExprId, ir::ScopeId)>,
+    rows: &'a mut Vec<RowRef>,
+    measured: &'a mut Vec<(usize, usize)>,
     declared: &'a Declared,
     /// Bytes read before the file's own text (1 for a library file).
     shift: u32,
@@ -77,6 +80,22 @@ pub(super) struct Stmt {
     pub(super) scope: ir::ScopeId,
     /// The root, `.subckt`, `.lib` section or branch node it stands in.
     pub(super) container: Node,
+}
+
+/// A row's reference waiting for the bind step ([`Lower::refer`]): its item, its slot in
+/// `RowFacts::map_refs` order, the scope it is read from, the kind the slot expects, the name.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct RowRef {
+    /// The pushed item.
+    pub(super) item: ir::ItemRef,
+    /// Its reference's slot.
+    pub(super) k: u32,
+    /// Where the name is read.
+    pub(super) scope: ir::ScopeId,
+    /// The definition kind the slot expects.
+    pub(super) kind: ir::DefKind,
+    /// The name, as pushed.
+    pub(super) name: ir::NameId,
 }
 
 /// What a name is defined as, for the declare step.
@@ -106,44 +125,58 @@ struct Frame<'a> {
 pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
     assert!(!src.files().is_empty(), "ngspice read: a file to read");
     let lex = lexicon();
+    let roles: Vec<ir::Role> = (0..src.files().len())
+        .map(|k| {
+            if k < src.entries().len() {
+                src.form()
+            } else {
+                ir::Role::Library
+            }
+        })
+        .collect();
+    // a library file is read behind one empty line (its line 1 is no title)
+    let texts: Vec<String> = src
+        .files()
+        .iter()
+        .zip(&roles)
+        .map(|((_, t), r)| {
+            if *r == ir::Role::Library {
+                format!("\n{t}")
+            } else {
+                t.clone()
+            }
+        })
+        .collect();
+    let toks: Vec<Tokens<'_>> = texts.iter().map(|t| tokenize(t, lex)).collect();
+    let asts: Vec<_> = toks.iter().map(|t| parse(t, lex)).collect();
     let mut names = Folder::default();
     let mut pending = Vec::new();
-    for (k, (path, text)) in src.files().iter().enumerate() {
-        let role = if k < src.entries().len() {
-            src.form()
-        } else {
-            ir::Role::Library
-        };
-        let shifted;
-        let (text, shift) = if role == ir::Role::Library {
-            shifted = format!("\n{text}");
-            (shifted.as_str(), 1)
-        } else {
-            (text.as_str(), 0)
-        };
-        let toks = tokenize(text, lex);
-        let ast = parse(&toks, lex);
-        let (file, top) = out.file(path, role);
-        let declared = declare(&ast, &toks);
+    let mut rows = Vec::new();
+    let mut measured = Vec::new();
+    for (k, (path, _)) in src.files().iter().enumerate() {
+        let (file, top) = out.file(path, roles[k]);
+        let declared = declare(&asts[k], &toks[k]);
         let mut lw = Lower {
             b: &mut *out,
             diags: &mut *diags,
             names: &mut names,
-            ast: &ast,
-            toks: &toks,
+            ast: &asts[k],
+            toks: &toks[k],
             src,
             path,
             file,
-            role,
+            role: roles[k],
             pending: &mut pending,
+            rows: &mut rows,
+            measured: &mut measured,
             declared: &declared,
-            shift,
+            shift: u32::from(roles[k] == ir::Role::Library),
             frames: Vec::new(),
             framed: false,
         };
         lower(&mut lw, top);
     }
-    bind(out, &pending);
+    bind(out, &pending, &measured, &rows);
 }
 
 /// The files `text` names, in text order: each `.include` path and `.lib` call's file.
@@ -173,6 +206,50 @@ pub(super) fn references(text: &str) -> Vec<Reference> {
         }
     }
     out
+}
+
+/// The bind step's row half: each queued reference bound to the `kind` definition of its name
+/// nearest its scope outward (`Design::lookup`), through `Builder::bind_ref`; left unresolved
+/// when there is none (R4).
+pub(super) fn bind_rows(b: &mut ir::Builder<'_>, rows: &[RowRef]) {
+    for r in rows {
+        let def = b.design().lookup(r.scope, r.kind, r.name);
+        if !def.is_none() {
+            b.bind_ref(r.item, r.k, def);
+        }
+    }
+}
+
+/// The bind step's read half: each pending parameter read and user call, still unresolved,
+/// bound to the definition ngspice reads from its scope, the nearest enclosing one
+/// (`Design::lookup`); a read inside a `measured` range (`Lower::measure_reads`) binds to a
+/// measure of its name first, then to a parameter.
+pub(super) fn bind_reads(
+    b: &mut ir::Builder<'_>,
+    pending: &[(ir::ExprId, ir::ScopeId)],
+    measured: &[(usize, usize)],
+) {
+    for (k, &(e, scope)) in pending.iter().enumerate() {
+        let (kind, r) = match b.design().expr(e) {
+            ir::Expr::Param(r) => (ir::DefKind::Param, r),
+            ir::Expr::UserCall(r, _) => (ir::DefKind::Func, r),
+            other => unreachable!("only reads and calls are pending: {other:?}"),
+        };
+        if !r.def.is_none() {
+            continue;
+        }
+        let in_measure = measured.iter().any(|&(a, z)| (a..z).contains(&k));
+        let mut def = ir::DefId::NONE;
+        if in_measure && kind == ir::DefKind::Param {
+            def = b.design().lookup(scope, ir::DefKind::Measure, r.name);
+        }
+        if def.is_none() {
+            def = b.design().lookup(scope, kind, r.name);
+        }
+        if !def.is_none() {
+            b.resolve(e, def);
+        }
+    }
 }
 
 impl<'a, 'd> Lower<'a, 'd> {
@@ -258,10 +335,10 @@ impl<'a, 'd> Lower<'a, 'd> {
         self.toks.text(self.ast.main_token(n)).to_ascii_lowercase()
     }
 
-    /// Appends `tree` for an item in `scope`, notes a rounded number, and returns its root.
+    /// Appends `tree` for an item in `scope`, gives its reading's notes, and returns its root.
     pub(super) fn expr(&mut self, st: Stmt, tree: &Tree, scope: ir::ScopeId) -> ir::ExprId {
-        if tree.rounded() {
-            self.note(st, codes::ROUNDED);
+        for &code in tree.notes() {
+            self.note(st, code);
         }
         tree.emit(self.b, self.names, scope, self.pending)
     }
@@ -275,6 +352,67 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// The class of `text` read in `block` (R14, `declare.rs`), `formals` shadowing.
     pub(super) fn class(&self, block: Node, text: &str, formals: &[String]) -> Class {
         self.declared.class(block, text, formals)
+    }
+
+    /// Queues slot `k` (in `RowFacts::map_refs` order) of a pushed `item` to be bound in the
+    /// bind step to the `kind` definition named `name` (as pushed: folded) nearest `scope`
+    /// outward, the reader's rule (R3); left unresolved when none is found (R4). The one way an
+    /// area binds a row's reference (a master or model defined later, or in a later file of
+    /// the same scope chain): `Builder::bind_ref` in `bind`.
+    #[allow(dead_code, reason = "the element and model areas call it (S3.1, S3.2)")]
+    pub(super) fn refer(
+        &mut self,
+        item: ir::ItemRef,
+        k: u32,
+        scope: ir::ScopeId,
+        kind: ir::DefKind,
+        name: ir::NameId,
+    ) {
+        assert!(!name.is_none(), "refer: a name");
+        self.rows.push(RowRef {
+            item,
+            k,
+            scope,
+            kind,
+            name,
+        });
+    }
+
+    /// Marks the parameter reads queued since `mark` as reads inside a `.meas … param=`: the bind
+    /// step binds each to a measure of its name first, then to a parameter (ngspice-45
+    /// `measure.c` `do_measure`: every other measure runs first and enters its result with
+    /// `nupa_add_param`, so a measure, even a later one, hides a `.param` of its name).
+    #[allow(dead_code, reason = "the output area calls it (S3.3b)")]
+    pub(super) fn measure_reads(&mut self, mark: usize) {
+        assert!(
+            mark <= self.pending.len(),
+            "measure_reads: a mark from before"
+        );
+        self.measured.push((mark, self.pending.len()));
+    }
+
+    /// The head parameter names (folded, `name::key`) of the `.subckt name` ngspice binds from
+    /// `st`'s block: the nearest block outward in this file, else a top-level `.subckt` of an
+    /// earlier file of the read; `None` when none is visible.
+    #[allow(dead_code, reason = "the element area calls it (S3.1a)")]
+    pub(super) fn subckt_formals(&self, st: Stmt, name: &str) -> Option<Vec<String>> {
+        if let Some(f) = self.declared.formals(st.container, name) {
+            return Some(f.to_vec());
+        }
+        let d = self.b.design();
+        let key = name::key(name);
+        let def = d.definitions().iter().find(|def| {
+            def.kind == ir::DefKind::Subckt
+                && d.scope(def.scope).kind == ir::ScopeKind::File
+                && name::key(d.str(def.name)) == key
+        })?;
+        let s: ir::item::Subckt = d.row(def.item.index);
+        Some(
+            d.params(s.params)
+                .iter()
+                .map(|&(n, _)| name::key(d.str(n)))
+                .collect(),
+        )
     }
 
     /// How many parameter reads and calls wait for the bind step (a mark for [`Lower::rescope`]).
@@ -448,20 +586,14 @@ fn comments(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, from: u32, to: u32) {
     }
 }
 
-/// The bind step: each pending parameter read and user call, still unresolved, bound to the
-/// definition ngspice reads from its scope (the nearest enclosing one: `Design::lookup`).
-fn bind(b: &mut ir::Builder<'_>, pending: &[(ir::ExprId, ir::ScopeId)]) {
-    for &(e, scope) in pending {
-        let (kind, r) = match b.design().expr(e) {
-            ir::Expr::Param(r) => (ir::DefKind::Param, r),
-            ir::Expr::UserCall(r, _) => (ir::DefKind::Func, r),
-            other => unreachable!("only reads and calls are pending: {other:?}"),
-        };
-        if r.def.is_none() {
-            let def = b.design().lookup(scope, kind, r.name);
-            if !def.is_none() {
-                b.resolve(e, def);
-            }
-        }
-    }
+/// The bind step: each queued row reference ([`bind_rows`]), then each pending parameter read
+/// and user call ([`bind_reads`]).
+fn bind(
+    b: &mut ir::Builder<'_>,
+    pending: &[(ir::ExprId, ir::ScopeId)],
+    measured: &[(usize, usize)],
+    rows: &[RowRef],
+) {
+    bind_rows(b, rows);
+    bind_reads(b, pending, measured);
 }

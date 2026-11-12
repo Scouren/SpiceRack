@@ -182,7 +182,7 @@ impl<'t> Words<'t> {
 
     /// A field value: an atom, or a parenthesized expression (references in it are linked after
     /// the whole text). `scope` is where the expression is used.
-    pub fn value(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
+    pub fn value(&mut self, _scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
         self.blank();
         let at = self.pos;
         let s = self.text.as_bytes();
@@ -214,7 +214,7 @@ impl<'t> Words<'t> {
 
     /// An expression to the end of the line or the next unmatched `)`/`,`/`]` (the `param` and
     /// `func` right-hand sides). Explicit operator stack: no recursion on nesting depth (C11).
-    pub fn expr(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
+    pub fn expr(&mut self, _scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
         self.blank();
         match parse_expr(self.text, self.pos, self.end, b) {
             Ok((e, q)) => {
@@ -230,7 +230,7 @@ impl<'t> Words<'t> {
     }
 
     /// A bracketed expression list: `[e1, e2]`, possibly `[]`.
-    pub fn exprs(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprList {
+    pub fn exprs(&mut self, _scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprList {
         if !self.expect("[", diags) {
             return ExprList::EMPTY;
         }

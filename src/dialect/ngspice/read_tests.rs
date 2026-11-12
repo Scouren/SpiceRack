@@ -368,9 +368,9 @@ fn any_bytes_read_returns_and_checks_clean() {
 
 #[test]
 fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
-    // R21 (`Write::admits`): a literal ngspice reads back otherwise (no centi letter; numparam
-    // reads `mil` as milli: xpressn.c parseunit), a head parameter with no default (manual
-    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once).
+    // R21 (`Write::admits`): never a literal (R28: respelled exactly), a head parameter with no default (manual
+    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once),
+    // a string value (numparam has none).
     let mut d = ir::Design::new();
     {
         let mut b = d.builder();
@@ -393,19 +393,105 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
         b.comment(top, "two\nlines", ir::Span::NONE);
         let t = b.temp();
         b.if_(top, &[t], ir::Span::NONE);
+        let text = b.string("4.8.3");
+        b.param(top, "v", text, ir::Span::NONE);
     }
     let row = dialect::by_name("ngspice").expect("row");
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut d, row, &mut diags);
-    let mut got = codes_of(&diags);
+    // the admits rows; `U0001` for `Expr(Str)` also comes until the model area's FEATURES add it
+    let mut got: Vec<ir::Code> = codes_of(&diags)
+        .into_iter()
+        .filter(|c| c.letter == b'W')
+        .collect();
     got.sort();
     let mut want = vec![
-        codes::LITERAL_FORM,
-        codes::LITERAL_FORM,
         codes::NO_DEFAULT,
         codes::LINE_BREAK,
         codes::READS_RUN,
+        codes::TEXT_VALUE,
     ];
     want.sort();
     assert_eq!(got, want);
+}
+
+#[test]
+fn a_row_reference_queued_by_an_area_binds_to_a_definition_pushed_later() {
+    // R3 (the reader binds by ngspice's rule: the nearest definition outward), A11
+    // (`Builder::bind_ref`): an instance before its `.subckt`, as an X card standing first.
+    let mut d = ir::Design::new();
+    let (item, sub) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("d.sp", ir::Role::Deck);
+        let head = b.head("x1", &["a"], Some("s"), &[], ir::ExprId::NONE);
+        let item = b.instance(top, ir::ElemKind::Instance, head, ir::Span::NONE);
+        let (sub, _) = b.subckt(top, "s", &["p"], &[], ir::Span::NONE);
+        (item, sub)
+    };
+    let mut b = d.builder();
+    let name = b.design().find_name("s");
+    let top = b.design().file(b.design().entry()).top;
+    let rows = [super::read::RowRef {
+        item,
+        k: 0,
+        scope: top,
+        kind: ir::DefKind::Subckt,
+        name,
+    }];
+    super::read::bind_rows(&mut b, &rows);
+    let e: ir::Element = d.row(item.index);
+    assert_eq!(d.def(e.model.def).item, sub);
+}
+
+#[test]
+fn a_read_in_a_measure_binds_to_a_measure_before_a_parameter() {
+    // ngspice-45 measure.c do_measure: every other measure runs first and enters its result with
+    // nupa_add_param, so inside `.meas ... param=` a measure hides a `.param` of its name; outside
+    // one the `.param` is read.
+    let mut d = ir::Design::new();
+    let mut b = d.builder();
+    let (_, top) = b.file("d.sp", ir::Role::Deck);
+    let one = b.num(1.0);
+    let p = b.param(top, "x", one, ir::Span::NONE);
+    let c = b.comment(top, "stands in for a measure item", ir::Span::NONE);
+    let x = b.name("x");
+    let m = b.define(ir::DefKind::Measure, x, top, c);
+    let inside = b.param_ref("x");
+    let outside = b.param_ref("x");
+    let pending = [(inside, top), (outside, top)];
+    super::read::bind_reads(&mut b, &pending, &[(0, 1)]);
+    let def = |e| match b.design().expr(e) {
+        ir::Expr::Param(r) => r.def,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(def(inside), m);
+    assert_eq!(b.design().def(def(outside)).item, p);
+}
+
+#[test]
+fn a_subckts_formals_are_known_from_any_enclosing_block() {
+    // inpcom.c found_mult_param: an X line's m= is the multiplier unless the subcircuit declares
+    // m; the declare step answers for a .subckt defined anywhere in the enclosing blocks.
+    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
+    let text = "t\n.subckt outer a\n.subckt inner b params: M=1 w=2\n.ends\n.ends\n.subckt top c m=3\n.ends\n";
+    let toks = crate::syntax::tokenize(text, lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    let d = super::declare::declare(&ast, &toks);
+    let root = ast.root();
+    assert_eq!(d.formals(root, "TOP"), Some(&["m".to_string()][..]));
+    assert_eq!(d.formals(root, "inner"), None, "inner is outer's");
+    let outer = crate::syntax::ast::Node(ast.fields(root)[1]);
+    let want = ["m".to_string(), "w".to_string()];
+    assert_eq!(d.formals(outer, "inner"), Some(&want[..]));
+}
+
+#[test]
+fn a_blank_line_one_is_an_empty_title() {
+    // INV 14.12: line 1 of a deck is its title whatever it holds, so every ngspice deck has one.
+    let (d, _) = deck("\n.param a=1\n");
+    let top = d.file(d.entry()).top;
+    let t: ir::item::Title = d.row(d.items(top)[0].index);
+    assert_eq!(d.items(top)[0].kind, ItemKind::Title);
+    assert_eq!(d.text(t.text), "");
+    assert_eq!(write(&d), "\n.param a=1\n.end\n");
 }

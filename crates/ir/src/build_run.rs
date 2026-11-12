@@ -76,7 +76,7 @@
 //! - items: `Builder::analysis`, `Builder::op`, `Builder::dc_inc`, `Builder::loop_`,
 //!   `Builder::alter`, `Builder::option`, `Builder::option_private`, `Builder::env`,
 //!   `Builder::node_set`, `Builder::save`, `Builder::print`, `Builder::measure`,
-//!   `Builder::statistics`
+//!   `Builder::statistics`, `Builder::elaborate`
 
 use crate::analysis::{Analysis, AnalysisKind, RunDetail};
 use crate::build::Builder;
@@ -88,7 +88,9 @@ use crate::measure::MeasureKind;
 use crate::option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 use crate::option_key::OptionKey;
 use crate::output::{Measure, Print, PrintView, Save};
-use crate::plan::{Alter, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
+use crate::plan::{
+    Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList,
+};
 use crate::probe::{Probe, ProbeKind, ProbeList};
 use crate::run_words::{loop_depth, pool};
 use crate::span::Span;
@@ -472,6 +474,21 @@ impl Builder<'_> {
         );
         self.define(DefKind::Measure, name, scope, item);
         item
+    }
+
+    /// From here on, the top circuit is the named subcircuits' bodies (references left
+    /// unresolved for the caller's rule). Asserts at least one.
+    pub fn elaborate(&mut self, scope: ScopeId, circuits: &[&str], span: Span) -> ItemRef {
+        assert!(
+            !circuits.is_empty(),
+            "an elaborate names at least one circuit"
+        );
+        let refs: Vec<Ref> = circuits
+            .iter()
+            .map(|c| Ref::unresolved(self.name(c)))
+            .collect();
+        let circuits = pool(&mut self.design.run.refs, &refs);
+        self.push(scope, Elaborate { circuits }, span)
     }
 
     /// A statistics block (its lists appended with [`Builder::varies`] and

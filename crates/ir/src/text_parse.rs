@@ -48,7 +48,7 @@ enum Call<'t> {
 }
 
 /// The binary operators, longest spelling first.
-const BINARY: [(&str, BinOp); 18] = [
+const BINARY: [(&str, BinOp); 19] = [
     ("||", BinOp::Or),
     ("&&", BinOp::And),
     ("==", BinOp::Eq),
@@ -58,6 +58,7 @@ const BINARY: [(&str, BinOp); 18] = [
     ("<=", BinOp::Le),
     (">=", BinOp::Ge),
     ("//", BinOp::IntDiv),
+    ("/:", BinOp::DivTyped),
     ("|", BinOp::BitOr),
     ("^", BinOp::BitXor),
     ("&", BinOp::BitAnd),

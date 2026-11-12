@@ -25,7 +25,7 @@ const SIZE: Size = Size {
 };
 
 /// The run owner's item kinds.
-const RUN_KINDS: [ItemKind; 10] = [
+const RUN_KINDS: [ItemKind; 11] = [
     ItemKind::Statistics,
     ItemKind::Analysis,
     ItemKind::Loop,
@@ -36,6 +36,7 @@ const RUN_KINDS: [ItemKind; 10] = [
     ItemKind::Save,
     ItemKind::Print,
     ItemKind::Measure,
+    ItemKind::Elaborate,
 ];
 
 // ---- private ----

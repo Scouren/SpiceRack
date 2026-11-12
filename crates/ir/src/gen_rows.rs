@@ -102,6 +102,8 @@ pub(crate) fn gen_subckt(
     f: &FeatureSet,
 ) -> ItemRef {
     let mut classes = Vec::new();
+    // a head default reads a parameter only when the set has FormalReadsParam (A12 K2)
+    g.param_reads = f.contains(Feature::Extra(Extra::FormalReadsParam));
     let defaults: Vec<ExprId> = (0..g.below(3))
         .map(|_| {
             let value = f.contains(Feature::Expr(ExprTag::Num)) && g.chance(2);
@@ -114,6 +116,7 @@ pub(crate) fn gen_subckt(
             e
         })
         .collect();
+    g.param_reads = true;
     let name = g.fresh();
     let ports: Vec<String> = (0..g.below(4)).map(|_| g.fresh()).collect();
     let keys: Vec<String> = defaults.iter().map(|_| g.fresh()).collect();

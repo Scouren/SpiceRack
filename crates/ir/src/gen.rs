@@ -72,6 +72,17 @@ pub struct Gen {
     pub(crate) class: ExprClass,
     pub(crate) dynamic: bool,
     pub(crate) reads: Reads,
+    /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
+    /// `expr` from its feature set).
+    pub(crate) int_literals: bool,
+    /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
+    /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
+    /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
+    pub(crate) enclosing_ok: bool,
+    pub(crate) param_reads: bool,
+    /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
+    /// `Extra::CaseSensitiveNames`).
+    pub(crate) case_ok: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -119,6 +130,10 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         class: ExprClass::Constant,
         dynamic: false,
         reads: Reads::Constant,
+        int_literals: false,
+        enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
+        param_reads: true,
+        case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -151,6 +166,15 @@ impl Gen {
     /// trailing zeros in `frac`, so every writer's number spelling and the literal round trip are
     /// exercised.
     pub fn literal(&mut self) -> Literal {
+        if self.int_literals && self.chance(4) {
+            let n = self.below(2001) as i64 - 1000;
+            return Literal {
+                mantissa: n,
+                frac: 0,
+                exp10: 0,
+                form: NumForm::Int,
+            };
+        }
         let sign = if self.chance(4) { -1 } else { 1 };
         let mantissa = sign * (1 + self.below(999_999)) as i64;
         let frac = self.below(4) as u8;
@@ -216,7 +240,9 @@ impl Gen {
         for _ in 0..if n == 0 { 0 } else { 8 } {
             let k = self.below(n) as usize;
             let def = self.by_kind[kind as usize][k];
-            if chain.contains(&design.def(def).scope) {
+            let at = design.def(def).scope;
+            let enclosing = !self.enclosing_ok && design.in_enclosing_subckt(scope, at);
+            if chain.contains(&at) && !enclosing {
                 return def;
             }
         }
@@ -227,6 +253,11 @@ impl Gen {
     /// interns it in a builder caller's order).
     pub(crate) fn fresh(&mut self) -> String {
         self.fresh += 1;
+        // the case twin of the previous call's index: each index has at most one, so the name
+        // is still unique as written
+        if self.case_ok && self.fresh > 1 && self.chance(16) {
+            return format!("G{}", self.fresh - 2);
+        }
         format!("g{}", self.fresh - 1)
     }
 
@@ -346,6 +377,7 @@ fn candidates(
             | ItemKind::Include
             | ItemKind::Global
             | ItemKind::Opaque
+            | ItemKind::DeviceLibrary
             | ItemKind::Statistics
             | ItemKind::Element
             | ItemKind::Analysis
@@ -355,7 +387,8 @@ fn candidates(
             | ItemKind::NodeSet
             | ItemKind::Save
             | ItemKind::Print
-            | ItemKind::Measure => true,
+            | ItemKind::Measure
+            | ItemKind::Elaborate => true,
         })
         .collect()
 }

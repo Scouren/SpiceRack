@@ -11,9 +11,11 @@
 //! Cites: `rewrite/DIALECT-NGSPICE.md` §2, §3; `rewrite/S3-AREAS.md`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`
+//! `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `pub(super) fn probe(lw: &mut Lower<'_, '_>, st: Stmt, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`
 
 use super::codes::Row;
+use super::expr_read::Fail;
 use super::read::{Lower, Stmt};
 use crate::ir;
 
@@ -27,4 +29,19 @@ pub(super) const CODES: &[Row] = &[];
 /// An output card (stub: `Unread`).
 pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     lw.unread(st);
+}
+
+/// One output named inside another card (`.four 1k v(a)`, `.tf v(out) vin`, `.noise v(out)
+/// vin`), as the probe it reads in the analysis of `analysis`: the run area calls it for those
+/// cards' outputs, so that one reader spells probes. `Err` is the class and code of the
+/// `Opaque` the calling statement becomes. Stub: no probe is read yet (`Unread`).
+#[expect(dead_code, reason = "the run area calls it (S3.3a)")]
+pub(super) fn probe(
+    lw: &mut Lower<'_, '_>,
+    st: Stmt,
+    text: &str,
+    analysis: ir::AnalysisKind,
+) -> Result<ir::Probe, Fail> {
+    let _ = (lw, st, text, analysis);
+    Err(Fail::unread())
 }

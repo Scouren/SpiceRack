@@ -70,6 +70,8 @@ pub(crate) fn lex_literal(word: &str) -> Option<Literal> {
         (0, NumForm::Plain)
     } else if rest == "mil" {
         (0, NumForm::Mil)
+    } else if rest == "i" {
+        (0, NumForm::Int)
     } else if let Some(e) = rest.strip_prefix('e') {
         (e.parse::<i16>().ok()?, NumForm::Exponent)
     } else {
