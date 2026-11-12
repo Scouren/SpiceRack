@@ -18,7 +18,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `SAVE_CLEAR`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`), `control`,
+//! `ALTER_TYPE`, `SAVE_CLEAR`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`), `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -78,6 +78,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Option(ir::OptionKey::GminSteps))
 .with(ir::Feature::Option(ir::OptionKey::SrcSteps))
 .with(ir::Feature::Option(ir::OptionKey::NoOpIter))
+// Only as a sweep's `option=` target: an option row of a private key is refused (W2304).
 .with(ir::Feature::Option(ir::OptionKey::Private))
 .with(ir::Feature::Run(ir::RunExtra::SeveralAnalyses))
 .with(ir::Feature::Run(ir::RunExtra::AnalysisNamed))
@@ -96,10 +97,21 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::DcAxisModelParam))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisTemp))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisOption))
-.with(ir::Feature::Run(ir::RunExtra::SweepLinPoints))
-.with(ir::Feature::Run(ir::RunExtra::SweepDec))
-.with(ir::Feature::Run(ir::RunExtra::SweepOct))
-.with(ir::Feature::Run(ir::RunExtra::SweepList))
+.with(ir::Feature::Run(ir::RunExtra::SweepDcLinStep))
+.with(ir::Feature::Run(ir::RunExtra::SweepDcLinPoints))
+.with(ir::Feature::Run(ir::RunExtra::SweepDcDec))
+.with(ir::Feature::Run(ir::RunExtra::SweepDcOct))
+.with(ir::Feature::Run(ir::RunExtra::SweepDcList))
+.with(ir::Feature::Run(ir::RunExtra::SweepLoopLinStep))
+.with(ir::Feature::Run(ir::RunExtra::SweepLoopLinPoints))
+.with(ir::Feature::Run(ir::RunExtra::SweepLoopDec))
+.with(ir::Feature::Run(ir::RunExtra::SweepLoopOct))
+.with(ir::Feature::Run(ir::RunExtra::SweepLoopList))
+.with(ir::Feature::Run(ir::RunExtra::SweepFreqLinStep))
+.with(ir::Feature::Run(ir::RunExtra::SweepFreqLinPoints))
+.with(ir::Feature::Run(ir::RunExtra::SweepFreqDec))
+.with(ir::Feature::Run(ir::RunExtra::SweepFreqOct))
+.with(ir::Feature::Run(ir::RunExtra::SweepFreqList))
 .with(ir::Feature::Run(ir::RunExtra::SpPorts))
 .with(ir::Feature::Run(ir::RunExtra::LoopMonteCarlo))
 .with(ir::Feature::Run(ir::RunExtra::LoopRestore))
@@ -152,6 +164,10 @@ pub(super) const SWEEP_NAME_MADE: ir::Code = ir::Code::new(b'W', 2302);
 
 /// A save of a probe category VACASK has no directive for (refused by `write_outputs::admits`).
 pub(super) const SAVE_CATEGORY: ir::Code = ir::Code::new(b'W', 2303);
+
+/// An option row of a private key: VACASK's own options are read as Hint or Private opaques
+/// (refused by `write_run::admits`).
+pub(super) const OPTION_ROW_PRIVATE: ir::Code = ir::Code::new(b'W', 2304);
 
 /// This area's rows (the writer's two notes too: `write_run` has no table of its own).
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
@@ -266,6 +282,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "VD cmd-sweep",
         "VACASK requires a sweep name (it names the swept vector); a sweep with none is named `sweep<n>`.",
         ir::Kind::Note,
+    ),
+    row(
+        OPTION_ROW_PRIVATE,
+        "an option row of a simulator's own key",
+        "R19; DIALECT-VACASK §3.4 options",
+        "VACASK's reader keeps its own options as Hint or Private text, never as a private option row; another simulator's private option has no VACASK spelling.",
+        ir::Kind::Refusal,
     ),
     row(
         SAVE_CATEGORY,

@@ -8,7 +8,7 @@ file "analyses.ir" deck
   nodeset nodeset every_op next_only node=(b) reference=(c) value=0.5
   analysis op name=op1
   nodeset ic transient next_only node=(x1 n) value=1i
-  analysis tran name=t1 stop=10m record_start=6m max_step=10u initial_step=1u cap=span_over50 uic
+  analysis tran name=t1 stop=10m record_start=6m initial_step=1u max_step=10u uic
   analysis tran name=t2 stop=1m noise_fmax=5k noise_fmin=(5k /: 1e3) noise_seed=3i cap=span_over50
   analysis ac name=a1 (lin start=1k stop=2k points=11i)
   analysis ac name=a2 (lin start=1k stop=2k step=100i)

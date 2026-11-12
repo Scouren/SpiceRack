@@ -2,5 +2,5 @@ transients
 control
   analysis t1 tran stop=1m step=1u
   analysis t2 tran stop=10m start=6m step=1u maxstep=10u icmode="uic" ic={"b", 1}
-  analysis t3 tran stop=1m maxstep=0
+  analysis t3 tran stop=1m maxstep=0 start=0
 endc

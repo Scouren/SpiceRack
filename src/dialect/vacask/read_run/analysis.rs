@@ -8,7 +8,8 @@
 //!
 //! The kinds and their parameters are VACASK's (VD cmd-analysis-op, -dcinc, -dcxf, -ac, -acxf,
 //! -acstb, -acsp, -noise, -tran, -trannoise): `tran`'s `step` is the initial step, `start` the
-//! start of recording, no `maxstep` (or a literal 0, run e7) the span/50 cap (run tr1);
+//! start of recording (a literal 0: none, R47), no `maxstep` (or a literal 0, run e7) the
+//! span/50 rule (run tr1, `StepCeiling::Rule`);
 //! `noisefmin` absent or 0 is `noisefmax/1e3`, stated as written; a lin `points` counts
 //! intervals, so the IR's count is one more (VD cmd-analysis-ac, IR sweep.rs).
 //!
@@ -285,6 +286,8 @@ fn tran(l: &Lower<'_, '_, '_>, pairs: &[(String, u32)]) -> Result<Tran, Why> {
     check(l, &[stop, step, start, maxstep, fmax, fmin, seed])?;
     // A literal zero is VACASK's "none" for these (run e7; VD: noisefmin 0 is the default).
     let maxstep = if zero(l, maxstep) { NONE } else { maxstep };
+    // `start=0` records from 0: no record start (R47; check refuses a literal-0 one).
+    let start = if zero(l, start) { NONE } else { start };
     let fmin = if zero(l, fmin) { NONE } else { fmin };
     Ok(Tran {
         stop,
@@ -395,7 +398,10 @@ fn build(l: &mut Lower<'_, '_, '_>, plan: &Plan, span: ir::Span) {
 fn tran_row(l: &mut Lower<'_, '_, '_>, t: Tran) -> ir::tran::Tran {
     let stop = value(l, t.stop);
     let record_start = value(l, t.start);
-    let max_step = value(l, t.maxstep);
+    let ceiling = match t.maxstep {
+        NONE => ir::tran::StepCeiling::Rule(ir::tran::StepCap::SpanOver50),
+        m => ir::tran::StepCeiling::Given(value(l, m)),
+    };
     let initial_step = value(l, t.step);
     let noise_fmax = value(l, t.fmax);
     let noise_fmin = match (t.fmax, t.fmin) {
@@ -412,13 +418,12 @@ fn tran_row(l: &mut Lower<'_, '_, '_>, t: Tran) -> ir::tran::Tran {
         stop,
         record_start,
         print_step: ir::ExprId::NONE,
-        max_step,
         initial_step,
         noise_fmax,
         noise_fmin,
         noise_seed,
         segments: ir::List::EMPTY,
-        cap: ir::tran::StepCap::SpanOver50,
+        ceiling,
         uic: t.uic,
         startup: false,
     }

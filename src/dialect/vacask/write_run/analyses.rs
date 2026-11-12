@@ -296,7 +296,9 @@ fn tran(d: &ir::Design, t: ir::tran::Tran, out: &mut String) {
     key(d, "stop", t.stop, out);
     key(d, "step", t.initial_step, out);
     key(d, "start", t.record_start, out);
-    key(d, "maxstep", t.max_step, out);
+    if let ir::tran::StepCeiling::Given(e) = t.ceiling {
+        key(d, "maxstep", e, out);
+    }
     if t.uic {
         out.push_str(" icmode=\"uic\"");
     }

@@ -12,4 +12,5 @@ control
   options rawfile="ascii"
   analysis tq tran stop=10m step=1u
   analysis tw tran stop=10m step=1u maxstep=0
+  analysis tz tran stop=10m step=1u start=0
 endc

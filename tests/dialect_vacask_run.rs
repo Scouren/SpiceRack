@@ -390,10 +390,13 @@ fn save_scope_v_governs_op_and_tran_not_ac() {
 
 #[test]
 fn maxstep0_a_zero_ceiling_is_none() {
-    // Run e7: `maxstep=0` writes the same raw file as no maxstep (the span/50 cap of tr1).
+    // Run e7: `maxstep=0` writes the same raw file as no maxstep (the span/50 cap of tr1), and
+    // `start=0` the same as no start.
     let r = settle("maxstep0.sim");
     let get = |n: &str| r.raws.iter().find(|(k, _)| k == n).expect(n).1.clone();
     assert_eq!(get("tq.raw"), get("tw.raw"));
+    // VD cmd-analysis-tran: `start` defaults to 0, so a literal 0 is none given (R47).
+    assert_eq!(get("tq.raw"), get("tz.raw"));
 }
 
 #[test]

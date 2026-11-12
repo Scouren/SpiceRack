@@ -17,6 +17,7 @@
 mod analyses;
 mod plan;
 
+use super::read_run::OPTION_ROW_PRIVATE;
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
 use crate::ir;
@@ -55,21 +56,60 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     }
 }
 
-/// The first and last index into `design.items(top)` of a control-block item (a run kind, or a
-/// `vacask` Opaque this area made: not `Unread`, its head word a control command): the spine writes `control` before
-/// the first, the items between at depth 1, and `endc` after the last (VD cmd-overview: one
-/// control block per file; run x1). `None` when the file has none.
+/// The first and last index into `design.items(top)` of the control block's items, for the
+/// spine's `control` … `endc` (VD cmd-overview: one block per file; run x1): from the first run
+/// item to the last, widened over the control-command opaques next to them (a `print` before
+/// the first analysis); with no run item, the first and last control-command opaque of class
+/// Private, Inert or Hint. A command word alone is no proof: outside a block `print …` is an
+/// instance named `print` (another area's opaque, of class Unread or InvalidInSource).
 pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
     let items = design.items(top);
-    let first = items.iter().position(|&at| control_item(design, at))?;
-    let last = items.iter().rposition(|&at| control_item(design, at))?;
+    let command = |k: usize| command_opaque(design, items[k]);
+    let ours = |k: usize| command(k).is_some_and(|c| c != ir::OpaqueClass::Unread);
+    let comment = |k: usize| items[k].kind == ir::ItemKind::Comment;
+    if let Some(mut first) = items.iter().position(|&at| run_item(at)) {
+        let mut last = items.iter().rposition(|&at| run_item(at))?;
+        // Widen over our command opaques, across comments between them.
+        let mut k = first;
+        while k > 0 && (ours(k - 1) || comment(k - 1)) {
+            k -= 1;
+            if ours(k) {
+                first = k;
+            }
+        }
+        let mut k = last;
+        while k + 1 < items.len() && (ours(k + 1) || comment(k + 1)) {
+            k += 1;
+            if ours(k) {
+                last = k;
+            }
+        }
+        return Some((first, last));
+    }
+    let own = |k: &usize| {
+        command(*k).is_some_and(|c| {
+            matches!(
+                c,
+                ir::OpaqueClass::Private | ir::OpaqueClass::Inert | ir::OpaqueClass::Hint
+            )
+        }) || command(*k) == Some(ir::OpaqueClass::InvalidInSource) && reserved(design, items[*k])
+    };
+    let first = (0..items.len()).find(own)?;
+    let last = (0..items.len()).rfind(own)?;
     Some((first, last))
 }
 
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
-/// states (R21). Nothing yet: every lack this area found is a feature request (A22).
+/// states (R21): an option row of a private key (W2304; VACASK's own options are Hint or
+/// Private opaques).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    let _ = (design, diags);
+    for (at, _) in design.reachable() {
+        if at.kind == ir::ItemKind::Option
+            && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
+        {
+            diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+        }
+    }
 }
 
 /// `text` as a VACASK string (`"…"`, `"` and `\` escaped).
@@ -150,31 +190,49 @@ pub(super) fn body(w: &mut Writer<'_, '_>, scope: ir::ScopeId) {
 
 // ---- private ----
 
-/// Whether `at` belongs in the control block.
-fn control_item(design: &ir::Design, at: ir::ItemRef) -> bool {
-    match at.kind {
+/// Whether `at` is a run item.
+fn run_item(at: ir::ItemRef) -> bool {
+    matches!(
+        at.kind,
         ir::ItemKind::Analysis
-        | ir::ItemKind::Loop
-        | ir::ItemKind::Alter
-        | ir::ItemKind::Option
-        | ir::ItemKind::Env
-        | ir::ItemKind::NodeSet
-        | ir::ItemKind::Save
-        | ir::ItemKind::Print
-        | ir::ItemKind::Measure
-        | ir::ItemKind::Elaborate => true,
-        ir::ItemKind::Opaque => {
-            let row: ir::item::Opaque = design.row(at.index);
-            let text = design.text(row.text);
-            let head = text
-                .split(|c: char| c.is_whitespace() || c == '(')
-                .next()
-                .unwrap_or("");
-            // An `Unread` statement is another area's (an ngspice line in a `.sim`): not ours.
-            design.str(row.dialect) == "vacask"
-                && row.class != ir::OpaqueClass::Unread
-                && COMMANDS.contains(&head)
-        }
-        _ => false,
+            | ir::ItemKind::Loop
+            | ir::ItemKind::Alter
+            | ir::ItemKind::Option
+            | ir::ItemKind::Env
+            | ir::ItemKind::NodeSet
+            | ir::ItemKind::Save
+            | ir::ItemKind::Print
+            | ir::ItemKind::Measure
+            | ir::ItemKind::Elaborate
+    )
+}
+
+/// The class of `at` when it is a `vacask` opaque whose head word is a control command.
+fn command_opaque(design: &ir::Design, at: ir::ItemRef) -> Option<ir::OpaqueClass> {
+    if at.kind != ir::ItemKind::Opaque {
+        return None;
     }
+    let row: ir::item::Opaque = design.row(at.index);
+    let text = design.text(row.text);
+    let head = text
+        .split(|c: char| c.is_whitespace() || c == '(')
+        .next()
+        .unwrap_or("");
+    (design.str(row.dialect) == "vacask" && COMMANDS.contains(&head)).then_some(row.class)
+}
+
+/// Whether opaque `at` starts with a word VACASK reads as a control statement only (`analysis`,
+/// `sweep`, `save` are reserved in a control block, VD input-reserved; `options`, `mc`,
+/// `endmc`, `alter`, `elaborate` are no instance names an area reads as invalid).
+fn reserved(design: &ir::Design, at: ir::ItemRef) -> bool {
+    let row: ir::item::Opaque = design.row(at.index);
+    let head = design
+        .text(row.text)
+        .split_whitespace()
+        .next()
+        .unwrap_or("");
+    matches!(
+        head,
+        "analysis" | "sweep" | "save" | "options" | "mc" | "endmc" | "alter" | "elaborate"
+    )
 }
