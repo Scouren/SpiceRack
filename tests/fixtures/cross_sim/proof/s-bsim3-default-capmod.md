@@ -19,4 +19,21 @@ pass the harness's refinement oracle since its TSTOP/20000 run (e47042d):
 their difference was the step, so they are `refinement` lines, not this
 rule's.
 
+Seven more decks are the family's circuit behind binned model cards
+(`.model nmos.1 nmos (level=9 lmin=… wmax=…)`, every other parameter
+default) or `.options parser scale`: `MODEL_BINNING/comparatorBinning.cir`,
+`comparatorBinning_forGlobal.cir`, `globalPar_comparatorBinning.cir`,
+`BUG_1041_SON/bsim3_comparatorBinningScale.cir` and `…ScaleRef.cir`,
+`ISSUE_239/bsim3_test2.cir` and `bsim3_test2Ref.cir`. Each one's Xyce run
+against its baseline's Xyce run, and its ngspice run against its baseline's
+ngspice run, compared as `tests/test_cross_sim/cmp.rs` compares a pair:
+every shared vector inside the tube (worst distance from the band 0 of the
+tolerance, both simulators, all seven). Each leaves the tube against the
+other simulator at the baseline's sample: V(1) = -0.3762851594665437 V on
+Xyce (the same 16 digits as `comparatorBaseline.cir`) where ngspice has
++0.88245705936 V, t = 10.9548 ns. `bsim3_comparatorBinningScale2.cir` is
+another circuit on both simulators (v(8) 99 tolerances from the baseline's)
+and is not this rule's. Run 2026-11-11, Xyce 7.10.0 and ngspice-45
+(ZERO-LEDGER P1-066).
+
 Source: research/mismatches.md §2 (S-BSIM3-DEFAULT-CAPMOD); ZERO-LEDGER P1-032.

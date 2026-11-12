@@ -238,3 +238,69 @@ fn p1_066_gm6_and_vreg_are_ngspices_own() {
         );
     }
 }
+
+/// ZERO-LEDGER P1-066. Seven decks are the BSIM3 comparator behind binned
+/// model cards (`nmos.1`…`nmos.4`, every parameter default) or `.options
+/// parser scale`; Xyce and ngspice each give them the baseline's run, so
+/// their difference is S-BSIM3-DEFAULT-CAPMOD's (LTspice sides with Xyce).
+/// Oracle: the comments the harness blessed from the two simulators: each
+/// of the seven leaves the tube at `COMPARATOR/comparator.cir`'s sample,
+/// value and tolerance, character for character; and the lines citing the
+/// proof are the 23 below, by name. Checks: 7 + 1.
+#[test]
+fn p1_066_the_binned_comparators_are_the_capmod_family() {
+    const BINNED: [&str; 7] = [
+        "Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale.cir",
+        "Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScaleRef.cir",
+        "Certification_Tests/ISSUE_239/bsim3_test2.cir",
+        "Certification_Tests/ISSUE_239/bsim3_test2Ref.cir",
+        "MODEL_BINNING/comparatorBinning.cir",
+        "MODEL_BINNING/comparatorBinning_forGlobal.cir",
+        "MODEL_BINNING/globalPar_comparatorBinning.cir",
+    ];
+    const FAMILY: [&str; 16] = [
+        "COMPARATOR/comparator.cir",
+        "MODEL_BINNING/comparatorBaseline.cir",
+        "MODEL_BINNING/comparatorBaseline_forGlobal.cir",
+        "MODEL_BINNING/globalPar_comparatorBaseline.cir",
+        "Nonlinear/ConvergenceTests/NLStrategy2.cir",
+        "Nonlinear/ConvergenceTests/NLStrategy5.cir",
+        "Nonlinear/ConvergenceTests/NLStrategy6.cir",
+        "Nonlinear/ConvergenceTests/Nox0.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod1.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod2.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod3.cir",
+        "Nonlinear/ConvergenceTests/SearchMethod4.cir",
+        "Nonlinear/ConvergenceTests/XyceTests.cir",
+        "OP/comparator_op.cir",
+        "POWER/power_bsim3_gear.cir",
+        "POWER/power_bsim3_trap.cir",
+    ];
+    let dir = env!("CARGO_MANIFEST_DIR");
+    let file = format!("{dir}/tests/fixtures/cross_sim/xyce-ngspice.txt");
+    let list = std::fs::read_to_string(&file).unwrap_or_else(|e| panic!("{file}: {e}"));
+    let cites = " simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md ";
+    // What the harness observed, after the class: `# tran V(1): … (tol …)`.
+    let observed = |deck: &str| {
+        let start = format!("{deck}{cites}");
+        list.lines().find_map(|l| l.strip_prefix(start.as_str()))
+    };
+    let baseline = observed(FAMILY[0]).expect("the family's own line");
+    assert!(
+        baseline.starts_with("# tran V(1): -0.376285159"),
+        "{baseline}"
+    );
+    for deck in BINNED {
+        assert_eq!(observed(deck), Some(baseline), "{deck}");
+    }
+    let cited: BTreeSet<&str> = list
+        .lines()
+        .filter(|l| l.contains(cites))
+        .filter_map(|l| l.split_whitespace().next())
+        .collect();
+    let want: BTreeSet<&str> = FAMILY.iter().chain(&BINNED).copied().collect();
+    assert_eq!(
+        cited, want,
+        "the lines citing proof/s-bsim3-default-capmod.md"
+    );
+}
