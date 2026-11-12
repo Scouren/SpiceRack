@@ -1,0 +1,12 @@
+which2: a default reading a sibling declared on a later line
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt inner(a)
+  parameters r=v
+  parameters v=3k
+  r1 (a 0) res r=r
+ends
+x1 (n) inner
+control
+  print instance("x1:r1")
+endc

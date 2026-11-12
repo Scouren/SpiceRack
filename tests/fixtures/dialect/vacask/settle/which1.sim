@@ -1,0 +1,16 @@
+which1: a default reading u, 2k at the top and 8k in the wrapper holding the instance
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters u=2k
+subckt inner(a)
+  parameters r=u
+  r1 (a 0) res r=r
+ends
+subckt wrap(a)
+  parameters u=8k
+  x1 (a) inner
+ends
+x0 (n) wrap
+control
+  print instance("x0:x1:r1")
+endc
