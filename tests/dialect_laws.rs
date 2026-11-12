@@ -57,6 +57,14 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the
+/// test function). Its name must be defined under `tests/`.
+#[cfg(feature = "corpus")]
+const L6_ELSEWHERE: &[(&str, &str)] = &[(
+    "ngspice",
+    "every_example_deck_reads_checks_legalizes_and_round_trips",
+)];
+
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;
 
@@ -207,6 +215,19 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
             continue;
         }
         let texts = corpus(row.name);
+        // A row whose corpus law lives in its own test file names it (it reads the corpus the
+        // nightly tier pins); the name must be defined, as the reach list's properties are.
+        if let Some((_, name)) = L6_ELSEWHERE.iter().find(|(r, _)| *r == row.name) {
+            let defined = test_sources()
+                .iter()
+                .any(|t| t.contains(&format!("fn {name}(")));
+            assert!(
+                defined,
+                "{}: its corpus law `{name}` is not defined",
+                row.name
+            );
+            continue;
+        }
         assert!(
             !texts.is_empty(),
             "{}: no corpus (unsupported fails)",
