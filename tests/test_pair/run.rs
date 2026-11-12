@@ -119,6 +119,18 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     }
     let spine = match spine(from, to, &deck.src, deck.policy) {
         Ok(s) => s,
+        Err((1, f)) if deck.policy == Policy::Lenient => {
+            // A corpus deck the reader refuses: when the source simulator rejects it too, the
+            // refusal is right and no reader finding (`source-rejects`, both messages).
+            let text = &deck.src.files()[0].1;
+            return match sim::run_checked(c.from_sim, &deck.path, text, &[], SECS) {
+                Ran::Failed(why) => {
+                    let said = format!("reader: {} | {}: {why}", f.said, c.from_sim.name());
+                    stop(fails, 1, fail("source-rejects", said), None)
+                }
+                _ => stop(fails, 1, f, None),
+            };
+        }
         Err((step, f)) => return stop(fails, step, f, None),
     };
     let written = Some(spine.files.clone());
