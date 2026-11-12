@@ -1,0 +1,14 @@
+save_set: a save of one node (VACASK's save governs the operating point, its sweeps and the transient) before an operating point and a DC sweep of a divider: both simulators write v(out) alone
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource dc=1.0
+r1 (in out) resistor r=1k
+r2 (out mid) resistor r=3k
+r3 (mid 0) resistor r=1k
+control
+  save v(out)
+  analysis op1 op
+  sweep s1 instance="v1" parameter="dc" from=0.0 to=5.0 step=0.25
+    analysis dc1 op
+endc
