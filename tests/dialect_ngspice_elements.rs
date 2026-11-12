@@ -337,9 +337,18 @@ fn a_six_terminal_soi3_card_runs_on_ngspice_after_the_round_trip() {
 #[test]
 fn no_card_reaches_a_builder_assert_and_every_read_checks_clean() {
     // Oracle: ir::check (A19: no parameter bears a typed field's name; every builder
-    // invariant). Each element form with each typed key added once and twice reads without a
-    // panic, and the design it reads to has no violation.
+    // invariant). Each element form, each prefix of it, and it with each typed key added once
+    // and twice reads without a panic, and the design it reads to has no violation.
     for base in BASES {
+        // every prefix of the card, down to the name alone (the mutation law's short cards)
+        let words: Vec<&str> = base.split(' ').collect();
+        for k in 1..words.len() {
+            let deck = format!("t\n{}\n", words[..k].join(" "));
+            let (design, _) = read_deck("t.sp", &deck);
+            let mut diags = ir::Diags::new();
+            ir::check(&design, &mut diags);
+            assert!(diags.is_empty(), "{deck}: {diags:?}");
+        }
         for key in KEYS {
             for card in [format!("{base} {key}=1"), format!("{base} {key}=1 {key}=2")] {
                 let deck = format!("t\n{card}\n");
