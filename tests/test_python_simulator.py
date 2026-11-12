@@ -1609,3 +1609,57 @@ def test_p3_040_a_dc_sweep_of_a_resistor_sweeps_its_resistance():
     tb = bench("spectre")
     tb.add_dc(Rl=slice(1e3, 3e3, 1e3))
     assert "dc1 dc dev=rl param=r start=1k stop=3k step=1k" in tb.netlist("spectre").splitlines()
+
+
+@pytest.mark.needs("vacask")
+def test_p3_043_save_all_reaches_hspice_xyce_and_vacask():
+    """ZERO-LEDGER P3-043: `tb.save("all")` asks for every node, and the HSPICE, Xyce and VACASK
+    decks lost it. HSPICE writes no waveform without `.option post` (cmdref E-2010.12 p.596:
+    "POST=0: Does not output simulation results", the default); Xyce prints nothing without a
+    `.print` ("No print specified"), and `V(*)` is every node voltage (RG 7.10, 2.1.31.11) on the
+    print of the one kind the deck runs, so a deck of two kinds gets none and a W0023; VACASK
+    saves every node with no `save` line: no line, no note. Oracle: the two manuals' lines, and
+    VACASK's run of the built deck: 1 V over 1k, 1k and 2k is 0.75 V and 0.5 V."""
+    import spicerack as ps
+
+    def bench(*saves):
+        c = ps.Circuit("div")
+        c.V("in", "in", "0", 1.0)
+        c.R("1", "in", "mid", 1e3)
+        c.R("2", "mid", "out", 1e3)
+        c.R("l", "out", "0", 2e3)
+        tb = ps.Testbench(c)
+        tb.save(*saves)
+        return tb
+
+    def written(tb, target):
+        text, notes = tb.netlist_with_notes(target)
+        return text.splitlines(), [d.code for d in notes]
+
+    op = bench("all")
+    op.add_operating_point()
+    assert ".option post" in written(op, "hspice")[0]
+    lines, codes = written(op, "xyce")
+    assert (".print dc V(*)" in lines, codes) == (True, [])
+    lines, codes = written(op, "vacask")
+    assert ([l for l in lines if l.split()[:1] == ["save"]], codes) == ([], [])
+    tran = bench("all")
+    tran.add_transient(step_time=1e-6, end_time=2e-6)
+    assert ".print tran V(*)" in written(tran, "xyce")[0]
+    # Two kinds: Xyce runs one and stops on the other's print.
+    both = bench("all")
+    both.add_transient(step_time=1e-6, end_time=2e-6)
+    both.add_ac(variation="dec", number_of_points=1, start_frequency=1e3, stop_frequency=1e4)
+    lines, codes = written(both, "xyce")
+    assert ([l for l in lines if l.startswith(".print")], codes) == ([], ["W0023"])
+    # A list is left out and noted, as before.
+    one = bench("V(out)")
+    one.add_operating_point()
+    for target in ("xyce", "vacask"):
+        lines, codes = written(one, target)
+        assert ([l for l in lines if l.startswith(".print")], codes) == ([], ["W0023"]), target
+    run = bench("all")
+    run.with_backend("vacask")
+    got = run.operating_point()
+    assert got.nodes == ["in", "mid", "out"]
+    assert [got[n] for n in got.nodes] == pytest.approx([1.0, 0.75, 0.5], rel=1e-9)

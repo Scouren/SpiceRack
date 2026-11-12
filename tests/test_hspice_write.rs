@@ -178,3 +178,83 @@ fn p3_086_an_ako_model_with_no_base_or_another_type_is_refused() {
         assert!(named.contains(&Code::W0142), "{named:?}\n{deck}");
     }
 }
+
+/// What Xyce prints for `text` run as a user runs it, with no `-r` raw
+/// file: each column of its print file `t.cir.prn` (RG 7.10 §2.1.31, the
+/// default format), its header and its first row's value.
+fn xyce_printed(text: &str) -> Vec<(String, f64)> {
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    std::fs::write(dir.path().join("t.cir"), text).expect("the deck written");
+    let out = std::process::Command::new("Xyce")
+        .arg("t.cir")
+        .current_dir(dir.path())
+        .output()
+        .expect("Xyce on PATH (nix develop .#testing)");
+    let log = String::from_utf8_lossy(&out.stdout);
+    let prn = std::fs::read_to_string(dir.path().join("t.cir.prn"))
+        .unwrap_or_else(|_| panic!("no print file:\n{log}\n{text}"));
+    let mut rows = prn.lines().map(str::split_whitespace);
+    let (head, first) = (rows.next().expect("a header"), rows.next().expect("a row"));
+    head.map(str::to_string)
+        .zip(first.map(|v| v.parse().expect("a number")))
+        .collect()
+}
+
+/// Ledger P3-043. `.save all` (the Python `tb.save("all")`) asks for
+/// every node, and the decks written for HSPICE, Xyce and VACASK lost it.
+/// HSPICE writes no waveform unless `.option post` says so (cmdref
+/// `.OPTION POST`, p.596: "POST=0: Does not output simulation results",
+/// the default) and every node with it (`.OPTION PROBE`, p.601: "All
+/// node voltage and source currents are output"). Xyce 7.10 prints
+/// nothing without a `.print` ("Netlist warning: No print specified");
+/// `V(*)` is every node voltage (RG 7.10 §2.1.31.11) on the print of the
+/// kind the deck runs, the one print Xyce takes ("Analysis type TRAN and
+/// print type DC are inconsistent." stops it), so a deck of two kinds
+/// gets none and says so (W0023). VACASK saves every node when no `save`
+/// is given (`lib/coredcinc.cpp`, `addAllUnknowns`): no line, no note.
+/// The decks run: 1 V over 1k, 1k and 2k is 0.75 V and 0.5 V, in Xyce's
+/// print file too. A list is left out and noted, as before.
+#[test]
+fn p3_043_save_all_is_written_for_hspice_xyce_and_vacask() {
+    let net = "t\nV1 1 0 1\nR1 1 2 1k\nR2 2 3 1k\nR3 3 0 2k\n";
+    let op = format!("{net}.save all\n.op\n.end\n");
+    let ng = Dialect::Ngspice;
+    let post = "HSPICE cmdref E-2010.12 `.OPTION POST` (p.596): POST=0: Does not output";
+    spec_example(post, &op, ng, Dialect::Hspice, &[".option post"]);
+    let star = "Xyce RG 7.10 §2.1.31.11: V(*) will print all of the node voltages";
+    let xy = spec_example(star, &op, ng, Dialect::Xyce, &[".print dc V(*)"]);
+    // A linear divider: the solvers' rounding, the print file's nine digits.
+    let tol = Tol {
+        rel: 1e-8,
+        floor: 0.0,
+    };
+    let printed = xyce_printed(&xy);
+    for (name, want) in [("V(1)", 1.0), ("V(2)", 0.75), ("V(3)", 0.5)] {
+        let got = printed.iter().find(|(n, _)| n == name);
+        let near = got.is_some_and(|(_, v)| tol.within(*v, want));
+        assert!(near, "{name}, want {want}: {printed:?}");
+    }
+    let tran = format!("{net}.save all\n.op\n.tran 1u 2u\n.end\n");
+    let xy = spec_example(star, &tran, ng, Dialect::Xyce, &[".print tran V(*)"]);
+    let printed = xyce_printed(&xy);
+    let out = printed.iter().find(|(n, _)| n == "V(3)");
+    assert!(out.is_some_and(|(_, v)| tol.within(*v, 0.5)), "{printed:?}");
+    // Two kinds: Xyce runs one and stops on the other's print.
+    let both = format!("{net}.save all\n.tran 1u 2u\n.ac dec 1 1k 10k\n.end\n");
+    let w = oracle::written(&both, ng, Dialect::Xyce);
+    assert!(!w.text.contains(".print"), "{}", w.text);
+    assert!(oracle::notes(&w).contains(&Code::W0023), "{}", w.text);
+    let va = oracle::written(&op, ng, Dialect::Vacask);
+    assert!(!oracle::notes(&va).contains(&Code::W0023), "{}", va.text);
+    let on = [ng, Dialect::Hspice, Dialect::Xyce, Dialect::Vacask];
+    for (node, want) in [("2", 0.75), ("3", 0.5)] {
+        closed_form(ng, &op, &on, node, At::First, want, tol);
+    }
+    // The legal neighbour, as before: a list.
+    let list = format!("{net}.save v(2)\n.op\n.end\n");
+    for to in [Dialect::Xyce, Dialect::Vacask] {
+        let w = oracle::written(&list, ng, to);
+        assert!(oracle::notes(&w).contains(&Code::W0023), "{to:?}");
+        assert!(!w.text.contains(".print"), "{}", w.text);
+    }
+}

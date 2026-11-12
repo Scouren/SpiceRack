@@ -14,7 +14,7 @@
 //! Contents:
 //! - `fn is_four(line: &str) -> bool`, `fn is_continuation(line: &str) -> bool`
 //! - `pub(super) struct Tb`, `Tb::runs(&self) -> bool`, `Tb::tran_uic(&self) -> bool`, `Tb::monte_carlo(&self) -> bool`,
-//!   `Tb::measures_dc(&self) -> bool`
+//!   `Tb::measures_dc(&self) -> bool`, `Tb::saves_all(&self) -> bool`
 //! - `W::fold(&self) -> Tb`, `W::control_run(&self, tb: &Tb) -> Option<Vec<String>>`,
 //!   `W::bench(&mut self, mut tb: Tb, control: Option<&[String]>)`
 //! - `W::vacask_lines(&mut self, lines: &[(String, u32)])`
@@ -101,6 +101,14 @@ impl Tb {
         self.measures
             .iter()
             .any(|m| measure_kind(m).eq_ignore_ascii_case("dc"))
+    }
+
+    /// Whether the save cards ask for every node: `all` among their
+    /// outputs, or no output at all (a lone `.save all`, which
+    /// `read::testbench` reads as an empty list).
+    pub(super) fn saves_all(&self) -> bool {
+        let all = self.saves.iter().any(|s| s.eq_ignore_ascii_case("all"));
+        self.save_tok.is_some() && (all || self.saves.is_empty())
     }
 }
 
@@ -466,8 +474,11 @@ impl W<'_, '_> {
     /// voltages, so a node list can never name it: ngspice then saves all
     /// (and the names beside it), the others none. HSPICE's `.save` saves
     /// simulator state; `.probe` selects outputs, of which ngspice's
-    /// `@dev[param]` is none (left out, W0052). Xyce's rawfile holds
-    /// every vector.
+    /// `@dev[param]` is none (left out, W0052), and `all` is `.option
+    /// post`: HSPICE writes no waveform without it (cmdref `.OPTION
+    /// POST`, p.596) and every node with it (`.OPTION PROBE`, p.601).
+    /// Xyce's rawfile holds every vector, its print file a `.print`'s
+    /// only: `all` is `W::print_all`'s card, and a list is left out.
     fn saves(&mut self, tb: &Tb) {
         let noise = tb.plan.runs.iter().any(|a| matches!(a, Ana::Noise { .. }));
         let ngspice = matches!(
@@ -477,18 +488,25 @@ impl W<'_, '_> {
         // Asked here, not through `ask`: a deck with no save card has no
         // token to note an omission at.
         let written = match self.cells[Construct::Save as usize] {
-            Action::Spell(Alt::Omit(_)) => tb.saves.is_empty(),
+            // Asks `all`, on Xyce: the card `print_all` writes, or none
+            // (W0023). Any other list is left out, as on every target
+            // that omits one.
+            Action::Spell(Alt::Omit(_)) => {
+                let all = self.b.analysis_form == AnalysisForm::Xyce && tb.saves_all();
+                let printed = all && self.print_all(&tb.plan.runs);
+                tb.saves.is_empty() && (printed || !all)
+            }
             Action::Spell(Alt::Probe) if !noise => {
+                if tb.saves_all() {
+                    self.o.token(".option post", Space::Line);
+                }
                 // ngspice's `@dev[param]` (manual §15.6) is no HSPICE
                 // output variable (cmdref `.PROBE`: a voltage, a current,
                 // an element template). `@` leads it: a node may hold one
                 // (Xyce's `1@`).
-                for s in tb.saves.iter().filter(|s| !s.starts_with('@')) {
-                    let line = match s.as_str() {
-                        "all" => ".option post".to_string(),
-                        s => format!(".probe {s}"),
-                    };
-                    self.o.token(&line, Space::Line);
+                let probed = |s: &&String| !s.starts_with('@') && !s.eq_ignore_ascii_case("all");
+                for s in tb.saves.iter().filter(probed) {
+                    self.o.token(&format!(".probe {s}"), Space::Line);
                 }
                 if let Some(tok) = tb.save_tok
                     && tb.saves.iter().any(|s| s.starts_with('@'))

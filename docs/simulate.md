@@ -69,6 +69,13 @@ Branch currents are not saved unless you ask: `tb.save("I(Vin)")`, or
 An operating point reads a vector by the simulator's spelling too:
 `op["v(vout)"]` is `op["vout"]`, `op["I(Vin)"]` is `op["i(vin)"]`.
 
+`tb.save("all")` asks for every node in a deck written for any simulator:
+`netlist("hspice")` gets `.option post` (HSPICE writes no waveform file
+without it), `netlist("xyce")` gets `.print dc V(*)`, `.print tran V(*)` or
+`.print ac V(*)` for the one kind of analysis the deck runs (Xyce prints
+nothing without a `.print`; a deck of two kinds gets none and a W0023 note),
+and VACASK saves every node unasked.
+
 ## Simulator settings
 
 ```python

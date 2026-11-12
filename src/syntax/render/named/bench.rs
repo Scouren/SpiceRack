@@ -287,7 +287,10 @@ impl W<'_, '_> {
         for (_, _, tok) in &tb.step_lists {
             self.ask(Construct::StepList, *tok);
         }
-        if let Some(tok) = tb.save_tok {
+        // A lone `.save all` is an empty list: it asks for what a target
+        // that omits the list saves unasked (VACASK with no `save`: every
+        // unknown, `lib/coredcinc.cpp`).
+        if let Some(tok) = tb.save_tok.filter(|_| !tb.saves.is_empty()) {
             self.ask(Construct::Save, tok);
         }
     }

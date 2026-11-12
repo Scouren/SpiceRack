@@ -7,9 +7,14 @@
 //! such a print or output is left out (W0023), a print format
 //! (`PRECISION=`) too (W0024), and Xyce's accessors are spelled as
 //! ngspice's (`ngspice_output`); the other targets get the card as read.
+//! Xyce's card for a save list that asks `all` is written here too:
+//! `.print <kind> V(*)` (RG 7.10 §2.1.31.11: "V(*) will print all of the
+//! node voltages in the circuit for all analysis modes"), Xyce's print
+//! file holding a `.print`'s outputs and nothing else.
 //!
 //! Contents:
 //! - `W::prints(&mut self, prints: &[(String, Vec<String>, u32)], analyses: &[Ana])`
+//! - `W::print_all(&mut self, analyses: &[Ana]) -> bool`
 
 use super::W;
 use crate::syntax::behaviour::AnalysisForm;
@@ -79,6 +84,25 @@ impl W<'_, '_> {
             let line = format!(".print{sep}{kind} {}", outs.join(" "));
             self.o.token(&line, Space::Line);
         }
+    }
+
+    /// Xyce's card for a save list that asks `all`: `.print <kind> V(*)`,
+    /// every node voltage (RG 7.10 §2.1.31.11), on the print of the one
+    /// kind the deck runs (`xyce_kind`). Whether the card was written.
+    ///
+    /// # Panics
+    /// On a target other than Xyce.
+    pub(super) fn print_all(&mut self, analyses: &[Ana]) -> bool {
+        // Paired with `saves`' own test: only Xyce's writer asks.
+        let xyce = self.b.analysis_form == AnalysisForm::Xyce;
+        assert!(xyce, "print_all: Xyce's card");
+        let kind = xyce_kind(analyses);
+        // Paired with `xyce_kind`'s arms: a kind Xyce's `.print` takes.
+        assert!(kind.is_none_or(|k| ["dc", "ac", "tran"].contains(&k)));
+        if let Some(kind) = kind {
+            self.o.token(&format!(".print {kind} V(*)"), Space::Line);
+        }
+        kind.is_some()
     }
 }
 
@@ -244,4 +268,35 @@ fn paren(b: &[u8], i: usize) -> Option<usize> {
         }
     }
     None
+}
+
+/// The kind of the `.print` Xyce takes beside `analyses`: Xyce 7.10 stops
+/// on a print of a kind it does not run ("Analysis type TRAN and print
+/// type DC are inconsistent.", run by hand) and runs one kind a deck. An
+/// operating point's print is `dc`; beside a `.tran` or an `.ac` it is
+/// that run's first point. `None` for two kinds, and for a kind whose
+/// print holds no node voltage this writer has run.
+fn xyce_kind(analyses: &[Ana]) -> Option<&'static str> {
+    let mut kind = None;
+    for a in analyses {
+        let k = match a {
+            Ana::Op => continue,
+            Ana::Dc(_) | Ana::DcAxes(_) => "dc",
+            Ana::Ac(_) => "ac",
+            Ana::Tran { .. } | Ana::Four(..) => "tran",
+            Ana::Noise { .. }
+            | Ana::Sp(_)
+            | Ana::Tf(..)
+            | Ana::Sens(..)
+            | Ana::Pz(..)
+            | Ana::Hb { .. }
+            | Ana::MonteCarlo { .. }
+            | Ana::Spectre { .. } => return None,
+        };
+        if kind.is_some_and(|was| was != k) {
+            return None;
+        }
+        kind = Some(k);
+    }
+    Some(kind.unwrap_or("dc"))
 }
