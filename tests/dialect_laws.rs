@@ -100,7 +100,8 @@ impl Write for Panicky {
     fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
         for (item, _) in design.reachable() {
             if item.kind != ir::ItemKind::Element {
-                diags.push_at(ir::Code::new(b'W', 9001), design, item, 0);
+                // a catalogued refusal: the harness asserts every emitted code has a row
+                diags.push_at(dialect::STRICT_UNREAD, design, item, 0);
             }
         }
     }
