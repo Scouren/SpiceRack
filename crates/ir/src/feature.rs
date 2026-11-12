@@ -33,7 +33,7 @@ use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+use crate::item::{ItemKind, Role, ScopeKind};
 use crate::model::ModelFamily;
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
@@ -117,6 +117,10 @@ pub enum Extra {
     /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
     /// only a formal whose default folds to a constant).
     FormalReadsParam,
+    /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
+    /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
+    /// empty one are the same text there).
+    DeckWithoutTitle,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -249,7 +253,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 11] = [
+    pub const ALL: [Extra; Extra::DeckWithoutTitle as usize + 1] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -261,6 +265,7 @@ impl Extra {
         Extra::IntLiteral,
         Extra::EnclosingRef,
         Extra::FormalReadsParam,
+        Extra::DeckWithoutTitle,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -367,6 +372,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
     if case_clash(design) {
         *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
+    let untitled = |f| {
+        let file = design.file(f);
+        file.role == Role::Deck
+            && !design
+                .items(file.top)
+                .iter()
+                .any(|i| i.kind == ItemKind::Title)
+    };
+    if design.files().any(untitled) {
+        *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
     }
     crate::element::design_features(design, set);
     crate::analysis::design_features(design, set);

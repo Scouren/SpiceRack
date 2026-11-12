@@ -145,7 +145,7 @@ fn files_scopes_and_entry() {
             file: lib
         }
     );
-    assert_eq!(d.entry(), deck, "the first Deck file");
+    assert_eq!(d.entry(), lib, "file 0, whatever its role (ruled)");
     assert_eq!(d.find_file("models.lib"), lib);
     assert_eq!(d.find_file("nope.sp"), FileId::NONE);
     assert!(d.items(deck_top).is_empty());

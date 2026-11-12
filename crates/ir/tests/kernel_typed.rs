@@ -208,6 +208,13 @@ fn every_row_of_the_tag_table() {
         "SgnZeroPos: its operand's"
     );
     assert_eq!(call(Func::SgnZeroPos, &[real(30, 1)]), r(1.0));
+    // run e1: −0.0 is not below zero (a literal has no sign of zero, so it is `Neg(0)`)
+    let neg_zero = ev(|bl| {
+        let z = bl.literal(Literal::ZERO);
+        let n = bl.unary(UnOp::Neg, z);
+        bl.call(Func::SgnZeroPos, &[n])
+    });
+    assert_eq!(neg_zero, r(1.0), "sgn of -0.0 is 1");
     let ternary = |c: Literal, a: Literal, b: Literal| {
         ev(|bl| {
             let (c, a, b) = (bl.literal(c), bl.literal(a), bl.literal(b));
@@ -278,9 +285,8 @@ fn vacask_runs_i1_t3_f2() {
   param f2k = (3i > 2i) /: 2i
   param f4a = sgn_zero_pos(3.0) /: 2i
   param f4b = sgn_zero_pos(-3.0) /: 2i
-  param f4c = sgn_zero_pos(0.0) /: 2i
+  param f4c = sgn_zero_pos(0) /: 2i
   param f4d = sgn_zero_pos(3i) /: 2i
-  param f4e = sgn_zero_pos(-0.0)
   param f4f = sgn(3i) /: 2i
 ";
     let mut d = Design::new();
@@ -313,7 +319,6 @@ fn vacask_runs_i1_t3_f2() {
         ("f4b", -0.5),
         ("f4c", 0.5),
         ("f4d", 0.0),
-        ("f4e", 1.0),
         ("f4f", 0.5),
     ];
     let top = d.file(d.entry()).top;

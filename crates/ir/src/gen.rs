@@ -138,7 +138,15 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
     for k in 0..files {
-        let role = if k == 0 { Role::Deck } else { Role::Library };
+        // a deck holds a title unless the set has DeckWithoutTitle (A12 K2 addendum); a set
+        // with neither generates libraries only
+        let deck_ok = features.contains(Feature::Item(ItemKind::Title))
+            || features.contains(Feature::Extra(Extra::DeckWithoutTitle));
+        let role = if k == 0 && deck_ok {
+            Role::Deck
+        } else {
+            Role::Library
+        };
         let (_, top) = b.file(&format!("f{k}.sp"), role);
         fill(&mut g, &mut b, top, features);
     }
@@ -295,11 +303,13 @@ impl Gen {
 /// order of `text::dump`), choosing kinds the set and the placement allow.
 fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
     let deck = b.design().file(b.design().scope(top).file).role == Role::Deck;
-    if deck && features.contains(Feature::Item(ItemKind::Title)) && g.items_left > 0 && g.chance(2)
-    {
+    let untitled_ok = features.contains(Feature::Extra(Extra::DeckWithoutTitle));
+    let titled = features.contains(Feature::Item(ItemKind::Title))
+        && (!untitled_ok || (g.items_left > 0 && g.chance(2)));
+    if deck && titled {
         let text = g.word();
         b.title(top, text, crate::span::Span::NONE);
-        g.items_left -= 1;
+        g.items_left = g.items_left.saturating_sub(1); // a required title may pass the budget
     }
     // the top takes what the budget leaves; each body a few items
     let first = g.items_left;
