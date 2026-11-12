@@ -8,7 +8,10 @@
 //! model defined after its instance); R3 (the reader binds), R33 (a branch's definitions are its
 //! own).
 //!
-//! Contents: `Declared`, `Master`, `Found`, `declare`, `find`
+//! And each instance's master and `type` word, so a `sweep` can tell an independent source's DC
+//! value from a device parameter (R64: `Declared::source`).
+//!
+//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`
 //! (crate-private to the dialect)
 
 use std::collections::HashMap;
@@ -24,6 +27,19 @@ pub(in crate::dialect::vacask) struct Declared {
     defs: HashMap<(Holder, String), Master>,
     /// Each subcircuit's enclosing holder (absent: the top).
     parent: HashMap<Holder, Holder>,
+    /// `(holder, name)` → a subcircuit's own holder; the first declaration wins.
+    bodies: HashMap<(Holder, String), Holder>,
+    /// `(holder, instance name)` → its master's name and its `type="…"` word, if given.
+    instances: HashMap<(Holder, String), (String, Option<String>)>,
+}
+
+/// What an instance of a `vsource` or `isource` model is, for a sweep of its `dc` (R64).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::dialect::vacask) enum Source {
+    /// `type="dc"`, given or by default: the sweep moves its value (settle run/sweep_source).
+    Dc,
+    /// A waveform type: VACASK ignores `dc`, so the sweep moves nothing (the same deck).
+    Wave,
 }
 
 /// What a master is.
@@ -73,6 +89,21 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
         while let Some((s, holder)) = todo.pop() {
             let n = Node(s);
             match ast.tag(n) {
+                Tag::Instance => {
+                    let h = ast.header(n);
+                    if h.master != crate::syntax::ast::NONE {
+                        let key = (holder, read::field_name(cst, h.name));
+                        let wave = ast
+                            .fields(n)
+                            .iter()
+                            .map(|&f| Node(f))
+                            .filter(|&f| ast.tag(f) == Tag::Assign)
+                            .find(|&f| read::field_name(cst, ast.lhs(f)) == "type")
+                            .map(|f| read::field_name(cst, ast.rhs(f)));
+                        let master = read::field_name(cst, h.master);
+                        out.instances.entry(key).or_insert((master, wave));
+                    }
+                }
                 Tag::Model => {
                     if let [name, module, ..] = ast.fields(n) {
                         let key = (holder, read::field_name(cst, *name));
@@ -100,6 +131,7 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                         params,
                     };
                     let key = (holder, read::field_name(cst, name));
+                    out.bodies.entry(key.clone()).or_insert(own);
                     out.defs.entry(key).or_insert(master);
                     todo.extend(ast.body(n).iter().map(|&b| (b, own)));
                 }
@@ -137,6 +169,35 @@ pub(in crate::dialect::vacask) fn find(
         }
     }
     Found::Nowhere
+}
+
+impl Declared {
+    /// The instance `path:element` (`path` the subcircuit instances from the top) when it is
+    /// an instance of a `vsource` or `isource` model, each master found by VACASK's rule (the
+    /// holder's own, then the top's); `None` for any other instance or a name no file declares.
+    pub(in crate::dialect::vacask) fn source(
+        &self,
+        path: &[String],
+        element: &str,
+    ) -> Option<Source> {
+        let own_or_top = |h: Holder, name: &str| [h, Holder::Top].map(|x| (x, name.to_string()));
+        let mut at = Holder::Top;
+        // Bounded by the path's length.
+        for inst in path {
+            let (m, _) = self.instances.get(&(at, inst.clone()))?;
+            at = *own_or_top(at, m).iter().find_map(|k| self.bodies.get(k))?;
+        }
+        let (m, wave) = self.instances.get(&(at, element.to_string()))?;
+        match own_or_top(at, m).iter().find_map(|k| self.defs.get(k))? {
+            Master::Model(word) if word == "vsource" || word == "isource" => {
+                Some(match wave.as_deref() {
+                    None | Some("dc") => Source::Dc,
+                    Some(_) => Source::Wave,
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 // ---- private ----

@@ -137,7 +137,8 @@ pub(super) fn range(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
     }
 }
 
-/// ` instance="x1:r1" parameter="r"`, ` model="m" parameter="p"`, ` option="name"`.
+/// ` instance="x1:r1" parameter="r"`, ` instance="x1:v1" parameter="dc"` (a source's DC value,
+/// R64), ` model="m" parameter="p"`, ` option="name"`.
 pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
     let element = |out: &mut String| {
         let mut path = name_of(d, t.path);
@@ -153,6 +154,11 @@ pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
             element(out);
             out.push_str(" parameter=");
             quote(d.str(t.b), out);
+        }
+        ir::TargetKind::SourceDc => {
+            out.push_str(" instance=");
+            element(out);
+            out.push_str(" parameter=\"dc\"");
         }
         ir::TargetKind::ModelParam => {
             out.push_str(" model=");

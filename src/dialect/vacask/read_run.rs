@@ -18,7 +18,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -124,6 +124,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::LoopRestore))
 .with(ir::Feature::Run(ir::RunExtra::LoopScoped))
 .with(ir::Feature::Run(ir::RunExtra::LoopTemp))
+.with(ir::Feature::Run(ir::RunExtra::LoopSourceDc))
 .with(ir::Feature::Run(ir::RunExtra::LoopDeviceParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopModelParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopOption))
@@ -160,6 +161,12 @@ pub(super) const ELABORATE_TOP: ir::Code = ir::Code::new(b'P', 2311);
 pub(super) const SWEEP_FORM: ir::Code = ir::Code::new(b'P', 2312);
 /// An `alter` of a source's `type` (the fold of R42 is the scaffold's declare step, not yet).
 pub(super) const ALTER_TYPE: ir::Code = ir::Code::new(b'P', 2313);
+/// A sweep of a waveform source's `dc`, which VACASK ignores (settle run/sweep_source).
+pub(super) const SWEEP_WAVE: ir::Code = ir::Code::new(b'P', 2314);
+/// A sweep of a source's DC value where the source has a wave and its DC is the wave's: a
+/// feature candidate (class F: ngspice has the form; a pass giving such a source its wave's
+/// value at zero as a given DC, spelled as R42's fold, would convert it when a pair deck needs it).
+pub(super) const SOURCE_SWEEP_WAVE: ir::Code = ir::Code::new(b'W', 2307);
 /// A control statement VACASK rejects.
 pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 2320);
 /// The writer named an unnamed analysis.
@@ -267,6 +274,20 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "R42 (the dc/wave alternation folds into the source; any other type alter is Private)",
         "The alternation's recognition is the scaffold's declare step; until it lands every type alter is kept as text.",
         ir::Kind::Note,
+    ),
+    row(
+        SWEEP_WAVE,
+        "a sweep of a waveform source's dc, kept as its text",
+        "R64; settle run/sweep_source (VACASK 36be560)",
+        "VACASK reads `dc` only on a source of type dc: a sweep of `dc` on a pulse, sine or other waveform source leaves its value as the wave gives it (0, 0 where ngspice's .dc gives 2, 4), a meaning only VACASK has.",
+        ir::Kind::Note,
+    ),
+    row(
+        SOURCE_SWEEP_WAVE,
+        "a sweep of the DC value of a source whose DC is its wave's",
+        "R64; settle run/sweep_source (VACASK 36be560)",
+        "VACASK ignores `dc` on a waveform source, so the sweep would move nothing (0, 0 where ngspice's .dc gives 2, 4); the source needs a given DC value (R42's type alternation) to be swept.",
+        ir::Kind::Refusal,
     ),
     row(
         REJECTED,

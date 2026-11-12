@@ -36,7 +36,7 @@
 mod behavioural;
 mod masters;
 
-pub(super) use masters::{Declared, Found, Master, find};
+pub(super) use masters::{Declared, Found, Master, Source, find};
 
 use super::expr_read::{self, Context, Refusal};
 use super::families::{self, Name};
