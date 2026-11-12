@@ -74,7 +74,7 @@ pub(super) fn source(w: &mut Out<'_>, item: ir::ItemRef) {
     }
     if s.dc_rule == ir::source::DcRule::Given {
         out.push_str(" dc ");
-        expr_write::value(d, s.dc, &mut out);
+        value(d, s.dc, &mut out);
     }
     pair(d, " ac ", s.ac_mag, s.ac_phase_deg, &mut out);
     if s.distof != ir::NO_ROW {
@@ -85,21 +85,33 @@ pub(super) fn source(w: &mut Out<'_>, item: ir::ItemRef) {
     if s.port != ir::NO_ROW {
         let p: ir::source::PortSpec = d.detail(s.port);
         out.push_str(" portnum ");
-        expr_write::value(d, p.index, &mut out);
+        value(d, p.index, &mut out);
         out.push_str(" z0=");
-        expr_write::value(d, p.z0, &mut out);
+        value(d, p.z0, &mut out);
     }
     if !s.wave.is_none() {
         wave(d, s.wave, e.kind == ir::ElemKind::ISource, &mut out);
     }
     if !e.mult.is_none() {
         out.push_str(" m=");
-        expr_write::value(d, e.mult, &mut out);
+        value(d, e.mult, &mut out);
     }
     w.line(&out);
 }
 
 // ---- private ----
+
+/// Appends `e` as a card value, a parameter name in `{…}`: bare, a name like `phase`, `v` or
+/// `freq` reads as a keyword of the card (corpus `param-example.cir`, `100W.sp`).
+fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
+    if matches!(d.expr(e), ir::Expr::Param(_)) {
+        out.push('{');
+        expr_write::expr(d, e, out);
+        out.push('}');
+    } else {
+        expr_write::value(d, e, out);
+    }
+}
 
 /// Whether ngspice's card spells the source exactly.
 fn spells(d: &ir::Design, e: &ir::Element) -> bool {
@@ -234,14 +246,14 @@ fn wave(d: &ir::Design, r: ir::WaveRef, current: bool, out: &mut String) {
         if k > 0 {
             out.push(' ');
         }
-        expr_write::value(d, x, out);
+        value(d, x, out);
     }
     out.push(')');
     if let ir::Wave::Pwl(p) = d.wave(r) {
         for (key, x) in [(" td=", p.delay), (" r=", p.repeat_at)] {
             if !x.is_none() {
                 out.push_str(key);
-                expr_write::value(d, x, out);
+                value(d, x, out);
             }
         }
     }
@@ -254,11 +266,11 @@ fn pair(d: &ir::Design, key: &str, mag: ir::ExprId, phase: ir::ExprId, out: &mut
         return;
     }
     out.push_str(key);
-    expr_write::value(d, mag, out);
+    value(d, mag, out);
     let zero = matches!(d.expr(phase), ir::Expr::Num(n) if d.num(n) == ir::Literal::ZERO);
     if !phase.is_none() && !zero {
         out.push(' ');
-        expr_write::value(d, phase, out);
+        value(d, phase, out);
     }
 }
 
