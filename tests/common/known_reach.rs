@@ -24,6 +24,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Wave(TrNoise)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrRandom)", FIXPOINT, SOURCES),
     ("ngspice", "Analysis(Dc)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(Noise)", FIXPOINT, RUN),
     ("ngspice", "Analysis(SensAc)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Four)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Pss)", FIXPOINT, RUN),
