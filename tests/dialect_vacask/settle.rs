@@ -179,6 +179,14 @@ fn f2_f3_result_types() {
 }
 
 #[test]
+fn f4_sgn_keeps_its_operands_type_and_sign_is_real() {
+    let r = run("vacask", "f4.sim");
+    let labels = ["sgnr", "sgnmr", "sgni", "sgn0r", "signr", "signi", "signir"];
+    let want = [0.5, -0.5, 0., 0.5, 1.5, 1.5, 1.5];
+    assert_eq!(printed(&r, &labels), want, "{}", r.out);
+}
+
+#[test]
 fn n_scoping_and_naming() {
     assert!(says(
         &run("vacask", "n1.sim"),

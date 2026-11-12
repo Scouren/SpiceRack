@@ -1,0 +1,7 @@
+sgn of reals
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (n 0) res r=1
+control
+  print ("sgnr", sgn(3.0)/2, "sgnmr", sgn(-3.0)/2, "sgni", sgn(3)/2, "sgn0r", sgn(0.0)/2, "signr", sign(3.0, 1)/2, "signi", sign(3, 1)/2, "signir", sign(3, 1.0)/2)
+endc
