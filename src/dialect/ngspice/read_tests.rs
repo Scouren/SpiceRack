@@ -409,3 +409,56 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
     want.sort();
     assert_eq!(got, want);
 }
+
+#[test]
+fn a_row_reference_queued_by_an_area_binds_to_a_definition_pushed_later() {
+    // R3 (the reader binds by ngspice's rule: the nearest definition outward), A11
+    // (`Builder::bind_ref`): an instance before its `.subckt`, as an X card standing first.
+    let mut d = ir::Design::new();
+    let (item, sub) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("d.sp", ir::Role::Deck);
+        let head = b.head("x1", &["a"], Some("s"), &[], ir::ExprId::NONE);
+        let item = b.instance(top, ir::ElemKind::Instance, head, ir::Span::NONE);
+        let (sub, _) = b.subckt(top, "s", &["p"], &[], ir::Span::NONE);
+        (item, sub)
+    };
+    let mut b = d.builder();
+    let name = b.design().find_name("s");
+    let top = b.design().file(b.design().entry()).top;
+    let rows = [super::read::RowRef {
+        item,
+        k: 0,
+        scope: top,
+        kind: ir::DefKind::Subckt,
+        name,
+    }];
+    super::read::bind_rows(&mut b, &rows);
+    let e: ir::Element = d.row(item.index);
+    assert_eq!(d.def(e.model.def).item, sub);
+}
+
+#[test]
+fn a_model_name_is_known_from_any_file_before_lowering() {
+    // inp2q.c / inp2m.c: ngspice ends a Q or M card's nodes at the first word naming a model in
+    // the deck's model table, wherever the card stands; `Lower::is_model` answers that for the
+    // element area. Oracle: the model cards of the two files, by hand.
+    let mut src = Sources::new();
+    src.add("d.sp", "t\n.include \"m.lib\"\n.model NCH nmos\n");
+    src.add("m.lib", ".subckt s a\n.model pch pmos\n.ends\n");
+    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
+    let texts = [
+        "t\n.model NCH nmos\n".to_string(),
+        "\n.subckt s a\n.model pch pmos\n.ends\n".to_string(),
+    ];
+    let toks: Vec<_> = texts
+        .iter()
+        .map(|t| crate::syntax::tokenize(t, lex))
+        .collect();
+    let asts: Vec<_> = toks.iter().map(|t| crate::syntax::parse(t, lex)).collect();
+    let models = super::read::model_names(&asts, &toks);
+    let mut got: Vec<_> = models.into_iter().collect();
+    got.sort();
+    assert_eq!(got, ["nch", "pch"]);
+    let _ = read(&src);
+}

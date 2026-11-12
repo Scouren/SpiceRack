@@ -65,10 +65,13 @@ Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `dia
 ## Open points the areas inherit (reported to the lead with the S3.0 report)
 
 - A row `Ref` to a definition pushed later (an instance before its `.subckt`, a model in a later
-  file) is bound in `read.rs`'s `bind` step, the one place that binds: today it resolves the
-  queued parameter reads and user calls with `Builder::resolve`; S3.1/S3.2 queue their row
-  references there (item, slot `k` in `RowFacts::map_refs` order, the scope, the kind) and
-  `bind` calls `Builder::bind_ref(item, k, def)` (A11) with the same nearest-scope lookup.
+  file) is bound in `read.rs`'s bind step, the one place that binds. An area pushes the row with
+  its `Ref` unresolved and queues it: `lw.refer(item: ir::ItemRef, k: u32, scope: ir::ScopeId,
+  kind: ir::DefKind, name: ir::NameId)`, `k` the slot in `RowFacts::map_refs` order, `name` as
+  pushed (folded). After every file is lowered, `bind_rows` looks up the `kind` definition of
+  `name` nearest `scope` outward (`Design::lookup`) and calls `Builder::bind_ref(item, k, def)`;
+  no definition leaves it unresolved (R4). Each slot expects one kind (`map_refs` states it);
+  queue that kind.
 - Element names (R23, AMEND-A12 §A13): the IR name is the whole folded name, letter included;
   `i(vdd)` is `I("vdd")` and every `i(<element>)` reads. The writer writes names as they are;
   `CircuitExtra::NameWithoutLetter` stays out of `FEATURES`.

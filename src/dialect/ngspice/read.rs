@@ -18,17 +18,20 @@
 //! later).
 //!
 //! Contents: `pub(super) struct Lower<'a, 'd>`, `pub(super) struct Stmt`,
-//! `pub(super) enum Def`,
+//! `pub(super) enum Def`, `pub(super) struct RowRef`, `pub(super) fn bind_rows`,
+//! `pub(super) fn model_names`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, wins,
-//! class, pending, rescope, include_path}`; the CST reads are `cst.rs`
+//! class, is_model, refer, pending, rescope, include_path}`; the CST reads are `cst.rs`
 
 use super::codes;
 use super::cst::{body, extent, joined, line, next, rest, unquote};
 use super::declare::{Class, Declared, declare};
 use super::expr_read::Tree;
-use super::name::Folder;
+use std::collections::HashSet;
+
+use super::name::{self, Folder};
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
 };
@@ -60,7 +63,9 @@ pub(super) struct Lower<'a, 'd> {
     /// Its role.
     pub(super) role: ir::Role,
     pending: &'a mut Vec<(ir::ExprId, ir::ScopeId)>,
+    rows: &'a mut Vec<RowRef>,
     declared: &'a Declared,
+    models: &'a HashSet<String>,
     /// Bytes read before the file's own text (1 for a library file).
     shift: u32,
     frames: Vec<Frame<'a>>,
@@ -77,6 +82,22 @@ pub(super) struct Stmt {
     pub(super) scope: ir::ScopeId,
     /// The root, `.subckt`, `.lib` section or branch node it stands in.
     pub(super) container: Node,
+}
+
+/// A row's reference waiting for the bind step ([`Lower::refer`]): its item, its slot in
+/// `RowFacts::map_refs` order, the scope it is read from, the kind the slot expects, the name.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct RowRef {
+    /// The pushed item.
+    pub(super) item: ir::ItemRef,
+    /// Its reference's slot.
+    pub(super) k: u32,
+    /// Where the name is read.
+    pub(super) scope: ir::ScopeId,
+    /// The definition kind the slot expects.
+    pub(super) kind: ir::DefKind,
+    /// The name, as pushed.
+    pub(super) name: ir::NameId,
 }
 
 /// What a name is defined as, for the declare step.
@@ -106,44 +127,58 @@ struct Frame<'a> {
 pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
     assert!(!src.files().is_empty(), "ngspice read: a file to read");
     let lex = lexicon();
+    let roles: Vec<ir::Role> = (0..src.files().len())
+        .map(|k| {
+            if k < src.entries().len() {
+                src.form()
+            } else {
+                ir::Role::Library
+            }
+        })
+        .collect();
+    // a library file is read behind one empty line (its line 1 is no title)
+    let texts: Vec<String> = src
+        .files()
+        .iter()
+        .zip(&roles)
+        .map(|((_, t), r)| {
+            if *r == ir::Role::Library {
+                format!("\n{t}")
+            } else {
+                t.clone()
+            }
+        })
+        .collect();
+    let toks: Vec<Tokens<'_>> = texts.iter().map(|t| tokenize(t, lex)).collect();
+    let asts: Vec<_> = toks.iter().map(|t| parse(t, lex)).collect();
+    let models = model_names(&asts, &toks);
     let mut names = Folder::default();
     let mut pending = Vec::new();
-    for (k, (path, text)) in src.files().iter().enumerate() {
-        let role = if k < src.entries().len() {
-            src.form()
-        } else {
-            ir::Role::Library
-        };
-        let shifted;
-        let (text, shift) = if role == ir::Role::Library {
-            shifted = format!("\n{text}");
-            (shifted.as_str(), 1)
-        } else {
-            (text.as_str(), 0)
-        };
-        let toks = tokenize(text, lex);
-        let ast = parse(&toks, lex);
-        let (file, top) = out.file(path, role);
-        let declared = declare(&ast, &toks);
+    let mut rows = Vec::new();
+    for (k, (path, _)) in src.files().iter().enumerate() {
+        let (file, top) = out.file(path, roles[k]);
+        let declared = declare(&asts[k], &toks[k]);
         let mut lw = Lower {
             b: &mut *out,
             diags: &mut *diags,
             names: &mut names,
-            ast: &ast,
-            toks: &toks,
+            ast: &asts[k],
+            toks: &toks[k],
             src,
             path,
             file,
-            role,
+            role: roles[k],
             pending: &mut pending,
+            rows: &mut rows,
             declared: &declared,
-            shift,
+            models: &models,
+            shift: u32::from(roles[k] == ir::Role::Library),
             frames: Vec::new(),
             framed: false,
         };
         lower(&mut lw, top);
     }
-    bind(out, &pending);
+    bind(out, &pending, &rows);
 }
 
 /// The files `text` names, in text order: each `.include` path and `.lib` call's file.
@@ -170,6 +205,37 @@ pub(super) fn references(text: &str) -> Vec<Reference> {
                 stack.extend(next(&ast, n));
                 stack.extend(body(&ast, n).iter().rev().map(|&s| Node(s)));
             }
+        }
+    }
+    out
+}
+
+/// The bind step's row half: each queued reference bound to the `kind` definition of its name
+/// nearest its scope outward (`Design::lookup`), through `Builder::bind_ref`; left unresolved
+/// when there is none (R4).
+pub(super) fn bind_rows(b: &mut ir::Builder<'_>, rows: &[RowRef]) {
+    for r in rows {
+        let def = b.design().lookup(r.scope, r.kind, r.name);
+        if !def.is_none() {
+            b.bind_ref(r.item, r.k, def);
+        }
+    }
+}
+
+/// The folded name of every `.model` card of every file, any block.
+pub(super) fn model_names(asts: &[Ast<'_>], toks: &[Tokens<'_>]) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for (ast, toks) in asts.iter().zip(toks) {
+        let mut stack: Vec<Node> = ast.fields(ast.root()).iter().map(|&n| Node(n)).collect();
+        // Bounded: each statement is visited once.
+        while let Some(n) = stack.pop() {
+            if ast.tag(n) == Tag::Model
+                && let Some(&f) = ast.fields(n).first()
+            {
+                out.insert(name::key(&joined(toks, ast, Node(f))));
+            }
+            stack.extend(next(ast, n));
+            stack.extend(body(ast, n).iter().map(|&s| Node(s)));
         }
     }
     out
@@ -275,6 +341,39 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// The class of `text` read in `block` (R14, `declare.rs`), `formals` shadowing.
     pub(super) fn class(&self, block: Node, text: &str, formals: &[String]) -> Class {
         self.declared.class(block, text, formals)
+    }
+
+    /// Whether any file of the sources has a `.model` named `word` (folded; any block). ngspice
+    /// ends an element's node list at the first word that names a model (`inp2q.c`, `inp2m.c`:
+    /// `INPlookMod` on the deck's model table). ponytail: any block, not the element's scope
+    /// chain; that differs only for a word that is a net here and a model in another subcircuit.
+    #[expect(dead_code, reason = "the element area calls it (S3.1)")]
+    pub(super) fn is_model(&self, word: &str) -> bool {
+        self.models.contains(&name::key(word))
+    }
+
+    /// Queues slot `k` (in `RowFacts::map_refs` order) of a pushed `item` to be bound in the
+    /// bind step to the `kind` definition named `name` (as pushed: folded) nearest `scope`
+    /// outward, the reader's rule (R3); left unresolved when none is found (R4). The one way an
+    /// area binds a row's reference (a master or model defined later, or in a later file of
+    /// the same scope chain): `Builder::bind_ref` in `bind`.
+    #[expect(dead_code, reason = "the element and model areas call it (S3.1, S3.2)")]
+    pub(super) fn refer(
+        &mut self,
+        item: ir::ItemRef,
+        k: u32,
+        scope: ir::ScopeId,
+        kind: ir::DefKind,
+        name: ir::NameId,
+    ) {
+        assert!(!name.is_none(), "refer: a name");
+        self.rows.push(RowRef {
+            item,
+            k,
+            scope,
+            kind,
+            name,
+        });
     }
 
     /// How many parameter reads and calls wait for the bind step (a mark for [`Lower::rescope`]).
@@ -449,8 +548,10 @@ fn comments(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, from: u32, to: u32) {
 }
 
 /// The bind step: each pending parameter read and user call, still unresolved, bound to the
-/// definition ngspice reads from its scope (the nearest enclosing one: `Design::lookup`).
-fn bind(b: &mut ir::Builder<'_>, pending: &[(ir::ExprId, ir::ScopeId)]) {
+/// definition ngspice reads from its scope (the nearest enclosing one: `Design::lookup`); then
+/// each queued row reference ([`Lower::refer`]) by the same rule, through `Builder::bind_ref`.
+fn bind(b: &mut ir::Builder<'_>, pending: &[(ir::ExprId, ir::ScopeId)], rows: &[RowRef]) {
+    bind_rows(b, rows);
     for &(e, scope) in pending {
         let (kind, r) = match b.design().expr(e) {
             ir::Expr::Param(r) => (ir::DefKind::Param, r),
