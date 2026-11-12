@@ -172,7 +172,7 @@ pub use plan::{
 };
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
 pub use reset::{Reset, ResetSet, Restorable};
-pub use rewrite::{rewrite_exprs, rewrite_exprs_in};
+pub use rewrite::{rewrite_exprs, rewrite_exprs_in, rewrite_tree};
 pub use run_extra::RunExtra;
 pub use span::Span;
 pub use stats::{Statistics, Vary, VaryDist};
