@@ -124,7 +124,6 @@ cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_4.sp mismatch # plots ["no
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/examples/control_structs/if-batchmode.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: ALL | Simulation aborted due to error.  There are 0 MSG_FATAL err
 ngspice/examples/ddt/ddt-test3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 ngspice/examples/hicum2/hic2_noise.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/examples/measure/func_cap.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {{max(icap_calc(1,2,3,4))}} | Netlist error: syntax error in expression {{max(icap_cal
@@ -161,7 +160,6 @@ ngspice/paranoia/various/ro_17_4.sp mismatch # tran v(3): 1.0032345606593271 lea
 ngspice/tests/bsim3soipd/t4.sp mismatch # dc i(vb): 0+0i vs -0.000000000006278979391451045+0i at 0 (tol 2.000e-12)
 ngspice/tests/general/fourbitadder.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(x1.x1.x1.x5.8): -0.0006232238726266992 leaves the tube at t=0.0000000036177435765459917 (tol 2.519e-5)
 ngspice/tests/general/rc.sp mismatch # tran v(1): 0.011117920800000002 leaves the tube at t=0.0011117920800000002 (tol 1.000e-2)
-ngspice/tests/mes/subth.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: VIDS#BRANCH | Simulation aborted due to error.  There are 0 MSG_F
 ngspice/tests/mos6/mos6inv.sp mismatch # tran i(vin): -0.00006723369385653813 leaves the tube at t=0.00000000046 (tol 6.811e-7)
 ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): -0.0000008905818325687239 leaves the tube at t=0.000000038139999999999996 (tol 9.868e-8)
 ngspice/tests/regression/func/func-1.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {100*foo0()} | Simulation aborted due to error.  There are 0 MSG_FATAL errors and 1 MS

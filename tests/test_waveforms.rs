@@ -182,3 +182,77 @@ fn p3_005_ltspice_pwl_relative_time_is_absolute() {
     ltspice_on_ngspice(deck, 2.5e-6, 1.0, tol);
     ltspice_on_ngspice(deck, 4e-6, 1.5, tol);
 }
+
+#[test]
+fn p3_021_an_ngspice_sffm_is_written_where_spice3s_form_runs_it() {
+    // Ledger P3-021. ngspice-45's SFFM is (VO VA FM MDI FC): VO + VA·sin(2π·
+    // FC·t + MDI·sin(2π·FM·t)) after time zero and 0 up to it, MDI limited
+    // to [0, FC/FM], an FC of 0 read as 500/TSTOP (manual §4.1.5;
+    // `vsrcload.c:228-280`). SPICE3's (VO VA FC MDI FS) is the same sum
+    // from time zero with no limit (Xyce RG 7.10 Table 2-59; HSPICE UG
+    // E-2010.12 p.256). By hand at 213.7 us for SFFM(0 1 200 4 10k):
+    // sin(2π·2.137 + 4·sin(2π·0.04274)) = sin(13.42717 + 1.06129) =
+    // 0.93892; with the two frequencies swapped, -0.15971
+    // (research/impl/evidence/P3-021/closed.py). Tolerance: 1e-3 V, above
+    // the 1.4e-4 a line between two 0.5 us steps is off a 10.8 kHz wave.
+    let tol = Tol {
+        rel: 1e-3,
+        floor: 1.0,
+    };
+    let card = |wave: &str, run: &str| format!("p3-021\nV2 a 0 {wave}\nR1 a 0 1k\n{run}\n.end\n");
+    let tran = ".tran 0.5u 1m";
+    let at = At::Time(213.7e-6);
+    let deck = card("SFFM(0 1 200 4 10k)", tran);
+    let on = [Dialect::Ngspice, Dialect::Xyce, Dialect::Vacask];
+    closed_form(Dialect::Ngspice, &deck, &on, "a", at, 0.93892, tol);
+    // Spectre is not run: `freq` is its sine's frequency, `fmmodfreq` the
+    // "FM modulation frequency".
+    let cite = "Spectre Reference 5.0 pp.684-685: freq, fmmodindex, fmmodfreq";
+    let fm = "v2 (a 0) vsource dc=0 type=sine sinedc=0 ampl=1 freq=10k fmmodindex=4 fmmodfreq=200";
+    oracle::spec_example(cite, &deck, Dialect::Ngspice, Dialect::Spectre, &[fm]);
+    // An offset (SPICE3's value at time zero, where ngspice is 0), an MDI
+    // ngspice limits and an FC of 0 make SPICE3's form another wave:
+    // refused. Xyce 7.10 ran each as it was written: 0.5 V at time zero;
+    // -0.0956 V and -0.1991 V at 213.7 us for ngspice's 0.9995 V and
+    // 0.7583 V; 0.8729 V for 0.1213 V (evidence/P3-021/run.txt).
+    let spice3 = [
+        Dialect::Xyce,
+        Dialect::Hspice,
+        Dialect::Ltspice,
+        Dialect::Spectre,
+        Dialect::Vacask,
+    ];
+    for wave in [
+        "SFFM(0.5 1 200 4 10k)",
+        "SFFM(0 1 200 80 10k)",
+        "SFFM(0 1 200 -4 10k)",
+        "SFFM(0 1 200 4 0)",
+    ] {
+        let deck = card(wave, tran);
+        for to in spice3 {
+            let codes = oracle::refusal(&deck, Dialect::Ngspice, to);
+            let w0108 = spicerack::syntax::diag::Code::W0108;
+            assert!(codes.contains(&w0108), "{wave} for {to:?}: {codes:?}");
+        }
+        // ESPice runs ngspice's SFFM: the card is written as it is.
+        let own = oracle::write(&deck, Dialect::Ngspice, Dialect::Espice);
+        assert!(own.contains("SFFM("), "{own}");
+    }
+    // The legal neighbour: an MDI of FC/FM is inside the limit, written,
+    // and the same wave on Xyce.
+    let edge = card("SFFM(0 1 200 50 10k)", tran);
+    sim_pair(Dialect::Ngspice, &edge, Dialect::Xyce, "a", at, tol);
+    // A card with no DC value is 0 V at an operating point too, whatever
+    // its offset (ngspice-45, run); one with a DC value is that value.
+    let op = card("SFFM(0.5 1 200 4 10k)", ".op");
+    sim_pair(Dialect::Ngspice, &op, Dialect::Ngspice, "a", At::First, tol);
+    let given = card("DC 3 SFFM(0.5 1 200 4 10k)", ".op");
+    sim_pair(
+        Dialect::Ngspice,
+        &given,
+        Dialect::Ngspice,
+        "a",
+        At::First,
+        tol,
+    );
+}

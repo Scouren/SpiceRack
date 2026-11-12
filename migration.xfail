@@ -4142,3 +4142,10 @@ vacask/test/test_noise.sim xyce refused differently: W0023 at a save card that a
 vacask/test/test_resistor.sim hspice written differently: one `.option post` for a save list that asks `all`: was none (P3-043)
 vacask/test/test_resistor.sim xyce written differently: `.print dc V(*)` for a save list that asks `all` (P3-043)
 vacask/test/test_visrc.sim xyce refused differently: W0023 at a save card that asks `all` beside analyses of no one `.print` kind (P3-043)
+# P1-066-xyce-print-words, P1-066-xyce-mes-threshold: an ngspice .print's `all` is written `v(*) i(*)` and a branch
+# vector `v1#branch` `i(v1)` on Xyce (prints.rs xyce_output; Xyce 7.10 stopped on both words), and an ngspice MESFET's
+# `vt0` is written `vto`, with ngspice's -2 V when the card gives none (xyce_models.rs MES; Xyce ignored `vt0` and
+# computed with 0 V). Oracle: real ngspice-45 and Xyce 7.10 to closed forms (tests/test_xyce_write.rs,
+# tests/test_xyce_models.rs p1_066).
+spice-bench/ngspice/examples/control_structs/if-batchmode.sp xyce written differently: `.print tran all` is `.print tran v(*) i(*)` (P1-066-xyce-print-words)
+spice-bench/ngspice/tests/mes/subth.sp xyce written differently: `.print dc vids#branch` is `.print dc i(vids)`, the MESFET's `vt0=-1.3` is `vto=-1.3` (P1-066-xyce-print-words, P1-066-xyce-mes-threshold)

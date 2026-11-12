@@ -1663,3 +1663,58 @@ def test_p3_043_save_all_reaches_hspice_xyce_and_vacask():
     got = run.operating_point()
     assert got.nodes == ["in", "mid", "out"]
     assert [got[n] for n in got.nodes] == pytest.approx([1.0, 0.75, 0.5], rel=1e-9)
+
+
+def _p3_021_fm(backend, offset=0.0):
+    """An FM source across 1 kOhm: a 10 kHz carrier modulated at 200 Hz, index 4."""
+    import spicerack as ps
+
+    d = ps.Subcircuit("fm", ["in"])
+    d.R("1", "in", d.gnd, 1e3)
+    tb = ps.Testbench(d)
+    tb.with_backend(backend)
+    tb.SingleFrequencyFMVoltageSource("in", "in", "0", offset=offset, amplitude=1.0, carrier_frequency=1e4,
+                                      modulation_index=4.0, signal_frequency=200.0)
+    return tb
+
+
+def _p3_021_closed(t, offset=0.0):
+    """offset + sin(2 pi FC t + MDI sin(2 pi FS t)), by the arguments' names (ngspice-45 manual
+    §4.1.5, eq. 4.3, FS its FM; HSPICE UG E-2010.12 p.256, eq. 9)."""
+    return offset + math.sin(2 * math.pi * 1e4 * t + 4 * math.sin(2 * math.pi * 200 * t))
+
+
+@pytest.mark.parametrize("backend", ["ngspice", "espice", "vacask"])
+def test_p3_021_an_fm_source_follows_its_closed_form(backend):
+    """ZERO-LEDGER P3-021 (P8-315). ngspice-45's card is `SFFM(VO VA FM MDI FC)`: the builder put
+    the carrier third, so ngspice and ESPice ran a 200 Hz carrier modulated at 10 kHz (0.279 V at
+    213.3 us for the closed form's 0.948 V). The source drives the node, so every sample is the
+    closed form to rounding: ngspice-45 exactly, ESPice 0.3.0 to 2.5e-15, VACASK to 3e-17
+    (research/impl/evidence/P3-021/py/fixed.out, today.out). VACASK held before as well: its writer
+    copied the slots back the same way."""
+    tran = _p3_021_fm(backend).transient(step_time=1e-6, end_time=1e-3, max_time=1e-6)
+    time, v = list(tran.time), list(tran["in"])
+    assert len(time) > 1000 and time[-1] == pytest.approx(1e-3)
+    for t, got in zip(time, v):
+        assert got == pytest.approx(_p3_021_closed(t), abs=1e-12), t
+
+
+def test_p3_021_an_fm_source_with_an_offset_is_ngspices_alone():
+    """ngspice-45 `vsrcload.c:272`: SFFM is 0 up to time zero, the operating point included,
+    whatever its offset, so the card's default DC value is 0 (`dc=` is "the waveform at t=0").
+    SPICE3's form (Xyce RG 7.10 Table 2-59; HSPICE UG p.256; Spectre's and VACASK's FM sine) is
+    the offset there: Xyce 7.10 and VACASK ran 0.5 V at time zero
+    (research/impl/evidence/P3-021/run.txt), so each such target refuses the source (W0108)."""
+    import spicerack as ps
+
+    tb = _p3_021_fm("ngspice", offset=0.5)
+    assert "Vin in 0 0 SFFM(0.5 1 200 4 10000)" in tb.netlist_with_notes("ngspice")[0].splitlines()
+    assert tb.operating_point()["in"] == 0.0
+    tran = tb.transient(step_time=1e-6, end_time=1e-4, max_time=1e-6)
+    time, v = list(tran.time), list(tran["in"])
+    assert (time[0], v[0]) == (0.0, 0.0)
+    for t, got in zip(time[1:], v[1:]):
+        assert got == pytest.approx(_p3_021_closed(t, 0.5), abs=1e-12), t
+    for target in ("xyce", "hspice", "ltspice", "spectre", "vacask"):
+        with pytest.raises(ps.Error, match="W0108"):
+            tb.netlist_with_notes(target)

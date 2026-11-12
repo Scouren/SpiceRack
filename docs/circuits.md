@@ -103,7 +103,7 @@ Each comes as `...VoltageSource` and `...CurrentSource`, on all three objects:
 | `PulseVoltageSource` | `initial_value, pulsed_value, delay, rise_time, fall_time, pulse_width, period` |
 | `PieceWiseLinearVoltageSource` | `values=[(t, v), ...], repeat_time, delay_time` (ngspice `r=`, `td=`; ngspice repeats a voltage source only, ESPice both; Spectre takes `delay_time`, and `repeat_time=0` when the points start at 0 and end on their first value, as `pwlperiod`; VACASK the same, as `delay` and `period`) |
 | `ExponentialVoltageSource` | `initial_value, pulsed_value, rise_delay_time, rise_time_constant, fall_delay_time, fall_time_constant` |
-| `SingleFrequencyFMVoltageSource` | `offset, amplitude, carrier_frequency, modulation_index, signal_frequency` |
+| `SingleFrequencyFMVoltageSource` | `offset, amplitude, carrier_frequency, modulation_index, signal_frequency` (ngspice `SFFM`: `offset + amplitude·sin(2π·carrier_frequency·t + modulation_index·sin(2π·signal_frequency·t))` after t=0 and 0 up to it, the index held within 0 and `carrier_frequency/signal_frequency`. Xyce, HSPICE, LTspice, Spectre and VACASK run the sum from t=0 with no limit: they take the source with `offset=0` and an index inside the limit, and refuse any other, `W0108`) |
 | `AmplitudeModulatedVoltageSource` | `offset, amplitude, modulating_frequency, carrier_frequency, signal_delay, signal_phase, carrier_phase` |
 | `TransientNoiseVoltageSource` | `noise_rms, time_step, flicker_exponent, flicker_rms, rts_amplitude, rts_capture_time, rts_emission_time` (ngspice `TRNOISE`; ngspice only) |
 | `RandomVoltageSource` | `random_type` (`uniform`, `gaussian`, `exponential`, `poisson`), `duration, time_delay, parameter1, parameter2` (ngspice `TRRANDOM`; ngspice only) |

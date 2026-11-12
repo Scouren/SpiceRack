@@ -20,7 +20,9 @@
 //! current times the area, as Xyce's level 1), `devices/bjt/bjt.c`,
 //! `bjtsetup.c` (the defaults), `devices/hicum2/hicum2.c` (level 8, its
 //! aliases), `devices/mos6/mos6set.c:93-97` (level 6: `lambda0`, by default
-//! `lambda`); Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` (`LAMBDA` read only
+//! `lambda`), `devices/mes/mes.c`, `messetup.c` (MESFET level 1: `vt0`,
+//! -2 V by default; Xyce RG `Z`: `VTO`, 0 V);
+//! Xyce 7.10 `N_DEV_MOSFET6.C:3055-3062` (`LAMBDA` read only
 //! beside `LAMBDA0`). The levels with no Xyce device (`NO_XYCE_DEVICE`):
 //! Xyce 7.10 and ngspice-45 run on a one-device deck per type and level
 //! (ZERO-LEDGER P1-066, research/impl/evidence/P1-066-xyce-model-levels/).
@@ -69,6 +71,9 @@ struct Device {
     off: &'static [(&'static str, Off)],
     /// Names both devices read under other laws: refused off 0.
     differ: &'static [&'static str],
+    /// Names whose default is another value on Xyce: ngspice's, written
+    /// when the card gives none.
+    defaults: &'static [(&'static str, &'static str)],
 }
 
 /// The ngspice `.model` types (lowercase) and LEVELs ngspice-45 has a
@@ -167,6 +172,7 @@ const DIODE: Device = Device {
         ("xw", Off::Any),
     ],
     differ: &["ik", "ikf"],
+    defaults: &[],
 };
 
 /// ngspice's Gummel-Poon BJT (level 1) as Xyce's level 1: Xyce has none of
@@ -213,6 +219,7 @@ const BJT: Device = Device {
         ("dtemp", Off::At(0.0)),
     ],
     differ: &[],
+    defaults: &[],
 };
 
 /// ngspice's HICUM/L2 (level 8, `hicum2.c`) as Xyce's (level 234): the
@@ -242,6 +249,27 @@ const HICUM: Device = Device {
         ("m", Off::At(1.0)),
     ],
     differ: &[],
+    defaults: &[],
+};
+
+/// ngspice's MESFET (level 1, Statz; `devices/mes/mes.c`) as Xyce's `Z`
+/// level 1 (RG 7.10 `Z`): the same parameters, the threshold under
+/// ngspice's `vt0`, which Xyce ignores with a warning ("No model parameter
+/// VT0 found"), and by default -2 V (`messetup.c`) where Xyce's `VTO` is
+/// 0 V (7.10.0 runs: off where ngspice conducts; with `vto=` the two agree
+/// to 1.8e-9, research/impl/evidence/P1-066-xyce-mes/runs.txt).
+const MES: Device = Device {
+    key: "mes1",
+    level: "1",
+    renames: &[("vt0", "vto")],
+    off: &[
+        ("nmf", Off::Any),
+        ("pmf", Off::Any),
+        ("area", Off::At(1.0)),
+        ("m", Off::At(1.0)),
+    ],
+    differ: &[],
+    defaults: &[("vto", "-2")],
 };
 
 /// The [`Shape`] ngspice's card `kind` with `params` gives its instances.
@@ -293,6 +321,7 @@ pub(super) fn xyce_model(
         ("d", None | Some("1" | "3")) => &DIODE,
         ("npn" | "pnp", None | Some("1")) => &BJT,
         ("npn" | "pnp", Some("8")) => &HICUM,
+        ("nmf" | "pmf", None | Some("1")) => &MES,
         (k @ ("c" | "l"), _) => return default_value(k, params),
         // ngspice's VDMOS (`devices/vdmos`): Xyce has no `vdmos` model
         // type, and its level-18 VDMOS is another model (RG `M` level 18).
@@ -353,7 +382,12 @@ pub(super) fn xyce_model(
             _ => return Err(Code::W0050),
         }
     }
-    debug_assert!(out.len() <= params.len());
+    for (name, value) in device.defaults {
+        if !out.iter().any(|(k, _)| k.eq_ignore_ascii_case(name)) {
+            out.push((name.to_string(), value.to_string()));
+        }
+    }
+    debug_assert!(out.len() <= params.len() + device.defaults.len());
     Ok(Some(out))
 }
 

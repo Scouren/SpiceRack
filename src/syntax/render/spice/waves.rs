@@ -122,7 +122,8 @@ impl W<'_, '_> {
     /// wave: LTspice's SINE with a cycle count ([`Wave::sin_cycles`]),
     /// SPICE3's SFFM where ngspice's is not it ([`Wave::ngspice_sffm`]).
     /// `None`: `w` is written in its own form, or it has no such
-    /// expression and is refused (W0108).
+    /// expression and is refused (W0108), as ngspice's SFFM is where
+    /// SPICE3's is not it ([`Wave::spice3_sffm`]).
     pub(super) fn wave_as_b(&mut self, w: &Wave, tok: u32) -> Option<String> {
         let expr = match w.kind {
             WaveKind::Sin if self.pair.sin_cycles_as_b && w.cycled() => w.sin_cycles("time"),
@@ -133,6 +134,11 @@ impl W<'_, '_> {
                     // cannot read `{v0}` there).
                     Num::Expr(e) => self.ternaries(e),
                 }))
+            }
+            // ngspice's SFFM for a target whose SFFM is SPICE3's: 0 up to
+            // time zero, MDI limited, an FC of 0 a default.
+            WaveKind::Sffm if self.pair.sffm_swap && !self.pair.sffm_as_b && !w.spice3_sffm() => {
+                None
             }
             _ => return None,
         };
