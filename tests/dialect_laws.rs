@@ -36,11 +36,6 @@ const SIZE: Size = Size {
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l1-empty",
-        "ngspice",
-        "a blank line 1 is a deck's empty Title (the lead's ruling, follow-up 3 of S3.0); an empty text has none",
-    ),
-    (
         "l3",
         "ngspice",
         "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",

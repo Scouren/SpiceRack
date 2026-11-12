@@ -40,6 +40,7 @@ const READ: &[&str] = &[
     "param_reads_circuit",
     "param_temp_class",
     "subckt_nested",
+    "title_blank",
     "title_comments_end",
 ];
 
