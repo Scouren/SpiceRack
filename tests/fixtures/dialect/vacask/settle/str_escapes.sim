@@ -1,0 +1,7 @@
+string escapes
+model vsource vsource
+v1 (a 0) vsource dc=1
+control
+  print ("[q\"q]", "[b\\b]", "[n\nn]", "[t\tt]", "[x\qx]")
+  analysis op1 op
+endc

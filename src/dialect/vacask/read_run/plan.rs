@@ -15,7 +15,8 @@
 //! Contents: `mc`, `statement` (crate-private)
 
 use super::{
-    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, bare_name, string,
+    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, bare_name,
+    check_value, string,
 };
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::fold;
@@ -77,7 +78,7 @@ pub(super) fn mc(l: &mut Lower<'_, '_, '_>, n: Node) -> Option<bool> {
     };
     let seed = get("seed");
     for v in [Some(samples), seed].into_iter().flatten() {
-        if let Err(r) = expr_read::check_expr(l, v, Context::Param) {
+        if let Err(r) = check_value(l, v) {
             read::opaque(l, n, r.class, Some(r.code));
             return Some(true);
         }
@@ -178,7 +179,7 @@ fn alter(l: &mut Lower<'_, '_, '_>, n: Node) {
         return read::opaque(l, n, ir::OpaqueClass::Private, Some(ALTER_TYPE));
     }
     for (_, v) in &pairs {
-        if let Err(r) = expr_read::check_expr(l, *v, Context::Param) {
+        if let Err(r) = check_value(l, *v) {
             return read::opaque(l, n, r.class, Some(r.code));
         }
     }

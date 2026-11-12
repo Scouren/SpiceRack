@@ -1,0 +1,8 @@
+section a
+foo bar baz(
+parameters p=1
+endsection
+.model x d
+section b
+parameters p=2
+endsection

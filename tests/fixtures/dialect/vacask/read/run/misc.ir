@@ -1,11 +1,13 @@
 # Oracle: DIALECT-VACASK §3.4 (print, abort, postprocess: Inert, C K10); R43 (var Private under
-# its own code, P2307); VD cmd-options-set, cmd-save (`clear options`, `clear` reset state:
+# its own code, P2307); R63 (a statement reading a name only the Private var defines is Private
+# under its own code, P2315: corpus demo/bsim3-ptm/characteristic.sim `op_itl=(a+b*a)*b`); VD cmd-options-set, cmd-save (`clear options`, `clear` reset state:
 # Private, P2310); comments keep their place among the statements.
-# codes: P2307 P2310 P2310 S0002 S0002 S0002 S0003 S0003 S0003
+# codes: P2307 P2310 P2310 P2315 S0002 S0002 S0002 S0002 S0003 S0003 S0003
 file "misc.sim" deck
   title "print, abort, postprocess, clear, var"
   comment " a comment before the first statement"
   opaque vacask private "var x=2"
+  opaque vacask private "options op_itl=(x+1)*2 reltol=1e-4"
   opaque vacask inert "print instance(\"r1\")"
   opaque vacask inert "abort always"
   analysis op name=op1

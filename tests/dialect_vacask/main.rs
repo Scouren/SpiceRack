@@ -16,4 +16,5 @@ mod corpus;
 mod probe;
 mod read;
 mod settle;
+mod settle_syntax;
 mod write;

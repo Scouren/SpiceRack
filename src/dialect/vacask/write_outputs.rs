@@ -5,7 +5,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-save.
 //!
-//! Contents: `admits`, `save` (crate-private)
+//! Contents: `admit`, `save` (crate-private)
 
 use super::name::{self, Place};
 use super::read_run::SAVE_CATEGORY;
@@ -62,40 +62,35 @@ pub(super) fn save(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// states: an `AllV` not followed by an `AllBranchI`, an `AllBranchI` alone (VACASK's only
 /// category is `default`, both together; run e5), or a set of analyses other than the one a
 /// `save` line governs (op, its sweeps and tran; with `default` and no p() also ac and dcinc).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, _) in design.reachable() {
-        if at.kind != ir::ItemKind::Save {
-            continue;
-        }
-        let row: ir::Save = design.row(at.index);
-        let kinds: Vec<ir::ProbeKind> = design.probes(row.probes).iter().map(|p| p.kind).collect();
-        let mut k = 0;
-        let mut spelled = true;
-        // Bounded: each pass takes one or two probes.
-        while k < kinds.len() {
-            spelled &= match kinds[k] {
-                ir::ProbeKind::AllV => kinds.get(k + 1) == Some(&ir::ProbeKind::AllBranchI),
-                ir::ProbeKind::V | ir::ProbeKind::I | ir::ProbeKind::Param => true,
-                _ => false,
-            };
-            k += 1 + usize::from(kinds[k] == ir::ProbeKind::AllV);
-        }
-        // A `save` line governs op, its sweeps and tran; with `default` and no p() also ac and
-        // dcinc (run e5): every other set has no spelling.
-        use ir::AnalysisKind as K;
-        let base = ir::AnalysisKinds::of(&[K::Op, K::Dc, K::Tran]);
-        let own = ir::AnalysisKinds::of(&[K::Op, K::Dc, K::Tran, K::Ac, K::DcInc]);
-        let default = kinds.contains(&ir::ProbeKind::AllV);
-        let param = kinds.contains(&ir::ProbeKind::Param);
-        let own_set = default && !param;
-        spelled &= match own_set {
-            true => row.analyses == own,
-            false => row.analyses == base,
+pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags) {
+    let row: ir::Save = design.row(at.index);
+    let kinds: Vec<ir::ProbeKind> = design.probes(row.probes).iter().map(|p| p.kind).collect();
+    let mut k = 0;
+    let mut spelled = true;
+    // Bounded: each pass takes one or two probes.
+    while k < kinds.len() {
+        spelled &= match kinds[k] {
+            ir::ProbeKind::AllV => kinds.get(k + 1) == Some(&ir::ProbeKind::AllBranchI),
+            ir::ProbeKind::V | ir::ProbeKind::I | ir::ProbeKind::Param => true,
+            _ => false,
         };
-        // Runs sv1, sv2: a VACASK save holds from where it stands.
-        spelled &= row.holds == ir::Applies::FromHere;
-        if !spelled {
-            diags.push_at(SAVE_CATEGORY, design, at, 0);
-        }
+        k += 1 + usize::from(kinds[k] == ir::ProbeKind::AllV);
+    }
+    // A `save` line governs op, its sweeps and tran; with `default` and no p() also ac and
+    // dcinc (run e5): every other set has no spelling.
+    use ir::AnalysisKind as K;
+    let base = ir::AnalysisKinds::of(&[K::Op, K::Dc, K::Tran]);
+    let own = ir::AnalysisKinds::of(&[K::Op, K::Dc, K::Tran, K::Ac, K::DcInc]);
+    let default = kinds.contains(&ir::ProbeKind::AllV);
+    let param = kinds.contains(&ir::ProbeKind::Param);
+    let own_set = default && !param;
+    spelled &= match own_set {
+        true => row.analyses == own,
+        false => row.analyses == base,
+    };
+    // Runs sv1, sv2: a VACASK save holds from where it stands.
+    spelled &= row.holds == ir::Applies::FromHere;
+    if !spelled {
+        diags.push_at(SAVE_CATEGORY, design, at, 0);
     }
 }

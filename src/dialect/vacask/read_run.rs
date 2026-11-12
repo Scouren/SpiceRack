@@ -16,15 +16,20 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.4; R43, A22; VD cmd-overview, cmd-sweep,
 //! cmd-analysis-mc.
 //!
+//! Circuit variables: `variables.rs`.
+//!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
 mod options;
 mod plan;
 mod sweep;
+mod variables;
+
+use variables::check_value;
 
 use super::codes::UNCLOSED;
 use super::read::{self, Lower};
@@ -162,6 +167,8 @@ pub(super) const ELABORATE_TOP: ir::Code = ir::Code::new(b'P', 2311);
 pub(super) const SWEEP_FORM: ir::Code = ir::Code::new(b'P', 2312);
 /// An `alter` of a source's `type` (the fold of R42 is the scaffold's declare step, not yet).
 pub(super) const ALTER_TYPE: ir::Code = ir::Code::new(b'P', 2313);
+/// A statement that reads a circuit variable (a `var` name no top-level parameter defines).
+pub(super) const READS_VARIABLE: ir::Code = ir::Code::new(b'P', 2315);
 /// A sweep of a waveform source's `dc`, which VACASK ignores (settle run/sweep_source).
 pub(super) const SWEEP_WAVE: ir::Code = ir::Code::new(b'P', 2314);
 /// A sweep of a source's DC value where the source has a wave and its DC is the wave's: a
@@ -278,6 +285,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "an alter of a source's type, kept as its text",
         "R42 (the dc/wave alternation folds into the source; any other type alter is Private)",
         "The alternation's recognition is the scaffold's declare step; until it lands every type alter is kept as text.",
+        ir::Kind::Note,
+    ),
+    row(
+        READS_VARIABLE,
+        "a statement that reads a circuit variable, kept as its text",
+        "R43, R63; VD expr-cirvars; corpus demo/bsim3-ptm/characteristic.sim (`var a=2 b=2`, `options … op_itl=(a+b*a)*b`)",
+        "A var statement is Private (P2307), so a name only it defines has no IR definition; a statement that reads one is kept as text with it, VACASK's writer copies both.",
         ir::Kind::Note,
     ),
     row(

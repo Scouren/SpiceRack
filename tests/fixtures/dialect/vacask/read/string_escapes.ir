@@ -1,0 +1,8 @@
+# Oracle: settle str_escapes (VACASK 36be560 prints "[q\"q]" as [q"q], "[b\\b]" as [b\b],
+# "[n\nn]" with a line break, "[t\tt]" with a tab, "[x\qx]" as [xqx]): a string field is read
+# with its escapes resolved, as an expression's string is.
+# codes:
+file "string_escapes.sim" deck
+  title "string escapes in a path"
+  include "a\\b \"c\".inc"
+  include "tqx.inc"
