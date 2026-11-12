@@ -1,7 +1,7 @@
 //! `tran_print_step_to_simulator`'s proof (R67, A41): the interval only resamples the output,
 //! so the state at every analysis and every row reference stay (`keeps_state`, the model in
 //! `passes_run/state.rs`), and over generated designs each transient's print step goes with a
-//! `U0412` note carrying the old interval, or stays with `U0413` exactly where something reads
+//! `U0417` note carrying the old interval, or stays with `U0418` exactly where something reads
 //! it (ngspice's ceiling rule, a `$tstep` leaf, further segments). Oracle: the rows read back
 //! against the rule's statement.
 //!
@@ -26,12 +26,23 @@ fn tran_print_step_to_simulator_drops_exactly_the_unread_intervals() {
     let name = "tran_print_step_to_simulator";
     let pass = passes::all().find(|p| p.name == name).expect("registered");
     let (mut dropped, mut kept) = (0, 0);
-    // every feature, and the set without what reads an interval (else most are kept)
-    let readers = ir::FeatureSet::EMPTY
-        .with(ir::Feature::Expr(ir::ExprTag::TStep))
+    // every feature, and two sets of transients alone: one with every ceiling and segments,
+    // one adding `$tstep` (the generator reaches few print steps over every feature)
+    let tran = ir::FeatureSet::EMPTY
+        .with(ir::Feature::Item(ir::ItemKind::Title))
+        .with(ir::Feature::Item(ir::ItemKind::Analysis))
+        .with(ir::Feature::Expr(ir::ExprTag::Num))
+        .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
+        .with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed))
+        .with(ir::Feature::Run(ir::RunExtra::TranPrintStep))
+        .with(ir::Feature::Run(ir::RunExtra::TranMaxStep))
         .with(ir::Feature::Run(ir::RunExtra::TranCapNgspice))
+        .with(ir::Feature::Run(ir::RunExtra::TranCapSpan50))
         .with(ir::Feature::Run(ir::RunExtra::TranSegments));
-    let sets = [ir::FeatureSet::ALL, ir::FeatureSet::ALL.minus(readers)];
+    let tstep = tran
+        .with(ir::Feature::Item(ir::ItemKind::Param))
+        .with(ir::Feature::Expr(ir::ExprTag::TStep));
+    let sets = [ir::FeatureSet::ALL, tran, tstep];
     for (set, seed) in sets.iter().flat_map(|s| SEEDS.map(move |k| (s, k))) {
         let mut design = generate(seed, set, SIZE);
         if !ir::features_used(&design).contains(ir::Feature::Run(ir::RunExtra::TranPrintStep)) {
@@ -54,12 +65,12 @@ fn tran_print_step_to_simulator_drops_exactly_the_unread_intervals() {
             match read {
                 true => {
                     assert_eq!(new.print_step, old.print_step, "seed {seed}: kept");
-                    assert_eq!(notes[0].code.number, 413, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 418, "seed {seed}");
                     kept += 1;
                 }
                 false => {
                     assert!(new.print_step.is_none(), "seed {seed}: dropped");
-                    assert_eq!(notes[0].code.number, 412, "seed {seed}");
+                    assert_eq!(notes[0].code.number, 417, "seed {seed}");
                     assert_eq!(
                         notes[0].arg, old.print_step.0,
                         "seed {seed}: the old interval"
@@ -70,8 +81,9 @@ fn tran_print_step_to_simulator_drops_exactly_the_unread_intervals() {
         }
     }
     eprintln!("{name}: {dropped} dropped, {kept} kept");
-    assert!(dropped > 0, "no generated interval was dropped");
-    assert!(kept > 0, "no generated interval was read");
+    // a floor on the cases exercised, both ways
+    assert!(dropped >= 30, "{dropped} generated intervals dropped");
+    assert!(kept >= 30, "{kept} generated intervals kept");
 }
 
 /// Every reachable transient with its detail, in listed order.
