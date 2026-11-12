@@ -80,7 +80,7 @@ pub enum OptionKey {
     /// ngspice `noopiter`; VACASK `op_skipinitial=1`.
     NoOpIter,
     /// Deck-wide ceiling on the transient time step, s, applied to every transient. HSPICE
-    /// `delmax`; LTspice `maxstep`. A transient's own ceiling is `Tran::max_step`.
+    /// `delmax`; LTspice `maxstep`. A transient's own ceiling is `Tran::ceiling`.
     MaxStep,
     // ---- equations ----
     /// Conductance across every junction in every analysis, S. ngspice, LTspice, Spectre,
