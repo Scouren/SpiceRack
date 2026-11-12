@@ -133,6 +133,7 @@ mod tests {
                 period,
                 cycles,
                 law: spicerack_ir::wave::PulseLaw::Spice,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source {
                 ac_mag,
@@ -329,6 +330,7 @@ mod tests {
                 period,
                 cycles: ExprId::NONE,
                 law: spicerack_ir::wave::PulseLaw::Vacask,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source {
                 wave,
@@ -358,6 +360,7 @@ mod tests {
                 td2,
                 tau2,
                 td2_from,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source { wave, ..source(dc) };
             b.source(top, ElemKind::ISource, h, row, Span::NONE);
@@ -384,6 +387,7 @@ mod tests {
                 phase_m_deg,
                 law: spicerack_ir::wave::SffmLaw::Ngspice,
                 pre: spicerack_ir::wave::PreDelay::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             });
             let row = spicerack_ir::source::Source { wave, ..source(dc) };
             b.source(top, ElemKind::VSource, h, row, Span::NONE);
@@ -479,6 +483,33 @@ mod tests {
             b.model(top, model(name, ModelFamily::Mesa, Polarity::P), Span::NONE);
             let h = b.head("m1", &["d", "g", "s", "b"], Some("nch"), &[], ExprId::NONE);
             b.semi(top, ElemKind::Mosfet, h, semi(), Span::NONE);
+        });
+    }
+
+    /// A17 (R35): under ngspice's zero rule a field holds what the card holds, and an omitted
+    /// one is absent.
+    #[test]
+    fn a_pulse_under_the_spice_zero_rule() {
+        let text = "file \"t.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=pulse(v1=0 v2=1 delay=0 \
+                    rise=0 given_zero=spice_default)\n";
+        same(text, |b, top| {
+            let h = head(b, "v1", &["a", "0"]);
+            let dc = n(b, 0);
+            let [v1, v2, delay, rise] = [0, 1, 0, 0].map(|x| n(b, x));
+            let wave = b.wave(spicerack_ir::wave::Pulse {
+                v1,
+                v2,
+                delay,
+                rise,
+                fall: ExprId::NONE,
+                width: ExprId::NONE,
+                period: ExprId::NONE,
+                cycles: ExprId::NONE,
+                law: spicerack_ir::wave::PulseLaw::Spice,
+                given_zero: spicerack_ir::wave::GivenZero::SpiceDefault,
+            });
+            let row = spicerack_ir::source::Source { wave, ..source(dc) };
+            b.source(top, ElemKind::VSource, h, row, Span::NONE);
         });
     }
 }

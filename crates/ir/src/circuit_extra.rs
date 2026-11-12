@@ -238,11 +238,18 @@ pub enum CircuitExtra {
     /// A circuit-valued capacitor's temperature factor applied as a divisor
     /// (`TcLaw::Reciprocal`, ngspice).
     TcLawReciprocal,
+    // A17 (R35)
+    /// A pulse, sine, exponential or SFFM whose zero fields mean what they hold
+    /// (`GivenZero::AsGiven`).
+    GivenZeroAsGiven,
+    /// A pulse, sine, exponential or SFFM under ngspice's zero rule
+    /// (`GivenZero::SpiceDefault`).
+    GivenZeroSpiceDefault,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 102] = [
+    pub const ALL: [CircuitExtra; 104] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -345,6 +352,8 @@ impl CircuitExtra {
         CircuitExtra::TcBaseFixed27,
         CircuitExtra::TcLawDirect,
         CircuitExtra::TcLawReciprocal,
+        CircuitExtra::GivenZeroAsGiven,
+        CircuitExtra::GivenZeroSpiceDefault,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

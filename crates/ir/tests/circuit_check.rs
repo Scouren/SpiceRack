@@ -163,6 +163,20 @@ mod tests {
                 ..source(ExprId::NONE)
             });
             push(b, top, ElemKind::VSource, &["a", "0"], None, w);
+            // under ngspice's zero rule an omitted rise, fall, width and period are legal (A17)
+            let omitted = b.wave(spicerack_ir::wave::Pulse {
+                rise: ExprId::NONE,
+                fall: ExprId::NONE,
+                width: ExprId::NONE,
+                period: ExprId::NONE,
+                given_zero: spicerack_ir::wave::GivenZero::SpiceDefault,
+                ..pulse(one)
+            });
+            let o = b.detail(spicerack_ir::source::Source {
+                wave: omitted,
+                ..source(one)
+            });
+            push(b, top, ElemKind::VSource, &["a", "0"], None, o);
             let name = b.name("nch");
             b.push(
                 top,
@@ -228,7 +242,7 @@ mod tests {
     #[test]
     fn every_field_domain_rule_is_reported_alone() {
         type Case = fn(&mut Builder<'_>, ScopeId);
-        let cases: [(&str, Case); 38] = [
+        let cases: [(&str, Case); 39] = [
             ("diode without a model", |b, top| {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
@@ -612,6 +626,27 @@ mod tests {
                 };
                 b.push(top, row, Span::NONE);
             }),
+            (
+                "an omitted exponential delay under the as-given rule",
+                |b, top| {
+                    let one = n(b, 1);
+                    let wave = b.wave(spicerack_ir::wave::Exp {
+                        v1: one,
+                        v2: one,
+                        td1: ExprId::NONE,
+                        tau1: one,
+                        td2: one,
+                        tau2: one,
+                        td2_from: spicerack_ir::wave::TdFrom::Zero,
+                        given_zero: spicerack_ir::wave::GivenZero::AsGiven,
+                    });
+                    let v = b.detail(spicerack_ir::source::Source {
+                        wave,
+                        ..source(one)
+                    });
+                    push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+                },
+            ),
         ];
         for (what, case) in cases {
             assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");

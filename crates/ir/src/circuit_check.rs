@@ -31,7 +31,7 @@ use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{IcMode, TcBase, TcLaw};
 use crate::source::DcRule;
-use crate::wave::{PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
+use crate::wave::{GivenZero, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
 /// What is wrong with an element beyond its terminal count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -445,21 +445,21 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
     let all = |e: &[ExprId]| e.iter().all(|&x| some(x));
     match w.kind {
         WaveKind::Pulse => side::<Pulse>(design, w.index, v).is_none_or(|p| {
-            all(&[p.v1, p.v2, p.delay, p.rise, p.fall, p.width, p.period])
+            // A17: under ngspice's zero rule the defaulted fields may be absent
+            all(&[p.v1, p.v2, p.delay])
+                && (p.given_zero == GivenZero::SpiceDefault
+                    || all(&[p.rise, p.fall, p.width, p.period]))
                 && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
         }),
         WaveKind::Sin => side::<Sin>(design, w.index, v).is_none_or(|s| {
-            all(&[
-                s.offset,
-                s.amplitude,
-                s.freq,
-                s.delay,
-                s.damping,
-                s.phase_deg,
-            ]) && paired(s.amplitude2, s.freq2)
+            all(&[s.offset, s.amplitude, s.delay, s.damping, s.phase_deg])
+                && (s.given_zero == GivenZero::SpiceDefault || some(s.freq))
+                && paired(s.amplitude2, s.freq2)
         }),
-        WaveKind::Exp => side::<Exp>(design, w.index, v)
-            .is_none_or(|x| all(&[x.v1, x.v2, x.td1, x.tau1, x.td2, x.tau2])),
+        WaveKind::Exp => side::<Exp>(design, w.index, v).is_none_or(|x| {
+            all(&[x.v1, x.v2])
+                && (x.given_zero == GivenZero::SpiceDefault || all(&[x.td1, x.tau1, x.td2, x.tau2]))
+        }),
         WaveKind::Pwl => side::<Pwl>(design, w.index, v).is_none_or(|p| {
             let never = p.repeat == PwlRepeat::Never;
             p.points.len().is_multiple_of(2)
@@ -472,13 +472,12 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
             all(&[
                 s.offset,
                 s.amplitude,
-                s.carrier_freq,
                 s.mod_index,
                 s.signal_freq,
                 s.delay,
                 s.phase_c_deg,
                 s.phase_m_deg,
-            ])
+            ]) && (s.given_zero == GivenZero::SpiceDefault || some(s.carrier_freq))
         }),
         WaveKind::Am => side::<Am>(design, w.index, v).is_none_or(|a| {
             all(&[
