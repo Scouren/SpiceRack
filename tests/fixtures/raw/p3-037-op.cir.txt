@@ -1,0 +1,8 @@
+* p3-037 a stepped source, op (LTspice 26.1.1: column 0 is `vdd voltage`, not a param)
+.param r=1k
+Rtop vdd out {r}
+Rbot out 0 1k
+Vdd vdd 0 1 AC 1
+.step Vdd 1 3 1
+.op
+.end

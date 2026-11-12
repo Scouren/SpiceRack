@@ -239,16 +239,18 @@ fn parse_utf8(data: &[u8], ltspice: bool) -> Result<(RawData, usize, bool), RawF
     Ok((raw, pos + used, stepped))
 }
 
-/// A stepped plot as one plot per step. Column 0 a `param` (a stepped
-/// operating point): one point a step, the step's value that point's.
-/// Otherwise a step starts where column 0 comes back to its first value
-/// (time 0, the first frequency or sweep value) after leaving it.
+/// A stepped plot as one plot per step. A stepped operating point (column
+/// 0 the stepped `param`, or, stepping a source, its `voltage` or `current`
+/// named for it: LTspice 26.1.1, `tests/fixtures/raw/p3-037-op.raw`): one
+/// point a step, the step's value that point's. Otherwise a step starts
+/// where column 0 comes back to its first value (time 0, the first
+/// frequency or sweep value) after leaving it.
 fn split_steps(raw: RawData) -> Vec<RawData> {
     let axis = raw.re(0).into_owned();
     if axis.is_empty() {
         return vec![raw];
     }
-    let param = raw.variables[0].var_type == VarType::Param;
+    let param = raw.variables[0].var_type == VarType::Param || raw.plot_name == "Operating Point";
     let mut starts: Vec<usize> = (0..axis.len())
         .filter(|&i| param || i == 0 || (axis[i] == axis[0] && axis[i - 1] != axis[0]))
         .collect();

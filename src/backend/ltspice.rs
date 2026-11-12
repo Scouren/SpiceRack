@@ -232,4 +232,23 @@ mod tests {
         two.iter_mut().for_each(|p| p.params.clear());
         assert!(log_steps(&log, &mut two).is_err(), "3 steps, 2 plots");
     }
+
+    #[test]
+    fn p3_037_a_stepped_source_operating_point_is_one_plot_per_step() {
+        // tests/fixtures/raw/p3-037-op.*: LTspice 26.1.1's `.step Vdd 1 3 1`
+        // `.op`, whose column 0 is `vdd voltage` (a `.step param` writes
+        // `r param`); its log names no step. V(out) = Vdd / 2.
+        let raw = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/raw/p3-037-op.raw"
+        ))
+        .expect("raw");
+        let plots = crate::rawfile::parse_raw_all(&raw).expect("parsed");
+        let got: Vec<_> = plots
+            .iter()
+            .map(|p| (p.params.clone(), p.re(1).to_vec()))
+            .collect();
+        let want = [1.0, 2.0, 3.0].map(|v| (vec![("vdd".to_string(), v)], vec![v / 2.0]));
+        assert_eq!(got, want);
+    }
 }
