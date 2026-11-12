@@ -144,8 +144,9 @@ pub enum PwlJoin {
     /// A ramp over `join_width` seconds when the first and last values differ (sp
     /// `pwlperiod` with `twidth`, default period/1000 written by the reader).
     RampWidth,
-    /// The wrap segment is the extrapolation of the first segment (va `period=` with a first
-    /// time above 0, measured against its own documentation).
+    /// VACASK's periodic PWL (`period=` > 0, A22, R42): on [xN, period) and on [0, x1) of the
+    /// wrapped time τ, the value is the line through (xN, yN) and (period + x1, y1), evaluated
+    /// at τ itself; between the points it is the plain PWL.
     Extrapolate,
 }
 
@@ -268,10 +269,12 @@ pub struct Exp {
     pub given_zero: GivenZero,
 }
 
-/// `PWL(t1 v1 t2 v2 …)`: absolute (time, value) points, linear between them, the last value
-/// held. Relative times (lt `+t`), scale, offset and stretch (lt, sp, va) are accumulated by
-/// the reader into the absolute points as expressions (5.09, 5.33); a deck with no t = 0 point
-/// gets the one its simulator implies (hs ramps from DC, ng and lt hold the first value; 5.10).
+/// `PWL(t1 v1 t2 v2 …)`: absolute (time, value) points, linear between them. Before the first
+/// point the first value holds, after the last the last value, unless `repeat` says otherwise
+/// (A22, R42). No reader writes a point the deck lacks: a simulator with another rule before
+/// the first point gets a mode member when its slice shows the rule (none today). Relative
+/// times (lt `+t`), scale, offset and stretch (lt, sp, va) are accumulated by the reader into
+/// the absolute points as expressions (5.09, 5.33).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Pwl {
     /// Flat (time, value) pairs, times non-decreasing; `List::EMPTY` only when `file` is set.

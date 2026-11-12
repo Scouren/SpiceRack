@@ -120,7 +120,7 @@ pub enum CircuitExtra {
     PwlJoinRamp,
     /// A PWL repeat that ramps over a width (`PwlJoin::RampWidth`, sp).
     PwlJoinRampWidth,
-    /// A PWL repeat whose wrap extrapolates the first segment (`PwlJoin::Extrapolate`, va).
+    /// A PWL repeat joined by VACASK's periodic law (`PwlJoin::Extrapolate`, va; A22).
     PwlJoinExtrapolate,
     /// PWL points in a file (`Pwl::file`, 5.12).
     PwlFile,
