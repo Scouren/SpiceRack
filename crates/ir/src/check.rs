@@ -100,9 +100,12 @@ pub enum Violation {
     /// A function body whose root is a string or a list (A25 item 4: a body is a number).
     /// `arg`: the root.
     StringOrListBody,
-    /// A typed field (a `Handle::Expr` or `Handle::ExprDyn` of a row other than a `Param`'s
-    /// value) whose root is a list, or a string where the row's `RowFacts::string_roots` does not
-    /// name it (A25 item 4). `arg`: the root.
+    /// A typed field (a `Handle::Expr` or `Handle::ExprDyn` root, or any root of a
+    /// `Handle::Exprs` vector, of a row other than a `Param`'s value) whose root is a list, or a
+    /// string where the row's `RowFacts::string_roots` does not name it (A25 item 4). A vector
+    /// given whole by one list-valued expression is a form the IR does not state: its reader keeps
+    /// the statement `Private` (with a census count) until a deck of a pair needs it. `arg`: the
+    /// root.
     StringOrListField,
 }
 
