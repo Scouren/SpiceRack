@@ -18,7 +18,8 @@
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
 //! Contents: `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
-//! `pub mod drop_device_libraries`, `pub mod explicit_family_models`, `pub mod hoist_nested_subckts`,
+//! `pub mod drop_device_libraries`, `pub mod explicit_family_models`,
+//! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod deck_title;
@@ -26,6 +27,7 @@ pub mod device_libraries;
 pub mod drop_builtin_models;
 pub mod drop_device_libraries;
 pub mod explicit_family_models;
+pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
 mod libraries;
 
@@ -61,6 +63,16 @@ pub(super) const PASSES: &[Pass] = &[
             hoist_nested_subckts::NOT_IN_BODY,
         ],
         run: hoist_nested_subckts::hoist_nested_subckts,
+    },
+    Pass {
+        name: "formal_defaults_to_instances",
+        removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[
+            formal_defaults_to_instances::DRAW_IN_DEFAULT,
+            formal_defaults_to_instances::UNKNOWN_INSTANCES,
+        ],
+        run: formal_defaults_to_instances::formal_defaults_to_instances,
     },
     // before `device_libraries`: the models it adds may need libraries (it adds them itself)
     Pass {
@@ -133,6 +145,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a subcircuit defined in a branch, loop or section inside a subcircuit",
             cite: "rewrite/AMEND-A12.md A15 K1; R27",
             explain: "The subcircuit is defined under a condition or inside a section of an enclosing subcircuit; moving it out would change when or where it is defined, so it is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        formal_defaults_to_instances::DRAW_IN_DEFAULT,
+        ir::Info {
+            title: "a subcircuit formal whose non-constant default holds a draw",
+            cite: "R53; rewrite/AMEND-A12.md A29",
+            explain: "The target lets an instance override only a formal whose default is a constant, so the default would be passed at each instance; it holds a random draw, and a copy per instance would not draw what the default draws, so the subcircuit is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        formal_defaults_to_instances::UNKNOWN_INSTANCES,
+        ir::Info {
+            title: "a subcircuit with instances the design cannot bind",
+            cite: "R53; rewrite/AMEND-A12.md A29",
+            explain: "Its non-constant default would be passed at every instance and itself replaced; an element names a subcircuit of this name without a binding (its file is not read), and that instance would read the replaced default, so the subcircuit is refused.",
             kind: ir::Kind::Note,
         },
     ),

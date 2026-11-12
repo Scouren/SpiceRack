@@ -27,6 +27,7 @@ const PENDING_PAIRS: &[&str] = &[
     "drop_device_libraries",
     "hoist_nested_subckts",
     "hoist_enclosing_refs",
+    "formal_defaults_to_instances",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
