@@ -1,0 +1,5 @@
+# codes:
+file "global_gnd.sp" deck
+  title "global_gnd"
+  comment " oracle: manual 2.6 (.global), INV-semantics 11.01 (gnd is node 0: inpcom.c inp_fix_gnd_name), 3.02 (names fold case)"
+  global vdd vss

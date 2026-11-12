@@ -1,0 +1,6 @@
+# codes: P1009
+file "if_branch_param_refused.sp" deck
+  title "if_branch_param_refused"
+  comment " oracle: manual 2.15 (a branch holds instances and models only; no .param, .subckt, .include, .lib)"
+  if (1)
+    opaque ngspice invalid ".param p=1"

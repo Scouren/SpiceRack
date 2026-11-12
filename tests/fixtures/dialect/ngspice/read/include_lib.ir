@@ -1,0 +1,7 @@
+# codes: R1003 R1003 R1003
+file "include_lib.sp" deck
+  title "include_lib"
+  comment " oracle: INV-constructs A8 (.include, .inc), A11 (.lib file section), SPINE 2 (a path the sources lack stays as written)"
+  include "models/a.sp"
+  include "corner.lib" section=TT
+  include "gone.sp"

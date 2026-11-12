@@ -1,0 +1,16 @@
+# oracle: ngspice manual 2.4, 2.6-2.8, 2.12, 2.15 (the card forms); written by hand
+file "structure.sp" deck
+  title "structure"
+  comment " a comment"
+  global vdd vss
+  include "a.sp"
+  include "c.lib" section=tt
+  param w = 2
+  func sq(x) = x * x
+  subckt cell (a b) w=1 l=w * 2
+    param k = l + 1
+  if (w == 1)
+    comment " one"
+  elif (w > 1)
+  else
+    comment " other"

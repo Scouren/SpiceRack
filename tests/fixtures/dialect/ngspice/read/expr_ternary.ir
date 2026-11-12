@@ -1,0 +1,6 @@
+# codes:
+file "expr_ternary.sp" deck
+  title "expr_ternary"
+  comment " oracle: INV-semantics 2.13 (numparam reads a?b?c:d:e as a?c:e), run {1?0?4:8:16} = 4; else-chains group right, run {1?0:1?3:4} = 0"
+  param a = 1 ? 4 : 16
+  param b = 1 ? 0 : (1 ? 3 : 4)

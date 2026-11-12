@@ -1,0 +1,6 @@
+# codes: P1002
+file "negation_refused.sp" deck
+  title "negation_refused"
+  comment " oracle: xpressn.c formula (a - after an operator negates the next number only), run {2*-q}: \"wrongly determined negation\""
+  param q = 3
+  opaque ngspice invalid ".param p={2*-q}"

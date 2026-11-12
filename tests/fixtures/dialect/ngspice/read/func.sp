@@ -1,0 +1,4 @@
+func
+* oracle: manual 2.12 (.func name(args) {body}; formals bind in the body, free names at the definition's scope)
+.func f(x, y) {x*y+z}
+.param z=1 p={f(2,3)}

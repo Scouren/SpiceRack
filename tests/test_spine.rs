@@ -171,7 +171,8 @@ fn the_route_table_and_the_override_pick_the_pipeline() {
         ("ir", "ir", Some(Pipeline::Old), false),
         ("ngspice", "spectre", None, false),
         ("ngspice", "spectre", Some(Pipeline::New), false),
-        ("ngspice", "ir", Some(Pipeline::New), false),
+        ("ngspice", "ir", Some(Pipeline::New), true),
+        ("spectre", "ir", Some(Pipeline::New), false),
         ("ir", "nowhere", Some(Pipeline::New), false),
     ];
     for (from, to, forced, new) in cases {

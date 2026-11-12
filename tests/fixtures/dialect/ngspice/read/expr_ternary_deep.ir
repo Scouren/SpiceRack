@@ -1,0 +1,5 @@
+# codes: P1004
+file "expr_ternary_deep.sp" deck
+  title "expr_ternary_deep"
+  comment " oracle: run {1?2:0?1?3:4:5} = 3 (C reads 2; numparam's then-branch rule reads 2): no single reading, INV-semantics 2.13"
+  opaque ngspice invalid ".param a={1?2:0?1?3:4:5}"

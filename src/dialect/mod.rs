@@ -37,15 +37,17 @@
 //!   `Write::write`)
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`
-//! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`
+//! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
+//!   `pub mod ngspice`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn write(design: &ir::Design, file: ir::FileId, to: &DialectRow, diags: &mut ir::Diags) -> String`
 //! - `pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Policy) -> Result<Written, ir::Diags>`
-//! - `pub fn refuses(code: ir::Code) -> bool`
+//! - `pub fn refuses(code: ir::Code) -> bool`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
 pub mod facade;
 pub mod irtext;
+pub mod ngspice;
 mod sources;
 
 pub use sources::{DEPTH_MAX, Reference, Sources};
@@ -92,12 +94,20 @@ pub struct DialectRow {
 }
 
 /// Every built-in language: the IR's own text first; each dialect slice appends its row.
-pub static BUILTIN: &[DialectRow] = &[DialectRow {
-    name: "ir",
-    text_family: ANY_FAMILY,
-    read: Some(&irtext::IrText),
-    write: Some(&irtext::IrText),
-}];
+pub static BUILTIN: &[DialectRow] = &[
+    DialectRow {
+        name: "ir",
+        text_family: ANY_FAMILY,
+        read: Some(&irtext::IrText),
+        write: Some(&irtext::IrText),
+    },
+    DialectRow {
+        name: "ngspice",
+        text_family: "ngspice",
+        read: Some(&ngspice::NGSPICE),
+        write: Some(&ngspice::NGSPICE),
+    },
+];
 
 /// The `text_family` of a writer whose text holds an `Opaque` of any dialect (the IR text,
 /// which is lossless).
@@ -239,7 +249,13 @@ pub fn transpile(
 /// Whether `code` refuses a deck: [`STRICT_UNREAD`], an IR code whose row is a refusal, and
 /// any code no catalogue knows (a missing row fails loudly, never silently).
 pub fn refuses(code: ir::Code) -> bool {
-    code == STRICT_UNREAD || ir::diag::info(code).is_none_or(|info| info.kind == ir::Kind::Refusal)
+    code == STRICT_UNREAD || info(code).is_none_or(|info| info.kind == ir::Kind::Refusal)
+}
+
+/// The catalogue row of `code`: the IR's own table, then each dialect's (`ngspice::info`).
+/// `None` for a code no table knows.
+pub fn info(code: ir::Code) -> Option<ir::Info> {
+    ir::diag::info(code).or_else(|| ngspice::info(code))
 }
 
 // ---- private ----

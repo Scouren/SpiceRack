@@ -1,0 +1,9 @@
+# codes:
+file "expr_ops.sp" deck
+  title "expr_ops"
+  comment " oracle: xpressn.c operate (% is x - y*trunc(x/y); \\ is trunc(fabs(x/y))), mathfunction (nint is nearbyint, int is trunc); runs {(-7)\\2} = 3, {nint(2.5)} = 2"
+  param a = fmod(7, 3)
+  param b = trunc(abs(-7 / 2))
+  param c = round_half_even(2.5)
+  param d = trunc(-1.5)
+  param e = (0 == 1) < 2

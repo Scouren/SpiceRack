@@ -1,0 +1,5 @@
+# codes: P1010
+file "global_ground_only.sp" deck
+  title "global_ground_only"
+  comment " oracle: INV-semantics 11.01 (ground is global already)"
+  opaque ngspice inert ".global gnd 0"

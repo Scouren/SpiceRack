@@ -1,0 +1,10 @@
+# codes:
+file "if_chain.sp" deck
+  title "if_chain"
+  comment " oracle: manual 2.15 (.if/.elseif/.else/.endif), INV-constructs B13, B28 (a single = is equality: xpressn.c fetchoperator)"
+  param s = 2
+  if (s == 1)
+    comment " one"
+  elif (s == 2)
+    comment " two"
+  else

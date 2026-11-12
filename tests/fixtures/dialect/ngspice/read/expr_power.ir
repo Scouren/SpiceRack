@@ -1,0 +1,9 @@
+# codes:
+file "expr_power.sp" deck
+  title "expr_power"
+  comment " oracle: INV-semantics 2.02-2.04 (ngspice ** and ^ are |x|^y, left-associative, unary minus looser), runs {2**3**2} = 64, {-2**2} = -4, {2*-2**2} = 8, {pow(0-2,3)} = -8"
+  param a = pow_abs(pow_abs(2, 3), 2)
+  param b = -pow_abs(2, 2)
+  param c = 2 * pow_abs(-2, 2)
+  param d = pow(0 - 2, 3)
+  param e = pow_abs(2, 3)

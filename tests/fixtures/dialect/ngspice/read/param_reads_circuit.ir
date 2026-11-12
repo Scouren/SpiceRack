@@ -1,0 +1,5 @@
+# codes: P1006
+file "param_reads_circuit.sp" deck
+  title "param_reads_circuit"
+  comment " oracle: INV-semantics 2.06 (numparam evaluates a .param once and has no v(), i(), time, temper, hertz)"
+  opaque ngspice invalid ".param p={v(a)*2}"

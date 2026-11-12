@@ -1,0 +1,12 @@
+# codes:
+file "numbers.sp" deck
+  title "numbers"
+  comment " oracle: INV-semantics 1.01-1.07, R1 (digits as written), xpressn.c fetchnumber (numparam: no d exponent, mil is milli), runs {2mil} = 2e-3, {1e3k} = 1e6"
+  param a = 100u
+  param b = 1m
+  param c = 1meg
+  param d = 0.050000
+  param e = 1e6
+  param f = 2m
+  param g = 1.5e-3
+  param h = 10
