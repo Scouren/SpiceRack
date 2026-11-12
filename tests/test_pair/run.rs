@@ -11,6 +11,7 @@
 //! - `pub struct Deck`, `pub struct Fail`, `pub struct Done`, `pub type Written`, `pub const JOBS`
 //! - `pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &PairFile) -> Done`
 //! - `pub fn determinism(from: &DialectRow, to: &DialectRow, decks: &[Deck], once: &BTreeMap<String, Written>) -> Vec<(String, String)>`
+//! - `pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written>`
 //! - `pub fn fail(class: &str, said: String) -> Fail`
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -203,6 +204,12 @@ pub fn determinism(
     out
 }
 
+/// `deck` read, legalized and written (steps 1 and 2 and the writing), or `None` when a step
+/// refused or panicked.
+pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written> {
+    spine(from, to, &deck.src, deck.policy).ok().map(|s| s.files)
+}
+
 /// A failure of class `class`.
 pub fn fail(class: &str, said: String) -> Fail {
     Fail {
@@ -230,6 +237,14 @@ fn spine(
         dialect::read(src, from, policy, &mut design, &mut diags)
     })?;
     let text = src.files().first().map_or("", |f| f.1.as_str());
+    // `ir::check`'s violations (`X` rows) are the reader's bug: a debug build panics on them in
+    // `dialect::read` (class `panic`), a release build only reports them (class `check:<codes>`).
+    let bad: Vec<&ir::Diag> = diags.rows().iter().filter(|d| d.code.letter == b'X').collect();
+    if !bad.is_empty() {
+        let codes: BTreeSet<String> = bad.iter().map(|d| d.code.to_string()).collect();
+        let class = format!("check:{}", codes.into_iter().collect::<Vec<_>>().join(","));
+        return Err((1, fail(&class, describe(&bad, text))));
+    }
     if let Some(f) = refusal(&diags, 0, text) {
         return Err((1, f));
     }

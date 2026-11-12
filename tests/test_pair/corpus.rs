@@ -1,8 +1,8 @@
 //! The corpus cells of the pair test (`--features corpus`, SPINE §8a): every deck of a corpus
 //! the old cross-sim cells run (spice-bench for `ngspice-vacask`, the VACASK corpus for
 //! `vacask-ngspice`), read leniently with every file it names, through the six steps on
-//! `PAIR_JOBS` workers (6). A deck the corpus's cross-sim source list quarantines as `slow` is
-//! converted and not simulated.
+//! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash). A deck the
+//! corpus's cross-sim source list quarantines as `slow` is converted and not simulated.
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
@@ -66,32 +66,26 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     );
     let slow = quarantined(corpus.source_list);
     let reader = from.read.expect("rows checked it");
-    let decks: Vec<Deck> = paths
-        .iter()
-        .map(|p| {
-            let dir = p.parent().expect("a deck in a folder").to_path_buf();
-            let name = p
-                .file_name()
-                .expect("a file")
-                .to_string_lossy()
-                .into_owned();
-            let mut load = |f: &str| std::fs::read_to_string(dir.join(f)).ok();
-            let src = Sources::load(&[&name], ir::Role::Deck, reader, &mut load);
-            Deck {
-                name: rel(p),
-                path: p.clone(),
-                src,
-                policy: Policy::Lenient,
-                simulate: !slow.contains(&rel(p)),
-            }
-        })
-        .collect();
+    // A deck is loaded in the worker that runs it and dropped after: a corpus does not fit in
+    // memory at once. Step 6 keeps a hash of the written bytes, not the bytes.
+    let load = |p: &Path| {
+        let dir = p.parent().expect("a deck in a folder").to_path_buf();
+        let name = p.file_name().expect("a file").to_string_lossy().into_owned();
+        let mut read = |f: &str| std::fs::read_to_string(dir.join(f)).ok();
+        Deck {
+            name: rel(p),
+            path: p.to_path_buf(),
+            src: Sources::load(&[&name], ir::Role::Deck, reader, &mut read),
+            policy: Policy::Lenient,
+            simulate: !slow.contains(&rel(p)),
+        }
+    };
     let jobs = std::env::var("PAIR_JOBS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6usize);
     let next = AtomicUsize::new(0);
-    let done: Mutex<Vec<(usize, Done)>> = Mutex::new(Vec::new());
+    let done: Mutex<Vec<(usize, Done, Option<u64>)>> = Mutex::new(Vec::new());
     let none = PairFile::default();
     std::thread::scope(|s| {
         for _ in 0..jobs.max(1) {
@@ -99,47 +93,57 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
                 // Bounded: each index is taken once.
                 loop {
                     let k = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(d) = decks.get(k) else { break };
-                    let v = run::steps(c, from, to, d, &none);
-                    done.lock().expect("no worker panicked").push((k, v));
+                    let Some(p) = paths.get(k) else { break };
+                    let mut v = run::steps(c, from, to, &load(p), &none);
+                    let h = v.written.take().map(|w| hash(&w));
+                    let mut all = done.lock().expect("no worker panicked");
+                    all.push((k, v, h));
+                    if all.len() % 200 == 0 {
+                        eprintln!("{}: {} of {} decks", c.name, all.len(), paths.len());
+                    }
                 }
             });
         }
     });
     let mut done = done.into_inner().expect("no worker panicked");
-    done.sort_by_key(|(k, _)| *k);
-    assert_eq!(done.len(), decks.len(), "{}: every deck ran", c.name);
-    let once: BTreeMap<String, run::Written> = done
-        .iter()
-        .filter_map(|(k, v)| v.written.clone().map(|w| (decks[*k].name.clone(), w)))
-        .collect();
+    done.sort_by_key(|(k, _, _)| *k);
+    assert_eq!(done.len(), paths.len(), "{}: every deck ran", c.name);
     let mut seen: BTreeMap<(String, u8), Fail> = BTreeMap::new();
     let mut lines = Vec::new();
-    for (k, v) in done {
-        let name = &decks[k].name;
-        lines.push(format!(
-            "{name} {}",
-            crate::line(&v, once.contains_key(name))
-        ));
+    for (k, v, h) in done {
+        let name = rel(&paths[k]);
+        lines.push(format!("{name} {}", crate::line(&v, h.is_some())));
         for (step, f) in v.fails {
             seen.insert((name.clone(), step), f);
         }
-    }
-    for (name, why) in run::determinism(from, to, &decks, &once) {
-        seen.insert((name, 6), run::fail("nondeterministic", why));
+        // Step 6: the deck converted again on one job, against the bytes `jobs` workers wrote.
+        if let Some(h) = h
+            && run::convert(from, to, &load(&paths[k])).map(|w| hash(&w)) != Some(h)
+        {
+            let said = format!("the written bytes differ between {jobs} jobs and 1");
+            seen.insert((name, 6), run::fail("nondeterministic", said));
+        }
     }
     let file = format!("{}/pair-{}-census.txt", env!("CARGO_TARGET_TMPDIR"), c.name);
     std::fs::write(&file, lines.join("\n") + "\n").unwrap_or_else(|e| panic!("{file}: {e}"));
     eprintln!(
         "{}: census of {} decks in {file}\n{}",
         c.name,
-        decks.len(),
-        table(&seen, decks.len())
+        paths.len(),
+        table(&seen, paths.len())
     );
     crate::judge(&format!("{}-corpus", c.name), &seen)
 }
 
 // ---- private ----
+
+/// A hash of a deck's written files, paths and bytes.
+fn hash(w: &run::Written) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    w.hash(&mut h);
+    h.finish()
+}
 
 /// The decks a cross-sim source list names `slow` (corpus-relative paths).
 fn quarantined(list: &str) -> Vec<String> {
