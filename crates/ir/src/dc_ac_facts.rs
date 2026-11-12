@@ -33,9 +33,9 @@ use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-use crate::id::ScopeId;
 #[cfg(any(test, feature = "gen"))]
-use crate::id::{ExprId, NameId};
+use crate::id::ExprId;
+use crate::id::ScopeId;
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::gen_target;
 use crate::plan::{
@@ -89,6 +89,7 @@ impl DetailFacts for Dc {
         flag(set, self.restart, RunExtra::DcRestart);
         for axis in axes {
             flag(set, !axis.name.is_none(), RunExtra::DcAxisNamed);
+            flag(set, axis.name.is_none(), RunExtra::DcAxisUnnamed);
             target_features(&axis.target, TargetUse::Dc, set);
             sweep_features(&axis.sweep, SweepUse::Dc, set);
         }
@@ -155,11 +156,14 @@ impl DetailFacts for Dc {
             let target = gen_target(g, b, features, TargetUse::Dc)?;
             let sweep = gen_sweep(g, b, features, SweepUse::Dc);
             // after the sweep: the text interns the name after the sweep's values
-            let name = if has(features, RunExtra::DcAxisNamed) && g.chance(3) {
-                g.fresh_name(b)
-            } else {
-                NameId::NONE
-            };
+            let name = crate::run_words::gen_name(
+                g,
+                b,
+                features,
+                RunExtra::DcAxisNamed,
+                RunExtra::DcAxisUnnamed,
+                3,
+            )?;
             axes.push(DcAxis {
                 target,
                 sweep,

@@ -23,7 +23,7 @@
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
 //!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`, `pub(crate) fn is_zero`,
-//!   `pub(crate) fn loop_depth`
+//!   `pub(crate) fn loop_depth`, `pub(crate) fn gen_name` (gen)
 
 use std::fmt::{Debug, Write as _};
 
@@ -398,6 +398,26 @@ pub(crate) fn loop_depth(design: &Design, scope: ScopeId) -> usize {
         s = row.parent;
     }
     unreachable!("the scope tree has a cycle")
+}
+
+/// A generated statement name: a fresh one or `NONE`, as the set's `named` and `unnamed`
+/// features allow (named one time in `n` when both do); `None` when neither does.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_name(
+    g: &mut crate::r#gen::Gen,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+    named: RunExtra,
+    unnamed: RunExtra,
+    n: u32,
+) -> Option<NameId> {
+    let name = match (has(features, named), has(features, unnamed)) {
+        (false, false) => return None,
+        (true, false) => true,
+        (false, true) => false,
+        (true, true) => g.chance(n),
+    };
+    Some(if name { g.fresh_name(b) } else { NameId::NONE })
 }
 
 // ---- private ----

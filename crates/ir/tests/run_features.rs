@@ -254,7 +254,8 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Run(RunExtra::TranUic))
         .with(Feature::Run(RunExtra::SaveWholeRunMidRun))
         .with(Feature::Run(RunExtra::OptionFromHere))
-        .with(Feature::Run(RunExtra::SaveWholeRun));
+        .with(Feature::Run(RunExtra::SaveWholeRun))
+        .with(Feature::Run(RunExtra::AnalysisUnnamed));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
 

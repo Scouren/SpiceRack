@@ -154,9 +154,11 @@ impl RowFacts for Loop {
         if over_op {
             add(RunExtra::LoopOverOp);
         }
-        if !self.name.is_none() {
-            add(RunExtra::LoopNamed);
-        }
+        add(if self.name.is_none() {
+            RunExtra::LoopUnnamed
+        } else {
+            RunExtra::LoopNamed
+        });
         if self.kind == LoopKind::Sweep && !one_run(design, self.body) {
             add(RunExtra::SweepBodyNotOne);
         }
@@ -222,6 +224,9 @@ impl RowFacts for Loop {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let has = |x: RunExtra| features.contains(Feature::Run(x));
+        if !has(RunExtra::LoopNamed) && !has(RunExtra::LoopUnnamed) {
+            return ItemRef::NONE; // a loop is named or not: one of the two is needed
+        }
         let design = b.design();
         let outer = loop_depth(design, scope);
         if outer >= LOOP_DEPTH_MAX {
@@ -263,11 +268,15 @@ impl RowFacts for Loop {
         }
         let kind = kinds[g.below(kinds.len() as u32) as usize];
         // The name first: the text interns it before the detail's names.
-        let name = if has(RunExtra::LoopNamed) && g.chance(4) {
-            g.fresh_name(b)
-        } else {
-            NameId::NONE
-        };
+        let name = crate::run_words::gen_name(
+            g,
+            b,
+            features,
+            RunExtra::LoopNamed,
+            RunExtra::LoopUnnamed,
+            4,
+        )
+        .expect("a naming feature is in the set");
         let detail = by_loop!(kind, gen_of(g, scope, b, features))
             .expect("a possible loop kind's detail generates");
         let row = |body| Loop {
@@ -287,16 +296,18 @@ impl RowFacts for Loop {
             && (d.analyses.is_empty() || has(RunExtra::SeveralAnalyses))
             && crate::r#gen::placeable(d, body, ItemKind::Analysis, features)
             // as `Analysis::generate`: without `LoopScoped` an analysis is inside every loop
-            && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len());
+            && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len())
+            && (has(RunExtra::AnalysisNamed) || has(RunExtra::AnalysisUnnamed));
         if kind == LoopKind::Sweep
             && has(RunExtra::LoopOverOp)
             && op_ok
             && g.items_left > 1
             && g.chance(2)
         {
+            let name = crate::analysis_facts::analysis_name(g, b, features);
             let op = Analysis {
                 kind: AnalysisKind::Op,
-                name: NameId::NONE,
+                name,
                 detail: u32::MAX,
             };
             b.push(body, op, Span::NONE);
