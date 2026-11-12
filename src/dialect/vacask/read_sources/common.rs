@@ -6,7 +6,7 @@
 //! Cites: VD cir-instance, cir-hier ("Scope"), cir-mfactor; RUN m1; A2 (check before push).
 //!
 //! Contents: `Fail`, `Params` (`get`, `val`, `only`, `keys`), `Val`, `COMMON`, `invalid`,
-//! `private`, `params`, `module_of`, `type_keys`, `source_key`, `at_default`, `nonpositive`,
+//! `private`, `params`, `type_keys`, `source_key`, `at_default`, `nonpositive`,
 //! `string`, `check`, `build`, `head`, `mult`, `terminals`, `flow_node` (crate-private)
 
 use super::{CTLNODE, INVALID, UNSTATED, default_of};
@@ -127,35 +127,6 @@ pub(super) fn params(l: &Lower<'_, '_, '_>, n: Node) -> Result<Params, Fail> {
         out.push((key, ast.rhs(x)));
     }
     Ok(Params(out))
-}
-
-/// The module word `master` is declared with: the first `model master <module>` of the file.
-/// ponytail: one file only, until the spine hands over its name → module map (asked of
-/// vacask-plan); a model from an include is missed.
-pub(super) fn module_of(l: &Lower<'_, '_, '_>, master: &str) -> Option<String> {
-    let ast = &l.cst.ast;
-    let mut todo: Vec<u32> = ast.fields(ast.root()).to_vec();
-    // Bounded: each statement node is taken once (the tree is acyclic).
-    while let Some(s) = todo.pop() {
-        let n = Node(s);
-        match ast.tag(n) {
-            Tag::Model => {
-                if let [name, module, ..] = ast.fields(n)
-                    && read::field_name(l.cst, *name) == master
-                {
-                    return Some(read::field_name(l.cst, *module));
-                }
-            }
-            Tag::Subckt | Tag::Section | Tag::If | Tag::Else => {
-                todo.extend_from_slice(ast.body(n));
-                if let Some(next) = ast.next(n) {
-                    todo.push(next.0);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
 }
 
 /// The active and the known parameters of a `vsource`/`isource` of `type`, or `None` for a

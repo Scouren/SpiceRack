@@ -59,10 +59,26 @@ fn read(src: &Sources, row: &'static str) -> (ir::Design, ir::Diags) {
     (design, diags)
 }
 
-/// The deck at `path` as sources.
+/// The deck at `path` as sources, then each `<stem>--<name>` library beside it (sorted).
 fn deck(path: &Path) -> Sources {
     let name = path.file_name().unwrap().to_string_lossy().into_owned();
-    Sources::one(&name, &std::fs::read_to_string(path).unwrap())
+    let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
+    let mut src = Sources::new();
+    src.add(&name, &std::fs::read_to_string(path).unwrap());
+    let mut libs: Vec<PathBuf> = std::fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with(&format!("{stem}--")))
+        })
+        .collect();
+    libs.sort();
+    for lib in libs {
+        let lib_name = lib.file_name().unwrap().to_string_lossy().into_owned();
+        src.add(&lib_name, &std::fs::read_to_string(&lib).unwrap());
+    }
+    src
 }
 
 /// The canonical IR text of every file of `design`.

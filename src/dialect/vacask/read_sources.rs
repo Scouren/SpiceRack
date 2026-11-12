@@ -33,13 +33,15 @@ mod common;
 mod wave;
 
 use super::read::{self, Lower};
+use super::read_elements::{self, Found, Master};
+use super::read_structure;
+use super::tables::SOURCE_MODULES;
 use crate::ir;
 use crate::ir::CircuitExtra as X;
 use crate::ir::Feature as F;
 use crate::syntax::ast::Node;
 use common::{
-    Fail, Params, Val, build, check, flow_node, head, invalid, module_of, mult, params, string,
-    terminals,
+    Fail, Params, Val, build, check, flow_node, head, invalid, mult, params, string, terminals,
 };
 
 /// What this area's rows use (its writer spells the same set, law L5).
@@ -235,7 +237,20 @@ pub(super) fn default_of(key: &str) -> Option<&'static str> {
 pub(super) fn source(l: &mut Lower<'_, '_, '_>, n: Node) {
     let h = l.cst.ast.header(n);
     let master = read::field_name(l.cst, h.master);
-    let module = module_of(l, &master);
+    // The master as VACASK binds it (vc-devices' declared table: own subckt, then the top).
+    let module = match read_elements::find(l, l.declared, &master) {
+        Found::Here(Master::Model(word)) if SOURCE_MODULES.contains(&word.as_str()) => Some(word),
+        Found::Enclosing => {
+            return read::opaque(
+                l,
+                n,
+                ir::OpaqueClass::InvalidInSource,
+                Some(read_structure::ENCLOSING),
+            );
+        }
+        // A name a source model has elsewhere, but not as seen from here: the devices area's.
+        _ => return read_elements::instance(l, n),
+    };
     let result = params(l, n).and_then(|p| match module.as_deref() {
         Some("vsource" | "isource") => {
             wave::independent(l, n, &p, module.as_deref() == Some("isource"))
