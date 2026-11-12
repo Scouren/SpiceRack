@@ -60,7 +60,7 @@ use crate::class::ExprClass;
 use crate::edit::Editor;
 use crate::element::{CircuitDetails, Element};
 use crate::expr::{
-    BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Exprs, Func as Builtin, Literal, UnOp,
+    BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Exprs, Func as Builtin, Literal, NumForm, UnOp,
 };
 use crate::facts::{Handle, RowFacts};
 use crate::id::{
@@ -409,6 +409,24 @@ impl Design {
     pub fn num(&self, num: NumId) -> Literal {
         assert!(num.index() < self.exprs.nums.len(), "a literal id in range");
         self.exprs.nums[num.index()]
+    }
+
+    /// The correctly rounded double of any literal of this design, `Long` included (A18): the
+    /// generic caller's `Literal::value`.
+    pub fn literal_value(&self, l: Literal) -> f64 {
+        todo!()
+    }
+
+    /// Whether two literals of this design state the same exact decimal number, `Long` included
+    /// (A18): the generic caller's `Literal::eq_value`.
+    pub fn literal_eq(&self, a: Literal, b: Literal) -> bool {
+        todo!()
+    }
+
+    /// A `Long` literal's significand as written and the form its power was written in;
+    /// `None` for a short literal. A writer spells the digits, then `exp10` in that form.
+    pub fn long_digits(&self, l: Literal) -> Option<(&str, NumForm)> {
+        todo!()
     }
 
     /// Expression row count; ids `0..expr_count()` are valid.

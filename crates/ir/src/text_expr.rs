@@ -243,6 +243,7 @@ pub fn write_literal(l: Literal, out: &mut String) {
         }
         NumForm::Mil => out.push_str("mil"),
         NumForm::Int => out.push('i'),
+        NumForm::Long => todo!(),
     }
 }
 

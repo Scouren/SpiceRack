@@ -8,7 +8,8 @@
 //! Contents: `pub struct Literal`, `pub enum NumForm` (`ALL`, `COUNT`), `Literal::ZERO`,
 //! `Literal::value(self) -> f64`, `Literal::from_f64(f64) -> Literal`,
 //! `Literal::eq_value(self, Literal) -> bool`, `Literal::is_valid(self) -> bool`; crate:
-//! `Literal::shape_ok(self) -> bool`, `Literal::finite(self) -> bool`
+//! `Literal::shape_ok(self) -> bool`, `Literal::finite(self) -> bool`; `pub fn significant_digits(&str) -> usize`,
+//! `pub const fn exceeds_mantissa(usize) -> bool`
 
 /// A decimal literal, as written: `mantissa × 10^(exp10 − frac)` (`Mil`: that times 25.4e-6).
 /// The IR states the number; the double is each simulator's own arithmetic on these digits.
@@ -47,6 +48,12 @@ pub enum NumForm {
     /// A whole number of integer type (A12 K1: VACASK's typed arithmetic): `frac` and `exp10`
     /// are 0. Every other form is real.
     Int,
+    /// More significant digits than the mantissa holds (A18, R37): the significand as written
+    /// lives in the design's long-literal pool; `mantissa` is its index there, `exp10` the power
+    /// of ten written or implied by a scale letter, and `frac` the form that power was written
+    /// in (`Plain`, `Exponent` or `Scale`, as a `NumForm` index). Real. Only the design can read
+    /// it: `Design::literal_value`, `Design::literal_eq`, `Design::long_digits`.
+    Long,
 }
 
 /// The powers of ten a scale letter states (A3): a `Scale` literal's `exp10` is one of these.
@@ -58,12 +65,13 @@ const _: () = assert!(size_of::<Literal>() == 16);
 
 impl NumForm {
     /// Every form, in declaration order.
-    pub const ALL: [NumForm; 5] = [
+    pub const ALL: [NumForm; NumForm::Long as usize + 1] = [
         NumForm::Plain,
         NumForm::Exponent,
         NumForm::Scale,
         NumForm::Mil,
         NumForm::Int,
+        NumForm::Long,
     ];
     /// Form count.
     pub const COUNT: usize = Self::ALL.len();
@@ -173,9 +181,23 @@ impl Literal {
                 NumForm::Scale => SCALES.contains(&self.exp10),
                 NumForm::Exponent => true,
                 NumForm::Int => self.exp10 == 0 && self.frac == 0,
+                NumForm::Long => todo!(),
             }
             && (self.mantissa != 0 || self == Literal::ZERO || self.form == NumForm::Int)
     }
+}
+
+/// How many significant digits a written significand has: its digits after leading zeros,
+/// trailing zeros as written counted (the count a short `mantissa` holds): `0.000123` has 3,
+/// `1.2300` has 5. Sign and point are not digits.
+pub fn significant_digits(significand: &str) -> usize {
+    todo!()
+}
+
+/// Whether `digits` significant digits exceed what a short literal's mantissa holds (18): the one
+/// bound between a short literal and a `Long` one (A18).
+pub const fn exceeds_mantissa(digits: usize) -> bool {
+    todo!()
 }
 
 // ---- private ----
@@ -188,6 +210,7 @@ impl Literal {
             NumForm::Mil => (self.mantissa as i128 * 254, k - 7),
             NumForm::Plain | NumForm::Exponent | NumForm::Scale => (self.mantissa as i128, k),
             NumForm::Int => (self.mantissa as i128, 0),
+            NumForm::Long => todo!(),
         }
     }
 

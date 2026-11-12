@@ -123,6 +123,10 @@ pub enum Extra {
     /// An `If` condition of class `Temp` or `Circuit` (A15 K2: a netlist chosen by a value no
     /// constant fold decides).
     IfConditionDynamic,
+    /// A literal of form `Long` anywhere in the design (A18, R37): its digits outlive the
+    /// mantissa. A writer that spells them verbatim lists it; another target gets the pass that
+    /// writes the correctly rounded shortest double.
+    LongLiteral,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -270,7 +274,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::IfConditionDynamic as usize + 1] = [
+    pub const ALL: [Extra; Extra::LongLiteral as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -280,6 +284,7 @@ impl Extra {
         Extra::DeckWithoutTitle,
         Extra::FormalWithoutDefault,
         Extra::IfConditionDynamic,
+        Extra::LongLiteral,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

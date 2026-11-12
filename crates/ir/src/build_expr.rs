@@ -13,7 +13,9 @@
 //! `Builder::list` (each `-> ExprId`); crate: `Builder::rebuild`, `Builder::expr_row`, `Builder::assert_expr`
 
 use crate::build::Builder;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, UnOp, UserCall};
+use crate::expr::{
+    BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, NumForm, UnOp, UserCall,
+};
 use crate::id::{DefId, EXPRS_MAX, ExprId, NameId, Ref};
 
 impl Builder<'_> {
@@ -27,6 +29,15 @@ impl Builder<'_> {
         nums.push(literal);
         let id = (nums.len() - 1) as u32;
         self.expr_row(ExprTag::Num, 0, id, 0)
+    }
+
+    /// A literal whose significand has more significant digits than the mantissa holds (A18):
+    /// `significand` as written (`[-]digits[.digits]`), `exp10` the power written or implied by
+    /// a scale letter, `written` the form it was written in (`Plain` with `exp10 == 0`,
+    /// `Exponent`, or `Scale` with a letter's power). Asserts the significand is that long
+    /// (`literal::exceeds_mantissa`; a shorter one is built with `literal`) and well formed.
+    pub fn long_literal(&mut self, significand: &str, exp10: i16, written: NumForm) -> ExprId {
+        todo!()
     }
 
     /// A built number (Python, Schemify, passes), stored as `Literal::from_f64(value)`. Asserts
