@@ -35,7 +35,11 @@ use crate::text_expr::Ctx;
 /// holding, and the design's own value holds again: what the `WholeRun` items and the cards
 /// give, else the simulator's default. "Earlier" is run order: listed order with includes in
 /// place, and inside a loop body every earlier pass's items too (ngspice's `reset` in a
-/// `foreach` body is global). Items listed after the reset hold as usual. No class restores
+/// `foreach` body is global). A change is any of its class: an `Alter` or `FromHere` state
+/// item, and an enclosing loop's assignment of its target for the current pass (a loop over a
+/// device value whose body starts with a `Reset` of `Values` runs that body on the design's own
+/// value: ngspice `foreach v …; alter r1 $v; reset; op; end`). Items listed after the reset
+/// hold as usual, and the loop's next pass assigns its target again. No class restores
 /// parameters: no simulator does (ngspice's `reset` keeps every `alterparam`), so an `Alter`
 /// of `Param` or `SubcktParam` holds across every reset. `restores` is never empty (checked).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -48,12 +52,14 @@ pub struct Reset {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Restorable {
-    /// `Alter`s of a source's DC value, an element's value, a device's or a model's
-    /// parameter (ngspice `alter`, `altermod`).
+    /// Changes of a source's DC value, an element's value, a device's or a model's parameter:
+    /// `Alter`s (ngspice `alter`, `altermod`) and enclosing loops' targets of those kinds.
     Values,
-    /// `FromHere` option rows (ngspice script `option`/`set` of a simulator option).
+    /// `FromHere` option rows (ngspice script `option`/`set` of a simulator option) and
+    /// enclosing loops' option targets.
     Options,
-    /// The temperature of `FromHere` `Env` rows (ngspice script `set temp`).
+    /// The temperature of `FromHere` `Env` rows (ngspice script `set temp`) and enclosing
+    /// loops' temperature targets.
     Temp,
     /// The nominal temperature of `FromHere` `Env` rows (ngspice script `option tnom=`).
     Tnom,
