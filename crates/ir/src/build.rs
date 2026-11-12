@@ -400,6 +400,14 @@ impl<'d> Builder<'d> {
 
     // ---- definitions ----
 
+    /// Sets the `k`-th reference of `item` (in its `RowFacts::map_refs` order) to `def`: a reader
+    /// binding a row's reference to a definition it pushed later, by its own simulator's rule
+    /// (`resolve` covers expressions). Asserts `k` is in range and `def` has the kind that slot
+    /// expects.
+    pub fn bind_ref(&mut self, item: ItemRef, k: u32, def: DefId) {
+        todo!() // A11: red first
+    }
+
     /// Adds a definition. Asserts no definition of `kind` named `name` exists in `scope` yet:
     /// the reader keeps one winner by its simulator's rule before it calls.
     pub fn define(&mut self, kind: DefKind, name: NameId, scope: ScopeId, item: ItemRef) -> DefId {

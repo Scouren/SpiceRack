@@ -111,7 +111,7 @@ pub use check::{Violation, check, check_legal};
 pub use design::{Design, DetailRow, ItemRow};
 pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
-pub use eval::{Bindings, Domain, eval};
+pub use eval::{Bindings, Domain, ExprClass, eval, expr_class};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
 pub use facts::{Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};

@@ -519,3 +519,38 @@ fn an_empty_list_is_the_one_empty_list() {
     let row: Subckt = d.row(sub.index);
     assert_eq!((row.ports, row.params), (NameList::EMPTY, ParamList::EMPTY));
 }
+
+#[test]
+fn bind_ref_binds_a_row_reference_pushed_before_its_definition() {
+    use spicerack_ir::{ElemKind, Element, NO_ROW, NameList, ParamList};
+    // an instance pushed before its subcircuit, bound afterwards by the reader's own rule,
+    // equals the same pushes with the reference resolved from the start
+    let build = |bind_later: bool| {
+        let mut d = Design::new();
+        {
+            let mut b = d.builder();
+            let (_, top) = b.file("top.sp", Role::Deck);
+            let master = b.name("inv");
+            let name = b.name("x1");
+            // the subckt pushed next gets definition 0
+            let def = if bind_later { DefId::NONE } else { DefId(0) };
+            let row = Element {
+                kind: ElemKind::Instance,
+                name,
+                terminals: NameList::EMPTY,
+                model: Ref { name: master, def },
+                params: ParamList::EMPTY,
+                mult: ExprId::NONE,
+                detail: NO_ROW,
+            };
+            let x1 = b.push(top, row, Span::NONE);
+            b.subckt(top, "inv", &[], &[], Span::NONE);
+            if bind_later {
+                let sub = b.design().lookup(top, DefKind::Subckt, master);
+                b.bind_ref(x1, 0, sub);
+            }
+        }
+        d
+    };
+    assert!(build(true).eq_ignoring_spans(&build(false)));
+}

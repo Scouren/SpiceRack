@@ -203,6 +203,9 @@ fn arities_are_the_fact_table() {
     assert_eq!(Func::Atan2.arity(), (2, 2));
     assert_eq!(Func::Clamp.arity(), (3, 3));
     assert_eq!(Func::Pwl.arity(), (3, u8::MAX));
+    assert_eq!(Func::StepHalf.arity(), (1, 1));
+    assert_eq!(Func::PowSigned.arity(), (2, 2));
+    assert_eq!(Func::Sqr.arity(), (1, 1));
     assert_eq!(Dist::AbsGauss.arity(), (3, 3));
     assert_eq!(Dist::Limit.arity(), (2, 2));
     assert!(Func::Ddt.reads_circuit() && Func::Idt.reads_circuit());
