@@ -2,7 +2,7 @@
 //! each root it changed evaluated before and after (`ir::eval_typed`) under the same bindings.
 //!
 //! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`, `pub fn keeps_values_over`,
-//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`
+//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`, `pub fn paths`
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -196,7 +196,45 @@ pub fn pairs(
     out
 }
 
+/// The rows under `e` counted by paths (what a writer spells), saturating; each row visited
+/// once.
+pub fn paths(design: &ir::Design, e: ir::ExprId) -> u64 {
+    let mut rows = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut stack = vec![e];
+    while let Some(r) = stack.pop() {
+        if r.is_none() || !seen.insert(r) {
+            continue;
+        }
+        rows.push(r);
+        stack.extend(operands(design, r));
+    }
+    rows.sort_unstable();
+    let mut size = std::collections::HashMap::new();
+    for &r in &rows {
+        let below = operands(design, r)
+            .iter()
+            .fold(1u64, |n, k| n.saturating_add(size[k]));
+        size.insert(r, below);
+    }
+    size[&e]
+}
+
 // ---- private ----
+
+/// The operands of `e`.
+fn operands(design: &ir::Design, e: ir::ExprId) -> Vec<ir::ExprId> {
+    match design.expr(e) {
+        ir::Expr::Call(_, l)
+        | ir::Expr::UserCall(_, l)
+        | ir::Expr::Draw(_, _, _, l)
+        | ir::Expr::List(l) => design.exprs(l).to_vec(),
+        ir::Expr::Unary(_, a) => vec![a],
+        ir::Expr::Binary(_, a, b) => vec![a, b],
+        ir::Expr::Ternary(c, a, b) => vec![c, a, b],
+        _ => Vec::new(),
+    }
+}
 
 /// Whether `was` is an error raised at a row the new tree no longer reads.
 fn dropped(design: &ir::Design, was: Result<ir::Value, ir::Domain>, new: ir::ExprId) -> bool {
@@ -211,10 +249,14 @@ fn dropped(design: &ir::Design, was: Result<ir::Value, ir::Domain>, new: ir::Exp
         ) => e,
     };
     let mut stack = vec![new];
-    for _ in 0..=design.expr_count() * 4 {
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..=2 * design.expr_count() + 1 {
         let Some(e) = stack.pop() else { return true };
         if e == at {
             return false;
+        }
+        if !seen.insert(e) {
+            continue;
         }
         match design.expr(e) {
             ir::Expr::Call(_, l)
@@ -245,9 +287,10 @@ fn int_capable(e: ir::Expr) -> bool {
 /// Whether the tree under `root` holds a node `hit` accepts (bounded by the row count).
 fn holds(design: &ir::Design, root: ir::ExprId, hit: fn(ir::Expr) -> bool) -> bool {
     let mut stack = vec![root];
-    for _ in 0..=design.expr_count() * 4 {
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..=2 * design.expr_count() + 1 {
         let Some(e) = stack.pop() else { return false };
-        if e.is_none() {
+        if e.is_none() || !seen.insert(e) {
             continue;
         }
         let x = design.expr(e);
