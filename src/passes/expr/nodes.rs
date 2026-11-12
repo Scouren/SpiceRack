@@ -12,6 +12,9 @@
 //! `pub(super) fn instance(&ir::Design, ir::ItemRef) -> Option<(ir::ItemRef, ir::ParamList)>`,
 //! `pub(super) fn live(&ir::Design) -> Vec<ir::ExprId>`, `pub(super) fn reads_tags(&ir::Design) -> bool`,
 //! `pub(super) fn note_left(&ir::Design, &mut ir::Diags, ir::Feature, ir::Code)`,
+//! `pub(super) fn carrying(&ir::Design, ir::Feature) -> Vec<ir::Span>`,
+//! `pub(super) fn samples(&ir::Design) -> bool`,
+//! `pub(super) fn leaf_literal(&ir::Design, ir::ExprId) -> Option<ir::Literal>`,
 //! `pub(super) fn binary_form(ir::BinOp, bool) -> ir::Feature`, `pub(super) fn func_form(ir::Func, bool) -> ir::Feature`,
 //! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`
 
@@ -214,15 +217,51 @@ pub(super) fn note_left(
     feature: ir::Feature,
     code: ir::Code,
 ) {
+    let index = u32::from(feature.index());
+    for span in carrying(design, feature) {
+        diags.push(code, span, index);
+    }
+}
+
+/// The spans of the items that carry `feature` (`ir::check_legal` against every feature but
+/// it), in its order.
+pub(super) fn carrying(design: &ir::Design, feature: ir::Feature) -> Vec<ir::Span> {
     let legal = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(feature));
     let mut rows = ir::Diags::new();
     ir::check_legal(design, &legal, &mut rows);
     let index = u32::from(feature.index());
-    for d in rows.rows() {
-        if d.code == ir::diag::UNSUPPORTED && d.arg == index {
-            diags.push(code, d.span, index);
-        }
+    let rows = rows.rows().iter();
+    rows.filter(|d| d.code == ir::diag::UNSUPPORTED && d.arg == index)
+        .map(|d| d.span)
+        .collect()
+}
+
+/// Whether the design runs a sampling loop (a reachable `Loop` of kind `MonteCarlo`): only
+/// there does a `DrawWhen::Sampling` draw yield a sample.
+pub(super) fn samples(design: &ir::Design) -> bool {
+    design.reachable().into_iter().any(|(item, _)| {
+        item.kind == ir::ItemKind::Loop
+            && design.row::<ir::Loop>(item.index).kind == ir::LoopKind::MonteCarlo
+    })
+}
+
+/// The literal a leaf may be replaced by: `e`'s own when it is one, Real (an `Int` literal is
+/// respelled `Plain`, its value unchanged: the leaf it replaces is Real).
+pub(super) fn leaf_literal(design: &ir::Design, e: ir::ExprId) -> Option<ir::Literal> {
+    if e.is_none() {
+        return None;
     }
+    let ir::Expr::Num(n) = design.expr(e) else {
+        return None;
+    };
+    let l = design.num(n);
+    Some(match l.form {
+        ir::NumForm::Int => ir::Literal {
+            form: ir::NumForm::Plain,
+            ..l
+        },
+        _ => l,
+    })
 }
 
 /// `Binary(op)` or, in the dynamic form, `BinaryDyn(op)`.

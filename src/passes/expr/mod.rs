@@ -24,12 +24,16 @@
 //! (`ir::features_used`), so each rule is two rows, `<rule>` and `<rule>_dyn`, one file:
 //! `context.rs` applies a rule to one context's roots and leaves the other's.
 //!
-//! Contents: `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub(super) const PASSES: &[Pass]`,
-//! `pub(super) const CODES: &[(ir::Code, ir::Info)]`, `pub(super) const MIXED_DIVISION`, `pub(super) const TAG_READ`, `pub(super) const POW_BASE`, `pub(super) const DRAW_TWICE`, `pub(super) const PWL_POINTS`
+//! Contents: `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod draws_always_to_sampling`, `pub mod draws_per_reference_to_call_site`, `pub mod fold_constant_bitops`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sampling_draws_to_nominal`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod substitute_tran_leaves`, `pub mod tnom_to_env`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub(super) const PASSES: &[Pass]`,
+//! `pub(super) const CODES: &[(ir::Code, ir::Info)]` and the codes (`codes.rs`)
 
+mod codes;
 mod context;
 pub mod div_to_div_typed;
 pub mod div_typed_to_div;
+pub mod draws_always_to_sampling;
+pub mod draws_per_reference_to_call_site;
+pub mod fold_constant_bitops;
 mod nodes;
 pub mod pow_to_powabs;
 pub mod powabs_to_pow;
@@ -37,13 +41,18 @@ pub mod pwl_to_ternary;
 pub mod ramp_to_ternary;
 pub mod round_half_away_to_floor;
 pub mod round_half_even_to_away;
+pub mod sampling_draws_to_nominal;
 pub mod sgn_to_ternary;
 pub mod sgnzeropos_to_ternary;
 pub mod step_half_to_ternary;
 pub mod step_to_ternary;
+pub mod substitute_tran_leaves;
 mod tags;
+pub mod tnom_to_env;
 pub mod toint_to_trunc;
 pub mod toreal_to_mul;
+
+pub(super) use codes::*;
 
 use super::Pass;
 use crate::ir;
@@ -359,66 +368,135 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[PWL_POINTS],
         run: pwl_to_ternary::pwl_to_ternary_dyn,
     },
-];
-
-/// A typed division whose operand types the design does not fix.
-pub(super) const MIXED_DIVISION: ir::Code = ir::Code::new(b'U', 101);
-/// A rewrite that drops a tag while a typed division may read it.
-pub(super) const TAG_READ: ir::Code = ir::Code::new(b'U', 103);
-/// A signed power whose exponent is no literal and whose base may be negative.
-pub(super) const POW_BASE: ir::Code = ir::Code::new(b'U', 104);
-/// A rewrite that would read an operand holding a draw more than once.
-pub(super) const DRAW_TWICE: ir::Code = ir::Code::new(b'U', 105);
-/// A `pwl` whose points are not increasing literals, or whose input holds a draw.
-pub(super) const PWL_POINTS: ir::Code = ir::Code::new(b'U', 106);
-
-/// The group's catalogue rows (`U0100..=U0199`).
-pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
-    (
-        MIXED_DIVISION,
-        ir::Info {
-            title: "a typed division whose operand types the design does not fix",
-            cite: "rewrite/AMEND-A12.md K1; rewrite/DIALECT-VACASK.md §6.2",
-            explain: "The division truncates when both operands are integers and divides exactly otherwise, and the design gives an operand both types (two instances pass a parameter an integer and a real, two calls pass a formal differently, or a loop or an alter sets it). Real division cannot say which, so the item is refused. While such a division stands, no integer quotient elsewhere is rewritten either: it could read that quotient's type.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        TAG_READ,
-        ir::Info {
-            title: "a rewrite that drops an integer type while a typed division may read it",
-            cite: "rewrite/AMEND-A12.md K1",
-            explain: "The target has no spelling for an integer-typed value here; its real spelling has the same value, but a typed division still in the design reads types, so the item is refused until none is left.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        POW_BASE,
-        ir::Info {
-            title: "a signed power whose exponent is not a literal and whose base may be negative",
-            cite: "rewrite/DIALECT-VACASK.md §6.2",
-            explain: "pow(x, y) of a negative x is (-1)^y |x|^y for a whole y; the target's powers keep the sign only for a known odd exponent (pwr) or drop it (pow_abs). With an exponent known only at run time and a base that may be negative, no spelling is equal, so the item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        DRAW_TWICE,
-        ir::Info {
-            title: "a rewrite that would read an operand holding a draw more than once",
-            cite: "the expression group's operand rule; rewrite/RULINGS.md R22",
-            explain: "The target spells this function by its definition, which reads its operand more than once. The operand holds a statistical draw (directly or through a parameter or function it reads), and each read may draw anew, so the item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        PWL_POINTS,
-        ir::Info {
-            title: "a pwl whose points are not increasing literals, or whose input holds a draw",
-            cite: "crates/ir/src/expr.rs (Func::Pwl)",
-            explain: "The target spells pwl as a chain of ternaries, which reads the input several times and each point only on its own segment. That is the same function only when every point is a literal with strictly increasing x values and the input holds no draw; otherwise the item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
+    Pass {
+        name: "fold_constant_bitand",
+        removes: ir::Feature::Binary(ir::BinOp::BitAnd),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitand,
+    },
+    Pass {
+        name: "fold_constant_bitand_dyn",
+        removes: ir::Feature::BinaryDyn(ir::BinOp::BitAnd),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitand_dyn,
+    },
+    Pass {
+        name: "fold_constant_bitor",
+        removes: ir::Feature::Binary(ir::BinOp::BitOr),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitor,
+    },
+    Pass {
+        name: "fold_constant_bitor_dyn",
+        removes: ir::Feature::BinaryDyn(ir::BinOp::BitOr),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitor_dyn,
+    },
+    Pass {
+        name: "fold_constant_bitxor",
+        removes: ir::Feature::Binary(ir::BinOp::BitXor),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitxor,
+    },
+    Pass {
+        name: "fold_constant_bitxor_dyn",
+        removes: ir::Feature::BinaryDyn(ir::BinOp::BitXor),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitxor_dyn,
+    },
+    Pass {
+        name: "fold_constant_shl",
+        removes: ir::Feature::Binary(ir::BinOp::Shl),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_shl,
+    },
+    Pass {
+        name: "fold_constant_shl_dyn",
+        removes: ir::Feature::BinaryDyn(ir::BinOp::Shl),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_shl_dyn,
+    },
+    Pass {
+        name: "fold_constant_shr",
+        removes: ir::Feature::Binary(ir::BinOp::Shr),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_shr,
+    },
+    Pass {
+        name: "fold_constant_shr_dyn",
+        removes: ir::Feature::BinaryDyn(ir::BinOp::Shr),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_shr_dyn,
+    },
+    Pass {
+        name: "fold_constant_bitnot",
+        removes: ir::Feature::Unary(ir::UnOp::BitNot),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitnot,
+    },
+    Pass {
+        name: "fold_constant_bitnot_dyn",
+        removes: ir::Feature::UnaryDyn(ir::UnOp::BitNot),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[BITOP_NOT_CONSTANT],
+        run: fold_constant_bitops::fold_constant_bitnot_dyn,
+    },
+    Pass {
+        name: "tnom_to_env",
+        removes: ir::Feature::Expr(ir::ExprTag::Tnom),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[NO_LEAF_VALUE],
+        run: tnom_to_env::tnom_to_env,
+    },
+    Pass {
+        name: "substitute_tstep",
+        removes: ir::Feature::Expr(ir::ExprTag::TStep),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[NO_LEAF_VALUE],
+        run: substitute_tran_leaves::substitute_tstep,
+    },
+    Pass {
+        name: "substitute_tstop",
+        removes: ir::Feature::Expr(ir::ExprTag::TStop),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[NO_LEAF_VALUE],
+        run: substitute_tran_leaves::substitute_tstop,
+    },
+    Pass {
+        name: "draws_always_to_sampling",
+        removes: ir::Feature::DrawWhen(ir::DrawWhen::Always),
+        requires: set(&[ir::Feature::DrawWhen(ir::DrawWhen::Sampling)]),
+        notes: &[],
+        run: draws_always_to_sampling::draws_always_to_sampling,
+    },
+    Pass {
+        name: "draws_per_reference_to_call_site",
+        removes: ir::Feature::DrawPer(ir::DrawPer::Reference),
+        requires: set(&[ir::Feature::DrawPer(ir::DrawPer::CallSite)]),
+        notes: &[DRAW_SAMPLES],
+        run: draws_per_reference_to_call_site::draws_per_reference_to_call_site,
+    },
+    Pass {
+        name: "sampling_draws_to_nominal",
+        removes: ir::Feature::DrawWhen(ir::DrawWhen::Sampling),
+        requires: set(&[
+            ir::Feature::Binary(ir::BinOp::Mul),
+            ir::Feature::BinaryDyn(ir::BinOp::Mul),
+        ]),
+        notes: &[DRAW_SAMPLES],
+        run: sampling_draws_to_nominal::sampling_draws_to_nominal,
+    },
 ];
 
 // ---- private ----
