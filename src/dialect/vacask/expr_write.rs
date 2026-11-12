@@ -11,7 +11,7 @@
 //!
 //! Cites: VD expr-operators, expr-functions, expr-special; `rewrite/DIALECT-VACASK.md` §4.
 //!
-//! Contents: `NO_REAL`, `CODES`, `write_expr`, `admits` (crate-private)
+//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `admits` (crate-private)
 
 use super::name::{self, Place};
 use super::number;
@@ -21,16 +21,30 @@ use crate::ir;
 /// circuit-reading field, or a bare parameter read in one (which reads back as `to_real`).
 pub(super) const NO_REAL: ir::Code = ir::Code::new(b'W', 2006);
 
+/// An integer literal past 32 bits, which VACASK would wrap (run iw1).
+pub(super) const WIDE_INT: ir::Code = ir::Code::new(b'W', 2008);
+
 /// This area's rows.
-pub(super) const CODES: &[(ir::Code, ir::Info)] = &[(
-    NO_REAL,
-    ir::Info {
-        title: "a real conversion VACASK cannot spell",
-        cite: "VD dev-builtin-behavioral; R40; DIALECT-VACASK Appendix A run b1",
-        explain: "A VACASK behavioural source reads every parameter as a real and a parameter expression keeps the parameter's type; VACASK has no function that converts a value to real. So `to_real` is spelled only over a parameter read in a behavioural source's expression, and a parameter read there must be one.",
-        kind: ir::Kind::Refusal,
-    },
-)];
+pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
+    (
+        NO_REAL,
+        ir::Info {
+            title: "a real conversion VACASK cannot spell",
+            cite: "VD dev-builtin-behavioral; R40; DIALECT-VACASK Appendix A run b1",
+            explain: "A VACASK behavioural source reads every parameter as a real and a parameter expression keeps the parameter's type; VACASK has no function that converts a value to real. So `to_real` is spelled only over a parameter read in a behavioural source's expression, and a parameter read there must be one.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        WIDE_INT,
+        ir::Info {
+            title: "an integer literal past 32 bits",
+            cite: "DIALECT-VACASK Appendix A run iw1",
+            explain: "VACASK's integers are 32 bits and a wider literal wraps; the IR's integer does not, so no VACASK spelling states it.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+];
 
 /// One step of the writer: text, or an expression (in parentheses or not).
 enum Task {
@@ -64,7 +78,7 @@ pub(super) fn write_expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
             todo.push(Task::Text(")"));
         }
         match design.expr(e) {
-            ir::Expr::Num(id) => number::spell(design.num(id), out),
+            ir::Expr::Num(id) => number::spell(design, design.num(id), out),
             ir::Expr::Str(s) => string(design.str(s), out),
             ir::Expr::Param(r) => name::spell(design.str(r.name), Place::Other, out),
             ir::Expr::Temp => out.push_str("$temp"),
@@ -133,49 +147,57 @@ pub(super) fn write_expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
     }
 }
 
-/// Appends a refusal for each real conversion VACASK cannot spell ([`NO_REAL`]).
+/// Appends a refusal, at its item, for each real conversion VACASK cannot spell ([`NO_REAL`])
+/// and each integer literal it would wrap ([`WIDE_INT`]).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     let mut handles = Vec::new();
     for (at, _) in design.reachable() {
         handles.clear();
         design.item_handles(at, &mut handles);
-        let spelled = handles.iter().all(|&h| match h {
-            ir::Handle::Expr(e) => real_free(design, e, false),
-            ir::Handle::ExprDyn(e) => real_free(design, e, true),
+        let refused = handles.iter().find_map(|&h| match h {
+            ir::Handle::Expr(e) => refusal(design, e, false),
+            ir::Handle::ExprDyn(e) => refusal(design, e, true),
             ir::Handle::Exprs(list) => design
                 .exprs(list)
                 .iter()
-                .all(|&e| real_free(design, e, false)),
+                .find_map(|&e| refusal(design, e, false)),
             ir::Handle::Params(list) => design
                 .params(list)
                 .iter()
-                .all(|&(_, e)| real_free(design, e, false)),
-            _ => true,
+                .find_map(|&(_, e)| refusal(design, e, false)),
+            _ => None,
         });
-        if !spelled {
-            diags.push(NO_REAL, design.span_of(at), 0);
+        if let Some(code) = refused {
+            diags.push_at(code, design, at, 0);
         }
     }
 }
 
 // ---- private ----
 
-/// Whether root `e` needs no real conversion VACASK lacks: in a circuit-reading field (`circuit`)
-/// every parameter read is the operand of a `to_real` and every `to_real` reads a parameter; in
-/// any other field there is no `to_real`.
-fn real_free(design: &ir::Design, e: ir::ExprId, circuit: bool) -> bool {
+/// What VACASK cannot spell in root `e`: an integer literal past 32 bits ([`WIDE_INT`]); a real
+/// conversion it lacks ([`NO_REAL`]): in a circuit-reading field (`circuit`) a parameter read
+/// that is not the operand of a `to_real`, or a `to_real` of anything else; in any other field a
+/// `to_real`.
+fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code> {
     if e.is_none() {
-        return true;
+        return None;
     }
     let mut todo = vec![(e, false)];
     // Bounded: each row of the (acyclic) expression tree is taken once per parent.
     while let Some((x, under_real)) = todo.pop() {
         match design.expr(x) {
-            ir::Expr::Param(_) if circuit && !under_real => return false,
+            ir::Expr::Num(id) => {
+                let l = design.num(id);
+                if l.form == ir::NumForm::Int && !number::int_fits(l.mantissa) {
+                    return Some(WIDE_INT);
+                }
+            }
+            ir::Expr::Param(_) if circuit && !under_real => return Some(NO_REAL),
             ir::Expr::Call(ir::Func::ToReal, args) => {
                 let arg = design.exprs(args)[0];
                 if !circuit || !matches!(design.expr(arg), ir::Expr::Param(_)) {
-                    return false;
+                    return Some(NO_REAL);
                 }
                 todo.push((arg, true));
             }
@@ -188,7 +210,7 @@ fn real_free(design: &ir::Design, e: ir::ExprId, circuit: bool) -> bool {
             _ => {}
         }
     }
-    true
+    None
 }
 
 /// A binary operator's level and spelling.

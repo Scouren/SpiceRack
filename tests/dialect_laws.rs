@@ -55,7 +55,31 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 
 /// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
 /// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str)] = &[];
+const KNOWN_REACH: &[(&str, &str)] = &[
+    // vacask: the families its `load` lines read as device libraries; a generated
+    // `DeviceLibrary` sets no `Family` feature until A25 (ir-circuit), and no `Model` row is
+    // read before S4.1 lands.
+    ("vacask", "Family(Resistor)"),
+    ("vacask", "Family(Capacitor)"),
+    ("vacask", "Family(Inductor)"),
+    ("vacask", "Family(Diode)"),
+    ("vacask", "Family(GummelPoon)"),
+    ("vacask", "Family(Vbic)"),
+    ("vacask", "Family(Mos1)"),
+    ("vacask", "Family(Mos2)"),
+    ("vacask", "Family(Mos3)"),
+    ("vacask", "Family(Mos6)"),
+    ("vacask", "Family(Mos9)"),
+    ("vacask", "Family(Bsim3)"),
+    ("vacask", "Family(Bsim4)"),
+    ("vacask", "Family(Psp103)"),
+    ("vacask", "Family(BsimBulk)"),
+    ("vacask", "Family(Vdmos)"),
+    ("vacask", "Family(JfetShichman)"),
+    ("vacask", "Family(JfetParkerSkellern)"),
+    ("vacask", "Family(Mesfet)"),
+    ("vacask", "Family(TlineIdeal)"),
+];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).

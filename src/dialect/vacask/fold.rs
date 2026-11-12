@@ -188,7 +188,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         }
         let spelled = scope == entry && tran && runnable && given_wave(design, at).is_some();
         if !spelled {
-            diags.push(NO_FOLD, design.span_of(at), 0);
+            diags.push_at(NO_FOLD, design, at, 0);
         }
     }
 }

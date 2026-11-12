@@ -1,0 +1,12 @@
+integer width
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (n 0) res r=2147483647
+r2 (n 0) res r=2147483648
+r3 (n 0) res r=4294967297
+r4 (n 0) res r=2147483647+1
+r5 (n 0) res r=65536*65536
+r6 (n 0) res r=99999999999
+control
+  print instance("r1", "r2", "r3", "r4", "r5", "r6")
+endc
