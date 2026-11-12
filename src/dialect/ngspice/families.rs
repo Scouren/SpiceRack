@@ -31,7 +31,8 @@
 //! `pub(super) fn dispatches(ir::ModelFamily) -> bool`,
 //! `pub(super) fn device(ir::ModelFamily, Option<&str>) -> Option<&'static str>`,
 //! `pub(super) fn accepts(&str, &str) -> bool`, `pub(super) fn binnable(ir::ModelFamily) -> bool`,
-//! `pub(super) fn code_model(&str) -> bool`, `pub(super) fn device_name(&str) -> bool`
+//! `pub(super) fn code_model(&str) -> bool`, `pub(super) fn device_name(&str) -> bool`,
+//! `pub(super) fn module_word(&str) -> bool`
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -320,6 +321,24 @@ pub(super) fn code_model(word: &str) -> bool {
 /// Whether `word` (lowercase) is a built-in device name (`INPtypelook` matches it).
 pub(super) fn device_name(word: &str) -> bool {
     DEVICE_NAMES.split_whitespace().any(|w| w == word)
+}
+
+/// Whether the reader reads `.model name <word>` as a model of the OSDI module `word`: a
+/// lowercase bare word that is no type word, device name or code model (`INPtypelook` looks
+/// those up first; an OSDI module is matched only when `pre_osdi` loaded one of that name).
+pub(super) fn module_word(word: &str) -> bool {
+    let bare = !word.is_empty()
+        && word
+            .bytes()
+            .all(|c| c.is_ascii_graphic() && !c.is_ascii_uppercase() && !b"(),=\"'{}".contains(&c));
+    let typed = levelled(word)
+        || word == "d"
+        || fixed(word).is_some()
+        || word.starts_with("vdmos")
+        || word == "ako"
+        || word.starts_with("ako:")
+        || ["numd", "nbjt", "numos", "poly"].contains(&word);
+    bare && !typed && !device_name(word) && !code_model(word)
 }
 
 // ---- private ----

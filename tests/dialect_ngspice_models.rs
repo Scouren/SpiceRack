@@ -129,6 +129,14 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         ("model a hicum2 polarity=n", "W1202"),
         // a module's version is no field ngspice has (its reader keeps `version=` a parameter)
         ("model a module module=m version=\"1.0\"", "W1202"),
+        // the type word is a code model or an OSDI module by what ngspice loaded (inpdomod.c
+        // default branch; run: `.model dd foo` is "Unknown model type foo - ignored"): a code
+        // model the build lacks reads back as a module, a module named like a code model, a
+        // device or a type word as those (L5 seed 9)
+        ("model a code_model word=g50", "W1206"),
+        ("model a module module=xfer", "W1206"),
+        ("model a module module=bsim4", "W1206"),
+        ("model a module module=nmos", "W1206"),
         ("model a mos1 polarity=n params=(vto=1 bogus=2)", "W1203"),
         ("model a.1 mos1 polarity=n bin_of=a", "W1204"),
         (
