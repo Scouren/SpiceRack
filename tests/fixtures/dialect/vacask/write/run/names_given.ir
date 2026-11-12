@@ -3,8 +3,12 @@
 # its axes as sweep lines, outermost first, then an op).
 file "names_given.ir" deck
   title "names given"
+  device_library resistor
+  model res resistor
+  element resistor r1 (a 0) model=res value=1k
+  element resistor r2 (a 0) model=res value=1k
   analysis op
   analysis tran stop=1m cap=span_over50
   loop sweep (temp) (list values=[0i])
     analysis ac (list values=[1k])
-  analysis dc (device_param v2 dc) (list values=[0i, 1i]) (device_param v1 dc) (lin start=1i stop=3i step=0.5)
+  analysis dc (device_param r2 r) (list values=[1k, 2k]) (device_param r1 r) (lin start=1k stop=3k step=500i)

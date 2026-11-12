@@ -154,7 +154,10 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
 /// The title line of an entry deck (VD; S 14.12): a `Title` item, an empty line too, except in
 /// a file that holds nothing else.
 pub(super) fn title(l: &mut Lower<'_, '_, '_>, n: Node) {
-    let text = l.cst.tokens.text(l.cst.ast.main_token(n)).to_string();
+    // A CRLF file's line 1 ends in `\r`, which is no part of the title (corpus
+    // demo/cmos180n.lib read as a deck: the title row's one line, X0015).
+    let raw = l.cst.tokens.text(l.cst.ast.main_token(n));
+    let text = raw.strip_suffix('\r').unwrap_or(raw).to_string();
     let deck = l.b.design().file(l.cst.file).role == ir::Role::Deck && l.cst.shift == 0;
     // An empty file is no deck statement at all (law L1: an empty text holds no item).
     let only = l.cst.ast.fields(l.cst.ast.root()).len() == 1;

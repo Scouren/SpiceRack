@@ -1,0 +1,16 @@
+save list
+load "resistor.osdi"
+model res resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+control
+  options rawfile="ascii"
+  save (
+    v(b)
+    // a comment
+    i(v1)
+  )
+  analysis op1 op
+endc

@@ -318,12 +318,15 @@ pub(super) fn opaque(
 
 /// Statement `n`, which no reader rule reads: VACASK has no syntax for it (run fx; settle
 /// star_deck, star_in_section: "Syntax error, unexpected string."), so it is invalid in source
-/// (P2013), except at a library's top outside every section, which VACASK skips when the
-/// library is included by `section=` (settle star_outside_section, junk_outside_section):
-/// Inert (P2014). Nothing is left `Unread` (the corpus zero gate).
+/// (P2013), except at a library's top outside every section when some include reads that
+/// library by `section=`, which VACASK skips (settle star_outside_section,
+/// junk_outside_section): Inert (P2014). A library read alone or included whole is the deck
+/// case (settle plain_include: VACASK rejects even the `section` line there). Nothing is left `Unread` (the corpus zero gate).
 pub(super) fn unread(l: &mut Lower<'_, '_, '_>, n: Node) {
-    let file = l.b.design().file(l.cst.file);
-    let skipped = file.role != ir::Role::Deck && l.scope == file.top;
+    let design = l.b.design();
+    let file = design.file(l.cst.file);
+    let included = l.declared.by_section(design.str(file.path));
+    let skipped = file.role != ir::Role::Deck && l.scope == file.top && included;
     match skipped {
         true => opaque(l, n, ir::OpaqueClass::Inert, Some(codes::SKIPPED)),
         false => opaque(

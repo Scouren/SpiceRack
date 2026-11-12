@@ -3,7 +3,8 @@
 //! small-signal analyses (`from`/`to` with `step`, or `mode="lin|dec|oct"` with `points`, or
 //! `values=[…]`). A lin `points` counts intervals (VD cmd-sweep, cmd-analysis-ac), so the IR's
 //! count is one more; targets `instance=`/`parameter=` (a device parameter, hierarchical names
-//! split at `:`; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
+//! split at `:`; an instance no file declares is VACASK's error, settle run/nosuch_sweep;
+//! `instance="__topinst__"` is the top-level parameter `parameter=`, R70; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
 //! of a waveform source, whose `dc` VACASK ignores, Private: settle run/sweep_source), `model=`/`parameter=` (bound to the top level's model), `option="temp"` (the
 //! temperature), `option=` a typed key or VACASK's own option by name. The principal parameter,
 //! `continuation=0`, values by a variable's name and a sweep of a variable are Private (R43).
@@ -40,6 +41,7 @@ pub(super) struct Spec {
 /// A sweep target, as names.
 pub(super) enum Aim {
     Device(Vec<String>, String, String),
+    Param(String),
     Source(Vec<String>, String),
     Model(String, String),
     Temp,
@@ -214,6 +216,20 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
         (Some(i), _, _, Some(p)) => {
             let mut path: Vec<String> = i.split(':').map(str::to_string).collect();
             let element = path.pop().expect("split gives one part");
+            if path.is_empty() && element == super::TOP_INSTANCE {
+                return match super::top_param(l, &p) {
+                    true => Ok(Sweep {
+                        name,
+                        aim: Aim::Param(p),
+                        spec: range(l, &pairs, SWEEP_FORM)?,
+                        span: l.span(s),
+                    }),
+                    false => Err(BAD),
+                };
+            }
+            if !l.declared.has_instance(&path, &element) {
+                return Err(BAD);
+            }
             match (p.as_str(), l.declared.source(&path, &element)) {
                 ("dc", Some(Source::Dc)) => Aim::Source(path, element),
                 ("dc", Some(Source::Wave)) => return Err(private(SWEEP_WAVE)),
@@ -267,6 +283,10 @@ pub(super) fn target(l: &mut Lower<'_, '_, '_>, aim: &Aim) -> ir::Target {
         Aim::Device(path, element, param) => {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();
             l.b.target(ir::TargetKind::DeviceParam, &path, element, Some(param))
+        }
+        Aim::Param(name) => {
+            let t = l.b.target(ir::TargetKind::Param, &[], name, None);
+            super::bind_top_param(l, t)
         }
         Aim::Source(path, element) => {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();

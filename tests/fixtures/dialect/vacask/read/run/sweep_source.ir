@@ -15,6 +15,5 @@ file "sweep_source.sim" deck
   analysis dc name=dc1 (source_dc i1) (list values=[0i, 1m]) name=ig (source_dc v1) (lin start=0i stop=5i step=0.1) name=vg
   analysis dc name=dc2 (source_dc v2 path=(x1)) (list values=[1i, 2i]) name=vs
   analysis dc name=dc3 (device_param v1 mag) (list values=[1i, 2i]) name=vm
-  analysis dc name=dc4 (device_param u1 dc) (list values=[1i, 2i]) name=vu
   loop sweep name=vl (source_dc v1) (list values=[1i, 2i])
     analysis tran name=t1 stop=1m cap=span_over50

@@ -484,3 +484,22 @@ fn a_sweep_of_a_waveform_sources_dc_is_refused_and_a_dc_sources_is_not() {
         assert_eq!(refused, want, "{body}");
     }
 }
+
+#[test]
+fn a_given_print_step_never_reaches_the_writer() {
+    // R67, A41: VACASK has no output interval (run: `outstep=`, `tstep=` are "Parameter … not
+    // found."), so `FEATURES` lacks `TranPrintStep` and `legalize` refuses a transient that
+    // gives one (until the run group's rule drops it with its note); the writer asserts it.
+    let text = "file \"p.ir\" deck\n  title \"print step\"\n  analysis tran name=t1 stop=40n print_step=0.1n max_step=1n\n";
+    let (mut design, _) = read("p.ir", text, "ir");
+    let row = dialect::by_name("vacask").expect("the vacask row");
+    let mut diags = ir::Diags::new();
+    dialect::legalize(&mut design, row, &mut diags);
+    let want = ir::Feature::Run(ir::RunExtra::TranPrintStep);
+    let converted = !ir::features_used(&design).contains(want);
+    let refused = diags
+        .rows()
+        .iter()
+        .any(|d| dialect::refuses(d.code) && ir::Feature::from_index(d.arg as u16) == want);
+    assert!(converted || refused, "{:?}", diags.rows());
+}

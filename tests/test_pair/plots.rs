@@ -7,7 +7,7 @@
 //! Contents:
 //! - `pub fn renamed(plots: Vec<RawData>, map: &HashMap<String, String>) -> Vec<RawData>`
 //! - `pub fn only(plots: Vec<RawData>, keep: Option<&BTreeSet<String>>) -> Vec<RawData>`
-//! - `pub fn names(a: &[RawData], b: &[RawData], devices: &BTreeSet<String>) -> Result<(), String>`
+//! - `pub fn names(a: &[RawData], b: &[RawData], devices: &BTreeSet<String>, axes: &BTreeSet<String>) -> Result<(), String>`
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -64,10 +64,16 @@ pub fn only(mut plots: Vec<RawData>, keep: Option<&BTreeSet<String>>) -> Vec<Raw
 
 /// Step 5: every vector of every plot of `a` is in a plot of its kind in `b`, by normal name.
 /// A device's internal unknowns (VACASK's `d1:a_int`, `m1:implicit_equation_0`: a path through
-/// a name of `devices`) are its simulator's own, not the deck's, and are left out.
+/// a name of `devices`) are its simulator's own, not the deck's, and are left out; so are a DC
+/// plot's axis vectors named in `axes` (the names the target could not spell).
 // ponytail: devices by name across scopes; a device and a subcircuit instance of one name in
 // two scopes hide the instance's nodes. Key by scope path when a deck does that.
-pub fn names(a: &[RawData], b: &[RawData], devices: &BTreeSet<String>) -> Result<(), String> {
+pub fn names(
+    a: &[RawData],
+    b: &[RawData],
+    devices: &BTreeSet<String>,
+    axes: &BTreeSet<String>,
+) -> Result<(), String> {
     let mut missing = Vec::new();
     for p in a {
         let k = cmp::kind(p);
@@ -81,7 +87,11 @@ pub fn names(a: &[RawData], b: &[RawData], devices: &BTreeSet<String>) -> Result
             let n = cmp::normal(&v.name);
             let path: Vec<&str> = n.trim_end_matches("#branch").split('.').collect();
             let internal = path[..path.len() - 1].iter().any(|s| devices.contains(*s));
-            if !internal && !theirs.contains(&n) {
+            // A named DC axis's vector (VACASK's `sweep s1` writes `s1`) is the plot's grid,
+            // which step 4 pairs; ngspice writes the inner axis as its scale and the outer
+            // ones not at all.
+            let axis = k == "dc" && axes.contains(&n);
+            if !internal && !axis && !theirs.contains(&n) {
                 missing.push(format!("{k} {}", v.name));
             }
         }

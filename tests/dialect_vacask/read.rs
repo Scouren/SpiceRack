@@ -229,3 +229,29 @@ fn a_deleted_closing_bracket_or_quote_is_refused() {
         failed.join("\n")
     );
 }
+
+/// Oracle: law L2 (a reader never builds IR `ir::check` refuses, whatever the file). A library's
+/// shape read through the deck entry (`spice2rack --dump-ir demo/cmos180n.lib`: line 1 a `//`
+/// comment, then sections including each other and a `*` line outside them).
+#[test]
+fn a_library_read_as_a_deck_checks_clean() {
+    let text = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/dialect/vacask/settle/lib_as_deck.sim"),
+    )
+    .unwrap();
+    let row = dialect::by_name("vacask").expect("the vacask row");
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    let src = Sources::one("lib_as_deck.sim", &text);
+    row.read
+        .expect("a reader")
+        .read(&src, &mut design.builder(), &mut diags);
+    let at = diags.len();
+    ir::check(&design, &mut diags);
+    let x: Vec<String> = diags.rows()[at..]
+        .iter()
+        .map(|d| format!("{} {:?} {}", d.code, d.item, d.arg))
+        .collect();
+    assert!(x.is_empty(), "{x:?}\n{}", canonical(&design));
+}

@@ -365,6 +365,7 @@ VACASK (a candidate feature), or VACASK's own limit.
 | W2006 | S4.0 | `to_real` in a parameter expression of class Temp: R52's deferred gap (c) (the bare read in a behavioural source is A33's `BehavUntypedParam`, which `FEATURES` lacks) | feature |
 | W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp`, `rpar` (ngspice's B has them) or a multiplicity (`MultOther` covers it with lines; law L5 seed 15) | feature |
 | W2109 | S4.1 | an unresolved element with a multiplicity (`$mfactor` is a parameter on a subckt that declares it: it reads back as one; law L5 seed 1) | VACASK's own |
+| W2312 | S4.3 | a sweep, DC axis or alter target naming no instance (from the top, every file's top) or no top-level parameter (`__topinst__`) VACASK finds (settle run/nosuch_alter "Instance not found.", nosuch_sweep, top_nosuch "Parameter 'zz' not found."; R70) | invalid on VACASK; ngspice prints "no such device or model name" and goes on (R70's wrong number): IR invariant candidate (a run target names something) |
 | W2311 | S4.3 | a `dcxf`, `acxf` or `noise` output that is no node or node pair (`ProbeI` is held for saves; law L5 seed 37) | feature (R58's grain: a probe kind per use) |
 | W2310 | S4.3 | an `mc` loop inside another (VD cmd-analysis-mc: no nesting; law L5 seed 20) | VACASK's own |
 | W2308 | S4.3 | a node set that no analysis line taking its list follows (law L5 seed 12) | VACASK's own |

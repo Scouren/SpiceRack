@@ -11,6 +11,23 @@ use std::path::Path;
 use spicerack::dialect::{self, Policy, Sources};
 use spicerack::ir;
 
+/// Refusals the reader gives in corpus files VACASK runs, each `file code`, in file order;
+/// strict both ways (a reader bug each, or a file VACASK rejects: say which beside it).
+#[rustfmt::skip] // a table: one row per line
+const KNOWN_INVALID: &[&str] = &[
+    // VACASK 36be560 rejects a `;`-separated list (settle run/list_semicolon: "Parser syntax
+    // error, unexpected ;, expecting ] or \",\""): these decks are a newer VACASK's.
+    "demo/spice/vdmossh.sim P2320",
+    // VACASK 36be560's shipped resistor has no `has_noise` (settle run/resistor_has_noise:
+    // "Parameter 'has_noise' not found.").
+    "test/test_ac.sim P2103",
+    "test/test_acxf.sim P2103",
+    "test/test_noise.sim P2103",
+    // the `;`-separated list again
+    "test/test_opnodeset.sim P2320",
+    "test/test_tranic.sim P2320",
+];
+
 // ---- private ----
 
 /// `text` as the only file of a read, in `role`.
@@ -58,6 +75,7 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
     files.sort();
     let mut failed = Vec::new();
     let mut unread_files: Vec<String> = Vec::new();
+    let mut invalid: Vec<String> = Vec::new();
     for path in &files {
         let rel = path.strip_prefix(root).unwrap().display().to_string();
         let text = std::fs::read_to_string(path).unwrap();
@@ -79,6 +97,19 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
         if unread > 0 {
             unread_files.push(format!("{rel}: {unread}"));
         }
+        // The census (V1-V3): VACASK runs every corpus file but the ngspice- and Xyce-format
+        // benchmark files, so none of its statements is invalid in source.
+        let foreign = ["/ngspice", "/xyce"].iter().any(|d| rel.contains(d));
+        if !foreign {
+            let mut codes: Vec<String> = diags
+                .rows()
+                .iter()
+                .filter(|d| dialect::refuses(d.code))
+                .map(|d| format!("{rel} {}", d.code))
+                .collect();
+            codes.dedup();
+            invalid.extend(codes);
+        }
         let mut written = String::new();
         let mut wd = ir::Diags::new();
         dialect::legalize(&mut once, row, &mut wd);
@@ -98,6 +129,11 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
             ));
         }
     }
+    let known: Vec<String> = KNOWN_INVALID.iter().map(|s| s.to_string()).collect();
+    assert_eq!(
+        invalid, known,
+        "refusals in decks VACASK runs (file, code), against KNOWN_INVALID"
+    );
     assert!(
         unread_files.is_empty(),
         "{} files hold Unread statements:\n{}",
