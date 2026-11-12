@@ -6,7 +6,7 @@
 file "behavioural.sim" deck
   title "behavioural sources"
   param p = 3i
-  element behav b1 (a 0) expr=(3i / 2i) output=voltage
+  element behav b1 (a 0) expr=(3i /: 2i) output=voltage
   element behav b2 (b 0) expr=1m output=current
   element behav b3 (c 0) expr=(v(a) * 2i) output=voltage
   opaque vacask unread "b4 (d 0) v=p/2"

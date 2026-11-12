@@ -1,14 +1,14 @@
 //! The masters every file declares (`declare`: one walk over every CST before lowering, so an
 //! instance knows its master's kind when the master is defined later or in a library file),
 //! the lookup by VACASK's rule (`find`: the own subcircuit, then the top; never an enclosing
-//! subcircuit) and the binding of each element's master after the last file (`bind`).
+//! subcircuit). The binding itself is the spine's (`bind::masters`).
 //!
 //! Cites: VD cir-masters ("Scope": the current scope, then the toplevel scope), cir-instance;
 //! DIALECT-VACASK run m1 (an enclosing subckt's model: "Master 'res' not found."), run fwd (a
 //! model defined after its instance); R3 (the reader binds), R33 (a branch's definitions are its
 //! own).
 //!
-//! Contents: `Masters`, `Master`, `Pending`, `Found`, `declare`, `find`, `bind`
+//! Contents: `Declared`, `Master`, `Found`, `declare`, `find`
 //! (crate-private to the dialect)
 
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ use crate::syntax::ast::{Node, Tag};
 
 /// Every master every file declares, by the scope that holds it and its name.
 #[derive(Debug, Default)]
-pub(in crate::dialect::vacask) struct Masters {
+pub(in crate::dialect::vacask) struct Declared {
     /// `(holder, name)` → the master; the first declaration wins.
     defs: HashMap<(Holder, String), Master>,
     /// Each subcircuit's enclosing holder (absent: the top).
@@ -38,17 +38,6 @@ pub(in crate::dialect::vacask) enum Master {
         /// Every parameter name of its body's `parameters` statements.
         params: Vec<String>,
     },
-}
-
-/// An element whose master binds after the last file is lowered.
-#[derive(Clone, Copy, Debug)]
-pub(in crate::dialect::vacask) struct Pending {
-    /// The element.
-    pub(in crate::dialect::vacask) item: ir::ItemRef,
-    /// The scope it stands in.
-    pub(in crate::dialect::vacask) scope: ir::ScopeId,
-    /// What its master is.
-    pub(in crate::dialect::vacask) kind: ir::DefKind,
 }
 
 /// A lookup's answer.
@@ -71,8 +60,8 @@ enum Holder {
 }
 
 /// The masters of every file.
-pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> Masters {
-    let mut out = Masters::default();
+pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> Declared {
+    let mut out = Declared::default();
     for (cst, _) in csts {
         let ast = &cst.ast;
         let mut todo: Vec<(u32, Holder)> = ast
@@ -129,66 +118,26 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> Ma
 }
 
 /// The master `name` as seen from the current scope: the own subcircuit's, else the top's.
-pub(in crate::dialect::vacask) fn find(l: &Lower<'_, '_, '_>, name: &str) -> Found {
+pub(in crate::dialect::vacask) fn find(
+    l: &Lower<'_, '_, '_>,
+    declared: &Declared,
+    name: &str,
+) -> Found {
     let own = holder(l);
-    let at = |h: Holder| l.masters.defs.get(&(h, name.to_string())).cloned();
+    let at = |h: Holder| declared.defs.get(&(h, name.to_string())).cloned();
     if let Some(m) = at(own).or_else(|| at(Holder::Top)) {
         return Found::Here(m);
     }
-    let mut up = l.masters.parent.get(&own).copied();
+    let mut up = declared.parent.get(&own).copied();
     // Bounded by the subcircuit count: each step moves to an enclosing one.
-    for _ in 0..=l.masters.parent.len() {
+    for _ in 0..=declared.parent.len() {
         match up {
             Some(h @ Holder::Subckt(..)) if at(h).is_some() => return Found::Enclosing,
-            Some(h @ Holder::Subckt(..)) => up = l.masters.parent.get(&h).copied(),
+            Some(h @ Holder::Subckt(..)) => up = declared.parent.get(&h).copied(),
             _ => break,
         }
     }
     Found::Nowhere
-}
-
-/// Binds each pending element's master by VACASK's rule: defined in the element's own region
-/// (its scope up to its subcircuit's body or its file's top), else in exactly one top-level
-/// scope of any file (a file's top or a section at it). Two top-level candidates (sections of a
-/// corner library) or none: left named and unbound (R33).
-pub(in crate::dialect::vacask) fn bind(b: &mut ir::Builder<'_>, pending: &[Pending]) {
-    for p in pending {
-        let design = b.design();
-        let row: ir::Element = design.row(p.item.index);
-        let name = row.model.name;
-        let here = |s: ir::ScopeId| {
-            let d = design.lookup(s, p.kind, name);
-            (!d.is_none() && design.def(d).scope == s).then_some(d)
-        };
-        let mut own = None;
-        let mut at = p.scope;
-        // Bounded: each step moves to a parent; the scope tree is acyclic (`ir::check`).
-        for _ in 0..1 << 16 {
-            own = own.or_else(|| here(at));
-            let s = design.scope(at);
-            if matches!(s.kind, ir::ScopeKind::Subckt | ir::ScopeKind::File) || s.parent.is_none()
-            {
-                break;
-            }
-            at = s.parent;
-        }
-        let def = own.or_else(|| {
-            let tops: Vec<ir::DefId> = design
-                .definitions()
-                .iter()
-                .enumerate()
-                .filter(|(_, d)| d.kind == p.kind && d.name == name && top_level(design, d.scope))
-                .map(|(k, _)| ir::DefId(u32::try_from(k).expect("fewer than 2^32 defs")))
-                .collect();
-            match tops.as_slice() {
-                [one] => Some(*one),
-                _ => None,
-            }
-        });
-        if let Some(def) = def {
-            b.bind_ref(p.item, 0, def);
-        }
-    }
 }
 
 // ---- private ----
@@ -211,19 +160,4 @@ fn holder(l: &Lower<'_, '_, '_>) -> Holder {
         }
     }
     Holder::Top
-}
-
-/// Whether `scope` is a file's top or a section (of sections) at it.
-fn top_level(design: &ir::Design, scope: ir::ScopeId) -> bool {
-    let mut at = scope;
-    // Bounded: each step moves to a parent; the scope tree is acyclic (`ir::check`).
-    for _ in 0..1 << 16 {
-        let s = design.scope(at);
-        match s.kind {
-            ir::ScopeKind::File => return true,
-            ir::ScopeKind::Section => at = s.parent,
-            _ => return false,
-        }
-    }
-    false
 }

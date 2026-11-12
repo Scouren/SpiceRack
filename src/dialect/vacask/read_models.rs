@@ -34,8 +34,6 @@ use crate::syntax::ast::{Node, Tag};
 /// What this area's rows use.
 pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Item(ir::ItemKind::Model))
-    // a model inside a subcircuit (VD cir-masters: masters may be defined in a subckt)
-    .with(ir::Feature::Extra(ir::Extra::LocalModel))
     .with(ir::Feature::Family(ir::ModelFamily::SourceV))
     .with(ir::Feature::Family(ir::ModelFamily::SourceI))
     .with(ir::Feature::Family(ir::ModelFamily::Vcvs))

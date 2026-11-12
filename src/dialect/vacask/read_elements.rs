@@ -1,8 +1,9 @@
 //! Instance statements → `Element` rows: `name (nodes) master params` of a model, a subcircuit
 //! or a loaded module (the kind from the master, `masters::find`), `$mfactor` → `Element.mult`
 //! on a device (a parameter on a subckt instance), and the behavioural source `name (p n)
-//! v=|i=<expr>` → `Behav`. The master table every file declares (`declare`) and the master
-//! binding after the last file (`bind`) live in `read_elements/masters.rs`; the spine calls them.
+//! v=|i=<expr>` → `Behav`. The master table every file declares (`declare`) and its
+//! lookup live in `read_elements/masters.rs`; the spine calls `declare` and binds the masters
+//! (`bind::masters`).
 //!
 //! Rules (each with its evidence):
 //! - the master resolves in the own subckt, then the top, never an enclosing subckt (VD
@@ -27,12 +28,14 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.2 (instance, `$mfactor`, R C L, behavioural); VD
 //! cir-instance, cir-mfactor, dev-builtin-behavioral.
 //!
-//! Contents: `FEATURES`, `CODES`, `Masters`, `Pending`, `declare`, `bind`, `instance`
+//! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `NOISY`,
+//! `Declared`, `declare`, `instance`, `instance_in`
 //! (crate-private)
 
+mod behavioural;
 mod masters;
 
-pub(super) use masters::{Masters, Pending};
+pub(super) use masters::Declared;
 
 use super::expr_read::{self, Context, Refusal};
 use super::families::{self, Name};
@@ -55,6 +58,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Elem(ir::ElemKind::ModuleModel))
     .with(ir::Feature::Elem(ir::ElemKind::Instance))
     .with(ir::Feature::Elem(ir::ElemKind::Unresolved))
+    .with(ir::Feature::Elem(ir::ElemKind::Behav))
     .with(ir::Feature::Circuit(ir::CircuitExtra::MultResistor))
     .with(ir::Feature::Circuit(ir::CircuitExtra::MultCapacitor))
     .with(ir::Feature::Circuit(ir::CircuitExtra::MultInductor))
@@ -156,19 +160,43 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     ),
 ];
 
-/// The masters of every file (one walk before lowering).
-pub(super) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> Masters {
+/// What an instance parameter of a device is.
+enum Slot {
+    /// `Element.mult`.
+    Mult,
+    /// A typed field of the detail row.
+    Field(&'static str),
+    /// An instance parameter by its IR name.
+    Param(String),
+}
+
+/// A `Semi` with every field absent.
+const SEMI: ir::semi::Semi = ir::semi::Semi {
+    area: ir::ExprId::NONE,
+    ic: ir::List::EMPTY,
+    temp_abs: ir::ExprId::NONE,
+    dtemp: ir::ExprId::NONE,
+    ic_mode: ir::passive::IcMode::None,
+    initial: ir::semi::InitialState::Unset,
+};
+
+/// The masters of every file (one walk before lowering; `Lower::declared`).
+#[allow(dead_code, reason = "the spine calls it once Lower::declared lands")]
+pub(super) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> Declared {
     masters::declare(csts)
 }
 
-/// Binds every pending element's master by VACASK's rule.
-pub(super) fn bind(b: &mut ir::Builder<'_>, pending: &[Pending], diags: &mut ir::Diags) {
-    let _ = diags;
-    masters::bind(b, pending);
+/// `name (nodes) master params`, and a behavioural source (no master).
+///
+/// Until the spine carries the declared-master table (`Lower::declared`, asked of
+/// vacask-plan) every instance is `Unread`; `instance_in` is the body.
+pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
+    read::unread(l, n);
 }
 
-/// `name (nodes) master params`, and a behavioural source (no master).
-pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
+/// The body of `instance`, given every file's declared masters.
+#[allow(dead_code, reason = "instance calls it once Lower::declared lands")]
+pub(super) fn instance_in(l: &mut Lower<'_, '_, '_>, n: Node, declared: &Declared) {
     let h = l.cst.ast.header(n);
     let (name, master) = (h.name, h.master);
     let nodes: Vec<String> = h.nodes.iter().map(|&x| node(l, x)).collect();
@@ -182,10 +210,10 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
         entries.push((key, l.cst.ast.rhs(Node(f))));
     }
     if master == NONE {
-        return behavioural(l, n, &name, &nodes, &entries);
+        return behavioural::source(l, n, &name, &nodes, &entries);
     }
     let master = read::field_name(l.cst, master);
-    match masters::find(l, &master) {
+    match masters::find(l, declared, &master) {
         Found::Enclosing => read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(ENCLOSING)),
         Found::Nowhere => unresolved(l, n, &name, &nodes, &master, &entries),
         Found::Here(Master::Subckt { ports, params }) => {
@@ -223,15 +251,6 @@ fn head(
     let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
     let params: Vec<(&str, ir::ExprId)> = params.iter().map(|(k, e)| (k.as_str(), *e)).collect();
     l.b.head(name, &nodes, Some(master), &params, mult)
-}
-
-/// Pushes the element through `push` and queues its master's binding.
-fn pending(l: &mut Lower<'_, '_, '_>, item: ir::ItemRef, kind: ir::DefKind) {
-    l.pending.push(Pending {
-        item,
-        scope: l.scope,
-        kind,
-    });
 }
 
 /// An instance of a master no read file defines.
@@ -285,17 +304,7 @@ fn subckt(
     let head = head(l, who, &params, ir::ExprId::NONE);
     let span = l.span(n);
     let item = l.b.instance(l.scope, ir::ElemKind::Instance, head, span);
-    pending(l, item, ir::DefKind::Subckt);
-}
-
-/// What an instance parameter of a device is.
-enum Slot {
-    /// `Element.mult`.
-    Mult,
-    /// A typed field of the detail row.
-    Field(&'static str),
-    /// An instance parameter by its IR name.
-    Param(String),
+    l.bind_master_later(item);
 }
 
 /// An instance of a model of the module `word`.
@@ -344,7 +353,7 @@ fn device(
     }
     let mut mult = ir::ExprId::NONE;
     let mut params = Vec::new();
-    let mut passive = ir::Passive::PLAIN;
+    let mut passive = ir::passive::Passive::PLAIN;
     let mut semi = SEMI;
     for ((key, value), slot) in entries.iter().zip(slots) {
         if matches!(slot, Slot::Field("noisy")) {
@@ -366,18 +375,8 @@ fn device(
         ir::DetailKind::Semi => l.b.semi(l.scope, kind, head, semi, span),
         _ => l.b.instance(l.scope, kind, head, span),
     };
-    pending(l, item, ir::DefKind::Model);
+    l.bind_master_later(item);
 }
-
-/// A `Semi` with every field absent.
-const SEMI: ir::Semi = ir::Semi {
-    area: ir::ExprId::NONE,
-    ic: ir::List::EMPTY,
-    temp_abs: ir::ExprId::NONE,
-    dtemp: ir::ExprId::NONE,
-    ic_mode: ir::IcMode::None,
-    initial: ir::InitialState::Unset,
-};
 
 /// The typed field a module's (canonical) instance parameter `p` is on an element of `kind`.
 fn field(kind: ir::ElemKind, p: &str) -> Option<&'static str> {
@@ -399,7 +398,7 @@ fn field(kind: ir::ElemKind, p: &str) -> Option<&'static str> {
 }
 
 /// Sets field `f` of the passive or semiconductor row.
-fn set(passive: &mut ir::Passive, semi: &mut ir::Semi, f: &str, e: ir::ExprId) {
+fn set(passive: &mut ir::passive::Passive, semi: &mut ir::semi::Semi, f: &str, e: ir::ExprId) {
     match f {
         "value" => passive.value = e,
         "tc1" => passive.tc1 = e,
@@ -443,84 +442,4 @@ fn build(l: &mut Lower<'_, '_, '_>, entries: &[(String, u32)]) -> Vec<(String, i
             (k.clone(), e)
         })
         .collect()
-}
-
-/// `name (p n) v=|potential=|i=|flow=<expr>`.
-fn behavioural(
-    l: &mut Lower<'_, '_, '_>,
-    n: Node,
-    name: &str,
-    nodes: &[String],
-    entries: &[(String, u32)],
-) {
-    let output = match entries {
-        [(key, _)] if key == "v" || key == "potential" => ir::OutKind::Voltage,
-        [(key, _)] if key == "i" || key == "flow" => ir::OutKind::Current,
-        _ => return read::opaque(l, n, ir::OpaqueClass::Private, Some(super::codes::PRIVATE)),
-    };
-    if nodes.len() != 2 || reads_name(l, entries[0].1) {
-        // A parameter read is real-typed there (run b1): `Unread` until A21's `ToReal`.
-        return read::unread(l, n);
-    }
-    let value = entries[0].1;
-    let expr = match expr_read::expr(l, value, Context::Behavioural) {
-        Ok(e) => e,
-        Err(r) => return read::opaque(l, n, r.class, Some(r.code)),
-    };
-    let row = ir::Behav {
-        expr,
-        tc1: ir::ExprId::NONE,
-        tc2: ir::ExprId::NONE,
-        temp_abs: ir::ExprId::NONE,
-        dtemp: ir::ExprId::NONE,
-        rpar: ir::ExprId::NONE,
-        output,
-        tc_base: ir::TcBase::Tnom,
-    };
-    let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
-    let head = l.b.head(name, &nodes, None, &[], ir::ExprId::NONE);
-    let span = l.span(n);
-    l.b.behav(l.scope, ir::ElemKind::Behav, head, row, span);
-}
-
-/// Whether the expression at `node` names a parameter (an identifier that is no constant and
-/// no special leaf).
-fn reads_name(l: &Lower<'_, '_, '_>, node: u32) -> bool {
-    let ast = &l.cst.ast;
-    let mut todo = vec![node];
-    // Bounded: each node of the (acyclic) expression tree is taken once.
-    while let Some(x) = todo.pop() {
-        if x == NONE {
-            continue;
-        }
-        let n = Node(x);
-        match ast.tag(n) {
-            Tag::Ident | Tag::Word => {
-                let name = match ast.tag(n) {
-                    Tag::Word => ast.name(crate::syntax::ast::Name(ast.rhs(n))),
-                    _ => ast.name(crate::syntax::ast::Name(ast.lhs(n))),
-                };
-                let constant = super::tables::CONSTANTS.iter().any(|(c, _)| *c == name);
-                if !constant && !name.starts_with('$') {
-                    return true;
-                }
-            }
-            Tag::Unary | Tag::Paren | Tag::Delimited => todo.push(ast.lhs(n)),
-            Tag::Binary => todo.extend([ast.lhs(n), ast.rhs(n)]),
-            Tag::Ternary => {
-                let at = ast.rhs(n);
-                todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
-            }
-            Tag::Call | Tag::Probe => {
-                // `v(a)`, `i(x)` name nodes and instances, not parameters.
-                let callee = ast.name(crate::syntax::ast::Name(ast.lhs(n)));
-                if callee != "v" && callee != "i" {
-                    let at = ast.rhs(n);
-                    todo.extend((0..ast.extra(at + 1)).map(|k| ast.extra(at + 2 + k)));
-                }
-            }
-            _ => {}
-        }
-    }
-    false
 }

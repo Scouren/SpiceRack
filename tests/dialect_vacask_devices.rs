@@ -281,7 +281,12 @@ fn every_runnable_reader_fixture_runs_the_same_after_read_and_write() {
             }
             continue;
         }
-        let again = written(&mut design).files()[0].1.clone();
+        let Ok(again) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            written(&mut design).files()[0].1.clone()
+        })) else {
+            failed.push((stem(&deck), "legalize or write refused".to_string()));
+            continue;
+        };
         let b = vacask(&again);
         if a.0 != b.0 || a.1 != b.1 {
             failed.push((stem(&deck), format!("{}\n--- written\n{again}", a.0)));

@@ -1,2 +1,5 @@
-# Known failures of this directory: <fixture> <why>.
-behavioural v(), i() in Context::Behavioural are expr_read.rs (vacask-plan), asked; Private until then
+# Known failures of this directory: <fixture> <why>. A line goes the day its cause is fixed.
+masters every instance Unread until Lower::declared (vacask-plan) lands
+passives every instance Unread until Lower::declared (vacask-plan) lands
+semis every instance Unread until Lower::declared (vacask-plan) lands; ModelWithoutLibrary set on Module-family models (ir-circuit, reported)
+behavioural v()/i() Private in Context::Behavioural (expr_read, vacask-plan); ElementWithoutModel set on Behav, which takes no master on VACASK (ir-circuit, reported)

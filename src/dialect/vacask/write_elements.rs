@@ -34,7 +34,7 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     if e.kind == ir::ElemKind::Behav {
         let row = d.behav(&e);
         w.out.push_str(match row.output {
-            ir::OutKind::Voltage => " v=",
+            ir::controlled::OutKind::Voltage => " v=",
             _ => " i=",
         });
         write_expr(d, row.expr, w.out);
