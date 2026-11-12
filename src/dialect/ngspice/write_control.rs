@@ -4,7 +4,10 @@
 //! `.control` block for adjacent commands; blocks concatenate, so the split is exact,
 //! `rewrite/S3-CONTROL.md` O1). `needs_script` is the spine's one choice
 //! per deck: a plan with an alter, a loop or a `FromHere` state item is written whole as a
-//! script, analyses as commands (R49 (3) (i), the reader's own image).
+//! script, analyses as commands (R49 (3) (i), the reader's own image). An unnamed loop's
+//! variable is made up as `sr<depth>` (the loop's depth, itself included); the reader reads
+//! exactly that name at that depth back as unnamed, so a user's own `sr1` at depth 1
+//! round-trips to the same text (lead's answer, R42's pattern).
 //!
 //! Each function writes one item of a design legal for `FEATURES`, sees only the IR and never
 //! learns a source. Codes: `W1400–W1499`.
@@ -13,7 +16,7 @@
 //! `device.c:1249-1420`, `inp.c:1735-1857`, `control.c:462-466`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`,
+//! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`, `LOAD_SOURCE`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn load`, `loop_`, `alter`
@@ -35,6 +38,10 @@ pub(super) const LOOP_FORM: ir::Code = ir::Code::new(b'W', 1402);
 /// numparam), or a parameter alter whose value has no one-token spelling.
 pub(super) const ALTER_VALUE: ir::Code = ir::Code::new(b'W', 1403);
 
+/// A Verilog-A load: ngspice loads compiled OSDI binaries only (`pre_osdi`); compiling the
+/// source is the backend's (OpenVAF).
+pub(super) const LOAD_SOURCE: ir::Code = ir::Code::new(b'W', 1404);
+
 /// This area's codes, `W1400–W1499`.
 pub(super) const CODES: &[Row] = &[
     refusal(
@@ -54,6 +61,12 @@ pub(super) const CODES: &[Row] = &[
         "an alter value ngspice cannot read",
         "ngspice-45 device.c:1249-1420 (ft_getpnames), inp.c:1761 (gettok)",
         "an alter takes one number; an alterparam one token.",
+    ),
+    refusal(
+        LOAD_SOURCE,
+        "a Verilog-A source load",
+        "ngspice-45 inp.c:791-797 (pre_osdi), osdi/osdiregistry.c",
+        "ngspice loads a compiled OSDI binary, never a Verilog-A source.",
     ),
 ];
 
@@ -85,8 +98,7 @@ pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21, `Write::admits`).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
-    let span = design.span_of(item);
-    let mut refuse = |code| diags.push(code, span, 0);
+    let mut refuse = |code| diags.push_at(code, design, item, 0);
     match item.kind {
         ir::ItemKind::Alter => {
             let a: ir::Alter = design.row(item.index);
@@ -99,7 +111,18 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                 refuse(PARAM_RESET);
             }
         }
-        ir::ItemKind::Loop if sweep(design, item).is_none() => refuse(LOOP_FORM),
+        ir::ItemKind::Loop => match sweep(design, item) {
+            None => refuse(LOOP_FORM),
+            Some(s) if s.target.kind == ir::TargetKind::Param && live_before(design, item) => {
+                refuse(PARAM_RESET);
+            }
+            Some(_) => {}
+        },
+        ir::ItemKind::Load
+            if design.row::<ir::item::Load>(item.index).kind != ir::LoadKind::Osdi =>
+        {
+            refuse(LOAD_SOURCE);
+        }
         _ => {}
     }
 }
@@ -202,27 +225,55 @@ fn alter_value(d: &ir::Design, a: &ir::Alter) -> bool {
     a.target.kind == ir::TargetKind::Param || matches!(d.expr(a.value), ir::Expr::Num(_))
 }
 
-/// Whether an alter or `FromHere` state item stands before `item` in its scope (the `reset`
-/// of an `alterparam` would drop it).
+/// Whether a target a `reset` would restore is live where `item` sets a parameter: an alter
+/// of another kind or a `FromHere` state item listed before it in any enclosing scope, or
+/// anywhere in an enclosing loop's body or the item's own loop body (a later pass's `reset`
+/// sees it).
 fn live_before(d: &ir::Design, item: ir::ItemRef) -> bool {
-    let Some(&(_, scope)) = d.reachable().iter().find(|(i, _)| *i == item) else {
+    let Some(&(_, mut scope)) = d.reachable().iter().find(|(i, _)| *i == item) else {
         return false;
     };
-    for &i in d.items(scope) {
-        if i == item {
-            return false;
-        }
-        let live = match i.kind {
-            ir::ItemKind::Alter => d.row::<ir::Alter>(i.index).target.kind != ir::TargetKind::Param,
-            ir::ItemKind::Option => d.row::<ir::OptionRow>(i.index).holds == ir::Applies::FromHere,
-            ir::ItemKind::Env => d.row::<ir::Env>(i.index).holds == ir::Applies::FromHere,
-            _ => false,
-        };
-        if live {
+    if item.kind == ir::ItemKind::Loop && live_in(d, d.row::<ir::Loop>(item.index).body) {
+        return true;
+    }
+    let mut at = item;
+    // Bounded: each step goes one scope outward; a file's top scope has no parent.
+    while !scope.is_none() {
+        let sc = d.scope(scope);
+        if sc.kind == ir::ScopeKind::Loop && (live(d, sc.owner) || live_in(d, scope)) {
             return true;
         }
+        let before = d.items(scope).iter().take_while(|&&i| i != at);
+        if before.copied().any(|i| live(d, i)) {
+            return true;
+        }
+        at = sc.owner;
+        scope = sc.parent;
     }
     false
+}
+
+/// Whether `scope` or a loop body in it holds a live item.
+fn live_in(d: &ir::Design, scope: ir::ScopeId) -> bool {
+    d.items(scope).iter().any(|&i| {
+        live(d, i) || (i.kind == ir::ItemKind::Loop && live_in(d, d.row::<ir::Loop>(i.index).body))
+    })
+}
+
+/// Whether `i` makes a target a `reset` restores live: an alter of anything but a parameter, a
+/// `FromHere` option or environment.
+fn live(d: &ir::Design, i: ir::ItemRef) -> bool {
+    match i.kind {
+        ir::ItemKind::Alter => d.row::<ir::Alter>(i.index).target.kind != ir::TargetKind::Param,
+        ir::ItemKind::Option => d.row::<ir::OptionRow>(i.index).holds == ir::Applies::FromHere,
+        ir::ItemKind::Env => d.row::<ir::Env>(i.index).holds == ir::Applies::FromHere,
+        ir::ItemKind::Loop => {
+            let l: ir::Loop = d.row(i.index);
+            l.kind == ir::LoopKind::Sweep
+                && d.detail::<ir::plan::SweepLoop>(l.detail).target.kind != ir::TargetKind::Param
+        }
+        _ => false,
+    }
 }
 
 /// How many loops enclose `item`'s body, itself included (a made-up variable's number).

@@ -1,0 +1,8 @@
+# oracle: S3-CONTROL O1 and the script region (write.rs): every deck line after a script command closes its .control block first (law L5 seed 2 found a pre_osdi block left open over a comment and an .if); written by hand
+file "load_then_deck.sp" deck
+  title "load_then_deck"
+  load osdi "a.osdi"
+  comment " c"
+  load osdi "b.osdi"
+  if (1)
+    comment " d"

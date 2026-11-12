@@ -29,8 +29,9 @@ use crate::ir;
 pub(super) struct Out<'a> {
     /// The design, read only.
     pub(super) design: &'a ir::Design,
-    /// The text so far.
-    pub(super) out: &'a mut String,
+    /// The text so far: written only through `line`, `script` and frame tails, so a script
+    /// region always closes before a deck line.
+    out: &'a mut String,
     /// Diagnostics.
     #[allow(dead_code, reason = "the areas' writers note through it (S3.1-S3.4)")]
     pub(super) diags: &'a mut ir::Diags,
