@@ -18,14 +18,14 @@
 //!
 //! Contents:
 //! - `pub struct Corpus`
-//! - `pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String>`
+//! - `pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String>`
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use spicerack::dialect::{Policy, Sources};
+use spicerack::dialect::{DialectRow, Policy, Sources};
 use spicerack::ir;
 
 use crate::files::PairFile;
@@ -48,12 +48,16 @@ pub struct Corpus {
 // when a nightly has the hour.
 const STRIDE_SIX: usize = 10;
 
+/// A deck's conversion budget in seconds: past it the deck is `converter-slow` at step 1 (named,
+/// never a pass or a skip; the class must be empty before a release).
+const BUDGET: u64 = 120;
+
 /// A deck still running after this many seconds is named on stderr while it runs.
 const SLOW: u64 = 120;
 
 /// Every deck of `corpus` through `c`'s six steps: the census written, its table printed, and
 /// the differences from the cell's corpus list returned (empty: the list holds).
-pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
+pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
     let (from, to) = rows(c);
     let root = std::env::var(corpus.var)
         .unwrap_or_else(|_| panic!("{} not set: run in `nix develop .#testing`", corpus.var));
@@ -141,7 +145,7 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
                             last: 1,
                             written: None,
                         },
-                        false => run::steps(c, from, to, &load(p), none),
+                        false => budgeted(c, from, to, load(p), none.clone()),
                     };
                     running.lock().expect("no worker panicked")[w] = None;
                     let h = v.written.take().map(|w| hash(&w));
@@ -210,6 +214,36 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
 
 // ---- private ----
 
+/// `deck` through the steps on a thread of its own: its conversion first, within [`BUDGET`]
+/// seconds, else `converter-slow` (the thread is left to finish or to die with the process: a
+/// thread cannot be stopped), then the steps, whose simulator runs have their own budgets.
+fn budgeted(
+    c: &'static Cell,
+    from: &'static DialectRow,
+    to: &'static DialectRow,
+    deck: Deck,
+    pair: PairFile,
+) -> Done {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let name = deck.name.clone();
+    std::thread::spawn(move || {
+        let _ = run::convert(from, to, &deck);
+        if tx.send(None).is_ok() {
+            let _ = tx.send(Some(run::steps(c, from, to, &deck, &pair)));
+        }
+    });
+    let slow = || Done {
+        fails: [(1, run::fail("converter-slow", format!("{name}: past {BUDGET} s converting")))]
+            .into(),
+        last: 1,
+        written: None,
+    };
+    match rx.recv_timeout(std::time::Duration::from_secs(BUDGET)) {
+        Ok(_) => rx.recv().ok().flatten().unwrap_or_else(slow),
+        Err(_) => slow(),
+    }
+}
+
 /// A hash of a deck's written files, paths and bytes.
 fn hash(w: &run::Written) -> u64 {
     use std::hash::{Hash, Hasher};
@@ -268,7 +302,10 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
         }
     }
     let pass = decks - first.len();
-    let mut out = format!("pass all six: {pass}\nfirst failing step and class:\n");
+    let slow = seen.values().filter(|f| f.class == "converter-slow").count();
+    let mut out = format!(
+        "pass all six: {pass}; converter-slow (must be 0 before a release): {slow}\nfirst failing step and class:\n"
+    );
     for (k, n) in &by_class {
         out += &format!("  {n:5} {k}\n");
     }
