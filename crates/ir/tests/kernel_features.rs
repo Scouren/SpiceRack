@@ -293,6 +293,18 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.if_(top, &[yes], Span::NONE);
             },
         ),
+        (
+            Extra::LongLiteral,
+            |b, top| {
+                let v =
+                    b.long_literal("0.12345678901234567890123", 0, spicerack_ir::NumForm::Plain);
+                b.param(top, "p", v, Span::NONE);
+            },
+            |b, top| {
+                let v = b.num(0.123_456_789_012_345_67);
+                b.param(top, "p", v, Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         let f = Feature::Extra(extra);

@@ -9,7 +9,10 @@
 //! - P5: on a design without the feature nothing changes (IR text equal).
 //!
 //! And each pass's fixtures, `tests/fixtures/passes/<group>/<pass>/<case>.ir` read, passed and
-//! written back equal to `<case>.out.ir`; a fixture folder naming no registered pass fails.
+//! written back equal to `<case>.out.ir`, the codes the pass appended equal, in order, to
+//! `<case>.notes` (one code a line, `#` comments; A26). A case whose pass appends a row and has
+//! no `.notes` fails, and so does a `.notes` that lists what the pass did not append; a fixture
+//! folder naming no registered pass fails.
 //!
 //! Failing passes are compared with [`KNOWN`] by name, strictly both ways; a law that ran on no
 //! generated design for a pass fails for it (a registered pass with no law run is a failure).
@@ -154,7 +157,8 @@ fn every_fixture_reads_passes_and_writes_its_expected_text() {
             for case in cases_in(&root.join(&group).join(&name)) {
                 cases += 1;
                 if let Err(m) = fixture(pass, &case) {
-                    failures.push(format!("{group}/{name}/{}: {m}", case.display()));
+                    let file = case.file_name().map(|f| f.to_string_lossy().into_owned());
+                    failures.push(format!("{group}/{name}/{}: {m}", file.unwrap_or_default()));
                 }
             }
         }
@@ -283,6 +287,23 @@ fn fixture(pass: &Pass, case: &Path) -> Result<(), String> {
         return Err(format!("the input does not read clean: {:?}", diags.rows()));
     }
     (pass.run)(&mut design, &mut diags);
+    let noted: Vec<String> = diags.rows().iter().map(|d| d.code.to_string()).collect();
+    let listed = match std::fs::read_to_string(case.with_extension("notes")) {
+        Ok(t) => t
+            .lines()
+            .map(|l| l.split('#').next().unwrap_or("").trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect(),
+        Err(_) if noted.is_empty() => Vec::new(),
+        Err(_) => {
+            return Err(format!(
+                "the pass noted {noted:?} and the case has no .notes"
+            ));
+        }
+    };
+    if noted != listed {
+        return Err(format!("notes {noted:?}, its .notes lists {listed:?}"));
+    }
     ir::check(&design, &mut diags);
     let refused: Vec<_> = diags
         .rows()
