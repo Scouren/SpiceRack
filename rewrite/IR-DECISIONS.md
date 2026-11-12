@@ -184,3 +184,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `todo_facts!` carries `#[allow(unused_macros)]`: on the owners' branches every row is real and the macro has no user, while on `ir-rewrite` the owners' placeholder rows still use it. It is deleted at M5, after both merges.
 - The writers live in `text_expr.rs` and are re-exported from `text` (`text::write_value`, …), together with `Ctx`. `write_names`, `write_exprs` and `write_params` were added as the mirrors of `Words::names`, `exprs` and `params`; `write_params` asserts every value is set (a head default without a value is the `Subckt` row's own spelling).
 - A10: `link` and `item_text::dump_subckt` use the subcircuit's body as the lookup scope of its head defaults. Tests: `kernel_link::a_subckt_default_reads_its_sibling_head_parameter` (red with the rule reverted), `kernel_text::a_subckt_default_reading_a_sibling_needs_no_mark`.
+
+## The spine's additions and the canonical empty list
+
+- `FeatureSet::ALL` (every `Feature::COUNT` bit, the IR-text writer's set) and `Design::reachable` (public, its order part of the contract: files in id order, depth first, bodies right after their item) are in.
+- An empty list is always `List::EMPTY` (start 0): every `Builder` list constructor (`names`, `name_ids`, `exprs`, `params`, and through them every row and expression list) returns it for an empty slice, and `check` reports any other empty range as `HandleRange`. Equality therefore no longer depends on how an empty list was made (the circuit owner's report; its `canonical()` in circuit_parse.rs can go).
+- `check_legal` agrees with `features_used` by construction: both take the design-level features from `feature::design_level` (the case clash and both owners' `design_features`). A generated property checks it: for 40 designs × 20 random subsets, the set of reported `arg`s equals `features_used(d).minus(legal)`.
