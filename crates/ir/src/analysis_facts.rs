@@ -12,7 +12,7 @@
 //! Contents: `pub(crate) trait DetailFacts` (`DetailFacts::handles`, `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
 //! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
-//! `pub(crate) fn analysis_count`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
+//! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
 //! `pub(crate) fn fault_of`, `pub(crate) fn dump_of`, `pub(crate) fn parse_of`,
 //! `pub(crate) fn gen_of`; `RowFacts` for `Analysis`
 
@@ -34,7 +34,7 @@ use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::target_refs;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
-use crate::run_words::reachable;
+use crate::run_words::loop_depth;
 use crate::run_words::{put_name, take_enum, take_name, word};
 use crate::text::Words;
 use crate::text_expr::Ctx;
@@ -144,15 +144,6 @@ pub(crate) fn base_before(design: &Design, scope: ScopeId, pos: usize) -> bool {
     unreachable!("the scope tree has a cycle")
 }
 
-/// The analyses reachable from every file's top scope.
-#[cfg(any(test, feature = "gen"))]
-pub(crate) fn analysis_count(design: &Design) -> usize {
-    design
-        .files()
-        .map(|f| reachable(design, design.file(f).top, ItemKind::Analysis))
-        .sum()
-}
-
 impl RowFacts for Analysis {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Name(self.name));
@@ -248,19 +239,15 @@ impl RowFacts for Analysis {
             return ItemRef::NONE;
         }
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
-        if analysis_count(design) > 0 && !several {
+        // Generation appends, so the table's rows are the design's analyses (no dead rows).
+        if !design.analyses.is_empty() && !several {
             return ItemRef::NONE;
         }
         // Without `LoopScoped`, every loop must wrap every analysis: a new one goes inside
         // every existing loop's body.
         let scoped = features.contains(Feature::Run(RunExtra::LoopScoped));
-        if !scoped
-            && !design
-                .loops
-                .rows()
-                .iter()
-                .all(|l| within(design, scope, l.body))
-        {
+        // Inside every loop's body exactly when the scope's loop depth is the loop count.
+        if !scoped && loop_depth(design, scope) != design.loops.len() {
             return ItemRef::NONE;
         }
         let kinds: Vec<AnalysisKind> = AnalysisKind::ALL
@@ -338,6 +325,19 @@ pub(crate) fn gen_of<D: DetailFacts>(
     Some(b.detail(row))
 }
 
+/// Whether the last item of `scope` is an `Hb` or `Pss` analysis: the generator's O(1) form of
+/// `base_before` (a periodic small-signal row it generates follows its base directly).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn base_just_before(design: &Design, scope: ScopeId) -> bool {
+    design.items(scope).last().is_some_and(|it| {
+        it.kind == ItemKind::Analysis
+            && matches!(
+                Analysis::table(design).get(it.index).kind,
+                AnalysisKind::Hb | AnalysisKind::Pss
+            )
+    })
+}
+
 // ---- private ----
 
 /// Whether `kind`'s detail generator succeeds here under `features` (its only failures; the
@@ -359,8 +359,7 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
         }
         AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
-            let d = b.design();
-            base_before(d, scope, d.items(scope).len())
+            base_just_before(b.design(), scope)
         }
         AnalysisKind::Op
         | AnalysisKind::Dc
@@ -381,20 +380,4 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
         | AnalysisKind::DcInc
         | AnalysisKind::TimedOp => true,
     }
-}
-
-/// Whether `scope` is `body` or lies inside it. Bounded by the scope count.
-#[cfg(any(test, feature = "gen"))]
-fn within(design: &Design, scope: ScopeId, body: ScopeId) -> bool {
-    let mut s = scope;
-    for _ in 0..=design.scopes.len() {
-        if s == body {
-            return true;
-        }
-        if s.is_none() {
-            return false;
-        }
-        s = design.scope(s).parent;
-    }
-    unreachable!("the scope tree has a cycle")
 }

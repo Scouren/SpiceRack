@@ -21,8 +21,6 @@
 
 use crate::analysis::{Analysis, AnalysisKind};
 #[cfg(any(test, feature = "gen"))]
-use crate::analysis_facts::analysis_count;
-#[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
 use crate::analysis_facts::{
     detail_get, dump_of, fault_of, features_of, handles_of, parse_of, report,
@@ -189,7 +187,7 @@ impl RowFacts for Loop {
         if (outer > 0 && !has(RunExtra::LoopNested)) || outer >= LOOP_DEPTH_MAX {
             return ItemRef::NONE;
         }
-        if !has(RunExtra::LoopScoped) && analysis_count(design) > 0 {
+        if !has(RunExtra::LoopScoped) && !design.analyses.is_empty() {
             return ItemRef::NONE;
         }
         let ends: Vec<LoopEnd> = [

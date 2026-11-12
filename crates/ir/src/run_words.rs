@@ -23,10 +23,9 @@
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
 //!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`,
-//!   `pub(crate) fn in_scope_kind`, `pub(crate) fn loop_depth`,
-//!   `pub(crate) fn reachable`
+//!   `pub(crate) fn in_scope_kind`, `pub(crate) fn loop_depth`
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Write as _};
 
 use crate::build::Builder;
 use crate::check::Violation;
@@ -35,8 +34,6 @@ use crate::diag::Diags;
 use crate::expr::{Expr, Literal, NumForm};
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{ExprId, ExprList, List, NameId, NameList, POOL_MAX, Ref, ScopeId};
-#[cfg(any(test, feature = "gen"))]
-use crate::item::ItemKind;
 use crate::item::{DefKind, ScopeKind};
 use crate::run_extra::RunExtra;
 use crate::text::Words;
@@ -60,7 +57,14 @@ pub(crate) fn word<E: Debug>(e: E) -> String {
 
 /// The member of `all` whose word is `w`.
 pub(crate) fn member<E: Copy + Debug>(all: &[E], w: &str) -> Option<E> {
-    all.iter().copied().find(|&e| word(e) == w)
+    // One buffer for every candidate's name, compared with `w` as it is snake-cased (parse
+    // calls this per enum field: no allocation per candidate).
+    let mut name = String::with_capacity(24);
+    all.iter().copied().find(|&e| {
+        name.clear();
+        write!(name, "{e:?}").expect("writing to a String does not fail");
+        snake_eq(&name, w)
+    })
 }
 
 /// ` w`.
@@ -395,31 +399,18 @@ pub(crate) fn loop_depth(design: &Design, scope: ScopeId) -> usize {
     unreachable!("the scope tree has a cycle")
 }
 
-/// How many items of `kind` the scopes reachable from `scope` hold (bodies of scoped items
-/// included). Explicit stack (C11); O(scopes + items).
-#[cfg(any(test, feature = "gen"))]
-pub(crate) fn reachable(design: &Design, scope: ScopeId, kind: ItemKind) -> usize {
-    let mut children = vec![Vec::new(); design.scopes.len()];
-    for (child, row) in design.scopes.iter().enumerate() {
-        if !row.parent.is_none() {
-            children[row.parent.index()].push(ScopeId(child as u32));
-        }
-    }
-    let mut count = 0;
-    let mut stack = vec![scope];
-    while let Some(s) = stack.pop() {
-        assert!(
-            stack.len() <= design.scopes.len(),
-            "the scope tree is a tree"
-        );
-        for &item in design.items(s) {
-            if item.kind == kind {
-                count += 1;
-            }
-        }
-        stack.extend_from_slice(&children[s.index()]);
-    }
-    count
-}
-
 // ---- private ----
+
+/// Whether `w` is `name`'s snake case (`word`'s rule), without building it.
+fn snake_eq(name: &str, w: &str) -> bool {
+    let mut want = w.bytes();
+    for (i, c) in name.bytes().enumerate() {
+        if c.is_ascii_uppercase() && i > 0 && want.next() != Some(b'_') {
+            return false;
+        }
+        if want.next() != Some(c.to_ascii_lowercase()) {
+            return false;
+        }
+    }
+    want.next().is_none()
+}
