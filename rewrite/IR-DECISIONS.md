@@ -370,3 +370,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `check`'s report takes the item instead of a span; non-item rows (expression rows, definitions' own faults at `Span::NONE`, the design-level features) pass `ItemRef::NONE`. The owners' row checks (`item_facts::field_domain`, the opaque check, `element::design_check`, `circuit_check`, `analysis_facts::report`) push at the item too; `Diags::push(code, span, arg)` stays for a reader's syntax rows and sets no item.
 
+## A25 items 2, 3, 5 applied
+
+- `FormalNotConstant` counts `$tnom` through the row's tree walk (`item_facts::reads_dependent`, which replaced `reads_param`), not through the class: `$tnom` is a constant of the run, and only a head default reading it is dependent (VACASK run c3).
+- `SubcktConstantParam` is a `Param` row fact for a `Param` listed directly in a `Subckt` body. A `Param` in a branch inside a body is not one, since VACASK's `parameters` at that place is the branch's. The generator lists no `Param` in a subcircuit body when the set lacks it; dependent locals are dropped there too, a simplification that costs no reachable feature under `FeatureSet::ALL`.
+- A generated `Load`'s path ends in `.va` for `VerilogA` and `.osdi` for `Osdi`. The `DeviceLibrary` path half is the circuit owner's generator, in its round-5 head.
+- Item 4 (string or list values) waits for `ng-scaffold`'s and `vacask-plan`'s answers on the contexts each accepts.
+
