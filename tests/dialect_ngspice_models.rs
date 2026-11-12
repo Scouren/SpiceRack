@@ -47,6 +47,7 @@ const READ: &[&str] = &[
     "unread_forms",
     "values",
     "vdmos",
+    "wrapped",
 ];
 
 /// The write fixtures, by name.

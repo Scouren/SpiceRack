@@ -45,6 +45,7 @@ const READ: &[&str] = &[
     "resistor_ignored",
     "semi_refused",
     "switches",
+    "wrapped",
 ];
 
 /// The write fixtures, by name.

@@ -50,6 +50,7 @@ const READ: &[&str] = &[
     "subckt_nested",
     "title_blank",
     "title_comments_end",
+    "wrapped_param",
 ];
 
 /// The write fixtures, by name.

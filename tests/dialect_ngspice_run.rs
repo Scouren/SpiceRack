@@ -61,6 +61,7 @@ const READ: &[&str] = &[
     "tran",
     "tran_tmax_zero",
     "tran_word_refused",
+    "wrapped",
 ];
 
 /// The write fixtures, by name.

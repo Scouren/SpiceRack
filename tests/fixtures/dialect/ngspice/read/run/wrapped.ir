@@ -1,0 +1,10 @@
+# codes: P1300 P1300 P1300 P1300
+file "wrapped.sp" deck
+  title "wrapped"
+  comment " oracle: settle/wrap_analysis_{1,2,3,4}.sp ({a}+{b} and 'a'+'b': 'Bad syntax!'; 'a+{b}' and {a+'b'}: 'Syntax error: letter [{]', fatal)"
+  param a = 1
+  param b = 2
+  opaque ngspice invalid ".dc v1 0 {a}+{b} 1"
+  opaque ngspice invalid ".dc v1 0 'a'+'b' 1"
+  opaque ngspice invalid ".dc v1 0 'a+{b}' 1"
+  opaque ngspice invalid ".dc v1 0 {a+'b'} 1"

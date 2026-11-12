@@ -19,9 +19,9 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes as constants (`pub(super) const MALFORMED`, `UNREAD_FORM`, `DROPPED`, `TC_BASE`,
 //! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`, `PORT_COUNT`, `MODEL_ORDER`), `pub(super) struct Item`, `pub(super) enum Kind`,
-//! `pub(super) enum Val`, `pub(super) struct Card`, `Card::param(&mut self, &str, Val)`, `Item::as_value(&self) -> String`,
+//! `pub(super) struct Card`, `Card::param(&mut self, &str, Val)`, `Item::as_value(&self) -> String`,
 //! `pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) fn val`, `b_tree`,
-//! `emit`, `head`, `push_done`, `number_word`, `literal`,
+//! `head`, `push_done`, `number_word`, `literal`,
 //! `pub(super) fn instance_temp(&ir::Design, &ir::Element) -> (bool, bool)`,
 //! `pub(super) fn bound(&ir::Design, &mut ir::Diags)`, `pub(super) const TEMP_FAMILY`
 
@@ -36,6 +36,8 @@ use super::expr_read::{self, Fail, Tree};
 use super::number::{self, Scan};
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
+use super::value::{Val, emit};
+use super::value::{Wrap, parens, unwrap};
 use crate::ir::{self, CircuitExtra as X, ElemKind as K, Feature, FeatureSet, ItemKind};
 
 /// What the element area reads: every kind below, and the field members its rules produce.
@@ -198,15 +200,6 @@ pub(super) enum Kind {
     Brace,
 }
 
-/// A value read but not appended: a card number or an expression tree.
-#[derive(Clone, Debug)]
-pub(super) enum Val {
-    /// A card number (`INPevaluate`).
-    Lit(Scan),
-    /// A braced expression.
-    Tree(Tree),
-}
-
 /// An element header before it is appended: names as written.
 #[derive(Debug, Default)]
 pub(super) struct Card {
@@ -288,34 +281,37 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, text: &str) -> Result<Val, Fail>
         .next()
         .is_some_and(|c| c.is_ascii_alphabetic() || c == b'_')
         && t.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_');
-    if let Some(inner) = braced(text).or(ident.then_some(t)) {
-        let class = lw.class(st.container, inner, &[]);
-        let eval = if class >= super::declare::Class::Temp {
-            Eval::Behavioural
-        } else {
-            Eval::Numparam
-        };
-        return expr_read::parse_in(inner, eval).map(Val::Tree);
-    }
-    number_word(text).map(Val::Lit).ok_or_else(Fail::invalid)
+    let inner = match unwrap(text) {
+        // a wrapper inside the value's is a parenthesis here (settle wrap_element_3/4.sp)
+        Wrap::Whole(inner, _) => parens(inner),
+        Wrap::Bare(t) if ident => t.to_string(),
+        // each wrapper its own expression: "unknown parameter (+)" (wrap_element_1/2.sp)
+        Wrap::Parts => return Err(Fail::invalid()),
+        Wrap::Bare(_) => return number_word(text).map(Val::of).ok_or_else(Fail::invalid),
+    };
+    let class = lw.class(st.container, &inner, &[]);
+    let eval = if class >= super::declare::Class::Temp {
+        Eval::Behavioural
+    } else {
+        Eval::Numparam
+    };
+    expr_read::parse_in(&inner, eval).map(Val::Tree)
 }
 
 /// A B-source field (`v=`, `i=`, `vol=`, `cur=`, `value=`, a table's input, an R/C/L value run
 /// as a B source): the B-source parser's, whatever its class (`inp_bsource_compat`).
 pub(super) fn b_tree(text: &str) -> Result<Tree, Fail> {
-    let inner = braced(text).unwrap_or(text.trim());
+    // ponytail: a B field's wrappers as an element value's; `{a}+{b}` there is not settled and
+    // is read whole, braces as parentheses, as before
+    let inner = match unwrap(text) {
+        Wrap::Whole(inner, _) => parens(inner),
+        Wrap::Bare(t) => t.to_string(),
+        Wrap::Parts => text.trim().to_string(),
+    };
     if inner.is_empty() {
         return Err(Fail::invalid());
     }
-    expr_read::parse_in(inner, Eval::Behavioural)
-}
-
-/// Appends a value read by [`val`].
-pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
-    match v {
-        Val::Lit(s) => lw.number(s.literal, &s.fit),
-        Val::Tree(t) => lw.expr(st, t, st.scope),
-    }
+    expr_read::parse_in(&inner, Eval::Behavioural)
 }
 
 /// Appends `card`'s header in the order the IR text reads it back: the name, the terminals, the
@@ -471,21 +467,6 @@ const fn row(
             kind,
         },
     )
-}
-
-/// The inner text of a value wrapped whole in `{…}` or `'…'`.
-fn braced(text: &str) -> Option<&str> {
-    let t = text.trim();
-    if let Some(inner) = t.strip_prefix('\'').and_then(|r| r.strip_suffix('\'')) {
-        return (!inner.contains('\'')).then_some(inner);
-    }
-    let inner = t.strip_prefix('{')?.strip_suffix('}')?;
-    let mut depth = 0i32;
-    let whole = inner.bytes().all(|c| {
-        depth += i32::from(c == b'{') - i32::from(c == b'}');
-        depth >= 0
-    });
-    (whole && depth == 0).then_some(inner)
 }
 
 /// The card text after the name, split into items; `None` when a group does not close or a

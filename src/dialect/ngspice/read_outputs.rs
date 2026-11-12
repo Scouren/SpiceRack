@@ -28,7 +28,7 @@
 //! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
 //! `pub(super) fn script_save(lw, st, &[String], ir::Applies) -> Result<(), No>`,
 //! `pub(super) fn meas_command(lw, st, &[String]) -> Result<(), No>`,
-//! `pub(super) fn fail(No) -> Fail`, `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
+//! `pub(super) fn fail(No) -> Fail`, `pub(super) fn words(&str) -> Vec<String>`; the probe
 //! words (`Ctx`, `Want`, `probe_word`) are `read_outputs/probe.rs`, the measures
 //! `read_outputs/meas.rs`
 
@@ -182,19 +182,6 @@ pub(super) fn words(text: &str) -> Vec<String> {
         out.push(cur);
     }
     out
-}
-
-/// `text` without one `'…'` or `{…}` around all of it.
-pub(super) fn unwrap(text: &str) -> &str {
-    let t = text.trim();
-    for (open, close) in [('\'', '\''), ('{', '}')] {
-        if let Some(inner) = t.strip_prefix(open).and_then(|r| r.strip_suffix(close))
-            && !inner.contains([open, close])
-        {
-            return inner;
-        }
-    }
-    t
 }
 
 /// One output named inside another card (`.four 1k v(a)`, `.tf v(out) vin`, `.noise v(out)
