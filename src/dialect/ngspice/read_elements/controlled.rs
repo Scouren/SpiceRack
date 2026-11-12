@@ -4,12 +4,14 @@
 //! - linear: `E|G n+ n- c+ c- gain`, `F|H n+ n- vname gain`; the HSPICE words `vcvs`, `vccs`,
 //!   `cccs`, `ccvs` after the nodes are dropped (`inp_compat` `replace_token`). `m` is a
 //!   parameter of G and F only (`vccs.c`, `cccs.c`; run: `E1 a 0 b 0 2 m=3` is "unknown
-//!   parameter (m)", `InvalidInSource`);
+//!   parameter (m)", `InvalidInSource`), and an error on any POLY form (run: G/F `poly(1) … m=3`
+//!   is XSPICE's "Bad real value");
 //! - `POLY(n)` controls coefficients (XSPICE `poly`, `enhtrans.c`); more than one number after
 //!   one control is `POLY(1)` (`inp_poly_2g6_compat`; run: `E2 f 0 poly(1) b 0 0 2` = 1 V at
 //!   0.5 V);
 //! - `E … value={e}` / `vol={e}` and `G … value={e}` / `cur={e}` are B sources (`inp_compat`;
-//!   runs: 2 V and 3 V), the expression the B-source parser's;
+//!   runs: 2 V and 3 V), the expression the B-source parser's; `m` multiplies the E's value (run:
+//!   3 V for 1 V, read `Mul(m, e)` as on a voltage B, R31) and is the G's multiplicity (run);
 //! - `E|G … table {e} = (x, y) …`: XSPICE `pwl` with `input_domain=0.1 fraction=TRUE`, ngspice's
 //!   rounded corners (`TableLaw::NgspiceRounded`; run: 1 V at 0.5 V on (0,0) (1,2));
 //! - `E … laplace …`: ngspice-45 has none (run: "Undefined parameter [v]", fatal),
@@ -26,8 +28,8 @@
 
 use super::super::read::{Lower, Stmt};
 use super::{
-    Card, Item, Kind, MALFORMED, PRIVATE_FORM, UNREAD_FORM, VOLTAGE_M, Val, b_tree, emit, head,
-    number_word, val,
+    Card, Item, Kind, MALFORMED, PRIVATE_FORM, UNREAD_FORM, Val, b_tree, emit, head, number_word,
+    val,
 };
 use crate::ir::{self, ElemKind as K};
 
@@ -68,15 +70,15 @@ pub(super) fn efgh(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
     }
     card.nodes = vec![items[0].text.clone(), items[1].text.clone()];
     let mut rest = &items[2..];
-    // a trailing `m=` (G, F) is the multiplicity, on every form
+    // a trailing `m=`: the multiplicity of a G or F (vccs.c, cccs.c), the value's factor on
+    // the B source `E … vol=` becomes (run: `vol={v(b)*2} m=3` = 3 V at 0.5 V), an error on
+    // POLY (XSPICE poly: "Bad real value", run) and on any other E or H ("unknown parameter")
+    let mut m = None;
     if let Some((last, init)) = rest.split_last()
         && last.kind == Kind::Assign
         && last.text.eq_ignore_ascii_case("m")
     {
-        if !current_out {
-            return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
-        }
-        card.mult = Some(match val(lw, st, &last.value) {
+        m = Some(match val(lw, st, &last.value) {
             Ok(v) => v,
             Err(e) => return lw.opaque(st, e.class, e.code),
         });
@@ -90,19 +92,24 @@ pub(super) fn efgh(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
         if rest.len() != 1 {
             return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
         }
-        if letter == b'e' && card.mult.is_some() {
-            return lw.opaque(st, ir::OpaqueClass::Unread, VOLTAGE_M);
-        }
+        let mut f = Fields::default();
         let output = if current_out {
+            card.mult = m;
             ir::controlled::OutKind::Current
         } else {
+            f.scale = m;
             ir::controlled::OutKind::Voltage
         };
-        return behav(lw, st, &card, &first.value, output, Fields::default());
+        return behav(lw, st, &card, &first.value, output, f);
     }
-    if first.kind != Kind::Word {
+    let word0 = first.text.to_ascii_lowercase();
+    let keyword = ["table", "vcvs", "vccs", "ccvs", "cccs"].contains(&word0.as_str());
+    let poly_form =
+        word0.starts_with("poly(") || (!keyword && rest.len() > if voltage_ctl { 3 } else { 2 });
+    if first.kind != Kind::Word || m.is_some() && (!current_out || poly_form) {
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     }
+    card.mult = m;
     if word.starts_with("laplace") {
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     }
@@ -220,9 +227,7 @@ pub(super) fn b(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
             // a second `v=`/`i=`
             _ => return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED),
         };
-        if taken {
-            return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-        }
+        card.dups |= taken;
     }
     behav(lw, st, &card, &expr, output, f);
 }

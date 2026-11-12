@@ -10,6 +10,7 @@ file "cards.sp" deck
   element cccs F1 (o 0) mult=2 gain=2 sense=vx
   element poly E3 (o 0) controls=(a 0 b 0) coeffs=[0, 1, 2] dimension=2
   element behav B1 (b 0) mult=2 expr=(v(a) * 2) output=current
+  element behav E4 (o 0) expr=(v(c) * 4)
   element table E6 (o 0) input=(v(c)) points=[0, 0, 1, 2] law=ngspice_rounded
   element diode D1 (a k) model=dmod? area=2 ic=[0.6] ic_mode=uic_only initial=off
   element mosfet M1 (d g s b) model=nmos? params=(w=1u) mult=2 ic=[1, 2, 3] ic_mode=uic_only

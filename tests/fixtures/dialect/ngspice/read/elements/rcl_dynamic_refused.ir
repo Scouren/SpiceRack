@@ -1,8 +1,9 @@
-# codes: P1103 P1105 P1100 P1102
+# codes: P1103 P1105 P1100 P1102 P1103
 file "rcl_dynamic_refused.sp" deck
   title "rcl_dynamic_refused"
-  comment " oracle: ngspice-45 inpcom.c inp_compat (first { on the line is the value; no brace: mal formed, exit; dtemp and ic dropped), asrcload.c:41 (tc from 300.15 K, which the IR states only on a value that reads the circuit); INV-semantics 14.13"
+  comment " oracle: ngspice-45 inpcom.c inp_compat (first { on the line is the value; no brace: mal formed, exit; dtemp and ic dropped), asrcload.c:41 (tc from 300.15 K, which the IR states only on a value that reads the circuit); INV-semantics 14.13; C2 (charge with tc: ngspice divides the charge, reciproctc=1) is Unread until Behav has a TcLaw (lead, to ir-circuit)"
   opaque ngspice unread "R1 a b {temper*1k} tc1=1m"
   opaque ngspice private "R2 a b tc1={1m} r={v(a)}"
   opaque ngspice invalid "R3 a b v(a)"
   element capacitor C1 (a b) value=(v(a) * 1p) noisy=false
+  opaque ngspice unread "C2 a b q={1p*v(a)} tc1=1m"

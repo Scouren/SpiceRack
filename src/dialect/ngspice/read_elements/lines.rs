@@ -72,9 +72,7 @@ pub(super) fn line(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
             Some(k) => f[k].replace(v).is_some(),
             None => lumps.replace(v).is_some(),
         };
-        if taken {
-            return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-        }
+        card.dups |= taken;
     }
     if letter == b't' {
         if f[Z0].is_none() {

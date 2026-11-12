@@ -124,9 +124,7 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
             let Some(s) = number_word(&next.text) else {
                 return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
             };
-            if f.tc2.replace(Val::Lit(s)).is_some() {
-                return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-            }
+            card.dups |= f.tc2.replace(Val::Lit(s)).is_some();
             k += 1;
         }
         let taken = match slot {
@@ -145,24 +143,23 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
                     f.noisy = s.literal.mantissa != 0;
                     false
                 }
-                _ => true,
+                _ => return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM),
             },
             Slot::Param => {
-                card.params.push((it.text.clone(), v));
+                card.param(&it.text, v);
                 false
             }
         };
-        if taken {
-            // a second value for one field: ngspice's last one wins; no rule yet
-            return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-        }
+        card.dups |= taken;
     }
     if f.value.is_none() && card.model.is_none() {
-        if letter != b'r' {
-            return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-        }
-        // restemp.c:79: no value, no model resistance: 1 mOhm
-        f.value = Some(Val::Lit(literal(1, 0, -3, NumForm::Scale)));
+        // restemp.c:79: an R with no value and no model resistance is 1 mOhm; a C or L is 0
+        // (runs: `C1 a 0 w=1u l=1u`, `L1 a 0 ic=1m` show capacitance 0, inductance 0)
+        f.value = Some(Val::Lit(if letter == b'r' {
+            literal(1, 0, -3, NumForm::Scale)
+        } else {
+            literal(0, 0, 0, NumForm::Plain)
+        }));
     }
     let kind = match letter {
         b'r' => K::Resistor,
@@ -365,9 +362,7 @@ fn dynamic(
                     return lw.opaque(st, ir::OpaqueClass::Unread, TC_BASE);
                 }
                 let slot = if key == "tc1" { &mut tc1 } else { &mut tc2 };
-                if slot.replace(v).is_some() {
-                    return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-                }
+                card.dups |= slot.replace(v).is_some();
             }
             (Kind::Assign, "m") => match val(lw, st, &i.value) {
                 Ok(v) => card.mult = Some(v),

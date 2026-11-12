@@ -108,13 +108,11 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
             "temp" if typed => temp.replace(one()).is_some(),
             "dtemp" if typed => dtemp.replace(one()).is_some(),
             _ => {
-                card.params.push((it.text.clone(), one()));
+                card.param(&it.text, one());
                 false
             }
         };
-        if taken {
-            return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-        }
+        card.dups |= taken;
     }
     let h = head(lw, st, &card);
     let area = area.as_ref().map_or(ir::ExprId::NONE, |v| emit(lw, st, v));

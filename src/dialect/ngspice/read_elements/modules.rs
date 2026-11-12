@@ -13,7 +13,7 @@
 //! `(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`)
 
 use super::super::read::{Lower, Stmt};
-use super::{Card, Item, Kind, MALFORMED, PRIVATE_FORM, UNREAD_FORM, head, push_done, val};
+use super::{Card, Item, Kind, MALFORMED, PRIVATE_FORM, head, push_done, val};
 use crate::ir::{self, ElemKind as K};
 
 /// An X card.
@@ -89,15 +89,7 @@ pub(super) fn a(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
 /// Reads `k=v` parameters into `card` (`m` into `mult` when `mult` says so); on a refusal
 /// pushes the opaque and returns false.
 fn keyed(lw: &mut Lower<'_, '_>, st: Stmt, card: &mut Card, rest: &[Item], mult: bool) -> bool {
-    for (k, it) in rest.iter().enumerate() {
-        let dup = rest[..k]
-            .iter()
-            .any(|p| p.text.eq_ignore_ascii_case(&it.text));
-        if dup {
-            // the IR holds one value per key; ngspice's winner is not established
-            lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-            return false;
-        }
+    for it in rest {
         let v = match val(lw, st, &it.value) {
             Ok(v) => v,
             Err(e) => {
@@ -106,9 +98,9 @@ fn keyed(lw: &mut Lower<'_, '_>, st: Stmt, card: &mut Card, rest: &[Item], mult:
             }
         };
         if mult && it.text.eq_ignore_ascii_case("m") {
-            card.mult = Some(v);
+            card.dups |= card.mult.replace(v).is_some();
         } else {
-            card.params.push((it.text.clone(), v));
+            card.param(&it.text, v);
         }
     }
     true

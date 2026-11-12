@@ -18,8 +18,8 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes as constants (`pub(super) const MALFORMED`, `UNREAD_FORM`, `DROPPED`, `TC_BASE`,
-//! `VOLTAGE_M`, `FIRST_BRACE`, `PRIVATE_FORM`), `pub(super) struct Item`, `pub(super) enum Kind`,
-//! `pub(super) enum Val`, `pub(super) struct Card`, `Item::as_value(&self) -> String`,
+//! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`), `pub(super) struct Item`, `pub(super) enum Kind`,
+//! `pub(super) enum Val`, `pub(super) struct Card`, `Card::param(&mut self, &str, Val)`, `Item::as_value(&self) -> String`,
 //! `pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) fn val`, `b_tree`,
 //! `emit`, `head`, `push_done`, `number_word`, `literal`
 
@@ -113,14 +113,15 @@ pub(super) const DROPPED: ir::Code = ir::Code::new(b'P', 1102);
 /// (ngspice divides its charge by the factor), or a number ngspice rounds to 9 digits
 /// (`inpcom.c` `eval_tc`, `%15.8e`): `Unread`.
 pub(super) const TC_BASE: ir::Code = ir::Code::new(b'P', 1103);
-/// `m` on `E … vol=`: no rule yet (`Unread`). A voltage B's `m` is read as a product (R31).
-pub(super) const VOLTAGE_M: ir::Code = ir::Code::new(b'P', 1104);
 /// An R/C/L run as a B source whose first `{…}` on the line is not its value: ngspice runs that
 /// expression as the value (`inpcom.c` `strchr(cut_line, '{')`, INV 14.13): `Private`.
 pub(super) const FIRST_BRACE: ir::Code = ir::Code::new(b'P', 1105);
 /// An ngspice-only form: XSPICE port modifiers (`%v`, `[ ]`), `reciproctc`, `reciprocm`:
 /// `Private`.
 pub(super) const PRIVATE_FORM: ir::Code = ir::Code::new(b'P', 1106);
+/// A key a card gives twice: ngspice keeps the last (runs: `R1 a 0 1k r=2k` is 2 kΩ,
+/// `tc1=0.01 tc1=0.02` is 0.02, `X1 … w=1 w=2` passes 2); the earlier ones are left out.
+pub(super) const DUPLICATE_KEY: ir::Code = ir::Code::new(b'P', 1107);
 
 /// This area's codes.
 pub(super) const CODES: &[Row] = &[
@@ -149,16 +150,16 @@ pub(super) const CODES: &[Row] = &[
         "on a temperature-only or charge-defined R/C/L run as a B source, or rounded by ngspice to 9 digits (Unread).",
     ),
     row(
-        VOLTAGE_M,
-        "m on an E vol= source",
-        "ngspice-45 frontend/inpcom.c inp_compat",
-        "no rule yet for the multiplier ngspice gives the B source it builds (Unread).",
-    ),
-    row(
         FIRST_BRACE,
         "an R, C or L whose first braced expression is not its value",
         "ngspice-45 frontend/inpcom.c inp_compat; rewrite/INV-semantics.md 14.13",
         "ngspice runs the first {...} on the line as the value; kept as ngspice text (Private).",
+    ),
+    row(
+        DUPLICATE_KEY,
+        "a parameter given twice on an element card",
+        "ngspice-45 INPdevParse (each value set in turn); runs",
+        "ngspice keeps the last value; the earlier ones are left out.",
     ),
     row(
         PRIVATE_FORM,
@@ -218,6 +219,8 @@ pub(super) struct Card {
     pub(super) params: Vec<(String, Val)>,
     /// `m`.
     pub(super) mult: Option<Val>,
+    /// Whether a key was given twice (ngspice keeps the last; [`head`] notes it).
+    pub(super) dups: bool,
 }
 
 /// An element card (the spine's dispatch: every letter but `V` and `I`).
@@ -244,6 +247,23 @@ pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt) {
         b'n' => modules::n(lw, st, card, &items),
         b'a' => modules::a(lw, st, card, &items),
         _ => lw.unread(st),
+    }
+}
+
+impl Card {
+    /// Sets instance parameter `key` to `v`: a later value replaces an earlier one (ngspice
+    /// keeps the last) and marks the card.
+    pub(super) fn param(&mut self, key: &str, v: Val) {
+        if let Some(p) = self
+            .params
+            .iter_mut()
+            .find(|p| p.0.eq_ignore_ascii_case(key))
+        {
+            p.1 = v;
+            self.dups = true;
+        } else {
+            self.params.push((key.to_string(), v));
+        }
     }
 }
 
@@ -305,6 +325,9 @@ pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
 /// Appends `card`'s header in the order the IR text reads it back: the name, the terminals, the
 /// master, the parameters (values, then keys), the multiplicity.
 pub(super) fn head(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) -> ir::ElemHead {
+    if card.dups {
+        lw.note(st, DUPLICATE_KEY);
+    }
     let name = lw.names.fold(&card.name);
     let name = lw.b.name(&name);
     let nodes: Vec<String> = card.nodes.iter().map(|n| lw.names.node(n)).collect();

@@ -26,8 +26,10 @@ const READ: &[&str] = &[
     "bsource_refused",
     "capacitor_inductor",
     "controlled",
+    "controlled_m",
     "controlled_refused",
     "coupling",
+    "defaults_duplicates",
     "diode_bjt",
     "instance",
     "lines",
@@ -47,10 +49,7 @@ const WRITE: &[&str] = &["cards"];
 /// Known failures, by fixture name, with why: the design reads (or is written) but uses a feature
 /// ngspice's `FEATURES` lacks. Strict both ways (`known`): an unexpected pass fails until the
 /// marker goes.
-const KNOWN: &[(&str, &str)] = &[(
-    "controlled",
-    "NameWithoutLetter on E/G-named Behav (E vol=, G cur=): ir::spice_letter gives Behav only B (reported to ir-circuit)",
-)];
+const KNOWN: &[(&str, &str)] = &[];
 
 /// The simulator deck: every card form that carries a number and runs in an operating point.
 const SIM: &str = "elements
