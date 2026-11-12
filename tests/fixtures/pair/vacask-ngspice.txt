@@ -1,7 +1,7 @@
 # The vacask-ngspice cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`,
 # compared by (deck, step) both ways. A line goes the day its step passes.
-# Proofs: `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.2 plans for the feature refused (not
-# registered on the trunk); `finding=<id>` a pair finding sent to the lead:
+# Proofs: `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.2 (or REWRITE-PLAN §4.4) plans for the
+# feature refused (not registered on the trunk); `finding=<id>` a pair finding sent to the lead:
 #   F3  ngspice lacks Extra(IntLiteral) and no pass removes it, none planned (§6.2 has no row): a
 #       VACASK integer literal (`dc=5`, an ac's `points=10`) refuses the deck. Owner: the expr
 #       group (a literal pass) or the ngspice FEATURES, by the lead's assignment.
@@ -25,3 +25,4 @@ tran_rc_pulse 2 refused:U0001 pass=pulse_vacask_to_spice # Circuit(PulseVacask);
 tran_sine 2 refused:U0001 finding=F4 # Circuit(GivenZeroAsGiven); also Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
 param_div 2 refused:U0001,W1007 finding=F5 # BinaryDyn(DivTyped) at `r=rbase*num/den`
 expr_resistor 4 target-fails finding=F6 # ngspice: "unknown parameter (resistor)" on `r1 in 0 {...} resistor`
+case_names 2 refused:U0001 pass=rename_collisions # Extra(CaseSensitiveNames): r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)

@@ -30,3 +30,9 @@ tran_pwl 3 differs finding=F2 # also A35: read back `name=tran1`, and without `p
 tran_rl_isrc 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.2n`
 tran_exp 2 refused:U0001 pass=exp_td2_relative # Circuit(ExpTd2FromZero)
 tran_uic 2 refused:U0001 pass=device_ic_to_nodeset # Circuit(IcUicOnly): a capacitor's ic= under uic
+ac_phase 3 differs ruling=A35 # analysis ac read back as `name=ac1`
+case_names 3 differs ruling=A35 # analysis op read back as `name=op1`
+temp_card 3 differs ruling=A35 # analysis op read back as `name=op1`
+coupled_l 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=5n`
+pulse_zero_edges 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.1n`
+sine_full 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.1n`
