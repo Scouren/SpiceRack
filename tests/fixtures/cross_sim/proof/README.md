@@ -10,7 +10,9 @@ here. Such a deck is observed as the kind when the harness's own run agrees
 as a `mismatch` when the run that settles it is one the harness does not
 make (a step finer than (TSTOP-TSTART)/20000, a cell with no control): the
 file then records the step, both simulators' values and the comparer's
-verdict (`lists.rs`, `BY_HAND`; ZERO-LEDGER P1-045).
+verdict (`lists.rs`, `BY_HAND`; ZERO-LEDGER P1-045). `refined-by-hand.md`
+holds the Xyce corpus's certificates, `refined-by-hand-spice-bench.md` the
+ngspice corpus's (one row per deck and target; ZERO-LEDGER P1-066).
 
 A `simulator-fails reason=<rule-id> proof=<file>` line names one too: the
 target's simulator fails on the written deck, runs the original in its

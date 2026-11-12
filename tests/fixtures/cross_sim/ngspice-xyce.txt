@@ -135,8 +135,8 @@ ngspice/examples/measure/simple-meas-tran.sp target-fails # no raw file .cross_s
 ngspice/examples/mos/nmos_pmos_drainresistor.sp slow # quarantined
 ngspice/examples/mos/ro-meas.sp mismatch # tran v(xro.n2): 0.7617871250767438 leaves the tube at t=0.0000000008145599999999978 (tol 1.576e-2)
 ngspice/examples/p-to-n-examples/logic.sp mismatch # tran v(1): 1.5 leaves the tube at t=0 (tol 1.500e-2)
-ngspice/examples/snapshot/adder_mos.sp mismatch # tran v(10): -0.342428563650284 leaves the tube at t=0.0000002402593553989835 (tol 3.778e-2)
-ngspice/examples/snapshot/adder_mos_circ.sp mismatch # tran v(x1.x1.x1.x1.net.1): 1.6918072410561842 leaves the tube at t=0.0000006064999999999999 (tol 1.918e-2)
+ngspice/examples/snapshot/adder_mos.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (TSTOP/100000) agree; its .tran is in the included file, which the harness does not refine; as written v(10) is 1.45 x out
+ngspice/examples/snapshot/adder_mos_circ.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand-spice-bench.md # both at TMAX 10 ps (TSTOP/100000) agree (worst 0.699 of the tolerance); at TSTOP/20000 i(vin3b) is 8.01 x out
 ngspice/examples/soa/nic_soa.sp mismatch # tran v(bias): 0.6388506757411574 leaves the tube at t=0 (tol 6.502e-3)
 ngspice/examples/soi/Inv_chain.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so
 ngspice/examples/soi/inv_dc.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: /nix/store/2ms2y4xn6ra9yfy9gkwpd1q96mj6vr78-spice-bench/ngspice/src.assets/ngspice/examples/soi/./bsim4so

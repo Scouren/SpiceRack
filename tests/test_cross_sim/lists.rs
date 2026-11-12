@@ -221,4 +221,31 @@ mod tests {
             assert_eq!(admits(line, now), ok, "{line} observed as {now:?}");
         }
     }
+
+    #[test]
+    fn p1_066_the_adder_decks_are_refined_by_hand() {
+        // The 4-bit adder's peaks move with the step on ngspice, Xyce and
+        // VACASK and meet at TMAX 10 ps, a step the harness does not
+        // refine to; `adder_mos.sp` holds its `.tran` in an included file,
+        // which the harness does not refine at all.
+        // Oracle: the list files' own lines, and the proof file's rows
+        // (ngspice-45, Xyce 7.10.0 and VACASK at TSTOP/100000, every
+        // vector through the comparer), matched by deck and target.
+        // Checks: 3 + 3.
+        let by_hand = "simulator-differs:refinement:by-hand";
+        let dir = env!("CARGO_MANIFEST_DIR");
+        let file = format!("{dir}/tests/fixtures/cross_sim/proof/refined-by-hand-spice-bench.md");
+        let proof = std::fs::read_to_string(&file).expect("the proof file");
+        for (cell, deck, target) in [
+            ("ngspice-xyce", "adder_mos.sp", "Xyce"),
+            ("ngspice-xyce", "adder_mos_circ.sp", "Xyce"),
+            ("ngspice-vacask", "adder_mos_circ.sp", "VACASK"),
+        ] {
+            let deck = format!("ngspice/examples/snapshot/{deck}");
+            let class = listed(cell).get(&deck).cloned();
+            assert_eq!(class.as_deref(), Some(by_hand), "{cell}: {deck}");
+            let row = format!("| {deck} | {target} |");
+            assert!(proof.contains(&row), "{file}: no row {row}");
+        }
+    }
 }
