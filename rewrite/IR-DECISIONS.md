@@ -377,3 +377,11 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - A generated `Load`'s path ends in `.va` for `VerilogA` and `.osdi` for `Osdi`. The `DeviceLibrary` path half is the circuit owner's generator, in its round-5 head.
 - Item 4 (string or list values) waits for `ng-scaffold`'s and `vacask-plan`'s answers on the contexts each accepts.
 
+## The generator's tracked class is the tree's
+
+- `Gen::class` now adds a node's own class (a circuit-reading function, a user function's noted class) when the node is built, not when it is chosen. A node chosen and then abandoned for a leaf (a tree that still owed its probe) no longer raises it. `gen_expr::tests::the_tracked_class_is_the_trees` pins it against `expr_class`. Found by the circuit owner: a generator choice that read `g.class` built a design check refused. `Gen::new` is the constructor `generate` and the test share.
+
+## The scaling gate
+
+- `cargo run --release --features gen --example throughput -- scaling` measures build, dump, parse and check over `FeatureSet::ALL` at 1e5 and 4e5 items (best of two runs) and exits 1 when a ratio exceeds 8: a linear phase measures 4.4 to 4.9 here, a quadratic one about 16. It is a release binary, not a test: a debug-build test at sizes cheap enough for the suite cannot tell a quadratic term from cache effects, and a release-only test would skip in debug. It goes in the merge tier beside the gate's commands (IR-PERF.md, How it is measured). On 68c6be2d it is red on build (13.6), the circuit regression.
+

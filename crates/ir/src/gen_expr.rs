@@ -86,7 +86,10 @@ impl Gen {
                     continue;
                 }
                 // a tree that still owes its probe takes a leaf where an empty node would end it
-                Some((node, _)) if !need_probe => build(b, node, Vec::new()),
+                Some((node, _)) if !need_probe => {
+                    self.class = self.class.max(self.own_class(&node));
+                    build(b, node, Vec::new())
+                }
                 Some(_) | None => self.leaf(b, features, &probes, dynamic, &mut need_probe),
             };
             // hand the value up, building every frame it completes
@@ -99,6 +102,7 @@ impl Gen {
                     break;
                 }
                 let frame = stack.pop().expect("the frame just filled");
+                self.class = self.class.max(self.own_class(&frame.node));
                 value = build(b, frame.node, frame.kids);
             }
         }
@@ -108,6 +112,16 @@ impl Gen {
 // ---- private ----
 
 impl Gen {
+    /// The class a built node adds by itself: a circuit-reading function, or a user function's
+    /// noted class (its arguments add theirs as they are built).
+    fn own_class(&self, node: &Node) -> ExprClass {
+        match node {
+            Node::Call(f) if f.reads_circuit() => ExprClass::Circuit,
+            Node::User(_, def) if !def.is_none() => self.class_of(*def),
+            _ => ExprClass::Constant,
+        }
+    }
+
     /// A leaf the set allows: constants, parameter reads and the constant leaves; in a
     /// circuit-reading tree also probes, its first leaf always one.
     fn leaf(
@@ -320,14 +334,8 @@ impl Gen {
             return None;
         }
         let k = self.below(nodes.len() as u32) as usize;
-        let chosen = nodes.swap_remove(k);
-        let own = match &chosen.0 {
-            Node::Call(f) if f.reads_circuit() => ExprClass::Circuit,
-            Node::User(_, def) if !def.is_none() => self.class_of(*def),
-            _ => ExprClass::Constant,
-        };
-        self.class = self.class.max(own);
-        Some(chosen)
+        // the node's class is added when it is built, not here: a choice may end in a leaf
+        Some(nodes.swap_remove(k))
     }
 }
 

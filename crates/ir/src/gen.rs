@@ -17,7 +17,7 @@
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
-//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
+//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::new(u64, &FeatureSet, Size) -> Gen`, `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
 //! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
 
