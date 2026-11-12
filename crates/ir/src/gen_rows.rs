@@ -25,7 +25,7 @@ pub(crate) fn gen_title(
     b: &mut Builder<'_>,
     _: &FeatureSet,
 ) -> ItemRef {
-    let text = g.word();
+    let text = g.line_word();
     b.title(scope, text, Span::NONE)
 }
 
@@ -35,7 +35,7 @@ pub(crate) fn gen_comment(
     b: &mut Builder<'_>,
     _: &FeatureSet,
 ) -> ItemRef {
-    let text = g.word();
+    let text = g.line_word();
     b.comment(scope, text, Span::NONE)
 }
 
@@ -104,9 +104,19 @@ pub(crate) fn gen_subckt(
     let mut classes = Vec::new();
     // a head default reads a parameter only when the set has FormalReadsParam (A12 K2)
     g.param_reads = f.contains(Feature::Extra(Extra::FormalReadsParam));
-    let defaults: Vec<ExprId> = (0..g.below(3))
+    // no formal can be made when it may neither go without a default nor have one
+    let formals = if f.contains(Feature::Expr(ExprTag::Num))
+        || f.contains(Feature::Extra(Extra::FormalWithoutDefault))
+    {
+        g.below(3)
+    } else {
+        0
+    };
+    let defaults: Vec<ExprId> = (0..formals)
         .map(|_| {
-            let value = f.contains(Feature::Expr(ExprTag::Num)) && g.chance(2);
+            // a formal has its default unless the set has FormalWithoutDefault (A15 K2)
+            let value = f.contains(Feature::Expr(ExprTag::Num))
+                && (!f.contains(Feature::Extra(Extra::FormalWithoutDefault)) || g.chance(2));
             let e = if value {
                 g.expr(b, f, Reads::Constant)
             } else {
@@ -144,9 +154,12 @@ pub(crate) fn gen_section(
 }
 
 pub(crate) fn gen_if(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>, f: &FeatureSet) -> ItemRef {
+    // a condition is of class Constant unless the set has IfConditionDynamic (A15 K2)
+    g.constant_only = !f.contains(Feature::Extra(Extra::IfConditionDynamic));
     let mut conds: Vec<ExprId> = (0..1 + g.below(2))
         .map(|_| g.expr(b, f, Reads::Constant))
         .collect();
+    g.constant_only = false;
     if g.chance(2) {
         conds.push(ExprId::NONE);
     }

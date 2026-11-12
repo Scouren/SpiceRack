@@ -16,10 +16,10 @@ use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::tran::{StepCap, Tran};
 use spicerack_ir::{
-    Alter, Analysis, AnalysisKind, Builder, Design, Diags, Edge, Elaborate, Env, Event, ExprId,
-    IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet, NodeSetKind,
-    OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId, ScopeKind, Span, Statistics,
-    SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
+    Alter, Analysis, AnalysisKind, Applies, Builder, Design, Diags, Edge, Elaborate, Env, Event,
+    ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet,
+    NodeSetKind, OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId, ScopeKind, Span,
+    Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
 };
 
 type Fixture = (&'static str, Violation, fn(&mut Builder<'_>, ScopeId));
@@ -138,26 +138,25 @@ const BROKEN: &[Fixture] = &[
     ("private option without a dialect", Violation::FieldDomain, |b, s| {
         let private = b.name("tran_rmax");
         let v = b.num(1.0);
-        b.push(s, OptionRow { key: OptionKey::Private, private, dialect: NameId::NONE, value: v }, Span::NONE);
+        b.push(s, OptionRow { key: OptionKey::Private, private, dialect: NameId::NONE, value: v, holds: Applies::FromHere }, Span::NONE);
     }),
     ("flag option with a value", Violation::FieldDomain, |b, s| {
         let v = b.num(1.0);
-        b.push(s, OptionRow { key: OptionKey::Klu, private: NameId::NONE, dialect: NameId::NONE, value: v }, Span::NONE);
+        b.push(s, OptionRow { key: OptionKey::Klu, private: NameId::NONE, dialect: NameId::NONE, value: v, holds: Applies::FromHere }, Span::NONE);
     }),
-    ("env without tnom", Violation::FieldDomain, |b, s| {
-        let t = b.num(27.0);
-        b.push(s, Env { temp: t, tnom: NO }, Span::NONE);
+    ("env that names neither temperature", Violation::FieldDomain, |b, s| {
+        b.push(s, Env { temp: NO, tnom: NO, holds: Applies::WholeRun }, Span::NONE);
     }),
     ("nodeset held in the transient only", Violation::FieldDomain, |b, s| {
         let node = b.names(&["a"]);
         let value = b.num(1.0);
-        b.push(s, NodeSet { kind: NodeSetKind::Nodeset, applies: IcScope::Transient, next_only: false, node, reference: List::EMPTY, value }, Span::NONE);
+        b.push(s, NodeSet { kind: NodeSetKind::Nodeset, applies: IcScope::Transient, next_only: false, node, reference: List::EMPTY, value, holds: Applies::FromHere }, Span::NONE);
     }),
     ("device state with a reference node", Violation::FieldDomain, |b, s| {
         let node = b.names(&["c1"]);
         let reference = b.names(&["b"]);
         let value = b.num(1.0);
-        b.push(s, NodeSet { kind: NodeSetKind::Device, applies: IcScope::EveryOp, next_only: false, node, reference, value }, Span::NONE);
+        b.push(s, NodeSet { kind: NodeSetKind::Device, applies: IcScope::EveryOp, next_only: false, node, reference, value, holds: Applies::FromHere }, Span::NONE);
     }),
     ("when measure at the analysis bound", Violation::FieldDomain, |b, s| {
         let i = b.detail(MeasureWhen { at: Event::BOUND });
@@ -168,6 +167,12 @@ const BROKEN: &[Fixture] = &[
         let sig = b.probe_v(&["a"]);
         let v = b.num(1.0);
         let at = Event::cross(sig, Edge::Rise, v, NO);
+        b.measure(s, "m", AnalysisKind::Tran, MeasureWhen { at }, Span::NONE);
+    }),
+    ("crossing picked both by default and by count", Violation::FieldDomain, |b, s| {
+        let sig = b.probe_v(&["a"]);
+        let (v, c) = (b.num(1.0), b.num(1.0));
+        let at = Event { skip_initial: true, ..Event::cross(sig, Edge::Rise, v, c) };
         b.measure(s, "m", AnalysisKind::Tran, MeasureWhen { at }, Span::NONE);
     }),
     ("param measure without a value", Violation::FieldDomain, |b, s| {
@@ -313,6 +318,7 @@ fn a_valid_run_reports_nothing() {
     let got = codes(|b, s| {
         let (t, tn) = (b.num(27.0), b.num(27.0));
         b.env(s, t, tn, Span::NONE);
+        b.env(s, ExprId::NONE, tn, Span::NONE); // an env sets what it names (A14)
         let one = b.num(1e-3);
         b.option(s, OptionKey::RelTol, one, Span::NONE);
         b.option_private(s, "xyce", "timeint.reltol", one, Span::NONE);

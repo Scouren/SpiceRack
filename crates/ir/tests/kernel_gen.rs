@@ -203,9 +203,8 @@ fn the_full_set_runs_every_property() {
     // a `ddt`/`idt` makes its tree read the circuit (class `Circuit`), so it only ever counts as
     // `FuncDyn`: no valid design holds these two
     let unreachable = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)];
-    // known gap, a marker: the run owner's generator does not yet make a sweep loop over one
-    // `Op` (A12 R2); remove the member here when it does, or this test fails
-    let not_yet = [Feature::Run(spicerack_ir::RunExtra::LoopOverOp)];
+    // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
+    let not_yet: [Feature; 0] = [];
     let goal = unreachable
         .iter()
         .chain(&not_yet)

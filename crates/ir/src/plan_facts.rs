@@ -21,8 +21,6 @@
 
 use crate::analysis::{Analysis, AnalysisKind};
 #[cfg(any(test, feature = "gen"))]
-use crate::analysis_facts::analysis_count;
-#[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
 use crate::analysis_facts::{
     detail_get, dump_of, fault_of, features_of, handles_of, parse_of, report,
@@ -189,7 +187,7 @@ impl RowFacts for Loop {
         if (outer > 0 && !has(RunExtra::LoopNested)) || outer >= LOOP_DEPTH_MAX {
             return ItemRef::NONE;
         }
-        if !has(RunExtra::LoopScoped) && analysis_count(design) > 0 {
+        if !has(RunExtra::LoopScoped) && !design.analyses.is_empty() {
             return ItemRef::NONE;
         }
         let ends: Vec<LoopEnd> = [
@@ -233,8 +231,32 @@ impl RowFacts for Loop {
             detail,
             body,
         };
-        // The kernel's generator fills the body (M4).
-        b.push_scoped(scope, ScopeKind::Loop, row, Span::NONE).0
+        let (item, body) = b.push_scoped(scope, ScopeKind::Loop, row, Span::NONE);
+        // The kernel's generator fills the body (M4). A sweep over one operating point
+        // (`LoopOverOp`) needs its body to start with an `Op`: put it there half the time, so
+        // the kind does not hang on the kernel picking it (the fill may still add items after).
+        let d = b.design();
+        let op_ok = features.contains(Feature::Item(ItemKind::Analysis))
+            && features.contains(Feature::Analysis(AnalysisKind::Op))
+            && (d.analyses.is_empty() || has(RunExtra::SeveralAnalyses))
+            && (!crate::state_order::nested(d, body) || has(RunExtra::RunItemNested))
+            // as `Analysis::generate`: without `LoopScoped` an analysis is inside every loop
+            && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len());
+        if kind == LoopKind::Sweep
+            && has(RunExtra::LoopOverOp)
+            && op_ok
+            && g.items_left > 1
+            && g.chance(2)
+        {
+            let op = Analysis {
+                kind: AnalysisKind::Op,
+                name: NameId::NONE,
+                detail: u32::MAX,
+            };
+            b.push(body, op, Span::NONE);
+            g.items_left -= 1;
+        }
+        item
     }
 }
 

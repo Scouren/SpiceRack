@@ -9,10 +9,11 @@
 //! its second), `ITerminal` the current entering that terminal from the net. A writer whose
 //! simulator reports the other sign negates or inserts a 0 V probe (9.02).
 //!
-//! There is no `All` kind: each simulator's "all" means another set (ngspice: node voltages and
-//! voltage-source currents; LTspice: also device currents, but no subcircuit-internal node), so
-//! each reader expands its own `all` and its own default save set into the categories it means
-//! (9.03–9.05).
+//! There is no `All` kind: each simulator's "all" means another set (ngspice: every node
+//! voltage at every depth and every element's branch current, `AllV` + `AllBranchI`, A15 R1;
+//! LTspice: also device currents, but no subcircuit-internal node), so each reader expands its
+//! own `all` into the categories it means (9.04, 9.05). What a deck saves when it names nothing
+//! is not stated yet (R29, open until the run side).
 //!
 //! Cites: `rewrite/IR-RUN.md` §4; `rewrite/INV-constructs.md` H1, H3, H12, H13, H23, H25–H27;
 //! `rewrite/INV-semantics.md` 9.01–9.06; `DESIGN-probe-terminals.md` §2–§3.
@@ -105,6 +106,9 @@ pub enum ProbeKind {
     OutputNoise,
     /// The input-referred noise of the noise analysis (`inoise`).
     InputNoise,
+    /// The branch current of every element that has a branch unknown (voltage sources, VCVS,
+    /// CCVS, inductors: ngspice's `all` adds these to every node voltage, A15 R1).
+    AllBranchI,
 }
 
 /// Which part of a complex value a probe reads.
@@ -155,7 +159,7 @@ impl Probe {
 
 impl ProbeKind {
     /// Every kind, in declaration order.
-    pub const ALL: [ProbeKind; 14] = [
+    pub const ALL: [ProbeKind; 15] = [
         ProbeKind::V,
         ProbeKind::Vdiff,
         ProbeKind::I,
@@ -170,6 +174,7 @@ impl ProbeKind {
         ProbeKind::AllPinI,
         ProbeKind::OutputNoise,
         ProbeKind::InputNoise,
+        ProbeKind::AllBranchI,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
@@ -190,7 +195,8 @@ impl ProbeKind {
             | ProbeKind::AllI
             | ProbeKind::AllPinI
             | ProbeKind::OutputNoise
-            | ProbeKind::InputNoise => true,
+            | ProbeKind::InputNoise
+            | ProbeKind::AllBranchI => true,
         }
     }
 }
@@ -243,7 +249,8 @@ pub(crate) fn probe_valid(p: &Probe) -> bool {
         | ProbeKind::AllI
         | ProbeKind::AllPinI
         | ProbeKind::OutputNoise
-        | ProbeKind::InputNoise => (false, false, false, false),
+        | ProbeKind::InputNoise
+        | ProbeKind::AllBranchI => (false, false, false, false),
     };
     let b_ok = if p.kind == ProbeKind::Param {
         fields.1
@@ -256,34 +263,10 @@ pub(crate) fn probe_valid(p: &Probe) -> bool {
 /// Adds the probe's `RunExtra` features.
 pub(crate) fn probe_features(p: &Probe, set: &mut FeatureSet) {
     let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
-    let kind = match p.kind {
-        ProbeKind::V => None,
-        ProbeKind::Vdiff => Some(RunExtra::ProbeVdiff),
-        ProbeKind::I => Some(RunExtra::ProbeI),
-        ProbeKind::ITerminal => Some(RunExtra::ProbeITerminal),
-        ProbeKind::Param => Some(RunExtra::ProbeParam),
-        ProbeKind::Power => Some(RunExtra::ProbePower),
-        ProbeKind::Expr => Some(RunExtra::ProbeExpr),
-        ProbeKind::AllV => Some(RunExtra::ProbeAllV),
-        ProbeKind::AllVTop => Some(RunExtra::ProbeAllVTop),
-        ProbeKind::AllSourceI => Some(RunExtra::ProbeAllSourceI),
-        ProbeKind::AllI => Some(RunExtra::ProbeAllI),
-        ProbeKind::AllPinI => Some(RunExtra::ProbeAllPinI),
-        ProbeKind::OutputNoise | ProbeKind::InputNoise => Some(RunExtra::ProbeNoise),
-    };
-    if let Some(x) = kind {
+    if let Some(x) = kind_feature(p.kind) {
         add(x);
     }
-    let part = match p.part {
-        AcPart::None => None,
-        AcPart::Re => Some(RunExtra::PartRe),
-        AcPart::Im => Some(RunExtra::PartIm),
-        AcPart::Mag => Some(RunExtra::PartMag),
-        AcPart::PhaseDeg => Some(RunExtra::PartPhaseDeg),
-        AcPart::PhaseRad => Some(RunExtra::PartPhaseRad),
-        AcPart::Db => Some(RunExtra::PartDb),
-    };
-    if let Some(x) = part {
+    if let Some(x) = part_feature(p.part) {
         add(x);
     }
     if p.a.len > 1 || (p.kind == ProbeKind::Vdiff && p.b.len > 1) {
@@ -358,26 +341,27 @@ pub(crate) fn gen_probe(
     features: &FeatureSet,
     paths: bool,
 ) -> Probe {
-    let mut kinds = vec![ProbeKind::V];
+    // O(1) per call: the kinds and parts the set allows, read off two small tables.
+    let mut kinds = [ProbeKind::V; ProbeKind::COUNT];
+    let mut n = 1;
     for k in ProbeKind::ALL.into_iter().skip(1) {
-        let mut one = FeatureSet::EMPTY;
-        probe_features(
-            &Probe {
-                kind: k,
-                ..Probe::category(ProbeKind::AllV)
-            },
-            &mut one,
-        );
-        let allowed = one.iter().all(|f| features.contains(f));
+        let allowed = kind_feature(k).is_none_or(|x| features.contains(Feature::Run(x)));
         if allowed && (!paths || matches!(k, ProbeKind::Vdiff | ProbeKind::I)) {
-            kinds.push(k);
+            kinds[n] = k;
+            n += 1;
         }
     }
+    let kinds = &kinds[..n];
     let kind = kinds[g.below(kinds.len() as u32) as usize];
     let path = |g: &mut Gen, b: &mut Builder<'_>| {
         let deep = features.contains(Feature::Run(RunExtra::ProbeHierarchical)) && g.chance(3);
-        let names: Vec<_> = (0..1 + deep as usize).map(|_| g.fresh_name(b)).collect();
-        b.name_ids(&names)
+        let first = g.fresh_name(b);
+        if deep {
+            let second = g.fresh_name(b);
+            b.name_ids(&[first, second])
+        } else {
+            b.name_ids(&[first])
+        }
     };
     let mut p = Probe::category(ProbeKind::AllV);
     p.kind = kind;
@@ -403,24 +387,54 @@ pub(crate) fn gen_probe(
         | ProbeKind::AllI
         | ProbeKind::AllPinI
         | ProbeKind::OutputNoise
-        | ProbeKind::InputNoise => {}
+        | ProbeKind::InputNoise
+        | ProbeKind::AllBranchI => {}
     }
-    let parts: Vec<AcPart> = AcPart::ALL
-        .into_iter()
-        .filter(|&part| {
-            let mut one = FeatureSet::EMPTY;
-            probe_features(
-                &Probe {
-                    part,
-                    ..Probe::category(ProbeKind::AllV)
-                },
-                &mut one,
-            );
-            one.iter()
-                .all(|f| features.contains(f) || f == Feature::Run(RunExtra::ProbeAllV))
-        })
-        .collect();
+    let mut parts = [AcPart::None; AcPart::COUNT];
+    let mut n = 0;
+    for part in AcPart::ALL {
+        if part_feature(part).is_none_or(|x| features.contains(Feature::Run(x))) {
+            parts[n] = part;
+            n += 1;
+        }
+    }
+    let parts = &parts[..n];
     p.part = parts[g.below(parts.len() as u32) as usize];
     debug_assert!(probe_valid(&p));
     p
+}
+
+// ---- private ----
+
+/// The `RunExtra` a probe kind uses, if any (`V` is every target's).
+const fn kind_feature(kind: ProbeKind) -> Option<RunExtra> {
+    match kind {
+        ProbeKind::V => None,
+        ProbeKind::Vdiff => Some(RunExtra::ProbeVdiff),
+        ProbeKind::I => Some(RunExtra::ProbeI),
+        ProbeKind::ITerminal => Some(RunExtra::ProbeITerminal),
+        ProbeKind::Param => Some(RunExtra::ProbeParam),
+        ProbeKind::Power => Some(RunExtra::ProbePower),
+        ProbeKind::Expr => Some(RunExtra::ProbeExpr),
+        ProbeKind::AllV => Some(RunExtra::ProbeAllV),
+        ProbeKind::AllVTop => Some(RunExtra::ProbeAllVTop),
+        ProbeKind::AllSourceI => Some(RunExtra::ProbeAllSourceI),
+        ProbeKind::AllI => Some(RunExtra::ProbeAllI),
+        ProbeKind::AllPinI => Some(RunExtra::ProbeAllPinI),
+        ProbeKind::OutputNoise | ProbeKind::InputNoise => Some(RunExtra::ProbeNoise),
+        ProbeKind::AllBranchI => Some(RunExtra::ProbeAllBranchI),
+    }
+}
+
+/// The `RunExtra` a part uses, if any.
+const fn part_feature(part: AcPart) -> Option<RunExtra> {
+    match part {
+        AcPart::None => None,
+        AcPart::Re => Some(RunExtra::PartRe),
+        AcPart::Im => Some(RunExtra::PartIm),
+        AcPart::Mag => Some(RunExtra::PartMag),
+        AcPart::PhaseDeg => Some(RunExtra::PartPhaseDeg),
+        AcPart::PhaseRad => Some(RunExtra::PartPhaseRad),
+        AcPart::Db => Some(RunExtra::PartDb),
+    }
 }
