@@ -417,25 +417,47 @@ impl Design {
 
 impl Design {
     /// Appends the child ids of `e` to `out` (operands, arguments, list elements), in order.
+    /// Total over any table contents: reads the raw columns and skips a list or a pair that does
+    /// not lie in its pool (`check` reports those), so the kernel's walks never panic on a
+    /// broken design. Does not check that a child is below `e`; the walks do.
     pub(crate) fn children(&self, e: ExprId, out: &mut Vec<ExprId>) {
-        match self.expr(e) {
-            Expr::Call(_, l) | Expr::UserCall(_, l) | Expr::Draw(_, _, _, l) | Expr::List(l) => {
-                out.extend_from_slice(self.exprs(l))
+        let x = &self.exprs;
+        let i = e.index();
+        if i >= x.tags.len() {
+            return;
+        }
+        let (a, b) = (x.a[i], x.b[i]);
+        let pool = &self.expr_pool;
+        let list = |start: u32, len: u32, out: &mut Vec<ExprId>| {
+            let end = start as usize + len as usize;
+            if end <= pool.len() {
+                out.extend_from_slice(&pool[start as usize..end]);
             }
-            Expr::Unary(_, a) => out.push(a),
-            Expr::Binary(_, a, b) => out.extend([a, b]),
-            Expr::Ternary(c, a, b) => out.extend([c, a, b]),
-            Expr::Num(_)
-            | Expr::Str(_)
-            | Expr::Param(_)
-            | Expr::V(..)
-            | Expr::I(_)
-            | Expr::Time
-            | Expr::Temp
-            | Expr::Freq
-            | Expr::TStep
-            | Expr::TStop
-            | Expr::Tnom => {}
+        };
+        match x.tags[i] {
+            ExprTag::Call | ExprTag::Draw | ExprTag::List => list(a, b, out),
+            ExprTag::UserCall => {
+                if let Some(call) = x.calls.get(a as usize) {
+                    list(call.args.start, call.args.len, out);
+                }
+            }
+            ExprTag::Unary => out.push(ExprId(a)),
+            ExprTag::Binary => out.extend([ExprId(a), ExprId(b)]),
+            ExprTag::Ternary => {
+                out.push(ExprId(a));
+                list(b, 2, out);
+            }
+            ExprTag::Num
+            | ExprTag::Str
+            | ExprTag::Param
+            | ExprTag::V
+            | ExprTag::I
+            | ExprTag::Time
+            | ExprTag::Temp
+            | ExprTag::Freq
+            | ExprTag::TStep
+            | ExprTag::TStop
+            | ExprTag::Tnom => {}
         }
     }
 }

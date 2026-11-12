@@ -21,13 +21,18 @@
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
+//! - crate: `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
+//!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
+//!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
 use crate::design::Design;
 use crate::element::ElemKind;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, UnOp};
-use crate::item::ItemKind;
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
+use crate::facts::{Handle, RowFacts};
+use crate::id::{ExprId, ItemRef, NameId, ScopeId};
+use crate::item::{ItemKind, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 use crate::wave::WaveKind;
@@ -106,7 +111,39 @@ pub struct FeatureSet {
     words: [u64; WORDS],
 }
 
+/// A walker over expression trees that visits each row once per walk (shared subtrees are not
+/// re-walked: a DAG's paths can be exponential) and descends only to lower ids that exist, so it
+/// terminates on any table contents. Explicit stack (C11).
+pub(crate) struct ExprWalk {
+    stamp: Vec<u32>,
+    epoch: u32,
+    nodes: Vec<ExprId>,
+    stack: Vec<ExprId>,
+    kids: Vec<ExprId>,
+}
+
 const WORDS: usize = (Feature::COUNT as usize).div_ceil(64);
+/// The member count of each `Feature` group, in declaration order.
+const COUNTS: [usize; 18] = [
+    ItemKind::COUNT,
+    ElemKind::COUNT,
+    WaveKind::COUNT,
+    AnalysisKind::COUNT,
+    ExprTag::COUNT,
+    Func::COUNT,
+    Func::COUNT,
+    BinOp::COUNT,
+    BinOp::COUNT,
+    UnOp::COUNT,
+    UnOp::COUNT,
+    Dist::COUNT,
+    DrawWhen::COUNT,
+    DrawPer::COUNT,
+    Extra::COUNT,
+    CircuitExtra::COUNT,
+    RunExtra::COUNT,
+    OptionKey::COUNT,
+];
 
 impl Feature {
     /// Feature count; indices are `0..COUNT`.
@@ -129,12 +166,65 @@ impl Feature {
     /// The dense index: the variant's offset (the counts of the variants before it, in
     /// declaration order) plus the member's position in its `ALL`.
     pub const fn index(self) -> u16 {
-        todo!()
+        let (group, member) = match self {
+            Feature::Item(m) => (0, m as usize),
+            Feature::Elem(m) => (1, m as usize),
+            Feature::Wave(m) => (2, m as usize),
+            Feature::Analysis(m) => (3, m as usize),
+            Feature::Expr(m) => (4, m as usize),
+            Feature::Func(m) => (5, m as usize),
+            Feature::FuncDyn(m) => (6, m as usize),
+            Feature::Binary(m) => (7, m as usize),
+            Feature::BinaryDyn(m) => (8, m as usize),
+            Feature::Unary(m) => (9, m as usize),
+            Feature::UnaryDyn(m) => (10, m as usize),
+            Feature::Dist(m) => (11, m as usize),
+            Feature::DrawWhen(m) => (12, m as usize),
+            Feature::DrawPer(m) => (13, m as usize),
+            Feature::Extra(m) => (14, m as usize),
+            Feature::Circuit(m) => (15, m as usize),
+            Feature::Run(m) => (16, m as usize),
+            Feature::Option(m) => (17, m as usize),
+        };
+        assert!(
+            member < COUNTS[group],
+            "a member's position lies in its group"
+        );
+        (offset(group) + member) as u16
     }
 
     /// The feature at `index`. Asserts `index < COUNT`.
     pub const fn from_index(index: u16) -> Feature {
-        todo!()
+        assert!(
+            index < Feature::COUNT,
+            "a feature index below Feature::COUNT"
+        );
+        let (mut group, mut i) = (0, index as usize);
+        while i >= COUNTS[group] {
+            i -= COUNTS[group];
+            group += 1;
+        }
+        match group {
+            0 => Feature::Item(ItemKind::ALL[i]),
+            1 => Feature::Elem(ElemKind::ALL[i]),
+            2 => Feature::Wave(WaveKind::ALL[i]),
+            3 => Feature::Analysis(AnalysisKind::ALL[i]),
+            4 => Feature::Expr(ExprTag::ALL[i]),
+            5 => Feature::Func(Func::ALL[i]),
+            6 => Feature::FuncDyn(Func::ALL[i]),
+            7 => Feature::Binary(BinOp::ALL[i]),
+            8 => Feature::BinaryDyn(BinOp::ALL[i]),
+            9 => Feature::Unary(UnOp::ALL[i]),
+            10 => Feature::UnaryDyn(UnOp::ALL[i]),
+            11 => Feature::Dist(Dist::ALL[i]),
+            12 => Feature::DrawWhen(DrawWhen::ALL[i]),
+            13 => Feature::DrawPer(DrawPer::ALL[i]),
+            14 => Feature::Extra(Extra::ALL[i]),
+            15 => Feature::Circuit(CircuitExtra::ALL[i]),
+            16 => Feature::Run(RunExtra::ALL[i]),
+            17 => Feature::Option(OptionKey::ALL[i]),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -160,28 +250,51 @@ impl FeatureSet {
 
     /// This set and `f`.
     pub const fn with(self, f: Feature) -> FeatureSet {
-        todo!()
+        let i = f.index() as usize;
+        let mut words = self.words;
+        words[i / 64] |= 1 << (i % 64);
+        FeatureSet { words }
     }
 
     /// Both sets.
     pub const fn union(self, other: FeatureSet) -> FeatureSet {
-        todo!()
+        let mut words = self.words;
+        let mut k = 0;
+        while k < WORDS {
+            words[k] |= other.words[k];
+            k += 1;
+        }
+        FeatureSet { words }
     }
 
     /// This set without `other`'s members (what a design uses that a target lacks:
     /// `used.minus(target)`).
     pub const fn minus(self, other: FeatureSet) -> FeatureSet {
-        todo!()
+        let mut words = self.words;
+        let mut k = 0;
+        while k < WORDS {
+            words[k] &= !other.words[k];
+            k += 1;
+        }
+        FeatureSet { words }
     }
 
     /// Whether `f` is in the set.
     pub const fn contains(&self, f: Feature) -> bool {
-        todo!()
+        let i = f.index() as usize;
+        self.words[i / 64] >> (i % 64) & 1 == 1
     }
 
     /// Whether the set has no member.
     pub const fn is_empty(&self) -> bool {
-        todo!()
+        let mut k = 0;
+        while k < WORDS {
+            if self.words[k] != 0 {
+                return false;
+            }
+            k += 1;
+        }
+        true
     }
 
     /// The members, in index order.
@@ -200,5 +313,204 @@ impl FeatureSet {
 /// An expression's functions and operators count as `*Dyn` when the expression holds a `V`,
 /// `I`, `Time` or `Freq` leaf.
 pub fn features_used(design: &Design) -> FeatureSet {
-    todo!()
+    let mut set = FeatureSet::EMPTY;
+    let mut walk = ExprWalk::new(design);
+    for (item, scope) in design.reachable() {
+        item_features(design, item, scope, &mut walk, &mut set);
+    }
+    if case_clash(design) {
+        set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
+    set
+}
+
+/// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),
+/// its placement (`Extra`s that depend on the enclosing scopes), and its expressions'.
+pub(crate) fn item_features(
+    design: &Design,
+    item: ItemRef,
+    scope: ScopeId,
+    walk: &mut ExprWalk,
+    set: &mut FeatureSet,
+) {
+    *set = set.with(Feature::Item(item.kind));
+    let mut handles = Vec::new();
+    for_kind!(item.kind, R => {
+        let row: R = design.row(item.index);
+        row.features(design, set);
+        row.handles(design, &mut handles);
+    });
+    let (in_subckt, in_branch) = enclosing(design, scope);
+    let placed = match item.kind {
+        ItemKind::Subckt if in_subckt => Some(Extra::NestedSubckt),
+        ItemKind::Model if in_subckt => Some(Extra::LocalModel),
+        ItemKind::Func if in_subckt => Some(Extra::LocalFunc),
+        ItemKind::Param if in_branch => Some(Extra::ParamInBranch),
+        ItemKind::Load if in_branch => Some(Extra::LoadInBranch),
+        ItemKind::Title
+        | ItemKind::Comment
+        | ItemKind::Include
+        | ItemKind::Global
+        | ItemKind::Load
+        | ItemKind::Opaque
+        | ItemKind::Subckt
+        | ItemKind::Section
+        | ItemKind::If
+        | ItemKind::Param
+        | ItemKind::Func
+        | ItemKind::Model
+        | ItemKind::Statistics
+        | ItemKind::Element
+        | ItemKind::Analysis
+        | ItemKind::Loop
+        | ItemKind::Alter
+        | ItemKind::Option
+        | ItemKind::Env
+        | ItemKind::NodeSet
+        | ItemKind::Save
+        | ItemKind::Print
+        | ItemKind::Measure => None,
+    };
+    if let Some(extra) = placed {
+        *set = set.with(Feature::Extra(extra));
+    }
+    for root in expr_roots(design, &handles) {
+        let nodes = walk.tree(design, root);
+        let dynamic = nodes.iter().any(|&e| {
+            matches!(
+                design.expr(e),
+                Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq
+            )
+        });
+        for &e in nodes {
+            *set = set.with(Feature::Expr(design.expr(e).tag()));
+            let f = match design.expr(e) {
+                Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
+                Expr::Call(func, _) => Feature::Func(func),
+                Expr::Binary(op, ..) if dynamic => Feature::BinaryDyn(op),
+                Expr::Binary(op, ..) => Feature::Binary(op),
+                Expr::Unary(op, _) if dynamic => Feature::UnaryDyn(op),
+                Expr::Unary(op, _) => Feature::Unary(op),
+                Expr::Draw(dist, when, per, _) => {
+                    *set = set
+                        .with(Feature::DrawWhen(when))
+                        .with(Feature::DrawPer(per));
+                    Feature::Dist(dist)
+                }
+                Expr::Num(_)
+                | Expr::Str(_)
+                | Expr::Param(_)
+                | Expr::UserCall(..)
+                | Expr::Ternary(..)
+                | Expr::V(..)
+                | Expr::I(_)
+                | Expr::Time
+                | Expr::Temp
+                | Expr::Freq
+                | Expr::TStep
+                | Expr::TStop
+                | Expr::Tnom
+                | Expr::List(_) => continue,
+            };
+            *set = set.with(f);
+        }
+    }
+}
+
+/// Whether two interned names differ only in ASCII case (a case-folding target merges them).
+pub(crate) fn case_clash(design: &Design) -> bool {
+    let mut seen = std::collections::HashSet::new();
+    (0..design.names.len())
+        .any(|k| !seen.insert(design.names.str(NameId(k as u32)).to_ascii_lowercase()))
+}
+
+impl ExprWalk {
+    /// A walker sized for `design`'s expression rows.
+    pub(crate) fn new(design: &Design) -> ExprWalk {
+        ExprWalk {
+            stamp: vec![0; design.expr_count()],
+            epoch: 0,
+            nodes: Vec::new(),
+            stack: Vec::new(),
+            kids: Vec::new(),
+        }
+    }
+
+    /// Every row of the tree under `root` (each once), root first. An out-of-range root yields
+    /// nothing.
+    pub(crate) fn tree(&mut self, design: &Design, root: ExprId) -> &[ExprId] {
+        self.epoch += 1;
+        self.nodes.clear();
+        self.stack.clear();
+        if root.is_none() || root.index() >= self.stamp.len() {
+            return &self.nodes;
+        }
+        self.stack.push(root);
+        while let Some(e) = self.stack.pop() {
+            if self.stamp[e.index()] == self.epoch {
+                continue;
+            }
+            self.stamp[e.index()] = self.epoch;
+            self.nodes.push(e);
+            self.kids.clear();
+            design.children(e, &mut self.kids);
+            self.stack
+                .extend(self.kids.iter().copied().filter(|k| *k < e));
+        }
+        &self.nodes
+    }
+}
+
+/// The expression roots among a row's handles: value fields, list elements, parameter values.
+/// Out-of-range lists are skipped (`check` reports them).
+pub(crate) fn expr_roots(design: &Design, handles: &[Handle]) -> Vec<ExprId> {
+    let mut roots = Vec::new();
+    for h in handles {
+        match *h {
+            Handle::Expr(e) | Handle::ExprDyn(e) => roots.push(e),
+            Handle::Exprs(l) if l.start as usize + l.len() <= design.expr_pool.len() => {
+                roots.extend_from_slice(design.exprs(l))
+            }
+            Handle::Params(l) if l.start as usize + l.len() <= design.param_pool.len() => {
+                roots.extend(design.params(l).iter().map(|p| p.1))
+            }
+            Handle::Exprs(_)
+            | Handle::Params(_)
+            | Handle::Name(_)
+            | Handle::Ref(_)
+            | Handle::Names(_)
+            | Handle::Scope(_)
+            | Handle::Text(_)
+            | Handle::Branches(_) => {}
+        }
+    }
+    roots
+}
+
+// ---- private ----
+
+/// The index of a group's first feature: the member counts of the groups before it.
+const fn offset(group: usize) -> usize {
+    let (mut sum, mut g) = (0, 0);
+    while g < group {
+        sum += COUNTS[g];
+        g += 1;
+    }
+    sum
+}
+
+/// Whether `scope` lies inside a subcircuit body, and inside an `If` branch (any ancestor).
+fn enclosing(design: &Design, scope: ScopeId) -> (bool, bool) {
+    let (mut sub, mut branch, mut at) = (false, false, scope);
+    // bounded by the scope count; `check` reports a cycle
+    for _ in 0..=design.scopes.len() {
+        if at.is_none() || at.index() >= design.scopes.len() {
+            break;
+        }
+        let s = design.scopes[at.index()];
+        sub |= s.kind == ScopeKind::Subckt;
+        branch |= s.kind == ScopeKind::Branch;
+        at = s.parent;
+    }
+    (sub, branch)
 }

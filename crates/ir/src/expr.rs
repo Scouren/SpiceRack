@@ -48,7 +48,7 @@
 //!   but `Expr`: `ALL`, `COUNT`
 //! - `pub struct Literal`, `Literal::ZERO`, `Literal::value(self) -> f64`,
 //!   `Literal::from_f64(f64) -> Literal`, `Literal::eq_value(self, Literal) -> bool`,
-//!   `Literal::is_valid(self) -> bool`
+//!   `Literal::is_valid(self) -> bool`, crate: `Literal::shape_ok(self) -> bool`
 //! - `Func::arity(self) -> (u8, u8)`, `Func::reads_circuit(self) -> bool`,
 //!   `Dist::arity(self) -> (u8, u8)`, `Expr::tag(self) -> ExprTag`
 //! - `pub(crate) struct Exprs`, `pub(crate) struct UserCall`
@@ -713,15 +713,20 @@ impl Literal {
 
     /// Whether the literal meets every invariant on [`Literal`].
     pub fn is_valid(self) -> bool {
-        let shape = self.mantissa.unsigned_abs() < MANTISSA_BOUND
+        self.shape_ok() && self.value().is_finite()
+    }
+
+    /// Whether the literal meets every invariant but finiteness (`check` reports the two
+    /// separately: `LiteralShape`, `NonFinite`).
+    pub(crate) fn shape_ok(self) -> bool {
+        self.mantissa.unsigned_abs() < MANTISSA_BOUND
             && self.frac <= 18
             && match self.form {
                 NumForm::Plain | NumForm::Mil => self.exp10 == 0,
                 NumForm::Scale => SCALES.contains(&self.exp10),
                 NumForm::Exponent => true,
             }
-            && (self.mantissa != 0 || self == Literal::ZERO);
-        shape && self.value().is_finite()
+            && (self.mantissa != 0 || self == Literal::ZERO)
     }
 }
 
