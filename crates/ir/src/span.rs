@@ -32,6 +32,6 @@ impl Span {
 
     /// Whether the span has no file.
     pub const fn is_none(self) -> bool {
-        todo!()
+        self.file.is_none()
     }
 }

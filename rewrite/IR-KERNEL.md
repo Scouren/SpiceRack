@@ -209,9 +209,19 @@ three meanings, so the node states them: `Expr::Draw(Dist, DrawWhen, DrawPer, Ex
 `DrawPer::{Reference, CallSite, Instance, Run}`. Converting one to another (the two-layer
 parameter idiom, Spectre's `statistics` block) is a pass.
 
+**A9 (2026-11-12): a row's facts take its position.** The bodies showed three things the trait
+above could not say, so its final shape is: `handles(&self, design, out)`; `features(&self,
+design, at: ItemRef, scope: ScopeId, set)`; `check(&self, design, at, scope, out)`; `dump(&self,
+design, at, scope, out)` (with the scope a row writes `name#k` exactly when lookup would bind
+another definition); `map_refs(design: &mut Design, at: ItemRef, f)` as an associated function
+that visits every `Ref` the item owns, in its header, its detail rows and its pools (a sweep's
+target, a `Vary`'s parameter), and stores them back. Features of the whole design (several
+analyses in one deck, an option after a run item) are not a row's: `features_used` calls one
+`design_features(&Design, &mut FeatureSet)` hook per owner. `text.rs` gives owners the writers
+that mirror the `Words` readers (`write_name`, `write_value`, `write_expr`, `write_ref`, …).
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
-`map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind))` (each `Ref` the row holds, with the
-kind it expects). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
+`map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
 done, the IR text parser runs it after the whole text (so a hand-written fixture may name a
 definition that comes later), and a dialect reader never calls it, because a reader binds by its

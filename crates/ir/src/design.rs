@@ -41,7 +41,8 @@
 //!   `Design::expr_count(&self) -> usize`,
 //!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
 //!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
-//!   `Design::eq_meaning(&self, &Design) -> bool`
+//!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
+//!   (crate)
 
 use std::collections::HashMap;
 
@@ -49,15 +50,17 @@ use crate::analysis::{Analysis, RunDetails};
 use crate::build::Builder;
 use crate::edit::Editor;
 use crate::element::{CircuitDetails, Element};
-use crate::expr::{Expr, Exprs, Literal};
+use crate::expr::{
+    BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Exprs, Func as Builtin, Literal, UnOp,
+};
 use crate::facts::RowFacts;
 use crate::id::{
-    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, NameId, NameList, NumId, ParamList,
-    ScopeId, TextId,
+    BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, NumId, ParamList,
+    Ref, ScopeId, TextId,
 };
 use crate::item::{
-    Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Section,
-    Subckt, Title,
+    Branch, Comment, DefKind, Func, Global, If, Include, ItemKind, Load, Opaque, Param, Role,
+    Section, Subckt, Title,
 };
 use crate::model::Model;
 use crate::names::{Names, Texts};
@@ -194,23 +197,63 @@ item_rows! {
 impl Design {
     /// An empty design: no file, the name `0` interned as [`NameId::GROUND`].
     pub fn new() -> Design {
-        todo!()
+        Design {
+            names: Names::new(),
+            texts: Texts::new(),
+            files: Vec::new(),
+            scopes: Vec::new(),
+            scope_items: Vec::new(),
+            defs: Vec::new(),
+            def_index: HashMap::new(),
+            exprs: Exprs::default(),
+            name_pool: Vec::new(),
+            expr_pool: Vec::new(),
+            param_pool: Vec::new(),
+            branch_pool: Vec::new(),
+            titles: Table::new(),
+            comments: Table::new(),
+            includes: Table::new(),
+            globals: Table::new(),
+            loads: Table::new(),
+            opaques: Table::new(),
+            subckts: Table::new(),
+            sections: Table::new(),
+            ifs: Table::new(),
+            params: Table::new(),
+            funcs: Table::new(),
+            models: Table::new(),
+            statistics: Table::new(),
+            elements: Table::new(),
+            analyses: Table::new(),
+            loops: Table::new(),
+            alters: Table::new(),
+            options: Table::new(),
+            envs: Table::new(),
+            node_sets: Table::new(),
+            saves: Table::new(),
+            prints: Table::new(),
+            measures: Table::new(),
+            circuit: CircuitDetails::default(),
+            run: RunDetails::default(),
+        }
     }
 
     /// The append-only door for readers and builders.
     pub fn builder(&mut self) -> Builder<'_> {
-        todo!()
+        Builder { design: self }
     }
 
     /// The door for passes: replace rows and item lists, append through a builder.
     pub fn editor(&mut self) -> Editor<'_> {
-        todo!()
+        Editor { design: self }
     }
 
     /// The file a run starts from: the first `Deck` file, else file 0. Asserts the design has a
     /// file.
     pub fn entry(&self) -> FileId {
-        todo!()
+        assert!(!self.files.is_empty(), "a design with a file has an entry");
+        let deck = self.files.iter().position(|f| f.role == Role::Deck);
+        FileId(deck.unwrap_or(0) as u16)
     }
 
     /// Every file, in id order.
@@ -221,106 +264,179 @@ impl Design {
 
     /// The row of `file`. Asserts it is in range.
     pub fn file(&self, file: FileId) -> File {
-        todo!()
+        assert!(file.index() < self.files.len(), "a file id in range");
+        self.files[file.index()]
     }
 
     /// The row of `scope`. Asserts it is in range.
     pub fn scope(&self, scope: ScopeId) -> Scope {
-        todo!()
+        assert!(scope.index() < self.scopes.len(), "a scope id in range");
+        self.scopes[scope.index()]
     }
 
     /// The items of `scope`, in order (order is meaning: card order is matrix and result order).
     pub fn items(&self, scope: ScopeId) -> &[ItemRef] {
-        todo!()
+        assert!(
+            scope.index() < self.scope_items.len(),
+            "a scope id in range"
+        );
+        &self.scope_items[scope.index()]
     }
 
     /// The row at `index` of `R`'s table. Asserts `index` is in range.
     pub fn row<R: ItemRow>(&self, index: u32) -> R {
-        todo!()
+        R::table(self).get(index)
     }
 
     /// The detail row at `index` of `D`'s table. Asserts `index` is in range. The owners' typed
     /// accessors (`design.passive(&e)`, …) add the header-kind check on top of this.
     pub fn detail<D: DetailRow>(&self, index: u32) -> D {
-        todo!()
+        let rows = D::rows(self);
+        assert!((index as usize) < rows.len(), "a detail index in range");
+        rows[index as usize]
     }
 
     /// The span of any item (one exhaustive dispatch over its kind).
     pub fn span_of(&self, item: ItemRef) -> Span {
-        todo!()
+        for_kind!(item.kind, R => R::table(self).span(item.index))
     }
 
     /// The bytes of a name. Asserts `name` is not `NONE`.
     pub fn str(&self, name: NameId) -> &str {
-        todo!()
+        self.names.str(name)
     }
 
     /// The id of `text` if it is an interned name, else `NONE`. Never interns.
     pub fn find_name(&self, text: &str) -> NameId {
-        todo!()
+        self.names.get(text)
     }
 
     /// The names of a list.
     pub fn names(&self, list: NameList) -> &[NameId] {
-        todo!()
+        slice(&self.name_pool, list.start, list.len)
     }
 
     /// The expressions of a list.
     pub fn exprs(&self, list: ExprList) -> &[ExprId] {
-        todo!()
+        slice(&self.expr_pool, list.start, list.len)
     }
 
     /// The `(name, value)` pairs of a list.
     pub fn params(&self, list: ParamList) -> &[(NameId, ExprId)] {
-        todo!()
+        slice(&self.param_pool, list.start, list.len)
     }
 
     /// The branches of an `If`.
     pub fn branches(&self, list: BranchList) -> &[Branch] {
-        todo!()
+        slice(&self.branch_pool, list.start, list.len)
     }
 
     /// The bytes of a text (`Opaque`, `Comment`, `Title`).
     pub fn text(&self, text: TextId) -> &str {
-        todo!()
+        self.texts.str(text)
     }
 
     /// The expression row `e`, decoded. Asserts `e` is not `NONE`.
     pub fn expr(&self, e: ExprId) -> Expr {
-        todo!()
+        let i = e.index();
+        let x = &self.exprs;
+        assert!(i < x.tags.len(), "an expression id in range");
+        let (sub, a, b) = (x.subs[i] as usize, x.a[i], x.b[i]);
+        let list = List::range(a, b);
+        match x.tags[i] {
+            ExprTag::Num => Expr::Num(NumId(a)),
+            ExprTag::Str => Expr::Str(NameId(a)),
+            ExprTag::Param => Expr::Param(Ref {
+                name: NameId(a),
+                def: DefId(b),
+            }),
+            ExprTag::Call => Expr::Call(Builtin::ALL[sub], list),
+            ExprTag::UserCall => {
+                let call = x.calls[a as usize];
+                Expr::UserCall(call.func, call.args)
+            }
+            ExprTag::Unary => Expr::Unary(UnOp::ALL[sub], ExprId(a)),
+            ExprTag::Binary => Expr::Binary(BinOp::ALL[sub], ExprId(a), ExprId(b)),
+            ExprTag::Ternary => {
+                let pair = slice(&self.expr_pool, b, 2);
+                Expr::Ternary(ExprId(a), pair[0], pair[1])
+            }
+            ExprTag::V => Expr::V(NameId(a), NameId(b)),
+            ExprTag::I => Expr::I(NameId(a)),
+            ExprTag::Time => Expr::Time,
+            ExprTag::Temp => Expr::Temp,
+            ExprTag::Freq => Expr::Freq,
+            ExprTag::TStep => Expr::TStep,
+            ExprTag::TStop => Expr::TStop,
+            ExprTag::Tnom => Expr::Tnom,
+            ExprTag::Draw => Expr::Draw(
+                Dist::ALL[sub & 0xF],
+                DrawWhen::ALL[(sub >> 4) & 1],
+                DrawPer::ALL[(sub >> 5) & 3],
+                list,
+            ),
+            ExprTag::List => Expr::List(list),
+        }
     }
 
     /// The literal of a `Num` expression. Asserts `num` is in range.
     pub fn num(&self, num: NumId) -> Literal {
-        todo!()
+        assert!(num.index() < self.exprs.nums.len(), "a literal id in range");
+        self.exprs.nums[num.index()]
     }
 
     /// Expression row count; ids `0..expr_count()` are valid.
     pub fn expr_count(&self) -> usize {
-        todo!()
+        self.exprs.tags.len()
     }
 
     /// Every definition, in definition order (a kit's model of what it defines).
     pub fn definitions(&self) -> &[Def] {
-        todo!()
+        &self.defs
     }
 
     /// The row of `def`. Asserts it is in range.
     pub fn def(&self, def: DefId) -> Def {
-        todo!()
+        assert!(def.index() < self.defs.len(), "a definition id in range");
+        self.defs[def.index()]
     }
 
     /// Structural equality: every table, pool, list and id equal, literals field by field
     /// (`1k` ≠ `1e3`), spans ignored. The `≅` of law L5 before its case rule.
     pub fn eq_ignoring_spans(&self, other: &Design) -> bool {
-        todo!()
+        self.same(other, |a, b| a == b)
     }
 
     /// As [`Design::eq_ignoring_spans`], but two literals are equal when their exact decimal
     /// values are (`Literal::eq_value`: `1k` = `1e3`). For the differential harness
     /// (REWRITE-PLAN §7.3), which compares meanings across dialects.
     pub fn eq_meaning(&self, other: &Design) -> bool {
-        todo!()
+        self.same(other, Literal::eq_value)
+    }
+}
+
+impl Design {
+    /// Appends the child ids of `e` to `out` (operands, arguments, list elements), in order.
+    pub(crate) fn children(&self, e: ExprId, out: &mut Vec<ExprId>) {
+        match self.expr(e) {
+            Expr::Call(_, l) | Expr::UserCall(_, l) | Expr::Draw(_, _, _, l) | Expr::List(l) => {
+                out.extend_from_slice(self.exprs(l))
+            }
+            Expr::Unary(_, a) => out.push(a),
+            Expr::Binary(_, a, b) => out.extend([a, b]),
+            Expr::Ternary(c, a, b) => out.extend([c, a, b]),
+            Expr::Num(_)
+            | Expr::Str(_)
+            | Expr::Param(_)
+            | Expr::V(..)
+            | Expr::I(_)
+            | Expr::Time
+            | Expr::Temp
+            | Expr::Freq
+            | Expr::TStep
+            | Expr::TStop
+            | Expr::Tnom => {}
+        }
     }
 }
 
@@ -328,4 +444,44 @@ impl Default for Design {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ---- private ----
+
+impl Design {
+    /// Every table equal, spans ignored, literals compared by `num_eq`.
+    fn same(&self, o: &Design, num_eq: fn(Literal, Literal) -> bool) -> bool {
+        let (x, y) = (&self.exprs, &o.exprs);
+        let nums =
+            x.nums.len() == y.nums.len() && x.nums.iter().zip(&y.nums).all(|(a, b)| num_eq(*a, *b));
+        let structure = self.names.bytes == o.names.bytes
+            && self.names.ends == o.names.ends
+            && self.texts == o.texts
+            && self.files == o.files
+            && self.scopes == o.scopes
+            && self.scope_items == o.scope_items
+            && self.defs == o.defs;
+        let exprs =
+            x.tags == y.tags && x.subs == y.subs && x.a == y.a && x.b == y.b && x.calls == y.calls;
+        let pools = self.name_pool == o.name_pool
+            && self.expr_pool == o.expr_pool
+            && self.param_pool == o.param_pool
+            && self.branch_pool == o.branch_pool;
+        let details = self.circuit == o.circuit && self.run == o.run;
+        nums && structure && exprs && pools && details && self.same_rows(o)
+    }
+
+    /// Every item table's rows equal (not their spans).
+    fn same_rows(&self, o: &Design) -> bool {
+        ItemKind::ALL
+            .iter()
+            .all(|&kind| for_kind!(kind, R => R::table(self).rows() == R::table(o).rows()))
+    }
+}
+
+/// `pool[start..start + len]`, asserting the range lies in the pool.
+fn slice<T>(pool: &[T], start: u32, len: u32) -> &[T] {
+    let (start, end) = (start as usize, start as usize + len as usize);
+    assert!(end <= pool.len(), "a list's range lies in its pool");
+    &pool[start..end]
 }
