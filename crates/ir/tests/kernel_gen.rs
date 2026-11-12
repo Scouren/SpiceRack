@@ -299,3 +299,31 @@ fn refs_and_map_refs_list_the_same_references_in_the_same_order() {
         );
     }
 }
+
+#[test]
+fn a_generated_load_names_a_file_of_its_kind() {
+    // A25 (R48): VACASK decides a load's kind by the extension, so the generator draws what a
+    // simulator could mean: `.va` for a Verilog-A source, `.osdi` for a compiled binary
+    let mut seen = [false; 2];
+    for seed in 0..300u64 {
+        let d = generate(seed, &FeatureSet::ALL, SIZE);
+        for (item, _) in d.reachable() {
+            if item.kind != ItemKind::Load {
+                continue;
+            }
+            let row: spicerack_ir::item::Load = d.row(item.index);
+            let path = d.str(row.path);
+            let want = match row.kind {
+                spicerack_ir::LoadKind::VerilogA => ".va",
+                spicerack_ir::LoadKind::Osdi => ".osdi",
+            };
+            assert!(
+                path.ends_with(want),
+                "seed {seed}: {:?} at {path}",
+                row.kind
+            );
+            seen[row.kind as usize] = true;
+        }
+    }
+    assert_eq!(seen, [true; 2], "both kinds generated");
+}

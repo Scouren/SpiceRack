@@ -305,6 +305,23 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.param(top, "p", v, Span::NONE);
             },
         ),
+        (
+            Extra::SubcktConstantParam,
+            |b, top| {
+                let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
+                let one = b.num(1.0);
+                b.param(body, "k", one, Span::NONE);
+            },
+            |b, top| {
+                // a dependent local (it reads the formal) and a constant at the top
+                let one = b.num(1.0);
+                let (_, body) = b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+                let w = b.param_ref("w");
+                b.param(body, "k", w, Span::NONE);
+                let two = b.num(2.0);
+                b.param(top, "c", two, Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         let f = Feature::Extra(extra);
@@ -463,5 +480,13 @@ fn a_temperature_default_is_not_a_constant() {
         let t = b.tnom();
         b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
     });
-    assert!(!tnom.contains(f), "w = $tnom is a constant of the run");
+    assert!(
+        tnom.contains(f),
+        "w = $tnom (A25, VACASK run c3: dependent, reads back as a local)"
+    );
+    let literal = used(|b, top| {
+        let one = b.num(1.0);
+        b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+    });
+    assert!(!literal.contains(f), "a literal default is a constant");
 }

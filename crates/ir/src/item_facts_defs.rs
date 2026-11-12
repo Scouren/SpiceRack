@@ -10,12 +10,12 @@ use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
 use crate::facts::{ExprUse, Handle, RowFacts};
-use crate::feature::FeatureSet;
+use crate::feature::{Extra, Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 use crate::id::{ExprId, ItemRef, Ref, ScopeId};
-use crate::item::{DefKind, Func, Param};
-use crate::item_facts::{distinct, field_domain};
+use crate::item::{DefKind, Func, Param, ScopeKind};
+use crate::item_facts::{distinct, field_domain, reads_dependent};
 use crate::item_text;
 use crate::text::Words;
 use crate::text_expr::Ctx;
@@ -39,8 +39,15 @@ impl RowFacts for Param {
         // no reference field
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
+    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        // A25: a constant local of a subcircuit (VACASK reads it as a formal)
+        let in_body = design.scope(scope).kind == ScopeKind::Subckt;
+        let constant = !reads_dependent(design, self.value)
+            && crate::class::tree_class(design, self.value, crate::class::def_classes(design))
+                == crate::class::ExprClass::Constant;
+        if in_body && constant {
+            *set = set.with(Feature::Extra(Extra::SubcktConstantParam));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {

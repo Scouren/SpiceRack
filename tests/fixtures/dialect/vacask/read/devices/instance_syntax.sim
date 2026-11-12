@@ -1,0 +1,6 @@
+instance syntax
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (a 0) res r=1k
+r1 (b 0) res r=2k
+r2 a 0 res r=1k

@@ -1,0 +1,15 @@
+# Oracle: the `spice/*.va` instance names (`r`, `c`, `l` aliases of the value, `tc1` of `tc`;
+# `temp dtemp tc2 tce scale noisy` themselves; `area` the diode's); VD cir-mfactor (`$mfactor`
+# after the parameters).
+file "elements.sim" deck
+  title "elements"
+  device_library resistor
+  device_library capacitor
+  device_library diode
+  model r resistor
+  model c capacitor
+  model dmod diode
+  element resistor r1 (a 0) model=r mult=2i value=1k tc1=0.01 tc2=0.001 tce=1i temp_abs=77i dtemp=10i scale=2i noisy=false
+  element resistor r2 (a b) model=r params=(w=2u) value=1k
+  element capacitor c1 (b 0) model=c value=1n
+  element diode d1 (b 0) model=dmod area=2i

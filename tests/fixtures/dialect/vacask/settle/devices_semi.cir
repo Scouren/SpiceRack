@@ -1,0 +1,20 @@
+D and M reference (ngspice-45) for devices_semi.sim
+.model dmod d is=1e-14 n=1.05 rs=10 cjo=1p
+.model mn nmos level=1 vto=0.7 kp=100u lambda=0.02 gamma=0.4
+.model mp pmos level=1 vto=-0.7 kp=50u
+vdd vdd 0 dc 5
+vd vd 0 dc 3 ac 1
+rd1 vd d1 10k
+d1 d1 0 dmod area=2
+rm vdd dm1 10k
+vg g1 0 dc 2 ac 1
+m1 dm1 g1 0 0 mn w=10u l=2u
+rp dp1 0 10k
+vgp gp 0 dc 2.5 ac 1
+m2 dp1 gp vdd vdd mp w=20u l=2u m=2
+.options tnom=27 temp=50 reltol=1e-9
+.control
+ac lin 1 1k 1k
+print mag(v(d1)) mag(v(dm1)) mag(v(dp1))
+.endc
+.end

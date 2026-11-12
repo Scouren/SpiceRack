@@ -16,6 +16,13 @@ const DIR: &str = "tests/fixtures/dialect/vacask/write";
 /// The settle decks.
 const SETTLE: &str = "tests/fixtures/dialect/vacask/settle";
 
+/// Settle decks whose round trip fails today, by name, and why. Strict both ways.
+const SETTLE_KNOWN: &[(&str, &str)] = &[
+    // legalize refuses Circuit(ElementWithoutModel) on a behavioural source, a kind that names
+    // no model; ir-circuit's fix (the lead's note on R52) removes it.
+    ("bp1.sim", "ElementWithoutModel on Behav"),
+];
+
 // ---- private ----
 
 /// The entry file of `design` written by VACASK's writer, after `legalize`.
@@ -172,22 +179,49 @@ fn the_settle_decks_run_the_same_after_read_and_write() {
         .filter(|p| p.extension().is_some_and(|e| e == "sim"))
         .collect();
     decks.sort();
+    let mut failing: Vec<String> = Vec::new();
     for deck in decks {
-        let text = std::fs::read_to_string(&deck).unwrap();
+        let name = deck.file_name().unwrap().to_string_lossy().into_owned();
+        if let Err(why) = round_trip(&deck) {
+            eprintln!("{name}: {why}");
+            failing.push(name);
+        }
+    }
+    let known: Vec<&str> = SETTLE_KNOWN.iter().map(|(d, _)| *d).collect();
+    assert_eq!(
+        failing, known,
+        "settle round trips failing, against SETTLE_KNOWN"
+    );
+}
+
+/// One settle deck: VACASK on it and on `write(read(it))` print and write the same, or the
+/// reader refuses a deck VACASK rejects.
+fn round_trip(deck: &Path) -> Result<(), String> {
+    {
+        let text = std::fs::read_to_string(deck).unwrap();
         let (mut design, refused) = read_checked("deck.sim", &text, "vacask");
         let a = vacask(&text);
         if refused {
             // A deck the reader refuses is one VACASK itself rejects.
-            assert!(
-                a.2,
-                "{}: refused, but VACASK reported no error",
-                deck.display()
-            );
-            continue;
+            return match a.2 {
+                true => Ok(()),
+                false => Err("refused, but VACASK reported no error".to_string()),
+            };
         }
-        let again = write_entry(&mut design);
+        let again =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| write_entry(&mut design)))
+                .map_err(|e| {
+                    e.downcast_ref::<String>()
+                        .cloned()
+                        .unwrap_or_else(|| "the writer panicked".to_string())
+                })?;
         let b = vacask(&again);
-        assert_eq!(a.0, b.0, "{}: printed\n{again}", deck.display());
-        assert_eq!(a.1, b.1, "{}: raw files\n{again}", deck.display());
+        if a.0 != b.0 {
+            return Err(format!("printed\n{}\nagainst\n{}\nfor\n{again}", a.0, b.0));
+        }
+        if a.1 != b.1 {
+            return Err(format!("raw files differ for\n{again}"));
+        }
+        Ok(())
     }
 }

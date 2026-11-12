@@ -1,0 +1,5 @@
+models
+load "spice/resistor.osdi"
+load "inductor.osdi"
+model r sp_resistor model_tc1=0.01 rsh=10
+model l inductor
