@@ -249,6 +249,12 @@ fn literal(
     let shift = power.min(frac);
     frac -= shift;
     power -= shift;
+    // more fraction digits than a literal holds (18): the whole fraction moves into the power,
+    // exactly (`0.0027500000000000003` is 27500000000000003 × 10^-19, form Exponent)
+    if frac > 18 {
+        power -= frac;
+        frac = 0;
+    }
     if mantissa == 0 {
         return Some((ir::Literal::ZERO, rounded));
     }
@@ -418,6 +424,20 @@ mod tests {
         assert!(scan("e3", Grammar::Inp).is_none());
         assert!(scan(".", Grammar::Inp).is_none());
         assert!(scan("1e999", Grammar::Inp).is_none());
+    }
+
+    #[test]
+    fn a_fraction_longer_than_a_literal_holds_moves_into_the_exponent_exactly() {
+        // sky130 BSIM4 cards (ng-models' census: 95 of 6616): 19 digits after the point.
+        let s = card("0.0027500000000000003").expect("ngspice reads it");
+        assert_eq!(
+            s.literal,
+            lit(27500000000000003, 0, -19, ir::NumForm::Exponent)
+        );
+        assert_eq!(s.literal.value(), 0.0027500000000000003);
+        let mut out = String::new();
+        spell(s.literal, Grammar::Inp, &mut out);
+        assert_eq!(scan(&out, Grammar::Inp).expect(&out).literal, s.literal);
     }
 
     #[test]
