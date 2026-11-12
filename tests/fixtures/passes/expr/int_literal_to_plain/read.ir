@@ -1,0 +1,7 @@
+file "d.sp" deck
+  param n = 7i
+  param q = n /: 2i
+  func g(x) = x * 1i
+  param s = to_int(@g(3i)) + 4i
+  param t = 5i & 6i
+  param u = to_real(2i) + n

@@ -21,8 +21,8 @@ mod towers;
 use spicerack::ir;
 
 use compare::{
-    ANY, code, keeps_boundary_values, keeps_folded, keeps_generated_values, keeps_values_over,
-    notes, typed,
+    ANY, code, keeps_boundary_values, keeps_every_root_value, keeps_folded, keeps_generated_values,
+    keeps_values_over, notes, typed,
 };
 
 /// Each rule of the powers, roundings and ternaries: its rows, the texts whose roots it
@@ -422,6 +422,26 @@ fn long_literal_to_shortest_keeps_every_value() {
         notes("long_literal_to_shortest", "plain"),
         [code(111), code(111)]
     );
+}
+
+/// Oracle: `eval_typed` by value, never the rule's arithmetic: every root of generated
+/// designs before and after (parameters bound to their definitions, so a literal in a
+/// definition reaches its readers); each root the rule changes in a deck at the boundary set,
+/// `x` and `y` of every tag (its `q` is a typed division the rule must leave: a rule that wrote
+/// its literals Real would change it, and it would be compared); and the notes on the fixture
+/// whose tags are read (a typed division, a body under `to_int`, a bit operator, `to_real`).
+#[test]
+fn int_literal_to_plain_keeps_every_value_and_leaves_what_a_tag_reads() {
+    let changed = keeps_every_root_value("int_literal_to_plain");
+    eprintln!("int_literal_to_plain: {changed} generated roots changed");
+    assert!(
+        changed > 0,
+        "no generated root held an unread integer literal"
+    );
+    let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = x * 3i + y - 2i\n  param s = min(x, 4i) * -y\n  param t = x > 1i ? y : 0i\n  param q = (x * 2i + 1i) /: 3i\n";
+    let points = keeps_boundary_values("int_literal_to_plain", text, ANY);
+    eprintln!("int_literal_to_plain: {points} boundary points");
+    assert_eq!(notes("int_literal_to_plain", "read"), [code(118); 6]);
 }
 
 #[test]

@@ -1,0 +1,7 @@
+file "d.sp" deck
+  param n = 10
+  param a = n * 2 + 1
+  param b = 3 > 2 ? 4 : -5
+  func f(x) = x + 1
+  param c = @f(7)
+  element resistor r1 (a 0) value=(max(2, a))
