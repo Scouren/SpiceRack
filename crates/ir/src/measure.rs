@@ -78,6 +78,10 @@ pub struct Event {
     pub edge: Edge,
     /// `Cross`: the last crossing instead of the `count`-th (`LAST`).
     pub last: bool,
+    /// `Cross`: the first crossing after the analysis's first interval, the one ngspice takes
+    /// when no `RISE`/`FALL`/`CROSS` is given (`com_measure2.c`; an explicit `CROSS=1` counts a
+    /// crossing in that interval, so this is never count 1: R30). `count` is `NONE`.
+    pub skip_initial: bool,
     /// `Cross`: the probe that crosses. Unread otherwise (an `Expr` probe with no expression).
     pub signal: Probe,
     /// `Cross`: the threshold (it may read the circuit: `WHEN v(a)=v(b)`). `At`: the position
@@ -88,6 +92,9 @@ pub struct Event {
     pub count: ExprId,
     /// `Cross`: crossings before this position are not counted (`TD=`), or `NONE`.
     pub delay: ExprId,
+    /// `Cross`: crossings after this position are not searched (ngspice `TO=` on a crossing,
+    /// A15 R2), or `NONE` for the analysis's end.
+    pub until: ExprId,
 }
 
 /// How an [`Event`] is found.
@@ -130,6 +137,10 @@ pub enum Stat {
     Rms,
     /// The integral along the sweep axis (trapezoidal).
     Integ,
+    /// Where on the sweep axis the least value is (ngspice `MIN_AT`).
+    MinAt,
+    /// Where on the sweep axis the greatest value is (ngspice `MAX_AT`).
+    MaxAt,
 }
 
 /// `TrigTarg` detail: `targ`'s position minus `trig`'s.
@@ -186,12 +197,12 @@ pub struct MeasureParam {
     pub value: ExprId,
 }
 
-const _: () = assert!(size_of::<Event>() == 40);
-const _: () = assert!(size_of::<MeasureTrigTarg>() == 80);
-const _: () = assert!(size_of::<MeasureWhen>() == 40);
-const _: () = assert!(size_of::<MeasureFind>() == 64);
-const _: () = assert!(size_of::<MeasureDeriv>() == 64);
-const _: () = assert!(size_of::<MeasureStat>() == 108);
+const _: () = assert!(size_of::<Event>() == 44);
+const _: () = assert!(size_of::<MeasureTrigTarg>() == 88);
+const _: () = assert!(size_of::<MeasureWhen>() == 44);
+const _: () = assert!(size_of::<MeasureFind>() == 68);
+const _: () = assert!(size_of::<MeasureDeriv>() == 68);
+const _: () = assert!(size_of::<MeasureStat>() == 116);
 const _: () = assert!(size_of::<MeasureParam>() == 4);
 
 impl Event {
@@ -211,6 +222,8 @@ impl Event {
         value: ExprId::NONE,
         count: ExprId::NONE,
         delay: ExprId::NONE,
+        until: ExprId::NONE,
+        skip_initial: false,
     };
 
     /// The position `value` on the sweep axis.

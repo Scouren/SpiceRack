@@ -270,11 +270,20 @@ pub enum RunExtra {
     /// An analysis, option or `Env` listed inside a subcircuit or section body (R26: it is
     /// still its deck's).
     RunItemNested,
+    /// A probe of every element's branch current (`ProbeKind::AllBranchI`).
+    ProbeAllBranchI,
+    /// A statistic measure that reports where the extremum is (`Stat::MinAt`, `Stat::MaxAt`).
+    MeasStatAt,
+    /// A measure crossing searched only up to a position (`Event::until`).
+    MeasUntil,
+    /// A measure crossing picked by ngspice's default, skipping the first interval
+    /// (`Event::skip_initial`).
+    MeasSkipInitial,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 124] = [
+    pub const ALL: [RunExtra; 128] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -399,6 +408,10 @@ impl RunExtra {
         RunExtra::NodeSetMidRun,
         RunExtra::WholeRunMidRun,
         RunExtra::RunItemNested,
+        RunExtra::ProbeAllBranchI,
+        RunExtra::MeasStatAt,
+        RunExtra::MeasUntil,
+        RunExtra::MeasSkipInitial,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

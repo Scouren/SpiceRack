@@ -140,6 +140,10 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
     (RunExtra::WholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
     (RunExtra::RunItemNested, "  subckt s ()\n    analysis op", "  if (1)\n    analysis op"),
+    (RunExtra::ProbeAllBranchI, "  save (all_branch_i)", P),
+    (RunExtra::MeasStatAt, "  measure m tran stat min_at (v (a)) (bound) (bound)", "  measure m tran stat min (v (a)) (bound) (bound)"),
+    (RunExtra::MeasUntil, "  measure m tran when (cross rise (v (a)) value=1 count=1 until=1u)", MW),
+    (RunExtra::MeasSkipInitial, "  measure m tran when (cross rise skip_initial (v (a)) value=1)", MW),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";

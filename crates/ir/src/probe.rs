@@ -9,10 +9,11 @@
 //! its second), `ITerminal` the current entering that terminal from the net. A writer whose
 //! simulator reports the other sign negates or inserts a 0 V probe (9.02).
 //!
-//! There is no `All` kind: each simulator's "all" means another set (ngspice: node voltages and
-//! voltage-source currents; LTspice: also device currents, but no subcircuit-internal node), so
-//! each reader expands its own `all` and its own default save set into the categories it means
-//! (9.03–9.05).
+//! There is no `All` kind: each simulator's "all" means another set (ngspice: every node
+//! voltage at every depth and every element's branch current, `AllV` + `AllBranchI`, A15 R1;
+//! LTspice: also device currents, but no subcircuit-internal node), so each reader expands its
+//! own `all` into the categories it means (9.04, 9.05). What a deck saves when it names nothing
+//! is not stated yet (R29, open until the run side).
 //!
 //! Cites: `rewrite/IR-RUN.md` §4; `rewrite/INV-constructs.md` H1, H3, H12, H13, H23, H25–H27;
 //! `rewrite/INV-semantics.md` 9.01–9.06; `DESIGN-probe-terminals.md` §2–§3.
@@ -105,6 +106,9 @@ pub enum ProbeKind {
     OutputNoise,
     /// The input-referred noise of the noise analysis (`inoise`).
     InputNoise,
+    /// The branch current of every element that has a branch unknown (voltage sources, VCVS,
+    /// CCVS, inductors: ngspice's `all` adds these to every node voltage, A15 R1).
+    AllBranchI,
 }
 
 /// Which part of a complex value a probe reads.
@@ -155,7 +159,7 @@ impl Probe {
 
 impl ProbeKind {
     /// Every kind, in declaration order.
-    pub const ALL: [ProbeKind; 14] = [
+    pub const ALL: [ProbeKind; 15] = [
         ProbeKind::V,
         ProbeKind::Vdiff,
         ProbeKind::I,
@@ -170,6 +174,7 @@ impl ProbeKind {
         ProbeKind::AllPinI,
         ProbeKind::OutputNoise,
         ProbeKind::InputNoise,
+        ProbeKind::AllBranchI,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
@@ -190,7 +195,8 @@ impl ProbeKind {
             | ProbeKind::AllI
             | ProbeKind::AllPinI
             | ProbeKind::OutputNoise
-            | ProbeKind::InputNoise => true,
+            | ProbeKind::InputNoise
+            | ProbeKind::AllBranchI => true,
         }
     }
 }
@@ -243,7 +249,8 @@ pub(crate) fn probe_valid(p: &Probe) -> bool {
         | ProbeKind::AllI
         | ProbeKind::AllPinI
         | ProbeKind::OutputNoise
-        | ProbeKind::InputNoise => (false, false, false, false),
+        | ProbeKind::InputNoise
+        | ProbeKind::AllBranchI => (false, false, false, false),
     };
     let b_ok = if p.kind == ProbeKind::Param {
         fields.1
@@ -270,6 +277,7 @@ pub(crate) fn probe_features(p: &Probe, set: &mut FeatureSet) {
         ProbeKind::AllI => Some(RunExtra::ProbeAllI),
         ProbeKind::AllPinI => Some(RunExtra::ProbeAllPinI),
         ProbeKind::OutputNoise | ProbeKind::InputNoise => Some(RunExtra::ProbeNoise),
+        ProbeKind::AllBranchI => Some(RunExtra::ProbeAllBranchI),
     };
     if let Some(x) = kind {
         add(x);
@@ -403,7 +411,8 @@ pub(crate) fn gen_probe(
         | ProbeKind::AllI
         | ProbeKind::AllPinI
         | ProbeKind::OutputNoise
-        | ProbeKind::InputNoise => {}
+        | ProbeKind::InputNoise
+        | ProbeKind::AllBranchI => {}
     }
     let parts: Vec<AcPart> = AcPart::ALL
         .into_iter()

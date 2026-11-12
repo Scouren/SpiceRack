@@ -232,7 +232,7 @@ fn loops_alters_and_state() {
 fn outputs_measures_and_statistics() {
     let text = "file \"t.sp\" deck
   save (v (out)) (i mag (v1))
-  save analysis=tran (all_v) (i_terminal terminal=2 (m1)) (param (m1) (gm)) (power (r1)) (expr expr=(v(a) * 2))
+  save analysis=tran (all_v) (all_branch_i) (i_terminal terminal=2 (m1)) (param (m1) (gm)) (power (r1)) (expr expr=(v(a) * 2))
   print hb hb_time (v (out))
   measure tdel tran trig_targ (cross rise (v (in)) value=0.5 count=1) (cross fall last (v (out)) value=0.5 delay=1n)
   measure tw tran when (cross cross (v (a)) value=(v(b)) count=2)
@@ -240,6 +240,8 @@ fn outputs_measures_and_statistics() {
   measure d1 tran deriv (v (out)) (at value=1u)
   measure a1 tran stat avg (v (out)) (bound) (at value=1u)
   measure p1 tran param value=(tdel * 2)
+  measure s1 tran stat max_at (v (out)) (bound) (bound)
+  measure w2 tran when (cross rise skip_initial (v (a)) value=0.5 until=1u)
   statistics process (vth gauss spread=1m) (tox unif percent mean=1n spread=10) mismatch (vth log_normal spread=1m) process_correlate (vth tox cc=0.5) truncate=4
 ";
     case(text, |b, top| {
@@ -249,6 +251,7 @@ fn outputs_measures_and_statistics() {
         ];
         b.save(top, None, &p, Span::NONE);
         let all = Probe::category(spicerack_ir::ProbeKind::AllV);
+        let branches = Probe::category(spicerack_ir::ProbeKind::AllBranchI);
         let it = b.probe_terminal(&["m1"], 2);
         let pp = b.probe_param(&["m1"], "gm");
         let pw = b.probe_power(&["r1"]);
@@ -259,7 +262,7 @@ fn outputs_measures_and_statistics() {
         b.save(
             top,
             Some(AnalysisKind::Tran),
-            &[all, it, pp, pw, pe],
+            &[all, branches, it, pp, pw, pe],
             Span::NONE,
         );
         let o = b.probe_v(&["out"]);
@@ -335,6 +338,30 @@ fn outputs_measures_and_statistics() {
             "p1",
             AnalysisKind::Tran,
             MeasureParam { value },
+            Span::NONE,
+        );
+        b.name("s1");
+        let signal = b.probe_v(&["out"]);
+        let row = MeasureStat {
+            stat: Stat::MaxAt,
+            signal,
+            from: Event::BOUND,
+            to: Event::BOUND,
+        };
+        b.measure(top, "s1", AnalysisKind::Tran, row, Span::NONE);
+        b.name("w2");
+        let a = b.probe_v(&["a"]);
+        let (h, u) = (n(b, "0.5"), n(b, "1u"));
+        let at = Event {
+            skip_initial: true,
+            until: u,
+            ..Event::cross(a, Edge::Rise, h, NO)
+        };
+        b.measure(
+            top,
+            "w2",
+            AnalysisKind::Tran,
+            MeasureWhen { at },
             Span::NONE,
         );
         let vth = Ref::unresolved(b.name("vth"));

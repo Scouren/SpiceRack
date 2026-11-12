@@ -169,6 +169,12 @@ const BROKEN: &[Fixture] = &[
         let at = Event::cross(sig, Edge::Rise, v, NO);
         b.measure(s, "m", AnalysisKind::Tran, MeasureWhen { at }, Span::NONE);
     }),
+    ("crossing picked both by default and by count", Violation::FieldDomain, |b, s| {
+        let sig = b.probe_v(&["a"]);
+        let (v, c) = (b.num(1.0), b.num(1.0));
+        let at = Event { skip_initial: true, ..Event::cross(sig, Edge::Rise, v, c) };
+        b.measure(s, "m", AnalysisKind::Tran, MeasureWhen { at }, Span::NONE);
+    }),
     ("param measure without a value", Violation::FieldDomain, |b, s| {
         let i = b.detail(MeasureParam { value: NO });
         let name = b.name("m");
