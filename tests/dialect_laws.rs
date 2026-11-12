@@ -41,18 +41,11 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
-const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "l5",
-        "ngspice",
-        "R28 against L5: numparam reads `mil` as milli, so a Mil literal in a numparam expression is respelled exactly in exponent form (5128.59mil -> 1302661.86e-7, seed 0): the same number, another form, and L5 compares forms; for the lead to rule",
-    ),
-    (
-        "l7",
-        "ngspice",
-        "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
-    ),
-];
+const KNOWN: &[(&str, &str, &str)] = &[(
+    "l7",
+    "ngspice",
+    "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
+)];
 
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;

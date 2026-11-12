@@ -40,6 +40,8 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     // a head default may read a parameter (A12 K2)
     Feature::Extra(Extra::EnclosingRef),
     Feature::Extra(Extra::FormalNotConstant),
+    // a `.param` in a `.subckt` body is that body's local, constant or not (A25, R48)
+    Feature::Extra(Extra::SubcktConstantParam),
 ])
 // where ngspice reads each structure item (runs under the S3.0 report's `runs/` decks): a
 // subcircuit holds everything but a `.lib` section (`.func`, `.include`, `.global`, `.param`,

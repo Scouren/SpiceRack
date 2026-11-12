@@ -23,6 +23,9 @@ use spicerack::ir;
 /// The read fixtures, by name.
 const READ: &[&str] = &[
     "default_self",
+    "default_which",
+    "default_which2",
+    "default_which3",
     "element_twice",
     "expr_ops",
     "expr_power",
@@ -125,6 +128,29 @@ fn written_expressions_run_on_ngspice_to_the_original_values() {
             "v(n{}) = {v}, want {w}",
             k + 1
         );
+    }
+}
+
+#[test]
+fn formal_defaults_run_where_the_instance_stands() {
+    // Oracle: ngspice-45 on the deck as written (R53: a head default reads its sibling formals,
+    // any other name where the instance stands); the written deck must print the same.
+    let probe = "i1 0 n1 1m\n.control\nop\nprint v(n1)\n.endc\n.end\n";
+    for (name, want) in [
+        ("default_which", 3.0),
+        ("default_which2", 3.0),
+        ("default_which3", 6.0),
+    ] {
+        let deck = text("read", name, "sp");
+        let original = ngspice_op(&format!("{deck}{probe}"), 1)[0];
+        assert_eq!(original, want, "{name}: the run its header records");
+        let (design, _) = read_deck(&format!("{name}.sp"), &deck);
+        let written = write_entry(&design);
+        let body = written
+            .strip_suffix(".end\n")
+            .expect("a deck ends with .end");
+        let again = ngspice_op(&format!("{body}{probe}"), 1)[0];
+        assert_eq!(again, original, "{name}:\n{written}");
     }
 }
 

@@ -22,7 +22,7 @@
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
-//! class, subckt_formals, refer, pending, rescope, rescope_name, measure_reads, include_path}`; the CST reads are `cst.rs`
+//! class, subckt_formals, refer, pending, rescope, unqueue_reads, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use std::collections::HashSet;
 
@@ -425,20 +425,23 @@ impl<'a, 'd> Lower<'a, 'd> {
         }
     }
 
-    /// Makes the parameter reads of `name` queued in `from..to` bind from `scope`: a head
-    /// default's read of its own name is the enclosing scope's (ngspice runs outer.cir,
-    /// selfplus.cir: `t={t*2}` reads the outer `t`).
-    pub(super) fn rescope_name(&mut self, from: usize, to: usize, name: &str, scope: ir::ScopeId) {
+    /// Takes the parameter reads queued in `from..to` whose name is not in `keep` out of the bind
+    /// step: they stay unbound names (R53: a head default's read of anything but a sibling
+    /// formal is looked up from each instance's scope; runs which.cir, which2.cir, which3.cir).
+    pub(super) fn unqueue_reads(&mut self, from: usize, to: usize, keep: &[String]) {
         assert!(
             from <= to && to <= self.pending.len(),
-            "rescope_name: marks from before"
+            "unqueue_reads: marks from before"
         );
-        for p in &mut self.pending[from..to] {
-            let own = matches!(self.b.design().expr(p.0), ir::Expr::Param(r) if self.b.design().str(r.name) == name);
-            if own {
-                p.1 = scope;
-            }
-        }
+        let design = self.b.design();
+        let kept = |e: ir::ExprId| match design.expr(e) {
+            ir::Expr::Param(r) => keep.iter().any(|k| k == design.str(r.name)),
+            _ => true,
+        };
+        let tail = self.pending.split_off(to);
+        let range = self.pending.split_off(from);
+        self.pending.extend(range.into_iter().filter(|p| kept(p.0)));
+        self.pending.extend(tail);
     }
 
     /// The path an include names, as the design's file table names it: resolved against this

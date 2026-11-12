@@ -108,23 +108,24 @@ pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
     let name = lw.names.fold(&head.name);
     let mut params = Vec::new();
-    let mut marks = vec![lw.pending()];
-    for ((key, _), tree) in head.params.iter().zip(&trees) {
+    let keys: Vec<String> = head.params.iter().map(|(k, _)| lw.names.fold(k)).collect();
+    let mark = lw.pending();
+    for (k, tree) in trees.iter().enumerate() {
+        let from = lw.pending();
         let e = lw.expr(st, tree, st.scope);
-        params.push((lw.names.fold(key), e));
-        marks.push(lw.pending());
+        // R53: a sibling formal is the formal; any other name is read where the instance stands
+        let mut siblings = keys.clone();
+        siblings.remove(k);
+        let to = lw.pending();
+        lw.unqueue_reads(from, to, &siblings);
+        params.push((keys[k].clone(), e));
     }
-    let mark = marks[0];
     let ports: Vec<&str> = ports.iter().map(String::as_str).collect();
     let params: Vec<(&str, ir::ExprId)> = params.iter().map(|(k, e)| (k.as_str(), *e)).collect();
     let span = lw.span(st.node);
     let (_, body) = lw.b.subckt(st.scope, &name, &ports, &params, span);
-    // a head default reads from the subcircuit's body (IR-KERNEL A10), its own name from the
-    // enclosing scope (runs outer.cir, selfplus.cir)
+    // a head default's sibling reads bind in the subcircuit's body (A10, R53)
     lw.rescope(mark, body);
-    for (k, (key, _)) in params.iter().enumerate() {
-        lw.rescope_name(marks[k], marks[k + 1], key, st.scope);
-    }
     open_body(lw, st, body);
 }
 
