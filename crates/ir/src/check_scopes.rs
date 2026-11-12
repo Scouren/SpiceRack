@@ -5,7 +5,8 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §9, C5; `rewrite/AMEND-A12.md` A28.
 //!
-//! Contents: crate: `pub(crate) fn files_and_scopes(&mut Out<'_>)`
+//! Contents: crate: `pub(crate) fn files_and_scopes(&mut Out<'_>)`,
+//! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`
 
 use std::collections::HashSet;
 
@@ -70,11 +71,9 @@ pub(crate) fn files_and_scopes(out: &mut Out<'_>) {
     }
 }
 
-// ---- private ----
-
 /// Which scopes are live: a file's top, and the body of an item listed in a live scope. Explicit
 /// worklist bounded by the scope count; out-of-range handles are skipped (they are reported).
-fn live_scopes(d: &Design) -> Vec<bool> {
+pub(crate) fn live_scopes(d: &Design) -> Vec<bool> {
     let n = d.scopes.len();
     let mut bodies: std::collections::HashMap<ItemRef, Vec<usize>> =
         std::collections::HashMap::new();
@@ -106,6 +105,38 @@ fn live_scopes(d: &Design) -> Vec<bool> {
     }
     live
 }
+
+/// `StaleDefinition` for each index entry in a live scope whose definition's item no live scope
+/// lists (round 7b: a pass that bypassed `Editor::remove_item` or `move_item`), in definition
+/// order.
+pub(crate) fn stale_definitions(out: &mut Out<'_>) {
+    let d = out.design;
+    let live = live_scopes(d);
+    let listed: HashSet<ItemRef> = d
+        .scope_items
+        .iter()
+        .enumerate()
+        .filter(|(k, _)| live[*k])
+        .flat_map(|(_, items)| items.iter().copied())
+        .collect();
+    let mut stale: Vec<u32> = d
+        .def_index
+        .iter()
+        .filter(|((scope, ..), def)| {
+            scope.index() < live.len()
+                && live[scope.index()]
+                && def.index() < d.defs.len()
+                && !listed.contains(&d.defs[def.index()].item)
+        })
+        .map(|(_, def)| def.0)
+        .collect();
+    stale.sort_unstable();
+    for k in stale {
+        out.report(Violation::StaleDefinition, ItemRef::NONE, k);
+    }
+}
+
+// ---- private ----
 
 /// Whether the parent chain of a valid-ranged scope ends at a file scope with no parent, owner
 /// `NONE` and its file's top, without a cycle.

@@ -297,7 +297,9 @@ pub enum Func {
     Ramp,
     /// `d x / dt`, the time derivative. Reads the circuit (only in an expression that may).
     Ddt,
-    /// `∫₀ᵗ x dt`, from 0 at `t = 0`. Reads the circuit.
+    /// `ic + ∫₀ᵗ x dt`: `idt(x)` starts from 0, `idt(x, ic)` from `ic` (A28, VACASK run bp3); the
+    /// operating point reads `ic`. One row per meaning: a literal 0 initial value is the absent
+    /// one, and `check` refuses it (`LiteralShape`). Reads the circuit.
     Idt,
     /// `pwl(x, x₁, y₁, …, xₙ, yₙ)`: linear interpolation in `x` through the points (`xᵢ`
     /// strictly increasing, `n >= 1`), held constant beyond the ends (the neutral `table`).
@@ -561,7 +563,6 @@ impl Func {
             | Func::Sqr
             | Func::Ramp
             | Func::Ddt
-            | Func::Idt
             | Func::ToInt
             | Func::SgnZeroPos
             | Func::ToReal => (1, 1),
@@ -574,6 +575,7 @@ impl Func {
             | Func::Atan2
             | Func::Hypot
             | Func::Fmod => (2, 2),
+            Func::Idt => (1, 2),
             Func::Clamp => (3, 3),
             Func::Pwl => (3, u8::MAX),
         }

@@ -240,7 +240,14 @@ holds, `name?` for an unresolved reference the lookup would bind, `name#k` other
 
 **A10 (2026-11-12): a subcircuit's head defaults are looked up from its body.** The neutral lookup
 scope of a `Subckt` row's expressions is its body scope, not the scope that lists it, so
-`r=rval w=(2*r)` binds `r` to the sibling head parameter and then looks outward. `link`, the
+`r=rval w=(2*r)` binds `r` to the sibling head parameter and then looks outward. Amended by
+A29 (R53): a read in a formal's default binds to a sibling formal of that name (declared earlier
+or later), never to the formal itself; any other read is either bound to the definition visible
+from where the subcircuit is defined (a dialect that evaluates defaults there; `link`'s neutral
+rule) or left unbound (a dialect that evaluates them where the instance stands: ngspice), and an
+unbound read in a default is looked up, by name, from the scope of each instance that omits the
+actual. An unbound read in a default makes the formal `FormalNotConstant`. A cycle among
+defaults is `DefinitionCycle`. `link`, the
 writer's bare-or-`#k` test and `parse` (through `link`) use the body for that row; every other row
 keeps its listing scope. Why: ngspice sorts head parameters by dependency, HSPICE and Spectre read
 them in the body, and a lookup from the parent would dump the common case as `r#k`.
@@ -416,6 +423,47 @@ only: a file's top and the bodies of items listed in a live scope, so a body a p
 dead, not wrong. The generator builds a function body from operators its set allows in both
 forms. Property (`form_tests`): inlining every call adds no feature, whenever no inlined call
 drops an argument of class `Temp` or above (one that does changes its caller's form).
+
+**A28 (2026-11-12): a definition cycle is its own violation.** `Violation::DefinitionCycle`
+(X0017): parameter or function definitions that read one another in a cycle; the smallest is a
+formal's default bound to the formal itself (A29). `check` reports each definition on a cycle
+once, at its item (a definition neither a deps-first nor a readers-first worklist settles,
+`class::cycle_defs`). A definition on or behind a cycle takes the most class its own value and
+what it reads give, so the cycle no longer makes every reader `Circuit` and a `ProbeContext`
+report.
+
+**A28 (2026-11-12): `idt` takes an initial value.** `Func::Idt` takes one or two operands:
+`idt(x)` is `∫₀ᵗ x dt` from 0, `idt(x, ic)` starts from `ic`, and the operating point reads
+`ic` (VACASK run bp3). One row per meaning: a literal 0 initial value is the absent one, and
+`check` refuses it (`LiteralShape`, at the item). The generator draws the one-operand form.
+
+**Round 7 (2026-11-12): `CaseSensitiveNames` per namespace.** Two names of one namespace that
+differ only in ASCII case, a namespace being what a simulator's own lookup separates: the
+definitions of one kind in a scope; the elements of a scope; the nets of a scope (element
+terminals, a subcircuit's ports in its body, the global nets in every scope); the keys of one
+parameter list (a subcircuit's formals included). Live items only. Reported by `check_legal` at
+the item that brings the second spelling (`case::case_clashes`); an element `IS` beside a key or
+parameter `is` is two namespaces and no clash.
+
+**Round 7b (2026-11-12): the passes' doors for definitions and one tree.**
+`Editor::remove_item(scope, item)` unlists an item and takes its definitions out of the index;
+`Editor::move_item(from, item, to, at)` re-lists it and re-keys its definitions and body scopes
+to `to` (one file; the new key free); `Editor::redefine(def, item)` re-points a definition to
+another defining item (a local parameter made a formal); `Editor::rename_def(def, name)` re-keys
+one. References bound to a definition keep its `DefId` through all four. `check` reports
+`StaleDefinition` (X0018) for an index entry in a live scope whose item no live scope lists, and
+for a reference bound to a definition the index does not hold: a pass that drops through
+`Editor::items_mut` fails it. `rewrite_tree(b, root, rule)` rewrites one root with its own memo
+and returns the new root; `Builder::param_ref_to(def)` builds a bound read.
+
+**A32 (2026-11-12): element names used as references.** `RowFacts::map_element_names(design, at,
+f: FnMut(&mut [NameId]))` (default none): each by-name element reference a row holds outside its
+expressions, a single name as a slice of one, a path as its name-pool slice, in field order.
+`Editor::map_element_uses(scope, item, f: FnMut(ElementUse) -> Option<NameId>)` adds the item's
+`Expr::I` reads (root by root, left to right) and resolves each path segment's scope: segment 0
+in the item's listing scope, each next in the body of the master of the instance before it, by
+its old name or else its new one; `ScopeId::NONE` after a non-instance or an unresolved master
+(never guessed). `Design::element_uses()` is the read-only twin over every live item.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

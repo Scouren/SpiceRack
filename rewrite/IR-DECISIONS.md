@@ -424,3 +424,26 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `Loop.name`'s doc: the loop's own name in its dialect (Spectre's or VACASK's statement name, ngspice's `foreach` variable).
 - Oracle: the feature table with a neighbour for each new member, three new `check` rows, the IR text round trip, and builder asserts. The tests were not committed red before the bodies. Instead, with the bodies stubbed out (no reset features, no `from_here` text, a save's mode ignored by the listed-order walk), the feature table, the text test and the walk test each failed on exactly the stubbed members.
 - Reach over 4,000 full-set seeds: every new member is in 1,868 seeds or more. The scaling gate (`throughput -- scaling`) passes: build ratio 4.20 at 4× items, bound 8.
+
+## A28: the definition cycle
+
+- Withdrawn: A11's "what the worklist cannot order is `Circuit`". A definition on or behind a cycle rises to the fixpoint of its direct class and its reads' classes (each class rises at most twice). The cycle itself is `DefinitionCycle`, reported before `ProbeContext` in `check`'s last pass, on an otherwise valid design, since the graph reads definitions through their rows.
+- The cycle test is two worklists over the read graph: a definition that neither settles is on a cycle, or between two (reported too; no generated or corpus design has one). `class.rs`'s graph, `kahn` and `order` are shared by the class table and the cycle test.
+
+## `CaseSensitiveNames` per namespace (ruled)
+
+- Replaces the pool-wide `case_clash`. `case::case_clashes` returns the live items that bring a second spelling; `features_used` sets the feature when there is one, and `check_legal` reports it at each such item, so the two still agree. A net clash against a global net is reported at the item naming the local net (the global's `Global` item is the first spelling's).
+- Nets are what the kernel can name without the owners' rows beyond `Element.terminals`: element terminals, subcircuit ports (in the body), global nets. A net named only in a probe or an analysis (`v(A)` beside a terminal `a`) is not yet in the namespace: no reader has produced one, and adding it means walking every probe.
+
+## Round 7b doors 2 and 3
+
+- `items_mut` stays public; its doc says what it does not maintain (the index), and `StaleDefinition` makes a bypass fail. `remove_item` removes only the item's own definitions from the index: definitions inside its dead body are unreachable by any lookup from a live scope, so `check` (live scopes only) leaves them. `remove_item` scans the definitions table, O(definitions) per call; a pass removing many items pays that per item (a per-item index of definitions, when one does).
+- `move_item` re-parents the item's body scopes and asserts both scopes are in one file (a scope's `file` is not rewritten).
+- `rename_def` leaves bound references' names to the pass (else `RefTarget`).
+
+## A32 applied (the element-name door)
+
+- `map_element_uses` takes the item's listing scope (`(scope, item, f)`, changed from the first proposal before any body): finding it per item would scan every list.
+- Three phases per item: the row's paths are copied (the row's walk holds `&mut Design`), the pass answers each segment with the design readable (`walk_path`), and a second walk stores the names in the same order. A segment after `NONE` is still offered to the pass with `scope: NONE`, so it can note the reference.
+- The drift property A32 asks for ("every use listed resolves, every resolved reference is listed") needs `check` to resolve element references, which it does not today; until the owners' rows land, the tests pin the kernel's `Expr::I` part and the path walk by hand.
+
