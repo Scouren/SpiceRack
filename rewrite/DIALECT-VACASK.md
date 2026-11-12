@@ -360,8 +360,8 @@ VACASK (a candidate feature), or VACASK's own limit.
 | Code | Owner | What it refuses | Class |
 |---|---|---|---|
 | W2105 (subckt half) | S4.1 | an instance whose terminal count is not its subckt's ports | IR invariant (the lead's ruling) |
-| W2203 | S4.2 | a source-like element with instance parameters | IR invariant, to be confirmed by S4.2 |
-| W2006 | S4.0 | `to_real` other than over a parameter read in a behavioural source's expression (in a parameter expression of class Temp: gap (c), deferred by R52) | feature |
+| W2203 | S4.2 | a coupling with a multiplicity (VACASK "Parameter '$mfactor' not found.", ngspice-45 "unknown parameter (m)"); a source-like element with untyped instance parameters (VACASK "Parameter 'foo' not found.", ngspice-45 "unknown parameter (foo)"; Spectre's sources may take some: no run) | IR invariant (`Coupling.mult` NONE); feature, to be settled by the Spectre slice's run |
+| W2006 | S4.0 | `to_real` in a parameter expression of class Temp: R52's deferred gap (c) (the bare read in a behavioural source is A33's `BehavUntypedParam`, which `FEATURES` lacks) | feature |
 | W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp` or `rpar` (ngspice's B has them) | feature |
 | W2108 | S4.1 | an element whose kind is not the one its model's family gives | feature |
 | W2201 | S4.2 | an AM whose modulation offset is not the literal 1 (goes with A31's `AmModOffset`) | feature |

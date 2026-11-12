@@ -19,7 +19,9 @@ use crate::ir;
 
 /// A real conversion VACASK cannot spell: `to_real` anywhere but over a parameter read in a
 /// behavioural source's expression (a passive's value is not one: R52). A bare parameter read
-/// there is `CircuitExtra::BehavUntypedParam`, which `FEATURES` lacks (A33).
+/// there is `CircuitExtra::BehavUntypedParam`, which `FEATURES` lacks (A33); what remains here
+/// is R52's deferred gap (c): `to_real` in a parameter expression of class Temp, which the IR's
+/// dynamic form joins with a circuit-reading field.
 pub(super) const NO_REAL: ir::Code = ir::Code::new(b'W', 2006);
 
 /// An integer literal past 32 bits, which VACASK would wrap (run iw1).
