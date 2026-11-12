@@ -371,6 +371,22 @@ generated item (every kind of all three owners, since round 4), an identity
 rule changes no id, a wrapping rule changes every visited root and no `eval` value, and `check`
 finds nothing after either.
 
+**A18 (2026-11-12): a literal keeps digits its mantissa cannot hold (R37).** `NumForm::Long`: the
+significand as written (`[-]digits[.digits]`) lives in the design's long-literal pool beside the
+literal table; the row (still 16 bytes) holds its pool index in `mantissa`, the power in `exp10`,
+and the form that power was written in (`Plain`, `Exponent`, `Scale`) in `frac`. One bound
+decides long against short, `literal::exceeds_mantissa(significant_digits(..))`: more than 18
+significant digits, leading zeros not counted and trailing zeros as written counted (`0.000123`
+is 3 digits, `1.2300` is 5), the count a short mantissa holds; the lexer, `Builder::long_literal`
+and `check` call it, so no value has two rows. Value: the correctly rounded double of the digits
+(`Design::literal_value`). Equality: exact decimal equality, digits and power after stripping
+zeros, never the doubles (`Design::literal_eq`, and `eq_meaning` through it); an `Int` equals
+only an `Int`; `eq_ignoring_spans` compares the digits as written. The bare row's
+`Literal::value`, `eq_value` and `text::write_literal` assert "not Long", and `is_valid` is
+false for it; every generic caller goes through the design (`literal_value`, `literal_eq`,
+`long_digits`, `text::write_num`). IR text spells the digits as written, then the power in its
+form. `Extra::LongLiteral` marks one; the generator makes them only when the set has it.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

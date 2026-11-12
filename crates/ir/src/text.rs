@@ -115,7 +115,7 @@
 //! Contents: `pub fn dump(&Design, FileId, &mut String)`,
 //! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`), the
 //! writers `Ctx`, `write_expr`, `write_value`, `write_exprs`, `write_names`, `write_params`,
-//! `write_ref`, `write_name`, `write_string`, `write_literal` (re-exported from `text_expr`); crate:
+//! `write_ref`, `write_name`, `write_string`, `write_literal`, `write_num` (re-exported from `text_expr`); crate:
 //! `pub(crate) fn keyword(ItemKind) -> &'static str`
 
 use std::collections::HashMap;
@@ -130,8 +130,8 @@ use crate::item::{DefKind, If, ItemKind, Role};
 use crate::item_text;
 use crate::link::link;
 pub use crate::text_expr::{
-    Ctx, write_expr, write_exprs, write_literal, write_name, write_names, write_params, write_ref,
-    write_string, write_value,
+    Ctx, write_expr, write_exprs, write_literal, write_name, write_names, write_num, write_params,
+    write_ref, write_string, write_value,
 };
 pub use crate::text_words::Words;
 
