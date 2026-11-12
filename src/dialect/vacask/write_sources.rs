@@ -20,7 +20,8 @@ use crate::ir::wave as w;
 
 /// An `Am` whose `mod_offset` is not the literal 1 VACASK's AM means.
 pub(super) const AM_OFFSET: ir::Code = ir::Code::new(b'W', 2201);
-/// A periodic `Pwl` whose join is a jump.
+/// A periodic `Pwl` whose join is a jump (becomes the missing feature `PwlPeriodJump` with
+/// ir-circuit round 5).
 pub(super) const PWL_JUMP: ir::Code = ir::Code::new(b'W', 2202);
 /// A source-like element with instance parameters.
 pub(super) const PARAMS: ir::Code = ir::Code::new(b'W', 2203);
@@ -85,7 +86,6 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             continue;
         }
         let e: ir::Element = design.row(at.index);
-        let span = design.span_of(at);
         let source_like = matches!(
             e.kind,
             K::VSource
@@ -98,11 +98,11 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
                 | K::LosslessLine
         );
         if source_like && !e.params.is_empty() {
-            diags.push(PARAMS, span, 0);
+            diags.push_at(PARAMS, design, at, 0);
         }
         if e.kind == K::Coupling && !e.mult.is_none() {
             // `MultOther` covers lines (VACASK's tline_ideal takes `$mfactor`), not `mutual`.
-            diags.push(PARAMS, span, 0);
+            diags.push_at(PARAMS, design, at, 0);
         }
         if !matches!(e.kind, K::VSource | K::ISource) {
             continue;
@@ -113,10 +113,10 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         }
         match design.wave(s.wave) {
             ir::Wave::Am(am) if !is_default(design, am.mod_offset, "1.") => {
-                diags.push(AM_OFFSET, span, 0);
+                diags.push_at(AM_OFFSET, design, at, 0);
             }
             ir::Wave::Pwl(p) if p.repeat == w::PwlRepeat::Period && p.join == w::PwlJoin::Jump => {
-                diags.push(PWL_JUMP, span, 0);
+                diags.push_at(PWL_JUMP, design, at, 0);
             }
             _ => {}
         }
