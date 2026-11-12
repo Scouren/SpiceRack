@@ -295,9 +295,9 @@ fn a_threshold_reads_the_circuit_through_a_function_or_a_parameter() {
     let has = |lines: &str| features(lines).contains(Feature::Run(RunExtra::MeasCircuitThreshold));
     let when =
         |value: &str| format!("  measure m tran when (cross rise (v (a)) value=({value}) count=1)");
-    assert!(has(&format!("  func f(x) = x * v(b)\n{}", when("f(1)"))));
+    assert!(has(&format!("  func f(x) = x * v(b)\n{}", when("@f(1)"))));
     assert!(has(&format!("  param p = v(b)\n{}", when("p"))));
     // neighbours: a constant function and a constant parameter
-    assert!(!has(&format!("  func f(x) = x * 2\n{}", when("f(1)"))));
+    assert!(!has(&format!("  func f(x) = x * 2\n{}", when("@f(1)"))));
     assert!(!has(&format!("  param p = 2\n{}", when("p"))));
 }
