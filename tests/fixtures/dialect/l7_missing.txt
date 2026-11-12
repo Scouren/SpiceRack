@@ -105,14 +105,10 @@ ngspice Run(TranSegments) unspoken
 ngspice Run(DcRestart) unspoken
 ngspice Run(DcAxisParam) owed from=vacask
 ngspice Run(DcAxisSubcktParam) unspoken
-ngspice Run(DcAxisDeviceParam) owed from=vacask
-ngspice Run(DcAxisModelParam) owed from=vacask
 ngspice Run(DcAxisOption) owed from=vacask
-ngspice Run(SweepDcLinPoints) owed from=vacask
 ngspice Run(SweepDcDec) owed from=vacask
 ngspice Run(SweepDcOct) owed from=vacask
 ngspice Run(SweepDcLog) unspoken
-ngspice Run(SweepDcList) owed from=vacask
 ngspice Run(SweepLoopLinStep) owed from=vacask
 ngspice Run(SweepLoopLinPoints) owed from=vacask
 ngspice Run(SweepLoopDec) owed from=vacask
@@ -120,7 +116,6 @@ ngspice Run(SweepLoopOct) owed from=vacask
 ngspice Run(SweepLoopLog) unspoken
 ngspice Run(SweepFreqLinStep) owed from=vacask
 ngspice Run(SweepFreqLog) unspoken
-ngspice Run(SweepFreqList) owed from=vacask
 ngspice Run(SweepEndOnStop) unspoken
 ngspice Run(SweepCenterSpan) unspoken
 ngspice Run(NoiseAcSweep) unspoken
