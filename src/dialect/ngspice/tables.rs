@@ -19,7 +19,7 @@
 //!
 //! Contents: `pub(super) enum Eval`, `Eval::grammar(self) -> number::Grammar`,
 //! `pub(super) enum Named`, `pub(super) const FUNCS: &[(&str, Named, Eval)]`,
-//! `pub(super) const NO_MEMBER: &[(&str, Eval)]`, `pub(super) const LEAVES: &[&str]`,
+//! `pub(super) const NO_MEMBER: &[(&str, Eval)]`,
 //! `pub(super) const TERNARY: u8`,
 //! `pub(super) fn named(Eval, &str) -> Option<Named>`, `pub(super) fn no_member(Eval, &str) -> bool`,
 //! `pub(super) fn func_spelling(Eval, ir::Func) -> Option<&'static str>`,
@@ -112,6 +112,9 @@ pub(super) const FUNCS: &[(&str, Named, Eval)] = &[
     ("floor", Named::Func(Func::Floor), Eval::Numparam),
     ("floor", Named::Func(Func::Floor), Eval::Behavioural),
     ("uramp", Named::Func(Func::Ramp), Eval::Behavioural),
+    ("u", Named::Func(Func::StepHalf), Eval::Behavioural),
+    ("pwr", Named::Func(Func::PowSigned), Eval::Behavioural),
+    ("sqr", Named::Func(Func::Sqr), Eval::Numparam),
     ("ddt", Named::Func(Func::Ddt), Eval::Behavioural),
     ("u2", Named::Clamp01, Eval::Behavioural),
     ("ternary_fcn", Named::Ternary, Eval::Numparam),
@@ -123,12 +126,10 @@ pub(super) const FUNCS: &[(&str, Named, Eval)] = &[
     ("limit", Named::Draw(Dist::Limit), Eval::Numparam),
 ];
 
-/// Function names ngspice has whose meaning no IR member states: B `u` (0.5 at 0, `PTustep`),
-/// `pwr` (`sgn(x)·|x|^y`, `PTpwr`), `eq0`…`le0`, `pwl`,
-/// `pwl_derivative`; numparam `sqr`. An expression using one is `Unread`.
+/// Function names ngspice has whose meaning no IR member states: B `eq0`…`le0`, `pwl`,
+/// `pwl_derivative`. An expression using one is `Unread`. (B `u`, `pwr` and numparam `sqr` are
+/// `StepHalf`, `PowSigned`, `Sqr`: A11.)
 pub(super) const NO_MEMBER: &[(&str, Eval)] = &[
-    ("u", Eval::Behavioural),
-    ("pwr", Eval::Behavioural),
     ("eq0", Eval::Behavioural),
     ("ne0", Eval::Behavioural),
     ("gt0", Eval::Behavioural),
@@ -137,11 +138,7 @@ pub(super) const NO_MEMBER: &[(&str, Eval)] = &[
     ("le0", Eval::Behavioural),
     ("pwl", Eval::Behavioural),
     ("pwl_derivative", Eval::Behavioural),
-    ("sqr", Eval::Numparam),
 ];
-
-/// The names that make the B-source parser read an expression (with a `v(` or `i(` probe).
-pub(super) const LEAVES: &[&str] = &["time", "temper", "hertz"];
 
 /// The ternary's level in both evaluators: the loosest.
 pub(super) const TERNARY: u8 = 9;

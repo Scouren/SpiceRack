@@ -1,9 +1,7 @@
-# oracle: inpeval.c and xpressn.c parseunit (ngspice's scale letters t g meg k m u n p f a; no c or peta; numparam reads mil as milli)
+# oracle: inpeval.c and xpressn.c parseunit (ngspice's scale letters t g meg k m u n p f a; a centi or peta scale, or mil in numparam, is refused: read_tests.rs)
 file "numbers.sp" deck
   title "numbers"
   param a = 100u
   param b = 0.050000
   param c = 1meg
   param d = 1.5e-3
-  param e = 3c
-  param f = 2mil

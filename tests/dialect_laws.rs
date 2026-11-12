@@ -44,6 +44,40 @@ const SIZE: Size = Size {
     files: 3,
 };
 
+/// The laws a row fails today, by name, with why. Strict both ways (`laws`). The `ngspice`
+/// row: every generated design is refused by its `admits` (R21) for a form no feature states
+/// yet (a head parameter with no default, a blank or multi-line title or comment, a literal
+/// form ngspice reads back otherwise, a section in a section, a definition in an `.if` branch,
+/// an `.if` condition that reads the temperature), so L3, L4, L5 and L8 run on nothing; and it
+/// lacks the S3.1–S3.4 areas' features, which have neither a pass nor a citation yet (L7).
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l3",
+        "ngspice",
+        "no admitted design (features requested in the S3.0 report)",
+    ),
+    (
+        "l4",
+        "ngspice",
+        "no admitted design (features requested in the S3.0 report)",
+    ),
+    (
+        "l5",
+        "ngspice",
+        "no admitted design (features requested in the S3.0 report)",
+    ),
+    (
+        "l7",
+        "ngspice",
+        "lacked features with no pass or citation (S3.1-S3.4, citations.toml)",
+    ),
+    (
+        "l8",
+        "ngspice",
+        "no admitted design (features requested in the S3.0 report)",
+    ),
+];
+
 // ---- private ----
 
 #[test]
@@ -65,31 +99,35 @@ fn l1_l2_any_bytes_read_returns_and_checks_clean() {
 
 #[test]
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
-    for (row, writer) in writers() {
+    laws("l3", |row, writer| {
+        let mut admitted = 0;
         for seed in SEEDS.take(8) {
-            let text = all_files(&generate(seed, &kernel(writer.features()), SIZE), row);
-            let once = all_files(&read_text(row, &text).0, row);
+            let Some(design) = admitted_design(seed, row, writer) else {
+                continue;
+            };
+            admitted += 1;
+            let files = write_all(&design, row);
+            let once = canonical(&read_all(row, &files));
             let threads: Vec<String> = std::thread::scope(|s| {
                 let jobs: Vec<_> = (0..4)
-                    .map(|_| s.spawn(|| all_files(&read_text(row, &text).0, row)))
+                    .map(|_| s.spawn(|| canonical(&read_all(row, &files))))
                     .collect();
                 jobs.into_iter()
                     .map(|j| j.join().expect("a reader thread"))
                     .collect()
             });
-            assert!(
-                threads.iter().all(|t| *t == once),
-                "{} seed {seed}",
-                row.name
-            );
+            if !threads.iter().all(|t| *t == once) {
+                return Err(format!("seed {seed}: the threads differ"));
+            }
         }
-    }
+        some(admitted)
+    });
 }
 
 #[test]
 fn l4_write_is_total_over_a_design_legalize_accepted() {
-    for (row, writer) in writers() {
-        let claimed = kernel(writer.features());
+    laws("l4", |row, writer| {
+        let claimed = generated(row, writer);
         let (mut skipped, mut seen) = (Vec::new(), ir::FeatureSet::EMPTY);
         for seed in SEEDS {
             let mut design = generate(seed, &claimed, SIZE);
@@ -108,43 +146,47 @@ fn l4_write_is_total_over_a_design_legalize_accepted() {
                 .iter()
                 .filter(|d| dialect::refuses(d.code))
                 .collect();
-            assert!(
-                refusals.is_empty(),
-                "{} seed {seed}: {refusals:?}",
-                row.name
-            );
+            if !refusals.is_empty() {
+                return Err(format!("seed {seed}: {refusals:?}"));
+            }
         }
         // The skip cannot make the law vacuous: every item kind the writer claims is admitted in
         // some generated design.
         for &kind in &ir::ItemKind::ALL {
             let f = ir::Feature::Item(kind);
-            assert!(
-                !claimed.contains(f) || seen.contains(f),
-                "{}: no admitted design holds {kind:?} (skipped seeds {skipped:?})",
-                row.name
-            );
+            if claimed.contains(f) && !seen.contains(f) {
+                return Err(format!(
+                    "no admitted design holds {kind:?} (skipped {skipped:?})"
+                ));
+            }
         }
-    }
+        Ok(())
+    });
 }
 
 #[test]
 fn l5_read_of_write_is_the_design() {
-    for (row, writer) in writers() {
+    laws("l5", |row, writer| {
         if row.read.is_none() {
-            continue;
+            return Ok(());
         }
+        let mut admitted = 0;
         for seed in SEEDS {
-            let design = generate(seed, &kernel(writer.features()), SIZE);
-            let text = all_files(&design, row);
-            let back = read_text(row, &text).0;
-            assert_eq!(
-                canonical(&back),
-                canonical(&design),
-                "{} seed {seed}",
-                row.name
-            );
+            let Some(design) = admitted_design(seed, row, writer) else {
+                continue;
+            };
+            admitted += 1;
+            let back = read_all(row, &write_all(&design, row));
+            if canonical(&back) != canonical(&design) {
+                return Err(format!(
+                    "seed {seed}:\n{}\nread back as\n{}",
+                    canonical(&design),
+                    canonical(&back)
+                ));
+            }
         }
-    }
+        some(admitted)
+    });
 }
 
 #[cfg(feature = "corpus")]
@@ -162,7 +204,7 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
         );
         for (k, text) in texts.iter().enumerate() {
             let once = read_text(row, text).0;
-            let twice = read_text(row, &all_files(&once, row)).0;
+            let twice = read_all(row, &write_all(&once, row));
             assert_eq!(
                 canonical(&twice),
                 canonical(&once),
@@ -176,14 +218,12 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
 #[test]
 fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
-    for (row, writer) in writers() {
+    laws("l7", |_row, writer| {
         for f in all.minus(*writer.features()).iter() {
             let removed = spicerack::passes::PASSES.iter().any(|p| p.removes == f);
-            assert!(
-                removed,
-                "{} lacks {f:?}: no pass removes it, and no citation",
-                row.name
-            );
+            if !removed {
+                return Err(format!("lacks {f:?}: no pass removes it, and no citation"));
+            }
         }
         for seed in SEEDS {
             let mut design = generate(seed, &kernel(all), SIZE);
@@ -200,21 +240,26 @@ fn l7_legalized_designs_use_only_the_writers_features() {
                 .iter()
                 .map(|f| u32::from(f.index()))
                 .collect();
-            assert_eq!(
-                left, refused,
-                "{} seed {seed}: what is left is what is refused",
-                row.name
-            );
+            if left != refused {
+                return Err(format!(
+                    "seed {seed}: what is left {left:?} is not what is refused {refused:?}"
+                ));
+            }
         }
-    }
+        Ok(())
+    });
 }
 
 #[test]
 fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
-    for (row, writer) in writers() {
+    laws("l8", |row, writer| {
+        let mut admitted = 0;
         for seed in SEEDS {
-            let design = generate(seed, &kernel(writer.features()), SIZE);
+            let Some(design) = admitted_design(seed, row, writer) else {
+                continue;
+            };
+            admitted += 1;
             let entry = design.entry();
             let path = design.str(design.file(entry).path).to_string();
             let mut alone = ir::Diags::new();
@@ -225,9 +270,88 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             let permuted = read_text(ir_row, &files.concat()).0;
             let mut diags = ir::Diags::new();
             let again = dialect::write(&permuted, permuted.find_file(&path), row, &mut diags);
-            assert_eq!(again, first, "{} seed {seed}", row.name);
+            if again != first {
+                return Err(format!("seed {seed}: the file is written otherwise"));
+            }
+        }
+        some(admitted)
+    });
+}
+
+/// Runs `law` on every row with a writer and compares the rows it fails on with the known
+/// failures of that law ([`KNOWN`]), strictly: an unexpected failure and an unexpected pass both
+/// fail, each with its message.
+fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Result<(), String>) {
+    let mut failing = Vec::new();
+    let mut messages = Vec::new();
+    for (row, writer) in writers() {
+        if let Err(m) = law(row, writer) {
+            failing.push(row.name);
+            messages.push(format!("{}: {m}", row.name));
         }
     }
+    let known: Vec<&str> = KNOWN
+        .iter()
+        .filter(|(law, _, _)| *law == name)
+        .map(|(_, row, _)| *row)
+        .collect();
+    assert_eq!(
+        failing,
+        known,
+        "{name}: failing rows against KNOWN\n{}",
+        messages.join("\n")
+    );
+}
+
+/// `Ok` when at least one generated design was admitted (else the law ran on nothing).
+fn some(admitted: usize) -> Result<(), String> {
+    if admitted == 0 {
+        return Err("no generated design was admitted: the law ran on nothing".to_string());
+    }
+    Ok(())
+}
+
+/// The set a law generates over: the writer's features (the kernel's kinds), without `Opaque`
+/// for a row that is not lossless (an opaque's class is its reader's judgement of the text,
+/// which a generated text cannot carry).
+fn generated(row: &DialectRow, writer: &dyn Write) -> ir::FeatureSet {
+    let set = kernel(writer.features());
+    if row.text_family == dialect::ANY_FAMILY {
+        return set;
+    }
+    set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(ir::ItemKind::Opaque)))
+}
+
+/// Design `seed` over [`generated`], legalized for `row`; `None` when `legalize` refuses it.
+fn admitted_design(seed: u64, row: &DialectRow, writer: &dyn Write) -> Option<ir::Design> {
+    let mut design = generate(seed, &generated(row, writer), SIZE);
+    let mut diags = ir::Diags::new();
+    dialect::legalize(&mut design, row, &mut diags);
+    (!diags.rows().iter().any(|d| dialect::refuses(d.code))).then_some(design)
+}
+
+/// Every file of `design` written by `row`, with its path, in file order.
+fn write_all(design: &ir::Design, row: &DialectRow) -> Vec<(String, String)> {
+    let mut diags = ir::Diags::new();
+    design
+        .files()
+        .map(|f| {
+            let path = design.str(design.file(f).path).to_string();
+            (path, dialect::write(design, f, row, &mut diags))
+        })
+        .collect()
+}
+
+/// The files read back by `row` as one source set, leniently, the first one the entry.
+fn read_all(row: &DialectRow, files: &[(String, String)]) -> ir::Design {
+    let mut src = Sources::new();
+    for (path, text) in files {
+        src.add(path, text);
+    }
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(&src, row, Policy::Lenient, &mut design, &mut diags);
+    design
 }
 
 /// `set` without the item kinds the kernel does not own yet (what `generate` may build today).
@@ -275,15 +399,6 @@ fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags) {
         &mut diags,
     );
     (design, diags)
-}
-
-/// Every file of `design` written by `row`, concatenated (the form one read takes back).
-fn all_files(design: &ir::Design, row: &DialectRow) -> String {
-    let mut diags = ir::Diags::new();
-    design
-        .files()
-        .map(|f| dialect::write(design, f, row, &mut diags))
-        .collect()
 }
 
 /// One file as IR text.

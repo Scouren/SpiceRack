@@ -1,5 +1,5 @@
 //! ngspice expression text → tokens, as the evaluator that reads it lexes it: which evaluator
-//! that is ([`dynamic`]: numparam, unless the text holds `v(`, `i(`, `time`, `temper` or
+//! that is (the declare step's class, `declare.rs`: numparam, unless the text holds `v(`, `i(`, `time`, `temper` or
 //! `hertz`), numbers by that evaluator's grammar (`number.rs`), names by numparam's `fetchid`
 //! (`alfanum` and `.`), probes by `PTlex` (`v(a)`, `v(a,b)`, `i(vname)`, raw arguments), and the
 //! operators each one has (numparam: `%`, `\\`, a single `=`, inner `{…}` as parentheses; B
@@ -10,12 +10,12 @@
 //! 2.24.
 //!
 //! Contents: `pub(super) enum Tok`, `pub(super) enum Op`, `pub(super) const PI: ir::Literal`,
-//! `pub(super) const E: ir::Literal`, `pub(super) fn dynamic(&str) -> bool`,
+//! `pub(super) const E: ir::Literal`, `pub(super) struct Leaves`, `pub(super) fn leaves(&str) -> Leaves`,
 //! `pub(super) fn lex(&str, Eval) -> Result<Vec<Tok>, Fail>`
 
 use super::expr_read::Fail;
 use super::number;
-use super::tables::{self, Eval};
+use super::tables::Eval;
 use crate::ir;
 
 /// A token of an expression.
@@ -54,14 +54,27 @@ pub(super) enum Op {
     Colon,
 }
 
+/// What a text reads by its own spelling ([`leaves`]).
+#[derive(Clone, Debug, Default)]
+pub(super) struct Leaves {
+    /// A probe, `time`, `hertz` or `ddt(`.
+    pub(super) circuit: bool,
+    /// `temper`.
+    pub(super) temp: bool,
+    /// Every other name, and whether it is called.
+    pub(super) names: Vec<(String, bool)>,
+}
+
 /// The literal `pi` and `e` fold to in a B source (`inpptree.c` `constants[]`: M_PI, M_E), to
 /// 18 digits, which read back to those doubles.
 pub(super) const PI: ir::Literal = literal18(314_159_265_358_979_324);
 pub(super) const E: ir::Literal = literal18(271_828_182_845_904_524);
 
-/// `v(`/`i(` probe (any case), outside numbers.
-pub(super) fn dynamic(text: &str) -> bool {
+/// What `text` reads by its own spelling, outside numbers: `v(`/`i(` probes, `time`, `hertz`,
+/// `ddt(` (circuit), `temper`, and every other name (`true`: called as a function).
+pub(super) fn leaves(text: &str) -> Leaves {
     let b = text.as_bytes();
+    let mut out = Leaves::default();
     let mut k = 0;
     // Bounded: every step advances `k`.
     while k < b.len() {
@@ -77,16 +90,18 @@ pub(super) fn dynamic(text: &str) -> bool {
                 k += 1;
             }
             let word = &text[start..k];
-            let open = text[k..].trim_start().starts_with('(');
-            let probe = (word.eq_ignore_ascii_case("v") || word.eq_ignore_ascii_case("i")) && open;
-            if probe || tables::LEAVES.iter().any(|l| l.eq_ignore_ascii_case(word)) {
-                return true;
+            let call = text[k..].trim_start().starts_with('(');
+            let lower = word.to_ascii_lowercase();
+            match (lower.as_str(), call) {
+                ("v" | "i" | "ddt", true) | ("time" | "hertz", false) => out.circuit = true,
+                ("temper", false) => out.temp = true,
+                _ => out.names.push((word.to_string(), call)),
             }
         } else {
             k += 1;
         }
     }
-    false
+    out
 }
 
 /// `text` as tokens under `eval`'s lexer.

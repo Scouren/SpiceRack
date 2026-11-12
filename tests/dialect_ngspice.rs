@@ -11,8 +11,7 @@
 //!   prints for the original (L9; ngspice is the oracle of its own dialect). ngspice comes from
 //!   `nix develop .#testing`; a missing simulator fails.
 //!
-//! Fixture lists are compared by name, never by count. The two tests that parse IR text reach
-//! `ir::parse` (kernel M3) and carry the marker until it lands.
+//! Fixture lists are compared by name, never by count.
 //!
 //! Contents: tests only.
 
@@ -28,6 +27,7 @@ const READ: &[&str] = &[
     "expr_ternary",
     "expr_ternary_deep",
     "func",
+    "funcs_a11",
     "global_gnd",
     "global_ground_only",
     "if_branch_param_refused",
@@ -37,6 +37,7 @@ const READ: &[&str] = &[
     "numbers",
     "param_last_wins",
     "param_reads_circuit",
+    "param_temp_class",
     "subckt_nested",
     "title_comments_end",
 ];
@@ -82,8 +83,6 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
 }
 
 #[test]
-// marker: ir::parse (kernel M3); remove when it lands
-#[should_panic(expected = "not yet implemented")]
 fn each_read_fixture_reads_to_its_ir() {
     for name in READ {
         let (got, _) = read_deck(&format!("{name}.sp"), &text("read", name, "sp"));
@@ -93,8 +92,6 @@ fn each_read_fixture_reads_to_its_ir() {
 }
 
 #[test]
-// marker: ir::parse (kernel M3); remove when it lands
-#[should_panic(expected = "not yet implemented")]
 fn each_write_fixture_writes_to_its_text() {
     for name in WRITE {
         let design = parse_ir(&text("write", name, "ir"));

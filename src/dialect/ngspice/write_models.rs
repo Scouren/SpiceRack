@@ -11,6 +11,7 @@
 //! Cites: `rewrite/DIALECT-NGSPICE.md` §2, §4; `rewrite/S3-AREAS.md`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
+//! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn model(w: &mut Out<'_>, item: ir::ItemRef)`
 
 use super::codes::Row;
@@ -22,6 +23,10 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY;
 
 /// This area's codes, `W1200–W1299`. Empty in the stub.
 pub(super) const CODES: &[Row] = &[];
+
+/// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
+/// (R21, `Write::admits`). Stub: nothing (no item of this area is legal yet).
+pub(super) fn admits(_design: &ir::Design, _item: ir::ItemRef, _diags: &mut ir::Diags) {}
 
 /// A `Model` (stub: unreachable).
 pub(super) fn model(_w: &mut Out<'_>, _item: ir::ItemRef) {

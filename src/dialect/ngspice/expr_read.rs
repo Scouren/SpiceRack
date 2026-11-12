@@ -22,7 +22,7 @@
 //! below; the lexer is `expr_lex.rs`; `rewrite/INV-semantics.md` 2.02–2.06, 2.10–2.14, 2.24, 12.01–12.03.
 //!
 //! Contents: `pub(super) struct Tree`, `pub(super) struct Fail`,
-//! `pub(super) fn parse(text: &str) -> Result<Tree, Fail>`, `Tree::dynamic(&self) -> bool`,
+//! `pub(super) fn parse_in(&str, Eval) -> Result<Tree, Fail>`,
 //! `Tree::rounded(&self) -> bool`, `Fail::invalid() -> Fail`, `Fail::unread() -> Fail`,
 //! `Tree::emit(&self, b, names, scope, pending) -> ir::ExprId`
 
@@ -37,7 +37,6 @@ use crate::ir;
 pub(super) struct Tree {
     nodes: Vec<N>,
     root: usize,
-    eval: Eval,
     rounded: bool,
 }
 
@@ -95,13 +94,9 @@ struct Parser<'t> {
     rounded: bool,
 }
 
-/// The tree of `text` under the evaluator ngspice reads it with, or the reason it has none.
-pub(super) fn parse(text: &str) -> Result<Tree, Fail> {
-    let eval = if expr_lex::dynamic(text) {
-        Eval::Behavioural
-    } else {
-        Eval::Numparam
-    };
+/// The tree of `text` under `eval` (the declare step's choice: a dependence on `temper` or the
+/// circuit through a definition makes it the B-source parser's, R14).
+pub(super) fn parse_in(text: &str, eval: Eval) -> Result<Tree, Fail> {
     let toks = expr_lex::lex(text, eval)?;
     let mut p = Parser {
         eval,
@@ -118,17 +113,11 @@ pub(super) fn parse(text: &str) -> Result<Tree, Fail> {
     Ok(Tree {
         nodes: p.nodes,
         root,
-        eval,
         rounded: p.rounded,
     })
 }
 
 impl Tree {
-    /// Whether the B-source parser read it (it may read the circuit or the temperature).
-    pub(super) fn dynamic(&self) -> bool {
-        self.eval == Eval::Behavioural
-    }
-
     /// Whether a number in it was rounded to 18 significant digits (a note, A3).
     pub(super) fn rounded(&self) -> bool {
         self.rounded

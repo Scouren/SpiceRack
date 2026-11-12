@@ -30,6 +30,7 @@
 
 mod codes;
 mod cst;
+mod declare;
 mod expr_lex;
 mod expr_read;
 mod expr_write;
@@ -109,6 +110,11 @@ impl Write for Ngspice {
     /// [`FEATURES`].
     fn features(&self) -> &'static ir::FeatureSet {
         &FEATURES
+    }
+
+    /// What ngspice cannot spell for a reason no feature states (R21): `write::admits`.
+    fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
+        write::admits(design, diags);
     }
 
     /// One file as ngspice text.

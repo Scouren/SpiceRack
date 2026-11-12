@@ -22,14 +22,13 @@
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, wins,
-//! include_path}`; the CST reads are `cst.rs`
-
-use std::collections::HashMap;
+//! class, pending, rescope, include_path}`; the CST reads are `cst.rs`
 
 use super::codes;
-use super::cst::{body, extent, joined, line, next, unquote};
+use super::cst::{body, extent, joined, line, next, rest, unquote};
+use super::declare::{Class, Declared, declare};
 use super::expr_read::Tree;
-use super::name::{self, Folder};
+use super::name::Folder;
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
 };
@@ -61,7 +60,7 @@ pub(super) struct Lower<'a, 'd> {
     /// Its role.
     pub(super) role: ir::Role,
     pending: &'a mut Vec<(ir::ExprId, ir::ScopeId)>,
-    winners: &'a HashMap<(u32, Def, String), (u32, usize)>,
+    declared: &'a Declared,
     /// Bytes read before the file's own text (1 for a library file).
     shift: u32,
     frames: Vec<Frame<'a>>,
@@ -125,7 +124,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         let toks = tokenize(text, lex);
         let ast = parse(&toks, lex);
         let (file, top) = out.file(path, role);
-        let winners = declare(&ast, &toks);
+        let declared = declare(&ast, &toks);
         let mut lw = Lower {
             b: &mut *out,
             diags: &mut *diags,
@@ -137,7 +136,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             file,
             role,
             pending: &mut pending,
-            winners: &winners,
+            declared: &declared,
             shift,
             frames: Vec::new(),
             framed: false,
@@ -251,15 +250,7 @@ impl<'a, 'd> Lower<'a, 'd> {
 
     /// A statement's head line after its first token, one blank per gap.
     pub(super) fn rest(&self, n: Node) -> String {
-        let (a, b) = line(self.toks, self.ast.main_token(n));
-        let mut out = String::new();
-        for k in a + 1..=b {
-            if k > a + 1 && self.toks.start(k) > self.toks.end(k - 1) {
-                out.push(' ');
-            }
-            out.push_str(self.toks.text(k));
-        }
-        out
+        rest(self.toks, self.ast, n)
     }
 
     /// The lowercased text of a statement's head token (`.param`, `r1`).
@@ -278,8 +269,26 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// Whether the definition `(def, name)` of field `k` of `st` is the one ngspice keeps in
     /// its block (the declare step).
     pub(super) fn wins(&self, st: Stmt, def: Def, name: &str, k: usize) -> bool {
-        let key = (st.container.0, def, name::key(name));
-        self.winners.get(&key) == Some(&(st.node.0, k))
+        self.declared.wins(st.container, def, name, st.node, k)
+    }
+
+    /// The class of `text` read in `block` (R14, `declare.rs`), `formals` shadowing.
+    pub(super) fn class(&self, block: Node, text: &str, formals: &[String]) -> Class {
+        self.declared.class(block, text, formals)
+    }
+
+    /// How many parameter reads and calls wait for the bind step (a mark for [`Lower::rescope`]).
+    pub(super) fn pending(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Makes the reads queued since `mark` bind from `scope` (a head default reads from its
+    /// subcircuit's body, A10).
+    pub(super) fn rescope(&mut self, mark: usize, scope: ir::ScopeId) {
+        assert!(mark <= self.pending.len(), "rescope: a mark from before");
+        for p in &mut self.pending[mark..] {
+            p.1 = scope;
+        }
     }
 
     /// The path an include names, as the design's file table names it: resolved against this
@@ -437,71 +446,6 @@ fn comments(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, from: u32, to: u32) {
         };
         lw.b.comment(scope, text, span);
     }
-}
-
-/// Which definition of each `(block, kind, name)` ngspice keeps: the last `.param` (INV 3.01),
-/// the first of any other kind (the later ones are `Unread`). A `.param` naming its
-/// subcircuit's head parameter keeps none.
-fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> HashMap<(u32, Def, String), (u32, usize)> {
-    let mut win = HashMap::new();
-    let mut stack: Vec<Node> = vec![ast.root()];
-    // Bounded: each block is pushed once.
-    while let Some(container) = stack.pop() {
-        let items: &[u32] = if container == ast.root() {
-            ast.fields(ast.root())
-        } else {
-            body(ast, container)
-        };
-        let head: Vec<String> = if ast.tag(container) == Tag::Subckt {
-            read_structure::head_params(ast, toks, container)
-        } else {
-            Vec::new()
-        };
-        for &s in items {
-            let s = Node(s);
-            let mut put = |def: Def, name: &str, k: usize, last: bool| {
-                let key = (container.0, def, name::key(name));
-                if last || !win.contains_key(&key) {
-                    win.insert(key, (s.0, k));
-                }
-            };
-            match ast.tag(s) {
-                Tag::Param => {
-                    for (k, name) in read_structure::param_names(ast, toks, s) {
-                        let clash = head.iter().any(|h| name::key(h) == name::key(&name));
-                        put(Def::Param, &name, if clash { usize::MAX } else { k }, true);
-                    }
-                }
-                Tag::Func => {
-                    if let Some(name) = read_structure::def_name(ast, toks, s) {
-                        put(Def::Func, &name, 0, false);
-                    }
-                }
-                Tag::Subckt | Tag::Section => {
-                    let def = if ast.tag(s) == Tag::Subckt {
-                        Def::Subckt
-                    } else {
-                        Def::Section
-                    };
-                    if let Some(name) = read_structure::def_name(ast, toks, s) {
-                        put(def, &name, 0, false);
-                    }
-                    stack.push(s);
-                }
-                Tag::If => {
-                    let mut b = Some(s);
-                    // Bounded: a chain's branches are distinct nodes.
-                    for _ in 0..ast.len() {
-                        let Some(at) = b else { break };
-                        stack.push(at);
-                        b = next(ast, at);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    win
 }
 
 /// The bind step: each pending parameter read and user call, still unresolved, bound to the

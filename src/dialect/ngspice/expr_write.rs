@@ -16,7 +16,8 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) fn eval_of(&ir::Design, ir::ExprId) -> Eval`,
 //! `pub(super) fn expr(&ir::Design, ir::ExprId, &mut String)`,
-//! `pub(super) fn value(&ir::Design, ir::ExprId, &mut String)`
+//! `pub(super) fn value(&ir::Design, ir::ExprId, &mut String)`,
+//! `pub(super) fn literals_spell(&ir::Design, ir::ExprId) -> bool`
 
 use super::number;
 use super::tables::{self, Eval};
@@ -68,6 +69,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Func(Func::Ceil),
     Feature::Func(Func::Floor),
     Feature::Func(Func::Fmod),
+    Feature::Func(Func::Sqr),
     Feature::FuncDyn(Func::Abs),
     Feature::FuncDyn(Func::Sqrt),
     Feature::FuncDyn(Func::Exp),
@@ -94,6 +96,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::FuncDyn(Func::Floor),
     Feature::FuncDyn(Func::Ramp),
     Feature::FuncDyn(Func::Ddt),
+    Feature::FuncDyn(Func::StepHalf),
+    Feature::FuncDyn(Func::PowSigned),
     Feature::Binary(BinOp::Add),
     Feature::Binary(BinOp::Sub),
     Feature::Binary(BinOp::Mul),
@@ -163,25 +167,14 @@ struct Pos {
     after_op: bool,
 }
 
-/// The evaluator ngspice reads `e` with: `Behavioural` when the tree holds `v()`, `i()`, `time`,
-/// `temper`, `hertz` or a time derivative or integral.
+/// The evaluator ngspice reads `e` with: `Behavioural` when its class (`ir::expr_class`: it, or
+/// a parameter or function it reads, transitively) is `Temp` or `Circuit` (R14, A11).
 pub(super) fn eval_of(design: &ir::Design, e: ir::ExprId) -> Eval {
-    let mut stack = vec![e];
-    let mut seen = vec![false; design.expr_count()];
-    // Bounded: each row is visited once.
-    while let Some(x) = stack.pop() {
-        if std::mem::replace(&mut seen[x.index()], true) {
-            continue;
-        }
-        match design.expr(x) {
-            ir::Expr::V(..) | ir::Expr::I(_) | ir::Expr::Time | ir::Expr::Temp | ir::Expr::Freq => {
-                return Eval::Behavioural;
-            }
-            ir::Expr::Call(ir::Func::Ddt | ir::Func::Idt, _) => return Eval::Behavioural,
-            other => stack.extend(kids(design, other)),
-        }
+    if ir::expr_class(design, e) >= ir::ExprClass::Temp {
+        Eval::Behavioural
+    } else {
+        Eval::Numparam
     }
-    Eval::Numparam
 }
 
 /// Appends `e` as an expression of its evaluator. Asserts every node is one ngspice spells
@@ -209,6 +202,33 @@ pub(super) fn value(design: &ir::Design, e: ir::ExprId, out: &mut String) {
     if !bare {
         out.push('}');
     }
+}
+
+/// Whether every literal of `e` reads back as itself when spelled in `e`'s evaluator: a scale
+/// ngspice has a letter for, and no `mil` under numparam (which reads it as milli).
+pub(super) fn literals_spell(design: &ir::Design, e: ir::ExprId) -> bool {
+    let numparam = eval_of(design, e) == Eval::Numparam;
+    let mut stack = vec![e];
+    let mut kids = Vec::new();
+    // Bounded: a tree of earlier rows; a shared row is checked once per path, at most the rows.
+    let mut seen = vec![false; design.expr_count()];
+    while let Some(x) = stack.pop() {
+        if std::mem::replace(&mut seen[x.index()], true) {
+            continue;
+        }
+        let row = design.expr(x);
+        if let ir::Expr::Num(n) = row {
+            let lit = design.num(n);
+            let scale_ok = lit.form != ir::NumForm::Scale || ![-2, 15].contains(&lit.exp10);
+            if !scale_ok || (numparam && lit.form == ir::NumForm::Mil) {
+                return false;
+            }
+        }
+        kids.clear();
+        children(design, row, &mut kids);
+        stack.extend_from_slice(&kids);
+    }
+    true
 }
 
 // ---- private ----
@@ -428,15 +448,17 @@ fn pair(d: &ir::Design, args: ir::ExprList) -> (ir::ExprId, ir::ExprId) {
 }
 
 /// The children of a decoded row.
-fn kids(d: &ir::Design, e: ir::Expr) -> Vec<ir::ExprId> {
+fn children(d: &ir::Design, e: ir::Expr, out: &mut Vec<ir::ExprId>) {
     match e {
         ir::Expr::Call(_, l)
         | ir::Expr::UserCall(_, l)
         | ir::Expr::Draw(.., l)
-        | ir::Expr::List(l) => d.exprs(l).to_vec(),
-        ir::Expr::Unary(_, a) => vec![a],
-        ir::Expr::Binary(_, l, r) => vec![l, r],
-        ir::Expr::Ternary(c, t, f) => vec![c, t, f],
+        | ir::Expr::List(l) => {
+            out.extend_from_slice(d.exprs(l));
+        }
+        ir::Expr::Unary(_, a) => out.push(a),
+        ir::Expr::Binary(_, l, r) => out.extend([l, r]),
+        ir::Expr::Ternary(c, t, f) => out.extend([c, t, f]),
         ir::Expr::Num(_)
         | ir::Expr::Str(_)
         | ir::Expr::Param(_)
@@ -447,6 +469,6 @@ fn kids(d: &ir::Design, e: ir::Expr) -> Vec<ir::ExprId> {
         | ir::Expr::Freq
         | ir::Expr::TStep
         | ir::Expr::TStop
-        | ir::Expr::Tnom => Vec::new(),
+        | ir::Expr::Tnom => {}
     }
 }

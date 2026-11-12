@@ -5,7 +5,7 @@
 //!
 //! Cites: `src/syntax/ast.rs` (the row layouts each `Tag` states), `src/syntax/token.rs`.
 //!
-//! Contents: `pub(super) fn body`, `next`, `closer`, `line`, `extent`, `joined`, `unquote`
+//! Contents: `pub(super) fn body`, `next`, `closer`, `line`, `extent`, `joined`, `rest`, `unquote`
 
 use crate::syntax::ast::{Ast, NONE, Node, Tag, WordKind};
 use crate::syntax::token::{Tag as T, Tokens};
@@ -78,6 +78,19 @@ pub(super) fn joined(toks: &Tokens<'_>, ast: &Ast<'_>, n: Node) -> String {
     let mut out = String::new();
     for k in a..=b {
         if k > a && toks.start(k) > toks.end(k - 1) {
+            out.push(' ');
+        }
+        out.push_str(toks.text(k));
+    }
+    out
+}
+
+/// A statement's head line after its first token, one blank per gap.
+pub(super) fn rest(toks: &Tokens<'_>, ast: &Ast<'_>, n: Node) -> String {
+    let (a, b) = line(toks, ast.main_token(n));
+    let mut out = String::new();
+    for k in a + 1..=b {
+        if k > a + 1 && toks.start(k) > toks.end(k - 1) {
             out.push(' ');
         }
         out.push_str(toks.text(k));

@@ -16,13 +16,15 @@
 //!
 //! Contents: `pub(super) fn title`, `end`, `include`, `subckt`, `section`, `if_chain`, `param`,
 //! `func`, `global`, `card` (each `(lw: &mut Lower<'_, '_>, st: Stmt)`);
-//! `pub(super) fn head_params`, `param_names`, `def_name` (the declare step's readers)
+//! `pub(super) fn def_name`, `func_parts` (the declare step's readers)
 
 use super::codes;
 use super::cst::{self, joined};
+use super::declare::Class;
 use super::expr_read::{self, Tree};
 use super::read::{Def, Lower, Stmt};
 use super::read_run;
+use super::tables::Eval;
 use crate::ir;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::token::Tokens;
@@ -88,7 +90,7 @@ pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
     let mut trees = Vec::new();
     for (_, value) in &head.params {
-        match parameter(value) {
+        match parameter(lw, st.node, value) {
             Ok(t) => trees.push(t),
             Err(f) => return lw.opaque(st, f.class, f.code),
         }
@@ -99,6 +101,7 @@ pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
     let name = lw.names.fold(&head.name);
     let mut params = Vec::new();
+    let mark = lw.pending();
     for ((key, _), tree) in head.params.iter().zip(&trees) {
         let e = lw.expr(st, tree, st.scope);
         params.push((lw.names.fold(key), e));
@@ -107,6 +110,8 @@ pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     let params: Vec<(&str, ir::ExprId)> = params.iter().map(|(k, e)| (k.as_str(), *e)).collect();
     let span = lw.span(st.node);
     let (_, body) = lw.b.subckt(st.scope, &name, &ports, &params, span);
+    // a head default reads from the subcircuit's body (IR-KERNEL A10)
+    lw.rescope(mark, body);
     open_body(lw, st, body);
 }
 
@@ -151,7 +156,16 @@ pub(super) fn if_chain(lw: &mut Lower<'_, '_>, st: Stmt) {
         let Some(&cond) = lw.ast.fields(br).first().filter(|c| **c != NONE) else {
             return malformed(lw, st);
         };
-        match parameter(&lw.text(Node(cond))) {
+        let text = lw.text(Node(cond));
+        if lw.class(st.container, &text, &[]) >= Class::Temp {
+            // numparam decides an `.if` once, before the run: no temperature, no circuit
+            return lw.opaque(
+                st,
+                ir::OpaqueClass::InvalidInSource,
+                codes::PARAM_READS_CIRCUIT,
+            );
+        }
+        match parameter(lw, st.container, &text) {
             Ok(t) => trees.push(Some(t)),
             Err(f) => return lw.opaque(st, f.class, f.code),
         }
@@ -200,7 +214,7 @@ pub(super) fn param(lw: &mut Lower<'_, '_>, st: Stmt) {
         if !lw.wins(st, Def::Param, name, k) && lw.wins(st, Def::Param, name, usize::MAX) {
             return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
         }
-        match parameter(value) {
+        match parameter(lw, st.container, value) {
             Ok(t) => trees.push(t),
             Err(f) => return lw.opaque(st, f.class, f.code),
         }
@@ -234,7 +248,8 @@ pub(super) fn func(lw: &mut Lower<'_, '_>, st: Stmt) {
     if !lw.wins(st, Def::Func, &name, 0) {
         return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
     }
-    let tree = match expr_read::parse(body) {
+    let class = lw.class(st.container, body, &args);
+    let tree = match expr_read::parse_in(body, eval(class)) {
         Ok(t) => t,
         Err(f) => return lw.opaque(st, f.class, f.code),
     };
@@ -282,26 +297,6 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
 }
 
-/// The head parameter names of a `.subckt` node (the declare step).
-pub(super) fn head_params(ast: &Ast<'_>, toks: &Tokens<'_>, n: Node) -> Vec<String> {
-    let fields = ast.fields(n);
-    fields
-        .iter()
-        .filter(|&&f| ast.tag(Node(f)) == Tag::Assign)
-        .map(|&f| joined(toks, ast, Node(ast.lhs(Node(f)))))
-        .collect()
-}
-
-/// The `(position, name)` of each assignment of a `.param` node (the declare step).
-pub(super) fn param_names(ast: &Ast<'_>, toks: &Tokens<'_>, n: Node) -> Vec<(usize, String)> {
-    ast.fields(n)
-        .iter()
-        .filter(|&&f| ast.tag(Node(f)) == Tag::Assign)
-        .enumerate()
-        .map(|(k, &f)| (k, joined(toks, ast, Node(ast.lhs(Node(f))))))
-        .collect()
-}
-
 /// The defined name of a `.subckt`, `.lib` section or `.func` node, as written.
 pub(super) fn def_name(ast: &Ast<'_>, toks: &Tokens<'_>, n: Node) -> Option<String> {
     let first = *ast.fields(n).first()?;
@@ -312,6 +307,31 @@ pub(super) fn def_name(ast: &Ast<'_>, toks: &Tokens<'_>, n: Node) -> Option<Stri
         _ => return None,
     };
     (!name.is_empty()).then_some(name)
+}
+
+/// `name(a, b) [=] body`: the name, the formals and the body text without its wrapper.
+pub(super) fn func_parts(text: &str) -> Option<(String, Vec<String>, &str)> {
+    let (name, rest) = text.split_once('(')?;
+    let name = name.trim();
+    let (args, body) = rest.split_once(')')?;
+    let args: Vec<String> = if args.trim().is_empty() {
+        Vec::new()
+    } else {
+        args.split(',').map(|a| a.trim().to_string()).collect()
+    };
+    let ident = |s: &str| {
+        s.as_bytes()
+            .first()
+            .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
+            && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+    };
+    if !ident(name) || !args.iter().all(|a| ident(a)) {
+        return None;
+    }
+    let body = body.trim();
+    let body = body.strip_prefix('=').unwrap_or(body).trim();
+    let body = unwrap(body);
+    (!body.trim().is_empty()).then(|| (name.to_string(), args, body))
 }
 
 // ---- private ----
@@ -366,42 +386,28 @@ fn assignments(lw: &Lower<'_, '_>, n: Node) -> Option<Vec<(String, String)>> {
     Some(out)
 }
 
-/// A `.param`, head default or `.if` value: its `{…}` or `'…'` wrapper dropped, read by
-/// numparam; one that reads the circuit is ngspice's error.
-fn parameter(value: &str) -> Result<Tree, expr_read::Fail> {
-    let tree = expr_read::parse(unwrap(value))?;
-    if tree.dynamic() {
+/// A `.param`, head default or `.if` value read in `block`: its `{…}` or `'…'` wrapper dropped,
+/// read by the evaluator its class picks (R14: one that reads `temper`, directly or through a
+/// definition, is the B-source parser's); one that reads the circuit is ngspice's error.
+fn parameter(lw: &Lower<'_, '_>, block: Node, value: &str) -> Result<Tree, expr_read::Fail> {
+    let text = unwrap(value);
+    let class = lw.class(block, text, &[]);
+    if class == Class::Circuit {
         return Err(expr_read::Fail {
             code: codes::PARAM_READS_CIRCUIT,
             class: ir::OpaqueClass::InvalidInSource,
         });
     }
-    Ok(tree)
+    expr_read::parse_in(text, eval(class))
 }
 
-/// `name(a, b) [=] body`: the name, the formals and the body text without its wrapper.
-fn func_parts(text: &str) -> Option<(String, Vec<String>, &str)> {
-    let (name, rest) = text.split_once('(')?;
-    let name = name.trim();
-    let (args, body) = rest.split_once(')')?;
-    let args: Vec<String> = if args.trim().is_empty() {
-        Vec::new()
+/// The evaluator of a class: the B-source parser from `Temp` up (R14).
+fn eval(class: Class) -> Eval {
+    if class >= Class::Temp {
+        Eval::Behavioural
     } else {
-        args.split(',').map(|a| a.trim().to_string()).collect()
-    };
-    let ident = |s: &str| {
-        s.as_bytes()
-            .first()
-            .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
-            && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
-    };
-    if !ident(name) || !args.iter().all(|a| ident(a)) {
-        return None;
+        Eval::Numparam
     }
-    let body = body.trim();
-    let body = body.strip_prefix('=').unwrap_or(body).trim();
-    let body = unwrap(body);
-    (!body.trim().is_empty()).then(|| (name.to_string(), args, body))
 }
 
 /// `text` without one `{…}` or `'…'` that wraps all of it.

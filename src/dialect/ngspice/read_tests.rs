@@ -365,3 +365,47 @@ fn any_bytes_read_returns_and_checks_clean() {
         let _ = deck(&text);
     }
 }
+
+#[test]
+fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
+    // R21 (`Write::admits`): a literal ngspice reads back otherwise (no centi letter; numparam
+    // reads `mil` as milli: xpressn.c parseunit), a head parameter with no default (manual
+    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once).
+    let mut d = ir::Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("d.sp", ir::Role::Deck);
+        let centi = b.literal(ir::Literal {
+            mantissa: 3,
+            frac: 0,
+            exp10: -2,
+            form: ir::NumForm::Scale,
+        });
+        b.param(top, "a", centi, ir::Span::NONE);
+        let mil = b.literal(ir::Literal {
+            mantissa: 2,
+            frac: 0,
+            exp10: 0,
+            form: ir::NumForm::Mil,
+        });
+        b.param(top, "b", mil, ir::Span::NONE);
+        b.subckt(top, "s", &["p"], &[("w", ir::ExprId::NONE)], ir::Span::NONE);
+        b.comment(top, "two\nlines", ir::Span::NONE);
+        let t = b.temp();
+        b.if_(top, &[t], ir::Span::NONE);
+    }
+    let row = dialect::by_name("ngspice").expect("row");
+    let mut diags = ir::Diags::new();
+    dialect::legalize(&mut d, row, &mut diags);
+    let mut got = codes_of(&diags);
+    got.sort();
+    let mut want = vec![
+        codes::LITERAL_FORM,
+        codes::LITERAL_FORM,
+        codes::NO_DEFAULT,
+        codes::LINE_BREAK,
+        codes::READS_RUN,
+    ];
+    want.sort();
+    assert_eq!(got, want);
+}

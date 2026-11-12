@@ -10,8 +10,10 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) fn title`, `comment`,
 //! `include`, `global`, `opaque`, `subckt`, `section`, `if_`, `param`, `func` (each
-//! `(w: &mut Out<'_>, item: ir::ItemRef)`)
+//! `(w: &mut Out<'_>, item: ir::ItemRef)`); `pub(super) fn admits(&ir::Design, ir::ItemRef,
+//! ir::ScopeId, &mut ir::Diags)`
 
+use super::codes;
 use super::expr_write;
 use super::tables;
 use super::write::Out;
@@ -173,4 +175,74 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
     expr_write::expr(w.design, f.body, &mut text);
     text.push('}');
     w.line(&text);
+}
+
+/// Appends a refusal for a structure item ngspice cannot spell for a reason no feature states
+/// (R21): a head parameter with no default (`W1001`), a blank or multi-line title or a
+/// multi-line comment (`W1002`), a literal it would read back in another form (`W1003`), a
+/// section in a section or a definition or include in an `.if` branch (`W1004`), an `.if`
+/// condition that reads the run or a value that reads the circuit (`W1005`).
+pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diags: &mut ir::Diags) {
+    let span = d.span_of(item);
+    let mut refuse = |code| diags.push(code, span, 0);
+    let in_kind = |k: ir::ScopeKind| d.scope(scope).kind == k;
+    let broken = |t: &str| t.contains(['\n', '\r']);
+    let mut values: Vec<(ir::ExprId, ir::ExprClass)> = Vec::new();
+    match item.kind {
+        ItemKind::Title => {
+            let t: ir::item::Title = d.row(item.index);
+            let text = d.text(t.text);
+            if text.trim().is_empty() || broken(text) {
+                refuse(codes::LINE_BREAK);
+            }
+        }
+        ItemKind::Comment => {
+            let c: ir::item::Comment = d.row(item.index);
+            if broken(d.text(c.text)) {
+                refuse(codes::LINE_BREAK);
+            }
+        }
+        ItemKind::Subckt => {
+            let s: ir::item::Subckt = d.row(item.index);
+            for &(_, v) in d.params(s.params) {
+                if v.is_none() {
+                    refuse(codes::NO_DEFAULT);
+                } else {
+                    values.push((v, ir::ExprClass::Circuit));
+                }
+            }
+        }
+        ItemKind::If => {
+            let i: ir::item::If = d.row(item.index);
+            for b in d.branches(i.branches).iter().filter(|b| !b.cond.is_none()) {
+                values.push((b.cond, ir::ExprClass::Temp));
+            }
+        }
+        ItemKind::Param => {
+            let p: ir::item::Param = d.row(item.index);
+            values.push((p.value, ir::ExprClass::Circuit));
+        }
+        ItemKind::Func => {
+            let f: ir::item::Func = d.row(item.index);
+            values.push((f.body, ir::ExprClass::Circuit));
+        }
+        _ => {}
+    }
+    let placed = match item.kind {
+        ItemKind::Section => in_kind(ir::ScopeKind::Section) || in_kind(ir::ScopeKind::Branch),
+        ItemKind::Subckt | ItemKind::Func | ItemKind::Include => in_kind(ir::ScopeKind::Branch),
+        _ => false,
+    };
+    if placed {
+        refuse(codes::PLACEMENT);
+    }
+    for (e, limit) in values {
+        let class = ir::expr_class(d, e);
+        if item.kind != ItemKind::Func && class >= limit {
+            refuse(codes::READS_RUN);
+        }
+        if !expr_write::literals_spell(d, e) {
+            refuse(codes::LITERAL_FORM);
+        }
+    }
 }

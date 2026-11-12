@@ -12,6 +12,7 @@
 //!
 //! Contents: `pub(super) struct Out<'a>`,
 //! `pub(super) fn write(&ir::Design, ir::FileId, &mut String, &mut ir::Diags)`,
+//! `pub(super) fn admits(&ir::Design, &mut ir::Diags)`,
 //! `Out::open(&mut self, ir::ScopeId, String)`, `Out::line(&mut self, &str)`
 
 use super::{
@@ -85,6 +86,38 @@ pub(super) fn write(
         dispatch(&mut w, item);
     }
     assert!(w.out.len() >= start, "the writer only appends");
+}
+
+/// `Write::admits` (R21): a refusal for each reachable item ngspice cannot spell for a reason no
+/// feature states, by the item's area (one exhaustive dispatch, as `write`'s).
+pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+    for (item, scope) in design.reachable() {
+        match item.kind {
+            ir::ItemKind::Title
+            | ir::ItemKind::Comment
+            | ir::ItemKind::Include
+            | ir::ItemKind::Global
+            | ir::ItemKind::Opaque
+            | ir::ItemKind::Subckt
+            | ir::ItemKind::Section
+            | ir::ItemKind::If
+            | ir::ItemKind::Param
+            | ir::ItemKind::Func => write_structure::admits(design, item, scope, diags),
+            ir::ItemKind::Element => write_elements::admits(design, item, diags),
+            ir::ItemKind::Model => write_models::admits(design, item, diags),
+            ir::ItemKind::Statistics
+            | ir::ItemKind::Analysis
+            | ir::ItemKind::Option
+            | ir::ItemKind::Env
+            | ir::ItemKind::NodeSet => write_run::admits(design, item, diags),
+            ir::ItemKind::Save | ir::ItemKind::Print | ir::ItemKind::Measure => {
+                write_outputs::admits(design, item, diags);
+            }
+            ir::ItemKind::Load | ir::ItemKind::Loop | ir::ItemKind::Alter => {
+                write_control::admits(design, item, diags);
+            }
+        }
+    }
 }
 
 impl<'a> Out<'a> {

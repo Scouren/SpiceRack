@@ -10,9 +10,11 @@
 //! Contents: tests only.
 
 use super::codes;
-use super::expr_read::{Fail, parse};
+use super::expr_lex;
+use super::expr_read::{Fail, Tree, parse_in};
 use super::expr_write;
 use super::name::Folder;
+use super::tables::Eval;
 use crate::ir;
 
 /// `V(any) = 1`; draws give their nominal; nothing else is bound.
@@ -52,6 +54,17 @@ impl ir::Bindings for Unit {
 }
 
 // ---- private ----
+
+/// `text` read by the evaluator its own spelling picks (no definitions around it).
+fn parse(text: &str) -> Result<Tree, Fail> {
+    let l = expr_lex::leaves(text);
+    let eval = if l.circuit || l.temp {
+        Eval::Behavioural
+    } else {
+        Eval::Numparam
+    };
+    parse_in(text, eval)
+}
 
 /// A design holding `text` read as one expression, and its root.
 fn read(text: &str) -> Result<(ir::Design, ir::ExprId), Fail> {
@@ -130,6 +143,9 @@ fn numparam_and_b_source_values_are_ngspices() {
         ("1||0&&0", 1.0),
         ("v(c)+1>=2", 1.0),
         ("u2(0.5*v(c))", 0.5),
+        ("u(0*v(c))", 0.5),
+        ("v(c)*pwr(0-3,2)", -9.0),
+        ("sqr(3)", 9.0),
     ];
     for (text, want) in cases {
         let got = value(text);
@@ -194,8 +210,8 @@ fn what_ngspice_rejects_or_the_ir_lacks_is_coded() {
         assert_eq!(fail(text), invalid(codes::EXPR_INVALID), "{text}");
     }
     assert_eq!(fail("1?2:0?1?3:4:5"), invalid(codes::TERNARY_NEST));
-    // no IR member: B `u` (0.5 at 0), `pwr` (sgn·|x|^y), numparam `sqr`, `i()` of no V source
-    for text in ["u(v(a))", "pwr(v(a),3)", "sqr(2)", "\"s\""] {
+    // no IR member: B `eq0`…`le0`, `pwl`; a string
+    for text in ["eq0(v(a))", "pwl(v(a),0,0,1,1)", "\"s\""] {
         assert_eq!(fail(text), unread, "{text}");
     }
 }
@@ -238,6 +254,9 @@ fn the_writer_spells_the_fewest_parentheses_that_read_back() {
         ("{1+x}*2", "(1 + x) * 2"),
         ("u2(v(a))", "min(max(v(a), 0), 1)"),
         ("i(R1)*2", "i(R1) * 2"),
+        ("u(v(a))", "u(v(a))"),
+        ("pwr(v(a),3)", "pwr(v(a), 3)"),
+        ("sqr(2)", "sqr(2)"),
     ];
     for (text, want) in cases {
         assert_eq!(written(text), want, "{text}");

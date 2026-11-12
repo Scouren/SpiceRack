@@ -7,7 +7,7 @@ file "structure.sp" deck
   include "c.lib" section=tt
   param w = 2
   func sq(x) = x * x
-  subckt cell (a b) w=1 l=w * 2
+  subckt cell (a b) w=1 l=(w * 2)
     param k = l + 1
   if (w == 1)
     comment " one"

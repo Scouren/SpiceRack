@@ -9,8 +9,8 @@
 //! catalogue's own titles; the route rules of `rewrite/SPINE.md` §5 written out as a table; a
 //! hand-built include graph with its expected breadth-first order.
 //!
-//! Tests that still reach an IR stub (the circuit and run owners' rows) carry the marker
-//! `#[should_panic(expected = "not yet implemented")]`: they fail (an unexpected pass) the day
+//! A test that reaches an IR stub carries the marker
+//! `#[should_panic(expected = "not yet implemented")]`: it fails (an unexpected pass) the day
 //! the rows land, until the marker goes.
 //!
 //! Contents: tests only.
@@ -199,8 +199,6 @@ fn kernel_kinds_are_a_fixpoint_of_the_ir_dialect() {
 }
 
 #[test]
-// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
-#[should_panic(expected = "not yet implemented")]
 fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
     let src = Sources::one("rc.ir", WORKED);
     let out = dialect::transpile(&src, ir_row(), ir_row(), Policy::Strict)
@@ -230,8 +228,6 @@ fn a_feature_no_pass_removes_is_refused_at_its_item() {
 }
 
 #[test]
-// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
-#[should_panic(expected = "not yet implemented")]
 fn a_feature_no_pass_removes_is_refused_with_its_index() {
     let src = Sources::one("rc.ir", WORKED);
     let refused = dialect::transpile(&src, ir_row(), &NO_SUBCKT, Policy::Lenient)

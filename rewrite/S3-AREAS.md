@@ -74,3 +74,21 @@ Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `dia
   `CircuitExtra::NameWithoutLetter` stays out of `FEATURES`.
 - The evaluator class is `ir::expr_class` (A11, R14: transitive, `Temp` counts); the writer
   decides numparam or B source by it.
+
+## Evidence: how S3.0 checked ngspice-45
+
+- **Source.** The pinned simulator's source tarball is a nix store path:
+  `nix-store -r /nix/store/515ksnwkf7z112xz6pifn1ixgr9p4bys-ngspice-45.tar.gz.drv` realises
+  `/nix/store/b9hi97vj3s8y32h41a9gs6kzicvvg8yf-ngspice-45.tar.gz` (the `.drv` is the one
+  `ls /nix/store | grep ngspice-45.tar.gz` lists); unpack it with `tar xzf … -C <scratch>`. The
+  files S3.0 read: `src/frontend/numparam/xpressn.c` (`formula`, `fetchoperator`, `operate`,
+  `fetchnumber`, `parseunit`, `mathfunction`), `src/spicelib/parser/inpptree-parser.y` (the
+  B-source grammar), `inpptree.c` (`PTlex`, `PT_mksnode`, `funcs[]`, `constants[]`),
+  `ptfuncs.c` (each B function), `inpeval.c` (`INPevaluate`), `src/frontend/inpcom.c`
+  (`inp_fix_gnd_name`, `inp_fix_temper_in_param`, `inp_sort_params`).
+- **Runs.** `nix develop .#testing` has `ngspice` (ngspice-45). A numparam value:
+  `printf 'probe\n.param p={%s}\nV1 a 0 {p}\nR1 a 0 1\n.control\nop\nprint v(a)\n.endc\n.end\n' "$e" > d.cir; ngspice -b d.cir`;
+  a B-source value with nothing folded: `Vc c 0 1` and `B1 b 0 V=<expr with v(c)>`, then
+  `print v(b)`. Read the printed `v(a) = …` line; an error line (`Undefined parameter`,
+  `out of range for ln`, `wrongly determined negation`) is the run's answer too. Every value
+  pinned in `expr_tests.rs` and `tests/dialect_ngspice.rs` came from such a run.
