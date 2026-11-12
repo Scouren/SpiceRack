@@ -324,6 +324,11 @@ impl RowFacts for Alter {
         design.editor().set(at.index, row);
     }
 
+    fn string_roots(&self, _design: &Design, out: &mut Vec<ExprId>) {
+        // a string-valued device parameter (VACASK `type="dc"`; A25)
+        out.push(self.value);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let mut row: Alter = design.row(at.index);
         target_refs(&mut row.target, f);

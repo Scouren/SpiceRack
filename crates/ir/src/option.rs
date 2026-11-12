@@ -253,6 +253,13 @@ impl RowFacts for OptionRow {
         design.editor().set(at.index, row);
     }
 
+    fn string_roots(&self, _design: &Design, out: &mut Vec<ExprId>) {
+        // a simulator's own option may take a string, kept as written (A25)
+        if self.key == OptionKey::Private {
+            out.push(self.value);
+        }
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
