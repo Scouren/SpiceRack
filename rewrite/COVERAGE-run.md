@@ -12,10 +12,10 @@ result-side fact (backend, harness), outside the netlist IR.
 
 - G1 → `AnalysisKind::Op`; HSPICE `.OP format time` / timed form → `AnalysisKind::TimedOp`; Xyce `.op` beside another analysis: reader rule (keeps what Xyce runs), `Extra::SeveralAnalyses`.
 - G2 → `AnalysisKind::Dc` (a VACASK `sweep` + `op` is a `Loop` around an `Op`: `RunExtra::LoopOverOp`, R20), `dc_ac::Dc { axes }`, `DcAxis { target: TargetKind::SourceDc, sweep: SweepKind::Lin }`; HSPICE `START= STOP= STEP=`: spelling.
-- G3 → `SweepKind::{Dec, Oct, List}` on a `DcAxis`; `Extra::{SweepDec, SweepOct, SweepList}`; ngspice `foreach` lowering is a pass.
+- G3 → `SweepKind::{Dec, Oct, List}` on a `DcAxis`; the sweep form class `RunExtra::SweepDc*` (A24); ngspice `foreach` lowering is a pass.
 - G4 → `plan::Target` / `TargetKind::{Temp, Param, SourceDc, ElementValue, DeviceParam, ModelParam}`; Xyce's "bare name, parameter wins": reader rule; `Extra::DcAxis*`.
 - G5 → `AnalysisKind::Ac`, `dc_ac::Ac { sweep }`; Spectre `lin=`/VACASK `points` count steps: reader adds one (`SweepSpec::points` = values); Spectre AC over `dev=/param=` at one `freq=` → `Loop` over the target around a one-point `Ac`.
-- G6 → `tran::Tran { stop, record_start, print_step, max_step, initial_step, uic, startup, segments, cap }`; Xyce `NOOP` → `uic`; Spectre `skipdc=yes` → `uic`; VACASK `ic=`/`nodeset=` on the line → `NodeSet { next_only: true }`.
+- G6 → `tran::Tran { stop, record_start, print_step, initial_step, uic, startup, segments, ceiling: StepCeiling }`; Xyce `NOOP` → `uic`; Spectre `skipdc=yes` → `uic`; VACASK `ic=`/`nodeset=` on the line → `NodeSet { next_only: true }`.
 - G7 → `OptionKey::MaxStep` (HSPICE `delmax`).
 - G8 → `AnalysisKind::Noise`, `dc_ac::Noise { output: Probe, source, sweep, points_per_summary, ac_sweep, input_ref }`; Xyce integrated noise to stdout: RUN.
 - G9 → `AnalysisKind::Tf`, `dc_ac::Tf`; VACASK `dcxf` → `AnalysisKind::DcXf`; Rin/Rout availability: RUN.
@@ -63,7 +63,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - G51 → `Hb::tones` (several), `Hb::intermod`, `Hb::truncate`; `selectharms`, `tahb`: Private Xyce options.
 - G52 → gap G-SAMPLING (Xyce `.SAMPLING`, `.EMBEDDEDSAMPLING`, `.PCE`: Private).
 - G53 → `LoopKind::Table` around the analysis.
-- G54 → `Tran::max_step` = the schedule's smallest nonzero step (reader rule, 8.25); the schedule itself: gap G-SCHEDULE.
+- G54 → `Tran::ceiling` (`StepCeiling::Given`) = the schedule's smallest nonzero step (reader rule, 8.25); the schedule itself: gap G-SCHEDULE.
 - G55 → `AnalysisKind::Tran` (spelling).
 - G56 → `TargetKind::{DeviceParam, Temp}` with `Target::path`.
 - G57 → Private (Xyce optimisation).
@@ -199,8 +199,8 @@ result-side fact (backend, harness), outside the netlist IR.
 
 ## INV-semantics category 8 (analyses)
 
-- 8.01 → `Tran` fields named, `NONE` ≠ 0; `StepCap` for the default ceiling; `segments` for HSPICE.
-- 8.02 → `Tran::max_step`, `StepCap`, `OptionKey::MaxStep`; VACASK `tran_rmax`: Private.
+- 8.01 → `Tran` fields named, `NONE` ≠ 0; `StepCeiling::Rule(StepCap)` for the default ceiling; `segments` for HSPICE.
+- 8.02 → `Tran::ceiling` (`StepCeiling`), `StepCap`, `OptionKey::MaxStep`; VACASK `tran_rmax`: Private.
 - 8.03 → `Tran::print_step` `NONE` (`Extra::TranSimulatorStep`); a non-positive span: reader's refusal.
 - 8.04 → item order is the source's listed order (A14 R25; the row's "reverse order" is wrong: ngspice runs by type rank); independent analyses' result order is a run fact (S12); `RunExtra::SeveralAnalyses`.
 - 8.05 → `TargetKind` (typed, never a string).
@@ -223,7 +223,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - 8.22 → `SweepSpec` values are expressions (may read outer loop targets).
 - 8.23 → `Pss::tstab` in seconds (reader multiplies); the rest writer rules.
 - 8.24 → every analysis value is an `ExprId`.
-- 8.25 → `.TR` → `Tran`; schedule → `Tran::max_step` (gap G-SCHEDULE); `.LIN SPARCALC=0` → `Ac`; `.OP` beside another: reader rule.
+- 8.25 → `.TR` → `Tran`; schedule → `Tran::ceiling` (`StepCeiling::Given`) (gap G-SCHEDULE); `.LIN SPARCALC=0` → `Ac`; `.OP` beside another: reader rule.
 - 8.26 → RUN (result kind from the analysis item, not the point count).
 
 ## INV-semantics category 9 (outputs)
@@ -245,7 +245,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - 10.03 → `MethodTrap`, `MethodGear`, `MethodEuler`, `MaxOrd`; Spectre `errpreset`-dependent defaults: Private (gap G-ERRPRESET).
 - 10.04 → `OptionKey::TrTol`; Spectre `lteratio`: Private.
 - 10.05 → `Gmin`, `GminDc`, `GminTran`, `Gshunt`, `Rshunt`, `Cshunt`; LTspice `gfloat`: Private.
-- 10.06 → `Itl1` (incl. Xyce `nonlin maxstep`), `Itl4`, `MaxStep` (s), `Tran::max_step`.
+- 10.06 → `Itl1` (incl. Xyce `nonlin maxstep`), `Itl4`, `MaxStep` (s), `Tran::ceiling` (`StepCeiling::Given`).
 - 10.07 → Private (solution-changing, one simulator).
 - 10.08 → writer/comparison tables (RUN); the IR holds only what the source set.
 - 10.09 → `OptionKey::class()` → `OptionClass::{Equations, Accuracy, Path, Output}`.
@@ -294,7 +294,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - G-ALTERCARD (G46, K12, K13, 13.03): HSPICE `.alter` blocks that re-state element or model cards, Spectre `altergroup` (defaults first). Proposal: an `Alter` variant whose target is an element or model and whose value is a replacement item (`ItemRef` to an element/model row in a side scope), with a `reset: bool` for altergroup's defaulting.
 - G-ELABORATE (K9, K17): closed by A12 R1: `ItemKind::Elaborate { circuits }`, references of `DefKind::Subckt`, the top circuit for every run item after it.
 - G-FILEVALUES (G47, H20): values read from a data file (LTspice `file=`, HSPICE `.load`). Proposal: the kit's `Role::Data` files (`INV-constructs.md` L27) and `SweepSpec::List` filled from them at read.
-- G-SCHEDULE (G54, 8.25): Xyce's `schedule()` max step. Proposal: a kernel `Func::Schedule` (piecewise-constant in time) in `Tran::max_step`, which may then read `Time`.
+- G-SCHEDULE (G54, 8.25): Xyce's `schedule()` max step. Proposal: a kernel `Func::Schedule` (piecewise-constant in time) in `Tran::ceiling` (`StepCeiling::Given`), which may then read `Time`.
 - G-SLOTS (G59, G60): VACASK `store=`/`nodeset="slot"`/`writeop` (named solution slots). Proposal: Private until a second simulator has slots.
 - G-CONTINUATION (G62): VACASK `continuation=1` on a sweep. Proposal: `SweepLoop::continuation: bool` beside `Dc::restart` once its meaning is measured.
 - G-SPECTREIC (G66, 8.21): Spectre `tran ic=dc|node|dev|all` (which ICs are honoured). Proposal: `Tran::ic_use: IcUse` enum; until then the reader applies precedence and notes.
