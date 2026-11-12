@@ -3,22 +3,25 @@
 //! feature a stub writer lacks, `Policy::Strict` refusing an `Unread`, the facade's message
 //! format and code map, the route override, and `Sources::load`'s walk.
 //!
-//! Oracles: the IR text grammar's worked example (`crates/ir/src/text.rs`) read and written
-//! back is the same text (a fixpoint); hand-computed line and column of a byte offset; the old
+//! Oracles: canonical IR text read and written back is the same text (a fixpoint): the
+//! kernel's kinds today (`KERNEL`), the grammar's worked example (`crates/ir/src/text.rs`) when
+//! the circuit and run rows land; hand-computed line and column of a byte offset; the old
 //! catalogue's own titles; the route rules of `rewrite/SPINE.md` §5 written out as a table; a
 //! hand-built include graph with its expected breadth-first order.
 //!
-//! Tests that reach the IR crate's `todo!()` bodies carry the marker
+//! Tests that still reach an IR stub (the circuit and run owners' rows) carry the marker
 //! `#[should_panic(expected = "not yet implemented")]`: they fail (an unexpected pass) the day
-//! the bodies land, until the marker goes.
+//! the rows land, until the marker goes.
 //!
 //! Contents: tests only.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use spicerack::dialect::facade::{self, Pipeline, ROUTES, UNMAPPED};
+use spicerack::dialect::facade::{self, IR_NOTE, IR_REFUSAL, Pipeline, ROUTES};
 use spicerack::dialect::{
-    self, BUILTIN, DialectRow, Policy, Reference, STRICT_UNREAD, Sources, Write, irtext::IrText,
+    self, BUILTIN, DialectRow, INERT_DROPPED, Policy, Reference, STRICT_UNREAD, Sources, Write,
+    irtext::IrText,
 };
 use spicerack::ir;
 use spicerack::syntax::diag::{Code, info};
@@ -37,6 +40,31 @@ file \"rc.sp\" deck
   analysis op
 ";
 
+/// The kernel's own kinds only (title, comment, global, include, param, func, subckt, if,
+/// section, opaque), in canonical form: what the IR bodies landed so far can read and write.
+const KERNEL: &str = "\
+file \"kit.sp\" deck
+  title \"kernel kinds\"
+  comment \"a note\"
+  global vdd vss
+  include \"models.lib\" section=tt
+  param w = 2u
+  param l = w / 2
+  func area(a, b) = a * b
+  subckt cell (a b) r=w
+    param k = r * 2
+  if (w > 1u)
+    param m = 1
+  elif (w > 0)
+    param m = 2
+  else
+    param m = 3
+  opaque ngspice inert \".width out=80\"
+file \"models.lib\" library
+  section tt
+    param vth = 0.4
+";
+
 /// A writer that spells every feature but subcircuits.
 struct NoSubckt;
 
@@ -46,6 +74,51 @@ static NO_SUBCKT: DialectRow = DialectRow {
     read: None,
     write: Some(&NoSubckt),
 };
+
+/// A writer that refuses every comment reading "a note" in `admits` (a reason no feature
+/// states), and counts its write calls.
+struct Picky(AtomicUsize);
+
+static PICKY: Picky = Picky(AtomicUsize::new(0));
+
+static PICKY_ROW: DialectRow = DialectRow {
+    name: "picky",
+    text_family: dialect::ANY_FAMILY,
+    read: None,
+    write: Some(&PICKY),
+};
+
+/// The picky writer's refusal: a code of its own (no catalogue holds it, so it refuses).
+const PICKY_CODE: ir::Code = ir::Code::new(b'W', 9001);
+
+/// A Spectre-family writer that counts its calls and spells everything.
+struct Counting(AtomicUsize);
+
+static SPECTRE_STUB: Counting = Counting(AtomicUsize::new(0));
+static NGSPICE_STUB: Counting = Counting(AtomicUsize::new(0));
+
+static SPECTRE_ROW: DialectRow = DialectRow {
+    name: "spectre-stub",
+    text_family: "spectre",
+    read: None,
+    write: Some(&SPECTRE_STUB),
+};
+
+static NGSPICE_ROW: DialectRow = DialectRow {
+    name: "ngspice-stub",
+    text_family: "ngspice",
+    read: None,
+    write: Some(&NGSPICE_STUB),
+};
+
+/// Two files: an inert ngspice statement in the deck, a private one in the library.
+const TWO_FILES: &str = "\
+file \"a.sp\" deck
+  opaque ngspice inert \".width out=80\"
+  title \"a\"
+file \"b.lib\" library
+  opaque ngspice private \".csparam x=1\"
+";
 
 impl Write for NoSubckt {
     fn features(&self) -> &'static ir::FeatureSet {
@@ -61,6 +134,37 @@ impl Write for NoSubckt {
     }
 }
 
+impl Write for Counting {
+    fn features(&self) -> &'static ir::FeatureSet {
+        IrText.features()
+    }
+
+    fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+        ir::dump(design, file, out);
+    }
+}
+
+impl Write for Picky {
+    fn features(&self) -> &'static ir::FeatureSet {
+        IrText.features()
+    }
+
+    fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+        ir::dump(design, file, out);
+    }
+
+    fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
+        let table = <ir::item::Comment as ir::ItemRow>::table(design);
+        for (i, row) in table.rows().iter().enumerate() {
+            if design.text(row.text) == "a note" {
+                diags.push(PICKY_CODE, table.span(i as u32), 0);
+            }
+        }
+    }
+}
+
 // ---- private ----
 
 fn ir_row() -> &'static DialectRow {
@@ -68,7 +172,34 @@ fn ir_row() -> &'static DialectRow {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
+fn kernel_kinds_are_a_fixpoint_of_the_ir_dialect() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(&src, ir_row(), Policy::Strict, &mut design, &mut diags);
+    assert!(
+        diags.is_empty(),
+        "no row on canonical text: {:?}",
+        diags.rows()
+    );
+    let written: String = design
+        .files()
+        .map(|f| dialect::write(&design, f, ir_row(), &mut diags))
+        .collect();
+    assert_eq!(written, KERNEL);
+    let out = dialect::transpile(&src, ir_row(), ir_row(), Policy::Strict)
+        .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
+    assert_eq!(
+        out.text,
+        KERNEL
+            .split("file \"models.lib\"")
+            .next()
+            .expect("the deck")
+    );
+}
+
+#[test]
+// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
 #[should_panic(expected = "not yet implemented")]
 fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
     let src = Sources::one("rc.ir", WORKED);
@@ -83,7 +214,23 @@ fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
+fn a_feature_no_pass_removes_is_refused_at_its_item() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let refused = dialect::transpile(&src, ir_row(), &NO_SUBCKT, Policy::Lenient)
+        .expect_err("no pass removes subcircuits");
+    let subckt = u32::from(ir::Feature::Item(ir::ItemKind::Subckt).index());
+    let rows: Vec<(ir::Code, u32)> = refused.rows().iter().map(|d| (d.code, d.arg)).collect();
+    assert_eq!(rows, [(ir::diag::UNSUPPORTED, subckt)]);
+    let at = refused.rows()[0].span;
+    assert_eq!(
+        &KERNEL[at.start as usize..][..6],
+        "subckt",
+        "the row is at the subckt's line"
+    );
+}
+
+#[test]
+// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
 #[should_panic(expected = "not yet implemented")]
 fn a_feature_no_pass_removes_is_refused_with_its_index() {
     let src = Sources::one("rc.ir", WORKED);
@@ -95,8 +242,6 @@ fn a_feature_no_pass_removes_is_refused_with_its_index() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
-#[should_panic(expected = "not yet implemented")]
 fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
     let text = "file \"o.sp\" deck\n  opaque ngspice unread \".foo bar\"\n";
     let src = Sources::one("o.ir", text);
@@ -113,53 +258,158 @@ fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
 }
 
 #[test]
-fn the_facade_writes_todays_message_lines_from_spans() {
-    // Byte 9 of the text is `c` of line 2 ("ab cd"), column 4; byte 0 is line 1, column 1.
-    let src = Sources::one("deck", "first\nab cd\n");
-    let at = |start| ir::Span {
-        file: ir::FileId(0),
-        start,
-        len: 1,
-    };
-    let rows = [
-        ir::Diag {
-            code: ir::Code::new(b'X', 3),
-            span: at(9),
-            arg: 0,
-        },
-        ir::Diag {
-            code: ir::Code::new(b'W', 1),
-            span: at(0),
-            arg: 0,
-        },
-        ir::Diag {
-            code: ir::Code::new(b'P', 2),
-            span: ir::Span::NONE,
-            arg: 0,
-        },
-    ];
-    let shown = facade::diags(&rows, &src, "t", "spectre");
-    let codes: Vec<Code> = shown.diags.iter().map(|d| d.code).collect();
-    assert_eq!(codes, [Code::W0001, Code::R0042, Code::P0002]);
-    let expected = format!(
-        "t:1:1: W0001 {}\nt:2:4: R0042 {}\nt:0:0: P0002 {}\n",
-        info(Code::W0001).title,
-        info(UNMAPPED).title,
-        info(Code::P0002).title
+fn legalize_drops_a_foreign_inert_and_refuses_a_foreign_private_once() {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(
+        &Sources::one("two.ir", TWO_FILES),
+        ir_row(),
+        Policy::Lenient,
+        &mut design,
+        &mut diags,
     );
-    assert_eq!(shown.messages, expected);
+    let read_rows = diags.len();
+    dialect::legalize(&mut design, &SPECTRE_ROW, &mut diags);
+    let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
+    let rows: Vec<(ir::Code, u32)> = diags.rows()[read_rows..]
+        .iter()
+        .map(|d| (d.code, d.arg))
+        .collect();
+    assert_eq!(rows, [(INERT_DROPPED, 0), (ir::diag::UNSUPPORTED, opaque)]);
+    let deck = design.find_file("a.sp");
+    let left = design.items(design.file(deck).top);
+    assert_eq!(
+        left.iter().map(|i| i.kind).collect::<Vec<_>>(),
+        [ir::ItemKind::Title]
+    );
 }
 
 #[test]
-fn a_new_code_with_no_row_is_its_namesake_or_unmapped() {
-    let d = |letter, number| ir::Diag {
-        code: ir::Code::new(letter, number),
+fn after_one_clean_legalize_each_file_is_written_once() {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(
+        &Sources::one("two.ir", TWO_FILES),
+        ir_row(),
+        Policy::Lenient,
+        &mut design,
+        &mut diags,
+    );
+    let read_rows = diags.len();
+    dialect::legalize(&mut design, &NGSPICE_ROW, &mut diags);
+    let added = &diags.rows()[read_rows..];
+    assert!(added.is_empty(), "the ngspice family keeps both: {added:?}");
+    let texts: Vec<String> = design
+        .files()
+        .map(|f| dialect::write(&design, f, &NGSPICE_ROW, &mut diags))
+        .collect();
+    assert_eq!(texts.concat(), TWO_FILES);
+    assert_eq!(NGSPICE_STUB.0.load(Ordering::Relaxed), 2);
+    assert_eq!(
+        SPECTRE_STUB.0.load(Ordering::Relaxed),
+        0,
+        "a refused design is never written"
+    );
+}
+
+#[test]
+fn a_writer_admits_refusal_comes_last_from_legalize_and_stops_transpile() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(&src, ir_row(), Policy::Lenient, &mut design, &mut diags);
+    let read_rows = diags.len();
+    dialect::legalize(&mut design, &PICKY_ROW, &mut diags);
+    let added: Vec<ir::Code> = diags.rows()[read_rows..].iter().map(|d| d.code).collect();
+    assert_eq!(added, [PICKY_CODE]);
+    let at = diags.rows()[read_rows].span;
+    assert_eq!(
+        &KERNEL[at.start as usize..][..7],
+        "comment",
+        "the row is at the comment"
+    );
+    let refused = dialect::transpile(&src, ir_row(), &PICKY_ROW, Policy::Lenient);
+    let codes: Vec<ir::Code> = refused
+        .expect_err("admits refused")
+        .rows()
+        .iter()
+        .map(|d| d.code)
+        .collect();
+    assert_eq!(codes, [PICKY_CODE]);
+    assert_eq!(
+        PICKY.0.load(Ordering::Relaxed),
+        0,
+        "a refused design is never written"
+    );
+}
+
+#[test]
+fn a_writer_that_admits_everything_writes_as_before() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let out = dialect::transpile(&src, ir_row(), &NGSPICE_ROW, Policy::Lenient)
+        .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
+    assert_eq!(
+        out.text,
+        KERNEL
+            .split("file \"models.lib\"")
+            .next()
+            .expect("the deck")
+    );
+}
+
+#[test]
+fn the_facade_writes_todays_message_lines_from_spans() {
+    // Byte 9 of the text is `c` of line 2 ("ab cd"), column 4; byte 0 is line 1, column 1.
+    let src = Sources::one("deck", "first\nab cd\n");
+    let at = |file, start| ir::Span {
+        file: ir::FileId(file),
+        start,
+        len: 1,
+    };
+    let strict = |span| ir::Diag {
+        code: STRICT_UNREAD,
+        span,
+        arg: 0,
+    };
+    let rows = [
+        strict(at(0, 9)),
+        strict(ir::Span::NONE),
+        strict(at(0, 0)),
+        strict(at(7, 0)),
+    ];
+    let shown = facade::diags(&rows, &src, "t", "spectre");
+    let codes: Vec<Code> = shown.diags.iter().map(|d| d.code).collect();
+    assert_eq!(codes, [Code::W0203; 4], "a refusal stays a refusal");
+    let title = dialect::info(STRICT_UNREAD).expect("the spine's row").title;
+    let expected = format!(
+        "t:1:1: W0203 S0101 {title}\nt:2:4: W0203 S0101 {title}\nt:0:0: W0203 S0101 {title}\nt:0:0: W0203 S0101 {title}\n"
+    );
+    assert_eq!(shown.messages, expected);
+    assert_eq!(
+        info(Code::W0203).kind,
+        spicerack::syntax::diag::Kind::Refusal
+    );
+    assert_eq!(info(Code::W0204).kind, spicerack::syntax::diag::Kind::Note);
+}
+
+#[test]
+fn a_new_code_with_no_row_is_shown_by_its_verdict() {
+    let d = |code| ir::Diag {
+        code,
         span: ir::Span::NONE,
         arg: 0,
     };
-    assert_eq!(facade::old_code(&d(b'R', 6), "ngspice"), Code::R0006);
-    assert_eq!(facade::old_code(&d(b'U', 1), "ngspice"), UNMAPPED);
-    assert_eq!(facade::old_code(&d(b'W', 9999), "ngspice"), UNMAPPED);
+    let unread = ir::diag::opaque_code(ir::OpaqueClass::Unread);
+    assert_eq!(facade::old_code(&d(unread), "ngspice"), IR_NOTE);
+    assert_eq!(
+        facade::old_code(&d(ir::diag::UNSUPPORTED), "ngspice"),
+        IR_REFUSAL
+    );
+    // A code no catalogue holds refuses, loudly.
+    assert_eq!(
+        facade::old_code(&d(ir::Code::new(b'W', 9999)), "ngspice"),
+        IR_REFUSAL
+    );
 }
 
 #[test]

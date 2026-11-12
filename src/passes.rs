@@ -1,7 +1,8 @@
 //! Legalization: a design and a target's feature set in, the same design rewritten to use only
-//! what the target has out, or `U0001` refusals for what no pass removes. Passes know features,
-//! never dialects: this file (and each pass, one per file under `passes/` once the first lands)
-//! imports `crate::ir` only (`tests/layering.rs`).
+//! what the target has out, or `U0001` refusals (`ir::check_legal`'s, one at each item) for
+//! what no pass removes. Passes know features, never dialects: this file (and each pass, one
+//! per file under `passes/` once the first lands) imports `crate::ir` only
+//! (`tests/layering.rs`).
 //!
 //! Cites: `REWRITE-PLAN.md` §4.4; `rewrite/SPINE.md` §4.
 //!
@@ -27,11 +28,10 @@ pub struct Pass {
 pub static PASSES: &[Pass] = &[];
 
 /// Rounds of: the features `design` uses and `target` lacks; for each, the first pass of
-/// [`PASSES`] that removes it and whose `requires` `target` has, run and then `ir::check`ed. It
-/// stops when nothing is missing, or when a round changes nothing; what is still missing is
-/// refused, one `U0001` row per feature (`arg` its index; at no span until the IR can name the
-/// items that carry a feature). A check violation after a pass is that pass's bug (a debug
-/// assertion).
+/// [`PASSES`] that removes it and whose `requires` `target` has, run and then `ir::check`ed,
+/// until nothing is missing or a round changes nothing. Then `ir::check_legal` reports what is
+/// left: one `U0001` row per (item, feature) at the item. A check violation after a pass is
+/// that pass's bug (a debug assertion).
 ///
 /// # Panics
 /// When the rounds do not settle within `PASSES.len() + 1` (passes that undo each other).
@@ -58,15 +58,9 @@ pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir
         }
         let left = ir::features_used(design).minus(*target);
         if left == missing {
-            for feature in left.iter() {
-                diags.push(
-                    ir::diag::UNSUPPORTED,
-                    ir::Span::NONE,
-                    u32::from(feature.index()),
-                );
-            }
-            return;
+            break;
         }
         missing = left;
     }
+    ir::check_legal(design, target, diags);
 }

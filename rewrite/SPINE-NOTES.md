@@ -18,22 +18,25 @@ Each line: question → choice → why.
    Verilog-A text would be read as netlist text. A dialect that needs modules adds a role then.
 6. Path normalization → a local copy of `resolve::normalize` (it is `pub(super)` and `syntax/` is not mine
    to edit) → eight lines.
-7. Verdict for codes no catalogue knows → `dialect::refuses` treats them as refusals → a missing
-   catalogue row fails loudly. Dialect slices must make their `P`/`R`/`W` notes known here (a
-   catalogue lookup per row, when the first dialect lands).
-8. `Policy::Strict` → `dialect::read` pushes `STRICT_UNREAD` (`S9001`, the spine's own code) at each
-   `Opaque` row of class `Unread` (scanning the `Opaque` table) → the IR catalogue has no refusal
-   for it (request 1). `S0001` (the reader's note) stays a note.
-9. Text family → the spine refuses another family's `Opaque` (`U0001`, `arg` =
-   `Feature::Item(Opaque)`) before the writer runs; `ANY_FAMILY = "*"` marks the IR text writer,
-   which spells every dialect's → one rule in the spine instead of one loop per writer. An `Opaque`
-   counts for the file being written by its span's file (`Span::NONE` counts as that file).
-10. `write` on any refusal (foreign opaque, features left after `legalize`) → the writer is not called,
-    the text is empty → a writer only ever sees legal IR (rule 4). `transpile` does not write after
-    a read that refused.
-11. `legalize`'s leftovers → one `U0001` per feature at `Span::NONE` (not per item) → the IR has no
-    per-item feature query (request 2). `ir::check_legal` then runs only when nothing is left and must
-    add nothing (a debug assertion: a pass bug).
+7. Verdict → `dialect::info` looks a code up in the spine's catalogue (`S0101..=S0199`), then the
+   IR crate's; `refuses` is "its row is a refusal, or no catalogue holds it" → a missing row fails
+   loudly. Dialect slices add their `P`/`R`/`W` tables to `dialect::info` when they land.
+8. `Policy::Strict` → `dialect::read` pushes `STRICT_UNREAD` (`S0101`, the spine's own table, ruling 1)
+   at each `Opaque` row of class `Unread` (scanning the `Opaque` table). `S0001` (the reader's note)
+   stays a note.
+9. Text family (R11) → `dialect::legalize` (once per design and target, in place) walks every reachable
+   item: another family's `Opaque` of class `Inert` is removed from its scope with an `INERT_DROPPED`
+   note (`S0102`), any other class is refused (`U0001`, `arg` = `Feature::Item(Opaque)`) at the item;
+   `ANY_FAMILY = "*"` (the IR text writer) skips the step. The walk is a private stand-in for
+   `Design::reachable()` (Subckt, Section, If, Loop bodies; files in id order), swapped when the
+   kernel makes it public (ruling 5).
+10. `write` (R11) → calls the writer only; legality is the caller's contract (debug assertions:
+    features inside the writer's set, no foreign `Opaque`). `transpile` = read → refused? → legalize →
+    refused? → write of the entry. The facade's `render_kit` keeps today's one-file-per-call shape:
+    one read and one legalize per call.
+11. `legalize`'s leftovers (ruling 2) → passes run to the fixpoint, then `ir::check_legal(design,
+    target)` appends one `U0001` per (item, feature) at the item: that is the leftover report. `write`
+    calls the writer only when nothing is left.
 12. `legalize` stops when a round changes the missing set not at all (and refuses), bounded by
     `PASSES.len() + 1` rounds (asserted) → "until nothing changes" without spinning a no-op pass.
 13. Facade policy → `Policy::Lenient` → today's `render_text` keeps foreign text as notes (`W0001`).
@@ -41,12 +44,13 @@ Each line: question → choice → why.
     creates its files in that order, stated on `Read::read`); a row with no span or a file out of range
     prints `name:0:0:`; every row is named `name` (today's messages name one deck). Old `Diag::token`
     holds the span's first byte (there are no tokens).
-15. Messages → `name:line:col: CODE title` with the *old* code and the *old* catalogue's title → the
-    line reads as today's does. Columns are bytes from 1, as `Tokens::location`.
+15. Messages → `name:line:col: CODE title` with the *old* code and the *old* catalogue's title for an
+    `OLD_CODE` row (the line reads as today's does); `W0203|W0204 <new code> <new title>` otherwise. Columns are bytes from 1, as `Tokens::location`.
 16. `OLD_CODE` row → `{code, feature: Option, target: Option<&str>, old}` (`None` = any), first match
-    wins; no row → the old code of the same letter and number; else `UNMAPPED = R0042` ("the simulator
-    registry is full", which no transpile raises) → the old catalogue has no designated row and is not
-    mine to edit (request 3).
+    wins; a row exists only where a routed test asserts an old code. No row → `W0203` (refusal) or
+    `W0204` (note) by the new code's verdict, whose message is `W0203 <new code> <new title>` (ruling
+    3; the two rows are in `syntax/diag/rows_w_def.rs`, beside W0201/W0202 of the same shape). No
+    same-number fallback: codes are renumbered, so a match would be a wrong code with no crash.
 17. `SPICERACK_PIPELINE` → read once per process (`OnceLock`); a value other than `old`/`new` is said
     on stderr and ignored; the "no such pair" note prints once per process. `route_with` is the pure
     form the tests use.
@@ -57,25 +61,53 @@ Each line: question → choice → why.
     `<stem>.ir` and prints its path; `--dump-ir=legal` needs `--to` with a new-pipeline writer.
     A side the new pipeline lacks (e.g. `--dialect ngspice --dump-ir`) fails the deck (exit 1).
 20. `IrText::features` → every feature, built once at run time (`OnceLock`) from
-    `Feature::from_index` → `FeatureSet` has no `ALL` const (request 4) and its `with` is `todo!()`
-    today, which a `const` would evaluate at compile time.
+    `Feature::from_index`, until `FeatureSet::ALL` lands as a `const` (ruling 4), then swapped.
 21. The IR reader reads each `Sources` text with `ir::parse`; the text's own `file` lines name the
     design's files (the `Sources` path is not used) → IR text is self-describing.
 22. L1's "statement count in = out" → not asserted for `ir` (no statement counter the IR exposes);
     L1 asserts the read returns and L2 that `check` adds no `X` row. L6's corpus for `ir` is the
     worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous with one row.
 
-## Requests for the IR crate's owners (not added: `crates/ir/src/` is theirs)
+23. `Write::admits` (AMEND-A12 S1) → default empty; `dialect::legalize` calls it last; `write`'s debug
+    assertions run it into a scratch list that must stay empty. L4 skips a generated design
+    `legalize` refuses (any refusal) and fails when no admitted design holds an item kind the
+    writer claims (checked over `Feature::Item` only; kinds outside the kernel's join when the
+    generator builds them).
+24. `OpaqueClass::Hint` (R19) is not in the kernel yet: `legalize`'s match over classes is exhaustive,
+    so the member's arrival stops the build; then a spine note row (distinct from `INERT_DROPPED`:
+    "the numbers may move within the solver's tolerance") and the drop.
 
-1. A refusal code for a strict read of an `Unread` item (today the spine uses `S9001`).
-2. Per-item features: `item_features(&Design, ItemRef, &mut FeatureSet)` (or `check_legal` reporting at
-   items), so `legalize` can put one `U` row per item that carries a feature (SPINE §4).
-3. (Old catalogue, `syntax/diag`) a designated row for an unmapped new code, instead of `R0042`.
-4. `FeatureSet::ALL` (a `const`), for writers that spell everything.
-5. A walk of every item of one file (all nested scopes), so the family check and diagnostics can
-   attribute an item to its file without its span.
+## Requests (ruled by the lead)
+
+1. Strict code: the spine's own (`S0101`). Done.
+2. Per-item `U` rows: `ir::check_legal` already reports per (item, feature). Done in `legalize`.
+3. Unmapped codes: two old-catalogue rows, `W0203`/`W0204`. Done.
+4. `FeatureSet::ALL`: asked of the kernel owner; swap the `OnceLock` when it lands.
+5. `Design::reachable() -> Vec<(ItemRef, ScopeId)>`: asked of the kernel owner; swap the span rule of
+   decision 9 when it lands.
+
+## The IR bodies at 79af0b3b, against the spine's assumptions
+
+Merged into `ir-spine`; the kernel's kinds behave as the spine assumed in signature and verdict
+(`check_legal` reports one `U0001` per (item, feature) at the item's span, `arg` the feature
+index; `ir::diag::info` answers the kernel's codes). Differences found:
+
+1. `ir::parse` leaves every span's `file` at `NONE` (items and `P9001` rows alike); the offsets are
+   into the text handed to `parse`, which may hold several `file` blocks. The facade then prints
+   `name:0:0:` for every row read from IR text. Request: `parse` sets `span.file` to the file block
+   the line is in (or the spine needs the text's index to map it).
+2. `TEXT_SYNTAX` (`P9001`) is a `Refusal`: one malformed IR line refuses a lenient read. Its span is
+   the word that failed (or an empty span at the end of the line), not the line.
+3. `ir::parse` of an `opaque … unread` line pushes no `S0001` note: in IR text the class is data,
+   not a reader finding. The spine's strict rule scans the `Opaque` table, so it is unaffected.
+4. A text with no `file` line yields a design with no file: `Design::entry` then panics ("a design
+   with a file has an entry"). `transpile` is safe only because the `P9001` refusal stops it before
+   `entry`; a dialect reader must create a file even for an empty text.
+5. A repeated port (`subckt s (a a)`) is a `P9001` with nothing pushed, as `item_text.rs` says; an
+   unresolved name (`param p = q + 1`) is no row (legal, C8).
 
 ## Open
 
-- The gate item "`spice2rack --dialect ir --to ir` is a fixpoint on the worked example" cannot run until
-  the IR bodies land (the test `the_worked_example_is_a_fixpoint_of_the_ir_dialect` carries the marker).
+- The gate item "`spice2rack --dialect ir --to ir` is a fixpoint on the worked example" waits for the
+  circuit and run rows (`the_worked_example_is_a_fixpoint_of_the_ir_dialect` carries the marker); the
+  kernel-kinds twin `kernel_kinds_are_a_fixpoint_of_the_ir_dialect` passes.

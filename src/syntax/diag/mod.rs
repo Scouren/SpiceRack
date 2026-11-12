@@ -15,7 +15,7 @@
 //! | R0001–R0100 | resolve |
 //! | W0001–W0100 | render: the SPICE-family writer and the rules both writers share |
 //! | W0101–W0200 | render: the named writer (Spectre, VACASK) |
-//! | W0201–W0300 | render: rules a dialect definition declares |
+//! | W0201–W0300 | render: rules a dialect definition declares; W0203–W0204 the IR pipeline's (`dialect::facade`) |
 //! | W0301–W0399 | render: stream S4 (D56) |
 //!
 //! A `W0201`/`W0202` diagnostic carries a `detail`: which of the codes a

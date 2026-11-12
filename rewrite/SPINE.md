@@ -35,6 +35,11 @@ pub trait Write: Sync {
     /// only the IR. Total over legal IR: every item is spelled, or copied when it is this
     /// family's `Opaque`.
     fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, diags: &mut ir::Diags);
+    /// Appends a refusal for everything in `design`, legal by `features()`, that this dialect
+    /// cannot spell for a reason no feature states (a model parameter its simulator's module
+    /// does not have, a name it cannot quote). Never for something a feature could state.
+    /// Default: nothing (AMEND-A12 S1, R21).
+    fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {}
 }
 
 /// One language. CDL and Verilog have no reader.
@@ -61,18 +66,29 @@ reader never touches a file system.
 
 ```rust
 pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags);
+pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags);
 pub fn write(design: &ir::Design, file: ir::FileId, to: &DialectRow, diags: &mut ir::Diags) -> String;
 pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Policy) -> Result<Written, ir::Diags>;
 ```
 
 - `read` = the dialect's `read`, then `ir::check`. A violation is a reader bug: an `X` row, and a
   debug assertion.
-- `write` = if the design uses only the target's features, the dialect's `write`; else a clone,
-  `passes::legalize`, `ir::check_legal`, then `write`. A violation after `legalize` is a pass bug.
-- `transpile` = `read`, `write` of the entry file, and the verdict: any `Kind::Refusal` row
-  refuses the deck. `Policy::Strict` turns an `Opaque` of class `Unread` into a refusal;
-  `Lenient` keeps it (a writer of the same text family copies it, any other refuses it).
-- Every branch on which work happens is in these three functions.
+- `legalize` = once per (design, target), in place (the caller clones first to keep the neutral
+  design or to write a second target): every `Opaque` of another text family is dropped with a
+  note when its class is `Inert` (it moves no number) and refused otherwise (a `U` row at the
+  item); then `passes::legalize` with the target's features, whose `ir::check_legal` reports
+  what no pass removed; last, always, the writer's `admits`, so the caller sees every refusal at
+  once. The whole design is legal for the target, or it is refused: a file the caller loaded is
+  a file the caller converts.
+- `write` = the dialect's `write` of one file of a design `legalize` accepted for that target.
+  Handing it a design that is not legal is the caller's bug: a debug assertion
+  (`features_used ⊆ features`, no foreign `Opaque`), never a second legalization. A kit is
+  `read`, one `legalize`, one `write` per file.
+- `transpile` = `read`, `legalize`, `write` of the entry file, and the verdict: any
+  `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
+  turns an `Opaque` of class `Unread` into a refusal; `Lenient` keeps it (a writer of the same
+  text family copies it).
+- Every branch on which work happens is in these four functions.
 
 ## 4. Legalization (`src/passes/mod.rs`)
 
@@ -133,7 +149,10 @@ laws run on.
 - `tests/dialect_laws.rs`: for every row of `BUILTIN`, the laws of REWRITE-PLAN §4.2 that apply
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
-  row.write.features(), size)`; seeds are fixed and printed on failure. In this slice the only
+  row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
+  total over a design `legalize` accepted; a generated design `legalize` refuses (`admits`) is
+  skipped and counted, and the law fails when no admitted design holds an item kind the
+  writer's features claim. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
   edge: a file under `src/dialect/<d>/` importing another dialect (except a declared parent),

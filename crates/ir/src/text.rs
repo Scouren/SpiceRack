@@ -110,53 +110,174 @@
 //! `name#k` only when the lookup would bind another definition than the row's.
 //!
 //! Contents: `pub fn dump(&Design, FileId, &mut String)`,
-//! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `pub struct Words<'t>`,
-//! `Words::next(&mut self) -> Option<&'t str>`, `Words::peek(&self) -> Option<&'t str>`,
-//! `Words::at_end(&self) -> bool`, `Words::expect(&mut self, &str, &mut Diags) -> bool`,
-//! `Words::key(&mut self) -> Option<&'t str>`,
-//! `Words::name(&mut self, &mut Builder<'_>, &mut Diags) -> NameId`,
-//! `Words::names(&mut self, &mut Builder<'_>, &mut Diags) -> NameList`,
-//! `Words::number(&mut self, &mut Diags) -> Option<Literal>`,
-//! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
-//! `Words::reference(&mut self, &mut Builder<'_>, &mut Diags) -> Ref`,
-//! `Words::value(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
-//! `Words::expr(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
-//! `Words::exprs(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprList`,
-//! `Words::params(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ParamList`,
-//! `Words::error(&self, &mut Diags)`, `Words::span(&self) -> Span`
-
-use std::borrow::Cow;
+//! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`); crate:
+//! `pub(crate) fn keyword(ItemKind) -> &'static str`
 
 use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
-#[cfg(doc)]
-use crate::diag::TEXT_SYNTAX;
-use crate::expr::Literal;
-use crate::id::{ExprId, ExprList, FileId, NameId, NameList, ParamList, Ref, ScopeId};
-use crate::span::Span;
+use crate::expr::ExprTag;
+use crate::facts::RowFacts;
+use crate::id::{BranchList, DefId, ExprId, FileId, ItemRef, ScopeId};
+use crate::item::{If, ItemKind, Role};
+use crate::item_text;
+use crate::link::link;
+use crate::text_expr::{Ctx, write_expr, write_string};
+pub use crate::text_words::Words;
 
-/// The IR text reader's cursor over one statement line (after its indentation). A word is a
-/// maximal run of non-blank bytes outside a string or backtick name, or one of `( ) [ ] , =`.
-/// Every reading method that fails appends a [`TEXT_SYNTAX`] row at the current word, consumes
-/// nothing more than the bad word, and returns its failure value (`None`, `NONE`, an empty list).
-#[derive(Debug)]
-pub struct Words<'t> {
-    /// The whole text (spans are offsets into it).
-    pub(crate) text: &'t str,
-    /// Byte offset of the next word.
-    pub(crate) pos: usize,
-    /// Byte offset of the end of this line.
-    pub(crate) end: usize,
+/// An `if` whose `elif`/`else` lines are still to come at its depth: its branches and the
+/// next one to open. `None` branches: the `if` failed, its other lines are skipped.
+struct Chain {
+    branches: Option<BranchList>,
+    next: usize,
+}
+
+/// The keyword of each item kind in IR text (the kernel writes it; a row's `dump` writes what
+/// follows).
+pub(crate) fn keyword(kind: ItemKind) -> &'static str {
+    match kind {
+        ItemKind::Title => "title",
+        ItemKind::Comment => "comment",
+        ItemKind::Include => "include",
+        ItemKind::Global => "global",
+        ItemKind::Load => "load",
+        ItemKind::Opaque => "opaque",
+        ItemKind::Subckt => "subckt",
+        ItemKind::Section => "section",
+        ItemKind::If => "if",
+        ItemKind::Param => "param",
+        ItemKind::Func => "func",
+        ItemKind::Model => "model",
+        ItemKind::Statistics => "statistics",
+        ItemKind::Element => "element",
+        ItemKind::Analysis => "analysis",
+        ItemKind::Loop => "loop",
+        ItemKind::Alter => "alter",
+        ItemKind::Option => "option",
+        ItemKind::Env => "env",
+        ItemKind::NodeSet => "nodeset",
+        ItemKind::Save => "save",
+        ItemKind::Print => "print",
+        ItemKind::Measure => "measure",
+    }
 }
 
 /// Appends `file`'s block (its `file` line and every item of its scopes, depth first in item
 /// order) to `out`. Total over a design that passes `check`. Spans are not written. Each item
 /// line is its row's `RowFacts::dump` (one exhaustive dispatch over `ItemKind`).
-// definition phase: ptr_arg fires only because the body is todo!() (it will push to `out`).
-#[allow(clippy::ptr_arg)]
 pub fn dump(design: &Design, file: FileId, out: &mut String) {
-    todo!()
+    /// What remains to write: a scope's items from `next` on, or an `elif`/`else` line.
+    enum Frame {
+        Items {
+            scope: ScopeId,
+            depth: usize,
+            next: usize,
+        },
+        Branch {
+            cond: ExprId,
+            scope: ScopeId,
+            item: ItemRef,
+            depth: usize,
+        },
+    }
+    let f = design.file(file);
+    out.push_str("file ");
+    write_string(design.str(f.path), out);
+    out.push_str(match f.role {
+        Role::Deck => " deck\n",
+        Role::Library => " library\n",
+        Role::VerilogA => " veriloga\n",
+        Role::Missing => " missing\n",
+    });
+    let bodies = design.bodies();
+    let mut stack = vec![Frame::Items {
+        scope: f.top,
+        depth: 1,
+        next: 0,
+    }];
+    while let Some(frame) = stack.pop() {
+        match frame {
+            Frame::Branch {
+                cond,
+                scope,
+                item,
+                depth,
+            } => {
+                indent(depth, out);
+                if cond.is_none() {
+                    out.push_str("else\n");
+                } else {
+                    out.push_str("elif (");
+                    write_expr(
+                        design,
+                        cond,
+                        &Ctx {
+                            scope,
+                            item,
+                            formals: DefId::NONE,
+                        },
+                        out,
+                    );
+                    out.push_str(")\n");
+                }
+            }
+            Frame::Items { scope, depth, next } => {
+                let Some(&item) = design.items(scope).get(next) else {
+                    continue;
+                };
+                stack.push(Frame::Items {
+                    scope,
+                    depth,
+                    next: next + 1,
+                });
+                indent(depth, out);
+                out.push_str(keyword(item.kind));
+                let fields = out.len();
+                out.push(' ');
+                write_fields(
+                    design,
+                    item,
+                    &Ctx {
+                        scope,
+                        item,
+                        formals: DefId::NONE,
+                    },
+                    out,
+                );
+                if out.len() == fields + 1 {
+                    out.truncate(fields);
+                }
+                out.push('\n');
+                if item.kind == ItemKind::If {
+                    let row: If = design.row(item.index);
+                    let branches = design.branches(row.branches);
+                    for (k, br) in branches.iter().enumerate().rev() {
+                        stack.push(Frame::Items {
+                            scope: br.body,
+                            depth: depth + 1,
+                            next: 0,
+                        });
+                        if k > 0 {
+                            stack.push(Frame::Branch {
+                                cond: br.cond,
+                                scope,
+                                item,
+                                depth,
+                            });
+                        }
+                    }
+                } else if let Some(scopes) = bodies.get(&item) {
+                    for &body in scopes.iter().rev() {
+                        stack.push(Frame::Items {
+                            scope: body,
+                            depth: depth + 1,
+                            next: 0,
+                        });
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Reads one or more `file` blocks into `b`. Total: a line it cannot read appends a
@@ -165,94 +286,309 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
 /// (one exhaustive dispatch over `ItemKind`); then `link` binds every reference, `name?` ones
 /// excepted (module header).
 pub fn parse(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
-    todo!()
+    let lines = line_ranges(text);
+    let mut stack: Vec<ScopeId> = Vec::new(); // stack[d - 1]: the scope of a depth-d line
+    let mut chains: Vec<Option<Chain>> = Vec::new(); // per depth: an `if` awaiting `elif`/`else`
+    let mut skip_deeper: Option<usize> = None;
+    for (k, &(start, end)) in lines.iter().enumerate() {
+        let Some((depth, at)) = statement_start(text, start, end) else {
+            continue;
+        };
+        if let Some(d) = skip_deeper {
+            if depth > d {
+                continue;
+            }
+            skip_deeper = None;
+        }
+        let before = diags.len();
+        let mut w = Words {
+            text,
+            pos: at,
+            end,
+            line: at,
+        };
+        let failed = statement(
+            &mut w,
+            depth,
+            &lines[k + 1..],
+            &mut stack,
+            &mut chains,
+            b,
+            diags,
+        );
+        if failed {
+            skip_deeper = Some(depth);
+            if diags.len() == before {
+                w.error(diags);
+            }
+        }
+        diags
+            .rows
+            .truncate(before + (diags.len() > before) as usize); // one row per bad line
+    }
+    link(b.design, diags);
+    clear_held(b.design);
 }
 
-impl<'t> Words<'t> {
-    /// The next word, consumed; `None` at the end of the line.
-    #[allow(clippy::should_implement_trait)] // a cursor over one line, not an `Iterator`
-    pub fn next(&mut self) -> Option<&'t str> {
-        todo!()
-    }
+// ---- private ----
 
-    /// The next word, not consumed.
-    pub fn peek(&self) -> Option<&'t str> {
-        todo!()
+/// Reads one statement (the line's keyword already ahead of `w`). Returns whether it failed;
+/// a failed statement's deeper lines are skipped.
+fn statement(
+    w: &mut Words<'_>,
+    depth: usize,
+    rest: &[(usize, usize)],
+    stack: &mut Vec<ScopeId>,
+    chains: &mut Vec<Option<Chain>>,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> bool {
+    let Some(kw) = w.next() else { return false };
+    if depth == 0 {
+        return !file_line(w, kw, stack, chains, b, diags);
     }
+    if depth > stack.len() {
+        return true;
+    }
+    stack.truncate(depth);
+    chains.truncate(depth);
+    let scope = stack[depth - 1];
+    match kw {
+        "elif" | "else" => {
+            let Some(chain) = chains[depth - 1].as_mut() else {
+                return true;
+            };
+            let Some(list) = chain.branches else {
+                return false;
+            }; // a failed `if`: skip quietly
+            let Some(branch) = b.design().branches(list).get(chain.next).copied() else {
+                return true;
+            };
+            chain.next += 1;
+            stack.push(branch.body);
+            chains.push(None);
+            false
+        }
+        "if" => {
+            chains[depth - 1] = None;
+            let Some(conds) = if_conditions(w, depth, rest, scope, b, diags) else {
+                chains[depth - 1] = Some(Chain {
+                    branches: None,
+                    next: 0,
+                });
+                return true;
+            };
+            let (_, list) = b.if_(scope, &conds, w.line_span());
+            chains[depth - 1] = Some(Chain {
+                branches: Some(list),
+                next: 1,
+            });
+            stack.push(b.design().branches(list)[0].body);
+            chains.push(None);
+            false
+        }
+        _ => {
+            chains[depth - 1] = None;
+            let Some(kind) = ItemKind::ALL
+                .into_iter()
+                .find(|k| keyword(*k) == kw && *k != ItemKind::If)
+            else {
+                return true;
+            };
+            let scopes_before = b.design().scopes.len();
+            let item = for_kind!(kind, R => R::parse(w, scope, b, diags));
+            if item == ItemRef::NONE {
+                return true;
+            }
+            if !w.at_end() {
+                w.error(diags);
+            }
+            let d = b.design();
+            let body = (scopes_before..d.scopes.len())
+                .map(|s| ScopeId(s as u32))
+                .find(|s| d.scope(*s).owner == item);
+            if let Some(body) = body {
+                stack.push(body);
+                chains.push(None);
+            }
+            false
+        }
+    }
+}
 
-    /// Whether the line has no word left.
-    pub fn at_end(&self) -> bool {
-        todo!()
+/// `file "path" role`: opens a file block. Returns whether it succeeded.
+fn file_line(
+    w: &mut Words<'_>,
+    kw: &str,
+    stack: &mut Vec<ScopeId>,
+    chains: &mut Vec<Option<Chain>>,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> bool {
+    stack.clear();
+    chains.clear();
+    if kw != "file" {
+        return false;
     }
+    let Some(path) = w.string(diags) else {
+        return false;
+    };
+    let role = match w.next() {
+        Some("deck") => Role::Deck,
+        Some("library") => Role::Library,
+        Some("veriloga") => Role::VerilogA,
+        Some("missing") => Role::Missing,
+        _ => return false,
+    };
+    if !w.at_end() || !b.design().find_file(&path).is_none() {
+        return false;
+    }
+    let (_, top) = b.file(&path, role);
+    stack.push(top);
+    chains.push(None);
+    true
+}
 
-    /// Consumes `word` if it is next; else reports and returns false.
-    pub fn expect(&mut self, word: &str, diags: &mut Diags) -> bool {
-        todo!()
+/// The conditions of an `if` chain: this line's `(cond)`, then each following `elif (cond)` and
+/// a final `else` at the same depth (deeper lines between them are bodies). Built before any
+/// body, as a builder caller builds them. `None` (one row reported) if any is malformed.
+fn if_conditions(
+    w: &mut Words<'_>,
+    depth: usize,
+    rest: &[(usize, usize)],
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> Option<Vec<ExprId>> {
+    let first = w.value(scope, b, diags);
+    if first.is_none() || !w.at_end() {
+        return None;
     }
+    let mut conds = vec![first];
+    for &(start, end) in rest {
+        let Some((d, at)) = statement_start(w.text, start, end) else {
+            continue;
+        };
+        if d > depth {
+            continue;
+        }
+        let mut line = Words {
+            text: w.text,
+            pos: at,
+            end,
+            line: at,
+        };
+        match (d == depth).then(|| line.next()).flatten() {
+            Some("elif") => {
+                let cond = line.value(scope, b, diags);
+                if cond.is_none() || !line.at_end() {
+                    return None;
+                }
+                conds.push(cond);
+            }
+            Some("else") => {
+                if !line.at_end() {
+                    line.error(diags);
+                    return None;
+                }
+                conds.push(ExprId::NONE);
+                break;
+            }
+            _ => break,
+        }
+    }
+    Some(conds)
+}
 
-    /// If the next words are `key =`, consumes them and returns the key; else `None`, consuming
-    /// nothing (fields are optional, so this never reports).
-    pub fn key(&mut self) -> Option<&'t str> {
-        todo!()
+/// Writes the fields of `item`'s row (after its keyword): kernel rows with their context
+/// (`item_text`), the owners' rows through their `RowFacts::dump`.
+fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, out: &mut String) {
+    fn owner<R: RowFacts>(d: &Design, item: ItemRef, out: &mut String) {
+        d.row::<R>(item.index).dump(d, out);
     }
+    let i = item.index;
+    match item.kind {
+        ItemKind::Title => item_text::dump_title(&d.row(i), d, item, ctx, out),
+        ItemKind::Comment => item_text::dump_comment(&d.row(i), d, item, ctx, out),
+        ItemKind::Include => item_text::dump_include(&d.row(i), d, item, ctx, out),
+        ItemKind::Global => item_text::dump_global(&d.row(i), d, item, ctx, out),
+        ItemKind::Load => item_text::dump_load(&d.row(i), d, item, ctx, out),
+        ItemKind::Opaque => item_text::dump_opaque(&d.row(i), d, item, ctx, out),
+        ItemKind::Subckt => item_text::dump_subckt(&d.row(i), d, item, ctx, out),
+        ItemKind::Section => item_text::dump_section(&d.row(i), d, item, ctx, out),
+        ItemKind::If => item_text::dump_if(&d.row(i), d, item, ctx, out),
+        ItemKind::Param => item_text::dump_param(&d.row(i), d, item, ctx, out),
+        ItemKind::Func => item_text::dump_func(&d.row(i), d, item, ctx, out),
+        ItemKind::Model => owner::<crate::model::Model>(d, item, out),
+        ItemKind::Statistics => owner::<crate::stats::Statistics>(d, item, out),
+        ItemKind::Element => owner::<crate::element::Element>(d, item, out),
+        ItemKind::Analysis => owner::<crate::analysis::Analysis>(d, item, out),
+        ItemKind::Loop => owner::<crate::plan::Loop>(d, item, out),
+        ItemKind::Alter => owner::<crate::plan::Alter>(d, item, out),
+        ItemKind::Option => owner::<crate::option::OptionRow>(d, item, out),
+        ItemKind::Env => owner::<crate::option::Env>(d, item, out),
+        ItemKind::NodeSet => owner::<crate::option::NodeSet>(d, item, out),
+        ItemKind::Save => owner::<crate::output::Save>(d, item, out),
+        ItemKind::Print => owner::<crate::output::Print>(d, item, out),
+        ItemKind::Measure => owner::<crate::output::Measure>(d, item, out),
+    }
+}
 
-    /// A name (bare in a name position, or backtick-quoted), interned.
-    pub fn name(&mut self, b: &mut Builder<'_>, diags: &mut Diags) -> NameId {
-        todo!()
+/// After the link: a reference held as `name?` becomes unresolved (`DefId::HELD` never
+/// survives `parse`).
+fn clear_held(d: &mut Design) {
+    let x = &mut d.exprs;
+    for (i, tag) in x.tags.iter().enumerate() {
+        if *tag == ExprTag::Param && x.b[i] == DefId::HELD.0 {
+            x.b[i] = DefId::NONE.0;
+        }
     }
+    for call in &mut x.calls {
+        if call.func.def == DefId::HELD {
+            call.func.def = DefId::NONE;
+        }
+    }
+    for (item, _) in d.reachable() {
+        d.editor().map_refs(item, &mut |r, _| {
+            if r.def == DefId::HELD {
+                r.def = DefId::NONE;
+            }
+        });
+    }
+}
 
-    /// A parenthesized, blank-separated name list: `(a b c)`, possibly `()`.
-    pub fn names(&mut self, b: &mut Builder<'_>, diags: &mut Diags) -> NameList {
-        todo!()
+/// The `[start, end)` byte range of each line (without its line break).
+fn line_ranges(text: &str) -> Vec<(usize, usize)> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    for (k, c) in text.bytes().enumerate() {
+        if c == b'\n' {
+            lines.push((start, k));
+            start = k + 1;
+        }
     }
+    if start < text.len() {
+        lines.push((start, text.len()));
+    }
+    lines
+}
 
-    /// A number in the grammar's spelling, as its literal (no floating arithmetic).
-    pub fn number(&mut self, diags: &mut Diags) -> Option<Literal> {
-        todo!()
+/// A statement line's depth and first byte; `None` for a blank or `#` comment line. An odd
+/// indentation is read at the depth below it (and reported by the line's own reading).
+fn statement_start(text: &str, start: usize, end: usize) -> Option<(usize, usize)> {
+    let s = &text.as_bytes()[start..end];
+    let n = s.iter().take_while(|c| **c == b' ').count();
+    let rest = &s[n..];
+    if rest
+        .iter()
+        .all(|c| *c == b' ' || *c == b'\t' || *c == b'\r')
+        || rest[0] == b'#'
+    {
+        return None;
     }
+    Some((n / 2, start + n))
+}
 
-    /// A double-quoted string, unescaped: borrowed from the text when it has no escape, owned
-    /// when it has.
-    pub fn string(&mut self, diags: &mut Diags) -> Option<Cow<'t, str>> {
-        todo!()
-    }
-
-    /// A reference: `name` (unresolved; `link` binds it after the whole text), `name?` (held
-    /// unresolved through the link) or `name#k` (bound to definition `k`, checked by `check`).
-    /// The row stores the returned `Ref` as it is.
-    pub fn reference(&mut self, b: &mut Builder<'_>, diags: &mut Diags) -> Ref {
-        todo!()
-    }
-
-    /// A field value: an atom, or a parenthesized expression (references in it are linked after
-    /// the whole text). `scope` is where the expression is used.
-    pub fn value(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
-        todo!()
-    }
-
-    /// An expression to the end of the line or the next unmatched `)`/`,`/`]` (the `param` and
-    /// `func` right-hand sides). Explicit operator stack: no recursion on nesting depth (C11).
-    pub fn expr(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
-        todo!()
-    }
-
-    /// A bracketed expression list: `[e1, e2]`, possibly `[]`.
-    pub fn exprs(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprList {
-        todo!()
-    }
-
-    /// A parenthesized `key=value` list: `(w=1e-6 l=(2 * lmin))`, possibly `()`.
-    pub fn params(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ParamList {
-        todo!()
-    }
-
-    /// Appends a [`TEXT_SYNTAX`] row at the current word.
-    pub fn error(&self, diags: &mut Diags) {
-        todo!()
-    }
-
-    /// The current word's bytes (file `NONE`: the text is not a design file).
-    pub fn span(&self) -> Span {
-        todo!()
-    }
+fn indent(depth: usize, out: &mut String) {
+    out.extend(std::iter::repeat_n(' ', 2 * depth));
 }

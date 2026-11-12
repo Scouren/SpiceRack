@@ -54,15 +54,22 @@ pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
+#[cfg(any(test, feature = "gen"))]
+mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
+pub mod item_text;
 pub mod link;
 pub mod names;
 pub mod scope;
 pub mod span;
 pub mod table;
 pub mod text;
+pub mod text_expr;
+pub mod text_lex;
+pub mod text_parse;
+pub mod text_words;
 
 // circuit owner
 pub mod build_circuit;

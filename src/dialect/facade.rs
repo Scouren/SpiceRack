@@ -6,14 +6,16 @@
 //!
 //! A pair goes to the new pipeline when it is in [`ROUTES`] (empty in slice S2), or when
 //! `SPICERACK_PIPELINE=new` and both rows have the side it needs; `SPICERACK_PIPELINE=old`
-//! sends every pair to the old one. New diagnostic codes are shown as today's through
-//! [`OLD_CODE`], then by the same letter and number, then as [`UNMAPPED`].
+//! sends every pair to the old one. A new diagnostic code is shown as today's through
+//! [`OLD_CODE`] (a row exists only where a routed test asserts an old code), else as
+//! [`IR_REFUSAL`] or [`IR_NOTE`] by its verdict, its message carrying the new code and title.
 //!
 //! Cites: `rewrite/SPINE.md` §5; `REWRITE-PLAN.md` §7.2.
 //!
 //! Contents:
 //! - `pub enum Pipeline`, `pub const ENV: &str`, `pub const ROUTES: &[(&str, &str)]`,
-//!   `pub struct OldCode`, `pub static OLD_CODE: &[OldCode]`, `pub const UNMAPPED: Code`
+//!   `pub struct OldCode`, `pub static OLD_CODE: &[OldCode]`, `pub const IR_REFUSAL: Code`,
+//!   `pub const IR_NOTE: Code`
 //! - `pub fn route(from: &str, to: &str) -> Option<(&'static DialectRow, &'static DialectRow)>`
 //! - `pub fn route_with(from: &str, to: &str, pipeline: Option<Pipeline>) -> Option<(&'static DialectRow, &'static DialectRow)>`
 //! - `pub fn render_text(text: &str, name: &str, from: &DialectRow, to: &DialectRow) -> Result<render::Written, render::Diags>`
@@ -62,10 +64,11 @@ pub struct OldCode {
 /// The code map the dialect slices fill as they flip pairs; the first matching row wins.
 pub static OLD_CODE: &[OldCode] = &[];
 
-/// What a new code with no row and no namesake in today's catalogue is shown as: a code no
-/// transpile raises today (the simulator registry is full), so a test that pins codes fails
-/// on it loudly.
-pub const UNMAPPED: Code = Code::R0042;
+/// How a refusing new code with no [`OLD_CODE`] row is shown: `W0203 <code> <title>`.
+pub const IR_REFUSAL: Code = Code::W0203;
+
+/// How a new note with no [`OLD_CODE`] row is shown: `W0204 <code> <title>`.
+pub const IR_NOTE: Code = Code::W0204;
 
 /// [`route_with`] under `SPICERACK_PIPELINE` (read once per process).
 pub fn route(from: &str, to: &str) -> Option<(&'static DialectRow, &'static DialectRow)> {
@@ -112,7 +115,9 @@ pub fn render_text(
 }
 
 /// `file` of `kit` (its entry) and every kit file it reaches through `from`'s references,
-/// through `transpile`, leniently, in today's types.
+/// through `transpile`, leniently, in today's types: one read and one `legalize` of the kit per
+/// call (today's `render_kit` writes one file per call; a caller of the spine writes them all
+/// after one `legalize`).
 ///
 /// # Errors
 /// The refusal, as today's `Diags`.
@@ -152,9 +157,10 @@ pub fn render_kit(
 }
 
 /// `rows` in today's form: each code through [`old_code`], sorted by position (file, byte,
-/// code), messages `name:line:column: CODE title` with the line and byte column (from 1)
-/// computed from the span in `src`'s file of that position; `0:0` for a row with no span or
-/// a file `src` lacks. Today's `Diag::token` holds the span's first byte.
+/// code), messages `name:line:column: CODE title` (for [`IR_REFUSAL`] and [`IR_NOTE`]: `CODE
+/// <new code> <new title>`) with the line and byte column (from 1) computed from the span in
+/// `src`'s file of that position; `0:0` for a row with no span or a file `src` lacks. Today's
+/// `Diag::token` holds the span's first byte.
 pub fn diags(rows: &[ir::Diag], src: &Sources, name: &str, target: &str) -> render::Diags {
     let mut sorted = rows.to_vec();
     sorted.sort_by_key(|d| (d.span.file, d.span.start, d.code));
@@ -169,31 +175,33 @@ pub fn diags(rows: &[ir::Diag], src: &Sources, name: &str, target: &str) -> rend
             .flatten();
         let (line, column) = text.map_or((0, 0), |(_, t)| location(t, d.span.start));
         out.diags.push(diag::Diag::new(old, d.span.start, 0));
-        let title = diag::info(old).title;
+        let title = match old {
+            IR_REFUSAL | IR_NOTE => {
+                let new = super::info(d.code).map_or("a code no catalogue holds", |i| i.title);
+                format!("{}{:04} {new}", char::from(d.code.letter), d.code.number)
+            }
+            _ => diag::info(old).title.to_string(),
+        };
         out.messages += &format!("{name}:{line}:{column}: {old:?} {title}\n");
     }
     assert!(out.diags.len() == rows.len(), "one old row per new row");
     out
 }
 
-/// Today's code for `d` on `target`: the first [`OLD_CODE`] row that matches, else the old
-/// code of the same letter and number, else [`UNMAPPED`].
+/// Today's code for `d` on `target`: the first [`OLD_CODE`] row that matches, else
+/// [`IR_REFUSAL`] or [`IR_NOTE`] by the new code's verdict (`dialect::refuses`), so a refusal
+/// stays a refusal.
 pub fn old_code(d: &ir::Diag, target: &str) -> Code {
     let row = OLD_CODE.iter().find(|r| {
         r.code == d.code
             && r.target.is_none_or(|t| t == target)
             && r.feature.is_none_or(|f| u32::from(f.index()) == d.arg)
     });
-    if let Some(r) = row {
-        return r.old;
+    match row {
+        Some(r) => r.old,
+        None if super::refuses(d.code) => IR_REFUSAL,
+        None => IR_NOTE,
     }
-    let same = format!("{}{:04}", char::from(d.code.letter), d.code.number);
-    // ponytail: a scan of the old catalogue per unmapped row; a map if routed decks get many.
-    Code::ALL
-        .iter()
-        .copied()
-        .find(|c| format!("{c:?}") == same)
-        .unwrap_or(UNMAPPED)
 }
 
 // ---- private ----
