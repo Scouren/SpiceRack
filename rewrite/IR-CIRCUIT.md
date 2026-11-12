@@ -59,21 +59,26 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 never to a parameter named `m`. How it multiplies is the header's `mult_law` (AMEND-A12 A15 C1,
 R31): `MultLaw::Parallel` (every kind: `mult` whole copies in parallel; through the hierarchy
 multiplicities compose by multiplication) or, on an `Instance` with a `mult` only,
-`MultLaw::NgspiceAppend` (ngspice's `m` on an X line, `inpcom.c:4124-4198`): the instance's
-`mult` is given to every element of the subcircuit's body whose kind ngspice multiplies,
-replacing that element's own `mult`, and is passed on the same way to nested `Instance`s. By
-kind, ngspice leaves these as they are (their own `mult` stays): `VSource` and `Port` (V cards),
-`Vcvs` and `Delay` and a voltage-output `Poly`, `Table`, `Laplace` or `FreqTable` (E cards),
-`Ccvs` and a voltage-output current-controlled `Poly` (H cards), `Behav` with
-`OutKind::Voltage` (a V-valued B card), `CodeModel` (A), `Coupling` (K), `ModuleModel` (N), the
-line kinds (`LosslessLine`, `LossyLine`, `RcLine`, `SingleLossyLine`, `CoupledLines`) and the
-switches (`VSwitch`, `ISwitch`). Every other kind takes it: R, C, L and their charge- and
-flux-defined forms, `ISource`, `Vccs`, `Cccs` and their `Poly`/`Table`/`Laplace`/`FreqTable`
-current-output forms, a `Behav` of any other output, the semiconductors. This list is A15's
-reading of the exclusion list; the exact list by card letter (with the B source split by
-output) comes from the ngspice elements slice, and a difference is a change of this paragraph
-only, with its run. Features: `MultInstanceParallel`, `MultInstanceNgspiceAppend` (they
-replace `MultInstance`).
+`MultLaw::NgspiceAppend` (ngspice's `m` on an X line, ngspice-45 `inpcom.c:4124-4198`
+`inp_fix_subckt_multiplier` and `4208-4250`; exact list and runs from the ngspice elements
+slice): when the subcircuit does not declare `m`, the instance's `mult` is appended as `m={m}`
+to every element of the body, after its own `m=`, so it replaces that element's own `mult` (the
+last one wins: an inner `R1 p q 1k m=5` under `X … m=2` runs as 500 Ω, v(f) = 0.6667), and
+nested `Instance`s pass it on the same way. ngspice leaves untouched the cards whose letter is
+in "vehaknopstuwy" and a B card whose output is `v=`: by kind `VSource` and `Port` (V), `Vcvs`,
+`Delay` and the voltage-output `Poly`, `Table`, `Laplace`, `FreqTable` (E), `Ccvs` and the
+voltage-output current-controlled `Poly` (H), `CodeModel` (A), `Coupling` (K), `ModuleModel`
+(N), `LossyLine` (O), `CoupledLines` (P), `VSwitch` (S), `LosslessLine` (T), `RcLine` (U),
+`ISwitch` (W), `SingleLossyLine` (Y), and `Behav` with `OutKind::Voltage`. Every other kind is
+multiplied: R, C, L (with the charge- and flux-defined forms and a circuit-valued R), `ISource`
+(`i` is not in the list), `Vccs`, `Cccs` and every current-output G/F form, a current `Behav`,
+D, Q, M, J, Z (`Mesfet`, `Igbt`), and nested `Instance`s (X). `Module` and `Unresolved` are no
+ngspice cards. Runs (ngspice-45): `X1 … m=2` over `R1 p q 1k` gives v(b) = 0.6667 (500 Ω). A
+subcircuit that declares `m` in its head (`params: m=1`) triggers nothing: `m` is an ordinary
+parameter (v(d) = 0.5, R stays 1k), so the ngspice reader puts it in the instance's `params`
+and leaves `mult` `NONE`. HSPICE compatibility mode (`newcompat.hs`) writes `m={m*<old>}`, a
+product: that is `Parallel`, not this law. Features: `MultInstanceParallel`,
+`MultInstanceNgspiceAppend` (they replace `MultInstance`).
 
 ## 3. Waveforms (`wave.rs`)
 
