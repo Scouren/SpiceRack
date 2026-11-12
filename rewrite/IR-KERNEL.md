@@ -348,6 +348,17 @@ sections may now be nested where the set allows. `Placed(_, Title)` never occurs
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
 
+**The builder's undo (2026-11-12, the dialects' audit row 5).** `Builder::mark() -> Mark` and
+`Builder::truncate(Mark)` (`mark.rs`): a mark holds every table's length (the kernel's, the 26
+item tables, the circuit and run details, listed by exhaustive destructuring so a new table is
+a compile error), and the truncate drops what was appended since: rows, pool entries, names
+(each out of its hash chain, newest first), texts, definitions and their index entries,
+scopes, and the items at the end of each surviving scope list. Appends only: a row changed in
+place since the mark stays changed. A reader marks before a statement, pushes while it
+validates, and truncates a refused one. Property (`tests/kernel_mark.rs`): a generated text
+pushed after a mark and truncated leaves the design equal to one read without the detour,
+its next ids the same.
+
 **A40 (2026-11-12): a root's form follows its class, except in a behavioural source (R66;
 amends A19 and A26).** `ExprUse` has a third member, `Behavioural`: the expression of an element
 whose detail is a `Behav` row (a behavioural source, a charge-defined capacitor, a flux-defined
