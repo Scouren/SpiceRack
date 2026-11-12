@@ -477,6 +477,36 @@ root's class.
 a function whose formals number differently from its arguments, at the item. The generator calls
 a bound function with one argument per formal.
 
+**Round 7b (2026-11-12): strings and lists as values (A25 item 4, ruled).** Two features by
+type: `Extra::StringValue` and `Extra::ListValue`, a `Param`'s value or a `Subckt` head default
+whose root is a string or a list. A string or a list in an element's or model's parameter list
+is `Expr(Str)`/`Expr(List)` alone. Two invariants: a function body's root is neither
+(`StringOrListBody`, X0020); a typed field's root (a `Handle::Expr`, `ExprDyn` or `Exprs` root of
+any row, a `Param`'s value aside) is never a list, and a string only where its row names it in
+`RowFacts::string_roots` (default none). The owners name three: a model's `version` (a family
+version is a number or a dotted string), an alter's `value` (a string-valued device parameter),
+and a private option's `value` (`StringOrListField`, X0021). The generator draws a string or a
+list root only where a field asks for one (`Gen::root_str`, `Gen::root_list`).
+
+**Round 7b (2026-11-12): a typed parameter read in the generator (A33).** `Gen::typed_params`:
+a parameter-read leaf is built as `ToReal(read)`, or `ToInt(read)`, whichever the set allows
+dynamically, or is not drawn. The circuit owner sets it around a behavioural draw without
+`BehavUntypedParam`.
+
+**R62/A37 (2026-11-12): the two rules of a formal's default.** `Extra::FormalOuterRead`: a
+`Subckt` head default holds a read bound to a definition outside the subcircuit's body (the
+lexical rule). `Extra::FormalUnboundRead`: it holds an unbound read whose name is no sibling
+formal's (looked up from each instance's scope, A29). A sibling's read, bound or by name, sets
+neither. Both stand beside `FormalNotConstant`, which any read still sets. The generator draws
+each kind of read in a default only when the set holds its feature (`Gen::bound_reads`,
+`Gen::unbound_reads`; a read neither allows is a literal).
+
+**R63/A38 (2026-11-12): the unbound reads.** `link::unbound_reads(&Design) -> Vec<UnboundRead>`:
+every `Expr::Param` row no definition is bound to, item by item in `reachable` order and left to
+right, each `UnboundRead { item, expr, name, held }`. `held` marks a `Subckt` head default's read,
+which each instance's scope looks up (A29, IR text `name?`). The spine's strict read refuses
+the others.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

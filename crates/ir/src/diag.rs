@@ -291,6 +291,18 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a call whose arguments do not match its function's formals",
             "a user function is called with more or fewer arguments than it has formals; every simulator we know refuses it.",
         ),
+        Violation::StringOrListBody => (
+            "a function body that is a string or a list",
+            "a user function's body is a number; a string or a list is a value only of a parameter, a formal's default or a parameter list.",
+        ),
+        Violation::InstancePortCount => (
+            "a subcircuit instance whose terminals do not match its definition's ports",
+            "an instance connects one net per port of the subcircuit it is bound to; ngspice and HSPICE refuse another count, and VACASK's own reading (internal nodes for missing trailing terminals) is kept Private by its reader.",
+        ),
+        Violation::StringOrListField => (
+            "a typed field that holds a string or a list",
+            "a row's own expression field is a number, except the fields its row names as strings (a model's version, an alter's value, a private option's value); a list is a value only of a parameter, a formal's default or a parameter list.",
+        ),
     }
 }
 

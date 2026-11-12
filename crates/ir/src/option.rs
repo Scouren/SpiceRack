@@ -31,7 +31,8 @@
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
 //! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
 //! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`); crate:
-//! `pub(crate) fn gen_nfreqs`, `pub(crate) fn gen_holds` (gen)
+//! `pub(crate) struct Modes`, `pub(crate) const OPTION_MODES`, `ENV_MODES`, `NODE_SET_MODES`,
+//! `SAVE_MODES`, `pub(crate) const fn mode_feature` (the generators: `state_gen.rs`)
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
@@ -46,6 +47,7 @@ use crate::id::{ExprId, ItemRef, NameId, NameList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
+use crate::run_names::names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -102,7 +104,9 @@ pub struct NodeSet {
     /// serves every solve).
     pub applies: IcScope,
     /// Whether it applies to the next analysis only (VACASK's analysis-line `ic=[…]` and
-    /// `nodeset=[…]`), instead of to every analysis after it.
+    /// `nodeset=[…]`), instead of to every analysis after it. A next-only and a standing one of
+    /// the same kind, node and reference both in force at one analysis are refused (checked,
+    /// `state_order::node_set_mix`): no simulator states both, so none decides which holds.
     pub next_only: bool,
     /// The node: the instance path then the net, relative to the item's scope (a subcircuit
     /// body: each instance's own nodes). `Device`: the element's path. Empty only for
@@ -120,8 +124,15 @@ pub struct NodeSet {
     pub holds: Applies,
 }
 
-/// Which run items a state item (`OptionRow`, `Env`, `NodeSet`) holds for (A14, R24).
-/// `FromHere` is the default (builder, IR text): it is the meaning state items had before A14.
+/// Which run items a state item (`OptionRow`, `Env`, `NodeSet`, `Save`) holds for (A14, R24).
+/// `FromHere` is the default of the state items (builder, IR text): it is the meaning they had
+/// before A14; a `Save`'s default is `WholeRun`.
+///
+/// Precedence (A28; by ngspice's runs: a script `option` beats an `.options` card, and `reset`
+/// drops the script's and keeps the card's): a `FromHere` item holds from where it stands over
+/// every `WholeRun` item that sets the same thing, until a `Reset` of its class or a later
+/// `FromHere` item of the same thing; before it, and after such a `Reset`, the `WholeRun` value
+/// holds. `state_order::in_force` is this rule as code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Applies {
@@ -159,6 +170,48 @@ pub enum IcScope {
     /// Every operating point: `.op`, each `.dc` point, the transient's (Xyce).
     EveryOp,
 }
+
+/// One state item kind's mode features (A28 grain): each mode wherever it stands, and each
+/// after a run item in listed order.
+pub(crate) struct Modes {
+    /// The kind's item that holds `FromHere`.
+    pub(crate) from_here: RunExtra,
+    /// The kind's item that holds `WholeRun`.
+    pub(crate) whole_run: RunExtra,
+    /// A `FromHere` one after a run item.
+    pub(crate) mid: RunExtra,
+    /// A `WholeRun` one after a run item.
+    pub(crate) whole_mid: RunExtra,
+}
+
+/// An option row's mode features.
+pub(crate) const OPTION_MODES: Modes = Modes {
+    from_here: RunExtra::OptionFromHere,
+    whole_run: RunExtra::OptionWholeRun,
+    mid: RunExtra::OptionMidRun,
+    whole_mid: RunExtra::OptionWholeRunMidRun,
+};
+/// An `Env`'s mode features.
+pub(crate) const ENV_MODES: Modes = Modes {
+    from_here: RunExtra::EnvFromHere,
+    whole_run: RunExtra::EnvWholeRun,
+    mid: RunExtra::EnvMidRun,
+    whole_mid: RunExtra::EnvWholeRunMidRun,
+};
+/// A `NodeSet`'s mode features.
+pub(crate) const NODE_SET_MODES: Modes = Modes {
+    from_here: RunExtra::NodeSetFromHere,
+    whole_run: RunExtra::NodeSetWholeRun,
+    mid: RunExtra::NodeSetMidRun,
+    whole_mid: RunExtra::NodeSetWholeRunMidRun,
+};
+/// A `Save`'s mode features.
+pub(crate) const SAVE_MODES: Modes = Modes {
+    from_here: RunExtra::SaveFromHere,
+    whole_run: RunExtra::SaveWholeRun,
+    mid: RunExtra::SaveMidRun,
+    whole_mid: RunExtra::SaveWholeRunMidRun,
+};
 
 const _: () = assert!(size_of::<OptionRow>() == 16);
 const _: () = assert!(size_of::<Env>() == 12);
@@ -200,6 +253,13 @@ impl RowFacts for OptionRow {
         design.editor().set(at.index, row);
     }
 
+    fn string_roots(&self, _design: &Design, out: &mut Vec<ExprId>) {
+        // a simulator's own option may take a string, kept as written (A25)
+        if self.key == OptionKey::Private {
+            out.push(self.value);
+        }
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -209,9 +269,9 @@ impl RowFacts for OptionRow {
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        holds_feature(self.holds, set);
+        holds_feature(&OPTION_MODES, self.holds, set);
         *set = set.with(Feature::Option(self.key));
-        // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
+        // `OptionMidRun` and `OptionWholeRunMidRun` are facts of the listed order: `state_order_features`.
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -278,8 +338,7 @@ impl RowFacts for OptionRow {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::OptionMidRun, mode_feature)
-        else {
+        let Some(holds) = crate::state_gen::gen_holds(g, b, scope, features, &OPTION_MODES) else {
             return ItemRef::NONE;
         };
         let keys: Vec<OptionKey> = OptionKey::ALL
@@ -343,7 +402,7 @@ impl RowFacts for Env {
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        holds_feature(self.holds, set);
+        holds_feature(&ENV_MODES, self.holds, set);
         // placement is the kernel's `Placed` (A15 K1)
     }
 
@@ -386,8 +445,7 @@ impl RowFacts for Env {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::EnvMidRun, mode_feature)
-        else {
+        let Some(holds) = crate::state_gen::gen_holds(g, b, scope, features, &ENV_MODES) else {
             return ItemRef::NONE;
         };
         // At least one of the two, each in the text's order.
@@ -421,6 +479,18 @@ impl RowFacts for NodeSet {
         design.editor().set(at.index, row);
     }
 
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: NodeSet = design.row(at.index);
+        let mut r = names(design, f);
+        match row.kind {
+            NodeSetKind::Device => r.path(row.node),
+            NodeSetKind::Ic | NodeSetKind::Nodeset => {
+                r.net_path(row.node);
+                r.net_path(row.reference);
+            }
+        }
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
@@ -430,7 +500,7 @@ impl RowFacts for NodeSet {
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        holds_feature(self.holds, set);
+        holds_feature(&NODE_SET_MODES, self.holds, set);
         let held = self.kind != NodeSetKind::Nodeset;
         flag(
             set,
@@ -522,7 +592,7 @@ impl RowFacts for NodeSet {
         if !next && !beyond {
             return ItemRef::NONE;
         }
-        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun, mode_feature)
+        let Some(holds) = crate::state_gen::gen_holds(g, b, scope, features, &NODE_SET_MODES)
         else {
             return ItemRef::NONE;
         };
@@ -539,8 +609,12 @@ impl RowFacts for NodeSet {
             IcScope::Transient
         };
         let next_only = next && (!beyond || g.chance(3));
-        let all =
-            kind == NodeSetKind::Nodeset && has(features, RunExtra::NodesetAll) && g.chance(3);
+        // a next-only node set on every node beside a standing one would be the refused mix
+        // (`state_order::node_set_mix`); fresh node names never meet
+        let all = kind == NodeSetKind::Nodeset
+            && !next_only
+            && has(features, RunExtra::NodesetAll)
+            && g.chance(3);
         let node = if all {
             crate::id::List::EMPTY
         } else {
@@ -570,62 +644,12 @@ impl RowFacts for NodeSet {
     }
 }
 
-/// Pushes an `nfreqs` option into `scope` for a Fourier analysis about to follow it (its count
-/// then comes from the option, A16), when the set allows one there. Whether it pushed.
-#[cfg(any(test, feature = "gen"))]
-pub(crate) fn gen_nfreqs(
-    g: &mut Gen,
-    scope: ScopeId,
-    b: &mut Builder<'_>,
-    features: &FeatureSet,
-) -> bool {
-    let allowed = features.contains(Feature::Item(crate::item::ItemKind::Option))
-        && features.contains(Feature::Option(OptionKey::NFreqs))
-        && crate::r#gen::placeable(b.design(), scope, crate::item::ItemKind::Option, features)
-        && g.items_left > 1;
-    let Some(holds) = allowed
-        .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun, mode_feature))
-        .flatten()
-    else {
-        return false;
-    };
-    let value = g.expr(b, features, Reads::Constant);
-    let row = OptionRow {
-        key: OptionKey::NFreqs,
-        private: NameId::NONE,
-        dialect: NameId::NONE,
-        value,
-        holds,
-    };
-    b.push(scope, row, Span::NONE);
-    g.items_left -= 1;
-    true
-}
-
-/// The mode of a state item generated into `scope`, or `None` when the set allows neither: once
-/// any run item exists (conservatively: anywhere, since items are generated in listed order),
-/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun` (placement is `fill`'s, A15 K1);
-/// each mode also needs its own feature, `mode(m)` (a state item's or a save's).
-#[cfg(any(test, feature = "gen"))]
-pub(crate) fn gen_holds(
-    g: &mut Gen,
-    b: &Builder<'_>,
-    _scope: ScopeId,
-    features: &FeatureSet,
-    mid: RunExtra,
-    mode: fn(Applies) -> RunExtra,
-) -> Option<Applies> {
-    let d = b.design();
-    let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
-    let modes: Vec<Applies> = [
-        (Applies::FromHere, mid),
-        (Applies::WholeRun, RunExtra::WholeRunMidRun),
-    ]
-    .into_iter()
-    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode(m)))
-    .map(|(m, _)| m)
-    .collect();
-    (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])
+/// The feature of each `Applies` member of one state item kind (A28 grain: per kind).
+pub(crate) const fn mode_feature(modes: &Modes, holds: Applies) -> RunExtra {
+    match holds {
+        Applies::FromHere => modes.from_here,
+        Applies::WholeRun => modes.whole_run,
+    }
 }
 
 // ---- private ----
@@ -639,15 +663,7 @@ fn take_holds(words: &mut Words<'_>) -> Applies {
     }
 }
 
-/// Adds the feature of a state item's mode (`StateFromHere`, `StateWholeRun`).
-fn holds_feature(holds: Applies, set: &mut FeatureSet) {
-    flag(set, true, mode_feature(holds));
-}
-
-/// The feature of each `Applies` member.
-const fn mode_feature(holds: Applies) -> RunExtra {
-    match holds {
-        Applies::FromHere => RunExtra::StateFromHere,
-        Applies::WholeRun => RunExtra::StateWholeRun,
-    }
+/// Adds the feature of a state item's mode (`OptionFromHere`, `EnvWholeRun`, …).
+fn holds_feature(modes: &Modes, holds: Applies, set: &mut FeatureSet) {
+    flag(set, true, mode_feature(modes, holds));
 }

@@ -698,4 +698,58 @@ mod tests {
             assert_eq!(f.library_free(), free, "{f:?}");
         }
     }
+
+    /// A32: the circuit rows' element names (`RowFacts::map_element_names`), in field order, each
+    /// one use read in the element's scope: a coupling's inductors, a current-controlled
+    /// source's sensing element, a current-controlled polynomial's controls, a current switch's
+    /// sensing element; neighbours: a voltage-controlled polynomial's controls and every
+    /// terminal are nets. Oracle: the names written in the text, and the text after a rename.
+    #[test]
+    fn the_circuit_rows_name_elements_by_name() {
+        let src = concat!(
+            "file \"t.sp\" deck\n",
+            "  element coupling k1 () inductors=(l1 l2) k=1\n",
+            "  element cccs f1 (o 0) gain=2 sense=v1\n",
+            "  element poly f2 (o 0) controls=(v2 v3) coeffs=[0, 1, 1] dimension=2 output=current control=current\n",
+            "  element poly e2 (o 0) controls=(a b) coeffs=[0, 1] dimension=1 output=voltage control=voltage\n",
+            "  element iswitch w1 (a b) model=sw sense=v4\n",
+        );
+        let mut d = Design::new();
+        let mut diags = spicerack_ir::Diags::new();
+        parse(src, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        let top = d.file(d.entry()).top;
+        let names: Vec<String> = d
+            .element_uses()
+            .into_iter()
+            .map(|(_, u)| {
+                assert_eq!(u.scope, top);
+                d.str(u.name).to_string()
+            })
+            .collect();
+        assert_eq!(names, ["l1", "l2", "v1", "v2", "v3", "v4"]);
+        // a rename stores back in every field
+        let renames: Vec<(spicerack_ir::NameId, spicerack_ir::NameId)> =
+            ["l1", "l2", "v1", "v2", "v3", "v4"]
+                .iter()
+                .map(|n| (d.find_name(n), d.builder().name(&format!("x{n}"))))
+                .collect();
+        let items: Vec<spicerack_ir::ItemRef> = d.items(top).to_vec();
+        for item in items {
+            d.editor().map_element_uses(top, item, &mut |u| {
+                renames.iter().find(|r| r.0 == u.name).map(|r| r.1)
+            });
+        }
+        let mut text = String::new();
+        dump(&d, d.entry(), &mut text);
+        for want in [
+            "inductors=(xl1 xl2)",
+            "sense=xv1",
+            "controls=(xv2 xv3)",
+            "controls=(a b)",
+            "sense=xv4",
+        ] {
+            assert!(text.contains(want), "{want} in\n{text}");
+        }
+    }
 }

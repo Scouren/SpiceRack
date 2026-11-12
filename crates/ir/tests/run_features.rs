@@ -147,7 +147,10 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
     (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
     (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
-    (RunExtra::WholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
+    (RunExtra::OptionWholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
+    (RunExtra::EnvWholeRunMidRun, "  analysis op\n  env temp=1 whole_run", "  env temp=1 whole_run\n  analysis op"),
+    (RunExtra::NodeSetWholeRunMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run", "  nodeset ic transient node=(a) value=1 whole_run\n  analysis op"),
+    (RunExtra::SaveWholeRunMidRun, "  analysis op\n  save (v (out))", "  save (v (out))\n  analysis op"),
     (RunExtra::ProbeAllBranchI, "  save (all_branch_i)", P),
     (RunExtra::MeasStatAt, "  measure m tran stat min_at (v (a)) (bound) (bound)", "  measure m tran stat min (v (a)) (bound) (bound)"),
     (RunExtra::MeasUntil, "  measure m tran when (cross rise (v (a)) value=1 count=1 until=1u)", MW),
@@ -156,8 +159,12 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::PssScIter, "  analysis pss driven fundamental=1meg tstab=1u sc_iter=50", PSS),
     (RunExtra::PssSteadyCoeff, "  analysis pss driven fundamental=1meg tstab=1u steady_coeff=1m", PSS),
     (RunExtra::FourHarmonicsOption, "  option n_freqs value=10\n  analysis four fundamental=1k periods=1 (v (out))", "  option n_freqs value=10\n  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"),
-    (RunExtra::StateFromHere, "  env temp=1", "  env temp=1 whole_run"),
-    (RunExtra::StateWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
+    (RunExtra::OptionFromHere, "  option klu", "  option klu whole_run"),
+    (RunExtra::OptionWholeRun, "  option klu whole_run", "  option klu"),
+    (RunExtra::EnvFromHere, "  env temp=1", "  env temp=1 whole_run"),
+    (RunExtra::EnvWholeRun, "  env temp=1 whole_run", "  env temp=1"),
+    (RunExtra::NodeSetFromHere, S, "  nodeset ic transient node=(a) value=1 whole_run"),
+    (RunExtra::NodeSetWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
     (RunExtra::DcAxisNamed, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1", D),
     (RunExtra::LoopNamed, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op", L),
     (RunExtra::SweepBodyNotOne, "  loop sweep (temp) (list values=[1])\n    option klu\n    analysis op", "  loop sweep (temp) (list values=[1])\n    comment \"c\"\n    loop sweep (param p) (list values=[1])\n      analysis op"),
@@ -173,6 +180,9 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::SaveFromHere, "  save from_here (v (out))", P),
     (RunExtra::SaveWholeRun, P, "  save from_here (v (out))"),
     (RunExtra::SaveMidRun, "  analysis op\n  save from_here (v (out))", "  save from_here (v (out))\n  analysis op"),
+    (RunExtra::AnalysisUnnamed, "  analysis op", "  analysis op name=o1"),
+    (RunExtra::DcAxisUnnamed, D, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1"),
+    (RunExtra::LoopUnnamed, L, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
@@ -201,7 +211,11 @@ fn features(lines: &str) -> FeatureSet {
     let mut d = Design::new();
     let mut diags = Diags::new();
     parse(&text, &mut d.builder(), &mut diags);
-    assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
+    assert!(
+        diags.is_empty(),
+        "the deck reads with no diagnostic before any feature is looked at\n{text}: {:?}",
+        diags.rows()
+    );
     features_used(&d)
 }
 
@@ -242,9 +256,10 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Option(OptionKey::Klu))
         .with(Feature::Run(RunExtra::TranCapNone))
         .with(Feature::Run(RunExtra::TranUic))
-        .with(Feature::Run(RunExtra::WholeRunMidRun))
-        .with(Feature::Run(RunExtra::StateFromHere))
-        .with(Feature::Run(RunExtra::SaveWholeRun));
+        .with(Feature::Run(RunExtra::SaveWholeRunMidRun))
+        .with(Feature::Run(RunExtra::OptionFromHere))
+        .with(Feature::Run(RunExtra::SaveWholeRun))
+        .with(Feature::Run(RunExtra::AnalysisUnnamed));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
 
@@ -260,7 +275,7 @@ fn listed_order_reads_an_include_in_place() {
         let mut diags = Diags::new();
         parse(&text, &mut d.builder(), &mut diags);
         assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
-        features_used(&d).contains(Feature::Run(RunExtra::WholeRunMidRun))
+        features_used(&d).contains(Feature::Run(RunExtra::OptionWholeRunMidRun))
     };
     assert!(used("  analysis op\n  include \"lib.sp\""));
     assert!(!used("  include \"lib.sp\"\n  analysis op"));
@@ -275,4 +290,38 @@ fn a_sweep_form_counts_for_its_use_only() {
     let lp = features("  loop sweep (temp) (dec start=1 stop=10 points=2)\n    analysis op");
     assert!(lp.contains(Feature::Run(RunExtra::SweepLoopDec)));
     assert!(!lp.contains(Feature::Run(RunExtra::SweepDcDec)));
+}
+
+/// Whether `lines` (read with no diagnostic: `features` asserts it before any feature is
+/// looked at) set `MeasCircuitThreshold` for a crossing at `value`.
+fn threshold_reads_circuit(before: &str, value: &str) -> bool {
+    let lines =
+        format!("{before}  measure m tran when (cross rise (v (a)) value=({value}) count=1)");
+    features(&lines).contains(Feature::Run(RunExtra::MeasCircuitThreshold))
+}
+
+#[test]
+fn a_threshold_reads_the_circuit_through_a_user_function() {
+    // R14: the class is transitive through a user function's body
+    assert!(
+        threshold_reads_circuit("  func f(x) = x * v(b)\n", "@f(1)"),
+        "a threshold @f(1) with f's body reading v(b) is MeasCircuitThreshold"
+    );
+    assert!(
+        !threshold_reads_circuit("  func f(x) = x * 2\n", "@f(1)"),
+        "a constant function's threshold is not"
+    );
+}
+
+#[test]
+fn a_threshold_reads_the_circuit_through_a_parameter() {
+    // R14: the class is transitive through a parameter of class Circuit
+    assert!(
+        threshold_reads_circuit("  param p = v(b)\n", "p"),
+        "a threshold p with p = v(b) is MeasCircuitThreshold"
+    );
+    assert!(
+        !threshold_reads_circuit("  param p = 2\n", "p"),
+        "a constant parameter's threshold is not"
+    );
 }

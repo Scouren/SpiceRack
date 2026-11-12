@@ -26,6 +26,7 @@ use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -47,6 +48,10 @@ impl DetailFacts for Pz {
 
     fn map_exprs(&mut self, _r: &mut Roots<'_>) {
         // no expression field
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.one(&mut self.source); // the nodes are nets, flat
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.input == PzInput::Source, RunExtra::PzSourceInput);
@@ -149,6 +154,10 @@ impl DetailFacts for Sp {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.sweep(&mut self.sweep);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.each(self.ports);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(set, self.ports.len > 0, RunExtra::SpPorts);
@@ -212,6 +221,11 @@ impl DetailFacts for Net {
         r.probe(&mut self.output);
         r.expr(&mut self.rin);
         r.expr(&mut self.rout);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.output);
+        r.one(&mut self.source);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -280,6 +294,10 @@ impl DetailFacts for Disto {
         r.sweep(&mut self.sweep);
         r.expr(&mut self.f2_over_f1);
     }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
@@ -329,6 +347,10 @@ impl DetailFacts for TimedOp {
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.exprs(self.times);
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
     fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
     fn fault(&self, _design: &Design) -> Option<Violation> {

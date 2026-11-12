@@ -314,3 +314,4 @@ result-side fact (backend, harness), outside the netlist IR.
 - G-XFMAG (circuit G13): Spectre `xfmag` on a source. Proposal: a source field (circuit owner); `Xf` unchanged.
 - K1 (I6): the per-key writer legality needs `Feature::Option(OptionKey)` (kernel change request).
 - K2 (H21, 9.08): measures read earlier measures by name; needs `DefKind::Measure` so the linker binds them (kernel change request).
+- Node-set mix (a `next_only` and a standing initial condition or node set of one node at one analysis): refused, because no simulator states both; it is decided at the first that does (`state_order::node_set_mix`).

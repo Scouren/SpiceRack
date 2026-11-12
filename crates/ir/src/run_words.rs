@@ -22,8 +22,8 @@
 //!   `pub(crate) fn close`
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
-//!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`, `pub(crate) fn is_zero`,
-//!   `pub(crate) fn loop_depth`
+//!   `pub(crate) fn is_one`, `pub(crate) fn is_zero`,
+//!   `pub(crate) fn loop_depth`, `pub(crate) fn gen_name` (gen)
 
 use std::fmt::{Debug, Write as _};
 
@@ -315,43 +315,6 @@ pub(crate) fn domain_unless(ok: bool) -> Option<Violation> {
     (!ok).then_some(Violation::FieldDomain)
 }
 
-/// Whether the tree at `e` holds a `V`, `I`, `Time` or `Freq` leaf or a `Ddt`/`Idt` call.
-/// Explicit stack (C11). `NONE` reads nothing.
-pub(crate) fn reads_circuit(design: &Design, e: ExprId) -> bool {
-    if e.is_none() {
-        return false;
-    }
-    let mut stack = vec![e];
-    let mut seen = 0usize;
-    while let Some(x) = stack.pop() {
-        seen += 1;
-        assert!(seen <= design.expr_count(), "an expression tree is acyclic");
-        match design.expr(x) {
-            Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq => return true,
-            Expr::Call(f, list) => {
-                if f.reads_circuit() {
-                    return true;
-                }
-                stack.extend_from_slice(design.exprs(list));
-            }
-            Expr::UserCall(_, list) | Expr::Draw(_, _, _, list) | Expr::List(list) => {
-                stack.extend_from_slice(design.exprs(list));
-            }
-            Expr::Unary(_, a) => stack.push(a),
-            Expr::Binary(_, a, c) => stack.extend([a, c]),
-            Expr::Ternary(c, t, o) => stack.extend([c, t, o]),
-            Expr::Num(_)
-            | Expr::Str(_)
-            | Expr::Param(_)
-            | Expr::Temp
-            | Expr::TStep
-            | Expr::TStop
-            | Expr::Tnom => {}
-        }
-    }
-    false
-}
-
 /// Whether `e` is a literal equal to 1.
 pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
     if e.is_none() {
@@ -398,6 +361,26 @@ pub(crate) fn loop_depth(design: &Design, scope: ScopeId) -> usize {
         s = row.parent;
     }
     unreachable!("the scope tree has a cycle")
+}
+
+/// A generated statement name: a fresh one or `NONE`, as the set's `named` and `unnamed`
+/// features allow (named one time in `n` when both do); `None` when neither does.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_name(
+    g: &mut crate::r#gen::Gen,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+    named: RunExtra,
+    unnamed: RunExtra,
+    n: u32,
+) -> Option<NameId> {
+    let name = match (has(features, named), has(features, unnamed)) {
+        (false, false) => return None,
+        (true, false) => true,
+        (false, true) => false,
+        (true, true) => g.chance(n),
+    };
+    Some(if name { g.fresh_name(b) } else { NameId::NONE })
 }
 
 // ---- private ----

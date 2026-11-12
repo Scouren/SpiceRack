@@ -15,7 +15,7 @@
 //!
 //! Contents (crate-private): `pub(crate) struct Verdict`, `pub(crate) enum Classes`,
 //! `pub(crate) fn verdict`,
-//! `pub(crate) fn check_element`, `pub(crate) fn check_model`, `pub(crate) fn model_ok`,
+//! `pub(crate) fn check_element`, `pub(crate) fn master_ports`, `pub(crate) fn check_model`, `pub(crate) fn model_ok`,
 //! `pub(crate) fn detail_len`; it re-exports the tables of `circuit_tables.rs`
 
 use crate::check::Violation;
@@ -119,6 +119,35 @@ pub(crate) fn check_element(e: &Element, design: &Design, at: ItemRef, out: &mut
     if !v.domain {
         out.push_at(violation_code(Violation::FieldDomain), design, at, at.index);
     }
+    // R61/A36: an instance has its bound subcircuit's port count (an unbound or out-of-range
+    // master is the kernel's reference rules')
+    if e.kind == ElemKind::Instance
+        && let Some(ports) = master_ports(design, e.model)
+        && ports != count
+    {
+        out.push_at(
+            violation_code(Violation::InstancePortCount),
+            design,
+            at,
+            count as u32,
+        );
+    }
+}
+
+/// The port count of the `Subckt` `master` is bound to, or `None` when it is unbound, out of
+/// range or not a subcircuit.
+pub(crate) fn master_ports(design: &Design, master: crate::id::Ref) -> Option<usize> {
+    if master.def.is_none() || master.def.index() >= design.definitions().len() {
+        return None;
+    }
+    let def = design.def(master.def);
+    (def.kind == crate::item::DefKind::Subckt && def.item.kind == crate::item::ItemKind::Subckt)
+        .then(|| {
+            design
+                .row::<crate::item::Subckt>(def.item.index)
+                .ports
+                .len()
+        })
 }
 
 /// Appends `m`'s `FieldDomain` violation, if any.

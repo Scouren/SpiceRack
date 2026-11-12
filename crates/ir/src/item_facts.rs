@@ -13,7 +13,8 @@
 //! Contents: `RowFacts` for `Title`, `Comment`, `Include`, `Global`, `Load`, `Opaque`, `Subckt`,
 //! `Section`, `If` (`Param` and `Func`: `item_facts_defs.rs`); crate:
 //! `pub(crate) fn field_domain(&Design, ItemRef, &mut Diags)`,
-//! `pub(crate) fn distinct(&[NameId]) -> bool`, `pub(crate) fn reads_dependent(&Design, ExprId) -> bool`
+//! `pub(crate) fn distinct(&[NameId]) -> bool`, `pub(crate) fn reads_dependent(&Design, ExprId) -> bool`,
+//! `pub(crate) fn value_type(&Design, ExprId, &mut FeatureSet)`
 
 use crate::build::Builder;
 use crate::check::Violation;
@@ -364,6 +365,34 @@ impl RowFacts for Subckt {
         if design.params(self.params).iter().any(|p| p.1.is_none()) {
             *set = set.with(Feature::Extra(Extra::FormalWithoutDefault));
         }
+        // A25 item 4: a default by type
+        for p in design.params(self.params) {
+            value_type(design, p.1, set);
+        }
+        // R62/A37: a default's reads by rule, a sibling formal's aside
+        let formals: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
+        let mut nodes = Vec::new();
+        for p in design.params(self.params) {
+            nodes.clear();
+            crate::class::tree_nodes(design, p.1, &mut nodes);
+            for &e in &nodes {
+                let crate::expr::Expr::Param(r) = design.expr(e) else {
+                    continue;
+                };
+                let rule = if !r.is_resolved() {
+                    (!formals.contains(&r.name)).then_some(Extra::FormalUnboundRead)
+                } else {
+                    let outside = r
+                        .def
+                        .index_checked(design.defs.len())
+                        .is_some_and(|k| design.defs[k].scope != self.body);
+                    outside.then_some(Extra::FormalOuterRead)
+                };
+                if let Some(x) = rule {
+                    *set = set.with(Feature::Extra(x));
+                }
+            }
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -556,6 +585,19 @@ pub(crate) fn reads_dependent(design: &Design, root: ExprId) -> bool {
         stack.extend(kids.iter().copied().filter(|k| *k < e));
     }
     false
+}
+
+/// Adds `Extra::StringValue` or `Extra::ListValue` when the value `e` (a `Param`'s, or a
+/// `Subckt` head default) is a string or a list at its root (A25 item 4). `NONE`: nothing.
+pub(crate) fn value_type(design: &Design, e: ExprId, set: &mut FeatureSet) {
+    if e.is_none() || e.index() >= design.expr_count() {
+        return;
+    }
+    match design.expr(e) {
+        crate::expr::Expr::Str(_) => *set = set.with(Feature::Extra(Extra::StringValue)),
+        crate::expr::Expr::List(_) => *set = set.with(Feature::Extra(Extra::ListValue)),
+        _ => {}
+    }
 }
 
 // ---- private ----

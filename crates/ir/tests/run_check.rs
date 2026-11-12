@@ -427,7 +427,8 @@ fn a_valid_run_reports_nothing() {
             grid: NO,
             outputs,
         };
-        b.analysis(body, None, four, Span::NONE);
+        // after the option, which holds from where it stands (A28)
+        b.analysis(s, None, four, Span::NONE);
     });
     assert!(got.is_empty(), "{got:?}");
 }

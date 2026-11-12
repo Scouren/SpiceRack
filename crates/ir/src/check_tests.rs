@@ -94,7 +94,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 16] = [
+    let cases: [(Violation, Break); 18] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -220,6 +220,25 @@ fn each_kernel_invariant_has_its_fixture() {
             bl.resolve(call, f);
             bl.param(top, "c", call, Span::NONE);
         }),
+        (Violation::StringOrListBody, |b| {
+            // g() = "fast"; a string as a parameter's value beside it is legal
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let mut bl = b.d.builder();
+            let s = bl.string("fast");
+            bl.func(top, "g", &[], s, Span::NONE);
+            let t = bl.string("slow");
+            bl.param(top, "corner", t, Span::NONE);
+        }),
+        (Violation::StringOrListField, |b| {
+            // an if whose condition is a list; a list as a formal's default beside it is legal
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let mut bl = b.d.builder();
+            let one = bl.num(1.0);
+            let l = bl.list(&[one]);
+            bl.if_(top, &[l], Span::NONE);
+            let m = bl.list(&[one]);
+            bl.subckt(top, "t", &[], &[("w", m)], Span::NONE);
+        }),
     ];
     for (want, break_it) in cases {
         let mut b = base();
@@ -232,6 +251,7 @@ fn each_kernel_invariant_has_its_fixture() {
         Violation::TerminalCount,
         Violation::DetailRow,
         Violation::DuplicateElement,
+        Violation::InstancePortCount,
     ];
     let kernel: Vec<Violation> = Violation::ALL
         .into_iter()

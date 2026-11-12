@@ -36,7 +36,7 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 #[cfg(any(test, feature = "gen"))]
 use crate::measure::gen_event;
@@ -51,6 +51,8 @@ use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles, probe
 use crate::run_exprs::Roots;
 use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
+use crate::run_names::names_of;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{domain_unless, flag, put_expr, put_word, take_enum, take_expr, word};
@@ -82,6 +84,11 @@ impl RowFacts for Measure {
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let row: Measure = design.row(at.index);
         by_measure!(row.kind, exprs_of(design, row.detail, f));
+    }
+
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Measure = design.row(at.index);
+        by_measure!(row.kind, names_of(design, row.detail, f));
     }
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
@@ -210,6 +217,11 @@ impl DetailFacts for MeasureTrigTarg {
         r.event(&mut self.trig);
         r.event(&mut self.targ);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.event(&self.trig);
+        r.event(&self.targ);
+    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         event_features(design, &self.trig, set);
         event_features(design, &self.targ, set);
@@ -259,6 +271,10 @@ impl DetailFacts for MeasureWhen {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.event(&mut self.at);
     }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.event(&self.at);
+    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         event_features(design, &self.at, set);
     }
@@ -300,6 +316,11 @@ impl DetailFacts for MeasureFind {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.find);
         r.event(&mut self.at);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.find);
+        r.event(&self.at);
     }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         probe_features(&self.find, set);
@@ -351,6 +372,11 @@ impl DetailFacts for MeasureDeriv {
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.probe(&mut self.signal);
         r.event(&mut self.at);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.signal);
+        r.event(&self.at);
     }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         probe_features(&self.signal, set);
@@ -404,6 +430,12 @@ impl DetailFacts for MeasureStat {
         r.probe(&mut self.signal);
         r.event(&mut self.from);
         r.event(&mut self.to);
+    }
+
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probe(&self.signal);
+        r.event(&self.from);
+        r.event(&self.to);
     }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(
@@ -474,6 +506,10 @@ impl DetailFacts for MeasureParam {
 
     fn map_exprs(&mut self, r: &mut Roots<'_>) {
         r.expr(&mut self.value);
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
     fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
     fn fault(&self, _design: &Design) -> Option<Violation> {

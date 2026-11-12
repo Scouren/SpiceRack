@@ -1162,4 +1162,37 @@ mod tests {
             assert_eq!(got, want, "{repeat:?} {join:?}");
         }
     }
+
+    /// R61/A36: a subcircuit instance has as many terminals as its bound master has ports
+    /// (ngspice refuses the deck, VACASK fills missing trailing terminals with internal nodes:
+    /// the IR states neither). A short and a long instance each report `InstancePortCount`
+    /// alone; neighbours: the matching count, and an instance of a master no file defines.
+    #[test]
+    fn an_instance_has_its_masters_port_count() {
+        let codes_of = |terminals: &str, master: &str| {
+            let text = format!(
+                "file \"t.sp\" deck\n  subckt div (a b)\n    element resistor r1 (a b) value=1\n  element instance x1 ({terminals}) model={master}\n"
+            );
+            let mut d = Design::new();
+            let mut diags = Diags::new();
+            spicerack_ir::parse(&text, &mut d.builder(), &mut diags);
+            assert!(diags.is_empty(), "{:?}", diags.rows());
+            spicerack_ir::link(&mut d, &mut diags);
+            let mut out = Diags::new();
+            check(&d, &mut out);
+            codes(&out)
+        };
+        assert_eq!(
+            codes_of("n1", "div"),
+            only(Violation::InstancePortCount),
+            "short"
+        );
+        assert_eq!(
+            codes_of("n1 n2 n3", "div"),
+            only(Violation::InstancePortCount),
+            "long"
+        );
+        assert_eq!(codes_of("n1 n2", "div"), Vec::<Code>::new(), "matching");
+        assert_eq!(codes_of("n1", "elsewhere"), Vec::<Code>::new(), "unbound");
+    }
 }
