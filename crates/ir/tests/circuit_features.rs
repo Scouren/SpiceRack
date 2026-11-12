@@ -1688,4 +1688,35 @@ mod tests {
         );
         assert!(features_used(&d).contains(Feature::Family(ModelFamily::Bsim4)));
     }
+
+    /// A behavioural source can name no model (`master_kind` is `None`), so naming none states
+    /// nothing a target lacks (vc-devices: every VACASK `b` source was refused); a resistor
+    /// with no model still states `ElementWithoutModel`.
+    #[test]
+    fn a_masterless_kind_needs_no_model() {
+        let with = |resistor: bool| {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            if resistor {
+                let one = n(&mut b, 1);
+                let h = b.head("r1", &["a", "0"], None, &[], ExprId::NONE);
+                b.passive(
+                    top,
+                    ElemKind::Resistor,
+                    h,
+                    Passive {
+                        value: one,
+                        ..Passive::PLAIN
+                    },
+                    Span::NONE,
+                );
+            } else {
+                behav_el(&mut b, top, OutKind::Voltage, false, false, false);
+            }
+            features_used(&d).contains(Feature::Circuit(X::ElementWithoutModel))
+        };
+        assert!(!with(false), "a behavioural source");
+        assert!(with(true), "a resistor");
+    }
 }

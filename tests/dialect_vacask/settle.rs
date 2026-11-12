@@ -442,3 +442,48 @@ fn dp1_a_subcircuit_port_named_twice_is_rejected() {
         "Terminal '1' is not unique."
     ));
 }
+
+#[test]
+fn ip_parameter_reads_in_a_behavioural_source() {
+    // ip1: `$intparam` truncates toward zero to an integer (2.7 → 2, −2.7 → −2, integer
+    // division after it); `$realparam(p)` and a bare `p` are the real (R56).
+    let r = run("vacask", "ip1.sim");
+    let op = raw(&r, "op1.raw");
+    let want = [
+        ("n1", 1.0),
+        ("n2", 2.0),
+        ("n3", 1.0),
+        ("n4", -2.0),
+        ("n5", 1.5),
+        ("n6", 1.5),
+        ("n7", 3f64.sin()),
+        ("n8", 1.0),
+    ];
+    for (node, v) in want {
+        assert!(close(at(&op, node, 0.0), v, 1e-12), "{node}: {}", r.out);
+    }
+    // ip2: past 32 bits `$intparam` gives −2147483648 (R54's domain).
+    let r = run("vacask", "ip2.sim");
+    let op = raw(&r, "op1.raw");
+    for (node, v) in [
+        ("n1", -2147483648.0),
+        ("n2", 2147483647.0),
+        ("n3", -2147483648.0),
+    ] {
+        assert!(close(at(&op, node, 0.0), v, 1e-12), "{node}: {}", r.out);
+    }
+    // ip3: a string parameter is no behavioural value; ip4: `$intparam` is behavioural only;
+    // ip5: its argument is one identifier.
+    assert!(says(
+        &run("vacask", "ip3.sim"),
+        "Cannot convert string into real."
+    ));
+    assert!(says(
+        &run("vacask", "ip4.sim"),
+        "Function '$intparam' not found."
+    ));
+    assert!(says(
+        &run("vacask", "ip5.sim"),
+        "$intparam() requires a single identifier argument."
+    ));
+}

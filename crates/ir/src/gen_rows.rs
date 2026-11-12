@@ -197,7 +197,10 @@ pub(crate) fn gen_func(
 ) -> ItemRef {
     let args: Vec<String> = (0..g.below(3)).map(|_| g.fresh()).collect();
     g.formals = args.clone();
+    // A28: a body counts in its callers' forms, so its operators are those of both
+    g.both_forms = true;
     let body = g.expr(b, f, Reads::Circuit);
+    g.both_forms = false;
     let class = g.class;
     g.formals.clear();
     let name = g.fresh();

@@ -7,7 +7,7 @@
 //! `rewrite/DIALECT-VACASK.md` §3.2 (load), §4.
 //!
 //! Contents: `CONSTANTS`, `SOURCE_MODULES`, `STATIC_FUNCS`, `DYNAMIC_LACKS`, `DYNAMIC_FUNCS`, `DYNAMIC_BINARY`,
-//! `SPICE_FILES`, `OWN_FILES`, `library`, `default_file` (crate-private)
+//! `SPICE_FILES`, `OWN_FILES`, `library`, `default_file`, `function`, `draw`, `binary` (crate-private)
 
 use crate::ir;
 
@@ -204,4 +204,78 @@ pub(super) fn default_file(family: ir::ModelFamily) -> Option<String> {
             .find(|(_, f)| *f == family)
             .map(|(p, _)| (*p).to_string()),
     }
+}
+
+/// The function a VACASK call name reads as, with its argument count.
+pub(super) fn function(name: &str) -> Option<(ir::Func, usize)> {
+    use ir::Func as F;
+    Some(match name {
+        "sin" => (F::Sin, 1),
+        "cos" => (F::Cos, 1),
+        "tan" => (F::Tan, 1),
+        "asin" => (F::Asin, 1),
+        "acos" => (F::Acos, 1),
+        "atan" => (F::Atan, 1),
+        "atan2" => (F::Atan2, 2),
+        "sinh" => (F::Sinh, 1),
+        "cosh" => (F::Cosh, 1),
+        "tanh" => (F::Tanh, 1),
+        "asinh" => (F::Asinh, 1),
+        "acosh" => (F::Acosh, 1),
+        "atanh" => (F::Atanh, 1),
+        "exp" => (F::Exp, 1),
+        "log" | "ln" => (F::Ln, 1),
+        "log10" => (F::Log10, 1),
+        "sqrt" => (F::Sqrt, 1),
+        "pow" => (F::Pow, 2),
+        "hypot" => (F::Hypot, 2),
+        "abs" => (F::Abs, 1),
+        "floor" => (F::Floor, 1),
+        "ceil" => (F::Ceil, 1),
+        "round" => (F::RoundHalfAway, 1),
+        "integer" => (F::Trunc, 1),
+        "int" => (F::ToInt, 1),
+        "fmod" => (F::Fmod, 2),
+        "min" => (F::Min, 2),
+        "max" => (F::Max, 2),
+        "ddt" => (F::Ddt, 1),
+        "idt" => (F::Idt, 1),
+        _ => return None,
+    })
+}
+
+/// The draw a VACASK call name reads as.
+pub(super) fn draw(name: &str) -> Option<ir::Dist> {
+    Some(match name {
+        "agauss" => ir::Dist::AbsGauss,
+        "gauss" => ir::Dist::RelGauss,
+        "aunif" => ir::Dist::AbsUnif,
+        "unif" => ir::Dist::RelUnif,
+        _ => return None,
+    })
+}
+
+/// The binary operator token `op` spells (`**` is `Pow`, handled by the caller).
+pub(super) fn binary(op: &str) -> Option<ir::BinOp> {
+    use ir::BinOp as B;
+    Some(match op {
+        "+" => B::Add,
+        "-" => B::Sub,
+        "*" => B::Mul,
+        "/" => B::DivTyped,
+        "==" => B::Eq,
+        "!=" => B::Ne,
+        "<" => B::Lt,
+        "<=" => B::Le,
+        ">" => B::Gt,
+        ">=" => B::Ge,
+        "&&" => B::And,
+        "||" => B::Or,
+        "&" => B::BitAnd,
+        "|" => B::BitOr,
+        "^" => B::BitXor,
+        "<<" => B::Shl,
+        ">>" => B::Shr,
+        _ => return None,
+    })
 }

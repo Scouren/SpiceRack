@@ -195,8 +195,9 @@ model of it (A25);
 whose family has no reachable library of that family; `Module`, `CodeModel` and `Other` are
 exempt beside the builtins, R44: their code comes from a `Load` or is unbound, never from a
 family's library); `CircuitExtra::ElementWithoutModel`
-(item-level: an element whose `model.name` is `NONE`; VACASK instantiates every device through a
-model, run n2). Neutral passes add and remove libraries and models; readers and writers stay
+(item-level: an element of a kind with a master, `master_kind` `Some`, whose `model.name` is
+`NONE`; VACASK instantiates every device through a model, run n2; a masterless kind such as
+`Behav`, `ChargeCapacitor` or `FluxInductor` never sets it). Neutral passes add and remove libraries and models; readers and writers stay
 inverse.
 
 **Parameterless models of kinds with no family today** (agreed with the VACASK agent,

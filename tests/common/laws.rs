@@ -13,19 +13,21 @@
 //! `Tally::admit(&mut self)`, `Tally::skip(&mut self, String)`,
 //! `Tally::some(&self) -> Result<(), String>`,
 //! `pub fn generated(row: &DialectRow, writer: &dyn Write) -> ir::FeatureSet`,
-//! `pub fn admitted(seed: u64, row: &DialectRow, writer: &dyn Write) -> Result<ir::Design, String>`,
+//! `pub const PARAMS: [Params; 2]`,
+//! `pub fn admitted(seed: u64, params: Params, row: &DialectRow, writer: &dyn Write) -> Result<ir::Design, String>`,
 //! `pub fn write_all(design: &ir::Design, row: &DialectRow) -> Sources`,
 //! `pub fn read_all(row: &DialectRow, src: &Sources) -> ir::Design`,
 //! `pub fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags)`,
 //! `pub fn readers() -> impl Iterator`, `pub fn writers() -> impl Iterator`,
 //! `pub fn one_file(design: &ir::Design, file: ir::FileId) -> String`,
-//! `pub fn canonical(design: &ir::Design) -> String`
+//! `pub fn canonical(design: &ir::Design) -> String`,
+//! `pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool`
 
 use std::collections::BTreeMap;
 
 use spicerack::dialect::{self, BUILTIN, DialectRow, Policy, Read, Sources, Write};
 use spicerack::ir;
-use spicerack::ir::r#gen::{Size, generate};
+use spicerack::ir::r#gen::{Params, Size, generate_with};
 
 /// A moderate design: the merge tier's size (REWRITE-PLAN §7.5).
 pub const SIZE: Size = Size {
@@ -34,6 +36,9 @@ pub const SIZE: Size = Size {
     expr_depth: 4,
     files: 3,
 };
+
+/// Both generator settings (A28), the laws' outer loop: untyped parameters drawn, and none.
+pub const PARAMS: [Params; 2] = [Params::Untyped, Params::TypedOnly];
 
 /// What a law ran on: the designs admitted, and the seeds skipped by the code that skipped
 /// them.
@@ -82,10 +87,15 @@ pub fn generated(row: &DialectRow, writer: &dyn Write) -> ir::FeatureSet {
     set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(ir::ItemKind::Opaque)))
 }
 
-/// Design `seed` over [`generated`], shrunk to what `row` admits and legalized for it; `Err`
+/// Design `seed` under `params` over [`generated`], shrunk to what `row` admits and legalized for it; `Err`
 /// with the code of a refusal that names no item the design lists.
-pub fn admitted(seed: u64, row: &DialectRow, writer: &dyn Write) -> Result<ir::Design, String> {
-    let mut design = generate(seed, &generated(row, writer), SIZE);
+pub fn admitted(
+    seed: u64,
+    params: Params,
+    row: &DialectRow,
+    writer: &dyn Write,
+) -> Result<ir::Design, String> {
+    let mut design = generate_with(seed, &generated(row, writer), SIZE, params);
     let bound = design.reachable().len() + 1;
     for _ in 0..=bound {
         let mut trial = design.clone();
@@ -105,31 +115,10 @@ pub fn admitted(seed: u64, row: &DialectRow, writer: &dyn Write) -> Result<ir::D
         for _ in 0..=bound {
             let mut found = ir::Diags::new();
             ir::check(&design, &mut found);
-            // A row about what was just dropped is no reason to drop more: one about an item the
-            // design no longer lists, or `ScopeOwner` (at no item) about the body of a dropped
-            // owner, which `check` still walks.
-            let listing = design.reachable();
-            let listed = |i: ir::ItemRef| listing.iter().any(|(l, _)| *l == i);
-            let owner_code = ir::diag::violation_code(ir::Violation::ScopeOwner);
-            let dead_body = |d: &ir::Diag| {
-                d.code == owner_code && !listed(design.scope(ir::ScopeId(d.arg)).owner)
-            };
-            let live: Vec<ir::Diag> = found
-                .rows()
-                .iter()
-                .filter(|d| {
-                    if d.item.index == u32::MAX {
-                        !dead_body(d)
-                    } else {
-                        listed(d.item)
-                    }
-                })
-                .copied()
-                .collect();
-            if live.is_empty() {
+            if found.is_empty() {
                 break;
             }
-            drop_named(&mut design, &live)?;
+            drop_named(&mut design, found.rows())?;
         }
     }
     Err("no fixpoint within the item count".to_string())
@@ -204,6 +193,15 @@ pub fn one_file(design: &ir::Design, file: ir::FileId) -> String {
 /// `≅`: the canonical IR text of every file (no spans in it).
 pub fn canonical(design: &ir::Design) -> String {
     design.files().map(|f| one_file(design, f)).collect()
+}
+
+/// `≅` for L5/L6 (R28): both designs in normal form (written as IR text and read back, so
+/// their ids follow the canonical order whatever order a reader pushed in), then
+/// `Design::eq_meaning` (real literals equal by value).
+pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool {
+    let ir_row = dialect::by_name("ir").expect("the ir row");
+    let normal = |d: &ir::Design| read_all(ir_row, &write_all(d, ir_row));
+    normal(a).eq_meaning(&normal(b))
 }
 
 // ---- private ----

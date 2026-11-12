@@ -9,7 +9,8 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9, C1–C12; `REWRITE-PLAN.md` §2.2 rule 4.
 //!
 //! Contents: `pub enum Violation`, `Violation::ALL`, `Violation::COUNT`,
-//! `pub fn check(&Design, &mut Diags)`, `pub fn check_legal(&Design, &FeatureSet, &mut Diags)`
+//! `pub fn check(&Design, &mut Diags)`, `pub fn check_legal(&Design, &FeatureSet, &mut Diags)`; crate:
+//! `pub(crate) struct Out` (`Out::report`), `pub(crate) fn table_len(&Design, ItemKind) -> usize`
 
 use std::collections::HashSet;
 
@@ -19,8 +20,8 @@ use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
-use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
-use crate::item::{DefKind, ItemKind, ScopeKind};
+use crate::id::{DefId, ExprId, ItemRef, NameId};
+use crate::item::{DefKind, ItemKind};
 use crate::literal;
 use crate::span::Span;
 
@@ -83,10 +84,10 @@ pub enum Violation {
     DuplicateElement,
 }
 
-/// The design under check and where its rows go.
-struct Out<'a> {
-    design: &'a Design,
-    diags: &'a mut Diags,
+/// The design under check and where its rows go (crate: `check_scopes` reports through it).
+pub(crate) struct Out<'a> {
+    pub(crate) design: &'a Design,
+    pub(crate) diags: &'a mut Diags,
 }
 
 impl Violation {
@@ -120,7 +121,7 @@ impl Violation {
 pub fn check(design: &Design, diags: &mut Diags) {
     let before = diags.len();
     let mut out = Out { design, diags };
-    files_and_scopes(&mut out);
+    crate::check_scopes::files_and_scopes(&mut out);
     definitions(&mut out);
     let bad = expression_rows(&mut out);
     items(&mut out, &bad);
@@ -152,6 +153,18 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
     for f in whole.minus(*legal).iter() {
         diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
+}
+
+impl Out<'_> {
+    /// Appends violation `v` about `at` (`ItemRef::NONE`: no item).
+    pub(crate) fn report(&mut self, v: Violation, at: ItemRef, arg: u32) {
+        self.diags.push_at(violation_code(v), self.design, at, arg);
+    }
+}
+
+/// The row count of `kind`'s table.
+pub(crate) fn table_len(d: &Design, kind: ItemKind) -> usize {
+    for_kind!(kind, R => R::table(d).len())
 }
 
 // ---- private ----
@@ -195,104 +208,6 @@ fn probe_classes(out: &mut Out<'_>) {
             }
         }
     }
-}
-
-impl Out<'_> {
-    fn report(&mut self, v: Violation, at: ItemRef, arg: u32) {
-        self.diags.push_at(violation_code(v), self.design, at, arg);
-    }
-}
-
-/// Files, scopes and item lists: handle ranges, the tree's shape, each scope's owner.
-fn files_and_scopes(out: &mut Out<'_>) {
-    let d = out.design;
-    let n_scopes = d.scopes.len();
-    for (k, f) in d.files.iter().enumerate() {
-        if f.path.index_checked(d.names.len()).is_none() {
-            out.report(Violation::HandleRange, ItemRef::NONE, f.path.0);
-        }
-        let top_ok = f.top.0 < n_scopes as u32
-            && d.scopes[f.top.index()].kind == ScopeKind::File
-            && d.scopes[f.top.index()].file.0 as usize == k;
-        if !top_ok {
-            out.report(Violation::ScopeTree, ItemRef::NONE, f.top.0);
-        }
-    }
-    let mut listed: HashSet<ItemRef> = HashSet::new();
-    // the scope that first lists each item, for the owner test (one pass, not a search per scope)
-    let mut listing: std::collections::HashMap<ItemRef, ScopeId> = std::collections::HashMap::new();
-    for (k, items) in d.scope_items.iter().enumerate() {
-        for &item in items {
-            listing.entry(item).or_insert(ScopeId(k as u32));
-        }
-    }
-    for (k, s) in d.scopes.iter().enumerate() {
-        let id = k as u32;
-        let parent_ok = s.parent.is_none() || s.parent.index() < n_scopes;
-        let owner_ok =
-            s.owner == ItemRef::NONE || (s.owner.index as usize) < table_len(d, s.owner.kind);
-        if !parent_ok || (s.file.0 as usize) >= d.files.len() || !owner_ok {
-            out.report(Violation::HandleRange, ItemRef::NONE, id);
-            continue;
-        }
-        if !reaches_a_file(d, ScopeId(id)) {
-            out.report(Violation::ScopeTree, ItemRef::NONE, id);
-            continue;
-        }
-        for &item in &d.scope_items[k] {
-            if (item.index as usize) >= table_len(d, item.kind) {
-                out.report(Violation::HandleRange, ItemRef::NONE, item.index);
-            } else if !listed.insert(item) {
-                out.report(Violation::ScopeTree, item, id);
-            }
-        }
-        if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id), &listing) {
-            out.report(Violation::ScopeOwner, ItemRef::NONE, id);
-        }
-    }
-}
-
-/// Whether the parent chain of a valid-ranged scope ends at a file scope with no parent, owner
-/// `NONE` and its file's top, without a cycle.
-fn reaches_a_file(d: &Design, scope: ScopeId) -> bool {
-    let mut at = scope;
-    for _ in 0..=d.scopes.len() {
-        let s = d.scopes[at.index()];
-        if s.kind == ScopeKind::File {
-            let file = d.files.get(s.file.index());
-            return s.parent.is_none()
-                && s.owner == ItemRef::NONE
-                && file.is_some_and(|f| f.top == at);
-        }
-        if s.parent.is_none() || s.parent.index() >= d.scopes.len() {
-            return false;
-        }
-        at = s.parent;
-    }
-    false
-}
-
-/// Whether a non-file scope's owner has the scope's kind, names it as a body, and is listed in
-/// the scope's parent.
-fn owner_matches(
-    d: &Design,
-    scope: ScopeId,
-    listing: &std::collections::HashMap<ItemRef, ScopeId>,
-) -> bool {
-    let s = d.scopes[scope.index()];
-    let kind_ok = match s.kind {
-        ScopeKind::Subckt => s.owner.kind == ItemKind::Subckt,
-        ScopeKind::Section => s.owner.kind == ItemKind::Section,
-        ScopeKind::Branch => s.owner.kind == ItemKind::If,
-        ScopeKind::Loop => s.owner.kind == ItemKind::Loop,
-        ScopeKind::File => false,
-    };
-    if !kind_ok || listing.get(&s.owner) != Some(&s.parent) {
-        return false;
-    }
-    let mut handles = Vec::new();
-    for_kind!(s.owner.kind, R => d.row::<R>(s.owner.index).handles(d, &mut handles));
-    handles.contains(&Handle::Scope(scope))
 }
 
 /// Definitions: handle ranges, one per (scope, kind, name).
@@ -596,9 +511,4 @@ fn def_ok(d: &Design, def: DefId) -> bool {
 /// Whether a count lies in an arity range (`max == u8::MAX`: unbounded).
 fn arity((min, max): (u8, u8), n: u32) -> bool {
     n >= min as u32 && (max == u8::MAX || n <= max as u32)
-}
-
-/// The row count of `kind`'s table.
-fn table_len(d: &Design, kind: ItemKind) -> usize {
-    for_kind!(kind, R => R::table(d).len())
 }

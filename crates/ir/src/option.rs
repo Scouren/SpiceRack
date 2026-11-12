@@ -31,7 +31,7 @@
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
 //! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
 //! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`); crate:
-//! `pub(crate) fn gen_nfreqs`
+//! `pub(crate) fn gen_nfreqs`, `pub(crate) fn gen_holds` (gen)
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
@@ -278,7 +278,8 @@ impl RowFacts for OptionRow {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::OptionMidRun) else {
+        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::OptionMidRun, mode_feature)
+        else {
             return ItemRef::NONE;
         };
         let keys: Vec<OptionKey> = OptionKey::ALL
@@ -385,7 +386,8 @@ impl RowFacts for Env {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::EnvMidRun) else {
+        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::EnvMidRun, mode_feature)
+        else {
             return ItemRef::NONE;
         };
         // At least one of the two, each in the text's order.
@@ -520,7 +522,8 @@ impl RowFacts for NodeSet {
         if !next && !beyond {
             return ItemRef::NONE;
         }
-        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun) else {
+        let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun, mode_feature)
+        else {
             return ItemRef::NONE;
         };
         let mut kinds = vec![NodeSetKind::Ic, NodeSetKind::Nodeset];
@@ -581,7 +584,7 @@ pub(crate) fn gen_nfreqs(
         && crate::r#gen::placeable(b.design(), scope, crate::item::ItemKind::Option, features)
         && g.items_left > 1;
     let Some(holds) = allowed
-        .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun))
+        .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun, mode_feature))
         .flatten()
     else {
         return false;
@@ -599,6 +602,32 @@ pub(crate) fn gen_nfreqs(
     true
 }
 
+/// The mode of a state item generated into `scope`, or `None` when the set allows neither: once
+/// any run item exists (conservatively: anywhere, since items are generated in listed order),
+/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun` (placement is `fill`'s, A15 K1);
+/// each mode also needs its own feature, `mode(m)` (a state item's or a save's).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_holds(
+    g: &mut Gen,
+    b: &Builder<'_>,
+    _scope: ScopeId,
+    features: &FeatureSet,
+    mid: RunExtra,
+    mode: fn(Applies) -> RunExtra,
+) -> Option<Applies> {
+    let d = b.design();
+    let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
+    let modes: Vec<Applies> = [
+        (Applies::FromHere, mid),
+        (Applies::WholeRun, RunExtra::WholeRunMidRun),
+    ]
+    .into_iter()
+    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode(m)))
+    .map(|(m, _)| m)
+    .collect();
+    (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])
+}
+
 // ---- private ----
 
 /// `whole_run` when it is the next word.
@@ -608,30 +637,6 @@ fn take_holds(words: &mut Words<'_>) -> Applies {
     } else {
         Applies::FromHere
     }
-}
-
-/// The mode of a state item generated into `scope`, or `None` when the set allows neither: once
-/// any run item exists (conservatively: anywhere, since items are generated in listed order),
-/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun` (placement is `fill`'s, A15 K1).
-#[cfg(any(test, feature = "gen"))]
-fn gen_holds(
-    g: &mut Gen,
-    b: &Builder<'_>,
-    _scope: ScopeId,
-    features: &FeatureSet,
-    mid: RunExtra,
-) -> Option<Applies> {
-    let d = b.design();
-    let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
-    let modes: Vec<Applies> = [
-        (Applies::FromHere, mid),
-        (Applies::WholeRun, RunExtra::WholeRunMidRun),
-    ]
-    .into_iter()
-    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode_feature(m)))
-    .map(|(m, _)| m)
-    .collect();
-    (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])
 }
 
 /// Adds the feature of a state item's mode (`StateFromHere`, `StateWholeRun`).
