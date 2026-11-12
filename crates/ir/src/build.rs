@@ -42,7 +42,8 @@
 //! Cites: `rewrite/IR-KERNEL.md` C2, C6–C10, C13; `REWRITE-PLAN.md` §2.4 (caller code first).
 //!
 //! Contents:
-//! - `pub struct Builder<'d>`, `Builder::design(&self) -> &Design`
+//! - `pub struct Builder<'d>`, `Builder::design(&self) -> &Design`,
+//!   `Builder::element_named(&mut self, ScopeId, NameId) -> Option<ItemRef>`
 //! - files and pools: `Builder::file(&mut self, &str, Role) -> (FileId, ScopeId)`,
 //!   `Builder::name(&mut self, &str) -> NameId`, `Builder::text(&mut self, &str) -> TextId`,
 //!   `Builder::names(&mut self, &[&str]) -> NameList`,
@@ -212,6 +213,13 @@ impl<'d> Builder<'d> {
             index,
         };
         self.design.scope_items[scope.index()].push(item);
+        // the element-name index, when built, keeps up (R23)
+        if R::KIND == ItemKind::Element && self.design.element_names.get().is_some() {
+            let name = self.design.row::<crate::element::Element>(index).name;
+            if let Some(names) = self.design.element_names.get_mut() {
+                names.entry((scope, name)).or_insert(item);
+            }
+        }
         item
     }
 
@@ -219,7 +227,9 @@ impl<'d> Builder<'d> {
     /// none is (R23: a reader refuses a duplicate before pushing it). Amortized O(1): an index
     /// built once from the design and kept by every push.
     pub fn element_named(&mut self, scope: ScopeId, name: NameId) -> Option<ItemRef> {
-        todo!()
+        let d: &Design = self.design;
+        let index = d.element_names.get_or_init(|| element_index(d));
+        index.get(&(scope, name)).copied()
     }
 
     /// Appends an item that opens a scope: creates the body scope (`body` kind, parent `scope`,
@@ -522,6 +532,19 @@ impl<'d> Builder<'d> {
 }
 
 // ---- private ----
+
+/// The first element of each whole name in each scope, in list order: `element_named`'s index,
+/// built from the design in O(items).
+fn element_index(d: &Design) -> crate::names::FxMap<(ScopeId, NameId), ItemRef> {
+    let mut names = crate::names::FxMap::default();
+    for (s, items) in d.scope_items.iter().enumerate() {
+        for &item in items.iter().filter(|i| i.kind == ItemKind::Element) {
+            let name = d.row::<crate::element::Element>(item.index).name;
+            names.entry((ScopeId(s as u32), name)).or_insert(item);
+        }
+    }
+    names
+}
 
 impl Builder<'_> {
     /// A new empty scope. Asserts `SCOPES_MAX`.

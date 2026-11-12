@@ -394,3 +394,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `cargo run --release --features gen --example throughput -- scaling` measures build, dump, parse and check over `FeatureSet::ALL` at 1e5 and 4e5 items (best of two runs) and exits 1 when a ratio exceeds 8: a linear phase measures 4.4 to 4.9 here, a quadratic one about 16. It is a release binary, not a test: a debug-build test at sizes cheap enough for the suite cannot tell a quadratic term from cache effects, and a release-only test would skip in debug. It goes in the merge tier beside the gate's commands (IR-PERF.md, How it is measured). On 68c6be2d it is red on build (13.6), the circuit regression.
 
+## The element-name index (R23)
+
+- `Builder::element_named(scope, name) -> Option<ItemRef>`: the first element of that whole name listed in `scope`, from an index on `Design` (`element_names`, lookup only) built on first use in O(items). It is extended by `Builder::push` itself whenever the row is an `Element`, so IR text (which pushes through the low tier) and `Builder::element` both keep it. It is cleared where `editor()` hands out its door and in `Editor::items_mut` and `Editor::set`, the mutations that can move or rename an element, as the class cache is. It takes `&mut self` because the builder's design is `&mut`; it reads only.
+

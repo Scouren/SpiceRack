@@ -46,6 +46,7 @@ impl<'d> Editor<'d> {
     /// unreachable); an item must not appear in two lists.
     pub fn items_mut(&mut self, scope: ScopeId) -> &mut Vec<ItemRef> {
         self.design.classes.take();
+        self.design.element_names.take();
         assert!(
             scope.index() < self.design.scope_items.len(),
             "a scope id in range"
@@ -57,6 +58,7 @@ impl<'d> Editor<'d> {
     /// range and the row's handles are.
     pub fn set<R: ItemRow>(&mut self, index: u32, row: R) {
         self.design.classes.take();
+        self.design.element_names.take();
         R::table_mut(self.design).set(index, row)
     }
 
