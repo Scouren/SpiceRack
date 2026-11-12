@@ -16,7 +16,7 @@
 //! writer.write(&design, design.entry(), &mut text, &mut diags);
 //! ```
 //!
-//! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addenda A1–A6);
+//! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addenda A1–A7);
 //! `rewrite/RULINGS.md`.
 //!
 //! Contents: the modules below (kernel, circuit owner, run owner, in three groups), and
@@ -27,9 +27,9 @@
 //!   `Handle`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `check`,
 //!   `check_legal`, `Violation`, the diagnostic rows of `diag`, `eval`, `Bindings`, `Domain`,
 //!   `dump`, `parse`
-//! - circuit owner: `ElemHead`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
+//! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
-//! - run owner: `Analysis`, `AnalysisKind`, `RunDetail`, `RunDetails`, `Edge`, `Event`,
+//! - run owner: `Analysis`, `AnalysisKind`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
 //!   `EventKind`, `MeasureKind`, `Stat`, `Env`, `IcScope`, `NodeSet`, `NodeSetKind`,
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
@@ -64,6 +64,7 @@ pub mod text;
 
 // circuit owner
 pub mod build_circuit;
+pub mod circuit_extra;
 pub mod controlled;
 pub mod element;
 pub mod line;
@@ -74,6 +75,7 @@ pub mod source;
 pub mod wave;
 
 pub use build_circuit::ElemHead;
+pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, NO_ROW};
 pub use model::{Model, ModelFamily, Polarity};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
@@ -89,6 +91,7 @@ pub mod output;
 pub mod periodic;
 pub mod plan;
 pub mod probe;
+pub mod run_extra;
 pub mod stats;
 pub mod sweep;
 pub mod tran;
@@ -115,6 +118,7 @@ pub use option_key::{OptionClass, OptionKey};
 pub use output::{Measure, Print, PrintView, Save};
 pub use plan::{Alter, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
+pub use run_extra::RunExtra;
 pub use span::Span;
 pub use stats::{Statistics, Vary, VaryDist};
 pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};

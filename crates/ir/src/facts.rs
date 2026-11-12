@@ -39,7 +39,7 @@ pub trait RowFacts: ItemRow {
     fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind));
 
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
-    /// kind and its `Extra`s. The kernel adds the expression features from `handles`.
+    /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features. The kernel adds the expression features from `handles`.
     fn features(&self, design: &Design, set: &mut FeatureSet);
 
     /// Appends the violations of the row's own invariants (counts, a detail row present exactly
