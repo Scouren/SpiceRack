@@ -33,6 +33,7 @@
 
 mod meas;
 mod probe;
+mod values;
 
 use probe::build;
 pub(super) use probe::{Ctx, Want, probe_word};
