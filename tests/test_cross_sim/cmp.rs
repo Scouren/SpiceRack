@@ -52,7 +52,8 @@ pub struct Tol {
     /// transient is compared by period and peak-to-peak.
     autonomous: bool,
     /// The writer noted outputs the target writes no vector for (W0052: an
-    /// integrated noise, an `@dev[param]`): the reference's are not compared.
+    /// integrated noise, an `@dev[param]`, an `.op` beside another analysis
+    /// where the target wrote no op plot): the reference's are not compared.
     pub noted_drops: bool,
     /// A source's AC magnitude is not 1: the input-referred noise is
     /// divided by it in Xyce, not in ngspice (G-NOISE-INPUT-REF), so it is
@@ -77,11 +78,16 @@ const TRAN: f64 = 1e-2;
 /// plot beside a noise analysis where `a` has none: HSPICE runs `.NOISE`
 /// on an `.AC` sweep, which the deck written for it holds (HSPICE Reference
 /// Manual, `.NOISE`), and ngspice's integrated noise (a one-point plot,
-/// `total`) where `a`, Xyce's, has only the spectrum.
+/// `total`) where `a`, Xyce's, has only the spectrum. The other way round,
+/// an op plot `a` has and `b` lacks passes when the writer noted the drop
+/// (`Tol::noted_drops`): the deck written for Xyce holds the `.op` and Xyce
+/// does not calculate it.
 pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String> {
     let has = |k: &str| a.iter().any(|p| kind(p) == k);
     let total = has("total") && !tol.noted_drops;
-    let (op, ac) = (has("op"), has("ac") || !has("noise"));
+    // A noted `.op` the target did not run: the reference's is not compared.
+    let unrun = tol.noted_drops && !b.iter().any(|p| kind(p) == "op");
+    let (op, ac) = (has("op") && !unrun, has("ac") || !has("noise"));
     let kinds = |r: &[RawData]| {
         let mut k: Vec<&str> = r
             .iter()
@@ -589,5 +595,31 @@ mod tests {
         assert!(compare(&a, &off, Tol::of(&[])).is_err());
         let twice = [ngspice(grid, low), ngspice(grid, low)];
         assert!(compare(&twice, &b, Tol::of(&[])).is_err());
+    }
+
+    #[test]
+    fn p1_066_a_noted_op_the_target_did_not_run_is_not_compared() {
+        // ngspice runs `.op` and `.dc` (two plots); Xyce 7.10 on the deck
+        // written for it runs the `.dc` alone and the writer notes the
+        // `.op` (W0052). Oracle: Xyce 7.10.0 on `.op` + `.dc` over an RC
+        // (research/impl/evidence/P1-066-xyce-one-analysis/results.txt,
+        // a5_op_dc: one plot, "DC transfer characteristic (3 pts)"), and
+        // the verdict table below written out by hand. Checks: 4.
+        let sweep = [0.0, 1.0, 2.0, 3.0];
+        let dc = |out: [f64; 4]| ngspice(sweep, out);
+        let mut op = real("Operating Point", &[("v(out)", VarType::Voltage, [1.0; 4])]);
+        op.real_data[0].truncate(1);
+        let a = [dc(sweep), op.clone()];
+        let mut noted = Tol::of(&[]);
+        noted.noted_drops = true;
+        // Noted and not run: the sweep alone is compared.
+        assert_eq!(compare(&a, &[dc(sweep)], noted), Ok(()));
+        // Not noted: the missing op is a difference.
+        assert!(compare(&a, &[dc(sweep)], Tol::of(&[])).is_err());
+        // Noted, and the target wrote an op all the same: it is compared.
+        let mut off = op.clone();
+        off.real_data[0][0] = 2.0;
+        assert!(compare(&a, &[dc(sweep), off], noted).is_err());
+        assert_eq!(compare(&a, &[dc(sweep), op], noted), Ok(()));
     }
 }

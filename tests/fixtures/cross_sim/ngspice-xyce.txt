@@ -1,8 +1,6 @@
-circuitsim90/BJT/vreg.sp mismatch # plots ["dc", "op"] became ["dc"]
-circuitsim90/MOS2/ab_integ.sp mismatch # plots ["op", "tran"] became ["tran"]
-circuitsim90/MOS2/ab_opamp.sp mismatch # plots ["op", "tran"] became ["tran"]
-circuitsim90/MOS2/gm6.sp mismatch # plots ["op", "tran"] became ["tran"]
-circuitsim90/MOS2/hussamp.sp mismatch # plots ["op", "tran"] became ["tran"]
+circuitsim90/BJT/vreg.sp mismatch # dc v(2): 0.5586759973994992 vs 0.5652145450319832 at 2 (tol 4.595e-3; 2/16 points out)
+circuitsim90/MOS2/ab_opamp.sp mismatch # tran v(203): -0.09578908027965216 leaves the tube at t=1.2028e-5 (tol 9.622e-4; target there -0.0855473)
+circuitsim90/MOS2/gm6.sp mismatch # tran v(13): 0.40898654762563585 leaves the tube at t=0 (tol 9.111e-3; target there -8.33e-23)
 circuitsim90/MOS2/nand.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS2/pump.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS2/ring.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(2): 0.51398545047556 leaves the tube at t=0.00000009053104541064522 (tol 3.055e-2)
@@ -14,7 +12,6 @@ circuitsim90/MOS2_LARGE/pchip.sp slow # quarantined
 circuitsim90/MOS3/arom.sp slow # quarantined
 circuitsim90/MOS3/gm17.sp mismatch # tran v(4): 4.813072814687794 leaves the tube at t=0.0000000000016000000000000003 (tol 5.000e-2)
 circuitsim90/MOS3/gm19.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
-circuitsim90/MOS3/gm3.sp mismatch # plots ["op", "tran"] became ["tran"]
 circuitsim90/MOS3/jge.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 circuitsim90/MOS3/mike2.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/20000 both agree; was: tran i(vpulse): -0.0020232967180685846 leaves the tube at t=0.000000001011106874948874 (tol 2.311e-5)
 circuitsim90/MOS3/rich3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
@@ -164,7 +161,6 @@ ngspice/paranoia/various/ro_17_4.sp mismatch # tran v(3): 1.0032345606593271 lea
 ngspice/tests/bsim3soipd/t4.sp mismatch # dc i(vb): 0+0i vs -0.000000000006278979391451045+0i at 0 (tol 2.000e-12)
 ngspice/tests/general/fourbitadder.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(x1.x1.x1.x5.8): -0.0006232238726266992 leaves the tube at t=0.0000000036177435765459917 (tol 2.519e-5)
 ngspice/tests/general/rc.sp mismatch # tran v(1): 0.011117920800000002 leaves the tube at t=0.0011117920800000002 (tol 1.000e-2)
-ngspice/tests/jfet/jfet_vds-vgs.sp mismatch # plots ["dc", "op"] became ["dc"]
 ngspice/tests/mes/subth.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: VIDS#BRANCH | Simulation aborted due to error.  There are 0 MSG_F
 ngspice/tests/mos6/mos6inv.sp mismatch # tran i(vin): -0.00006723369385653813 leaves the tube at t=0.00000000046 (tol 6.811e-7)
 ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): -0.0000008905818325687239 leaves the tube at t=0.000000038139999999999996 (tol 9.868e-8)
