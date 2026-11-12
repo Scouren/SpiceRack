@@ -3,6 +3,6 @@ benchmark/graetz/vacask/runme.sim mismatch # ngspice stops: timestep too small a
 benchmark/ring/vacask/runme.sim mismatch # vdd current at 0.62 us (tol 5.5e-5 A): psp103v4.osdi linked; the ngspice "unknown parameter (*)" stop F listed is gone on this head, so the ring runs; not triaged (Phase 0 merge, 2026-11-07)
 benchmark/vadistiller/c6288/vacask/runme.sim mismatch # icmode="uic" with no ic: VACASK reports the zero state at t=0, ngspice its uic point with the sources on (cmd-analysis-tran.md); its elaborated c6288_test read as the top
 benchmark/vadistiller/mul/vacask/runme.sim mismatch # simulator differs: ngspice on the corpus's own ngspice version of this cascade gives v(10) = 31.82/46.44/48.78 V at 0.29/1/5 ms, on the written deck 31.74/46.48/48.76, VACASK 28.30/38.06/36.82 (its spice/sn/diode.osdi, ngspice-47's diode, with tt=4.32u)
-demo/spice/mos2inv.sim mismatch # vdd current at an edge (3.05 us, a 5e-5 A tube): VACASK runs its OSDI build of MOS2 (devices/spice/mos2.va), ngspice its own; not triaged (mos1, mos3, mos6, mos9 inv pass)
-test/resonator.sim mismatch # a lossless LC under trap: VACASK steps up to 46 us (step=2u is its first step, no max), ngspice holds 2 us (TSTEP): the phases part after 1 ms
-test/timestep.sim mismatch # a tolerance test: relref="alllocal", tran_lteratio=3.5 have no ngspice option, so the step control (and a 2% L1 difference) is each simulator's
+demo/spice/mos2inv.sim simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran: agrees with ngspice once VACASK's maxstep= is capped at TSTOP/20000 (P1-066-vacask-harness)
+test/resonator.sim simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran: agrees with ngspice once VACASK's maxstep= is capped at TSTOP/2000 (P1-066-vacask-harness)
+test/timestep.sim simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran: agrees with ngspice once VACASK's maxstep= is capped at TSTOP/2000 (P1-066-vacask-harness)
