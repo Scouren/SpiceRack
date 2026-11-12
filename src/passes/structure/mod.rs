@@ -127,6 +127,30 @@ pub(super) const PASSES: &[Pass] = &[
         run: formal_defaults_to_instances::formal_defaults_to_instances_default,
     },
     Pass {
+        name: "formal_defaults_to_instances_outer",
+        removes: ir::Feature::Extra(ir::Extra::FormalOuterRead),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
+            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
+        notes: &[
+            formal_defaults_to_instances::DRAW_IN_DEFAULT,
+            formal_defaults_to_instances::UNKNOWN_INSTANCES,
+        ],
+        run: formal_defaults_to_instances::formal_defaults_to_instances_outer,
+    },
+    Pass {
+        name: "formal_defaults_to_instances_unbound",
+        removes: ir::Feature::Extra(ir::Extra::FormalUnboundRead),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
+            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
+        notes: &[
+            formal_defaults_to_instances::DRAW_IN_DEFAULT,
+            formal_defaults_to_instances::UNKNOWN_INSTANCES,
+        ],
+        run: formal_defaults_to_instances::formal_defaults_to_instances_unbound,
+    },
+    Pass {
         name: "name_with_letter",
         removes: ir::Feature::Circuit(ir::CircuitExtra::NameWithoutLetter),
         requires: ir::FeatureSet::EMPTY,

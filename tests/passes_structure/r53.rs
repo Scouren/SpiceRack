@@ -6,13 +6,12 @@
 //! read an instance's value takes is bound, and an unbound one is out of the domain.
 //!
 //! Contents: `pub struct AtInstance`, `AtInstance::new`, `AtInstance::value(&self, usize) -> Option<f64>`,
-//! `ir::Bindings` for it, `pub fn keeps_every_instances_values()`, `pub fn values(&ir::Design, bool) -> Vec<Option<u64>>`,
+//! `ir::Bindings` for it, `pub fn keeps_every_instances_values(&str, fn(&mut ir::Design, &mut ir::Diags))`, `pub fn values(&ir::Design, bool) -> Vec<Option<u64>>`,
 //! `pub fn design(u64) -> String`
 
 use std::cell::Cell;
 
 use spicerack::ir;
-use spicerack::passes;
 
 use crate::bindings::ByDefinition;
 
@@ -119,8 +118,9 @@ impl ir::Bindings for AtInstance<'_> {
     }
 }
 
-/// R53's property over 200 seeded designs (the test's doc in `tests/passes_structure.rs`).
-pub fn keeps_every_instances_values() {
+/// R53's property over 200 seeded designs for the row `name` (the test's doc in
+/// `tests/passes_structure.rs`).
+pub fn keeps_every_instances_values(name: &str, run: fn(&mut ir::Design, &mut ir::Diags)) {
     let (mut designs, mut points, mut passed) = (0, 0, 0);
     for seed in 1..=200u64 {
         let text = design(seed);
@@ -129,10 +129,7 @@ pub fn keeps_every_instances_values() {
         ir::parse(&text, &mut design.builder(), &mut diags);
         assert!(diags.is_empty(), "seed {seed}: {:?}\n{text}", diags.rows());
         let before = values(&design, false);
-        passes::structure::formal_defaults_to_instances::formal_defaults_to_instances(
-            &mut design,
-            &mut diags,
-        );
+        run(&mut design, &mut diags);
         let mut found = ir::Diags::new();
         ir::check(&design, &mut found);
         assert!(found.is_empty(), "seed {seed}: {:?}\n{text}", found.rows());
@@ -144,9 +141,9 @@ pub fn keeps_every_instances_values() {
     }
     assert!(
         designs == 200 && points > 1000 && passed == 200,
-        "{designs} {points} {passed}"
+        "{name}: {designs} {points} {passed}"
     );
-    eprintln!("formal_defaults_to_instances: {designs} seeded designs, {points} instance values");
+    eprintln!("{name}: {designs} seeded designs, {points} instance values");
 }
 
 /// Every formal's value at every instance of the design, in listed order.
