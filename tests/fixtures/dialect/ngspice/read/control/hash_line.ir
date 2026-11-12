@@ -1,0 +1,7 @@
+# codes: P1406
+file "hash_line.sp" deck
+  title "hash_line"
+  comment " oracle: S3-CONTROL O1, L1: a *# line outside a block is a script command (inp.c:777-797; settle/load_hash.sp, state_alterparam.sp)"
+  load osdi "res.osdi"
+  opaque ngspice inert "*# echo hi"
+  analysis op

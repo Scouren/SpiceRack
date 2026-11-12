@@ -1,0 +1,6 @@
+# codes: P1409
+file "private_commands.sp" deck
+  title "private_commands"
+  comment " oracle: lead's Q4: setseed, optran, codemodel are ngspice's own: Private at their place"
+  opaque ngspice private ".control\nsetseed 3\n.endc"
+  analysis op

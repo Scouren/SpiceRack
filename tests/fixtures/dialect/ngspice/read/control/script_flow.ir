@@ -1,0 +1,6 @@
+# codes: P1401 P1401
+file "script_flow.sp" deck
+  title "script_flow"
+  comment " oracle: R49 (5): data-dependent flow (if, control.c) makes the whole script Script: every block of the deck"
+  opaque ngspice script ".control\nop\n.endc"
+  opaque ngspice script ".control\nif 1\nop\nend\n.endc"

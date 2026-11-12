@@ -1,0 +1,6 @@
+# oracle: S3-CONTROL S3: a FromHere option is a script option (settle/state_option_temp.sp); written by hand
+file "script_option.sp" deck
+  title "script_option"
+  option rel_tol value=0.01
+  env temp=60
+  analysis op

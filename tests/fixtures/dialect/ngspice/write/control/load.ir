@@ -1,0 +1,5 @@
+# oracle: S3-CONTROL L1: an OSDI load is pre_osdi in its own block (settle/load_ctl.sp); written by hand
+file "load.sp" deck
+  title "load"
+  load osdi "res.osdi"
+  analysis op

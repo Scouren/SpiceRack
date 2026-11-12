@@ -1,0 +1,6 @@
+# oracle: S3-CONTROL S2, S5: a parameter loop is foreach + alterparam + reset (settle/state_alterparam.sp); written by hand
+file "script_param_loop.sp" deck
+  title "script_param_loop"
+  param p = 1k
+  loop sweep keep_last name=val (param p) (list values=[1k, 3k])
+    analysis op

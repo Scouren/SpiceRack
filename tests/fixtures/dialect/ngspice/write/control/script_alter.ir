@@ -1,0 +1,5 @@
+# oracle: R49 (3) the writer's image: a plan with an alter is one script, analyses as commands (S3-CONTROL S4, settle/state_reset.sp); written by hand
+file "script_alter.sp" deck
+  title "script_alter"
+  alter (element_value r1) value=2k
+  analysis op

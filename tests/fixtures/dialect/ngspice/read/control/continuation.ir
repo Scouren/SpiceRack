@@ -1,0 +1,6 @@
+# codes: P1406
+file "continuation.sp" deck
+  title "continuation"
+  comment " oracle: S3-CONTROL O1: '+' continues a script line (settle/state_alterparam.sp); an inert command keeps its lines"
+  opaque ngspice inert ".control\necho a\n+ b\n.endc"
+  analysis op

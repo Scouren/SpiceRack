@@ -1,0 +1,6 @@
+# oracle: S3-CONTROL V1, S5: a KeepLast sweep loop is a foreach over its words, Loop.name the variable (settle/subst.sp); written by hand
+file "script_loop.sp" deck
+  title "script_loop"
+  loop sweep keep_last name=v (element_value r1) (list values=[1k, 2.2k])
+    analysis op
+    opaque ngspice inert ".control\necho $v\n.endc"

@@ -1,0 +1,7 @@
+# codes:
+file "analysis_commands.sp" deck
+  title "analysis_commands"
+  comment " oracle: R49 (3): with no dot-card analysis the script's analysis commands are the plan (commands.c:297-347; settle/order_two_blocks.sp)"
+  analysis op
+  analysis tran stop=5u print_step=1u cap=ngspice_rule
+  analysis ac (dec start=1 stop=1k points=2)

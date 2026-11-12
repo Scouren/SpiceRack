@@ -1,0 +1,7 @@
+# codes: P1408
+file "save_later_unread.sp" deck
+  title "save_later_unread"
+  comment " oracle: lead's Q6: a script save after an analysis holds from there (settle/state_save_reset.sp): Unread until Save.holds"
+  analysis op
+  opaque ngspice unread ".control\nsave v(b)\n.endc"
+  analysis tran stop=5u print_step=1u cap=ngspice_rule

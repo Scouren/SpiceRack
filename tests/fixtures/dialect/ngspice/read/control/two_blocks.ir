@@ -1,0 +1,7 @@
+# codes:
+file "two_blocks.sp" deck
+  title "two_blocks"
+  comment " oracle: S3-CONTROL O1: every block is one script in file order (inp.c:742-812; settle/order_two_blocks.sp); each block's items at its place"
+  analysis op
+  option rel_tol value=1e-4 whole_run
+  analysis tran stop=5u print_step=1u cap=ngspice_rule

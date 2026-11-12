@@ -1,0 +1,8 @@
+# codes:
+file "option_commands.sp" deck
+  title "option_commands"
+  comment " oracle: S3-CONTROL S3: option k=v and set k=v of a simulator option hold from here (com_option.c:104-131, options.c:444-450; settle/state_option_temp.sp)"
+  option rel_tol value=0.01
+  env temp=60
+  env temp=50 tnom=40
+  analysis op

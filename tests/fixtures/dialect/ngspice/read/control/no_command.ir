@@ -1,0 +1,6 @@
+# codes: P1411
+file "no_command.sp" deck
+  title "no_command"
+  comment " oracle: S3-CONTROL §2: a word that is no command (four, foo): ngspice says 'no such command available' (run): InvalidInSource at its place"
+  opaque ngspice invalid ".control\nfour 1k v(b)\n.endc"
+  analysis op

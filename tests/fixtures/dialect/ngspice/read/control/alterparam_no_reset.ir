@@ -1,0 +1,7 @@
+# codes: P1407
+file "alterparam_no_reset.sp" deck
+  title "alterparam_no_reset"
+  comment " oracle: S3-CONTROL S2: an alterparam with no reset after it changes nothing (settle/state_reset.sp: 0.3185 before the reset): Inert"
+  param p = 1k
+  opaque ngspice inert ".control\nalterparam p=3k\n.endc"
+  analysis op
