@@ -26,6 +26,7 @@ use spicerack::ir;
 /// The read fixtures, by name.
 const READ: &[&str] = &[
     "meas_ac",
+    "meas_dc_window",
     "meas_find",
     "meas_invalid",
     "meas_param",

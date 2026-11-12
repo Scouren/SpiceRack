@@ -307,7 +307,7 @@ fn stat(lw: &mut Lower<'_, '_>, st: Stmt, f: &str, words: &[String], ctx: Ctx) -
                 std::mem::swap(&mut from, &mut to);
             }
             (Val::Lit(..), Val::Lit(..)) => {}
-            _ => return Err(No::Untyped),
+            _ => return Err(No::DcWindow),
         }
     }
     Ok(Body::Stat(stat, signal, from, to))

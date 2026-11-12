@@ -24,7 +24,7 @@
 //! `tests/fixtures/dialect/ngspice/read/outputs/`; `rewrite/INV-semantics.md` 9.01–9.08.
 //!
 //! Contents: `pub(super) const FEATURES`, `pub(super) const CODES`, `pub(super) const UNTYPED`,
-//! `INVALID`, `INERT`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `INVALID`, `INERT`, `DC_WINDOW`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
 //! `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
 //! words (`Ctx`, `Want`, `probe_word`) are `read_outputs/probe.rs`, the measures
@@ -78,6 +78,10 @@ pub(super) const INVALID: Code = Code::new(b'P', 1351);
 /// `.plot`, `.width`: an ASCII picture or a column width, no number: `Inert`.
 pub(super) const INERT: Code = Code::new(b'P', 1352);
 
+/// A dc measure window with an expression bound: ngspice orders the two after substitution,
+/// and the IR has no window "between the two, in either order": `Unread`, counted on its own.
+pub(super) const DC_WINDOW: Code = Code::new(b'P', 1353);
+
 /// This area's codes.
 pub(super) const CODES: &[Row] = &[
     note(
@@ -91,6 +95,12 @@ pub(super) const CODES: &[Row] = &[
         "an output card ngspice rejects or fails on",
         "ngspice-45 com_measure2.c get_measure2, measure.c do_measure, dotcards.c gettoks",
         "deriv and err are not supported, an unknown function or analysis, v(a,b) in a measure, vi(, td= naming a measure (fatal), a print with no output; kept as ngspice text (InvalidInSource).",
+    ),
+    note(
+        DC_WINDOW,
+        "a dc measure window with an expression bound",
+        "ngspice-45 com_measure2.c measure_parse_stdParams (make m_from always less than m_to)",
+        "ngspice swaps the bounds by value at run time; the IR has no window in either order (R18: typed when the census finds one); kept as ngspice text (Unread).",
     ),
     note(
         INERT,
@@ -107,6 +117,8 @@ pub(super) enum No {
     Untyped,
     /// ngspice rejects it (`P1351`).
     Invalid,
+    /// A dc window whose order is known only at run time (`P1353`).
+    DcWindow,
 }
 
 /// An output card into `st.scope`, or one opaque with its code.
@@ -132,6 +144,7 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
         Ok(()) => {}
         Err(No::Untyped) => lw.opaque(st, ir::OpaqueClass::Unread, UNTYPED),
         Err(No::Invalid) => lw.opaque(st, ir::OpaqueClass::InvalidInSource, INVALID),
+        Err(No::DcWindow) => lw.opaque(st, ir::OpaqueClass::Unread, DC_WINDOW),
     }
 }
 
@@ -200,6 +213,10 @@ pub(super) fn probe(
         No::Invalid => Fail {
             code: INVALID,
             class: ir::OpaqueClass::InvalidInSource,
+        },
+        No::DcWindow => Fail {
+            code: DC_WINDOW,
+            class: ir::OpaqueClass::Unread,
         },
     };
     let mut wants =
