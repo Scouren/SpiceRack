@@ -501,3 +501,31 @@ fn legalize_refuses_the_power_cycle_instead_of_looping() {
     let codes: Vec<ir::Code> = diags.rows().iter().map(|d| d.code).collect();
     assert_eq!(codes, [ir::diag::UNSUPPORTED], "{:?}", diags.rows());
 }
+
+#[test]
+fn param_reads_to_typed_keeps_every_value_and_tag() {
+    // oracle: eval_typed of each behavioural root before and after, bindings that follow the
+    // definitions (the tag table's assumption), bits and tags compared while a typed division
+    // stands (the texts divide by 2i): a ToReal of a Real read and a ToInt of an Int one are
+    // the read itself
+    for (x, tags) in [("3i", &[1u8, 3][..]), ("2.5", &[0, 2])] {
+        let text = format!(
+            "file \"p.sp\" deck\n  param x = {x}\n  param y = 1\n  element behav b1 (n 0) expr=(x /: 2i * v(n) + y)\n"
+        );
+        let points = keeps_boundary_values("param_reads_to_typed", &text, tags);
+        eprintln!("param_reads_to_typed (x = {x}): {points} boundary points");
+    }
+    // over every feature the generator reaches few behavioural sources: every element kind
+    // but Behav taken out
+    let read = |e| matches!(e, ir::Expr::Param(_));
+    let behav_only = ir::ElemKind::ALL
+        .into_iter()
+        .filter(|&k| k != ir::ElemKind::Behav)
+        .fold(ir::FeatureSet::ALL, |s, k| {
+            s.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)))
+        });
+    let generated = keeps_values_over("param_reads_to_typed", read, true, behav_only);
+    eprintln!("param_reads_to_typed: {generated} generated roots");
+    assert!(generated > 0);
+    assert_eq!(notes("param_reads_to_typed", "mixed"), [code(115)]);
+}

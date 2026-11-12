@@ -121,12 +121,29 @@ fn times(d: &ir::Design, s: &ir::source::Source) -> Vec<f64> {
             }
             at
         }
-        ir::Wave::Sin(x) => vec![v(x.delay).unwrap_or(0.0)],
-        ir::Wave::Exp(x) => [v(x.td1), v(x.td2)].into_iter().flatten().collect(),
+        ir::Wave::Sin(x) => after(v(x.delay).unwrap_or(0.0)),
+        ir::Wave::Sffm(x) => after(v(x.delay).unwrap_or(0.0)),
+        ir::Wave::Am(x) => after(v(x.delay).unwrap_or(0.0)),
+        ir::Wave::Exp(x) => {
+            let (a, b) = (v(x.td1), v(x.td2));
+            let sum = a.zip(b).map(|(a, b)| a + b);
+            let mut at: Vec<f64> = [a, b, sum].into_iter().flatten().collect();
+            at.extend(at.clone().iter().map(|t| t * 1.5 + 1e-9));
+            at
+        }
         _ => Vec::new(),
     };
     for t in edges.into_iter().filter(|t| t.is_finite()) {
         out.extend([t.next_down(), t, t.next_up()]);
+    }
+    out
+}
+
+/// A delay and a spread of instants past it (ns to ms).
+fn after(delay: f64) -> Vec<f64> {
+    let mut out = vec![delay];
+    for k in 1..=24 {
+        out.push(delay + 1e-9 * 1.9f64.powi(k));
     }
     out
 }
@@ -173,7 +190,28 @@ fn compare(
                     }
                 }
                 (Err(x), Err(y)) => assert_eq!(x, y, "{name} {item:?} at {at:?}"),
-                _ => panic!("{name} {item:?} at {at:?}: {a:?} before, {b:?} after"),
+                _ => {
+                    let mut t = String::new();
+                    for f in was.files() {
+                        ir::dump(&was, f, &mut t);
+                    }
+                    let mut u = String::new();
+                    for f in design.files() {
+                        ir::dump(&design, f, &mut u);
+                    }
+                    let pick = |x: &str| {
+                        x.lines()
+                            .filter(|l| l.contains("wave=exp"))
+                            .map(String::from)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    };
+                    panic!(
+                        "{name} {item:?} at {at:?}: {a:?} before, {b:?} after\n{}\n{}",
+                        pick(&t),
+                        pick(&u)
+                    )
+                }
             }
         }
     }
@@ -345,4 +383,84 @@ fn given_zero_to_as_given_keeps_every_value() {
     );
     assert_eq!(tally.worst, 0, "the defaults are the same numbers");
     assert!(tally.sources > 3);
+}
+
+#[test]
+fn exp_td2_both_ways_keep_every_value() {
+    // drawn exponentials (literal delays, some whose difference does not round back) and
+    // generated ones; bit for bit (the absolute rule's sum is the evaluator's own sum; the
+    // relative rule converts only where td1 + (td2 - td1) is td2)
+    let mut h = 0x9E37_79B9_7F4A_7C15u64;
+    let mut next = move |n: u64| {
+        h ^= h << 13;
+        h ^= h >> 7;
+        h ^= h << 17;
+        h % n
+    };
+    for (name, from) in [
+        ("exp_td2_relative", ""),
+        ("exp_td2_absolute", " td2_from=td1"),
+    ] {
+        let mut tally = Tally::default();
+        for _ in 0..300 {
+            let (d1, d2) = (1 + next(999), 1 + next(999));
+            let (e1, e2) = (next(4) + 6, next(4) + 6);
+            let text = format!(
+                "file \"p.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=exp(v1=0.2 v2=-1.3 td1={d1}e-{e1} tau1=3n td2={d2}e-{e2} tau2=7n{from})\n"
+            );
+            compare(name, deck(&text), &mut tally, None);
+        }
+        generated(
+            name,
+            sources_only(&[ir::WaveKind::Exp], &[]),
+            &mut tally,
+            None,
+        );
+        eprintln!(
+            "{name}: {} sources, {} instants, worst {} ulp",
+            tally.sources, tally.points, tally.worst
+        );
+        assert_eq!(tally.worst, 0, "{name}: bit for bit");
+        assert!(tally.sources > 50, "{name}");
+    }
+}
+
+#[test]
+fn the_sffm_laws_both_ways_keep_every_value() {
+    // drawn SFFMs (literal index inside, at and beyond carrier/signal, and below 0) and
+    // generated ones; bit for bit: the index limit is applied to the literal, or changes
+    // nothing
+    let mut h = 0x5851_F42D_4C95_7F2Du64;
+    let mut next = move |n: u64| {
+        h ^= h << 13;
+        h ^= h >> 7;
+        h ^= h << 17;
+        h % n
+    };
+    for (name, law) in [
+        ("sffm_ngspice_to_spice3", " law=ngspice"),
+        ("sffm_spice3_to_ngspice", ""),
+    ] {
+        let mut tally = Tally::default();
+        for _ in 0..300 {
+            let (fc, fs) = (1 + next(999), 1 + next(99));
+            let mdi = next(3 * fc / fs + 2) as i64 - 1;
+            let text = format!(
+                "file \"p.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=sffm(offset=0.1 amplitude=0.9 carrier_freq={fc}k mod_index={mdi} signal_freq={fs}k delay=1u phase_c_deg=30 phase_m_deg=-45{law})\n"
+            );
+            compare(name, deck(&text), &mut tally, None);
+        }
+        generated(
+            name,
+            sources_only(&[ir::WaveKind::Sffm], &[]),
+            &mut tally,
+            None,
+        );
+        eprintln!(
+            "{name}: {} sources, {} instants, worst {} ulp",
+            tally.sources, tally.points, tally.worst
+        );
+        assert_eq!(tally.worst, 0, "{name}: bit for bit");
+        assert!(tally.sources > 50, "{name}");
+    }
 }

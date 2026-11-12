@@ -1,0 +1,2 @@
+file "d.sp" deck
+  element vsource v1 (a 0) dc=0 wave=exp(v1=0 v2=1 td1=163n tau1=2n td2=446n tau2=3n)

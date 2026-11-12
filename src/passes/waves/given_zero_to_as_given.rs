@@ -5,7 +5,8 @@
 //! when it is any other expression `x` it becomes `x == 0 ? default : x`. The defaults that
 //! need the transient are the leaves `TStep` and `TStop` (`TSTOP`'s fractions `1/TStop`,
 //! `5/TStop`, `500/TStop`), which `substitute_tstep` / `substitute_tstop` then replace; the
-//! exponential's `td2` defaults to the new `td1` plus `TStep`. A both field that may hold a
+//! exponential's second edge defaults to `TStep` after the first: `td2` is the new `td1` plus
+//! `TStep` counted from 0, `TStep` counted from `td1`. A both field that may hold a
 //! draw (it would be read twice) leaves the wave under ngspice's rule with note `U0202`.
 //!
 //! Removes `Circuit(GivenZeroSpiceDefault)`; requires `Circuit(GivenZeroAsGiven)`,
@@ -20,7 +21,7 @@
 use super::GIVEN_ZERO_LEFT;
 use super::nodes::{literal, may_draw, note_left, sources};
 use crate::ir;
-use crate::ir::wave::{Am, Exp, GivenZero, Pulse, Sffm, Sin, TrRandom};
+use crate::ir::wave::{Am, Exp, GivenZero, Pulse, Sffm, Sin, TdFrom, TrRandom};
 
 /// A default of IR-CIRCUIT §3's table.
 #[derive(Clone, Copy)]
@@ -107,7 +108,11 @@ fn exp(b: &mut ir::Builder<'_>, x: Exp) -> Option<Exp> {
     Some(Exp {
         td1,
         tau1: both(b, x.tau1, Default::TStep)?,
-        td2: both(b, x.td2, Default::AfterTStep(td1))?,
+        // the default edge is TSTEP after the first, whichever origin td2 counts from
+        td2: match x.td2_from {
+            TdFrom::Zero => both(b, x.td2, Default::AfterTStep(td1))?,
+            TdFrom::Td1 => both(b, x.td2, Default::TStep)?,
+        },
         tau2: both(b, x.tau2, Default::TStep)?,
         given_zero: GivenZero::AsGiven,
         ..x
