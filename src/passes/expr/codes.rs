@@ -131,7 +131,7 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Info {
             title: "a call of a user function that cannot be inlined",
             cite: "rewrite/RULINGS.md R51; INV-semantics.md 2.26",
-            explain: "The target has no user functions, so each call is replaced by the function's body with its arguments substituted. This call stays: the function is recursive (directly or through another), the call is unresolved, its argument count does not match, an argument holds a statistical draw that the body reads more than once (each read would draw anew), or an argument that reads the temperature or the circuit is never read by the body (the call counts as reading it; the copy would not). The item is refused.",
+            explain: "The target has no user functions, so each call is replaced by the function's body with its arguments substituted. This call stays: the function is recursive (directly or through another), the call is unresolved, its argument count does not match, an argument holds a statistical draw that the body reads more than once (each read would draw anew). The item is refused.",
             kind: ir::Kind::Note,
         },
     ),

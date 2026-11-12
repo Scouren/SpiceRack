@@ -9,8 +9,7 @@
 //! and the copy reads it at each use, which is the same number unless the argument holds a
 //! draw. An argument that may hold a draw and that the body reads more than once keeps the call
 //! (each read would draw anew), and so does a call of a function on or behind a call cycle (a
-//! recursive `.func` has no finite copy), an unresolved one, or one whose argument of class `Temp` or above the body never reads
-//! (the caller counts the dynamic form through it, R14; the copy would not): note `U0113`. Where the call
+//! recursive `.func` has no finite copy), or an unresolved one: note `U0113`. Where the call
 //! has no value (an argument the body never reads, or reads on a branch not taken, raises a
 //! domain error) the copy may have one: R12, not carried. A body calling another function is
 //! inlined over rounds, one call depth each, bounded by the function count.
@@ -184,13 +183,6 @@ fn inline(
         }
     }
     if (0..args.len()).any(|k| reads[k] > 1 && draws.holds(d, args[k])) {
-        return None;
-    }
-    // marker CALL_CLASS (until the kernel classes a call by its body, the lead's A28 refinement):
-    // an argument the body never reads drops out of the copy; one of class Temp or above made
-    // its caller count the dynamic form (R14), which the copy would no longer
-    let dynamic = |k: usize| ir::expr_class(d, args[k]) >= ir::ExprClass::Temp;
-    if (0..args.len()).any(|k| reads[k] == 0 && dynamic(k)) {
         return None;
     }
     Some(copy(b, row.body, &|d, e| formal(d, e).map(|k| args[k])))

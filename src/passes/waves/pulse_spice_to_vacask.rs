@@ -6,7 +6,8 @@
 //! period start (SPICE's `τ ≥ rise + width + fall` is VACASK's last branch, never reached
 //! inside a period only when the period is longer), the same ramps and the same flat top, and
 //! the same count of pulses. SPICE wraps `τ` as `τ − period·⌊τ/period⌋` and VACASK as
-//! `fmod(τ, period)`: one number, rounded by two formulas (measured in `tests/passes_waves.rs`).
+//! `fmod(τ, period)`: one number, rounded by two formulas; measured in `tests/passes_waves.rs`,
+//! the value moves by at most 1.007·ulp(t)·slope (the steepest edge), bit for bit elsewhere.
 //! Any other pulse keeps its law with note `U0201`: a zero fall (VACASK: no falling edge), a
 //! period of zero (VACASK: one pulse) or of exactly `rise + width + fall` (RUN q13), a field
 //! that is no literal, or ngspice's zero rule (its own pass makes it `AsGiven` first).
