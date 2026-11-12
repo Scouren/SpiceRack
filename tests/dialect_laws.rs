@@ -48,6 +48,13 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "62 of 64 seeds differ under eq_meaning, which compares table ids: each design read back is equal to the generated one once both go through the IR text (the ir row reading its own write); the order the vacask reader pushes rows in is not the generator's",
     ),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
+    ("l3", "vacask", "no generated design admitted: as l4"),
+    ("l8", "vacask", "no generated design admitted: as l4"),
+    (
+        "l4",
+        "vacask",
+        "Gen draws parameter names and library paths no shipped module has: admits refuses W2002, W2004 and S4.1's W2102, W2103 on nearly every seed (the R21 name-pool gap, S4-AREAS)",
+    ),
 ];
 
 /// The most seeds the shrink self-test searches for its case.

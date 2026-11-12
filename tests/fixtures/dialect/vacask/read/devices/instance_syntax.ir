@@ -1,0 +1,11 @@
+# Oracle: run dup ("An instance with name 'r1' already exists.": R2101, the first kept); run
+# np ("Parser syntax error, unexpected identifier, expecting (": terminals in parentheses only,
+# P2107).
+# codes: P2107 R2101 S0004 S0004
+file "instance_syntax.sim" deck
+  title "instance syntax"
+  device_library resistor
+  model res resistor
+  element resistor r1 (a 0) model=res value=1k
+  opaque vacask invalid "r1 (b 0) res r=2k"
+  opaque vacask invalid "r2 a 0 res r=1k"

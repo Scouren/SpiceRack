@@ -1,0 +1,29 @@
+# Oracle: settle devices_semi (sp_diode level 1 and sp_mos1, n and p, equal ngspice-45's D and
+# level-1 M: their families); devices_bjt_differs (sp_bjt is not Gummel-Poon at area 1.5: a
+# user module, R41 a, its parameters as written and `$mfactor` its `mult`); the `spice/*.va`
+# instance lists (`area`, `temp`, `dtemp` the Semi fields; `w l ad` the device's own); run fwd
+# (sp_mos1 has 4 terminals: one left out is Private P2104).
+# codes: P2004 P2004 P2104 S0001 S0001 S0002
+file "semis.sim" deck
+  title "diodes transistors and an unproven module"
+  device_library resistor
+  device_library diode
+  device_library mos1
+  device_library gummel_poon
+  model vs source_v
+  model r resistor
+  model dmod diode params=(is=1e-14 n=1.05 rs=10i cjo=1p)
+  model mn mos1 polarity=n params=(vto=0.7 kp=100u lambda=0.02 gamma=0.4)
+  model mp mos1 polarity=p params=(vto=-0.7 kp=50u)
+  model qm module params=(bf=100i is=1e-15) module=sp_bjt
+  opaque vacask unread "vdd (vdd 0) vs dc=5"
+  element resistor rd1 (vdd d1) model=r value=10k
+  element diode d1 (d1 0) model=dmod area=2i dtemp=5i
+  element resistor rm (vdd dm1) model=r value=10k
+  element mosfet m1 (dm1 vdd 0 0) model=mn params=(w=10u l=2u ad=1p)
+  element resistor rp (dp1 0) model=r value=10k
+  element mosfet m2 (dp1 0 vdd vdd) model=mp params=(w=20u l=2u) mult=2i temp_abs=40i
+  element resistor rq (vdd c1) model=r value=10k
+  element module_model q1 (c1 vdd 0 0) model=qm params=(area=1.5) mult=2i
+  opaque vacask private "m3 (dm1 vdd 0) mn"
+  opaque vacask unread "control\n  options temp=50 tnom=27 rawfile=\"ascii\"\n  analysis op1 op\nendc"

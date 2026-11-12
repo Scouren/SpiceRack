@@ -1,0 +1,33 @@
+sp_bjt at area 1.5 differs from ngspice-45 Q by 0.2 % (VD dev-spice Known differences); run semi_bjt
+load "spice/resistor.osdi"
+load "spice/diode.osdi"
+load "spice/bjt.osdi"
+load "spice/mos1.osdi"
+model vs vsource
+model r sp_resistor
+model dmod sp_diode is=1e-14 n=1.05 rs=10 cjo=1p
+model qm sp_bjt bf=100 is=1e-15 vaf=50 cje=1p
+model qp sp_bjt type=-1 bf=50 is=1e-15
+model mn sp_mos1 vto=0.7 kp=100u lambda=0.02 gamma=0.4
+model mp sp_mos1 type=-1 vto=-0.7 kp=50u
+vdd (vdd 0) vs dc=5
+vin (in 0) vs dc=0.8 mag=1
+vd (vd 0) vs dc=3 mag=1
+rd1 (vd d1) r r=10k
+d1 (d1 0) dmod area=2
+rq (vdd c1) r r=10k
+rb (in b1) r r=10k
+q1 (c1 b1 0 0) qm area=1.5
+rm (vdd dm1) r r=10k
+vg (g1 0) vs dc=2 mag=1
+m1 (dm1 g1 0 0) mn w=10u l=2u
+rp (dp1 0) r r=10k
+vgp (gp 0) vs dc=2.5 mag=1
+m2 (dp1 gp vdd vdd) mp w=20u l=2u $mfactor=2
+rq2 (cq2 0) r r=10k
+rbp (bp gp) r r=100k
+q2 (cq2 bp vdd vdd) qp
+control
+  options temp=50 tnom=27 reltol=1e-9 rawfile="ascii"
+  analysis ac1 ac from=1k to=1k mode="lin" points=1
+endc
