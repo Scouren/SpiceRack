@@ -392,7 +392,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// outward, the reader's rule (R3); left unresolved when none is found (R4). The one way an
     /// area binds a row's reference (a master or model defined later, or in a later file of
     /// the same scope chain): `Builder::bind_ref` in `bind`.
-    #[expect(dead_code, reason = "the element and model areas call it (S3.1, S3.2)")]
     pub(super) fn refer(
         &mut self,
         item: ir::ItemRef,
@@ -427,7 +426,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// The head parameter names (folded, `name::key`) of the `.subckt name` ngspice binds from
     /// `st`'s block: the nearest block outward in this file, else a top-level `.subckt` of an
     /// earlier file of the read; `None` when none is visible.
-    #[expect(dead_code, reason = "the element area calls it (S3.1a)")]
     pub(super) fn subckt_formals(&self, st: Stmt, name: &str) -> Option<Vec<String>> {
         if let Some(f) = self.declared.formals(st.container, name) {
             return Some(f.to_vec());

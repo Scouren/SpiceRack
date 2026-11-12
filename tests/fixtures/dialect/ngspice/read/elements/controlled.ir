@@ -14,4 +14,4 @@ file "controlled.sp" deck
   element behav E4 (o 0) expr=(v(c) * 4)
   element behav E5 (o 0) expr=(v(c) * 6)
   element behav G3 (o 0) mult=2 expr=(v(c) / 1k) output=current
-  element table E6 (o 0) input=v(c) points=[0, 0, 1, 2] law=ngspice_rounded
+  element table E6 (o 0) input=(v(c)) points=[0, 0, 1, 2] law=ngspice_rounded

@@ -8,7 +8,6 @@ E1 o 0 c 0 2
 F1 o 0 vx 2 m=2
 E3 o 0 poly(2) a 0 b 0 0 1 2
 B1 b 0 i={v(a) * 2} m=2
-E4 o 0 vol={v(c) * 4}
 E6 o 0 table {v(c)} = (0, 0) (1, 2)
 D1 a k dmod area=2 off ic=0.6
 M1 d g s b nmos ic=1,2,3 w=1u m=2

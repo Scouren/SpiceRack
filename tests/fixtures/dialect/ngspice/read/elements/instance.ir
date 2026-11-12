@@ -5,7 +5,7 @@ file "instance.sp" deck
   subckt sub (a b)
   subckt subm (a b) m=1
   element instance X1 (n1 n2) model=sub
-  element instance X2 (n1 n2) model=sub params=(w=1) mult=2
+  element instance X2 (n1 n2) model=sub params=(w=1) mult=2 mult_law=ngspice_append
   element instance X3 (n1 n2) model=subm params=(m=3)
   element instance X4 (n1 n2) model=later
   subckt later (a b)

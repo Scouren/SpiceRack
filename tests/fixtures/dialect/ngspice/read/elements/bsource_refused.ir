@@ -1,7 +1,5 @@
-# codes: P1104 P1103 P1106
+# codes: P1106
 file "bsource_refused.sp" deck
   title "bsource_refused"
-  comment " oracle: ngspice-45 asrcload.c:41-52 (tc from 300.15 K; m multiplies the value: run f5 B2 d 0 V=1 m=2 is 2 V), asrc.c (reciproctc)"
-  opaque ngspice unread "B1 a 0 V=1 m=2"
-  opaque ngspice unread "B2 b 0 I=1 tc1=1m"
+  comment " oracle: ngspice-45 asrc.c (reciproctc, reciprocm: ngspice's own flags)"
   opaque ngspice private "B3 c 0 I=1 reciproctc=1"

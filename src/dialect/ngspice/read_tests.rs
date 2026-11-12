@@ -285,7 +285,7 @@ fn global_drops_ground_and_funcs_bind_their_formals() {
 fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
     // INV 2.06 (a .param reading the circuit), manual §2.4 (ports, a head default), parse.rs
     // P0004 (a stray closer or `.elseif`), the stub areas (S3.1-S3.4: Unread).
-    let text = "t\n.param p={v(a)}\n.subckt s a a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\nR1 a b 1k\n.model m nmos\n.tran 1n 1u\n.control\nrun\n.endc\n.title x\n.global gnd\n";
+    let text = "t\n.param p={v(a)}\n.subckt s a a\n.ends\n.ends\n.elseif (1)\n.subckt q b w=\n.ends\n.model m nmos\n.tran 1n 1u\n.control\nrun\n.endc\n.title x\n.global gnd\n";
     let (d, diags) = deck(text);
     let top = d.file(d.entry()).top;
     assert_eq!(d.items(top)[0].kind, ItemKind::Title);
@@ -296,7 +296,7 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
     assert_eq!(
         classes,
         [
-            Bad, Bad, Bad, Bad, Bad, Unread, Unread, Unread, Unread, Unread, Inert
+            Bad, Bad, Bad, Bad, Bad, Unread, Unread, Unread, Unread, Inert
         ]
     );
     let c = codes_of(&diags);
@@ -310,12 +310,11 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
         codes::UNREAD,
         codes::UNREAD,
         codes::UNREAD,
-        codes::UNREAD,
         codes::GLOBAL_GROUND,
     ];
     assert_eq!(c, want);
     assert_eq!(
-        opaque(&d, top, 9).1,
+        opaque(&d, top, 8).1,
         ".control\nrun\n.endc",
         "a block is one statement"
     );
@@ -326,10 +325,10 @@ fn what_ngspice_rejects_or_no_area_reads_is_opaque_and_coded() {
 fn a_strict_read_refuses_unread_statements() {
     // SPINE §3, RULINGS R10: Policy::Strict turns each Unread into a refusal.
     let row = dialect::by_name("ngspice").expect("row");
-    let src = Sources::one("d.sp", "t\nR1 a b 1k\n");
+    let src = Sources::one("d.sp", "t\nZ1 d g s zmod 2\n");
     assert!(dialect::transpile(&src, row, row, Policy::Strict).is_err());
     let ok = dialect::transpile(&src, row, row, Policy::Lenient).expect("lenient");
-    assert_eq!(ok.text, "t\nR1 a b 1k\n.end\n");
+    assert_eq!(ok.text, "t\nZ1 d g s zmod 2\n.end\n");
 }
 
 #[test]

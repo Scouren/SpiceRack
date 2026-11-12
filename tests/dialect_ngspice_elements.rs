@@ -44,9 +44,23 @@ const READ: &[&str] = &[
 /// The write fixtures, by name.
 const WRITE: &[&str] = &["cards"];
 
+/// Known failures, by fixture name, with why: the design reads (or is written) but uses a feature
+/// ngspice's `FEATURES` lacks. Strict both ways (`known`): an unexpected pass fails until the
+/// marker goes.
+const KNOWN: &[(&str, &str)] = &[(
+    "controlled",
+    "NameWithoutLetter on E/G-named Behav (E vol=, G cur=): ir::spice_letter gives Behav only B (reported to ir-circuit)",
+)];
+
 /// The simulator deck: every card form that carries a number and runs in an operating point.
 const SIM: &str = "elements
+.options tnom=50
+.temp 77
 V1 in 0 1
+R17 a q {1k+0*v(a)} tc1=0.01
+R18 q 0 1k
+B3 vb 0 V=v(a) m=2
+R19 vb 0 1k
 R1 in a 1k
 R2 a 0 r=2k tc1=1m m=2
 C1 a 0 1p
@@ -75,21 +89,21 @@ R7 d 0 10k
 .model dmod d is=1e-14
 X1 a x sub m=2
 .subckt sub p q
-R1 p q 1k
+R1 p q 1k m=5
 .ends
 R8 x 0 1k
 R9 a k {1k+v(a)}
 R10 k 0 1k
 .control
 op
-print v(a) v(b) v(e) v(g) v(f) v(h2) v(p) v(h) v(bi) v(t) v(d) v(x) v(k)
+print v(a) v(b) v(e) v(g) v(f) v(h2) v(p) v(h) v(bi) v(t) v(d) v(x) v(k) v(q) v(vb)
 .endc
 .end
 ";
 
 /// The nets `SIM` prints, in order.
 const SIM_NETS: &[&str] = &[
-    "a", "b", "e", "g", "f", "h2", "p", "h", "bi", "t", "d", "x", "k",
+    "a", "b", "e", "g", "f", "h2", "p", "h", "bi", "t", "d", "x", "k", "q", "vb",
 ];
 
 // ---- private ----
@@ -136,6 +150,9 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
     for name in READ {
         let path = format!("{name}.sp");
         let (first, _) = read_deck(&path, &text("read", name, "sp"));
+        if known(name, &first) {
+            continue;
+        }
         let once = write_entry(&first);
         let (second, _) = read_deck(&path, &once);
         assert!(first.eq_ignoring_spans(&second), "{name}:\n{once}");
@@ -147,6 +164,9 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
 fn each_write_fixture_writes_to_its_text() {
     for name in WRITE {
         let design = parse_ir(&text("write", name, "ir"));
+        if known(name, &design) {
+            continue;
+        }
         assert_eq!(write_entry(&design), text("write", name, "sp"), "{name}");
     }
 }
@@ -170,6 +190,19 @@ fn written_elements_run_on_ngspice_to_the_original_operating_point() {
             "v({net}) = {g}, ngspice on the original: {w}\n{written}"
         );
     }
+}
+
+/// Whether `name` is a known failure; asserts it still fails (an unexpected pass fails).
+fn known(name: &str, design: &ir::Design) -> bool {
+    let Some((_, why)) = KNOWN.iter().find(|(n, _)| *n == name) else {
+        return false;
+    };
+    let lacked = ir::features_used(design).minus(spicerack::dialect::ngspice::FEATURES);
+    assert!(
+        !lacked.is_empty(),
+        "{name} passes: remove its KNOWN marker ({why})"
+    );
+    true
 }
 
 /// The ngspice row.
@@ -218,10 +251,16 @@ fn read_deck(path: &str, text: &str) -> (ir::Design, ir::Diags) {
     (design, diags)
 }
 
-/// The entry file written by the ngspice row; no refusal.
+/// The entry file legalized for and written by the ngspice row; no refusal, and the features
+/// ngspice lacks named when there are some.
 fn write_entry(design: &ir::Design) -> String {
+    let lacked = ir::features_used(design).minus(spicerack::dialect::ngspice::FEATURES);
+    let named: Vec<ir::Feature> = lacked.iter().collect();
+    assert!(named.is_empty(), "lacked: {named:?}");
+    let mut design = design.clone();
     let mut diags = ir::Diags::new();
-    let text = dialect::write(design, design.entry(), row(), &mut diags);
+    dialect::legalize(&mut design, row(), &mut diags);
+    let text = dialect::write(&design, design.entry(), row(), &mut diags);
     let refused: Vec<_> = diags
         .rows()
         .iter()
