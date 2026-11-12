@@ -50,6 +50,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Save),
     Feature::Run(RunExtra::SaveWholeRun),
     Feature::Run(RunExtra::SaveFromHere),
+    Feature::Run(RunExtra::SaveMidRun),
     Feature::Item(ItemKind::Print),
     Feature::Item(ItemKind::Measure),
     Feature::Run(RunExtra::ProbeVdiff),
@@ -215,7 +216,7 @@ pub(super) fn probe(
     Ok(build(lw, &wants.remove(0)))
 }
 
-/// A script's `save word …` before its first analysis (the control area calls it then):
+/// A script's `save word …` (the control area calls it for each one, wherever it stands):
 /// `com_save` reads each word by `copynode`, as `.save` reads it by `gettoks`, except a
 /// `v(a,b)`, which `copynode` reads as one name `a,b` (not typed). Pushes one `Save` that holds
 /// from where it stands (`Applies::FromHere`, A27), or none.
