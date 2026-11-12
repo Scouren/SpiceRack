@@ -1,0 +1,28 @@
+resistors capacitors inductors
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+model is isource
+model r sp_resistor
+model c sp_capacitor
+model l sp_inductor
+i1 (0 n1) is dc=1m mag=1
+r1 (n1 0) r r=1k tc1=0.01 tc2=0.001
+i2 (0 n2) is dc=1m mag=1
+r2 (n2 0) r resistance=1k tce=1 noise=0
+i3 (0 n3) is dc=1m mag=1
+r3 (n3 0) r r=1k temp=77 tc=0.01 w=2u l=1u
+i4 (0 n4) is dc=1m mag=1
+r4 (n4 0) r r=1k dtemp=10 scale=2 $mfactor=2
+i7 (0 c1) is mag=1
+rc1 (c1 0) r r=1e12
+c1 (c1 0) c c=1n tc1=0.01 $mfactor=2
+i9 (0 l1) is mag=1
+l1 (l1 0) l inductance=1m temp=77 scale=3
+rb (n1 0) r r=1k bogus=1
+rn (n1 0) r r=1k noisy=2
+rt (n1) r r=1k
+control
+  options temp=50 tnom=27 reltol=1e-9 rawfile="ascii"
+  analysis ac1 ac from=1k to=1k mode="lin" points=1
+endc

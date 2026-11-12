@@ -1,0 +1,33 @@
+# Oracle: settle devices_prc (run prc: each field below moves the number as ngspice-45's R, C,
+# L do: ΔT = T − tnom, the direct law, `scale` multiplies R); the `spice/*.va` aliases (`r`
+# for `resistance`, `tc1` for `tc`, `noise` for `noisy`, `l` for `inductance`); S 7.11 (an
+# unknown parameter: InvalidInSource P2103); `noisy=2` has no IR field (Private P2106); run fwd
+# (a terminal left unconnected: Private P2104, R41 Q3). The `isource` instances are the sources
+# area's (Unread until S4.2), the control block S4.3's.
+# codes: P2103 P2104 P2106 S0002 S0002 S0004 P2004 P2004 P2004 P2004 P2004 P2004 P2004 S0001 S0001 S0001 S0001 S0001 S0001 S0001
+file "passives.sim" deck
+  title "resistors capacitors inductors"
+  device_library resistor
+  device_library capacitor
+  device_library inductor
+  model is source_i
+  model r resistor
+  model c capacitor
+  model l inductor
+  opaque vacask unread "i1 (0 n1) is dc=1m mag=1"
+  element resistor r1 (n1 0) model=r value=1k tc1=0.01 tc2=0.001
+  opaque vacask unread "i2 (0 n2) is dc=1m mag=1"
+  element resistor r2 (n2 0) model=r value=1k tce=1i noisy=false
+  opaque vacask unread "i3 (0 n3) is dc=1m mag=1"
+  element resistor r3 (n3 0) model=r params=(w=2u l=1u) value=1k tc1=0.01 temp_abs=77i
+  opaque vacask unread "i4 (0 n4) is dc=1m mag=1"
+  element resistor r4 (n4 0) model=r mult=2i dtemp=10i scale=2i value=1k
+  opaque vacask unread "i7 (0 c1) is mag=1"
+  element resistor rc1 (c1 0) model=r value=1e12
+  element capacitor c1 (c1 0) model=c mult=2i value=1n tc1=0.01
+  opaque vacask unread "i9 (0 l1) is mag=1"
+  element inductor l1 (l1 0) model=l value=1m temp_abs=77i scale=3i
+  opaque vacask invalid "rb (n1 0) r r=1k bogus=1"
+  opaque vacask private "rn (n1 0) r r=1k noisy=2"
+  opaque vacask private "rt (n1) r r=1k"
+  opaque vacask unread "control\n  options temp=50 tnom=27 reltol=1e-9 rawfile=\"ascii\"\n  analysis ac1 ac from=1k to=1k mode=\"lin\" points=1\nendc"

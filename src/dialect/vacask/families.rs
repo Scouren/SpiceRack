@@ -20,7 +20,7 @@
 //!
 //! Contents: `Module`, `FAMILIES`, `PROVEN`, `Params`, `Name`, `module`, `file_word`, `default_word`,
 //! `design_word`, `params`, `kind`, `has_polarity`, `model_name_in`, `model_name_out`, `instance_name_in`,
-//! `instance_name_out` (crate-private)
+//! `canonical`, `instance_name_out` (crate-private)
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -241,7 +241,6 @@ pub(super) fn params(word: &str) -> Option<&'static Params> {
 }
 
 /// The element kind an instance of a model of `family` is.
-#[allow(dead_code, reason = "read_elements (next commit) calls it")]
 pub(super) fn kind(family: ir::ModelFamily) -> ir::ElemKind {
     use ir::{ElemKind as K, ModelFamily as F};
     match family {
@@ -312,7 +311,6 @@ pub(super) fn model_name_out(word: &str, ir: &str) -> String {
 }
 
 /// The IR name of parameter `written` on an instance of a model of the module `word`.
-#[allow(dead_code, reason = "read_elements (next commit) calls it")]
 pub(super) fn instance_name_in(word: &str, written: &str) -> Name {
     let Some(p) = params(word) else {
         return Name::Ir(written.to_string());
@@ -328,8 +326,12 @@ pub(super) fn instance_name_in(word: &str, written: &str) -> Name {
     }
 }
 
+/// The parameter `written` stands for on the module `word` (an alias's target, else itself).
+pub(super) fn canonical(word: &str, written: &str) -> String {
+    params(word).map_or(written, |p| p.target(written)).to_string()
+}
+
 /// The name an instance of a model of the module `word` spells the IR parameter `ir` with.
-#[allow(dead_code, reason = "read_elements (next commit) calls it")]
 pub(super) fn instance_name_out(word: &str, ir: &str) -> String {
     let prefixed = format!("instance_{ir}");
     match params(word).is_some_and(|p| p.has(&prefixed)) {

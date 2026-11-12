@@ -1,0 +1,13 @@
+# Oracle: VD dev-builtin-behavioral (`v=`/`potential=` a voltage, `i=`/`flow=` a current from
+# p through the source to n; `v(n)` a node's potential; `expr=`/`declarations=` Private, §5
+# G14); run b1 (a parameter read is real-typed there: `v=p/2` with p=3 is 1.5; Unread until
+# A21's ToReal, R41 Q1).
+# codes: P2003 P2004 S0001 S0002
+file "behavioural.sim" deck
+  title "behavioural sources"
+  param p = 3i
+  element behav b1 (a 0) expr=(3i / 2i) output=voltage
+  element behav b2 (b 0) expr=1m output=current
+  element behav b3 (c 0) expr=(v(a) * 2i) output=voltage
+  opaque vacask unread "b4 (d 0) v=p/2"
+  opaque vacask private "b5 (e 0) expr=1 declarations=\"\""
