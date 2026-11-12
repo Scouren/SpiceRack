@@ -370,7 +370,8 @@ fn any_bytes_read_returns_and_checks_clean() {
 fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
     // R21 (`Write::admits`): a literal ngspice reads back otherwise (no centi letter; numparam
     // reads `mil` as milli: xpressn.c parseunit), a head parameter with no default (manual
-    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once).
+    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once),
+    // a string value (numparam has none).
     let mut d = ir::Design::new();
     {
         let mut b = d.builder();
@@ -393,11 +394,17 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
         b.comment(top, "two\nlines", ir::Span::NONE);
         let t = b.temp();
         b.if_(top, &[t], ir::Span::NONE);
+        let text = b.string("4.8.3");
+        b.param(top, "v", text, ir::Span::NONE);
     }
     let row = dialect::by_name("ngspice").expect("row");
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut d, row, &mut diags);
-    let mut got = codes_of(&diags);
+    // the admits rows; `U0001` for `Expr(Str)` also comes until the model area's FEATURES add it
+    let mut got: Vec<ir::Code> = codes_of(&diags)
+        .into_iter()
+        .filter(|c| c.letter == b'W')
+        .collect();
     got.sort();
     let mut want = vec![
         codes::LITERAL_FORM,
@@ -405,6 +412,7 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
         codes::NO_DEFAULT,
         codes::LINE_BREAK,
         codes::READS_RUN,
+        codes::TEXT_VALUE,
     ];
     want.sort();
     assert_eq!(got, want);

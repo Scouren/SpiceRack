@@ -181,7 +181,8 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
 /// (R21): a head parameter with no default (`W1001`), a blank or multi-line title or a
 /// multi-line comment (`W1002`), a literal it would read back in another form (`W1003`), a
 /// section in a section or a definition or include in an `.if` branch (`W1004`), an `.if`
-/// condition that reads the run or a value that reads the circuit (`W1005`).
+/// condition that reads the run or a value that reads the circuit (`W1005`), a string or list
+/// value (`W1006`).
 pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diags: &mut ir::Diags) {
     let span = d.span_of(item);
     let mut refuse = |code| diags.push(code, span, 0);
@@ -241,7 +242,9 @@ pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diag
         if item.kind != ItemKind::Func && class >= limit {
             refuse(codes::READS_RUN);
         }
-        if !expr_write::spells_in(d, e, expr_write::eval_of(d, e)) {
+        if expr_write::holds_text(d, e) {
+            refuse(codes::TEXT_VALUE);
+        } else if !expr_write::spells_in(d, e, expr_write::eval_of(d, e)) {
             refuse(codes::LITERAL_FORM);
         }
     }

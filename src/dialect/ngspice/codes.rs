@@ -18,7 +18,7 @@
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`, `ROUNDED`,
 //! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
-//! `MISSING_FILE`, `NO_DEFAULT`, `LINE_BREAK`, `LITERAL_FORM`, `PLACEMENT`, `READS_RUN`), `pub fn info(ir::Code) -> Option<ir::Info>`
+//! `MISSING_FILE`, `NO_DEFAULT`, `LINE_BREAK`, `LITERAL_FORM`, `PLACEMENT`, `READS_RUN`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, write_control,
@@ -81,6 +81,10 @@ pub(super) const PLACEMENT: Code = Code::new(b'W', 1004);
 /// An `.if` condition that reads the temperature or the circuit, or a parameter or head default
 /// that reads the circuit (numparam evaluates them once, before the run).
 pub(super) const READS_RUN: Code = Code::new(b'W', 1005);
+
+/// A string or list value where ngspice reads an expression (a `.param`, head default, `.if`
+/// or `.func`): numparam has no string or vector values.
+pub(super) const TEXT_VALUE: Code = Code::new(b'W', 1006);
 
 /// The S3.0 rows.
 pub(super) const CODES: &[Row] = &[
@@ -167,6 +171,12 @@ pub(super) const CODES: &[Row] = &[
         "a definition or include where ngspice does not read it",
         "ngspice manual §2.8, §2.15",
         "sections do not nest; an .if branch holds instances and models only; refused.",
+    ),
+    refusal(
+        TEXT_VALUE,
+        "a string or list where ngspice reads an expression",
+        "ngspice-45 xpressn.c formula",
+        "a .param, head default, .if condition or .func body is a number expression; refused.",
     ),
     refusal(
         READS_RUN,
