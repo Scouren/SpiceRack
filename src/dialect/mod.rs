@@ -79,6 +79,12 @@ pub trait Write: Sync {
     /// only the IR. Total over legal IR: every item is spelled, or copied when it is this
     /// family's `Opaque` (another family's never reaches it: [`legalize`] drops or refuses it).
     fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, diags: &mut ir::Diags);
+
+    /// Appends a refusal for everything in `design`, legal by `features()`, that this dialect
+    /// cannot spell for a reason no feature states (a model parameter its simulator's module does
+    /// not have, a name it cannot quote). Never for something a feature could state. Default:
+    /// nothing. [`legalize`] calls it last, always (AMEND-A12 S1, R21).
+    fn admits(&self, _design: &ir::Design, _diags: &mut ir::Diags) {}
 }
 
 /// One language. CDL and Verilog have no reader.
@@ -202,7 +208,8 @@ pub fn read(
 /// dropped from its scope with an [`INERT_DROPPED`] note when its class is `Inert` (it moves no
 /// number) and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
 /// writer of [`ANY_FAMILY`] skips that step. Then `passes::legalize` with the writer's features,
-/// whose `ir::check_legal` reports what no pass removed. Legality is of the whole design.
+/// whose `ir::check_legal` reports what no pass removed. Last, always, the writer's own
+/// [`Write::admits`], so the caller sees every refusal at once. Legality is of the whole design.
 ///
 /// # Panics
 /// When `to` has no writer (the caller checks the row).
@@ -233,6 +240,7 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
         }
     }
     passes::legalize(design, writer.features(), diags);
+    writer.admits(design, diags);
 }
 
 /// `file` of a design [`legalize`] accepted for `to`, written by `to`'s writer; nothing else
@@ -240,7 +248,7 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
 ///
 /// # Panics
 /// When `to` has no writer (the caller checks the row); in debug builds, when `design` uses a
-/// feature the writer lacks or holds a foreign `Opaque`.
+/// feature the writer lacks, holds a foreign `Opaque`, or is refused by the writer's `admits`.
 pub fn write(
     design: &ir::Design,
     file: ir::FileId,
@@ -262,6 +270,12 @@ pub fn write(
         "write: no foreign Opaque for {}",
         to.name
     );
+    #[cfg(debug_assertions)]
+    {
+        let mut refused = ir::Diags::new();
+        writer.admits(design, &mut refused);
+        assert!(refused.is_empty(), "write: {} admits the design", to.name);
+    }
     let mut out = String::new();
     writer.write(design, file, &mut out, diags);
     out

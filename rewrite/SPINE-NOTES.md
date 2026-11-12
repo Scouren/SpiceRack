@@ -68,6 +68,15 @@ Each line: question → choice → why.
     L1 asserts the read returns and L2 that `check` adds no `X` row. L6's corpus for `ir` is the
     worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous with one row.
 
+23. `Write::admits` (AMEND-A12 S1) → default empty; `dialect::legalize` calls it last; `write`'s debug
+    assertions run it into a scratch list that must stay empty. L4 skips a generated design
+    `legalize` refuses (any refusal) and fails when no admitted design holds an item kind the
+    writer claims (checked over `Feature::Item` only; kinds outside the kernel's join when the
+    generator builds them).
+24. `OpaqueClass::Hint` (R19) is not in the kernel yet: `legalize`'s match over classes is exhaustive,
+    so the member's arrival stops the build; then a spine note row (distinct from `INERT_DROPPED`:
+    "the numbers may move within the solver's tolerance") and the drop.
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.

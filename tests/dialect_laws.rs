@@ -1,7 +1,7 @@
 //! The laws every dialect passes (REWRITE-PLAN §4.2), run for every row of
 //! `dialect::BUILTIN` on the sides it has: L1 totality, L2 validity, L3 determinism (reader);
-//! L4 writer totality, L7 feature honesty, L8 isolation (writer); L5 round trip (both); L6
-//! corpus fixpoint (both, `--features corpus` only). L9 belongs to each dialect's own simulator
+//! L4 writer totality over what `legalize` accepted, L7 feature honesty, L8 isolation (writer);
+//! L5 round trip (both); L6 corpus fixpoint (both, `--features corpus` only). L9 belongs to each dialect's own simulator
 //! tests. In slice S2 the only row is `ir`.
 //!
 //! Oracles: generated designs (`ir::gen::generate(seed, row's features, size)`, valid and legal
@@ -87,12 +87,22 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
 }
 
 #[test]
-fn l4_a_writer_refuses_nothing_it_claims() {
+fn l4_write_is_total_over_a_design_legalize_accepted() {
     for (row, writer) in writers() {
+        let claimed = kernel(writer.features());
+        let (mut skipped, mut seen) = (Vec::new(), ir::FeatureSet::EMPTY);
         for seed in SEEDS {
-            let design = generate(seed, &kernel(writer.features()), SIZE);
+            let mut design = generate(seed, &claimed, SIZE);
             let mut diags = ir::Diags::new();
-            let _ = dialect::write(&design, design.entry(), row, &mut diags);
+            dialect::legalize(&mut design, row, &mut diags);
+            if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
+                skipped.push(seed);
+                continue;
+            }
+            seen = seen.union(ir::features_used(&design));
+            for file in design.files() {
+                let _ = dialect::write(&design, file, row, &mut diags);
+            }
             let refusals: Vec<_> = diags
                 .rows()
                 .iter()
@@ -101,6 +111,16 @@ fn l4_a_writer_refuses_nothing_it_claims() {
             assert!(
                 refusals.is_empty(),
                 "{} seed {seed}: {refusals:?}",
+                row.name
+            );
+        }
+        // The skip cannot make the law vacuous: every item kind the writer claims is admitted in
+        // some generated design.
+        for &kind in &ir::ItemKind::ALL {
+            let f = ir::Feature::Item(kind);
+            assert!(
+                !claimed.contains(f) || seen.contains(f),
+                "{}: no admitted design holds {kind:?} (skipped seeds {skipped:?})",
                 row.name
             );
         }

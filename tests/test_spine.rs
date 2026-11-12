@@ -75,6 +75,22 @@ static NO_SUBCKT: DialectRow = DialectRow {
     write: Some(&NoSubckt),
 };
 
+/// A writer that refuses every comment reading "a note" in `admits` (a reason no feature
+/// states), and counts its write calls.
+struct Picky(AtomicUsize);
+
+static PICKY: Picky = Picky(AtomicUsize::new(0));
+
+static PICKY_ROW: DialectRow = DialectRow {
+    name: "picky",
+    text_family: dialect::ANY_FAMILY,
+    read: None,
+    write: Some(&PICKY),
+};
+
+/// The picky writer's refusal: a code of its own (no catalogue holds it, so it refuses).
+const PICKY_CODE: ir::Code = ir::Code::new(b'W', 9001);
+
 /// A Spectre-family writer that counts its calls and spells everything.
 struct Counting(AtomicUsize);
 
@@ -126,6 +142,26 @@ impl Write for Counting {
     fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
         self.0.fetch_add(1, Ordering::Relaxed);
         ir::dump(design, file, out);
+    }
+}
+
+impl Write for Picky {
+    fn features(&self) -> &'static ir::FeatureSet {
+        IrText.features()
+    }
+
+    fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+        ir::dump(design, file, out);
+    }
+
+    fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
+        let table = <ir::item::Comment as ir::ItemRow>::table(design);
+        for (i, row) in table.rows().iter().enumerate() {
+            if design.text(row.text) == "a note" {
+                diags.push(PICKY_CODE, table.span(i as u32), 0);
+            }
+        }
     }
 }
 
@@ -273,6 +309,51 @@ fn after_one_clean_legalize_each_file_is_written_once() {
         SPECTRE_STUB.0.load(Ordering::Relaxed),
         0,
         "a refused design is never written"
+    );
+}
+
+#[test]
+fn a_writer_admits_refusal_comes_last_from_legalize_and_stops_transpile() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(&src, ir_row(), Policy::Lenient, &mut design, &mut diags);
+    let read_rows = diags.len();
+    dialect::legalize(&mut design, &PICKY_ROW, &mut diags);
+    let added: Vec<ir::Code> = diags.rows()[read_rows..].iter().map(|d| d.code).collect();
+    assert_eq!(added, [PICKY_CODE]);
+    let at = diags.rows()[read_rows].span;
+    assert_eq!(
+        &KERNEL[at.start as usize..][..7],
+        "comment",
+        "the row is at the comment"
+    );
+    let refused = dialect::transpile(&src, ir_row(), &PICKY_ROW, Policy::Lenient);
+    let codes: Vec<ir::Code> = refused
+        .expect_err("admits refused")
+        .rows()
+        .iter()
+        .map(|d| d.code)
+        .collect();
+    assert_eq!(codes, [PICKY_CODE]);
+    assert_eq!(
+        PICKY.0.load(Ordering::Relaxed),
+        0,
+        "a refused design is never written"
+    );
+}
+
+#[test]
+fn a_writer_that_admits_everything_writes_as_before() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let out = dialect::transpile(&src, ir_row(), &NGSPICE_ROW, Policy::Lenient)
+        .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
+    assert_eq!(
+        out.text,
+        KERNEL
+            .split("file \"models.lib\"")
+            .next()
+            .expect("the deck")
     );
 }
 
