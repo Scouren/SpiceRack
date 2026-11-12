@@ -24,7 +24,9 @@ use crate::id::{ItemRef, NameId, Ref, ScopeId};
 use crate::item::{
     Comment, DefKind, Func, Global, If, Include, Load, Opaque, Param, Section, Subckt, Title,
 };
+use crate::item_text;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 impl RowFacts for Title {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
@@ -43,9 +45,10 @@ impl RowFacts for Title {
         // no invariant beyond the handles
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_title` with the item's context instead
+        item_text::dump_title(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -54,7 +57,7 @@ impl RowFacts for Title {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_title(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -85,9 +88,10 @@ impl RowFacts for Comment {
         // no invariant beyond the handles
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_comment` with the item's context instead
+        item_text::dump_comment(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -96,7 +100,7 @@ impl RowFacts for Comment {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_comment(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -131,9 +135,10 @@ impl RowFacts for Include {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_include` with the item's context instead
+        item_text::dump_include(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -142,7 +147,7 @@ impl RowFacts for Include {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_include(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -176,9 +181,10 @@ impl RowFacts for Global {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_global` with the item's context instead
+        item_text::dump_global(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -187,7 +193,7 @@ impl RowFacts for Global {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_global(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -220,9 +226,10 @@ impl RowFacts for Load {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_load` with the item's context instead
+        item_text::dump_load(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -231,7 +238,7 @@ impl RowFacts for Load {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_load(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -269,9 +276,10 @@ impl RowFacts for Opaque {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_opaque` with the item's context instead
+        item_text::dump_opaque(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -280,7 +288,7 @@ impl RowFacts for Opaque {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_opaque(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -320,9 +328,10 @@ impl RowFacts for Subckt {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_subckt` with the item's context instead
+        item_text::dump_subckt(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -331,7 +340,7 @@ impl RowFacts for Subckt {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_subckt(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -370,9 +379,10 @@ impl RowFacts for Section {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_section` with the item's context instead
+        item_text::dump_section(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -381,7 +391,7 @@ impl RowFacts for Section {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_section(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -422,9 +432,10 @@ impl RowFacts for If {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_if` with the item's context instead
+        item_text::dump_if(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -433,7 +444,7 @@ impl RowFacts for If {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_if(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -466,9 +477,10 @@ impl RowFacts for Param {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_param` with the item's context instead
+        item_text::dump_param(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -477,7 +489,7 @@ impl RowFacts for Param {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_param(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -515,9 +527,10 @@ impl RowFacts for Func {
         }
     }
 
-    #[allow(clippy::ptr_arg)] // M3: the body will push to `out`
     fn dump(&self, design: &Design, out: &mut String) {
-        todo!()
+        // detached: no scope, so resolved references are written `name#k`; `text::dump` calls
+        // `item_text::dump_func` with the item's context instead
+        item_text::dump_func(self, design, ItemRef::NONE, &Ctx::detached(), out);
     }
 
     fn parse(
@@ -526,7 +539,7 @@ impl RowFacts for Func {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        todo!()
+        item_text::parse_func(words, scope, b, diags)
     }
 
     #[cfg(any(test, feature = "gen"))]
