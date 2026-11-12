@@ -55,6 +55,7 @@ pub mod facts;
 
 pub mod build;
 pub mod build_expr;
+mod case;
 pub mod check;
 mod check_scopes;
 pub mod class;

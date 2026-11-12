@@ -147,14 +147,21 @@ pub fn check(design: &Design, diags: &mut Diags) {
 
 /// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
 /// `legal` (span: the item; `arg`: `Feature::index`), and one at `Span::NONE` per feature of the
-/// whole design outside it (the case clash, the owners' `design_features`). It appends nothing
+/// whole design outside it (the owners' `design_features`); a case clash at the item that brings
+/// the second spelling. It appends nothing
 /// exactly when `features_used(design).minus(legal)` is empty: these rows are `legalize`'s
 /// leftovers (R10). Assumes `check` passed. O(rows).
 pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
     let mut walk = ExprWalk::new(design);
+    let clashes = crate::case::case_clashes(design);
     for (item, scope) in design.reachable() {
         let mut used = FeatureSet::EMPTY;
         item_features(design, item, scope, &mut walk, &mut used);
+        if clashes.contains(&item) {
+            used = used.with(crate::feature::Feature::Extra(
+                crate::feature::Extra::CaseSensitiveNames,
+            ));
+        }
         for f in used.minus(*legal).iter() {
             diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
         }

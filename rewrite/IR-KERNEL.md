@@ -437,6 +437,14 @@ report.
 `ic` (VACASK run bp3). One row per meaning: a literal 0 initial value is the absent one, and
 `check` refuses it (`LiteralShape`, at the item). The generator draws the one-operand form.
 
+**Round 7 (2026-11-12): `CaseSensitiveNames` per namespace.** Two names of one namespace that
+differ only in ASCII case, a namespace being what a simulator's own lookup separates: the
+definitions of one kind in a scope; the elements of a scope; the nets of a scope (element
+terminals, a subcircuit's ports in its body, the global nets in every scope); the keys of one
+parameter list (a subcircuit's formals included). Live items only. Reported by `check_legal` at
+the item that brings the second spelling (`case::case_clashes`); an element `IS` beside a key or
+parameter `is` is two namespaces and no clash.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

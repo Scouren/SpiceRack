@@ -430,3 +430,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Withdrawn: A11's "what the worklist cannot order is `Circuit`". A definition on or behind a cycle rises to the fixpoint of its direct class and its reads' classes (each class rises at most twice). The cycle itself is `DefinitionCycle`, reported before `ProbeContext` in `check`'s last pass, on an otherwise valid design, since the graph reads definitions through their rows.
 - The cycle test is two worklists over the read graph: a definition that neither settles is on a cycle, or between two (reported too; no generated or corpus design has one). `class.rs`'s graph, `kahn` and `order` are shared by the class table and the cycle test.
 
+## `CaseSensitiveNames` per namespace (ruled)
+
+- Replaces the pool-wide `case_clash`. `case::case_clashes` returns the live items that bring a second spelling; `features_used` sets the feature when there is one, and `check_legal` reports it at each such item, so the two still agree. A net clash against a global net is reported at the item naming the local net (the global's `Global` item is the first spelling's).
+- Nets are what the kernel can name without the owners' rows beyond `Element.terminals`: element terminals, subcircuit ports (in the body), global nets. A net named only in a probe or an analysis (`v(A)` beside a terminal `a`) is not yet in the namespace: no reader has produced one, and adding it means walking every probe.
+
