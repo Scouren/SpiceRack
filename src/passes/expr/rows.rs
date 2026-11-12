@@ -77,6 +77,7 @@ pub(crate) const PASSES: &[Pass] = &[
     row("draws_per_reference_to_call_site", X::DrawPer(P::Reference), &[X::DrawPer(P::CallSite)], &[DRAW_SAMPLES], draws_per_reference_to_call_site::draws_per_reference_to_call_site),
     row("sampling_draws_to_nominal", X::DrawWhen(W::Sampling), &[X::Binary(O::Mul), X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[DRAW_SAMPLES], sampling_draws_to_nominal::sampling_draws_to_nominal),
     row("long_literal_to_shortest", X::Extra(E::LongLiteral), &[X::Expr(T::Num)], &[], long_literal_to_shortest::long_literal_to_shortest),
+    row("param_reads_to_typed", X::Circuit(ir::CircuitExtra::BehavUntypedParam), &[X::FuncDyn(F::ToReal), X::FuncDyn(F::ToInt), X::Expr(T::Call), X::Expr(T::Call)], &[UNTYPED_READ], param_reads_to_typed::param_reads_to_typed),
 ];
 
 // ---- private ----

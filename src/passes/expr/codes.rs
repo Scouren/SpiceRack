@@ -1,7 +1,7 @@
 //! The expression group's diagnostic codes (`U0100..=U0199`) and their catalogue rows: the
 //! notes its passes put at an item they leave carrying a feature.
 //!
-//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const CALL_LEFT`, `pub(crate) const FUNC_CALLED`, `pub(crate) const OPERAND_TOO_LARGE`, `pub(crate) const BOTH_FORMS`
+//! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`, `pub(crate) const MIXED_DIVISION`, `pub(crate) const TAG_READ`, `pub(crate) const POW_BASE`, `pub(crate) const DRAW_TWICE`, `pub(crate) const PWL_POINTS`, `pub(crate) const BITOP_NOT_CONSTANT`, `pub(crate) const NO_LEAF_VALUE`, `pub(crate) const PLAIN_RUN_NOMINAL`, `pub(crate) const DRAW_SAMPLES`, `pub(crate) const DIGITS_ROUNDED`, `pub(crate) const CALL_LEFT`, `pub(crate) const FUNC_CALLED`, `pub(crate) const OPERAND_TOO_LARGE`, `pub(crate) const UNTYPED_READ`, `pub(crate) const BOTH_FORMS`
 
 use crate::ir;
 
@@ -31,6 +31,8 @@ pub(crate) const CALL_LEFT: ir::Code = ir::Code::new(b'U', 113);
 pub(crate) const FUNC_CALLED: ir::Code = ir::Code::new(b'U', 114);
 /// A rule whose copies would make an expression too large to spell.
 pub(crate) const OPERAND_TOO_LARGE: ir::Code = ir::Code::new(b'U', 116);
+/// A parameter read of a behavioural source whose type the design does not fix.
+pub(crate) const UNTYPED_READ: ir::Code = ir::Code::new(b'U', 115);
 /// A function body its callers read in both forms.
 pub(crate) const BOTH_FORMS: ir::Code = ir::Code::new(b'U', 112);
 
@@ -150,6 +152,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a rule whose copies would make an expression too large to spell",
             cite: "the expression group's size bound (ROOT_PATHS_MAX, 8192 rows by paths)",
             explain: "The target spells this function by a definition that reads its operand more than once, and a writer writes each read out in full, so nested copies grow the text exponentially. Converted here, an expression of this item would spell 8192 rows or more (the longest expression of the ngspice and VACASK corpora is 132 tokens), so the rule leaves the item, which is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        UNTYPED_READ,
+        ir::Info {
+            title: "a parameter read of a behavioural source whose type the design does not fix",
+            cite: "rewrite/AMEND-A12.md A33; rewrite/RULINGS.md R56",
+            explain: "The target types every identifier of a behavioural expression: a bare name is the parameter as a real, $intparam(p) as an integer. This read takes an integer on one evaluation and a real on another (two instances pass it differently, a loop sets it, or it is unresolved), so neither spelling is the read on every evaluation. The item is refused.",
             kind: ir::Kind::Note,
         },
     ),
