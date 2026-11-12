@@ -116,6 +116,11 @@ pub enum Extra {
     /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
     /// empty one are the same text there).
     DeckWithoutTitle,
+    /// A `Subckt` head parameter with no default (A15 K2: an instance must pass it).
+    FormalWithoutDefault,
+    /// An `If` condition of class `Temp` or `Circuit` (A15 K2: a netlist chosen by a value no
+    /// constant fold decides).
+    IfConditionDynamic,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -244,7 +249,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::DeckWithoutTitle as usize + 1] = [
+    pub const ALL: [Extra; Extra::IfConditionDynamic as usize + 1] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -257,6 +262,8 @@ impl Extra {
         Extra::EnclosingRef,
         Extra::FormalReadsParam,
         Extra::DeckWithoutTitle,
+        Extra::FormalWithoutDefault,
+        Extra::IfConditionDynamic,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

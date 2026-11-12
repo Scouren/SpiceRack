@@ -11,8 +11,8 @@
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
     AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
-    ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass, OptionKey,
-    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
+    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass,
+    OptionKey, Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -318,6 +318,31 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             |b, top| {
                 b.title(top, "", Span::NONE);
                 b.comment(top, "titled", Span::NONE);
+            },
+        ),
+        (
+            Extra::FormalWithoutDefault,
+            |b, top| {
+                b.subckt(top, "s", &[], &[("w", ExprId::NONE)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+            },
+        ),
+        (
+            Extra::IfConditionDynamic,
+            |b, top| {
+                let t = b.temp();
+                let lim = b.num(100.0);
+                let hot = b.binary(BinOp::Gt, t, lim);
+                b.if_(top, &[hot], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                let zero = b.literal(spicerack_ir::Literal::ZERO);
+                let yes = b.binary(BinOp::Gt, one, zero);
+                b.if_(top, &[yes], Span::NONE);
             },
         ),
     ];
