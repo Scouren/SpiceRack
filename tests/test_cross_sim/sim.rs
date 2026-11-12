@@ -31,13 +31,17 @@ pub enum Sim {
     NgspiceHsa,
     Xyce,
     Vacask,
+    /// ESPice reading ngspice text (`espice --tokenizer=ngspice`), which is
+    /// what SpiceRack writes for it: untold, ESPice 0.3.0 reads a deck
+    /// holding a card ngspice lacks (`.fft`, `.data`, …) as HSPICE text.
     Espice,
     /// ESPice reading HSPICE text (`espice-hspice --tokenizer=hspice`): the
     /// revision `flake.nix` pins for its HSPICE reader (ZERO-LEDGER P1-063),
     /// whatever revision `espice` is at.
     EspiceHspice,
-    /// That pinned ESPice reading ngspice text (`espice-hspice`): the control
-    /// of the cell [`Sim::EspiceHspice`] is the target of, the same build.
+    /// That pinned ESPice reading ngspice text (`espice-hspice
+    /// --tokenizer=ngspice`): the control of the cell [`Sim::EspiceHspice`]
+    /// is the target of, the same build.
     EspicePinned,
     /// LTspice 26.1.1 under Wine (`ltspice`, `nix develop .#testing-ltspice`).
     Ltspice,
@@ -203,20 +207,17 @@ fn run_in(
         Sim::Ltspice => {
             c.args(["ltspice", "-b"]);
         }
-        Sim::Espice => {
-            c.arg("espice")
+        Sim::Espice | Sim::EspiceHspice | Sim::EspicePinned => {
+            // `espice` is the current build, `espice-hspice` the pinned one
+            // (`Sim::on_path`); each is told what its deck is, and only
+            // `EspiceHspice`'s is HSPICE text.
+            let (pinned, hspice) = (sim != Sim::Espice, sim == Sim::EspiceHspice);
+            let reads = if hspice { "hspice" } else { "ngspice" };
+            c.arg(if pinned { "espice-hspice" } else { "espice" })
                 .arg("--rawfile")
                 .arg(&raw)
-                .arg("--format=binary");
-        }
-        Sim::EspiceHspice | Sim::EspicePinned => {
-            c.arg("espice-hspice")
-                .arg("--rawfile")
-                .arg(&raw)
-                .arg("--format=binary");
-            if sim == Sim::EspiceHspice {
-                c.arg("--tokenizer=hspice");
-            }
+                .arg("--format=binary")
+                .arg(format!("--tokenizer={reads}"));
         }
     }
     let out = c.arg(&file).output().unwrap_or_else(|e| harness(&e));

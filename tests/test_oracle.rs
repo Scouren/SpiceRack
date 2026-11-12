@@ -309,3 +309,21 @@ fn p1_052_third_oracle_proofs_quote_the_recorded_runs() {
         }
     }
 }
+
+#[test]
+fn s4_rf_the_espice_cell_reads_a_written_deck_as_ngspice_text() {
+    // The harness's ESPice (`oracle::run`, `Sim::Espice`) is told its deck
+    // is ngspice text. ESPice 0.3.0 picks its reader from the deck when it
+    // is not told (`docs/using/cli.md`, `--tokenizer`: "HSPICE for a card
+    // or keyword ngspice lacks", `.fft` among them), and read as HSPICE
+    // text the brace below is no expression ("reading as hspice
+    // (--tokenizer to override)", ParseError). Oracle: the divider's closed
+    // form, 2 V times 1k over 1k + (1+1)·500, a linear solve (1e-9).
+    let deck = "* t\n.param x={1+1}\nV1 1 0 DC 2\nR1 1 2 {x*500}\nR2 2 0 1k\n.tran 10u 1m\n.fft v(2) np=64\n.end\n";
+    let got = value(&oracle::run(Dialect::Espice, deck), "2", At::Last);
+    let tol = Tol {
+        rel: 1e-9,
+        floor: 0.0,
+    };
+    assert!(tol.within(got, 1.0), "v(2) = {got}");
+}
