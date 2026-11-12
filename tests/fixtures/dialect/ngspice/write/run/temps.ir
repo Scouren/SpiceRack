@@ -1,0 +1,6 @@
+# oracle: inp.c:1159-1186 (.temp beats every .options temp=), R24 (among WholeRun items the last holds): two Envs that set the temperature are both written as .options temp=; written by hand
+file "temps.sp" deck
+  title "temps"
+  env temp=85 whole_run
+  env temp=60 whole_run
+  env tnom=40 whole_run

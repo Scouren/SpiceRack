@@ -36,6 +36,7 @@ const READ: &[&str] = &[
     "four_nfreqs",
     "four_script",
     "ic",
+    "ic_dotted_net",
     "ic_subckt",
     "nodeset",
     "noise",
@@ -61,19 +62,11 @@ const READ: &[&str] = &[
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["analyses", "analyses_outputs", "state"];
+const WRITE: &[&str] = &["analyses", "analyses_outputs", "state", "temps"];
 
-/// The fixtures that fail today, by name, with why: their outputs are read and spelled by the
-/// outputs area's `read_outputs::probe` and `write_outputs::probe`, stubs until S3.3b lands.
-/// Strict both ways: a listed fixture that passes fails the test until its line goes.
-const PENDING: &[(&str, &str)] = &[
-    ("four", "read_outputs::probe is a stub (S3.3b)"),
-    ("four_nfreqs", "read_outputs::probe is a stub (S3.3b)"),
-    ("noise", "read_outputs::probe is a stub (S3.3b)"),
-    ("sens", "read_outputs::probe is a stub (S3.3b)"),
-    ("tf", "read_outputs::probe is a stub (S3.3b)"),
-    ("analyses_outputs", "write_outputs::probe is a stub (S3.3b)"),
-];
+/// The fixtures that fail today, by name, with why. Strict both ways: a listed fixture that
+/// passes fails the test until its line goes.
+const PENDING: &[(&str, &str)] = &[];
 
 /// Decks whose raw file ngspice must reproduce after `write(read(deck))`. The element cards are
 /// another area's (copied as text while it is a stub); the run cards are this area's, some in
@@ -195,6 +188,37 @@ fn pending(sub: &str) -> Vec<&'static str> {
         .map(|(n, _)| *n)
         .filter(|n| names.contains(n))
         .collect()
+}
+
+#[test]
+fn a_temp_or_nfreqs_in_another_file_is_not_seen_today() {
+    // Oracle: none yet; pins the `ponytail:` limit of `read_run` (`.temp` and `nfreqs` are found
+    // in the statement's own file only). ngspice would read `temp=50` as beaten by the library's
+    // `.temp` and give `.four` five rows; today the deck's items say otherwise. A change here is
+    // the corpus run showing the limit bites: fix the detection, then this test.
+    let mut src = Sources::new();
+    src.add(
+        "deck.sp",
+        "deck\n.include \"lib.sp\"\n.options temp=50\n.four 1k v(a)\n",
+    );
+    src.add("lib.sp", "* lib\n.temp 85\n.options nfreqs=5\n");
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(&src, row(), Policy::Lenient, &mut design, &mut diags);
+    let top = design.file(design.entry()).top;
+    let kinds: Vec<ir::ItemKind> = design.items(top).iter().map(|i| i.kind).collect();
+    use ir::ItemKind::{Analysis, Env, Include, Title};
+    assert_eq!(kinds, [Title, Include, Env, Analysis]);
+    let env: ir::Env = design.row(design.items(top)[2].index);
+    assert!(
+        !env.temp.is_none(),
+        "temp=50 is read as setting the temperature"
+    );
+    let a: ir::Analysis = design.row(design.items(top)[3].index);
+    assert_eq!(a.kind, ir::AnalysisKind::Four);
+    let f: ir::tran::Four = design.detail(a.detail);
+    let nine = matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.num(n).value() == 9.0);
+    assert!(nine, "the default count, not the library's nfreqs");
 }
 
 /// The ngspice row.

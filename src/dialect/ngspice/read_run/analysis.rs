@@ -11,8 +11,9 @@
 //! (`nfreqs` 10 counts DC and 9 harmonics: runs four1.cir, four2.cir), `dot_pss` (every
 //! argument read, the oscillator node against ground), `pzsetp.c:78-87`; runs in `rewrite/DIALECT-NGSPICE.md` §3.
 //!
-//! Contents: `pub(super) enum Card`, `pub(super) enum Swept`, `pub(super) struct Sweep`, `pub(super) fn read(&mut Lower, Stmt, &str, &[String]) ->
-//! Result<Card, Fail>`
+//! Contents: `pub(in super::super) enum Card`, `pub(in super::super) enum Swept`,
+//! `pub(in super::super) struct Sweep`, `pub(in super::super) fn read(&mut Lower, Stmt, &str,
+//! &[String]) -> Result<Card, Fail>`
 
 use super::super::expr_read::Fail;
 use super::super::read::{Lower, Stmt};
@@ -24,7 +25,7 @@ use crate::ir::dc_ac::{PzFind, PzTransfer};
 
 /// An analysis read and validated, nothing appended yet.
 #[derive(Clone, Debug)]
-pub(super) enum Card {
+pub(in super::super) enum Card {
     /// `op`.
     Op,
     /// `dc`: the axes, innermost first: what is swept, start, stop, step.
@@ -81,7 +82,7 @@ pub(super) enum Card {
 
 /// What a DC axis sweeps.
 #[derive(Clone, Debug)]
-pub(super) enum Swept {
+pub(in super::super) enum Swept {
     /// A V or I source's DC value, by name.
     Source(String),
     /// A resistor's value, by name.
@@ -92,7 +93,7 @@ pub(super) enum Swept {
 
 /// `DEC|OCT|LIN np fstart fstop`.
 #[derive(Clone, Debug)]
-pub(super) struct Sweep {
+pub(in super::super) struct Sweep {
     pub(super) kind: ir::SweepKind,
     pub(super) points: Val,
     pub(super) start: Val,
@@ -100,8 +101,10 @@ pub(super) struct Sweep {
 }
 
 /// The analysis `name` with its words, validated whole. `Err` names the code and class of the
-/// `Opaque` the statement becomes.
-pub(super) fn read(
+/// `Opaque` the statement becomes. The control area calls it with a script command's words
+/// (`tran 1n 1u uic`: `name` "tran", `w` `["1n", "1u", "uic"]` as `words::split` gives them),
+/// then `rows::push` with the card.
+pub(in super::super) fn read(
     lw: &mut Lower<'_, '_>,
     st: Stmt,
     name: &str,
@@ -209,7 +212,9 @@ pub(super) fn read(
             // ponytail: a text scan of this file's non-comment lines; an `nfreqs` in another
             // file of the deck is not seen (a deck-wide option table would see it)
             let (mut by_option, mut by_script) = (false, false);
-            for l in lw.toks.source().lines() {
+            // a deck's line 1 is its title
+            let title = usize::from(lw.role == ir::Role::Deck);
+            for l in lw.toks.source().lines().skip(title) {
                 let l = l.trim_start().to_ascii_lowercase();
                 let named = l.contains("nfreqs") || l.contains("fourgridsize");
                 if named && l.starts_with(".opt") {

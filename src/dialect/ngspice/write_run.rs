@@ -43,12 +43,6 @@ pub(super) const CODES: &[Row] = &[
         "ngspice-45 inp2dot.c dot_dc, dot_ac, dot_tran; traninit.c:29",
         "a DC axis over another target or sweep, a frequency sweep by step, or a transient ceiling ngspice would read back otherwise; refused.",
     ),
-    refusal(
-        FROM_HERE,
-        "a state item that holds from its place on",
-        "ngspice-45 inp.c, inppas3.c, INPdoOpts (dot state cards hold for the whole deck); rewrite/RULINGS.md R24",
-        "an ngspice .options, .temp, .ic or .nodeset holds for every analysis wherever it stands; refused.",
-    ),
 ];
 
 /// A Fourier analysis whose harmonic count is not ngspice's default (DC and 9 harmonics): its
@@ -56,51 +50,33 @@ pub(super) const CODES: &[Row] = &[
 const FOUR_HARMONICS: ir::Code = ir::Code::new(b'W', 1300);
 /// An analysis field ngspice's card has no position for: a DC axis other than a source, a
 /// resistor or `temp` swept by step; a frequency sweep by step; a transient ceiling without a
-/// start, a zero ceiling, or another default ceiling than ngspice's; an `Env` of both fields
-/// beside one of the temperature alone (its `temp=` would lose to that `.temp`).
+/// start, a zero ceiling, or another default ceiling than ngspice's; an output no ngspice card
+/// spells (`write_outputs::probe_admits`).
 const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
-/// A state item that holds from its place on (`FromHere`): every ngspice dot state card holds
-/// for the whole run (R24); a `.control` script spells it (S3.4).
-const FROM_HERE: ir::Code = ir::Code::new(b'W', 1303);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300`, `W1301`, `W1303`) or a value that reads the run (`W1005`: numparam evaluates
+/// (R21): a card form (`W1300`, `W1301`) or a value that reads the run (`W1005`: numparam evaluates
 /// a card's `{…}` once).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let span = design.span_of(item);
     let mut refuse = |code| diags.push(code, span, 0);
     let mut values = Vec::new();
-    let held = match item.kind {
-        ir::ItemKind::Option => {
-            let o: ir::OptionRow = design.row(item.index);
-            values.push(o.value);
-            o.holds
-        }
+    // a `FromHere` state item is `RunExtra::StateFromHere`, which FEATURES lack
+    match item.kind {
+        ir::ItemKind::Option => values.push(design.row::<ir::OptionRow>(item.index).value),
         ir::ItemKind::Env => {
             let e: ir::Env = design.row(item.index);
             values.extend([e.temp, e.tnom]);
-            // `.options temp= tnom=` loses its `temp=` to any `.temp` the writer spells
-            if !e.temp.is_none() && !e.tnom.is_none() && temp_elsewhere(design, item) {
-                refuse(CARD_FORM);
-            }
-            e.holds
         }
-        ir::ItemKind::NodeSet => {
-            let n: ir::NodeSet = design.row(item.index);
-            values.push(n.value);
-            n.holds
-        }
-        _ => ir::Applies::WholeRun,
-    };
-    // every ngspice dot state card holds for the whole run (R24)
-    if held != ir::Applies::WholeRun {
-        refuse(FROM_HERE);
+        ir::ItemKind::NodeSet => values.push(design.row::<ir::NodeSet>(item.index).value),
+        _ => {}
     }
     if item.kind != ir::ItemKind::Analysis {
         return check_values(design, &values, &mut refuse);
     }
     let a: ir::Analysis = design.row(item.index);
     let mut form_ok = true;
+    let mut outs = Vec::new();
     let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
         values.extend([s.start, s.stop, s.points]);
         s.kind != ir::SweepKind::Lin || s.step.is_none()
@@ -127,11 +103,16 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         AnalysisKind::Ac => form_ok &= freq(design.detail::<Ac>(a.detail).sweep, &mut values),
         AnalysisKind::Noise => {
             let n: Noise = design.detail(a.detail);
+            outs.push(n.output);
             form_ok &= freq(n.sweep, &mut values);
             values.push(n.points_per_summary);
         }
+        AnalysisKind::Tf => outs.push(design.detail::<Tf>(a.detail).output),
+        AnalysisKind::Sens => outs.push(design.detail::<Sens>(a.detail).output),
         AnalysisKind::SensAc => {
-            form_ok &= freq(design.detail::<SensAc>(a.detail).sweep, &mut values);
+            let s: SensAc = design.detail(a.detail);
+            outs.push(s.output);
+            form_ok &= freq(s.sweep, &mut values);
         }
         AnalysisKind::Disto => {
             let d: Disto = design.detail(a.detail);
@@ -157,6 +138,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                 refuse(FOUR_HARMONICS);
             }
             values.push(f.fundamental);
+            outs.extend_from_slice(design.probes(f.outputs));
         }
         AnalysisKind::Pss => {
             let p: Pss = design.detail(a.detail);
@@ -168,6 +150,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         }
         _ => {}
     }
+    form_ok &= outs.iter().all(|p| write_outputs::probe_admits(design, p));
     if !form_ok {
         refuse(CARD_FORM);
     }
@@ -339,13 +322,15 @@ pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
     w.line(&t.replace("= ", "="));
 }
 
-/// An `Env`: `.temp t` when it sets the temperature only, else `.options temp=t tnom=n` (what
-/// it sets).
+/// An `Env`: `.temp t` when it sets the temperature only and is the design's one `Env` that
+/// sets it, else `.options temp=t tnom=n` (what it sets): `.temp` beats every `.options temp=`
+/// (`inp.c:1159-1186`), while among `.options` keys the last wins, the IR's rule (R24), and
+/// both spellings read back to the same `Env`.
 pub(super) fn env(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let e: ir::Env = d.row(item.index);
     let mut t = String::new();
-    if e.tnom.is_none() {
+    if e.tnom.is_none() && temps_set(d) == 1 {
         t.push_str(".temp");
         value(d, e.temp, &mut t);
     } else {
@@ -400,14 +385,14 @@ fn check_values(design: &ir::Design, values: &[ir::ExprId], refuse: &mut impl Fn
     }
 }
 
-/// Whether another `Env` of `design` sets the temperature alone (written as `.temp`).
-fn temp_elsewhere(design: &ir::Design, item: ir::ItemRef) -> bool {
-    design.reachable().into_iter().any(|(i, _)| {
-        i.kind == ir::ItemKind::Env && i != item && {
-            let e: ir::Env = design.row(i.index);
-            !e.temp.is_none() && e.tnom.is_none()
-        }
-    })
+/// How many `Env` items of `design` set the temperature.
+fn temps_set(design: &ir::Design) -> usize {
+    let sets = |i: ir::ItemRef| !design.row::<ir::Env>(i.index).temp.is_none();
+    design
+        .reachable()
+        .into_iter()
+        .filter(|&(i, _)| i.kind == ir::ItemKind::Env && sets(i))
+        .count()
 }
 
 /// A refusal row of this area.

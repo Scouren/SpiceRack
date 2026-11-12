@@ -19,14 +19,22 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) use state::KEYS`
-//! (ngspice's option spellings, which `write_run` spells back)
+//! (ngspice's option spellings, which `write_run` spells back); for the control area, which reads
+//! a script command (`tran 1n 1u uic`) as the card without its dot:
+//! `pub(super) use words::split as split_words` (`fn(&str) -> Vec<String>`),
+//! `pub(super) use analysis::read as read_analysis` (`fn(&mut Lower, Stmt, name: &str,
+//! words: &[String]) -> Result<Card, Fail>`), `pub(super) use rows::push as push_analysis`
+//! (`fn(&mut Lower, Stmt, &Card)`)
 
 mod analysis;
 mod rows;
 mod state;
 mod words;
 
+pub(super) use analysis::read as read_analysis;
+pub(super) use rows::push as push_analysis;
 pub(super) use state::KEYS;
+pub(super) use words::split as split_words;
 
 use super::codes::Row;
 use super::read::{Lower, Stmt};
@@ -123,6 +131,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::NodeSetInSubckt),
     Feature::Item(ItemKind::Env),
     Feature::Run(RunExtra::WholeRunMidRun),
+    Feature::Run(RunExtra::StateWholeRun),
     Feature::Run(RunExtra::RunItemNested),
 ]);
 
@@ -213,9 +222,10 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     match name {
         "op" | "dc" | "ac" | "tran" | "noise" | "tf" | "sens" | "pz" | "disto" | "sp" | "pss"
         | "four" | "fourier" => {
-            let w = words::split(&lw.rest(st.node));
-            match analysis::read(lw, st, name, &w) {
-                Ok(c) => rows::push(lw, st, &c),
+            // the control area's path: the words, one analysis, its rows
+            let w = split_words(&lw.rest(st.node));
+            match read_analysis(lw, st, name, &w) {
+                Ok(c) => push_analysis(lw, st, &c),
                 Err(f) => lw.opaque(st, f.class, f.code),
             }
         }
@@ -250,4 +260,37 @@ const fn note(
             kind: ir::Kind::Note,
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_words;
+    use crate::dialect::{self, Policy, Sources};
+    use crate::ir;
+
+    #[test]
+    fn a_script_commands_words_read_to_its_analysis() {
+        // Oracle: inp2dot.c dot_tran (tstep tstop [tstart [tmax]] [uic]) and INPgetTok's
+        // separators. The contract the control area calls: `split_words` on a command's
+        // arguments, `read_analysis` on the name and the words, `push_analysis` on the card;
+        // a dot card goes the same three steps (`card`), so a deck pins all three.
+        assert_eq!(split_words("1n 1u uic"), ["1n", "1u", "uic"]);
+        assert_eq!(
+            split_words("v(a, b) vin dec 10 1 1k"),
+            ["v(a, b)", "vin", "dec", "10", "1", "1k"]
+        );
+        let row = dialect::by_name("ngspice").expect("the ngspice row");
+        let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
+        let src = Sources::one("t.sp", "t\n.tran 1n 1u uic\n");
+        dialect::read(&src, row, Policy::Lenient, &mut design, &mut diags);
+        assert!(diags.rows().is_empty(), "{diags:?}");
+        let top = design.file(design.entry()).top;
+        let item = design.items(top)[1];
+        assert_eq!(item.kind, ir::ItemKind::Analysis);
+        let a: ir::Analysis = design.row(item.index);
+        assert_eq!(a.kind, ir::AnalysisKind::Tran);
+        let t: ir::tran::Tran = design.detail(a.detail);
+        assert!(t.uic && t.max_step.is_none() && t.record_start.is_none());
+        assert_eq!(t.cap, ir::tran::StepCap::NgspiceRule);
+    }
 }

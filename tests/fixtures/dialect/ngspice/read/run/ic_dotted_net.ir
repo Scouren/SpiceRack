@@ -1,0 +1,5 @@
+# codes:
+file "ic_dotted_net.sp" deck
+  title "ic_dotted_net"
+  comment " oracle: none yet: a pinned limit (ponytail in read_run/words.rs): a dotted node reads as an instance path, a top-level net named a.b included; the corpus run shows when it bites"
+  nodeset ic transient node=(a b) value=1 whole_run

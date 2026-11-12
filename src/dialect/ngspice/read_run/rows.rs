@@ -5,7 +5,7 @@
 //! Cites: `crates/ir/src/{dc_ac,tran,periodic}.rs` (the rows and their text order);
 //! `traninit.c:29-34` (`StepCap::NgspiceRule`), `fourier.c:69` (the default count, 9).
 //!
-//! Contents: `pub(super) fn push(&mut Lower, Stmt, &Card)`
+//! Contents: `pub(in super::super) fn push(&mut Lower, Stmt, &Card)`
 
 use super::super::read::{Lower, Stmt};
 use super::analysis::{Card, Sweep, Swept};
@@ -16,7 +16,8 @@ use crate::ir::periodic::{Pss, PssMode};
 use crate::ir::tran::{Four, StepCap, Tran};
 
 /// Appends `card` as one `Analysis` in `st.scope`.
-pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
+/// The control area calls it with the card `analysis::read` made of a script command's words.
+pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
     let span = lw.span(st.node);
     let scope = st.scope;
     let none = ir::ExprId::NONE;

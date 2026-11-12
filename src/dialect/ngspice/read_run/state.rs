@@ -314,7 +314,8 @@ pub(super) fn node_sets(lw: &mut Lower<'_, '_>, st: Stmt, kind: ir::NodeSetKind)
 /// Whether this file has a `.temp` card (ngspice's `ciprefix(".temp")`, `inp.c:1159`).
 /// ponytail: this file's lines only; a `.temp` in another file of the deck is not seen.
 fn has_temp_card(lw: &Lower<'_, '_>) -> bool {
-    lw.toks.source().lines().any(|l| {
+    let title = usize::from(lw.role == ir::Role::Deck);
+    lw.toks.source().lines().skip(title).any(|l| {
         let l = l.trim_start().to_ascii_lowercase();
         l.strip_prefix(".temp")
             .is_some_and(|r| !r.starts_with(|c: char| c.is_ascii_alphanumeric()))

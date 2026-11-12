@@ -8,7 +8,7 @@
 //! (`INPevaluate` with gobble: the rest of a number's token is ignored); runs: a bare parameter
 //! name in a dot card is an error (`.tran 1m ts`: circuit not parsed), `{ts}` is read.
 //!
-//! Contents: `pub(super) enum Val`, `pub(super) fn split`, `pub(super) fn value`,
+//! Contents: `pub(in super::super) enum Val`, `pub(in super::super) fn split`, `pub(super) fn value`,
 //! `pub(super) fn emit`, `pub(super) fn node`, `pub(super) fn invalid`
 
 use super::super::codes;
@@ -21,7 +21,7 @@ use crate::ir;
 
 /// A card value read but not yet appended.
 #[derive(Clone, Debug)]
-pub(super) enum Val {
+pub(in super::super) enum Val {
     /// A number as written, and whether its digits were rounded (A3).
     Lit(ir::Literal, bool),
     /// A numparam expression (`{…}`).
@@ -30,7 +30,8 @@ pub(super) enum Val {
 
 /// The words of `text`: blanks and `,` separate them, `=` is a word of its own, and a word
 /// runs on through a `(…)`, `{…}` or `'…'` group it opens (`v(a, b)` is one word).
-pub(super) fn split(text: &str) -> Vec<String> {
+/// The control area calls it on a script command's arguments (`1n 1u uic` of `tran 1n 1u uic`).
+pub(in super::super) fn split(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut word = String::new();
     let mut depth = 0usize;
